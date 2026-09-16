@@ -1075,15 +1075,47 @@
   // A row can hold more than one control: three numbers, or a number and a
   // switch. Rather than a component per combination - multiNumberRow, toggleRow,
   // and whatever the next shape would have been - a row takes a list of parts.
-  const detailParts = parts => element("div", {class: "lex-detail-parts"},
-    ...(parts || []).filter(Boolean).map(part => {
-      const control = part instanceof Element ? part : part.control;
-      const label = part instanceof Element ? "" : part.label;
-      return label
-        ? element("label", {class: "lex-detail-part"},
-          element("span", {class: "lex-detail-part-label"}, String(label)), control)
-        : element("div", {class: "lex-detail-part"}, control);
-    }));
+  // One row holding several properties of any kind - numbers, choices,
+  // switches, bare controls - side by side. The row is one grid and every part
+  // is a subgrid of it (copy button, name, box), so the names in a column share
+  // a width and every box in that column starts at the same place, the way a
+  // property's box does whatever its name. A switch is one part spanning all
+  // three. toggleRow and multiNumberRow are this row with their parts pre-made.
+  const detailPart = (part, options = {}) => {
+    if (part instanceof Element && part.matches(".lex-toggle")) return part;
+    const control = part instanceof Element ? part : part.control;
+    const caption = element("label", {class: "lex-detail-part-label lex-multi-number-label"},
+      part instanceof Element ? "" : (part.label ?? ""));
+    const item = element("div", {
+      class: "lex-detail-part lex-multi-number-item",
+      title: (part instanceof Element ? "" : part.title) || undefined,
+    }, caption, element("span", {class: "lex-detail-part-control lex-multi-number-control"}, control));
+    // The part is a plain box, not a label: as a <label> it adopted its first
+    // labelable descendant, which became the copy button once there was one.
+    const field = item.querySelector("input,select,textarea");
+    if (field) {
+      if (!field.id) field.id = `lex-part-${Math.random().toString(36).slice(2, 9)}`;
+      caption.setAttribute("for", field.id);
+    }
+    const input = options.copy ? item.querySelector('input:not([type="checkbox"]),select,textarea') : null;
+    item.prepend(input
+      ? copyValueButton(() => input.tagName === "SELECT"
+        ? (input.selectedOptions[0]?.textContent || input.value)
+        : input.value, `Copy ${typeof part.label === "string" ? part.label : "this value"}`)
+      : element("span", {class: "lex-detail-part-spare", "aria-hidden": "true"}));
+    return item;
+  };
+  const detailParts = (parts, options = {}) => {
+    const list = (parts || []).filter(Boolean);
+    const switches = list.length > 0 && list.every(part => part instanceof Element && part.matches(".lex-toggle"));
+    const columns = Math.max(1, Number(options.columns) || Math.min(3, list.length) || 1);
+    return element("div", {
+      class: ["lex-detail-parts", switches ? "lex-detail-parts-switches" : "", options.className || ""]
+        .filter(Boolean).join(" "),
+      style: `--lex-part-columns:${columns};--lex-multi-number-columns:${columns}`,
+      role: options.role, "aria-label": options.label,
+    }, ...list.map(part => detailPart(part, options)));
+  };
 
   const detailField = (options = {}) => {
     if (Array.isArray(options.controls)) {
@@ -1465,11 +1497,11 @@
       if (toggle.help) rail.append(infoHelp(toggle.help));
       return label;
     });
-    const root = element("div", {
-      class: ["lex-toggle-row", options.className || ""].filter(Boolean).join(" "),
+    const root = detailParts(toggles, {
+      className: ["lex-toggle-row", options.className || ""].filter(Boolean).join(" "),
       role: "group",
-      "aria-label": options.label || "Toggles",
-    }, ...toggles);
+      label: options.label || "Toggles",
+    });
     if (options.minimum) root.style.setProperty("--lex-toggle-minimum", `${options.minimum}px`);
     if (options.columns) root.style.setProperty("--lex-toggle-columns", String(options.columns));
     // A row of switches is one property holding one number. Copying it copies
@@ -1496,37 +1528,10 @@
   // One property that holds several numbers - a stat block, a set of junction
   // values - laid out as ordinary label-then-box pairs rather than captions
   // stacked over boxes, which is what every other property in the editor does.
-  const multiNumberRow = (entries = [], options = {}) => {
-    const items = entries.filter(Boolean);
-    const columns = Math.max(1, Number(options.columns) || Math.min(3, items.length) || 1);
-    return element("div", {
-      class: ["lex-multi-number", options.className || ""].filter(Boolean).join(" "),
-      style: `--lex-multi-number-columns:${columns}`,
-    }, ...items.map(entry => {
-      // The item is a plain box, not a label. As a <label> it adopted its first
-      // labelable descendant as its control - which, once each variable got a
-      // copy button, was the BUTTON. Hovering anywhere in the item lit the
-      // button as though the pointer were on it, and clicking the item's empty
-      // space would have pressed Copy instead of focusing the value.
-      const caption = element("label", {class: "lex-multi-number-label"}, entry.label);
-      const item = element("div", {
-        class: "lex-multi-number-item", title: entry.title || undefined,
-      }, caption, element("span", {class: "lex-multi-number-control"}, entry.control));
-      const field = item.querySelector("input,select,textarea");
-      if (field) {
-        if (!field.id) field.id = `lex-multi-${Math.random().toString(36).slice(2, 9)}`;
-        caption.setAttribute("for", field.id);
-      }
-      // Each variable carries its own copy button. One button on the property
-      // could only ever hand back one of these numbers, and it handed back
-      // whichever happened to be built first.
-      const input = item.querySelector('input:not([type="checkbox"]),select,textarea');
-      if (input) item.prepend(copyValueButton(() => input.tagName === "SELECT"
-        ? (input.selectedOptions[0]?.textContent || input.value)
-        : input.value, `Copy ${typeof entry.label === "string" ? entry.label : "this value"}`));
-      return item;
-    }));
-  };
+  const multiNumberRow = (entries = [], options = {}) => detailParts(
+    entries.filter(Boolean).map(entry => ({label: entry.label, control: entry.control, title: entry.title})),
+    {columns: options.columns, copy: true,
+     className: ["lex-multi-number", options.className || ""].filter(Boolean).join(" ")});
 
   // Nested navigation is a shared control. Plugins provide only labels,
   // active state, and the page-owned change callback.
@@ -4752,9 +4757,8 @@ ${contents.path}`});
     };
     const setDeveloperMode = enabled => {
       developerMode = !!enabled;
-      // Restarting the plugin is a developer action, the same as the GitHub
-      // workspace beside it and the Ctrl+Shift+R that reaches it. It was the
-      // one of the three that stayed on screen for everybody.
+      // Restarting the plugin is a developer action (issue #29), the same as
+      // the GitHub workspace beside it and the Ctrl+Shift+R that reaches it.
       restart.hidden = !developerMode;
       if (!developerMode) {
         githubWorkspace?.hide();
@@ -7729,7 +7733,9 @@ ${contents.path}`});
     if (fitted.get(label) === key) return;
     label.style.fontSize = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
-    while (size > 6 && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth + 1)) {
+    // Width gets no slack: a word may no longer wrap mid-way, so a name one
+    // pixel too wide pokes past the label edge every other name ends on.
+    while (size > 6 && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth)) {
       size -= .5;
       label.style.fontSize = `${size}px`;
     }

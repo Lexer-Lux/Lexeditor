@@ -29,8 +29,9 @@ def main():
    page=browser.new_page(viewport={'width':1440,'height':900});errors=[]
    page.on('pageerror',lambda e:errors.append(str(e)))
    page.add_init_script(STUB+"window.pywebview.api.github_repository=async()=>({repository:'Lexer-Lux/Lexeditor',login:'Lexer-Lux'});window.pywebview.api.open_plugin_repository=async id=>{window.__calls.push({openRepository:id});return{opened:true};};")
+   # Blank's tabs are the component catalogue; its demonstration views are opened by name.
    page.goto(f'http://127.0.0.1:{server.server_port}/games/blank/editor.html')
-   page.wait_for_selector('button[data-tab=three]');page.wait_for_timeout(400)
+   page.wait_for_selector('nav button[data-tab]');page.wait_for_timeout(400)
    page.locator('#plugin-data-map').click();page.wait_for_timeout(300)
    divider=page.locator('.lex-data-map-view .lex-panel-layout-divider')
    box=divider.bounding_box();x=box['x']+box['width']*.25;y=box['y']+box['height']/2
@@ -40,7 +41,7 @@ def main():
     moved=divider.bounding_box()['x']-box['x']
     assert abs(moved-delta)<2,{'pointer':delta,'divider':moved}
    page.mouse.up()
-   page.get_by_role('button',name='2 Panels',exact=True).click()
+   page.evaluate("navigate('two')")
    page.evaluate("window.pywebview.api.ui_scale=async percent=>{window.__calls.push({scale:percent});return{percent};}")
    scale=page.get_by_role('slider',name='UI scale',exact=True)
    assert scale.get_attribute('min')=='50' and scale.get_attribute('max')=='150'
@@ -61,13 +62,16 @@ def main():
    assert page.evaluate('window.__calls.at(-1).scale')==100
    assert page.evaluate("!document.dispatchEvent(new WheelEvent('wheel',{ctrlKey:true,deltaY:100,bubbles:true,cancelable:true}))")
    assert page.evaluate("document.dispatchEvent(new WheelEvent('wheel',{deltaY:100,bubbles:true,cancelable:true}))")
+   # Restart is a developer control (issue #29): shown with Developer Mode on,
+   # gone with it off.
    assert page.locator('#plugin-restart').is_visible()
    page.evaluate("dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{developerMode:false}}))")
-   assert page.locator('#plugin-restart').is_visible()
+   assert not page.locator('#plugin-restart').is_visible()
    page.evaluate("dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{developerMode:true}}))")
+   assert page.locator('#plugin-restart').is_visible()
    assert page.get_by_role('button',name='Editable Table',exact=True).count()==0
    page.locator('#plugin-github').click(button='right');assert page.evaluate('window.__calls.some(row=>row.openRepository==="blank")')
-   page.locator('button[data-tab=three]').click();page.wait_for_timeout(400)
+   page.evaluate("navigate('three')");page.wait_for_timeout(400)
    divider=page.locator('.lex-panel-layout-divider:visible').first
    box=divider.bounding_box();start=divider.get_attribute('aria-valuenow')
    page.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2)
@@ -116,7 +120,7 @@ def main():
    page.screenshot(path=str(OUT/'shortcut-keys.png'),animations='disabled')
    page.keyboard.press('m');page.keyboard.up('Control')
    assert page.locator('#plugin-data-map').evaluate('(e)=>e.classList.contains("active")')
-   page.locator('button[data-tab=one]').click();page.wait_for_timeout(400)
+   page.evaluate("navigate('one')");page.wait_for_timeout(400)
    page.mouse.move(1400,880)
    page.wait_for_timeout(180)
    rails=page.locator('.lex-toggle-rail')
@@ -137,10 +141,12 @@ def main():
    assert flag.bounding_box()==original
    page.keyboard.press('Tab');flag.locator('input').focus();page.wait_for_timeout(180)
    assert rail.evaluate('e=>getComputedStyle(e).opacity')=='1'
-   page.locator('button[data-tab=one]').focus();page.wait_for_timeout(180)
+   page.locator('nav button[data-tab]').first.focus();page.wait_for_timeout(180)
    assert rails.evaluate_all('nodes=>nodes.every(e=>getComputedStyle(e).opacity==="0")')
    gaps=page.locator('.lex-toggle').evaluate_all("""nodes=>nodes.map(e=>{const box=e.getBoundingClientRect(),rail=e.querySelector('.lex-toggle-rail')?.getBoundingClientRect(),name=e.querySelector('.lex-toggle-name');if(!rail||!name)return null;const range=document.createRange();range.selectNodeContents(name);const right=Math.max(...[...range.getClientRects()].map(r=>r.right));return {left:rail.left-box.left,right:box.right-right}}).filter(Boolean)""")
-   assert gaps and all(abs(row['left']-row['right'])<3 for row in gaps),gaps
+   # Every switch's box starts the same distance into its cell, whatever the
+   # length of its name - the way every property's box starts at one edge.
+   assert gaps and max(row['left'] for row in gaps)-min(row['left'] for row in gaps)<1,gaps
    copy_edges=page.evaluate("""()=>{
     const multi=document.querySelector('.lex-multi-number');
     const field=multi.closest('.lex-detail-field');
@@ -153,7 +159,7 @@ def main():
    marker.click(force=True);page.mouse.move(1400,880)
    page.wait_for_timeout(250)
    assert page.locator('.lex-help-popover').count()==0
-   page.locator('button[data-tab=graphs]').click();page.wait_for_timeout(350)
+   page.evaluate("navigate('graphs')");page.wait_for_timeout(350)
    assert page.locator('.lex-curve-svg').first.get_attribute('preserveAspectRatio')=='none'
    page.screenshot(path=str(OUT/'graphs.png'),animations='disabled')
    # Exercise the real source reader/writer through the rendered troop controls.

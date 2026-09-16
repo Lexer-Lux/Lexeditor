@@ -380,11 +380,6 @@ body.lex-save-busy .lex-save-icon.saving {
 }
 /* A row of parts: as many controls as the row needs, each with its own small
    label, wrapping rather than squeezing. */
-.lex-detail-parts { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; width:100%; min-width:0; }
-.lex-detail-part { display:flex; flex:1 1 7em; align-items:center; gap:6px; min-width:0; }
-.lex-detail-part > :is(input,select,textarea,output,.lex-readonly-field) { flex:1 1 auto; min-width:0; }
-.lex-detail-part-label { flex:0 0 auto; color:var(--lex-muted); font-size:.82em; letter-spacing:.04em; text-transform:uppercase; }
-.lex-detail-part:has(> input[type="checkbox"]) { flex:0 0 auto; }
 
 /* A button's own words are not text to drag-select, and neither is the window
    bar: a click on the title flashed a selection over it. */
@@ -2448,6 +2443,10 @@ body[data-lex-github-open="true"] > :not(.lex-shell-header):not(.lex-github-work
   grid-template-rows: var(--lex-panel-layout-template, minmax(0, 1fr));
   align-items: stretch;
 }
+/* A stacked pane fills its row. Sized to its content instead, the divider
+   measured two short boxes, clamped against minimums meant for the rows, and
+   jumped away from the pointer or would not move at all. */
+.lex-panel-layout-vertical > .lex-panel-layout-pane { align-self: stretch; }
 .lex-panel-layout-vertical > .lex-panel-layout-divider {
   width: 100%;
   min-width: 0;
@@ -5445,6 +5444,47 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-detail-field:hover .lex-multi-number-item > .lex-copy-value { opacity:.7; }
 .lex-multi-number-item > .lex-copy-value:hover { opacity:1; }
 
+/* ---- One row of properties ----------------------------------------------
+   Each part is three columns of the row's own grid: its copy button, its
+   name, its box. Names in the same column share one width, so every box in a
+   column starts at the same place. A switch spans a part's three columns. */
+.lex-detail-parts.lex-detail-parts {
+  display:grid;
+  width:100%;
+  min-width:0;
+  grid-template-columns:repeat(var(--lex-part-columns, 3), auto max-content minmax(0, 1fr));
+  align-items:center;
+  gap:5px 6px;
+}
+.lex-detail-parts > .lex-detail-part.lex-detail-part {
+  display:grid;
+  grid-column:span 3;
+  grid-template-columns:subgrid;
+  align-items:center;
+  min-width:0;
+  margin-right:6px;
+}
+.lex-detail-parts > .lex-toggle { grid-column:span 3; min-width:0; }
+.lex-detail-part-label.lex-detail-part-label {
+  justify-self:end;
+  overflow:hidden;
+  color:var(--lex-muted);
+  font-size:.86em;
+  line-height:1.05;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.lex-detail-part-control { display:flex; align-items:center; gap:6px; min-width:0; }
+.lex-detail-part-control > * { flex:1 1 auto; min-width:0; }
+.lex-detail-part-control > input[type="checkbox"] { flex:0 0 auto; }
+.lex-detail-part-spare { width:0; }
+/* A row that is only switches keeps the switch grid: as many as fit. */
+.lex-detail-parts.lex-detail-parts-switches {
+  grid-template-columns:repeat(var(--lex-toggle-columns, auto-fill), minmax(var(--lex-toggle-minimum, 150px), 1fr));
+  gap:6px 14px;
+}
+.lex-detail-parts-switches > .lex-toggle { grid-column:auto; }
+
 
 /* LEXEDITOR_FLAG_BOX_EVEN_20260910 */
 /* Each flag box is as wide as the flag in it. The boxes sit on a column grid
@@ -6267,7 +6307,10 @@ body:has(> .lex-shell-header) > main {min-height:0;}
   clip-path:polygon(0 43.75%,calc(100% - 6px) 43.75%,calc(100% - 6px) 0,100% 50%,calc(100% - 6px) 100%,calc(100% - 6px) 56.25%,0 56.25%);
 }
 .lex-boolean-field .lex-source-control > .lex-field-boolean-arrow::after { content:none; }
-.lex-detail-field.lex-boolean-field > .lex-detail-field-control { padding-block:17px; }
+/* Room for a reading under the box - only on a switch that can show one, so
+   the row keeps its height as readings come and go. A plain switch is as
+   tall as any other property. */
+.lex-detail-field.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control:not(.no-reference)) > .lex-detail-field-control { padding-block:4px 16px; }
 .lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
   grid-area:auto;top:calc(50% + 12.5px);bottom:auto;height:12px;
 }

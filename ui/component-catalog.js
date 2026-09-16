@@ -74,7 +74,7 @@
     {id: "detailField", level: "molecule", summary: "One property: label, control, help, and its changed state.",
       sample: () => UI.detailField({label: "POWER", control: UI.readonlyField("128"),
         help: UI.infoHelp("Damage before defence.")})},
-    {id: "detailRow", level: "molecule", summary: "A row holding as many controls as it needs: pass controls, and each part can carry its own small label.",
+    {id: "detailRow", level: "molecule", summary: "One property row holding any mix of parts - numbers, choices, switches. Every box in a column starts at the same place.",
       sample: () => el("div", {}, UI.detailRow({label: "DAMAGE", controls: [
           {label: "Min", control: el("input", {type: "number", value: "12"})},
           {label: "Max", control: el("input", {type: "number", value: "48"})}]}),
@@ -88,12 +88,12 @@
     {id: "dismissDialogs", level: "utility", summary: "Closes any shared dialog that is open."},
     {id: "detailNote", level: "molecule", summary: "A sentence inside a section that is not a property.",
       sample: () => UI.detailNote("Nothing in this section applies to this record.")},
-    {id: "toggleRow", level: "molecule", summary: "A row of on/off flags. Kept for the pages that use it; a new page uses detailRow with controls.",
+    {id: "toggleRow", level: "molecule", summary: "detailRow whose parts are all switches, laid out as many to a line as fit.",
       sample: () => UI.toggleRow({toggles: [
         {key: "menu", label: "Menu", checked: true, change: () => {}},
         {key: "battle", label: "Battle", checked: false, change: () => {}},
         {key: "field", label: "Field", checked: true, change: () => {}}]})},
-    {id: "multiNumberRow", level: "molecule", summary: "A stat block of numbers. Kept for the pages that use it; a new page uses detailRow with controls.",
+    {id: "multiNumberRow", level: "molecule", summary: "detailRow whose parts are labelled numbers, each with its own copy button.",
       sample: () => UI.multiNumberRow([
         {label: "HP", control: el("input", {type: "number", value: "2400"})},
         {label: "STR", control: el("input", {type: "number", value: "24"})},
