@@ -367,8 +367,18 @@
   function componentRows(level){
     const entries=(window.LexeditorComponentCatalog?.entries||[]).filter(entry=>entry.level===level);
     return entries.map(entry=>{const usedBy=catalogue.usage?.[entry.id]||[];
-      return {...entry,usedBy,games:usedBy.length,sampleMark:typeof entry.sample==="function"?"yes":"-",
+      return {...entry,usedBy,games:usedBy.length,sample_:typeof entry.sample==="function",
         hasSample:typeof entry.sample==="function"};});
+  }
+  // "Five games use it" means nothing without knowing how many should. An
+  // expectation turns silence into a named gap.
+  function expectationText(row){
+    const all=Object.keys(catalogue.games||{});
+    if(!all.length)return row.expect;
+    const uses=new Set(row.usedBy.map(value=>value.replace(/_/g,"-")));
+    const missing=all.filter(id=>!uses.has(id.replace(/_/g,"-")));
+    if(row.expect!=="every game")return `${row.expect}. Not in: ${missing.join(", ")||"none"}`;
+    return missing.length?`Every game. Missing from ${missing.join(", ")}.`:"Every game, and every game has it.";
   }
   function componentDetail(row){
     const body=[detailSection({title:"WHAT IT IS",body:[
@@ -376,6 +386,8 @@
       detailField({label:"LEVEL",control:readonlyField(row.level)}),
       detailField({label:"USED BY",control:usedByControl(row),
         help:infoHelp("Read from the plugins themselves, not a list anyone maintains. A faded game does not use it.")}),
+      ...(row.expect?[detailField({label:"EXPECTED IN",control:readonlyField(
+        expectationText(row)),help:infoHelp("What this component is for. A game missing it is usually a game that wrote its own.")})]:[]),
       ...(catalogue.shell?.has(row.id)&&row.usedBy.length
         ? [detailField({label:"ALSO",control:readonlyField("The shared UI calls this itself, for every game.")})]
         : []),
@@ -409,7 +421,8 @@
         template:"minmax(140px,1fr) 78px 64px",
         columns:[{key:"id",label:"Component"},
           {key:"games",label:"Games",numeric:true},
-          {key:"sampleMark",label:"Sample"}]}),
+          {key:"sample_",label:LexeditorUI.enabledMark,headerTitle:"Has a sample",
+            width:"max-content",align:"center",render:row=>LexeditorUI.booleanMark(row.sample_)}]}),
       detail:componentDetail,
       emptyDetail:()=>detailPanel({className:"blank-detail",title:"Components",
         body:[el("p",{},"No component matches this search.")]})});

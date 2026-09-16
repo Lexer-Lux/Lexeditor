@@ -378,8 +378,8 @@ body.lex-save-busy .lex-save-icon.saving {
   background: currentColor;
   translate: -50% -50%;
 }
-.lex-new-button-plus::before { width: 14px; height: 2px; }
-.lex-new-button-plus::after { width: 2px; height: 14px; }
+.lex-new-button-plus::before { width: 13px; height: 1.5px; border-radius: 1px; }
+.lex-new-button-plus::after { width: 1.5px; height: 13px; border-radius: 1px; }
 
 .lex-new-button:disabled {
   opacity: .4;
@@ -1576,11 +1576,15 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
 :is(input,select,textarea):disabled,
 :is(input,select,textarea)[readonly] {
   opacity:1;
-  color:color-mix(in srgb, var(--lex-muted) 82%, var(--lex-bg)) !important;
-  -webkit-text-fill-color:color-mix(in srgb, var(--lex-muted) 82%, var(--lex-bg));
-  background:color-mix(in srgb, var(--lex-panel-2) 45%, var(--lex-bg)) !important;
-  border-style:dashed;
-  border-color:color-mix(in srgb, var(--lex-border) 70%, transparent);
+  color:var(--lex-muted) !important;
+  -webkit-text-fill-color:var(--lex-muted);
+  /* A distinctly grey slab, darker than the panel it sits on and with no lit
+     edge, so it never reads as a box waiting for typing. */
+  background:color-mix(in srgb, var(--lex-border) 34%, var(--lex-panel)) !important;
+  border-color:color-mix(in srgb, var(--lex-border) 85%, transparent);
+  border-style:solid;
+  box-shadow:none;
+  font-style:italic;
   cursor:default;
 }
 

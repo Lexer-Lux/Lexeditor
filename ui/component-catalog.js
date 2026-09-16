@@ -30,10 +30,14 @@
 
   const entries = [
     // ---- atoms -----------------------------------------------------------
-    {id: "element", level: "atom", summary: "Builds one DOM node. Every other component is made of these.",
-      sample: () => el("code", {}, 'element("button", {type: "button"}, "Press")')},
-    {id: "el", level: "atom", summary: "The short name for element(), used inside plugins."},
-    {id: "newButton", level: "atom", summary: "The standard button.",
+    {id: "element", level: "atom", summary: "Builds one node: a tag, its attributes, its children. Every other component is made of calls to this.",
+      sample: () => el("div", {class: "lex-reshade-actions"},
+        el("button", {type: "button", class: "lex-dialog-action", onclick: () => {}}, "A button it made"),
+        el("span", {}, "and a span"))},
+    {id: "el", level: "atom", summary: "The same function as element, under the short name plugins use. el(tag, attributes, ...children).",
+      sample: () => el("div", {class: "lex-reshade-actions"},
+        el("input", {type: "text", value: "el(\"input\", {type: \"text\"})"}))},
+    {id: "newButton", level: "atom", expect: "every game whose records can be added to", summary: "The standard button.",
       sample: () => el("div", {class: "lex-reshade-actions"},
         UI.newButton({label: "Do the thing"}))},
     {id: "closeButton", level: "atom", summary: "The mark that dismisses a dialog or panel.",
@@ -69,7 +73,7 @@
       sample: () => UI.hoverable({label: "Example Item", targetLabel: "Example Item", open: () => {}})},
 
     // ---- molecules -------------------------------------------------------
-    {id: "detailField", level: "molecule", summary: "One property: label, control, help, and its changed state.",
+    {id: "detailField", level: "molecule", expect: "every game with records", summary: "One property: label, control, help, and its changed state.",
       sample: () => UI.detailField({label: "POWER", control: UI.readonlyField("128"),
         help: UI.infoHelp("Damage before defence.")})},
     {id: "detailRow", level: "molecule", summary: "The same field under another name, for rows outside a section.",
@@ -124,15 +128,15 @@
       }},
 
     // ---- organisms -------------------------------------------------------
-    {id: "columnList", level: "organism", summary: "The shared list: columns, sorting, selection, pinning, the pointer.",
+    {id: "columnList", level: "organism", expect: "every game with a list", summary: "The shared list: columns, sorting, selection, pinning, the pointer.",
       sample: () => UI.columnList({rows, key: row => row.id, selected: 2, select: () => {},
         sortState: {key: "name", dir: 1}, sort: () => {}, enabledChange: () => {},
         columns: [{key: "id", label: "ID"}, {key: "name", label: "Name"},
           {key: "category", label: "Category"}, {key: "value", label: "Value", numeric: true}]})},
-    {id: "detailPanel", level: "organism", summary: "The panel one record is edited in, with its heading and identity.",
+    {id: "detailPanel", level: "organism", expect: "every game with records", summary: "The panel one record is edited in, with its heading and identity.",
       sample: () => UI.detailPanel({title: "Example Item", body: [UI.detailSection({title: "ITEM",
         body: [UI.detailField({label: "VALUE", control: UI.readonlyField("25")})]})]})},
-    {id: "detailSection", level: "organism", summary: "A titled group of fields inside a panel.",
+    {id: "detailSection", level: "organism", expect: "every game with records", summary: "A titled group of fields inside a panel.",
       sample: () => UI.detailSection({title: "GROUP", body: [
         UI.detailField({label: "NAME", control: UI.readonlyField("Example Item")}),
         UI.detailField({label: "CATEGORY", control: UI.readonlyField("Common")}),
@@ -147,11 +151,11 @@
       sample: () => UI.subtabBar({label: "Sample views", active: "one", change: () => {},
         tabs: [{id: "one", label: "ONE"}, {id: "two", label: "TWO"}]})},
     {id: "tabbedPanel", level: "organism", summary: "A panel whose body switches between tabs."},
-    {id: "modLoaderSection", level: "organism", summary: "How this game loads mods, in the same five fields for every game.",
+    {id: "modLoaderSection", level: "organism", expect: "every game", summary: "How this game loads mods, in the same five fields for every game.",
       sample: () => UI.modLoaderSection({loader: "Sample loader beside the game.",
         output: "Sample output folder.", order: "Sample load order.",
         safety: "Nothing of the game's own is written.", removal: "Delete the folder."})},
-    {id: "reshadeSection", level: "organism", summary: "ReShade for one game: the switch, each effect and its controls.",
+    {id: "reshadeSection", level: "organism", expect: "every game with a Tweaks page", summary: "ReShade for one game: the switch, each effect and its controls.",
       // Its own sample state, so the section draws in full here whether or not
       // this machine has ReShade in a game.
       sample: () => UI.reshadeSection({act: () => {}, snapshot: {
@@ -172,7 +176,7 @@
         ]}})},
     {id: "creditsPanel", level: "organism", summary: "Who made what, from the generated credits.",
       sample: () => UI.creditsPanel("blank")},
-    {id: "dataMap", level: "organism", summary: "Which of a game's files Lexeditor understands."},
+    {id: "dataMap", level: "organism", expect: "every game that reads game files", summary: "Which of a game's files Lexeditor understands."},
     {id: "curveEditor", level: "organism", summary: "A formula drawn as a curve, edited by its terms."},
     {id: "soundCoverageTable", level: "organism", summary: "Which interface sounds a theme provides.",
       sample: () => UI.soundCoverageTable([{event: "save", label: "Save", provided: true},
@@ -196,12 +200,12 @@
           ...prefs.all().map(column => el("span", {class: "lex-pinnable-property"},
             prefs.pinButton(column.key, column.label), el("span", {}, column.label))));
       }},
-    {id: "showAlert", level: "organism", summary: "Lexeditor's own message box. Never the browser's.",
+    {id: "showAlert", level: "organism", expect: "every game that reports a problem", summary: "Lexeditor's own message box. Never the browser's.",
       sample: () => sampleButton("Show a message", () => UI.showAlert(
         {title: "Sample message", message: "This is the shared message box."}))},
     {id: "showToast", level: "organism", summary: "A short message that fades by itself.",
       sample: () => sampleButton("Show a toast", () => UI.showToast("Saved."))},
-    {id: "confirmAction", level: "organism", summary: "Lexeditor's own yes/no question.",
+    {id: "confirmAction", level: "organism", expect: "every game that asks before acting", summary: "Lexeditor's own yes/no question.",
       sample: () => sampleButton("Ask a question", () => UI.confirmAction(
         {title: "Do the thing?", message: "Nothing happens either way here.", confirmLabel: "Do it"}))},
     {id: "confirmDiscardChanges", level: "organism", summary: "Asks before throwing away edits.",
@@ -219,12 +223,12 @@
       sample: () => sampleButton("Open the game folder", () => UI.openGameFolder("blank"))},
 
     // ---- templates -------------------------------------------------------
-    {id: "mountShell", level: "template", summary: "The window: brand, tabs, project selector, save, play, history. Everything above this page is it."},
+    {id: "mountShell", level: "template", expect: "every game", summary: "The window: brand, tabs, project selector, save, play, history. Everything above this page is it."},
     {id: "panelLayout", level: "template", summary: "One, two or three resizable panes across a page."},
     {id: "list", level: "organism", summary: "A plain list of rows, without columns."},
     {id: "listDetail", level: "template", summary: "A list beside the detail of the selected row."},
     {id: "masterDetail", level: "template", summary: "The older list and detail shape, kept for existing pages."},
-    {id: "pagedListDetail", level: "template", summary: "List, detail, search and paging as one page.",
+    {id: "pagedListDetail", level: "template", expect: "every game with a long list", summary: "List, detail, search and paging as one page.",
       sample: () => UI.pagedListDetail({rows, key: row => row.id, selected: 1, page: 0, pageSize: 10,
         noun: "records", splitKey: "lex-sample-paged", rowsKey: "lex-sample-paged",
         change: () => {}, sync: () => {},
@@ -238,7 +242,7 @@
     {id: "createWindowActions", level: "template", summary: "Minimise, maximise and close, wired to the host. Top right of this window."},
     {id: "applyTheme", level: "template", summary: "Applies a game's tokens. Tokens only, never geometry: Blank's green is this.",
       sample: () => UI.readonlyField("This page's accent, panel and text colours come from applyTheme.")},
-    {id: "finishPluginLoading", level: "template", summary: "Clears the loading screen once a page is ready. The screen you saw opening this one."},
+    {id: "finishPluginLoading", level: "template", expect: "every game", summary: "Clears the loading screen once a page is ready. The screen you saw opening this one."},
 
     // ---- utilities -------------------------------------------------------
     {id: "callWindow", level: "utility", summary: "Calls the desktop host from a page."},

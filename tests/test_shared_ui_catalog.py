@@ -40,6 +40,19 @@ class SharedUiCatalogTests(unittest.TestCase):
             self.assertIn(level, levels, name)
             self.assertTrue(summary.strip(), name)
 
+    def test_a_component_every_game_needs_is_in_every_game(self):
+        """Counting use is not enough: the catalogue says what should use it."""
+        import json
+
+        source = (ROOT / "ui" / "component-catalog.js").read_text(encoding="utf-8")
+        usage = json.loads((ROOT / "ui" / "component-usage.json").read_text(encoding="utf-8"))["components"]
+        games = {name for names in usage.values() for name in names} - {"blank"}
+        required = re.findall(r'^\s{4}\{id: "(\w+)", level: "\w+", expect: "every game"', source, re.M)
+        self.assertTrue(required, "no component claims to be needed by every game")
+        for component in required:
+            missing = sorted(games - set(usage.get(component, [])))
+            self.assertEqual(missing, [], f"{component} is missing from {missing}")
+
     def test_component_usage_is_generated_not_remembered(self):
         result = subprocess.run([sys.executable, str(ROOT / "tools/generate_component_usage.py"), "--check"],
                                 capture_output=True, text=True, cwd=ROOT)
