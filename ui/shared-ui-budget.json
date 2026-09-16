@@ -2,7 +2,7 @@
   "note": "Counts may fall, never rise. See tools/verify_shared_ui_budget.py.",
   "files": {
     "games/ff8/editor.html": {
-      "sharedSelectors": 560,
+      "sharedSelectors": 0,
       "handBuiltRows": 17
     },
     "games/rdr/editor.html": {

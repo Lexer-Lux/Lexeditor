@@ -946,7 +946,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 
 .lex-unit-field-static {
   display:inline-flex;
-  align-items:center;
+  align-items:var(--lex-unit-align, center);
   gap:.35em;
 }
 
@@ -1111,8 +1111,9 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-detail-section {
   position:relative;
   min-width:0;
-  border:1px solid var(--lex-border);
-  background:var(--lex-panel);
+  /* FF8 separates sections by their titles alone, on one menu surface. */
+  border:var(--lex-section-border, 1px solid var(--lex-border));
+  background:var(--lex-section-bg, var(--lex-panel));
 }
 
 .lex-detail-section-title {
@@ -1129,7 +1130,15 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   letter-spacing:.08em;
 }
 
-.lex-detail-section-content { min-width:0; }
+/* A section is as tall as its content, unless the page puts one in a pane
+   that fills its height - FF8's three GF panels, whose tables then get the
+   whole pane to fit rows into. */
+.lex-detail-section-content {
+  min-width:0;
+  min-height:0;
+  padding:var(--lex-section-content-padding, 0);
+  flex:var(--lex-section-content-flex, 0 1 auto);
+}
 
 .lex-detail-field {
   --lex-field-type-gutter:20px;
@@ -2282,7 +2291,9 @@ body[data-lex-github-open="true"] > :not(.lex-shell-header):not(.lex-github-work
 .lex-panel-layout-pane {
   min-width: 0;
   min-height: 0;
-  align-self: start;
+  /* A pane is as tall as its content unless the page fills its height,
+     as FF8's three GF panels do. */
+  align-self: var(--lex-panel-pane-align, start);
 }
 
 .lex-paged-list-detail {
@@ -2558,6 +2569,9 @@ body.lex-panel-layout-dragging * {
   grid-template-columns: subgrid;
   align-items: stretch;
   min-width: 0;
+  /* A cell that is its own container no longer reports a height, so a
+     table of those states the floor its rows keep. */
+  min-height: var(--lex-row-min-height, 0);
   overflow:visible;
 }
 
@@ -2821,8 +2835,8 @@ body.lex-panel-layout-dragging * {
 }
 
 .lex-column-list-head-cell.sorted {
-  color:var(--lex-highlight);
-  background:color-mix(in srgb, var(--lex-accent) 18%, var(--lex-panel-2));
+  color:var(--lex-sort-header-fg, var(--lex-highlight));
+  background:var(--lex-sort-header-bg, color-mix(in srgb, var(--lex-accent) 18%, var(--lex-panel-2)));
 }
 
 .lex-column-list-head-cell.dragging { opacity:.45;cursor:grabbing; }
@@ -4465,21 +4479,23 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
 
 /* ---- Sort caret ------------------------------------------------------ */
 .lex-sort-indicator {
-  /* Absolute, because font-size:0 below would collapse any em sizing. */
-  width: 8px;
-  height: 8px;
-  flex: 0 0 8px;
+  /* A caret by default: a block of the current colour clipped to a triangle.
+     A game that marks the sorted column with a picture of its own - FF8's
+     pointing hand - gives the image and clears the clip. */
+  width: var(--lex-sort-marker-width, 8px);
+  height: var(--lex-sort-marker-height, 8px);
+  flex: 0 0 var(--lex-sort-marker-width, 8px);
   margin-right: 5px;
   /* font-size:0 hides the glyph without killing currentColor, which the
      clipped background depends on. */
   font-size: 0;
   overflow: hidden;
-  background: currentColor;
-  clip-path: polygon(50% 100%, 0 0, 100% 0);
-  opacity: .55;
+  background: var(--lex-sort-marker-image, currentColor) center / contain no-repeat;
+  clip-path: var(--lex-sort-marker-clip, polygon(50% 100%, 0 0, 100% 0));
+  opacity: var(--lex-sort-marker-opacity, .55);
 }
-.lex-column-list-head-cell.sorted .lex-sort-indicator { opacity: .85; }
-.lex-sort-indicator.ascending { clip-path: polygon(50% 0, 0 100%, 100% 100%); }
+.lex-column-list-head-cell.sorted .lex-sort-indicator { opacity: var(--lex-sort-marker-sorted-opacity, .85); }
+.lex-sort-indicator.ascending { clip-path: var(--lex-sort-marker-clip-ascending, polygon(50% 0, 0 100%, 100% 100%)); }
 
 /* ---- Field rail contract -------------------------------------------- */
 /* Keep the metadata in one fixed slot. The type and range are ordinary
@@ -5883,16 +5899,16 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 .lex-shell-header nav button.active,
 .lex-shell-header nav button:hover {
-  transform:translateY(-3px);
+  transform:translateY(var(--lex-tab-lift, -3px));
 }
 .lex-shell-header nav button.active::after {
   position:absolute;
   right:0;
   bottom:-3px;
   left:0;
-  height:4px;
-  content:"";
-  background:var(--lex-accent);
+  height:var(--lex-tab-underline-height, 4px);
+  content:var(--lex-tab-underline-content, "");
+  background:var(--lex-tab-underline-bg, var(--lex-accent));
 }
 .lex-shell-header nav button.lex-settings-tab.active::after {
   background:color-mix(in srgb, var(--lex-accent) 72%, var(--lex-panel-2));
@@ -6387,8 +6403,8 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 .lex-column-pin > svg { width: .95em; height: .95em; }
 .lex-source-control-internal:not(:has(> select)) > :is(.lex-reference-values, .lex-reference-placeholder) { right: .35em; }
 .lex-reference-tag { margin-right: .08em; }
-.lex-detail-panel-body { padding: 10px; gap: 10px; }
-.lex-detail-panel-body > .lex-detail-section { flex: 1 1 auto; }
+.lex-detail-panel-body { padding: 10px; gap: var(--lex-panel-body-gap, 10px); }
+.lex-detail-panel-body > .lex-detail-section { flex: var(--lex-section-flex, 1 1 auto); }
 .lex-tabbed-panel-content { padding: 12px; }
 .lex-boolean-mark { display: block; font-size: 1.45em; text-align: center; }
 .lex-curve-editor { display: block; min-width: 0; }
@@ -6459,7 +6475,12 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 
 /* Paintable parts of a list, a field and the add button. Defaults are what they
    already were; a game sets the token on its own container. */
-.lex-column-list-cell { padding: var(--lex-cell-padding, 6px 10px); }
+.lex-column-list-cell {
+  padding: var(--lex-cell-padding, 6px 10px);
+  /* FF8 draws a GF portrait that fills its cell's height. Nothing can
+     size itself against a cell unless the cell says it is a container. */
+  container-type: var(--lex-cell-container, normal);
+}
 .lex-column-list-head-cell { padding: var(--lex-head-cell-padding, 6px 10px); }
 .lex-brand-button { color: var(--lex-brand-fg, inherit); }
 .lex-detail-field { border-bottom: var(--lex-field-border, 0); }
@@ -6544,6 +6565,7 @@ body { font-size-adjust: var(--lex-font-size-adjust, none); }
 .lex-shell-command-row {
   padding: var(--lex-command-row-padding, 4px 10px);
   border: var(--lex-command-row-border, 0);
+  border-color: var(--lex-command-row-border-color, var(--lex-border));
 }
 .lex-shell-header nav {
   background: var(--lex-nav-bg, var(--lex-panel-2));
@@ -6556,6 +6578,8 @@ body { font-size-adjust: var(--lex-font-size-adjust, none); }
   font-size: var(--lex-tab-font-size, inherit);
   color: var(--lex-tab-fg, inherit);
   background: var(--lex-tab-bg, transparent);
+  border: var(--lex-tab-border, 0);
+  border-color: var(--lex-tab-border-color, transparent);
 }
 .lex-shell-header nav button:hover { background: var(--lex-tab-hover-bg, var(--lex-panel)); }
 .lex-shell-header nav button.active {
@@ -6638,6 +6662,8 @@ body { text-shadow: var(--lex-text-shadow, none); }
    active tab already has. Default: nothing drawn, as before. */
 .lex-column-list-row.selected .lex-column-pointer-cell > .lex-column-cell-content::before {
   content: var(--lex-row-marker-content, none);
+  position: relative;
+  z-index: 5;
   flex: 0 0 var(--lex-row-marker-width, 24px);
   width: var(--lex-row-marker-width, 24px);
   height: var(--lex-row-marker-height, 16px);
@@ -6648,12 +6674,7 @@ body { text-shadow: var(--lex-text-shadow, none); }
   pointer-events: none;
 }
 .lex-sort-indicator {
-  background: var(--lex-sort-marker-image, none) center / contain no-repeat;
-  color: var(--lex-sort-marker-fg, inherit);
-  opacity: var(--lex-sort-marker-opacity, 1);
   filter: var(--lex-sort-marker-filter, none);
-  width: var(--lex-sort-marker-width, auto);
-  height: var(--lex-sort-marker-height, auto);
   image-rendering: pixelated;
 }
 .lex-sort-indicator.ascending { transform: var(--lex-sort-marker-ascending, none); }
@@ -6663,6 +6684,7 @@ body { text-shadow: var(--lex-text-shadow, none); }
 .lex-pager {
   color: var(--lex-pager-fg, var(--lex-muted));
   border: var(--lex-pager-border, 0);
+  border-color: var(--lex-pager-border-color, var(--lex-border));
   border-top: var(--lex-pager-border-top, 1px solid var(--lex-border));
   background: var(--lex-pager-bg, var(--lex-panel));
 }
@@ -6684,6 +6706,7 @@ body { text-shadow: var(--lex-text-shadow, none); }
 /* The curve editor's own ink. */
 .lex-curve-svg {
   border: var(--lex-curve-border, 1px solid var(--lex-border));
+  border-color: var(--lex-curve-border-color, var(--lex-border));
   background: var(--lex-curve-bg, color-mix(in srgb, var(--lex-bg) 58%, var(--lex-panel)));
 }
 .lex-curve-line { stroke: var(--lex-curve-stroke, var(--lex-highlight)); filter: var(--lex-curve-line-filter, none); }
