@@ -3211,6 +3211,11 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
   padding-right:calc(var(--lex-internal-reference-width) + .95em);
 }
 .lex-source-control-internal.no-reference { --lex-internal-reference-width:0px !important; }
+/* Matching vanilla shows nothing in the lane, so the value gets the room back.
+   The box keeps its width and its text stays left-aligned, so nothing moves
+   when a reference appears; a long value like "50,000" was cut to "50," by a
+   lane reserved for a reference that was not there. */
+.lex-source-control-internal:has(> .lex-reference-placeholder) { --lex-internal-reference-width:0px !important; }
 .lex-source-control-internal > .lex-unit-field > :is(input,select,textarea) {
   padding-right:calc(var(--lex-unit-reserve,2.4em) + var(--lex-internal-reference-width) + .7em) !important;
 }
@@ -5480,8 +5485,8 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-detail-part-spare { width:0; }
 /* A row that is only switches keeps the switch grid: as many as fit. */
 .lex-detail-parts.lex-detail-parts-switches {
-  grid-template-columns:repeat(var(--lex-toggle-columns, auto-fill), minmax(var(--lex-toggle-minimum, 150px), 1fr));
-  gap:6px 14px;
+  grid-template-columns:repeat(auto-fit, minmax(min(100%, var(--lex-toggle-basis, 11em)), 1fr));
+  gap:var(--lex-panel-gap, 12px);
 }
 .lex-detail-parts-switches > .lex-toggle { grid-column:auto; }
 
@@ -6675,7 +6680,9 @@ body { font-size-adjust: var(--lex-font-size-adjust, none); }
 .lex-shell-header nav button.lex-settings-tab.active { background: var(--lex-settings-tab-active-bg, var(--lex-tab-active-bg, var(--lex-accent))); }
 /* The mark on the active tab: a caret by default, a game's own image when it
    has one - FF8's pointing hand. */
-.lex-shell-header nav button.active .lex-tab-label { position: relative; display: inline-block; }
+/* A box for the marker to hang from, set on the middle: on the baseline it
+   moved the words two and a half pixels past the tab, so they rode high. */
+.lex-shell-header nav button.active .lex-tab-label { position: relative; display: inline-block; vertical-align: middle; }
 .lex-shell-header nav button.active .lex-tab-label::before {
   content: var(--lex-tab-marker-content, none);
   position: absolute;

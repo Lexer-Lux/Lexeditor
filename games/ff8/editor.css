@@ -880,3 +880,5 @@
 .refine-view {--lex-cell-padding:6px 3px;--lex-head-cell-padding:6px 1px}
 .weapon-detail {--lex-field-padding:2px 7px}
 .gf-compat-table.ff8-record-list {--lex-cell-padding:6px 4px}
+/* A record's icon before its name in the panel heading. */
+.ff8-heading-label,.ff8-ability-label {display:inline-flex;align-items:center;gap:.35em;--ff8-item-icon-size:1.15em}
