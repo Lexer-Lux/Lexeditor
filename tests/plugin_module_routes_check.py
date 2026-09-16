@@ -31,7 +31,13 @@ def check(name: str) -> list[str]:
     handler = getattr(module, "Handler", None)
     if handler is None:
         return [f"{name}: no request handler"]
-    server = HTTPServer(("127.0.0.1", 0), handler)
+    class Quiet(HTTPServer):
+        # Closing the browser mid-request aborts the connection, and the default
+        # handler prints a traceback for it. That is not a finding.
+        def handle_error(self, request, client_address):
+            return
+
+    server = Quiet(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     problems = []
@@ -45,11 +51,37 @@ def check(name: str) -> list[str]:
                         problems.append(f"{name}: {asset} served empty")
             except Exception as error:  # noqa: BLE001 - the failure is the result
                 problems.append(f"{name}: {asset} -> {error}")
+        problems += boot(base, name)
     finally:
         server.shutdown()
         server.server_close()
         thread.join()
     return problems
+
+
+def boot(base: str, name: str) -> list[str]:
+    """Load the page and report anything the modules said on the way up.
+
+    A module that runs before the one it reads from says so here - "X is not
+    defined" - which a served-file check cannot see.
+    """
+    from playwright.sync_api import sync_playwright
+    fatal = []
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        page.on("pageerror", lambda error: fatal.append(str(error)))
+        try:
+            page.goto(base + "/", wait_until="domcontentloaded", timeout=20000)
+            page.wait_for_timeout(900)
+        except Exception as error:  # noqa: BLE001 - the failure is the result
+            fatal.append(str(error))
+        browser.close()
+    # A plugin without its game data still loads its modules; what matters here
+    # is whether they could see each other.
+    return [f"{name}: {message}" for message in fatal
+            if "is not defined" in message or "SyntaxError" in message
+            or "is not a function" in message]
 
 
 def main() -> int:
