@@ -5625,8 +5625,9 @@ ${contents.path}`});
     }
     const options = layoutOptions || {};
     const nodes = (Array.isArray(panels) ? panels : [panels]).filter(Boolean);
+    const vertical = String(options.orientation || "").toLowerCase() === "vertical";
     const root = element("div", {
-      class: `lex-panel-layout ${className}`.trim(),
+      class: `lex-panel-layout ${vertical ? "lex-panel-layout-vertical " : ""}${className}`.trim(),
     });
     const stackAt = [700, 850, 1000, 1100].includes(Number(options.stackAt))
       ? Number(options.stackAt) : 850;
@@ -5723,7 +5724,8 @@ ${contents.path}`});
       }
     };
     const resizePair = (index, delta, persist = false, edge = "", initialWidths = null) => {
-      const widths = initialWidths ? [...initialWidths] : nodes.map(node => node.getBoundingClientRect().width);
+      const widths = initialWidths ? [...initialWidths]
+        : nodes.map(node => vertical ? node.getBoundingClientRect().height : node.getBoundingClientRect().width);
       const pairWidth = Math.max(1, widths[index] + widths[index + 1]);
       const requestedMinimum = minSizes[index] + minSizes[index + 1];
       // When the window is narrower than both requested minimums, preserve
@@ -5774,14 +5776,15 @@ ${contents.path}`});
         // pointer made the shared Barrels buttons appear live but do nothing.
         if (event.target.closest?.("button,input,select,textarea,[role=button]")) return;
         event.preventDefault();
-        dragStart = {x:event.clientX, widths:nodes.map(node => node.getBoundingClientRect().width)};
+        dragStart = {x: vertical ? event.clientY : event.clientX,
+          widths: nodes.map(node => vertical ? node.getBoundingClientRect().height : node.getBoundingClientRect().width)};
         divider.classList.add("dragging");
         document.body.classList.add("lex-panel-layout-dragging");
         try { divider.setPointerCapture?.(event.pointerId); } catch (_error) {}
       });
       divider.addEventListener("pointermove", event => {
         if (!divider.classList.contains("dragging")) return;
-        pendingDrag = {divider, index, x:event.clientX};
+        pendingDrag = {divider, index, x: vertical ? event.clientY : event.clientX};
         if (!dragFrame) dragFrame = requestAnimationFrame(flushDrag);
       });
       divider.addEventListener("pointerup", event => finishDrag(divider, event));

@@ -42,6 +42,12 @@
     .blank-graphs .lex-curve-path-formula{display:block;filter:drop-shadow(1px 1px 1px var(--lex-panel))}
     .blank-graphs .lex-curve-formula{display:none}
     .blank-components{height:100%}
+    .blank-component-split{height:100%;min-height:0}
+    .blank-sample-pane{display:flex;flex-direction:column;min-height:0;overflow:auto;padding:12px;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .blank-sample-pane.glyph{align-items:flex-start}
+    .blank-sample-pane>svg{width:28px;height:28px}
+    .blank-games-note{align-self:center;color:var(--lex-muted)}
+    .blank-game.unused{opacity:.45;filter:grayscale(80%)}
     .blank-sample{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;padding:12px;border:1px dashed var(--lex-border);overflow-x:auto}
     /* A sample is shown at the size the component really is. Only the wide
        ones - lists, panels, pages - take the width of the row. */
@@ -330,13 +336,30 @@
   }
   // A plugin folder name is what the scan reports; the game is what Lexeditor
   // knows it as, cover art included.
-  function gameCard(pluginId){
+  function gameCard(pluginId,used){
     const game=catalogue.games?.[pluginId.replace(/_/g,"-")]||catalogue.games?.[pluginId]||null;
     const name=game?.name||pluginId;
     const art=game?.uri
       ? el("img",{class:"blank-game-cover",src:game.uri,alt:""})
       : el("span",{class:"blank-game-fallback","aria-hidden":"true"},name.slice(0,1).toUpperCase());
-    return el("span",{class:"blank-game",title:name},art,el("span",{class:"blank-game-name"},name));
+    return el("span",{class:`blank-game${used?"":" unused"}`,
+      title:used?`${name} uses this`:`${name} does not use this`},art,el("span",{class:"blank-game-name"},name));
+  }
+  // Which games use a component reads better as every game at once: the ones
+  // that do not use it are faded and pushed to the end, like an absent game on
+  // the home screen.
+  function usedByControl(row){
+    const all=Object.keys(catalogue.games||{});
+    const ids=all.length?all:row.usedBy;
+    const uses=new Set(row.usedBy.map(value=>value.replace(/_/g,"-")));
+    const used=ids.filter(id=>uses.has(id.replace(/_/g,"-")));
+    const unused=ids.filter(id=>!uses.has(id.replace(/_/g,"-")));
+    if(!used.length)return readonlyField("No game uses this. The shared UI may still use it itself.");
+    // "Every game" is only true when the full list of games is known: without
+    // the desktop host this page only knows the ones that do use it.
+    if(!unused.length)return el("div",{class:"blank-games"},...used.map(id=>gameCard(id,true)),
+      all.length?el("span",{class:"blank-games-note"},"Every game."):null);
+    return el("div",{class:"blank-games"},...used.map(id=>gameCard(id,true)),...unused.map(id=>gameCard(id,false)));
   }
   function componentRows(level){
     const entries=(window.LexeditorComponentCatalog?.entries||[]).filter(entry=>entry.level===level);
@@ -348,23 +371,21 @@
     const body=[detailSection({title:"WHAT IT IS",body:[
       detailField({label:"SUMMARY",control:readonlyField(row.summary||"")}),
       detailField({label:"LEVEL",control:readonlyField(row.level)}),
-      detailField({label:"USED BY",control:!row.usedBy.length
-        ? readonlyField("No game uses this yet.")
-        : row.usedBy.length>=(catalogue.pluginCount||Infinity)
-          ? readonlyField("All games.")
-          : el("div",{class:"blank-games"},...row.usedBy.map(gameCard)),
-        help:infoHelp("Read from the plugins themselves, not a list anyone maintains.")}),
+      detailField({label:"USED BY",control:usedByControl(row),
+        help:infoHelp("Read from the plugins themselves, not a list anyone maintains. A faded game does not use it.")}),
     ]})];
-    // A glyph is a few pixels across in use; a list is a page wide. The sample
-    // box follows the component rather than stretching everything to fit.
+    const panel=detailPanel({className:"blank-detail",title:row.id,meta:row.level,body});
+    // A glyph is a few pixels across in use; a list is a page wide. The pane
+    // holds the component raw, so its own spacing and edges are what you see.
     const glyph=/icon$|^infoIcon$|Mark$/.test(row.id);
-    const wide=["organism","template"].includes(row.level)&&!glyph;
-    body.push(detailSection({title:"SAMPLE",body:[row.hasSample
-      ? el("div",{class:`blank-sample${wide?" wide":""}${glyph?" glyph":""}`},row.sample())
-      : el("p",{class:"blank-sample-missing"},row.level==="utility"
-        ? "Nothing to draw: this one is code a page calls, not a control."
-        : "No sample yet. Add one in ui/component-catalog.js.")]}));
-    return detailPanel({className:"blank-detail",title:row.id,meta:row.level,body});
+    const sample=el("section",{class:`blank-sample-pane${glyph?" glyph":""}`},
+      row.hasSample
+        ? row.sample()
+        : el("p",{class:"blank-sample-missing"},row.level==="utility"
+          ? "Nothing to draw: this one is code a page calls, not a control."
+          : "No sample yet. Add one in ui/component-catalog.js."));
+    return panelLayout([panel,sample],"blank-component-split",
+      {orientation:"vertical",layoutKey:`blank-sample-${row.level}`,defaultSizes:[58,42],stackAt:700});
   }
   function componentsPanel(level){
     loadComponentUsage();

@@ -17,6 +17,11 @@
   const UI = window.LexeditorUI;
   if (!UI) return;
   const el = UI.el;
+  // A sample that opens something needs a button that says what it opens. The
+  // add button is a plus and takes no words, so every dialog sample looked like
+  // the same anonymous square.
+  const sampleButton = (label, onclick) =>
+    el("button", {type: "button", class: "lex-dialog-action", onclick}, label);
   const rows = [
     {id: 1, name: "Example Item", category: "Common", value: 25, enabled: true},
     {id: 2, name: "Second Item", category: "Rare", value: 100, enabled: false},
@@ -59,7 +64,7 @@
     {id: "enabledMark", level: "atom", summary: "The mark on the shared list's enabled column.",
       sample: () => UI.enabledMark()},
     {id: "copyText", level: "atom", summary: "Copies a value to the clipboard and says so.",
-      sample: () => UI.newButton({label: "Copy a value", onclick: () => UI.copyText("Example Item")})},
+      sample: () => sampleButton("Copy a value", () => UI.copyText("Example Item"))},
     {id: "hoverable", level: "atom", summary: "A value that links to the record it names.",
       sample: () => UI.hoverable({label: "Example Item", targetLabel: "Example Item", open: () => {}})},
 
@@ -192,26 +197,26 @@
             prefs.pinButton(column.key, column.label), el("span", {}, column.label))));
       }},
     {id: "showAlert", level: "organism", summary: "Lexeditor's own message box. Never the browser's.",
-      sample: () => UI.newButton({label: "Show a message", onclick: () => UI.showAlert(
-        {title: "Sample message", message: "This is the shared message box."})})},
+      sample: () => sampleButton("Show a message", () => UI.showAlert(
+        {title: "Sample message", message: "This is the shared message box."}))},
     {id: "showToast", level: "organism", summary: "A short message that fades by itself.",
-      sample: () => UI.newButton({label: "Show a toast", onclick: () => UI.showToast("Saved.")})},
+      sample: () => sampleButton("Show a toast", () => UI.showToast("Saved."))},
     {id: "confirmAction", level: "organism", summary: "Lexeditor's own yes/no question.",
-      sample: () => UI.newButton({label: "Ask a question", onclick: () => UI.confirmAction(
-        {title: "Do the thing?", message: "Nothing happens either way here.", confirmLabel: "Do it"})})},
+      sample: () => sampleButton("Ask a question", () => UI.confirmAction(
+        {title: "Do the thing?", message: "Nothing happens either way here.", confirmLabel: "Do it"}))},
     {id: "confirmDiscardChanges", level: "organism", summary: "Asks before throwing away edits.",
-      sample: () => UI.newButton({label: "Discard edits", onclick: () => UI.confirmDiscardChanges(
-        {dirtyCount: () => 3, discard: async () => {}})})},
+      sample: () => sampleButton("Discard edits", () => UI.confirmDiscardChanges(
+        {dirtyCount: () => 3, discard: async () => {}}))},
     {id: "confirmUnsavedExit", level: "organism", summary: "Asks before leaving with unsaved edits.",
-      sample: () => UI.newButton({label: "Leave with edits", onclick: () => UI.confirmUnsavedExit(
+      sample: () => sampleButton("Leave with edits", () => UI.confirmUnsavedExit(
         {dirtyCount: () => 2, save: async () => {}}, async () => true,
-        {question: "Save before leaving this sample?"})})},
+        {question: "Save before leaving this sample?"}))},
     {id: "openSettings", level: "organism", summary: "The shared settings dialog.",
-      sample: () => UI.newButton({label: "Open settings", onclick: () => UI.openSettings()})},
+      sample: () => sampleButton("Open settings", () => UI.openSettings())},
     {id: "sharedSettings", level: "organism", summary: "The settings every game has in common, as this page sees them.",
       sample: () => UI.readonlyField(JSON.stringify(UI.sharedSettings() || {}).slice(0, 120) || "No settings loaded here.")},
     {id: "openGameFolder", level: "organism", summary: "Opens this game's folder in the file browser.",
-      sample: () => UI.newButton({label: "Open the game folder", onclick: () => UI.openGameFolder("blank")})},
+      sample: () => sampleButton("Open the game folder", () => UI.openGameFolder("blank"))},
 
     // ---- templates -------------------------------------------------------
     {id: "mountShell", level: "template", summary: "The window: brand, tabs, project selector, save, play, history. Everything above this page is it."},
