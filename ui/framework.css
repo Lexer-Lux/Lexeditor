@@ -1040,7 +1040,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
      min-content made the browser resolve the two against each other and drop
      the bottom padding - two pixels of every heading, clipped. */
   padding: 10px 14px 10px 10px;
-  overflow:hidden;
+  /* Clipped, but not at the edge: the ID's pin overhangs its corner by a
+     few pixels by design, and a hard clip cut its right side off. */
+  overflow:clip;
+  overflow-clip-margin:16px;
 }
 .lex-detail-panel-heading.no-icon .lex-detail-panel-identity { grid-column-start:1; }
 .lex-detail-panel-heading.no-actions .lex-detail-panel-identity { grid-column:2 / -1; }
@@ -1103,6 +1106,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
      this the panel grew a horizontal scrollbar for that overhang alone. */
   overflow-x:clip;
 }
+/* A body that is one tabbed panel fills the detail panel, so its tabs sit at
+   the panel's foot. Sized to its content, the body ended wherever the
+   content did and the tabs floated partway down a tall window. */
+.lex-detail-panel-body:has(> .lex-tabbed-panel:only-child) { flex:1 1 auto; }
 
 .lex-detail-section {
   position:relative;
@@ -6356,6 +6363,10 @@ body:has(> .lex-shell-header) > main {min-height:0;}
   grid-area:auto;top:calc(50% + 12.5px);bottom:auto;height:12px;
 }
 .lex-toggle-row > .lex-toggle { padding:var(--lex-toggle-padding,5px 12px);gap:var(--lex-toggle-gap,8px); }
+/* A switch may carry an icon before its name; it never shrinks the name. */
+.lex-toggle > img { flex:none; }
+/* Names wrap between words, never inside one. */
+.lex-toggle-name { min-width:0; overflow-wrap:normal; word-break:normal; }
 /* Reference colors identify sources. They are not the editable-value accent. */
 .lex-source-control-internal .lex-reference-value {
   overflow:visible;

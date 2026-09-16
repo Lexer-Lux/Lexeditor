@@ -85,6 +85,17 @@
   const booleanMark=value=>el("span",{class:"lex-boolean-mark lex-ui-symbol"},booleanGlyph(value));
   function flagSourceControl(field,view,rowId){
     const lookup=field.lookup,vanillaField=rowOf(state.vanilla,view,rowId)?.fields?.find(value=>value.field===field.field),referenceFields=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,field:rowOf(state.referenceData[reference.id],view,rowId)?.fields?.find(value=>value.field===field.field)})),iconOnly=["element","j_status"].includes(String(lookup.name));
+    // Named flags are one property of switches, like an item's USE FLAGS: the
+    // reference compares the whole word. Icon-only lists keep their grid.
+    if(!iconOnly){
+      const word=value=>Number(value??0),bitOf=entry=>Number(entry.mask??entry.value);
+      const switches=toggleRow({label:field.label,value:()=>word(field.value),toggles:lookup.entries.map(entry=>{const bit=bitOf(entry);return{
+        key:String(bit),label:entry.name,icon:conceptIcon(lookup.name,entry.name),help:entry.description||null,checked:(word(field.value)&bit)===bit,
+        change:checked=>{field.value=checked?(word(field.value)|bit):(word(field.value)&~bit);shell.refresh()}}})});
+      return sourceControl(switches,()=>word(field.value),vanillaField?word(vanillaField.value):undefined,
+        referenceFields.filter(reference=>reference.field).map(reference=>({name:reference.name,shortName:reference.shortName,value:word(reference.field.value)})),
+        value=>{field.value=word(value);render()},value=>`0x${word(value).toString(16).toLocaleUpperCase()}`);
+    }
     return el("div",{class:`flag-list flag-list-${String(lookup.name||"flags").replace(/[^a-z0-9_-]/gi,"-")} ${iconOnly?"flag-list-icon-toggles":""}`},...lookup.entries.map(entry=>{
       const bit=Number(entry.mask??entry.value),read=value=>(Number(value??0)&bit)===bit,apply=checked=>{field.value=checked?(Number(field.value)|bit):(Number(field.value)&~bit)},setState=checked=>{stateMark.textContent=booleanGlyph(checked);stateMark.classList.toggle("positive",checked);stateMark.classList.toggle("negative",!checked)},input=el("input",{type:"checkbox",checked:read(field.value),"aria-label":entry.name,onchange:event=>{apply(event.target.checked);setState(event.target.checked);shell.refresh()}}),stateMark=el("span",{class:`ff8-flag-state ${read(field.value)?"positive":"negative"}`,"aria-hidden":"true"},booleanGlyph(read(field.value))),control=el("label",{class:iconOnly?"ff8-icon-toggle":"ff8-flag-toggle",title:entry.name},input,conceptIcon(lookup.name,entry.name),iconOnly?stateMark:el("span",{},entry.name));
       const refs=referenceFields.filter(reference=>reference.field).map(reference=>({name:reference.name,shortName:reference.shortName,value:read(reference.field.value)}));

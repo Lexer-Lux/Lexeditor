@@ -1635,7 +1635,7 @@
       const label = element("label", {
         class: ["lex-toggle", toggle.className || ""].filter(Boolean).join(" "),
         "data-lex-toggle": toggle.key || toggle.label || "",
-      }, rail, input, element("span", {class: "lex-toggle-name"}, toggle.label));
+      }, rail, input, toggle.icon || null, element("span", {class: "lex-toggle-name"}, toggle.label));
       if (toggle.help) rail.append(infoHelp(toggle.help));
       // A switch that is also a table column carries its pin in its corner,
       // the same place every other pinnable property keeps one.
