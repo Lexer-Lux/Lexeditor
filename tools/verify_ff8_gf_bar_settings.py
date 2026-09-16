@@ -30,7 +30,8 @@ def run():
             except ValueError as error: assert 'GF HP Bars' in str(error)
             else: raise AssertionError('Invalid GF bar value was accepted')
         assert 'gfHpBars' in settings.ACCEPTED_TWEAKS
-    ui=(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8')
+    # The page and the modules it loads.
+    ui=chr(10).join(path.read_text(encoding='utf-8') for path in [ROOT/'games/ff8/editor.html',*sorted((ROOT/'games/ff8').glob('*.js'))])
     assert 'gfHpBars:state.data.settings.gfHpBars' in ui
     assert '"aria-label":"GF HP Bars"' in ui
     assert 'platformConfigView({config:state.platformConfig,showHeader:false,' in ui

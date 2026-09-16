@@ -305,6 +305,101 @@
   };
   // Listened for from the start: the window bar's own toast is not made here.
   document.addEventListener("pointermove", ghostToasts, {passive: true});
+  // Scrollbars take no room. The system bar is hidden everywhere and one thumb
+  // per axis is drawn over whichever box is being scrolled, or whose edge the
+  // pointer is near, then fades. A system bar was a solid track down the side
+  // of every scrolling panel, taking width from the content and never matching
+  // the theme. The thumb can be dragged like the bar it replaces.
+  const installOverlayScrollbars = () => {
+    const axes = {
+      y: {overflow: "overflowY", size: "clientHeight", extent: "scrollHeight", offset: "scrollTop",
+        start: "top", length: "height", pointer: "clientY"},
+      x: {overflow: "overflowX", size: "clientWidth", extent: "scrollWidth", offset: "scrollLeft",
+        start: "left", length: "width", pointer: "clientX"},
+    };
+    const EDGE = 14, MINIMUM = 24, INSET = 2;
+    const bars = {};
+    let drag = null;
+    const scrolls = (node, axis) => node instanceof Element &&
+      node[axes[axis].extent] > node[axes[axis].size] + 1 &&
+      (node === document.scrollingElement || /auto|scroll/.test(getComputedStyle(node)[axes[axis].overflow]));
+    const layout = (bar) => {
+      const {target, axis} = bar;
+      const a = axes[axis];
+      if (!target?.isConnected || !scrolls(target, axis)) { bar.node.classList.remove("visible"); return false; }
+      const box = target === document.scrollingElement
+        ? {top: 0, left: 0, width: innerWidth, height: innerHeight, right: innerWidth, bottom: innerHeight}
+        : target.getBoundingClientRect();
+      const track = box[a.length] - INSET * 2;
+      const thumb = Math.max(MINIMUM, track * target[a.size] / target[a.extent]);
+      const range = target[a.extent] - target[a.size];
+      const at = (track - thumb) * (range ? target[a.offset] / range : 0);
+      bar.track = track; bar.thumbLength = thumb;
+      bar.node.style.cssText = axis === "y"
+        ? `left:${box.right - 9}px;top:${box.top + INSET}px;height:${track}px`
+        : `top:${box.bottom - 9}px;left:${box.left + INSET}px;width:${track}px`;
+      bar.thumb.style.cssText = axis === "y"
+        ? `height:${thumb}px;transform:translateY(${at}px)`
+        : `width:${thumb}px;transform:translateX(${at}px)`;
+      return true;
+    };
+    const show = (target, axis) => {
+      const bar = bars[axis];
+      bar.target = target;
+      // A page that rebuilds its body takes the bars with it.
+      if (!bar.node.isConnected && document.body) document.body.append(bar.node);
+      if (!layout(bar)) return;
+      bar.node.classList.add("visible");
+      clearTimeout(bar.timer);
+      bar.timer = setTimeout(function fade() {
+        if (drag?.bar === bar || bar.node.matches(":hover")) { bar.timer = setTimeout(fade, 400); return; }
+        bar.node.classList.remove("visible");
+      }, 900);
+    };
+    for (const axis of Object.keys(axes)) {
+      const thumb = element("div", {class: "lex-overlay-scrollbar-thumb"});
+      const node = element("div", {class: `lex-overlay-scrollbar lex-overlay-scrollbar-${axis}`, "aria-hidden": "true"}, thumb);
+      const bar = bars[axis] = {axis, node, thumb, target: null, timer: 0, track: 0, thumbLength: 0};
+      thumb.addEventListener("pointerdown", event => {
+        if (!bar.target || event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        thumb.setPointerCapture(event.pointerId);
+        drag = {bar, from: event[axes[axis].pointer], offset: bar.target[axes[axis].offset]};
+        node.classList.add("dragging");
+      });
+      thumb.addEventListener("pointermove", event => {
+        if (drag?.bar !== bar) return;
+        const a = axes[axis], target = bar.target;
+        const free = Math.max(1, bar.track - bar.thumbLength);
+        target[a.offset] = drag.offset + (event[a.pointer] - drag.from) * (target[a.extent] - target[a.size]) / free;
+      });
+      const release = () => { if (drag?.bar === bar) { drag = null; node.classList.remove("dragging"); show(bar.target, axis); } };
+      thumb.addEventListener("pointerup", release);
+      thumb.addEventListener("pointercancel", release);
+    }
+    const mount = () => document.body.append(bars.y.node, bars.x.node);
+    if (document.body) mount(); else document.addEventListener("DOMContentLoaded", mount, {once: true});
+    document.addEventListener("scroll", event => {
+      const target = event.target === document ? document.scrollingElement : event.target;
+      for (const axis of Object.keys(axes)) {
+        if (bars[axis].target === target && bars[axis].node.classList.contains("visible")) layout(bars[axis]);
+        else if (scrolls(target, axis)) show(target, axis);
+      }
+    }, {capture: true, passive: true});
+    // Near a scrolling box's edge, its thumb comes up so it can be grabbed.
+    document.addEventListener("pointermove", event => {
+      if (drag) return;
+      for (let node = event.target; node instanceof Element; node = node.parentElement) {
+        const box = node.getBoundingClientRect();
+        if (box.right - event.clientX <= EDGE && scrolls(node, "y")) { show(node, "y"); return; }
+        if (box.bottom - event.clientY <= EDGE && scrolls(node, "x")) { show(node, "x"); return; }
+      }
+    }, {passive: true});
+    addEventListener("resize", () => Object.values(bars).forEach(bar => bar.node.classList.contains("visible") && layout(bar)));
+  };
+  installOverlayScrollbars();
+
   const showToast = (message, options = {}) => {
     if (!toastStack || !toastStack.isConnected) {
       toastStack = element("div", {class: "lex-toast-stack", role: "status", "aria-live": "polite"});

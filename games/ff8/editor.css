@@ -614,8 +614,8 @@
     .enemy-detail-split {height:100%;min-height:0}
     .enemy-detail-split>.enemy-tabbed-column {order:0}
     .enemy-detail-split>.enemy-detail {order:1}
-    .enemy-detail-split .enemy-tabbed-column {display:flex;flex-direction:column;min-height:0}
-    .enemy-detail-split .enemy-tabbed-column {background:var(--ff8-menu-surface)!important;}
+    /* The column is exactly its pane's height so its content scrolls under the tabs, not the tabs with it. */
+    .enemy-detail-split .enemy-tabbed-column {display:flex;flex-direction:column;min-height:0;height:100%}
     .enemy-detail-split .enemy-tabbed-column {border-right:1px solid #4d4d4d!important}
     .enemy-ai-content {display:flex;min-height:100%;flex-direction:column;gap:10px;padding:0 8px 12px}
     .enemy-ai-boundary {margin:0;padding:8px;color:#dedede;font-size:.86em;line-height:1.25}
@@ -643,7 +643,7 @@
     .enemy-battle-text-content {display:flex;min-height:100%;flex-direction:column;gap:1px;padding:0 8px 12px}
     .enemy-battle-text-content>.enemy-ai-boundary {margin-bottom:8px}
     .enemy-battle-text-line textarea {display:block;width:100%;min-height:92px;resize:vertical;padding:9px 11px;color:#fff;border:2px solid;border-color:#292929 #a5a5a5 #a5a5a5 #292929;background:#3b3b3b;font:inherit;line-height:1.35}
-    .enemy-curve-column {min-width:0;min-height:0;overflow:visible;margin:0!important;padding-top:14px}
+    .enemy-curve-column {min-width:0;min-height:0;overflow:auto;margin:0!important;padding-top:14px}
     .enemy-curve-column .character-curve-grid {display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:repeat(var(--lex-enemy-curve-rows,8),minmax(0,1fr))!important;height:100%!important;gap:2px!important;overflow:hidden!important}
     .enemy-curve-column .enemy-stat-growth {height:100%!important;min-height:0!important;margin:0!important}
     .ff8-credit a {color:#fff;text-decoration:underline;text-underline-offset:3px}

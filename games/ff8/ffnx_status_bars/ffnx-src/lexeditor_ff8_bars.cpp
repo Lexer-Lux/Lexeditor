@@ -51,7 +51,11 @@ using GlyphRenderer = std::uint32_t(__cdecl *)(std::uint32_t, std::uint32_t, int
 BattleRowRenderer g_battle_row_renderer = nullptr;
 GlyphRenderer g_hp_glyph_renderer = nullptr, g_atb_glyph_renderer = nullptr;
 struct HpCapture {
-    float left = 0, right = 0, top = 0;
+    // left: visible start of the name; name_right: end of its 96-pixel area.
+    // hp_left/hp_right: where the HP digits were actually drawn; digit: the
+    // widest digit, so the bar can span a full four-digit field.
+    float left = 0, right = 0, top = 0, name_right = 0;
+    float hp_left = 0, hp_right = 0, digit = 0;
     sprite_viewport viewport{};
     std::uint16_t current = 0, maximum = 0;
     std::uint32_t gf_current = 0, gf_maximum = 0;
@@ -75,8 +79,15 @@ void capture_glyph(int x, int y, bool hp)
     if (count == 0 || count > 64) return;
     const auto *sprite = table + (entry & 0xFFFF);
     for (unsigned i = 0; i < count; ++i, sprite += 8) {
-        const float right = x + static_cast<std::int8_t>(sprite[5]) + sprite[4];
-        if (!hp) g_hp_row->right = std::max(g_hp_row->right, right);
+        const float left = x + static_cast<std::int8_t>(sprite[5]);
+        const float right = left + sprite[4];
+        if (!hp) {
+            g_hp_row->right = std::max(g_hp_row->right, right);
+        } else {
+            g_hp_row->hp_left = g_hp_row->hp_visible ? std::min(g_hp_row->hp_left, left) : left;
+            g_hp_row->hp_right = std::max(g_hp_row->hp_right, right);
+            g_hp_row->digit = std::max(g_hp_row->digit, static_cast<float>(sprite[4]));
+        }
     }
     g_hp_row->viewport = **g_active_viewport;
     if (hp) g_hp_row->hp_visible = true;
@@ -142,7 +153,8 @@ std::uint32_t __cdecl battle_row_hook(std::uint8_t *row, std::uint32_t a, std::u
         // 004B0C0B reads the name area's origin. 004B0CCF..004B0CF0
         // right-aligns the name inside its 96-pixel area using row+0x4A.
         // Use that visible name edge, not the empty area's left edge.
-        capture.left = *reinterpret_cast<const std::uint16_t *>(row + 8) + 96.0f
+        capture.name_right = *reinterpret_cast<const std::uint16_t *>(row + 8) + 96.0f;
+        capture.left = capture.name_right
             - *reinterpret_cast<const std::uint16_t *>(row + 0x4A);
         capture.top = *reinterpret_cast<const std::int16_t *>(row + 0xA);
         capture.maximum = *reinterpret_cast<const std::uint16_t *>(row + 0x1C);
@@ -409,42 +421,47 @@ void draw_battle_hp()
         return;
     }
     for (const auto &row : g_hp_rows) {
-        if (!row.atb_visible || row.right <= row.left ||
+        // Only rows the native HUD drew this frame.
+        if (!(row.hp_visible || row.atb_visible) ||
             row.viewport.scale_x <= 0 || row.viewport.scale_y <= 0) continue;
         const auto &v = row.viewport;
-        const float full_width = (row.right - row.left) * v.scale_x;
+        // A gauge spans the thing it measures and fills by current/max. It
+        // used to be anchored at the ATB gauge's far end and shortened by
+        // max/9999, so a 479-HP character got a two-pixel stub floating past
+        // the end of the ATB frame instead of a bar under its HP.
         auto draw_line = [&](std::uint32_t current, std::uint32_t maximum,
-                             float native_y, bool from_left, ImU32 color) {
-            if (!maximum) return;
-            const float width = full_width * std::min(1.0f, maximum / 9999.0f);
-            const float x = (from_left ? row.left : row.right) * v.scale_x + v.offset_x;
+                             float native_left, float native_right, float native_y, ImU32 color) {
+            if (!maximum || native_right <= native_left) return;
+            const float left = scale_x(native_left * v.scale_x + v.offset_x);
+            const float right = scale_x(native_right * v.scale_x + v.offset_x);
             const float top = native_y * v.scale_y + v.offset_y;
-            const float left = scale_x(from_left ? x : x - width);
-            const float right = scale_x(from_left ? x + width : x);
-            if (right <= left) return;
-            auto *draw = ImGui::GetForegroundDrawList();
             const float fraction = std::min(1.0f, current / static_cast<float>(maximum));
             const float filled = (right - left) * fraction;
+            if (filled <= 0) return;
+            auto *draw = ImGui::GetForegroundDrawList();
             // Match the menu HP gauge: two thin parallel lines with a clear
             // gap. The unfilled part stays transparent, without a black track.
-            // HP and GF HP share geometry; only anchor, direction and color differ.
             for (int rail = 0; rail < 2; ++rail) {
                 const float y = top + rail * 2.0f * v.scale_y;
-                if (fraction > 0) draw->AddRectFilled(
-                    ImVec2(from_left ? left : right - filled, scale_y(y)),
-                    ImVec2(from_left ? left + filled : right, scale_y(y + v.scale_y)), color);
+                draw->AddRectFilled(ImVec2(left, scale_y(y)),
+                    ImVec2(left + filled, scale_y(y + v.scale_y)), color);
             }
-
         };
         // Native rows are 15 pixels high (004B0FF6) and spaced by 15
-        // (004B1978). Text starts at row_y+2 and is 12 pixels high. Glyph
-        // atlas cells can contain transparent padding beyond that row.
-        // Anchor the first red rail to its final pixel, never to atlas-cell bounds.
-        if (enable_ff8_hp_bars && row.hp_visible)
-            draw_line(row.current, row.maximum, row.top + 14.0f, false, IM_COL32(236, 0, 0, 255));
-        // Both blue rails fit above the name, whose text starts at row_y+2.
-        if (enable_ff8_gf_hp_bars)
-            draw_line(row.gf_current, row.gf_maximum, row.top - 1.0f, true, IM_COL32(48, 128, 255, 255));
+        // (004B1978). Text starts at row_y+2 and is 12 pixels high, so the
+        // red rails sit on the row's final pixel, under the HP digits. The
+        // number is right-aligned; the bar spans a full four-digit field
+        // ending where the digits end, so every row's bar has one length.
+        if (enable_ff8_hp_bars && row.hp_visible && row.hp_right > row.hp_left) {
+            const float field = std::max(row.hp_right - row.hp_left, 4.0f * row.digit);
+            draw_line(row.current, row.maximum, row.hp_right - field, row.hp_right,
+                row.top + 14.0f, IM_COL32(236, 0, 0, 255));
+        }
+        // Both blue rails fit above the name, whose text starts at row_y+2,
+        // and span the name's own area.
+        if (enable_ff8_gf_hp_bars && row.name_right > row.left)
+            draw_line(row.gf_current, row.gf_maximum, row.left, row.name_right,
+                row.top - 1.0f, IM_COL32(48, 128, 255, 255));
     }
 }
 

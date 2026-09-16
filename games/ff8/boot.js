@@ -98,7 +98,7 @@
       row("FLYING EVA BONUS","Adds the selected effective EVA to intrinsic flying targets against grounded melee attacks. A hit rate of 255 does not bypass it.",flyingControl,"value-toggle"),
       row("GF HP CASTING","Battle Magic spends the spell’s GF HP cost instead of spell stock. Set costs in Magic → Attack Data. Requires Monogamy and No Magic Consumption. A character without a GF or enough GF HP cannot cast.",gfHpCasting,"boolean"),
       row("GF HP BARS","Shows blue GF HP bars above party names, filling left to right. Requires Monogamy. Shows only one junctioned GF, including damage during summoning. Multiple junctioned GFs cause an error and hide the bar.",gfHpBars,"boolean"),
-      row("HP BARS","Shows party HP bars at the bottom-right during battle.",hpBars,"boolean"),
+      row("HP BARS","Shows a red HP bar under each party member's HP during battle.",hpBars,"boolean"),
       row("IN-GAME TIME","Shows your computer's local clock where the main menu shows play time. It does not replace FF8's saved play-time counter: that keeps counting, and timed events still measure against it.",inGameTime,"boolean"),
       row("MAX SPELL","Sets the maximum stock for each spell. A full stack keeps the same junction effect as 100 spells in vanilla.",maxSpellControl,"value-toggle"),
       row("MODERN CONTROLS",settings.modernControlsBlocker||"Right stick turns the battle camera while the camera is idle, and gives the world map analog rotation. The number is the turn rate as a multiple of the shipped speed, from 0.2 to 4. The camera stops level with what it is looking at rather than dropping through the ground.",modernControlsControl,"value-toggle"),
