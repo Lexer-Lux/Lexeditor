@@ -276,6 +276,7 @@
     {id: "hasEnabledProperty", level: "utility", summary: "Whether a record carries an enabled flag."},
     {id: "refreshReferences", level: "utility", summary: "Re-reads reference mods after a change."},
     {id: "autoFitControlText", level: "utility", summary: "Shrinks text to fit a fixed control."},
+    {id: "lazyOptions", level: "utility", summary: "Fills a long select's options the first time it is used."},
     {id: "beginSearcher", level: "utility", summary: "Starts a hold-to-search interaction."},
     {id: "finishSearcher", level: "utility", summary: "Ends one."},
     {id: "playThemeSound", level: "utility", summary: "Plays one interface sound from the active theme."},

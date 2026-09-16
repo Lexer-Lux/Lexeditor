@@ -3211,6 +3211,15 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
   padding-right:calc(var(--lex-internal-reference-width) + .95em);
 }
 .lex-source-control-internal.no-reference { --lex-internal-reference-width:0px !important; }
+/* A select's open list is drawn by the system, which paints it white with
+   black text unless told otherwise, and a theme's text shadow comes along and
+   smears it. The list wears the panel and ink of the page that opened it. */
+select option,
+select optgroup {
+  background-color:var(--lex-panel);
+  color:var(--lex-text);
+  text-shadow:none;
+}
 /* Matching vanilla shows nothing in the lane, so the value gets the room back.
    The box keeps its width and its text stays left-aligned, so nothing moves
    when a reference appears; a long value like "50,000" was cut to "50," by a
@@ -6319,7 +6328,7 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 .lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
   grid-area:auto;top:calc(50% + 12.5px);bottom:auto;height:12px;
 }
-.lex-toggle-row > .lex-toggle { padding:5px 12px;gap:8px; }
+.lex-toggle-row > .lex-toggle { padding:var(--lex-toggle-padding,5px 12px);gap:var(--lex-toggle-gap,8px); }
 /* Reference colors identify sources. They are not the editable-value accent. */
 .lex-source-control-internal .lex-reference-value {
   overflow:visible;

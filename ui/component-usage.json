@@ -227,6 +227,9 @@
       "blank",
       "ff7"
     ],
+    "lazyOptions": [
+      "ff8"
+    ],
     "list": [
       "ff7",
       "rdr",

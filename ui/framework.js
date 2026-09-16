@@ -869,8 +869,54 @@
     }, content || [])));
   };
 
+  // A select that shows one of hundreds of choices holds only that choice
+  // until someone reaches for it. FF8's AI view has a few hundred opcode and
+  // branch selects, and building every option of every one up front was
+  // twenty-five thousand elements and six seconds of frozen window.
+  // `entries` is an array of {value, label} or a function returning one.
+  const lazyOptions = (control, entries) => {
+    if (!(control instanceof HTMLSelectElement)) return control;
+    let filled = false;
+    const fill = () => {
+      if (filled) return;
+      filled = true;
+      const value = control.value;
+      const list = typeof entries === "function" ? entries() : entries;
+      control.replaceChildren(...list.map(entry => element("option", {value: entry.value}, entry.label)));
+      control.value = value;
+    };
+    for (const type of ["pointerdown", "focus", "keydown"]) control.addEventListener(type, fill);
+    control.lexFillOptions = fill;
+    return control;
+  };
+
   // Keep the visible value legible when a bounded control contains a long
   // enum label. Width changes and value changes use the same measurement path.
+  //
+  // Fitting is reset, read, write. Done one control at a time, each read came
+  // straight after the previous control's write and cost a full layout, which
+  // on FF8's AI view was half a second for four hundred selects. Resizes and
+  // first fits are therefore gathered and done together: every reset, then
+  // every read, then every write.
+  const autoFitQueue = new Set();
+  const flushAutoFit = () => {
+    const controls = [...autoFitQueue].filter(control => control.isConnected);
+    autoFitQueue.clear();
+    controls.forEach(control => { control.style.fontSize = ""; });
+    const sizes = controls.map(control => control.__lexAutoFitMeasure());
+    controls.forEach((control, index) => { if (sizes[index]) control.style.fontSize = sizes[index]; });
+  };
+  const queueAutoFit = control => {
+    if (!autoFitQueue.size) requestAnimationFrame(flushAutoFit);
+    autoFitQueue.add(control);
+  };
+  // One observer for every fitted control, held here for the life of the page.
+  const autoFitObserver = typeof ResizeObserver === "function"
+    ? new ResizeObserver(entries => {
+      entries.forEach(entry => autoFitQueue.add(entry.target));
+      flushAutoFit();
+    })
+    : null;
   const autoFitControlText = (control, options = {}) => {
     if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement)) return control;
     if (control.__lexAutoFitUpdate) {
@@ -878,8 +924,8 @@
       return control;
     }
     const minimum = Math.max(8, Number(options.minimum) || 11);
-    const update = () => {
-      control.style.fontSize = "";
+    // The size the text needs, read with the control at its natural size.
+    const measure = () => {
       const style = getComputedStyle(control);
       const maximum = Number.parseFloat(style.fontSize) || 16;
       const horizontal = (Number.parseFloat(style.paddingLeft) || 0) +
@@ -893,22 +939,23 @@
         : control.value || control.placeholder || "";
       const canvas = autoFitControlText.canvas ||= document.createElement("canvas");
       const context = canvas.getContext("2d");
-      if (!context || !value) return;
+      if (!context || !value) return "";
       context.font = `${style.fontStyle} ${style.fontWeight} ${maximum}px ${style.fontFamily}`;
       const measured = context.measureText(value).width;
-      if (measured > available) control.style.fontSize = `${Math.max(minimum, maximum * available / measured)}px`;
+      return measured > available ? `${Math.max(minimum, maximum * available / measured)}px` : "";
+    };
+    const update = () => {
+      control.style.fontSize = "";
+      const size = measure();
+      if (size) control.style.fontSize = size;
     };
     control.addEventListener("input", update);
     control.addEventListener("change", update);
     control.__lexAutoFitUpdate = update;
-    if (typeof ResizeObserver === "function") {
-      // Keep a strong reference. A detached observer can be collected after
-      // setup, which made later grid and panel resizes retain the old size.
-      control.__lexAutoFitResizeObserver = new ResizeObserver(update);
-      control.__lexAutoFitResizeObserver.observe(control);
-    }
-    document.fonts?.ready?.then(update);
-    requestAnimationFrame(update);
+    control.__lexAutoFitMeasure = measure;
+    autoFitObserver?.observe(control);
+    document.fonts?.ready?.then(() => queueAutoFit(control));
+    queueAutoFit(control);
     return control;
   };
 
@@ -1495,6 +1542,12 @@
         "data-lex-toggle": toggle.key || toggle.label || "",
       }, rail, input, element("span", {class: "lex-toggle-name"}, toggle.label));
       if (toggle.help) rail.append(infoHelp(toggle.help));
+      // A switch that is also a table column carries its pin in its corner,
+      // the same place every other pinnable property keeps one.
+      if (toggle.pin) {
+        label.classList.add("lex-pinnable-property");
+        label.append(toggle.pin);
+      }
       return label;
     });
     const root = detailParts(toggles, {
@@ -2178,6 +2231,11 @@
       this.redoStack = [];
       this.applying = false;
       this.pending = null;
+      // The last snapshot known to match the data, and its signature. A copy
+      // of a large plugin's data takes a few hundred milliseconds, and every
+      // click and every slider step asks for a "before"; when nothing has
+      // changed since the last snapshot, that snapshot is the before.
+      this.known = null;
     }
 
     get canUndo() { return this.undoStack.length > 0; }
@@ -2192,8 +2250,11 @@
 
     begin(label = "Edit", source = "") {
       if (this.applying || this.pending || !this.enabled()) return;
-      const before = clone(this.capture());
-      this.pending = {label, source, before, beforeSignature: signature(before)};
+      const current = this.capture();
+      const beforeSignature = signature(current);
+      const before = this.known?.signature === beforeSignature ? this.known.snapshot : clone(current);
+      this.known = {signature: beforeSignature, snapshot: before};
+      this.pending = {label, source, before, beforeSignature};
       setTimeout(() => this.finish(), 0);
     }
 
@@ -2201,9 +2262,11 @@
       const pending = this.pending;
       this.pending = null;
       if (!pending || this.applying) return;
-      const after = clone(this.capture());
-      const afterSignature = signature(after);
+      const current = this.capture();
+      const afterSignature = signature(current);
       if (afterSignature === pending.beforeSignature) return;
+      const after = clone(current);
+      this.known = {signature: afterSignature, snapshot: after};
       const now = Date.now();
       const last = this.undoStack.at(-1);
       if (last && pending.source && last.source === pending.source && now - last.time < 700 &&
@@ -2221,6 +2284,7 @@
 
     async apply(snapshot) {
       this.applying = true;
+      this.known = null;
       try {
         await this.restore(clone(snapshot));
         await this.render();
@@ -2250,7 +2314,8 @@
 
     observe(root = document) {
       const begin = event => {
-        if (event.target.closest?.("[data-lex-history-control]")) return;
+        // Moving between tabs, subtabs and pages edits nothing.
+        if (event.target.closest?.("[data-lex-history-control],nav [data-tab],.lex-subtab-button,.lex-pager")) return;
         const control = event.target.closest?.("input,select,textarea,button,[role=button]");
         const source = control ? [
           document.body.dataset.lexPlugin || "plugin",
@@ -4976,7 +5041,9 @@ ${contents.path}`});
       refreshReferences();
       projectControl.refresh?.();
       const dirty = options.dirtyCount?.() || 0;
-      if (!dirty && options.history?.capture) savedPreviewState=clone(options.history.capture());
+      // Only the built-in change list reads this copy; a plugin with its own
+      // pendingChanges would pay for a full copy of its data on every refresh.
+      if (!dirty && options.history?.capture && !options.pendingChanges) savedPreviewState=clone(options.history.capture());
       navigationHistory?.visit(githubWorkspace?.state.open ? "github" : `tab:${options.activeTab()}`);
       undo.disabled = !history?.canUndo;
       redo.disabled = !history?.canRedo;
@@ -5432,8 +5499,11 @@ ${contents.path}`});
 
   // Column minima include the rendered heading, not only the body values.
   const columnHeadingWidths = new Map();
-  const fitColumnHeadings = root => {
-    if (!root.isConnected) return;
+  // Measuring is split from writing so that every list waiting for a fit is
+  // probed in one layout: prepare() adds a list's probes, finish() reads them
+  // after all of them are in.
+  const prepareHeadingFit = root => {
+    if (!root.isConnected) return null;
     const base = root.lexHeadingTemplate || root.style.getPropertyValue("--lex-column-list-template");
     root.lexHeadingTemplate = base;
     const tracks = [];
@@ -5448,8 +5518,10 @@ ${contents.path}`});
       }
     }
     const heads = [...root.querySelectorAll(":scope > .lex-column-list-header > .lex-column-list-head-cell")];
-    if (tracks.length !== heads.length) return;
-    const fitted = heads.map((head, index) => {
+    if (!heads.length || tracks.length !== heads.length) return null;
+    // Probing one column at a time cost a full page layout per column, and a
+    // panel holding a dozen tables spent over a second doing it.
+    const probes = heads.map(head => {
       const probe = head.cloneNode(true);
       probe.removeAttribute("id");
       probe.style.cssText = "position:fixed;visibility:hidden;width:max-content;min-width:max-content;max-width:none;white-space:nowrap;";
@@ -5458,25 +5530,44 @@ ${contents.path}`});
         node.style.maxWidth = "none";
         node.style.flexShrink = "0";
       });
-      head.parentElement.append(probe);
-      const width = Math.ceil(probe.offsetWidth + 2);
-      probe.remove();
-      const track = tracks[index], range = /^minmax\((.*),\s*([^,]+)\)$/.exec(track);
-      // Intrinsic sizes are valid grid bounds, but are not CSS math values.
-      // Their natural size already includes the unwrapped heading.
-      if (range) {
-        if (/^(?:min-content|max-content|auto)$/.test(range[1].trim())) return track;
-        const candidate = `minmax(max(${width}px, ${range[1]}), ${range[2]})`;
-        return CSS.supports('grid-template-columns', candidate) ? candidate : track;
-      }
-      if (/^[\d.]+(?:px|em|rem|ch|%)$/.test(track)) return `max(${width}px, ${track})`;
-      if (/^[\d.]+fr$/.test(track)) return `minmax(${width}px, ${track})`;
-      return track;
-    }).join(" ");
-    if (!CSS.supports('grid-template-columns', fitted)) return;
-    columnHeadingWidths.set(root.lexHeadingKey, fitted);
-    if (root.style.getPropertyValue("--lex-column-list-template") !== fitted)
-      root.style.setProperty("--lex-column-list-template", fitted);
+      return probe;
+    });
+    heads[0].parentElement.append(...probes);
+    return () => {
+      const widths = probes.map(probe => Math.ceil(probe.offsetWidth + 2));
+      probes.forEach(probe => probe.remove());
+      const fitted = heads.map((head, index) => {
+        const width = widths[index];
+        const track = tracks[index], range = /^minmax\((.*),\s*([^,]+)\)$/.exec(track);
+        // Intrinsic sizes are valid grid bounds, but are not CSS math values.
+        // Their natural size already includes the unwrapped heading.
+        if (range) {
+          if (/^(?:min-content|max-content|auto)$/.test(range[1].trim())) return track;
+          const candidate = `minmax(max(${width}px, ${range[1]}), ${range[2]})`;
+          return CSS.supports('grid-template-columns', candidate) ? candidate : track;
+        }
+        if (/^[\d.]+(?:px|em|rem|ch|%)$/.test(track)) return `max(${width}px, ${track})`;
+        if (/^[\d.]+fr$/.test(track)) return `minmax(${width}px, ${track})`;
+        return track;
+      }).join(" ");
+      if (!CSS.supports('grid-template-columns', fitted)) return () => {};
+      columnHeadingWidths.set(root.lexHeadingKey, fitted);
+      return () => {
+        if (root.style.getPropertyValue("--lex-column-list-template") !== fitted)
+          root.style.setProperty("--lex-column-list-template", fitted);
+      };
+    };
+  };
+  const pendingHeadingFits = new Set();
+  const fitColumnHeadings = root => {
+    if (pendingHeadingFits.size === 0) requestAnimationFrame(() => {
+      const roots = [...pendingHeadingFits];
+      pendingHeadingFits.clear();
+      const reads = roots.map(prepareHeadingFit).filter(Boolean);
+      const writes = reads.map(read => read());
+      writes.forEach(write => write());
+    });
+    pendingHeadingFits.add(root);
   };
 
   const columnList = options => {
@@ -5714,7 +5805,7 @@ ${contents.path}`});
     root.lexHeadingKey = JSON.stringify([template, options.class, header.textContent]);
     const cachedHeadingTemplate = columnHeadingWidths.get(root.lexHeadingKey);
     if (cachedHeadingTemplate) root.style.setProperty("--lex-column-list-template", cachedHeadingTemplate);
-    requestAnimationFrame(() => fitColumnHeadings(root));
+    fitColumnHeadings(root);
     document.fonts?.ready.then(() => fitColumnHeadings(root));
     return root;
   };
@@ -7423,7 +7514,7 @@ ${contents.path}`});
       paged)
   };
 
-  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 
