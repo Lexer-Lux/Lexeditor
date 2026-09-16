@@ -378,6 +378,14 @@ body.lex-save-busy .lex-save-icon.saving {
   background: currentColor;
   translate: -50% -50%;
 }
+/* A row of parts: as many controls as the row needs, each with its own small
+   label, wrapping rather than squeezing. */
+.lex-detail-parts { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; width:100%; min-width:0; }
+.lex-detail-part { display:flex; flex:1 1 7em; align-items:center; gap:6px; min-width:0; }
+.lex-detail-part > :is(input,select,textarea,output,.lex-readonly-field) { flex:1 1 auto; min-width:0; }
+.lex-detail-part-label { flex:0 0 auto; color:var(--lex-muted); font-size:.82em; letter-spacing:.04em; text-transform:uppercase; }
+.lex-detail-part:has(> input[type="checkbox"]) { flex:0 0 auto; }
+
 /* A button's own words are not text to drag-select. */
 .lex-brand-button, .lex-brand-button h1, .lex-subtab-button, .lex-shell-header nav button {
   user-select: none;
@@ -2448,6 +2456,8 @@ body[data-lex-github-open="true"] > :not(.lex-shell-header):not(.lex-github-work
   bottom: calc(100% - 21px);
   left: 50%;
   flex-direction: row;
+  /* Upright: only a divider you drag sideways needs its control turned. */
+  transform: none;
   translate: -50% 0;
 }
 
@@ -2723,6 +2733,12 @@ body.lex-panel-layout-dragging * {
 }
 
 .lex-column-sort {
+  /* One line, whether or not this column is the sorted one: the arrow used to
+     add a second line to the header, which pushed the last row out of view. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .3em;
   width: 100%;
   min-width: 0;
   padding: 0;
@@ -2731,7 +2747,9 @@ body.lex-panel-layout-dragging * {
   background: transparent;
   cursor: pointer;
   font: inherit;
+  line-height: 1.35;
   text-align: center;
+  white-space: nowrap;
 }
 
 .lex-column-heading {
@@ -5784,6 +5802,15 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   box-sizing:border-box;
   min-height:var(--lex-pager-bar-height, 52px);
   height:var(--lex-pager-bar-height, 52px);
+}
+
+/* Shown in place rather than pinned to the window: a sample, a dialog, or a
+   panel that pages its own contents. */
+.lex-pager-inline {
+  position:static;
+  z-index:auto;
+  width:100%;
+  border-top:0;
 }
 .lex-pager > * { min-height:0; }
 .lex-pager-search { height:32px; }

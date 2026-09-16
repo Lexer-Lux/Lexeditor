@@ -1025,7 +1025,23 @@
     }
   };
 
+  // A row can hold more than one control: three numbers, or a number and a
+  // switch. Rather than a component per combination - multiNumberRow, toggleRow,
+  // and whatever the next shape would have been - a row takes a list of parts.
+  const detailParts = parts => element("div", {class: "lex-detail-parts"},
+    ...(parts || []).filter(Boolean).map(part => {
+      const control = part instanceof Element ? part : part.control;
+      const label = part instanceof Element ? "" : part.label;
+      return label
+        ? element("label", {class: "lex-detail-part"},
+          element("span", {class: "lex-detail-part-label"}, String(label)), control)
+        : element("div", {class: "lex-detail-part"}, control);
+    }));
+
   const detailField = (options = {}) => {
+    if (Array.isArray(options.controls)) {
+      options = {...options, control: detailParts(options.controls)};
+    }
     const control = options.control instanceof Element && options.control.matches('input[type="checkbox"]')
       ? element("div", {class:"lex-source-control no-reference"}, options.control)
       : options.control;
@@ -5451,6 +5467,20 @@ ${contents.path}`});
         sortState: {key: column.key, dir: nextDirection},
         idFloor: recordIdWidth,
       });
+      // The page fitter measured the list this replaces and set its row height
+      // on that node. Sorting swapped in a fresh one, which kept none of it, so
+      // the table shrank to its natural height and lost its last row.
+      if (root) {
+        for (const name of ["--lex-fitted-row-height", "--lex-page-row-count", "--lex-page-font-row-count"]) {
+          const value = root.style.getPropertyValue(name);
+          if (value) replacement.style.setProperty(name, value);
+        }
+        for (const key of ["lexFixedRows", "lexFittedPageSize"]) {
+          if (root.dataset[key]) replacement.dataset[key] = root.dataset[key];
+        }
+        if (root.classList.contains("lex-fitted-page")) replacement.classList.add("lex-fitted-page");
+        if (root.style.height) replacement.style.height = root.style.height;
+      }
       root?.replaceWith(replacement);
       // A local sort replaces the table in place, so anything outside it - the
       // pager summary - only learns of the new order from this event.
@@ -5896,6 +5926,7 @@ ${contents.path}`});
       });
       options.resize?.(cachedGeometry.height, cachedGeometry);
     }
+    let lastStability = "", lastStableGeometry = null;
     const measure = () => {
       frame = 0;
       if (!listNode.isConnected) return;
@@ -5910,6 +5941,14 @@ ${contents.path}`});
         (listNode.firstElementChild?.classList.contains("lex-list-row") ? null : listNode.firstElementChild);
       const rows = [...listNode.querySelectorAll(options.rowSelector || ".lex-list-row")];
       if (!rows.length) return;
+      // Same rows, same space, same answer. Re-sorting a column rebuilds the
+      // rows, and measuring the rebuilt ones handed back a different row height
+      // each time, so the table changed size when you sorted it.
+      const stability = `${rows.length}:${Math.round(availableNode.clientHeight)}:${Math.round(listNode.clientWidth)}`;
+      if (lastStability === stability && lastStableGeometry) {
+        options.resize?.(lastStableGeometry.height, lastStableGeometry);
+        return;
+      }
       // A paged view can set one real CSS row height for content whose icons or
       // glyphs otherwise alter the line box. That keeps capacity independent
       // of the page being displayed. Measuring only the current page can make
@@ -5958,6 +5997,8 @@ ${contents.path}`});
       const fittedHeight = full ? availableHeight :
         Math.ceil(borderHeight + headerHeight + visibleRows * rowHeight);
       const geometry = {full, pageSize, visibleRows, rowHeight, height:fittedHeight};
+      lastStability = stability;
+      lastStableGeometry = geometry;
       if (geometryKey && fixedRows) fittedPageGeometry.set(geometryKey, geometry);
       options.resize?.(fittedHeight, geometry);
       if ((!fixedRows || minimumRowHeight > 0) && pageSize !== lastSize) {
@@ -6165,6 +6206,7 @@ ${contents.path}`});
   };
 
   const pager = options => {
+    const inline = options.inline === true;
     const pages = Math.max(1, Number(options.pages) || 1);
     const page = Math.max(0, Math.min(Number(options.page) || 0, pages - 1));
     const change = target => options.change?.(Math.max(0, Math.min(target, pages - 1)));
@@ -6241,7 +6283,7 @@ ${contents.path}`});
       ...(options.filters || []),
       element("span", {class: "lex-page-summary", text: `${formatNumber(first)}-${formatNumber(last)}/${formatNumber(total)}`}));
     return element("div", {
-      class: `lex-pager${pages === 1 ? " single-page" : ""}`,
+      class: `lex-pager${pages === 1 ? " single-page" : ""}${inline ? " lex-pager-inline" : ""}`,
       "aria-label": "Search and pagination",
     }, left, pages === 1 ? null : controls, right);
   };
