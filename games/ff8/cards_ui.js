@@ -29,20 +29,6 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     // here is the plugin's own theme token or the card's own blue.
     style.textContent = `
       .ff8-card-root{display:grid;grid-template-rows:auto minmax(0,1fr);row-gap:var(--lex-panel-gap);min-height:0;height:100%}
-      .ff8-card-root > .lex-subtab-bar{margin:0}
-
-      /* One row: the card on the left, everything you can change on its right.
-         Nothing stacked, nothing scrolling. */
-      .ff8-card-detail .lex-detail-panel-body{
-        display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;
-        gap:18px;padding:14px 16px;min-height:0;overflow:hidden}
-      .ff8-card-detail .lex-detail-section{border:0;background:transparent;margin:0;min-width:0}
-      .ff8-card-detail .lex-detail-section > h3,
-      .ff8-card-detail .lex-detail-section-title{display:none}
-      .ff8-card-detail .lex-detail-section-content{min-width:0}
-      @media (max-width:900px){
-        .ff8-card-detail .lex-detail-panel-body{grid-template-columns:minmax(0,1fr)}
-      }
 
       /* The card. Triple Triad draws a blue player card with a soft lit centre
          falling to a darker edge, a pale border and the ranks in a diamond in
@@ -89,8 +75,6 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       .ff8-card-element-picker button:is(:hover,:focus-visible){background:var(--lex-accent)}
       .ff8-card-element-picker img,.ff8-card-element-empty{width:22px;height:22px;object-fit:contain}
 
-
-      .ff8-card-player-detail .lex-detail-panel-body{padding:var(--lex-panel-gap);gap:var(--lex-panel-gap)}
     `;
     document.head.append(style);
   }
@@ -189,6 +173,9 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     // No NAME property. The name is the heading, and the heading is typed into
     // directly, so a card no longer carries its own name twice.
     return detailPanel({
+      // The card beside what it holds: the shared panel's own layout, asked for
+      // by name rather than restyled from here.
+      bodyLayout: "beside",
       className: "lex-detail detail ff8-card-detail",
       title: row.name,
       renameRecord: value => {renameCard(row, value);shell.refresh();},
@@ -275,6 +262,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     if (state.tab !== "cards") return null;
     const root = el("div", {class: "ff8-card-root"},
       subtabBar({
+        flush: true,
         label: "Cards views",
         active: mode,
         tabs: [{id: "cards", label: "CARDS"}, {id: "players", label: "PLAYERS"}],
@@ -342,22 +330,20 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       .${PANEL_CLASS}{margin:0;padding:8px;border:0;border-radius:0;background:var(--lex-panel);color:var(--lex-text);font:inherit}
       .gf-abilities-views{flex:1;min-height:0;overflow:auto}
       .gf-abilities-views>[hidden]{display:none!important}
-      .gf-abilities-views>.lex-detail-section-content{height:100%}
-      .gf-panel.abilities>.lex-subtab-bar{flex:0 0 auto}
-      .gf-panel.abilities [role=tab] .lex-info-help{position:relative;inset:auto;margin-left:8px}
+      .gf-abilities-views>*{height:100%}
       .${PANEL_CLASS} :is(button,select){color:var(--lex-text);background:var(--lex-panel-2);font:inherit;text-shadow:none;border:1px solid var(--lex-border);border-radius:0;min-height:30px;padding:4px 8px}
-      .${PANEL_CLASS} .lex-spell-row{grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) auto}
+      .${PANEL_CLASS} .ff8-spell-row{grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) auto}
       .${PANEL_CLASS} h3{margin:0 0 5px;font-size:14px;letter-spacing:.05em}
-      .${PANEL_CLASS} .lex-spell-note{opacity:.78;font-size:12px;margin:0 0 10px}
-      .${PANEL_CLASS} .lex-spell-toolbar,.${PANEL_CLASS} .lex-spell-page-head,.${PANEL_CLASS} .lex-spell-row{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
-      .${PANEL_CLASS} .lex-spell-toolbar{margin:8px 0}
-      .${PANEL_CLASS} .lex-spell-page{padding:8px;margin:8px 0;border:1px solid rgba(160,180,215,.28);border-radius:6px}
-      .${PANEL_CLASS} .lex-spell-page-head{justify-content:space-between;margin-bottom:6px;font-size:12px;font-weight:700}
-      .${PANEL_CLASS} .lex-spell-row{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) auto;margin:5px 0}
+      .${PANEL_CLASS} .ff8-spell-note{opacity:.78;font-size:12px;margin:0 0 10px}
+      .${PANEL_CLASS} .ff8-spell-toolbar,.${PANEL_CLASS} .ff8-spell-page-head,.${PANEL_CLASS} .ff8-spell-row{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+      .${PANEL_CLASS} .ff8-spell-toolbar{margin:8px 0}
+      .${PANEL_CLASS} .ff8-spell-page{padding:8px;margin:8px 0;border:1px solid rgba(160,180,215,.28);border-radius:6px}
+      .${PANEL_CLASS} .ff8-spell-page-head{justify-content:space-between;margin-bottom:6px;font-size:12px;font-weight:700}
+      .${PANEL_CLASS} .ff8-spell-row{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) auto;margin:5px 0}
       .${PANEL_CLASS} select{min-width:0;width:100%}
       .${PANEL_CLASS} button{white-space:nowrap}
-      .${PANEL_CLASS} .lex-spell-status{font-size:12px;min-height:1.3em}
-      @media(max-width:760px){.${PANEL_CLASS} .lex-spell-row{grid-template-columns:28px 1fr}.${PANEL_CLASS} .lex-spell-row select{grid-column:2}.${PANEL_CLASS} .lex-spell-actions{grid-column:2}}
+      .${PANEL_CLASS} .ff8-spell-status{font-size:12px;min-height:1.3em}
+      @media(max-width:760px){.${PANEL_CLASS} .ff8-spell-row{grid-template-columns:28px 1fr}.${PANEL_CLASS} .ff8-spell-row select{grid-column:2}.${PANEL_CLASS} .ff8-spell-actions{grid-column:2}}
     `;
     document.head.append(style);
   };
@@ -372,10 +358,11 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     marker.textContent = "Loading GF spellbook…";
     const abilitiesPanel=host.querySelector('[data-gf-panel="abilities"]');
     if(!abilitiesPanel)return;
-    const abilitiesContent=abilitiesPanel.querySelector('.lex-detail-section-content');
-    abilitiesPanel.querySelector('.lex-detail-section-title')?.remove();
+    const parts=LexeditorUI.sectionParts(abilitiesPanel);
+    const abilitiesContent=parts.content;
+    parts.title?.remove();
     const views=document.createElement('div');views.className='gf-abilities-views';
-    const tabs=LexeditorUI.subtabBar({label:'GF abilities and spellbook',active:'abilities',tabs:[{id:'abilities',label:'ABILITIES'},{id:'spellbook',label:'SPELLBOOK'}],change:id=>{
+    const tabs=LexeditorUI.subtabBar({flush:true,label:'GF abilities and spellbook',active:'abilities',tabs:[{id:'abilities',label:'ABILITIES'},{id:'spellbook',label:'SPELLBOOK'}],change:id=>{
       abilitiesContent.hidden=id!=='abilities';marker.hidden=id!=='spellbook';
       tabs.querySelectorAll('[role="tab"]').forEach((tab,index)=>{const active=index===(id==='abilities'?0:1);tab.tabIndex=active?0:-1;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));});
     }});
@@ -398,13 +385,13 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       const title = document.createElement("h3");
       title.textContent = "SPELLBOOK";
       const note = document.createElement("p");
-      note.className = "lex-spell-note";
+      note.className = "ff8-spell-note";
       note.textContent = "Ordered Magic pages for this GF. Zero-stock spells remain visible but disabled in battle. Optional requirements use abilities learned by this GF. Runtime requires Single GF and Shared Magic off.";
       const toolbar = document.createElement("div");
-      toolbar.className = "lex-spell-toolbar";
+      toolbar.className = "ff8-spell-toolbar";
       const body = document.createElement("div");
       const status = document.createElement("div");
-      status.className = "lex-spell-status";
+      status.className = "ff8-spell-status";
       const setDirty = () => { dirty = true; status.textContent = "Unsaved spellbook changes"; };
       const usedMagic = (except=null) => new Set(pages.flatMap(page => page).filter(slot => slot !== except).map(slot => slot.magicId));
       const draw = () => {
@@ -413,7 +400,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         if (!pages.length) {
           toolbar.append(button("ENABLE SPELLBOOK", () => {pages=[[]];setDirty();draw();}));
           const empty = document.createElement("div");
-          empty.className = "lex-spell-note";
+          empty.className = "ff8-spell-note";
           empty.textContent = "No custom book: FF8 uses its native Magic stock list.";
           body.append(empty);
         } else {
@@ -423,9 +410,9 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
           );
           pages.forEach((page, pageIndex) => {
             const card = document.createElement("div");
-            card.className = "lex-spell-page";
+            card.className = "ff8-spell-page";
             const head = document.createElement("div");
-            head.className = "lex-spell-page-head";
+            head.className = "ff8-spell-page-head";
             const name = document.createElement("span");
             name.textContent = `PAGE ${pageIndex+1}`;
             const pageActions = document.createElement("span");
@@ -438,7 +425,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
             card.append(head);
             page.forEach((slot, slotIndex) => {
               const row = document.createElement("div");
-              row.className = "lex-spell-row";
+              row.className = "ff8-spell-row";
               const index = document.createElement("span");
               index.textContent = String(slotIndex+1);
               const spellChoices = magic.map(entry => ({...entry}));
@@ -449,7 +436,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
               });
               const abilitySelect = select(abilities,slot.abilityId,value=>{slot.abilityId=value;setDirty();},"No learned-ability requirement");
               const actions = document.createElement("span");
-              actions.className = "lex-spell-actions";
+              actions.className = "ff8-spell-actions";
               actions.append(
                 button("↑",()=>{if(slotIndex){[page[slotIndex-1],page[slotIndex]]=[page[slotIndex],page[slotIndex-1]];setDirty();draw();}},"Move spell earlier"),
                 button("↓",()=>{if(slotIndex<page.length-1){[page[slotIndex+1],page[slotIndex]]=[page[slotIndex],page[slotIndex+1]];setDirty();draw();}},"Move spell later"),

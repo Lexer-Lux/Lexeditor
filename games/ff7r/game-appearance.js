@@ -108,7 +108,7 @@
 
   function bitmapizeDocument() {
     if (!bitmapState) return;
-    document.querySelectorAll("#lexeditor-shell button[data-tab], .lex-detail-panel-title")
+    (window.LexeditorUI?.shellTextNodes?.() || [])
       .forEach(bitmapize);
   }
 

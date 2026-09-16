@@ -153,6 +153,7 @@
       "palworld",
       "warband"
     ],
+    "dismissDialogs": [],
     "el": [
       "blank",
       "ff7",
@@ -314,6 +315,10 @@
       "palworld",
       "rdr2"
     ],
+    "pendingChangeList": [
+      "ff8",
+      "ff9"
+    ],
     "platformConfigView": [
       "ff7",
       "ff8"
@@ -362,6 +367,9 @@
       "blank",
       "ff8"
     ],
+    "sectionParts": [
+      "ff8"
+    ],
     "settingsColumns": [
       "blank",
       "ff7r",
@@ -382,6 +390,7 @@
       "ff7",
       "ff8"
     ],
+    "shellTextNodes": [],
     "showAlert": [
       "blank",
       "ff8",
@@ -473,6 +482,7 @@
     "pagerToggle",
     "paginateSettings",
     "panelLayout",
+    "pendingChangeList",
     "playThemeSound",
     "readonlyField",
     "recordId",

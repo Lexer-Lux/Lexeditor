@@ -91,7 +91,7 @@ body[data-lex-theme="ff7r"] .ff7r-detail label {
 }
 
 /* Skin content panes only. Divider accessories extend across pane edges. */
-body[data-lex-theme="ff7r"] .ff7r-layout > :not(.lex-panel-layout-divider) {
+body[data-lex-theme="ff7r"] .ff7r-layout > .ff7r-pane {
   overflow: hidden;
   border-color: color-mix(in srgb, var(--lex-border) 76%, transparent) !important;
   background:
@@ -117,7 +117,7 @@ body[data-lex-theme="ff7r"] .ff7r-layout > *:last-child {
    a column's sort control, an info bubble - are transparent hit areas drawn
    inside someone else's box, so filling them painted a dark rectangle inside
    every table header cell. */
-body[data-lex-theme="ff7r"] .ff7r-view button:not(.lex-column-sort):not(.lex-info-help):not(.lex-column-pin),
+body[data-lex-theme="ff7r"] .ff7r-view button:not([data-lex-control]),
 body[data-lex-theme="ff7r"] .ff7r-view input,
 body[data-lex-theme="ff7r"] .ff7r-view select,
 body[data-lex-theme="ff7r"] .ff7r-view textarea {
@@ -131,14 +131,14 @@ body[data-lex-theme="ff7r"] .ff7r-view textarea {
 body[data-lex-theme="ff7r"] .ff7r-view input:focus,
 body[data-lex-theme="ff7r"] .ff7r-view select:focus,
 body[data-lex-theme="ff7r"] .ff7r-view textarea:focus,
-body[data-lex-theme="ff7r"] .ff7r-view button:not(.lex-column-sort):not(.lex-info-help):not(.lex-column-pin):focus-visible {
+body[data-lex-theme="ff7r"] .ff7r-view button:not([data-lex-control]):focus-visible {
   outline: 1px solid var(--lex-highlight);
   outline-offset: 1px;
   border-color: var(--lex-highlight);
   box-shadow: 0 0 0 2px rgba(54, 182, 238, .10), 0 0 18px rgba(54, 182, 238, .08);
 }
 
-body[data-lex-theme="ff7r"] .ff7r-view button:not(.lex-column-sort):not(.lex-info-help):not(.lex-column-pin):not(:disabled):hover {
+body[data-lex-theme="ff7r"] .ff7r-view button:not([data-lex-control]):not(:disabled):hover {
   border-color: var(--lex-highlight);
   background: linear-gradient(180deg, rgba(30, 95, 127, .88), rgba(13, 52, 72, .88));
   text-shadow: 0 0 9px rgba(162, 226, 255, .30);
@@ -179,7 +179,7 @@ html[data-lex-ff7r-bitmap-font="installed"] #lexeditor-shell button[data-tab]:no
   opacity: .79;
 }
 
-html[data-lex-ff7r-bitmap-font="installed"] .lex-detail-panel-title.ff7r-bitmapized {
+html[data-lex-ff7r-bitmap-font="installed"] .ff7r-bitmapized {
   display: flex;
   align-items: center;
   min-width: 0;

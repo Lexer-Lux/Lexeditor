@@ -17,7 +17,8 @@ OUTPUT = ROOT / "ui" / "component-usage.json"
 
 def exports() -> list[str]:
     source = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
-    block = source[source.index("window.LexeditorUI = {"):]
+    # Past the assignment itself, or the first name is read as "window".
+    block = source[source.index("window.LexeditorUI = {") + len("window.LexeditorUI = {"):]
     block = block[:block.index("};")]
     names = []
     for piece in block.split(","):

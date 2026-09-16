@@ -442,6 +442,7 @@
       ...(interactive ? {type: "button", onclick} : {tabindex: "0"}),
       ...rest,
       class: ["lex-info-help", className].filter(Boolean).join(" "),
+      "data-lex-control": "help",
       "aria-label": ariaLabel, "aria-describedby": popupId,
     }, element("span", {"aria-hidden": "true"}, "?"));
     let closeTimer = null;
@@ -759,7 +760,12 @@
 
   // One shared Detail heading owns the optional icon or live-preview slot,
   // record identity, metadata, and actions. Games supply themed content.
+  // Where a panel's body arranges its sections: stacked by default, or the
+  // first section beside the others, for a record with a picture.
+  const DETAIL_BODY_LAYOUTS = {stacked: "", beside: "lex-detail-panel-beside"};
+
   const detailPanel = (options = {}) => {
+    const bodyClass = ["lex-detail-panel-body", DETAIL_BODY_LAYOUTS[options.bodyLayout] || ""].filter(Boolean).join(" ");
     // A record's name is the heading, so the heading is where it is edited. It
     // was an ordinary property row lower down the panel instead, which meant
     // the name appeared twice and the copy at the top - the one being read -
@@ -797,7 +803,7 @@
     return element("section", {
       ...(options.attrs || {}),
       class: ["lex-detail-panel", "lex-detail", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
-    }, heading, options.paginate ? paginateSettings(element("div", {class:"lex-detail-panel-body"}, options.body || [])) : element("div", {class: "lex-detail-panel-body"}, options.body || []));
+    }, heading, options.paginate ? paginateSettings(element("div", {class: bodyClass}, options.body || [])) : element("div", {class: bodyClass}, options.body || []));
   };
 
   // A panel can own local navigation without turning those choices into
@@ -986,6 +992,26 @@
   // invent one - a property named for the storage state rather than for
   // anything in the game - and the reader could not tell the invented row from
   // a real one. A note is not a property: no label column, no control, no pin.
+  // A page that rearranges a section - FF8 moves a GF's abilities under its own
+  // tabs - asks for its parts instead of querying the shared class names.
+  const sectionParts = section => ({
+    title: section?.querySelector(":scope > .lex-detail-section-title") || null,
+    content: section?.querySelector(":scope > .lex-detail-section-content") || null,
+  });
+
+  // Every piece of the shell's own text a game may want to redraw - Warband
+  // and FF7 Remake paint these in the game's bitmap font. Asking for them keeps
+  // the class names inside the framework.
+  const shellTextNodes = (root = document) => [
+    ...root.querySelectorAll(".lex-brand-button h1"),
+    ...root.querySelectorAll(".lex-shell-header nav button .lex-tab-label-text"),
+    ...root.querySelectorAll(".lex-detail-panel-title"),
+  ];
+
+  // Close any shared dialog that is open, without knowing how one is built.
+  const dismissDialogs = (root = document) =>
+    root.querySelectorAll(".lex-dialog-backdrop").forEach(node => node.remove());
+
   const detailNote = (text, options = {}) => element("p", {
     class: ["lex-detail-note", options.className || ""].filter(Boolean).join(" "),
   }, text);
@@ -1488,7 +1514,8 @@
   const subtabBar = (options = {}) => (options.tabs || []).length < 2
     ? element("div", {class: "lex-subtab-bar lex-subtab-bar-single", hidden: true})
     : element("div", {
-    class: ["lex-subtab-bar", options.className || ""].filter(Boolean).join(" "),
+    class: ["lex-subtab-bar", options.flush === true ? "lex-subtab-bar-flush" : "",
+      options.className || ""].filter(Boolean).join(" "),
     role: "tablist",
     "aria-label": options.label || "Subsections",
   }, ...(options.tabs || []).map((tab, index) => element("button", {
@@ -5200,6 +5227,7 @@ ${contents.path}`});
         icon.append(pin);
         return element("button", {
           type: "button", class: `lex-column-pin${pinned ? " pinned" : ""}`,
+          "data-lex-control": "pin",
           "data-lex-pin-column": value,
           title: pinned ? `Hide ${label} in the table` : `Show ${label} in the table`,
           "aria-label": pinned ? `Unpin ${label} column` : `Pin ${label} column`,
@@ -5509,7 +5537,8 @@ ${contents.path}`});
         typeof column.label === "function" ? column.label() : column.label);  // ascending points up
       const sortControl = sortable
         ? element("button", {
-            type: "button", class: ["lex-column-sort", active ? "sorted" : ""].filter(Boolean).join(" "),
+            type: "button", "data-lex-control": "sort",
+        class: ["lex-column-sort", active ? "sorted" : ""].filter(Boolean).join(" "),
             title: `Sort by ${typeof column.label === "string" ? column.label : column.key}`,
           }, label)
         : label;
@@ -5669,7 +5698,10 @@ ${contents.path}`});
     const stackAt = [700, 850, 1000, 1100].includes(Number(options.stackAt))
       ? Number(options.stackAt) : 850;
     root.classList.add(`lex-panel-layout-stack-${stackAt}`);
-    nodes.forEach(node => node.classList?.add("lex-panel-layout-pane"));
+    nodes.forEach(node => {
+      node.classList?.add("lex-panel-layout-pane");
+      if (options.paneClass) node.classList?.add(options.paneClass);
+    });
     let minimumFractions = Array.from({length: nodes.length}, (_, index) =>
       Math.max(0, Math.min(.95, Number(options.minimumFractions?.[index]) || 0)));
     const minimumTotal = minimumFractions.reduce((sum, value) => sum + value, 0);
@@ -5896,6 +5928,7 @@ ${contents.path}`});
         dividerClass: "lex-list-detail-divider",
         dividerLabels: ["Resize list and detail panels"],
         dividerAccessories: options.dividerAccessories,
+        paneClass: options.paneClass,
         eventName: "lex-list-detail-resize",
       });
     if (options.resizable !== false) root.classList.add("lex-list-detail-resizable");
@@ -6737,6 +6770,7 @@ ${contents.path}`});
       minRight: options.minRight,
       minimumSplit: Math.min(78, 22 * barrels),
       dividerAccessories: [barrelControl],
+      paneClass: options.paneClass,
     });
     root.classList.add("lex-paged-list-detail");
     root.dataset.lexPage = String(page);
@@ -7366,7 +7400,7 @@ ${contents.path}`});
       paged)
   };
 
-  window.LexeditorUI = {pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 

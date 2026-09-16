@@ -81,6 +81,10 @@
         UI.detailRow({label: "BEHAVIOUR", controls: [
           {label: "Power", control: el("input", {type: "number", value: "128"})},
           {label: "Ranged", control: el("input", {type: "checkbox", checked: true})}]}))},
+    {id: "pendingChangeList", level: "utility", summary: "The list of unsaved changes a save button shows before it saves."},
+    {id: "sectionParts", level: "utility", summary: "The title and content of a section, by name, for a page that rearranges one."},
+    {id: "shellTextNodes", level: "utility", summary: "Every piece of the shell's own text, for a game that redraws it in its own font."},
+    {id: "dismissDialogs", level: "utility", summary: "Closes any shared dialog that is open."},
     {id: "detailNote", level: "molecule", summary: "A sentence inside a section that is not a property.",
       sample: () => UI.detailNote("Nothing in this section applies to this record.")},
     {id: "toggleRow", level: "molecule", summary: "A row of on/off flags. Kept for the pages that use it; a new page uses detailRow with controls.",

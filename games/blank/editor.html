@@ -9,38 +9,21 @@
   <style>
     *{box-sizing:border-box}
     body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
-    .lex-shell-command-row{background:#fff}
-    .lex-nav-frame,.lex-shell-header nav{background:#e5e9ed}
     main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
-    .blank-layout,.lex-paged-list-detail{height:100%}
+    .blank-layout{height:100%}
     .blank-detail,.blank-table{height:100%;min-height:0}
     .blank-detail{overflow:visible}
-    :root{--lex-accent:#72ff1e;--lex-accent-text:#102008;--lex-highlight:#405247}
-    .blank-detail .lex-detail-panel-heading{padding:4px 18px 4px 4px;border-bottom:1px solid var(--lex-border);background:#f1f3f5}
-    .blank-detail .lex-detail-panel-icon{display:grid;width:auto;height:100%;aspect-ratio:1;place-items:center;color:var(--lex-accent);border:1px solid var(--lex-border);background:#fff}
-    .blank-detail .lex-detail-panel-icon svg{width:64%;height:64%;fill:none;stroke:currentColor;stroke-width:1.7}
+    :root{--lex-accent:#72ff1e;--lex-accent-text:#102008;--lex-highlight:#405247;--lex-command-row-bg:#fff;--lex-nav-bg:#e5e9ed}
     
-    .blank-detail .lex-column-pin{width:1em;min-width:1em;height:1em;min-height:1em;flex-basis:1em}
-    .blank-detail .lex-column-pin>svg{width:.95em;height:.95em}
-    .blank-detail .lex-source-control-internal:not(:has(>select))>:is(.lex-reference-values,.lex-reference-placeholder){right:.35em}
-    .blank-detail .lex-reference-tag{margin-right:.08em}
-    .blank-detail .lex-detail-panel-body{padding:10px;gap:10px}
-    .blank-detail .lex-detail-section{flex:1 1 auto}
     .blank-button-row{display:flex;flex-wrap:wrap;gap:8px}
     .blank-button-row button{padding:7px 12px;color:var(--lex-accent-text);border:0;background:var(--lex-accent);cursor:pointer}
     .blank-statuses{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px}
-    .blank-subtab-panel>.lex-tabbed-panel-content{padding:12px}
     .blank-subtab-panel{display:flex;flex-direction:column;height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel)}
-    .blank-table .lex-boolean-mark{display:block;font-size:1.45em;text-align:center}
     .blank-tweaks{height:100%}
     .blank-paged-pane{display:grid;grid-template-rows:minmax(0,1fr) auto;min-height:0;gap:var(--lex-panel-gap)}
     .blank-graphs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,600px),1fr));align-content:start;gap:16px;height:100%;overflow:auto}
-    .blank-graphs .lex-curve-editor{display:block;min-width:0}
     /* The drawing is 2:1; a fixed height gave it a differently shaped box, which
        letterboxed the graph and stranded the right-hand axis. */
-    .blank-graphs .lex-curve-plot{height:auto}
-    .blank-graphs .lex-curve-path-formula{display:block;filter:drop-shadow(1px 1px 1px var(--lex-panel))}
-    .blank-graphs .lex-curve-formula{display:none}
     .blank-components{height:100%}
     .blank-component-split{height:100%;min-height:0}
     .blank-sample-pane{display:flex;flex-direction:column;min-height:0;overflow:auto;padding:12px;border:1px solid var(--lex-border);background:var(--lex-panel);transform:translate(0)}

@@ -1,29 +1,9 @@
 {
   "note": "Counts may fall, never rise. See tools/verify_shared_ui_budget.py.",
   "files": {
-    "games/blank/editor.html": {
-      "sharedSelectors": 21,
-      "handBuiltRows": 0
-    },
-    "games/ff7r/game-appearance.css": {
-      "sharedSelectors": 11,
-      "handBuiltRows": 0
-    },
-    "games/ff7r/game-appearance.js": {
-      "sharedSelectors": 1,
-      "handBuiltRows": 0
-    },
-    "games/ff8/cards_ui.js": {
-      "sharedSelectors": 26,
-      "handBuiltRows": 0
-    },
     "games/ff8/editor.html": {
       "sharedSelectors": 560,
       "handBuiltRows": 17
-    },
-    "games/ff9/editor.html": {
-      "sharedSelectors": 3,
-      "handBuiltRows": 0
     },
     "games/rdr/editor.html": {
       "sharedSelectors": 15,
@@ -32,10 +12,6 @@
     "games/rdr2/editor.html": {
       "sharedSelectors": 45,
       "handBuiltRows": 230
-    },
-    "games/warband/editor.html": {
-      "sharedSelectors": 29,
-      "handBuiltRows": 0
     }
   }
 }

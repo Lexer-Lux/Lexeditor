@@ -6357,3 +6357,109 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 .lex-reshade-slider { display:flex; align-items:center; gap:8px; width:100%; }
 .lex-reshade-slider input[type="range"] { flex:1 1 auto; min-width:0; }
 .lex-reshade-slider input[type="number"] { flex:0 0 5.5em; width:5.5em; }
+
+/* ---- Defaults that Blank used to state by overriding them ---------------
+   Blank exists to show the shared UI unchanged. Every rule below lived in its
+   page as an override, which made the reference page a liar: the default was
+   whatever Blank happened to patch. They are the default now, and Blank
+   overrides nothing. Colours are tokens, so a game restyles them without
+   touching a shared class. */
+.lex-shell-command-row { background: var(--lex-command-row-bg, var(--lex-panel)); }
+.lex-nav-frame, .lex-shell-header nav { background: var(--lex-nav-bg, var(--lex-panel-2)); }
+.lex-paged-list-detail { height: 100%; }
+.lex-detail-panel-heading {
+  padding: 4px 18px 4px 4px;
+  border-bottom: 1px solid var(--lex-border);
+  background: var(--lex-detail-heading-bg, color-mix(in srgb, var(--lex-panel-2) 55%, var(--lex-panel)));
+}
+.lex-detail-panel-icon {
+  display: grid;
+  width: auto;
+  height: 100%;
+  aspect-ratio: 1;
+  place-items: center;
+  color: var(--lex-accent);
+  border: 1px solid var(--lex-border);
+  background: var(--lex-detail-icon-bg, var(--lex-panel));
+}
+.lex-detail-panel-icon svg { width: 64%; height: 64%; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.lex-column-pin { width: 1em; min-width: 1em; height: 1em; min-height: 1em; flex-basis: 1em; }
+.lex-column-pin > svg { width: .95em; height: .95em; }
+.lex-source-control-internal:not(:has(> select)) > :is(.lex-reference-values, .lex-reference-placeholder) { right: .35em; }
+.lex-reference-tag { margin-right: .08em; }
+.lex-detail-panel-body { padding: 10px; gap: 10px; }
+.lex-detail-panel-body > .lex-detail-section { flex: 1 1 auto; }
+.lex-tabbed-panel-content { padding: 12px; }
+.lex-boolean-mark { display: block; font-size: 1.45em; text-align: center; }
+.lex-curve-editor { display: block; min-width: 0; }
+.lex-curve-plot { height: auto; }
+.lex-curve-path-formula { display: block; filter: drop-shadow(1px 1px 1px var(--lex-panel)); }
+.lex-curve-formula { display: none; }
+/* A record with a picture: the first section beside the rest, stacking when the
+   panel is too narrow for both. Sections in this layout carry no frame and no
+   title, because the picture and its properties read as one thing. */
+.lex-detail-panel-beside {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+  padding: 14px 16px;
+  min-height: 0;
+  overflow: hidden;
+}
+.lex-detail-panel-beside > .lex-detail-section {
+  margin: 0;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+}
+.lex-detail-panel-beside > .lex-detail-section > .lex-detail-section-title { display: none; }
+.lex-detail-panel-beside > .lex-detail-section > .lex-detail-section-content { min-width: 0; }
+@media (max-width: 900px) {
+  .lex-detail-panel-beside { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* A tab bar with no margin of its own, against what it labels. */
+.lex-subtab-bar-flush { margin: 0; flex: 0 0 auto; }
+
+/* Help inside a tab sits beside the label rather than floating over it. */
+[role="tab"] .lex-info-help { position: relative; inset: auto; margin-left: 8px; }
+
+/* Colours a game restyles through tokens rather than by naming shared classes:
+   the window bar, its buttons, a list's header and cell rules, a panel's
+   heading, title and id. */
+.lex-shell-header {
+  color: var(--lex-shell-header-fg, inherit);
+  background: var(--lex-shell-header-bg, var(--lex-panel));
+  border-bottom-color: var(--lex-shell-header-border, var(--lex-border));
+}
+.lex-shell-header :is(.lex-history-button, .lex-save-icon, .lex-game-process) {
+  color: var(--lex-shell-button-fg, inherit);
+  border-color: var(--lex-shell-button-border, var(--lex-border));
+  background: var(--lex-shell-button-bg, var(--lex-panel-2));
+}
+.lex-column-list-header { background: var(--lex-list-header-bg, var(--lex-panel-2)); }
+.lex-column-list-cell { border-bottom: 1px solid var(--lex-list-cell-border, var(--lex-border)); }
+.lex-detail-panel-title { color: var(--lex-detail-title-fg, inherit); }
+.lex-detail-panel-id { color: var(--lex-detail-id-fg, var(--lex-muted)); }
+
+/* More of the same: a plain list and its rows, so a game's own palette reaches
+   them without a game naming the classes. */
+.lex-list, .lex-detail { background: var(--lex-surface-bg, transparent); box-shadow: var(--lex-surface-shadow, none); }
+.lex-list-row:not(.lex-column-list-row) { padding: var(--lex-list-row-padding, 7px 10px); }
+.lex-list-row.selected { color: var(--lex-row-selected-fg, inherit); background: var(--lex-row-selected-bg, var(--lex-highlight)); }
+.lex-column-list-row:hover { background: var(--lex-row-hover-bg, color-mix(in srgb, var(--lex-highlight) 25%, transparent)); }
+.lex-detail-panel-heading { padding: var(--lex-detail-heading-padding, 4px 18px 4px 4px); }
+.lex-detail-panel-icon { border: 1px solid var(--lex-detail-icon-border, var(--lex-border)); }
+
+/* More of the same: a plain list and its rows, so a game's own palette reaches
+   them without a game naming the classes. */
+.lex-list, .lex-detail { background: var(--lex-surface-bg, transparent); box-shadow: var(--lex-surface-shadow, none); }
+.lex-list-row:not(.lex-column-list-row) { padding: var(--lex-list-row-padding, 7px 10px); }
+.lex-list-row.selected { color: var(--lex-row-selected-fg, inherit); background: var(--lex-row-selected-bg, var(--lex-highlight)); }
+.lex-column-list-row:hover { background: var(--lex-row-hover-bg, color-mix(in srgb, var(--lex-highlight) 25%, transparent)); }
+.lex-detail-panel-heading { padding: var(--lex-detail-heading-padding, 4px 18px 4px 4px); }
+.lex-detail-panel-icon { border: 1px solid var(--lex-detail-icon-border, var(--lex-border)); }
+
+/* The data map fills its page rather than scrolling the page behind it. */
+.lex-data-map-view { height: 100%; overflow: hidden; }
