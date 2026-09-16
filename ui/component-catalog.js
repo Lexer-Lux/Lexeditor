@@ -1,0 +1,170 @@
+/* The shared UI, organised so it can be browsed.
+ *
+ * Every component the framework hands out is listed here with the level it
+ * belongs to, what it is for, and - where one exists - a live sample. Blank
+ * renders this catalogue, and the shared UI contract check fails when a
+ * component is exported without being listed, so the catalogue grows with the
+ * framework instead of drifting behind it.
+ *
+ * Levels, in the usual vocabulary for a component library:
+ *   atom      one control: a button, a field, a mark.
+ *   molecule  a few atoms doing one job: a labelled field, a row of flags.
+ *   organism  a whole region: a list, a detail panel, a tab bar, a section.
+ *   template  a page shape the games fill in.
+ *   utility   not drawn: state, history, formatting, host calls.
+ */
+(() => {
+  const UI = window.LexeditorUI;
+  if (!UI) return;
+  const el = UI.el;
+  const rows = [
+    {id: 1, name: "Example Item", category: "Common", value: 25, enabled: true},
+    {id: 2, name: "Second Item", category: "Rare", value: 100, enabled: false},
+    {id: 3, name: "Null Sword", category: "Weapon", value: 255, enabled: true},
+  ];
+
+  const entries = [
+    // ---- atoms -----------------------------------------------------------
+    {id: "element", level: "atom", summary: "Builds one DOM node. Every other component is made of these.",
+      sample: () => el("code", {}, 'element("button", {type: "button"}, "Press")')},
+    {id: "el", level: "atom", summary: "The short name for element(), used inside plugins."},
+    {id: "newButton", level: "atom", summary: "The standard button.",
+      sample: () => el("div", {class: "lex-reshade-actions"},
+        UI.newButton({label: "Do the thing"}))},
+    {id: "closeButton", level: "atom", summary: "The mark that dismisses a dialog or panel.",
+      sample: () => UI.closeButton({onclick: () => {}})},
+    {id: "readonlyField", level: "atom", summary: "A value that can be read and copied but not changed.",
+      sample: () => UI.readonlyField("Cannot be edited here")},
+    {id: "booleanMark", level: "atom", summary: "Yes or no, as a mark rather than a word.",
+      sample: () => el("div", {class: "lex-reshade-actions"}, UI.booleanMark(true), UI.booleanMark(false))},
+    {id: "recordId", level: "atom", summary: "A record's own id, formatted the same way everywhere.",
+      sample: () => UI.recordId(7)},
+    {id: "infoIcon", level: "atom", summary: "The information glyph used by help controls.",
+      sample: () => UI.infoIcon()},
+    {id: "infoHelp", level: "atom", summary: "A help bubble that explains one control in one sentence.",
+      sample: () => el("div", {class: "lex-reshade-actions"}, el("span", {}, "Power"),
+        UI.infoHelp("How hard the attack hits."))},
+    {id: "unitField", level: "atom", summary: "A number with its unit kept beside it."},
+    {id: "magnitudeValue", level: "atom", summary: "A number scaled for reading: 12.4k rather than 12,431."},
+    {id: "numberValue", level: "atom", summary: "A number formatted for a table cell."},
+    {id: "formatNumber", level: "atom", summary: "Shared number formatting, so no plugin invents its own."},
+    {id: "saveIcon", level: "atom", summary: "The save glyph used by the shell.", sample: () => UI.saveIcon()},
+    {id: "searchIcon", level: "atom", summary: "The search glyph.", sample: () => UI.searchIcon()},
+    {id: "settingsIcon", level: "atom", summary: "The settings glyph.", sample: () => UI.settingsIcon()},
+    {id: "folderIcon", level: "atom", summary: "The folder glyph.", sample: () => UI.folderIcon()},
+    {id: "enabledMark", level: "atom", summary: "Shows whether a row is switched on."},
+    {id: "copyText", level: "atom", summary: "Copies a value to the clipboard and says so."},
+    {id: "hoverable", level: "atom", summary: "Attaches a hover explanation to any node."},
+
+    // ---- molecules -------------------------------------------------------
+    {id: "detailField", level: "molecule", summary: "One property: label, control, help, and its changed state.",
+      sample: () => UI.detailField({label: "POWER", control: UI.readonlyField("128"),
+        help: UI.infoHelp("Damage before defence.")})},
+    {id: "detailRow", level: "molecule", summary: "A row of related fields kept on one line."},
+    {id: "detailNote", level: "molecule", summary: "A sentence inside a section that is not a property.",
+      sample: () => UI.detailNote("Nothing in this section applies to this record.")},
+    {id: "toggleRow", level: "molecule", summary: "A row of on/off flags that wraps instead of stretching."},
+    {id: "multiNumberRow", level: "molecule", summary: "Several numbers that belong together, such as a stat block."},
+    {id: "pager", level: "molecule", summary: "Page controls for a long list."},
+    {id: "pagerSelect", level: "molecule", summary: "Jump straight to a page."},
+    {id: "pagerToggle", level: "molecule", summary: "Switch a long page between one column and several."},
+    {id: "controlHelp", level: "molecule", summary: "The help text attached to a control."},
+    {id: "provenanceControl", level: "molecule", summary: "Says where a value came from, beside the value."},
+    {id: "referenceDisplay", level: "molecule", summary: "Shows the same value in other mods, for comparison."},
+    {id: "integrationStatus", level: "molecule", summary: "How far Lexeditor understands one game file."},
+    {id: "settingsSaveControl", level: "molecule", summary: "Save and revert for a settings page."},
+    {id: "uiScaleControl", level: "molecule", summary: "The interface scale slider in the window bar.",
+      sample: () => UI.uiScaleControl()},
+    {id: "bottomSearch", level: "molecule", summary: "The search bar that sits under a list."},
+    {id: "decorateSearchCandidate", level: "molecule", summary: "Marks the part of a row that matched a search."},
+
+    // ---- organisms -------------------------------------------------------
+    {id: "columnList", level: "organism", summary: "The shared list: columns, sorting, selection, pinning, the pointer.",
+      sample: () => UI.columnList({rows, key: row => row.id, selected: 2, select: () => {},
+        template: "60px minmax(140px,1fr) 90px",
+        columns: [{key: "id", label: "ID"}, {key: "name", label: "Name"},
+          {key: "value", label: "Value", numeric: true}]})},
+    {id: "detailPanel", level: "organism", summary: "The panel one record is edited in, with its heading and identity.",
+      sample: () => UI.detailPanel({title: "Example Item", body: [UI.detailSection({title: "ITEM",
+        body: [UI.detailField({label: "VALUE", control: UI.readonlyField("25")})]})]})},
+    {id: "detailSection", level: "organism", summary: "A titled group of fields inside a panel.",
+      sample: () => UI.detailSection({title: "GROUP",
+        body: [UI.detailField({label: "FIELD", control: UI.readonlyField("value")})]})},
+    {id: "detailGroup", level: "organism", summary: "Sections grouped under one heading."},
+    {id: "subtabBar", level: "organism", summary: "One level of tabs inside a page.",
+      sample: () => UI.subtabBar({label: "Sample views", active: "one", change: () => {},
+        tabs: [{id: "one", label: "ONE"}, {id: "two", label: "TWO"}]})},
+    {id: "tabbedPanel", level: "organism", summary: "A panel whose body switches between tabs."},
+    {id: "modLoaderSection", level: "organism", summary: "How this game loads mods, in the same five fields for every game.",
+      sample: () => UI.modLoaderSection({loader: "Sample loader beside the game.",
+        output: "Sample output folder.", order: "Sample load order.",
+        safety: "Nothing of the game's own is written.", removal: "Delete the folder."})},
+    {id: "reshadeSection", level: "organism", summary: "ReShade for one game: the switch, each effect and its controls."},
+    {id: "creditsPanel", level: "organism", summary: "Who made what, from the generated credits."},
+    {id: "dataMap", level: "organism", summary: "Which of a game's files Lexeditor understands."},
+    {id: "curveEditor", level: "organism", summary: "A formula drawn as a curve, edited by its terms."},
+    {id: "soundCoverageTable", level: "organism", summary: "Which interface sounds a theme provides."},
+    {id: "platformConfigView", level: "organism", summary: "A game runtime's own configuration file, edited safely."},
+    {id: "settingsColumns", level: "organism", summary: "Settings cards laid out in columns that reflow."},
+    {id: "paginateSettings", level: "organism", summary: "Splits a long settings page into pages."},
+    {id: "columnPreferences", level: "organism", summary: "Which columns a list shows, and in what order."},
+    {id: "showAlert", level: "organism", summary: "Lexeditor's own message box. Never the browser's."},
+    {id: "showToast", level: "organism", summary: "A short message that fades by itself.",
+      sample: () => UI.newButton({label: "Show a toast", onclick: () => UI.showToast("Saved.")})},
+    {id: "confirmAction", level: "organism", summary: "Lexeditor's own yes/no question."},
+    {id: "confirmDiscardChanges", level: "organism", summary: "Asks before throwing away edits."},
+    {id: "confirmUnsavedExit", level: "organism", summary: "Asks before leaving with unsaved edits."},
+    {id: "openSettings", level: "organism", summary: "The shared settings dialog."},
+    {id: "sharedSettings", level: "organism", summary: "The settings every game has in common."},
+    {id: "openGameFolder", level: "organism", summary: "Opens this game's folder in the file browser."},
+
+    // ---- templates -------------------------------------------------------
+    {id: "mountShell", level: "template", summary: "The window: brand, tabs, project selector, save, play, history."},
+    {id: "panelLayout", level: "template", summary: "One, two or three resizable panes across a page."},
+    {id: "list", level: "organism", summary: "A plain list of rows, without columns."},
+    {id: "listDetail", level: "template", summary: "A list beside the detail of the selected row."},
+    {id: "masterDetail", level: "template", summary: "The older list and detail shape, kept for existing pages."},
+    {id: "pagedListDetail", level: "template", summary: "List, detail, search and paging as one page.",
+      sample: () => UI.pagedListDetail({rows, key: row => row.id, selected: 1, page: 0, pageSize: 10,
+        noun: "records", splitKey: "lex-sample-paged", rowsKey: "lex-sample-paged",
+        change: () => {}, sync: () => {},
+        master: ({rows: listed, selected, select}) => UI.columnList({rows: listed, key: row => row.id,
+          selected, select, template: "60px minmax(120px,1fr)",
+          columns: [{key: "id", label: "ID"}, {key: "name", label: "Name"}]}),
+        detail: row => UI.detailPanel({title: row.name, body: [UI.detailSection({title: "RECORD",
+          body: [UI.detailField({label: "VALUE", control: UI.readonlyField(String(row.value))})]})]})})},
+    {id: "fitListPage", level: "template", summary: "Chooses how many rows fit the page height."},
+    {id: "installWindowFrame", level: "template", summary: "The window buttons and the regions that drag it."},
+    {id: "createWindowActions", level: "template", summary: "Minimise, maximise and close, wired to the host."},
+    {id: "applyTheme", level: "template", summary: "Applies a game's tokens. Tokens only, never geometry."},
+    {id: "finishPluginLoading", level: "template", summary: "Clears the loading screen once a page is ready."},
+
+    // ---- utilities -------------------------------------------------------
+    {id: "callWindow", level: "utility", summary: "Calls the desktop host from a page."},
+    {id: "clone", level: "utility", summary: "A deep copy, for keeping an untouched baseline."},
+    {id: "EditHistory", level: "utility", summary: "Undo and redo over a page's own state."},
+    {id: "NavigationHistory", level: "utility", summary: "Back and forward between tabs."},
+    {id: "installBrowserHistoryGuard", level: "utility", summary: "Keeps the browser's own back button in step."},
+    {id: "installExtendedMouseHistory", level: "utility", summary: "The mouse's back and forward buttons."},
+    {id: "installControlHelp", level: "utility", summary: "Attaches help to controls a page built itself."},
+    {id: "bindSettingDependencies", level: "utility", summary: "Disables settings whose dependency is off."},
+    {id: "hasEnabledProperty", level: "utility", summary: "Whether a record carries an enabled flag."},
+    {id: "refreshReferences", level: "utility", summary: "Re-reads reference mods after a change."},
+    {id: "autoFitControlText", level: "utility", summary: "Shrinks text to fit a fixed control."},
+    {id: "beginSearcher", level: "utility", summary: "Starts a hold-to-search interaction."},
+    {id: "finishSearcher", level: "utility", summary: "Ends one."},
+    {id: "playThemeSound", level: "utility", summary: "Plays one interface sound from the active theme."},
+    {id: "configureThemeSounds", level: "utility", summary: "Sets which interface sounds a theme uses."},
+  ];
+
+  window.LexeditorComponentCatalog = {
+    levels: [
+      {id: "atom", label: "Atoms", summary: "One control: a button, a field, a mark."},
+      {id: "molecule", label: "Molecules", summary: "A few atoms doing one job."},
+      {id: "organism", label: "Organisms", summary: "A whole region: a list, a panel, a section."},
+      {id: "template", label: "Templates", summary: "A page shape the games fill in."},
+      {id: "utility", label: "Utilities", summary: "Not drawn: state, history, formatting, host calls."},
+    ],
+    entries,
+  };
+})();

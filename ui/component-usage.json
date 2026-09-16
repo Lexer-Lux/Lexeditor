@@ -1,0 +1,400 @@
+{
+  "components": {
+    "EditHistory": [
+      "blank",
+      "ff7",
+      "ff7r"
+    ],
+    "NavigationHistory": [],
+    "applyTheme": [
+      "ff7r"
+    ],
+    "autoFitControlText": [
+      "ff8"
+    ],
+    "beginSearcher": [
+      "ff8"
+    ],
+    "bindSettingDependencies": [
+      "ff8"
+    ],
+    "booleanMark": [
+      "ff9"
+    ],
+    "bottomSearch": [],
+    "callWindow": [
+      "blank",
+      "ff7r",
+      "ff7r2",
+      "ff9"
+    ],
+    "clone": [
+      "blank",
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "closeButton": [],
+    "columnList": [
+      "blank",
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff8",
+      "ff9",
+      "rdr2",
+      "warband"
+    ],
+    "columnPreferences": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff8",
+      "ff9"
+    ],
+    "configureThemeSounds": [
+      "ff7",
+      "ff7r",
+      "ff8"
+    ],
+    "confirmAction": [
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff9"
+    ],
+    "confirmDiscardChanges": [],
+    "confirmUnsavedExit": [],
+    "controlHelp": [],
+    "copyText": [],
+    "createWindowActions": [],
+    "creditsPanel": [
+      "chrono_trigger",
+      "ff8"
+    ],
+    "curveEditor": [
+      "blank",
+      "ff8"
+    ],
+    "dataMap": [
+      "blank",
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "decorateSearchCandidate": [
+      "ff8"
+    ],
+    "detailField": [
+      "blank",
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "warband"
+    ],
+    "detailGroup": [
+      "warband"
+    ],
+    "detailNote": [
+      "ff7r",
+      "ff7r2"
+    ],
+    "detailPanel": [
+      "blank",
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "warband"
+    ],
+    "detailRow": [],
+    "detailSection": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "warband"
+    ],
+    "el": [
+      "blank",
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "element": [],
+    "enabledMark": [],
+    "finishPluginLoading": [
+      "blank",
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "finishSearcher": [],
+    "fitListPage": [],
+    "folderIcon": [
+      "ff8"
+    ],
+    "formatNumber": [
+      "ff8"
+    ],
+    "hasEnabledProperty": [],
+    "hoverable": [
+      "blank",
+      "ff8",
+      "rdr2",
+      "warband"
+    ],
+    "infoHelp": [
+      "blank",
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2"
+    ],
+    "infoIcon": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff8",
+      "ff9"
+    ],
+    "installBrowserHistoryGuard": [],
+    "installControlHelp": [],
+    "installExtendedMouseHistory": [],
+    "installWindowFrame": [],
+    "integrationStatus": [
+      "blank",
+      "ff7"
+    ],
+    "list": [
+      "ff7",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "listDetail": [
+      "ff7"
+    ],
+    "magnitudeValue": [],
+    "masterDetail": [
+      "warband"
+    ],
+    "modLoaderSection": [
+      "blank",
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "mountShell": [
+      "blank",
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "multiNumberRow": [
+      "blank",
+      "ff8"
+    ],
+    "newButton": [
+      "rdr2"
+    ],
+    "numberValue": [
+      "ff8"
+    ],
+    "openGameFolder": [
+      "ff8"
+    ],
+    "openSettings": [],
+    "pagedListDetail": [
+      "blank",
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff8",
+      "ff9",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "pager": [
+      "blank",
+      "ff7r",
+      "ff8",
+      "warband"
+    ],
+    "pagerSelect": [
+      "ff7r"
+    ],
+    "pagerToggle": [],
+    "paginateSettings": [],
+    "panelLayout": [
+      "blank",
+      "ff8",
+      "palworld",
+      "rdr2"
+    ],
+    "platformConfigView": [
+      "ff7",
+      "ff8"
+    ],
+    "playThemeSound": [
+      "ff7"
+    ],
+    "provenanceControl": [
+      "blank",
+      "ff7",
+      "ff8",
+      "rdr"
+    ],
+    "readonlyField": [
+      "blank",
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld"
+    ],
+    "recordId": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff8",
+      "ff9",
+      "rdr"
+    ],
+    "referenceDisplay": [
+      "blank",
+      "rdr2"
+    ],
+    "refreshReferences": [],
+    "reshadeSection": [
+      "blank",
+      "ff7r",
+      "ff7r2",
+      "ff9"
+    ],
+    "saveIcon": [],
+    "searchIcon": [
+      "ff8"
+    ],
+    "settingsColumns": [
+      "blank",
+      "ff7r",
+      "ff8",
+      "rdr",
+      "rdr2"
+    ],
+    "settingsIcon": [],
+    "settingsSaveControl": [
+      "rdr",
+      "rdr2"
+    ],
+    "sharedSettings": [
+      "ff7",
+      "ff8"
+    ],
+    "showAlert": [
+      "blank",
+      "ff8",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "showToast": [
+      "blank",
+      "ff7r",
+      "ff7r2",
+      "ff9",
+      "rdr"
+    ],
+    "soundCoverageTable": [
+      "ff7",
+      "ff8"
+    ],
+    "subtabBar": [
+      "chrono_trigger",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "warband"
+    ],
+    "tabbedPanel": [
+      "blank",
+      "ff7",
+      "ff8"
+    ],
+    "toggleRow": [
+      "blank",
+      "ff7",
+      "ff8",
+      "ff9"
+    ],
+    "uiScaleControl": [],
+    "unitField": [
+      "blank",
+      "ff8"
+    ]
+  }
+}

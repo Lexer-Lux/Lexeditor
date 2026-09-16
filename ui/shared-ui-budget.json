@@ -1,0 +1,49 @@
+{
+  "note": "Counts may fall, never rise. See tools/verify_shared_ui_budget.py.",
+  "files": {
+    "games/blank/editor.html": {
+      "sharedSelectors": 21,
+      "handBuiltRows": 0
+    },
+    "games/chrono_trigger/editor.html": {
+      "sharedSelectors": 4,
+      "handBuiltRows": 132
+    },
+    "games/chrono_trigger/event_editor.js": {
+      "sharedSelectors": 0,
+      "handBuiltRows": 19
+    },
+    "games/chrono_trigger/map_previews.js": {
+      "sharedSelectors": 0,
+      "handBuiltRows": 11
+    },
+    "games/ff7r/theme.js": {
+      "sharedSelectors": 1,
+      "handBuiltRows": 0
+    },
+    "games/ff8/cards_ui.js": {
+      "sharedSelectors": 26,
+      "handBuiltRows": 0
+    },
+    "games/ff8/editor.html": {
+      "sharedSelectors": 560,
+      "handBuiltRows": 17
+    },
+    "games/ff9/editor.html": {
+      "sharedSelectors": 3,
+      "handBuiltRows": 0
+    },
+    "games/rdr/editor.html": {
+      "sharedSelectors": 15,
+      "handBuiltRows": 11
+    },
+    "games/rdr2/editor.html": {
+      "sharedSelectors": 45,
+      "handBuiltRows": 230
+    },
+    "games/warband/editor.html": {
+      "sharedSelectors": 29,
+      "handBuiltRows": 0
+    }
+  }
+}
