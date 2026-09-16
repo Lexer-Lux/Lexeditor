@@ -41,6 +41,30 @@ def counts() -> dict[str, dict[str, int]]:
     return found
 
 
+def listing(pattern: str = "") -> int:
+    """Every hand-built row and shared-class selector, with its line.
+
+    The conversion list: `--list rows` or `--list selectors`, worst file first.
+    """
+    wanted = {"rows": (HAND_BUILT,), "selectors": (SHARED_CLASS,)}.get(
+        pattern, (HAND_BUILT, SHARED_CLASS))
+    total = 0
+    for name, row in sorted(counts().items(), key=lambda item: -sum(item[1].values())):
+        lines = []
+        text = (ROOT / name).read_text(encoding="utf-8", errors="replace").splitlines()
+        for number, line in enumerate(text, 1):
+            hits = sum(len(expression.findall(line)) for expression in wanted)
+            if hits:
+                lines.append(f"  {name}:{number}  {hits}x  {line.strip()[:110]}")
+        if not lines:
+            continue
+        total += len(lines)
+        print(f"{name}: {len(lines)} lines")
+        print("\n".join(lines))
+    print(f"{total} lines to convert.")
+    return 0
+
+
 def check() -> int:
     recorded = json.loads(BUDGET.read_text(encoding="utf-8"))["files"] if BUDGET.is_file() else {}
     current = counts()
@@ -74,4 +98,8 @@ def update() -> int:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--update", action="store_true")
-    raise SystemExit(update() if parser.parse_args().update else check())
+    parser.add_argument("--list", nargs="?", const="all", choices=["all", "rows", "selectors"],
+                        help="print every line to convert, worst file first")
+    arguments = parser.parse_args()
+    raise SystemExit(update() if arguments.update
+                     else listing(arguments.list) if arguments.list else check())

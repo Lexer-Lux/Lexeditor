@@ -377,7 +377,6 @@
     if(!all.length)return row.expect;
     const uses=new Set(row.usedBy.map(value=>value.replace(/_/g,"-")));
     const missing=all.filter(id=>!uses.has(id.replace(/_/g,"-")));
-    if(row.expect!=="every game")return `${row.expect}. Not in: ${missing.join(", ")||"none"}`;
     return missing.length?`Every game. Missing from ${missing.join(", ")}.`:"Every game, and every game has it.";
   }
   function componentDetail(row){
