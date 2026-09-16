@@ -1,7 +1,10 @@
 """Coverage claims must have a specific implemented interface, not just I/O."""
 from pathlib import Path
 import tempfile
+import sys
 import unittest
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 from unittest.mock import patch
 
 class CoverageTests(unittest.TestCase):
@@ -82,7 +85,7 @@ class CoverageTests(unittest.TestCase):
     def test_all_plugins_use_shared_data_map(self):
         root=Path(__file__).resolve().parents[1]
         for game in ('blank','warband','ff7','ff8','ff9','rdr','rdr2'):
-            text=(root/'games'/game/'editor.html').read_text(encoding='utf-8')
+            text=plugin_ui(game)
             self.assertIn('LexeditorUI.dataMap(',text,game)
         self.assertIn('games.ff7.server',(root/'games/ff7_2013/plugin.py').read_text(encoding='utf-8'))
 

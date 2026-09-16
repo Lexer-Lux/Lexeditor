@@ -7,6 +7,8 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from tools import generate_credits
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 
 class FollowupTests(unittest.TestCase):
     def test_credits_check_is_read_only_and_rejects_drift(self):
@@ -23,7 +25,7 @@ class FollowupTests(unittest.TestCase):
                 self.assertEqual(raised.exception.code,1)
                 self.assertEqual(dest.read_text(encoding='utf-8'),'changed by a fixture')
     def test_obsolete_camera_clamps_not_reintroduced_in_help(self):
-        text=(ROOT/'games/rdr2/editor.html').read_text(encoding='utf-8')
+        text=plugin_ui('rdr2')
         self.assertNotIn('Clamped to -2.00..2.00',text)
         self.assertNotIn('Clamped to 0.30..8.00',text)
         # 1.2 puts bounds on the control and keeps only behavior in its help.

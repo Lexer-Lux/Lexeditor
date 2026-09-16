@@ -10,14 +10,16 @@ What stays private is the part that has to be: which archive holds the mesh,
 whether this machine can read it, and how the geometry is fetched and drawn.
 """
 from pathlib import Path
+import sys
 
 
-EDITOR = Path(__file__).resolve().parents[1] / "games" / "rdr2" / "editor.html"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 FRAMEWORK = Path(__file__).resolve().parents[1] / "ui" / "framework.js"
 
 
 def test_the_item_panel_has_the_shared_heading_the_control_needs():
-    html = EDITOR.read_text(encoding="utf-8")
+    html = plugin_ui("rdr2")
     # attachModelPreview takes the panel's heading icon; without a real heading
     # there is nothing for it to take, which is why this plugin grew its own.
     assert 'el("div",{class:"lex-detail-panel-heading no-actions"}' in html
@@ -26,7 +28,7 @@ def test_the_item_panel_has_the_shared_heading_the_control_needs():
 
 
 def test_the_preview_opens_through_the_shared_control():
-    html = EDITOR.read_text(encoding="utf-8")
+    html = plugin_ui("rdr2")
     assert "LexeditorUI.attachModelPreview(pane,{" in html
     assert "attachItemModelPreview(pane,it)" in html
     # The page-wide modal is gone: the preview is drawer content now.
@@ -35,7 +37,7 @@ def test_the_preview_opens_through_the_shared_control():
 
 
 def test_one_click_on_the_heading_icon_means_one_thing():
-    html = EDITOR.read_text(encoding="utf-8")
+    html = plugin_ui("rdr2")
     # The inventory icon is a button of its own. Left in the trigger slot it
     # opened the icon picker AND the drawer from a single click, so in the
     # detail panel it is shown rather than clicked and its action moves to the

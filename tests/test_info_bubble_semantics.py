@@ -1,7 +1,11 @@
 """Info bubbles explain semantics; visible property metadata stays out of them."""
 from pathlib import Path
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui, plugins_with_ui
+
 PLUGIN_EDITORS = sorted((ROOT / "games").glob("*/editor.html"))
 
 def text(path):
@@ -22,7 +26,7 @@ def test_manual_defines_semantic_only_contract():
     assert "If no useful semantic explanation is known, omit the info" in manual
 
 def test_known_metadata_filler_is_gone_from_plugins():
-    sources = "\n".join(path.read_text("utf-8") for path in PLUGIN_EDITORS)
+    sources = "\n".join(plugin_ui(name) for name in plugins_with_ui())
     for forbidden in (
         "Storage range:", "Editor range:", "This Memoria array is edited as a comma-separated list.",
         "Stored parameter 1.", "Stored parameter 2.", "These are the exact stored Renzokuken table values.",
@@ -47,7 +51,7 @@ def test_ff9_has_real_semantic_help_for_core_relationships():
     assert 'return FIELD_HELP[`${dataKey}:${field.key}`]||"";' in ff9
 
 def test_rdr2_setting_help_does_not_append_visible_metadata():
-    rdr2 = text("games/rdr2/editor.html")
+    rdr2 = plugin_ui('rdr2')
     block = rdr2[rdr2.index("function settingHelp(section,setting)"):rdr2.index("function settingUnit(section,key)")]
     assert "Editor range:" not in block
     assert "Unit:" not in block

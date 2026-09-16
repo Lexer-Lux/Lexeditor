@@ -5045,12 +5045,28 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_response(200)
                     self.send_header("Content-Type", "text/html; charset=utf-8")
                     self.send_header("X-Lexeditor-Plugin", PLUGIN_ID)
-                    # The editor is a single HTML file (CSS + JS inline). Without
-                    # this the browser caches it and keeps showing an OLD build
-                    # after edits, which made fixes look like they did nothing.
+                    # Without this the browser caches the page and keeps showing
+                    # an OLD build after edits, which made fixes look like they
+                    # did nothing. The modules below say the same.
                     self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
                     self.send_header("Pragma", "no-cache")
                     self.send_header("Expires", "0")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                elif path.endswith((".js", ".css")) and "/" not in path.strip("/"):
+                    # The page is a page: its script and its stylesheet live in
+                    # modules beside it, named for what they hold.
+                    module = (ROOT / path.lstrip("/")).resolve()
+                    if module.parent != ROOT.resolve() or not module.is_file():
+                        self.send_error(404)
+                        return
+                    data = module.read_bytes()
+                    self.send_response(200)
+                    self.send_header("Content-Type",
+                                     "text/css; charset=utf-8" if path.endswith(".css")
+                                     else "application/javascript; charset=utf-8")
+                    self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
                     self.send_header("Content-Length", str(len(data)))
                     self.end_headers()
                     self.wfile.write(data)

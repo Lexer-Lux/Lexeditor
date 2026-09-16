@@ -27,6 +27,14 @@ css = text("ui/framework.css")
 manual = text("docs/UI-MANUAL.md")
 host = text("desktop_host.py")
 github = text("github_integration.py")
+def plugin_ui(plugin):
+    """A plugin's whole UI: the page and the modules it loads beside it."""
+    parts = [(plugin / "editor.html").read_text(encoding="utf-8")]
+    parts += [path.read_text(encoding="utf-8")
+              for path in sorted(plugin.glob("*.js")) + sorted(plugin.glob("*.css"))]
+    return "\n".join(parts)
+
+
 blank = text("games/blank/editor.html")
 warband = text("games/warband/editor.html")
 
@@ -129,7 +137,7 @@ for phrase in ("most human-friendly semantic control", "checkless toggle", "Bitf
 for plugin in sorted((ROOT / "games").iterdir()):
     if not (plugin / "editor.html").is_file():
         continue
-    editor = (plugin / "editor.html").read_text(encoding="utf-8")
+    editor = plugin_ui(plugin)
     require("modLoaderSection(" in editor,
             f"{plugin.name} does not render the shared MOD LOADER section")
     for field in ("loader:", "output:", "order:", "safety:", "removal:"):
@@ -146,8 +154,9 @@ require("MOD LOADER" in framework and "MOD_LOADER_FIELDS" in framework,
 # more than one line, and are the reason "I get this browser message" was a bug
 # report. Every question and every message is Lexeditor's own.
 for source_path in [ROOT / "ui" / "framework.js", ROOT / "ui" / "chooser.html"] + [
-        plugin / "editor.html" for plugin in sorted((ROOT / "games").iterdir())
-        if (plugin / "editor.html").is_file()]:
+        path for plugin in sorted((ROOT / "games").iterdir())
+        if (plugin / "editor.html").is_file()
+        for path in [plugin / "editor.html", *sorted(plugin.glob("*.js"))]]:
     text = source_path.read_text(encoding="utf-8")
     for banned in ("window.confirm(", "window.alert(", "window.prompt("):
         require(banned not in text,
@@ -158,12 +167,12 @@ require("const confirmAction = options =>" in framework,
 
 require("reshadeSection" in framework,
         "the shared ReShade section is not defined in the framework")
-require("reshadeSection(" in (ROOT / "games" / "blank" / "editor.html").read_text(encoding="utf-8"),
+require("reshadeSection(" in plugin_ui(ROOT / "games" / "blank"),
         "games/blank does not demonstrate the shared ReShade section")
 for plugin in sorted((ROOT / "games").iterdir()):
     if not (plugin / "editor.html").is_file():
         continue
-    editor = (plugin / "editor.html").read_text(encoding="utf-8")
+    editor = plugin_ui(plugin)
     if 'id:"tweaks"' not in editor and "id: \"tweaks\"" not in editor:
         continue
     require("reshadeSection(" in editor,
