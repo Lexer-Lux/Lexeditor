@@ -598,6 +598,10 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
             f"{ALWAYS_HIT_BRANCH:X} = EB",
             f"{HIT_FORMULA_HOOK:X} = E9 06 C0 30 02 90",
             f"{CODE_CAVE:X} = {payload.hex(' ').upper()}",
+            "# Physical Attack and the gunblade get the same penalty.",
+            f"{flying_eva.PHYSICAL_CAVE:X}:{len(flying_eva.PHYSICAL_TEMPLATE):X}",
+            *(f"{site:X} = {replacement}" for site, (replacement, _) in flying_eva.PHYSICAL_HOOKS.items()),
+            f"{flying_eva.PHYSICAL_CAVE:X} = {flying_eva.build_physical_payload(bonus).hex(' ').upper()}",
         ])
     else:
         lines.append("# Flying EVA Bonus is disabled.")
@@ -846,6 +850,7 @@ def initialize_project(project_root: Path) -> None:
         "flatStatAbilities": False,
         "maxSpellEnabled": False,
         "maxSpell": DEFAULT_MAX_SPELL,
+        "cameraSpeed": DEFAULT_CAMERA_SPEED,
     }
     _atomic_text(settings_path(project), json.dumps(
         settings_data, indent=2, sort_keys=True,
@@ -949,7 +954,7 @@ def save(data: dict, game_root: Path | None = None,
     )
     xp_bars = _boolean(data.get("xpBars", DEFAULT_XP_BARS), "XP Bars")
     hp_bars = _boolean(data.get("hpBars", DEFAULT_HP_BARS), "HP Bars")
-    gf_hp_bars = _boolean(data.get("gfHpBars", DEFAULT_GF_HP_BARS), "GF HP Bars")
+    gf_hp_bars = _boolean(data.get("gfHpBars", DEFAULT_GF_HP_BARS), 'GF "MP" Bars')
     in_game_time = _boolean(data.get("inGameTime", DEFAULT_INGAME_TIME), "In-game Time")
     no_magic_consumption = _boolean(data.get("noMagicConsumption", False), "No Magic Consumption")
     drops_after_mug = _boolean(data.get("dropsAfterMug", False), "Drops After Mug")
@@ -986,7 +991,7 @@ def save(data: dict, game_root: Path | None = None,
     # installed. Activation installs and verifies the runtime before launch.
     # Save must never turn an enabled feature off behind the user's back.
     if gf_hp_bars and not single_gf:
-        raise ValueError("GF HP Bars requires Monogamy")
+        raise ValueError('GF "MP" Bars requires Monogamy')
     if fixed_command_menu_enabled and not single_gf:
         raise ValueError("Fixed Command Menu requires Monogamy")
     gf_casting = _boolean(data.get("gfHpCasting", False), "GF HP Casting")
@@ -1042,6 +1047,9 @@ def save(data: dict, game_root: Path | None = None,
         "fixedCommandMenu": fixed_command_menu_enabled,
         "trueAtbWait": true_atb_wait,
         "modernControls": modern_controls,
+        # Stored with the switch it belongs to. Written only to FFNx.toml, it
+        # read back as the default and the next save overwrote the reader's.
+        "cameraSpeed": round(camera_speed, 2),
         "vibrationConsolidation": vibration_consolidation,
         "betterTargeting": better_targeting,
         "damageLimitRemoval": damage_limit_removal,

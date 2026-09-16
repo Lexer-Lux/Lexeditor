@@ -195,7 +195,7 @@
     .shop-detail .rare {--lex-reference-rail-width:3em}
     .settings-view {position:relative;height:100%;padding:14px;background:linear-gradient(135deg,#747474,#555 66%,#5f5f5f);border:3px solid;border-color:#aaa #282828 #282828 #aaa}
     .setting-row {display:grid;grid-template-columns:minmax(150px,1fr) minmax(110px,150px);gap:14px;align-items:start;padding:14px 10px;border-top:1px solid #ffffff30}
-    .setting-copy strong {display:block;font-size:19px}
+    .setting-copy > strong {display:block;font-size:19px}
     .setting-copy p {max-width:760px;margin:6px 0 0;color:#eee}
     .setting-control {display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px}
     .setting-control input {width:100%;min-height:38px;padding:6px 9px;color:#fff;border:2px solid;border-color:#292929 #aaa #aaa #292929;background:#333}
@@ -869,7 +869,9 @@
     .drop-chance-table {width:100%;margin-top:6px;font:inherit;white-space:nowrap;
       --lex-cell-padding:3px 5px;--lex-head-cell-padding:3px 5px;--lex-list-cell-border:#ffffff28;
       --lex-surface-border:0;--lex-surface-shadow:none;--lex-surface-bg:transparent}
-    .drop-chance-table small {display:block;font-size:.8em;color:#ddd}
+    .drop-chance-table .drop-chance-unlocked {color:#ffd257}
+    .tweak-bindings {margin:6px 0 0;padding-left:1.1em}
+    .tweak-bindings li+li {margin-top:3px}
   
 
 /* Per-view spacing, as values on the view: the tables and panels that FF8 packs

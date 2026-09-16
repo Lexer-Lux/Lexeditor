@@ -10,6 +10,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from games.ff8 import gameplay_settings  # noqa: E402
 
@@ -93,7 +94,8 @@ def main() -> int:
             assert not missing, f"settings file is missing declared defaults: {missing}"
             assert gameplay_settings.patch_path(project).read_text(encoding="utf-8") == patch
 
-    editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    from plugin_source import plugin_source
+    editor = plugin_source("ff8")
     server = (ROOT / "games" / "ff8" / "server.py").read_text(encoding="utf-8")
     extractor = (ROOT / "games" / "ff8" / "extractor.py").read_text(encoding="utf-8")
     assert '["settings","Tweaks"]' in editor

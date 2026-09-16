@@ -27,13 +27,13 @@ def run():
         assert json.loads(path.read_text(encoding='utf-8'))['gfHpBars'] is False
         for bad in ('true',1,[],{}):
             try: settings.save({**settings.load(project,game),'gfHpBars':bad},game_root=game,project_root=project)
-            except ValueError as error: assert 'GF HP Bars' in str(error)
+            except ValueError as error: assert 'GF "MP" Bars' in str(error)
             else: raise AssertionError('Invalid GF bar value was accepted')
         assert 'gfHpBars' in settings.ACCEPTED_TWEAKS
     # The page and the modules it loads.
     ui=chr(10).join(path.read_text(encoding='utf-8') for path in [ROOT/'games/ff8/editor.html',*sorted((ROOT/'games/ff8').glob('*.js'))])
     assert 'gfHpBars:state.data.settings.gfHpBars' in ui
-    assert '"aria-label":"GF HP Bars"' in ui
+    assert '"aria-label":\'GF "MP" Bars\'' in ui
     assert 'platformConfigView({config:state.platformConfig,showHeader:false,' in ui
     print('PASS: GF-bar defaults, strict values, per-mod reset, independent TOML toggles, and UI wiring.')
 

@@ -24,6 +24,13 @@ SET_SLOT_STATE = 0x004B9B90
 HIDE_SLOT = 0x004B9C00
 READ_INPUT = 0x004A8420
 DRAW_TEXT = 0x004A7250
+# 004A7510 submits the battle menu panel described by the menu context
+# (01D6D490): style at +0x23, x/y/width/height words at +0x34. Party Switch
+# draws its selector the same way. Submitted last, it renders behind the text.
+DRAW_PANEL = 0x004A7510
+MENU_CONTEXT = 0x01D6D490
+# Two columns of eight: cursor x 40/170, names from y 40 every 18 pixels.
+PANEL_RECT = (32, 34, 250, 150)
 PARSE_CHARACTER = 0x00495530
 PARSE_MAGIC = 0x00495960
 UPDATE_LOW_HP = 0x00494360
@@ -227,7 +234,18 @@ def _update_payload() -> bytes:
     code = _Code(UPDATE_CAVE)
     code.add(bytes.fromhex("53 56 57 6A 00"))
     code.call(READ_INPUT)
-    code.add(bytes.fromhex("83 C4 04 89 C7 A8 10"))
+    code.add(bytes.fromhex("83 C4 04 89 C7"))
+    # The press that chose Switch is still in the repeat word on the next
+    # frames and read as confirm or cancel, so the menu flashed and closed.
+    # Opened is 1; keys count only once everything has been released (2).
+    code.add(b"\x80\x3D" + SWITCH_ACTIVE.to_bytes(4, "little") + b"\x01")
+    code.branch(bytes.fromhex("0F 85"), "armed")
+    code.add(bytes.fromhex("85 C0"))
+    code.branch(bytes.fromhex("0F 85"), "done")
+    code.add(b"\xC6\x05" + SWITCH_ACTIVE.to_bytes(4, "little") + b"\x02")
+    code.branch(b"\xE9", "done")
+    code.label("armed")
+    code.add(bytes.fromhex("A8 10"))
     code.branch(bytes.fromhex("0F 85"), "cancel")
     code.add(bytes.fromhex("A8 08"))
     code.branch(bytes.fromhex("0F 85"), "confirm")
@@ -303,6 +321,16 @@ def _draw_payload() -> bytes:
     code.label("advance")
     code.add(bytes.fromhex("47 83 FF 10"))
     code.branch(bytes.fromhex("0F 8C"), "loop")
+    # The panel, after the text so it renders behind it.
+    code.add(b"\xA1" + MENU_CONTEXT.to_bytes(4, "little") + bytes.fromhex("85 C0"))
+    code.branch(bytes.fromhex("0F 84"), "no_panel")
+    code.add(bytes.fromhex("C6 40 23 08"))
+    for offset, value in zip((0x34, 0x36, 0x38, 0x3A), PANEL_RECT):
+        code.add(bytes.fromhex("66 C7 40") + bytes((offset,)) + value.to_bytes(2, "little"))
+    code.add(bytes.fromhex("6A 00 68 00 10 00 00 56 55"))
+    code.call(DRAW_PANEL)
+    code.add(bytes.fromhex("83 C4 10 89 C6"))
+    code.label("no_panel")
     code.add(bytes.fromhex("89 F0 5F 5E 5D 5B C3"))
     code.label("cursor")
     code.add(CURSOR_TEXT)

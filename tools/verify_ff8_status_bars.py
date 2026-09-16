@@ -318,7 +318,7 @@ def main() -> int:
         require(label in editor, f"{label} is absent from Tweaks")
     require("under main-menu character names, under character and GF level rows, and on the post-battle report" in editor,
             "XP Bars description does not state every rendered surface")
-    require("under each party member's HP during battle" in editor,
+    require("under each party member's HP number during battle" in editor,
             "HP Bars description does not state its battle placement")
 
     print("FF8 FFNx XP/HP bars: executable, source, integration, and mutations verified")

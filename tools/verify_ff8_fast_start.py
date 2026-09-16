@@ -41,6 +41,13 @@ native_transition = bytes.fromhex(
     "C7 44 24 1C 70 D9 56 00 C7 44 24 20 20 05 47 00"
 )
 assert image_bytes(pe, 0x0052DAE4, len(native_transition)) == native_transition
+# The intro loop plays the logo movie while 0209A798 is set, then schedules
+# the credits with its own callbacks, which stay untouched.
+intro_loop = bytes.fromhex("8B 0D 98 A7 09 02 3B C8 75 33")
+assert image_bytes(pe, 0x004703F9, len(intro_loop)) == intro_loop
+assert image_bytes(pe, fast_start.INTRO_MOVIE_BRANCH, 2) == fast_start.INTRO_MOVIE_BRANCH_ORIGINAL
+intro_schedule = bytes.fromhex("C7 44 24 24 70 D9 52 00 C7 44 24 28 90 DB 52 00 C7 44 24 2C 20 DA 52 00")
+assert image_bytes(pe, 0x00470409, len(intro_schedule)) == intro_schedule
 
 # FFNx is independent primary evidence for the symbol chain and offsets. It
 # resolves both the credits mode and the main-menu mode from these functions.
@@ -60,6 +67,7 @@ assert subprocess.check_output(
 assert fast_start.build_hext(False) == ""
 patch = fast_start.build_hext(True)
 assert f"{fast_start.CREDITS_COMPLETION_CALL:X} = B8 01 00 00 00" in patch
+assert f"{fast_start.INTRO_MOVIE_BRANCH:X} = 90 90" in patch
 for retired in ("47040D =", "470415 =", "47041D ="):
     assert retired not in patch
 for invalid in (0, 1, "true", None):

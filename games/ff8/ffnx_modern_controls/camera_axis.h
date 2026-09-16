@@ -18,7 +18,8 @@ inline int axis_step(int raw, int &remainder) {
     return step;
 }
 inline int yaw_step(int raw, int &remainder) { return axis_step(raw, remainder); }
-inline int pitch_step(int raw, int &remainder) { return axis_step(raw, remainder); }
+// Non-inverted: stick up tilts the view up, the opposite sign of the raw axis.
+inline int pitch_step(int raw, int &remainder) { return -axis_step(raw, remainder); }
 inline unsigned wrap_yaw(int yaw) { return static_cast<unsigned>(yaw) & 0xFFFu; }
 inline int clamp_pitch(int pitch) { return std::clamp(pitch, -0x200, 0); }
 

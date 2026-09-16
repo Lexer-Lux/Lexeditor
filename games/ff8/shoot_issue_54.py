@@ -13,7 +13,11 @@ SHOT_ACTOR = 0x01D27B0F
 PARTICIPANT_BASE = 0x01D27B10
 PARTICIPANT_STRIDE = 0xD0
 IRVINE_WEAPON_ID = 0x01CFE221
-WEAPON_BASE = 0x01CF7408
+# Kernel weapon records in memory start here, 12 bytes each: 0047EBA7 reads
+# the name word at +0, 00490417 the crit bonus at +10, 0048B661 the melee flag
+# at +11. 0x01CF7408 was the STR-bonus byte, so +3 read the melee flag and
+# every gun fell back to one shot.
+WEAPON_BASE = 0x01CF7400
 WEAPON_STRIDE = 12
 SHOTS_OFFSET = 3
 

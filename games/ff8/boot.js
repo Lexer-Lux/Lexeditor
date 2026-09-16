@@ -65,7 +65,7 @@
     const fastStart=el("input",{type:"checkbox",checked:settings.fastStart,"aria-label":"Fast Start",onchange:event=>{settings.fastStart=event.target.checked;shell.refresh()}});
     const xpBars=el("input",{type:"checkbox",checked:settings.xpBars,"aria-label":"XP Bars",onchange:event=>{settings.xpBars=event.target.checked;shell.refresh()}});
     const hpBars=el("input",{type:"checkbox",checked:settings.hpBars,"aria-label":"HP Bars",onchange:event=>{settings.hpBars=event.target.checked;shell.refresh()}});
-    const gfHpBars=el("input",{type:"checkbox",checked:settings.gfHpBars,disabled:!settings.singleGf,"aria-label":"GF HP Bars",onchange:event=>{settings.gfHpBars=event.target.checked;shell.refresh()}});
+    const gfHpBars=el("input",{type:"checkbox",checked:settings.gfHpBars,disabled:!settings.singleGf,"aria-label":'GF "MP" Bars',onchange:event=>{settings.gfHpBars=event.target.checked;shell.refresh()}});
     const inGameTime=el("input",{type:"checkbox",checked:settings.inGameTime,"aria-label":"In-game Time",onchange:event=>{settings.inGameTime=event.target.checked;shell.refresh()}});
     const noMagicConsumption=el("input",{type:"checkbox",checked:settings.noMagicConsumption,"aria-label":"No Magic Consumption",onchange:event=>{settings.noMagicConsumption=event.target.checked;shell.refresh()}});
     const gfHpCasting=el("input",{type:"checkbox",checked:settings.gfHpCasting,disabled:!settings.singleGf||!settings.noMagicConsumption,"aria-label":"GF HP Casting",onchange:event=>{settings.gfHpCasting=event.target.checked;shell.refresh()}});
@@ -92,16 +92,16 @@
       row("DROPS AFTER MUG","A successfully Mugged enemy still rolls its normal death drops. Mugging the same enemy twice remains prohibited; its item-slot distribution follows the current Drop Chance setting.",dropsAfterMug,"boolean"),
       row("ENHANCED ABILITY MENU","Shows unfinished GF abilities first, orders each group by name, and dims completed abilities.",enhancedAbilityMenu,"boolean"),
       row("ENHANCED SCAN","Card Game opens Scan target selection without requiring or consuming Scan Magic and without spending the active character's turn.",scannedTargetScan,"boolean"),
-      row("FAST START","Completes the native opening credits immediately, then uses the game's normal transition and main-menu initialization.",fastStart,"boolean"),
+      row("FAST START","Skips the Square Enix logo movie and the opening credits, then uses the game's normal transition into the main menu.",fastStart,"boolean"),
       row("FF10-STYLE PARTY SWITCH","Look Left opens the reserve-party selector during an active turn. Confirming a replacement spends that turn.",partySwitch,"boolean"),
       row("FLAT +STAT ABILITIES","Changes +Stat% abilities into fixed-point +Stat abilities and updates their in-game names and descriptions.",flatStatAbilities,"boolean"),
       row("FLYING EVA BONUS","Adds the selected effective EVA to intrinsic flying targets against grounded melee attacks. A hit rate of 255 does not bypass it.",flyingControl,"value-toggle"),
       row("GF HP CASTING","Battle Magic spends the spell’s GF HP cost instead of spell stock. Set costs in Magic → Attack Data. Requires Monogamy and No Magic Consumption. A character without a GF or enough GF HP cannot cast.",gfHpCasting,"boolean"),
-      row("GF HP BARS","Shows blue GF HP bars above party names, filling left to right. Requires Monogamy. Shows only one junctioned GF, including damage during summoning. Multiple junctioned GFs cause an error and hide the bar.",gfHpBars,"boolean"),
-      row("HP BARS","Shows a red HP bar under each party member's HP during battle.",hpBars,"boolean"),
+      row('GF "MP" BARS',"Shows a blue bar above each party name for the junctioned GF's HP, which is spent like MP, including damage it takes while being summoned. Requires Monogamy. With more than one GF junctioned the bar is hidden and the FFNx log says why.",gfHpBars,"boolean"),
+      row("HP BARS","Shows a red bar under each party member's HP number during battle; the lost part turns black.",hpBars,"boolean"),
       row("IN-GAME TIME","Shows your computer's local clock where the main menu shows play time. It does not replace FF8's saved play-time counter: that keeps counting, and timed events still measure against it.",inGameTime,"boolean"),
       row("MAX SPELL","Sets the maximum stock for each spell. A full stack keeps the same junction effect as 100 spells in vanilla.",maxSpellControl,"value-toggle"),
-      row("MODERN CONTROLS",settings.modernControlsBlocker||"Right stick turns the battle camera while the camera is idle, and gives the world map analog rotation. The number is the turn rate as a multiple of the shipped speed, from 0.2 to 4. The camera stops level with what it is looking at rather than dropping through the ground.",modernControlsControl,"value-toggle"),
+      row("MODERN CONTROLS",settings.modernControlsBlocker||el("div",{},el("p",{},"Modern bindings for battle and the world map. The number is the camera turn rate as a multiple of the shipped speed, from 0.2 to 4."),el("ul",{class:"tweak-bindings"},el("li",{},"Right stick: turns the battle camera while it is idle, and rotates the world map camera. Up tilts the view up. The camera stops level with what it looks at."),el("li",{},"RT / R2 / left mouse button: fire. The gunblade trigger, and Irvine's shots."),el("li",{},"LT / L2 / right mouse button: hold to flee."),el("li",{},"B / Circle / Backspace: end Irvine's Shot early."),el("li",{},"RT and LT on the world map: accelerate and reverse vehicles."))),modernControlsControl,"value-toggle"),
       row("MONOGAMY","Allows one GF on each character. Warning: when gameplay starts, any character who already has several GFs junctioned will have all of those GFs unequipped.",singleGf,"boolean"),
       row("NO MAGIC CONSUMPTION","Casting spells in battle or from the field Magic menu keeps their stock. Items, discarding and other inventory operations are unchanged; works with Shared Magic and Max Spell.",noMagicConsumption,"boolean"),
       row("REMOVE DAMAGE LIMIT","Uses FF8's existing 60,000-damage path instead of the normal 9,999 cap.",damageLimitRemoval,"boolean"),
@@ -123,14 +123,18 @@
     $("#main").replaceChildren(platformConfigView({config:state.platformConfig,showHeader:false,query:state.platformQuery,...tweakTabProps(),disabled:state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}}));
   }
   function dropChanceDescription(){
-    const normal=[137,68,34,17],rare=[94,70,53,39];
-    const chance=value=>el("span",{},`${(value/256*100).toFixed(2)}%`,el("small",{},`${value}/256`));
-    return el("div",{},el("p",{},"In vanilla, Rare Item makes the fourth loot slot impossible to receive. This rework restores that chance and improves the odds of the rarer slots. Applies to enemy drops and Mug. Values when enabled:"),
-      columnList({class:"drop-chance-table","aria-label":"Drop Chance slot probabilities",
-        rows:normal.map((value,index)=>({key:index,slot:index+1,normal:value,rare:rare[index]})),
-        key:entry=>entry.key, localSort:false, template:'60px minmax(0,1fr) minmax(0,1fr)',
-        columns:[{key:"slot",label:"Slot"},{key:"normal",label:"Normal",render:entry=>chance(entry.normal)},
-          {key:"rare",label:"Rare Item",render:entry=>chance(entry.rare)}]}));
+    // Weights out of 256, from drop_chance.py.
+    const vanilla={normal:[178,51,15,12],rare:[128,114,14,0]},rework={normal:[137,68,34,17],rare:[94,70,53,39]};
+    const percent=value=>`${(value/256*100).toFixed(1)}%`;
+    const change=(before,after)=>el("span",{class:before===0?"drop-chance-unlocked":""},`${percent(before)} → ${percent(after)}`);
+    return el("div",{},
+      el("p",{},el("strong",{},"Fixes a vanilla bug: "),"with the Rare Item ability, the fourth loot slot - usually the rarest item an enemy has - can never drop or be Mugged. The rework makes it reachable again and evens out the odds of the rarer slots, with and without Rare Item."),
+      columnList({class:"drop-chance-table","aria-label":"Drop Chance slot probabilities, vanilla to rework",
+        rows:[0,1,2,3].map(index=>({key:index,slot:index+1,normal:index,rare:index})),
+        key:entry=>entry.key, localSort:false, template:'48px minmax(0,1fr) minmax(0,1fr)',
+        columns:[{key:"slot",label:"Slot"},
+          {key:"normal",label:"Normal",render:entry=>change(vanilla.normal[entry.slot-1],rework.normal[entry.slot-1])},
+          {key:"rare",label:"Rare Item",render:entry=>change(vanilla.rare[entry.slot-1],rework.rare[entry.slot-1])}]}));
   }
   const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"platform",label:"FFNx"}];
   const tweakTabProps=()=>({tabs:TWEAK_TABS,activeTab:state.settingsTab,

@@ -103,7 +103,9 @@ inline bool orbit(Vec3s &position, const Vec3s &look_at, int raw_x, int raw_y,
 
     const float rate = speed_scale(scale);
     float yaw = std::atan2(dx, dz) + input_x * yaw_speed * rate;
-    float pitch = std::atan2(dy, horizontal) - input_y * pitch_speed * rate;
+    // Pushing the stick up tilts the view up, so the camera drops: the
+    // non-inverted convention. It used to raise the camera, which read inverted.
+    float pitch = std::atan2(dy, horizontal) + input_y * pitch_speed * rate;
     // The scene's floor if one has been learned, level otherwise, and never
     // above where the camera already is - a pose that is somehow lower still
     // may be raised but is not yanked up on its own.

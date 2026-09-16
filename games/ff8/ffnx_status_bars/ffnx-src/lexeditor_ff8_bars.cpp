@@ -212,25 +212,26 @@ float scale_y(float value)
     return newRenderer.projectGamePointToScreen(0.0f, value)[1] * ImGui::GetIO().DisplaySize.y;
 }
 
-void draw_bar(float x, float y, float width, float height, float fraction, ImU32 fill)
+// FF8's own menu HP gauge, measured from the game at 3x: a colour line one
+// native pixel tall over a black track two pixels tall, so the line carries a
+// one-pixel black shadow and the lost part of the bar stays black. x, y and
+// width are screen units; pixel is one native pixel in screen units.
+//
+// The old bar inset its fill by a pixel on every side. Menu XP bars are one
+// native pixel tall, so the inset ate the whole fill and every XP bar was a
+// black strip.
+void draw_gauge(float x, float y, float width, float pixel, float fraction, ImU32 fill)
 {
     ImDrawList *draw = ImGui::GetForegroundDrawList();
-    const ImVec2 minimum(scale_x(x), scale_y(y));
-    const ImVec2 maximum(scale_x(x + width), scale_y(y + height));
-    if (maximum.x <= minimum.x || maximum.y <= minimum.y) {
+    const float left = scale_x(x), right = scale_x(x + width);
+    const float top = scale_y(y), line = scale_y(y + pixel), bottom = scale_y(y + 2.0f * pixel);
+    if (right <= left || line <= top) {
         return;
     }
-    const float inset = std::max(1.0f, scale_y(1.0f) - scale_y(0.0f));
     fraction = std::clamp(fraction, 0.0f, 1.0f);
-
-    draw->AddRectFilled(minimum, maximum, IM_COL32(0, 0, 0, 220));
-    // The surrounding native panel supplies its own edge. No overlay outline.
+    draw->AddRectFilled(ImVec2(left, top), ImVec2(right, bottom), IM_COL32(0, 0, 0, 255));
     if (fraction > 0.0f) {
-        const ImVec2 fill_min(minimum.x + inset, minimum.y + inset);
-        const ImVec2 fill_max(
-            fill_min.x + (maximum.x - minimum.x - 2.0f * inset) * fraction,
-            maximum.y - inset);
-        draw->AddRectFilled(fill_min, fill_max, fill);
+        draw->AddRectFilled(ImVec2(left, top), ImVec2(left + (right - left) * fraction, line), fill);
     }
 }
 
@@ -374,7 +375,7 @@ void draw_menu_xp()
 {
     for(std::size_t i=0;i<g_menu_xp_count;++i) {
         const auto &row=g_menu_xp[i]; const auto &v=row.viewport;
-        draw_bar(row.x*v.scale_x+v.offset_x,row.y*v.scale_y+v.offset_y,
+        draw_gauge(row.x*v.scale_x+v.offset_x,row.y*v.scale_y+v.offset_y,
             row.width*v.scale_x, v.scale_y,row.fraction,IM_COL32(224,192,48,255));
     }
     g_menu_xp_count=0;
@@ -403,9 +404,8 @@ void draw_after_battle_xp()
         const auto &viewport = row.viewport;
         const float x = row.rect[0] * viewport.scale_x + viewport.offset_x;
         const float bottom = (row.rect[1] + row.rect[3]) * viewport.scale_y + viewport.offset_y;
-        const float height = std::min(4.0f, row.rect[3] * viewport.scale_y);
-        draw_bar(x + viewport.scale_x, bottom - height - viewport.scale_y,
-            std::max(0.0f, (row.rect[2] - 2.0f) * viewport.scale_x), height,
+        draw_gauge(x + viewport.scale_x, bottom - 3.0f * viewport.scale_y,
+            std::max(0.0f, (row.rect[2] - 2.0f) * viewport.scale_x), viewport.scale_y,
             xp_fraction(exp, character), IM_COL32(224, 192, 48, 255));
     }
 }
@@ -432,24 +432,13 @@ void draw_battle_hp()
         auto draw_line = [&](std::uint32_t current, std::uint32_t maximum,
                              float native_left, float native_right, float native_y, ImU32 color) {
             if (!maximum || native_right <= native_left) return;
-            const float left = scale_x(native_left * v.scale_x + v.offset_x);
-            const float right = scale_x(native_right * v.scale_x + v.offset_x);
-            const float top = native_y * v.scale_y + v.offset_y;
-            const float fraction = std::min(1.0f, current / static_cast<float>(maximum));
-            const float filled = (right - left) * fraction;
-            if (filled <= 0) return;
-            auto *draw = ImGui::GetForegroundDrawList();
-            // Match the menu HP gauge: two thin parallel lines with a clear
-            // gap. The unfilled part stays transparent, without a black track.
-            for (int rail = 0; rail < 2; ++rail) {
-                const float y = top + rail * 2.0f * v.scale_y;
-                draw->AddRectFilled(ImVec2(left, scale_y(y)),
-                    ImVec2(left + filled, scale_y(y + v.scale_y)), color);
-            }
+            draw_gauge(native_left * v.scale_x + v.offset_x, native_y * v.scale_y + v.offset_y,
+                (native_right - native_left) * v.scale_x, v.scale_y,
+                current / static_cast<float>(maximum), color);
         };
         // Native rows are 15 pixels high (004B0FF6) and spaced by 15
         // (004B1978). Text starts at row_y+2 and is 12 pixels high, so the
-        // red rails sit on the row's final pixel, under the HP digits. The
+        // gauge starts on the row's last pixel, under the HP digits. The
         // number is right-aligned; the bar spans a full four-digit field
         // ending where the digits end, so every row's bar has one length.
         if (enable_ff8_hp_bars && row.hp_visible && row.hp_right > row.hp_left) {
@@ -457,11 +446,11 @@ void draw_battle_hp()
             draw_line(row.current, row.maximum, row.hp_right - field, row.hp_right,
                 row.top + 14.0f, IM_COL32(236, 0, 0, 255));
         }
-        // Both blue rails fit above the name, whose text starts at row_y+2,
-        // and span the name's own area.
+        // The blue gauge takes the two pixels above the name, whose text
+        // starts at row_y+2, and spans the name's own area.
         if (enable_ff8_gf_hp_bars && row.name_right > row.left)
             draw_line(row.gf_current, row.gf_maximum, row.left, row.name_right,
-                row.top - 1.0f, IM_COL32(48, 128, 255, 255));
+                row.top, IM_COL32(48, 128, 255, 255));
     }
 }
 

@@ -14,6 +14,7 @@
 
 extern int right_stick_x;
 extern int right_stick_y;
+extern HWND gameHwnd;
 extern int ff8_get_analog_value(std::int8_t, int, std::int8_t);
 
 namespace {
@@ -49,6 +50,71 @@ constexpr std::uintptr_t kBattleCameraBlend = 0x01D9771E;
 constexpr std::uintptr_t kBattleLivePosition = 0x00B8B7F0;
 constexpr std::uintptr_t kBattleIdlePosition = 0x00B8B800;
 constexpr std::uintptr_t kBattleIdleLookAt = 0x00B8B808;
+
+// Battle bindings (FF8_EN.exe 064d466b...). The per-frame battle input at
+// 004A84E0 reads the keyscan three times - held into +0x10, newly pressed
+// into +0x12, repeating into +0x14 of the battle input block - each through
+// the button-layout translator 004A2D60. What comes out is FF8's own function
+// bits after the player's button layout: L2 0x01, R2 0x02, R1 0x08. The
+// battle loop at 004A85CC counts a flee while L2 and R2 are both held; R1 is
+// the gunblade trigger and Shot's fire button.
+constexpr std::uintptr_t kBattleHeldCall = 0x004A8505;
+constexpr std::uintptr_t kBattlePressedCall = 0x004A8521;
+constexpr std::uintptr_t kBattleRepeatCall = 0x004A853D;
+constexpr std::uintptr_t kBattleKeyTranslate = 0x004A2D60;
+constexpr int kL2Function = 0x01, kR2Function = 0x02, kR1Function = 0x08;
+// Shot registers its widget in slot 6 of the table at 01D76628 (20-byte
+// entries, update callback first) and clears it on close (004ADBAC). Its
+// update ends Shot through its own path when the request byte is set
+// (004AD92B: state 8, countdown 0xFFFF, request cleared).
+constexpr std::uintptr_t kShotWidgetUpdate = 0x01D766A0;
+constexpr std::uintptr_t kShotUpdate = 0x004AD8D0;
+constexpr std::uintptr_t kShotEndRequest = 0x01D7675B;
+
+using KeyTranslate = int(__cdecl *)(int);
+KeyTranslate original_translate = nullptr;
+bool bindings_installed = false;
+
+struct BattleButtons { bool fire = false, flee = false, back = false; };
+BattleButtons buttons_now, buttons_before;
+std::uint32_t buttons_frame = ~0u;
+
+void read_battle_buttons() {
+    if (buttons_frame == frame_counter) return;
+    buttons_frame = frame_counter;
+    buttons_before = buttons_now;
+    // The mouse and keyboard only count while FF8 is the window in front.
+    const bool focused = GetForegroundWindow() == gameHwnd;
+    const auto down = [&](int key) { return focused && (GetAsyncKeyState(key) & 0x8000) != 0; };
+    const float left = use_sdl_gamepad ? sdlgamepad.leftTrigger : gamepad.leftTrigger;
+    const float right = use_sdl_gamepad ? sdlgamepad.rightTrigger : gamepad.rightTrigger;
+    const bool b = use_sdl_gamepad ? sdlgamepad.IsPressed(SDL_GAMEPAD_BUTTON_EAST)
+                                   : gamepad.IsPressed(XINPUT_GAMEPAD_B);
+    buttons_now.fire = right > 0.5f || down(VK_LBUTTON);
+    buttons_now.flee = left > 0.5f || down(VK_RBUTTON);
+    buttons_now.back = b || down(VK_BACK);
+}
+
+// channel: 0 held, 1 newly pressed, 2 repeating.
+int translate_battle_keys(int keyscan, int channel) {
+    int bits = original_translate(keyscan);
+    if (!lexeditor_ff8_modern_controls_battle_active()) return bits;
+    read_battle_buttons();
+    const bool fire_edge = buttons_now.fire && !buttons_before.fire;
+    // The right trigger is also FF8's R2. Alone, that is half a flee and
+    // nothing else, so it is withheld while the trigger means "fire".
+    if (buttons_now.fire && !buttons_now.flee) bits &= ~kR2Function;
+    if (channel == 0 ? buttons_now.fire : fire_edge) bits |= kR1Function;
+    if (channel == 0 && buttons_now.flee) bits |= kL2Function | kR2Function;
+    if (channel == 1 && buttons_now.back && !buttons_before.back &&
+        *reinterpret_cast<const std::uintptr_t *>(kShotWidgetUpdate) == kShotUpdate) {
+        *reinterpret_cast<std::uint8_t *>(kShotEndRequest) = 1;
+    }
+    return bits & 0xFFFF;
+}
+int __cdecl translate_held(int keyscan) { return translate_battle_keys(keyscan, 0); }
+int __cdecl translate_pressed(int keyscan) { return translate_battle_keys(keyscan, 1); }
+int __cdecl translate_repeat(int keyscan) { return translate_battle_keys(keyscan, 2); }
 
 lexeditor_battle_camera::Vec3s read_vec(std::uintptr_t address) {
     lexeditor_battle_camera::Vec3s value{};
@@ -181,7 +247,8 @@ bool lexeditor_ff8_modern_controls_world_active() {
 
 bool lexeditor_ff8_modern_controls_battle_active() {
     const auto *mode = getmode_cached();
-    return battle_installed && enable_ff8_modern_controls && mode && mode->driver_mode == MODE_BATTLE;
+    return (battle_installed || bindings_installed) && enable_ff8_modern_controls && mode &&
+        mode->driver_mode == MODE_BATTLE;
 }
 
 bool lexeditor_ff8_modern_controls_take_square_press() {
@@ -207,7 +274,7 @@ int lexeditor_ff8_modern_world_axis(std::int8_t port, int type, std::int8_t offs
 }
 
 void lexeditor_ff8_modern_controls_install() {
-    if (!ff8 || !enable_ff8_modern_controls || world_installed || battle_installed) return;
+    if (!ff8 || !enable_ff8_modern_controls || world_installed || battle_installed || bindings_installed) return;
 
     const unsigned char first[] = {0xE8, 0xD7, 0x7E, 0x01, 0x00};
     const unsigned char second[] = {0xE8, 0x6F, 0x6A, 0x01, 0x00};
@@ -228,6 +295,24 @@ void lexeditor_ff8_modern_controls_install() {
         battle_installed = true;
     } else {
         ffnx_warning("Lexeditor Modern Controls: unsupported battle-camera call site; battle camera changes not installed.\n");
+    }
+
+    // Each call site is E8 rel32 to 004A2D60; anything else is not this game.
+    const auto calls_translator = [](std::uintptr_t site) {
+        const auto *code = reinterpret_cast<const unsigned char *>(site);
+        std::int32_t rel = 0;
+        std::memcpy(&rel, code + 1, sizeof rel);
+        return code[0] == 0xE8 && site + 5 + rel == kBattleKeyTranslate;
+    };
+    if (calls_translator(kBattleHeldCall) && calls_translator(kBattlePressedCall) &&
+        calls_translator(kBattleRepeatCall)) {
+        original_translate = reinterpret_cast<KeyTranslate>(kBattleKeyTranslate);
+        replace_call(kBattleHeldCall, reinterpret_cast<void *>(&translate_held));
+        replace_call(kBattlePressedCall, reinterpret_cast<void *>(&translate_pressed));
+        replace_call(kBattleRepeatCall, reinterpret_cast<void *>(&translate_repeat));
+        bindings_installed = true;
+    } else {
+        ffnx_warning("Lexeditor Modern Controls: unsupported battle input call sites; battle bindings not installed.\n");
     }
 
     if (world_installed || battle_installed) {

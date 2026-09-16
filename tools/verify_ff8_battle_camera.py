@@ -51,7 +51,7 @@ int main() {
     assert(std::abs(radius(full,target)-r0) < 1.5);
     assert(std::abs(radius(vertical,target)-r0) < 1.5);
     assert(full.y == start.y);
-    assert(vertical.y > start.y);
+    assert(vertical.y < start.y);   // stick up: view tilts up, camera drops
 
     Vec3s sweep=start;
     for (int i=0;i<240;++i) assert(orbit(sweep,target,255,128));
@@ -80,10 +80,10 @@ int main() {
     assert(orbit(floor_rate,target,255,128,0.035f,0.025f,DEFAULT_SPEED_SCALE));
     assert(displacement(zero,floor_rate) < 1.5);
 
-    // The floor. Holding the stick down can bring the camera level with what it
+    // The floor. Holding the stick up (the camera drops) can bring the camera level with what it
     // is looking at and no lower: below that it is inside the battlefield.
     Vec3s sinking=start;
-    for (int i=0;i<600;++i) orbit(sinking,target,128,255);
+    for (int i=0;i<600;++i) orbit(sinking,target,128,0);
     assert(sinking.y >= target.y - 2);
     // The floor a scene sets for itself. FF8 hands the camera back below level
     // here, so that pose is this battle's floor: the reader can sink to it and
@@ -95,7 +95,7 @@ int main() {
     assert(floor.pitch < 0.0f);
     const float learned=floor.pitch;
     Vec3s driven=low;
-    for (int i=0;i<600;++i) orbit(driven,target,128,255,0.035f,0.025f,1.0f,&floor);
+    for (int i=0;i<600;++i) orbit(driven,target,128,0,0.035f,0.025f,1.0f,&floor);
     assert(driven.y <= target.y - 1);   // not lifted to level
     assert(driven.y >= low.y - 2);      // and not driven below the scene's pose
 
@@ -105,7 +105,7 @@ int main() {
     assert(floor.known && floor.pitch == 0.0f);
     assert(learned < floor.pitch);
     Vec3s again=high;
-    for (int i=0;i<600;++i) orbit(again,target,128,255,0.035f,0.025f,1.0f,&floor);
+    for (int i=0;i<600;++i) orbit(again,target,128,0,0.035f,0.025f,1.0f,&floor);
     assert(again.y >= target.y - 2);
 
     std::cout << "Battle camera policy: idle gate, zero-drift center/deadzone, proportional X/Y orbit, radius preservation, speed scaling, per-scene ground floor and handed-back baseline passed\n";
