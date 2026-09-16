@@ -781,11 +781,9 @@
     .enemy-properties-compact .enemy-property-boolean .enemy-property-name {flex:1;text-align:left;justify-content:flex-start;padding-right:9px}
     .enemy-properties-compact .enemy-property-boolean input {width:16px;height:16px;min-height:16px;margin:0}
     .enemy-properties-compact .enemy-property input:not([type=checkbox]) {font-size:13px;min-height:28px}
-    .enemy-tier-table {width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px}
-    .enemy-tier-table th:first-child {width:42px}
-    .enemy-tier-table th {padding:3px 1px;font-size:11px;font-weight:normal;text-align:center}
-    .enemy-tier-table td {padding:4px 3px;border-bottom:1px solid #ffffff20;vertical-align:middle}
-    .enemy-tier-table tbody tr:last-child td {border-bottom:0}
+    .enemy-tier-table {width:100%;font-size:13px;--lex-cell-padding:4px 3px;--lex-head-cell-padding:3px 1px;
+      --lex-list-cell-border:#ffffff20;--lex-surface-border:0;--lex-surface-shadow:none;--lex-surface-bg:transparent}
+    .enemy-tier-table .header-label {font-size:11px;font-weight:normal}
     .enemy-tier-entry {display:grid;grid-template-columns:minmax(0,1fr) 36px;align-items:center;gap:2px;min-width:0}
     .enemy-tier-entry :is(.ff8-entity-search,.ff8-item-search) {display:flex!important;align-items:center;justify-content:center!important;gap:1px!important;padding:0!important;border:0!important;background:transparent!important;min-height:25px;width:100%;min-width:0}
     .enemy-tier-entry :is(.ff8-entity-search-name,.ff8-item-link) {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
@@ -846,9 +844,9 @@
     .world-map-marker:hover,.world-map-marker:focus-visible {outline:2px solid white}
     .world-map-help {position:absolute;z-index:6;top:8px;right:8px}
     .magic-detail-tabs {flex:1;min-height:0;height:100%}
-    .drop-chance-table {width:100%;border-collapse:collapse;margin-top:6px;font:inherit}
-    .drop-chance-table th,.drop-chance-table td {padding:3px 5px;text-align:right;border-bottom:1px solid #ffffff28;white-space:nowrap}
-    .drop-chance-table th:first-child {text-align:left}
+    .drop-chance-table {width:100%;margin-top:6px;font:inherit;white-space:nowrap;
+      --lex-cell-padding:3px 5px;--lex-head-cell-padding:3px 5px;--lex-list-cell-border:#ffffff28;
+      --lex-surface-border:0;--lex-surface-shadow:none;--lex-surface-bg:transparent}
     .drop-chance-table small {display:block;font-size:.8em;color:#ddd}
   </style>
 </head>
@@ -1367,26 +1365,37 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
   function enemyPairSection(row,kind,title,valueLabel){
     const tiers=[['low','LOW'],['medium','MED'],['high','HIGH']], draw=kind==='draw';
     const origin=()=>{state.selected.enemies=row.id;navigate('enemies')};
-    const table=el('table',{class:`enemy-tier-table enemy-${kind}-table`,'aria-label':`${title} by level tier`});
-    if(!draw)table.append(el('thead',{},el('tr',{},el('th',{scope:'col'},'LEVEL'),
-      ...[1,2,3,4].map(slot=>el('th',{scope:'col'},`SLOT ${slot}`)))));
-    table.append(el('tbody',{},...tiers.map(([tier,label])=>el('tr',{'data-tier':tier},
-      el('th',{scope:'row'},label),...(row.tables[kind][tier]||[]).map(entry=>{
-        // Keep the actual stored entry, not a spread copy: saveAll reads this
-        // array. Display labels never sort, compact, or renumber DAT slots.
-        const read=value=>value?.tables[kind]?.[tier]?.find(value=>value.slot===entry.slot);
-        const set=value=>{entry.valueId=Number(value);shell.refresh()};
-        const prompt=`Select ${valueLabel} for ${row.name}, ${label.toLowerCase()} level.`;
-        const choice=draw?magicSearchControl(entry.valueId,prompt,set,origin):itemSearchControl(entry.valueId,prompt,set,origin);
-        choice.title=choice.textContent.trim();
-        const value=enemyTableSource(choice,row,value=>read(value)?.valueId,set);
-        const quantity=numberControl(entry.quantity,0,255,1,value=>entry.quantity=Math.round(value),
-          {'aria-label':`${title} ${tier} choice ${entry.slot+1} quantity`});
-        quantity.addEventListener('blur',()=>quantity.value=String(entry.quantity));
-        return el('td',{'data-slot':entry.slot},el('div',{class:'enemy-tier-entry'},value,
-          enemyTableSource(unitField(quantity,'×',{unitClass:'enemy-quantity-unit'}),row,
-            value=>read(value)?.quantity,value=>entry.quantity=Number(value))));
-      })))));
+    // Keep the actual stored entry, not a spread copy: saveAll reads this
+    // array. Display labels never sort, compact, or renumber DAT slots.
+    const entryFor=(tier,index)=>(row.tables[kind][tier]||[])[index];
+    const slotCell=(tier,label,index)=>{
+      const entry=entryFor(tier,index);
+      if(!entry)return "";
+      const read=value=>value?.tables[kind]?.[tier]?.find(value=>value.slot===entry.slot);
+      const set=value=>{entry.valueId=Number(value);shell.refresh()};
+      const prompt=`Select ${valueLabel} for ${row.name}, ${label.toLowerCase()} level.`;
+      const choice=draw?magicSearchControl(entry.valueId,prompt,set,origin):itemSearchControl(entry.valueId,prompt,set,origin);
+      choice.title=choice.textContent.trim();
+      const value=enemyTableSource(choice,row,value=>read(value)?.valueId,set);
+      const quantity=numberControl(entry.quantity,0,255,1,value=>entry.quantity=Math.round(value),
+        {'aria-label':`${title} ${tier} choice ${entry.slot+1} quantity`});
+      quantity.addEventListener('blur',()=>quantity.value=String(entry.quantity));
+      return el('div',{class:'enemy-tier-entry','data-slot':entry.slot},value,
+        enemyTableSource(unitField(quantity,'×',{unitClass:'enemy-quantity-unit'}),row,
+          value=>read(value)?.quantity,value=>entry.quantity=Number(value)));
+    };
+    const table=columnList({
+      rows:tiers.map(([tier,label])=>({key:tier,tier,label})),
+      key:entry=>entry.key,
+      class:`enemy-tier-table enemy-${kind}-table`,
+      'aria-label':`${title} by level tier`,
+      editable:true, localSort:false, showHeader:!draw,
+      template:'42px repeat(4,minmax(0,1fr))',
+      rowClass:entry=>`enemy-tier-row enemy-tier-${entry.tier}`,
+      columns:[{key:'label',label:'LEVEL',render:entry=>entry.label},
+        ...[0,1,2,3].map(index=>({key:`slot${index}`,label:`SLOT ${index+1}`,
+          render:entry=>slotCell(entry.tier,entry.label,index)}))],
+    });
     return detailSection({className:'enemy-table-section enemy-tier-section',title,body:el('fieldset',{class:'enemy-table-controls',disabled:state.activeSource!=='mine'},table)});
   }
   function enemyCardChoices(row){
@@ -1905,11 +1914,13 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
   }
   function dropChanceDescription(){
     const normal=[137,68,34,17],rare=[94,70,53,39];
-    const chance=value=>el("td",{},`${(value/256*100).toFixed(2)}%`,el("small",{},`${value}/256`));
+    const chance=value=>el("span",{},`${(value/256*100).toFixed(2)}%`,el("small",{},`${value}/256`));
     return el("div",{},el("p",{},"In vanilla, Rare Item makes the fourth loot slot impossible to receive. This rework restores that chance and improves the odds of the rarer slots. Applies to enemy drops and Mug. Values when enabled:"),
-      el("table",{class:"drop-chance-table","aria-label":"Drop Chance slot probabilities"},
-        el("thead",{},el("tr",{},...['Slot','Normal','Rare Item'].map(label=>el("th",{scope:"col"},label)))),
-        el("tbody",{},...normal.map((value,index)=>el("tr",{},el("th",{scope:"row"},String(index+1)),chance(value),chance(rare[index]))))));
+      columnList({class:"drop-chance-table","aria-label":"Drop Chance slot probabilities",
+        rows:normal.map((value,index)=>({key:index,slot:index+1,normal:value,rare:rare[index]})),
+        key:entry=>entry.key, localSort:false, template:'60px minmax(0,1fr) minmax(0,1fr)',
+        columns:[{key:"slot",label:"Slot"},{key:"normal",label:"Normal",render:entry=>chance(entry.normal)},
+          {key:"rare",label:"Rare Item",render:entry=>chance(entry.rare)}]}));
   }
   const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"platform",label:"FFNx"}];
   const tweakTabProps=()=>({tabs:TWEAK_TABS,activeTab:state.settingsTab,

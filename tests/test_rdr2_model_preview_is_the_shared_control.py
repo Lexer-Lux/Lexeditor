@@ -42,7 +42,9 @@ def test_one_click_on_the_heading_icon_means_one_thing():
     # actions column beside the acquisition-sources control.
     assert "item-icon-shown" in html
     assert "item-icon-view" in html
-    assert 'const iconOptions=asDetail?{showAt:' in html
+    # There is one item rendering now - the detail panel - so this is no
+    # longer conditional on which of two forms is being drawn.
+    assert 'const iconOptions={showAt:' in html
 
 
 def test_the_shared_drawer_accepts_a_content_factory():

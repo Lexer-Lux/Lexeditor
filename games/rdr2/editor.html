@@ -965,6 +965,7 @@
 const $ = s => document.querySelector(s);
 const el = window.LexeditorUI.el;
 const newButton=window.LexeditorUI.newButton;
+const columnList=window.LexeditorUI.columnList;
 function showSaveFailure(error){const message=error?.message||String(error);toast("Save failed",true);LexeditorUI.showAlert({title:"Save failed",items:[{item:"Save",issue:message}],closeLabel:"Confirm and Close"});return error instanceof Error?error:new Error(message)}
 
 const state = {
@@ -2025,7 +2026,7 @@ function renderItems() {
       el("span",{class:"item-list-group",title:it.group||"No group"},it.group||"—"),
       el("span",{class:"item-list-category",title:it.category},it.category.replace("CI_CATEGORY_",""))];
     }},
-    detail:it=>itemRow(it,true),
+    detail:it=>itemRow(it),
     emptyDetail:()=>el("div",{class:"loot-detail-pane lex-detail"},el("div",{class:"loading"},"No items match.")),
     sync:next=>{f.itemPage=next.page;f.itemPageSize=next.pageSize;f.itemSel=next.selected||"";},
     change:next=>{f.itemPage=next.page;f.itemPageSize=next.pageSize;f.itemSel=next.selected||"";renderItems();}
@@ -2078,7 +2079,7 @@ function priceInput(it, section, cost, part) {
 
 function sellPriceCell(it,sellCash,sellRef){
   const edited=state.sellabilityEdits[it.key],sellable=edited?edited.sellable:sellCash.length>0;
-  const cell=el("td",{class:"price-cell"}),controls=el("div",{class:"price-controls"});
+  const cell=el("div",{class:"price-cell"}),controls=el("div",{class:"price-controls"});
   if(sellable){
     const rows=sellCash.length?sellCash:[[null,{qty:edited?.cents??100,item:"CURRENCY_CASH"}]];
     for(const [c,p] of rows) controls.append(c?priceInput(it,"sell",c,p):el("span",{class:"money"},el("input",{type:"number",step:"0.01",min:"0",value:fmtMoney(p.qty),onchange:e=>{state.sellabilityEdits[it.key]={sellable:true,cents:Math.round((+e.target.value||0)*100)};renderToolbarOnly();}})));
@@ -2093,7 +2094,7 @@ function sellPriceCell(it,sellCash,sellRef){
 }
 
 function buyPriceCell(it,buyCash,buyRef){
-  const edited=state.buyabilityEdits[it.key],buyable=edited?edited.buyable:buyCash.length>0,cell=el("td",{class:"price-cell"}),controls=el("div",{class:"price-controls"});
+  const edited=state.buyabilityEdits[it.key],buyable=edited?edited.buyable:buyCash.length>0,cell=el("div",{class:"price-cell"}),controls=el("div",{class:"price-controls"});
   if(buyable){
     const rows=buyCash.length?buyCash:[[null,{qty:edited?.cents??100,item:"CURRENCY_CASH"}]];
     for(const [cost,part] of rows)controls.append(cost?priceInput(it,"buy",cost,part):el("span",{class:"money"},el("input",{type:"number",step:"0.01",min:"0",value:fmtMoney(part.qty),onchange:e=>{state.buyabilityEdits[it.key]={buyable:true,cents:Math.round((+e.target.value||0)*100)};renderToolbarOnly();}})));
@@ -2111,7 +2112,7 @@ function purchaseQuantityCell(it) {
   const pending=state.buyabilityEdits[it.key];
   const cost=it.buy.find(c=>c.costtype==="COST_TYPE_PRICE"&&c.parts.some(p=>p.item==="CURRENCY_CASH"))||
     (pending?.buyable?{key:"COST_SHOP_DEFAULT",costtype:"COST_TYPE_PRICE",yield:1,parts:[{item:"CURRENCY_CASH",qty:pending.cents??100}],unlocks:[]}:null);
-  if(!cost)return el("td",{},el("input",{class:"na-price",value:"N/A",readonly:"",title:"No cash purchase record defines a purchase quantity."}));
+  if(!cost)return el("div",{},el("input",{class:"na-price",value:"N/A",readonly:"",title:"No cash purchase record defines a purchase quantity."}));
   const editKey=`${it.key}|buy|${cost.key}`,base=cost.yield||1,cur=isRO()?base:(state.yieldEdits[editKey]??base);
   const bundle=purchaseBundleOf(it);
   const attrs={type:"number",min:"1",step:"1",value:cur,class:editKey in state.yieldEdits?"edited":"",title:bundle?`Raw ${bundle.container} record quantity before the game unpacks its contents`:"Units received for this catalog purchase"};
@@ -2123,7 +2124,7 @@ function purchaseQuantityCell(it) {
     fields.append(el("div",{class:"bundle-output"},el("input",outAttrs),
       itemLink(bundle.target,true,localizedValue(bundle.targetItem?.nameKey)||bundle.target)));
   }
-  return el("td",{class:"purchase-output"}, refField(fields, [
+  return el("div",{class:"purchase-output"}, refField(fields, [
     ["V","vtag",purchaseYieldValue(refItem("vanilla",it.key))],
     ["K","ktag",purchaseYieldValue(refItem("kiddos",it.key))],
     ["1899","p1899tag",purchaseYieldValue(refItem("prices1899",it.key))]
@@ -2257,7 +2258,7 @@ function portableCraftEntries(entries){
 }
 
 function craftCell(it) {
-  const cell=el("td",{class:"craft"}),entries=craftView(it),controls=el("div",{class:"craft-summary"});
+  const cell=el("div",{class:"craft"}),entries=craftView(it),controls=el("div",{class:"craft-summary"});
   const displayName=localizedValue(it.nameKey);
   const recipeVariant=!entries.length&&displayName?state.catalog.items.find(other=>other!==it&&localizedValue(other.nameKey)===displayName&&craftView(other).length):null;
   if(recipeVariant)controls.append(el("button",{class:"icon-link",title:`Recipe is stored on ${recipeVariant.key}`,onclick:()=>goToRecipeOutput(recipeVariant.key)},"⌕"));
@@ -2286,49 +2287,9 @@ function craftCell(it) {
   return cell;
 }
 
-function recipeDetailRow(it) {
-  const entries=craftView(it),panel=el("div",{class:"inline-recipe-editor"});
-  const ventries=refRecipes(it,"vanilla"),kentries=refRecipes(it,"kiddos");
-  panel.append(el("div",{class:"inline-recipe-title"},
-    el("span",{class:"record-name"},originDisplayName(localizedValue(it.nameKey)||it.key,it)),
-    el("span",{class:"key"},it.key),
-    el("button",{class:"icon-link",title:"Close recipe editor",onclick:()=>{state.expandedRecipes.delete(it.key);renderItems();}},"×")));
-  const list=el("div",{class:"inline-recipe-list"});
-  const slotCount=Math.max(entries.length,ventries.length,kentries.length);
-  for(let ei=0;ei<slotCount;ei++){
-    const entry=entries[ei];
-    if(!entry){
-      list.append(el("div",{class:"inline-recipe inline-recipe-missing"},
-        el("div",{},el("span",{class:"cat"},`Recipe slot ${ei+1} is removed from My Overhaul.`)),
-        recipeReferenceControls(it,ei)));
-      continue;
-    }
-    const recipe=el("div",{class:"inline-recipe"},
-      el("label",{},"Station / recipe slot",craftKeySelect(entry,ev=>{ensureCraft(it)[ei].key=ev.target.value;renderToolbarOnly();},entries.map(e=>e.key))),
-      el("label",{},"Makes",el("input",{type:"number",min:"1",step:"1",value:entry.yield,onchange:ev=>{ensureCraft(it)[ei].yield=Math.max(1,Math.round(+ev.target.value||1));renderToolbarOnly();}})),
-      el("label",{},"Learned",validatedKeyEditor("Recipe unlock",(entry.unlocks||[])[0]||"ALWAYS KNOWN",recipeUnlockKeys(),v=>{ensureCraft(it)[ei].unlocks=!v||v==="ALWAYS KNOWN"?[]:[v];renderToolbarOnly();})),
-      recipeReferenceControls(it,ei)||el("span"));
-    const ingredients=el("div",{class:"ingredient-editor"},
-      el("div",{class:"ingredient-head"},el("span",{},"Ingredient"),el("span",{},"Quantity"),el("span")));
-    entry.parts.forEach((p,pi)=>ingredients.append(el("div",{class:"ingredient-row"},
-      linkedCatalogKeyEditor(p.item,v=>{ensureCraft(it)[ei].parts[pi].item=v;renderItems();}),
-      el("input",{type:"number",min:"1",step:"1",value:p.qty,onchange:ev=>{ensureCraft(it)[ei].parts[pi].qty=Math.max(1,Math.round(+ev.target.value||1));renderToolbarOnly();}}),
-      el("button",{class:"icon-link del",title:"Remove ingredient",onclick:()=>{ensureCraft(it)[ei].parts.splice(pi,1);renderItems();}},"×"))));
-    recipe.append(ingredients,el("div",{class:"inline-recipe-actions addrow"},
-      newButton({title:"Add ingredient",onclick:()=>pickNewIngredient(it,ei,renderItems)}),
-      el("button",{class:"remove-recipe",onclick:()=>{ensureCraft(it).splice(ei,1);renderItems();}},"Remove recipe")));
-    list.append(recipe);
-  }
-  const addRecipeAttrs={onclick:()=>{
-    const recipes=ensureCraft(it),key=nextCraftKey(recipes);if(key)recipes.push({key,yield:1,parts:[{item:"",qty:1}],unlocks:[]});renderItems();
-  }};
-  if(!nextCraftKey(entries))addRecipeAttrs.disabled="";
-  panel.append(list,el("div",{class:"addrow"},newButton({...addRecipeAttrs,title:entries.length?"Add another recipe":"Add recipe"})));
-  return el("tr",{class:"recipe-detail-row"},el("td",{colspan:"10"},panel));
-}
 
 function itemEffectsCell(it){
-  const cell=el("td");
+  const cell=el("div");
   const draw=()=>{
     const current=isRO()?it.effects:[...(state.itemEffectEdits[it.key]??it.effects)];
     const vanilla=refItem("vanilla",it.key),kiddos=refItem("kiddos",it.key);
@@ -2437,7 +2398,7 @@ function quickSelectSlotsCell(it){
   draw();return wrap;
 }
 
-function itemRow(it, asDetail=false) {
+function itemRow(it) {
   const buyCash = [], sellCash = [], other = [];
   for (const c of it.buy) {
     if (isCraftCost(c)) continue; // crafting handled by craftCell
@@ -2474,7 +2435,7 @@ function itemRow(it, asDetail=false) {
     if(slot==="0x550898DE"||slot==="0xAEEE1782")return "Unresolved engine inventory slot. Rockstar stored only this hash; no name was recovered from community string corpora. It is almost always -1 and is not proven to be a player-facing unlimited carry cap or a specific camp/horse context.";
     return `Hashed inventory/upgrade slot ${slot}. Its exact Rockstar name is unresolved; infer its contribution from which item categories use it and the vanilla reference value.`;
   };
-  const carryCell = el("td", {});
+  const carryCell = el("div", {});
   const permanentFoodBait=/^UPGRADE_FSH_BAIT_(BREAD|CHEESE|CORN)$/.test(it.key);
   const loteRule=(it.carry||[]).find(c=>c.slot==="0x04718245");
   for (const c of (it.carry || []).filter(c=>c.slot!=="0x04718245")) {
@@ -2552,30 +2513,28 @@ function itemRow(it, asDetail=false) {
             el("span",{class:"item-meta-separator","aria-hidden":"true"}),
             el("span",{class:"item-meta-category"},it.category.replace("CI_CATEGORY_","")))),
         nameReference));
-  const iconOptions=asDetail?{showAt:(open,name)=>{
+  const iconOptions={showAt:(open,name)=>{
     const actions=identityMain.querySelector(".item-identity-actions");
     if(!actions||actions.querySelector(".item-icon-view"))return;
     actions.append(el("button",{class:"icon-link item-icon-view",
       title:"View the inventory icon at full size",
       "aria-label":`View the ${name} inventory icon at full size`,onclick:open},"\u26f6"));
-  }}:{};
+  }};
   const identity=el("div",{class:"item-identity"},itemIcon(texture,it,iconOptions),identityMain);
   sizeItemIdentityIcon(identity,identityMain);
-  const identityCell = el("td", {},identity);
-  const usedInCell = (() => { const uses = recipesUsing(it.key); return el("td", {}, uses.length ?
+  const identityCell = el("div", {},identity);
+  const usedInCell = (() => { const uses = recipesUsing(it.key); return el("div", {}, uses.length ?
       el("button", { class:"save", style:"padding:4px 10px", onclick:()=>goToRecipesUsing(it.key) }, `${uses.length} recipe${uses.length===1?"":"s"}`) :
       el("span", {class:"cat"}, "none")); })();
   const cells = {
     identity: identityCell, description: itemDescriptionCell(it),
     buy: buyPriceCell(it,buyCash,buyRef), purchase: purchaseQuantityCell(it),
     sell: sellPriceCell(it,sellCash,sellRef), carry: carryCell,
-    quickSelect: el("td",{},quickSelectSlotsCell(it)),
+    quickSelect: el("div",{},quickSelectSlotsCell(it)),
     recipe: craftCell(it), usedIn: usedInCell, effects: effCell,
-    tags: el("td", {}, itemTagsCell(it)),
+    tags: el("div", {}, itemTagsCell(it)),
   };
-  if (asDetail) return itemDetailPane(it, cells);
-  return el("tr", {}, cells.identity, cells.description, cells.buy, cells.purchase,
-    cells.sell, cells.carry, cells.recipe, cells.usedIn, cells.effects, cells.tags);
+  return itemDetailPane(it, cells);
 }
 
 // Split-view detail: the same cells itemRow builds, laid out vertically as
@@ -2993,7 +2952,7 @@ async function itemDescriptionCell(it){
     editor.onchange=ev=>{ev.target.value=sanitizeItemDescription(ev.target.value);originalChange(ev);};
   }
   const vanilla=state.localization?.vanilla?.[it.descriptionKey||key];
-  return el("td", {class:"desc-cell"}, refField(editor, [["V","vtag",vanilla]], localizedValue(key), v=>applyToControl(editor,v), String));
+  return el("div", {class:"desc-cell"}, refField(editor, [["V","vtag",vanilla]], localizedValue(key), v=>applyToControl(editor,v), String));
 }
 
 // ----- Shop inventories -----
@@ -3362,43 +3321,47 @@ function renderShopAcceptanceReport(m){
     "Rockstar decides ordinary acceptance in compiled shop category rules that appear in no data file and in no script. ",
     "The exception list is a sparse permit list, not a whitelist: only 5 of 20 shops carry any entries at all, and the ",
     "trapper's list holds no pelts and no carcasses even though he plainly buys both."));
-  const table=el("table",{class:"shop-table shop-acceptance-table"},el("thead",{},el("tr",{},
-    el("th",{},"Shop"),...ACCEPTANCE_COLS.map(([,label,tip])=>el("th",{title:tip},label)))));
-  const body=el("tbody");
-  for(const shop of a.shops){
-    const c=a.summary[shop]||{};
-    body.append(el("tr",{},el("td",{},shopLabel(shop)),
-      ...ACCEPTANCE_COLS.map(([key])=>el("td",{class:c[key]?"":"muted"},String(c[key]||0)))));
-  }
-  table.append(body);m.append(table);
+  const table=columnList({class:"shop-table shop-acceptance-table","aria-label":"Shop acceptance",
+    rows:a.shops.map(shop=>({shop,counts:a.summary[shop]||{}})),key:row=>row.shop,
+    template:`31% repeat(${ACCEPTANCE_COLS.length},minmax(0,1fr))`,
+    columns:[{key:"shop",label:"Shop",render:row=>shopLabel(row.shop)},
+      ...ACCEPTANCE_COLS.map(([key,label,tip])=>({key,label:()=>el("span",{title:tip},label),
+        sortValue:row=>Number(row.counts[key]||0),
+        cellClass:row=>row.counts[key]?"":"muted",
+        render:row=>String(row.counts[key]||0)}))]});
+  m.append(table);
   const conflicts=a.rows.filter(r=>r.verdict==="LISTED_NO_PRICE");
   if(conflicts.length){
     m.append(el("div",{class:"hint",style:"margin-top:18px"},el("b",{},`${conflicts.length} conflicts: `),
       "listed by the shop, but the catalog gives no sell price. These do change hands in game, so “no price” cannot be assumed to win."));
-    const ct=el("table",{class:"shop-table"},el("thead",{},el("tr",{},el("th",{},"Shop"),el("th",{},"Item"),el("th",{},"Source"))));
-    const cb=el("tbody");
-    conflicts.slice(0,300).forEach(r=>cb.append(el("tr",{},el("td",{},shopLink(r.shop)),el("td",{},itemLink(r.item)),el("td",{},r.source))));
-    ct.append(cb);m.append(ct);
+    m.append(columnList({class:"shop-table","aria-label":"Listed with no catalog price",
+      rows:conflicts.slice(0,300),key:(r,index)=>`${r.shop}:${r.item}:${index}`,
+      template:"31% minmax(0,1fr) minmax(0,1fr)",
+      columns:[{key:"shop",label:"Shop",render:r=>shopLink(r.shop)},
+        {key:"item",label:"Item",render:r=>itemLink(r.item)},
+        {key:"source",label:"Source"}]}));
     if(conflicts.length>300)m.append(el("div",{class:"hint"},`Showing 300 of ${conflicts.length}.`));
   }
   const stray=Object.entries(a.unresolvedListed||{}).filter(([,v])=>v.length);
   if(stray.length){
     m.append(el("div",{class:"hint",style:"margin-top:18px"},el("b",{},"Listed but not in the catalog at all: "),
       "these tokens sit in a shop's buyer list with no catalog record behind them. Either dead references or items created elsewhere."));
-    const st2=el("table",{class:"shop-table"},el("thead",{},el("tr",{},el("th",{},"Shop"),el("th",{},"Tokens"))));
-    const sb=el("tbody");
-    stray.forEach(([shop,list])=>sb.append(el("tr",{},el("td",{},shopLabel(shop)),el("td",{},list.join(", ")))));
-    st2.append(sb);m.append(st2);
+    m.append(columnList({class:"shop-table","aria-label":"Listed but not in the catalog",
+      rows:stray.map(([shop,list])=>({shop,tokens:list.join(", ")})),key:row=>row.shop,
+      template:"31% minmax(0,1fr)",
+      columns:[{key:"shop",label:"Shop",render:row=>shopLabel(row.shop)},
+        {key:"tokens",label:"Tokens"}]}));
   }
 }
 
 function renderShopItemPicker(items,m){
   const rows=sortedRows("shops-picker",items,{name:it=>localizedValue(it.nameKey)||it.key});
   $("#toolbar").insertBefore(el("span",{class:"count"},`${rows.length} matching items${rows.length>200?" (showing 200)":""}`),$("#toolbar").lastChild);
-  const table=el("table",{class:"shop-table"},el("thead",{},el("tr",{},sortHead("shops-picker","name","Item",renderShops))));
-  const body=el("tbody");
-  rows.slice(0,200).forEach(it=>body.append(el("tr",{},el("td",{},el("button",{class:"table-link",onclick:()=>{state.filters.shopExact=it.key;state.filters.shopBuyQ=it.key;state.filters.shopSellQ=it.key;renderShops();}},localizedValue(it.nameKey)||"No localized name"),itemLink(it.key)))));
-  table.append(body);m.append(table);
+  m.append(columnList({class:"shop-table","aria-label":"Matching items",
+    rows:rows.slice(0,200),key:it=>it.key,template:"minmax(0,1fr)",
+    columns:[{key:"name",label:"Item",sortValue:it=>localizedValue(it.nameKey)||it.key,
+      render:it=>el("span",{},el("button",{class:"table-link",onclick:()=>{state.filters.shopExact=it.key;state.filters.shopBuyQ=it.key;state.filters.shopSellQ=it.key;renderShops();}},
+        localizedValue(it.nameKey)||"No localized name"),itemLink(it.key))}]}));
 }
 
 function shopListing(shop,item){return shop.items.find(row=>row.item===item);}
@@ -3422,23 +3385,41 @@ function setShopListing(shop,item,enabled){
 }
 function renderShopMatrix(it,shops,m,mode){
   const selling=mode==="buy";
-  const summary=el("table",{class:"shop-table shop-item-summary"},el("thead",{},el("tr",{},el("th",{},"Item"),el("th",{},selling?"Global buy price":"Global sell price"),...(selling?[el("th",{},"Purchase output")]:[]))));
-  const summaryBody=el("tbody"),summaryRow=el("tr",{},el("td",{},el("span",{class:"record-name"},originDisplayName(localizedValue(it.nameKey)||"No localized name",it)),itemLink(it.key,false)),selling?buyPriceCell(it,cashParts(it.buy,"buy"),shopPriceRef(it,"buy")):sellPriceCell(it,cashParts(it.sell,"sell"),shopPriceRef(it,"sell")));
-  if(selling)summaryRow.append(purchaseQuantityCell(it));summaryBody.append(summaryRow);summary.append(summaryBody);m.append(summary);
+  m.append(columnList({class:"shop-table shop-item-summary","aria-label":"Item prices",
+    rows:[it],key:row=>row.key,localSort:false,
+    template:`31% minmax(0,1fr)${selling?" minmax(0,1fr)":""}`,
+    columns:[{key:"item",label:"Item",render:row=>el("span",{},
+        el("span",{class:"record-name"},originDisplayName(localizedValue(row.nameKey)||"No localized name",row)),
+        itemLink(row.key,false))},
+      {key:"price",label:selling?"Global buy price":"Global sell price",
+        render:row=>selling?buyPriceCell(row,cashParts(row.buy,"buy"),shopPriceRef(row,"buy"))
+          :sellPriceCell(row,cashParts(row.sell,"sell"),shopPriceRef(row,"sell"))},
+      ...(selling?[{key:"yield",label:"Purchase output",render:row=>purchaseQuantityCell(row)}]:[])]}));
   const allTypes=[...new Set([...(selling?shops.map(s=>s.type):[]),...(state.shopBuyers?.shops||[])])].sort((a,b)=>shopLabel(a).localeCompare(shopLabel(b)));
-  const matrix=el("table",{class:"shop-table shop-matrix"},el("thead",{},el("tr",{},el("th",{},"Shop"),el("th",{},selling?"Requirements":"Vanilla behavior"),el("th",{},selling?"Sells":"Buy override"))));
-  const body=el("tbody");
-  allTypes.forEach(type=>{
-    const shop=shops.find(s=>s.type===type),listing=shop&&shopListing(shop,it.key),accepted=merchantAccepted(type,it.key);
-    const buyerRule=cashOf(it,"sell")===null
-      ? "No — no SELL_SHOP_DEFAULT payout"
-      : "Unknown — Rockstar keeps this shop's category filter in compiled script";
-    const override=merchantOverride(type,it.key);
-    const control=el("select",{title:"Vanilla keeps Rockstar's compiled category decision; Accept and Reject explicitly override it.",onchange:ev=>setMerchantOverride(type,it.key,ev.target.value)},
-      ...[["default","Vanilla"],["accept","Accept"],["reject","Reject"]].map(([value,label])=>el("option",{value,...(override===value?{selected:true}:{})},label)));
-    body.append(el("tr",{},el("td",{},shopLabel(type)),el("td",{class:"requirements"},selling?(listing?.requirements?.length?listing.requirements.map(r=>`${r.type}: ${r.key}${r.state?` = ${r.state}`:""}`).join(" · "):listing?"Always available":"—"):buyerRule+(accepted?"; explicit PDATA row present":"")),selling?el("td",{},el("input",{type:"checkbox",checked:!!listing,title:"Include this item in this shop's stock",onchange:ev=>setShopListing(shop,it.key,ev.target.checked)})):el("td",{},control)));
-  });
-  matrix.append(body);m.append(matrix);
+  const shopFor=type=>shops.find(s=>s.type===type);
+  const listingFor=type=>{const shop=shopFor(type);return shop&&shopListing(shop,it.key);};
+  const buyerRule=cashOf(it,"sell")===null
+    ? "No — no SELL_SHOP_DEFAULT payout"
+    : "Unknown — Rockstar keeps this shop's category filter in compiled script";
+  m.append(columnList({class:"shop-table shop-matrix","aria-label":"Shops",
+    rows:allTypes.map(type=>({type})),key:row=>row.type,editable:true,localSort:false,
+    template:"31% minmax(0,1fr) minmax(0,1fr)",
+    columns:[{key:"shop",label:"Shop",render:row=>shopLabel(row.type)},
+      {key:"rule",label:selling?"Requirements":"Vanilla behavior",cellClass:"requirements",
+        render:row=>{const listing=listingFor(row.type);
+          if(!selling)return buyerRule+(merchantAccepted(row.type,it.key)?"; explicit PDATA row present":"");
+          if(listing?.requirements?.length)return listing.requirements.map(r=>`${r.type}: ${r.key}${r.state?` = ${r.state}`:""}`).join(" · ");
+          return listing?"Always available":"—";}},
+      {key:"state",label:selling?"Sells":"Buy override",
+        render:row=>{
+          if(selling)return el("input",{type:"checkbox",checked:!!listingFor(row.type),
+            title:"Include this item in this shop's stock",
+            onchange:ev=>setShopListing(shopFor(row.type),it.key,ev.target.checked)});
+          const override=merchantOverride(row.type,it.key);
+          return el("select",{title:"Vanilla keeps Rockstar's compiled category decision; Accept and Reject explicitly override it.",
+            onchange:ev=>setMerchantOverride(row.type,it.key,ev.target.value)},
+            ...[["default","Vanilla"],["accept","Accept"],["reject","Reject"]].map(([value,label])=>
+              el("option",{value,...(override===value?{selected:true}:{})},label)));}}]}));
   if(!selling)m.append(el("div",{class:"hint"},el("b",{},"Merchant overrides: "),"Vanilla preserves Rockstar's category decision. Accept adds a PDATA exception; Reject greys the Sell action when that item is selected in this merchant's satchel."));
 }
 

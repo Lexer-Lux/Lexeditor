@@ -5625,7 +5625,9 @@ ${contents.path}`});
       style: `--lex-column-list-template:${template};grid-template-columns:var(--lex-column-list-template)`,
       "aria-label": options["aria-label"],
       "aria-rowcount": options.rows.length + 1,
-      header,
+      // A tiny table whose columns are named by the row beside them - FF8's
+      // draw tiers - reads better without a header row.
+      header: options.showHeader === false ? undefined : header,
       rowRole: "row",
       rowClass: row => ["lex-column-list-row",
         columns.some(column => String(column.key).toLocaleLowerCase() === "enabled") && row?.enabled === false ? "lex-row-disabled" : "",
