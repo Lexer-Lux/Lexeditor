@@ -315,7 +315,8 @@
   async function loadComponentUsage(){
     if(catalogue.usageLoaded)return;
     catalogue.usageLoaded=true;
-    try{const response=await fetch("/shared/component-usage.json");catalogue.usage=(await response.json()).components||{};}
+    try{const response=await fetch("/shared/component-usage.json");const payload=await response.json();
+      catalogue.usage=payload.components||{};catalogue.shell=new Set(payload.shell||[]);}
     catch(_error){catalogue.usage={};}
     // How many games there are, so a component every one of them uses can say
     // so instead of listing the lot.
@@ -354,7 +355,9 @@
     const uses=new Set(row.usedBy.map(value=>value.replace(/_/g,"-")));
     const used=ids.filter(id=>uses.has(id.replace(/_/g,"-")));
     const unused=ids.filter(id=>!uses.has(id.replace(/_/g,"-")));
-    if(!used.length)return readonlyField("No game uses this. The shared UI may still use it itself.");
+    if(!used.length)return readonlyField(catalogue.shell?.has(row.id)
+      ? "No game calls this directly. The shared UI calls it for every game."
+      : "Nothing uses this yet.");
     // "Every game" is only true when the full list of games is known: without
     // the desktop host this page only knows the ones that do use it.
     if(!unused.length)return el("div",{class:"blank-games"},...used.map(id=>gameCard(id,true)),
@@ -373,6 +376,9 @@
       detailField({label:"LEVEL",control:readonlyField(row.level)}),
       detailField({label:"USED BY",control:usedByControl(row),
         help:infoHelp("Read from the plugins themselves, not a list anyone maintains. A faded game does not use it.")}),
+      ...(catalogue.shell?.has(row.id)&&row.usedBy.length
+        ? [detailField({label:"ALSO",control:readonlyField("The shared UI calls this itself, for every game.")})]
+        : []),
     ]})];
     const panel=detailPanel({className:"blank-detail",title:row.id,meta:row.level,body});
     // A glyph is a few pixels across in use; a list is a page wide. The pane

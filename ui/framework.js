@@ -7233,11 +7233,12 @@ ${contents.path}`});
       emptyDetail:()=>detailPanel({className:"lex-data-map-detail",title:"Data Map",body:[element("p",{},"No files match this filter.")]}),
       master:({rows,selected,select})=>columnList({rows,key:keyOf,selected,select,
         class:`lex-data-map-table ${options.tableClass || ""}`,
-        template:"minmax(100px,1.2fr) minmax(80px,1fr) 130px",
+        template:"max-content minmax(100px,1.2fr) minmax(80px,1fr)",
         sortState:{key:sortKey,dir:direction},sort:options.changeSort,
-        columns:[{key:"filename",label:"Filename",sortable:true,align:"start"},
-          {key:"controls",label:"What it controls",sortable:true,align:"start"},
-          {key:"status",label:"Integration",sortable:true,align:"center",render:row=>integrationStatus(status(row))}]}),
+        columns:[{key:"status",label:enabledMark,headerTitle:"Integration",width:"max-content",
+            sortable:true,align:"center",render:row=>integrationStatus(status(row))},
+          {key:"filename",label:"Filename",sortable:true,align:"start"},
+          {key:"controls",label:"What it controls",sortable:true,align:"start"}]}),
       detail,
     });
     return {controls:[],content,page,pages:Math.max(1,Math.ceil(filtered.length/saved.pageSize)),filtered};

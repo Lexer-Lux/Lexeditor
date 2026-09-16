@@ -19,9 +19,12 @@
       "ff8"
     ],
     "booleanMark": [
+      "blank",
       "ff9"
     ],
-    "bottomSearch": [],
+    "bottomSearch": [
+      "blank"
+    ],
     "callWindow": [
       "blank",
       "ff7r",
@@ -40,7 +43,9 @@
       "rdr2",
       "warband"
     ],
-    "closeButton": [],
+    "closeButton": [
+      "blank"
+    ],
     "columnList": [
       "blank",
       "chrono_trigger",
@@ -64,18 +69,28 @@
       "ff8"
     ],
     "confirmAction": [
+      "blank",
       "chrono_trigger",
       "ff7",
       "ff7r",
       "ff7r2",
       "ff9"
     ],
-    "confirmDiscardChanges": [],
-    "confirmUnsavedExit": [],
-    "controlHelp": [],
-    "copyText": [],
+    "confirmDiscardChanges": [
+      "blank"
+    ],
+    "confirmUnsavedExit": [
+      "blank"
+    ],
+    "controlHelp": [
+      "blank"
+    ],
+    "copyText": [
+      "blank"
+    ],
     "createWindowActions": [],
     "creditsPanel": [
+      "blank",
       "chrono_trigger",
       "ff8"
     ],
@@ -96,6 +111,7 @@
       "warband"
     ],
     "decorateSearchCandidate": [
+      "blank",
       "ff8"
     ],
     "detailField": [
@@ -111,9 +127,11 @@
       "warband"
     ],
     "detailGroup": [
+      "blank",
       "warband"
     ],
     "detailNote": [
+      "blank",
       "ff7r",
       "ff7r2"
     ],
@@ -129,7 +147,9 @@
       "rdr",
       "warband"
     ],
-    "detailRow": [],
+    "detailRow": [
+      "blank"
+    ],
     "detailSection": [
       "blank",
       "ff7",
@@ -154,7 +174,9 @@
       "warband"
     ],
     "element": [],
-    "enabledMark": [],
+    "enabledMark": [
+      "blank"
+    ],
     "finishPluginLoading": [
       "blank",
       "chrono_trigger",
@@ -171,9 +193,11 @@
     "finishSearcher": [],
     "fitListPage": [],
     "folderIcon": [
+      "blank",
       "ff8"
     ],
     "formatNumber": [
+      "blank",
       "ff8"
     ],
     "hasEnabledProperty": [],
@@ -219,7 +243,9 @@
     "listDetail": [
       "ff7"
     ],
-    "magnitudeValue": [],
+    "magnitudeValue": [
+      "blank"
+    ],
     "masterDetail": [
       "warband"
     ],
@@ -254,15 +280,20 @@
       "ff8"
     ],
     "newButton": [
+      "blank",
       "rdr2"
     ],
     "numberValue": [
+      "blank",
       "ff8"
     ],
     "openGameFolder": [
+      "blank",
       "ff8"
     ],
-    "openSettings": [],
+    "openSettings": [
+      "blank"
+    ],
     "pagedListDetail": [
       "blank",
       "chrono_trigger",
@@ -281,10 +312,15 @@
       "warband"
     ],
     "pagerSelect": [
+      "blank",
       "ff7r"
     ],
-    "pagerToggle": [],
-    "paginateSettings": [],
+    "pagerToggle": [
+      "blank"
+    ],
+    "paginateSettings": [
+      "blank"
+    ],
     "panelLayout": [
       "blank",
       "ff8",
@@ -333,8 +369,11 @@
       "ff7r2",
       "ff9"
     ],
-    "saveIcon": [],
+    "saveIcon": [
+      "blank"
+    ],
     "searchIcon": [
+      "blank",
       "ff8"
     ],
     "settingsColumns": [
@@ -344,12 +383,16 @@
       "rdr",
       "rdr2"
     ],
-    "settingsIcon": [],
+    "settingsIcon": [
+      "blank"
+    ],
     "settingsSaveControl": [
+      "blank",
       "rdr",
       "rdr2"
     ],
     "sharedSettings": [
+      "blank",
       "ff7",
       "ff8"
     ],
@@ -368,10 +411,12 @@
       "rdr"
     ],
     "soundCoverageTable": [
+      "blank",
       "ff7",
       "ff8"
     ],
     "subtabBar": [
+      "blank",
       "chrono_trigger",
       "ff7",
       "ff7r",
@@ -391,10 +436,72 @@
       "ff8",
       "ff9"
     ],
-    "uiScaleControl": [],
+    "uiScaleControl": [
+      "blank"
+    ],
     "unitField": [
       "blank",
       "ff8"
     ]
-  }
+  },
+  "shell": [
+    "EditHistory",
+    "NavigationHistory",
+    "applyTheme",
+    "booleanMark",
+    "bottomSearch",
+    "callWindow",
+    "clone",
+    "closeButton",
+    "columnList",
+    "confirmAction",
+    "confirmDiscardChanges",
+    "confirmUnsavedExit",
+    "controlHelp",
+    "copyText",
+    "createWindowActions",
+    "creditsPanel",
+    "dataMap",
+    "detailField",
+    "detailPanel",
+    "detailSection",
+    "element",
+    "finishSearcher",
+    "fitListPage",
+    "folderIcon",
+    "formatNumber",
+    "hasEnabledProperty",
+    "infoHelp",
+    "infoIcon",
+    "installBrowserHistoryGuard",
+    "installControlHelp",
+    "installExtendedMouseHistory",
+    "installWindowFrame",
+    "integrationStatus",
+    "list",
+    "listDetail",
+    "magnitudeValue",
+    "newButton",
+    "numberValue",
+    "pagedListDetail",
+    "pager",
+    "pagerToggle",
+    "paginateSettings",
+    "panelLayout",
+    "playThemeSound",
+    "readonlyField",
+    "recordId",
+    "referenceDisplay",
+    "refreshReferences",
+    "saveIcon",
+    "searchIcon",
+    "settingsIcon",
+    "settingsSaveControl",
+    "sharedSettings",
+    "showAlert",
+    "showToast",
+    "subtabBar",
+    "uiScaleControl",
+    "unitField"
+  ]
 }

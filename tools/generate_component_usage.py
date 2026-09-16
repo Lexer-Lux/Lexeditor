@@ -30,10 +30,12 @@ def exports() -> list[str]:
 def usage() -> dict[str, list[str]]:
     names = exports()
     found: dict[str, set[str]] = {name: set() for name in names}
-    for plugin in sorted((ROOT / "games").iterdir()):
-        if not plugin.is_dir():
-            continue
-        for path in sorted(plugin.rglob("*")):
+    sources = [(plugin.name, plugin) for plugin in sorted((ROOT / "games").iterdir()) if plugin.is_dir()]
+    # The component catalogue is rendered by Blank, so a component with a sample
+    # there is one Blank shows, whoever wrote the file.
+    sources.append(("blank", ROOT / "ui" / "component-catalog.js"))
+    for name, plugin in sources:
+        for path in ([plugin] if plugin.is_file() else sorted(plugin.rglob("*"))):
             if path.suffix.lower() not in (".html", ".js") or not path.is_file():
                 continue
             text = path.read_text(encoding="utf-8", errors="replace")
@@ -42,18 +44,42 @@ def usage() -> dict[str, list[str]]:
             destructured = set()
             for block in re.findall(r"=\s*LexeditorUI\s*;|\{([^{}]*)\}\s*=\s*LexeditorUI", text):
                 destructured.update(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", block or ""))
-            for name in names:
-                if f"LexeditorUI.{name}" in text or (name in destructured
-                        and re.search(rf"\b{re.escape(name)}\s*\(", text)):
-                    found[name].add(plugin.name)
+            for component in names:
+                if f"LexeditorUI.{component}" in text or f"UI.{component}(" in text or (
+                        component in destructured
+                        and re.search(rf"\b{re.escape(component)}\s*\(", text)):
+                    found[component].add(name)
     return {name: sorted(plugins) for name, plugins in found.items()}
+
+
+def shell_usage(names: list[str]) -> list[str]:
+    """Components the shared UI calls itself, on every game's behalf.
+
+    A game that never names applyTheme still gets themed, because mountShell
+    applies it. Without this, the catalogue reads as though nothing uses it.
+    """
+    # The framework itself, plus the shell pages that are not a game: the home
+    # screen and the editor host.
+    source = "\n".join(path.read_text(encoding="utf-8", errors="replace")
+                       for path in sorted((ROOT / "ui").glob("*"))
+                       if path.suffix in (".js", ".html") and path.name != "component-catalog.js")
+    used = []
+    for name in names:
+        calls = len(re.findall(rf"(?<![\w.]){re.escape(name)}\s*\(", source))
+        # The definition reads `const name = ...`, never `name(`, so any call
+        # at all is the shared UI using it.
+        if calls:
+            used.append(name)
+    return used
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
     arguments = parser.parse_args()
-    payload = json.dumps({"components": usage()}, indent=2) + "\n"
+    components = usage()
+    payload = json.dumps({"components": components,
+                          "shell": shell_usage(sorted(components))}, indent=2) + "\n"
     if arguments.check:
         current = OUTPUT.read_text(encoding="utf-8") if OUTPUT.is_file() else ""
         if current != payload:

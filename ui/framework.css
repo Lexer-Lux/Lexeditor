@@ -1359,8 +1359,17 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
   cursor:pointer;
 }
 
-.lex-subtab-button:hover { color:var(--lex-text);border-radius:8px 8px 0 0;background:color-mix(in srgb,var(--lex-panel-2) 72%,var(--lex-highlight));transform:translateY(-3px); }
-.lex-subtab-button.active { color:var(--lex-accent-text);border-radius:8px 8px 0 0;background:var(--lex-accent);transform:translateY(-3px); }
+.lex-subtab-button:hover,
+.lex-subtab-button.active {
+  /* The tab rises by three pixels; the padding gives those three pixels back to
+     the top, so the label stays on the same line as every other tab's. */
+  padding-top:7px;
+  padding-bottom:1px;
+  border-radius:8px 8px 0 0;
+  transform:translateY(-3px);
+}
+.lex-subtab-button:hover { color:var(--lex-text);background:color-mix(in srgb,var(--lex-panel-2) 72%,var(--lex-highlight)); }
+.lex-subtab-button.active { color:var(--lex-accent-text);background:var(--lex-accent); }
 .lex-subtab-button:focus-visible { position:relative;z-index:1;outline:2px solid var(--lex-highlight);outline-offset:-2px; }
 
 .lex-curve-editor {
