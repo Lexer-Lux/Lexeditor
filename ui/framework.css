@@ -6480,5 +6480,70 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 }
 .lex-settings-dialog { width: var(--lex-settings-dialog-width, min(720px, 96vw)); }
 
+/* ---- The window chrome as a skin ---------------------------------------
+   FF8 draws a PlayStation menu: bevelled buttons, a pointing-hand marker on the
+   active tab, black behind the tabs. It did that by restyling every shared
+   class in the header. These tokens are that surface, so a game paints and
+   sizes the chrome without naming one of them. Defaults are today's look. */
+.lex-shell-header {
+  gap: var(--lex-shell-header-gap, 0);
+  padding: var(--lex-shell-header-padding, 0);
+}
+.lex-shell-command-row {
+  padding: var(--lex-command-row-padding, 4px 10px);
+  border: var(--lex-command-row-border, 0);
+}
+.lex-shell-header nav {
+  background: var(--lex-nav-bg, var(--lex-panel-2));
+  flex-wrap: var(--lex-nav-wrap, wrap);
+}
+.lex-nav-frame { padding-inline: var(--lex-nav-padding-inline, 0); }
+.lex-shell-header nav button {
+  min-height: var(--lex-tab-min-height, 0);
+  padding-inline: var(--lex-tab-padding-inline, 10px);
+  font-size: var(--lex-tab-font-size, inherit);
+  color: var(--lex-tab-fg, inherit);
+  background: var(--lex-tab-bg, transparent);
+}
+.lex-shell-header nav button:hover { background: var(--lex-tab-hover-bg, var(--lex-panel)); }
+.lex-shell-header nav button.active {
+  color: var(--lex-tab-active-fg, var(--lex-accent-text));
+  background: var(--lex-tab-active-bg, var(--lex-accent));
+  border-color: var(--lex-tab-active-border-color, transparent);
+}
+.lex-shell-header nav button:first-child { border-left: var(--lex-tab-first-border, 0); }
+.lex-shell-header nav button.lex-settings-tab { background: var(--lex-settings-tab-bg, var(--lex-tab-bg, transparent)); }
+.lex-shell-header nav button.lex-settings-tab:hover { background: var(--lex-settings-tab-hover-bg, var(--lex-tab-hover-bg, var(--lex-panel))); }
+.lex-shell-header nav button.lex-settings-tab.active { background: var(--lex-settings-tab-active-bg, var(--lex-tab-active-bg, var(--lex-accent))); }
+/* The mark on the active tab: a caret by default, a game's own image when it
+   has one - FF8's pointing hand. */
+.lex-shell-header nav button.active .lex-tab-label { position: relative; display: inline-block; }
+.lex-shell-header nav button.active .lex-tab-label::before {
+  content: var(--lex-tab-marker-content, none);
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  right: calc(100% + var(--lex-tab-marker-gap, 5px));
+  width: var(--lex-tab-marker-width, 24px);
+  height: var(--lex-tab-marker-height, 16px);
+  background: var(--lex-tab-marker-image, none) center / contain no-repeat;
+  image-rendering: pixelated;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.lex-shell-actions button, .lex-history-button, .lex-window-button,
+.lex-settings-button, .lex-help-button, .lex-developer-button, .lex-game-process {
+  color: var(--lex-shell-button-fg, inherit);
+  border: var(--lex-shell-button-border-width, 1px) solid;
+  border-color: var(--lex-shell-button-border-color, var(--lex-border));
+  background: var(--lex-shell-button-bg, var(--lex-panel-2));
+}
+.lex-window-button { height: var(--lex-window-button-height, 30px); }
+.lex-save-icon { width: var(--lex-save-icon-size, 32px); height: var(--lex-save-icon-size, 32px); }
+.lex-game-process svg, .lex-shell-actions button svg {
+  width: var(--lex-shell-icon-size, 18px);
+  height: var(--lex-shell-icon-size, 18px);
+}
+
 /* The data map fills its page rather than scrolling the page behind it. */
 .lex-data-map-view { height: 100%; overflow: hidden; }
