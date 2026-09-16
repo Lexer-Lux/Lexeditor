@@ -196,9 +196,14 @@
       sample: () => {
         const prefs = UI.columnPreferences("lex-sample-columns", [{key: "id", label: "ID"},
           {key: "name", label: "Name"}, {key: "value", label: "Value"}]);
-        return el("div", {class: "lex-reshade-actions"},
-          ...prefs.all().map(column => el("span", {class: "lex-pinnable-property"},
-            prefs.pinButton(column.key, column.label), el("span", {}, column.label))));
+        // The pin sits on the property, and pinning it puts that property in
+        // the list's columns. Shown the way a record's panel shows it.
+        // The generated enabled column is the list's own, not a property.
+        const properties = prefs.all().filter(column => typeof column.label === "string");
+        return UI.detailSection({title: "PIN A PROPERTY INTO THE LIST", body: properties.map(column =>
+          UI.detailField({label: String(column.label ?? column.key).toUpperCase(),
+            pin: prefs.pinButton(column.key, column.label),
+            control: UI.readonlyField(column.key === "value" ? "25" : "Example Item")}))});
       }},
     {id: "showAlert", level: "organism", summary: "Lexeditor's own message box. Never the browser's.",
       sample: () => sampleButton("Show a message", () => UI.showAlert(

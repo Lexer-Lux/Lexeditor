@@ -45,6 +45,7 @@
     .blank-component-split{height:100%;min-height:0}
     .blank-sample-pane{display:flex;flex-direction:column;min-height:0;overflow:auto;padding:12px;border:1px solid var(--lex-border);background:var(--lex-panel)}
     .blank-sample-pane.glyph{align-items:flex-start}
+    .blank-sample-pane.wide>*{width:100%}
     .blank-sample-pane>svg{width:28px;height:28px}
     .blank-games-note{align-self:center;color:var(--lex-muted)}
     .blank-game.unused{opacity:.45;filter:grayscale(80%)}
@@ -396,7 +397,8 @@
     // A glyph is a few pixels across in use; a list is a page wide. The pane
     // holds the component raw, so its own spacing and edges are what you see.
     const glyph=/icon$|^infoIcon$|Mark$/.test(row.id);
-    const sample=el("section",{class:`blank-sample-pane${glyph?" glyph":""}`},
+    const wide=["organism","template"].includes(row.level)&&!glyph;
+    const sample=el("section",{class:`blank-sample-pane${glyph?" glyph":""}${wide?" wide":""}`},
       row.hasSample
         ? row.sample()
         : el("p",{class:"blank-sample-missing"},row.level==="utility"
@@ -419,9 +421,10 @@
       change:next=>{Object.assign(catalogue,next);render()},
       master:({rows:listed,selected,select})=>columnList({rows:listed,key:row=>row.id,selected,select,
         template:"minmax(140px,1fr) 78px 64px",
-        columns:[{key:"sample_",label:"Live",headerTitle:"Has a live sample below",
-            width:"max-content",align:"center",render:row=>LexeditorUI.booleanMark(row.sample_)},
-          {key:"id",label:"Component"},
+        columns:[{key:"sample_",label:"Sample?",width:"max-content",align:"center",
+            help:"Whether a live sample of this component is shown in the pane below.",
+            render:row=>LexeditorUI.booleanMark(row.sample_)},
+          {key:"id",label:"Component",grow:1},
           {key:"games",label:"Games",numeric:true}]}),
       detail:componentDetail,
       emptyDetail:()=>detailPanel({className:"blank-detail",title:"Components",

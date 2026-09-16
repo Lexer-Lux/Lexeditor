@@ -5034,10 +5034,11 @@ ${contents.path}`});
     // switch: unpinning the name column would otherwise leave every real
     // column at max-content and the table wider than its panel.
     const firstReal = columns.findIndex(column => !column.generated && !column.width);
-    const automaticGrow = nameIndex >= 0 ? nameIndex : Math.max(0, firstReal);
+    const automaticGrow = nameIndex >= 0 ? nameIndex : firstReal;
     return columns.map((column, index) => {
       if (column.width) return column.width;
-      const grow = Number(column.grow) || (!declaredGrow && index === automaticGrow ? 1 : 0);
+      const grow = Number(column.grow)
+        || (!declaredGrow && automaticGrow >= 0 && index === automaticGrow ? 1 : 0);
       if (grow > 0) return `minmax(0, ${grow}fr)`;
       // A max-content track is still squeezed when the wider columns beside it
       // want the space, and a squeezed number is not a shortened number - it is
