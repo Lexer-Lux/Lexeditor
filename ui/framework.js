@@ -308,10 +308,16 @@
     return toast;
   };
 
-  const copyText = async text => {
+  const copyText = async (text, options = {}) => {
+    const done = copied => {
+      if (options.quiet !== true) {
+        showToast(copied ? (options.message || "Copied.") : "Could not copy that.", !copied);
+      }
+      return copied;
+    };
     try {
       await navigator.clipboard.writeText(text);
-      return true;
+      return done(true);
     } catch (_error) {
       // WebView clipboard permissions vary; fall back to a scratch selection.
       const scratch = element("textarea", {
@@ -322,7 +328,7 @@
       let copied = false;
       try { copied = document.execCommand("copy"); } catch (_ignored) {}
       scratch.remove();
-      return copied;
+      return done(copied);
     }
   };
 

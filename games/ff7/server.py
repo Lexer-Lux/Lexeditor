@@ -15,6 +15,7 @@ from .datasets import CATEGORIES, UNRESOLVED, READ_ERRORS, load_datasets, save_d
 from .storage import target_path
 from platform_config import load_config, save_config
 from theme_sounds import ensure_theme_sounds, sound_file
+from plugin_http import PluginRequestHandler
 
 
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
@@ -200,29 +201,8 @@ def save_editor_data(payload: object) -> dict:
     return save_datasets(GAME_ROOT, PROJECT_ROOT, payload)
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(PluginRequestHandler):
     server_version = "LexeditorFF7/2"
-
-    def log_message(self, _format, *_args):
-        return
-
-    def json_response(self, payload, status=200):
-        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
-    def file_response(self, target: Path):
-        data = target.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
 
     def editor_response(self):
         identity = {"id": PLUGIN_ID, "name": PLUGIN_NAME, "edition": PLUGIN_EDITION}

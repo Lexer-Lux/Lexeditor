@@ -30,13 +30,11 @@
 
   const entries = [
     // ---- atoms -----------------------------------------------------------
-    {id: "element", level: "atom", summary: "Builds one node: a tag, its attributes, its children. Every other component is made of calls to this.",
+    {id: "element", level: "utility", summary: "document.createElement with the boring parts done: attributes, event handlers, children, and nulls skipped. Not a component - the thing every component is built out of.",
       sample: () => el("div", {class: "lex-reshade-actions"},
         el("button", {type: "button", class: "lex-dialog-action", onclick: () => {}}, "A button it made"),
         el("span", {}, "and a span"))},
-    {id: "el", level: "atom", summary: "The same function as element, under the short name plugins use. el(tag, attributes, ...children).",
-      sample: () => el("div", {class: "lex-reshade-actions"},
-        el("input", {type: "text", value: "el(\"input\", {type: \"text\"})"}))},
+    {id: "el", level: "utility", summary: "The same function as element. Plugins destructure it under the short name."},
     {id: "newButton", level: "atom", summary: "The standard button.",
       sample: () => el("div", {class: "lex-reshade-actions"},
         UI.newButton({label: "Do the thing"}))},

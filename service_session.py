@@ -44,6 +44,26 @@ def request_json(url: str, body: dict | None = None) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
+def project_session(*, module: str, plugin_id: str, app_root: Path,
+                    check: Callable[[], list[str]], project_env: str,
+                    project_root: Callable[[], Path], port_env: str | None = None):
+    """A session class for a plugin whose service is told where its project is.
+
+    Four plugins had the same eleven-line constructor: read the project root,
+    put it in the environment under this plugin's name, hand the rest to the
+    session. Subclass the result to keep the plugin's own name and docstring.
+    """
+
+    class ProjectSession(LocalPluginSession):
+        def __init__(self, extra_env: dict[str, str] | None = None):
+            environment = {project_env: str(project_root())}
+            environment.update(extra_env or {})
+            super().__init__(module=module, plugin_id=plugin_id, app_root=app_root,
+                             check=check, port_env=port_env, extra_env=environment)
+
+    return ProjectSession
+
+
 class LocalPluginSession:
     """One hidden loopback service owned by the Lexeditor window."""
 

@@ -420,7 +420,6 @@
       sync:next=>Object.assign(catalogue,next),
       change:next=>{Object.assign(catalogue,next);render()},
       master:({rows:listed,selected,select})=>columnList({rows:listed,key:row=>row.id,selected,select,
-        template:"minmax(140px,1fr) 78px 64px",
         columns:[{key:"sample_",label:"Sample?",width:"max-content",align:"center",
             help:"Whether a live sample of this component is shown in the pane below.",
             render:row=>LexeditorUI.booleanMark(row.sample_)},

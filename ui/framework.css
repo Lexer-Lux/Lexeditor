@@ -378,6 +378,12 @@ body.lex-save-busy .lex-save-icon.saving {
   background: currentColor;
   translate: -50% -50%;
 }
+/* A button's own words are not text to drag-select. */
+.lex-brand-button, .lex-brand-button h1, .lex-subtab-button, .lex-shell-header nav button {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .lex-new-button-plus::before { width: 13px; height: 1.5px; border-radius: 1px; }
 .lex-new-button-plus::after { width: 1.5px; height: 13px; border-radius: 1px; }
 

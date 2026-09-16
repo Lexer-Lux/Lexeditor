@@ -819,16 +819,13 @@ class HostApi:
             if plugin.plugin_id == "blank":
                 continue
             installation = managed["installation"]
-            helper = installation.get("helper") or {}
-            located = installation.get("status") != "not-added"
-            tasks = [{"label": "Game located", "done": located}]
-            if plugin.helper_name:
-                tasks.append({"label": f"{plugin.helper_name} installed", "done": bool(helper.get("installed"))})
+            tasks = []
             if plugin.installation is not None:
                 tasks.append({"label": "ReShade defaults set",
                               "done": self._reshade_defaults(plugin.plugin_id).is_file()})
             games.append({"id": plugin.plugin_id, "name": plugin.name,
                           "status": installation.get("statusText") or installation.get("status", ""),
+                          "modLoading": self._mod_loading_state(plugin),
                           "tasks": tasks})
         return {"games": sorted(games, key=lambda row: row["name"].lower()),
                 "sharedUi": self._shared_ui_budget(),
@@ -854,6 +851,25 @@ class HostApi:
                  "over": live.get(name, 0) > recorded.get(name, 0)}
                 for name in sorted(set(live) | set(recorded))]
         return sorted(rows, key=lambda row: -row["copiedLines"])
+
+    def _mod_loading_state(self, plugin) -> dict:
+        """Whether this game can load a mod yet, and how.
+
+        A plugin that can install and enable a package has an adapter; one that
+        only edits project copies does not, and says so in ui/mod-loading.json.
+        """
+        import json
+
+        try:
+            entry = json.loads((Path(__file__).resolve().parent / "ui" / "mod-loading.json")
+                               .read_text(encoding="utf-8"))["plugins"].get(plugin.plugin_id, {})
+        except (OSError, ValueError, KeyError):
+            entry = {}
+        loader = str(entry.get("loader", ""))
+        works = bool(getattr(plugin, "mods_load", False))
+        return {"works": works,
+                "state": "Loads mods" if works else "Not yet",
+                "loader": loader.split(". ")[0] if loader else "No loader declared."}
 
     def _shared_ui_budget(self) -> list[dict]:
         """How far each plugin still reaches into the shared components.

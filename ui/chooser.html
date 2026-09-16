@@ -134,6 +134,8 @@
     .lexer-dev-task { display:block; white-space:nowrap; }
     .lexer-dev-task.done { color:var(--lex-muted); }
     .lexer-dev-task.todo { color:var(--lex-text); font-weight:600; }
+    .lexer-dev-table td.good { color:#7fc08a; font-weight:600; }
+    .lexer-dev-table td.todo { color:var(--lex-muted); }
     .lexer-dev-table tr.over td { color:#e08a80; }
     .lexer-dev-table tr.total td { border-top:2px solid var(--lex-border); font-weight:700; }
     .lexer-panel-list { display:flex; overflow:auto; flex:1 1 auto; flex-direction:column; gap:9px; margin:0; padding:0; list-style:none; }
@@ -206,7 +208,7 @@
       <section class="lexer-dev-helpers">
         <h3>HELPERS</h3>
         <ul id="lexer-panel-list" class="lexer-panel-list"></ul>
-        <div class="lexer-panel-actions"><button id="lexer-panel-refresh" type="button">Check again</button></div>
+
       </section>
     </div>
   </aside>
@@ -343,14 +345,16 @@
         renderCodeBudget(overview?.sharedCode||[]);
         const rows=overview?.games||[];
         const head=document.createElement("tr");
-        for(const name of ["GAME","STATUS","TASKS","DONE"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
+        for(const name of ["GAME","MOD LOADING","HOW","TASKS"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
         table.replaceChildren(head,...rows.map(row=>{
           const tr=document.createElement("tr");
           const tasks=document.createElement("td");
           tasks.append(...row.tasks.map(task=>Object.assign(document.createElement("span"),
             {className:`lexer-dev-task ${task.done?"done":"todo"}`,textContent:`${task.done?"✓":"○"} ${task.label}`})));
-          const done=row.tasks.filter(task=>task.done).length;
-          tr.append(cell(row.name),cell(row.status),tasks,cell(row.tasks.length?`${Math.round(done/row.tasks.length*100)}%`:"—","num"));
+          const loading=row.modLoading||{};
+          const state=Object.assign(document.createElement("td"),
+            {textContent:loading.state||"Unknown",className:loading.works?"good":"todo"});
+          tr.append(cell(row.name),state,cell(loading.loader||""),tasks);
           return tr;
         }));
       }catch(error){
@@ -405,7 +409,7 @@
     }
     lexerButton.onclick=()=>setLexerPanel(lexerPanel.hidden||!lexerPanel.classList.contains("open"));
     document.querySelector("#lexer-panel-close").onclick=()=>setLexerPanel(false);
-    document.querySelector("#lexer-panel-refresh").onclick=()=>loadHelperVersions(true);
+
     addEventListener("keydown",event=>{if(event.key==="Escape"&&!lexerPanel.hidden)setLexerPanel(false);});
     const windowFrame=LexeditorUI.installWindowFrame({
       controls:windowControls,

@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from runtime_bootstrap import user_data_dir
-from service_session import LocalPluginSession, request_json
+from service_session import project_session, request_json
 
 from .tooling import REPAK_TAG, helper_install, helper_status
 from .mod_support import PakModAdapter
@@ -32,20 +32,11 @@ def check() -> list[str]:
     return []
 
 
-class FF7RSession(LocalPluginSession):
-    def __init__(self, extra_env: dict[str, str] | None = None):
-        environment = {
-            "LEXEDITOR_FF7R_PROJECT": str(DEFAULT_PROJECT),
-        }
-        environment.update(extra_env or {})
-        super().__init__(
-            module="games.ff7r.themed_server",
-            plugin_id="ff7r",
-            app_root=ROOT,
-            check=check,
-            port_env="LEXEDITOR_FF7R_PORT",
-            extra_env=environment,
-        )
+class FF7RSession(project_session(
+        module="games.ff7r.themed_server", plugin_id="ff7r", app_root=ROOT,
+        check=check, project_env="LEXEDITOR_FF7R_PROJECT",
+        project_root=lambda: DEFAULT_PROJECT, port_env="LEXEDITOR_FF7R_PORT")):
+    """One host-owned ff7r editor service."""
 
 
 def launch() -> int:

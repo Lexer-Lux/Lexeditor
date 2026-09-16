@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from runtime_bootstrap import user_data_dir
-from service_session import LocalPluginSession, request_json
+from service_session import project_session, request_json
 
 from .package import default_info
 
@@ -26,18 +26,11 @@ def check() -> list[str]:
     return []
 
 
-class PalworldSession(LocalPluginSession):
-    def __init__(self, extra_env: dict[str, str] | None = None):
-        environment = {"LEXEDITOR_PALWORLD_PROJECT": str(DEFAULT_PROJECT)}
-        environment.update(extra_env or {})
-        super().__init__(
-            module="games.palworld.full_server",
-            plugin_id="palworld",
-            app_root=ROOT,
-            check=check,
-            port_env="LEXEDITOR_PALWORLD_PORT",
-            extra_env=environment,
-        )
+class PalworldSession(project_session(
+        module="games.palworld.full_server", plugin_id="palworld", app_root=ROOT,
+        check=check, project_env="LEXEDITOR_PALWORLD_PROJECT",
+        project_root=lambda: DEFAULT_PROJECT, port_env="LEXEDITOR_PALWORLD_PORT")):
+    """One host-owned palworld editor service."""
 
 
 def launch() -> int:

@@ -163,6 +163,11 @@ class GamePlugin:
     # Explicit mod-loader adapter; editable project support alone is not proof
     # that imported packages can be enabled and removed in the game.
     mod_adapter: object | None = None
+    # Does a mod built here actually load in the game? Stated by the plugin,
+    # never inferred: an adapter that exists is not an adapter that works. The
+    # developer page reads this, and the answer is no until someone proves
+    # otherwise in the game itself.
+    mods_load: bool = False
     managed_mod: object | None = None
 
 
