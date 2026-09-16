@@ -92,11 +92,22 @@
     --lex-list-header-border: 2px solid var(--border);
     --lex-list-cell-border: #2a2419;
     --lex-row-hover-bg: #201a12;
-    --lex-input-fg: var(--text);
-    --lex-input-bg: var(--panel);
-    --lex-input-border: 1px solid var(--border);
-    --lex-input-radius: 3px;
   }
+  .crime-table .crime-name { display:grid; gap:2px; width:100%; }
+  .crime-table .crime-key { font-size:10px; color:var(--dim); }
+  /* The controls RDR2 puts straight into its tables, by its own table names. */
+  :is(.shop-table,.shop-matrix,.matrix-table,.velocity-table,.weapon-field-table,.ai-field-table,
+      .mob-table,.mob-model-table,.cooldown-table,.phase-table,.responder-table,.honor-table,
+      .dispatch-table,.crime-table,.loot-table) input:not([type=checkbox]) {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    padding: 3px 7px; border-radius: 3px; width: 90px; font-size: 13px; }
+  :is(.shop-table,.shop-matrix,.matrix-table,.velocity-table,.weapon-field-table,.ai-field-table,
+      .mob-table,.mob-model-table,.cooldown-table,.phase-table,.responder-table,.honor-table,
+      .dispatch-table,.crime-table,.loot-table) select {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    padding: 3px 5px; border-radius: 3px; font-size: 13px; }
+  :is(.shop-table,.matrix-table,.crime-table,.mob-table) input.edited { border-color: var(--accent2); color: var(--accent2); }
+  :is(.matrix-table) input.wide { width: 100%; min-width: 220px; }
   .key { font-family: Consolas, monospace; font-size: 12.5px; }
   .cat { color:#776d5d; font-size:11px; }
   .chip { display: inline-flex; align-items: center; gap: 4px; background: var(--panel2);
@@ -221,7 +232,8 @@
   .loot-list.list-4col .item-list-id { color:var(--dim); font:10px/1 Consolas,monospace; }
   .loot-list.list-4col .item-list-group,
   .loot-list.list-4col .item-list-category { color:var(--dim); font-size:10.5px; }
-  .loot-list.list-4col .loot-item.sel > * { color:#fff; }
+  /* The shared list marks the chosen row .selected; the gold row needs dark ink. */
+  .loot-list .loot-item:is(.sel,.selected) > * { color:var(--bg); }
   .loot-list.list-2col .loot-listhead, .loot-list.list-2col .loot-item {
              grid-template-columns:minmax(0,1fr) minmax(0,150px); }
   .loot-list.list-2col .li-type { text-align:left; }

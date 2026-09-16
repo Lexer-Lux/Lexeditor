@@ -2,6 +2,16 @@
     :root {--lex-bg:#000;--lex-panel:#626262;--lex-panel-2:#4f4f4f;--lex-border:#929292;
       --lex-text:#fff;--lex-muted:#d0d0d0;--lex-accent:#aa2432;--lex-accent-text:#fff;
       --lex-highlight:#fff;--lex-success:#d8d8d8;--lex-font:"FF8 Menu","Arial Narrow",sans-serif;--lex-font-size-adjust:none;--lex-text-nudge:0px;--lex-text-line:1.25;
+      /* FF8 draws the whole PlayStation menu, so it takes the shared skin and
+         the font-metric rules; games that do not ask keep their own look. */
+      --lex-skin:on;--lex-font-metrics:on;
+      /* Toasts are FF8 menu panels: large, centred under the window bar. */
+      --lex-toast-top:calc(var(--lex-shell-header-bottom, 180px) + var(--lex-panel-gap));
+      --lex-toast-bottom:auto;--lex-toast-right:auto;--lex-toast-left:50%;
+      --lex-toast-shift:-50% 0;--lex-toast-align:center;
+      --lex-toast-bg:var(--ff8-menu-surface);--lex-toast-fg:#fff;
+      --lex-toast-border:3px solid;--lex-toast-border-color:#aaa #282828 #282828 #aaa;
+      --lex-toast-font-size:26px;--lex-toast-padding:14px 28px;
       --lex-heading-font:"FF8 Menu","Arial Narrow",sans-serif;--lex-radius:0;
       --ff8-menu-surface:linear-gradient(135deg,#707070 0%,#626262 52%,#575757 100%);
       --ff8-bevel-light:#aaa;--ff8-bevel-dark:#282828;
@@ -57,7 +67,8 @@
       --lex-sort-marker-clip-ascending:none;--lex-sort-marker-opacity:.75;
       --lex-sort-marker-sorted-opacity:.75;--lex-sort-marker-width:22px;--lex-sort-marker-height:15px;
       --lex-sort-marker-filter:drop-shadow(1px 1px #111);
-      --lex-sort-marker-ascending:rotate(-30deg);--lex-sort-marker-descending:rotate(30deg);
+      --lex-sort-marker-ascending:translateY(-50%) rotate(-30deg);--lex-sort-marker-descending:translateY(-50%) rotate(30deg);
+      --lex-sort-marker-position:absolute;--lex-sort-marker-top:50%;--lex-sort-marker-right:calc(100% + 2px);--lex-sort-marker-margin:0;--lex-head-cell-overflow:visible;
       --lex-pager-fg:#fff;--lex-pager-bg:#4f4f4f;--lex-pager-border:3px solid;
       --lex-pager-border-color:#aaa #282828 #282828 #aaa;--lex-pager-button-fg:#fff;
       --lex-pager-button-bg:#606060;--lex-pager-button-border:2px solid;
@@ -71,12 +82,30 @@
 
       /* Section titles are outlined and straddle the border they sit on. */
       --lex-section-title-fg:#d0d0d0;--lex-section-title-font:20px/1 var(--lex-heading-font);
-      --lex-section-title-shadow:1px 1px 0 #252525;--lex-section-title-border:0;
+      --lex-section-title-shadow:-2px -2px 0 #151515,0 -2px 0 #151515,2px -2px 0 #151515,-2px 0 0 #151515,
+        2px 0 0 #151515,-2px 2px 0 #151515,0 2px 0 #151515,2px 2px 0 #151515;
+      --lex-section-title-border:0;--lex-section-title-stroke:.65px #d0d0d0;
+      --lex-section-title-position:absolute;--lex-section-title-top:0;--lex-section-title-left:10px;
+      --lex-section-title-shift:0 -50%;--lex-section-title-padding:0 4px;
+      --lex-section-title-letter-spacing:.01em;--lex-section-title-transform:uppercase;
+      --lex-subsection-border:2px solid #8e8e8e;--lex-subsection-gap:18px;
+      /* Subtabs are the window's tabs, smaller: the same bevel everywhere. */
+      --lex-subtab-fg:#eee;--lex-subtab-border:3px solid;
+      --lex-subtab-border-color:#a7a7a7 #292929 #292929 #a7a7a7;
+      --lex-subtab-bg:linear-gradient(135deg,#6d6d6d,#505050);
+      --lex-subtab-hover-fg:#fff;--lex-subtab-hover-bg:linear-gradient(135deg,#7b7b7b,#5b5b5b);
+      --lex-subtab-active-fg:#fff;--lex-subtab-active-border-color:#d0d0d0 #313131 #313131 #d0d0d0;
+      --lex-subtab-active-bg:linear-gradient(135deg,#888,#626262);
+      --lex-subtab-active-shadow:inset 2px 2px #717171,inset -2px -2px #3d3d3d;
+      --lex-subtab-text-shadow:2px 2px #222;
+      /* The record's name heads the panel with no band or rule under it. */
+      --lex-detail-heading-bg:transparent;--lex-detail-heading-border:0;
+      --lex-detail-heading-padding:2px 6px 4px;
       --lex-section-border:0;--lex-section-bg:transparent;
       /* A title straddles the top of its section, so sections keep their
          height and stand clear of one another. */
       --lex-section-flex:0 0 auto;--lex-panel-body-gap:16px;
-      --lex-section-content-padding:10px 0 0;
+      --lex-section-content-padding:16px 0 0;
       --lex-detail-title-fg:#fff;--lex-detail-id-fg:#c0c0c0;
 
       /* The growth curves. */
@@ -422,7 +451,7 @@
     .encounter-slots-section {display:flex;flex:1 1 auto;flex-direction:column;min-height:0}
     .encounter-slot-table {--lex-column-list-template:minmax(150px,1.2fr) repeat(3,minmax(95px,.8fr)) minmax(120px,1fr) repeat(4,minmax(75px,.7fr))!important;height:100%!important;align-content:stretch;grid-template-rows:auto repeat(8,minmax(0,1fr))}
     .gf-three-panel {align-items:stretch}
-    .gf-panel {display:flex;height:100%;flex-direction:column;overflow:visible!important;--lex-section-content-flex:1 1 auto}
+    .gf-panel {display:flex;height:100%;flex-direction:column;overflow:visible!important;--lex-section-content-flex:1 1 auto;--lex-section-content-min-height:0}
     .gf-compat-table {height:100%!important;align-content:stretch;grid-template-rows:auto repeat(16,minmax(0,1fr))}
     .gf-panel.compatibility {--lex-info-fill:#050505;--lex-info-mark:#fff}
     .item-menu-section .flag-list {grid-template-columns:repeat(auto-fit,minmax(98px,1fr))!important}
@@ -840,3 +869,14 @@
       --lex-surface-border:0;--lex-surface-shadow:none;--lex-surface-bg:transparent}
     .drop-chance-table small {display:block;font-size:.8em;color:#ddd}
   
+
+/* Per-view spacing, as values on the view: the tables and panels that FF8 packs
+   tighter than the shared defaults. (These were rules on shared classes.) */
+.ff8-record-list {--lex-cell-padding:5px 8px}
+.gf-ability-table {--lex-cell-padding:5px 7px}
+.ff8-shop-table {--lex-cell-padding:1px 5px}
+.encounter-slot-table {--lex-cell-padding:4px 5px;--lex-head-cell-padding:6px 4px}
+.field-card-table {--lex-cell-padding:5px 8px}
+.refine-view {--lex-cell-padding:6px 3px;--lex-head-cell-padding:6px 1px}
+.weapon-detail {--lex-field-padding:2px 7px}
+.gf-compat-table.ff8-record-list {--lex-cell-padding:6px 4px}

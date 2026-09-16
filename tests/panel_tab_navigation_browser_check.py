@@ -24,7 +24,8 @@ def main():
   p.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
   p.evaluate("""()=>{const U=LexeditorUI;window.active={a:'one',b:'one'};window.draw=id=>document.getElementById(id).replaceChildren(U.tabbedPanel({label:id,active:active[id],tabs:[{id:'one',label:'One'},{id:'two',label:'Two'}],change:value=>{active[id]=value;draw(id)},content:U.el('input',{'aria-label':id+' input'})}));draw('a');draw('b')}""")
   p.wait_for_timeout(100)
-  assert p.locator('#a .lex-subtab-bar').bounding_box()['y']>p.locator('#a .lex-tabbed-panel-content').bounding_box()['y']
+  # A tabbed panel standing on its own is page-level: its tabs stay on top.
+  assert p.locator('#a .lex-subtab-bar').bounding_box()['y']<p.locator('#a .lex-tabbed-panel-content').bounding_box()['y']
   p.evaluate("""()=>{const U=LexeditorUI;
    const page=U.el('div',{id:'page-tabs',style:'display:flex;flex-direction:column;height:200px'},
     U.subtabBar({label:'Abilities tables',active:'general',tabs:[{id:'general',label:'General'},{id:'map',label:'Map'}]}),

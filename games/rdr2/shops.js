@@ -364,7 +364,7 @@ function renderShopAcceptanceReport(m){
     "Rockstar decides ordinary acceptance in compiled shop category rules that appear in no data file and in no script. ",
     "The exception list is a sparse permit list, not a whitelist: only 5 of 20 shops carry any entries at all, and the ",
     "trapper's list holds no pelts and no carcasses even though he plainly buys both."));
-  const table=columnList({class:"shop-table shop-acceptance-table","aria-label":"Shop acceptance",
+  const table=columnList({class:"shop-table shop-acceptance-table",align:"start",headerAlign:"start","aria-label":"Shop acceptance",
     rows:a.shops.map(shop=>({shop,counts:a.summary[shop]||{}})),key:row=>row.shop,
     template:`31% repeat(${ACCEPTANCE_COLS.length},minmax(0,1fr))`,
     columns:[{key:"shop",label:"Shop",render:row=>shopLabel(row.shop)},
@@ -377,7 +377,7 @@ function renderShopAcceptanceReport(m){
   if(conflicts.length){
     m.append(el("div",{class:"hint",style:"margin-top:18px"},el("b",{},`${conflicts.length} conflicts: `),
       "listed by the shop, but the catalog gives no sell price. These do change hands in game, so “no price” cannot be assumed to win."));
-    m.append(columnList({class:"shop-table","aria-label":"Listed with no catalog price",
+    m.append(columnList({class:"shop-table",align:"start",headerAlign:"start","aria-label":"Listed with no catalog price",
       rows:conflicts.slice(0,300),key:(r,index)=>`${r.shop}:${r.item}:${index}`,
       template:"31% minmax(0,1fr) minmax(0,1fr)",
       columns:[{key:"shop",label:"Shop",render:r=>shopLink(r.shop)},
@@ -389,7 +389,7 @@ function renderShopAcceptanceReport(m){
   if(stray.length){
     m.append(el("div",{class:"hint",style:"margin-top:18px"},el("b",{},"Listed but not in the catalog at all: "),
       "these tokens sit in a shop's buyer list with no catalog record behind them. Either dead references or items created elsewhere."));
-    m.append(columnList({class:"shop-table","aria-label":"Listed but not in the catalog",
+    m.append(columnList({class:"shop-table",align:"start",headerAlign:"start","aria-label":"Listed but not in the catalog",
       rows:stray.map(([shop,list])=>({shop,tokens:list.join(", ")})),key:row=>row.shop,
       template:"31% minmax(0,1fr)",
       columns:[{key:"shop",label:"Shop",render:row=>shopLabel(row.shop)},
@@ -400,7 +400,7 @@ function renderShopAcceptanceReport(m){
 function renderShopItemPicker(items,m){
   const rows=sortedRows("shops-picker",items,{name:it=>localizedValue(it.nameKey)||it.key});
   $("#toolbar").insertBefore(el("span",{class:"count"},`${rows.length} matching items${rows.length>200?" (showing 200)":""}`),$("#toolbar").lastChild);
-  m.append(columnList({class:"shop-table","aria-label":"Matching items",
+  m.append(columnList({class:"shop-table",align:"start",headerAlign:"start","aria-label":"Matching items",
     rows:rows.slice(0,200),key:it=>it.key,template:"minmax(0,1fr)",
     columns:[{key:"name",label:"Item",sortValue:it=>localizedValue(it.nameKey)||it.key,
       render:it=>el("span",{},el("button",{class:"table-link",onclick:()=>{state.filters.shopExact=it.key;state.filters.shopBuyQ=it.key;state.filters.shopSellQ=it.key;renderShops();}},
@@ -429,7 +429,7 @@ function setShopListing(shop,item,enabled){
 }
 function renderShopMatrix(it,shops,m,mode){
   const selling=mode==="buy";
-  m.append(columnList({class:"shop-table shop-item-summary","aria-label":"Item prices",
+  m.append(columnList({class:"shop-table shop-item-summary",align:"start",headerAlign:"start","aria-label":"Item prices",
     rows:[it],key:row=>row.key,localSort:false,
     template:`31% minmax(0,1fr)${selling?" minmax(0,1fr)":""}`,
     columns:[{key:"item",label:"Item",render:row=>el("span",{},
@@ -445,7 +445,7 @@ function renderShopMatrix(it,shops,m,mode){
   const buyerRule=cashOf(it,"sell")===null
     ? "No — no SELL_SHOP_DEFAULT payout"
     : "Unknown — Rockstar keeps this shop's category filter in compiled script";
-  m.append(columnList({class:"shop-table shop-matrix","aria-label":"Shops",
+  m.append(columnList({class:"shop-table shop-matrix",align:"start",headerAlign:"start","aria-label":"Shops",
     rows:allTypes.map(type=>({type})),key:row=>row.type,editable:true,localSort:false,
     template:"31% minmax(0,1fr) minmax(0,1fr)",
     columns:[{key:"shop",label:"Shop",render:row=>shopLabel(row.type)},
@@ -496,7 +496,7 @@ function renderShopInventory(shop,q,m){
   const soldBy=exact?state.shops.shops.filter(candidate=>candidate.items.some(row=>row.item===exact.key)):[];
   if(exact)m.append(el("div",{class:"hint"},el("b",{},"Sold by: "),...soldBy.length?soldBy.map((candidate,index)=>shopLink(candidate.type,`${index?" · ":""}${shopLabel(candidate.type)}`)):["no standard shop inventory"]));
   m.append(el("div",{class:"hint"},el("b",{},`${shopLabel(shop.type)}: `),"each row is something this shop can sell to the player. Price and purchase output are global catalog values shared by every shop; requirements belong to this listing only."));
-  const table=columnList({class:"shop-table","aria-label":"Shop inventory",
+  const table=columnList({class:"shop-table",align:"start",headerAlign:"start","aria-label":"Shop inventory",
     rows:rows.slice(0,600).filter(entry=>entry.it),key:({row})=>row.item,editable:true,
     template:"31% 165px 155px minmax(0,1fr) 40px",
     columns:[{key:"name",label:"Item",sortValue:({it})=>localizedValue(it.nameKey)||it.key,
@@ -519,7 +519,7 @@ function renderAllShopInventories(shops,q,m){
   let rows=sortedRows("shops-buy-all",[...grouped.values()],{name:x=>localizedValue(x.it.nameKey)||x.it.key,price:x=>cashOf(x.it,"buy")??Infinity,qty:x=>effectivePurchaseYieldOf(x.it),shops:x=>x.listings.map(v=>shopLabel(v.shop.type)).sort().join("|")});
   $("#toolbar").insertBefore(el("span",{class:"count"},`${rows.length} matching items`),$("#toolbar").lastChild);
   m.append(el("div",{class:"hint"},el("b",{},"Global catalog prices: "),"an item's buy price and purchase output are shared by every shop. Shop membership and availability requirements are edited separately below."));
-  m.append(columnList({class:"shop-table","aria-label":"Items sold by shop",
+  m.append(columnList({class:"shop-table",align:"start",headerAlign:"start","aria-label":"Items sold by shop",
     rows:rows.slice(0,1000),key:({it})=>it.key,editable:true,
     template:"31% 165px 155px minmax(0,1fr)",
     columns:[{key:"name",label:"Item",sortValue:({it})=>localizedValue(it.nameKey)||it.key,
@@ -541,7 +541,7 @@ function renderShopSellPrices(q,m){
   rows=sortedRows("shops-sell",rows,{name:it=>localizedValue(it.nameKey)||it.key,price:it=>cashOf(it,"sell")??Infinity});
   $("#toolbar").insertBefore(el("span",{class:"count"},`${rows.length} matching items${rows.length>600?" (showing 600)":""}`),$("#toolbar").lastChild);
   m.append(el("div",{class:"hint"},el("b",{},"BUYS: "),"The price field is the only proven global sellability control. It is editable. Merchant-specific acceptance cannot be derived from PDATA; its exceptions are displayed read-only and never mean that a blank merchant rejects an item."));
-  m.append(columnList({class:"shop-table","aria-label":"Sell prices",
+  m.append(columnList({class:"shop-table",align:"start",headerAlign:"start","aria-label":"Sell prices",
     rows:rows.slice(0,600),key:it=>it.key,editable:true,
     template:"31% 165px minmax(0,1fr)",
     columns:[{key:"name",label:"Item",sortValue:it=>localizedValue(it.nameKey)||it.key,

@@ -11,7 +11,7 @@
 }
 
 :root {
-  --lex-bg: #f7f8f9;
+  --lex-bg: #e3e7eb;
   --lex-panel: #ffffff;
   --lex-panel-2: #eef1f3;
   --lex-border: #c8cdd2;
@@ -386,8 +386,9 @@ body.lex-save-busy .lex-save-icon.saving {
 .lex-detail-part-label { flex:0 0 auto; color:var(--lex-muted); font-size:.82em; letter-spacing:.04em; text-transform:uppercase; }
 .lex-detail-part:has(> input[type="checkbox"]) { flex:0 0 auto; }
 
-/* A button's own words are not text to drag-select. */
-.lex-brand-button, .lex-brand-button h1, .lex-subtab-button, .lex-shell-header nav button {
+/* A button's own words are not text to drag-select, and neither is the window
+   bar: a click on the title flashed a selection over it. */
+.lex-shell-header, .lex-brand-button, .lex-brand-button h1, .lex-subtab-button, .lex-shell-header nav button {
   user-select: none;
   -webkit-user-select: none;
 }
@@ -1135,7 +1136,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
    whole pane to fit rows into. */
 .lex-detail-section-content {
   min-width:0;
-  min-height:0;
+  min-height:var(--lex-section-content-min-height, auto);
   padding:var(--lex-section-content-padding, 0);
   flex:var(--lex-section-content-flex, 0 1 auto);
 }
@@ -1372,10 +1373,10 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
   min-height:min(31px, calc(var(--lex-command-row-height) * .6667));
   padding:4px 16px;
   color:var(--lex-muted);
-  border:0;
-  border-right:0;
+  /* A subtab has its own fill and outline, so it reads as a tab on its bar. */
+  border:1px solid var(--lex-border);
   border-radius:0;
-  background:transparent;
+  background:var(--lex-panel);
   font:800 .98em/1 var(--lex-heading-font);
   letter-spacing:.03em;
   text-transform:uppercase;
@@ -2571,7 +2572,7 @@ body.lex-panel-layout-dragging * {
   min-width: 0;
   /* A cell that is its own container no longer reports a height, so a
      table of those states the floor its rows keep. */
-  min-height: var(--lex-row-min-height, 0);
+  min-height: var(--lex-row-min-height, auto);
   overflow:visible;
 }
 
@@ -2579,8 +2580,12 @@ body.lex-panel-layout-dragging * {
   position: sticky;
   top: 0;
   z-index: 2;
-  color: var(--lex-highlight);
+  color: var(--lex-list-header-fg, var(--lex-highlight));
   background: var(--lex-panel-2);
+  font: var(--lex-list-header-font, inherit);
+  letter-spacing: var(--lex-list-header-letter-spacing, normal);
+  text-transform: var(--lex-list-header-transform, none);
+  border-bottom: var(--lex-list-header-border, 0);
 }
 
 .lex-column-list-head-cell,
@@ -2707,6 +2712,16 @@ body.lex-panel-layout-dragging * {
   background:transparent;
   opacity:0;
   cursor:pointer;
+}
+/* A pin on a pinnable label is a small mark in that label's top-right corner,
+   the same size beside a heading's id as beside a property name. */
+.lex-pinnable-property:not(.lex-detail-field) { position:relative; }
+.lex-pinnable-property:not(.lex-detail-field) > .lex-column-pin {
+  position:absolute;
+  z-index:5;
+  top:-6px;
+  right:-12px;
+  font-size:var(--lex-pin-size, 16px);
 }
 /* A subtle lift so a pin reads as sitting on the field rather than in it. */
 .lex-column-pin > svg { filter:drop-shadow(0 1px 1px rgb(0 0 0 / .45)); }
@@ -3927,26 +3942,34 @@ body:has(.lex-data-map-table) #main {
 .lex-toast-stack {
   position:fixed;
   z-index:100001;
-  right:18px;
-  bottom:18px;
+  top:var(--lex-toast-top, auto);
+  right:var(--lex-toast-right, 18px);
+  bottom:var(--lex-toast-bottom, 18px);
+  left:var(--lex-toast-left, auto);
+  translate:var(--lex-toast-shift, none);
   display:flex;
   flex-direction:column;
-  align-items:flex-end;
+  align-items:var(--lex-toast-align, flex-end);
   gap:8px;
   pointer-events:none;
 }
 .lex-toast {
-  max-width:min(460px,60vw);
-  padding:9px 14px;
-  color:var(--lex-text);
-  border:1px solid var(--lex-border);
+  max-width:min(640px,70vw);
+  padding:var(--lex-toast-padding, 13px 20px);
+  color:var(--lex-toast-fg, var(--lex-text));
+  border:var(--lex-toast-border, 1px solid var(--lex-border));
+  border-color:var(--lex-toast-border-color, var(--lex-border));
   border-radius:var(--lex-radius);
-  background:var(--lex-panel-2);
+  background:var(--lex-toast-bg, var(--lex-panel-2));
   box-shadow:0 6px 18px #0006;
-  font-size:.95em;
+  font-size:var(--lex-toast-font-size, 1.12em);
   overflow-wrap:anywhere;
   animation:lex-toast-enter .18s ease both;
+  transition:opacity .15s ease;
 }
+/* A toast under the pointer all but disappears, so whatever it covers can be
+   read and clicked through it - it never takes the pointer anyway. */
+.lex-toast.lex-toast-ghost { opacity:.12 !important; }
 @keyframes lex-toast-enter { from { opacity:0;translate:0 10px } to { opacity:1;translate:0 0 } }
 .lex-toast.leaving { opacity:0;translate:0 6px;transition:opacity .2s ease,translate .2s ease; }
 
@@ -4321,7 +4344,7 @@ body:has(.lex-data-map-table) #main {
 /* Record ids matter least on the screen, so the heading's id recedes toward
    the panel rather than competing with the record's name. */
 .lex-detail-panel-id {
-  color: color-mix(in srgb, var(--lex-muted) 55%, var(--lex-panel)) !important;
+  color: var(--lex-detail-id-fg, color-mix(in srgb, var(--lex-muted) 55%, var(--lex-panel))) !important;
   font-weight: 400;
 }
 
@@ -4799,7 +4822,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-detail-field { grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr); }
 .lex-detail-field-label {
   min-width:0; min-height:0; height:100%; overflow:hidden;
-  white-space:normal; overflow-wrap:anywhere; line-height:1.05;
+  /* Wrap between words only: splitting one ("SUMMAR / Y") reads as a bug.
+     A single word too long for the column is shrunk by the label fitter. */
+  white-space:normal; overflow-wrap:normal; word-break:normal; line-height:1.05;
   align-content:center; text-align:center;
 }
 .lex-info-help {
@@ -5575,6 +5600,13 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-panel-layout-divider:focus-visible::before,
 .lex-panel-layout-divider.dragging::before {color:var(--lex-highlight);}
 .lex-panel-layout-divider::after {content:none;}
+/* A stacked layout drags up and down, so its grip is the same arrows turned a
+   quarter: the earlier stacked rule reshaped the box to 24x10, which squashed
+   the upright artwork into a smear instead of turning it. */
+.lex-panel-layout-vertical > .lex-panel-layout-divider::before {
+  width:16px;height:32px;
+  transform:translate(-50%,-50%) rotate(90deg);
+}
 
 /* LEXEDITOR_TAB_ROWS_EVEN_20260911 */
 /* A bar that has to wrap splits its tabs evenly between the rows, rather than
@@ -6258,7 +6290,7 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 /* Panel tabs occupy the bottom edge. Page navigation stays in the shell.
    The Tweaks rule below once shared this selector, which carried every tabbed
    panel's tabs to the top along with the page bar it meant to move. */
-.lex-tabbed-panel > .lex-subtab-bar { order:100; margin-top:auto; margin-bottom:0; }
+.lex-detail-panel .lex-tabbed-panel > .lex-subtab-bar { order:100; margin-top:auto; margin-bottom:0; }
 /* The tweak page's own subtab bar sits where every other page's does: at
    the top, full width. It was ordered last and pushed to the bottom, which
    put the same control in a different place on this page than on all the
@@ -6387,7 +6419,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 .lex-paged-list-detail { height: 100%; }
 .lex-detail-panel-heading {
   padding: 4px 18px 4px 4px;
-  border-bottom: 1px solid var(--lex-border);
+  border-bottom: var(--lex-detail-heading-border, 1px solid var(--lex-border));
   background: var(--lex-detail-heading-bg, color-mix(in srgb, var(--lex-panel-2) 55%, var(--lex-panel)));
 }
 .lex-detail-panel-icon {
@@ -6456,14 +6488,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   border-color: var(--lex-shell-button-border, var(--lex-border));
   background: var(--lex-shell-button-bg, var(--lex-panel-2));
 }
-.lex-column-list-header {
-  color: var(--lex-list-header-fg, inherit);
-  background: var(--lex-list-header-bg, var(--lex-panel-2));
-  font: var(--lex-list-header-font, inherit);
-  letter-spacing: var(--lex-list-header-letter-spacing, normal);
-  text-transform: var(--lex-list-header-transform, none);
-  border-bottom: var(--lex-list-header-border, 0);
-}
+.lex-column-list-header { background: var(--lex-list-header-bg, var(--lex-panel-2)); }
 .lex-column-list-cell { border-bottom: 1px solid var(--lex-list-cell-border, var(--lex-border)); }
 .lex-detail-panel-title { color: var(--lex-detail-title-fg, inherit); }
 .lex-detail-panel-id { color: var(--lex-detail-id-fg, var(--lex-muted)); }
@@ -6473,11 +6498,11 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 .lex-list, .lex-detail {
   border: var(--lex-surface-border, 1px solid var(--lex-border));
   border-color: var(--lex-surface-border-color, var(--lex-border));
-  background: var(--lex-surface-bg, var(--lex-panel));
+  background: var(--lex-surface-bg, transparent);
   box-shadow: var(--lex-surface-shadow, none);
 }
 .lex-list-row:not(.lex-column-list-row) { padding: var(--lex-list-row-padding, 7px 10px); }
-.lex-list-row.selected { color: var(--lex-row-selected-fg, inherit); background: var(--lex-row-selected-bg, var(--lex-highlight)); }
+.lex-list-row.selected { color: var(--lex-row-selected-fg, var(--lex-highlight)); background: var(--lex-row-selected-bg, color-mix(in srgb, var(--lex-accent) 24%, var(--lex-panel))); }
 .lex-column-list-row:hover { background: var(--lex-row-hover-bg, color-mix(in srgb, var(--lex-highlight) 25%, transparent)); }
 .lex-detail-panel-heading { padding: var(--lex-detail-heading-padding, 4px 18px 4px 4px); }
 .lex-detail-panel-icon { border: 1px solid var(--lex-detail-icon-border, var(--lex-border)); }
@@ -6535,7 +6560,8 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 body { font-size-adjust: var(--lex-font-size-adjust, none); }
 
 /* Text-bearing boxes follow the face rather than a pixel guess, and never clip
-   by a fixed height. */
+   by a fixed height - for a game that declares its face's metrics. */
+@container style(--lex-font-metrics: on) {
 .lex-column-list-cell,
 .lex-column-list-head-cell,
 .lex-detail-field-label,
@@ -6564,6 +6590,7 @@ body { font-size-adjust: var(--lex-font-size-adjust, none); }
   height: auto;
   min-height: max(var(--lex-subtab-min-height, 2.1em), 26px);
 }
+}
 
 /* ---- The window chrome as a skin ---------------------------------------
    FF8 draws a PlayStation menu: bevelled buttons, a pointing-hand marker on the
@@ -6589,9 +6616,9 @@ body { font-size-adjust: var(--lex-font-size-adjust, none); }
   padding-inline: var(--lex-tab-padding-inline, 10px);
   font-size: var(--lex-tab-font-size, inherit);
   color: var(--lex-tab-fg, inherit);
-  background: var(--lex-tab-bg, transparent);
-  border: var(--lex-tab-border, 0);
-  border-color: var(--lex-tab-border-color, transparent);
+  background: var(--lex-tab-bg, var(--lex-panel));
+  border: var(--lex-tab-border, 1px solid);
+  border-color: var(--lex-tab-border-color, var(--lex-border));
 }
 .lex-shell-header nav button:hover { background: var(--lex-tab-hover-bg, var(--lex-panel)); }
 .lex-shell-header nav button.active {
@@ -6643,6 +6670,7 @@ body { font-size-adjust: var(--lex-font-size-adjust, none); }
    straddling each section's top border. None of that is FF8-specific machinery
    - it is paint - so it lives here as tokens whose defaults are today's look,
    and a game states its own values beside its palette. */
+@container style(--lex-skin: on) {
 body { text-shadow: var(--lex-text-shadow, none); }
 
 /* The controls inside a field or a cell: one surface, set once. */
@@ -6724,3 +6752,58 @@ body { text-shadow: var(--lex-text-shadow, none); }
 }
 .lex-curve-line { stroke: var(--lex-curve-stroke, var(--lex-highlight)); filter: var(--lex-curve-line-filter, none); }
 .lex-curve-grid-lines { stroke: var(--lex-curve-grid, color-mix(in srgb, var(--lex-border) 42%, transparent)); }
+
+/* Subtabs wear the same paint as the window's tabs when a game says so. */
+.lex-subtab-bar {
+  background: var(--lex-subtab-bar-bg, transparent);
+  border: var(--lex-subtab-bar-border, 0);
+  padding: var(--lex-subtab-bar-padding, 0);
+  gap: var(--lex-subtab-bar-gap, 0);
+}
+.lex-subtab-button {
+  color: var(--lex-subtab-fg, var(--lex-muted));
+  border: var(--lex-subtab-border, 0);
+  border-color: var(--lex-subtab-border-color, transparent);
+  border-radius: var(--lex-subtab-radius, 0);
+  background: var(--lex-subtab-bg, transparent);
+  box-shadow: var(--lex-subtab-shadow, none);
+  text-shadow: var(--lex-subtab-text-shadow, inherit);
+}
+.lex-subtab-button:hover {
+  color: var(--lex-subtab-hover-fg, var(--lex-text));
+  background: var(--lex-subtab-hover-bg, color-mix(in srgb, var(--lex-panel-2) 72%, var(--lex-highlight)));
+}
+.lex-subtab-button.active {
+  color: var(--lex-subtab-active-fg, var(--lex-accent-text));
+  border-color: var(--lex-subtab-active-border-color, transparent);
+  background: var(--lex-subtab-active-bg, var(--lex-accent));
+  box-shadow: var(--lex-subtab-active-shadow, none);
+}
+
+/* A section title can sit on its section's top edge, as a menu label does. */
+.lex-detail-section-title {
+  position: var(--lex-section-title-position, static);
+  z-index: 10;
+  top: var(--lex-section-title-top, auto);
+  left: var(--lex-section-title-left, auto);
+  translate: var(--lex-section-title-shift, none);
+  padding: var(--lex-section-title-padding, 8px 10px);
+  letter-spacing: var(--lex-section-title-letter-spacing, .08em);
+  text-transform: var(--lex-section-title-transform, none);
+}
+.lex-detail-section .lex-detail-section {
+  border: var(--lex-subsection-border, var(--lex-section-border, 1px solid var(--lex-border)));
+  margin-top: var(--lex-subsection-gap, 0);
+}
+
+/* A sort mark that is a picture hangs off the label's left side, out of the
+   flow: sorting a column must never widen its header or move its words. */
+.lex-column-list-header .header-label { position: relative; }
+.lex-column-list-head-cell { overflow: var(--lex-head-cell-overflow, hidden); }
+.lex-sort-indicator {
+  position: var(--lex-sort-marker-position, static);
+  top: var(--lex-sort-marker-top, auto);
+  right: var(--lex-sort-marker-right, auto);
+  margin-right: var(--lex-sort-marker-margin, .3em);
+}
+}

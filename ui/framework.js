@@ -293,11 +293,28 @@
   // Short-lived confirmations. One stack, oldest dropped first, so a burst of
   // copies cannot bury the screen.
   let toastStack = null;
+  // Toasts never take the pointer, so hovering one is measured, not heard:
+  // one under the pointer fades until the pointer moves off it.
+  const ghostToasts = event => {
+    for (const toast of document.querySelectorAll(".lex-toast")) {
+      const box = toast.getBoundingClientRect();
+      const over = event.clientX >= box.left && event.clientX <= box.right &&
+        event.clientY >= box.top && event.clientY <= box.bottom;
+      toast.classList.toggle("lex-toast-ghost", over);
+    }
+  };
+  // Listened for from the start: the window bar's own toast is not made here.
+  document.addEventListener("pointermove", ghostToasts, {passive: true});
   const showToast = (message, options = {}) => {
     if (!toastStack || !toastStack.isConnected) {
       toastStack = element("div", {class: "lex-toast-stack", role: "status", "aria-live": "polite"});
       document.body.append(toastStack);
     }
+    // A game may seat its toasts under the window bar; say where that ends, on
+    // the root, where a game's own token that reads it is declared.
+    const header = document.querySelector(".lex-shell-header");
+    if (header) document.documentElement.style.setProperty("--lex-shell-header-bottom",
+      `${Math.round(header.getBoundingClientRect().bottom)}px`);
     const toast = element("div", {class: "lex-toast"}, message);
     toastStack.append(toast);
     while (toastStack.children.length > 4) toastStack.firstElementChild.remove();

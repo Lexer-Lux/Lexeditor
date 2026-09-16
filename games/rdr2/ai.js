@@ -27,7 +27,7 @@ async function renderAI() {
     const refByPath={};refData.fields.forEach(x=>refByPath[x.path.join(".")]=x.value);
     const rows=sortedRows("ai",data.fields.filter(x=>!q||x.context.toUpperCase().includes(q)||x.field.toUpperCase().includes(q)),{context:x=>x.context,field:x=>x.field,value:x=>x.value}).slice(0,1000);
     tb.insertBefore(el("span",{class:"count"},`${rows.length}${data.fields.length>1000?` shown of ${data.fields.length}`:" fields"}`),tb.querySelector(".savebar"));
-    m.append(columnList({class:"ai-field-table","aria-label":"AI fields",
+    m.append(columnList({class:"ai-field-table",align:"start",headerAlign:"start","aria-label":"AI fields",
       rows,key:row=>row.path.join("."),editable:true,localSort:false,
       template:"minmax(180px,1fr) minmax(180px,1fr) minmax(0,1.4fr)",
       columns:[{key:"context",label:"Profile / context",cellClass:"key"},

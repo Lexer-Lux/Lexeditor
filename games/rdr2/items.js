@@ -614,13 +614,9 @@ function itemRow(it) {
             el("span",{class:"item-meta-separator","aria-hidden":"true"}),
             el("span",{class:"item-meta-category"},it.category.replace("CI_CATEGORY_","")))),
         nameReference));
-  const iconOptions={showAt:(open,name)=>{
-    const actions=identityMain.querySelector(".item-identity-actions");
-    if(!actions||actions.querySelector(".item-icon-view"))return;
-    actions.append(el("button",{class:"icon-link item-icon-view",
-      title:"View the inventory icon at full size",
-      "aria-label":`View the ${name} inventory icon at full size`,onclick:open},"\u26f6"));
-  }};
+  // Shown, not clicked: the heading icon's click belongs to the shared model
+  // preview, and there is no separate full-size dialog.
+  const iconOptions={showAt:()=>{}};
   const identity=el("div",{class:"item-identity"},itemIcon(texture,it,iconOptions),identityMain);
   sizeItemIdentityIcon(identity,identityMain);
   const identityCell = el("div", {},identity);
@@ -1036,7 +1032,7 @@ async function createModelRenderer(canvas,geometry){
   return{reset,draw,state:()=>({yaw,pitch,zoom}),dispose:()=>{disposed=true;observer.disconnect();canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);canvas.removeEventListener("wheel",wheel);canvas.removeEventListener("dblclick",reset);for(const resource of resources){if(resource.kind==="vao")gl.deleteVertexArray(resource.value);else if(resource.kind==="texture")gl.deleteTexture(resource.value);else gl.deleteBuffer(resource.value);}gl.deleteProgram(program);}};
 }
 
-async function itemDescriptionCell(it){
+function itemDescriptionCell(it){
   if(isRO()&&!it.descriptionKey){const area=el("textarea",{readonly:"readonly",title:"This catalog record has no description field."});area.value="N/A";return el("div",{},area);}
   const shared=it.descriptionKey&&state.catalog.items.filter(x=>x.descriptionKey===it.descriptionKey).length>1;
   const generatedDescriptionKey=/^0x[0-9a-f]{8}$/i.test(it.key)

@@ -345,7 +345,7 @@ function renderProjectileSpeeds(data,sectionTabs){
     const value=edits[row.ammo]??row.multiplier;
     return data.runtimeSwitching?Number(data.baseSpeed)*Number(value):Number(data.baseSpeed);
   };
-  const table=columnList({class:"velocity-table","aria-label":"Cartridge speeds",
+  const table=columnList({class:"velocity-table",align:"start",headerAlign:"start","aria-label":"Cartridge speeds",
     rows,key:row=>row.ammo,editable:true,
     template:"minmax(160px,1fr) 120px 150px minmax(0,2fr)",
     columns:[{key:"ammo",label:"Cartridge",cellClass:"key",render:row=>weaponRecordLink("ammo",row.ammo)},
@@ -466,7 +466,7 @@ function weaponDetail(d,section,record,f){
   const groups=el("div",{class:"weapon-field-groups"});
   [...grouped.values()].sort((a,b)=>order.indexOf(a.key)-order.indexOf(b.key)).forEach(group=>{
     const editKey=row=>`${row.targetType||section}|${row.targetName||record.name}|${row.path.join(".")}`;
-    const table=columnList({class:"weapon-field-table","aria-label":`${group.label} fields`,
+    const table=columnList({class:"weapon-field-table",align:"start",headerAlign:"start","aria-label":`${group.label} fields`,
       rows:group.rows,key:editKey,editable:true,localSort:false,
       template:"minmax(180px,1fr) minmax(0,1.6fr)",
       columns:[{key:"field",label:"Field",cellClass:"key",

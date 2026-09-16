@@ -541,7 +541,7 @@ async function renderMatrix() {
     yields.append(el("div",{class:"addrow"},newButton({title:"Add yield",onclick:()=>{a.rows.push({damage:group.damage,skin:group.skin,item:"",qty:1});state.matrixDirty.add(a.key);renderMatrix();}})));
     matrixRows.push({group,yields,qual:groupQualSel});
   });
-  m.append(columnList({class:"matrix-table","aria-label":"Yields by quality",
+  m.append(columnList({class:"matrix-table",align:"start",headerAlign:"start","aria-label":"Yields by quality",
     rows:matrixRows,key:({group})=>`${group.damage}|${group.skin}`,editable:true,localSort:false,
     template:"minmax(140px,1fr) minmax(140px,1fr) minmax(0,3fr)",
     columns:[{key:"damage",label:()=>el("span",{},"Damage quality",fieldHelp("Kill cleanliness/appropriateness resolved using damagecleanlinessdata.meta; independent of the animal's starting star quality.")),

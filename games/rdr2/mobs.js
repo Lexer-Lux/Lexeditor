@@ -74,7 +74,7 @@ async function renderMobModels(){
   tb.append(el("span",{class:"count"},`${rows.length} observed`));
   if(!rows.length){m.append(el("div",{class:"hint"},"No observed models match this group and filter."));return;}
   const getters={model:r=>r.model,hp:r=>r.observedHealth??Infinity,archetype:r=>r.candidates.length===1?r.candidates[0]:""};
-  m.append(columnList({class:"mob-model-table","aria-label":"Mob models",
+  m.append(columnList({class:"mob-model-table",align:"start",headerAlign:"start","aria-label":"Mob models",
     rows:sortedRows("mob-models",rows,getters),key:r=>r.model,localSort:false,
     template:`minmax(180px,1fr) 130px minmax(0,1.4fr) repeat(${MOB_MODEL_STATS.length},minmax(0,.7fr))`,
     columns:[{key:"model",label:"Model",cellClass:"key"},
@@ -137,7 +137,7 @@ async function renderMobArchetypes(){
     if(isRO())input.disabled=true;
     return input;
   };
-  m.append(columnList({class:"mob-table","aria-label":"Mob archetypes",
+  m.append(columnList({class:"mob-table",align:"start",headerAlign:"start","aria-label":"Mob archetypes",
     rows:sortedRows("mobs",rows,getters),key:record=>record.name,editable:true,localSort:false,
     template:`minmax(180px,1fr) repeat(${columns.length},minmax(0,.8fr))`,
     columns:[{key:"name",label:"Record",cellClass:"key"},

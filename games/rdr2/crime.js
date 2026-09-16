@@ -95,7 +95,7 @@ async function renderBountyHunters(){
   for(const s of d.settings)top.append(bountyNumber(setting(s.id),s.label,s.help,vsetting(s.id)));m.append(top);
   const tierHelp="Rockstar stores five rows labelled WANTED_CLEAN, WANTED_LEVEL1, WANTED_LEVEL2, WANTED_LEVEL3 and WANTED_LEVEL4+. These are the player's current wanted/search state, not bounty-dollar ranges. Clean means no active wanted level; it does not mean the regional bounty balance is zero. ‘Wanted 4+’ means level 4 and any higher engine tier.";
   const bound=(r,k)=>r.ids[k]?bountyNumber({id:r.ids[k],value:safeDisplay(r[k],"")},"","",vcool(r.ids[k])):el("span",{},"—");
-  const cool=columnList({class:"cooldown-table","aria-label":"Encounter spacing",
+  const cool=columnList({class:"cooldown-table",align:"start",headerAlign:"start","aria-label":"Encounter spacing",
     rows:d.cooldowns,key:(r,index)=>`${r.eventLabel}:${r.level}:${index}`,editable:true,localSort:false,
     template:"minmax(220px,1.4fr) minmax(160px,1fr) 120px 120px",
     columns:[{key:"event",label:"Cooldown event",cellClass:"key",
@@ -113,7 +113,7 @@ async function renderBountyHunters(){
   // of its rows, as they did in the table this replaced.
   const phaseRows=d.phases.flatMap(p=>(p.groups.length?p.groups:[null]).map((g,index)=>({p,g,first:index===0})));
   const groupCell=(g,k)=>g?.ids[k]?bountyNumber({id:g.ids[k],value:safeDisplay(g[k],"").replace(/f$/i,"")},"","",vphase(g.ids[k])):el("span",{},"—");
-  const pt=columnList({class:"phase-table","aria-label":"Escalation composition",
+  const pt=columnList({class:"phase-table",align:"start",headerAlign:"start","aria-label":"Escalation composition",
     rows:phaseRows,key:(row,index)=>`${row.p.label}:${index}`,editable:true,localSort:false,
     template:"minmax(140px,1fr) 120px 110px minmax(160px,1fr) 90px 90px 100px 100px",
     columns:[{key:"phase",label:"Phase",cellClass:"key",render:row=>row.first?row.p.label:""},
@@ -130,7 +130,7 @@ async function renderBountyHunters(){
       {key:"weight",label:()=>el("span",{},"Weight ",fieldHelp("Relative selection weight inside the random pool. It is compared with the other weights in the same phase; it is not an independent percentage.")),
         render:row=>groupCell(row.g,"weight")}]});
   m.append(el("section",{},el("h2",{},"Escalation composition"),scrollableCrimeTable(pt)));
-  const deps=columnList({class:"responder-table","aria-label":"Responder equipment and tactics",
+  const deps=columnList({class:"responder-table",align:"start",headerAlign:"start","aria-label":"Responder equipment and tactics",
     rows:d.presets,key:p=>p.preset,localSort:false,
     template:"minmax(180px,1fr) minmax(0,1.6fr) minmax(160px,1fr) minmax(140px,1fr)",
     columns:[{key:"label",label:"Responder",cellClass:"key",
@@ -175,7 +175,7 @@ async function renderHonorActions(){
         class:("amount" in edit)?"edited":"",
         onchange:e=>{state.honorActionEdits[r.id]={...(state.honorActionEdits[r.id]||{}),amount:Number(e.target.value)};refreshGlobalSave();}});
     };
-    const list=columnList({class:"honor-table","aria-label":title,
+    const list=columnList({class:"honor-table",align:"start",headerAlign:"start","aria-label":title,
       rows,key:r=>r.id,editable:true,localSort:false,
       template:tier?"minmax(160px,1fr) 110px minmax(160px,1fr)":"minmax(220px,1fr) 110px",
       columns:[{key:"name",label:tier?"Vanilla amount":"Honor event",cellClass:"key",
@@ -250,7 +250,7 @@ function dispatchSection() {
       }});
     return refField(inp, vRow?[["V","vtag",vRow.value]]:null, cur, (v,ev)=>applyToInput(ev,v), String);
   };
-  wrap.append(columnList({class:"dispatch-table","aria-label":"Dispatch settings",
+  wrap.append(columnList({class:"dispatch-table",align:"start",headerAlign:"start","aria-label":"Dispatch settings",
     rows:dispatchRows,key:r=>r.group+"|"+r.field,editable:true,localSort:false,
     template:"minmax(180px,1fr) minmax(200px,1.2fr) minmax(160px,1fr)",
     columns:[{key:"setting",label:"Setting",cellClass:"cat",render:r=>dispatchLabel(r.group)},
@@ -359,12 +359,12 @@ async function renderCrime() {
     return refField(sev, [["V","vtag",vRow?.severity],["CT","cttag",ctRow?.severity]], severityValue,
       (v,ev)=>applyToInput(ev,v), v=>String(v));
   };
-  m.append(columnList({class:"crime-table","aria-label":"Crimes",
+  m.append(columnList({class:"crime-table",align:"start",headerAlign:"start","aria-label":"Crimes",
     rows,key:c=>c.key,editable:true,localSort:false,
     template:`minmax(220px,1.4fr) repeat(${CRIME_COLS.length},minmax(0,.9fr)) 120px`,
     columns:[{key:"name",label:()=>el("span",{},"Name / crime",fieldHelp("The editable name is an editor-only identification label, stored in this RDR2 plugin's labels.json; it does not rename game UI text.")),
         cellClass:"key",
-        render:c=>el("span",{},humanNameInput("crimes",c.key),c.key.replace("CRIME_",""))},
+        render:c=>el("span",{class:"crime-name"},humanNameInput("crimes",c.key),el("span",{class:"crime-key"},c.key.replace("CRIME_","")))},
       ...CRIME_COLS.map(col=>({key:col[0],
         label:col[3]?()=>el("span",{},col[1],fieldHelp(col[3])):col[1],
         cellClass:col[2]==="bool"?"bool-cell":"",
