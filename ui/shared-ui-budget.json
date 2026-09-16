@@ -5,18 +5,6 @@
       "sharedSelectors": 21,
       "handBuiltRows": 0
     },
-    "games/chrono_trigger/editor.html": {
-      "sharedSelectors": 4,
-      "handBuiltRows": 132
-    },
-    "games/chrono_trigger/event_editor.js": {
-      "sharedSelectors": 0,
-      "handBuiltRows": 19
-    },
-    "games/chrono_trigger/map_previews.js": {
-      "sharedSelectors": 0,
-      "handBuiltRows": 11
-    },
     "games/ff7r/game-appearance.css": {
       "sharedSelectors": 11,
       "handBuiltRows": 0

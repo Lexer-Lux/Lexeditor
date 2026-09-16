@@ -43,7 +43,6 @@ def html_for(game):
     # A plugin whose code lives in its own script files needs them inlined, or
     # nothing of it runs and the page looks like a plugin that failed to boot.
     for owner, names in (
-        ('chrono_trigger', ('event_editor.js', 'map_previews.js', 'ui-integration.js')),
         ('palworld', ('build-ui-pre.js', 'editor.js', 'build-ui.js')),
     ):
         if game != owner:
@@ -88,7 +87,6 @@ with sync_playwright() as p:
                       if(typeof state.config!=="undefined")state.config={datasets:{mine:{readonly:false,label:"My Mod"}}};
                       navigate("datamap");
                     }''',ROWS)
-                if game == 'chrono_trigger':
                     page.evaluate('state.busy=false;render();refreshShell();')
                 page.wait_for_selector('.lex-data-map-table')
                 page.wait_for_timeout(600)

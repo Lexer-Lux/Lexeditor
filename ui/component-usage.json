@@ -33,7 +33,6 @@
     ],
     "clone": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff7r2",
@@ -48,7 +47,6 @@
     ],
     "columnList": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff8",
@@ -70,7 +68,6 @@
     ],
     "confirmAction": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff7r2",
@@ -91,7 +88,6 @@
     "createWindowActions": [],
     "creditsPanel": [
       "blank",
-      "chrono_trigger",
       "ff8"
     ],
     "curveEditor": [
@@ -100,7 +96,6 @@
     ],
     "dataMap": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff8",
@@ -116,7 +111,6 @@
     ],
     "detailField": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff7r2",
@@ -137,7 +131,6 @@
     ],
     "detailPanel": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff7r2",
@@ -162,7 +155,6 @@
     ],
     "el": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff7r2",
@@ -179,7 +171,6 @@
     ],
     "finishPluginLoading": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff7r2",
@@ -209,7 +200,6 @@
     ],
     "infoHelp": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff7r2",
@@ -251,7 +241,6 @@
     ],
     "modLoaderSection": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff7r2",
@@ -264,7 +253,6 @@
     ],
     "mountShell": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff7r2",
@@ -296,7 +284,6 @@
     ],
     "pagedListDetail": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff8",
@@ -342,7 +329,6 @@
     ],
     "readonlyField": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff7r2",
@@ -417,7 +403,6 @@
     ],
     "subtabBar": [
       "blank",
-      "chrono_trigger",
       "ff7",
       "ff7r",
       "ff7r2",
