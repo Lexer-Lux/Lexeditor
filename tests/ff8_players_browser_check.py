@@ -12,6 +12,12 @@ def main():
   browser=pw.chromium.launch(headless=True);page=browser.new_page(viewport={'width':1440,'height':900})
   page.route('**/*',lambda route:route.abort())
   page.route('http://fixture/',lambda route:route.fulfill(body='<html></html>',content_type='text/html'))
+  # The view lists only areas that really have a card player, which it asks the
+  # plugin for. Without an answer it draws its "could not find" message and
+  # there is nothing here to check.
+  page.route('**/api/card-players',lambda route:route.fulfill(
+      content_type='application/json',
+      body='{"ready":true,"error":null,"keys":["test","garden"],"scanned":2,"total":2}'))
   page.goto('http://fixture/')
   page.set_content('<main id="main" style="height:800px"></main>')
   page.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
