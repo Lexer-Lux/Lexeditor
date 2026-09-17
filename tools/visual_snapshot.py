@@ -85,6 +85,72 @@ def settle(page, ms=700):
     page.wait_for_timeout(ms)
 
 
+SUBTABS = "#main .lex-subtab-bar:not([hidden]) > .lex-subtab-button"
+
+
+def visible_subtab_count(page, depth: int) -> int:
+    """How many subtab buttons the depth-th visible subtab bar holds."""
+    return page.evaluate("""([selector, depth]) => {
+      const bars = [...document.querySelectorAll('#main .lex-subtab-bar:not([hidden])')]
+        .filter(bar => bar.offsetParent !== null);
+      return bars[depth] ? bars[depth].querySelectorAll(':scope > .lex-subtab-button').length : 0;
+    }""", [SUBTABS, depth])
+
+
+def click_subtab(page, depth: int, index: int) -> bool:
+    return page.evaluate("""([depth, index]) => {
+      const bars = [...document.querySelectorAll('#main .lex-subtab-bar:not([hidden])')]
+        .filter(bar => bar.offsetParent !== null);
+      const button = bars[depth]?.querySelectorAll(':scope > .lex-subtab-button')[index];
+      if (!button) return false;
+      button.click();
+      return true;
+    }""", [depth, index])
+
+
+def subtab_paths(page) -> list[tuple[int, ...]]:
+    """(i,) for each subtab of the first bar, and (i, j) for each subtab of a
+    second bar that subtab i shows. Tabs already open count once."""
+    paths = []
+    for first in range(visible_subtab_count(page, 0)):
+        paths.append((first,))
+        if not open_subtabs(page, (first,)):
+            continue
+        for second in range(visible_subtab_count(page, 1)):
+            paths.append((first, second))
+    return paths
+
+
+def open_subtabs(page, path) -> bool:
+    for depth, index in enumerate(path):
+        if not click_subtab(page, depth, index):
+            return False
+        settle(page, 900)
+    return True
+
+
+def select_first_row(page) -> None:
+    # Select a record by its first cell's corner, never by the middle of a
+    # row, where an editable cell's input would take the click.
+    row = page.locator("#main .lex-list-row")
+    if row.count():
+        try:
+            row.first.click(position={"x": 4, "y": 4}, timeout=3000)
+            settle(page, 900)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def capture(page, out: Path, name: str) -> None:
+    page.mouse.move(2, SIZE["height"] - 2)
+    settle(page, 200)
+    page.screenshot(path=str(out / f"{name}.png"))
+    if STYLES:
+        styles = page.evaluate(CAPTURE, PROPERTIES)
+        (out / f"{name}.styles.json").write_text(
+            json.dumps(styles, indent=0, sort_keys=True), encoding="utf-8")
+
+
 def shoot_plugin(browser, api, plugin_id: str, out: Path) -> list[str]:
     notes = []
     try:
@@ -106,7 +172,7 @@ def shoot_plugin(browser, api, plugin_id: str, out: Path) -> list[str]:
             page.wait_for_timeout(500)
         settle(page, 2500)
         tabs = page.evaluate("[...document.querySelectorAll('nav button[data-tab]')]"
-                             ".map(b=>b.dataset.tab).filter(t=>t&&t!=='settings')")
+                             ".map(b=>b.dataset.tab).filter(Boolean)")
         for tab in tabs or [None]:
             if tab:
                 try:
@@ -115,24 +181,21 @@ def shoot_plugin(browser, api, plugin_id: str, out: Path) -> list[str]:
                     notes.append(f"{plugin_id}/{tab}: tab not clickable")
                     continue
                 settle(page, 1800)
-            # Select a record by its first cell's corner, never by the middle of
-            # a row, where an editable cell's input would take the click.
-            row = page.locator("#main .lex-list-row")
-            if row.count():
-                try:
-                    row.first.click(position={"x": 4, "y": 4}, timeout=3000)
-                    settle(page, 900)
-                except Exception:  # noqa: BLE001
-                    pass
-            page.mouse.move(2, SIZE["height"] - 2)
-            settle(page, 200)
-            page.screenshot(path=str(out / f"{plugin_id}-{tab or 'page'}.png"))
-            if STYLES:
-                styles = page.evaluate(CAPTURE, PROPERTIES)
-                (out / f"{plugin_id}-{tab or 'page'}.styles.json").write_text(
-                    json.dumps(styles, indent=0, sort_keys=True), encoding="utf-8")
-        # Page-level subtabs are part of the look too: shoot each on the last tab
-        # only when a plugin has them on its first screen.
+            select_first_row(page)
+            capture(page, out, f"{plugin_id}-{tab or 'page'}")
+            # Every subtab on this tab, by position, so a bar that redraws
+            # itself after a click is read afresh each time. Subtabs that open
+            # further subtabs are followed one level down.
+            for path in subtab_paths(page):
+                if not open_subtabs(page, path):
+                    notes.append(f"{plugin_id}/{tab}/{'-'.join(map(str, path))}: subtab not clickable")
+                    continue
+                select_first_row(page)
+                capture(page, out, f"{plugin_id}-{tab or 'page'}-sub{'-'.join(map(str, path))}")
+            if tab:
+                # Leave the tab as it was found for the next one.
+                page.locator(f'nav button[data-tab="{tab}"]').first.click(timeout=5000)
+                settle(page, 400)
     except Exception as error:  # noqa: BLE001
         notes.append(f"{plugin_id}: {error}".replace("\n", " ")[:300])
     finally:
