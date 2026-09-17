@@ -17,14 +17,14 @@ import css_audit  # noqa: E402
 
 # Non-token rules per plugin; the target for every one is 0.
 PLUGIN_RULES = {
-    "blank": 32, "ff7r": 57, "ff7r2": 11, "ff8": 666, "ff9": 16,
+    "blank": 32, "ff7r": 57, "ff7r2": 0, "ff8": 666, "ff9": 16,
     "palworld": 33, "rdr": 89, "rdr2": 644, "warband": 69,
 }
 PLUGIN_IMPORTANT = {
     "blank": 0, "ff7r": 5, "ff7r2": 0, "ff8": 229, "ff9": 0,
     "palworld": 0, "rdr": 0, "rdr2": 8, "warband": 4,
 }
-FRAMEWORK_DUPLICATES = 464
+FRAMEWORK_DUPLICATES = 345
 FRAMEWORK_IMPORTANT = 234
 
 

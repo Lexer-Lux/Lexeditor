@@ -20,6 +20,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def split_selectors(prelude: str) -> list[str]:
+    """A selector list's members; commas inside :is(), :not() and the like do
+    not separate members."""
+    parts, depth, start = [], 0, 0
+    for index, char in enumerate(prelude):
+        if char in "([":
+            depth += 1
+        elif char in ")]":
+            depth -= 1
+        elif char == "," and depth == 0:
+            parts.append(prelude[start:index])
+            start = index + 1
+    parts.append(prelude[start:])
+    return [" ".join(part.split()) for part in parts if part.strip()]
+
+
 def strip_comments(css: str) -> str:
     return re.sub(r"/\*.*?\*/", "", css, flags=re.S)
 
@@ -78,8 +94,8 @@ def framework_counts(path: Path) -> dict:
     for context, selector, body in rules(path.read_text(encoding="utf-8")):
         if body is None:
             continue
-        for one in selector.split(","):
-            seen[(context, " ".join(one.split()))] += 1
+        for one in split_selectors(selector):
+            seen[(context, one)] += 1
     duplicates = {key: count for key, count in seen.items() if count > 1}
     return {"duplicates": duplicates, "extra": sum(c - 1 for c in duplicates.values()),
             "important": path.read_text(encoding="utf-8").count("!important")}

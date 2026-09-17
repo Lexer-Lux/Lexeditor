@@ -1,3 +1,4 @@
+:root{--lex-page-display:block;--lex-page-height:auto;--lex-page-overflow:visible}
   @font-face {
     font-family:"Lex Redemption";
     src:url("/assets/fonts/Redemption.woff") format("woff"),

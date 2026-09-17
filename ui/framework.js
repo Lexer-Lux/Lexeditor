@@ -1175,6 +1175,16 @@
   const dismissDialogs = (root = document) =>
     root.querySelectorAll(".lex-dialog-backdrop").forEach(node => node.remove());
 
+  // Something the reader has to act on, above the content it concerns:
+  // a title, a sentence, and the one button that deals with it.
+  const notice = (options = {}) => element("div", {
+    class: ["lex-notice", options.tone ? `lex-tone-${options.tone}` : "", options.className || ""].filter(Boolean).join(" "),
+    role: "status",
+  }, element("div", {class: "lex-notice-text"},
+    options.title ? element("strong", {}, options.title) : null,
+    options.message ? element("span", {}, options.message) : null),
+  options.action || null);
+
   const detailNote = (text, options = {}) => element("p", {
     class: ["lex-detail-note", options.className || ""].filter(Boolean).join(" "),
   }, text);
@@ -1380,7 +1390,8 @@
     const arrow = booleanField ? element("span", {class: "lex-field-boolean-arrow", "aria-hidden": "true"}) : null;
     const node = element("div", {
       ...(options.attrs || {}),
-      class: ["lex-detail-field", "lex-pinnable-property", booleanField ? "lex-boolean-field" : "", options.className || ""].filter(Boolean).join(" "),
+      class: ["lex-detail-field", "lex-pinnable-property", booleanField ? "lex-boolean-field" : "",
+        options.tone ? `lex-tone-${options.tone}` : "", options.className || ""].filter(Boolean).join(" "),
       "data-lex-type": dataType,
       "data-lex-property": options.property
         || pin?.getAttribute?.("data-lex-pin-column") || null,
@@ -2694,6 +2705,11 @@
     // Fill each page until one more card would overflow the box. A caller
     // that genuinely wants a fixed count passes pageSize.
     const overflows = () => scroll.scrollHeight > scroll.clientHeight + 1;
+    const columnsFit = () => {
+      const top = scroll.getBoundingClientRect().top;
+      return [...content.querySelectorAll(":scope > .lex-tweak-column")].every(column =>
+        column.children.length < 2 || column.getBoundingClientRect().bottom - top <= scroll.clientHeight + 1);
+    };
     const paginate = visible => {
       pagedCount = visible.length;
       if (size || !scroll.isConnected || scroll.clientHeight <= 0) {
@@ -2705,8 +2721,12 @@
       for (let from = 0; from < visible.length;) {
         let count = 1;
         while (from + count < visible.length) {
+          // A card taller than the window overflows on its own, so "does the
+          // page still fit" gave it a page to itself and stranded every card
+          // after it. A column may run past the window only when it holds
+          // that one card; any column of several must fit.
           deal(visible.slice(from, from + count + 1));
-          if (overflows()) break;
+          if (!columnsFit()) break;
           count += 1;
         }
         from += count;
@@ -2788,6 +2808,7 @@
     root.refreshPages = () => {page=0;pagedCount=-1;refit();};
     root.lexFitPage = refit;
     render();
+    if (options.notice) root.prepend(options.notice);
     if ((options.tabs || []).length > 1) root.prepend(subtabBar({
       tabs: options.tabs, active: options.activeTab,
       label: options.tabsLabel || "Tweak groups", change: options.changeTab}));
@@ -7609,7 +7630,7 @@ ${contents.path}`});
       paged)
   };
 
-  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 

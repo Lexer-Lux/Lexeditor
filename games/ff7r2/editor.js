@@ -126,10 +126,8 @@
         `${state.missingFiles.length} file${state.missingFiles.length===1?"":"s"} from the release are gone. Restore puts them back.`)}));
     }
     for(const clash of state.conflicts||[]){
-      const field=detailField({label:"KEY CLASH",control:readonlyField(clash.message),
-        help:infoHelp("ReShade is installed in the same folder and answers the same key, so one press does both. Change the key below, or in ReShade's own settings.")});
-      field.classList.add("ff7r2-warning");
-      rows.push(field);
+      rows.push(detailField({label:"KEY CLASH",control:readonlyField(clash.message),tone:"warning",
+        help:infoHelp("ReShade is installed in the same folder and answers the same key, so one press does both. Change the key below, or in ReShade's own settings.")}));
     }
     const cache=state.shaderCache||{files:[],bytes:0,folder:""};
     const clear=el("button",{type:"button",class:"lex-dialog-action",disabled:injectorBusy||!cache.files.length,
@@ -192,9 +190,7 @@
           onclick:()=>{injectorDraft=clone(saved);render()}},"Revert"))}),
     ];
     for(const problem of file.problems||[]){
-      const field=detailField({label:"FILE PROBLEM",control:readonlyField(problem)});
-      field.classList.add("ff7r2-warning");
-      fileRows.push(field);
+      fileRows.push(detailField({label:"FILE PROBLEM",control:readonlyField(problem),tone:"warning"}));
     }
     return LexeditorUI.detailPanel({title:"SHADERINJECTOR.INI",body:[
       detailSection({title:"SETTINGS FILE",body:fileRows}), ...sections]});
@@ -212,10 +208,6 @@
   }
 
   function tweaks(){
-    const bar=LexeditorUI.subtabBar({tabs:[
-      {id:"reshade",label:"ReShade",help:"Effects over the finished frame."},
-      {id:"injector",label:"Shader Injector",help:"Replaces Rebirth's own shaders."},
-    ],active:tweakTab,label:"Presentation tools",change:id=>{tweakTab=id;render()}});
     const section=LexeditorUI.reshadeSection({snapshot:reshade,act:actReshade});
     const cards=tweakTab==="injector"
       ? [injectorStatusCard(),injectorSettingsCard(),loaderCard()].filter(Boolean)
@@ -223,12 +215,14 @@
     // Setup is not finished while the shader cache predates the injector, so
     // the step and its button sit above both subtabs until it is done.
     const notice=injector?.setupNotice;
-    const banner=notice?el("div",{class:"ff7r2-notice",role:"status"},
-      el("div",{class:"ff7r2-notice-text"},el("strong",{},notice.title),el("span",{},notice.message)),
-      el("button",{type:"button",class:"lex-dialog-action primary",disabled:injectorBusy,
-        onclick:clearShaderCache},notice.actionLabel)):null;
-    return el("div",{class:"ff7r2-page"},bar,...(banner?[banner]:[]),
-      el("div",{class:`ff7r2-tweaks ${tweakTab}`},...cards));
+    const banner=notice?LexeditorUI.notice({title:notice.title,message:notice.message,
+      action:el("button",{type:"button",class:"lex-dialog-action primary",disabled:injectorBusy,
+        onclick:clearShaderCache},notice.actionLabel)}):null;
+    return LexeditorUI.settingsColumns(cards,{columnWidth:"520px",notice:banner,
+      tabs:[
+        {id:"reshade",label:"ReShade",help:"Effects over the finished frame."},
+        {id:"injector",label:"Shader Injector",help:"Replaces Rebirth's own shaders."},
+      ],activeTab:tweakTab,tabsLabel:"Presentation tools",changeTab:id=>{tweakTab=id;render()}});
   }
 
   async function loadDataMap(){
@@ -252,11 +246,7 @@
   function render(){
     const main=document.querySelector("#main");
     if(tab==="datamap"){main.replaceChildren(dataMapView());shell.refresh?.();return}
-    const scroller=main.querySelector(".ff7r2-tweaks");
-    const scroll=scroller?scroller.scrollTop:0;
     main.replaceChildren(tweaks());
-    const next=main.querySelector(".ff7r2-tweaks");
-    if(next)next.scrollTop=scroll;
     shell.refresh?.();
   }
   function navigate(value){tab=String(value||"tweaks");render()}

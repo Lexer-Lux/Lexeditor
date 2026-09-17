@@ -29,6 +29,34 @@
   --lex-panel-gap: clamp(10px, 1vw, 16px);
 }
 
+/* ---- Page shell ---------------------------------------------------------
+   Every plugin page is the shared header over one main area, filling the
+   window. Each plugin used to state this itself, nine slightly different
+   ways. A game changes it through the tokens, never by restating it. */
+* {
+  box-sizing:border-box;
+  /* A thumb is drawn over the content instead (installOverlayScrollbars). */
+  scrollbar-width:none;
+}
+body {
+  display:var(--lex-page-display, flex);
+  flex-direction:column;
+  height:var(--lex-page-height, 100vh);
+  margin:0;
+  overflow:var(--lex-page-overflow, hidden);
+  color:var(--lex-text);
+  background:var(--lex-page-bg, var(--lex-bg));
+  font:var(--lex-font-size, 15px)/var(--lex-line-height, 1.35) var(--lex-font);
+  /* See Font metrics. */
+  font-size-adjust:var(--lex-font-size-adjust, none);
+}
+main {
+  flex:1;
+  min-height:0;
+  padding:var(--lex-panel-gap);
+}
+
+
 html.lex-transition-entry body {
   visibility: hidden !important;
 }
@@ -3218,9 +3246,8 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
   padding-right:calc(var(--lex-internal-reference-width) + .95em);
 }
 .lex-source-control-internal.no-reference { --lex-internal-reference-width:0px !important; }
-/* Scrollbars take no room: the system bar is hidden and a thumb is drawn over
-   the content by installOverlayScrollbars. */
-* { scrollbar-width:none; }
+/* Scrollbars take no room: the system bar is hidden (page shell) and a thumb
+   is drawn over the content by installOverlayScrollbars. */
 .lex-overlay-scrollbar {
   position:fixed;
   z-index:100002;
@@ -3984,6 +4011,21 @@ body:has(.lex-data-map-table) #main {
 /* Filler rows exist only to carry the table's rules past the last record. */
 .lex-column-list-row.lex-filler-row { pointer-events:none; }
 .lex-column-list-row.lex-filler-row > .lex-column-list-cell { color:transparent; }
+
+/* ---- Notices -------------------------------------------------------- */
+.lex-notice {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:10px 14px;
+  border:1px solid var(--lex-notice-border, var(--lex-accent));
+  background:var(--lex-notice-bg, var(--lex-panel));
+}
+.lex-notice-text { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.lex-notice-text strong { font-weight:600; }
+/* A value that needs attention. */
+.lex-tone-warning :is(input, output, .lex-readonly-field) { color:var(--lex-warning, #9a5b00); }
 
 /* ---- Toasts -------------------------------------------------------- */
 .lex-toast-stack {
@@ -6653,7 +6695,6 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   --lex-text-line: 1.35;
 }
 
-body { font-size-adjust: var(--lex-font-size-adjust, none); }
 
 /* Text-bearing boxes follow the face rather than a pixel guess, and never clip
    by a fixed height - for a game that declares its face's metrics. */

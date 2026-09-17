@@ -168,7 +168,9 @@
       "rdr2",
       "warband"
     ],
-    "element": [],
+    "element": [
+      "blank"
+    ],
     "enabledMark": [
       "blank"
     ],
@@ -277,6 +279,10 @@
       "blank",
       "rdr2"
     ],
+    "notice": [
+      "blank",
+      "ff7r2"
+    ],
     "numberValue": [
       "blank",
       "ff8"
@@ -379,6 +385,7 @@
     "settingsColumns": [
       "blank",
       "ff7r",
+      "ff7r2",
       "ff8",
       "rdr",
       "rdr2"
@@ -420,7 +427,6 @@
       "blank",
       "ff7",
       "ff7r",
-      "ff7r2",
       "ff8",
       "ff9",
       "warband"

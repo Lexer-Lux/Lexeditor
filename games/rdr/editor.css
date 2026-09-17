@@ -1,3 +1,4 @@
+:root{--lex-page-display:block;--lex-page-height:auto;--lex-page-overflow:visible}
     @font-face{font-family:Redemption;src:url('/fonts/Redemption.ttf') format('truetype');font-display:swap}
     @font-face{font-family:RDRLino;src:url('/fonts/RDRLino-Regular.woff2') format('woff2');font-display:swap}
     :root{

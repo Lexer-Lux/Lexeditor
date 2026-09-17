@@ -1,3 +1,4 @@
+:root{--lex-page-display:block;--lex-page-height:auto;--lex-page-overflow:visible}
     :root {--lex-surface-bg:#f7edcf;--lex-surface-shadow:inset 0 0 0 1px #fff7de;--lex-list-row-padding:9px 11px;--lex-row-selected-fg:#6b1717;--lex-row-selected-bg:#e4c98d;--lex-list-header-bg:#d1b879;--lex-list-cell-border:#c8ae78;--lex-row-hover-bg:#f0dba8;--lex-shell-header-fg:#f4dfb1;--lex-shell-header-bg:#4b1717;--lex-shell-header-border:#a66b24;--lex-shell-button-fg:#f4dfb1;--lex-shell-button-border:#8c4a35;--lex-shell-button-bg:#6b2424;
       --lex-bg:#e8d9b4; --lex-panel:#f4e7c5; --lex-panel-2:#dcc99a; --lex-border:#8b6b39;
       --lex-text:#2b2114; --lex-muted:#6e5b3d; --lex-accent:#7a2020; --lex-accent-text:#fff5d8;

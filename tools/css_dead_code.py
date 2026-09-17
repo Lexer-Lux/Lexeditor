@@ -42,6 +42,22 @@ SHORTHANDS["border"] = set().union(*(SHORTHANDS[f"border-{s}"] for s in SIDES)) 
     "border-width", "border-style", "border-color", *(f"border-{s}" for s in SIDES)}
 
 
+def split_selectors(prelude: str) -> list[str]:
+    """A selector list's members; commas inside :is(), :not() and the like do
+    not separate members."""
+    parts, depth, start = [], 0, 0
+    for index, char in enumerate(prelude):
+        if char in "([":
+            depth += 1
+        elif char in ")]":
+            depth -= 1
+        elif char == "," and depth == 0:
+            parts.append(prelude[start:index])
+            start = index + 1
+    parts.append(prelude[start:])
+    return [" ".join(part.split()) for part in parts if part.strip()]
+
+
 def blank_comments(css: str) -> str:
     """Same length, comments turned to spaces, so offsets stay true."""
     return re.sub(r"/\*.*?\*/", lambda m: " " * len(m.group(0)), css, flags=re.S)
@@ -132,7 +148,7 @@ def parse(text: str, start: int = 0, end: int | None = None, context: tuple = ()
                 yield from parse(text, brace + 1, close - 1, context + (" ".join(prelude.split()),))
         elif prelude:
             rule_start = i + (len(prelude_raw) - len(prelude_raw.lstrip()))
-            selectors = tuple(" ".join(s.split()) for s in prelude.split(","))
+            selectors = tuple(split_selectors(prelude))
             rule = Rule(context, selectors, rule_start, close)
             rule.declarations = split_declarations(text, 0, brace + 1, close - 1)
             yield rule

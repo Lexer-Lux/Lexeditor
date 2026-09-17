@@ -1,26 +1,6 @@
-    *{box-sizing:border-box}
-    body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
-    main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
-    :root{--lex-accent:#3f7fd0;--lex-accent-text:#f2f7ff;--lex-highlight:#2a4a72}
-    .ff7r2-page{display:flex;flex-direction:column;gap:var(--lex-panel-gap,12px);height:100%;min-height:0}
-    .ff7r2-tweaks{
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));
-      align-content:start;
-      align-items:start;
-      gap:var(--lex-panel-gap,12px);
-      flex:1 1 auto;
-      min-height:0;
-      overflow:auto;
-      --lex-detail-label-width:clamp(130px,15%,240px);
-    }
-    /* The ReShade card carries every control on its tab, so it gets a lane of
-       its own on any window wide enough to give it one. */
-    .ff7r2-tweaks.reshade > :last-child{grid-column:1/-1}
-    @media (min-width:1400px){.ff7r2-tweaks.reshade > :last-child{grid-column:auto}}
-    .ff7r2-warning input{color:#9a5b00}
-    /* First-time setup's remaining step, above both subtabs, with its button. */
-    .ff7r2-notice{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 14px;border:1px solid var(--lex-accent);background:var(--lex-panel)}
-    .ff7r2-notice-text{display:flex;flex-direction:column;gap:2px;min-width:0}
-    .ff7r2-notice-text strong{font-weight:600}
-  
+:root{
+  --lex-accent:#3f7fd0;
+  --lex-accent-text:#f2f7ff;
+  --lex-highlight:#2a4a72;
+  --lex-detail-label-width:clamp(130px,15%,240px);
+}
