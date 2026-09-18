@@ -6,6 +6,10 @@
       "ff7r"
     ],
     "NavigationHistory": [],
+    "actionRow": [
+      "blank",
+      "ff9"
+    ],
     "applyTheme": [
       "ff7r"
     ],
@@ -129,7 +133,8 @@
     "detailNote": [
       "blank",
       "ff7r",
-      "ff7r2"
+      "ff7r2",
+      "ff9"
     ],
     "detailPanel": [
       "blank",
@@ -281,7 +286,8 @@
     ],
     "notice": [
       "blank",
-      "ff7r2"
+      "ff7r2",
+      "ff9"
     ],
     "numberValue": [
       "blank",

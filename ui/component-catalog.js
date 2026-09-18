@@ -86,6 +86,8 @@
     {id: "sectionParts", level: "utility", summary: "The title and content of a section, by name, for a page that rearranges one."},
     {id: "shellTextNodes", level: "utility", summary: "Every piece of the shell's own text, for a game that redraws it in its own font."},
     {id: "dismissDialogs", level: "utility", summary: "Closes any shared dialog that is open."},
+    {id: "actionRow", level: "molecule", summary: "Buttons that act on the thing above them, in one wrapping row.",
+      sample: () => UI.actionRow(UI.element("button", {type: "button"}, "Install"), UI.element("button", {type: "button"}, "Open settings"))},
     {id: "notice", level: "molecule", summary: "A banner above a page: a title, a sentence and the one action that deals with it.",
       sample: () => UI.notice({title: "Setup is not finished", message: "Clear the shader cache once before playing.",
         action: UI.element("button", {type: "button", class: "lex-dialog-action primary"}, "Clear cache")})},

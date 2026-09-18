@@ -50,10 +50,14 @@ body {
   /* See Font metrics. */
   font-size-adjust:var(--lex-font-size-adjust, none);
 }
+/* Form controls use the page's font; left alone, the browser gives them its
+   own (Arial, 13px), which is what FF9's inputs showed without a rule. */
+button, input, select, textarea { font:inherit; }
 main {
   flex:1;
   min-height:0;
   padding:var(--lex-panel-gap);
+  overflow:var(--lex-main-overflow, visible);
 }
 
 
@@ -2945,10 +2949,6 @@ body.lex-panel-layout-dragging * {
   box-shadow: none;
 }
 
-#toolbar:empty {
-  display: none !important;
-}
-
 /* Reserve the fixed pagination bar and the same gap used beside panels. */
 body:has(.lex-pager) #main {
   padding-bottom: calc(var(--lex-pager-height, 56px) + var(--lex-panel-gap)) !important;
@@ -4011,6 +4011,21 @@ body:has(.lex-data-map-table) #main {
 /* Filler rows exist only to carry the table's rules past the last record. */
 .lex-column-list-row.lex-filler-row { pointer-events:none; }
 .lex-column-list-row.lex-filler-row > .lex-column-list-cell { color:transparent; }
+
+/* ---- Page toolbar ----------------------------------------------------
+   The strip above main that some pages fill with their own controls. Empty,
+   it takes no room. */
+#toolbar {
+  display:flex;
+  align-items:center;
+  gap:var(--lex-toolbar-gap, 8px);
+  margin:var(--lex-toolbar-margin, var(--lex-panel-gap) var(--lex-panel-gap) 0);
+}
+/* Important, so a game's own toolbar class cannot show an empty bar. */
+#toolbar:empty { display:none !important; }
+
+/* ---- Action rows ----------------------------------------------------- */
+.lex-action-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
 
 /* ---- Notices -------------------------------------------------------- */
 .lex-notice {

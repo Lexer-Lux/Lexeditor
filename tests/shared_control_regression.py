@@ -121,7 +121,9 @@ def main():
    page.keyboard.press('m');page.keyboard.up('Control')
    assert page.locator('#plugin-data-map').evaluate('(e)=>e.classList.contains("active")')
    page.evaluate("navigate('one')");page.wait_for_timeout(400)
-   page.mouse.move(1400,880)
+   # Parked on the brand, where no switch can ever sit; a point inside the
+   # page lands on a switch whenever the layout shifts a few pixels.
+   page.mouse.move(8,8)
    page.wait_for_timeout(180)
    rails=page.locator('.lex-toggle-rail')
    assert rails.count()>1
@@ -136,7 +138,7 @@ def main():
    assert rail.locator('.lex-info-help').evaluate('e=>getComputedStyle(e).display')!='none'
    assert rail.locator('.lex-toggle-type').evaluate('e=>getComputedStyle(e).display')=='none'
    flag.locator('input').click()
-   page.mouse.move(1400,880);page.wait_for_timeout(180)
+   page.mouse.move(8,8);page.wait_for_timeout(180)
    assert rails.evaluate_all('nodes=>nodes.every(e=>getComputedStyle(e).opacity==="0")')
    assert flag.bounding_box()==original
    page.keyboard.press('Tab');flag.locator('input').focus();page.wait_for_timeout(180)

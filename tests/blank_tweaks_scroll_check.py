@@ -38,6 +38,8 @@ def main():
    print('Tweaks pages its cards at 1350, 900 and 700 pixels: no scrollbar, nothing clipped.')
    # Every page fits, not only the one the fit was measured on, and the wheel
    # turns pages because there is nothing to scroll.
+   # One column, so Blank's three cards need more than one page and each fits.
+   page.set_viewport_size({'width':400,'height':450});page.wait_for_timeout(400)
    pages=page.evaluate("document.querySelector('.lex-tweaks-pages .lex-page-total').textContent")
    assert int(pages)>1,pages
    for number in range(2,int(pages)+1):
