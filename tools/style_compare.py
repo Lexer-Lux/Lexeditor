@@ -11,12 +11,16 @@ from __future__ import annotations
 
 import collections
 import json
+import re
 import sys
 from pathlib import Path
 
 
 def load(path: Path) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+    # Each run serves the page on a new port; a URL is the same asset whatever
+    # port it came from.
+    text = re.sub(r"https?://127\.0\.0\.1:\d+", "http://local", path.read_text(encoding="utf-8"))
+    return json.loads(text)
 
 
 def main() -> int:

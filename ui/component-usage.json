@@ -66,6 +66,9 @@
       "ff8",
       "ff9"
     ],
+    "componentSample": [
+      "blank"
+    ],
     "configureThemeSounds": [
       "ff7",
       "ff7r",
@@ -98,6 +101,9 @@
     "curveEditor": [
       "blank",
       "ff8"
+    ],
+    "curveGrid": [
+      "blank"
     ],
     "dataMap": [
       "blank",
@@ -200,6 +206,9 @@
     "formatNumber": [
       "blank",
       "ff8"
+    ],
+    "gameCard": [
+      "blank"
     ],
     "hasEnabledProperty": [],
     "hoverable": [
@@ -309,6 +318,9 @@
       "rdr",
       "rdr2",
       "warband"
+    ],
+    "pagedPane": [
+      "blank"
     ],
     "pager": [
       "blank",

@@ -79,7 +79,7 @@
       detailSection({title:"TEXT & NUMBERS",body:[detailField({label:"TEXT",help:infoHelp("Blank uses this sample to demonstrate the shared text control and Vanilla-reference behavior; it has no game-specific meaning."),control:text}),detailField({label:"NUMBER",help:infoHelp("This sample demonstrates an internal Vanilla reference: changing the live value leaves the unchanged reference available inside the same field."),control:numericReferenceControl(),dataType:"INT",min:0,max:255}),detailField({label:"FLOAT",control:floatReferenceControl(),dataType:"FLOAT",min:-100,max:100}),detailField({label:"READ ONLY",control:readonlyField("Computed fallback")}),detailField({label:"MULTI-NUMBER",help:infoHelp("One property holding several numbers. Each pair reads label-then-box like an ordinary property row."),control:multiNumberControl(),dataType:"INT"})]}),
       detailSection({title:"REFERENCE STACKS",body:[1,2,3].map((count,index)=>detailField({label:`${count}-REF VALUE`,control:stackedReferenceControl(count,index),dataType:"INT",min:0,max:255}))}),
       detailSection({title:"CHOICES",body:[detailField({label:"ENABLED",control:booleanReferenceControl(),dataType:"BOOL"}),detailField({label:"SELECT",control:selectSource,dataType:"ENUM"}),detailField({label:"USE FLAGS",help:infoHelp("One property made of several related on/off switches. The row wraps onto more lines instead of squeezing its labels."),control:toggleRowControl(),dataType:"FLAGS"})]}),
-      detailSection({title:"ACTIONS & LINKS",body:[detailField({label:"HOVERABLE",control:hoverable({content:"Example Item",targetType:"item",targetId:0,targetLabel:"Example Item",activate:()=>{selected=0;navigate("two")}})}),detailField({label:"BUTTONS",control:el("div",{class:"blank-button-row"},el("button",{type:"button"},"Confirm"),el("button",{type:"button",disabled:true},"Disabled"))})]}),
+      detailSection({title:"ACTIONS & LINKS",body:[detailField({label:"HOVERABLE",control:hoverable({content:"Example Item",targetType:"item",targetId:0,targetLabel:"Example Item",activate:()=>{selected=0;navigate("two")}})}),detailField({label:"BUTTONS",control:LexeditorUI.actionRow(el("button",{type:"button",class:"lex-dialog-action primary"},"Confirm"),el("button",{type:"button",class:"lex-dialog-action",disabled:true},"Disabled"))})]}),
     ]});
   }
   function multiNumberControl(){
@@ -112,8 +112,7 @@
     const pages=Math.max(1,Math.ceil(all.length/size));
     threePage=Math.max(0,Math.min(threePage,pages-1));
     const shown=all.slice(threePage*size,threePage*size+size);
-    return el("div",{class:"blank-paged-pane"},
-      tablePanel(shown),
+    return LexeditorUI.pagedPane(tablePanel(shown),
       pager({page:threePage,pages,total:all.length,pageSize:size,noun:"records",
         change:next=>{threePage=next;render()}}));
   }
@@ -122,8 +121,8 @@
     const sortMarker=property=>sort.key===property?{"data-lex-sort":sort.dir>0?"asc":"desc"}:{};
     return detailPanel({className:"blank-detail",title:row.name,icon:blankIcon(),identity:recordId(row.id),meta:row.category,body:[detailSection({title:"GENERAL",body:[detailField({label:"NAME",...fields.name,attrs:sortMarker("name"),pin:withPins?prefs.pinButton("name","Name"):null}),detailField({label:"CATEGORY",...fields.category,attrs:sortMarker("category"),pin:withPins?prefs.pinButton("category","Category"):null}),detailField({label:"VALUE",...fields.value,attrs:sortMarker("value"),pin:withPins?prefs.pinButton("value","Value"):null}),detailField({label:"ENABLED",...fields.enabled,attrs:sortMarker("enabled"),pin:withPins?prefs.pinButton("enabled","Enabled"):null})]})]});
   }
-  function inspectorPanel(){const row=selectedRow();return detailPanel({className:"blank-detail",title:"Inspector",identity:"LIVE",meta:"Third shared pane",body:[detailSection({title:"SELECTION",body:[detailField({label:"RECORD",control:readonlyField(row.name)}),detailField({label:"VALUE",control:readonlyField(String(row.value))})]}),detailSection({title:"INTEGRATION STATES",body:[el("div",{class:"blank-statuses"},integrationStatus("integrated"),integrationStatus("partial"),integrationStatus("not-integrated"))]}),detailSection({title:"REFERENCE DISPLAY",body:[referenceDisplay({current:row.value,sources:[{name:"Vanilla",value:vanillaRow(row.id).value}],apply:()=>{}})]})]})}
-  function subtabPanel(){const tabs=[{id:"controls",label:"Controls"},{id:"references",label:"References"},{id:"states",label:"States"}];let content;if(subtab==="references")content=detailSection({title:"REFERENCE VALUES",body:[detailField({label:"NUMBER",control:numericReferenceControl(),dataType:"INT",min:0,max:255}),detailField({label:"BOOLEAN",control:booleanReferenceControl(),dataType:"BOOL"})]});else if(subtab==="states")content=detailSection({title:"STATUS TOKENS",body:[el("div",{class:"blank-statuses"},integrationStatus("integrated"),integrationStatus("partial"),integrationStatus("not-integrated"))]});else content=detailSection({title:"STANDARD CONTROLS",body:[detailField({label:"TEXT",control:el("input",{type:"text",value:demo.text,disabled:activeSource!=="mine",oninput:event=>{demo.text=event.target.value;refreshShell()}})}),detailField({label:"NUMBER",control:numericReferenceControl(),dataType:"INT",min:0,max:255}),detailField({label:"TOGGLE",control:booleanReferenceControl(),dataType:"BOOL"})]});return tabbedPanel({className:"blank-subtab-panel",tabs,active:subtab,label:"Blank Game tabbed-panel example",change:value=>{subtab=value;render()},content})}
+  function inspectorPanel(){const row=selectedRow();return detailPanel({className:"blank-detail",title:"Inspector",identity:"LIVE",meta:"Third shared pane",body:[detailSection({title:"SELECTION",body:[detailField({label:"RECORD",control:readonlyField(row.name)}),detailField({label:"VALUE",control:readonlyField(String(row.value))})]}),detailSection({title:"INTEGRATION STATES",body:[LexeditorUI.actionRow(integrationStatus("integrated"),integrationStatus("partial"),integrationStatus("not-integrated"))]}),detailSection({title:"REFERENCE DISPLAY",body:[referenceDisplay({current:row.value,sources:[{name:"Vanilla",value:vanillaRow(row.id).value}],apply:()=>{}})]})]})}
+  function subtabPanel(){const tabs=[{id:"controls",label:"Controls"},{id:"references",label:"References"},{id:"states",label:"States"}];let content;if(subtab==="references")content=detailSection({title:"REFERENCE VALUES",body:[detailField({label:"NUMBER",control:numericReferenceControl(),dataType:"INT",min:0,max:255}),detailField({label:"BOOLEAN",control:booleanReferenceControl(),dataType:"BOOL"})]});else if(subtab==="states")content=detailSection({title:"STATUS TOKENS",body:[LexeditorUI.actionRow(integrationStatus("integrated"),integrationStatus("partial"),integrationStatus("not-integrated"))]});else content=detailSection({title:"STANDARD CONTROLS",body:[detailField({label:"TEXT",control:el("input",{type:"text",value:demo.text,disabled:activeSource!=="mine",oninput:event=>{demo.text=event.target.value;refreshShell()}})}),detailField({label:"NUMBER",control:numericReferenceControl(),dataType:"INT",min:0,max:255}),detailField({label:"TOGGLE",control:booleanReferenceControl(),dataType:"BOOL"})]});return tabbedPanel({tabs,active:subtab,label:"Blank Game tabbed-panel example",change:value=>{subtab=value;render()},content})}
   // The reference Tweaks page. A plugin's tweak surface is a settings page,
   // not a record table: groups of switches and bounded values, with dependent
   // controls disabled until their parent switch is on. Copy this shape.
@@ -219,7 +218,7 @@
       const scale=el("input",{type:"number",min:0,max:5,step:.1,value:1,"aria-label":`${title} multiplier`});
       return LexeditorUI.curveEditor({title,variables:[{label:"A",control:scale}],domain:{min:1,max:100},range:{min:0,max:500},overlayExtrema:true,evaluate:level=>evaluate(level)*Number(scale.value),formula:title==="Linear"?"Value = Level × A":"Value = Level² × A / 100"});
     });
-    return el("div",{class:"blank-graphs"},...cards);
+    return LexeditorUI.curveGrid(...cards);
   }
   function addRecord(){const id=activeRows().reduce((highest,row)=>Math.max(highest,row.id),-1)+1;rows.push({id,name:`New Record ${String(id+1).padStart(2,"0")}`,category:categories[0],value:0,enabled:true});selected=id;render();refreshShell()}
   // "Mod contents only" hides every record this project has not touched, which
@@ -269,11 +268,8 @@
   function gameCard(pluginId,used){
     const game=catalogue.games?.[pluginId.replace(/_/g,"-")]||catalogue.games?.[pluginId]||null;
     const name=game?.name||pluginId;
-    const art=game?.uri
-      ? el("img",{class:"blank-game-cover",src:game.uri,alt:""})
-      : el("span",{class:"blank-game-fallback","aria-hidden":"true"},name.slice(0,1).toUpperCase());
-    return el("span",{class:`blank-game${used?"":" unused"}`,
-      title:used?`${name} uses this`:`${name} does not use this`},art,el("span",{class:"blank-game-name"},name));
+    return LexeditorUI.gameCard({name,cover:game?.uri||null,faded:!used,
+      title:used?`${name} uses this`:`${name} does not use this`});
   }
   // Which games use a component reads better as every game at once: the ones
   // that do not use it are faded and pushed to the end, like an absent game on
@@ -289,9 +285,9 @@
       : "Nothing uses this yet.");
     // "Every game" is only true when the full list of games is known: without
     // the desktop host this page only knows the ones that do use it.
-    if(!unused.length)return el("div",{class:"blank-games"},...used.map(id=>gameCard(id,true)),
-      all.length?el("span",{class:"blank-games-note"},"Every game."):null);
-    return el("div",{class:"blank-games"},...used.map(id=>gameCard(id,true)),...unused.map(id=>gameCard(id,false)));
+    if(!unused.length)return LexeditorUI.actionRow(...used.map(id=>gameCard(id,true)),
+      all.length?LexeditorUI.detailNote("Every game."):null);
+    return LexeditorUI.actionRow(...used.map(id=>gameCard(id,true)),...unused.map(id=>gameCard(id,false)));
   }
   function componentRows(level){
     const entries=(window.LexeditorComponentCatalog?.entries||[]).filter(entry=>entry.level===level);
@@ -326,12 +322,11 @@
     // holds the component raw, so its own spacing and edges are what you see.
     const glyph=/icon$|^infoIcon$|Mark$/.test(row.id);
     const wide=["organism","template"].includes(row.level)&&!glyph;
-    const sample=el("section",{class:`blank-sample-pane${glyph?" glyph":""}${wide?" wide":""}`},
-      row.hasSample
+    const sample=LexeditorUI.componentSample(row.hasSample
         ? row.sample()
-        : el("p",{class:"blank-sample-missing"},row.level==="utility"
+        : LexeditorUI.detailNote(row.level==="utility"
           ? "Nothing to draw: this one is code a page calls, not a control."
-          : "No sample yet. Add one in ui/component-catalog.js."));
+          : "No sample yet. Add one in ui/component-catalog.js."),{glyph,wide});
     return panelLayout([panel,sample],"blank-component-split",
       {orientation:"vertical",layoutKey:`blank-sample-${row.level}`,defaultSizes:[58,42],stackAt:700});
   }

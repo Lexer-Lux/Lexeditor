@@ -87,6 +87,10 @@ def settle(page, ms=700):
 
 SUBTABS = "#main .lex-subtab-bar:not([hidden]) > .lex-subtab-button"
 
+# Views a plugin keeps off its tab bar, opened by name with its navigate().
+# Blank's demonstration pages are the live samples for the heavier components.
+EXTRA_VIEWS = {"blank": ["one", "two", "three", "subtabs", "tweaks", "graphs"]}
+
 
 def visible_subtab_count(page, depth: int) -> int:
     """How many subtab buttons the depth-th visible subtab bar holds."""
@@ -153,10 +157,18 @@ def capture(page, out: Path, name: str) -> None:
 
 def shoot_plugin(browser, api, plugin_id: str, out: Path) -> list[str]:
     notes = []
-    try:
-        opened = api.open_plugin(plugin_id)
-    except Exception as error:  # noqa: BLE001 - a plugin that cannot open is a result
-        return [f"{plugin_id}: cannot open ({error})".replace("\n", " ")[:300]]
+    # A game is refused while the host is still checking its files; that check
+    # starts with the host, so wait for it rather than report it.
+    deadline = time.time() + 600
+    while True:
+        try:
+            opened = api.open_plugin(plugin_id)
+            break
+        except Exception as error:  # noqa: BLE001 - a plugin that cannot open is a result
+            if "check" in str(error).lower() and time.time() < deadline:
+                time.sleep(2)
+                continue
+            return [f"{plugin_id}: cannot open ({error})".replace("\n", " ")[:300]]
     page = browser.new_page(viewport=SIZE)
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
@@ -196,6 +208,14 @@ def shoot_plugin(browser, api, plugin_id: str, out: Path) -> list[str]:
                 # Leave the tab as it was found for the next one.
                 page.locator(f'nav button[data-tab="{tab}"]').first.click(timeout=5000)
                 settle(page, 400)
+        for view in EXTRA_VIEWS.get(plugin_id, []):
+            page.evaluate(f"navigate('{view}')")
+            settle(page, 1200)
+            select_first_row(page)
+            capture(page, out, f"{plugin_id}-view-{view}")
+            for path in subtab_paths(page):
+                if open_subtabs(page, path):
+                    capture(page, out, f"{plugin_id}-view-{view}-sub{'-'.join(map(str, path))}")
     except Exception as error:  # noqa: BLE001
         notes.append(f"{plugin_id}: {error}".replace("\n", " ")[:300])
     finally:

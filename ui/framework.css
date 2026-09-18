@@ -2326,9 +2326,11 @@ body[data-lex-github-open="true"] > :not(.lex-shell-header):not(.lex-github-work
 .lex-panel-layout-pane {
   min-width: 0;
   min-height: 0;
-  /* A pane is as tall as its content unless the page fills its height,
-     as FF8's three GF panels do. */
-  align-self: var(--lex-panel-pane-align, start);
+  /* A pane fills the layout's height, so side-by-side panels end at the
+     same line above the pager. Hugging the content by default made every
+     game restate height:100% on its own panels. A page whose panes should
+     hug their content says so with this token. */
+  align-self: var(--lex-panel-pane-align, stretch);
 }
 
 .lex-paged-list-detail {
@@ -4026,6 +4028,52 @@ body:has(.lex-data-map-table) #main {
 
 /* ---- Action rows ----------------------------------------------------- */
 .lex-action-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
+
+/* An action row standing directly in a section sits in from its edges, the way
+   the section's property rows do. */
+.lex-detail-section-content > .lex-action-row { padding:10px; }
+
+/* ---- Paged panes and graph grids --------------------------------------- */
+.lex-paged-pane { display:grid; grid-template-rows:minmax(0,1fr) auto; min-height:0; gap:var(--lex-panel-gap); }
+.lex-curve-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(min(100%, var(--lex-curve-min-width, 600px)), 1fr));
+  align-content:start;
+  gap:16px;
+  height:100%;
+  overflow:auto;
+}
+
+/* ---- Game cards -------------------------------------------------------- */
+.lex-game-card { display:grid; width:64px; gap:3px; justify-items:center; font-size:10px; line-height:1.2; text-align:center; }
+.lex-game-card.faded { opacity:.45; filter:grayscale(80%); }
+.lex-game-card-cover { width:64px; aspect-ratio:2/3; border:1px solid var(--lex-border); object-fit:cover; }
+.lex-game-card-initial {
+  display:grid;
+  place-items:center;
+  background:var(--lex-panel-2);
+  color:var(--lex-muted);
+  font:800 22px/1 var(--lex-heading-font, var(--lex-font));
+}
+.lex-game-card-name { overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow-wrap:anywhere; }
+
+/* ---- Component catalogue sample --------------------------------------- */
+/* A sample is shown at the size the component really is; only the wide ones
+   - lists, panels, pages - take the width of the pane. transform makes the
+   pane the containing block for anything the sample fixes in place. */
+.lex-component-sample {
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+  overflow:auto;
+  padding:12px;
+  border:1px solid var(--lex-border);
+  background:var(--lex-panel);
+  transform:translate(0);
+}
+.lex-component-sample.glyph { align-items:flex-start; }
+.lex-component-sample.wide > * { width:100%; }
+.lex-component-sample > svg { width:28px; height:28px; }
 
 /* ---- Notices -------------------------------------------------------- */
 .lex-notice {

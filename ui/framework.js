@@ -1188,6 +1188,31 @@
   // Buttons that act on the thing above them, in one wrapping row.
   const actionRow = (...children) => element("div", {class: "lex-action-row"}, ...children);
 
+  // A table that is its own pane, with its pager under it.
+  const pagedPane = (content, pagerNode) => element("div", {class: "lex-paged-pane"}, content, pagerNode);
+
+  // Graphs side by side, as many to a row as fit at a readable width.
+  const curveGrid = (...cards) => element("div", {class: "lex-curve-grid"}, ...cards);
+
+  // A game as the home screen shows it: its cover, or its initial when there
+  // is no cover, over its name. A faded card is a game that is not involved.
+  const gameCard = (options = {}) => {
+    const name = String(options.name || "");
+    return element("span", {
+      class: ["lex-game-card", options.faded ? "faded" : ""].filter(Boolean).join(" "),
+      title: options.title || name,
+    }, options.cover
+      ? element("img", {class: "lex-game-card-cover", src: options.cover, alt: ""})
+      : element("span", {class: "lex-game-card-cover lex-game-card-initial", "aria-hidden": "true"}, name.slice(0, 1).toUpperCase()),
+    element("span", {class: "lex-game-card-name"}, name));
+  };
+
+  // The component catalogue's frame for one live sample: the component at the
+  // size it really is, or across the pane when it is a page-wide one.
+  const componentSample = (content, options = {}) => element("section", {
+    class: ["lex-component-sample", options.glyph ? "glyph" : "", options.wide ? "wide" : ""].filter(Boolean).join(" "),
+  }, content);
+
   const detailNote = (text, options = {}) => element("p", {
     class: ["lex-detail-note", options.className || ""].filter(Boolean).join(" "),
   }, text);
@@ -7638,7 +7663,7 @@ ${contents.path}`});
       paged)
   };
 
-  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, curveGrid, gameCard, componentSample, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 
