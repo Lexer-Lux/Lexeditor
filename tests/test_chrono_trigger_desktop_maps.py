@@ -23,7 +23,7 @@ class DesktopMapPreviewContractTests(unittest.TestCase):
     def test_desktop_module_is_attached_and_keeps_composition_limit_explicit(self):
         server = SERVER.read_text(encoding="utf-8")
         module = MAP_PREVIEWS.read_text(encoding="utf-8")
-        self.assertIn('<script src="/map_previews.js"></script>', server)
+        self.assertIn('<script src="/map_previews.js"></script>', (ROOT / 'games/chrono_trigger/editor.html').read_text(encoding='utf-8'))
         self.assertIn("/api/scene-raster", module)
         self.assertIn("/api/world-raster", module)
         self.assertIn("isolated layer only", module)

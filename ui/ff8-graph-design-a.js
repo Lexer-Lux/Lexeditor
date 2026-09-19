@@ -138,7 +138,9 @@
     } catch {
       /* A future plugin formula should remain visible even before the parser is
          taught its notation. Preserve it rather than failing the graph. */
-      return text(source);
+      const result=span("lex-curve-math-row");
+      for (const token of source.split(/\b([ABCD])\b/g)) result.append(/^[ABCD]$/.test(token) ? span(`lex-curve-variable-${token.toLowerCase()}`,text(token)) : text(token));
+      return result;
     }
   }
 
@@ -196,6 +198,16 @@
     if (width > available) {
       const base = parseFloat(getComputedStyle(label).fontSize) || 10;
       label.style.fontSize = `${Math.max(7.5, base * available / width).toFixed(2)}px`;
+    }
+    // Leave a visible gap from the curve, then keep the equation clear of both end values.
+    const endpoints=[...svg.querySelectorAll('.lex-curve-range-value')];
+    endpoints.forEach(node=>node.setAttribute('dy','-6'));
+    let lift=0;
+    for (let attempt=0;attempt<16;attempt++) {
+      const bounds=label.getBoundingClientRect();
+      const overlap=endpoints.some(node=>{const box=node.getBoundingClientRect();return bounds.left<box.right+10&&bounds.right>box.left-10&&bounds.top<box.bottom+8&&bounds.bottom>box.top-8});
+      if (!overlap) break;
+      lift+=8;label.style.top=`${center.y-plotBounds.top-lift}px`;
     }
     if (!observed.has(card)) {
       observed.add(card);

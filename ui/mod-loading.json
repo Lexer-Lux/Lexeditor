@@ -56,6 +56,11 @@
       "structure": "One selected Lexeditor project is a CTExt-compatible archive-relative overlay containing Game/... and Localize/... paths. External projects can be mirrored into <Chrono Trigger>/mods/<project-name>; a source project already directly under mods/<name> is used in place and is never deleted by Lexeditor.",
       "overriding": "CTExt owns runtime mod load order through ctext.json. Lexeditor appends or removes only its selected project entry, preserves unrelated entries, and never semantically merges separate projects; within the selected project, loose files replace the corresponding resources.bin resources while the installed archive remains immutable."
     },
+    "ff7r2": {
+      "loader": "Two loaders sit beside ff7rebirth_.exe in End/Binaries/Win64, each under a name Windows loads for the game. ReShade is dxgi.dll. Shader Injector 2.2.1 is dsound.dll, with its ShaderInjector folder, and replaces the game's own lighting, shadow, water and post-process shaders while it runs. Rebirth's own d3d12.dll, or a DirectX 12 fix installed under that name, is never overwritten.",
+      "structure": "A Rebirth project holds a reshade/ folder with the preset .ini and any shaders its author wrote. Shader Injector ships inside Lexeditor as upstream's pinned release archive and is extracted into the game folder on request; ShaderInjector.ini beside the executable holds its settings, and the ShaderInjector folder holds the shaders people edit.",
+      "overriding": "ReShade applies one preset at a time over the finished frame. Shader Injector changes shaders before that, so the two stack rather than compete. Files the player has edited in the ShaderInjector folder are kept on reinstall and removal, and a PAK mod from elsewhere is untouched."
+    },
     "ffx-x2": {
       "loader": "Fahrenheit's External File Loader. Lexeditor creates one file-only Fahrenheit mod and does not patch or rebuild the installed FFX_Data.vbf or FFX2_Data.vbf archives.",
       "structure": "The selected project mirrors Fahrenheit EFL roots under <project>/efl/x/ for FFX and <project>/efl/x2/ for FFX-2. Deploy Project copies those replacements into <game>/fahrenheit/mods/lexeditor-ffx-x2/ with a Fahrenheit manifest and one managed loadorder entry.",

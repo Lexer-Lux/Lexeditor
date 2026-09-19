@@ -26,6 +26,8 @@ triangles=[[0,1,2],[0,2,3],[4,6,5],[4,7,6],[0,4,5],[0,5,1],[3,2,6],[3,6,7],[1,5,
 MODEL={'cacheKey':'a'*64,'mesh':'fixture_sword','material':'fixture_steel','resource':'fixture.brf','texture':'/fixture-texture.png','summary':{'vertices':8,'triangles':12},'geometry':{'positions':positions,'normals':[[0,-1,0]]*8,'texCoords':[[0,0],[1,0],[1,1],[0,1]]*2,'triangles':triangles,'bounds':{'min':[-.3,-.15,-1],'max':[.3,.15,1]}}}
 TROOPS=[{'id':id,'name':name,'faction':faction,'level':level,'flags':'tf_guarantee_armor','line':i+1,'status':'active','plural':name+'s'} for i,(id,name,faction,level) in enumerate([
     ('recruit','Recruit','fac_north',1),('footman','Footman','fac_north',10),('archer','Archer','fac_north',10),('knight','Knight','fac_north',20),('guard','Guard','fac_north',20),('militia','Militia','fac_north',2),('elite_militia','Elite militia','fac_north',12),('horseman','Horseman','fac_south',10),('rider','Rider','fac_south',20)])]
+for row in TROOPS:
+    row.update(fields={'name':row['name'],'plural':row['plural'],'faction':row['faction'],'attributes':'0','flags':'0','inventory':'[]'},stats={},flagValue=None)
 UPGRADES=[{'fromId':a,'toId':b} for a,b in [('recruit','footman'),('recruit','archer'),('footman','knight'),('footman','guard'),('militia','elite_militia'),('horseman','rider')]]
 def fixture_item(i,mesh='fixture_sword'):
     item_id=f'fixture_{i:03}';name=f'Fixture sword {i:03}'
@@ -51,15 +53,16 @@ def main():
                 for width,height in [(1200,800),(900,620),(1600,1000)]:
                     page=browser.new_page(viewport={'width':width,'height':height});page.on('pageerror',lambda e:errors.append(str(e)))
                     # In-memory fixtures avoid browser policies that disallow loopback HTTP.
-                    fixtures={'/api/items':{'rows':ITEMS},'/api/troops':{'rows':TROOPS},'/api/upgrades':{'rows':UPGRADES},'/api/modules':{'modules':[]},'/api/warband-font':{'available':False},'/api/dashboard':{'paths':{},'problems':[]},'/api/settings':{'rows':server.settings_rows()},'/api/datamap':server.data_map_rows()}
+                    fixtures={'/api/items':{'rows':ITEMS},'/api/troops':{'rows':TROOPS,'items':[],'factions':[]},'/api/upgrades':{'rows':UPGRADES},'/api/modules':{'modules':[]},'/api/warband-font':{'available':False},'/api/dashboard':{'paths':{},'problems':[]},'/api/settings':{'rows':server.settings_rows()},'/api/datamap':server.data_map_rows()}
                     model={**MODEL,'texture':'data:image/png;base64,'+base64.b64encode(TEXTURE).decode()}
                     stub='const replaceState=history.replaceState.bind(history);history.replaceState=(state,unused)=>replaceState(state,unused);window.fetch=async function(input){const path=String(input);const fixtures='+json.dumps(fixtures)+';if(path.startsWith("/api/item-preview?")){return new Response(JSON.stringify(path.includes("broken")?{error:"Missing diffuse texture fixture"}:'+json.dumps(model)+'),{status:path.includes("broken")?422:200});}if(path.startsWith("/api/item-icon?")){if(path.includes("broken"))return new Response(JSON.stringify({error:"Missing diffuse texture fixture"}),{status:422});const bytes=Uint8Array.from(atob("'+base64.b64encode(ICON).decode()+'"),c=>c.charCodeAt(0));return new Response(bytes,{headers:{"Content-Type":"image/png"}});}return new Response(JSON.stringify(fixtures[path]||{}));};'
-                    html=(ROOT/'games/warband/editor.html').read_text()
+                    html=(ROOT/'games/warband/editor.html').read_text(encoding="utf-8")
                     # Synthetic set_content pages need a hierarchical base for shared optional asset URLs.
                     html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
-                    html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text()+'</style>')
-                    html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text()+'</script>')
-                    html=html.replace('<script src="/warband/troop_trees.js"></script>','<script>'+(ROOT/'games/warband/troop_trees.js').read_text()+'</script>')
+                    html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding="utf-8")+'</style>')
+                    html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding="utf-8")+'</script>')
+                    html=html.replace('<script src="/warband/troop_trees.js"></script>','<script>'+(ROOT/'games/warband/troop_trees.js').read_text(encoding="utf-8")+'</script>')
+                    html=html.replace('<script src="/warband/troop_editor.js"></script>','<script>'+(ROOT/'games/warband/troop_editor.js').read_text(encoding="utf-8")+'</script>')
                     page.set_content(html,wait_until='domcontentloaded');page.wait_for_function('!state.booting')
                     page.wait_for_function('document.querySelector(".warband-item-thumbnail img")?.naturalWidth>0')
                     assert page.locator('.warband-item-detail [data-lex-property="id"] input').count()==1

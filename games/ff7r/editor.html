@@ -67,8 +67,8 @@
   const propertyColumnKey=prop=>`p:${prop.name}`;
   function propertyCellValue(row,prop){
     const value=row.values?.[prop.name];
-    if(Array.isArray(value))return value.length?value.join(", "):"—";
-    return value===undefined||value===null||value===""?"—":value;
+    if(Array.isArray(value))return value.length?value.map(item=>resolvedText(item)||item).join(", "):"—";
+    return value===undefined||value===null||value===""?"—":resolvedText(value)||value;
   }
   function dataTableColumns(){
     return [...dataColumns,...(state.data?.properties||[]).map(prop=>({
@@ -76,7 +76,7 @@
       width:"minmax(7em,1fr)",
       numeric:!prop.array&&["INT","FLOAT"].includes(semanticType(prop)),
       render:row=>propertyCellValue(row,prop),
-      sortValue:row=>{const value=row.values?.[prop.name];return Array.isArray(value)?value.length:value}}))];
+      sortValue:row=>propertyCellValue(row,prop)}))];
   }
   function dataPreferences(){
     const asset=state.data?.asset||state.asset||"none";
@@ -311,7 +311,8 @@
   // per field map - eight of them - so taking the first match showed one
   // enemy and silently hid the rest.
   const curatedAssets=spec=>assets().filter(item=>
-    String(item.asset||"").split("/").pop().toLowerCase().replace(/\.uasset$/,"")===spec.basename);
+    String(item.asset||"").split("/").pop().toLowerCase().replace(/\.uasset$/,"")===spec.basename)
+    .sort((a,b)=>Number(/\/Resident\//i.test(b.asset))-Number(/\/Resident\//i.test(a.asset)));
   const curatedAsset=spec=>curatedAssets(spec)[0]||null;
   const SEMANTIC_TYPES={CanSale:"BOOL"};
   // The storage type is a signed 32-bit integer, so the schema's honest range is
@@ -522,13 +523,11 @@
     const rows=records().map(record=>{
       const row={record,id:record.id,tag:record.tag};
       for(const prop of properties){
-        const value=record.values[prop.name];
-        row[propertyColumnKey(prop)]=Array.isArray(value)
-          ?(value.length?value.join(", "):"—"):value;
+        row[propertyColumnKey(prop)]=propertyCellValue(record,prop);
       }
       return row;
     });
-    const filtered=q?rows.filter(row=>`${row.id} ${row.tag}`.toLocaleLowerCase().includes(q)):rows;
+    const filtered=q?rows.filter(row=>`${Object.values(row).filter(value=>typeof value!=="object").join(" ")} ${flattenStrings(row.record.values).join(" ")}`.toLocaleLowerCase().includes(q)):rows;
     const key=state.curatedSort.key,dir=state.curatedSort.dir;
     return filtered.sort((a,b)=>compareValues(a[key],b[key])*dir);
   }
@@ -546,7 +545,7 @@
       label:`${spec.label} tables`,
       active:state.data?.asset||siblings[0].asset,
       tabs:siblings.map(item=>({id:item.asset,
-        label:String(item.asset).split("/").slice(-2,-1)[0]||String(item.asset).split("/").pop()})),
+        label:/\/Resident\//i.test(item.asset)?"General":String(item.asset).split("/").slice(-2,-1)[0]||String(item.asset).split("/").pop()})),
       change:value=>{state.curatedAsset=value;state.selected=null;state.pages[spec.id]=0;
         state.asset=value;loadAsset(value).then(()=>render());},
     }):null;
@@ -696,7 +695,7 @@
   function lootRecordPanel(row=selectedRecord()){
     if(!row)return loadingPanel("Enemy loot","No BattleItemPossession rows were found.");const sections=[detailSection({title:"BATTLE",help:infoHelp("These drops live in the game's BattleItemPossession table, one row per battle. The Data ID is that row's key."),body:[detailField({label:"DATA ID",control:readonlyField(row.tag),pin:lootPrefs.pinButton("tag","Enemy / Battle ID")})]})];
     const labels={normal:"NORMAL DROPS",rare:"RARE DROPS",steal:"STEAL"};for(const spec of state.loot?.groups||[]){const itemProp=property(spec.itemProperty),items=itemProp?(row.values[itemProp.name]||[]):[];const body=items.length?items.map((_item,index)=>detailField({label:`SLOT ${index+1}`,control:lootSlotControl(row,spec,index),help:spec.percentProperty?infoHelp("Chance is the installed raw percent field, constrained by this semantic editor to 0–100."):null})): [detailNote("This drop array is empty on this record, so there are no slots to edit.")];sections.push(detailSection({title:labels[spec.kind]||spec.kind.toUpperCase(),body}))}
-    return detailPanel({className:"ff7r-detail",title:row.tag||`Battle ${row.id}`,identity:recordId(row.id),body:sections});
+    return detailPanel({className:"ff7r-detail",title:row.tag||"Battle",body:sections});
   }
   function lootPanel(){if(state.busy&&state.tab==="loot")return loadingPanel("Loading enemy loot","Discovering BattleItemPossession and validated drop arrays…");if(state.lootError)return errorPanel(state.lootError);if(state.loot&&!state.loot.available)return loadingPanel("Enemy loot unavailable",state.loot.reason||"BattleItemPossession was not found or did not contain recognized drop/steal arrays.");if(!state.loot)return loadingPanel("Enemy loot","Open this tab to discover the installed FF7R loot table.");if(state.data?.asset!==state.loot.asset)return loadingPanel("Loading enemy loot","Reading BattleItemPossession…");return el("div",{class:"ff7r-view"},pagedTable({id:"loot",noun:"enemies",
       modOnly:modOnlySpec(row=>row.record),

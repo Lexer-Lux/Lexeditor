@@ -36,6 +36,21 @@
         "name": "Lexend Project authors",
         "role": "Bundled Lexend interface font.",
         "url": "https://github.com/googlefonts/lexend"
+      },
+      {
+        "name": "crosire / ReShade",
+        "role": "The post-processing loader Lexeditor bundles, pinned to 6.8.0, and installs per game.",
+        "url": "https://github.com/crosire/reshade"
+      },
+      {
+        "name": "4lex4nder and Frans Bouma / ReshadeEffectShaderToggler",
+        "role": "The add-on Lexeditor installs beside ReShade to run effects before a game draws its HUD.",
+        "url": "https://github.com/4lex4nder/ReshadeEffectShaderToggler"
+      },
+      {
+        "name": "AMD / FidelityFX CAS",
+        "role": "The Contrast Adaptive Sharpening algorithm Lexeditor's Sharpen effect implements.",
+        "url": "https://github.com/GPUOpen-Effects/FidelityFX-CAS"
       }
     ],
     "licenses": [
@@ -46,6 +61,14 @@
       {
         "name": "Lexend — source notice",
         "sourcePath": "ui/assets/fonts/SOURCE.md"
+      },
+      {
+        "name": "ReShade — BSD 3-Clause License",
+        "sourcePath": "tools/reshade/6.8.0/LICENSE.md"
+      },
+      {
+        "name": "ReshadeEffectShaderToggler — MIT License",
+        "sourcePath": "tools/reshade/addons/REST-1.3.23.633/LICENSE.txt"
       }
     ]
   },
@@ -128,6 +151,27 @@
         {
           "name": "FF7R references and tools — source/license notices",
           "sourcePath": "games/ff7r/THIRD_PARTY.md"
+        }
+      ]
+    },
+    "ff7r2": {
+      "contributions": [
+        {
+          "name": "David Matos (frostbone25) / Shader Injector",
+          "role": "The D3D12 shader-replacement mod Lexeditor bundles for Rebirth, pinned to the 2.2.1 Maximum quality release.",
+          "url": "https://github.com/frostbone25/ShaderInjector"
+        },
+        {
+          "name": "Microsoft / DirectX Shader Compiler",
+          "role": "dxc, dxcompiler and dxil, shipped inside the Shader Injector release to recompile its shaders.",
+          "url": "https://github.com/microsoft/DirectXShaderCompiler"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Shader Injector — MIT License",
+          "sourcePath": "games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt"
         }
       ]
     },

@@ -49,6 +49,15 @@ for bad in (0, 256, True, 1.5, "many"):
         raise AssertionError(f"invalid Max Spell value accepted: {bad!r}")
 
 patch = max_spell.build_hext(True, 255)
+for cap in (1, 10, 100, 255):
+    candidate = max_spell.build_hext(True, cap)
+    for address in (0x004A48DD, 0x004A4910):
+        assert not re.search(rf'(?m)^{address:X}\s*=', candidate), 'Max Spell changed an XP level limit'
+with EXE.open('rb') as stream:
+    stream.seek(0x004A48DB - 0x400000)
+    assert stream.read(3) == bytes.fromhex('80 F9 64')
+    stream.seek(0x004A4909 - 0x400000)
+    assert stream.read(8) == bytes.fromhex('80 BC 2E 72 02 00 00 64')
 assert emitted(patch, max_spell.LIMIT_VALUE) == b"\xff"
 for address, _original in max_spell.STOCK_LIMIT_SITES:
     assert emitted(patch, address) == b"\xff"

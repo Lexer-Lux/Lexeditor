@@ -98,6 +98,10 @@ def main() -> None:
                     route.fulfill(status=200, content_type="application/json", body=json.dumps(DASHBOARD))
                 elif path == "/api/scenes":
                     route.fulfill(status=200, content_type="application/json", body=json.dumps(SCENES))
+                elif path == "/api/deployment":
+                    route.fulfill(status=200, content_type="application/json", body=json.dumps({"ctext": {}, "audit": {"issues": []}}))
+                elif path == "/api/changes":
+                    route.fulfill(status=200, content_type="application/json", body=json.dumps({"rows": []}))
                 elif path == "/api/events":
                     body = EVENT_DETAIL if "id=" in route.request.url else EVENT_LIST
                     route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
@@ -112,8 +116,8 @@ def main() -> None:
             page.route(f"{ORIGIN}/**", handle)
             page.goto(ORIGIN + "/", wait_until="domcontentloaded")
             page.wait_for_function('state.scenes.data?.rows?.length === 1')
-            page.evaluate('navigate("events")')
-            page.wait_for_function('state.events.detail?.id === 20')
+            page.evaluate('navigate("info")')
+            page.wait_for_function('state.tab === "info" && !state.busy')
 
             panel = page.locator(".ct-event-audit")
             assert panel.count() == 1
@@ -161,7 +165,7 @@ def main() -> None:
             page.screenshot(path=str(ARTIFACTS / "event-audit-mine.png"), full_page=True)
 
             page.evaluate('selectSource("vanilla")')
-            page.wait_for_function('state.source === "vanilla" && state.events.detail?.id === 20')
+            page.wait_for_function('state.source === "vanilla" && !state.busy')
             stale_text = panel.inner_text()
             assert "Run coverage audit" in stale_text
             assert "Download audit JSON" not in stale_text

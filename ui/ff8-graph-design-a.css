@@ -61,3 +61,30 @@
   paint-order:normal;
   filter:drop-shadow(1px 1px 1px #252525);
 }
+
+/* Keep each graph and its controls within one visible card. */
+.ff8-character-curve.ff8-character-curve {
+  border:1px solid var(--lex-border)!important;
+  box-sizing:border-box;padding:30px 6px 6px!important;
+}
+.ff8-character-curve .lex-curve-heading {
+  top:5px;left:6px;right:6px;bottom:auto;width:auto;height:22px;
+  margin:0;padding:0;overflow:visible;clip-path:none;white-space:normal;
+}
+.ff8-character-curve .lex-curve-heading h4 {
+  opacity:1!important;transform:none!important;margin:0;
+}
+.ff8-character-curve .lex-curve-heading-formula,
+.ff8-character-curve .lex-curve-heading-extrema {display:none!important}
+.ff8-character-curve .lex-curve-variables.lex-curve-variable-strip {
+  top:30px;left:6px;right:6px;bottom:auto;width:auto;max-width:none;
+  transform:translateY(-6px);opacity:0;pointer-events:none;
+}
+.ff8-character-curve:is(:hover,:focus-within) .lex-curve-variables.lex-curve-variable-strip {
+  transform:translateY(0);opacity:1;pointer-events:auto;
+}
+
+.ff8-character-curve .lex-curve-heading h4,
+.ff8-character-curve .lex-curve-heading .lex-curve-heading-title {
+  font-size:18px!important;line-height:22px!important;letter-spacing:.04em;
+}

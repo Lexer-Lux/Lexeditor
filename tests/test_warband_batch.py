@@ -234,7 +234,9 @@ class HostControllerTests(unittest.TestCase):
         import threading
         host=HostApi.__new__(HostApi)
         controller=SimpleNamespace(status=lambda:{'running':True,'pid':11},launch=lambda root,project:{'running':True,'module':project.name},stop=lambda:{'running':False})
-        host._plugins={'warband':SimpleNamespace(game_process_factory=lambda:controller),'other':SimpleNamespace(process_names=())}
+        # The stub stands in for a GamePlugin, so it carries the optional fields
+        # the host reads. mod_adapter is one of them and defaults to None.
+        host._plugins={'warband':SimpleNamespace(game_process_factory=lambda:controller,mod_adapter=None),'other':SimpleNamespace(process_names=(),mod_adapter=None)}
         host._lock=threading.RLock();host._game_processes={}
         host._projects=SimpleNamespace(snapshot=lambda key:{'current':str(Path.cwd()/'selected-mod')})
         with patch.object(host,'_game_executable',return_value=(Path.cwd(),Path.cwd()/'game.exe')):

@@ -7,6 +7,7 @@ import os
 import socket
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -84,11 +85,28 @@ class LocalPluginSession:
             creationflags=creation_flags,
             start_new_session=os.name != "nt",
         )
+        # Nothing else reads the service's output. Left unread, the pipe fills
+        # and the service blocks on its next write - a traceback or a warning -
+        # and every request after that hangs. Keep the tail for error messages.
+        self.output_tail = []
+        process = self.process
+
+        def drain() -> None:
+            try:
+                for line in process.stdout:
+                    self.output_tail.append(line.rstrip())
+                    del self.output_tail[:-200]
+            except (OSError, ValueError):
+                pass
+
+        threading.Thread(target=drain, name=f"{self.plugin_id}-service-output", daemon=True).start()
         deadline = time.monotonic() + 15.0
         last_error = "service did not answer"
         while time.monotonic() < deadline:
             if self.process.poll() is not None:
-                output = self.process.communicate()[0].strip()
+                self.process.wait()
+                time.sleep(0.1)
+                output = "\n".join(self.output_tail).strip()
                 raise RuntimeError(output or f"{self.plugin_id} service exited with {self.process.returncode}")
             try:
                 identity = request_json(self.url + "api/plugin")

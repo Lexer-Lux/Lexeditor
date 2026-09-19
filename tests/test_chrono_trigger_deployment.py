@@ -6,6 +6,7 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from games.chrono_trigger.data import OverlayStore
 from games.chrono_trigger.deployment import deploy_audited_project, deployment_status
@@ -61,6 +62,15 @@ def _fixture(root: Path) -> tuple[OverlayStore, Path]:
 
 
 class DeploymentOrchestrationTests(unittest.TestCase):
+    def test_quick_status_does_not_scan_or_claim_an_audit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store, game = _fixture(Path(tmp))
+            with patch("games.chrono_trigger.deployment.audit_project", side_effect=AssertionError("unexpected scan")):
+                result = deployment_status(store, game, run_audit=False)
+            self.assertIsNone(result["audit"])
+            self.assertTrue(result["ctext"]["installed"])
+            self.assertFalse((game / "mods").exists())
+
     def test_status_combines_ctext_and_audit_without_mutating(self):
         with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-deployment-") as temp_name:
             store, game = _fixture(Path(temp_name))

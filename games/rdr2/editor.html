@@ -44,6 +44,16 @@
   input:not([type="checkbox"]):not([type="radio"]), select, textarea { line-height:1.35; }
   header { position:sticky; top:0; z-index:100; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px 18px; padding:10px 18px;
             background: #171512; border-bottom: 3px solid var(--accent); }
+  /* Separate the command bar, section tabs and page without changing controls. */
+  .lex-shell-header { background:var(--lex-bg, var(--bg)); }
+  .lex-shell-command-row {
+    background:color-mix(in srgb,var(--lex-panel-2, var(--panel2)) 90%,var(--lex-text, var(--text)));
+    border-bottom:1px solid var(--lex-border, var(--border));
+  }
+  .lex-nav-frame {
+    background:var(--lex-panel-2, var(--panel2));
+    border-bottom:1px solid var(--lex-border, var(--border));
+  }
   header h1 { font:400 31px/1 var(--rdr-font-display); margin:0; color:#f0e8da; letter-spacing:.02em; }
   h2 { font-family:var(--rdr-font-display); font-weight:400; }
   header .path { color:var(--dim); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
@@ -2844,6 +2854,7 @@ async function showLexeditorSettings(){
     };
     const save=LexeditorUI.settingsSaveControl({
       dirtyCount:()=>Number(size.value)!==savedCacheSize?1:0,
+      pendingChanges:()=>Number(size.value)===savedCacheSize?[]:[{label:"Model preview cache size (MB)",before:savedCacheSize,after:Number(size.value)}],
       save:async()=>{status.textContent="Saving settings…";const next=await api("/api/model-preview/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cacheSizeMb:Number(size.value)})});update(next);savedCacheSize=Number(next.cacheSizeMb);status.textContent="Cache settings saved.";},
       discard:()=>{size.value=String(savedCacheSize);status.textContent="Restored the last saved cache setting.";}
     });
@@ -4038,11 +4049,21 @@ function itemTagsCell(it){
         const input=el("input",{type:"number",min:"0",max:"1",step:"any",value:runtime===undefined?"":fmtCompactNumber(runtime),placeholder:"Unavailable",
           class:it.key in state.alcoholEdits?"edited":"",disabled:!available,
           title:available?"Actual drunkenness added when consumed. 1.0 causes immediate blackout. This runtime value is separate from Rockstar's coarse drink-class tag.":(state.alcohol.reason||"No verified per-drink strength is available for this item."),
+          // Recorded as it is typed, not only on blur. Chromium withholds the
+          // change event here - the number box is rebuilt around the reader
+          // between keystrokes - so an edit made by typing was silently lost
+          // and Save stayed grey. Blur still does the correcting.
+          oninput:event=>{
+            const value=event.target.valueAsNumber;
+            if(!Number.isFinite(value)||value<0||value>1)return;
+            state.alcoholEdits[it.key]=value;renderToolbarOnly();},
           onchange:event=>{
             const value=event.target.valueAsNumber;
             if(!Number.isFinite(value)||value<0||value>1){
+              delete state.alcoholEdits[it.key];
               event.target.value=runtime===undefined?"":fmtCompactNumber(runtime);
-              toast("Drunkenness must be a number from 0 to 1.",true);return;
+              toast("Drunkenness must be a number from 0 to 1.",true);
+              renderToolbarOnly();return;
             }
             state.alcoholEdits[it.key]=value;renderToolbarOnly();}});
         wrap.append(el("label",{class:"alcohol-strength"},"Drunkenness",input,
@@ -4487,9 +4508,7 @@ async function renderSettings(){
   // verify_rdr2_tweaks_shared_save exists to prevent.
   const m=$("#main");m.querySelector(".settings-layout")?.__settingsColumnsObserver?.disconnect();m.innerHTML="";
   if(!state.settings.available){m.append(el("div",{class:"loading"},"GameplayTweaks.ini is not installed for this editor profile. Catalog, loot, crafting, and other data editing remain available."));installTabContext();return;}
-  const layout=el("div",{class:"settings-layout"});
-  m.append(layout);
-  arrangeSettingsCategories(layout,buildSettingsCategories().filter(category=>category.subs.length));
+  m.append(LexeditorUI.settingsColumns(buildSettingsCategories().filter(category=>category.subs.length).map(renderSettingCategory)));
   installTabContext();
 }
 

@@ -102,9 +102,9 @@ def main() -> int:
     ordered = source.stable_ability_order([
         learned, available_a, learned_b, available_b,
     ])
-    # Category first, so FF8's own groups survive; unfinished before completed
-    # inside each group; alphabetical by ability name inside each of those.
-    assert ordered == [available_a, learned, available_b, learned_b], ordered
+    # Completion is global: an unfinished later-category ability must precede
+    # a completed earlier-category ability, as in the reported Learn screen.
+    assert ordered == [available_a, available_b, learned, learned_b], ordered
     ranks = source.ability_rank_table()
     same_group = [
         bytes((identifier, 0, source.ABILITY_AVAILABLE, 1, 0, 0, 0, 0))

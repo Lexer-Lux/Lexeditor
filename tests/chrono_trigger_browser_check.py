@@ -155,11 +155,11 @@ def _editor_html() -> str:
         '<script src="/shared/framework.js"></script>',
         "<script>" + (ROOT / "ui/framework.js").read_text(encoding="utf-8") + "</script>",
     )
-    modules = (
-        "<script>" + (ROOT / "games/chrono_trigger/event_editor.js").read_text(encoding="utf-8") + "</script>"
-        "<script>" + (ROOT / "games/chrono_trigger/map_previews.js").read_text(encoding="utf-8") + "</script>"
-    )
-    return html.replace("</body>", modules + "</body>", 1)
+    for name in ("event_editor.js", "map_previews.js", "ui-integration.js"):
+        html = html.replace(f'<script src="/{name}"></script>',
+                            "<script>" + (ROOT / "games/chrono_trigger" / name).read_text(encoding="utf-8") + "</script>")
+    return html
+
 
 
 def main() -> None:

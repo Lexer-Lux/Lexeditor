@@ -15,28 +15,27 @@
     }
     *{box-sizing:border-box} body{margin:0;color:var(--lex-text);background:linear-gradient(#eadcb8,#d9c28f);font:14px/1.45 var(--lex-font);overflow-x:hidden}
     .lex-shell-header{color:#f4dfb1;background:#4b1717;border-bottom-color:#a66b24}
-    .lex-brand-button{color:#f4dfb1}
-    .lex-shell-header .lex-nav-button:hover{background:#6b2424}.lex-shell-header .lex-nav-button.active{color:white;background:#a63c32}
+    
     .lex-shell-header :is(.lex-history-button,.lex-save-icon,.lex-game-process){color:#f4dfb1;border-color:#8c4a35;background:#6b2424}
     #toolbar{display:flex;align-items:center;gap:9px;min-height:52px;padding:8px 16px;border-bottom:1px solid var(--lex-border);background:#d8c38f;box-shadow:0 2px 8px #5a3b1a22}#toolbar input,#toolbar select,#toolbar button{padding:7px 9px;color:var(--lex-text);border:1px solid var(--lex-border);border-radius:4px;background:#fff5d8}#toolbar input{min-width:280px}#toolbar .count{margin-left:auto;color:var(--lex-muted)}
     main{padding:var(--lex-panel-gap);min-height:calc(100vh - 112px)}
-    body:has(:is(.warband-paged-table,.warband-trees)){display:flex;height:100vh;min-height:0;flex-direction:column;overflow:hidden}body:has(:is(.warband-paged-table,.warband-trees))>#lexeditor-shell,body:has(:is(.warband-paged-table,.warband-trees))>#toolbar{flex:0 0 auto}body:has(:is(.warband-paged-table,.warband-trees))>main{flex:1 1 auto;height:auto;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}.lex-master-detail{height:calc(100vh - 150px)}.lex-master-detail:is(.warband-paged-table,.warband-trees){height:100%}.lex-list,.lex-detail{background:#f7edcf;box-shadow:inset 0 0 0 1px #fff7de}.lex-list-row{padding:9px 11px}.lex-list-row .sub{color:var(--lex-muted);font-size:11px}.lex-list-row.selected{color:#6b1717;background:#e4c98d}
-    .warband-record-list{--lex-fitted-row-height:36px}.lex-column-list-header{background:#d1b879}.lex-column-list-row{height:var(--lex-fitted-row-height,auto);padding:0}.lex-column-list-cell{padding:7px 10px;border-bottom:1px solid #c8ae78}.warband-record-list .lex-column-list-cell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lex-column-list-row:hover{background:#f0dba8}
+    body:has(:is(.warband-paged-table,.warband-trees)){display:flex;height:100vh;min-height:0;flex-direction:column;overflow:hidden}body:has(:is(.warband-paged-table,.warband-trees))>#lexeditor-shell,body:has(:is(.warband-paged-table,.warband-trees))>#toolbar{flex:0 0 auto}body:has(:is(.warband-paged-table,.warband-trees))>main{flex:1 1 auto;height:auto;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}.lex-master-detail{height:calc(100vh - 150px)}.lex-master-detail:is(.warband-paged-table,.warband-trees){height:100%}.lex-list,.lex-detail{background:#f7edcf;box-shadow:inset 0 0 0 1px #fff7de}.lex-list-row:not(.lex-column-list-row){padding:9px 11px}.lex-list-row .sub{color:var(--lex-muted);font-size:11px}.lex-list-row.selected{color:#6b1717;background:#e4c98d}
+    .warband-record-list{--lex-fitted-row-height:36px}.lex-column-list-header{background:#d1b879}.lex-column-list-cell{border-bottom:1px solid #c8ae78}.warband-record-list .lex-column-list-cell{overflow:hidden;white-space:nowrap}.lex-column-list-row:hover{background:#f0dba8}
     .detail{padding:18px}.detail h2{margin:0 0 12px;font:700 22px var(--lex-heading-font);color:#651919}.detail-grid{display:grid;grid-template-columns:170px 1fr;gap:8px 14px}.detail-grid .label{color:var(--lex-muted);font-weight:700}.detail input,.detail textarea{width:100%;padding:8px;color:var(--lex-text);border:1px solid var(--lex-border);border-radius:4px;background:#fffaf0}.detail textarea{min-height:55vh;resize:none;font:13px/1.45 "Cascadia Mono",Consolas,monospace}.manual-page{margin-bottom:24px}.manual-page h3{margin:0 0 8px;color:#651919;font:700 18px var(--lex-heading-font)}.manual-page p{white-space:pre-wrap}
     .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}.card{padding:16px;border:1px solid var(--lex-border);border-radius:5px;background:#f5e9c9}.card h2{margin:0 0 12px;color:#651919;font:700 20px var(--lex-heading-font)}.path-row{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid #d9c69b}.path-row code{overflow:hidden;text-overflow:ellipsis}.ok{color:#45631e}.error{color:#9d2424}
     .build-log{max-height:42vh;overflow:auto;padding:12px;color:#d8dee9;border:1px solid #444;background:#101216;font:13px/1.4 "Cascadia Mono",Consolas,monospace;white-space:pre-wrap}
     .warband-bitmap-text{display:inline-flex;align-items:flex-start;vertical-align:middle;white-space:nowrap}.warband-glyph-slot{position:relative;display:inline-block;flex:none;height:var(--wb-line-height)}.warband-glyph{position:absolute;display:block;background-color:currentColor;-webkit-mask-image:url('/api/warband-font/atlas');mask-image:url('/api/warband-font/atlas');-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
-    .warband-item-detail{--lex-detail-icon-size:96px;display:flex;flex-direction:column;min-width:0;min-height:0;padding:14px;border:1px solid var(--lex-border);background:#f7edcf}.warband-item-detail>.lex-detail-panel-heading{padding:4px 10px 5px;border-bottom:1px solid #c8ae78}.warband-item-detail .lex-detail-panel-title{color:#651919;font:700 24px/1.1 var(--lex-heading-font)}.warband-item-detail .lex-detail-panel-id{margin-top:4px;color:var(--lex-muted);font:11px Consolas,monospace}.warband-item-detail .lex-detail-panel-icon{width:auto;height:100%;max-height:100%;aspect-ratio:1;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-item-thumbnail{position:relative;width:100%;height:100%;overflow:hidden}.warband-item-thumbnail canvas{display:block;width:100%;height:100%;pointer-events:none}.warband-item-thumbnail .warband-preview-message{padding:8px}.warband-mesh-list{padding:9px 2px;color:var(--lex-muted)}.warband-mesh-list b{color:#651919}.warband-item-detail .lex-detail-panel-body{overflow:auto}.warband-item-expression{min-height:72px!important;resize:vertical!important;font:12px/1.35 "Cascadia Mono",Consolas,monospace!important}.warband-preview-stage{position:relative;flex:1 1 auto;min-height:320px;overflow:hidden;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-preview-stage canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}.warband-preview-stage canvas.dragging{cursor:grabbing}.warband-preview-message{position:absolute;inset:0;display:grid;place-items:center;padding:28px;color:#ead8ac;text-align:center}.warband-preview-facts{display:flex;gap:16px;padding:8px 2px 0;color:var(--lex-muted);font:11px Consolas,monospace}.warband-preview-spin{width:22px;height:22px;border:3px solid #d5b46955;border-top-color:#d5b469;border-radius:50%;animation:warband-spin .7s linear infinite}@keyframes warband-spin{to{transform:rotate(360deg)}}
+    .warband-item-detail{--lex-detail-icon-size:96px;display:flex;flex-direction:column;min-width:0;min-height:0;padding:14px;border:1px solid var(--lex-border);background:#f7edcf}.warband-item-detail>.lex-detail-panel-heading{padding:4px 10px 5px;border-bottom:1px solid #c8ae78}.warband-item-detail .lex-detail-panel-title{color:#651919;font:700 24px/1.1 var(--lex-heading-font)}.warband-item-detail .lex-detail-panel-id{margin-top:4px;color:var(--lex-muted);font:11px Consolas,monospace}.warband-item-detail .lex-detail-panel-icon{border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-item-thumbnail{position:relative;width:100%;height:100%;overflow:hidden}.warband-item-thumbnail canvas{display:block;width:100%;height:100%;pointer-events:none}.warband-item-thumbnail .warband-preview-message{padding:8px}.warband-mesh-list{padding:9px 2px;color:var(--lex-muted)}.warband-mesh-list b{color:#651919}.warband-item-expression{min-height:72px!important;resize:vertical!important;font:12px/1.35 "Cascadia Mono",Consolas,monospace!important}.warband-preview-stage{position:relative;flex:1 1 auto;min-height:320px;overflow:hidden;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-preview-stage canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}.warband-preview-stage canvas.dragging{cursor:grabbing}.warband-preview-message{position:absolute;inset:0;display:grid;place-items:center;padding:28px;color:#ead8ac;text-align:center}.warband-preview-facts{display:flex;gap:16px;padding:8px 2px 0;color:var(--lex-muted);font:11px Consolas,monospace}.warband-preview-spin{width:22px;height:22px;border:3px solid #d5b46955;border-top-color:#d5b469;border-radius:50%;animation:warband-spin .7s linear infinite}@keyframes warband-spin{to{transform:rotate(360deg)}}
     .warband-cell-text{min-width:0;max-width:100%;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     [hidden]{display:none!important}.warband-item-thumbnail img{width:100%;height:100%;object-fit:contain;display:block}.warband-icon-message{padding:8px;color:var(--lex-text);background:var(--lex-panel);font-size:11px}
-    .warband-trees{align-items:stretch;grid-template-rows:minmax(0,1fr)}.warband-tree-page{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;height:100%}.warband-troop-gear{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:8px}.warband-troop-gear figure{margin:0;display:grid;gap:5px}.warband-troop-gear .warband-preview-stage{min-height:150px}.warband-troop-gear figcaption{color:var(--lex-muted);font-size:12px;text-align:center}.warband-trees>.lex-panel-layout-pane{align-self:stretch;height:100%;min-height:0}
+    .warband-trees{align-items:stretch;grid-template-rows:minmax(0,1fr)}.warband-tree-page{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;height:100%}.warband-troop-gear{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:8px}.warband-troop-gear figure{margin:0;display:grid;gap:5px}.warband-troop-gear .warband-preview-stage{min-height:150px}.warband-troop-gear figcaption{color:var(--lex-muted);font-size:12px;text-align:center}.warband-trees>.lex-panel-layout-pane{align-self:stretch}
     .warband-tree-scroll{overflow:auto;min-width:0;min-height:0;background:var(--lex-panel)}
     .warband-tree-scroll>p{padding:0 12px}.warband-tree-stage{position:relative;margin:auto;min-width:100%}
     .warband-tree-stage svg{position:absolute;inset:0;pointer-events:none}.warband-tree-stage path{fill:none;stroke:var(--lex-accent);stroke-width:2}
     .warband-tree-node{position:absolute;width:170px;height:56px;display:flex;flex-direction:column;justify-content:center;border:1px solid var(--lex-border);border-radius:4px;background:var(--lex-panel);color:var(--lex-text);cursor:pointer}
     .warband-tree-node strong,.warband-tree-node small{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .warband-tree-node[aria-pressed=true]{background:var(--lex-accent);color:var(--lex-accent-text)}.warband-tree-node:focus-visible{outline:3px solid var(--lex-highlight);outline-offset:2px}
-    .warband-tree-node.missing{border-style:dashed}.warband-tree-detail{overflow:auto;min-width:0}.warband-tree-detail>.lex-detail-panel{height:100%}.warband-tree-detail .lex-detail-panel-heading{padding:4px 10px}.warband-tree-detail .lex-detail-panel-id{font:12px/1.3 Consolas,monospace;color:var(--lex-muted)}.warband-tree-detail .lex-detail-panel-title{margin:0}.warband-tree-detail .detail-grid{grid-template-columns:80px minmax(0,1fr);overflow-wrap:anywhere}
+    .warband-tree-node.missing{border-style:dashed}.warband-tree-detail{overflow:auto;min-width:0}.warband-tree-detail>.lex-detail-panel{height:100%}.warband-tree-detail .lex-detail-panel-heading{padding:4px 10px}.warband-tree-detail .lex-detail-panel-id{font:12px/1.3 Consolas,monospace;color:var(--lex-muted)}.warband-tree-detail .detail-grid{grid-template-columns:80px minmax(0,1fr);overflow-wrap:anywhere}
   </style>
 </head>
 <body>
@@ -52,7 +51,7 @@
   const state={
     booting:true,modOnly:false,tab:"items",dashboard:null,settings:null,troops:null,items:null,upgrades:null,modules:null,datamap:null,activeSource:"mine",
     manual:null,font:null,selectedModule:"",selectedSetting:"",selectedItem:"",selectedTroop:"",selectedUpgrade:"",selectedFile:"",catalogFile:null,catalogDraft:"",
-    settingEdits:{},itemEdits:{},filters:{items:"",troops:"",cut:false,upgrades:"",settings:"",datamap:"",mapStatus:""},
+    settingEdits:{},itemEdits:{},troopEdits:{},filters:{items:"",troops:"",cut:false,upgrades:"",settings:"",datamap:"",mapStatus:""},
     pages:{items:0,troops:0,upgrades:0,datamap:0},pageSizes:{items:20,troops:20,upgrades:20},sorts:{items:["name",1],troops:["name",1],upgrades:["from",1],datamap:["filename",1]},
     build:{cursor:0,lines:[],running:false,returnCode:null},status:"Ready"
   };
@@ -69,9 +68,9 @@
       change:value=>{state.modOnly=value;state.pages[view]=0;render()}};
   }
   function itemDirtyCount(){return Object.values(state.itemEdits).reduce((total,row)=>total+Object.keys(row.fields||{}).length,0);}
-  function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+itemDirtyCount()+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
-  function historyCapture(){return {settingEdits:clone(state.settingEdits),itemEdits:clone(state.itemEdits),catalogDraft:state.catalogDraft,selectedFile:state.selectedFile,catalogFile:clone(state.catalogFile)};}
-  async function historyRestore(snapshot){state.settingEdits=clone(snapshot.settingEdits);state.itemEdits=clone(snapshot.itemEdits||{});state.catalogDraft=snapshot.catalogDraft;state.selectedFile=snapshot.selectedFile;state.catalogFile=clone(snapshot.catalogFile);}
+  function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+itemDirtyCount()+Object.values(state.troopEdits).reduce((n,r)=>n+Object.keys(r.fields).length,0)+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
+  function historyCapture(){return {troopEdits:clone(state.troopEdits),settingEdits:clone(state.settingEdits),itemEdits:clone(state.itemEdits),catalogDraft:state.catalogDraft,selectedFile:state.selectedFile,catalogFile:clone(state.catalogFile)};}
+  async function historyRestore(snapshot){state.troopEdits=clone(snapshot.troopEdits||{});state.settingEdits=clone(snapshot.settingEdits);state.itemEdits=clone(snapshot.itemEdits||{});state.catalogDraft=snapshot.catalogDraft;state.selectedFile=snapshot.selectedFile;state.catalogFile=clone(snapshot.catalogFile);}
   function effectiveSetting(row){return state.settingEdits[row.line]??row.value;}
   function setStatus(text){state.status=text;const target=$("#plugin-status");if(target)target.textContent=text;}
   function bitmapText(text,pixels){
@@ -101,7 +100,7 @@
     $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec(view,options.changed),rows:filtered,key:keyOf,slots:false,fit:{minRowHeight:36},page:state.pages[view],pageSize:state.pageSizes[view],selected,noun:view,splitKey:`warband-${view}`,className:"warband-paged-table",defaultSplit:58,
       search:{key:`warband-${view}`,value:query,placeholder:`Search ${view}…`,change:value=>{state.filters[view]=value;state.pages[view]=0;render();}},filters:options.filters||[],
       master:({rows,selected,select})=>columnList({rows,key:keyOf,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts[view][0],dir:state.sorts[view][1]},sort:key=>sort(view,key),selected,selectedClass:"selected",select,class:"warband-record-list", "aria-label":`${view} records`}),
-      detail,sync:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");},change:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");render();}}));
+      detail:options.detail||detail,sync:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");},change:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");render();}}));
   }
 
   function openTroop(troopId){
@@ -244,7 +243,7 @@
   function renderTroops(){
     const base=state.filters.cut?state.troops.rows.filter(row=>row.status==="CUT"):state.troops.rows;
     const cutFilter=el("label",{class:"lex-bottom-filter"},el("input",{type:"checkbox",checked:state.filters.cut,onchange:event=>{state.filters.cut=event.target.checked;state.pages.troops=0;render();}})," Cut only");
-    renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name"},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{key:troop=>troop.id,selected:()=>state.selectedTroop,setSelected:value=>{state.selectedTroop=value;},filters:[cutFilter]});
+    renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name"},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{key:troop=>troop.id,selected:()=>state.selectedTroop,setSelected:value=>{state.selectedTroop=value;},filters:[cutFilter],detail:troopEditorPanel});
   }
   function troopTreeDetail(node){
     if(!node)return detailPanel({title:"Select a troop"});
@@ -276,9 +275,8 @@
           el("figure",{},warbandPreviewStage(item),el("figcaption",{},item.name||item.id)))),
       }:null,
       body:node.missing?[el("p",{class:"error"},"This upgrade refers to a troop missing from the parsed active source.")]:[
-        el("div",{class:"detail-grid"},...["plural","level","faction","flags","status","line"].flatMap(key=>[
-          el("div",{class:"label"},key),el("div",{},String(node[key]??"—"))])),
-        el("p",{},"Troop records live in module_troops.py; open it in the Data Map to change one.")]});
+        ...troopFields(record)
+      ]});
   }
   function renderUpgrades(){
     const all=WarbandTroopTrees.build(state.troops.rows,state.upgrades.rows);
@@ -336,15 +334,17 @@
   }
   function discardSettings(){state.settingEdits={};setStatus("Restored the last saved settings");renderSettings();shell.refresh()}
   function renderSettings(){
-    const rows=settingRows(),selected=rows.find(row=>String(row.line)===state.selectedSetting)||rows[0];if(selected)state.selectedSetting=String(selected.line);
+    const rows=settingRows();
+    state.settingsPage=Math.min(state.settingsPage||0,Math.max(0,Math.ceil(rows.length/40)-1));
+    const pageRows=rows.slice(state.settingsPage*40,(state.settingsPage+1)*40),selected=rows.find(row=>String(row.line)===state.selectedSetting)||rows[0];if(selected)state.selectedSetting=String(selected.line);
     // No plugin Save button in the bar: the shell's own Save owns every
     // unsaved change in the editor, and a second one beside it asks the reader
     // which of the two they meant.
     $("#toolbar").replaceChildren();
-    const master=list({rows,key:row=>String(row.line),selected:state.selectedSetting,select:selectSetting,render:row=>el("div",{},el("b",{},row.key),el("div",{class:"sub"},row.section))});
+    const master=list({rows:pageRows,key:row=>String(row.line),selected:state.selectedSetting,select:selectSetting,render:row=>el("div",{},el("b",{},row.key),el("div",{class:"sub"},row.section))});
     const detail=el("div",{class:"lex-detail detail"},selected?el("div",{},el("h2",{},selected.key),el("div",{class:"detail-grid"},el("div",{class:"label"},"Section"),el("div",{},selected.section),el("div",{class:"label"},"Value"),el("input",{value:effectiveSetting(selected),oninput:event=>{if(event.target.value===selected.value)delete state.settingEdits[selected.line];else state.settingEdits[selected.line]=event.target.value;shell.refresh();}}),el("div",{class:"label"},"Description"),el("div",{},selected.description||"No description."))):"No matching setting.");
     const layout=masterDetail(master,detail,"",{splitKey:"warband-settings",defaultSplit:38});
-    const bottom=pager({page:0,pages:1,total:rows.length,pageSize:Math.max(1,rows.length),noun:"settings",search:{key:"warband-settings",value:state.filters.settings,placeholder:"Search settings…",change:value=>{state.filters.settings=value;renderSettings();}}});
+    const bottom=pager({page:state.settingsPage,pages:Math.ceil(rows.length/40),total:rows.length,pageSize:40,change:value=>{state.settingsPage=value;renderSettings();},noun:"settings",search:{key:"warband-settings",value:state.filters.settings,placeholder:"Search settings…",change:value=>{state.filters.settings=value;state.settingsPage=0;renderSettings();}}});
     $("#main").replaceChildren(layout,bottom);
   }
 
@@ -414,6 +414,13 @@
       const itemSourceDirty=state.catalogFile?.filename==="module_items.py"&&state.catalogFile.editable&&state.catalogDraft!==state.catalogFile.text;
       if(itemDirtyCount()&&itemSourceDirty)throw new Error("Items has structured edits while module_items.py also has unsaved source edits. Save or discard one editing path before using the other.");
       if(Object.keys(state.settingEdits).length){const edits=Object.entries(state.settingEdits).map(([line,value])=>({line:+line,value}));const result=await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.settings=await api("/api/settings");state.settingEdits={};setStatus(`Saved ${result.saved} settings`);}
+      const troopEdits=Object.values(state.troopEdits).filter(row=>Object.keys(row.fields).length);
+      if(troopEdits.length){
+        if(state.catalogFile?.filename==="module_troops.py"&&state.catalogDraft!==state.catalogFile.text)throw new Error("Save or discard the troop source draft first.");
+        await api("/api/troops/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sha256:state.troops.sha256,edits:troopEdits})});
+        state.troops=await api("/api/troops");state.troopEdits={};
+        if(state.catalogFile?.filename==="module_troops.py"){state.catalogFile=await api("/api/catalog/file?name=module_troops.py");state.catalogDraft=state.catalogFile.text;}
+      }
       if(itemDirtyCount()){
         const selectedRecord=state.items.rows.find(row=>row.id===state.selectedItem)?.recordIndex,edits=Object.values(state.itemEdits);
         const result=await api("/api/items/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.items=await api("/api/items");state.itemEdits={};
@@ -432,6 +439,7 @@
   function renderVanilla(){$("#toolbar").replaceChildren();$("#main").replaceChildren(el("section",{class:"card"},el("h2",{},"Vanilla"),el("p",{},"The installed Native module is read-only. Its generated text files do not contain the Module System source used by this editor."),el("p",{},"Select a mod to edit Items, Troops, Troop Trees, or Tweaks.")))}
   function render(){document.querySelectorAll("nav button").forEach(button=>button.classList.toggle("active",button.dataset.tab===state.tab));if(state.booting)return;if(state.activeSource!=="mine"&&!['manuals','datamap','dashboard'].includes(state.tab))renderVanilla();else views[state.tab]();shell.refresh();}
   async function switchProjectSource(value){state.activeSource=String(value||"mine")==="vanilla"?"vanilla":"mine";shell.history?.clear();render()}
+  </script><script src="/warband/troop_editor.js"></script><script>
   const shell=LexeditorUI.mountShell({
     host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"warband",themeName:"warband",theme:{bg:"#e8d9b4",panel:"#f4e7c5","panel-2":"#dcc99a",border:"#8b6b39",text:"#2b2114",muted:"#6e5b3d",accent:"#7a2020","accent-text":"#fff5d8",highlight:"#a8661c",success:"#556b2f",font:'"Segoe UI",system-ui,sans-serif',"heading-font":"Georgia,serif"}},
     tabs:[["items","Items"],["upgrades","Troop Trees"],["troops","Troops"],["tweaks","Tweaks"]].map(([id,label])=>({id,label})),

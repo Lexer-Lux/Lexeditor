@@ -138,8 +138,16 @@ def load_events(store: OverlayStore, source: str = "mine", query: str = "",
                if not needle or needle in str(event_id).casefold() or needle in path.casefold()]
     offset = max(0, min(int(offset), len(entries)))
     limit = max(1, min(int(limit), 250))
-    rows = [load_event(store, event_id, path, source, include_objects=False)
-            for event_id, path in entries[offset:offset + limit]]
+    rows = []
+    for event_id, path in entries[offset:offset + limit]:
+        try:
+            rows.append(load_event(store, event_id, path, source, include_objects=False))
+        except (ValueError, OSError) as error:
+            # One unsupported script must not hide every other script.
+            rows.append({"id": event_id, "name": f"Field Event {event_id:04d}",
+                         "path": path, "source": source, "readOnly": True,
+                         "objectCount": None, "decodedCommandCount": None,
+                         "problem": str(error)})
     return {
         "kind": "field-events",
         "readOnly": source == "vanilla",

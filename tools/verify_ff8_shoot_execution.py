@@ -29,8 +29,8 @@ for active in (0,1,2):
     put32(u,STACK+4,0)
     put32(u,STACK+8,1)
     run(u,s.UI_OPEN_CAVE,0x4AD7E9)
-    assert read32(u,STACK+8)==(60 if active else 1)
-    assert int.from_bytes(u.mem_read(0x1D76750,2),'little')==(240 if active else 4)
+    assert read32(u,STACK+8)==(4096 if active else 1)
+    assert int.from_bytes(u.mem_read(0x1D76750,2),'little')==(16384 if active else 4)
 
 for actor in range(3):
     for shots in range(1,11):
@@ -79,3 +79,17 @@ for state in (0,1,2):
     assert u.mem_read(s.SHOOT_LOCK,1)[0]==int(state==2)
     assert u.mem_read(s.ACTIVE_STATE,1)==b'\x00'
 print('PASS: Shot UI unregister stack, cancel without lock, fired return with lock')
+
+assert pe.get_data(s.TIMER_HOOK-0x400000,7)==s.TIMER_ORIGINAL
+for active in (0,1,2):
+    for remaining in (1000,750,500,250,0):
+        u=machine();u.mem_write(s.TIMER_CAVE,s._timer_payload())
+        u.mem_write(s.ACTIVE_STATE,bytes((active,)));u.mem_write(s.SHOT_ACTOR,b"\x01")
+        put32(u,s.PARTICIPANT_BASE+s.PARTICIPANT_STRIDE+0x10,1000)
+        put32(u,s.PARTICIPANT_BASE+s.PARTICIPANT_STRIDE+0x14,remaining)
+        u.mem_write(0x1D76752,(16384).to_bytes(2,"little"))
+        for frame in range(30):
+            run(u,s.TIMER_CAVE,0x4AD92B if active else s.TIMER_HOOK+7)
+            actual=int.from_bytes(u.mem_read(0x1D76752,2),"little")
+            assert actual==(max(1,remaining*16384//1000) if active else 16383-frame)
+print("PASS: fixed Shoot bar follows ATB without frame drain; Limit Break still counts down")

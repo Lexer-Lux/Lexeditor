@@ -12,6 +12,8 @@ from runtime_bootstrap import user_data_dir
 from service_session import LocalPluginSession, request_json
 
 from .tooling import REPAK_TAG, helper_install, helper_status
+from .mod_support import PakModAdapter
+from managed_mods import ManagedModSpec
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -19,7 +21,7 @@ PLUGIN_ROOT = Path(__file__).resolve().parent
 USER_ROOT = user_data_dir()
 # Lexer's FF7R mod lives outside Lexeditor's own data, beside the other
 # per-game mod repositories, so the mod can be worked on without Lexeditor.
-DEFAULT_PROJECT = Path(r"C:/FF7RMod")
+DEFAULT_PROJECT = Path(r"C:/FF7R-1Mod")
 DISPLAY_NAME = "FINAL FANTASY VII REMAKE INTERGRADE"
 
 
@@ -232,8 +234,12 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
+    mod_adapter=PakModAdapter(),
+    managed_mod=ManagedModSpec("Lexer-Lux/Lexers-Mod-For-FF7R-1", "Lexers-Mod-FF7R-1.zip"),
     plugin_id="ff7r",
     name=DISPLAY_NAME,
+    # Remake runs through Steam; Lexeditor only stops a copy that is running.
+    can_launch=False,
     subtitle="FF7 Remake",
     description="Edit FF7 Remake gameplay DataObjects and localized text, then build project overlays as mod PAKs.",
     accent="#1d6fb8",
@@ -250,6 +256,7 @@ PLUGIN = GamePlugin(
         root_env="LEXEDITOR_FF7R_PROJECT",
         default_root=DEFAULT_PROJECT,
         required_paths=(),
+        required_any=(("mod.json",), ("content",)),
         template_root=PLUGIN_ROOT / "_no_project_template",
         content_types=(
             ("DataObject tables", (".uasset", ".uexp")),
@@ -272,6 +279,9 @@ PLUGIN = GamePlugin(
             Path(r"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VII REMAKE"),
             Path(r"C:\Program Files\Epic Games\FFVIIRemakeIntergrade"),
         ),
+        # ReShade loads from beside the renderer, not the installation root.
+        reshade_root="End/Binaries/Win64",
+        reshade_renderer="dxgi",
         launch_path="End/Binaries/Win64/ff7remake_.exe",
     ),
 )

@@ -40,6 +40,10 @@ QUEUE_CAVE = 0x0279F660
 POST_FIRE_CAVE = 0x0279F6C0
 FINISH_CAVE = 0x0279F7A0
 READY_CAVE = 0x0279F820
+TIMER_HOOK = 0x004AD909
+TIMER_ORIGINAL = bytes.fromhex("66 FF 0D 52 67 D7 01")
+TIMER_CAVE = 0x0279F890
+
 ACTIVE_STATE = 0x0279F880  # 0 off, 1 opened, 2 fired
 SHOOT_LOCK = 0x0279F881
 
@@ -166,12 +170,50 @@ def _ui_open_payload() -> bytes:
     code = _Code(UI_OPEN_CAVE)
     code.add(b"\x80\x3D" + ACTIVE_STATE.to_bytes(4, "little") + b"\x00")
     code.branch(bytes.fromhex("0F 84"), "vanilla")
-    # Fixed Shoot has no Limit Break crisis roll. Use the native crisis-level-1 Shot
-    # duration instead of indexing its table with an unset crisis level.
-    code.add(bytes.fromhex("0F B6 05 4C 8B CF 01 89 44 24 08"))
+    # Native setup multiplies by four. This is a bar scale, not a duration;
+    # the custom timer hook reads remaining ATB instead of counting frames.
+    code.add(bytes.fromhex("C7 44 24 08 00 10 00 00"))
     code.label("vanilla")
     _jump(code, UI_OPEN_FUNCTION)
     return code.finish()
+
+
+def _timer_payload() -> bytes:
+    code = _Code(TIMER_CAVE)
+    code.add(bytes.fromhex("9C"))
+    code.add(b"\x80\x3D" + ACTIVE_STATE.to_bytes(4,"little") + b"\x00")
+    code.branch(bytes.fromhex("0F 84"), "vanilla")
+    code.add(bytes.fromhex("60"))
+    code.add(b"\x0F\xB6\x0D" + SHOT_ACTOR.to_bytes(4,"little"))
+    code.add(bytes.fromhex("83 F9 02"))
+    code.branch(bytes.fromhex("0F 87"), "done")
+    code.add(bytes.fromhex("69 C9 D0 00 00 00"))
+    code.add(b"\x8B\x81" + (PARTICIPANT_BASE+0x14).to_bytes(4,"little"))
+    code.add(b"\x8B\x89" + (PARTICIPANT_BASE+0x10).to_bytes(4,"little"))
+    code.add(bytes.fromhex("85 C9"))
+    code.branch(bytes.fromhex("0F 84"), "done")
+    code.add(bytes.fromhex("3B C1"))
+    code.branch(bytes.fromhex("0F 86"), "scale")
+    code.add(bytes.fromhex("8B C1"))
+    code.label("scale")
+    code.add(bytes.fromhex("BA 00 40 00 00 F7 E2 F7 F1"))
+    # Native close request requires a positive timer; retain one scale unit
+    # at zero ATB until that same tick consumes the post-fire close request.
+    code.add(bytes.fromhex("85 C0"))
+    code.branch(bytes.fromhex("0F 85"), "store_bar")
+    code.add(bytes.fromhex("40"))
+    code.label("store_bar")
+    code.add(bytes.fromhex("66 A3 52 67 D7 01"))
+    code.label("done")
+    code.add(bytes.fromhex("61 9D"))
+    _jump(code, 0x004AD92B)
+    code.label("vanilla")
+    code.add(bytes.fromhex("9D"))
+    code.add(TIMER_ORIGINAL)
+    _jump(code, TIMER_HOOK+len(TIMER_ORIGINAL))
+    result=code.finish()
+    assert len(result)<=0x70  # next fixed-command reservation starts at F900
+    return result
 
 
 def _finish_payload() -> bytes:
@@ -229,6 +271,7 @@ def build_component() -> str:
         (FINISH_CAVE, _finish_payload()),
         (READY_CAVE, _ready_payload()),
         (UI_OPEN_CAVE, _ui_open_payload()),
+        (TIMER_CAVE, _timer_payload()),
     )
     lines = ["# Irvine fixed Shoot: confirmed queue, ATB cost, same-turn return and next-ready lock."]
     for address, payload in caves:
@@ -239,6 +282,7 @@ def build_component() -> str:
                        (POST_FIRE_HOOK, POST_FIRE_CAVE),
                        (SHOT_UI_UNREGISTER_CALL, FINISH_CAVE), (READY_HOOK, READY_CAVE)):
         lines.append(f"{hook:X} = {_near(hook, cave).hex(' ').upper()}")
+    lines.append(f"{TIMER_HOOK:X} = {(_near(TIMER_HOOK,TIMER_CAVE)+bytes.fromhex('90 90')).hex(' ').upper()}")
     for hook in QUEUE_CALLS:
         lines.append(f"{hook:X} = {_near(hook, QUEUE_CAVE, bytes((0xE8,))).hex(' ').upper()}")
     lines.append(f"{UI_OPEN_CALL:X} = {_near(UI_OPEN_CALL, UI_OPEN_CAVE, bytes((0xE8,))).hex(' ').upper()}")

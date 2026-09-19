@@ -148,7 +148,16 @@ void __cdecl update_battle_camera() {
 
     auto position = read_vec(kBattleIdlePosition);
     const auto look_at = read_vec(kBattleIdleLookAt);
-    if (!lexeditor_battle_camera::orbit(position, look_at, right_stick_x, right_stick_y)) return;
+    // The reader's own turn rate, and this scene's floor. orbit() clamps the
+    // rate to a usable range, so a nonsense value in the config cannot make the
+    // camera unusable, and it re-learns the floor from FF8's own pose whenever
+    // the stick is centred - which is also what makes a new battle start from
+    // that battle's floor rather than the last one's.
+    static lexeditor_battle_camera::Floor camera_floor;
+    if (!lexeditor_battle_camera::orbit(
+            position, look_at, right_stick_x, right_stick_y, 0.035f, 0.025f,
+            static_cast<float>(ff8_modern_controls_camera_speed),
+            &camera_floor)) return;
 
     // Native has already handed ownership back to the idle/default pose. Move
     // both copies together so the current frame and the next native idle copy

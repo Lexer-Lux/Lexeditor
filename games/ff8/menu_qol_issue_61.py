@@ -162,15 +162,14 @@ def build_auto_sort_magic_hext(enabled: bool) -> str:
 def stable_ability_order(records: list[bytes]) -> list[bytes]:
     """Model the order the code cave produces, for tests and explanations.
 
-    Category first so FF8's own groups survive, then unfinished before
-    completed, then alphabetically by ability name inside each block.
+    Unfinished first across the entire list, then category and name.
     """
     if any(len(record) != ABILITY_RECORD_SIZE for record in records):
         raise ValueError("Every GF ability record must be eight bytes")
     ranks = ability_rank_table()
     return sorted(records, key=lambda record: (
-        record[ABILITY_CATEGORY_OFFSET],
         record[ABILITY_STATE_OFFSET] == ABILITY_COMPLETE,
+        record[ABILITY_CATEGORY_OFFSET],
         ranks[record[ABILITY_ID_OFFSET]],
     ))
 
@@ -197,12 +196,12 @@ def ability_rank_table() -> bytes:
 def build_enhanced_ability_order_code_cave(
     code_cave: int = ENHANCED_ABILITY_ALPHA_CAVE,
 ) -> bytes:
-    """Group the native records by category, then order each group by name.
+    """Put all unfinished records first, then order by category and name.
 
     The native builder emits records in ability-id order. Sorting on the key
-    (category, completed, alphabetical rank) keeps FF8's own grouping and its
-    unfinished-before-completed split, and only settles the order within each
-    of those blocks. Whole eight-byte records move, so the cursor, AP values
+    (completed, category, alphabetical rank) puts every completed ability last.
+    Categories and names order each completion block. Whole eight-byte records
+    move, so the cursor, AP values
     and learning target stay attached to their ability.
     """
     code = bytearray()
@@ -259,13 +258,13 @@ def build_enhanced_ability_order_code_cave(
     source = code_cave + len(code)
     code.extend(relative_branch(bytes((0xE9,)), source, ABILITY_LIST_RETURN))
 
-    # key(EDI) -> EAX = (category << 16) | (completed << 15) | alphabetical rank
+    # key(EDI) -> EAX = (completed << 16) | (category << 8) | alphabetical rank
     label("key")
     code.extend(bytes((0x0F, 0xB6, 0x47, ABILITY_CATEGORY_OFFSET)))
-    code.extend(bytes.fromhex("C1 E0 10"))                 # shl eax,16
+    code.extend(bytes.fromhex("C1 E0 08"))                 # shl eax,8
     code.extend(bytes((0x0F, 0xB6, 0x57, ABILITY_STATE_OFFSET)))
     code.extend(bytes.fromhex("4A"))                       # dec edx (1 -> 0, 2 -> 1)
-    code.extend(bytes.fromhex("C1 E2 0F"))                 # shl edx,15
+    code.extend(bytes.fromhex("C1 E2 10"))                 # shl edx,16
     code.extend(bytes.fromhex("0B C2"))                    # or eax,edx
     code.extend(bytes((0x0F, 0xB6, 0x57, ABILITY_ID_OFFSET)))
     rank_fixup = len(code) + 2
@@ -302,9 +301,9 @@ def build_enhanced_ability_order_hext() -> str:
         b"\xE9", ABILITY_LIST_RETURN_HOOK, ENHANCED_ABILITY_ALPHA_CAVE,
     )
     return "\n".join((
-        "# Enhanced Ability Menu ordering: FF8's own category groups are kept,",
-        "# unfinished entries stay ahead of completed ones, and each of those",
-        "# blocks is ordered alphabetically by ability name.",
+        "# Enhanced Ability Menu ordering: all unfinished entries come first.",
+        "# Completed entries come last across the entire list. Each completion",
+        "# block is ordered by category, then alphabetically by ability name.",
         f"{ENHANCED_ABILITY_ALPHA_CAVE:X}:{len(payload):X}",
         f"{ABILITY_LIST_RETURN_HOOK:X} = {hook.hex(' ').upper()}",
         f"{ENHANCED_ABILITY_ALPHA_CAVE:X} = {payload.hex(' ').upper()}",
