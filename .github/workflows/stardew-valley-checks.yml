@@ -55,3 +55,66 @@ jobs:
           node --check /tmp/stardew-editor.js
       - name: Managed plugin smoke path
         run: python -c "from games.stardew_valley.plugin import smoke; print(*smoke(), sep='\n')"
+
+  acceptance-candidate:
+    name: Windows installed-acceptance candidate
+    needs: plugin-regressions
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Stage exact branch candidate
+        shell: pwsh
+        run: |
+          $candidate = Join-Path $env:RUNNER_TEMP 'Lexeditor-Stardew-Valley-PR465'
+          $archive = Join-Path $env:RUNNER_TEMP 'lexeditor-source.zip'
+          New-Item -ItemType Directory -Force -Path $candidate | Out-Null
+          git archive --format=zip HEAD -o $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath $candidate -Force
+          @'
+          @echo off
+          cd /d "%~dp0"
+          call Lexeditor.cmd --game stardew-valley
+          '@ | Set-Content -LiteralPath (Join-Path $candidate 'START-STARDEW-PR465.cmd') -Encoding ascii
+          @"
+          Stardew Valley PR #465 installed-acceptance candidate
+          Branch: stardew-valley-plugin
+          Commit: $env:GITHUB_SHA
+          Install root required by the existing Lexeditor installer: C:\Lexeditor
+          Start: START-STARDEW-PR465.cmd
+          Test instructions: games\stardew_valley\ACCEPTANCE.md
+          This candidate has not passed real-game acceptance merely because CI packaged it.
+          "@ | Set-Content -LiteralPath (Join-Path $candidate 'STARDEW-PR465-CANDIDATE.txt') -Encoding utf8
+      - name: Verify staged candidate
+        shell: pwsh
+        run: |
+          $candidate = Join-Path $env:RUNNER_TEMP 'Lexeditor-Stardew-Valley-PR465'
+          foreach ($required in @(
+            'Lexeditor.cmd',
+            'install.ps1',
+            'requirements.txt',
+            'games\stardew_valley\plugin.py',
+            'games\stardew_valley\ACCEPTANCE.md',
+            'START-STARDEW-PR465.cmd',
+            'STARDEW-PR465-CANDIDATE.txt'
+          )) {
+            if (-not (Test-Path -LiteralPath (Join-Path $candidate $required))) {
+              throw "Candidate is missing required file: $required"
+            }
+          }
+          Push-Location $candidate
+          try {
+            python -c "from games.stardew_valley.plugin import smoke; print(*smoke(), sep='\n')"
+          } finally {
+            Pop-Location
+          }
+      - name: Upload installed-acceptance candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lexeditor-Stardew-Valley-PR465-${{ github.sha }}
+          path: ${{ runner.temp }}/Lexeditor-Stardew-Valley-PR465
+          if-no-files-found: error
+          retention-days: 30
