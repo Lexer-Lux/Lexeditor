@@ -1,7 +1,7 @@
 name: Bannerlord checks
 on:
   push:
-    branches: [master]
+    branches: [master, feature/bannerlord-plugin]
     paths:
       - 'games/bannerlord/**'
       - 'ui/framework.*'
