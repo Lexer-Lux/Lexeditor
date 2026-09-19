@@ -36,6 +36,8 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertIn('help:()=>navigate("datamap")', text)
         self.assertIn('info:()=>navigate("info")', text)
         self.assertIn("renderDatamap", text)
+        self.assertIn("LexeditorUI.dataMap({", text)
+        self.assertIn("open:row=>navigate(row.target)", text)
         self.assertIn("renderInfo", text)
         self.assertNotIn('data-tab="datamap"', text)
         self.assertNotIn('data-tab="deployment"', text)
