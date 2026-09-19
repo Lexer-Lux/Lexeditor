@@ -5,12 +5,33 @@ param(
 
     [string]$OutputPath = (Join-Path $PSScriptRoot "install-verification.json"),
 
-    [string]$BaselinePath = ""
+    [string]$BaselinePath = "",
+
+    [string]$VerifierPath = ""
 )
 
 $ErrorActionPreference = "Stop"
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
 $resolvedGameRoot = (Resolve-Path -LiteralPath $GameRoot).Path
+
+$resolvedVerifier = ""
+if (-not [string]::IsNullOrWhiteSpace($VerifierPath)) {
+    $resolvedVerifier = (Resolve-Path -LiteralPath $VerifierPath).Path
+}
+else {
+    $bundledVerifier = Join-Path $PSScriptRoot "FFX-X2-Verify.exe"
+    if (Test-Path -LiteralPath $bundledVerifier -PathType Leaf) {
+        $resolvedVerifier = (Resolve-Path -LiteralPath $bundledVerifier).Path
+    }
+}
+
+$repoRoot = ""
+if ([string]::IsNullOrWhiteSpace($resolvedVerifier)) {
+    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
+    $modulePath = Join-Path $repoRoot "games\ffx_x2\verify_install.py"
+    if (-not (Test-Path -LiteralPath $modulePath -PathType Leaf)) {
+        throw "No bundled FFX-X2-Verify.exe was found and the source verifier is unavailable. Use the delivered acceptance bundle or supply -VerifierPath."
+    }
+}
 $resolvedOutput = [System.IO.Path]::GetFullPath($OutputPath)
 $outputDirectory = Split-Path -Parent $resolvedOutput
 if ($outputDirectory) {
@@ -41,15 +62,29 @@ if (-not [string]::IsNullOrWhiteSpace($BaselinePath)) {
     }
 }
 
-Push-Location $repoRoot
-try {
-    $jsonLines = & python -m games.ffx_x2.verify_install `
+if (-not [string]::IsNullOrWhiteSpace($resolvedVerifier)) {
+    $jsonLines = & $resolvedVerifier `
         --game-root $resolvedGameRoot `
         --require-fahrenheit `
         --hash-archives `
         --json
     $exitCode = $LASTEXITCODE
-    $jsonText = $jsonLines -join [Environment]::NewLine
+}
+else {
+    Push-Location $repoRoot
+    try {
+        $jsonLines = & python -m games.ffx_x2.verify_install `
+            --game-root $resolvedGameRoot `
+            --require-fahrenheit `
+            --hash-archives `
+            --json
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        Pop-Location
+    }
+}
+$jsonText = $jsonLines -join [Environment]::NewLine
 
     if ([string]::IsNullOrWhiteSpace($jsonText)) {
         throw "FFX/X-2 verifier produced no JSON output."
@@ -108,7 +143,3 @@ try {
     Write-Host "FFX/X-2 real-install verifier PASS"
     Write-Host "Acceptance JSON: $resolvedOutput"
     Write-Host "Both installed VBF hashes and Fahrenheit launch prerequisites are present."
-}
-finally {
-    Pop-Location
-}

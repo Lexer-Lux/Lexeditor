@@ -2,6 +2,20 @@
 
 This checklist covers the evidence CI cannot provide for #461 / PR #462. Keep PR #462 draft until these checks are performed against a real Steam app 359870 installation.
 
+## Delivered Windows candidate
+
+For human acceptance, use the GitHub Actions artifact named `ffx-x2-windows-candidate-<commit SHA>` from the FFX-X2 checks run for the exact PR head. The artifact is a self-contained test bundle; **a repository checkout and Python installation are not required**.
+
+After extracting it, the bundle contains:
+
+- `Lexeditor/Lexeditor.exe` — the frozen Windows application candidate;
+- `FFX-X2-Verify.exe` — the frozen read-only real-install verifier;
+- `run-verifier.ps1` — strict baseline/after comparison runner that auto-detects the bundled verifier;
+- `ACCEPTANCE.md` — this checklist;
+- `CANDIDATE.json` — exact PR/head metadata recorded by CI.
+
+Before using a candidate, confirm `CANDIDATE.json` names PR #462 and the head SHA named in the live #461 test checklist. Do not substitute a source checkout or a different build.
+
 ## Safety boundary
 
 - Do not modify either installed VBF.
@@ -12,26 +26,20 @@ This checklist covers the evidence CI cannot provide for #461 / PR #462. Keep PR
 
 ## 1. Read-only inventory verification
 
-From the Lexeditor repository root on the Windows machine with the game installed:
+From the extracted candidate bundle on the Windows machine with the game installed:
 
 ```powershell
-python -m games.ffx_x2.verify_install --game-root "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" --require-fahrenheit --hash-archives --json > ffx-x2-install-verification.json
+.\run-verifier.ps1 -GameRoot "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" -OutputPath ".\baseline.json"
 ```
 
-The recommended shortcut runs that strict command and writes the report directly into this acceptance folder:
-
-```powershell
-.\worklog\acceptance\ffx-x2\run-verifier.ps1 -GameRoot "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster"
-```
-
-Use the actual Steam library path if different. `run-verifier.ps1` writes `worklog/acceptance/ffx-x2/install-verification.json` by default and exits with an error unless the report has the expected contract and `acceptanceReady: true`. `--hash-archives` deliberately reads the complete large VBF files, so it is optional during ordinary development but required for the draft-exit baseline.
+Use the actual Steam library path if different. The candidate runner auto-detects the adjacent `FFX-X2-Verify.exe`, writes the requested JSON report, and exits with an error unless the report has the expected contract and `acceptanceReady: true`. It always includes full VBF hashing for the strict baseline. Source-tree use remains supported as a developer fallback, but it is not the delivered human-test path.
 
 For automatic before/after immutability proof, keep the baseline and current report separate:
 
 ```powershell
-.\worklog\acceptance\ffx-x2\run-verifier.ps1 -GameRoot "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" -OutputPath ".\worklog\acceptance\ffx-x2\baseline.json"
+.\run-verifier.ps1 -GameRoot "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" -OutputPath ".\baseline.json"
 
-.\worklog\acceptance\ffx-x2\run-verifier.ps1 -GameRoot "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" -BaselinePath ".\worklog\acceptance\ffx-x2\baseline.json" -OutputPath ".\worklog\acceptance\ffx-x2\after.json"
+.\run-verifier.ps1 -GameRoot "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" -BaselinePath ".\baseline.json" -OutputPath ".\after.json"
 ```
 
 The second command fails if either installed VBF's header MD5 or full SHA-256 differs from the baseline. It also refuses to use the same path for baseline and output, so the baseline cannot be overwritten accidentally.
@@ -56,7 +64,7 @@ Acceptance requirements:
 - FFX-2 dressphere `job.bin` reports `0xE4` records and sixteen ability-tree pairs per row.
 - Fahrenheit Stage 0, Stage 1, FFX.exe and FFX-2.exe all report ready.
 
-Attach or transcribe the JSON results into this acceptance folder before taking the PR out of draft. The report contains paths/hashes/record metadata, not proprietary game payload bytes.
+Keep `baseline.json` and `after.json` from the extracted candidate bundle and attach them to #461 (or report their relevant hashes/results there) before taking the PR out of draft. The reports contain paths/hashes/record metadata, not proprietary game payload bytes.
 
 ## 2. Full-catalog UI smoke
 
