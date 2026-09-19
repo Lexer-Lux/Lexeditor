@@ -13,7 +13,7 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         text = EDITOR.read_text(encoding="utf-8")
         for tab in ("animationmeshes", "items", "evolved", "crafts", "fixing", "fluids", "vehicles", "sounds", "models", "mannequins", "timedactions"):
             with self.subTest(tab=tab):
-                self.assertIn(f'data-tab="{tab}"', text)
+                self.assertIn(f'id:"{tab}"', text)
         for endpoint in ("/api/animationmeshes", "/api/items", "/api/evolvedrecipes", "/api/craftrecipes", "/api/fixings", "/api/fluids", "/api/vehicles", "/api/sounds", "/api/models", "/api/mannequins", "/api/timedactions"):
             with self.subTest(endpoint=endpoint):
                 self.assertIn(endpoint, text)
@@ -29,6 +29,16 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
             with self.subTest(renderer=renderer):
                 self.assertIn(renderer, text)
                 self.assertIn(save, text)
+
+    def test_shared_shell_owns_data_map_and_info_navigation(self):
+        text = EDITOR.read_text(encoding="utf-8")
+        self.assertIn("LexeditorUI.mountShell({", text)
+        self.assertIn('help:()=>navigate("datamap")', text)
+        self.assertIn('info:()=>navigate("info")', text)
+        self.assertIn("renderDatamap", text)
+        self.assertIn("renderInfo", text)
+        self.assertNotIn('data-tab="datamap"', text)
+        self.assertNotIn('data-tab="deployment"', text)
 
     def test_animation_mesh_ui_exposes_only_single_value_typed_fields(self):
         text = EDITOR.read_text(encoding="utf-8")
