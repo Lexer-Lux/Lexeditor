@@ -90,7 +90,7 @@ const structuredConfigs={
     numberField("ResearchSkillLevel","Research Skill Level","Skill level gate used by the recipe's research/learning behavior. Negative sentinel values are preserved.",{step:1,integer:true}),
     textField("SkillRequired","Skill Required","Semicolon-separated Skill:level requirements required to craft the recipe."),
     textField("tags","Tags","Semicolon/comma data used by Build 42 to classify this recipe. Lexeditor does not invent tags."),
-    numberField("time","Time","Base timed-action duration declared by the recipe.",{step:1,integer:true,min:0}),
+    numberField("time","Time","Base timed-action duration declared by the recipe.",{step:1,integer:true}),
     textField("timedAction","Timed Action","Names the timed-action behavior used while the recipe is performed."),
     textField("Tooltip","Tooltip Key","Localization key for the crafting tooltip."),
   ],summary:row=>[
