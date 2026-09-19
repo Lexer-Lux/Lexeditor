@@ -24,6 +24,8 @@ def _application_root() -> Path:
 
 
 ROOT = _application_root()
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 TEMPLATE_ROOT = ROOT / "games" / "terraria" / "template"
 DEFAULT_SAVE_ROOT = Path.home() / "Documents" / "My Games" / "Terraria" / "tModLoader"
 DEFAULT_INSTALL_ROOT = Path(r"C:\Program Files (x86)\Steam\steamapps\common\tModLoader")
