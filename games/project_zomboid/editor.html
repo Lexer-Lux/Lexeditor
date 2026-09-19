@@ -6,23 +6,23 @@
   <title>Lexeditor - Project Zomboid</title>
   <link rel="stylesheet" href="/shared/framework.css">
   <style>
-    *{box-sizing:border-box}:root{--lex-accent:#708057;--lex-highlight:#4f5e3f}
+    *{box-sizing:border-box}
+    :root{--lex-accent:#708057;--lex-highlight:#4f5e3f}
     body{height:100vh;margin:0;display:flex;flex-direction:column;overflow:hidden;background:var(--lex-bg);color:var(--lex-text);font:15px/1.35 var(--lex-font)}
-    .pz-status{padding:4px 14px;border-bottom:1px solid var(--lex-border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--lex-muted);background:var(--lex-panel)}
-    main{flex:1;min-height:0;padding:12px;overflow:auto}.panel{max-width:1200px;margin:0 auto;border:1px solid var(--lex-border);background:var(--lex-panel)}
-    .panel>h2{margin:0;padding:12px 14px;border-bottom:1px solid var(--lex-border);font-size:1rem}.content{padding:14px}.grid{display:grid;grid-template-columns:repeat(2,minmax(260px,1fr));gap:12px 18px}.field{display:grid;gap:5px}.field label{font-size:.78rem;font-weight:700;letter-spacing:.04em;color:var(--lex-muted)}input,select,textarea{width:100%;padding:8px;border:1px solid var(--lex-border);background:var(--lex-bg);color:inherit;font:inherit}textarea{min-height:90px;resize:vertical}.actions{display:flex;gap:8px;align-items:center;margin-top:14px}.actions button{padding:8px 13px;border:0;background:var(--lex-accent);color:white;cursor:pointer}.actions button.secondary{background:var(--lex-bg);color:inherit;border:1px solid var(--lex-border)}button:disabled{opacity:.45;cursor:default}
-    .pz-record-layout{height:100%;min-height:0}.pz-shared-actions{display:flex;align-items:center;gap:8px}.pz-shared-actions button{padding:7px 12px}.empty{padding:30px;color:var(--lex-muted);text-align:center}.notice{margin-bottom:12px;padding:10px;border:1px solid var(--lex-border);background:var(--lex-bg);color:var(--lex-muted)}table{width:100%;border-collapse:collapse}th,td{padding:8px 10px;border-bottom:1px solid var(--lex-border);text-align:left;vertical-align:top}th{position:sticky;top:0;background:var(--lex-panel)}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.pill{display:inline-block;padding:2px 7px;border:1px solid var(--lex-border);border-radius:999px;font-size:.75rem}.danger{color:#b04444}@media(max-width:760px){.grid,.split{grid-template-columns:1fr}.list{border-right:0;border-bottom:1px solid var(--lex-border)}#status{display:none}}
+    main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
+    .pz-record-layout,.pz-script-layout,.pz-metadata,.lex-data-map-view,.lex-information-panel{height:100%;min-height:0}
+    .pz-shared-actions{display:flex;align-items:center;gap:8px}
+    .pz-shared-actions button{padding:7px 12px}
   </style>
 </head>
 <body>
 <header id="lexeditor-shell"></header>
-<div id="status" class="pz-status" role="status">Loading…</div>
 <main id="main"></main>
 <script src="/shared/framework.js"></script>
 <script>
 "use strict";
-const main=document.getElementById("main"),status=document.getElementById("status");
-let tab="metadata",metadata=null,animationMeshes={rows:[],errors:[]},items={rows:[],errors:[]},evolved={rows:[],errors:[]},crafts={rows:[],errors:[]},fixings={rows:[],errors:[]},fluids={rows:[],errors:[]},vehicles={rows:[],errors:[]},sounds={rows:[],errors:[]},models={rows:[],errors:[]},mannequins={rows:[],errors:[]},timedActions={rows:[],errors:[]},scripts={rows:[],counts:{},errors:[]},selectedAnimationMesh=null,selectedItem=null,selectedEvolved=null,selectedCraft=null,selectedFixing=null,selectedFluid=null,selectedVehicle=null,selectedSound=null,selectedModel=null,selectedMannequin=null,selectedTimedAction=null,datamap={rows:[]},deployment=null,shell=null;
+const main=document.getElementById("main");
+let tab="metadata",metadata=null,animationMeshes={rows:[],errors:[]},items={rows:[],errors:[]},evolved={rows:[],errors:[]},crafts={rows:[],errors:[]},fixings={rows:[],errors:[]},fluids={rows:[],errors:[]},vehicles={rows:[],errors:[]},sounds={rows:[],errors:[]},models={rows:[],errors:[]},mannequins={rows:[],errors:[]},timedActions={rows:[],errors:[]},scripts={rows:[],counts:{},errors:[]},datamap={rows:[]},deployment=null,shell=null;
 const shellTabs=[
   {id:"metadata",label:"Mod Metadata"},
   {id:"animationmeshes",label:"Animation Meshes"},
@@ -40,19 +40,56 @@ const shellTabs=[
 ];
 const editorTabs=new Map(shellTabs.map(row=>[row.label,row.id]));
 const mapState={page:0,query:"",status:"",sort:["filename",1]};
-const esc=value=>String(value??"").replace(/[&<>\"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+const scriptState={selected:null,page:0,pageSize:15,query:"",sort:{key:"name",dir:1}};
 async function api(path,options={}){const response=await fetch(path,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});let payload={};try{payload=await response.json()}catch{}if(!response.ok)throw new Error(payload.error||`Request failed (${response.status})`);return payload}
-function setStatus(message,error=false){status.textContent=message;status.classList.toggle("danger",error)}
-async function reload(){try{[metadata,animationMeshes,items,evolved,crafts,fixings,fluids,vehicles,sounds,models,mannequins,timedActions,scripts,datamap,deployment]=await Promise.all([api("/api/mod-info"),api("/api/animationmeshes"),api("/api/items"),api("/api/evolvedrecipes"),api("/api/craftrecipes"),api("/api/fixings"),api("/api/fluids"),api("/api/vehicles"),api("/api/sounds"),api("/api/models"),api("/api/mannequins"),api("/api/timedactions"),api("/api/zedscript"),api("/api/datamap"),api("/api/deployment")]);if(selectedAnimationMesh)selectedAnimationMesh=animationMeshes.rows.find(row=>row.key===selectedAnimationMesh.key)||null;if(selectedItem)selectedItem=items.rows.find(row=>row.key===selectedItem.key)||null;if(selectedEvolved)selectedEvolved=evolved.rows.find(row=>row.key===selectedEvolved.key)||null;if(selectedCraft)selectedCraft=crafts.rows.find(row=>row.key===selectedCraft.key)||null;if(selectedFixing)selectedFixing=fixings.rows.find(row=>row.key===selectedFixing.key)||null;if(selectedFluid)selectedFluid=fluids.rows.find(row=>row.key===selectedFluid.key)||null;if(selectedVehicle)selectedVehicle=vehicles.rows.find(row=>row.key===selectedVehicle.key)||null;if(selectedSound)selectedSound=sounds.rows.find(row=>row.key===selectedSound.key)||null;if(selectedModel)selectedModel=models.rows.find(row=>row.key===selectedModel.key)||null;if(selectedMannequin)selectedMannequin=mannequins.rows.find(row=>row.key===selectedMannequin.key)||null;if(selectedTimedAction)selectedTimedAction=timedActions.rows.find(row=>row.key===selectedTimedAction.key)||null;setStatus(`${animationMeshes.rows.length} animation meshes · ${items.rows.length} items · ${evolved.rows.length} evolved · ${crafts.rows.length} craft recipes · ${fixings.rows.length} fixings · ${fluids.rows.length} fluids · ${vehicles.rows.length} vehicles · ${sounds.rows.length} sounds · ${models.rows.length} models · ${mannequins.rows.length} mannequins · ${timedActions.rows.length} timed actions · ${scripts.rows.length} script records`);render()}catch(error){setStatus(error.message,true);main.innerHTML=`<div class="panel"><div class="empty">${esc(error.message)}</div></div>`}}
-function field(label,name,value,type="text",extra=""){return `<div class="field"><label for="${esc(name)}">${esc(label)}</label><input id="${esc(name)}" name="${esc(name)}" type="${esc(type)}" value="${esc(value)}" ${extra}></div>`}
-function selectField(label,name,value,options,disabled=false){return `<div class="field"><label for="${esc(name)}">${esc(label)}</label><select id="${esc(name)}" name="${esc(name)}" ${disabled?"disabled":""}>${options.map(option=>`<option value="${esc(option)}" ${option===value?"selected":""}>${esc(option)}</option>`).join("")}</select></div>`}
-function renderMetadata(){const f=metadata.fields;main.innerHTML=`<section class="panel"><h2>${esc(metadata.path)}</h2><form id="metadata-form" class="content"><div class="notice">Only documented scalar keys are rewritten. Unknown keys/lines are left intact; an external change forces a reload.</div><div class="grid">${field("Name","name",f.name)}${field("ID","id",f.id)}${field("Author","author",f.author)}${field("Mod Version","modversion",f.modversion)}${field("Minimum Game Version","versionMin",f.versionMin)}${field("Maximum Game Version","versionMax",f.versionMax)}${field("Icon","icon",f.icon)}${field("URL","url",f.url)}${field("Required Mods","require",f.require)}${field("Incompatible Mods","incompatible",f.incompatible)}${field("Load After","loadModAfter",f.loadModAfter)}${field("Load Before","loadModBefore",f.loadModBefore)}${field("Category","category",f.category)}</div><div class="field" style="margin-top:12px"><label for="description">Description</label><textarea id="description" name="description">${esc(f.description)}</textarea></div><div class="actions"><button type="submit">Save Metadata</button><span>${metadata.duplicateKeys.length?`Duplicate keys: ${esc(metadata.duplicateKeys.join(", "))}`:`${metadata.unmodeledLines} unmodeled line(s) preserved`}</span></div></form></section>`;document.getElementById("metadata-form").onsubmit=saveMetadata}
-async function saveMetadata(event){event.preventDefault();const form=new FormData(event.currentTarget),edits={};for(const [key,value] of form.entries())edits[key]=value;try{metadata=await api("/api/mod-info/save",{method:"POST",body:JSON.stringify({sha256:metadata.sha256,edits})});setStatus("Metadata saved");await reload()}catch(error){setStatus(error.message,true)}}
+function setStatus(message,error=false){LexeditorUI.showToast?.(message,error)}
+async function reload(){try{[metadata,animationMeshes,items,evolved,crafts,fixings,fluids,vehicles,sounds,models,mannequins,timedActions,scripts,datamap,deployment]=await Promise.all([api("/api/mod-info"),api("/api/animationmeshes"),api("/api/items"),api("/api/evolvedrecipes"),api("/api/craftrecipes"),api("/api/fixings"),api("/api/fluids"),api("/api/vehicles"),api("/api/sounds"),api("/api/models"),api("/api/mannequins"),api("/api/timedactions"),api("/api/zedscript"),api("/api/datamap"),api("/api/deployment")]);render()}catch(error){setStatus(error.message,true);renderLoadError(error)}}
+function renderLoadError(error){main.replaceChildren(LexeditorUI.detailPanel({className:"lex-information-panel",title:"Project Zomboid could not load",identity:null,meta:"Plugin load error",body:[LexeditorUI.detailSection({title:"ERROR",body:[sharedReadonly("Message",error.message||String(error),"Resolve this project/install problem, then reload the plugin.")]} )]}))}
+function renderMetadata(){
+  const row={fields:metadata.fields,duplicateKeys:metadata.duplicateKeys},readers={};
+  const build=spec=>{const value=sharedControl(row,spec);if(value.read)readers[spec.key]=value.read;return value.field};
+  const sections=metadataSpecs.map(group=>LexeditorUI.detailSection({title:group.title,body:group.fields.map(build)}));
+  const save=LexeditorUI.el("button",{type:"button",class:"lex-command-primary",onclick:()=>saveMetadata(readers)},"Save Metadata");
+  main.replaceChildren(LexeditorUI.detailPanel({className:"pz-metadata",title:metadata.fields.name||"Mod Metadata",identity:null,meta:metadata.path,body:[
+    LexeditorUI.detailSection({title:"SOURCE",body:[sharedReadonly("File",metadata.path,"Build 42 mod.info source. Lexeditor patches modeled keys and preserves unrelated lines.")]}),
+    ...sections,
+    LexeditorUI.detailSection({title:"PRESERVATION",body:[
+      sharedReadonly("Unmodeled Lines",String(metadata.unmodeledLines),"Non-empty lines outside the modeled scalar keys are preserved unless the file itself is externally changed."),
+      sharedReadonly("Duplicate Keys",metadata.duplicateKeys.length?metadata.duplicateKeys.join(", "):"None","Duplicated keys are shown but their controls are disabled so Lexeditor cannot make an ambiguous write."),
+    ]}),
+    LexeditorUI.detailSection({title:"ACTIONS",body:[LexeditorUI.el("div",{class:"pz-shared-actions"},save)]}),
+  ]}));
+}
+async function saveMetadata(readers){const edits={};for(const [key,read] of Object.entries(readers)){const value=read();if(String(value)!==String(metadata.fields?.[key]??""))edits[key]=value}if(!Object.keys(edits).length){setStatus("No metadata changes to save");return}try{metadata=await api("/api/mod-info/save",{method:"POST",body:JSON.stringify({sha256:metadata.sha256,edits})});setStatus("Metadata saved");await reload()}catch(error){setStatus(error.message,true)}}
 const structuredState=Object.fromEntries(["animationmeshes","items","evolved","crafts","fixing","fluids","vehicles","sounds","models","mannequins","timedactions"].map(id=>[id,{selected:null,page:0,pageSize:15,query:"",sort:{key:"id",dir:1}}]));
 const boolField=(key,label,help,extra={})=>({key,label,type:"bool",help,...extra});
 const textField=(key,label,help,extra={})=>({key,label,type:"text",help,...extra});
 const numberField=(key,label,help,extra={})=>({key,label,type:"number",help,...extra});
 const selectSpec=(key,label,help,choices,extra={})=>({key,label,type:"select",help,choices,...extra});
+const metadataSpecs=[
+  {title:"IDENTITY",fields:[
+    textField("name","Name","Display name shown for the mod in Project Zomboid's mod UI.",{addable:true}),
+    textField("id","ID","Stable mod identifier used by dependency and load-order metadata. Build 42 rejects commas, semicolons and equals signs here.",{addable:true}),
+    textField("author","Author","Author credit stored in mod.info.",{addable:true}),
+    textField("modversion","Mod Version","Version label for this mod. This is author metadata, not the Project Zomboid build requirement.",{addable:true}),
+    textField("description","Description","Description shown with the mod's metadata.",{addable:true,type:"textarea"}),
+  ]},
+  {title:"PRESENTATION",fields:[
+    textField("icon","Icon","Icon resource/path declared by mod.info for the mod listing.",{addable:true}),
+    textField("url","URL","Project/homepage URL declared by the mod.",{addable:true}),
+    textField("category","Category","Native Project Zomboid mod category metadata.",{addable:true}),
+  ]},
+  {title:"COMPATIBILITY",fields:[
+    textField("versionMin","Minimum Game Version","Minimum supported Project Zomboid version. Lexeditor validates dotted versions such as 42.20 or 42.20.4.",{addable:true}),
+    textField("versionMax","Maximum Game Version","Maximum supported Project Zomboid version. Leave empty when the mod does not declare an upper bound.",{addable:true}),
+    textField("require","Required Mods","Dependency mod IDs passed through to Project Zomboid's native mod loader.",{addable:true}),
+    textField("incompatible","Incompatible Mods","Mod IDs declared incompatible with this mod.",{addable:true}),
+  ]},
+  {title:"LOAD ORDER",fields:[
+    textField("loadModAfter","Load After","Mod IDs this mod asks Project Zomboid to load before it.",{addable:true}),
+    textField("loadModBefore","Load Before","Mod IDs this mod asks Project Zomboid to load after it.",{addable:true}),
+  ]},
+];
 const structuredConfigs={
   animationmeshes:{title:"Animation Meshes",noun:"animation meshes",save:"/api/animationmeshes/save",saved:"Animation mesh",rows:()=>animationMeshes.rows,limits:"Repeated animation source lists are preserved exactly: animationDirectory and animationPrefix entries stay read-only.",fields:[
     boolField("keepMeshAnimations","Keep Mesh Animations","Controls whether animations already attached to the source mesh are retained when Project Zomboid loads this animation mesh."),
@@ -155,7 +192,7 @@ const structuredConfigs={
 function sharedReadonly(label,value,help){return LexeditorUI.detailField({label:label.toUpperCase(),control:LexeditorUI.readonlyField(value),help:LexeditorUI.infoHelp(help)})}
 function sharedControl(row,spec){
   const raw=row.fields?.[spec.key]??"",present=raw!=="",ambiguous=(row.duplicateKeys||[]).includes(spec.key);
-  const disabled=!present||ambiguous||spec.locked===true;
+  const disabled=(!present&&spec.addable!==true)||ambiguous||spec.locked===true;
   let control,read=null,dataType="STRING";
   if(spec.type==="bool"){
     control=LexeditorUI.el("input",{type:"checkbox",checked:String(raw).toLowerCase()==="true",disabled,"aria-label":spec.label});
@@ -165,6 +202,9 @@ function sharedControl(row,spec){
     if(raw&&!values.includes(raw))values.unshift(raw);
     control=LexeditorUI.el("select",{disabled,"aria-label":spec.label},...values.map(value=>{const option=LexeditorUI.el("option",{value},value);option.selected=value===raw;return option}));
     dataType="ENUM";if(!disabled)read=()=>control.value;
+  }else if(spec.type==="textarea"){
+    control=LexeditorUI.el("textarea",{disabled,"aria-label":spec.label});control.value=raw;
+    if(!disabled)read=()=>control.value;
   }else{
     const attrs={type:spec.type==="number"?"number":"text",value:raw,disabled,"aria-label":spec.label};
     if(spec.min!==undefined)attrs.min=spec.min;if(spec.max!==undefined)attrs.max=spec.max;if(spec.step!==undefined)attrs.step=spec.step;
@@ -173,7 +213,7 @@ function sharedControl(row,spec){
     if(!disabled)read=()=>control.value;
   }
   let help=spec.help;
-  if(!present)help+=" This property is absent in this record, so Lexeditor leaves it absent.";
+  if(!present)help+=spec.addable===true?" Saving a non-empty value adds this key to mod.info.":" This property is absent in this record, so Lexeditor leaves it absent.";
   else if(ambiguous)help+=" This property appears more than once, so editing is disabled to avoid an ambiguous write.";
   return{field:LexeditorUI.detailField({label:spec.label.toUpperCase(),control,dataType,min:spec.min,max:spec.max,help:LexeditorUI.infoHelp(help)}),read};
 }
@@ -230,9 +270,60 @@ function renderSounds(){renderStructured("sounds")}
 function renderModels(){renderStructured("models")}
 function renderMannequins(){renderStructured("mannequins")}
 function renderTimedActions(){renderStructured("timedactions")}
-function renderScripts(){const countRows=Object.entries(scripts.counts||{}).filter(([,count])=>count).map(([kind,count])=>`<span class="pill">${esc(kind)}: ${esc(count)}</span>`).join(" ");main.innerHTML=`<section class="panel"><h2>Build 42 Script Inventory</h2><div class="content"><div class="notice">Current Build 42 ZedScript families are inventoried without inventing semantics. Animation meshes, items, evolved recipes, typed craftRecipe fields, fixing ConditionModifier, fluid scalars, vehicle scalars, sound scalars, model scalars, mannequin scalars and timedAction actionAnim are structured; insufficiently typed families remain read-only.</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${countRows||'<span class="pill">No recognized records</span>'}</div>${scripts.errors.length?`<div class="notice danger">${esc(scripts.errors.map(error=>`${error.path}: ${error.error}`).join(" · "))}</div>`:""}</div><div class="content" style="padding-top:0"><table><thead><tr><th>Kind</th><th>Record</th><th>Module</th><th>File</th><th>Integration</th></tr></thead><tbody>${scripts.rows.map(row=>`<tr><td><span class="pill">${esc(row.kind)}</span></td><td><code>${esc(row.name)}</code></td><td>${esc(row.module)}</td><td><code>${esc(row.path)}</code></td><td>${row.editable?"Structured editor":"Recognized · read-only"}</td></tr>`).join("")||`<tr><td colspan="5" class="empty">No recognized top-level script records.</td></tr>`}</tbody></table></div></section>`}
-function renderDatamap(){const rows=datamap.rows.map(row=>{const targets=String(row.editor||"").split(",").map(value=>value.trim()).filter(value=>editorTabs.has(value)).map(label=>({id:editorTabs.get(label),label}));const editable=targets.length>0;return{filename:row.filename,controls:row.editor||"Recognized Build 42 data",notes:row.notes,status:editable?"partial":"not-integrated",coverage:editable?"structured":String(row.filename||"").endsWith(".txt")?"view":"unavailable",targets}});const view=LexeditorUI.dataMap({rows,page:mapState.page,query:mapState.query,status:mapState.status,sort:mapState.sort,open:row=>navigate(row.target),changePage:value=>{mapState.page=value;renderDatamap()},changeQuery:value=>{mapState.query=value;mapState.page=0;renderDatamap()},changeStatus:value=>{mapState.status=value;mapState.page=0;renderDatamap()},changeSort:key=>{mapState.sort=mapState.sort[0]===key?[key,-mapState.sort[1]]:[key,1];renderDatamap()}});mapState.page=view.page;main.replaceChildren(view.content)}
-function renderInfo(){const target=deployment.target||"<Zomboid user folder>/mods/<project>";main.innerHTML=`<section class="panel"><h2>Project Zomboid Setup &amp; Deployment</h2><div class="content"><div id="mod-loader-slot"></div><div class="notice">The installed Steam game tree is read-only. Deploy copies this project into the native local-mod folder. Lexeditor removes or replaces only a deployment whose recorded file hashes still match.</div><div class="grid">${field("Target","deploy-target",target,"text","readonly")}${field("Files","deploy-count",deployment.fileCount,"text","readonly")}<div class="field"><label>State</label><input readonly value="${deployment.deployed?(deployment.owned?"Deployed · owned":"Deployed · external change detected"):"Not deployed"}"></div></div><div class="actions"><button id="deploy">${deployment.deployed?"Redeploy":"Deploy Local Mod"}</button><button id="undeploy" class="secondary" ${deployment.owned?"":"disabled"}>Remove Owned Deployment</button></div></div></section>`;document.getElementById("mod-loader-slot").replaceWith(LexeditorUI.modLoaderSection({loader:"Project Zomboid native Build 42 mod system.",output:"A full local development mod copy under <user>/Zomboid/mods/<project>.",order:"Project Zomboid owns activation and ordering; mod.info can declare require/incompatible/loadModBefore/loadModAfter relationships.",safety:"The installed Steam game tree is never modified; only the owned local deployment is replaced or removed.",removal:"Remove the owned local deployment; the authoring project is preserved."}));document.getElementById("deploy").onclick=()=>changeDeployment("/api/deploy");document.getElementById("undeploy").onclick=()=>changeDeployment("/api/undeploy")}
+const scriptEditorTabs={animationsMesh:"animationmeshes",item:"items",evolvedrecipe:"evolved",craftRecipe:"crafts",fixing:"fixing",fluid:"fluids",vehicle:"vehicles",sound:"sounds",model:"models",mannequin:"mannequins",timedAction:"timedactions"};
+function scriptKey(row){return [row.path,row.module,row.kind,row.name].join("\u001f")}
+function scriptRows(){
+  const query=scriptState.query.trim().toLocaleLowerCase(),rows=(scripts.rows||[]).map(row=>({...row,key:scriptKey(row),editor:row.editable?"Structured editor":"Read-only viewer"}));
+  const filtered=rows.filter(row=>!query||[row.kind,row.name,row.module,row.path,row.editor].some(value=>String(value||"").toLocaleLowerCase().includes(query)));
+  const {key,dir}=scriptState.sort;return filtered.sort((a,b)=>dir*String(a[key]??"").localeCompare(String(b[key]??""),undefined,{numeric:true}));
+}
+function openScriptRecord(row){
+  const target=scriptEditorTabs[row.kind];if(!target)return;
+  const source=structuredConfigs[target]?.rows?.()||[];
+  const match=source.find(candidate=>candidate.path===row.path&&candidate.module===row.module&&candidate.id===row.name);
+  if(match)structuredState[target].selected=match.key;
+  navigate(target);
+}
+function scriptDetail(row){
+  const target=scriptEditorTabs[row.kind],body=[LexeditorUI.detailSection({title:"RECORD",body:[
+    sharedReadonly("Kind",row.kind,"Top-level Build 42 ZedScript family detected by the structural inventory."),
+    sharedReadonly("Name",row.name,"Record name as declared in the script."),
+    sharedReadonly("Module",row.module,"ZedScript module containing the record."),
+    sharedReadonly("File",row.path,"Project-relative script file containing the record."),
+    sharedReadonly("Integration",row.editable?"Partial · structured editor":"Partial · read-only viewer",row.editable?"A structured editor exists, but unsupported fields remain preserved rather than exposed.":"Lexeditor can identify this record but has no structured editor for its fields yet."),
+  ]})];
+  if(target)body.push(LexeditorUI.detailSection({title:"ACTIONS",body:[LexeditorUI.el("div",{class:"pz-shared-actions"},LexeditorUI.el("button",{type:"button",class:"lex-command-primary",onclick:()=>openScriptRecord(row)},"Open Structured Editor"))]}));
+  if((scripts.errors||[]).length)body.push(LexeditorUI.detailSection({title:"CURRENT PROBLEMS",body:[sharedReadonly("Parser Errors",String(scripts.errors.length),"At least one script file failed closed. The affected file is left untouched and is also reported in Data Map.")]}));
+  return LexeditorUI.detailPanel({title:row.name,identity:null,meta:row.kind,body});
+}
+function renderScripts(){
+  const rows=scriptRows();if(scriptState.selected&&!rows.some(row=>row.key===scriptState.selected))scriptState.selected=null;if(!scriptState.selected&&rows.length)scriptState.selected=rows[0].key;
+  const view=LexeditorUI.pagedListDetail({rows,key:row=>row.key,selected:scriptState.selected,page:scriptState.page,pageSize:scriptState.pageSize,noun:"script records",className:"pz-script-layout",splitKey:"project-zomboid-scripts",rowsKey:"project-zomboid-scripts",
+    search:{key:"project-zomboid-scripts",value:scriptState.query,label:"Search Build 42 script records",change:value=>{scriptState.query=value;scriptState.page=0;renderScripts()}},
+    sync:next=>{scriptState.page=next.page;scriptState.pageSize=next.pageSize;if(next.selected!==null)scriptState.selected=next.selected},
+    change:next=>{scriptState.page=next.page;scriptState.pageSize=next.pageSize;if(next.selected!==null)scriptState.selected=next.selected;renderScripts()},
+    master:({rows:shown,selected,select})=>LexeditorUI.columnList({rows:shown,key:row=>row.key,selected,select,sortState:scriptState.sort,
+      sort:key=>{scriptState.sort=scriptState.sort.key===key?{key,dir:-scriptState.sort.dir}:{key,dir:1};scriptState.page=0;renderScripts()},
+      class:"pz-script-table","aria-label":"Build 42 Script Inventory",columns:[{key:"kind",label:"Kind",sortable:true},{key:"name",label:"Record",sortable:true},{key:"module",label:"Module",sortable:true},{key:"path",label:"File",sortable:true}]}),
+    detail:scriptDetail});
+  main.replaceChildren(view);shell?.refresh?.();
+}
+function renderDatamap(){const rows=datamap.rows.map(row=>{const editorTargets=String(row.editor||"").split(",").map(value=>value.trim()).filter(value=>editorTabs.has(value)).map(label=>({id:editorTabs.get(label),label})),scriptView=String(row.filename||"").endsWith(".txt"),targets=[...editorTargets,...(scriptView?[{id:"scripts",label:"Script Inventory"}]:[])];const editable=editorTargets.length>0;return{filename:row.filename,controls:row.editor||(scriptView?"Script Inventory":"Recognized Build 42 data"),notes:row.notes,status:(editable||scriptView)?"partial":"not-integrated",coverage:editable?"structured":scriptView?"view":"unavailable",targets}});const view=LexeditorUI.dataMap({rows,page:mapState.page,query:mapState.query,status:mapState.status,sort:mapState.sort,open:row=>navigate(row.target),changePage:value=>{mapState.page=value;renderDatamap()},changeQuery:value=>{mapState.query=value;mapState.page=0;renderDatamap()},changeStatus:value=>{mapState.status=value;mapState.page=0;renderDatamap()},changeSort:key=>{mapState.sort=mapState.sort[0]===key?[key,-mapState.sort[1]]:[key,1];renderDatamap()}});mapState.page=view.page;main.replaceChildren(view.content)}
+function renderInfo(){
+  const target=deployment.target||"<Zomboid user folder>/mods/<project>",state=deployment.deployed?(deployment.owned?"Deployed · owned":"Deployed · external change detected"):"Not deployed";
+  const deploy=LexeditorUI.el("button",{type:"button",class:"lex-command-primary",onclick:()=>changeDeployment("/api/deploy")},deployment.deployed?"Redeploy":"Deploy Local Mod");
+  const remove=LexeditorUI.el("button",{type:"button",disabled:!deployment.owned,onclick:()=>changeDeployment("/api/undeploy")},"Remove Owned Deployment");
+  main.replaceChildren(LexeditorUI.detailPanel({className:"lex-information-panel",title:"Project Zomboid Information",identity:null,meta:"Build 42 setup and local deployment",body:[
+    LexeditorUI.detailSection({title:"DEPLOYMENT",body:[
+      sharedReadonly("Target",target,"Native local-mod destination under the selected user's Zomboid/mods folder. The installed Steam game tree is never the deployment target."),
+      sharedReadonly("Files",String(deployment.fileCount??0),"Number of files currently present in the resolved deployment."),
+      sharedReadonly("State",state,"Owned means the deployed file hashes still match Lexeditor's recorded deployment. External changes disable removal/replacement until ownership is safe again."),
+      sharedReadonly("Game Source","Read only","The installed Build 42 Steam tree is source material only; Lexeditor does not modify it."),
+    ]}),
+    LexeditorUI.modLoaderSection({loader:"Project Zomboid native Build 42 mod system.",output:"A full local development mod copy under <user>/Zomboid/mods/<project>.",order:"Project Zomboid owns activation and ordering; mod.info can declare require/incompatible/loadModBefore/loadModAfter relationships.",safety:"The installed Steam game tree is never modified; only the owned local deployment is replaced or removed.",removal:"Remove the owned local deployment; the authoring project is preserved."}),
+    LexeditorUI.detailSection({title:"ACTIONS",body:[LexeditorUI.el("div",{class:"pz-shared-actions"},deploy,remove)]}),
+  ]}));
+}
 async function changeDeployment(path){try{deployment=await api(path,{method:"POST",body:"{}"});setStatus(path.endsWith("undeploy")?"Owned deployment removed":"Local mod deployed");await reload()}catch(error){setStatus(error.message,true)}}
 function render(){if(tab==="metadata")renderMetadata();else if(tab==="animationmeshes")renderAnimationMeshes();else if(tab==="items")renderItems();else if(tab==="evolved")renderEvolved();else if(tab==="crafts")renderCrafts();else if(tab==="fixing")renderFixings();else if(tab==="fluids")renderFluids();else if(tab==="vehicles")renderVehicles();else if(tab==="sounds")renderSounds();else if(tab==="models")renderModels();else if(tab==="mannequins")renderMannequins();else if(tab==="timedactions")renderTimedActions();else if(tab==="scripts")renderScripts();else if(tab==="datamap")renderDatamap();else if(tab==="info")renderInfo();else renderMetadata();shell?.refresh?.()}
 function navigate(value){tab=value;render()}

@@ -51,6 +51,15 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertIn('type:"checkbox"', text)
         self.assertNotIn('class="split"', text)
 
+    def test_metadata_scripts_and_info_use_shared_surfaces(self):
+        text = EDITOR.read_text(encoding="utf-8")
+        self.assertIn('className:"pz-metadata"', text)
+        self.assertIn('className:"pz-script-layout"', text)
+        self.assertIn('className:"lex-information-panel"', text)
+        self.assertIn('label:"Search Build 42 script records"', text)
+        self.assertNotIn("<table>", text)
+        self.assertNotIn('class="notice"', text)
+
     def test_animation_mesh_ui_exposes_only_single_value_typed_fields(self):
         text = EDITOR.read_text(encoding="utf-8")
         for field_name in ("keepMeshAnimations", "meshFile", "postProcess"):
