@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from games.ff8 import menu_qol_issue_61 as source
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
-from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_EAX
+from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_EAX, UC_X86_REG_EDI
 
 EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")
 
@@ -59,6 +59,32 @@ def main():
                 cases += 1
     assert source.build_enhanced_ability_menu_hext(False) == ''
     assert '4FD508 = 72 05' in source.build_enhanced_ability_menu_hext(True)
+    # Exercise the machine-code sorter with completed and unfinished records
+    # across category boundaries. Preserve each record's AP and target bytes.
+    import random
+    randomizer = random.Random(308)
+    for trial in range(80):
+        records = [bytes((i+1, i, 1+(i%2), (i*7)%5, 100, i*3, 0, 0))
+                   for i in range(22)]
+        randomizer.shuffle(records)
+        emu = Uc(UC_ARCH_X86, UC_MODE_32)
+        emu.mem_map(0x004AC000, 0x1000)
+        emu.mem_map(0x027A1000, 0x1000)
+        emu.mem_write(source.ENHANCED_ABILITY_ALPHA_CAVE,
+                      source.build_enhanced_ability_order_code_cave())
+        emu.mem_map(0x03000000, 0x3000)
+        stack, buffer = 0x03001000, 0x03002000
+        emu.mem_write(stack+0x130, struct.pack('<I',buffer))
+        emu.mem_write(buffer,b''.join(records))
+        emu.reg_write(UC_X86_REG_ESP,stack)
+        emu.reg_write(UC_X86_REG_EDI,len(records))
+        emu.emu_start(source.ENHANCED_ABILITY_ALPHA_CAVE,source.ABILITY_LIST_RETURN,count=100000)
+        result=bytes(emu.mem_read(buffer,len(records)*8))
+        ordered=[result[i:i+8] for i in range(0,len(result),8)]
+        assert ordered == source.stable_ability_order(records)
+        assert [row[2] for row in ordered] == [1]*11+[2]*11
+        assert sorted(ordered)==sorted(records)
+    print('Machine-code sort: 80 mixed-category completion cases passed; AP/targets preserved')
     for gf in range(16):
         for count in (0, 1, 11, 12, 22):
             for output in (0, 0x01D8DD30):

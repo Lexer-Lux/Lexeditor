@@ -2,7 +2,7 @@
   "contributions": [
     {
       "name": "HobbitDur",
-      "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas and editor references.",
+      "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas, editor references, and Cid packed world Draw Point coordinate conversion.",
       "url": "https://github.com/HobbitDur/FF8UltimateEditor"
     },
     {
@@ -17,7 +17,7 @@
     },
     {
       "name": "Jérôme Arzel (myst6re) and Deling contributors",
-      "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, encounters and world-map format references.",
+      "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, encounters and world-map format references; Japanese glyph mapping from src/qt/fonts/sysfnt_jp.txt (GPL v3 or later).",
       "url": "https://github.com/myst6re/deling"
     },
     {

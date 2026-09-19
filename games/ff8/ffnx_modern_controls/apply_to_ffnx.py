@@ -9,12 +9,24 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
         verify_revision(root)
     changes = {
         'src/cfg.cpp': [
-            ('bool enable_devtools;', 'bool enable_devtools;\nbool enable_ff8_modern_controls;'),
+            ('bool enable_devtools;',
+             'bool enable_devtools;\nbool enable_ff8_modern_controls;'
+             '\ndouble ff8_modern_controls_camera_speed;'),
             ('\tenable_devtools = config["enable_devtools"].value_or(false);',
-             '\tenable_devtools = config["enable_devtools"].value_or(false);\n\tenable_ff8_modern_controls = config["enable_ff8_modern_controls"].value_or(false);'),
+             '\tenable_devtools = config["enable_devtools"].value_or(false);'
+             '\n\tenable_ff8_modern_controls = config["enable_ff8_modern_controls"].value_or(false);'
+             '\n\tff8_modern_controls_camera_speed = config["ff8_modern_controls_camera_speed"].value_or(1.0);'),
         ],
-        'src/cfg.h': [('extern bool enable_devtools;', 'extern bool enable_devtools;\nextern bool enable_ff8_modern_controls;')],
-        'misc/FFNx.toml': [('enable_devtools = false', 'enable_devtools = false\n\n# Manual analog world-map and safe idle-battle camera controls.\nenable_ff8_modern_controls = false')],
+        'src/cfg.h': [('extern bool enable_devtools;',
+                       'extern bool enable_devtools;\nextern bool enable_ff8_modern_controls;'
+                       '\nextern double ff8_modern_controls_camera_speed;')],
+        'misc/FFNx.toml': [('enable_devtools = false',
+                            'enable_devtools = false\n\n'
+                            '# Manual analog world-map and safe idle-battle camera controls.\n'
+                            'enable_ff8_modern_controls = false\n'
+                            '# How fast the right stick turns the battle camera, as a multiple of\n'
+                            '# the shipped rate. Clamped to 0.2 - 4.0.\n'
+                            'ff8_modern_controls_camera_speed = 1.0')],
         'src/ff8_opengl.cpp': [
             ('#include "ff8.h"', '#include "ff8.h"\n#include "lexeditor_ff8_modern_controls.h"'),
             ('void ff8_init_hooks(struct game_obj *_game_object)\n{',

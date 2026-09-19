@@ -19,6 +19,7 @@ from .data import (
     classify_resource,
     data_map,
     load_message_table,
+    load_language_messages,
     load_scenes,
     save_message_table,
     save_scene,
@@ -106,7 +107,7 @@ def _archive_payload(query: str = "", offset: int = 0, limit: int = 250) -> dict
 
 def dashboard() -> dict:
     store = _store()
-    deployment = deployment_status(store, paths.GAME_ROOT)
+    deployment = deployment_status(store, paths.GAME_ROOT, run_audit=False)
     return {
         "game": {
             "root": str(paths.GAME_ROOT), "archive": str(paths.RESOURCE_PATH),
@@ -151,8 +152,6 @@ class Handler(BaseHTTPRequestHandler):
         marker = "</body>"
         if marker not in html:
             raise RuntimeError("Chrono Trigger editor document is missing its body terminator")
-        modules = '<script src="/event_editor.js"></script><script src="/map_previews.js"></script>'
-        html = html.replace(marker, modules + marker, 1)
         self.send_bytes(html.encode("utf-8"), "text/html; charset=utf-8")
 
     def send_bytes(self, data: bytes, content_type: str, *, attachment: bool = False):
@@ -175,6 +174,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_file(PLUGIN_ROOT / "event_editor.js")
             elif path == "/map_previews.js":
                 self.send_file(PLUGIN_ROOT / "map_previews.js")
+            elif path == "/ui-integration.js":
+                self.send_file(PLUGIN_ROOT / "ui-integration.js")
             elif path.startswith("/shared/"):
                 shared = (ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()
@@ -199,7 +200,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/dashboard":
                 self.send_json(dashboard())
             elif path == "/api/deployment":
-                self.send_json(deployment_status(_store(), paths.GAME_ROOT))
+                self.send_json(deployment_status(_store(), paths.GAME_ROOT, run_audit=params.get("quick", ["0"])[0] != "1"))
             elif path == "/api/changes":
                 self.send_json(list_changes(_store()))
             elif path == "/api/labels":
@@ -283,6 +284,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"files": _store().localization_files()})
             elif path == "/api/messages":
                 self.send_json(load_message_table(_store(), params.get("path", [""])[0], _source(params)))
+            elif path == "/api/messages/language":
+                self.send_json(load_language_messages(_store(), params.get("language", [""])[0], _source(params)))
             else:
                 self.send_json({"error": "Not found"}, 404)
         except KeyError as error:

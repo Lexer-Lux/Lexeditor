@@ -11,7 +11,8 @@ SERVICE_MODULES = frozenset({
     'games.ff8.server', 'games.ff9.server', 'games.palworld.full_server', 'games.project_zomboid.server',
     'games.rdr.server', 'games.rdr2.server', 'games.warband.server',
 })
-SERVICE_MODULES = SERVICE_MODULES | frozenset({'games.chrono_trigger.server'})
+SERVICE_MODULES = SERVICE_MODULES | frozenset({'games.chrono_trigger.server',
+                                               'games.ff7r2.server'})
 
 
 def user_data_dir() -> Path:

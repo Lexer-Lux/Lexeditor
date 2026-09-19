@@ -90,7 +90,8 @@ body[data-lex-theme="ff7r"] .ff7r-detail label {
   text-transform: uppercase;
 }
 
-body[data-lex-theme="ff7r"] .ff7r-layout > * {
+/* Skin content panes only. Divider accessories extend across pane edges. */
+body[data-lex-theme="ff7r"] .ff7r-layout > :not(.lex-panel-layout-divider) {
   overflow: hidden;
   border-color: color-mix(in srgb, var(--lex-border) 76%, transparent) !important;
   background:

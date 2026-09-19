@@ -30,16 +30,24 @@ def installed_module(game_root: Path, project: Path) -> str:
     return candidates[0].name
 
 
+def play_executable(game_root: Path) -> Path:
+    """The executable Play starts: WSE2 once it is present or managed, stock otherwise."""
+    root = Path(game_root)
+    wse2 = root.resolve() / "mb_warband_wse2.exe"
+    if (wse2.is_file() or (root / "mb_warband_wse2_x64.exe").exists()
+            or (root / ".lexeditor/wse2/receipt.json").exists()
+            or (root / ".lexeditor/wse2/pending.json").exists()):
+        return wse2
+    return root.resolve() / "mb_warband.exe"
+
+
 def launch_command(game_root: Path, project: Path) -> list[str]:
     module = installed_module(game_root, project)
-    executable = game_root.resolve() / "mb_warband_wse2.exe"
-    if (executable.is_file() or (game_root / "mb_warband_wse2_x64.exe").exists()
-            or (game_root / ".lexeditor/wse2/receipt.json").exists()
-            or (game_root / ".lexeditor/wse2/pending.json").exists()):
+    executable = play_executable(game_root)
+    if executable.name == "mb_warband_wse2.exe":
         from .wse2_manager import require_managed
         require_managed(game_root)
         return [str(executable), "--module", module, "--no-intro"]
-    executable = game_root.resolve() / "mb_warband.exe"
     if not executable.is_file():
         raise RuntimeError("Neither mb_warband.exe nor mb_warband_wse2.exe exists in the selected game folder.")
     # Stock uses its real launcher, not unverified command-line flags.
@@ -256,6 +264,10 @@ class WarbandGameController:
                 self._job.close();self._job=None;self._pid=None
             return {"running":bool(pids),"pid":self._pid if self._pid in pids else (pids[0] if pids else None),
                     "owned":bool(pids),"module":self._module,"processes":[{"pid":pid} for pid in pids]}
+
+    def executable(self, game_root: Path) -> Path:
+        """What launch() starts, so ReShade can match its build."""
+        return play_executable(game_root)
 
     def launch(self, game_root: Path, project: Path) -> dict:
         with self._lock:

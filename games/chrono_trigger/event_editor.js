@@ -90,6 +90,8 @@
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
+  window.ChronoTriggerEventAudit = eventAuditPanel;
+
   function eventAuditPanel() {
     const current = state.events.auditSource === state.source ? state.events.audit : null;
     const button = el("button", {
@@ -189,7 +191,7 @@
       disabled,
       onclick: () => saveEventCommand(objectId, functionId, commandIndex, command),
     }, "Apply command"));
-    controls.push(el("div", {class: "ct-command-editor-note"},
+    controls.push(LexeditorUI.infoHelp(
       state.source === "vanilla"
         ? "Vanilla reference: named values are visible but cannot be changed."
         : "Fixed-width PC command: Apply rewrites only existing argument bytes; opcode, size and pointers stay unchanged.",

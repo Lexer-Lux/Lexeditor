@@ -1,5 +1,10 @@
 # Make a game plugin for Lexeditor
 
+Reuse the shared controls and layouts before you add a new implementation.
+Within a plugin, use one panel component and one set of CSS sizing rules for
+repeated data views. Check all callers after a shared change. Add a screen-specific
+override only when the screen has a different requirement, and explain why.
+
 This is the default methodology for adding a new game to Lexeditor. It is written
 for humans and coding agents. Follow it in order unless there is a concrete reason
 not to. The goal is to spend effort on the parts nobody has solved yet, preserve
@@ -257,7 +262,59 @@ Start with `games/blank` as the shared-control gallery, not as markup to copy.
 Load `/shared/framework.css` and `/shared/framework.js` and use the common controls
 in `docs/UI-MANUAL.md`.
 
+Use the shell's **Info button** for setup, deployment, runtime status, Credits and
+project-file management. Use its **Data Map button** for the shared Data Map.
+Wire both actions through `mountShell`. Do not add Data Map, Info, Deployment or
+Changes as normal content tabs. Show a loading state as soon as navigation starts;
+never leave the previous page visible under the newly selected tab.
+
+Use `LexeditorUI.dataMap` for the Data Map, including its integration icons.
+Use one **Integration** column; do not add a separate Coverage column.
+- **Integrated:** all of the represented data can be viewed and edited in Lexeditor.
+- **Partial:** only part can be viewed or edited, or the viewer has no editor yet.
+- **Not integrated:** there is no usable viewer or editor.
+A parser, file download, or command-line tool alone does not make data integrated.
+Describe what players can change and what is missing in plain language. Keep
+format research in Codex, and export/deployment instructions in Info.
+
+An optional **Misc.** tab holds editable data that does not need a dedicated page.
+Use the tab ID `misc`. The shell places it after all other regular tabs and before
+**Tweaks**. Omit it if there is no suitable data. Use the shared searchable,
+paginated tables and detail controls, with readable names and schema limits.
+Misc. must save real edits through the plugin's normal save path. A file list,
+hex dump, or read-only preview does not count as an editor. List these files in
+Data Map and link them to Misc.; use Partial when any represented fields remain
+unsupported. Give frequently used or complex data a dedicated editor when needed.
+
+There is no separate editable-table mode. All record tables use the shared cell
+editors. Supply each editable column's `edit` callback and its schema controls
+(`choices`, numeric bounds, or `editor`) so a double-click edits the same value
+shown in Detail. Do not build a second table example with permanent inputs.
+
+Use `pagedListDetail` and `columnList` for record lists. Search and pagination
+belong in the shared bottom bar. Do not substitute a scrolling HTML table,
+dropdown file picker or custom Next/Previous controls. Check this with enough
+records to fill several pages. Editable values belong in the selected record's
+Detail pane. Related file names can be properties or list columns.
+
+For localized text, use one subtab per language, with its flag before its name.
+List that language's text entries across resource files. Show the resource path
+as a property; do not make users select a file before they can find text.
+
+Center popup-modal contents and make action buttons share the full available
+horizontal space. Use only the actions the question needs.
+
+Do not add general disclaimer banners about implementation, evidence, read-only
+data or safe writes. Disabled controls and source selection already show those
+states. Put necessary explanations in the relevant `infoHelp` bubble. Use a
+visible warning only for a specific problem that affects the current action.
+
 Keep record identity in the master list and editable properties in the detail pane.
+Default identity columns to real numeric ID, readable name, then internal name.
+Omit fields the source does not have; do not invent names or numeric IDs. Never
+label a parser row index, list position, or generated counter as an ID or show it
+as a detail badge. Internal selection and save keys can use row indices without
+showing them to the user. Preserve saved pin and column-order choices.
 Use semantic controls: checkbox/toggle for booleans, selects for known enums,
 bounded number/range controls for real numeric limits, and decomposed bitflags when
 possible. Help text should explain effect, unit, special values and restart/runtime
@@ -278,6 +335,15 @@ Tweaks is a settings page, not a record table. `games/blank`'s Tweaks tab is the
 reference: a master switch that owns the page, dependent controls disabled until it
 is on, bounded values with units, selects for fixed choices, and related switches
 grouped into one property.
+
+All Tweaks lists must use pagination. Use `LexeditorUI.settingsColumns` for
+setting cards, `paginateSettings` for an existing group container, or
+`detailPanel({paginate:true, ...})` for a settings detail page. The shared control
+keeps six groups per page and provides an inner scroll area for tall groups.
+Keep the pager outside that scroll area. Never rely on the outer window to
+scroll: the desktop shell can prevent it. Check every page, the last control in
+a tall group, and edit retention at small window sizes and large UI scales.
+Run `python tools/verify_tweaks_pagination.py` for the shared reachability check.
 
 Credits and Mod Loading are shared Info-page sections; do not hand-build per-game
 copies. A plugin still has to supply their data, and discovery will reject it if it
@@ -372,6 +438,11 @@ A new plugin is not complete until the applicable items below are true:
 - [ ] Save/deployment writes are atomic and recovery/revert behavior is defined.
 - [ ] The deployment, revert, launch and native acceptance path was designed before the endgame.
 - [ ] Shared UI controls are used instead of game-local clones.
+- [ ] Info and Data Map use the shell buttons, with no duplicate content tabs.
+- [ ] Record lists use shared search and pagination, verified across several pages.
+- [ ] Integration icons are visible in the rendered Data Map.
+- [ ] Loading a page cannot leave the previous page under the new tab selection.
+- [ ] Necessary help uses info bubbles; generic disclaimer banners are absent.
 - [ ] Safe smoke test exists and does not mutate a real installation/save.
 - [ ] Browser/shared-UI acceptance passes.
 - [ ] The normal installed Lexeditor runtime can start the plugin and its dependencies.
@@ -400,3 +471,11 @@ A new plugin is not complete until the applicable items below are true:
 When in doubt, prefer **research, reuse, preservation, explicit boundaries and one
 end-to-end proof** over breadth. Those five habits save more plugin-development time
 than clever code written before the game's existing ecosystem is understood.
+
+### Help for new users
+
+Use the shared question-mark help on tabs, sections, and fields. Explain what
+the player can change, the effect in the game, and how related controls work
+together. Explain special values and preview-only controls. State unknown
+behaviour clearly. Check that help is reachable by mouse and keyboard and does
+not activate the control beneath it. Storage-format notes alone are not user help.

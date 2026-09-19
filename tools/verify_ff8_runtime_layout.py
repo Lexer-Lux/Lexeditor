@@ -28,6 +28,8 @@ def main() -> int:
         source_hext.parent.mkdir(parents=True)
         source_direct.write_bytes(b"source-price")
         source_hext.write_text("source patch\n", encoding="utf-8")
+        backup = source_hext.with_name("patch.txt.20260912.bak")
+        backup.write_text("stale hook\n", encoding="utf-8")
 
         result = runtime_layout.compose(project, active)
         assert Path(result["projectRoot"]) == project
@@ -35,6 +37,8 @@ def main() -> int:
         assert (active / "direct" / "menu" / "price.bin").read_bytes() == b"source-price"
         runtime_hext = active / "hext" / "ff8" / "en_nv" / "000000__editable-mod__patch.txt"
         assert runtime_hext.read_text() == "source patch\n"
+        assert not list((active / "hext").rglob("*.bak"))
+        assert backup.read_text() == "stale hook\n"
         assert source_direct.read_bytes() == b"source-price"
         manifest = json.loads((active / runtime_layout.COMPOSITION_FILE).read_text())
         assert len(manifest["mods"]) == 1

@@ -4,6 +4,13 @@ from __future__ import annotations
 
 
 DEFAULT_MODERN_CONTROLS = False
+# How fast the right stick turns the battle camera, as a multiple of the
+# shipped rate. The bounds are what stays usable: below a fifth of the rate
+# the stick reads as unresponsive, above four times it overshoots the target
+# before the reader lets go. battle_camera.h clamps to the same range.
+DEFAULT_CAMERA_SPEED = 1.0
+MINIMUM_CAMERA_SPEED = 0.2
+MAXIMUM_CAMERA_SPEED = 4.0
 MODERN_CONTROLS_AVAILABLE = True
 MODERN_CONTROLS_BLOCKER = ""
 

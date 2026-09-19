@@ -58,7 +58,7 @@
   let demo={text:"Blank value",value:25,floatValue:.9999,enabled:false,choice:"alternate",refValues:[40,40,40,40],flags:{menu:true,gf:true},stats:{HP:2400,STR:30,MAG:31,SPD:18}};
   let saved={rows:clone(rows),demo:clone(demo)};
   let modOnly=false;
-  const columns=[{key:"id",label:"ID",numberedId:true,sortable:true},{key:"name",label:"Name",sortable:true,edit:(row,value)=>{row.name=String(value)}},{key:"category",label:"Category",sortable:true,edit:(row,value)=>{row.category=String(value)}},{key:"value",label:"Value",numeric:true,sortable:true,edit:(row,value)=>{row.value=Math.max(0,Math.min(255,Number(value)||0))}}];
+  const columns=[{key:"id",label:"ID",numberedId:true,sortable:true},{key:"name",label:"Name",sortable:true,edit:(row,value)=>{row.name=String(value)}},{key:"category",label:"Category",sortable:true,choices:categories,edit:(row,value)=>{row.category=String(value)}},{key:"value",label:"Value",numeric:true,min:0,max:255,step:1,sortable:true,edit:(row,value)=>{row.value=Math.max(0,Math.min(255,Number(value)||0))}}];
   let tab="one",subtab="controls",selected=0,sort={key:"name",dir:1},query="",page=0,pageSize=12,activeSource="mine";
   const prefs=columnPreferences("blank-records",columns,()=>render());
   const activeRows=()=>activeSource==="vanilla"?vanillaRows:rows;
@@ -166,40 +166,6 @@
       pager({page:threePage,pages,total:all.length,pageSize:size,noun:"records",
         change:next=>{threePage=next;render()}}));
   }
-  // In-cell editing: a table whose cells hold the controls themselves rather
-  // than opening a detail panel. A plugin author needs to see this shape, and
-  // it is the one Lexeditor uses wherever a record is small enough to edit in
-  // place. A row switched off keeps its own switch live and dims the rest.
-  function editableTablePanel(){
-    const cellInput=(row,key)=>el("input",{type:"text",value:row[key],
-      disabled:activeSource!=="mine","aria-label":`${key} for ${row.name}`,
-      oninput:event=>{row[key]=event.target.value;refreshShell()}});
-    const cellSelect=row=>el("select",{disabled:activeSource!=="mine",
-      "aria-label":`Category for ${row.name}`,
-      onchange:event=>{row.category=event.target.value;refreshShell()}},
-      ...categories.map(value=>{const option=el("option",{value},value);
-        option.selected=value===row.category;return option;}));
-    const cellNumber=row=>el("input",{type:"number",min:0,max:255,step:1,value:row.value,
-      disabled:activeSource!=="mine","aria-label":`Value for ${row.name}`,
-      oninput:event=>{if(event.target.value!=="")row.value=Number(event.target.value);refreshShell()}});
-    const editableColumns=[
-      {key:"enabled",label:"On",width:"48px",
-       render:row=>el("input",{type:"checkbox",checked:row.enabled,
-         "aria-label":`Enable ${row.name}`,
-         onchange:event=>{row.enabled=event.target.checked;render();refreshShell()}})},
-      {key:"name",label:"Name",sortable:true,width:"minmax(9em,1.3fr)",
-       render:row=>cellInput(row,"name")},
-      {key:"category",label:"Category",sortable:true,width:"minmax(8em,1fr)",
-       render:cellSelect},
-      {key:"value",label:"Value",sortable:true,numeric:true,width:"minmax(6em,.8fr)",
-       render:cellNumber},
-    ];
-    return columnList({rows:sortedRows(),key:value=>value.id,
-      sortState:sort,sort:key=>{sort=sort.key===key?{key,dir:-sort.dir}:{key,dir:1};render()},
-      columns:editableColumns,editable:true,
-      class:"blank-table blank-editable-table",
-      "aria-label":"Blank Game editable table"});
-  }
   function recordPanel(withPins=true,row=selectedRow()){
     const fields={name:editableField(row,"name"),category:editableField(row,"category",{type:"select"}),value:editableField(row,"value",{type:"number",min:0,max:255,step:1,unit:"units",dataType:"INT",help:infoHelp("This sample record demonstrates a numeric property with a Vanilla reference; it has no game-specific meaning.")}),enabled:editableField(row,"enabled",{type:"checkbox"})};
     const sortMarker=property=>sort.key===property?{"data-lex-sort":sort.dir>0?"asc":"desc"}:{};
@@ -217,11 +183,18 @@
       control:el("input",{type:"checkbox",checked:tweaks[key],disabled:activeSource!=="mine",
         "aria-label":label,onchange:event=>{tweaks[key]=event.target.checked;render();refreshShell()}})});
   }
+  // Which group of tweaks is on screen. A tweak page divides with subtabs, the
+  // same control every other page divides with, and the bar is not drawn until
+  // there are at least two groups to choose between.
+  let tweakGroup="gameplay";
+  const TWEAK_GROUPS=[{id:"gameplay",label:"Gameplay"},{id:"presentation",label:"Presentation"}];
   function tweaksPanel(){
     const gate=!tweaks.enabled||activeSource!=="mine";
-    return detailPanel({className:"blank-detail blank-tweaks",title:"Tweaks",icon:blankIcon(),
-      identity:tweaks.enabled?"ON":"OFF",meta:"Reference tweak page: switches, bounded values and dependent controls",
-      body:[
+    // The reference shape, and the one to copy: a page of cards dealt into as
+    // many columns as the width allows, a subtab bar above them, and a pager
+    // below sized to what the window can actually show. Not one long scroll,
+    // and not a fixed number of cards per page.
+    const gameplay=[
         detailSection({title:"MASTER",body:[
           tweakSwitch("enabled","ENABLED","Everything below is inert until this is on. A tweak page always has one switch that owns the rest."),
         ]}),
@@ -256,14 +229,19 @@
                 key,label,checked:tweaks.flags[key],disabled:gate,
                 help:`Blank sample flag: ${label}.`,
                 change:value=>{tweaks.flags[key]=value;refreshShell()}}))})}),
-        ]}),
+        ]})];
+    const presentation=[
         // Every game's Tweaks page offers the same ReShade section. Lexeditor
         // keeps one ReShade; the mod carries only its preset and any shaders
         // its author wrote, so the mod stays installable by hand.
-        LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade}),
-      ]});
+        LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade})];
+    return LexeditorUI.settingsColumns(
+      tweakGroup==="presentation"?presentation:gameplay,
+      {className:"blank-tweaks",tabs:TWEAK_GROUPS,activeTab:tweakGroup,
+       tabsLabel:"Blank tweak groups",
+       changeTab:value=>{tweakGroup=value;render()}});
   }
-  let reshade={manifest:{enabled:false,preset:"",repositories:[]},presets:[],shaders:[],
+  let reshade={manifest:{enabled:false,preset:""},presets:[],shaders:[],
     reshadeInstalled:false,installedRenderer:"",path:"",hasFolder:false,ready:false};
   async function loadReshade(){
     try{reshade=await LexeditorUI.callWindow?.("mod_reshade","blank")||reshade}
@@ -310,7 +288,7 @@
     page:mapState.page,query:mapState.query,status:mapState.status,sort:mapState.sort,
     changePage:value=>{mapState.page=value;render()},changeQuery:value=>{mapState.query=value;mapState.page=0;render()},
     changeStatus:value=>{mapState.status=value;mapState.page=0;render()},changeSort:key=>{mapState.sort=[key,-mapState.sort[1]];render()}}).content}
-  function render(){let layout;if(tab==="datamap")layout=dataMapPanel();else if(tab==="info")layout=panelLayout([informationPanel()],"blank-layout",{layoutKey:"blank-info",defaultSizes:[100]});else if(tab==="graphs")layout=panelLayout([graphsPanel()],"blank-layout",{layoutKey:"blank-graphs",defaultSizes:[100]});else if(tab==="one")layout=panelLayout([galleryPanel()],"blank-layout",{layoutKey:"blank-one",defaultSizes:[100]});else if(tab==="three")layout=panelLayout([pagedTablePane(),recordPanel(),inspectorPanel()],"blank-layout blank-three-layout",{layoutKey:"blank-three",defaultSizes:[38,34,28],minSizes:[300,320,260],stackAt:980});else if(tab==="editable")layout=panelLayout([editableTablePanel()],"blank-layout blank-editable-layout",{layoutKey:"blank-editable",defaultSizes:[100]});else if(tab==="subtabs")layout=panelLayout([subtabPanel()],"blank-layout",{layoutKey:"blank-subtabs",defaultSizes:[100]});else if(tab==="tweaks")layout=panelLayout([tweaksPanel()],"blank-layout",{layoutKey:"blank-tweaks",defaultSizes:[100]});else layout=pagedTwoPanel();document.querySelector("#main").replaceChildren(layout);refreshShell()}
+  function render(){let layout;if(tab==="datamap")layout=dataMapPanel();else if(tab==="info")layout=panelLayout([informationPanel()],"blank-layout",{layoutKey:"blank-info",defaultSizes:[100]});else if(tab==="graphs")layout=panelLayout([graphsPanel()],"blank-layout",{layoutKey:"blank-graphs",defaultSizes:[100]});else if(tab==="one")layout=panelLayout([galleryPanel()],"blank-layout",{layoutKey:"blank-one",defaultSizes:[100]});else if(tab==="three")layout=panelLayout([pagedTablePane(),recordPanel(),inspectorPanel()],"blank-layout blank-three-layout",{layoutKey:"blank-three",defaultSizes:[38,34,28],minSizes:[300,320,260],stackAt:980});else if(tab==="subtabs")layout=panelLayout([subtabPanel()],"blank-layout",{layoutKey:"blank-subtabs",defaultSizes:[100]});else if(tab==="tweaks")layout=panelLayout([tweaksPanel()],"blank-layout",{layoutKey:"blank-tweaks",defaultSizes:[100]});else layout=pagedTwoPanel();document.querySelector("#main").replaceChildren(layout);refreshShell()}
   function navigate(value){tab=value;render()}
   const editHistory=new EditHistory({capture:()=>({rows,demo}),restore:snapshot=>{rows=clone(snapshot.rows);demo=clone(snapshot.demo)},render:async()=>render(),enabled:()=>activeSource==="mine",changed:()=>refreshShell()});
   // Saved samples belong to the user data store, not the service's changing port.
@@ -350,7 +328,7 @@
     document.body.append(dialog);dialog.showModal();
   });
   void loadReshade().then(()=>render());
-  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"blank",name:"Blank Game",themeName:"blank",theme:{accent:"#72ff1e","accent-text":"#102008"}},tabs:[{id:"one",label:"1 Panel"},{id:"two",label:"2 Panels"},{id:"three",label:"3 Panels"},{id:"editable",label:"Editable Table"},{id:"subtabs",label:"Tabbed Panel"},{id:"tweaks",label:"Tweaks"},{id:"graphs",label:"Graphs"}],activeTab:()=>tab,navigate,help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Blank Data Map",dirtyCount,readonly:()=>activeSource!=="mine",history:editHistory,save:async()=>{await saveSample();saved={rows:clone(rows),demo:clone(demo)};editHistory.clear()},discard:async()=>{rows=clone(saved.rows);demo=clone(saved.demo);editHistory.clear();render()},projectSnapshot,projectCreatePrompt:{createLabel:"Create Sample",description:"Save a Blank sample project on this computer."},createProject:createSample,browseProject:browseSamples,projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Packaged unchanged sample data"}],projectActiveSource:()=>activeSource,selectProjectSource:async value=>{activeSource=String(value||"mine");selected=0;page=0;render()},info:()=>navigate("info"),infoActive:()=>tab==="info",infoTitle:"Open Blank setup and runtime information"});
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"blank",name:"Blank Game",themeName:"blank",theme:{accent:"#72ff1e","accent-text":"#102008"}},tabs:[{id:"one",label:"1 Panel"},{id:"two",label:"2 Panels"},{id:"three",label:"3 Panels"},{id:"subtabs",label:"Tabbed Panel"},{id:"tweaks",label:"Tweaks"},{id:"graphs",label:"Graphs"}],activeTab:()=>tab,navigate,help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Blank Data Map",dirtyCount,readonly:()=>activeSource!=="mine",history:editHistory,save:async()=>{await saveSample();saved={rows:clone(rows),demo:clone(demo)};editHistory.clear()},discard:async()=>{rows=clone(saved.rows);demo=clone(saved.demo);editHistory.clear();render()},projectSnapshot,projectCreatePrompt:{createLabel:"Create Sample",description:"Save a Blank sample project on this computer."},createProject:createSample,browseProject:browseSamples,projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Packaged unchanged sample data"}],projectActiveSource:()=>activeSource,selectProjectSource:async value=>{activeSource=String(value||"mine");selected=0;page=0;render()},info:()=>navigate("info"),infoActive:()=>tab==="info",infoTitle:"Open Blank setup and runtime information"});
   async function restoreSample(){
     try{
       const response=await fetch("/api/projects");

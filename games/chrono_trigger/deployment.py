@@ -9,10 +9,10 @@ from .data import OverlayStore
 from .integrity import audit_project
 
 
-def deployment_status(store: OverlayStore, game_root: Path) -> dict:
-    """Return CTExt state plus a non-mutating project preflight audit."""
+def deployment_status(store: OverlayStore, game_root: Path, *, run_audit: bool = True) -> dict:
+    """Return runtime state, with an optional non-mutating preflight audit."""
     ctext = ctext_status(Path(game_root), store.project_root)
-    audit = audit_project(store, "mine")
+    audit = audit_project(store, "mine") if run_audit else None
     return {
         "kind": "chrono-trigger-deployment-status",
         "ctext": ctext,
@@ -21,7 +21,7 @@ def deployment_status(store: OverlayStore, game_root: Path) -> dict:
             store.writable
             and ctext["installed"]
             and ctext["configValid"]
-            and audit["ok"]
+            and (audit is None or audit["ok"])
         ),
         "automatic": False,
     }

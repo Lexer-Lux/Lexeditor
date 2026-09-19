@@ -164,7 +164,7 @@ def mutation_checks(source: str, applied: Path) -> None:
     for old, new in mutations:
         # The title-menu guard and the end-of-frame expiry both clear capture.
         # Remove both when testing that the expiry contract is meaningful.
-        mutated = source.replace(old, new) if old == "g_capture = {};" else source.replace(old, new, 1)
+        mutated = source.replace(old, new) if old in ("g_capture = {};", "mode->driver_mode == MODE_MENU") else source.replace(old, new, 1)
         try:
             source_contract(mutated)
         except AssertionError:
@@ -195,6 +195,12 @@ def main() -> int:
     require(hashlib.sha256(EXE.read_bytes()).hexdigest() == EXE_SHA256,
             "installed FF8_EN.exe is not the supported Steam English build")
     pe = pefile.PE(str(EXE), fast_load=True)
+    require(image_bytes(pe, 0x004B0CCF, 4) == bytes.fromhex("66 8B 46 4A"),
+            "battle name width field changed")
+    require(image_bytes(pe, 0x004B0CDF, 5) == bytes.fromhex("B8 60 00 00 00")
+            and image_bytes(pe, 0x004B0CEA, 2) == bytes.fromhex("2B C1")
+            and image_bytes(pe, 0x004B0CF0, 2) == bytes.fromhex("03 C2"),
+            "battle name alignment is no longer origin + 96 - name width")
 
     # Native callback and renderer identities.
     require(struct.unpack("<I", image_bytes(pe, 0x00B87F00, 4))[0] == 0x004CDFA0,
@@ -209,6 +215,11 @@ def main() -> int:
             "main-menu callback prologue changed")
     require(struct.unpack("<I", image_bytes(pe, 0x004E67C3, 4))[0] == 0x004E5550,
             "main-menu callback renderer changed")
+    require(relative_target(pe, 0x004C1C6E) == 0x004BF020,
+            "main menu clock draw call changed")
+    require(image_bytes(pe, 0x004C1C54, 11) == bytes.fromhex(
+        "8B 0D 28 E9 CF 01 BA 01 00 00 00"),
+            "main menu playtime argument changed")
     require(image_bytes(pe, 0x004CEF92, 10) == bytes.fromhex("33 C0 8A 47 36 8D 0C C0 8D 14"),
             "Status selected-character read changed")
     require(image_bytes(pe, 0x004CEFA5, 7) == bytes.fromhex("8D 0C D5 E8 E0 CF 01"),

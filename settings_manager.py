@@ -25,6 +25,7 @@ DEFAULTS = {
     "pageWrapAround": True,
     "selectionHoldMs": 650,
     "tableRowsPerPage": 15,
+    "panelTabTarget": "hover",
     "panelGapPercent": 1.0,
     "residentHandleWidthPercent": 5.0,
     "mainMenuHeightPercent": 9.0,
@@ -131,12 +132,15 @@ class SettingsStore:
             for key, value in raw_preferences.items()
             if isinstance(key, str) and isinstance(value, int) and (
                 (key.startswith("rows:") and 5 <= value <= 80) or
-                (not key.startswith("rows:") and 1 <= value <= 6)
+                (key == "ui-scale" and 50 <= value <= 150) or
+                (key != "ui-scale" and not key.startswith("rows:") and 1 <= value <= 6)
             )
         } if isinstance(raw_preferences, dict) else {}
         return {
             "updateCheckFrequency": frequency,
+            "modLibraryPath": payload.get("modLibraryPath", "") if isinstance(payload.get("modLibraryPath", ""), str) else "",
             "hoverableAltClick": payload.get("hoverableAltClick", defaults["hoverableAltClick"]) is True,
+            "panelTabTarget": "focus" if payload.get("panelTabTarget", defaults["panelTabTarget"]) == "focus" else "hover",
             "pageWrapAround": payload.get("pageWrapAround", defaults["pageWrapAround"]) is not False,
             "selectionHoldMs": max(150, min(2000, selection_hold_ms)),
             "tableRowsPerPage": max(5, min(40, table_rows_per_page)),
@@ -181,11 +185,16 @@ class SettingsStore:
              main_menu_height_percent: float | None = None,
              sound_enabled: bool | None = None,
              sound_volume_percent: float | None = None,
-             page_wrap_around: bool | None = None) -> dict:
+             page_wrap_around: bool | None = None,
+             panel_tab_target: str | None = None) -> dict:
         """Save per-user preferences. Authenticated authoring state is never persisted."""
         if update_check_frequency not in UPDATE_FREQUENCIES:
             raise ValueError("Choose a listed update-check frequency")
         current = self.snapshot()
+        if panel_tab_target is None:
+            panel_tab_target = current["panelTabTarget"]
+        if panel_tab_target not in ("hover", "focus"):
+            raise ValueError("Choose hovered or focused panel")
         if hoverable_alt_click is None:
             hoverable_alt_click = current["hoverableAltClick"]
         if page_wrap_around is None:
@@ -211,16 +220,29 @@ class SettingsStore:
                 "updateCheckFrequency": update_check_frequency,
                 "hoverableAltClick": bool(hoverable_alt_click),
                 "pageWrapAround": bool(page_wrap_around),
+                "panelTabTarget": panel_tab_target,
                 "selectionHoldMs": selection_hold_ms,
                 "tableRowsPerPage": table_rows_per_page,
                 "panelGapPercent": panel_gap_percent,
                 "mainMenuHeightPercent": main_menu_height_percent,
                 "soundEnabled": bool(sound_enabled),
                 "viewPreferences": stored["viewPreferences"],
+                "modLibraryPath": stored["modLibraryPath"],
             }
             if sound_volume_percent is not None:
                 payload["soundVolumePercent"] = max(0.0, min(100.0, float(sound_volume_percent)))
             self._write(payload)
+        return self.snapshot()
+
+    def set_mod_library_path(self, path: Path) -> dict:
+        """Called after a verified library move, not by ordinary preference save."""
+        path = Path(path)
+        if not path.is_absolute():
+            raise ValueError("The mod library path must be absolute")
+        with self._lock:
+            value = self._read()
+            value["modLibraryPath"] = str(path.resolve())
+            self._write(value)
         return self.snapshot()
 
     def save_packaged_defaults(self, values: dict) -> dict:
@@ -239,6 +261,7 @@ class SettingsStore:
             "updateCheckFrequency": frequency,
             "hoverableAltClick": bool(current["hoverableAltClick"]),
             "pageWrapAround": bool(current["pageWrapAround"]),
+            "panelTabTarget": "focus" if current["panelTabTarget"] == "focus" else "hover",
             "selectionHoldMs": max(150, min(2000, int(current["selectionHoldMs"]))),
             "tableRowsPerPage": max(5, min(40, int(current["tableRowsPerPage"]))),
             "panelGapPercent": max(0.25, min(4.0, float(current["panelGapPercent"]))),
@@ -271,7 +294,7 @@ class SettingsStore:
                 for character in key):
             raise ValueError("Invalid view preference key")
         value = int(value)
-        minimum, maximum = (5, 80) if key.startswith("rows:") else (1, 6)
+        minimum, maximum = (50, 150) if key == "ui-scale" else (5, 80) if key.startswith("rows:") else (1, 6)
         if not minimum <= value <= maximum:
             raise ValueError(f"View preference must be from {minimum} through {maximum}")
         with self._lock:

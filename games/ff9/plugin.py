@@ -151,6 +151,10 @@ PLUGIN = GamePlugin(
         required_paths=("FF9_Launcher.exe", "x64/FF9.exe", "StreamingAssets/p0data2.bin"),
         # #73: use Memoria's existing settings UI on every Play, rather than
         # recreating it in Lexeditor or bypassing it with the game executable.
+        # The launcher sits at the root; the renderer is the 64-bit build
+        # under x64, and that is where a wrapper has to be.
+        reshade_root="x64",
+        reshade_renderer="dxgi",
         launch_path="FF9_Launcher.exe",
         steam_app_id="377840",
         install_dir_names=("FINAL FANTASY IX",),

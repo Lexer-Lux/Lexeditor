@@ -19,6 +19,7 @@
   --lex-muted: #68717a;
   --lex-accent: #30363c;
   --lex-accent-text: #ffffff;
+  --lex-accent-ink: color-mix(in srgb, var(--lex-accent) 25%, var(--lex-text) 75%);
   --lex-highlight: #56616c;
   --lex-success: #34784b;
   --lex-font: "Lexend", "Segoe UI", system-ui, sans-serif;
@@ -2795,13 +2796,9 @@ body.lex-panel-layout-dragging * {
   display: none !important;
 }
 
-/* The panel ends where the pagination bar begins. The extra panel gap here
-   left a band of dead ground above the bar on every page that has one, while
-   the data-map view - which reserves the bar's height and nothing else - had
-   none, so the same bar sat differently from one plugin to the next. One rule,
-   and it is the bar's own measured height. */
+/* Reserve the fixed pagination bar and the same gap used beside panels. */
 body:has(.lex-pager) #main {
-  padding-bottom: var(--lex-pager-height, 56px) !important;
+  padding-bottom: calc(var(--lex-pager-height, 56px) + var(--lex-panel-gap)) !important;
 }
 
 .lex-pager-left,
@@ -2930,7 +2927,7 @@ body:has(.lex-pager) #main {
 
 .lex-page-sized-table .lex-column-list-row {
   min-height:0;
-  font-size:clamp(11px,calc((100vh - 245px) / var(--lex-page-row-count) * .42),18px);
+  font-size:clamp(11px,calc((100vh - 245px) / var(--lex-page-font-row-count,var(--lex-page-row-count)) * .42),18px);
 }
 
 .lex-pager-controls {
@@ -3205,7 +3202,7 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
   line-height:1;
 }
 .lex-source-strip button:hover {
-  color:var(--lex-accent);
+  color:var(--lex-accent-ink);
   text-decoration:underline;
 }
 .lex-reference-tag {
@@ -3497,8 +3494,9 @@ body:has(.lex-data-map-table) #main {
 .lex-settings-lane-user>h3,
 .lex-settings-lane-lexer>h3 { grid-column:1 / -1; }
 
-.lex-settings-lane-lexer {
-  grid-template-columns:repeat(2,minmax(200px,1fr));
+.lex-settings-lane-lexer,
+.lex-settings-lane-developer {
+  grid-template-columns:repeat(2,minmax(0,1fr));
 }
 
 .lex-settings-lane {
@@ -3528,6 +3526,7 @@ body:has(.lex-data-map-table) #main {
 }
 
 .lex-global-setting {
+  min-width:0;
   margin-top: 0;
   padding: 10px;
   border: 1px solid var(--lex-border);
@@ -4314,8 +4313,7 @@ body:has(.lex-data-map-table) #main {
 /* Toggle rails follow the same rule as every other type label: hidden until
    the property is pointed at. */
 .lex-toggle-rail { opacity: 0; transition: opacity .12s ease; }
-.lex-detail-field:hover .lex-toggle-rail,
-.lex-detail-field:focus-within .lex-toggle-rail { opacity: 1; }
+
 
 /* Column highlighting is a hint, not a repaint. */
 .lex-column-list-cell,
@@ -4373,18 +4371,6 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
 }
 html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
   animation: lex-plugin-loading-spin .75s linear infinite !important;
-}
-
-/* ---- Page fit ------------------------------------------------------- */
-/* The fit deliberately waits two quiet layout frames before measuring, so a
-   freshly built table paints at the wrong row height until then. Holding the
-   rows back for those frames removes the resize flash on pin toggles and
-   re-renders; the header stays put so the panel never blanks. */
-.lex-column-list.lex-fitted-page:not([data-lex-fixed-rows]) > .lex-column-list-row {
-  visibility: hidden;
-}
-.lex-column-list.lex-fitted-page[data-lex-fixed-rows] > .lex-column-list-row {
-  visibility: visible;
 }
 
 /* ---- Sort caret ------------------------------------------------------ */
@@ -4474,12 +4460,12 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
   top:50%;
   left:50%;
   display:block;
-  width:9px;
-  height:9px;
+  width:18px;
+  height:18px;
   margin:0;
   content:"\25B2";
   color:var(--lex-highlight);
-  font:700 10px/9px var(--lex-symbol-font);
+  font:700 18px/18px var(--lex-symbol-font);
   text-align:center;
   transform:translate(-50%,-50%);
 }
@@ -4632,6 +4618,10 @@ nav button.active:focus-visible .lex-tab-shortcut,
   display:block;
   min-width:0;
   max-width:100%;
+  /* Bold game fonts can paint outside their advance box. Keep that ink and
+     its shadow inside the clip area; retain ellipsis for narrow tabs. */
+  box-sizing:border-box;
+  padding:.12em .2em;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
@@ -4818,7 +4808,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   font-size:clamp(26px,3.2vw,46px) !important; line-height:1 !important;
   transform:none !important; font-stretch:normal !important; letter-spacing:.04em !important;
 }
-.lex-curve-plot { --lex-curve-margin-right:42px !important; }
+.lex-curve-plot { --lex-curve-margin-right:var(--lex-curve-margin,26px); }
 .lex-curve-axis-top,.lex-curve-axis-bottom {
   left:auto !important; right:7px !important;
   writing-mode:vertical-rl !important; text-orientation:mixed !important;
@@ -5023,7 +5013,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   color:var(--lex-highlight);
   background:color-mix(in srgb,var(--lex-accent) 28%,var(--lex-panel));
 }
-.lex-toggle-rail { position:relative; align-self:stretch; opacity:1; }
+.lex-toggle-rail { position:relative; align-self:stretch; }
 .lex-toggle-type { writing-mode:horizontal-tb; text-orientation:mixed; transform:rotate(-90deg); white-space:nowrap; }
 .lex-toggle-rail > .lex-info-help { display:none !important; }
 /* Pointing at the switch brings its rail up; the swap to the help mark is the
@@ -5077,15 +5067,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 
 /* LEXEDITOR_TOGGLE_RAIL_CONTRACT_20260910 */
-/* One contract for every type rail in the editor, flags included. Pointing at
-   the PROPERTY brings its type codes up; pointing at an individual RAIL swaps
-   that one code for its help mark. A row of flags used to paint eight
-   permanent "BOOL" labels, and the pass that fixed that overcorrected: the
-   rail stayed dark until a switch was pointed at and then went straight to the
-   question mark, so the type code it is there to show was never readable. */
+/* Reserve the rail without showing it until this flag is hovered or reached
+   with the keyboard. Mouse focus must not leave the type visible. */
 .lex-toggle-rail { opacity:0; cursor:help; }
-.lex-detail-field:is(:hover,:focus-within) .lex-toggle-rail,
-.lex-toggle:is(:hover,:focus-within) > .lex-toggle-rail { opacity:1; }
+.lex-toggle:is(:hover,:has(:focus-visible)) > .lex-toggle-rail { opacity:1; }
 /* The code is the rail's resting content, whatever the switch around it is
    doing. */
 .lex-toggle > .lex-toggle-rail > .lex-toggle-type { display:block !important; }
@@ -5176,27 +5161,22 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 
 
-/* LEXEDITOR_SETTINGS_COLUMNS_20260910 */
-/* One scrolling settings page in as many columns as the window allows. CSS
-   columns rather than a resize observer rebuilding lanes: a section never
-   splits across a boundary, and the count follows the panel with no script. */
-.lex-settings-columns {
-  columns:var(--lex-settings-column-width,30em);
-  column-gap:var(--lex-panel-gap,10px);
+/* The framework distributes whole sections into explicit columns. The outer
+   page owns vertical scrolling; CSS multicolumn flow must not fragment it. */
+.lex-tweaks-columns {
+  columns:auto;
   height:100%;
+  min-height:0;
+  min-width:0;
   padding:0;
   overflow-y:auto;
 }
-.lex-settings-columns > * {
-  break-inside:avoid;
-  margin:0 0 var(--lex-panel-gap,10px);
-}
-
+.lex-tweaks-columns > * {margin:0;}
 
 /* A settings column is narrow and its property names are long, so the tenth of
    the row that a wide Detail panel gives a label is not enough here: it wrapped
    "Resident Parameter ID" into three lines. */
-.lex-settings-columns { --lex-detail-label-width:minmax(min(9em,34%),30%); }
+.lex-tweaks-columns { --lex-detail-label-width:minmax(min(9em,34%),30%); }
 
 
 /* LEXEDITOR_NESTED_SETTINGS_SECTION_20260910 */
@@ -5217,9 +5197,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 
 /* LEXEDITOR_RESHADE_REPOSITORY_ROW_20260910 */
-/* The repository row holds three text boxes and a button. Left to the generic
-   action row they each took a third of the panel and the button wrapped alone
-   onto a second line. */
+/* A ReShade action row: a select or a button, kept on one line. */
 .lex-reshade-actions { display:flex;flex-wrap:wrap;align-items:center;gap:6px; }
 .lex-reshade-actions > input[type="text"] { flex:1 1 8em;min-width:6em; }
 .lex-reshade-actions > select { flex:0 1 auto;min-width:0; }
@@ -5351,28 +5329,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 
 /* LEXEDITOR_DIVIDER_GRIP_20260910 */
-/* The grip between two panels is one slim bar, not a field of dots. The dot
-   grid read as a texture rather than a control: it said "something is here"
-   without saying "take hold of this". A bar says which way the thing moves,
-   and it grows and takes the accent under the pointer so the target is
-   unmistakable before the drag starts. */
-.lex-panel-layout-divider::before {
-  width:4px;
-  height:38px;
-  border-radius:999px;
-  background:color-mix(in srgb,var(--lex-border) 88%,var(--lex-text));
-  transition:width .12s ease,height .12s ease,background-color .12s ease;
-}
-.lex-panel-layout-divider:hover::before,
-.lex-panel-layout-divider:focus-visible::before,
-.lex-panel-layout-divider.dragging::before,
-.lex-panel-layout-dragging .lex-panel-layout-divider::before {
-  width:6px;
-  height:52px;
-  background:var(--lex-accent);
-}
-
-
 /* LEXEDITOR_HEADING_RENAME_20260910 */
 /* The record name is edited where it is read: in the panel heading. The box is
    the heading, not a box drawn around it, so the panel looks the same until it
@@ -5500,46 +5456,19 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-copy-value > svg { display:block;width:100%;height:100%; }
 
 
-/* LEXEDITOR_DIVIDER_EDGE_20260911 */
-/* Not a thumb in a track. A thumb is what a scrollbar has, and a scrollbar is
-   what the last one looked like. The divider is an EDGE: at rest it is the
-   hairline between two panels, and pointing at it lights the whole edge in the
-   accent and puts a pair of arrows at the middle to say which way it moves. */
+/* A symmetric resize symbol stays clear without a scrollbar track. */
 .lex-panel-layout-divider::before {
-  top:0;
-  left:50%;
-  width:1px;
-  height:100%;
-  border-radius:0;
-  background:var(--lex-border);
-  transform:translateX(-50%);
-  transition:width .1s ease,background-color .1s ease;
+  top:50%;left:50%;width:16px;height:32px;
+  border:0;border-radius:0;
+  background:currentColor;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 32'%3E%3Cpath d='M1 16 5 12v8ZM15 16 11 12v8Z'/%3E%3Crect x='7' y='6' width='2' height='20'/%3E%3C/svg%3E") center/16px 32px no-repeat;
+  color:var(--lex-muted);
+  transform:translate(-50%,-50%);
 }
 .lex-panel-layout-divider:hover::before,
 .lex-panel-layout-divider:focus-visible::before,
-.lex-panel-layout-divider.dragging::before,
-.lex-panel-layout-dragging .lex-panel-layout-divider::before {
-  width:2px;
-  background:var(--lex-accent);
-}
-.lex-panel-layout-divider::after {
-  position:absolute;
-  top:50%;
-  left:50%;
-  content:"\2039\203A";
-  color:var(--lex-accent);
-  font:700 13px/1 var(--lex-symbol-font);
-  letter-spacing:-1px;
-  opacity:0;
-  transform:translate(-50%,-50%);
-  transition:opacity .1s ease;
-  pointer-events:none;
-}
-.lex-panel-layout-divider:hover::after,
-.lex-panel-layout-divider:focus-visible::after,
-.lex-panel-layout-divider.dragging::after,
-.lex-panel-layout-dragging .lex-panel-layout-divider::after { opacity:1; }
-
+.lex-panel-layout-divider.dragging::before {color:var(--lex-highlight);}
+.lex-panel-layout-divider::after {content:none;}
 
 /* LEXEDITOR_TAB_ROWS_EVEN_20260911 */
 /* A bar that has to wrap splits its tabs evenly between the rows, rather than
@@ -5705,92 +5634,47 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 
 
-/* LEXEDITOR_BOOLEAN_ROW_GRID_20260911 */
-/* One grid holds the whole right-hand end of a boolean row. Row one is the
-   leader arrow and the checkbox it points at, so the arrow is centred on the
-   BOX rather than on the row and cannot drift when the row grows. Row two is
-   the reading, in the box's column, exactly the box's width. */
-.lex-boolean-field > .lex-detail-field-label { padding-right:0 !important; }
+/* The checkbox sets the normal row height. References use its bottom padding,
+   outside normal flow, and cannot enlarge the row. */
+.lex-detail-field.lex-boolean-field {min-height:0;}
+.lex-boolean-field > .lex-detail-field-label {overflow:visible;padding-right:0 !important;}
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control {padding-block:8px;align-self:stretch;}
 .lex-boolean-field .lex-detail-field-control > .lex-source-control {
-  display:grid !important;
-  /* Column two is the checkbox's own size, so the reading under it can never
-     be wider than the box it reads for. Left to max-content the column grew to
-     whichever of the two was wider, and a two-glyph reading pushed its own
-     left edge nine pixels past the box. */
   --lex-boolean-box:19px;
-  grid-template-columns:minmax(12px,1fr) var(--lex-boolean-box);
-  grid-template-rows:max-content max-content;
-  align-content:center;
-  justify-items:end;
-  column-gap:3px;
-  row-gap:3px;
-  padding-block:3px;
-  width:100%;
-  height:auto;
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) var(--lex-boolean-box);
+  grid-template-rows:minmax(19px,1fr);
+  column-gap:1vw;row-gap:0;align-items:center;align-content:stretch;
+  padding:0 0 0 1vw;box-sizing:border-box;
+  width:100%;height:auto;min-height:19px;position:relative;overflow:visible;
 }
 .lex-boolean-field .lex-source-control > .lex-field-boolean-arrow {
-  grid-area:1 / 1 / 2 / 2;
-  align-self:center;
-  justify-self:stretch;
-  width:auto;
-  min-width:12px;
-  margin:0;
+  grid-area:1/1;align-self:center;justify-self:stretch;
+  width:auto;min-width:0;margin:0;
 }
+.lex-boolean-field .lex-field-boolean-arrow::after {top:50%;transform:translateY(-50%);}
 .lex-boolean-field .lex-detail-field-control > .lex-source-control > input[type="checkbox"] {
-  /* Explicit areas, because an auto-placed sibling (the pin) was enough to
-     open an implicit column and slide the reading out from under the box. */
-  grid-area:1 / 2 / 2 / 3;
-  box-sizing:border-box;
-  width:var(--lex-boolean-box);
-  height:var(--lex-boolean-box);
-  margin:0 !important;
+  grid-area:1/2;align-self:center;justify-self:end;
+  width:19px;height:19px;margin:0 !important;
 }
 .lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
-  position:static !important;
-  grid-area:2 / 2 / 3 / 3;
-  justify-self:stretch;
-  align-self:center;
-  width:100% !important;
-  min-width:0;
-  max-width:100%;
-  overflow:hidden;
-  margin:0 !important;
-  padding:0;
-  transform:none;
-  /* `translate` is its own property now, so `transform:none` does not clear
-     it. A stray -50% left over from the old centred rail was sliding the
-     reading half its own width off the box it reads for. */
-  translate:none !important;
-  font-size:9px;
-  line-height:1;
+  position:absolute !important;top:calc(50% + 9.5px);bottom:-8px;right:0;left:auto;
+  width:19px !important;height:auto;min-width:0;max-width:none;
+  display:flex;align-items:center;justify-content:center;
+  overflow:visible;margin:0 !important;padding:0;transform:none;translate:none !important;
+  font:10px/1 var(--lex-symbol-font);
 }
 .lex-boolean-field .lex-reference-values .lex-reference-value {
-  grid-template-columns:auto auto;
-  justify-content:center;
-  column-gap:.25em;
-  padding:0;
+  display:flex;align-items:center;justify-content:center;gap:2px;
+  padding:0;min-width:0;max-width:none;overflow:visible;width:auto;height:auto;
 }
-/* The pin rides the row's own right margin - the band the row already keeps
-   clear past every value box - and it takes the checkbox's grid row, so it
-   lines up with the box without being told a pixel offset. Anywhere inside the
-   control it lands ON the checkbox, which is small enough that a pin covers it
-   whole. */
-.lex-boolean-field .lex-detail-field-control > .lex-source-control {
-  grid-template-columns:minmax(12px,1fr) var(--lex-boolean-box) 0;
-  column-gap:0;
+.lex-boolean-field .lex-reference-values :is(.lex-reference-tag,.lex-reference-text,.lex-boolean-mark) {
+  display:block;overflow:visible;min-width:0;max-width:none;width:auto;
+  margin:0;padding:0;flex:none;font-size:inherit;line-height:inherit;text-overflow:clip;
 }
-.lex-boolean-field .lex-source-control > .lex-field-boolean-arrow { margin-right:3px; }
-.lex-detail-field.lex-boolean-field .lex-source-control > .lex-column-pin,
-.lex-detail-field.lex-boolean-field > .lex-detail-field-control > .lex-column-pin {
-  grid-area:1 / 3 / 2 / 4;
-  position:static !important;
-  align-self:center;
-  justify-self:start;
-  margin-left:2px;
-  inset:auto !important;
-  transform:none !important;
+.lex-detail-field.lex-boolean-field .lex-column-pin {
+  position:absolute !important;margin:0;bottom:auto !important;transform:none !important;
 }
-
 
 /* LEXEDITOR_FLAG_BOX_FILL_20260911 */
 /* The flag boxes use the whole width of the row. They were shrinking to their
@@ -5832,10 +5716,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-pager > * { min-height:0; }
 .lex-pager-search { height:32px; }
 
-/* Text you can follow says so at rest, the way a link does, rather than only
-   admitting it once the pointer is already on it. */
+/* Record links keep the normal text color; hover and focus mark the action. */
 .lex-hoverable {
-  color:var(--lex-link, color-mix(in srgb, var(--lex-accent) 72%, var(--lex-text)));
+  color:inherit;
   text-decoration-color:color-mix(in srgb, currentColor 45%, transparent);
   text-underline-offset:.16em;
 }
@@ -6037,15 +5920,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-curve-formula { margin-top:-4px;height:2.2em; }
 
 
-/* LEXEDITOR_ID_COLUMN_WIDTH_20260911 */
-/* An ID column holds four or five digits, so it takes four or five digits of
-   the table. Left to share the grid it took a fifth of the width on a
-   two-column table and squeezed the name it sits in front of. A plugin can
-   still set its own width; this is the floor for one that does not. */
-.lex-column-list-head-cell.lex-numbered-id-cell,
-.lex-column-list-cell.lex-numbered-id-cell { max-width:11ch; }
-
-
 /* LEXEDITOR_FORMULA_TYPESETTING_20260911 */
 /* A formula is mathematics, so it is set like mathematics: an italic serif for
    the letters, upright for the numbers and operators, and figures that line up
@@ -6067,7 +5941,8 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 /* The shared Tweaks layout, in RDR2's shape with none of RDR2's styling: real
    columns dealt by the framework, so a card is never cut in half across a
    column break the way CSS columns do it. */
-.lex-settings-lane {
+.lex-tweaks-columns > .lex-settings-lane {
+  box-sizing:border-box;
   display:grid;
   grid-auto-flow:column;
   grid-auto-columns:minmax(0,1fr);
@@ -6082,7 +5957,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   gap:var(--lex-panel-gap, 12px);
   min-width:0;
 }
-.lex-settings-columns:has(> .lex-settings-lane) {
+.lex-tweaks-columns:has(> .lex-settings-lane) {
   display:block;
   column-count:auto;
 }
@@ -6100,3 +5975,286 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   font-size:12px;
   line-height:1.45;
 }
+
+.lex-integration-status.partial .lex-status-mark { background:#9a6818; }
+
+/* Shared interaction geometry. */
+.lex-detail-field-label { overflow:visible !important; }
+.lex-detail-field-label-text { overflow:visible; }
+.lex-toggle { justify-content:flex-start !important; gap:7px; padding-inline:7px; }
+.lex-toggle-row > .lex-toggle { width:fit-content; justify-self:start; }
+.lex-toggle-rail { flex:0 0 14px; width:14px; min-width:14px; }
+/* The name takes the rest of its box, so the space after it is the box's
+   own padding rather than whatever the grid track had left over. That is
+   what makes the gap before the switch and the gap after the name the
+   same on every flag in the row. */
+.lex-toggle-name { flex:1 1 auto; min-width:0; }
+.lex-reference-values .lex-boolean-mark { overflow:visible; }
+.lex-shell-header button:is(:active,.lex-command-pressed) { background:var(--lex-accent) !important; color:var(--lex-accent-text) !important; }
+.lex-control-held button[data-shortcut-key] { position:relative; }
+.lex-control-held button[data-shortcut-key] > * { visibility:hidden; }
+.lex-control-held button[data-shortcut-key]::after { content:attr(data-shortcut-key); position:absolute; inset:0; display:grid; place-items:center; color:inherit; font:700 13px/1 var(--lex-font); }
+.lex-control-held nav button:not(.active) .lex-tab-shortcut { opacity:1 !important; visibility:visible !important; display:grid !important; }
+.lex-control-held nav button.active .lex-tab-shortcut { visibility:hidden !important; }
+
+.lex-curve-plot::before { font-size:clamp(24px,calc(110cqw / var(--lex-curve-title-chars,10)),110px); }
+
+/* Flag boxes share the row and use all of it. Sized to their own content
+   they came out different widths with a band of dead space on the right,
+   which is the state that reads as a broken row rather than a set of
+   switches. The basis is the wrap threshold: boxes that no longer fit at
+   that width move to the next line and share it in turn. */
+/* Flag boxes are one set, so they are one width and they use the whole row.
+   Sized to their own content they came out ragged with a band of dead space
+   on the right; laid out as wrapping flex items the one left alone on the
+   last line stretched to seven times its neighbours. Equal grid tracks do
+   both: every box the same width, and the row filled across. */
+.lex-toggle-row {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--lex-toggle-basis,11em)),1fr));
+  gap:var(--lex-panel-gap,12px);
+}
+.lex-toggle-row > .lex-toggle { min-width:0; max-width:100%; width:auto; justify-self:stretch; }
+
+.lex-ui-scale {display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;margin:0 7px 0 0;color:var(--lex-text);font:12px/1 system-ui,sans-serif;text-shadow:none;}
+.lex-ui-scale input[type="range"] {width:64px;min-width:0;max-width:64px;height:18px;min-height:0;margin:0;padding:0;accent-color:var(--lex-accent);border:0;box-shadow:none;}
+.lex-ui-scale output {width:4ch;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:right;}
+
+@media (max-width:700px) {
+  .lex-global-settings .lex-settings-lane {grid-template-columns:minmax(0,1fr);}
+}
+
+/* Popup copy is centered; each action shares the full button row. */
+.lex-dialog:not(.lex-global-settings) {text-align:center;}
+.lex-dialog:not(.lex-global-settings) .lex-dialog-actions {justify-content:stretch;}
+.lex-dialog:not(.lex-global-settings) .lex-dialog-actions > button {flex:1 1 0;min-width:0;}
+
+/* Multi-row fields supply their own copy buttons in the shared copy lane. */
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control > .lex-multi-number {
+  grid-column:1 / -1;
+}
+
+/* Desktop plugin pages scroll inside their panels, never at the viewport. */
+html:has(body > .lex-shell-header) {height:100%;overflow:hidden;}
+body:has(> .lex-shell-header) {height:100dvh;max-height:100dvh;min-height:0;overflow:hidden;}
+body:has(> .lex-shell-header) > main {min-height:0;}
+
+/* Linked names truncate inside their button, including in narrow barrels. */
+.lex-hoverable { max-width:100%; }
+.lex-hoverable-label { display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.lex-hoverable > :is(img,svg) { flex-shrink:0; }
+
+.lex-value-modified > :is(input,select,textarea,output),
+.lex-value-modified > .lex-unit-field > :is(input,select,output),
+.lex-value-modified > :not(.lex-reference-values):not(.lex-reference-placeholder) .lex-hoverable { color:var(--lex-accent-ink)!important; }
+
+/* Keep tab help beside its label at every navigation density. */
+.lex-subtab-button:has(> .lex-info-help) { display:flex;align-items:center;justify-content:center; }
+.lex-subtab-button > .lex-info-help { flex:0 0 18px;position:relative; }
+.lex-subtab-button:has(> .lex-info-help) > .lex-tab-label { flex:0 1 auto;min-width:0; }
+
+/* Titles contribute to column minima and must not split inside a word. */
+.lex-column-list-head-cell .header-label { white-space:nowrap;overflow-wrap:normal;word-break:normal; }
+
+/* Reusable property grids reserve room for the label, value and reference rail.
+   A flag group needs a full row; squeezing it into a numeric cell hides labels. */
+.lex-property-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,26rem),1fr));
+  gap:4px 12px;
+  min-width:0;
+  align-items:start;
+}
+.lex-property-grid > .lex-detail-field { min-width:0; }
+.lex-property-grid > .lex-detail-field:has(input[type="checkbox"]) { grid-column:1 / -1; }
+.lex-property-grid .flag-list { grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr)); }
+.lex-property-grid .flag-list label { min-width:0;overflow-wrap:normal; }
+.lex-property-grid .flag-list input[type="checkbox"] { flex:0 0 auto;width:18px;min-height:18px;height:18px; }
+
+/* Long text uses the full control width, with its property label above it. */
+.lex-detail-field.lex-detail-field-stacked {
+  grid-template-columns:minmax(0,1fr)!important;
+  padding:0!important;
+  align-items:start!important;
+}
+.lex-detail-field-stacked > .lex-detail-field-label {
+  padding:6px 8px 6px var(--lex-field-type-gutter);
+  justify-content:flex-start;
+  text-align:left;
+}
+.lex-detail-field-stacked > .lex-detail-field-control { padding:0; }
+.lex-detail-field-stacked > .lex-field-type-rail { top:0;bottom:auto;height:30px; }
+
+.lex-detail-field.lex-detail-field-stacked > .lex-detail-field-control {
+  display:block;
+  padding:0!important;
+  position:static;
+}
+.lex-detail-field.lex-detail-field-stacked > .lex-detail-field-label {
+  contain:none;
+  min-height:30px;
+  padding-right:30px;
+}
+.lex-detail-field.lex-detail-field-stacked > .lex-detail-field-control > .lex-copy-value {
+  position:absolute;
+  top:7px;
+  right:8px;
+  left:auto;
+  transform:none;
+}
+
+/* Provenance checkboxes keep the ordinary property label track. The arrow
+   and checkbox share the remaining track, with a fixed gap at the tip. */
+.lex-detail-field.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control) {
+  grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr);
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  column-gap:4px;
+  padding-left:12px;
+}
+.lex-boolean-field .lex-source-control > .lex-field-boolean-arrow {
+  background:currentColor;
+  opacity:.65;
+  height:8px;
+  /* One filled shape: the shaft stops at the arrowhead, with no seam. */
+  clip-path:polygon(0 43.75%,calc(100% - 6px) 43.75%,calc(100% - 6px) 0,100% 50%,calc(100% - 6px) 100%,calc(100% - 6px) 56.25%,0 56.25%);
+}
+.lex-boolean-field .lex-source-control > .lex-field-boolean-arrow::after { content:none; }
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control { padding-block:17px; }
+.lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
+  grid-area:auto;top:calc(50% + 12.5px);bottom:auto;height:12px;
+}
+.lex-toggle-row > .lex-toggle { padding:5px 12px;gap:8px; }
+/* Reference colors identify sources. They are not the editable-value accent. */
+.lex-source-control-internal .lex-reference-value {
+  overflow:visible;
+  padding-inline:2px;
+}
+.lex-source-control-internal .lex-reference-text { overflow:visible; }
+.lex-detail-field.lex-boolean-field .lex-column-pin {
+  overflow:visible;
+}
+
+.lex-detail-field.lex-boolean-field > .lex-column-pin {
+  top:2px!important;
+  right:28px!important;
+}
+
+/* Panel tabs occupy the bottom edge. Page navigation stays in the shell. */
+.lex-tabbed-panel > .lex-subtab-bar,
+/* The tweak page's own subtab bar sits where every other page's does: at
+   the top, full width. It was ordered last and pushed to the bottom, which
+   put the same control in a different place on this page than on all the
+   others and left it as a small strip beside the pager. */
+.lex-settings-columns > .lex-subtab-bar {
+  order:0; margin-top:0; margin-bottom:var(--lex-panel-gap,12px);
+  /* The bar spans the page and its groups share the width evenly, which
+     is how it read when it lived in the toolbar above. Left as content
+     width it becomes a small strip in the corner of a very wide page. */
+  align-self:stretch;
+}
+.lex-settings-columns > .lex-subtab-bar > button { flex:1 1 0; min-width:0; }
+.lex-bottom-tab-panel { display:flex!important;flex-direction:column!important;min-height:0; }
+.lex-bottom-tab-panel > .lex-subtab-bar { order:100;flex:0 0 auto;margin-top:auto; }
+.lex-bottom-tab-panel > :not(.lex-subtab-bar) { min-height:0; }
+.lex-bottom-tab-panel > :not(.lex-subtab-bar):last-child { flex:1;overflow:auto; }
+
+
+.lex-save-preview{width:max-content;max-width:min(620px,calc(100vw - 16px));max-height:min(480px,70vh);overflow:auto;white-space:normal;pointer-events:auto}
+.lex-save-preview ul{padding-left:20px;margin:8px 0}
+.lex-save-preview li{margin:8px 0;overflow-wrap:anywhere}
+.lex-save-preview li div{white-space:pre-wrap}
+
+.lex-multi-edit-notice{padding:8px;border-bottom:1px solid var(--lex-border);font-size:14px;grid-column:1/-1}
+
+/* Tweaks pages always have their own scroll area and a reachable pager. */
+body:has(> main .lex-tweaks-paged) { display:flex; flex-direction:column; }
+body:has(> main .lex-tweaks-paged) > :not(main) { flex-shrink:0; }
+body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
+.lex-tweaks-paged { display:flex !important; flex-direction:column; height:100%; min-height:0; min-width:0; overflow:hidden;
+  /* Stretch, not start. This is a column, so align-items is the width,
+     and .lex-settings-columns sets start for its grid form - which left
+     the dealt cards shrunk to their content with the rest of the page
+     empty beside them. */
+  align-items:stretch; }
+.lex-tweaks-scroll { flex:1 1 0; min-height:0; overflow:auto; overscroll-behavior:contain; }
+.lex-tweaks-pages { flex:0 0 auto; min-width:0; }
+/* Dealt columns, not a grid: a grid row takes the height of its tallest
+   card and opens a band of empty panel across the rest of that row. Each
+   column here packs on its own. */
+.lex-tweak-card-grid { display:flex; align-items:flex-start; gap:var(--lex-panel-gap,12px); min-width:0; }
+.lex-tweak-column { display:flex; flex:1 1 0; flex-direction:column; gap:var(--lex-panel-gap,12px); min-width:0; }
+.lex-tweak-off-page { display:none !important; }
+.lex-tweaks-scroll > .settings-view { height:auto; overflow:visible; }
+.lex-platform-config:has(> .lex-tweaks-paged) { display:flex; flex-direction:column; height:100%; min-height:0; }
+.lex-platform-config > .lex-tweaks-paged { flex:1 1 0; }
+
+.lex-detail-panel > .lex-tweaks-paged { flex:1 1 0; }
+.lex-tweaks-scroll > .lex-detail-panel-body { height:auto; overflow:visible; }
+
+
+/* LEXEDITOR_PLATFORM_FIELD_STACK_20260912
+   These fields sit in cells about three hundred pixels wide. The shared
+   property row puts the name in a lane of about a tenth of the row, which here
+   is fifty pixels - not enough for "DISPLAY INDEX", so the name broke into a
+   vertical stack of two-letter fragments and the control beside it read as
+   belonging to nothing. In a column this narrow the name goes above its
+   control and both take the full width. Last in the file because the shared
+   row asserts its own two-column template with !important further up. */
+.lex-platform-config-field.lex-detail-field {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  gap:3px;
+  align-items:start;
+}
+.lex-platform-config-field.lex-detail-field > .lex-detail-field-label,
+.lex-platform-config-field.lex-detail-field > .lex-detail-field-control {
+  grid-column:1 !important;
+  justify-content:flex-start !important;
+  justify-self:stretch;
+  text-align:left !important;
+}
+.lex-platform-config-field.lex-detail-field > .lex-detail-field-label {
+  contain:none !important;
+  height:auto !important;
+  min-height:0;
+  padding-right:0 !important;
+  overflow:visible;
+}
+.lex-platform-config-field.lex-detail-field > .lex-detail-field-label
+  > .lex-detail-field-label-text {
+  overflow-wrap:break-word;
+  white-space:normal;
+  /* The label fitter scales a name down to fit a fixed lane. There is no fixed
+     lane here, so the name keeps its own size. */
+  transform:none !important;
+  font-size:inherit !important;
+}
+
+/* ReShade is the one helper row that installs itself, so its control sits
+   beside the release-notes link rather than replacing it. */
+.lexer-helper-install {
+  margin-top: 0.5em; margin-right: 0.6em; padding: 0.32em 0.9em;
+  font: inherit; font-size: 0.85em; letter-spacing: 0.04em; text-transform: uppercase;
+  color: inherit; background: transparent; cursor: pointer;
+  border: 1px solid currentColor; border-radius: 2px; opacity: 0.85;
+}
+.lexer-helper-install:hover:not(:disabled) { opacity: 1; }
+.lexer-helper-install:disabled { opacity: 0.5; cursor: default; }
+
+/* ReShade on a Tweaks page: one big switch, then each effect with its own. */
+.lex-reshade-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:10px 0 14px; }
+.lex-reshade-master { display:flex; align-items:center; gap:12px; cursor:pointer; }
+.lex-reshade-master input { appearance:none; position:relative; width:64px; height:34px; margin:0; border-radius:17px; background:var(--lex-panel-2, #3a3a3a); border:1px solid var(--lex-border); cursor:pointer; transition:background .15s; }
+.lex-reshade-master input::after { content:""; position:absolute; top:3px; left:3px; width:26px; height:26px; border-radius:50%; background:var(--lex-text); transition:transform .15s; }
+.lex-reshade-master input:checked { background:var(--lex-accent); }
+.lex-reshade-master input:checked::after { transform:translateX(30px); }
+.lex-reshade-master input:focus-visible { outline:2px solid var(--lex-highlight); outline-offset:2px; }
+.lex-reshade-master-label { font-weight:700; font-size:1.15em; }
+.lex-reshade-note, .lex-reshade-error { margin:0 0 10px; }
+.lex-reshade-error { color:#c0392b; }
+.lex-reshade-effect-toggle { display:inline-flex; align-items:center; gap:8px; cursor:pointer; }
+.lex-reshade-effect.off .lex-detail-section-content { opacity:.55; }
+.lex-reshade-slider { display:flex; align-items:center; gap:8px; width:100%; }
+.lex-reshade-slider input[type="range"] { flex:1 1 auto; min-width:0; }
+.lex-reshade-slider input[type="number"] { flex:0 0 5.5em; width:5.5em; }

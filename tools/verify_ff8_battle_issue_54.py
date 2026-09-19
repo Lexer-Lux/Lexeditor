@@ -156,13 +156,61 @@ def main() -> int:
         (battle.DRAW_EXIT_CAVE, battle._battle_exit_payload()),
         (battle.DRAW_RESULT_CAVE, battle._draw_result_payload()),
         (battle.DRAW_TARGET_MASK_CAVE, battle._draw_target_mask_payload()),
-        (battle.DRAW_SELECT_CAVE, battle._draw_select_payload()),
+        (battle.DRAW_SELECT_CAVE, battle._draw_select_payload(summon_gate=True)),
         (battle.DRAW_STATE, bytes(4)),
-        (battle.DRAW_RENDER_CAVE, battle._draw_render_payload()),
+        (battle.DRAW_RENDER_CAVE, battle._draw_render_payload(summon_gate=True)),
+        (battle.SUMMON_GATE_CAVE, battle._summon_gate_payload()),
+        (battle.SUMMON_REFUSED_FLAG, bytes(4)),
     ]
     for (address, payload), (next_address, _) in zip(caves, caves[1:]):
         assert address + len(payload) <= next_address
     assert caves[-1][0] + len(caves[-1][1]) <= 0x0279F600
+
+    # Summon's gate. The greying and the refusal are FF8's own: setting bit 1
+    # of the entry's flags byte is the whole mechanism, and the two sites that
+    # read it are the two this patch already owns.
+    assert battle.GF_COMMAND_ID == 3
+    assert battle.COMMAND_FLAG_DISABLED == 0x02
+    for address, expected in battle.COMMAND_DISABLED_SITES.items():
+        assert read(address, len(expected)) == expected
+    for address, expected in battle.COMMAND_ENTRY_SITES.items():
+        assert read(address, len(expected)) == expected
+    gate = battle._summon_gate_payload()
+    # It reads the acting actor, that actor's character id, and that
+    # character's junctioned-GF mask - the same mask Single GF normalizes.
+    assert battle.ACTIVE_BATTLE_ACTOR.to_bytes(4, "little") in gate
+    assert (battle.BATTLE_ACTOR_BASE +
+            battle.BATTLE_ACTOR_CHARACTER_ID).to_bytes(4, "little") in gate
+    assert (battle.SAVEMAP_CHARACTER_BASE +
+            battle.GF_MASK_OFFSET).to_bytes(4, "little") in gate
+    assert gate.endswith(bytes.fromhex("5A 59 5B C3")), "the gate must restore what it saved"
+    assert gate.startswith(bytes.fromhex("53 51 52"))
+    # Both callers branch on the GF command id and nothing else.
+    gated_select = battle._draw_select_payload(draw_once=False, summon_gate=True)
+    gated_render = battle._draw_render_payload(draw_once=False, summon_gate=True)
+    assert bytes.fromhex("80 3B 03") in gated_select      # cmp byte [ebx], 3
+    assert bytes.fromhex("80 39 03") in gated_render      # cmp byte [ecx], 3
+    assert bytes.fromhex("80 CB 02") in gated_render      # or bl, 2
+    assert battle.SUMMON_REFUSED_FLAG.to_bytes(4, "little") in gated_select
+    # The render path's EAX carries the sprite state its displaced code reads,
+    # so the gate call is wrapped in a save and restore.
+    assert bytes.fromhex("50") + bytes.fromhex("E8") in gated_render
+    # Off by default in both, so nothing else in the file changed shape.
+    assert bytes.fromhex("80 3B 03") not in battle._draw_select_payload()
+    assert bytes.fromhex("80 39 03") not in battle._draw_render_payload()
+    summon_patch = battle.build_command_eligibility_patch(
+        draw_once=False, summon_gate=True)
+    assert f"{battle.SUMMON_REFUSED_FLAG:X}:4" in summon_patch
+    assert f"{battle.SUMMON_GATE_CAVE:X}:" in summon_patch
+    assert f"{battle.DRAW_TARGET_MASK_HOOK:X} = " not in summon_patch, (
+        "Summon does not filter targets and must not take that hook"
+    )
+    assert battle.build_command_eligibility_patch(
+        draw_once=False, summon_gate=False) == ""
+    assert battle.summon_command_available(junctioned_gf_count=1)
+    assert not battle.summon_command_available(junctioned_gf_count=0)
+    assert battle.summon_unavailable_reason(junctioned_gf_count=0)
+    assert battle.summon_unavailable_reason(junctioned_gf_count=2) == ""
 
     gameplay = (ROOT / "games" / "ff8" / "gameplay_settings.py").read_text(encoding="utf-8")
     editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
@@ -177,7 +225,14 @@ def main() -> int:
     assert '"aria-label":"Command Menu Rework"' in editor
     assert "fixedCommandMenu:state.data.settings.fixedCommandMenu" in editor
     generated = gameplay_settings.build_hext(25, False, False, False, True)
-    assert draw_patch.rstrip() in generated
+    # Every build carries Summon's gate, so the composed patch is what the
+    # generated file must contain, not the Draw-only one.
+    composed = battle.build_command_eligibility_patch(
+        draw_once=True, better_card=False, streamlined_draw=False,
+        summon_gate=battle.DEFAULT_SUMMON_GATE)
+    assert composed.rstrip() in generated
+    assert battle.DEFAULT_SUMMON_GATE is True
+    assert f"{battle.SUMMON_GATE_CAVE:X}:" in generated
     shoot_patch = gameplay_settings.build_hext(
         25, False, True, False, False, fixed_command_menu_enabled=True,
     )

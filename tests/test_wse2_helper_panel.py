@@ -39,6 +39,9 @@ class HelperPanelTests(unittest.TestCase):
         self.api._settings=SimpleNamespace(snapshot=lambda:{'updateCheckFrequency':'never'})
         self.api._github=Mock();self.api._github.visible_repository.return_value={'repository':'Lexer-Lux/Lexeditor','login':'Lexer-Lux'}
         self.api._installations=self.manager;self.api._lock=threading.RLock();self.api._helper_versions=None
+        # ReShade shares one copy across every game and is checked over the
+        # network. This panel's behaviour is the subject here, not that check.
+        self.api._reshade_helper_row=Mock(return_value={'helper':'ReShade','pluginId':'','installable':True,'behind':False})
 
     def test_plugin_registers_pin_and_all_root_aware_hooks(self):
         self.assertEqual(PLUGIN.helper_name,'WSE2')
@@ -100,7 +103,10 @@ class HelperPanelTests(unittest.TestCase):
         self.api._plugins['test-helper']=other
         self.manager._plugins['test-helper']=other
         self.manager._states['test-helper']=self.manager._state('not-added','Absent',root=None)
-        rows=self.api.helper_versions()['helpers'];self.assertEqual(len(rows),2)
+        rows=self.api.helper_versions()['helpers']
+        plugin_rows=[row for row in rows if row['pluginId']]
+        self.assertEqual(len(plugin_rows),2)
+        self.assertEqual([row['helper'] for row in rows if not row['pluginId']],['ReShade'])
         self.assertTrue(next(row for row in rows if row['pluginId']=='warband')['latest'])
         self.assertIn('error',next(row for row in rows if row['pluginId']=='test-helper'))
 

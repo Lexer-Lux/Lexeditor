@@ -400,3 +400,14 @@ def native_window_metrics(window) -> dict:
     _invoke(native, read)
     result["appUserModelId"] = current_process_identity()
     return result
+
+
+def set_ui_scale(window, percent: int) -> None:
+    """Set page zoom while disabling browser zoom shortcuts and pinch zoom."""
+    native = _native_form(window)
+    def apply():
+        view = native.webview
+        view.CoreWebView2.Settings.IsZoomControlEnabled = False
+        view.CoreWebView2.Settings.IsPinchZoomEnabled = False
+        view.ZoomFactor = percent / 100.0
+    _invoke(native, apply)

@@ -62,7 +62,53 @@ int main() {
     assert(displacement(adopted,handed_back) < 100.0);
     assert(displacement(adopted,start) > 100.0);
 
-    std::cout << "Battle camera policy: idle gate, zero-drift center/deadzone, proportional X/Y orbit, radius preservation and handed-back baseline passed\n";
+    // Camera speed. The same stick push turns further at a higher setting and
+    // less at a lower one, and a setting outside the usable range is brought
+    // back into it rather than obeyed.
+    Vec3s slow=start, normal=start, fast=start;
+    assert(orbit(slow,target,255,128,0.035f,0.025f,0.4f));
+    assert(orbit(normal,target,255,128));
+    assert(orbit(fast,target,255,128,0.035f,0.025f,2.5f));
+    assert(displacement(slow,start) < displacement(normal,start));
+    assert(displacement(normal,start) < displacement(fast,start));
+    Vec3s absurd=start, ceiling=start;
+    assert(orbit(absurd,target,255,128,0.035f,0.025f,900.0f));
+    assert(orbit(ceiling,target,255,128,0.035f,0.025f,MAX_SPEED_SCALE));
+    assert(displacement(absurd,ceiling) < 1.5);
+    Vec3s zero=start, floor_rate=start;
+    assert(orbit(zero,target,255,128,0.035f,0.025f,0.0f));
+    assert(orbit(floor_rate,target,255,128,0.035f,0.025f,DEFAULT_SPEED_SCALE));
+    assert(displacement(zero,floor_rate) < 1.5);
+
+    // The floor. Holding the stick down can bring the camera level with what it
+    // is looking at and no lower: below that it is inside the battlefield.
+    Vec3s sinking=start;
+    for (int i=0;i<600;++i) orbit(sinking,target,128,255);
+    assert(sinking.y >= target.y - 2);
+    // The floor a scene sets for itself. FF8 hands the camera back below level
+    // here, so that pose is this battle's floor: the reader can sink to it and
+    // no further, rather than being clamped up to level.
+    Floor floor;
+    Vec3s low{start.x,static_cast<std::int16_t>(target.y-300),start.z};
+    assert(!orbit(low,target,128,128,0.035f,0.025f,1.0f,&floor));  // centred: learn
+    assert(floor.known);
+    assert(floor.pitch < 0.0f);
+    const float learned=floor.pitch;
+    Vec3s driven=low;
+    for (int i=0;i<600;++i) orbit(driven,target,128,255,0.035f,0.025f,1.0f,&floor);
+    assert(driven.y <= target.y - 1);   // not lifted to level
+    assert(driven.y >= low.y - 2);      // and not driven below the scene's pose
+
+    // A different battle starts from its own pose, not the last one's.
+    Vec3s high{start.x,static_cast<std::int16_t>(target.y+400),start.z};
+    assert(!orbit(high,target,128,128,0.035f,0.025f,1.0f,&floor));
+    assert(floor.known && floor.pitch == 0.0f);
+    assert(learned < floor.pitch);
+    Vec3s again=high;
+    for (int i=0;i<600;++i) orbit(again,target,128,255,0.035f,0.025f,1.0f,&floor);
+    assert(again.y >= target.y - 2);
+
+    std::cout << "Battle camera policy: idle gate, zero-drift center/deadzone, proportional X/Y orbit, radius preservation, speed scaling, per-scene ground floor and handed-back baseline passed\n";
 }
 '''
 
