@@ -42,6 +42,15 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertNotIn('data-tab="datamap"', text)
         self.assertNotIn('data-tab="deployment"', text)
 
+    def test_structured_editors_use_shared_paged_table_and_detail_controls(self):
+        text = EDITOR.read_text(encoding="utf-8")
+        self.assertIn("LexeditorUI.pagedListDetail({", text)
+        self.assertIn("LexeditorUI.columnList({", text)
+        self.assertIn("LexeditorUI.detailPanel({", text)
+        self.assertIn("LexeditorUI.infoHelp(", text)
+        self.assertIn('type:"checkbox"', text)
+        self.assertNotIn('class="split"', text)
+
     def test_animation_mesh_ui_exposes_only_single_value_typed_fields(self):
         text = EDITOR.read_text(encoding="utf-8")
         for field_name in ("keepMeshAnimations", "meshFile", "postProcess"):
