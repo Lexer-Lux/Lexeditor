@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -37,6 +39,28 @@ class StardewContentPackTests(unittest.TestCase):
             "MinimumVersion": "2.9.0",
         })
         self.assertEqual(content["Format"], "2.9.0")
+
+    def test_project_env_can_override_default_root_for_isolated_candidate(self):
+        isolated = self.root / "stardew-pr465-isolated"
+        environment = {**os.environ, "LEXEDITOR_STARDEW_PROJECT": str(isolated)}
+        output = subprocess.check_output(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "from games.stardew_valley import paths; "
+                    "from games.stardew_valley.plugin import PLUGIN; "
+                    "print(paths.DEFAULT_PROJECT_ROOT); "
+                    "print(paths.PROJECT_ROOT); "
+                    "print(PLUGIN.projects.default_root)"
+                ),
+            ],
+            cwd=Path(__file__).resolve().parents[1],
+            env=environment,
+            text=True,
+        ).splitlines()
+        expected = str(isolated.resolve())
+        self.assertEqual(output, [expected, expected, expected])
 
     def test_project_identity_is_stable_and_distinguishes_same_named_projects(self):
         first = self.root / "one" / "Same Name"

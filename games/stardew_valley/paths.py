@@ -20,14 +20,15 @@ def _user_data_root() -> Path:
     return (base / "Lexeditor").resolve()
 
 
-DEFAULT_PROJECT_ROOT = (_user_data_root() / "projects" / "stardew-valley").resolve()
+DEFAULT_PROJECT_ROOT = Path(os.environ.get(
+    "LEXEDITOR_STARDEW_PROJECT",
+    str(_user_data_root() / "projects" / "stardew-valley"),
+)).expanduser().resolve()
 GAME_ROOT = Path(os.environ.get(
     "LEXEDITOR_STARDEW_ROOT",
     r"C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley",
 )).expanduser()
-PROJECT_ROOT = Path(os.environ.get(
-    "LEXEDITOR_STARDEW_PROJECT", str(DEFAULT_PROJECT_ROOT)
-)).expanduser().resolve()
+PROJECT_ROOT = DEFAULT_PROJECT_ROOT
 
 
 def check() -> list[str]:
