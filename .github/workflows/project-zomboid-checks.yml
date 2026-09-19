@@ -85,7 +85,7 @@ jobs:
       - name: Check candidate build space
         shell: pwsh
         run: |
-          $drive = Get-PSDrive -Name ([System.IO.Path]::GetPathRoot((Get-Location).Path).TrimEnd(':','\\'))
+          $drive = Get-PSDrive -Name (Get-Location).Drive.Name
           $freeGiB = [math]::Round($drive.Free / 1GB, 1)
           Write-Host "Candidate build expects under 5 GiB; runner has $freeGiB GiB free."
           if ($drive.Free -lt 10GB) { throw "Less than 10 GiB free before candidate build." }
