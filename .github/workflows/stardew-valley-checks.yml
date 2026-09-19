@@ -140,7 +140,7 @@ jobs:
           '@
           Push-Location `$root
           try {
-              & `$venvPython -c `$init
+              `$init | & `$venvPython -
               if (`$LASTEXITCODE -ne 0) { throw 'Could not initialize isolated Stardew acceptance project.' }
           } finally {
               Pop-Location
@@ -200,9 +200,23 @@ jobs:
           $env:LOCALAPPDATA = Join-Path $candidate 'candidate-data\LocalAppData'
           $env:LEXEDITOR_STARDEW_PROJECT = Join-Path $candidate "candidate-data\stardew-pr465-$shortSha"
           $venvPython = Join-Path $candidate '.venv-pr465\Scripts\python.exe'
+          $verify = @'
+          import os
+          from pathlib import Path
+          from games.stardew_valley import paths
+          from games.stardew_valley.plugin import PLUGIN, smoke
+
+          expected = Path(os.environ["LEXEDITOR_STARDEW_PROJECT"]).resolve()
+          assert paths.DEFAULT_PROJECT_ROOT == expected
+          assert paths.PROJECT_ROOT == expected
+          assert PLUGIN.projects.default_root == expected
+          assert (expected / "manifest.json").is_file()
+          assert (expected / "content.json").is_file()
+          print(*smoke(), sep="\n")
+          '@
           Push-Location $candidate
           try {
-            & $venvPython -c "import os; from pathlib import Path; from games.stardew_valley import paths; from games.stardew_valley.plugin import PLUGIN, smoke; expected=Path(os.environ['LEXEDITOR_STARDEW_PROJECT']).resolve(); assert paths.DEFAULT_PROJECT_ROOT == expected; assert paths.PROJECT_ROOT == expected; assert PLUGIN.projects.default_root == expected; assert (expected/'manifest.json').is_file(); assert (expected/'content.json').is_file(); print(*smoke(), sep='\n')"
+            $verify | & $venvPython -
             if ($LASTEXITCODE -ne 0) { throw 'Candidate isolated smoke verification failed.' }
           } finally {
             Pop-Location
