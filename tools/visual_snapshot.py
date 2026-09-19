@@ -89,7 +89,8 @@ SUBTABS = "#main .lex-subtab-bar:not([hidden]) > .lex-subtab-button"
 
 # Views a plugin keeps off its tab bar, opened by name with its navigate().
 # Blank's demonstration pages are the live samples for the heavier components.
-EXTRA_VIEWS = {"blank": ["one", "two", "three", "subtabs", "tweaks", "graphs"]}
+EXTRA_VIEWS = {"blank": ["one", "two", "three", "subtabs", "tweaks", "graphs"],
+               "warband": ["dashboard", "datamap", "manuals"]}
 
 
 def visible_subtab_count(page, depth: int) -> int:

@@ -8,7 +8,8 @@
     "NavigationHistory": [],
     "actionRow": [
       "blank",
-      "ff9"
+      "ff9",
+      "warband"
     ],
     "applyTheme": [
       "ff7r"
@@ -21,6 +22,9 @@
     ],
     "bindSettingDependencies": [
       "ff8"
+    ],
+    "bitmapText": [
+      "warband"
     ],
     "booleanMark": [
       "blank",
@@ -48,6 +52,10 @@
     ],
     "closeButton": [
       "blank"
+    ],
+    "codeField": [
+      "blank",
+      "warband"
     ],
     "columnList": [
       "blank",
@@ -140,7 +148,8 @@
       "blank",
       "ff7r",
       "ff7r2",
-      "ff9"
+      "ff9",
+      "warband"
     ],
     "detailPanel": [
       "blank",
@@ -166,6 +175,10 @@
       "palworld",
       "warband"
     ],
+    "detailText": [
+      "blank",
+      "warband"
+    ],
     "dismissDialogs": [],
     "el": [
       "blank",
@@ -184,6 +197,10 @@
     ],
     "enabledMark": [
       "blank"
+    ],
+    "figureGrid": [
+      "blank",
+      "warband"
     ],
     "finishPluginLoading": [
       "blank",
@@ -217,6 +234,10 @@
       "rdr2",
       "warband"
     ],
+    "iconSlot": [
+      "blank",
+      "warband"
+    ],
     "infoHelp": [
       "blank",
       "ff7",
@@ -233,7 +254,8 @@
       "ff7",
       "ff7r",
       "ff8",
-      "ff9"
+      "ff9",
+      "warband"
     ],
     "installBrowserHistoryGuard": [],
     "installControlHelp": [],
@@ -255,6 +277,10 @@
     "listDetail": [
       "ff7"
     ],
+    "logView": [
+      "blank",
+      "warband"
+    ],
     "magnitudeValue": [
       "blank"
     ],
@@ -271,6 +297,10 @@
       "palworld",
       "rdr",
       "rdr2",
+      "warband"
+    ],
+    "modelStage": [
+      "blank",
       "warband"
     ],
     "mountShell": [
@@ -296,7 +326,8 @@
     "notice": [
       "blank",
       "ff7r2",
-      "ff9"
+      "ff9",
+      "warband"
     ],
     "numberValue": [
       "blank",
@@ -325,8 +356,7 @@
     "pager": [
       "blank",
       "ff7r",
-      "ff8",
-      "warband"
+      "ff8"
     ],
     "pagerSelect": [
       "blank",
@@ -369,7 +399,8 @@
       "ff7r2",
       "ff8",
       "ff9",
-      "palworld"
+      "palworld",
+      "warband"
     ],
     "recordId": [
       "blank",
@@ -441,6 +472,9 @@
       "ff7",
       "ff8"
     ],
+    "stack": [
+      "warband"
+    ],
     "subtabBar": [
       "blank",
       "ff7",
@@ -459,6 +493,10 @@
       "ff7",
       "ff8",
       "ff9"
+    ],
+    "treeGraph": [
+      "blank",
+      "warband"
     ],
     "uiScaleControl": [
       "blank"

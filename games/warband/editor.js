@@ -5,7 +5,7 @@
     booting:true,modOnly:false,tab:"items",dashboard:null,settings:null,troops:null,items:null,upgrades:null,modules:null,datamap:null,activeSource:"mine",
     manual:null,font:null,selectedModule:"",selectedSetting:"",selectedItem:"",selectedTroop:"",selectedUpgrade:"",selectedFile:"",catalogFile:null,catalogDraft:"",
     settingEdits:{},itemEdits:{},troopEdits:{},filters:{items:"",troops:"",cut:false,upgrades:"",settings:"",datamap:"",mapStatus:""},
-    pages:{items:0,troops:0,upgrades:0,datamap:0},pageSizes:{items:20,troops:20,upgrades:20},sorts:{items:["name",1],troops:["name",1],upgrades:["from",1],datamap:["filename",1]},
+    pages:{items:0,troops:0,upgrades:0,datamap:0,settings:0},pageSizes:{items:20,troops:20,upgrades:20,settings:20},sorts:{items:["name",1],troops:["name",1],upgrades:["from",1],datamap:["filename",1],settings:["section",1]},
     build:{cursor:0,lines:[],running:false,returnCode:null},status:"Ready"
   };
 
@@ -27,14 +27,15 @@
   function effectiveSetting(row){return state.settingEdits[row.line]??row.value;}
   function setStatus(text){state.status=text;const target=$("#plugin-status");if(target)target.textContent=text;}
   function bitmapText(text,pixels){
-    if(!state.font?.available)return document.createTextNode(text);
-    const scale=pixels/state.font.fontSize,root=el("span",{class:"warband-bitmap-text","aria-label":text,style:`--wb-line-height:${state.font.lineSpacing*scale}px`});
-    for(const character of text){const metrics=state.font.characters[String(character.codePointAt(0))];if(!metrics){root.append(el("span",{class:"warband-glyph-slot",style:`width:${pixels*.52}px`},character));continue;}
-      const slot=el("span",{class:"warband-glyph-slot",style:`width:${Math.max(1,metrics.postshift*scale)}px`});
-      if(metrics.w>metrics.u&&metrics.h>metrics.v)slot.append(el("i",{class:"warband-glyph","aria-hidden":"true",style:`left:${metrics.preshift*scale}px;top:${(state.font.fontSize-metrics.yadjust)*scale}px;width:${(metrics.w-metrics.u)*scale}px;height:${(metrics.h-metrics.v)*scale}px;-webkit-mask-size:${state.font.width*scale}px ${state.font.height*scale}px;mask-size:${state.font.width*scale}px ${state.font.height*scale}px;-webkit-mask-position:${-metrics.u*scale}px ${-metrics.v*scale}px;mask-position:${-metrics.u*scale}px ${-metrics.v*scale}px`}));
-      root.append(slot);
-    }
-    return root;
+    const font=state.font;if(!font?.available)return document.createTextNode(text);
+    const scale=pixels/font.fontSize;
+    return LexeditorUI.bitmapText({label:text,lineHeight:font.lineSpacing*scale,glyphs:[...text].map(character=>{
+      const metrics=font.characters[String(character.codePointAt(0))];
+      if(!metrics)return {width:pixels*.52,text:character};
+      return {width:Math.max(1,metrics.postshift*scale),quad:metrics.w>metrics.u&&metrics.h>metrics.v?{
+        left:metrics.preshift*scale,top:(font.fontSize-metrics.yadjust)*scale,width:(metrics.w-metrics.u)*scale,height:(metrics.h-metrics.v)*scale,
+        atlasWidth:font.width*scale,atlasHeight:font.height*scale,u:metrics.u*scale,v:metrics.v*scale}:null};
+    })});
   }
   function applyInstalledWarbandFont(){
     const brand=(window.LexeditorUI?.shellTextNodes?.()||[])[0]?.closest("button");if(brand&&!brand.dataset.bitmapFont){brand.dataset.bitmapFont="1";brand.replaceChildren(bitmapText("LEXEDITOR",24));}
@@ -44,11 +45,12 @@
   function sorted(rows,view){const [key,direction]=state.sorts[view];return [...rows].sort((a,b)=>direction*String(a[key]??"").localeCompare(String(b[key]??""),undefined,{numeric:true}));}
   function sort(view,key){const [active,direction]=state.sorts[view];state.sorts[view]=[key,active===key?-direction:1];render();}
   function renderTableView(view,rows,columns,options={}){
-    const query=state.filters[view]||"",filtered=sorted(search(rows,query,columns.map(column=>column.key)),view);
+    const query=state.filters[view]||"",filtered=sorted(search(rows,query,options.searchFields||columns.map(column=>column.key)),view);
     const keyOf=options.key||((row)=>columns.map(column=>String(row[column.key]??"")).join("|"));
     const selected=options.selected?.()||"",setSelected=options.setSelected||(()=>{});
-    const detail=row=>row?el("div",{class:"lex-detail detail"},el("h2",{},row.name||(row.from&&row.to?`${row.from} → ${row.to}`:String(keyOf(row)))),
-      el("div",{class:"detail-grid"},...columns.flatMap(column=>[el("div",{class:"label"},typeof column.label==="string"?column.label:column.key),el("div",{},String(row[column.key]??"—"))]))):el("div",{class:"lex-detail detail"},"No matching records.");
+    const detail=row=>row?detailPanel({title:row.name||String(keyOf(row)),body:[LexeditorUI.detailSection({body:columns.map(column=>
+      detailField({label:typeof column.label==="string"?column.label:column.key,control:LexeditorUI.readonlyField(row[column.key]??"—",{format:false})}))})]})
+      :detailPanel({title:"No matching records"});
     $("#toolbar").replaceChildren();
     $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec(view,options.changed),rows:filtered,key:keyOf,slots:false,fit:{minRowHeight:36},page:state.pages[view],pageSize:state.pageSizes[view],selected,noun:view,splitKey:`warband-${view}`,className:"warband-paged-table",defaultSplit:58,
       search:{key:`warband-${view}`,value:query,placeholder:`Search ${view}…`,change:value=>{state.filters[view]=value;state.pages[view]=0;render();}},filters:options.filters||[],
@@ -69,7 +71,7 @@
   // Undeclared columns size to their longest value, and Warband's ids and mesh
   // names are long enough to push the table past its panel and cut the last
   // column in half. Bounded widths let the long ones ellipsise instead.
-  function itemColumns(){return [{key:"name",label:"Name",width:"minmax(9em,1.4fr)",render:row=>el("span",{class:"warband-cell-text",title:row.name},row.name)},{key:"id",label:"ID",width:"minmax(6em,.8fr)"},{key:"type",label:"Type",width:"minmax(6em,.7fr)"},{key:"inventoryMesh",label:"Inventory mesh",width:"minmax(7em,1fr)"}];}
+  function itemColumns(){return [{key:"name",label:"Name",width:"minmax(9em,1.4fr)",render:row=>el("span",{title:row.name},row.name)},{key:"id",label:"ID",width:"minmax(6em,.8fr)"},{key:"type",label:"Type",width:"minmax(6em,.7fr)"},{key:"inventoryMesh",label:"Inventory mesh",width:"minmax(7em,1fr)"}];}
   function renderItems(){
     const view="items",columns=itemColumns(),query=state.filters.items||"";
     const filtered=sorted(search(state.items.rows,query,["name","id","type","inventoryMesh"]),view);
@@ -96,16 +98,16 @@
     else{const existing=state.itemEdits[recordKey]||(state.itemEdits[recordKey]={recordIndex:item.recordIndex,originalId:item.id,fields:{}});existing.fields[key]=next;}
     shell.refresh();
   }
-  function itemTypeFromFlags(flags){return (String(flags).match(/itp_type_([a-z0-9_]+)/i)||[])[1]||"";}
+  function itemTypeFromFlags(flags){return (String(flags).match(/\bitp_type_([a-z0-9_]+)/i)||[])[1]||"";}
   function setItemType(item,value){
     const clean=String(value).trim().replace(/^itp_type_/i,""),flags=String(effectiveItemField(item,"flags"));if(!clean)return;
-    const token=`itp_type_${clean}`,next=/itp_type_[a-z0-9_]+/i.test(flags)?flags.replace(/itp_type_[a-z0-9_]+/i,token):(flags.trim()?`${token}|${flags}`:token);
+    const token=`itp_type_${clean}`,next=/\bitp_type_[a-z0-9_]+/i.test(flags)?flags.replace(/\bitp_type_[a-z0-9_]+/i,token):(flags.trim()?`${token}|${flags}`:token);
     setItemField(item,"flags",next);const control=document.querySelector('[data-lex-property="flags"] textarea');if(control)control.value=next;
   }
-  function itemWeightFromStats(stats){return (String(stats).match(/weight\(([^)]+)\)/)||[])[1]?.trim()||"";}
+  function itemWeightFromStats(stats){return (String(stats).match(/\bweight\(([^)]+)\)/)||[])[1]?.trim()||"";}
   function setItemWeight(item,value){
     const clean=String(value).trim();if(!clean)return;const stats=String(effectiveItemField(item,"stats"));
-    const next=/weight\([^)]+\)/.test(stats)?stats.replace(/weight\([^)]+\)/,`weight(${clean})`):(stats.trim()?`weight(${clean})|${stats}`:`weight(${clean})`);
+    const next=/\bweight\([^)]+\)/.test(stats)?stats.replace(/\bweight\([^)]+\)/,`weight(${clean})`):(stats.trim()?`weight(${clean})|${stats}`:`weight(${clean})`);
     setItemField(item,"stats",next);const control=document.querySelector('[data-lex-property="stats"] textarea');if(control)control.value=next;
   }
   const ITEM_HELP={
@@ -121,12 +123,12 @@
     modifierBits:"Controls which generated item modifiers such as rusty, balanced, masterwork, or lordly may apply.",
     factions:"Optional faction list restricting where merchandise for this item may appear."
   };
-  function itemExpressionControl(item,key){return el("textarea",{class:"warband-item-expression",value:effectiveItemField(item,key),oninput:event=>setItemField(item,key,event.target.value)});}
+  function itemExpressionControl(item,key){return LexeditorUI.codeField({value:effectiveItemField(item,key),oninput:event=>setItemField(item,key,event.target.value)});}
   function itemFieldLabel(key){return ({meshes:"Meshes",flags:"Flags",capabilities:"Capabilities",value:"Value",stats:"Stats",modifierBits:"Modifier bits",factions:"Factions"})[key]||key.replace(/^extra/,"Extra field ");}
   function warbandItemDetail(item){
     disposeWarbandPreview();
     if(!item)return detailPanel({className:"warband-item-detail",title:"Select an item"});
-    const thumbnailMessage=el("div",{class:"warband-icon-message"},item.inventoryMesh?"Preparing icon…":"No mesh"),thumbnail=el("div",{class:"warband-item-thumbnail"},thumbnailMessage);
+    const thumbnail=LexeditorUI.iconSlot({className:"warband-item-thumbnail",message:item.inventoryMesh?"Preparing icon…":"No mesh"}),thumbnailMessage=thumbnail.lexMessage;
     const readOnly=state.activeSource!=="mine";
     const core=detailGroup({title:"Item",body:[
       detailField({label:"ID",property:"id",dataType:"STRING",description:ITEM_HELP.id,control:el("input",{value:effectiveItemField(item,"id"),disabled:readOnly,oninput:event=>setItemField(item,"id",event.target.value)})}),
@@ -154,9 +156,7 @@
   // The drawer's own stage. The icon in the heading stays a still thumbnail;
   // this is the turnable model behind it.
   function warbandPreviewStage(item){
-    const message=el("div",{class:"warband-preview-message"},
-      item.inventoryMesh?el("div",{class:"warband-preview-spin","aria-hidden":"true"}):"This item has no inventory mesh.");
-    const stage=el("div",{class:"warband-preview-stage"},message);
+    const stage=LexeditorUI.modelStage({className:"warband-preview-stage",busy:Boolean(item.inventoryMesh),message:"This item has no inventory mesh."}),message=stage.lexMessage;
     if(item.inventoryMesh)requestAnimationFrame(()=>loadWarbandIcon(item,stage,stage,message));
     return stage;
   }
@@ -218,20 +218,19 @@
     // The shared viewer control lives in the heading's icon slot, so a panel
     // without an icon has nowhere to put it. A troop's icon is the first piece
     // of equipment it carries, which is also the first thing the drawer shows.
-    const icon=gear.length?el("div",{class:"warband-item-thumbnail"},warbandPreviewStage(gear[0])):null;
-    return detailPanel({className:"detail warband-troop-detail",icon,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(node.name||node.id,24)),identity:node.id,
+    const icon=gear.length?LexeditorUI.iconSlot({className:"warband-item-thumbnail",content:warbandPreviewStage(gear[0])}):null;
+    return detailPanel({className:"warband-tree-detail",icon,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(node.name||node.id,24)),identity:node.id,
       modelPreview:gear.length?{
         label:`${node.name||node.id} equipment`,
         openLabel:`Open ${node.name||node.id}'s equipment`,
         closeLabel:`Close ${node.name||node.id}'s equipment`,
-        content:el("div",{class:"warband-troop-gear"},...gear.map(item=>
-          el("figure",{},warbandPreviewStage(item),el("figcaption",{},item.name||item.id)))),
+        content:LexeditorUI.figureGrid(gear.map(item=>({media:warbandPreviewStage(item),caption:item.name||item.id}))),
       }:null,
-      body:node.missing?[el("p",{class:"error"},"This upgrade refers to a troop missing from the parsed active source.")]:[
+      body:node.missing?[LexeditorUI.notice({tone:"warning",message:"This upgrade refers to a troop missing from the parsed active source."})]:[
         ...troopFields(record)
       ]});
   }
-  function renderUpgrades(){
+  function renderUpgrades(keep){
     const all=WarbandTroopTrees.build(state.troops.rows,state.upgrades.rows);
     const factions=[...new Set(all.flatMap(t=>t.factions))].sort();
     if(!factions.includes(state.treeFaction))state.treeFaction=factions[0]||"";
@@ -249,56 +248,49 @@
       change:value=>{state.treeId=value;renderUpgrades();},
     });
     $("#toolbar").replaceChildren(el("label",{},"Faction ",factionSelect));
-    if(!tree){$("#main").replaceChildren(el("section",{class:"card"},"No upgrade trees are available in the selected project's Module System source."));return;}
+    if(!tree){$("#main").replaceChildren(detailPanel({className:"lex-information-panel",title:"Troop trees",body:[LexeditorUI.detailNote("No upgrade trees are available in the selected project's Module System source.")]}));return;}
     const graph=WarbandTroopTrees.layout(tree), byId=new Map(graph.nodes.map(n=>[n.id,n]));
     let selected=byId.get(state.selectedUpgrade)||byId.get(tree.roots[0])||graph.nodes[0];state.selectedUpgrade=selected.id;
-    const stage=el("div",{class:"warband-tree-stage",style:`width:${graph.width}px;height:${graph.height}px`});
-    const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
-    svg.setAttribute("width",graph.width);svg.setAttribute("height",graph.height);svg.setAttribute("aria-hidden","true");
-    for(const edge of graph.edges){const a=byId.get(edge.from),b=byId.get(edge.to),line=document.createElementNS(ns,"path");
-      const top=a.y-28,bottom=b.y+28,mid=(top+bottom)/2;
-      line.setAttribute("d",`M${a.x},${top} V${mid} H${b.x} V${bottom} m-5,7 l5,-7 l5,7`);svg.append(line);}
-    stage.append(svg);
-    const details=el("div",{class:"warband-tree-detail"},troopTreeDetail(selected));
-    for(const node of graph.nodes){const button=el("button",{class:`warband-tree-node${node.missing?" missing":""}`,
-      style:`left:${node.x-85}px;top:${node.y-28}px`,"data-troop":node.id,"aria-pressed":String(node.id===selected.id),
-      onclick:()=>{state.selectedUpgrade=node.id;stage.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.troop===node.id)));details.replaceChildren(troopTreeDetail(node));}},
-      el("strong",{},node.name||node.id),el("small",{},node.id));stage.append(button);}
-    const master=el("div",{class:"warband-tree-scroll","aria-label":"Bottom-up troop upgrade tree"},
-      graph.cyclic?el("p",{class:"error"},"Cyclic upgrade links detected. Cycle members share a row; arrows preserve the source links."):null,stage);
-    $("#main").replaceChildren(el("div",{class:"warband-tree-page"},treeTabs,
-      masterDetail(master,details,"warband-trees",{splitKey:"warband-troop-trees",defaultSplit:65,paneClass:"warband-pane"})));
-    requestAnimationFrame(()=>{if(master.isConnected)master.scrollTop=master.scrollHeight;});
+    const master=LexeditorUI.treeGraph({width:graph.width,height:graph.height,edges:graph.edges,selected:selected.id,label:"Bottom-up troop upgrade tree",
+      nodes:graph.nodes.map(node=>({id:node.id,x:node.x,y:node.y,label:node.name||node.id,sub:node.id,missing:node.missing})),
+      note:graph.cyclic?LexeditorUI.notice({tone:"warning",message:"Cyclic upgrade links detected. Cycle members share a row; arrows preserve the source links."}):null,
+      // A new selection redraws the page with its detail; the tree stays
+      // scrolled where the reader left it, with the pressed node focused.
+      select:node=>{state.selectedUpgrade=node.id;renderUpgrades({left:master.scrollLeft,top:master.scrollTop});}});
+    $("#main").replaceChildren(LexeditorUI.stack(treeTabs,
+      masterDetail(master,troopTreeDetail(selected),"warband-trees",{splitKey:"warband-troop-trees",defaultSplit:65})));
+    if(keep){master.scrollLeft=keep.left;master.scrollTop=keep.top;master.querySelector(`[data-node="${CSS.escape(selected.id)}"]`)?.focus();}
+    else requestAnimationFrame(()=>{if(master.isConnected)master.scrollTop=master.scrollHeight;});
   }
 
   async function selectModule(name){state.selectedModule=name;state.manual=await api(`/api/manual?module=${encodeURIComponent(name)}`);renderManuals();}
   function renderManuals(){
-    $("#toolbar").replaceChildren(el("span",{class:"count"},`${state.modules.modules.length} installed modules`));
+    $("#toolbar").replaceChildren(el("span",{},`${state.modules.modules.length} installed modules`));
     const master=list({rows:state.modules.modules,key:name=>name,selected:state.selectedModule,select:selectModule,render:name=>el("div",{},el("b",{},name))});
-    const detail=el("div",{class:"lex-detail detail"},state.manual?el("div",{},el("h2",{},`${state.manual.module} — ${state.manual.pages.length} pages`),...state.manual.pages.map(page=>el("section",{class:"manual-page"},el("h3",{},page.title),el("p",{},page.body.trim())))):el("div",{},"Select an installed mod to read its manual."));
+    const detail=state.manual
+      ?detailPanel({title:state.manual.module,meta:`${state.manual.pages.length} pages`,body:state.manual.pages.map(page=>
+        LexeditorUI.detailSection({title:page.title,body:[LexeditorUI.detailText(page.body.trim())]}))})
+      :detailPanel({title:"Mod manuals",body:[LexeditorUI.detailNote("Select an installed mod to read its manual.")]});
     $("#main").replaceChildren(masterDetail(master,detail,"",{splitKey:"warband-manuals",defaultSplit:38}));
   }
 
-  function settingRows(){return search(state.settings.rows,state.filters.settings,["section","key","value","description"]);}
-  function selectSetting(row){state.selectedSetting=String(row.line);renderSettings();}
+  function settingDetail(row){
+    return detailPanel({title:row.key,meta:row.section,body:[LexeditorUI.detailSection({body:[
+      detailField({label:"Value",property:"value",control:el("input",{value:effectiveSetting(row),oninput:event=>{if(event.target.value===row.value)delete state.settingEdits[row.line];else state.settingEdits[row.line]=event.target.value;shell.refresh();}})}),
+      LexeditorUI.detailNote(row.description||"No description.")]})]});
+  }
   async function saveSettings(){
     const edits=Object.entries(state.settingEdits).map(([line,value])=>({line:+line,value}));if(!edits.length)return;
     const result=await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.settings=await api("/api/settings");state.settingEdits={};await buildSavedModule();shell.history.clear();setStatus(`Saved ${result.saved} settings and build verified`);renderSettings();shell.refresh();
   }
   function discardSettings(){state.settingEdits={};setStatus("Restored the last saved settings");renderSettings();shell.refresh()}
   function renderSettings(){
-    const rows=settingRows();
-    state.settingsPage=Math.min(state.settingsPage||0,Math.max(0,Math.ceil(rows.length/40)-1));
-    const pageRows=rows.slice(state.settingsPage*40,(state.settingsPage+1)*40),selected=rows.find(row=>String(row.line)===state.selectedSetting)||rows[0];if(selected)state.selectedSetting=String(selected.line);
     // No plugin Save button in the bar: the shell's own Save owns every
     // unsaved change in the editor, and a second one beside it asks the reader
     // which of the two they meant.
-    $("#toolbar").replaceChildren();
-    const master=list({rows:pageRows,key:row=>String(row.line),selected:state.selectedSetting,select:selectSetting,render:row=>el("div",{},el("b",{},row.key),el("div",{class:"sub"},row.section))});
-    const detail=el("div",{class:"lex-detail detail"},selected?el("div",{},el("h2",{},selected.key),el("div",{class:"detail-grid"},el("div",{class:"label"},"Section"),el("div",{},selected.section),el("div",{class:"label"},"Value"),el("input",{value:effectiveSetting(selected),oninput:event=>{if(event.target.value===selected.value)delete state.settingEdits[selected.line];else state.settingEdits[selected.line]=event.target.value;shell.refresh();}}),el("div",{class:"label"},"Description"),el("div",{},selected.description||"No description."))):"No matching setting.");
-    const layout=masterDetail(master,detail,"",{splitKey:"warband-settings",defaultSplit:38});
-    const bottom=pager({page:state.settingsPage,pages:Math.ceil(rows.length/40),total:rows.length,pageSize:40,change:value=>{state.settingsPage=value;renderSettings();},noun:"settings",search:{key:"warband-settings",value:state.filters.settings,placeholder:"Search settings…",change:value=>{state.filters.settings=value;state.settingsPage=0;renderSettings();}}});
-    $("#main").replaceChildren(layout,bottom);
+    renderTableView("settings",state.settings.rows,[{key:"key",label:"Key"},{key:"section",label:"Section"},{key:"value",label:"Value",render:row=>el("span",{title:effectiveSetting(row)},effectiveSetting(row))}],
+      {key:row=>String(row.line),selected:()=>state.selectedSetting,setSelected:value=>{state.selectedSetting=value;},
+       searchFields:["section","key","value","description"],changed:row=>state.settingEdits[row.line]!==undefined,detail:settingDetail});
   }
 
   async function selectCatalog(row){
@@ -334,17 +326,22 @@
   }
 
   function renderDashboard(){
-    $("#toolbar").replaceChildren(el("span",{},"Plugin and path health"));
-    const health=el("section",{class:"card"},el("h2",{},"Status"),state.dashboard.problems.length?el("div",{class:"error"},...state.dashboard.problems.map(problem=>el("div",{},problem))):el("div",{class:"ok"},"All configured paths found."));
-    const log=el("section",{class:"card"},el("h2",{},"Log"),el("pre",{class:"build-log"},state.build.lines.join("")||"No save or build has run in this session."));
-    const manuals=el("section",{class:"card"},el("h2",{},"Mod manuals"),el("button",{type:"button",onclick:()=>navigate("manuals")},"Read installed mod manuals"));$("#main").replaceChildren(el("div",{class:"cards"},health,manuals,log));
-    $("#main").append(LexeditorUI.modLoaderSection({
-      loader:"Warband loads a module folder chosen in its own launcher. There is no separate mod loader.",
-      output:"Lexeditor builds a saved module folder under the game's Modules directory; the launcher lists it as its own entry.",
-      order:"Only one module runs at a time, so modules do not stack or conflict. Combining changes means building them into one module.",
-      safety:"The Native module and the installed game files are never written. A build only ever creates or updates its own module folder.",
-      removal:"Pick a different module in the launcher, and delete the generated module folder to remove it entirely.",
-    }));
+    $("#toolbar").replaceChildren();
+    const problems=state.dashboard.problems;
+    $("#main").replaceChildren(detailPanel({className:"lex-information-panel",icon:LexeditorUI.infoIcon(),title:"Information",meta:"Plugin and path health, mod manuals, and the build log",body:[
+      LexeditorUI.detailSection({title:"STATUS",body:problems.length
+        ?problems.map(problem=>LexeditorUI.notice({tone:"warning",message:problem}))
+        :[LexeditorUI.detailNote("All configured paths found.")]}),
+      LexeditorUI.detailSection({title:"MOD MANUALS",body:[LexeditorUI.actionRow(el("button",{type:"button",onclick:()=>navigate("manuals")},"Read installed mod manuals"))]}),
+      LexeditorUI.detailSection({title:"LOG",body:[LexeditorUI.logView(state.build.lines.join("")||"No save or build has run in this session.")]}),
+      LexeditorUI.modLoaderSection({
+        loader:"Warband loads a module folder chosen in its own launcher. There is no separate mod loader.",
+        output:"Lexeditor builds a saved module folder under the game's Modules directory; the launcher lists it as its own entry.",
+        order:"Only one module runs at a time, so modules do not stack or conflict. Combining changes means building them into one module.",
+        safety:"The Native module and the installed game files are never written. A build only ever creates or updates its own module folder.",
+        removal:"Pick a different module in the launcher, and delete the generated module folder to remove it entirely.",
+      }),
+    ]}));
   }
 
   async function buildSavedModule(){
@@ -389,7 +386,9 @@
 
   const views={items:renderItems,manuals:renderManuals,upgrades:renderUpgrades,troops:renderTroops,tweaks:renderSettings,datamap:renderDataMap,dashboard:renderDashboard};
   function navigate(tab){disposeWarbandPreview();state.tab=tab;render();}
-  function renderVanilla(){$("#toolbar").replaceChildren();$("#main").replaceChildren(el("section",{class:"card"},el("h2",{},"Vanilla"),el("p",{},"The installed Native module is read-only. Its generated text files do not contain the Module System source used by this editor."),el("p",{},"Select a mod to edit Items, Troops, Troop Trees, or Tweaks.")))}
+  function renderVanilla(){$("#toolbar").replaceChildren();$("#main").replaceChildren(detailPanel({className:"lex-information-panel",title:"Vanilla",body:[LexeditorUI.detailSection({body:[
+    LexeditorUI.detailText("The installed Native module is read-only. Its generated text files do not contain the Module System source used by this editor."),
+    LexeditorUI.detailText("Select a mod to edit Items, Troops, Troop Trees, or Tweaks.")]})]}))}
   function render(){document.querySelectorAll("nav button").forEach(button=>button.classList.toggle("active",button.dataset.tab===state.tab));if(state.booting)return;if(state.activeSource!=="mine"&&!['manuals','datamap','dashboard'].includes(state.tab))renderVanilla();else views[state.tab]();shell.refresh();}
   async function switchProjectSource(value){state.activeSource=String(value||"mine")==="vanilla"?"vanilla":"mine";shell.history?.clear();render()}
   

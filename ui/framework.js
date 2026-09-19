@@ -153,9 +153,14 @@
 
   const element = (tag, attrs = {}, ...children) => {
     const node = document.createElement(tag);
+    // A textarea or a select has no value attribute: setting one left every
+    // Warband and Palworld text box empty. Their value is set as a property,
+    // once the options or the text are in.
+    const propertyValue = /^(textarea|select)$/i.test(tag) && attrs.value !== undefined && attrs.value !== null;
     for (const [key, value] of Object.entries(attrs)) {
       if (key === "class") node.className = value;
       else if (key === "text") node.textContent = value;
+      else if (key === "value" && propertyValue) continue;
       else if (key.startsWith("on") && typeof value === "function") {
         node.addEventListener(key.slice(2).toLowerCase(), value);
       } else if (value === true) node.setAttribute(key, "");
@@ -164,6 +169,7 @@
     for (const child of children.flat(Infinity)) {
       if (child !== null && child !== undefined && child !== false) node.append(child);
     }
+    if (propertyValue) node.value = String(attrs.value);
     return node;
   };
 
@@ -1212,6 +1218,113 @@
   const componentSample = (content, options = {}) => element("section", {
     class: ["lex-component-sample", options.glyph ? "glyph" : "", options.wide ? "wide" : ""].filter(Boolean).join(" "),
   }, content);
+
+  // A bar over the content it switches: the bar keeps its height and the
+  // content takes the rest of the page.
+  const stack = (...children) => element("div", {class: "lex-stack"}, ...children);
+
+  // Text in a game's own bitmap font. The game measures its glyphs; each is
+  // {width, quad} or {width, text} for a character the font lacks. A quad is
+  // where the glyph sits in its slot and where it sits in the atlas, which the
+  // stylesheet names as --lex-bitmap-atlas.
+  const bitmapText = (options = {}) => element("span", {
+    class: "lex-bitmap-text",
+    "aria-label": options.label,
+    style: `--lex-bitmap-line-height:${options.lineHeight}px`,
+  }, ...(options.glyphs || []).map(glyph => {
+    const quad = glyph.quad;
+    const mask = quad
+      ? `${quad.atlasWidth}px ${quad.atlasHeight}px`
+      : "";
+    const at = quad ? `${-quad.u}px ${-quad.v}px` : "";
+    return element("span", {class: "lex-bitmap-glyph-slot", style: `width:${glyph.width}px`},
+      quad
+        ? element("i", {class: "lex-bitmap-glyph", "aria-hidden": "true",
+          style: `left:${quad.left}px;top:${quad.top}px;width:${quad.width}px;height:${quad.height}px;` +
+            `-webkit-mask-size:${mask};mask-size:${mask};-webkit-mask-position:${at};mask-position:${at}`})
+        : (glyph.text ?? ""));
+  }));
+
+  // A turnable model: a renderer draws its canvas into the stage, and the
+  // message says what is happening until it has. `busy` shows a spinner in
+  // place of words. The message node is stage.lexMessage.
+  const modelStage = (options = {}) => {
+    const message = element("div", {class: "lex-model-stage-message"},
+      options.busy ? element("div", {class: "lex-model-stage-spin", "aria-hidden": "true"}) : (options.message ?? ""));
+    const stage = element("div", {class: ["lex-model-stage", options.className || ""].filter(Boolean).join(" ")}, message);
+    stage.lexMessage = message;
+    return stage;
+  };
+
+  // What fills a detail heading's icon box: a picture, a small stage, or a
+  // line saying why there is neither yet. The line is slot.lexMessage.
+  const iconSlot = (options = {}) => {
+    const message = options.content ? null
+      : element("div", {class: "lex-icon-slot-message"}, options.message ?? "");
+    const slot = element("div", {class: ["lex-icon-slot", options.className || ""].filter(Boolean).join(" ")},
+      options.content || message);
+    slot.lexMessage = message;
+    return slot;
+  };
+
+  // Pictures side by side, each over its caption: [{media, caption}].
+  const figureGrid = (items = []) => element("div", {class: "lex-figure-grid"},
+    ...items.map(item => element("figure", {}, item.media, element("figcaption", {}, item.caption))));
+
+  // Records joined by arrows on a stage the caller has laid out. Each node is
+  // {id, x, y, label, sub, missing}, with (x, y) its centre; each edge runs
+  // from the top of `from` up to the bottom of `to`, so the graph reads
+  // bottom-up. Pressing a node marks it and calls select(node).
+  const TREE_NODE = {width: 170, height: 56};
+  const treeGraph = (options = {}) => {
+    const {width = 0, height = 0, nodes = [], edges = []} = options;
+    const byId = new Map(nodes.map(node => [node.id, node]));
+    const half = TREE_NODE.height / 2;
+    const stage = element("div", {class: "lex-tree-graph-stage", style: `width:${width}px;height:${height}px`});
+    const namespace = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(namespace, "svg");
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+    svg.setAttribute("aria-hidden", "true");
+    for (const edge of edges) {
+      const from = byId.get(edge.from), to = byId.get(edge.to);
+      if (!from || !to) continue;
+      const top = from.y - half, bottom = to.y + half, middle = (top + bottom) / 2;
+      const path = document.createElementNS(namespace, "path");
+      path.setAttribute("d", `M${from.x},${top} V${middle} H${to.x} V${bottom} m-5,7 l5,-7 l5,7`);
+      svg.append(path);
+    }
+    stage.append(svg);
+    for (const node of nodes) {
+      stage.append(element("button", {
+        type: "button",
+        class: ["lex-tree-graph-node", node.missing ? "missing" : ""].filter(Boolean).join(" "),
+        style: `left:${node.x - TREE_NODE.width / 2}px;top:${node.y - half}px`,
+        "data-node": node.id,
+        "aria-pressed": String(node.id === options.selected),
+        onclick: () => {
+          stage.querySelectorAll(":scope > .lex-tree-graph-node").forEach(button =>
+            button.setAttribute("aria-pressed", String(button.dataset.node === node.id)));
+          options.select?.(node);
+        },
+      }, element("strong", {}, node.label ?? node.id), node.sub ? element("small", {}, node.sub) : null));
+    }
+    return element("div", {class: "lex-tree-graph", "aria-label": options.label || null}, options.note || null, stage);
+  };
+
+  // An expression or a source line, edited as text.
+  const codeField = (attrs = {}) => {
+    const {class: className = "", ...rest} = attrs;
+    return element("textarea", {...rest, spellcheck: "false",
+      class: ["lex-code-field", className].filter(Boolean).join(" ")});
+  };
+
+  // Prose in a section: a manual page, an explanation. Its line breaks are
+  // the author's.
+  const detailText = text => element("p", {class: "lex-detail-text"}, text);
+
+  // A log's text as it was written.
+  const logView = text => element("pre", {class: "lex-log"}, text);
 
   const detailNote = (text, options = {}) => element("p", {
     class: ["lex-detail-note", options.className || ""].filter(Boolean).join(" "),
@@ -7663,7 +7776,7 @@ ${contents.path}`});
       paged)
   };
 
-  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, curveGrid, gameCard, componentSample, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, curveGrid, gameCard, componentSample, stack, bitmapText, modelStage, iconSlot, figureGrid, treeGraph, codeField, logView, detailText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 

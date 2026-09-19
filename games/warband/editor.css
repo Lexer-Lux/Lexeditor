@@ -1,29 +1,16 @@
-:root{--lex-page-display:block;--lex-page-height:auto;--lex-page-overflow:visible}
-    :root {--lex-surface-bg:#f7edcf;--lex-surface-shadow:inset 0 0 0 1px #fff7de;--lex-list-row-padding:9px 11px;--lex-row-selected-fg:#6b1717;--lex-row-selected-bg:#e4c98d;--lex-list-header-bg:#d1b879;--lex-list-cell-border:#c8ae78;--lex-row-hover-bg:#f0dba8;--lex-shell-header-fg:#f4dfb1;--lex-shell-header-bg:#4b1717;--lex-shell-header-border:#a66b24;--lex-shell-button-fg:#f4dfb1;--lex-shell-button-border:#8c4a35;--lex-shell-button-bg:#6b2424;
-      --lex-bg:#e8d9b4; --lex-panel:#f4e7c5; --lex-panel-2:#dcc99a; --lex-border:#8b6b39;
-      --lex-text:#2b2114; --lex-muted:#6e5b3d; --lex-accent:#7a2020; --lex-accent-text:#fff5d8;
-      --lex-highlight:#a8661c; --lex-success:#556b2f; --lex-font:"Segoe UI",system-ui,sans-serif;--lex-font-size-adjust:none;--lex-text-nudge:0px;
-      --lex-heading-font:Georgia,serif; --lex-radius:4px;
-    }
-    *{box-sizing:border-box} body{margin:0;color:var(--lex-text);background:linear-gradient(#eadcb8,#d9c28f);font:14px/1.45 var(--lex-font);overflow-x:hidden}
-    
-    #toolbar{display:flex;align-items:center;gap:9px;min-height:52px;padding:8px 16px;border-bottom:1px solid var(--lex-border);background:#d8c38f;box-shadow:0 2px 8px #5a3b1a22}#toolbar input,#toolbar select,#toolbar button{padding:7px 9px;color:var(--lex-text);border:1px solid var(--lex-border);border-radius:4px;background:#fff5d8}#toolbar input{min-width:280px}#toolbar .count{margin-left:auto;color:var(--lex-muted)}
-    main{padding:var(--lex-panel-gap);min-height:calc(100vh - 112px)}
-    body:has(:is(.warband-paged-table,.warband-trees)){display:flex;height:100vh;min-height:0;flex-direction:column;overflow:hidden}body:has(:is(.warband-paged-table,.warband-trees))>#lexeditor-shell,body:has(:is(.warband-paged-table,.warband-trees))>#toolbar{flex:0 0 auto}body:has(:is(.warband-paged-table,.warband-trees))>main{flex:1 1 auto;height:auto;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}.warband-paged-table,.warband-trees{height:100%}.sub{color:var(--lex-muted);font-size:11px}
-    .warband-record-list{--lex-fitted-row-height:36px}
-    .detail{padding:18px}.detail h2{margin:0 0 12px;font:700 22px var(--lex-heading-font);color:#651919}.detail-grid{display:grid;grid-template-columns:170px 1fr;gap:8px 14px}.detail-grid .label{color:var(--lex-muted);font-weight:700}.detail input,.detail textarea{width:100%;padding:8px;color:var(--lex-text);border:1px solid var(--lex-border);border-radius:4px;background:#fffaf0}.detail textarea{min-height:55vh;resize:none;font:13px/1.45 "Cascadia Mono",Consolas,monospace}.manual-page{margin-bottom:24px}.manual-page h3{margin:0 0 8px;color:#651919;font:700 18px var(--lex-heading-font)}.manual-page p{white-space:pre-wrap}
-    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}.card{padding:16px;border:1px solid var(--lex-border);border-radius:5px;background:#f5e9c9}.card h2{margin:0 0 12px;color:#651919;font:700 20px var(--lex-heading-font)}.path-row{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid #d9c69b}.path-row code{overflow:hidden;text-overflow:ellipsis}.ok{color:#45631e}.error{color:#9d2424}
-    .build-log{max-height:42vh;overflow:auto;padding:12px;color:#d8dee9;border:1px solid #444;background:#101216;font:13px/1.4 "Cascadia Mono",Consolas,monospace;white-space:pre-wrap}
-    .warband-bitmap-text{display:inline-flex;align-items:flex-start;vertical-align:middle;white-space:nowrap}.warband-glyph-slot{position:relative;display:inline-block;flex:none;height:var(--wb-line-height)}.warband-glyph{position:absolute;display:block;background-color:currentColor;-webkit-mask-image:url('/api/warband-font/atlas');mask-image:url('/api/warband-font/atlas');-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
-    .warband-item-detail{--lex-detail-icon-size:96px;display:flex;flex-direction:column;min-width:0;min-height:0;padding:14px;border:1px solid var(--lex-border);background:#f7edcf}.warband-item-detail{--lex-detail-heading-padding:4px 10px 5px;--lex-detail-title-fg:#651919;--lex-detail-id-fg:var(--lex-muted);--lex-detail-icon-border:#8b6b39;--lex-detail-icon-bg:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-item-thumbnail{position:relative;width:100%;height:100%;overflow:hidden}.warband-item-thumbnail canvas{display:block;width:100%;height:100%;pointer-events:none}.warband-item-thumbnail .warband-preview-message{padding:8px}.warband-mesh-list{padding:9px 2px;color:var(--lex-muted)}.warband-mesh-list b{color:#651919}.warband-item-expression{min-height:72px!important;resize:vertical!important;font:12px/1.35 "Cascadia Mono",Consolas,monospace!important}.warband-preview-stage{position:relative;flex:1 1 auto;min-height:320px;overflow:hidden;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-preview-stage canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}.warband-preview-stage canvas.dragging{cursor:grabbing}.warband-preview-message{position:absolute;inset:0;display:grid;place-items:center;padding:28px;color:#ead8ac;text-align:center}.warband-preview-facts{display:flex;gap:16px;padding:8px 2px 0;color:var(--lex-muted);font:11px Consolas,monospace}.warband-preview-spin{width:22px;height:22px;border:3px solid #d5b46955;border-top-color:#d5b469;border-radius:50%;animation:warband-spin .7s linear infinite}@keyframes warband-spin{to{transform:rotate(360deg)}}
-    .warband-cell-text{min-width:0;max-width:100%;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    [hidden]{display:none!important}.warband-item-thumbnail img{width:100%;height:100%;object-fit:contain;display:block}.warband-icon-message{padding:8px;color:var(--lex-text);background:var(--lex-panel);font-size:11px}
-    .warband-trees{align-items:stretch;grid-template-rows:minmax(0,1fr)}.warband-tree-page{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;height:100%}.warband-troop-gear{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:8px}.warband-troop-gear figure{margin:0;display:grid;gap:5px}.warband-troop-gear .warband-preview-stage{min-height:150px}.warband-troop-gear figcaption{color:var(--lex-muted);font-size:12px;text-align:center}.warband-trees>.warband-pane{align-self:stretch}
-    .warband-tree-scroll{overflow:auto;min-width:0;min-height:0;background:var(--lex-panel)}
-    .warband-tree-scroll>p{padding:0 12px}.warband-tree-stage{position:relative;margin:auto;min-width:100%}
-    .warband-tree-stage svg{position:absolute;inset:0;pointer-events:none}.warband-tree-stage path{fill:none;stroke:var(--lex-accent);stroke-width:2}
-    .warband-tree-node{position:absolute;width:170px;height:56px;display:flex;flex-direction:column;justify-content:center;border:1px solid var(--lex-border);border-radius:4px;background:var(--lex-panel);color:var(--lex-text);cursor:pointer}
-    .warband-tree-node strong,.warband-tree-node small{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .warband-tree-node[aria-pressed=true]{background:var(--lex-accent);color:var(--lex-accent-text)}.warband-tree-node:focus-visible{outline:3px solid var(--lex-highlight);outline-offset:2px}
-    .warband-tree-node.missing{border-style:dashed}.warband-tree-detail{overflow:auto;min-width:0}.warband-tree-detail>*{height:100%}.warband-tree-detail{--lex-detail-heading-padding:4px 10px;--lex-detail-id-fg:var(--lex-muted)}.warband-tree-detail .detail-grid{grid-template-columns:80px minmax(0,1fr);overflow-wrap:anywhere}
-  
+:root{
+  --lex-bg:#e8d9b4;--lex-panel:#f4e7c5;--lex-panel-2:#dcc99a;--lex-border:#8b6b39;
+  --lex-text:#2b2114;--lex-muted:#6e5b3d;--lex-accent:#7a2020;--lex-accent-text:#fff5d8;
+  --lex-highlight:#a8661c;--lex-success:#556b2f;--lex-font:"Segoe UI",system-ui,sans-serif;--lex-font-size-adjust:none;--lex-text-nudge:0px;
+  --lex-heading-font:Georgia,serif;--lex-radius:4px;
+  --lex-page-bg:linear-gradient(#eadcb8,#d9c28f);--lex-font-size:14px;--lex-line-height:1.45;
+  --lex-surface-bg:#f7edcf;--lex-surface-shadow:inset 0 0 0 1px #fff7de;
+  --lex-list-row-padding:9px 11px;--lex-row-selected-fg:#6b1717;--lex-row-selected-bg:#e4c98d;--lex-list-header-bg:#d1b879;--lex-list-cell-border:#c8ae78;--lex-row-hover-bg:#f0dba8;
+  --lex-shell-header-fg:#f4dfb1;--lex-shell-header-bg:#4b1717;--lex-shell-header-border:#a66b24;--lex-shell-button-fg:#f4dfb1;--lex-shell-button-border:#8c4a35;--lex-shell-button-bg:#6b2424;
+  --lex-fitted-row-height:36px;
+  --lex-detail-icon-size:96px;--lex-detail-heading-padding:4px 10px 5px;--lex-detail-title-fg:#651919;--lex-detail-id-fg:var(--lex-muted);
+  --lex-detail-icon-border:#8b6b39;--lex-detail-icon-bg:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09);
+  --lex-model-stage-bg:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09);--lex-model-stage-fg:#ead8ac;--lex-model-stage-spinner:#d5b469;
+  --lex-input-bg:#fff5d8;
+  --lex-bitmap-atlas:url('/api/warband-font/atlas');
+}
