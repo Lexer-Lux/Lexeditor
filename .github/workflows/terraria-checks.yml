@@ -131,11 +131,13 @@ jobs:
             throw "Packaged acceptance runner did not generate the complete 20-family fixture"
           }
           $project = Join-Path $saveRoot 'ModSources\LexeditorAcceptanceCandidateCheck'
-          if (-not (Test-Path (Join-Path $project 'Content\Commands\AcceptanceCommand.cs'))) {
-            throw 'Packaged fixture is missing the /lexaccept command source'
+          $command = Join-Path $project 'Common\Commands\AcceptanceCommand.cs'
+          $recipe = Join-Path $project 'Common\Recipes\AcceptanceRecipe.cs'
+          if (-not (Test-Path $command) -or -not (Select-String -LiteralPath $command -SimpleMatch 'Command => "lexaccept";' -Quiet)) {
+            throw 'Packaged fixture is missing the /lexaccept command'
           }
-          if (-not (Test-Path (Join-Path $project 'Content\Recipes\AcceptanceRecipe.cs'))) {
-            throw 'Packaged fixture is missing the acceptance recipe source'
+          if (-not (Test-Path $recipe) -or -not (Select-String -LiteralPath $recipe -SimpleMatch 'recipe.AddIngredient(2, 1);' -Quiet)) {
+            throw 'Packaged fixture is missing the one-Dirt acceptance recipe'
           }
       - uses: actions/upload-artifact@v4
         with:
