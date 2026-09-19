@@ -80,3 +80,51 @@ jobs:
             out/bannerlord-browser
             out/bannerlord-data-map-browser
           retention-days: 7
+
+  package-candidate:
+    needs: [regression, browser]
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --disable-pip-version-check -r requirements.txt "pyinstaller>=6,<7"
+      - name: Ensure Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe')) {
+            choco install innosetup -y --no-progress
+          }
+      - name: Build and smoke packaged Lexeditor
+        run: python tools/build_distribution.py
+      - name: Prepare Bannerlord test candidate
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out\bannerlord-candidate | Out-Null
+          Copy-Item dist\installers\*.exe out\bannerlord-candidate\
+          @"
+          Lexeditor Bannerlord PR #453 test candidate
+          Commit: $env:GITHUB_SHA
+          Branch: feature/bannerlord-plugin
+
+          Setup:
+          1. Run the included Lexeditor Windows setup executable.
+          2. In Lexeditor, select the real Mount & Blade II: Bannerlord installation.
+          3. Select the intended Bannerlord project (for the existing mod, C:\Bannermod if unchanged).
+
+          Acceptance:
+          1. Open Module, Data Map, Build, Deployment, and Runtime; they must populate without preflight errors.
+          2. Run Build + Deploy. The module must deploy under Modules/<SubModule ID>; overwritten module-owned assets must receive backups; runtime override JSON must not be overwritten by ordinary asset sync.
+          3. Use Play. Bannerlord must start with the resolved module loadout and reach the game without module-loading/startup errors.
+          4. Load the existing mod/save, make one reversible Runtime Override change, confirm it in the running game, then revert it.
+          5. On failure, report the exact step plus Lexeditor/Bannerlord error text or relevant log excerpt.
+
+          CI evidence for this artifact includes Linux + Windows Bannerlord regression suites, dedicated Chromium smoke, shared Data Map browser coverage, and frozen packaged-app smoke.
+          "@ | Set-Content -Encoding UTF8 out\bannerlord-candidate\TEST-INSTRUCTIONS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bannerlord-test-candidate-windows-${{ github.sha }}
+          path: out/bannerlord-candidate
+          retention-days: 14
