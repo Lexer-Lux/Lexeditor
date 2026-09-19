@@ -13,6 +13,7 @@ import argparse
 import base64
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -70,14 +71,33 @@ def session_for(plugin_id: str, project: str | None):
     if session_class is None:
         raise SystemExit(f"no session class in games/{plugin_id}/plugin.py")
     variable = {
+        "bannerlord": "LEXEDITOR_BANNERLORD_PROJECT",
         "ff8": "LEXEDITOR_FF8_PROJECT", "ff7": "LEXEDITOR_FF7_PROJECT",
         "ff9": "LEXEDITOR_FF9_PROJECT", "rdr2": "LEXEDITOR_RDR2_PROJECT",
         "rdr": "LEXEDITOR_RDR_PROJECT", "warband": "LEXEDITOR_WARBAND_PROJECT",
     }.get(plugin_id)
+    extra_env = {variable: project} if variable and project else {}
+    # Bannerlord deliberately refuses to boot against an invalid project or game
+    # root. Screenshot/verifier runs use an isolated clean module and fake install
+    # so those checks exercise the real UI without depending on C:\\Bannermod or
+    # an installed copy of the game.
+    if plugin_id == "bannerlord" and project:
+        root = Path(project)
+        spec = module.PLUGIN.projects
+        if not (root / "SubModule.xml").is_file():
+            shutil.copytree(spec.template_root, root, dirs_exist_ok=True)
+            if spec.initialize is not None:
+                spec.initialize(root)
+        game = root / ".lexeditor-bannerlord-game"
+        executable = game / "bin" / "Win64_Shipping_Client" / "Bannerlord.exe"
+        executable.parent.mkdir(parents=True, exist_ok=True)
+        executable.touch()
+        (game / "Modules").mkdir(parents=True, exist_ok=True)
+        extra_env["LEXEDITOR_BANNERLORD_ROOT"] = str(game)
     # --live passes no project, so the plugin resolves its own real one from the
     # environment the desktop shell would give it.
     try:
-        return session_class({variable: project} if variable and project else {})
+        return session_class(extra_env)
     except TypeError:
         return session_class()
 
