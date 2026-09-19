@@ -38,8 +38,21 @@ def html_for(game):
     window.__lexeditorPlugin={id:"'''+game+'''",name:"Fixture edition",edition:"Fixture"};'''
     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')+'</script>')
-    if '<script src="/cards_ui.js"></script>' in html:
-        html=html.replace('<script src="/cards_ui.js"></script>','<script>'+(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8')+'</script>')
+    def inline_plugin_script(match):
+        source=match.group(1)
+        relative=source.lstrip('/')
+        candidates=(ROOT/'games'/relative,ROOT/'games'/source_game/relative)
+        games_root=(ROOT/'games').resolve()
+        for candidate in candidates:
+            resolved=candidate.resolve()
+            try:
+                resolved.relative_to(games_root)
+            except ValueError:
+                continue
+            if resolved.is_file() and resolved.suffix.casefold()=='.js':
+                return '<script>'+resolved.read_text(encoding='utf-8')+'</script>'
+        return match.group(0)
+    html=re.sub(r'<script src="([^"]+)"></script>',inline_plugin_script,html)
     # No third-party requests are made by these HTML documents in this harness.
     return html
 
