@@ -54,7 +54,7 @@ const textField=(key,label,help,extra={})=>({key,label,type:"text",help,...extra
 const numberField=(key,label,help,extra={})=>({key,label,type:"number",help,...extra});
 const selectSpec=(key,label,help,choices,extra={})=>({key,label,type:"select",help,choices,...extra});
 const structuredConfigs={
-  animationmeshes:{title:"Animation Meshes",noun:"animation meshes",save:"/api/animationmeshes/save",saved:"Animation mesh",rows:()=>animationMeshes.rows,limits:"Repeated animationDirectory and animationPrefix entries stay read-only and are preserved exactly.",fields:[
+  animationmeshes:{title:"Animation Meshes",noun:"animation meshes",save:"/api/animationmeshes/save",saved:"Animation mesh",rows:()=>animationMeshes.rows,limits:"Repeated animation source lists are preserved exactly: animationDirectory and animationPrefix entries stay read-only.",fields:[
     boolField("keepMeshAnimations","Keep Mesh Animations","Controls whether animations already attached to the source mesh are retained when Project Zomboid loads this animation mesh."),
     textField("meshFile","Mesh File","Names the skinned mesh resource used by this animation mesh. Change it only to another valid Project Zomboid mesh resource."),
     textField("postProcess","Post Process","Passes the Build 42 mesh post-processing directive through to the loader. Unknown directives are not invented or normalized."),
