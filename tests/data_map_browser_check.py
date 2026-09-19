@@ -25,6 +25,9 @@ ROWS=[{'id':str(i),'filename':f'file-{i:03}.dat','controls':f'Interface {i:03}',
        'status':'partial' if i%4<3 else 'not-integrated', 'notes':('Long scoped explanation. '*40),
        'target':'items','dataset':'fixture-data','datasetKey':'fixture-data','openable':i%4<3} for i in range(100)]
 ROWS[0]['filename']='same-file.dat';ROWS[4]['filename']='same-file.dat'  # IDs must not collapse sections.
+# The injected row must name a target the plugin's real Data Map adapter supports.
+# Most plugins route generic item rows; Bannerlord has explicit editor targets.
+OPEN_TARGETS={'bannerlord':'skills'}
 
 def html_for(game):
     source_game='ff7' if game=='ff7_2013' else game
@@ -71,6 +74,8 @@ with sync_playwright() as p:
                 if game=='blank':
                     page.evaluate('navigate("datamap")')
                 else:
+                    open_target=OPEN_TARGETS.get(game,'items')
+                    fixture_rows=[{**row,'target':open_target} for row in ROWS]
                     page.evaluate('''rows=>{
                       state.dataMap={rows};state.datamap={rows};state.booting=false;
                       if(Object.hasOwn(state,"loaded"))state.loaded=true;
@@ -78,7 +83,7 @@ with sync_playwright() as p:
                       if(typeof state.data!=="object" || !state.data)state.data={};
                       if(typeof state.config!=="undefined")state.config={datasets:{mine:{readonly:false,label:"My Mod"}}};
                       navigate("datamap");
-                    }''',ROWS)
+                    }''',fixture_rows)
                 page.wait_for_selector('.lex-data-map-table')
                 page.wait_for_timeout(600)
                 # A preview/source/parser does not produce an editable badge.
@@ -117,7 +122,7 @@ with sync_playwright() as p:
                     # without requiring another editor's unrelated fixture data.
                     page.evaluate('navigate=(target,filters)=>{window.mapOpened={target,filters}}')
                     page.locator('.lex-data-map-open').first.click()
-                    assert page.evaluate('mapOpened.target')=='items',game
+                    assert page.evaluate('mapOpened.target')==open_target,(game,open_target)
                     if game=='ff9':assert page.evaluate('state.datasetChoice.items')=='fixture-data'
                     page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('source')
                     page.wait_for_timeout(200)
