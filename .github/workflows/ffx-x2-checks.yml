@@ -162,13 +162,12 @@ jobs:
         shell: pwsh
         run: |
           python -c "from tools.build_distribution import build_app, smoke; candidate=build_app(); smoke(candidate); print(candidate)"
-          $list = & .\dist\Lexeditor\Lexeditor.exe --list
-          if ($LASTEXITCODE -ne 0 -or ($list -join "`n") -notmatch "(?m)^ffx-x2\t") {
-            throw "Frozen Lexeditor candidate does not expose the ffx-x2 plugin."
+          $smoke = Get-Content -LiteralPath .\build\distribution\smoke.json -Raw | ConvertFrom-Json
+          if (-not [bool]$smoke.passed -or -not [bool]$smoke.childStopped) {
+            throw "Frozen Lexeditor service smoke did not pass."
           }
-          & .\dist\Lexeditor\Lexeditor.exe --game ffx-x2 --smoke
-          if ($LASTEXITCODE -ne 0) {
-            throw "Frozen Lexeditor FFX/X-2 smoke failed."
+          if (@($smoke.plugins) -notcontains "ffx-x2") {
+            throw "Frozen Lexeditor candidate did not discover the ffx-x2 plugin."
           }
       - name: Build and smoke frozen install verifier
         shell: pwsh
