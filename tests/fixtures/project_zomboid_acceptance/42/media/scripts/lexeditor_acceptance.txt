@@ -1,0 +1,11 @@
+module LexeditorAcceptance
+{
+    item AcceptanceToken
+    {
+        DisplayName = Lexeditor Acceptance Token,
+        DisplayCategory = Tool,
+        ItemType = base:normal,
+        Weight = 0.25,
+        Icon = Radio,
+    }
+}
