@@ -126,7 +126,13 @@
         detailField({label:"TRANSLATION MOD",control:boolControl("translationMod"),dataType:"BOOL"}),
       ]}),
     ]});
-    return el("div",{class:"terraria-page"},...warnings(),panel,el("div",{class:"terraria-note"},"Lexeditor rewrites only modeled properties. Comments, unknown/future keys, localized display-name lines, and unrelated formatting remain untouched."));
+    return el("div",{class:"terraria-page"},...warnings(),panel,LexeditorUI.modLoaderSection({
+      loader:"tModLoader 1.4.4 stable. Lexeditor authors native tModLoader source mods; it does not patch vanilla Terraria or install a second loader.",
+      output:"Source stays under ModSources/<ModName>/. Build Mod invokes tModLoader's native build and expects the package under the save root at Mods/<ModName>.tmod.",
+      order:"tModLoader resolves dependencies and runtime load order. build.txt sortAfter/sortBefore express ordering requests; Lexeditor does not invent a separate file-priority system.",
+      safety:"Lexeditor edits only the selected ModSources project. Vanilla Terraria files and tModLoader's enabled.json remain read only.",
+      removal:"Disable or remove the mod through tModLoader, then delete its local .tmod and source project if desired. No vanilla Terraria data needs restoring.",
+    }),el("div",{class:"terraria-note"},"Lexeditor rewrites only modeled properties. Comments, unknown/future keys, localized display-name lines, and unrelated formatting remain untouched."));
   }
   async function openBuildDiagnostic(diagnostic){
     if(!diagnostic?.projectFile)return;
