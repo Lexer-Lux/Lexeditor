@@ -182,12 +182,14 @@ jobs:
           python -m PyInstaller --noconfirm --clean --onefile --console --name FFX-X2-Verify --paths . build\distribution\ffx_x2_verify_entry.py
           $empty = Join-Path $env:RUNNER_TEMP "ffx-x2-empty-install"
           New-Item -ItemType Directory -Force -Path $empty | Out-Null
-          $jsonLines = & .\dist\FFX-X2-Verify.exe --game-root $empty --json
-          $exitCode = $LASTEXITCODE
-          if ($exitCode -eq 0) {
+          $smokeJson = Join-Path $env:RUNNER_TEMP "ffx-x2-verifier-smoke.json"
+          $process = Start-Process -FilePath .\dist\FFX-X2-Verify.exe `
+            -ArgumentList @("--game-root", $empty, "--json") `
+            -RedirectStandardOutput $smokeJson -NoNewWindow -Wait -PassThru
+          if ($process.ExitCode -eq 0) {
             throw "Frozen verifier unexpectedly accepted an empty installation."
           }
-          $report = ($jsonLines -join [Environment]::NewLine) | ConvertFrom-Json
+          $report = Get-Content -LiteralPath $smokeJson -Raw | ConvertFrom-Json
           if ($report.contract -ne "Lexeditor.ffx-x2-install-verification" -or [bool]$report.verificationPassed) {
             throw "Frozen verifier smoke returned the wrong contract/result."
           }
