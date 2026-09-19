@@ -53,3 +53,94 @@ jobs:
           Path('/tmp/terraria-editor.js').write_text(script, encoding='utf-8')
           PY
           node --check /tmp/terraria-editor.js
+
+  acceptance-candidate:
+    name: Windows acceptance candidate
+    if: github.event_name == 'pull_request'
+    needs: terraria
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A human-test candidate must be the exact PR head, not GitHub's synthetic merge ref.
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build packaged acceptance runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m pip install --disable-pip-version-check -r requirements.txt 'pyinstaller>=6,<7'
+          python -m PyInstaller --noconfirm --clean --onefile --name TerrariaAcceptance `
+            --paths . `
+            --collect-submodules games.terraria `
+            --hidden-import plugin_api `
+            --hidden-import project_manager `
+            --hidden-import runtime_bootstrap `
+            --hidden-import service_session `
+            --add-data "games/terraria/template;games/terraria/template" `
+            tools/terraria_acceptance.py
+
+          New-Item -ItemType Directory -Force candidate | Out-Null
+          Copy-Item dist/TerrariaAcceptance.exe candidate/TerrariaAcceptance.exe
+
+          @"
+          Terraria / Lexeditor PR #464 acceptance candidate
+          Branch: feature/terraria-plugin
+          Head: ${{ github.event.pull_request.head.sha }}
+          Target: Windows Steam tModLoader 1.4.4 stable v2026.07.3.0
+
+          This executable is the packaged form of tools/terraria_acceptance.py from the exact PR head above.
+          It creates the prepared 20-family acceptance mod and invokes the installed tModLoader native build.
+          Lexer does not need Python, a repository checkout, or a compiler/toolchain for Lexeditor.
+
+          Run in PowerShell:
+            .\TerrariaAcceptance.exe
+
+          Optional non-default paths:
+            .\TerrariaAcceptance.exe --install-root "C:\path\to\tModLoader" --save-root "C:\path\to\Terraria\tModLoader"
+
+          A PASS means the installed tModLoader produced the expected .tmod. It is not in-game acceptance.
+          Then launch that same tModLoader installation, enable the generated LexeditorAcceptance_* mod if needed,
+          enter a world, run /lexaccept, and craft the magenta checker Acceptance Item from one Dirt Block.
+          Report any tModLoader content/asset error or mismatch in those two smoke checks.
+          "@ | Set-Content -Encoding utf8 candidate/ACCEPTANCE.txt
+
+          @"
+          PR=464
+          BRANCH=feature/terraria-plugin
+          HEAD=${{ github.event.pull_request.head.sha }}
+          "@ | Set-Content -Encoding ascii candidate/BUILD.txt
+          Get-FileHash candidate/TerrariaAcceptance.exe -Algorithm SHA256 |
+            ForEach-Object { "SHA256=$($_.Hash)" } | Add-Content -Encoding ascii candidate/BUILD.txt
+      - name: Prove packaged runner carries the prepared fixture
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $saveRoot = Join-Path $env:RUNNER_TEMP 'terraria-acceptance-save'
+          $json = & .\candidate\TerrariaAcceptance.exe `
+            --generate-only `
+            --save-root $saveRoot `
+            --name LexeditorAcceptanceCandidateCheck `
+            --json
+          if ($LASTEXITCODE -ne 0) { throw "Packaged acceptance runner exited $LASTEXITCODE" }
+          $result = $json | ConvertFrom-Json
+          if (-not $result.ok -or -not $result.generated -or $result.managedFamilies -ne 20) {
+            throw "Packaged acceptance runner did not generate the complete 20-family fixture"
+          }
+          $project = Join-Path $saveRoot 'ModSources\LexeditorAcceptanceCandidateCheck'
+          if (-not (Test-Path (Join-Path $project 'Content\Commands\AcceptanceCommand.cs'))) {
+            throw 'Packaged fixture is missing the /lexaccept command source'
+          }
+          if (-not (Test-Path (Join-Path $project 'Content\Recipes\AcceptanceRecipe.cs'))) {
+            throw 'Packaged fixture is missing the acceptance recipe source'
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terraria-acceptance-pr464-${{ github.event.pull_request.head.sha }}
+          path: candidate/
+          retention-days: 7
+          if-no-files-found: error
+

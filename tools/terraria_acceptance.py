@@ -16,7 +16,14 @@ import sys
 from datetime import datetime
 
 
-ROOT = Path(__file__).resolve().parents[1]
+def _application_root() -> Path:
+    """Resolve repository resources both from source and from the packaged acceptance runner."""
+    if getattr(sys, "frozen", False) and getattr(sys, "_MEIPASS", None):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parents[1]
+
+
+ROOT = _application_root()
 TEMPLATE_ROOT = ROOT / "games" / "terraria" / "template"
 DEFAULT_SAVE_ROOT = Path.home() / "Documents" / "My Games" / "Terraria" / "tModLoader"
 DEFAULT_INSTALL_ROOT = Path(r"C:\Program Files (x86)\Steam\steamapps\common\tModLoader")
