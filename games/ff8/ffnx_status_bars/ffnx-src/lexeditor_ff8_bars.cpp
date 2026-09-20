@@ -690,7 +690,7 @@ void lexeditor_ff8_bars_install()
         };
         for(const unsigned call:character_widget_calls) hook(call,kCharacterWidget,reinterpret_cast<void *>(&character_widget_hook));
     }
-    if(!enable_ff8_xp_bars) return;
+    if (!enable_ff8_xp_bars) return;
     if(FF8_US_VERSION) {
         const auto hook=[&](unsigned address,unsigned target,void *replacement) {
             if(original_call(address,target)) replace_call(address,replacement);
