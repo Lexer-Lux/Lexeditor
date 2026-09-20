@@ -515,11 +515,11 @@ function renderRecordDataset(key,host){
     splitKey:"ffxx2-"+key,defaultSplit:46,minLeft:300,minRight:330,
     search:{key:"ffxx2-"+key,value:ds.query,label:"Search "+spec.label,placeholder:"Search "+spec.label.toLocaleLowerCase()+"…",
       change:value=>{ds.query=value;ds.page=0;render()}},
-    className:"ffxx2-table",fit:{minRowHeight:38},
+    className:"ffxx2-table",paneClass:"ffxx2-pane",fit:{minRowHeight:38},
     master:({rows:shown,selected,select})=>columnList({
       rows:shown,key:row=>rowKey(row),selected:selected,select:row=>select(row),sortState:ds.sort,
       sort:column=>changeSort(ds,column),columnPreferences:ds.prefs,columns:columns,
-      refresh:()=>render(),class:"ffxx2-column-list","aria-label":spec.label+" Table",
+      refresh:()=>render(),class:"ffxx2-column-list",rowClass:"ffxx2-record-row","aria-label":spec.label+" Table",
       decorateRow:(node,row)=>node.dataset.dirty=String(isRowDirty(ds,row))
     }),
     detail:row=>detailFor(key,ds,row),
@@ -575,7 +575,7 @@ function renderArchive(key,host){
   if(ds.selected==null||!rows.some(row=>row.path===ds.selected))ds.selected=rows[0]?.path||null;
   const view=pagedListDetail({
     rows:rows,key:row=>row.path,slots:false,page:ds.page,pageSize:ds.pageSize,selected:ds.selected,noun:"files",
-    splitKey:"ffxx2-"+key,defaultSplit:56,minLeft:360,minRight:300,fit:{minRowHeight:38},
+    splitKey:"ffxx2-"+key,defaultSplit:56,minLeft:360,minRight:300,className:"ffxx2-table",paneClass:"ffxx2-pane",fit:{minRowHeight:38},
     search:{key:"ffxx2-"+key,value:state.archiveQueries[spec.game]||"",label:"Search "+spec.label,
       placeholder:"Search the complete "+spec.label.toLocaleLowerCase()+"…",change:value=>{state.archiveQueries[spec.game]=value;ds.page=0;ds.loaded=false;render()}},
     master:({rows:shown,selected,select})=>columnList({

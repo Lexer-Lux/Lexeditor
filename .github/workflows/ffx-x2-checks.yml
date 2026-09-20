@@ -77,6 +77,9 @@ jobs:
           python -c "from games.ffx_x2.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ffx_x2.server' in SERVICE_MODULES; print(PLUGIN.name)"
           && python tools/generate_credits.py --check
           && python plugin_metadata.py
+      - name: FFX-X2 shared UI budget
+        run: >-
+          python -c "import runpy; c=runpy.run_path('tools/verify_shared_ui_budget.py')['counts'](); f={k:v for k,v in c.items() if k.startswith('games/ffx_x2/')}; assert not f, f; print('FFX-X2 shared UI budget: zero local shared selectors/hand-built rows')"
       - name: FFX-X2 regressions
         run: >-
           python -m pytest -q
@@ -116,6 +119,9 @@ jobs:
         run: |
           python -m pip install playwright
           python -m playwright install --with-deps chromium
+      - name: FFX-X2 page-module route
+        run: >-
+          python -c "import runpy; p=runpy.run_path('tests/plugin_module_routes_check.py')['check']('ffx_x2'); assert not p, p; print('FFX-X2 page modules served and loaded')"
       - name: FFX-X2 rendered acceptance
         run: python tests/test_ffx_x2_browser_check.py --screenshots out/ffx-x2-browser
       - name: Upload browser acceptance

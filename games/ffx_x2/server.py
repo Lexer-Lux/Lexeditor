@@ -1,12 +1,13 @@
 """Loopback HTTP service for the FFX/X-2 HD Remaster collection editor."""
 from __future__ import annotations
 
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 import json
-import mimetypes
 import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+from plugin_http import PluginRequestHandler
 
 from . import (
     auto_ability_prices, ctb_base, deployment, ffx_auto_abilities, ffx_commands,
@@ -506,34 +507,13 @@ def archive_catalog(game: str, query: str, offset: int, limit: int) -> dict:
             "projectRoot": str(paths.PROJECT_ROOT.resolve())}
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(PluginRequestHandler):
     server_version = "LexeditorFFXX2/1"
-    def log_message(self, _format, *_args): return
-    def json_response(self, payload, status=200):
-        data = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8")
-        self.send_response(status); self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate"); self.send_header("Content-Length", str(len(data)))
-        self.end_headers(); self.wfile.write(data)
-    def file_response(self, target: Path):
-        data = target.read_bytes(); self.send_response(200)
-        self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate"); self.send_header("Content-Length", str(len(data)))
-        self.end_headers(); self.wfile.write(data)
-    def send_page_module(self, relative: str):
-        """Serve one declared page-local JS/CSS module without exposing arbitrary plugin files."""
-        if relative not in {"editor.js", "editor.css"}:
-            self.json_response({"error": "Page module not found"}, 404); return
-        root = PLUGIN_ROOT.resolve()
-        target = (root / relative).resolve()
-        if root not in target.parents or not target.is_file():
-            self.json_response({"error": "Page module not found"}, 404); return
-        self.file_response(target)
     def do_GET(self):
         parsed = urlparse(self.path); route = parsed.path
         try:
-            if route == "/": self.file_response(PLUGIN_ROOT / "editor.html")
-            elif route == "/editor.js": self.send_page_module("editor.js")
-            elif route == "/editor.css": self.send_page_module("editor.css")
+            if route == "/": self.send_file(PLUGIN_ROOT / "editor.html")
+            elif self.send_page_module(PLUGIN_ROOT, route): return
             elif route.startswith("/shared/"):
                 shared = (LEXEDITOR_ROOT / "ui").resolve(); target = (shared / route.removeprefix("/shared/")).resolve()
                 self.file_response(target) if shared in target.parents and target.is_file() else self.json_response({"error": "Shared UI asset not found"}, 404)
