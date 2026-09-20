@@ -265,7 +265,7 @@
     let rows=contentFiles.filter(row=>!query||`${row.name} ${row.kind} ${row.path}`.toLocaleLowerCase().includes(query));
     rows=sortedRows(rows,contentSort,{name:row=>row.name,kind:row=>row.kind,path:row=>row.path});
     return pagedListDetail({rows,key:row=>row.path,slots:false,noun:"managed content",page:contentPage,pageSize:contentPageSize,selected:structuredCurrent?.path||rows[0]?.path||null,
-      splitKey:"terraria-content",rowsKey:"terraria-content",defaultSplit:43,minLeft:300,minRight:360,
+      className:"terraria-record-view",splitKey:"terraria-content",rowsKey:"terraria-content",defaultSplit:43,minLeft:300,minRight:360,
       search:{key:"terraria-content",value:contentQuery,label:"Search managed Terraria content",placeholder:"Search names, families, or source paths…",change:value=>{contentQuery=value;contentPage=0;render()}},
       sync:next=>{contentPage=next.page;contentPageSize=next.pageSize;if(next.selected&&next.selected!==structuredCurrent?.path&&!structuredLoading)void loadStructuredContent(next.selected)},
       change:next=>{contentPage=next.page;contentPageSize=next.pageSize;if(next.selected&&next.selected!==structuredCurrent?.path)void loadStructuredContent(next.selected);else render()},
@@ -286,7 +286,7 @@
     ].filter(Boolean)});
     const actions=detailSection({title:"CREATE",body:[detailField({label:"ACTION",control:el("button",{class:"lex-dialog-action primary",type:"button",disabled:locked||!schema,onclick:createStructuredContent},contentCreating?"CREATING…":"Create content"),help:infoHelp("Creation never overwrites an existing C# or asset path. Lexeditor also creates the localization and placeholder assets required by the selected family.")})]});
     const result=contentResult?detailSection({title:"LAST CREATED",body:[detailField({label:"SOURCE",control:readonlyField(contentResult.path||contentResult.source?.path||"Created")})]}):null;
-    const panel=detailPanel({title:"Create Content",meta:"Native tModLoader structured scaffold",paginate:true,body:[identity,...schemaSections(schema,contentCreateValues,()=>shell?.refresh?.(),{disabled:locked}),actions,result].filter(Boolean)});
+    const panel=detailPanel({title:"Create Content",meta:"Native tModLoader structured scaffold",body:[identity,...schemaSections(schema,contentCreateValues,()=>shell?.refresh?.(),{disabled:locked}),actions,result].filter(Boolean)});
     return panelLayout([panel],"terraria-settings-layout",{layoutKey:"terraria-content-create",defaultSizes:[100]});
   }
   function logicScaffoldPanel(){
@@ -368,7 +368,7 @@
     rows=sortedRows(rows,locSort,{key:row=>row.key,value:row=>row.value,path:row=>row.path});
     const selected=rows.some(row=>row.key===locSelectedKey&&row.path===locCurrent?.path)?locSelectedKey:(rows[0]?.key||"");
     return pagedListDetail({rows,key:row=>`${row.path}\u001f${row.key}`,slots:false,noun:"localization entries",page:locPage,pageSize:locPageSize,selected:rows.find(row=>row.key===selected&&row.path===locCurrent?.path)?`${locCurrent.path}\u001f${selected}`:(rows[0]?`${rows[0].path}\u001f${rows[0].key}`:null),
-      splitKey:`terraria-localization-${locCulture}`,rowsKey:`terraria-localization-${locCulture}`,defaultSplit:48,minLeft:320,minRight:360,
+      className:"terraria-record-view",splitKey:`terraria-localization-${locCulture}`,rowsKey:`terraria-localization-${locCulture}`,defaultSplit:48,minLeft:320,minRight:360,
       search:{key:`terraria-localization-${locCulture}`,value:locQuery,label:`Search ${locCulture} localization`,placeholder:"Search keys, values, or resource paths…",change:value=>{locQuery=value;locPage=0;render()}},
       sync:next=>{locPage=next.page;locPageSize=next.pageSize;if(next.selected){const [path,key]=String(next.selected).split("\u001f");locSelectedKey=key;if(path!==locCurrent?.path&&!locLoading)void loadLocalizationFile(path,key)}},
       change:next=>{locPage=next.page;locPageSize=next.pageSize;if(next.selected){const [path,key]=String(next.selected).split("\u001f");locSelectedKey=key;if(path!==locCurrent?.path)void loadLocalizationFile(path,key);else render()}else render()},
@@ -415,7 +415,8 @@
         detailField({label:"LINES",control:readonlyField(String(sourceCurrent.lines))}),
         detailField({label:"SIZE",control:readonlyField(`${sourceCurrent.bytes} bytes`)}),
       ]}),
-      detailSection({title:"C# SOURCE",body:[detailField({label:"TEXT",control:editor,help:infoHelp("Raw author-controlled C#. tModLoader compiler diagnostics remain authoritative; Lexeditor preserves BOM/newline style and refuses stale writes.")})]}),
+      detailSection({title:"C# SOURCE",body:[]}),
+      detailField({label:"",className:"lex-text-editor",control:editor,help:infoHelp("Raw author-controlled C#. tModLoader compiler diagnostics remain authoritative; Lexeditor preserves BOM/newline style and refuses stale writes.")}),
       detailSection({title:"ACTIONS",body:[
         detailField({label:"RENAME / MOVE",control:el("button",{class:"lex-dialog-action",type:"button",disabled:sourceLoading||dirtyCount()>0,onclick:renameSourceFileAction},"Rename / move")}),
         detailField({label:"DELETE SOURCE",control:el("button",{class:"lex-dialog-action",type:"button",disabled:sourceLoading||dirtyCount()>0,onclick:deleteSourceFileAction},"Delete source")}),
@@ -425,7 +426,7 @@
   function sourcePanel(){
     const query=sourceQuery.trim().toLocaleLowerCase();let rows=sourceFiles.filter(row=>!row.error&&(!query||row.path.toLocaleLowerCase().includes(query)));rows=sortedRows(rows,sourceSort,{path:row=>row.path,lines:row=>row.lines,bytes:row=>row.bytes});
     return el("div",{class:"terraria-full-page"},...warnings(),pagedListDetail({rows,key:row=>row.path,slots:false,noun:"source files",page:sourcePage,pageSize:sourcePageSize,selected:sourceCreateMode?"__new__":sourceCurrent?.path||rows[0]?.path||null,
-      splitKey:"terraria-source",rowsKey:"terraria-source",defaultSplit:44,minLeft:300,minRight:380,add:()=>{sourceCreateMode=true;render()},addTitle:"Add C# source file",addDisabled:sourceLoading||dirtyCount()>0,
+      className:"terraria-record-view",splitKey:"terraria-source",rowsKey:"terraria-source",defaultSplit:44,minLeft:300,minRight:380,add:()=>{sourceCreateMode=true;render()},addTitle:"Add C# source file",addDisabled:sourceLoading||dirtyCount()>0,
       search:{key:"terraria-source",value:sourceQuery,label:"Search Terraria source files",placeholder:"Search project-relative C# paths…",change:value=>{sourceQuery=value;sourcePage=0;sourceCreateMode=false;render()}},
       sync:next=>{sourcePage=next.page;sourcePageSize=next.pageSize;if(next.selected&&next.selected!=="__new__"&&next.selected!==sourceCurrent?.path&&!sourceLoading){sourceCreateMode=false;void loadSourceFile(next.selected)}},
       change:next=>{sourcePage=next.page;sourcePageSize=next.pageSize;if(next.selected&&next.selected!=="__new__"&&next.selected!==sourceCurrent?.path){sourceCreateMode=false;void loadSourceFile(next.selected)}else render()},
@@ -483,7 +484,7 @@
   function assetsPanel(){
     const query=assetQuery.trim().toLocaleLowerCase();let rows=assetFiles.filter(row=>!row.error&&(!query||`${row.path} ${row.kind}`.toLocaleLowerCase().includes(query)));rows=sortedRows(rows,assetSort,{path:row=>row.path,kind:row=>row.kind,bytes:row=>row.bytes});
     return el("div",{class:"terraria-full-page"},...warnings(),pagedListDetail({rows,key:row=>row.path,slots:false,noun:"assets",page:assetPage,pageSize:assetPageSize,selected:assetImportMode?"__new__":assetCurrent?.path||rows[0]?.path||null,
-      splitKey:"terraria-assets",rowsKey:"terraria-assets",defaultSplit:46,minLeft:300,minRight:360,add:()=>{assetImportMode=true;render()},addTitle:"Import Terraria asset",addDisabled:assetLoading||dirtyCount()>0,
+      className:"terraria-record-view",splitKey:"terraria-assets",rowsKey:"terraria-assets",defaultSplit:46,minLeft:300,minRight:360,add:()=>{assetImportMode=true;render()},addTitle:"Import Terraria asset",addDisabled:assetLoading||dirtyCount()>0,
       search:{key:"terraria-assets",value:assetQuery,label:"Search Terraria assets",placeholder:"Search asset paths or formats…",change:value=>{assetQuery=value;assetPage=0;assetImportMode=false;render()}},
       sync:next=>{assetPage=next.page;assetPageSize=next.pageSize;if(next.selected&&next.selected!=="__new__"&&next.selected!==assetCurrent?.path&&!assetLoading){assetImportMode=false;void loadAsset(next.selected)}},
       change:next=>{assetPage=next.page;assetPageSize=next.pageSize;if(next.selected&&next.selected!=="__new__"&&next.selected!==assetCurrent?.path){assetImportMode=false;void loadAsset(next.selected)}else render()},

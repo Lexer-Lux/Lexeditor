@@ -222,7 +222,10 @@ def main() -> None:
                     capture(page, screenshots, "content-managed-desktop.png")
                     page.get_by_role("tab", name="Create").click()
                     page.get_by_text("Create Content", exact=True).wait_for()
-                    reveal_settings_text(page, "Create content")
+                    assert page.get_by_label("Content family").is_visible()
+                    create_button = page.get_by_role("button", name="Create content")
+                    create_button.scroll_into_view_if_needed()
+                    assert create_button.is_visible()
                     capture(page, screenshots, "content-create-desktop.png")
                     page.get_by_role("tab", name="Scaffolds").click()
                     page.get_by_text("Logic Scaffold", exact=True).wait_for()
@@ -262,6 +265,13 @@ def main() -> None:
                     page.wait_for_function("sourceCurrent?.path?.endsWith('AcceptanceCommand.cs')")
                     page.get_by_role("button", name="Delete source").scroll_into_view_if_needed()
                     assert page.get_by_role("button", name="Delete source").is_visible()
+                    source_width = page.evaluate("""() => {
+                      const detail=document.querySelector('.terraria-record-view .lex-detail-panel');
+                      const editor=document.querySelector('.terraria-source-editor');
+                      if(!detail||!editor)return null;
+                      return {detail:detail.getBoundingClientRect().width,editor:editor.getBoundingClientRect().width};
+                    }""")
+                    assert source_width and source_width["editor"] >= source_width["detail"] * 0.65, source_width
                     no_horizontal_overflow(page, "source-desktop")
                     capture(page, screenshots, "source-desktop.png")
 
@@ -298,7 +308,9 @@ def main() -> None:
                     assert page.get_by_role("button", name="Build Mod").is_visible()
                     page.evaluate('navigate("content")')
                     page.get_by_role("tab", name="Create").click()
-                    reveal_settings_text(page, "Create content")
+                    create_button = page.get_by_role("button", name="Create content")
+                    create_button.scroll_into_view_if_needed()
+                    assert create_button.is_visible()
                     page.evaluate('navigate("source")')
                     page.get_by_role("searchbox", name="Search Terraria source files").fill("AcceptanceCommand.cs")
                     page.locator(".lex-column-list-row").filter(has_text="AcceptanceCommand.cs").first.click()

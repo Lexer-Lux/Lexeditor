@@ -26,3 +26,8 @@ main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
 .terraria-diagnostics{max-height:240px;overflow:auto;border:1px solid var(--lex-border)}
 .terraria-info-layout{height:100%}
 @media(max-width:760px){.terraria-inline-fields>*{min-width:0;flex:1 1 100%}.terraria-source-editor{height:38vh;min-height:180px}}
+
+@media(max-width:850px){
+  .terraria-record-view{grid-template-rows:auto;grid-auto-rows:auto;height:100%;overflow:auto;align-content:start}
+  .terraria-record-view>*{max-height:none}
+}
