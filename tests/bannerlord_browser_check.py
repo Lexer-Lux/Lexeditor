@@ -225,7 +225,8 @@ def main() -> None:
             assert source_request["body"]["text"] == "after"
             assert source_request["body"]["originalText"] == "before"
 
-            page.evaluate('navigate("info")')
+            page.evaluate('state.infoView="setup";navigate("info")')
+            page.get_by_text("MOD LOADER", exact=True).wait_for()
             deployment_text = page.locator("#main").inner_text()
             assert "MOD LOADER" in deployment_text
             loader_values = page.locator("#main .lex-detail-field input").evaluate_all(
@@ -255,7 +256,9 @@ def main() -> None:
 
             page.evaluate('state.gauntletView="widgets";navigate("gauntlet")')
             page.wait_for_function("state.gauntlet && state.gauntlet.elementCount===3")
-            page.locator(".lex-column-list-row").filter(has_text="Widget").click()
+            widget_row = page.locator(".lex-column-list-row").filter(has_text="Widget")
+            widget_row.wait_for()
+            widget_row.click()
             page.locator('.lex-detail-panel input[type="checkbox"]').first.check()
             page.evaluate("save()")
             page.wait_for_function("!gauntletDirty()")
@@ -263,12 +266,14 @@ def main() -> None:
             assert gauntlet_request["body"]["edits"][0]["attribute"] == "IsEnabled"
 
             page.evaluate('navigate("build")')
+            page.get_by_role("button", name="Build", exact=True).wait_for()
             for label in ("Build", "Build + Deploy", "Sync assets"):
                 assert page.get_by_role("button", name=label, exact=True).is_enabled()
             page.get_by_role("button", name="Sync assets", exact=True).click()
             page.wait_for_function("state.deployResult && state.deployResult.copied.length===1")
 
-            page.evaluate('navigate("info")')
+            page.evaluate('state.infoView="deployment";navigate("info")')
+            page.get_by_text("ASSETS", exact=True).wait_for()
             deployment_text = page.locator("#main").inner_text()
             assert "GUI" in deployment_text
             assert "ModuleData" in deployment_text
