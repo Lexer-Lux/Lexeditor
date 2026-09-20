@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT))
 
 from games.stardew_valley.content_pack import initialize_project  # noqa: E402
 from games.stardew_valley.plugin import StardewValleySession  # noqa: E402
+from service_session import request_json  # noqa: E402
 from games.stardew_valley.source_data import objects_source_path  # noqa: E402
 
 
@@ -109,7 +110,7 @@ def open_editor(browser, url: str, width: int, height: int, zoom: float = 1.0):
     if zoom != 1.0:
         page.evaluate("value => { document.body.style.zoom=String(value); }", zoom)
         page.wait_for_timeout(250)
-    return page, errors
+    return page, errors + console_errors
 
 
 def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
@@ -289,6 +290,12 @@ def main() -> int:
             "LEXEDITOR_STARDEW_ROOT": str(game),
             "LEXEDITOR_STARDEW_PROJECT": str(project),
         }) as session, sync_playwright() as play:
+            identity = request_json(session.url + "api/plugin")
+            assert identity["pluginId"] == "stardew-valley"
+            dashboard = request_json(session.url + "api/dashboard")
+            data_map = request_json(session.url + "api/datamap")
+            objects = request_json(session.url + "api/objects")
+            assert dashboard["game"]["ready"] and len(data_map["rows"]) >= 6 and len(objects["rows"]) >= 96
             browser = play.chromium.launch(headless=True, args=["--no-sandbox"])
             results = []
             try:
