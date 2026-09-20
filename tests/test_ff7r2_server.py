@@ -3,9 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import tempfile
+
+import pytest
+
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from games.ff7r2.dataobject import DataObjectPackage
 from games.ff7r2.plugin import Ff7r2Session
 from ff7r2_fixture import fixture
 
@@ -92,3 +96,47 @@ def test_missing_source_is_an_explicit_empty_state_not_generic_file_access():
                 assert payload["workspace"]["playerParameter"]["sourcePresent"] is False
             else:
                 raise AssertionError("Missing source unexpectedly opened")
+
+
+def test_stale_playerparameter_write_is_rejected():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-stale-") as temp_name:
+        project = Path(temp_name)
+        (project / "lexeditor-project.json").write_text(
+            '{"format":1,"game":"ff7r2"}\n', encoding="utf-8")
+        source = project / "source" / PLAYER
+        source.parent.mkdir(parents=True)
+        source.write_bytes(fixture())
+        environment = {"LEXEDITOR_FF7R2_PROJECT": str(project)}
+
+        with Ff7r2Session(environment) as session:
+            before = _json(session.url + "api/player-parameter")
+            external = DataObjectPackage.from_bytes(source.read_bytes())
+            external.apply_edits([{
+                "nameIndex": before["records"][0]["nameIndex"],
+                "property": "HPMax",
+                "value": 1111,
+            }])
+            source.write_bytes(external.to_bytes())
+
+            request = Request(
+                session.url + "api/player-parameter/save",
+                method="POST",
+                data=json.dumps({
+                    "sha256": before["activeSha256"],
+                    "changes": [{
+                        "nameIndex": before["records"][0]["nameIndex"],
+                        "property": "HPMax",
+                        "value": 1234,
+                    }],
+                }).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+            )
+            with pytest.raises(HTTPError) as caught:
+                urlopen(request, timeout=10)
+            assert caught.value.code == 400
+            payload = json.loads(caught.value.read().decode("utf-8"))
+            assert "changed on disk" in payload["error"]
+            reopened = _json(session.url + "api/player-parameter")
+            hp = next(field for field in reopened["records"][0]["fields"]
+                      if field["name"] == "HPMax")
+            assert hp["value"] == 1111

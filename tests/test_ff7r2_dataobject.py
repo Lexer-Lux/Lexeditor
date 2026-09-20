@@ -62,3 +62,16 @@ def test_frozen_name_property_rejects_byte_patch_edit():
         package.apply_edits([
             {"nameIndex": 1, "property": "Mode", "value": "ModeB"},
         ])
+
+
+def test_noop_parse_is_byte_exact():
+    source = fixture()
+    package = DataObjectPackage.from_bytes(source)
+    assert package.to_bytes() == source
+
+
+@pytest.mark.parametrize("cut", [0, 8, 63, 64, 120])
+def test_truncated_assets_are_rejected(cut):
+    source = fixture()[:cut]
+    with pytest.raises(DataObjectError):
+        DataObjectPackage.from_bytes(source)
