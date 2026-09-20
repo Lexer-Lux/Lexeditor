@@ -80,6 +80,7 @@ def smoke() -> list[str]:
         target = game / relative
         target.parent.mkdir(parents=True)
         shutil.copy2(source, target)
+        installed_before = target.read_bytes()
         (game / "ff7_en.exe").write_bytes(b"test")
         project = root / "project"
         session_env = {
@@ -128,8 +129,14 @@ def smoke() -> list[str]:
             with urllib.request.urlopen(request, timeout=10) as response:
                 saved = json.loads(response.read().decode("utf-8"))
             saved_path = Path(saved["path"])
+            resolved_saved = saved_path.resolve()
+            if (not resolved_saved.is_relative_to(project.resolve())
+                    or resolved_saved.is_relative_to(game.resolve())):
+                raise RuntimeError("The legacy FF7 save escaped its isolated project")
             if not saved_path.is_file() or Kernel(saved_path).records("armor")[0]["values"]["defense"] != changed:
                 raise RuntimeError("The legacy FF7 project save did not survive binary readback")
+            if target.read_bytes() != installed_before:
+                raise RuntimeError("The legacy FF7 project save modified its installed source")
         if not session.wait_closed():
             raise RuntimeError("The legacy FF7 child service stayed open")
         with FF7LegacySession(session_env) as reopened:
@@ -139,11 +146,14 @@ def smoke() -> list[str]:
                 raise RuntimeError("The legacy FF7 project edit did not survive a fresh service reopen")
         if not reopened.wait_closed():
             raise RuntimeError("The reopened legacy FF7 child service stayed open")
+        if target.read_bytes() != installed_before:
+            raise RuntimeError("The reopened legacy FF7 project modified its installed source")
     return [
         "legacy FF7 product identity, shared editor and capabilities confirmed",
         "Data Map structured/openable coverage contract confirmed",
         "416 English KERNEL.BIN records decoded",
-        "bounded armor edit saved to the legacy project, survived binary readback and reopened",
+        "bounded armor edit stayed inside the project, survived binary readback and reopened",
+        "installed English KERNEL.BIN source remained byte-identical",
     ]
 
 
