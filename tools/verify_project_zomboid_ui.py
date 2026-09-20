@@ -386,7 +386,15 @@ def main() -> int:
                     page.locator('.pz-record-detail input[aria-label="Weight"]').press("Tab")
                     page.wait_for_function("dirtyCount()===2")
                     page.keyboard.press("Control+S")
-                    page.wait_for_function("dirtyCount()===0", timeout=15000)
+                    # dirtyCount reaches zero while saveAllChanges is still
+                    # reloading every PZ endpoint. The shared shell keeps the
+                    # UI inert until that async save/reload completes, so wait
+                    # for the same user-visible completion boundary before
+                    # deliberately reloading the page again.
+                    page.wait_for_function(
+                        "dirtyCount()===0 && !document.body.classList.contains('lex-save-busy')",
+                        timeout=30000,
+                    )
                     page.reload(wait_until="domcontentloaded")
                     page.locator(".pz-metadata").wait_for()
                     navigate(page, "items", ".pz-record-layout")
