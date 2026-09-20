@@ -17,6 +17,11 @@ import webbrowser
 import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
+
+try:
+    from plugin_http import PluginRequestHandler
+except ImportError:  # Old PR base; current master supplies the shared handler.
+    PluginRequestHandler = BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
 from . import (camera_features, input_remaps, loot_script, map_icon_features,
@@ -1876,7 +1881,7 @@ def dashboard_payload() -> dict:
     }
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(PluginRequestHandler):
     server_version = "LexeditorRDR/1.0"
 
     def log_message(self, _format, *_args):
@@ -1918,18 +1923,15 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 self.file_response(PLUGIN_ROOT / "editor.html")
+            elif hasattr(self, "send_page_module") and self.send_page_module(PLUGIN_ROOT, path):
+                return
+            elif path in {"/editor.js", "/editor.css", "/strings.js"}:
+                self.file_response(PLUGIN_ROOT / path.removeprefix("/"))
             elif path.startswith("/shared/"):
                 shared_root = (LEXEDITOR_ROOT / "ui").resolve()
                 target = (shared_root / path.removeprefix("/shared/")).resolve()
                 if shared_root not in target.parents or not target.is_file():
                     self.json_response({"error": "shared UI asset not found"}, 404)
-                else:
-                    self.file_response(target)
-            elif path.startswith("/assets/"):
-                asset_root = (PLUGIN_ROOT / "assets").resolve()
-                target = (asset_root / path.removeprefix("/assets/")).resolve()
-                if asset_root not in target.parents or not target.is_file():
-                    self.json_response({"error": "RDR plugin asset not found"}, 404)
                 else:
                     self.file_response(target)
             elif path.startswith("/fonts/"):
