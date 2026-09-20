@@ -215,8 +215,22 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
 
     if mutate:
         price_cell = stone.locator('[data-column-key="Price"]').first
+        assert "lex-cell-editable" in (price_cell.get_attribute("class") or ""), price_cell.evaluate("node => node.outerHTML")
+        assert page.locator("html").get_attribute("data-lex-project-readonly") == "false"
         price_cell.dblclick()
+        page.wait_for_timeout(120)
         price_editor = price_cell.locator('input[type="number"]')
+        if price_editor.count() != 1:
+            diagnostics = {
+                "cell": price_cell.evaluate("node => node.outerHTML"),
+                "readonly": page.locator("html").get_attribute("data-lex-project-readonly"),
+                "selected": stone.get_attribute("aria-selected"),
+                "activeElement": page.evaluate("() => document.activeElement?.outerHTML || ''"),
+            }
+            (OUT / f"cell-edit-failure-{label}.json").write_text(
+                json.dumps(diagnostics, indent=2) + "\n", encoding="utf-8")
+            take(page, f"cell-edit-failure-{label}.png")
+            raise AssertionError("Price cell did not enter edit mode: " + json.dumps(diagnostics))
         price_editor.fill("88")
         price_editor.press("Enter")
         page.wait_for_timeout(180)
