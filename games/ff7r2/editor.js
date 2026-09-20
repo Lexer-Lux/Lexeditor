@@ -241,11 +241,11 @@
     {key:"HPMax",label:"HP Max",numeric:true,sortable:true},
     {key:"MPMax",label:"MP Max",numeric:true,sortable:true},
     {key:"Strength",label:"Strength",numeric:true,sortable:true},
-    {key:"Vitality",label:"Vitality",numeric:true,sortable:true},
-    {key:"Magic",label:"Magic",numeric:true,sortable:true},
-    {key:"Spilit",label:"Spilit",numeric:true,sortable:true},
-    {key:"Dexterity",label:"Dexterity",numeric:true,sortable:true},
-    {key:"Luck",label:"Luck",numeric:true,sortable:true},
+    {key:"Vitality",label:"Vitality",numeric:true,sortable:true,pinned:false},
+    {key:"Magic",label:"Magic",numeric:true,sortable:true,pinned:false},
+    {key:"Spilit",label:"Spilit",numeric:true,sortable:true,pinned:false},
+    {key:"Dexterity",label:"Dexterity",numeric:true,sortable:true,pinned:false},
+    {key:"Luck",label:"Luck",numeric:true,sortable:true,pinned:false},
   ];
   const playerPrefs=columnPreferences("ff7r2-player-parameter",PLAYER_COLUMNS,()=>render());
 
@@ -457,7 +457,11 @@
     if(!row)return statusPanel("NO RECORD","No PlayerParameter record is selected.");
     const scalar=[],readonly=[];
     for(const field of row.fields||[]){
-      const item=detailField({label:field.name.toUpperCase(),...fieldControl(row,field)});
+      const column=PLAYER_COLUMNS.find(item=>item.key===field.name);
+      const item=detailField({
+        label:field.name.toUpperCase(),...fieldControl(row,field),
+        pin:column?playerPrefs.pinButton(field.name,column.label):null
+      });
       (field.editable?scalar:readonly).push(item);
     }
     const projectActions=el("div",{class:"lex-reshade-actions"},
