@@ -299,9 +299,10 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
 def assert_navigation_loading(page, button_selector: str, expected: str, screenshot_name: str) -> None:
     page.evaluate("""() => {
       window.__svAuditRealRAF = window.requestAnimationFrame;
+      window.__svAuditHeldFrames = [];
       window.requestAnimationFrame = callback => {
-        window.__svAuditHeldFrame = callback;
-        return 1;
+        window.__svAuditHeldFrames.push(callback);
+        return window.__svAuditHeldFrames.length;
       };
     }""")
     page.locator(button_selector).click()
@@ -309,11 +310,12 @@ def assert_navigation_loading(page, button_selector: str, expected: str, screens
     loading.wait_for(state="visible", timeout=2000)
     take(page, screenshot_name)
     page.evaluate("""() => {
-      const callback = window.__svAuditHeldFrame;
+      const callbacks = window.__svAuditHeldFrames || [];
       window.requestAnimationFrame = window.__svAuditRealRAF;
-      delete window.__svAuditHeldFrame;
+      delete window.__svAuditHeldFrames;
       delete window.__svAuditRealRAF;
-      callback?.(performance.now());
+      const now = performance.now();
+      for (const callback of callbacks) callback(now);
     }""")
 
 
