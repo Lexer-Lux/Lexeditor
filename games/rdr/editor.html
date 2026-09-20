@@ -456,6 +456,7 @@
     }
   }
   function validatePendingEdits(){
+    stringsUI.validate();
     for(const [identity,value] of Object.entries(state.itemEdits)){
       const split=identity.lastIndexOf("|"),item=state.items?.rows.find(row=>row.id===identity.slice(0,split)),field=item?.fields.find(row=>row.field===identity.slice(split+1));
       if(!field)throw new Error(`Item field ${identity} is no longer loaded`);
@@ -498,6 +499,7 @@
         const item=state.shops.rows.find(row=>row.id===id);if(!item)throw new Error(`Shop item ${id} is no longer loaded`);
         await api("/api/shop/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source:item.source,rootHash:item.rootHash,itemIndex:item.itemIndex,expectedName:item.name,edits})});saved.push(`${item.shop}: ${item.name}`);
       }
+      if(Object.keys(state.stringEdits).length)await stringsUI.savePending(saved);
       if(Object.keys(state.missionEdits).length){
         const overrides=[];
         for(const mission of state.missions.missions){
@@ -516,8 +518,9 @@
         await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});saved.push("LexerRDR.ini");
       }
       if(state.lootDirty){await api("/api/loot/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({document:state.lootDocument})});saved.push("LexerRDR.loot.json");}
-      [state.files,state.items,state.shops,state.missions,state.settings,state.loot,state.dashboard]=await Promise.all([api("/api/files"),api("/api/items"),api("/api/shops"),api("/api/missions"),optionalRuntime("/api/settings"),optionalRuntime("/api/loot"),api("/api/dashboard")]);
-      state.itemEdits={};state.shopEdits={};state.missionEdits={};state.settingEdits={};state.lootDocument=clone(state.loot.document);state.lootDirty=false;shell.history.clear();setStatus(`Saved to workspace: ${saved.join(", ")}. ${state.dashboard.deployment?.pending?"Deploy Project to rebuild the archive copies.":"Runtime-backed files are ready from the workspace."}`);render();
+      [state.files,state.items,state.shops,state.strings,state.missions,state.settings,state.loot,state.dashboard,state.vanilla.strings]=await Promise.all([api("/api/files"),api("/api/items"),api("/api/shops"),api("/api/string-tables"),api("/api/missions"),optionalRuntime("/api/settings"),optionalRuntime("/api/loot"),api("/api/dashboard"),api("/api/string-tables?dataset=vanilla")]);
+      if(state.stringTableId)await stringsUI.load(state.stringTableId,false);
+      state.itemEdits={};state.shopEdits={};stringsUI.clearEdits();state.missionEdits={};state.settingEdits={};state.lootDocument=clone(state.loot.document);state.lootDirty=false;shell.history.clear();setStatus(`Saved to workspace: ${saved.join(", ")}. ${state.dashboard.deployment?.pending?"Deploy Project to rebuild the archive copies.":"Runtime-backed files are ready from the workspace."}`);render();
     }catch(error){setStatus("Save failed");showAlert({title:"Save failed",items:[{item:"Save",issue:error.message||String(error)}],closeLabel:"Confirm and Close"});}
   }
 
