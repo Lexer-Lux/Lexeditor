@@ -20,7 +20,7 @@ editors = {
     for name in ("blank", "ff7", "ff8", "ff9", "rdr", "rdr2", "warband")
 }
 editors["rdr"] += "\n" + (
-    ROOT / "games" / "rdr" / "assets" / "editor.js"
+    ROOT / "games" / "rdr" / "editor.js"
 ).read_text(encoding="utf-8")
 ff7_2013_plugin = (ROOT / "games" / "ff7_2013" / "plugin.py").read_text(encoding="utf-8")
 rdr_server = (ROOT / "games" / "rdr" / "server.py").read_text(encoding="utf-8")
