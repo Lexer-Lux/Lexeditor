@@ -5,7 +5,7 @@ from .project import OverlayStore
 
 
 ROWS = [
-    ("resources.bin", "Steam resource archive", "Structured source container. Lexeditor reads ARC1 entries but never rewrites the installed archive.", "integrated", "info"),
+    ("resources.bin", "Steam resource archive", "Read-only source container. Lexeditor reads ARC1 entries but never rewrites the installed archive.", "partial", "info"),
     ("Localize/<lang>/msg/*.txt", "Dialogue, menu and item text", "Edit keyed UTF-8 text records and save only the selected resource into the mod project.", "integrated", "text"),
     ("Game/common/MapJumpOffsetTbl.dat + MapJumpDataTbl.dat", "Area exits", "Edit existing Steam 8-byte exit records: trigger tile/size, destination, facing and destination position. Counts remain unchanged.", "integrated", "exits"),
     ("Game/common/TakaraOffsetTbl.dat + TakaraDataTbl.dat", "Treasure chests", "Edit existing Steam 6-byte treasure records for position and known item/gold contents. Alias sentinels and unknown trailing words are preserved.", "integrated", "treasure"),
@@ -52,7 +52,7 @@ def build_data_map(store: OverlayStore) -> dict:
             "filename": filename,
             "controls": controls,
             "notes": notes if present else f"This family was not present in the selected Steam archive. {notes}",
-            "coverage": "structured" if actual == "integrated" else "recognized",
+            "coverage": "structured" if actual == "integrated" else ("source" if filename == "resources.bin" else "unavailable"),
             "status": actual,
             "openable": actual == "integrated" and target is not None,
             "target": target,

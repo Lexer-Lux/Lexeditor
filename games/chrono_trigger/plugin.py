@@ -30,8 +30,12 @@ class ChronoTriggerSession(LocalPluginSession):
             "LEXEDITOR_CHRONO_TRIGGER_PROJECT": str(paths.PROJECT_ROOT),
         }
         environment.update(extra_env or {})
+        session_check = lambda: paths.check_paths(
+            Path(environment["LEXEDITOR_CHRONO_TRIGGER_ROOT"]),
+            Path(environment["LEXEDITOR_CHRONO_TRIGGER_PROJECT"]),
+        )
         super().__init__(module="games.chrono_trigger.server", plugin_id="chrono-trigger", app_root=ROOT,
-                         check=check, port_env="LEXEDITOR_CHRONO_TRIGGER_PORT", extra_env=environment)
+                         check=session_check, port_env="LEXEDITOR_CHRONO_TRIGGER_PORT", extra_env=environment)
 
 
 def launch() -> int:

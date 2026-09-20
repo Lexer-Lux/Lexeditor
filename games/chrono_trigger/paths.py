@@ -13,17 +13,21 @@ GAME_ROOT = Path(os.environ.get("LEXEDITOR_CHRONO_TRIGGER_ROOT", r"D:\SteamLibra
 PROJECT_ROOT = Path(os.environ.get("LEXEDITOR_CHRONO_TRIGGER_PROJECT", user_data_dir() / "projects" / "chrono-trigger"))
 
 
-def check() -> list[str]:
+def check_paths(game_root: Path, project_root: Path) -> list[str]:
     problems = []
-    if not (GAME_ROOT / "Chrono Trigger.exe").is_file():
-        problems.append(f"Chrono Trigger.exe was not found under {GAME_ROOT}")
-    if not (GAME_ROOT / "resources.bin").is_file():
-        problems.append(f"resources.bin was not found under {GAME_ROOT}")
+    if not (game_root / "Chrono Trigger.exe").is_file():
+        problems.append(f"Chrono Trigger.exe was not found under {game_root}")
+    if not (game_root / "resources.bin").is_file():
+        problems.append(f"resources.bin was not found under {game_root}")
     try:
-        game = GAME_ROOT.resolve()
-        project = PROJECT_ROOT.resolve()
+        game = game_root.resolve()
+        project = project_root.resolve()
         if project == game or game in project.parents:
             problems.append("The Chrono Trigger project must be outside the installed game folder")
     except OSError:
         pass
     return problems
+
+
+def check() -> list[str]:
+    return check_paths(GAME_ROOT, PROJECT_ROOT)

@@ -1,0 +1,79 @@
+name: Chrono Trigger fresh checks
+
+on:
+  pull_request:
+    paths:
+      - 'games/chrono_trigger/**'
+      - 'codex/chrono_trigger/**'
+      - 'worklog/requests/chrono-trigger-plugin.md'
+      - 'tests/test_chrono_trigger_replacement.py'
+      - 'tests/chrono_trigger_browser_check.py'
+      - 'runtime_bootstrap.py'
+      - 'ui/mod-loading.json'
+      - 'ui/credits-sources.json'
+      - 'ui/credits.json'
+      - '.github/workflows/chrono-trigger-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile fresh Chrono Trigger modules
+        run: python -m compileall -q games/chrono_trigger
+      - name: Run fresh Chrono Trigger roundtrip tests
+        run: python -m unittest discover -s tests -p 'test_chrono_trigger_replacement.py' -v
+      - name: Run synthetic managed-service smoke
+        run: python -c "from games.chrono_trigger.plugin import smoke; print(smoke())"
+      - name: Check editor JavaScript syntax
+        run: node --check games/chrono_trigger/editor.js
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Lexeditor runtime dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify generated credits and plugin metadata
+        run: |
+          python tools/generate_credits.py --check
+          python plugin_metadata.py
+      - name: Verify shared UI contract and plugin discovery
+        run: |
+          python tools/verify_shared_ui_contract.py
+          python app.py --list
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser acceptance dependencies
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Run fixture-only Chrono Trigger browser acceptance
+        run: python tests/chrono_trigger_browser_check.py out/chrono-trigger-browser
+      - name: Preserve Chrono Trigger rendered evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrono-trigger-browser
+          path: out/chrono-trigger-browser
+          if-no-files-found: warn
+          retention-days: 7
