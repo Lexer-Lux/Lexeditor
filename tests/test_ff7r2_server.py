@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+from http.client import HTTPConnection
 from pathlib import Path
 import tempfile
 
 import pytest
 
 from urllib.error import HTTPError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from games.ff7r2.dataobject import DataObjectPackage
@@ -140,3 +142,24 @@ def test_stale_playerparameter_write_is_rejected():
             hp = next(field for field in reopened["records"][0]["fields"]
                       if field["name"] == "HPMax")
             assert hp["value"] == 1111
+
+
+def test_negative_content_length_is_rejected_without_unbounded_read():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-body-") as temp_name:
+        project = Path(temp_name)
+        (project / "lexeditor-project.json").write_text(
+            '{"format":1,"game":"ff7r2"}\n', encoding="utf-8")
+        with Ff7r2Session({"LEXEDITOR_FF7R2_PROJECT": str(project)}) as session:
+            parsed = urlparse(session.url)
+            connection = HTTPConnection(parsed.hostname, parsed.port, timeout=5)
+            try:
+                connection.putrequest("POST", "/api/player-parameter/reset")
+                connection.putheader("Content-Type", "application/json")
+                connection.putheader("Content-Length", "-1")
+                connection.endheaders()
+                response = connection.getresponse()
+                payload = json.loads(response.read().decode("utf-8"))
+            finally:
+                connection.close()
+            assert response.status == 400
+            assert "Request size is invalid" in payload["error"]
