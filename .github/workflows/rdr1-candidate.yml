@@ -45,9 +45,24 @@ jobs:
           assert not (target / "tools/magic-rdr/app").exists()
           assert not (target / "tools/magic-rdr/cli").exists()
           assert (target / "tools/magic-rdr/README.md").is_file()
+          other_games = [
+              path for path in (target / "games").iterdir()
+              if path.is_dir() and path.name != "rdr"
+          ]
+          assert not other_games, other_games
+          assert not [
+              path for path in target.rglob("*")
+              if path.suffix.lower() in {".ttf", ".otf", ".woff", ".woff2"}
+          ]
           PY
           cd candidate-root
-          python -m compileall -q games/rdr
+          python - <<'PY'
+          from plugin_metadata import static_plugin_ids, validate_repository_metadata
+          assert static_plugin_ids() == {"rdr"}
+          validate_repository_metadata()
+          print("candidate plugin metadata narrowed to RDR1")
+          PY
+          python -m compileall -q *.py games/rdr
           python -m unittest discover -s tests -p 'test_rdr_string_tables.py'
           python tools/verify_rdr_editing.py
           python tools/verify_rdr_cache_reuse_71.py
