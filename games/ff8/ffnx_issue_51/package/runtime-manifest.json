@@ -3,7 +3,7 @@
   "distribution": "lexeditor-ffnx-derivative",
   "sourceCommit": "c056db2783f376a340fcefa6a48cc33618998876",
   "driver": "AF3DN.P",
-  "driverSha256": "6f8b3b67397a9fce8eff7f0258ba8c4fc1bcb4f9702bc31ecfc932bac84fce24",
+  "driverSha256": "398062ac3da8c632bcb75410dd51406792c11bafa85108fe5f4913f553c68663",
   "architecture": "x86",
   "runtimeEnabled": true,
   "hookCount": 28,
@@ -25,8 +25,8 @@
     "license": "COPYING.TXT",
     "licenseSha256": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
     "sourcePatch": "ISSUE51_DERIVATIVE_SOURCE.patch",
-    "sourcePatchSha256": "d76453ec477436961955cadc9a2b680ad6769d5c00c9ea7b0cc4a16cfd928bc7",
+    "sourcePatchSha256": "4df3dc248d58bbc1887b538561893eb8eb04414eb2fb97f6785ec832f2c2a9d5",
     "buildReport": "ISSUE51_BUILD_REPORT.md",
-    "buildReportSha256": "a9b28c5a64c28c2fa9449aa00dc5400555bee876f61d16bb1e543f262baf45a1"
+    "buildReportSha256": "5b871c6bc6cac83847dff2e88f97129c2ba67dcce25079dc54fcd8c2f09b8156"
   }
 }

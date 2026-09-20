@@ -31,8 +31,6 @@ def fake_plugin(plugin_id: str, root: Path, prepare=None) -> GamePlugin:
     return GamePlugin(
         plugin_id=plugin_id,
         name=plugin_id.title(),
-        subtitle=plugin_id.upper(),
-        description="Automatic discovery verifier",
         accent="#ffffff",
         check=lambda: [],
         launch=lambda: 0,

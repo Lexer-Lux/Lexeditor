@@ -14,7 +14,6 @@ struct polygon_set;
 struct indexed_vertices;
 struct game_obj;
 
-// FF8's driver points here only while Better HP Colors is enabled. The
-// implementation delegates unchanged unless an audited HP-number scope is live.
+bool lexeditor_ff8_hp_colors_requested();
 void lexeditor_ff8_hp_colors_draw_paletted2D(
     struct polygon_set *, struct indexed_vertices *, struct game_obj *);

@@ -5,6 +5,9 @@ import io
 import os
 import json
 from pathlib import Path
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import inline_modules
 import sys
 import tempfile
 
@@ -61,8 +64,7 @@ def main():
                     html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
                     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding="utf-8")+'</style>')
                     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding="utf-8")+'</script>')
-                    html=html.replace('<script src="/warband/troop_trees.js"></script>','<script>'+(ROOT/'games/warband/troop_trees.js').read_text(encoding="utf-8")+'</script>')
-                    html=html.replace('<script src="/warband/troop_editor.js"></script>','<script>'+(ROOT/'games/warband/troop_editor.js').read_text(encoding="utf-8")+'</script>')
+                    html=inline_modules('warband',html)
                     page.set_content(html,wait_until='domcontentloaded');page.wait_for_function('!state.booting')
                     page.wait_for_function('document.querySelector(".warband-item-thumbnail img")?.naturalWidth>0')
                     assert page.locator('.warband-item-detail [data-lex-property="id"] input').count()==1
@@ -109,19 +111,19 @@ def main():
                     # Each tree is a subtab now. Select the recruit component
                     # rather than the independent militia tree.
                     page.get_by_role('tab',name='Recruit',exact=True).click()
-                    page.locator('button[data-troop="knight"]').click()
+                    page.locator('button[data-node="knight"]').click()
                     assert 'Knight' in page.locator('.warband-tree-detail').inner_text()
                     assert 'knight' in page.locator('.warband-tree-detail').inner_text()
                     assert page.evaluate("() => {const title=document.querySelector('.warband-tree-detail h2').getBoundingClientRect();const body=document.querySelector('.warband-tree-detail .lex-detail-panel-body').getBoundingClientRect();return title.bottom<=body.top+1;}")
-                    coords=page.evaluate('''() => Object.fromEntries([...document.querySelectorAll('[data-troop]')].map(n=>[n.dataset.troop,n.getBoundingClientRect().y]))''')
+                    coords=page.evaluate('''() => Object.fromEntries([...document.querySelectorAll('[data-node]')].map(n=>[n.dataset.node,n.getBoundingClientRect().y]))''')
                     assert coords['recruit']>coords['footman']>coords['knight'],coords
                     page.screenshot(path=str(ARTIFACTS/f'trees-{width}.png'),full_page=True)
                     page.get_by_role('combobox',name='Troop tree faction',exact=True).select_option('fac_south')
-                    assert page.locator('[data-troop="horseman"]').count()==1
-                    assert page.locator('[data-troop="recruit"]').count()==0
+                    assert page.locator('[data-node="horseman"]').count()==1
+                    assert page.locator('[data-node="recruit"]').count()==0
                     # A missing render dependency affects only the thumbnail; the actual item editor remains usable.
                     page.evaluate('state.filters.items="Missing texture fixture";navigate("items")')
-                    page.wait_for_function('document.querySelector(".warband-icon-message")?.textContent.includes("Icon unavailable")')
+                    page.wait_for_function('document.querySelector(".warband-item-thumbnail .lex-icon-slot-message")?.textContent.includes("Icon unavailable")')
                     assert page.locator('.warband-item-detail [data-lex-property="name"] input').is_enabled()
                     assert page.locator('.warband-item-detail [data-lex-property="stats"] textarea').is_enabled()
                     assert page.get_by_role('button',name='Open model preview',exact=True).count()==0

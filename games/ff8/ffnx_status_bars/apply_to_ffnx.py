@@ -70,16 +70,10 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
         b"enable_ff8_xp_bars = false\r\n\r\n"
         b"# Draw current/max HP bars for FF8's three active battle characters.\r\n"
         b"enable_ff8_hp_bars = false\r\n\r\n"
-        b"# Smoothly tint vanilla HP numbers by remaining HP; KO stays native.\r\n"
+        b"# Smoothly tint living HP numbers; KO keeps FF8's native display.\r\n"
         b"enable_ff8_better_hp_colors = false\r\n\r\n"
         b"# Draw blue junctioned-GF HP bars above the FF8 party names.\r\n"
         b"enable_ff8_gf_hp_bars = false\r\n",
-    )
-    replace_once(
-        root / "src/ff8_opengl.cpp",
-        b"\tret->draw_paletted2D = common_draw_paletted2D;\r\n",
-        b"\tret->draw_paletted2D = enable_ff8_better_hp_colors ? "
-        b"lexeditor_ff8_hp_colors_draw_paletted2D : common_draw_paletted2D;\r\n",
     )
     replace_once(
         root / "src/ff8_opengl.cpp",
@@ -90,6 +84,12 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
         root / "src/ff8_opengl.cpp",
         b"void ff8_init_hooks(struct game_obj *_game_object)\r\n{\r\n",
         b"void ff8_init_hooks(struct game_obj *_game_object)\r\n{\r\n\tlexeditor_ff8_bars_install();\r\n",
+    )
+    replace_once(
+        root / "src/ff8_opengl.cpp",
+        b"\tret->draw_paletted2D = common_draw_paletted2D;\r\n",
+        b"\tret->draw_paletted2D = lexeditor_ff8_hp_colors_requested() ? "
+        b"lexeditor_ff8_hp_colors_draw_paletted2D : common_draw_paletted2D;\r\n",
     )
     replace_once(
         root / "src/overlay.cpp",

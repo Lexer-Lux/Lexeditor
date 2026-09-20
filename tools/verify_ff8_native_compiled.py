@@ -32,9 +32,6 @@ def compile_and_run(text: str, name: str):
 
 def bars_source():
     source=(ROOT/'games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp').read_text()
-    # GCC cannot parse MSVC's x86 naked/inline-asm bridge. The Windows FFNx
-    # build compiles that exact function; this cross-platform harness replaces
-    # only the bridge body while retaining the production scope/render logic.
     hook_start=source.index('void __declspec(naked) __cdecl hp_number_hook()')
     hook_end=source.index('// Native 004B77F9 reads the menu sprite table.',hook_start)
     source=source[:hook_start]+'void __cdecl hp_number_hook() {}\n\n'+source[hook_end:]

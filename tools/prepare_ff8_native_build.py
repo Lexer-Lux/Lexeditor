@@ -157,16 +157,23 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
             ('bool enable_ff8_gf_hp_bars;','bool enable_ff8_gf_hp_bars;\nbool enable_ff8_ingame_time;'),
             ('\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);',
              '\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);\n\tenable_ff8_ingame_time = config["enable_ff8_ingame_time"].value_or(false);'),
+            # The Modern Controls overlay reads its camera turn rate; the
+            # provenance patch predates that setting.
+            ('bool enable_ff8_modern_controls;', 'bool enable_ff8_modern_controls;\ndouble ff8_modern_controls_camera_speed;'),
+            ('\tenable_ff8_modern_controls = config["enable_ff8_modern_controls"].value_or(false);',
+             '\tenable_ff8_modern_controls = config["enable_ff8_modern_controls"].value_or(false);\n\tff8_modern_controls_camera_speed = config["ff8_modern_controls_camera_speed"].value_or(1.0);'),
         ],
         'src/cfg.h':[
             ('extern bool enable_ff8_party_switch;', 'extern bool enable_ff8_party_switch;\nextern bool enable_ff8_no_magic_consumption;'),
             ('extern bool enable_ff8_hp_bars;','extern bool enable_ff8_hp_bars;\nextern bool enable_ff8_better_hp_colors;\nextern bool enable_ff8_gf_hp_bars;'),
             ('extern bool enable_ff8_gf_hp_bars;','extern bool enable_ff8_gf_hp_bars;\nextern bool enable_ff8_ingame_time;'),
+            ('extern bool enable_ff8_modern_controls;', 'extern bool enable_ff8_modern_controls;\nextern double ff8_modern_controls_camera_speed;'),
         ],
         'misc/FFNx.toml':[
             ('enable_ff8_party_switch = false', 'enable_ff8_party_switch = false\n\n# Keep spell stock on successful field/battle casts; items still consume.\nenable_ff8_no_magic_consumption = false'),
-            ('enable_ff8_hp_bars = false','enable_ff8_hp_bars = false\n\n# Smoothly tint vanilla HP numbers by remaining HP; KO stays native.\nenable_ff8_better_hp_colors = false\n\n# Blue junctioned-GF HP bar above each party name.\nenable_ff8_gf_hp_bars = false'),
+            ('enable_ff8_hp_bars = false','enable_ff8_hp_bars = false\n\n# Smoothly tint living HP numbers by remaining HP; KO stays native.\nenable_ff8_better_hp_colors = false\n\n# Blue junctioned-GF HP bar above each party name.\nenable_ff8_gf_hp_bars = false'),
             ('enable_ff8_gf_hp_bars = false','enable_ff8_gf_hp_bars = false\n\n# Show the computer local clock on FF8 main menu without changing PLAY time.\nenable_ff8_ingame_time = false'),
+            ('enable_ff8_modern_controls = false', 'enable_ff8_modern_controls = false\n\n# Battle camera turn rate as a multiple of the shipped speed, 0.2 to 4.\nff8_modern_controls_camera_speed = 1.0'),
         ],
     }
     # The message box draws in the same ImGui frame the status bars use, and
@@ -184,7 +191,7 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
     ]
     changes['src/ff8_opengl.cpp'] = [
         ('\tret->draw_paletted2D = common_draw_paletted2D;',
-         '\tret->draw_paletted2D = enable_ff8_better_hp_colors ? lexeditor_ff8_hp_colors_draw_paletted2D : common_draw_paletted2D;'),
+         '\tret->draw_paletted2D = lexeditor_ff8_hp_colors_requested() ? lexeditor_ff8_hp_colors_draw_paletted2D : common_draw_paletted2D;'),
         ('#include "lexeditor_ff8_party_switch.h"', '#include "lexeditor_ff8_party_switch.h"\n#include "lexeditor_ff8_stock_tweaks.h"\n#include "lexeditor_ff8_gf_spellbooks.h"\n#include "lexeditor_ff8_reptile_atb.h"'),
         ('\tlexeditor_ff8_party_switch_install();', '\tlexeditor_ff8_party_switch_install();\n\tlexeditor_ff8_stock_tweaks_install();\n\tlexeditor_ff8_gf_spellbooks_install();\n\tlexeditor_ff8_reptile_atb_install();'),
     ]

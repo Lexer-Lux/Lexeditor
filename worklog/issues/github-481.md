@@ -1,26 +1,21 @@
 # GitHub #481 — Better HP Colors
 
-State: in progress; native implementation and candidate checks are being wired.
-Scope: FF8 only.
+State: actionable. Draft PR #500; FF8 only.
 
-## Requirements / evidence
+## Requirement / gap / evidence
 
-- [x] True smooth RGB is technically supported: current and pinned FFNx pass
-  8-bit vertex colour into textured 2D rendering; no palette-step substitute.
-- [x] Anchors are white 100%, yellow 50%, orange 25%, red 0%, piecewise linear.
-- [x] KO is excluded from live tinting; full HP is left native white.
-- [x] Native non-white/yellow or non-white vertex presentation has precedence.
-- [x] Unsupported layout fails closed behind FF8 US plus the already-verified
-  battle and seven shared-character-widget call identities.
-- [x] Disabled candidate selects FFNx's original `common_draw_paletted2D`.
-- [x] Lexeditor tweak persistence/UI and disable transaction checks.
-- [ ] Windows derivative build + isolated artifact evidence on this branch.
-- [ ] Actual FF8 battle/menu visual acceptance (cannot be proven by CI).
+- [x] True smooth RGB through FFNx vertex colour; no stepped approximation.
+- [x] White 100%, yellow 50%, orange 25%, red 0%, piecewise linear.
+- [x] Battle uses verified row/HP-glyph hooks.
+- [x] Seven verified shared-character-widget menu callers use displayed computed current/max HP.
+- [x] KO/full HP delegate; native non-white/yellow or pre-coloured presentation wins.
+- [x] Unsupported native layout fails closed.
+- [x] Default-off setting/UI/config and disabled driver dispatch to original `common_draw_paletted2D`.
+- [x] Reconciled current master's newer gauge harness without changing production gauge behavior.
+- [ ] Active/reserve main-menu HP-number seam is separate and has not been safely identified; do not guess it. Establish whether vanilla threshold-recolours it and, if so, its exact call seam.
+- [ ] Current-head Windows derivative build + isolated candidate evidence.
+- [ ] Live battle/shared-menu visual and disable comparison.
 
-## Handoff
+The interrupted stale head failed because its harness asserted pre-refactor gauge geometry and its generated `ff8_opengl.cpp` read `enable_ff8_better_hp_colors` without a declaration. This reconciliation preserves current master's gauge source and makes the driver call exported `lexeditor_ff8_hp_colors_requested()`, avoiding a cfg-global dependency. An unrelated FF7R shared-UI failure is outside #481.
 
-The candidate workflow must package `AF3DN.P`, `FFNx.toml.sample`, provenance,
-and `ISSUE481-ACCEPTANCE.txt`. Test only an isolated copy of the supported
-Steam English executable (SHA-256
-`064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570`).
-Do not treat source/unit/build success as live colour acceptance.
+A successful candidate packages `AF3DN.P`, `FFNx.toml.sample`, license/provenance, and `ISSUE481-ACCEPTANCE.txt`. Use only an isolated copy of the supported Steam English game. CI is not in-game acceptance.

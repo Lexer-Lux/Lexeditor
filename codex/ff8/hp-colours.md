@@ -2,47 +2,17 @@
 
 Issue: GitHub #481.
 
-## Renderer evidence
+FFNx carries 8-bit BGRA on `nvertex`; its normal 2D shader multiplies textured colour by vertex colour. FF8 routes paletted 2D through `common_draw_paletted2D`, so true per-draw RGB is available without palette steps.
 
-FFNx current master and the pinned combined derivative revision
-`c056db2783f376a340fcefa6a48cc33618998876` both carry 8-bit BGRA on
-`nvertex`. The normal FFNx fragment shader multiplies textured 2D colour by
-that vertex colour. FF8 assigns `common_draw_paletted2D` to its paletted 2D
-driver entry, so the renderer can produce true per-draw RGB; this does not need
-palette stepping.
-
-The supported Steam English executable remains SHA-256
+Supported Steam English `FF8_EN.exe` SHA-256:
 `064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570`.
-The existing native verifier executes the shared character widget at
-`004C0780` and observes its HP-number draw through native number renderer
-`004A3530`, with the HP position packed as `((y+75)<<16)|(x+141)`. Existing
-battle verification already establishes the HP row/glyph calls at
-`004B17D5`, `004B1100`, and `004B127B`.
 
-## Issue #481 seam
+Executable-backed verification establishes battle row/HP glyph calls `004B17D5`, `004B1100`, `004B127B`, seven callers of shared character widget `004C0780`, and its HP-number draw through `004A3530` at packed position `((y+75)<<16)|(x+141)`. The shared widget's 32-byte computed-stat argument uses words 4/5 for displayed current/max HP, matching current main-menu HP-gauge work.
 
-Better HP Colors is a default-off FFNx derivative switch. When on, the FF8
-paletted-2D driver is wrapped, but the wrapper delegates unchanged unless a
-verified native HP-number scope is active.
+Better HP Colors is default off. When requested, the FF8 paletted driver selects a wrapper, but it delegates unchanged until every verified battle/shared-widget identity matched and an HP scope is active. Battle reuses the verified HP glyph scope. Shared character panels temporarily enable the `004A3530` detour only while that widget executes; the known HP position is checked and the native function is restored while it runs.
 
-Battle reuses the existing row/HP-glyph hooks to obtain the same current/max HP
-the HUD is drawing. Menus reuse the seven already-audited callers of the shared
-character widget. The native number renderer is detoured only while that widget
-runs; its original five bytes are restored before the native function executes
-and after the widget returns. The original argument stack is preserved, and the
-known packed HP position scopes the tint to the HP number.
+Only native white/yellow palette batches with untouched white vertex RGB are eligible. Other palettes or pre-coloured vertices win. Eligible batches temporarily use white glyphs multiplied by the interpolated RGB, call FFNx's normal paletted draw, then restore palette and vertex bytes.
 
-The wrapper accepts only vanilla white/yellow palettes and untouched white RGB
-vertices. Any other native palette/vertex colour wins. It temporarily uses the
-white glyph palette plus the interpolated RGB, calls FFNx's normal paletted
-draw, then restores the palette and vertices. KO (current HP zero) and full HP
-do not activate the tint.
+Anchors: white `(255,255,255)` at 100%, yellow `(255,255,0)` at 50%, orange `(255,128,0)` at 25%, red `(255,0,0)` at 0%, piecewise linear. Live 0 HP bypasses tinting so KO remains vanilla; full HP also delegates unchanged.
 
-Piecewise RGB anchors are white `(255,255,255)` at 100%, yellow
-`(255,255,0)` at 50%, orange `(255,128,0)` at 25%, and red
-`(255,0,0)` at 0%. The mathematical zero endpoint is red, while live zero HP
-is deliberately bypassed so KO keeps vanilla presentation.
-
-Source/build tests establish interpolation, hook/config contracts and an
-isolated binary candidate. They do **not** establish in-game rendering; use the
-candidate's `ISSUE481-ACCEPTANCE.txt` for battle/menu visual acceptance.
+Known boundary: the active/reserve main-menu row renderer is separate. Do not claim its HP number is covered until executable-backed evidence establishes its number-call seam and whether vanilla threshold recolouring occurs there. Source/build checks are not live visual acceptance.

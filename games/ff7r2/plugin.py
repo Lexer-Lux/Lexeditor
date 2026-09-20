@@ -45,8 +45,6 @@ def launch() -> int:
 PLUGIN = GamePlugin(
     plugin_id="ff7r2",
     name="Final Fantasy VII Rebirth",
-    subtitle="Presentation",
-    description="ReShade presets for Final Fantasy VII Rebirth.",
     accent="#3f7fd0",
     check=check,
     launch=launch,
