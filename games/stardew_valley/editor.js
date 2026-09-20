@@ -204,7 +204,7 @@ function fieldControl(row, key, kind, min, max, help) {
     attrs: {"data-lex-property": key},
   });
 }
-function tablePanel(rows = sortedRows(), picked = state.selected, select = row => { state.selected = row.id; render(); }) {
+function tablePanel(rows = sortedRows(), picked = state.selected, select = row => { if (state.selected === row.id) return; state.selected = row.id; render(); }) {
   return columnList({
     rows, key: row => row.id, selected: picked, select, sortState: state.sort,
     sort: key => { state.sort = state.sort.key === key ? {key, dir: -state.sort.dir} : {key, dir: 1}; state.page = 0; render(); },
