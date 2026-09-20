@@ -184,7 +184,9 @@ def main() -> None:
             page.set_content(inline_editor(), wait_until="domcontentloaded")
             page.wait_for_function("state.module && state.project && state.datamap", timeout=8000)
             body = page.locator("#main").inner_text()
-            assert "Fixture Module" in body, (body, errors)
+            heading = page.locator('.lex-detail-panel-title input[aria-label="Module display name"]')
+            assert heading.count() == 1, (body, errors)
+            assert heading.input_value() == "Fixture Module", (body, errors)
 
             page.evaluate('state.moduleView="dependencies";navigate("module")')
             legacy_row = page.locator(".lex-column-list-row").filter(has_text="LegacyBrowserDep")
