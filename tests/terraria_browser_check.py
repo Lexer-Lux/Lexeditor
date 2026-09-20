@@ -31,6 +31,28 @@ def no_horizontal_overflow(page, label: str) -> None:
     assert data["main"] <= data["mainClient"] + 3, (label, data)
 
 
+def capture(page, screenshots: list[str], name: str) -> None:
+    path = OUT / name
+    page.screenshot(path=str(path), full_page=True)
+    screenshots.append(path.name)
+
+
+def reveal_settings_text(page, text: str) -> None:
+    target = page.get_by_text(text, exact=False).first
+    for _ in range(12):
+        if target.count() and target.is_visible():
+            return
+        pager = page.locator("#main .lex-tweaks-pages").last
+        if not pager.count():
+            break
+        next_button = pager.get_by_role("button", name="Next page")
+        if not next_button.count() or next_button.is_disabled():
+            break
+        next_button.click()
+        page.wait_for_timeout(80)
+    assert target.count() and target.is_visible(), (text, page.locator("#main").inner_text())
+
+
 def main() -> None:
     errors: list[str] = []
     screenshots: list[str] = []
@@ -94,20 +116,20 @@ def main() -> None:
                     page.goto(session.url, wait_until="domcontentloaded")
                     page.locator(".lex-detail-panel").first.wait_for()
                     no_horizontal_overflow(page, "metadata-desktop")
+                    capture(page, screenshots, "metadata-desktop.png")
+
+                    page.evaluate('navigate("dependencies")')
+                    page.get_by_role("button", name="Build Mod").wait_for()
+                    page.get_by_role("button", name="Build Mod").scroll_into_view_if_needed()
+                    assert page.get_by_role("button", name="Build Mod").is_visible()
+                    no_horizontal_overflow(page, "dependencies-desktop")
+                    capture(page, screenshots, "dependencies-desktop.png")
 
                     page.locator("#plugin-info").click()
                     page.get_by_text("MOD LOADER", exact=True).wait_for()
-                    ownership = page.get_by_text("External Steam runtime", exact=False)
-                    for _ in range(8):
-                        if ownership.is_visible():
-                            break
-                        next_page = page.locator("#main .lex-tweaks-pages").get_by_role("button", name="Next page")
-                        if not next_page.count() or next_page.is_disabled():
-                            break
-                        next_page.click()
-                        page.wait_for_timeout(80)
-                    assert ownership.is_visible(), page.locator("#main").inner_text()
+                    reveal_settings_text(page, "External Steam runtime")
                     no_horizontal_overflow(page, "info-desktop")
+                    capture(page, screenshots, "info-desktop.png")
 
                     page.locator("#plugin-data-map").click()
                     page.locator(".lex-data-map-view").wait_for()
@@ -117,9 +139,7 @@ def main() -> None:
                     page.wait_for_timeout(100)
                     assert page.locator(".lex-column-list-row").count() >= 1
                     no_horizontal_overflow(page, "data-map-desktop")
-                    path = OUT / "data-map-desktop.png"
-                    page.screenshot(path=str(path), full_page=True)
-                    screenshots.append(path.name)
+                    capture(page, screenshots, "data-map-desktop.png")
                     data_search.fill("")
 
                     page.evaluate('navigate("content")')
@@ -141,6 +161,16 @@ def main() -> None:
                     page.evaluate("loadStructuredContent(structuredCurrent.path)")
                     page.wait_for_function("structuredCurrent?.values?.damage === 17")
                     assert page.get_by_label("Damage", exact=True).input_value() == "17"
+
+                    # Reopen the whole editor, not only the file API, and prove the saved
+                    # structured value survives a fresh UI boot.
+                    page.reload(wait_until="domcontentloaded")
+                    page.locator(".lex-detail-panel").first.wait_for()
+                    page.evaluate('navigate("content")')
+                    page.get_by_role("searchbox", name="Search managed Terraria content").fill("AcceptanceItem")
+                    page.get_by_text("AcceptanceItem", exact=True).first.click()
+                    page.wait_for_function("structuredCurrent?.path?.endsWith('AcceptanceItem.cs')")
+                    assert page.get_by_label("Damage", exact=True).input_value() == "17"
                     damage = page.get_by_label("Damage", exact=True)
                     damage.fill("23")
                     assert page.locator("#global-save").is_enabled()
@@ -149,9 +179,14 @@ def main() -> None:
                     page.wait_for_function("structuredCurrent?.values?.damage === 17")
                     assert page.get_by_label("Damage", exact=True).input_value() == "17"
                     no_horizontal_overflow(page, "content-desktop")
-                    path = OUT / "content-desktop.png"
-                    page.screenshot(path=str(path), full_page=True)
-                    screenshots.append(path.name)
+                    capture(page, screenshots, "content-managed-desktop.png")
+                    page.get_by_role("tab", name="Create").click()
+                    page.get_by_text("Create Content", exact=True).wait_for()
+                    reveal_settings_text(page, "Create content")
+                    capture(page, screenshots, "content-create-desktop.png")
+                    page.get_by_role("tab", name="Scaffolds").click()
+                    page.get_by_text("Logic Scaffold", exact=True).wait_for()
+                    capture(page, screenshots, "content-scaffolds-desktop.png")
 
                     page.evaluate('navigate("localization")')
                     page.get_by_role("tab", name="🇫🇷 fr-FR").click()
@@ -175,8 +210,12 @@ def main() -> None:
                     page.wait_for_timeout(100)
                     assert "Valeur modifiée" in page.locator("#main").inner_text()
                     no_horizontal_overflow(page, "localization-desktop")
+                    capture(page, screenshots, "localization-desktop.png")
 
                     page.evaluate('navigate("source")')
+                    assert int(page.locator(".lex-page-total").first.inner_text()) >= 2
+                    page.get_by_role("button", name="Next page").first.click()
+                    page.get_by_role("button", name="First page").first.click()
                     source_search = page.get_by_role("searchbox", name="Search Terraria source files")
                     source_search.fill("AcceptanceCommand.cs")
                     page.locator(".lex-column-list-row").filter(has_text="AcceptanceCommand.cs").first.click()
@@ -184,8 +223,12 @@ def main() -> None:
                     page.get_by_role("button", name="Delete source").scroll_into_view_if_needed()
                     assert page.get_by_role("button", name="Delete source").is_visible()
                     no_horizontal_overflow(page, "source-desktop")
+                    capture(page, screenshots, "source-desktop.png")
 
                     page.evaluate('navigate("assets")')
+                    assert int(page.locator(".lex-page-total").first.inner_text()) >= 2
+                    page.get_by_role("button", name="Next page").first.click()
+                    page.get_by_role("button", name="First page").first.click()
                     asset_search = page.get_by_role("searchbox", name="Search Terraria assets")
                     asset_search.fill("BrowserExtra17")
                     page.locator(".lex-column-list-row").filter(has_text="BrowserExtra17").first.click()
@@ -193,6 +236,7 @@ def main() -> None:
                     page.get_by_role("button", name="Delete asset").scroll_into_view_if_needed()
                     assert page.get_by_role("button", name="Delete asset").is_visible()
                     no_horizontal_overflow(page, "assets-desktop")
+                    capture(page, screenshots, "assets-desktop.png")
 
                     page.evaluate('navigate("metadata")')
                     pip = page.locator(".lex-info-help").first
@@ -206,6 +250,15 @@ def main() -> None:
                         page.evaluate(f'navigate("{tab}")')
                         page.wait_for_timeout(180)
                         no_horizontal_overflow(page, f"{tab}-narrow-150")
+
+                    page.evaluate('navigate("metadata")')
+                    reveal_settings_text(page, "TRANSLATION MOD")
+                    page.evaluate('navigate("dependencies")')
+                    page.get_by_role("button", name="Build Mod").scroll_into_view_if_needed()
+                    assert page.get_by_role("button", name="Build Mod").is_visible()
+                    page.evaluate('navigate("content")')
+                    page.get_by_role("tab", name="Create").click()
+                    reveal_settings_text(page, "Create content")
                     page.evaluate('navigate("source")')
                     page.get_by_role("searchbox", name="Search Terraria source files").fill("AcceptanceCommand.cs")
                     page.locator(".lex-column-list-row").filter(has_text="AcceptanceCommand.cs").first.click()
@@ -213,18 +266,21 @@ def main() -> None:
                     delete = page.get_by_role("button", name="Delete source")
                     delete.scroll_into_view_if_needed()
                     assert delete.is_visible()
-                    path = OUT / "source-narrow-150.png"
-                    page.screenshot(path=str(path), full_page=True)
-                    screenshots.append(path.name)
+                    capture(page, screenshots, "source-narrow-150.png")
+                    page.evaluate('navigate("assets")')
+                    page.get_by_role("searchbox", name="Search Terraria assets").fill("BrowserExtra17")
+                    page.locator(".lex-column-list-row").filter(has_text="BrowserExtra17").first.click()
+                    page.wait_for_function("assetCurrent?.path?.includes('BrowserExtra17')")
+                    page.get_by_role("button", name="Delete asset").scroll_into_view_if_needed()
+                    assert page.get_by_role("button", name="Delete asset").is_visible()
+                    capture(page, screenshots, "assets-narrow-150.png")
 
                     page.evaluate("document.body.style.zoom='1'")
                     page.set_viewport_size({"width": 1000, "height": 760})
                     page.locator("#plugin-data-map").click()
                     page.locator(".lex-data-map-view").wait_for()
                     no_horizontal_overflow(page, "data-map-medium")
-                    path = OUT / "data-map-medium.png"
-                    page.screenshot(path=str(path), full_page=True)
-                    screenshots.append(path.name)
+                    capture(page, screenshots, "data-map-medium.png")
                 finally:
                     browser.close()
 
