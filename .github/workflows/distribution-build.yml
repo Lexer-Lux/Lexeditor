@@ -101,7 +101,7 @@ jobs:
           PY
 
       - name: Record exact packaged revision
-        run: python -c "from pathlib import Path; import subprocess; p=Path('build/distribution/source-sha.txt'); p.parent.mkdir(parents=True,exist_ok=True); p.write_text(subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()+'\\n',encoding='utf-8')"
+        run: python -c "from pathlib import Path; import subprocess; p=Path('build/distribution/source-sha.txt'); p.parent.mkdir(parents=True,exist_ok=True); p.write_text(subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()+chr(10),encoding='utf-8')"
 
       - name: Verify one native installer was produced
         run: python -c "from pathlib import Path; p=Path('dist/installers'); files=[x for x in p.iterdir() if x.is_file()]; assert len(files)==1, files; print(files[0])"
