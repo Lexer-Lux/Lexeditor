@@ -9,11 +9,11 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import re
 from pathlib import Path
 
 from playwright.sync_api import expect, sync_playwright
 
-from plugin_ui import inline_modules
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -287,10 +287,6 @@ window.fetch = async function(input, options={}) {
 };
 """.replace("FIXTURE", json.dumps(fixture))
     html = (ROOT / "games/ff7r/editor.html").read_text(encoding="utf-8")
-    # Current FF7R keeps its game-specific CSS/JS in sibling modules. Inline
-    # them in the same order the production page loads them so set_content()
-    # exercises the actual modular editor rather than an empty shell.
-    html = inline_modules("ff7r", html)
     html = html.replace("<head>", '<head><base href="https://lexeditor.test/">', 1)
     html = html.replace(
         '<link rel="stylesheet" href="/shared/framework.css">',
@@ -300,6 +296,24 @@ window.fetch = async function(input, options={}) {
         '<script src="/shared/framework.js"></script>',
         "<script>" + stub + "</script><script>"
         + (ROOT / "ui/framework.js").read_text(encoding="utf-8") + "</script>",
+    )
+    # Match the repository-wide rendered harness: after the shared framework is
+    # inlined, replace every plugin-local module exactly where production loads
+    # it. This keeps editor.js after LexeditorUI has been defined.
+    folder = ROOT / "games" / "ff7r"
+    html = re.sub(
+        r'<script src="(?!/shared/)/?([A-Za-z0-9_./-]+\.js)"></script>',
+        lambda match: "<script>"
+        + (folder / Path(match[1]).name).read_text(encoding="utf-8").replace("</script", "<\\/script")
+        + "</script>",
+        html,
+    )
+    html = re.sub(
+        r'<link rel="stylesheet" href="(?!/shared/)/?([A-Za-z0-9_./-]+\.css)">',
+        lambda match: "<style>"
+        + (folder / Path(match[1]).name).read_text(encoding="utf-8")
+        + "</style>",
+        html,
     )
     return html
 
@@ -335,6 +349,14 @@ def new_page(browser, html: str, physical_width: int, physical_height: int, scal
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.route("**/*", lambda route: route.abort())
     page.set_content(html, wait_until="domcontentloaded")
+    page.wait_for_timeout(100)
+    if not page.evaluate('typeof state !== "undefined"'):
+        raise AssertionError({
+            "reason": "FF7R editor state missing after modular boot",
+            "pageErrors": errors,
+            "scripts": page.locator("script").count(),
+            "body": page.locator("body").inner_text()[:1200],
+        })
     page.wait_for_function("state.catalog && state.data && !state.busy")
     return context, page, errors
 
