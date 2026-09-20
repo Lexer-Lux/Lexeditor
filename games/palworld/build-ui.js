@@ -121,7 +121,7 @@ function palBuildPanel(){
       detailField({label:"SOURCE PROJECT",control:readonlyField(info?.project||"Unavailable")}),
     ]}),
     detailSection({title:"BUILD ACTIONS",body:[
-      detailField({label:"PACKAGE",control:el("div",{class:"pal-actions"},
+      detailField({label:"PACKAGE",control:LexeditorUI.actionRow(
         el("button",{type:"button",class:"primary",disabled:!canBuild,onclick:()=>runPalBuild("create")},state.current?"Rebuild package":"Build package"),
         el("button",{type:"button",disabled:!canRevert,onclick:()=>runPalBuild("revert")},"Revert build"),
         el("button",{type:"button",disabled:palBuildLoading,onclick:refreshPalBuild},"Refresh")
@@ -132,7 +132,7 @@ function palBuildPanel(){
       detailField({label:"WORKSHOP ROOT",control:readonlyField(workshop.workshopRoot||"Not detected")}),
       detailField({label:"LOCAL FOLDER",control:readonlyField(workshop.folder||"Not deployed")}),
       detailField({label:"TARGET",control:readonlyField(workshop.targetPath||"Not deployed")}),
-      detailField({label:"ACTIONS",control:el("div",{class:"pal-actions"},
+      detailField({label:"ACTIONS",control:LexeditorUI.actionRow(
         el("button",{type:"button",class:"primary",disabled:!canDeploy,onclick:()=>runPalWorkshop("deploy")},workshop.deployed?"Update local test":"Deploy local test"),
         el("button",{type:"button",disabled:!canRemove,onclick:()=>runPalWorkshop("remove")},"Remove local deployment")
       )}),
@@ -152,7 +152,7 @@ function palBuildPanel(){
       detailField({label:"SOURCE TARGET",control:readonlyField(serverDeploy.targetPath||"Not deployed")}),
       detailField({label:"LOADER",control:readonlyField(palServerLoaderText()),help:infoHelp("Dedicated-server activation is an explicit reversible PalModSettings.ini transaction. The original file is restored byte-for-byte only while its post-edit hash is unchanged.")}),
       detailField({label:"CONFIG",control:readonlyField(serverLoader.path||"Not generated yet")}),
-      detailField({label:"ACTIONS",control:el("div",{class:"pal-actions"},
+      detailField({label:"ACTIONS",control:LexeditorUI.actionRow(
         el("button",{type:"button",class:"primary",disabled:!canServerDeploy,onclick:()=>runPalServer("deploy")},serverDeploy.deployed?"Update server package":"Deploy server package"),
         el("button",{type:"button",disabled:!canServerEnable,onclick:()=>runPalServer("enable")},"Enable on server"),
         el("button",{type:"button",disabled:!canServerRevert,onclick:()=>runPalServer("revert-activation")},"Revert server activation"),

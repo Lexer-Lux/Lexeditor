@@ -39,6 +39,32 @@ Before coding, write down the intended scope in the PR or Worklog:
 Do not merge a plugin just because CI is green. Parser, browser, installed-runtime,
 deployment and in-game acceptance are different evidence levels.
 
+## The plugin's UI files
+
+One shape, checked by `tools/verify_shared_ui_contract.py`:
+
+- `editor.html` — the page. Every plugin with a UI has exactly this file, under
+  exactly this name, and it holds **markup only**: no inline `<script>` beyond
+  the one-line transition boot in `<head>`, and no inline `<style>`.
+- `<name>.js` / `<name>.css` — a module of that page, named for what it holds
+  (`items.js`, `crime.js`, `editor.css`, `troop_trees.js`), loaded by the page
+  with a **relative** path (`<script src="items.js">`), so the page works
+  whether its own service or a test server serves it. A module nothing loads is
+  deleted, not kept. The modules run in the order the page lists them, sharing
+  one global scope, so a value one module reads at load time must be defined by
+  a module the page lists earlier.
+- The plugin's service routes them with `self.send_page_module(PLUGIN_ROOT,
+  path)` from `plugin_http.py`; `tests/plugin_module_routes_check.py` starts
+  every service, asks it for each module its page names, and loads the page to
+  see that the modules can still see each other.
+- No theme file. A theme is tokens handed to `mountShell`. A stylesheet may set
+  tokens and style the game's own classes; a selector naming a shared class
+  (`.lex-…`) is counted by `tools/verify_shared_ui_budget.py`, and that count
+  may fall but never rise.
+
+Every shared component is listed in `ui/component-catalog.js` and shown in
+Blank. A component exported without being catalogued fails the tests.
+
 ## 1. Research before writing parsers
 
 This is usually the highest-leverage step. **Do not start by reverse-engineering a
@@ -214,7 +240,7 @@ to redistribute.
 
 Create `games/<game>/__init__.py` and `plugin.py`. Export one `GamePlugin` named
 `PLUGIN`; discovery is automatic. Give it a unique letters/numbers/hyphens ID,
-name, subtitle, description, accent, `check`, `launch`, `session_factory`, and a
+name, accent, `check`, `launch`, `session_factory`, and a
 safe `smoke()` before shipping.
 
 ```python
@@ -238,8 +264,6 @@ def launch():
 PLUGIN = GamePlugin(
     plugin_id="example",
     name="Example",
-    subtitle="Example game",
-    description="Edits the supported Example records.",
     accent="#557788",
     check=check,
     launch=launch,
@@ -344,47 +368,6 @@ Keep the pager outside that scroll area. Never rely on the outer window to
 scroll: the desktop shell can prevent it. Check every page, the last control in
 a tall group, and edit retention at small window sizes and large UI scales.
 Run `python tools/verify_tweaks_pagination.py` for the shared reachability check.
-
-### Derive the plugin theme from the installed game when feasible
-
-A plugin should not look like the Blank gallery with a different accent color when
-the game already ships a strong UI language of its own. **Research the game's menu
-art, fonts, icons, cursor/highlight treatment and short UI sound effects as part of
-the normal plugin research pass.** Prefer those proved source assets over drawing a
-generic imitation by hand.
-
-The safe default is **local derivation, not redistribution**:
-
-- read theme sources from the user's own supported game installation;
-- keep installed archives/files strictly read-only, just like gameplay source data;
-- write a bounded derived/cached theme outside the repository (normally under the
-  user's Lexeditor cache or other local application-data directory);
-- key/invalidate that cache by a source hash/header hash/build signature so stale
-  assets do not silently survive a game update;
-- never commit proprietary game textures, fonts, audio banks or extracted dumps to
-  Lexeditor just to make a plugin look authentic;
-- never expose arbitrary raw cache paths through the plugin HTTP service. Serve
-  only explicit browser-ready assets through the same resolved-path containment
-  rules as other local assets.
-
-Prefer formats the browser can already consume directly (`png`, `webp`,
-`ttf`/`otf`/`woff`, `wav`/`ogg`/`mp3`, etc.). When the game uses a proprietary
-container/atlas/bank, first look for a compatible licensed decoder/converter and
-credit it. It is fine to cache the recognized raw local source while conversion is
-still unsupported, but the UI must say that honestly instead of claiming the font
-or SFX is active.
-
-Theme extraction is cosmetic and must **fail soft**. Missing `metamenu`/UI assets,
-an unsupported bitmap-font atlas, or an undecoded sound bank must not block a safe
-gameplay editor. Keep a deliberate fallback theme that preserves the game's color,
-spacing and interaction character without pretending it is the original asset.
-When browser-ready local UI SFX exist, play them only after a user gesture and keep
-them subtle; do not auto-play game audio.
-
-Add the theme surface to the Data Map or another honest diagnostics surface. Real UI
-acceptance should verify both the installed-asset path and the fallback path. A
-screenshot/source inspection is not enough to prove a local texture, font or sound
-actually renders/plays in the desktop host.
 
 Credits and Mod Loading are shared Info-page sections; do not hand-build per-game
 copies. A plugin still has to supply their data, and discovery will reject it if it

@@ -120,8 +120,6 @@ class GamePlugin:
 
     plugin_id: str
     name: str
-    subtitle: str
-    description: str
     accent: str
     check: CheckFunction
     launch: LaunchFunction
@@ -163,6 +161,11 @@ class GamePlugin:
     # Explicit mod-loader adapter; editable project support alone is not proof
     # that imported packages can be enabled and removed in the game.
     mod_adapter: object | None = None
+    # Does a mod built here actually load in the game? Stated by the plugin,
+    # never inferred: an adapter that exists is not an adapter that works. The
+    # developer page reads this, and the answer is no until someone proves
+    # otherwise in the game itself.
+    mods_load: bool = False
     managed_mod: object | None = None
 
 
@@ -171,7 +174,7 @@ def validate_plugin(plugin: GamePlugin) -> None:
     """Reject incomplete or unsafe descriptors at discovery time."""
     if not plugin.plugin_id or not plugin.plugin_id.replace("-", "").isalnum():
         raise ValueError("plugin_id must contain letters, numbers, or hyphens")
-    for field in (plugin.name, plugin.subtitle, plugin.description, plugin.accent):
+    for field in (plugin.name, plugin.accent):
         if not field:
             raise ValueError(f"{plugin.plugin_id} has an empty descriptor field")
     if plugin.cover_art is not None:
@@ -232,9 +235,7 @@ def validate_plugin(plugin: GamePlugin) -> None:
                     f"{plugin.plugin_id} has an unsafe ReShade folder: {declared}")
     if plugin.projects is not None:
         projects = plugin.projects
-        if (not projects.root_env or
-                (not projects.default_root.is_absolute()
-                 and not (os.name != "nt" and PureWindowsPath(str(projects.default_root)).is_absolute()))):
+        if not projects.root_env or not projects.default_root.is_absolute():
             raise ValueError(f"{plugin.plugin_id} has an invalid project descriptor")
         if projects.template_root and not projects.template_root.is_absolute():
             raise ValueError(f"{plugin.plugin_id} has a relative project template")

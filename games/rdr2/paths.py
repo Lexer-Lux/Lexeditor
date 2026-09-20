@@ -42,6 +42,8 @@ def check() -> list[str]:
         (PROJECT_ROOT, "RDR2 project"),
         (PLUGIN_ROOT / "server.py", "RDR2 plugin service"),
         (PLUGIN_ROOT / "editor.html", "RDR2 plugin interface"),
+        (PLUGIN_ROOT / "core.js", "RDR2 plugin interface modules"),
+        (PLUGIN_ROOT / "editor.css", "RDR2 plugin interface styles"),
         (PLUGIN_ROOT / "settings_schema.json", "RDR2 settings schema"),
         (PLUGIN_ROOT / "assets", "RDR2 plugin assets"),
         (PLUGIN_ROOT / "vendor" / "reddead2blend" / "pylibdrawable.pyd",

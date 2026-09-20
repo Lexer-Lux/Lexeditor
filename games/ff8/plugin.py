@@ -158,8 +158,6 @@ PLUGIN = GamePlugin(
     helper_install=lambda: ffnx_manager.ensure_ffnx(paths.GAME_ROOT, paths.RUNTIME_DIRECT_ROOT),
     helper_status=lambda: ffnx_manager.status(paths.GAME_ROOT),
     helper_upstream=ffnx_manager.upstream_release,
-    subtitle="FFVIII",
-    description="Edit gameplay data for the original 2013 Steam release.",
     accent="#366bc2",
     check=check,
     launch=launch,
@@ -189,14 +187,8 @@ PLUGIN = GamePlugin(
             "Data/lang-en/battle.fs", "Data/lang-en/battle.fi", "Data/lang-en/battle.fl",
             "Data/lang-en/world.fs", "Data/lang-en/world.fi", "Data/lang-en/world.fl",
         ),
-        # FF8_Launcher.exe draws the seizure/health warning with the language
-        # picker on EVERY start - the string lives in the launcher and NOT in
-        # FF8_EN.exe, so nothing inside the game can suppress it. Starting the
-        # game directly skips it. That already happened by accident, because
-        # the host falls back to the first .exe in required_paths, but naming
-        # it means reordering that list cannot silently reintroduce the
-        # launcher.
-        launch_path="FF8_EN.exe",
+        # Use normal startup. Skipping the warning is a separate opt-in tweak.
+        launch_path="FF8_Launcher.exe",
         steam_app_id="39150",
         install_dir_names=("FINAL FANTASY VIII",),
         default_roots=(

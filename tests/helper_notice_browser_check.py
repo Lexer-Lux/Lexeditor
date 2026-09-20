@@ -11,7 +11,7 @@ ROOT = Path(r"C:\Lexeditor")
 NOTICE = {"title": "Purge the shader cache first",
           "message": "Shader Injector can only replace shaders it watches the game compile.",
           "action": "clear_shader_cache", "actionLabel": "Clear shader cache"}
-PLUGIN = {"id": "ff7r2", "name": "Final Fantasy VII Rebirth", "subtitle": "Presentation",
+PLUGIN = {"id": "ff7r2", "name": "Final Fantasy VII Rebirth",
           "status": "added", "canOpen": True, "scanInProgress": False,
           "root": "C:/Fixture/Rebirth", "problems": [], "statusText": "Ready", "resident": False,
           "coverArt": {"state": "missing"}, "helperName": "Shader Injector",

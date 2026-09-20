@@ -61,6 +61,13 @@ OPCODES = {
 }
 
 COMPARATORS = ("=", "<", ">", "!=", "<=", ">=")
+# Ifrit's ai_cronos target_basic table. Unknown byte values remain selectable.
+TARGETS = {
+    200: "Self", 201: "Random enemy", 202: "Random ally", 203: "Last attacker",
+    204: "All enemies", 205: "All allies", 206: "Everyone",
+    207: "Random other ally", 208: "Random enemy for each hit", 209: "New ally",
+    **{value: f"Local {chr(65 + value - 220)} target mask" for value in range(220, 228)},
+}
 SUBJECTS = {
     0: "HP", 1: "HP in team", 2: "Random value", 3: "Encounter ID",
     4: "Status", 5: "Status in team", 6: "Alive members", 7: "Level",
@@ -258,6 +265,11 @@ def _control(kind: str, value: int) -> dict:
     elif kind == "subject":
         result.update(minimum=0, maximum=255, control="enum",
                       choices=[{"id": key, "name": name} for key, name in SUBJECTS.items()])
+    elif kind == "target":
+        result.update(control="enum", choices=[
+            {"id": key, "name": name} for key, name in TARGETS.items()])
+        if value not in TARGETS:
+            result["choices"].append({"id": value, "name": f"Target {value} (unresolved)"})
     elif kind == "ability_line":
         # Vanilla also uses sentinel lines such as 253; keep the full stored
         # byte range instead of pretending only the 16 definition rows exist.

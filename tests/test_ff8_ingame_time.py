@@ -5,6 +5,9 @@ import unittest
 from games.ff8 import menu_qol_issue_61
 
 ROOT = Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 
 
 class InGameTimeTests(unittest.TestCase):
@@ -36,7 +39,7 @@ class InGameTimeTests(unittest.TestCase):
         self.assertIn("in_game_time=in_game_time", settings)
 
     def test_editor_exposes_clock_and_explains_semantics(self):
-        editor = (ROOT / "games/ff8/editor.html").read_text(encoding="utf-8")
+        editor = plugin_ui('ff8')
         self.assertIn('"aria-label":"In-game Time"', editor)
         self.assertIn('row("IN-GAME TIME"', editor)
         self.assertIn("local clock", editor)

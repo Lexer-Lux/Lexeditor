@@ -13,7 +13,7 @@ HELPERS=[
  {'pluginId':'ff9','plugin':'Final Fantasy 9','helper':'Memoria','pinned':'v2025.07.04','installedVersion':'v2025.07.04','error':'Fixture GitHub outage: this must not hide other helpers'},
  {'pluginId':'warband','plugin':'Mount & Blade: Warband','helper':'WSE2','pinned':'v1.1.5.1','packageVersion':'1.1.5.1-lex1','installedVersion':'v1.1.5.1','installedStatus':'verified','latest':'v1.1.5.1','published':'2026-08-28T20:12:29Z','behind':False,'releaseNotes':'https://github.com/Ruslan-700/WSE2-Releases/releases/tag/v1.1.5.1'},
 ]
-PLUGIN={'id':'warband','name':'Mount & Blade: Warband','subtitle':'Warband','status':'broken','canOpen':False,'scanInProgress':False,'root':'C:/Fixture/Warband','problems':['WSE2 differs from the pinned package. Use Install/Repair WSE2.'],'statusText':'Broken','resident':False,'coverArt':{'state':'missing'},'helperName':'WSE2','helperInstalled':False,'helperInstallable':True}
+PLUGIN={'id':'warband','name':'Mount & Blade: Warband','status':'broken','canOpen':False,'scanInProgress':False,'root':'C:/Fixture/Warband','problems':['WSE2 differs from the pinned package. Use Install/Repair WSE2.'],'statusText':'Broken','resident':False,'coverArt':{'state':'missing'},'helperName':'WSE2','helperInstalled':False,'helperInstallable':True}
 
 def main():
     OUTPUT.mkdir(parents=True,exist_ok=True)
@@ -24,12 +24,12 @@ def main():
             for width,height in [(900,620),(1440,900)]:
                 page=browser.new_page(viewport={'width':width,'height':height});errors=[]
                 page.on('pageerror',lambda e:errors.append(str(e)))
-                html=(ROOT/'ui/chooser.html').read_text()
+                html=(ROOT/'ui/chooser.html').read_text(encoding='utf-8')
                 # Synthetic set_content pages need a hierarchical base for shared optional asset URLs.
                 html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
-                html=html.replace('<link rel="stylesheet" href="framework.css">','<style>'+(ROOT/'ui/framework.css').read_text()+'</style>')
+                html=html.replace('<link rel="stylesheet" href="framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
                 for name in ('framework.js','editor-host.js'):
-                    html=html.replace(f'<script src="{name}"></script>','<script>'+(ROOT/'ui'/name).read_text()+'</script>')
+                    html=html.replace(f'<script src="{name}"></script>','<script>'+(ROOT/'ui'/name).read_text(encoding='utf-8')+'</script>')
                 page.set_content(html,wait_until='domcontentloaded')
                 page.evaluate('''({settings,helpers,plugin})=>{
                     window.__testSettings=settings;window.__testPlugin=plugin;window.__helperCalls=[];window.__installs=[];window.__notes=[];
@@ -56,9 +56,10 @@ def main():
                 assert page.evaluate('window.__installs')==[]
                 rows.nth(2).get_by_role('button',name='Release notes').click()
                 assert page.evaluate('window.__notes')==['warband']
-                page.locator('#lexer-panel-refresh').click()
-                page.wait_for_function('window.__helperCalls.length===2')
-                assert page.evaluate('window.__helperCalls')==[False,True]
+                # Helper versions are checked once, when the panel opens; the
+                # separate refresh button was removed on request.
+                assert page.locator('#lexer-panel-refresh').count()==0
+                assert page.evaluate('window.__helperCalls')==[False]
                 box=page.locator('#lexer-panel').bounding_box();assert box['x']>=0 and box['x']+box['width']<=width+1
                 assert page.locator('#lexer-panel').evaluate('(el)=>el.scrollWidth<=el.clientWidth')
                 page.screenshot(path=str(OUTPUT/f'helpers-{width}.png'))

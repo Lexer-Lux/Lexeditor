@@ -117,10 +117,11 @@ def main():
             assert all(t in text for t in ['Pinned: 1.0','Installed: 1.1','Latest upstream: 1.2','Installed: Not detected','2026-09-01','Offline']),text
             release=page.locator('#lexer-panel .lexer-helper-source').first
             assert release.count()==1 and release.evaluate("e=>e.tagName==='BUTTON'&&!e.hasAttribute('href')")
-            page.get_by_role('button',name='Check Again',exact=False).click();page.wait_for_timeout(100)
-            assert page.evaluate('window.__calls.includes(true)')
+            # Helper versions are checked when the panel opens; the separate
+            # "Check Again" button was removed on request, so it must stay gone.
+            assert page.get_by_role('button',name='Check Again',exact=False).count()==0
             page.screenshot(path=str(OUT/'helper-versions.png'));assert not errors,errors
-            results.append({'helper_versions':'pass','offline_rows_preserved':True,'refresh':'pass'})
+            results.append({'helper_versions':'pass','offline_rows_preserved':True,'no_check_again':True})
             browser.close()
     finally:server.shutdown();server.server_close();thread.join(timeout=2)
     (OUT/'results.json').write_text(json.dumps(results,indent=2)+'\n')
