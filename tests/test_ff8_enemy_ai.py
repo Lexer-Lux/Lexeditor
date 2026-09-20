@@ -91,5 +91,13 @@ class EnemyAiBranchTests(unittest.TestCase):
         self.assertEqual(parsed["instructions"][1]["targetOffset"], 0)
 
 
+def test_named_targets_preserve_unresolved_values():
+    control = enemy_ai._control('target', 200)
+    assert next(choice['name'] for choice in control['choices'] if choice['id'] == 200) == 'Self'
+    control = enemy_ai._control('target', 42)
+    assert any(choice['id'] == 42 for choice in control['choices'])
+    assert enemy_ai._compile_script(enemy_ai.parse_script('A: TARGET[4] target=42')) == bytes([4, 42, 0, 0])
+
+
 if __name__ == "__main__":
     unittest.main()

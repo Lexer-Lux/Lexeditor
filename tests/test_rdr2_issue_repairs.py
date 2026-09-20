@@ -57,6 +57,19 @@ class ProjectFixture(unittest.TestCase):
 
 
 class ShellStackTests(ProjectFixture):
+    def test_readable_weapon_matches_extracted_hash(self):
+        mine = ET.fromstring(weapon_xml('', 'WEAPON_REVOLVER_NAVY'))
+        hashed = f'UNK_MEMBER_0x{s.joaat("WEAPON_REVOLVER_NAVY"):08X}'
+        vanilla = ET.fromstring(weapon_xml('SHELL_NAVY', hashed))
+        status = s._weapon_shell_status(mine, vanilla)
+        self.assertTrue(status['available'])
+        self.assertEqual((status['blank'], status['total']), (1, 1))
+        self.assertEqual(s._set_weapon_shell_vfx(mine, vanilla, False), 1)
+        self.assertEqual(mine.find('./Item/Name').text, 'WEAPON_REVOLVER_NAVY')
+        self.assertEqual(mine.find('./Item/VfxWeaponShellInfoHashName').text, 'SHELL_NAVY')
+        self.assertEqual(mine.find('./Item/Damage').get('value'), '37')
+        self.assertEqual(s._set_weapon_shell_vfx(mine, vanilla, False), 0)
+
     def test_restore_and_reblank_every_layer_idempotently(self):
         self.stack()
         status = s.get_weapon_shell_vfx_status()

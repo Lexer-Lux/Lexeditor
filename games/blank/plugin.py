@@ -29,8 +29,6 @@ def launch() -> int:
 PLUGIN = GamePlugin(
     plugin_id="blank",
     name="Blank Game",
-    subtitle="Default UI",
-    description="Unthemed shared controls for Lexer Mode UI inspection.",
     accent="#68717e",
     check=check,
     launch=launch,

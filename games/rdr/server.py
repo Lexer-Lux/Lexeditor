@@ -24,6 +24,7 @@ from . import (camera_features, input_remaps, loot_script, map_icon_features,
 from .archive_deployment import (
     ArchiveSpec, deploy_archives, deployment_status, revert_archives,
 )
+from plugin_http import PluginRequestHandler
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -1634,11 +1635,8 @@ def dashboard_payload() -> dict:
     }
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(PluginRequestHandler):
     server_version = "LexeditorRDR/1.0"
-
-    def log_message(self, _format, *_args):
-        return
 
     def json_response(self, payload: dict, status: int = 200) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -1676,6 +1674,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 self.file_response(PLUGIN_ROOT / "editor.html")
+            elif self.send_page_module(PLUGIN_ROOT, path):
+                return
             elif path.startswith("/shared/"):
                 shared_root = (LEXEDITOR_ROOT / "ui").resolve()
                 target = (shared_root / path.removeprefix("/shared/")).resolve()
