@@ -224,11 +224,22 @@ def exercise_table(page, label):
 
     search = pager.locator('input[type="search"]').first
     if search.count():
-        search.fill("__no_such_bannerlord_record__")
-        page.wait_for_timeout(100)
-        assert page.locator(".lex-column-list").first.locator(".lex-column-list-row").count() == 0, (label, "search did not filter")
+        needle = "__no_such_bannerlord_record__"
+        search.fill(needle)
+        page.wait_for_function(
+            """([value])=>Object.values(state.uiTables||{}).some(row=>row.query===value)""",
+            arg=[needle],
+        )
+        table = page.locator(".lex-column-list").first
+        real_rows = table.locator(".lex-column-list-row:not(.lex-filler-row)")
+        assert real_rows.count() == 0, (label, "search did not filter real records")
+        assert "No " in page.locator(".lex-detail-panel").last.inner_text(), (label, "filtered table did not show shared empty detail")
+        search = page.locator(".lex-pager").first.locator('input[type="search"]').first
         search.fill("")
-        page.wait_for_timeout(100)
+        page.wait_for_function(
+            """()=>Object.values(state.uiTables||{}).every(row=>row.query!=="__no_such_bannerlord_record__")"""
+        )
+        assert page.locator(".lex-column-list").first.locator(".lex-column-list-row:not(.lex-filler-row)").count() > 0, (label, "clearing search did not restore records")
 
     sort_button = page.locator(".lex-column-list-header .lex-column-sort").first
     if sort_button.count():
