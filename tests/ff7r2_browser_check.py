@@ -64,6 +64,8 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 search = page.get_by_role("searchbox", name="Search PlayerParameter records")
                 search.fill("Tifa")
                 expect(page.get_by_text("Tifa", exact=True).first).to_be_visible()
+                search.fill("Cloud")
+                expect(page.get_by_text("Cloud", exact=True).first).to_be_visible()
                 search.fill("")
                 page.wait_for_function("()=>document.querySelectorAll('.lex-column-list-row').length>=10")
                 expect(page.get_by_text("Cloud", exact=True).first).to_be_visible()
