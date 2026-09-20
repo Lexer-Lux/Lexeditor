@@ -336,8 +336,12 @@ class BattleSceneStore:
 
     @staticmethod
     def _descriptors(fields: tuple[Field, ...]) -> list[dict[str, Any]]:
-        return [{"key": f.key, "label": f.label, "declaredType": f.fmt[-1], "editable": True,
-                 "kind": "integer", "min": f.min, "max": f.max} for f in fields]
+        result = []
+        for field in fields:
+            maximum = 4 if field.key == "MonsterCount" else field.max
+            result.append({"key": field.key, "label": field.label, "declaredType": field.fmt[-1],
+                           "editable": True, "kind": "integer", "min": field.min, "max": maximum})
+        return result
 
     def load(self, key: str) -> dict[str, Any]:
         if key not in {"enemies", "encounters"}:
@@ -356,8 +360,15 @@ class BattleSceneStore:
                 base = start + index * stride
                 values = {field.key: scene.read(base, field) for field in fields}
                 label = f"{scene_name} · {'Enemy' if key == 'enemies' else 'Pattern'} {index + 1}"
+                bounds = {}
+                if key == "encounters":
+                    bounds["MonsterCount"] = {"min": 0, "max": 4}
+                    type_max = max(0, scene.type_count - 1)
+                    for slot in range(1, 5):
+                        bounds[f"Slot{slot}Type"] = {"min": 0, "max": type_max}
                 rows.append({"line": len(rows), "id": f"{scene_name}:{index}", "name": label,
-                             "scene": scene_name, "record": index, "source": source_kind, "values": values})
+                             "scene": scene_name, "record": index, "source": source_kind,
+                             "fieldBounds": bounds, "values": values})
         status = next(row for row in self.status_rows() if row["key"] == key)
         return {**status, "sha256": _sha256(self.archive_path.read_bytes()) if self.archive_path.is_file() else "",
                 "sceneHashes": scene_hashes, "fields": self._descriptors(fields), "rows": rows}

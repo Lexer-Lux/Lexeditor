@@ -172,3 +172,14 @@ def test_data_map_reports_editor_integration_even_before_baseline_arrives(servic
     row = service[0].data_map()["rows"][0]
     assert row["status"] == "integrated" and row["coverage"] == "structured"
     assert row["openable"] is True and row["sourceAvailable"] is False
+
+
+def test_data_map_keeps_battle_editor_integration_when_game_source_is_missing(service, monkeypatch):
+    monkeypatch.setattr(service[0].BattleSceneStore, "status_rows", lambda self: [{
+        "available": False, "relativePath": "StreamingAssets/p0data2.bin → BattleMap/BattleScene/*/dbfile0000.raw16",
+        "controls": "Enemy fields", "notes": "Reads p0data2 and saves raw16 overlays.",
+        "tab": "enemies", "key": "enemies",
+    }])
+    row = next(row for row in service[0].data_map()["rows"] if row.get("datasetKey") == "enemies")
+    assert row["status"] == "integrated" and row["coverage"] == "structured"
+    assert row["openable"] is True and row["sourceAvailable"] is False

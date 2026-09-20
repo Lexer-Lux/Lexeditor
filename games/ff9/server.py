@@ -30,8 +30,8 @@ POST_ROUTES = {"/api/save", "/api/runtime/install", "/api/runtime/recover",
 
 
 UNRESOLVED_AREAS = (
-    ("StreamingAssets/p0data*.bin", "Vanilla Unity asset containers",
-     "Battle-scene records are decoded read-only from p0data2 and written only as Memoria project overlays; other container data remains outside the integrated surface."),
+    ("StreamingAssets/p0data*.bin (outside BattleScene raw16)", "Other vanilla Unity asset-container content",
+     "Enemy and encounter BattleScene raw16 records are integrated separately. Other p0data asset-container formats have no proved format-specific editor yet and remain unsupported."),
 )
 
 
@@ -68,8 +68,11 @@ def data_map() -> dict:
     for row in BattleSceneStore().status_rows():
         integrated.append({
             "filename": row["relativePath"], "controls": row["controls"],
-            "notes": row["notes"], "status": "integrated" if row["available"] else "partial",
-            "openable": row["available"], "target": row["tab"], "datasetKey": row["key"],
+            "notes": (row["notes"] + (" Source data is available now." if row["available"] else
+                      " The installed p0data2 source is not available yet; opening the view shows that dependency without changing integration status.")),
+            "status": "integrated", "coverage": "structured",
+            "openable": True, "sourceAvailable": bool(row["available"]),
+            "target": row["tab"], "datasetKey": row["key"],
         })
     launcher = paths.GAME_ROOT / "FF9_Launcher.exe"
     deployment = features.status()
@@ -77,13 +80,14 @@ def data_map() -> dict:
         "filename": "Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.Lexeditor.dll",
         "controls": "Lexeditor FF9 runtime tweaks",
         "notes": "Lexeditor-owned optional Memoria script runtime. Deploy Project activates the fixed Lexeditor mod folder; Memoria.ini remains otherwise untouched.",
-        "status": "integrated" if deployment["runtimeReady"] else "partial",
-        "openable": True, "target": "tweaks",
+        "status": "integrated", "coverage": "structured",
+        "openable": True, "sourceAvailable": bool(deployment["runtimeReady"]), "target": "tweaks",
     })
     return {"contract": "Lexeditor.data-map", "rows": integrated + [{
         "filename": "FF9_Launcher.exe", "controls": "Memoria settings in its own launcher",
         "notes": "Play opens the launcher. Lexeditor does not edit Memoria.ini; Tweaks explains this handoff.",
-        "status": "integrated" if launcher.is_file() else "partial", "openable": True, "target": "tweaks",
+        "status": "integrated", "coverage": "handoff", "sourceAvailable": launcher.is_file(),
+        "openable": True, "target": "tweaks",
     }] + [{
         "filename": filename, "controls": controls, "notes": notes,
         "status": "not-integrated", "coverage": "unavailable", "openable": False,
@@ -144,6 +148,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 self.file_response(PLUGIN_ROOT / "editor.html")
+            elif path in {"/editor.css", "/editor.js"}:
+                self.file_response(PLUGIN_ROOT / path.removeprefix("/"))
             elif path.startswith("/shared/"):
                 shared = (LEXEDITOR_ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()
