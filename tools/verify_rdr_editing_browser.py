@@ -33,7 +33,7 @@ def main():
                     page.goto(f'http://127.0.0.1:{service.server_port}/')
                     page.wait_for_function('typeof state !== "undefined" && !state.booting')
                     assert page.locator('.rdr-record-entry').count(), page.locator('#main').inner_text()
-                    for tab in ('items', 'shops', 'missions'):
+                    for tab in ('items', 'shops', 'strings', 'missions'):
                         for width, height in ((1600, 900), (1280, 720)):
                             page.set_viewport_size({'width': width, 'height': height})
                             page.evaluate('(tab) => navigate(tab)', tab)
@@ -70,6 +70,29 @@ def main():
                     assert page.evaluate('dirtyCount()') == 0
                     assert page.locator('.shop-detail input[type=number]').first.input_value() == '1.1'
                     assert server.shops_payload()['rows'][0]['project']
+                    page.evaluate('navigate("strings")')
+                    string_box = page.locator('.string-detail textarea')
+                    assert string_box.count() == 1
+                    assert string_box.input_value() == 'Hello'
+                    string_box.fill('Hello from New Austin')
+                    page.evaluate('saveAll()')
+                    page.wait_for_function('dirtyCount() === 0')
+                    assert string_box.input_value() == 'Hello from New Austin'
+                    saved_table = server.string_table_payload(
+                        'tuning', 'tune/stringtable/global.strtbl')
+                    assert next(row for row in saved_table['rows']
+                                if row['languageIndex'] == 0 and row['identifier'] == 'HELLO')['text'] == 'Hello from New Austin'
+                    page.evaluate('switchProjectSource("vanilla")')
+                    assert page.locator('.string-detail textarea').input_value() == 'Hello'
+                    page.evaluate('switchProjectSource("mine")')
+                    assert page.locator('.string-detail textarea').input_value() == 'Hello from New Austin'
+                    page.locator('.string-detail textarea').fill('Discard me')
+                    page.get_by_role('button', name='Discard string edits').click()
+                    assert page.locator('.string-detail textarea').input_value() == 'Hello from New Austin'
+                    page.reload()
+                    page.wait_for_function('typeof state !== "undefined" && !state.booting')
+                    page.evaluate('navigate("strings")')
+                    assert page.locator('.string-detail textarea').input_value() == 'Hello from New Austin'
                     # That decimal-save regression deliberately changed the same
                     # first deterministic fixture candidate. Restore only that
                     # deliberate test field before exercising the handoff helper;
@@ -134,7 +157,7 @@ def main():
                     assert 'Deploy Project rebuilds verified copies' in delivery_text
                     assert 'original' in delivery_text and 'never overwritten' in delivery_text
                     assert not errors, errors
-                    print('RDR browser: split views, preflight, decimal save, loot validation, discard, optional-file recovery passed')
+                    print('RDR browser: split views, string save/reopen, preflight, decimal save, loot validation, discard, optional-file recovery passed')
                 finally:
                     browser.close()
         finally:
