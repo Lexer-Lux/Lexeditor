@@ -57,9 +57,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 page = browser.new_page(viewport={"width": 1440, "height": 900})
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.goto(session.url, wait_until="domcontentloaded")
-                page.wait_for_selector(".lex-paged-list-detail")\n                page.locator(".lex-plugin-loading-screen").wait_for(state="detached", timeout=5000)
+                page.wait_for_selector(".lex-paged-list-detail")
+                page.locator(".lex-plugin-loading-screen").wait_for(state="detached", timeout=5000)
                 expect(page.get_by_text("Cloud", exact=True).first).to_be_visible()
-                expect(page.get_by_text("Tifa", exact=True).first).to_be_visible()\n                assert page.locator(".lex-column-list-row").count() >= 10
+                expect(page.get_by_text("Tifa", exact=True).first).to_be_visible()
+                assert page.locator(".lex-column-list-row").count() >= 10
                 expect(page.locator('.lex-column-list-head-cell[data-column-key="key"]')).to_be_visible()
                 assert page.locator('.lex-column-list-head-cell[data-column-key="Spilit"]').count() == 0
                 spilit_pin = page.locator('[data-lex-pin-column="Spilit"]').first
