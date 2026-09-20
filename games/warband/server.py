@@ -20,6 +20,7 @@ from .catalog import DATA_CATALOG
 from .dump_infopages import parse_info_pages
 from .dump_troops import parse_troops
 from .troop_editor import troop_data, save_troops
+from .module_records import SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME, dataset_data, save_dataset
 from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
 from .model_preview import PreviewUnavailable, preview as item_preview, texture_path as preview_texture_path
 from plugin_http import PluginRequestHandler
@@ -403,6 +404,26 @@ def modules_with_manual() -> list[str]:
             if (MODULES / name / "info_pages.txt").is_file()]
 
 
+SOURCE_ONLY_NOTES = {
+    "module.ini": "Warband engine/module INI directives are available as source. Resource load order and engine flags do not yet have a dedicated bounded settings screen.",
+    "module_skins.py": "Skin records contain face-key constraints and nested hair, beard, face-texture and voice lists. No dedicated safe editor is implemented.",
+    "module_animations.py": "Animation records contain variable sequence lists and order-sensitive hardcoded animation slots. No dedicated safe sequence editor is implemented.",
+    "module_parties.py": "Party records contain AI targets, coordinates and nested troop stacks; no dedicated party editor is implemented.",
+    "module_party_templates.py": "Party templates contain nested troop-stack ranges and behavior expressions; no dedicated template editor is implemented.",
+    "module_map_icons.py": "Map icons have several record shapes, including trigger operation lists. No dedicated icon/trigger editor is implemented.",
+    "module_scenes.py": "Scene source combines terrain codes, bounds and reference lists while .sco layouts remain Warband scene-editor data.",
+    "module_scene_props.py": "Scene props combine mesh/collision fields with operation-list triggers; no dedicated prop editor is implemented.",
+    "module_scripts.py": "Script records are operation blocks. Lexeditor has no structured Warband operation editor.",
+    "module_triggers.py": "Global triggers are timing/condition/consequence operation blocks without stable record IDs.",
+    "module_simple_triggers.py": "Simple triggers are timed operation blocks without stable record IDs.",
+    "module_mission_templates.py": "Mission templates include spawn records and trigger operation blocks; no dedicated editor is implemented.",
+    "module_game_menus.py": "Game menus contain activation, condition and consequence operation blocks; no dedicated menu editor is implemented.",
+    "module_dialogs.py": "Dialogs are state transitions with condition/consequence operation blocks and no independent stable record ID.",
+    "module_presentations.py": "Presentations are scripted overlay/trigger operation blocks; no dedicated presentation editor is implemented.",
+    "module_tableau_materials.py": "Tableau records end in executable operation blocks; no dedicated tableau editor is implemented.",
+    "module_particle_systems.py": "Particle systems have interdependent keyframes and vectors; no dedicated particle-system editor is implemented.",
+}
+
 def data_map_rows() -> dict:
     """Describe actual user-facing capabilities, not merely file I/O support."""
     rows = []
@@ -411,6 +432,7 @@ def data_map_rows() -> dict:
         for filename, controls in records:
             source = resolve_catalog_file(filename)
             source_available = source is not None and source.is_file()
+            dataset = SCHEMA_BY_FILENAME.get(filename, "")
             view = ""
             if filename == "settings.ini" and source_available:
                 coverage, status, view = "structured", "integrated", "tweaks"
@@ -421,9 +443,13 @@ def data_map_rows() -> dict:
             elif filename in browsers and source_available:
                 coverage, status, view = "structured", "partial", browsers[filename]
                 notes = "Troop names, factions, attributes, flags and equipment have controls. Advanced fields use source expressions. Saves preserve record IDs and upgrade code, then use the project build."
+            elif dataset and source_available:
+                schema = MODULE_RECORD_SCHEMAS[dataset]
+                coverage, status, view = "structured", schema["status"], "misc"
+                notes = schema["notes"]
             elif source_available:
-                coverage, status = "source", "partial"
-                notes = "Source-only editing with a backup. No dedicated record editor. Python syntax validation requires the installed Python 2 validator."
+                coverage, status = "source", "not-integrated"
+                notes = SOURCE_ONLY_NOTES.get(filename, "Source-only editing with backup is available, but no format-specific record screen is implemented.")
             elif filename in {"Resource/*.brf", "Textures/*.dds"}:
                 coverage, status, view = "view", "partial", "items"
                 notes = "Read-only installed item preview dependencies. Availability is checked per mesh, material and texture; binary editing is not supported."
@@ -432,14 +458,17 @@ def data_map_rows() -> dict:
                 notes = ("This source file is not present in the selected project. Installed compiled modules do not supply Module System source."
                          if area != "Generated output" else
                          "No dedicated editor. Compiled text is generated by the Module System; scenes require Warband's scene editor.")
-            rows.append({"filename": filename, "controls": controls, "notes": notes,
-                         "status": status, "coverage": coverage, "view": view,
-                         "openable": source_available, "sourceOpenable": source_available,
-                         "openLabel": "Edit source (not a structured editor)" if source_available else ""})
+            row = {"filename": filename, "controls": controls, "notes": notes,
+                   "status": status, "coverage": coverage, "view": view,
+                   "openable": source_available, "sourceOpenable": source_available,
+                   "openLabel": "Edit source (not a structured editor)" if source_available else ""}
+            if dataset:
+                row["dataset"] = dataset
+                row["recordLabel"] = MODULE_RECORD_SCHEMAS[dataset]["label"]
+            rows.append(row)
     rows.sort(key=lambda row: row["filename"].casefold())
     return {"rows": rows, "counts": {status: sum(row["status"] == status for row in rows)
             for status in ("integrated", "partial", "not-integrated")}, "path": str(MODULE_SYSTEM)}
-
 
 def resolve_catalog_file(filename: str) -> Path | None:
     known = {name for records in DATA_CATALOG.values() for name, _description in records}
@@ -590,7 +619,7 @@ class Handler(PluginRequestHandler):
                 else:
                     self.file_response(target)
             elif path == "/api/plugin":
-                self.json_response({"apiVersion": 1, "pluginId": "warband", "name": "Mount & Blade: Warband", "hosted": HOSTED, "windowHost": WINDOW_HOST, "projectRoot": str(PROJECT), "editorRoot": str(PLUGIN_ROOT), "capabilities": ["build", "catalog", "data-map", "game-font", "item-edit", "item-preview", "items", "manuals", "settings", "troops", "upgrades"]})
+                self.json_response({"apiVersion": 1, "pluginId": "warband", "name": "Mount & Blade: Warband", "hosted": HOSTED, "windowHost": WINDOW_HOST, "projectRoot": str(PROJECT), "editorRoot": str(PLUGIN_ROOT), "capabilities": ["build", "catalog", "data-map", "game-font", "item-edit", "item-preview", "items", "manuals", "module-records", "settings", "troops", "upgrades"]})
             elif path == "/api/dashboard":
                 self.json_response({"paths": {"Project": str(PROJECT), "Module System": str(MODULE_SYSTEM), "Game": paths.WARBAND_ROOT, "Installed modules": str(MODULES)}, "problems": paths.check()})
             elif path == "/api/settings":
@@ -637,6 +666,8 @@ class Handler(PluginRequestHandler):
                 self.json_response({"areas": [{"name": area, "files": [{"name": name, "description": description} for name, description in rows]} for area, rows in DATA_CATALOG.items()]})
             elif path == "/api/datamap":
                 self.json_response(data_map_rows())
+            elif path == "/api/module-records":
+                self.json_response(dataset_data(MODULE_SYSTEM, query.get("dataset", [""])[0]))
             elif path == "/api/catalog/file":
                 self.json_response(read_catalog_file(query.get("name", [""])[0]))
             elif path == "/api/build/status":
@@ -658,6 +689,8 @@ class Handler(PluginRequestHandler):
                 self.json_response(save_troops(MODULE_SYSTEM, body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/items/save":
                 self.json_response(save_item_edits(body.get("edits", [])))
+            elif path == "/api/module-records/save":
+                self.json_response(save_dataset(MODULE_SYSTEM, body.get("dataset", ""), body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/catalog/file/save":
                 self.json_response(save_catalog_file(body.get("filename", ""), body.get("text", ""), body.get("encoding", "utf-8")))
             elif path == "/api/build/start":
