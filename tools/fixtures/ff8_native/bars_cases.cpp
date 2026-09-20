@@ -70,7 +70,7 @@ int main() {
         nullptr,reinterpret_cast<indexed_vertices *>(&iv),nullptr);
     assert(paletted_draw_calls==1);
     assert((observed_palettes==std::vector<unsigned char>{0x0F,0x0F}));
-    for(auto color:observed_colors) assert((color&0x00FFFFFFU)==0x0000FFFFU);
+    for(auto color:observed_colors) assert((color&0x00FFFFFFU)==0x00FFFF00U);
     assert(palettes[0]==0x0E && palettes[1]==0x0E);
     for(auto &vertex:vertices) assert(vertex.color.color==0xFFFFFFFFU);
 
