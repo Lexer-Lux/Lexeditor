@@ -170,7 +170,7 @@ jobs:
           3. Select the intended Bannerlord project (for the existing mod, C:\Bannermod if unchanged).
 
           Acceptance:
-          1. Open Module, Data Map, Build, Info > Deployment, and Runtime; they must populate without preflight errors.
+          1. Open Module, Data Map, Build, Info (including Deployment Status), and Runtime; they must populate without preflight errors.
           2. Run Build + Deploy. The module must deploy under Modules/<SubModule ID>; overwritten module-owned assets must receive backups; runtime override JSON must not be overwritten by ordinary asset sync.
           3. Use Play. Bannerlord must start with the resolved module loadout and reach the game without module-loading/startup errors.
           4. Load the existing mod/save, make one reversible Runtime Override change, confirm it in the running game, then revert it.
