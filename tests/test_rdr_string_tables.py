@@ -37,7 +37,7 @@ def _block(entries: list[tuple[str, str]], trailing: bytes = b"") -> bytes:
 
 def fixture() -> bytes:
     identifiers = ["HELLO", "GOODBYE"]
-    prefix = bytearray(struct.pack("<i", 3) + bytes(12))
+    prefix = bytearray(struct.pack("<i", 11) + bytes(44))
     prefix += struct.pack("<Ii", 256, len(identifiers))
     for identifier in identifiers:
         encoded = identifier.encode("ascii")
@@ -46,7 +46,8 @@ def fixture() -> bytes:
     second = _block([("HELLO", "Hola"), ("GOODBYE", "Adiós")])
     first_offset = len(prefix)
     second_offset = first_offset + len(first)
-    for index, offset in enumerate((first_offset, second_offset, second_offset)):
+    positions = [first_offset] + [0] * 8 + [second_offset, second_offset]
+    for index, offset in enumerate(positions):
         struct.pack_into("<I", prefix, 4 + index * 4, offset)
     return bytes(prefix) + first + second
 
@@ -61,7 +62,7 @@ class StringTableCodec(unittest.TestCase):
     def test_text_growth_relocates_later_blocks_and_preserves_shared_language(self):
         source = fixture()
         table = string_tables.parse(source)
-        original_second = table.positions[1]
+        original_second = table.positions[9]
         edited, changed = string_tables.apply_text_edits(source, [{
             "languageIndex": 0,
             "entryIndex": 0,
@@ -71,20 +72,20 @@ class StringTableCodec(unittest.TestCase):
         }])
         self.assertEqual(changed, 1)
         reparsed = string_tables.parse(edited)
-        self.assertGreater(reparsed.positions[1], original_second)
-        self.assertEqual(reparsed.positions[1], reparsed.positions[2])
+        self.assertGreater(reparsed.positions[9], original_second)
+        self.assertEqual(reparsed.positions[9], reparsed.positions[10])
         self.assertEqual(reparsed.blocks[reparsed.positions[0]].entries[0].text,
                          "Hello from New Austin")
-        self.assertEqual(reparsed.blocks[reparsed.positions[1]].entries[0].text, "Hola")
+        self.assertEqual(reparsed.blocks[reparsed.positions[9]].entries[0].text, "Hola")
         self.assertTrue(
             reparsed.blocks[reparsed.positions[0]].trailing.endswith(b"\xAA\xBB")
         )
 
     def test_shared_language_block_is_one_ui_record_set(self):
         rows = string_tables.rows(string_tables.parse(fixture()))
-        spanish = [row for row in rows if row["languageIndex"] == 1]
+        spanish = [row for row in rows if row["languageIndex"] == 9]
         self.assertEqual(len(spanish), 2)
-        self.assertEqual(spanish[0]["languageIndexes"], [1, 2])
+        self.assertEqual(spanish[0]["languageIndexes"], [9, 10])
         self.assertTrue(spanish[0]["sharedLanguageBlock"])
         self.assertEqual(spanish[0]["identifier"], "HELLO")
 
