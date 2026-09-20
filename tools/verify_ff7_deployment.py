@@ -165,7 +165,7 @@ class DeploymentTests(unittest.TestCase):
 
     def test_unknown_kernel_mutation_blocks_deployment(self):
         kernel = datasets.Kernel(self.sources["kernel"])
-        kernel.sections[0][0] ^= 1
+        kernel.sections[0][2] ^= 1
         kernel.save(self.target("kernel"))
         plan = deployment.build_plan(self.game, self.project)
         self.assertFalse(plan["ready"])

@@ -12,6 +12,15 @@
   <header id="lexeditor-shell"></header>
   <main id="main"></main>
   <script src="/shared/framework.js"></script>
+  <script>
+  window.ff7ModLoaderSection = () => LexeditorUI.modLoaderSection({
+    loader:"FFNx Direct Mode is the proved runtime path for deployable FF7 data. Lexeditor detects FFNx.toml at the game root or ff7/workingdir and uses its configured direct_mode_path.",
+    output:"Project saves stay isolated until Export or Deploy. Direct Mode output covers KERNEL data sections 1–9, KERNEL2 text sections 10–27, scene blocks, field encounter section 7 and world enc_w.bin. Executable-backed project edits remain explicitly undeployable.",
+    order:"Lexeditor writes only paths listed in its deployment manifest. It refuses an unowned Direct Mode collision instead of deciding which mod should win.",
+    safety:"Installed KERNEL, scene, LGP and executable files are never replaced. Deploy writes only to FFNx Direct Mode and blocks projects containing unsupported changes.",
+    removal:"Remove Deployment deletes only unchanged files recorded as Lexeditor-owned; externally changed files are left in place.",
+  });
+  </script>
   <script src="/editor.js"></script>
 </body>
 </html>

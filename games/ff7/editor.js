@@ -319,7 +319,7 @@
       {key:4,level:"Level 4",first:fieldByKey("limitAttack4"),second:null,divisor:fieldByKey("limitHpDivisor4")},
     ];
     body.push(detailSection({title:"LIMIT ATTACKS",attrs:{"data-concept":"character-limit-attacks"},body:conceptTable(limits,
-      "70px minmax(125px,1.2fr) minmax(125px,1.2fr) minmax(78px,.65fr)",[
+      "52px minmax(0,1.2fr) minmax(0,1.2fr) minmax(0,.65fr)",[
         {key:"level",label:"Level",render:e=>e.level},
         {key:"first",label:"Attack 1",render:e=>semanticControl(row,e.first)},
         {key:"second",label:"Attack 2",render:e=>e.second?semanticControl(row,e.second):"—"},
@@ -569,17 +569,17 @@
     return undefined;
   }
   function derivedSummaryColumns(){
-    if(["characterAI","enemyAI","formationAI"].includes(state.tab))return[{key:"derived:aiScripts",label:"AI",help:"Battle-AI event scripts used out of the sixteen available hooks.",sortable:true,grow:.42,render:row=>`${aiUsedCount(row)}/16`}];
-    if(state.tab==="growthCurves")return[{key:"derived:growthKind",label:"TYPE",help:"What this growth curve controls.",sortable:true,grow:.48,render:row=>({primary:"Primary",hp:"HP",mp:"MP",exp:"EXP"}[growthCurveKind(row)])}];
-    if(state.tab==="encounters")return[{key:"derived:encounterEnemies",label:"FOES",help:"Number of non-empty enemy slots in this formation.",sortable:true,grow:.42,render:row=>derivedListValue(row,"derived:encounterEnemies")}];
-    if(["texts","exeText"].includes(state.tab))return[{key:"derived:textLength",label:"CHARS",help:"Decoded character count for this text record.",sortable:true,grow:.42,render:row=>derivedListValue(row,"derived:textLength")}];
+    if(["characterAI","enemyAI","formationAI"].includes(state.tab))return[{key:"derived:aiScripts",label:"AI",help:"Battle-AI event scripts used out of the sixteen available hooks.",sortable:true,width:"64px",render:row=>`${aiUsedCount(row)}/16`}];
+    if(state.tab==="growthCurves")return[{key:"derived:growthKind",label:"TYPE",help:"What this growth curve controls.",sortable:true,width:"64px",render:row=>({primary:"Primary",hp:"HP",mp:"MP",exp:"EXP"}[growthCurveKind(row)])}];
+    if(state.tab==="encounters")return[{key:"derived:encounterEnemies",label:"FOES",help:"Number of non-empty enemy slots in this formation.",sortable:true,width:"64px",render:row=>derivedListValue(row,"derived:encounterEnemies")}];
+    if(["texts","exeText"].includes(state.tab))return[{key:"derived:textLength",label:"CHARS",help:"Decoded character count for this text record.",sortable:true,width:"64px",render:row=>derivedListValue(row,"derived:textLength")}];
     return[];
   }
   function summaryColumns(){
     const explained=new Set(["CALC","FX","M.AP","TYPE","MENU","ORDER","RATE"]);
     const fields=(MASTER_SUMMARY_FIELDS[state.tab]||[]).flatMap(([fieldKey,label],index)=>{
       const field=fieldByKey(fieldKey);if(!field)return[];
-      return[{key:`value:${fieldKey}`,label,help:explained.has(label)?field.label:null,sortable:true,grow:.48,pinned:index>=2?false:true,render:row=>{const full=semanticListValue(row,field);return el("span",{title:full},compactListValue(full))}}];
+      return[{key:`value:${fieldKey}`,label,help:explained.has(label)?field.label:null,sortable:true,width:"64px",pinned:index>=2?false:true,render:row=>{const full=semanticListValue(row,field);return el("span",{title:full},compactListValue(full))}}];
     });
     return[...fields,...derivedSummaryColumns()];
   }
@@ -707,13 +707,7 @@
       ]}),
       ...((state.dashboard.problems||[]).length?[detailSection({title:"PROBLEMS",body:(state.dashboard.problems||[]).map((problem,index)=>detailField({label:`Problem ${index+1}`,control:readonlyField(problem)}))})]:[]),
       ...(sounds?[detailSection({title:"THEME SOUNDS",body:[sounds]})]:[]),
-      LexeditorUI.modLoaderSection({
-        loader:"FFNx Direct Mode is the proved runtime path for deployable FF7 data. Lexeditor detects FFNx.toml at the game root or ff7/workingdir and uses its configured direct_mode_path.",
-        output:"Project saves stay isolated until Export or Deploy. Direct Mode output covers KERNEL data sections 1–9, KERNEL2 text sections 10–27, scene blocks, field encounter section 7 and world enc_w.bin. Executable-backed project edits remain explicitly undeployable.",
-        order:"Lexeditor writes only paths listed in its deployment manifest. It refuses an unowned Direct Mode collision instead of deciding which mod should win.",
-        safety:"Installed KERNEL, scene, LGP and executable files are never replaced. Deploy writes only to FFNx Direct Mode and blocks projects containing unsupported changes.",
-        removal:"Remove Deployment deletes only unchanged files recorded as Lexeditor-owned; externally changed files are left in place.",
-      }),
+      window.ff7ModLoaderSection(),
       detailSection({title:"DEPLOYMENT",body:[detailField({label:"FFNx Direct Mode",control:el("button",{type:"button",onclick:()=>navigate("deployment")},"Open deployment")})]}),
     ]});
   }
@@ -735,7 +729,7 @@
     if(action!=="remove"&&dirtyCount()){state.deploymentError="Save or discard editor changes before exporting or deploying.";render();return}
     state.deploymentLoading=true;state.deploymentError="";render();
     try{
-      const result=await api("/api/deployment/"+action,{method:"POST"});
+      const result=await api("/api/deployment/"+action,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
       if(action==="remove"){await refreshDeployment();return}
       state.deployment=result;syncDeploymentMap(result);
       LexeditorUI.showToast?.(action==="deploy"?"FF7 Direct Mode deployment updated.":"FF7 Direct Mode export refreshed.");
