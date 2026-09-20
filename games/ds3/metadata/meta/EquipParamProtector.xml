@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self FieldLayout="EquipParamProtector" />
+  <Field>
+    <sortId />
+    <wanderingEquipId Refs="EquipParamProtector" />
+    <vagrantItemLotId />
+    <vagrantBonuseneDropItemLotId />
+    <vagrantItemEneDropItemLotId />
+    <fixPrice />
+    <basicPrice />
+    <sellValue />
+    <weight />
+    <residentSpEffectId Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <residentSpEffectId2 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <residentSpEffectId3 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <materialSetId Refs="EquipMtrlSetParam" />
+    <partsDamageRate />
+    <correctSARecover />
+    <originEquipPro1 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro2 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro3 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro4 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro5 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro6 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro7 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro8 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro9 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro10 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro11 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro12 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro13 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro14 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro15 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <originEquipPro16 Refs="EquipParamProtector" DeepCopyTarget="Source" />
+    <faceScaleM_ScaleX />
+    <faceScaleM_ScaleZ />
+    <faceScaleM_MaxX />
+    <faceScaleM_MaxZ />
+    <faceScaleF_ScaleX />
+    <faceScaleF_ScaleZ />
+    <faceScaleF_MaxX />
+    <faceScaleF_MaxZ />
+    <qwcId />
+    <equipModelId />
+    <iconIdM IconConfig="Item" />
+    <iconIdF IconConfig="Item" />
+    <Knockback />
+    <KnockbackBounceRate />
+    <durability />
+    <durabilityMax />
+    <saDurability />
+    <defFlickPower />
+    <defensePhys />
+    <defenseMagic />
+    <defenseFire />
+    <defenseThunder />
+    <defenseSlash />
+    <defenseBlow />
+    <defenseThrust />
+    <resistPoison />
+    <resistToxic />
+    <resistBlood />
+    <resistCurse />
+    <reinforceTypeId Refs="ReinforceParamProtector" />
+    <compTrophySedId />
+    <shopLv />
+    <knockbackParamId />
+    <FlickDamageCutRate />
+    <equipModelCategory Enum="EQUIP_MODEL_CATEGORY" />
+    <equipModelGender Enum="EQUIP_MODEL_GENDER" />
+    <protectorCategory Enum="PROTECTOR_CATEGORY" />
+    <defenseMaterial />
+    <defenseMaterialSfx />
+    <partsDmgType Enum="ATK_PARAM_PARTSDMGTYPE" />
+    <defenseMaterial_Weak />
+    <defenseMaterialSfx_Weak />
+    <isDeposit IsBool="" />
+    <headEquip IsBool="" />
+    <bodyEquip IsBool="" />
+    <armEquip IsBool="" />
+    <legEquip IsBool="" />
+    <useFaceScale IsBool="" />
+    <InvisibleFlag00 IsBool="" />
+    <InvisibleFlag01 IsBool="" />
+    <InvisibleFlag02 IsBool="" />
+    <InvisibleFlag03 IsBool="" />
+    <InvisibleFlag04 IsBool="" />
+    <InvisibleFlag05 IsBool="" />
+    <InvisibleFlag06 IsBool="" />
+    <InvisibleFlag07 IsBool="" />
+    <InvisibleFlag08 IsBool="" />
+    <InvisibleFlag09 IsBool="" />
+    <InvisibleFlag10 IsBool="" />
+    <InvisibleFlag11 IsBool="" />
+    <InvisibleFlag12 IsBool="" />
+    <InvisibleFlag13 IsBool="" />
+    <InvisibleFlag14 IsBool="" />
+    <InvisibleFlag15 IsBool="" />
+    <InvisibleFlag16 IsBool="" />
+    <InvisibleFlag17 IsBool="" />
+    <InvisibleFlag18 IsBool="" />
+    <InvisibleFlag19 IsBool="" />
+    <InvisibleFlag20 IsBool="" />
+    <InvisibleFlag21 IsBool="" />
+    <InvisibleFlag22 IsBool="" />
+    <InvisibleFlag23 IsBool="" />
+    <InvisibleFlag24 IsBool="" />
+    <InvisibleFlag25 IsBool="" />
+    <InvisibleFlag26 IsBool="" />
+    <InvisibleFlag27 IsBool="" />
+    <InvisibleFlag28 IsBool="" />
+    <InvisibleFlag29 IsBool="" />
+    <InvisibleFlag30 IsBool="" />
+    <InvisibleFlag31 IsBool="" />
+    <InvisibleFlag32 IsBool="" />
+    <InvisibleFlag33 IsBool="" />
+    <InvisibleFlag34 IsBool="" />
+    <InvisibleFlag35 IsBool="" />
+    <InvisibleFlag36 IsBool="" />
+    <InvisibleFlag37 IsBool="" />
+    <InvisibleFlag38 IsBool="" />
+    <InvisibleFlag39 IsBool="" />
+    <InvisibleFlag40 IsBool="" />
+    <InvisibleFlag41 IsBool="" />
+    <InvisibleFlag42 IsBool="" />
+    <InvisibleFlag43 IsBool="" />
+    <InvisibleFlag44 IsBool="" />
+    <InvisibleFlag45 IsBool="" />
+    <InvisibleFlag46 IsBool="" />
+    <InvisibleFlag47 IsBool="" />
+    <disableMultiDropShare IsBool="" />
+    <simpleModelForDlc1 IsBool="" />
+    <isGuestDrop0 IsBool="" />
+    <isGuestDrop1 IsBool="" />
+    <showLogCondType IsBool="" />
+    <showDialogCondType />
+    <Unk2 IsBool="" />
+    <Unk3 IsBool="" />
+    <Unk4 IsBool="" />
+    <Unk5 IsBool="" />
+    <PhysDamageCutRate IsInvertedPercentage="" />
+    <SlashDamageCutRate IsInvertedPercentage="" />
+    <StrikeDamageCutRate IsInvertedPercentage="" />
+    <ThrustDamageCutRate IsInvertedPercentage="" />
+    <MagicDamageCutRate IsInvertedPercentage="" />
+    <FireDamageCutRate IsInvertedPercentage="" />
+    <ThunderDamageCutRate IsInvertedPercentage="" />
+    <defenseMaterialSfx1 />
+    <defenseMaterialSfx_Weak1 />
+    <defenseMaterial1 />
+    <defenseMaterial_Weak1 />
+    <defenseMaterialSfx2 />
+    <defenseMaterialSfx_Weak2 />
+    <footMaterialSe />
+    <defenseMaterial_Weak2 />
+    <autoFootEffectDecalBaseId1 />
+    <toughnessDamageCutRate IsInvertedPercentage="" />
+    <pad1 />
+    <DarkDamageCutRate IsInvertedPercentage="" />
+    <defenseDark />
+    <Unk6 />
+    <Unk7 />
+    <Unk8 />
+    <postureControlId Refs="UpperArmParam" />
+    <saleValue />
+    <resistFrost />
+    <Mask00 Enum="Mask" />
+    <Mask01 Enum="Mask" />
+    <Mask02 Enum="Mask" />
+    <Mask03 Enum="Mask" />
+    <Mask04 Enum="Mask" />
+    <Mask05 Enum="Mask" />
+    <Mask06 Enum="Mask" />
+    <Mask07 Enum="Mask" />
+    <Mask08 Enum="Mask" />
+    <Mask09 Enum="Mask" />
+    <Mask10 Enum="Mask" />
+    <Mask11 Enum="Mask" />
+    <Mask12 Enum="Mask" />
+    <Mask13 Enum="Mask" />
+    <Mask14 Enum="Mask" />
+    <Mask15 Enum="Mask" />
+    <Mask16 Enum="Mask" />
+    <Mask17 Enum="Mask" />
+    <Mask18 Enum="Mask" />
+    <Mask19 Enum="Mask" />
+    <Mask20 Enum="Mask" />
+    <Mask21 Enum="Mask" />
+    <Mask22 Enum="Mask" />
+    <Mask23 Enum="Mask" />
+    <Mask24 Enum="Mask" />
+    <Mask25 Enum="Mask" />
+    <Mask26 Enum="Mask" />
+    <Mask27 Enum="Mask" />
+    <Mask28 Enum="Mask" />
+    <Mask29 Enum="Mask" />
+    <Mask30 Enum="Mask" />
+    <Mask31 Enum="Mask" />
+    <Mask32 Enum="Mask" />
+    <Mask33 Enum="Mask" />
+    <Mask34 Enum="Mask" />
+    <Mask35 Enum="Mask" />
+    <Mask36 Enum="Mask" />
+    <Mask37 Enum="Mask" />
+    <Mask38 Enum="Mask" />
+    <Mask39 Enum="Mask" />
+    <Mask40 Enum="Mask" />
+    <Mask41 Enum="Mask" />
+    <Mask42 Enum="Mask" />
+    <Mask43 Enum="Mask" />
+    <Mask44 Enum="Mask" />
+    <Mask45 Enum="Mask" />
+    <Mask46 Enum="Mask" />
+    <Mask47 Enum="Mask" />
+    <Mask48 Enum="Mask" />
+    <Mask49 Enum="Mask" />
+    <Mask50 Enum="Mask" />
+    <Mask51 Enum="Mask" />
+    <Mask52 Enum="Mask" />
+    <Mask53 Enum="Mask" />
+    <Mask54 Enum="Mask" />
+    <Mask55 Enum="Mask" />
+    <Mask56 Enum="Mask" />
+    <Mask57 Enum="Mask" />
+    <Mask58 Enum="Mask" />
+    <Mask59 Enum="Mask" />
+    <Mask60 Enum="Mask" />
+    <Mask61 Enum="Mask" />
+    <Mask62 Enum="Mask" />
+    <Mask63 Enum="Mask" />
+    <Mask64 Enum="Mask" />
+    <Mask65 Enum="Mask" />
+    <Mask66 Enum="Mask" />
+    <Mask67 Enum="Mask" />
+    <Mask68 Enum="Mask" />
+    <Mask69 Enum="Mask" />
+    <Mask70 Enum="Mask" />
+    <Mask71 Enum="Mask" />
+    <Mask72 Enum="Mask" />
+    <Mask73 Enum="Mask" />
+    <Mask74 Enum="Mask" />
+    <Mask75 Enum="Mask" />
+    <Mask76 Enum="Mask" />
+    <Mask77 Enum="Mask" />
+    <Mask78 Enum="Mask" />
+    <Mask79 Enum="Mask" />
+    <Mask80 Enum="Mask" />
+    <Mask81 Enum="Mask" />
+    <Mask82 Enum="Mask" />
+    <Mask83 Enum="Mask" />
+    <Mask84 Enum="Mask" />
+    <Mask85 Enum="Mask" />
+    <Mask86 Enum="Mask" />
+    <Mask87 Enum="Mask" />
+    <Mask88 Enum="Mask" />
+    <Mask89 Enum="Mask" />
+    <Mask90 Enum="Mask" />
+    <Mask91 Enum="Mask" />
+    <Mask92 Enum="Mask" />
+    <Mask93 Enum="Mask" />
+    <Mask94 Enum="Mask" />
+    <Mask95 Enum="Mask" />
+    <Mask96 Enum="Mask" />
+    <Mask97 Enum="Mask" />
+  </Field>
+</PARAMMETA>
