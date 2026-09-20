@@ -15,8 +15,13 @@ from project_manager import ProjectManager  # noqa: E402
 
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-editors = {name: (ROOT / "games" / name / "editor.html").read_text(encoding="utf-8")
-           for name in ("blank", "ff7", "ff8", "ff9", "rdr", "rdr2", "warband")}\neditors["rdr"] += "\\n" + (ROOT / "games" / "rdr" / "assets" / "editor.js").read_text(encoding="utf-8")
+editors = {
+    name: (ROOT / "games" / name / "editor.html").read_text(encoding="utf-8")
+    for name in ("blank", "ff7", "ff8", "ff9", "rdr", "rdr2", "warband")
+}
+editors["rdr"] += "\n" + (
+    ROOT / "games" / "rdr" / "assets" / "editor.js"
+).read_text(encoding="utf-8")
 ff7_2013_plugin = (ROOT / "games" / "ff7_2013" / "plugin.py").read_text(encoding="utf-8")
 rdr_server = (ROOT / "games" / "rdr" / "server.py").read_text(encoding="utf-8")
 
