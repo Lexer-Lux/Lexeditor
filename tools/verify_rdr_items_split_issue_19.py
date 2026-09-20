@@ -3,7 +3,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = (ROOT / "games" / "rdr" / "editor.html").read_text(encoding="utf-8")
+STYLE = (ROOT / "games" / "rdr" / "assets" / "editor.css").read_text(encoding="utf-8")
+SOURCE = (ROOT / "games" / "rdr" / "assets" / "editor.js").read_text(encoding="utf-8")
 
 
 def require(condition: bool, message: str) -> None:
@@ -11,7 +12,7 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-rule = re.search(r"\.lex-master-detail\.rdr-split\{([^}]*)\}", SOURCE)
+rule = re.search(r"\.lex-master-detail\.rdr-split\{([^}]*)\}", STYLE)
 require(rule is not None, "RDR list-detail sizing rule is missing")
 require("grid-template-columns" not in rule.group(1),
         "RDR must not replace the shared list-divider-detail grid with two tracks")
