@@ -731,7 +731,28 @@
 
   function loadingPanel(title,message){return detailPanel({className:"ff7r-detail",title,body:[detailSection({title:"DATA",body:[detailField({label:"STATE",control:readonlyField(message)})]})]})}
   function errorPanel(message){return detailPanel({className:"ff7r-detail",title:"Resource unavailable",body:[detailSection({title:"ERROR",body:[detailField({label:"DETAIL",control:LexeditorUI.notice({tone:"warning",message})})]})]})}
-  function openMapRow(row){const asset=row.target||row.view;if(!asset)return;if(textAssets().some(entry=>entry.asset===asset)){state.textResource=asset;return navigate("text")}if(assets().some(entry=>entry.asset===asset)){state.asset=asset;state.data=null;state.dataBaseline=null;return navigate("data")}return navigate(asset)}
+  function openMapRow(row){
+    const asset=row.target||row.view;if(!asset)return;
+    if(textAssets().some(entry=>entry.asset===asset)){
+      state.textResource=asset;
+      return navigate("text");
+    }
+    const item=assets().find(entry=>entry.asset===asset);
+    if(!item)return navigate(asset);
+    state.asset=asset;
+    if(isTweak(item))return navigate("tweaks");
+    const basename=String(asset).split("/").pop().toLocaleLowerCase().replace(/\.uasset$/,"");
+    const economyTab=ECONOMY_TABS.find(entry=>entry.id===basename);
+    if(economyTab)return navigate(economyTab.id);
+    if(basename==="battleitempossession")return navigate("loot");
+    const curated=CURATED_TABLES.find(entry=>entry.basename===basename);
+    if(curated){
+      state.curatedAsset=asset;
+      return navigate(curated.id);
+    }
+    state.data=null;state.dataBaseline=null;
+    return navigate("data");
+  }
   function dataMapPanel(){const rows=state.dataMap?.rows||[];return LexeditorUI.dataMap({rows,open:openMapRow,page:state.mapPage,query:state.mapQuery,status:state.mapStatus,sort:state.mapSort,changePage:value=>{state.mapPage=value;render()},changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changeSort:key=>{state.mapSort=state.mapSort[0]===key?[key,-state.mapSort[1]]:[key,1];render()}}).content}
   async function projectAction(kind){if(kind!=="remove"&&dirtyCount()){state.projectMessage="Save or discard all current gameplay/text changes before building or deploying.";render();return}state.busy=true;const removing=kind==="remove";state.projectMessage=removing?"Removing Lexeditor's deployed PAK…":`${kind==="deploy"?"Building and deploying":"Building"}…`;render();try{const path=removing?"/api/deploy/remove":`/api/${kind}`;const result=await api(path,{});state.projectMessage=removing?(result.removed?"Removed Lexeditor's deployed PAK.":"No Lexeditor-managed PAK was deployed."): `${kind==="deploy"?"Deployed":"Built"}: ${result.path}`;state.info=await api("/api/info")}catch(error){state.projectMessage=`Error: ${error.message}`}finally{state.busy=false;render()}}
   function deploymentSummary(info){const deployment=info.projectDeployment||{};if(deployment.managed)return "Managed by Lexeditor • ownership hash verified";if(deployment.exists)return deployment.state==="changed"?"Externally changed • preserved":deployment.state==="unmanaged"?"Unmanaged file • preserved":deployment.error||deployment.state||"Present";if(deployment.state==="stale-marker")return "PAK missing • stale Lexeditor marker";return "Not deployed"}
