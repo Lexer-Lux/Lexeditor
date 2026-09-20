@@ -124,7 +124,8 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 expect(page.get_by_text("IOSTORE TOOLING", exact=True)).to_be_visible()
                 retoc_field = page.locator(".lex-detail-field").filter(has_text="RETOC").first
                 expect(retoc_field).to_be_visible()
-                assert "v0.1.5" in retoc_field.inner_text(), retoc_field.inner_text()
+                retoc_value = retoc_field.locator("input.lex-readonly-field")
+                assert "v0.1.5" in retoc_value.input_value(), retoc_value.input_value()
                 page.screenshot(path=str(OUT / "information.png"), full_page=True)
 
                 page.evaluate('navigate("tweaks")')
