@@ -435,17 +435,22 @@
       step:field.kind==="float"?"any":"1"};
     if(Number.isSafeInteger(field.minimum))attrs.min=field.minimum;
     if(Number.isSafeInteger(field.maximum))attrs.max=field.maximum;
+    const captureNumeric=event=>{
+      const raw=String(event.target.value??"").replaceAll(",","").replace(/\s/g,"");
+      if(raw==="")return false;
+      let next=Number(raw);
+      if(!Number.isFinite(next))return false;
+      if(field.kind!=="float"&&!Number.isInteger(next))return false;
+      if(Number.isSafeInteger(field.minimum)&&next<field.minimum)return false;
+      if(Number.isSafeInteger(field.maximum)&&next>field.maximum)return false;
+      field.value=next;row[field.name]=next;shell.refresh?.();return true;
+    };
     return {dataType:field.kind==="float"?"FLOAT":"INT",min:attrs.min,max:attrs.max,
       help:infoHelp([FIELD_HELP[field.name],field.note].filter(Boolean).join("\n")),
-      control:el("input",{...attrs,onchange:event=>{
-        if(event.target.value==="")return;
-        let next=Number(event.target.value);
-        if(!Number.isFinite(next))return;
-        if(field.kind!=="float")next=Math.trunc(next);
-        if(Number.isSafeInteger(field.minimum))next=Math.max(field.minimum,next);
-        if(Number.isSafeInteger(field.maximum))next=Math.min(field.maximum,next);
-        field.value=next;row[field.name]=next;render();shell.refresh?.();
-      }})};
+      control:el("input",{...attrs,
+        oninput:event=>captureNumeric(event),
+        onchange:event=>{if(captureNumeric(event))render();}
+      })};
   }
 
   function playerRecordPanel(row){
