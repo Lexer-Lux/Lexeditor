@@ -190,7 +190,7 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
     assert page.locator(".lex-column-list-row").first.inner_text() == first_after
     page.get_by_role("button", name="Previous page", exact=True).click()
 
-    page.get_by_role("button", name="Sort by Sell price", exact=True).click()
+    page.locator('.lex-column-list-head-cell[data-column-key="Price"] .lex-column-sort').click()
     page.wait_for_timeout(180)
     visible = page.locator('.lex-column-list-row [data-column-key="Price"] .lex-column-cell-content').all_inner_texts()
     prices = [int(value.replace(",", "")) for value in visible if value.strip() not in {"", "-"}]
