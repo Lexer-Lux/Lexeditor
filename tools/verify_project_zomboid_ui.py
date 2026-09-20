@@ -262,8 +262,13 @@ def assert_table_fit(page, label: str) -> None:
 
 
 def render_surface_set(page, folder: Path | None, prefix: str, width: int, height: int, zoom: float = 1.0) -> dict:
-    page.set_viewport_size({"width": width, "height": height})
-    page.evaluate("(value) => { document.documentElement.style.zoom = value === 1 ? '' : String(value); }", zoom)
+    # Native Lexeditor uses WebView2 ZoomFactor, not CSS zoom. Browser zoom keeps
+    # 100vh equal to the visible viewport while reducing the CSS-pixel viewport
+    # available for layout. Emulate that geometry directly: a physical 1100x760
+    # window at 150% is about 733x507 CSS pixels.
+    effective_width = max(1, round(width / zoom))
+    effective_height = max(1, round(height / zoom))
+    page.set_viewport_size({"width": effective_width, "height": effective_height})
     results = {}
     for index, (tab, selector) in enumerate(SURFACES, start=1):
         navigate(page, tab, selector)
@@ -437,8 +442,6 @@ def main() -> int:
 
                     # Every surface must also survive the desktop host's maximum 150% UI scale.
                     scaled = render_surface_set(page, args.screenshots, "scale150", 1100, 760, 1.5)
-                    page.evaluate("document.documentElement.style.zoom=''")
-
                     assert not errors, errors
                     print({
                         "screens": len(SURFACES),
