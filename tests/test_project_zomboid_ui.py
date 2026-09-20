@@ -19,6 +19,9 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertIn('href="editor.css"', html)
         self.assertIn('src="editor.js"', html)
         self.assertIn('src="/shared/framework.js"', html)
+        self.assertIn("modLoaderSection(", html)
+        for field in ("loader:", "output:", "order:", "safety:", "removal:"):
+            self.assertIn(field, html)
         self.assertNotIn("<style", html)
         self.assertNotRegex(html, r"<script(?:\s[^>]*)?>\s*[^<\s]")
         self.assertLessEqual(len(EDITOR_CSS.read_text(encoding="utf-8").splitlines()), 24)
