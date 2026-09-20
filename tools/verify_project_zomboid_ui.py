@@ -328,6 +328,10 @@ def main() -> int:
                     page.on("pageerror", lambda error: errors.append(str(error)))
                     page.goto(f"http://127.0.0.1:{service.server_port}/", wait_until="domcontentloaded")
                     page.locator(".pz-metadata").wait_for(state="visible")
+                    loading = page.locator(".lex-plugin-loading-screen")
+                    if loading.count():
+                        loading.wait_for(state="detached", timeout=10000)
+                    page.wait_for_function("!document.documentElement.classList.contains('lex-loading-live')")
                     screenshot(page, args.screenshots, "00-initial-metadata")
                     tab_texts = page.locator(".lex-plugin-tab").all_inner_texts()
                     assert all("…" not in value and not value.endswith("...") for value in tab_texts), tab_texts
