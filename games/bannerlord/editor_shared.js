@@ -124,6 +124,24 @@ function bannerlordModLoaderSection(){
 }
 
 
+function deploymentDependencyText(row){
+  let source="Native dependency";
+  if(row.origin==="DependedModuleMetadatas")source="BLSE metadata";
+  else if(row.origin==="LoadAfterModules")source="Legacy LoadAfterModules";
+  else if(String(row.origin||"").startsWith("OptionalDependModules/")||row.origin==="DependedModules/OptionalDependModule")source="Launcher optional dependency";
+  const details=[source];
+  if(row.order==="LoadBeforeThis")details.push("loads before this");
+  else if(row.order==="LoadAfterThis")details.push("loads after this");
+  if(row.optional)details.push("optional");
+  if(row.incompatible)details.push("incompatible");
+  if(row.effective===false)details.push(`shadowed by ${row.shadowedByOrigin||"earlier relation"}`);
+  if(row.requiredVersion)details.push(`requires ${row.requiredVersion}`);
+  if(row.installedVersion)details.push(`installed ${row.installedVersion}`);
+  if(row.versionMatch===true)details.push("version OK");
+  else if(row.versionMatch===false)details.push("VERSION MISMATCH");
+  return details.join(" · ");
+}
+
 function renderInfo(){
   const deployment=state.deployment||{};
   const issues=deployment.issues||[],assets=deployment.assets||{},overrides=deployment.runtimeOverrides||{};
@@ -161,6 +179,9 @@ function renderInfo(){
         readField("Deployed version",deployment.deployedVersion||"—"),
         readField("Descriptor sync",deployment.descriptorInSync?"Yes":"No")
       ]}),
+      BLUI.detailSection({title:"DEPENDENCIES",body:(deployment.dependencies||[]).length?
+        deployment.dependencies.map((row,index)=>readField(row.id||`Relation ${index+1}`,deploymentDependencyText(row))):
+        [readField("Dependencies","No declared dependency relations")]}),
       BLUI.detailSection({title:"BINARIES",body:(deployment.binaries||[]).length?
         deployment.binaries.map((row,index)=>readField(row.name||`Binary ${index+1}`,row.exists?`${row.size} bytes · ${row.classType||"module assembly"}`:"Missing")):
         [readField("Binaries","No SubModule DLL entries")]}),
