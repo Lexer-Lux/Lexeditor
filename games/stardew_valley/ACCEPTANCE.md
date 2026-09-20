@@ -6,7 +6,7 @@ This checklist is for the delivered candidate from branch `stardew-valley-plugin
 
 Use the GitHub Actions artifact named `Lexeditor-Stardew-Valley-PR465-<commit SHA>` from the latest successful **Stardew Valley checks** run for PR #465 / branch `stardew-valley-plugin`.
 
-The acceptance package is staged from that exact commit, but its normal production `Lexeditor.cmd` and `install.ps1` entry points are intentionally omitted. Those belong to Lexeditor's normal installation contract and are not used for this candidate.
+The acceptance package is staged from that exact Stardew branch commit. Its shared `ui/framework.js` and `ui/framework.css` are then replaced with the exact current-`master` shared-UI revision that passed the same workflow's merge-target rendered acceptance. `STARDEW-PR465-CANDIDATE.txt` records both revisions. The normal production `Lexeditor.cmd` and `install.ps1` entry points are intentionally omitted.
 
 The artifact adds:
 - `START-STARDEW-PR465.cmd`, the only launcher to use for this acceptance candidate;
@@ -21,6 +21,10 @@ Do not substitute GitHub's generic source archive for this acceptance candidate.
 - SMAPI **4.4.0 or newer**.
 - Content Patcher **2.9.0 or newer**.
 - Python 3 available through `py -3` or `python`.
+
+For the strongest acceptance match, use the currently audited **SMAPI 4.5.2** and **Content Patcher 2.9.1**. The plugin's declared compatibility minimums remain SMAPI 4.4.0 and Content Patcher 2.9.0.
+
+This candidate does **not** install, replace, or update SMAPI or Content Patcher. Lexeditor's current shared helper API exposes only one managed helper/update row per game, while Stardew requires both independently versioned runtimes; Content Patcher also has no official GitHub release binary to pin and download in this environment. Do not build either helper for this test. If the required runtimes are absent, that is the recorded helper-delivery blocker rather than evidence that the Stardew editor itself failed.
 
 StardewXnbHack's `Content (unpacked)/Data/Objects.json` is optional. It makes vanilla object names/values visible, but the project override path works without it.
 
@@ -48,7 +52,8 @@ The SHA-specific Stardew project name also gives the deployed Content Patcher pa
 1. Download the candidate artifact for the exact PR head commit.
 2. Extract it to the isolated folder above.
 3. Run `START-STARDEW-PR465.cmd`.
-4. On first launch, the candidate creates its own `.venv-pr465`, installs the pinned requirements there, and initializes its isolated Stardew project. Lexer does not build code or run the repository installer.
+4. On first launch, the candidate creates its own `.venv-pr465`, installs the pinned Python requirements there, and initializes its isolated Stardew project. Lexer does not build code or run the repository installer.
+5. Open `STARDEW-PR465-CANDIDATE.txt` if you need to confirm both the Stardew branch commit and the tested current-`master` shared-UI commit.
 
 ## Representative acceptance edit
 

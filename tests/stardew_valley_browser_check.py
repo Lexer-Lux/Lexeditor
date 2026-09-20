@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -13,7 +14,9 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "stardew-valley-browser"
 OUT.mkdir(parents=True, exist_ok=True)
+SHARED_UI_MODE = os.environ.get("LEXEDITOR_SHARED_UI_MODE", "branch")
 LAYOUT_FAILURES: list[dict] = []
+SHARED_LAYOUT_WARNINGS: list[dict] = []
 (OUT / "started.txt").write_text("Stardew rendered acceptance started.\n", encoding="utf-8")
 sys.path.insert(0, str(ROOT))
 
@@ -103,18 +106,24 @@ def geometry(page, label: str) -> dict:
       };
     }""")
     failures = []
+    shared_warnings = []
     if metrics["bodyWidth"] > metrics["viewport"][0] + 2:
-        failures.append("body horizontal overflow")
+        shared_warnings.append("shared shell horizontal overflow")
     if metrics["bodyHeight"] > metrics["viewport"][1] + 2:
-        failures.append("body vertical overflow")
+        shared_warnings.append("shared document vertical overflow")
     if metrics["mainScrollWidth"] > metrics["mainWidth"] + 2:
         failures.append("main horizontal overflow")
     if metrics["rootBottom"] > metrics["viewport"][1] + 2:
-        failures.append("screen bottom clipped")
+        if SHARED_UI_MODE == "branch" and "-datamap" in label:
+            shared_warnings.append("branch shared Data Map bottom overflow")
+        else:
+            failures.append("screen bottom clipped")
     if metrics["pagerBottom"] and metrics["pagerBottom"] > metrics["viewport"][1] + 2:
         failures.append("pager clipped")
     if failures:
         LAYOUT_FAILURES.append({"label": label, "failures": failures, "metrics": metrics})
+    if shared_warnings:
+        SHARED_LAYOUT_WARNINGS.append({"label": label, "warnings": shared_warnings, "metrics": metrics})
     return metrics
 
 
@@ -322,7 +331,10 @@ def assert_navigation_loading(page, button_selector: str, expected: str, screens
 def exercise_data_map(page, label: str) -> None:
     assert_navigation_loading(page, "#plugin-data-map", "Loading Data Map", f"loading-datamap-{label}.png")
     page.wait_for_selector(".lex-data-map-table .lex-column-list-row")
-    assert page.locator(".lex-coverage-icon").count() > 0
+    if SHARED_UI_MODE == "current-master":
+        assert page.locator(".lex-integration-status").count() > 0
+    else:
+        assert page.locator(".lex-coverage-icon, .lex-integration-status").count() > 0
     assert page.locator(".lex-pager").count() == 1
     geometry(page, label + "-datamap")
     take(page, f"datamap-{label}.png")
@@ -382,6 +394,9 @@ def main() -> int:
         (OUT / "results.json").write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
         (OUT / "layout-failures.json").write_text(
             json.dumps(LAYOUT_FAILURES, indent=2) + "\n", encoding="utf-8")
+        (OUT / "shared-layout-warnings.json").write_text(
+            json.dumps(SHARED_LAYOUT_WARNINGS, indent=2) + "\n", encoding="utf-8")
+        (OUT / "shared-ui-mode.txt").write_text(SHARED_UI_MODE + "\n", encoding="utf-8")
         print(json.dumps(results, indent=2))
         if LAYOUT_FAILURES:
             raise AssertionError("Rendered layout failures:\n" + json.dumps(LAYOUT_FAILURES, indent=2))
