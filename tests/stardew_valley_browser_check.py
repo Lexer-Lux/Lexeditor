@@ -1,8 +1,5 @@
-"""Scoped real-rendered acceptance for the Stardew Valley plugin UI.
-
-Runs the real loopback service against synthetic Stardew/Content Patcher fixtures.
-No installed game or user project is touched.
-"""
+# -*- coding: utf-8 -*-
+"""Rendered acceptance for Stardew Valley using only synthetic game/project fixtures."""
 from __future__ import annotations
 
 import json
@@ -19,7 +16,7 @@ OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "stardew-valley
 OUT.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(ROOT))
 
-from games.stardew_valley.content_pack import ContentPackStore, initialize_project  # noqa: E402
+from games.stardew_valley.content_pack import initialize_project  # noqa: E402
 from games.stardew_valley.plugin import StardewValleySession  # noqa: E402
 from games.stardew_valley.source_data import objects_source_path  # noqa: E402
 
@@ -30,15 +27,17 @@ def make_fixture(root: Path) -> tuple[Path, Path]:
     (game / "Content" / "Data").mkdir(parents=True)
     (game / "Content" / "Data" / "Objects.xnb").write_bytes(b"synthetic objects xnb")
     (game / "Stardew Valley.exe").write_bytes(b"fixture")
-    (game / "StarewModdingAPI.exe").write_bytes(b"fixture")
+    (game / "StardewModdingAPI.exe").write_bytes(b"fixture")
     cp = game / "Mods" / "Content Patcher"
     cp.mkdir(parents=True)
     (cp / "manifest.json").write_text(json.dumps({
-        "Name": "Content Patcher", "UniqueID": "Pathoschild.ContentPatcher",
-        "Version": "2.9.1", "MinimumApiVersion": "4.4.0",
+        "Name": "Content Patcher",
+        "UniqueID": "Pathoschild.ContentPatcher",
+        "Version": "2.9.1",
+        "MinimumApiVersion": "4.4.0",
     }) + "\n", encoding="utf-8")
 
-    records: dict[str, dict] = {}
+    records = {}
     for index in range(1, 96):
         object_id = str(1000 + index)
         records[object_id] = {
@@ -50,8 +49,12 @@ def make_fixture(root: Path) -> tuple[Path, Path]:
             "IsDrink": index % 7 == 0,
         }
     records["390"] = {
-        "Name": "Stone", "DisplayName": "Stone", "Description": "A useful material.",
-        "Price": 2, "Edibility": -300, "IsDrink": False,
+        "Name": "Stone",
+        "DisplayName": "Stone",
+        "Description": "A useful material.",
+        "Price": 2,
+        "Edibility": -300,
+        "IsDrink": False,
     }
     source = objects_source_path(game)
     source.parent.mkdir(parents=True)
@@ -62,24 +65,27 @@ def make_fixture(root: Path) -> tuple[Path, Path]:
     return game, project
 
 
-def visible_table_values(page, key: str) -> list[str]:
-    return page.locator(f'.lex-column-list-row [data-column-key="{key}"] .lex-column-cell-content').all_inner_texts()
+def patch_value(project: Path, object_id: str, field: str):
+    data = json.loads((project / "content.json").read_text(encoding="utf-8"))
+    for change in data.get("Changes", []):
+        if change.get("LogName") == "Lexeditor Data/Objects overrides":
+            return change.get("Fields", {}).get(object_id, {}).get(field)
+    return None
 
 
-def assert_geometry(page, label: str) -> dict:
-    metrics = page.evaluate("""()=>{
+def geometry(page, label: str) -> dict:
+    metrics = page.evaluate("""() => {
       const main=document.querySelector('#main');
       const root=main?.firstElementChild;
-      const detail=document.querySelector('.sv-detail,.lex-data-map-detail');
       const pager=document.querySelector('.lex-pager');
       return {
         viewport:[innerWidth,innerHeight],
-        bodyWidth:document.body.scrollWidth,bodyHeight:document.body.scrollHeight,
-        mainWidth:main?.clientWidth||0,mainScrollWidth:main?.scrollWidth||0,
-        mainHeight:main?.clientHeight||0,mainScrollHeight:main?.scrollHeight||0,
+        bodyWidth:document.body.scrollWidth,
+        bodyHeight:document.body.scrollHeight,
+        mainWidth:main?.clientWidth||0,
+        mainScrollWidth:main?.scrollWidth||0,
         rootBottom:root?.getBoundingClientRect().bottom||0,
-        pagerBottom:pager?.getBoundingClientRect().bottom||0,
-        detailScroll:detail?.scrollHeight||0,detailHeight:detail?.clientHeight||0,
+        pagerBottom:pager?.getBoundingClientRect().bottom||0
       };
     }""")
     assert metrics["bodyWidth"] <= metrics["viewport"][0] + 2, (label, metrics)
@@ -91,188 +97,208 @@ def assert_geometry(page, label: str) -> dict:
     return metrics
 
 
-def screenshot(page, name: str) -> None:
+def take(page, name: str) -> None:
     page.screenshot(path=str(OUT / name), full_page=True)
 
 
-def run_viewport(browser, url: str, project: Path, width: int, height: int, *, zoom: float = 1.0) -> dict:
+def open_editor(browser, url: str, width: int, height: int, zoom: float = 1.0):
     page = browser.new_page(viewport={"width": width, "height": height})
-    errors: list[str] = []
+    errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     delayed = {"done": False}
+
     def delay_dashboard(route):
         if not delayed["done"]:
             delayed["done"] = True
-            time.sleep(.35)
+            time.sleep(0.30)
         route.continue_()
-    page.route("**/api/dashboard", de[^WÙ\Ú›Ø\™
-BˆYÙK™ÛİÊ\›ØZ]İ[[H™ÛXÛÛ[ØYYŠBˆYÙK™Ù]ØWÜ›ÛJœİ]\ÈŠK™š[\Š\×İ^H“ØY[™Èİ\™]È˜[^H›Ú™XİŠKØZ]Ù›ÜŠ
-BˆYÙKØZ]Ù›Ü—ÜÙ[XİÜŠ	Ë›^\YÙY[\İY]Z[›^XÛÛ[[‹[\İ\›İÉË[Y[İ]LŒ
-BˆYˆ›ÛÛHOHN‚ˆYÙK™]˜[X]J˜[YOOÙØİ[Y[˜›ÙKœİ[K›ÛÛOTİš[™Ê˜[YJ_H‹›ÛÛJBˆYÙKØZ]Ù›Ü—İ[Y[İ]
-ÍL
-B‚ˆX™[HˆİÚY^ÚZYÚK^Ş›ÛÛ_H‚ˆ\ÜÙ\YÙK›ØØ]ÜŠ	ÈÜYÚ[‹Y]K[X\	ÊK˜Ûİ[
 
-HOHBˆ\ÜÙ\YÙK›ØØ]ÜŠ	ÈÜYÚ[‹Z[™›ÉÊK˜Ûİ[
+    page.route("**/api/dashboard", delay_dashboard)
+    page.goto(url, wait_until="domcontentloaded")
+    page.get_by_role("status").filter(has_text="Loading Stardew Valley project").wait_for()
+    page.wait_for_selector(".lex-paged-list-detail .lex-column-list-row", timeout=20000)
+    if zoom != 1.0:
+        page.evaluate("value => { document.body.style.zoom=String(value); }", zoom)
+        page.wait_for_timeout(250)
+    return page, errors
 
-HOHBˆ\ÜÙ\YÙK›ØØ]ÜŠ	Û[šÖÚ™YH™Y]Ü‹˜ÜÜÈ—IÊK˜Ûİ[
 
-HOHBˆ\ÜÙ\YÙK›ØØ]ÜŠ	ÜØÜš\ÜÜ˜ÏH™Y]Ü‹šœÈ—IÊK˜Ûİ[
+def exercise_objects(page, project: Path, label: str) -> None:
+    assert page.locator("#plugin-data-map").count() == 1
+    assert page.locator("#plugin-info").count() == 1
+    assert page.locator("link[href='editor.css']").count() == 1
+    assert page.locator("script[src='editor.js']").count() == 1
+    assert page.locator(".lex-pager").count() == 1
+    geometry(page, label + "-objects")
+    take(page, f"objects-{label}.png")
 
-HOHBˆ\ÜÙ\YÙK›ØØ]ÜŠ	Ë›^XÛÛ[[‹[\İ\›İÉÊK˜Ûİ[
+    search = page.locator(".lex-pager-search input").first
+    search.fill("NO_SUCH_STARDew_OBJECT")
+    page.wait_for_timeout(180)
+    assert "No Data/Objects records match" in page.locator(".sv-detail").inner_text()
+    search.fill("")
+    page.wait_for_timeout(180)
 
-HH‚ˆ\ÜÙ\YÙK›ØØ]ÜŠ	Ë›^\YÙ\‰ÊK˜Ûİ[
+    first_before = page.locator(".lex-column-list-row").first.inner_text()
+    next_page = page.get_by_role("button", name="Next page", exact=True)
+    assert next_page.is_enabled()
+    next_page.click()
+    page.wait_for_timeout(220)
+    first_after = page.locator(".lex-column-list-row").first.inner_text()
+    assert first_after != first_before, (label, "next page did not advance")
+    page.wait_for_timeout(220)
+    assert page.locator(".lex-column-list-row").first.inner_text() == first_after
+    page.get_by_role("button", name="Previous page", exact=True).click()
 
-HOHBˆ\ÜÙ\ÙÙ[ÛY]JYÙKX™[
-È‹[Øš™XİÈŠBˆØÜ™Y[œÚİ
-YÙKˆ›Øš™XİË^ÛX™[Kœ™ÈŠB‚ˆÈ[\HÙX\˜Ú™\İ[È]™HH™X[[\Hİ]H[œİXYÙˆH˜ZÙH›Ü\K‚ˆÙX\˜ÚHYÙK›ØØ]ÜŠ	Ë›^\YÙ\‹\ÙX\˜Ú[œ]	ÊK™š\œİˆÙX\˜Ú™š[
-““×ÔÕPÒÔÕT‘]×ÓĞ’‘PÕŠBˆYÙKØZ]Ù›Ü—İ[Y[İ]
-N
-Bˆ\ÜÙ\“›È]KÓØš™XİÈ™XÛÜ™ÈX]Úˆ[ˆYÙK›ØØ]ÜŠ	Ëœİ‹Y]Z[	ÊKš[›™\—İ^
+    page.get_by_role("button", name="Sort by Sell price", exact=True).click()
+    page.wait_for_timeout(180)
+    visible = page.locator('.lex-column-list-row [data-column-key="Price"] .lex-column-cell-content').all_inner_texts()
+    prices = [int(value.replace(",", "")) for value in visible if value.strip() not in {"", "-"}]
+    assert prices == sorted(prices), (label, prices[:12])
 
-BˆÙX\˜Ú™š[
-ˆŠBˆYÙKØZ]Ù›Ü—İ[Y[İ]
-N
-B‚ˆÈ][K\YÙH˜]šYØ][Ûˆ]\İY˜[˜ÙH[™™[XZ[ˆİX›K‚ˆš\œİØ™Y›Ü™HHYÙK›ØØ]ÜŠ	Ë›^XÛÛ[[‹[\İ\›İÉÊK™š\œİš[›™\—İ^
+    search.fill("Stone")
+    page.wait_for_timeout(220)
+    stone = page.locator(".lex-column-list-row").filter(has_text="Stone").first
+    assert stone.count() == 1
+    stone.click()
+    assert "Stone" in page.locator(".lex-detail-panel-heading").inner_text()
 
-Bˆ™^Ø]ÛˆHYÙK™Ù]ØWÜ›ÛJ˜]Ûˆ‹˜[YOH“™^YÙH‹^XİUYJBˆ\ÜÙ\™^Ø]Û‹š\×Ù[˜X›Y
+    help_marker = page.locator('[data-lex-property="Edibility"] .lex-info-help').first
+    help_marker.focus()
+    tooltip = page.get_by_role("tooltip")
+    tooltip.wait_for()
+    help_text = tooltip.inner_text().lower()
+    assert "energy" in help_text and "health" in help_text and "2.5" in help_text
+    help_marker.press("ArrowDown")
+    assert tooltip.evaluate("node => document.activeElement === node")
+    tooltip.press("Escape")
 
-KX™[ˆ™^Ø]Û‹˜ÛXÚÊ
-BˆYÙKØZ]Ù›Ü—İ[Y[İ]
-L
-Bˆš\œİØY\ˆHYÙK›ØØ]ÜŠ	Ë›^XÛÛ[[‹[\İ\›İÉÊK™š\œİš[›™\—İ^
+    price_cell = stone.locator('[data-column-key="Price"]').first
+    price_cell.dblclick()
+    price_editor = price_cell.locator('input[type="number"]')
+    price_editor.fill("88")
+    price_editor.press("Enter")
+    page.wait_for_timeout(180)
+    assert page.locator("#global-save").is_enabled()
+    assert page.locator('[data-lex-property="Price"] input[type="number"]').input_value() == "88"
 
-Bˆ\ÜÙ\š\œİØY\ˆOHš\œİØ™Y›Ü™K
-X™[œYÙ\ˆY›İY˜[˜ÙHŠBˆYÙKØZ]Ù›Ü—İ[Y[İ]
-L
-Bˆ\ÜÙ\YÙK›ØØ]ÜŠ	Ë›^XÛÛ[[‹[\İ\›İÉÊK™š\œİš[›™\—İ^
+    drink_cell = stone.locator('[data-column-key="IsDrink"]').first
+    drink_cell.dblclick()
+    drink_editor = drink_cell.locator('input[type="checkbox"]')
+    drink_editor.check()
+    page.wait_for_timeout(150)
+    assert page.locator('[data-lex-property="IsDrink"] input[type="checkbox"]').is_checked()
 
-HOHš\œİØY\‚ˆYÙK™Ù]ØWÜ›ÛJ˜]Ûˆ‹˜[YOH”™]š[İ\ÈYÙH‹^XİUYJK˜ÛXÚÊ
-B‚ˆÈÛÜ[™È\ÈHXY\ˆXİ[Û‹[™Ù[Xİ[ÛˆÜ[œÈHÛÜœ™\ÜÛ™[™È]Z[‚ˆYÙK™Ù]ØWÜ›ÛJ˜]Ûˆ‹˜[YOH”ÛÜHÙ[šXÙH‹^XİUYJK˜ÛXÚÊ
-BˆYÙKØZ]Ù›Ü—İ[Y[İ]
-L
-BˆšXÙ\ÈHÚ[
-˜[YKœ™\XÙJ‹‹ˆŠJH›Üˆ˜[YH[ˆš\ÚX›WİX›Wİ˜[Y\ÊYÙK”šXÙHŠHYˆ˜[YKœİš\
-¸ %ŠWBˆ\ÜÙ\šXÙ\ÈOHÛÜY
-šXÙ\ÊK
-X™[šXÙ\ÖÎŒLJB‚ˆÙX\˜ÚHYÙK›ØØ]ÜŠ	Ë›^\YÙ\‹\ÙX\˜Ú[œ]	ÊK™š\œİˆÙX\˜Ú™š[
-”İÛ™HŠBˆYÙKØZ]Ù›Ü—İ[Y[İ]
-L
-BˆİÛ™HHYÙK›ØØ]ÜŠ	Ë›^XÛÛ[[‹[\İ\›İÉÊK™š[\Š\×İ^H”İÛ™HŠK™š\œİˆ\ÜÙ\İÛ™K˜Ûİ[
+    page.locator("#global-save").click()
+    page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
+    assert patch_value(project, "390", "Price") == 88
+    assert patch_value(project, "390", "IsDrink") is True
 
-HOHBˆİÛ™K˜ÛXÚÊ
-BˆYÙKØZ]Ù›Ü—İ[Y[İ]
-ML
-Bˆ\ÜÙ\”İÛ™Hˆ[ˆYÙK›ØØ]ÜŠ	Ë›^Y]Z[\[™[ZXY[™ÉÊKš[›™\—İ^
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_selector(".lex-column-list-row", timeout=20000)
+    page.locator(".lex-pager-search input").first.fill("Stone")
+    page.wait_for_timeout(180)
+    stone = page.locator(".lex-column-list-row").filter(has_text="Stone").first
+    assert "88" in stone.locator('[data-column-key="Price"]').inner_text()
 
-B‚ˆÈÙ[X[XÈ[]\İ™HÙ^X›Ø\™™XXÚX›H[™İ]HXİX[Ø[Y\^HY™™XİË‚ˆ[ÛX\šÙ\ˆHYÙK›ØØ]ÜŠ	ÖÙ]K[^\›Ü\OH‘YXš[]H—H›^Z[™›ËZ[	ÊK™š\œİˆ[ÛX\šÙ\‹™›Øİ\Ê
-BˆÛÛ\HYÙK™Ù]ØWÜ›ÛJÛÛ\ŠBˆÛÛ\ØZ]Ù›ÜŠ
-Bˆ[İ^HÛÛ\š[›™\—İ^
+    cell = stone.locator('[data-column-key="Price"]').first
+    cell.dblclick()
+    cell.locator("input").fill("99")
+    cell.locator("input").press("Enter")
+    assert page.locator("#global-save").is_enabled()
+    page.locator("#global-save").click(button="right")
+    page.get_by_role("button", name="Discard Changes", exact=True).click()
+    page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
+    page.locator(".lex-pager-search input").first.fill("Stone")
+    page.wait_for_timeout(160)
+    assert "88" in page.locator(".lex-column-list-row").filter(has_text="Stone").first.locator('[data-column-key="Price"]').inner_text()
 
-Bˆ\ÜÙ\™[™\™ŞHˆ[ˆ[İ^›İÙ\Š
-H[™šX[ˆ[ˆ[İ^›İÙ\Š
-H[™Œ‹Hˆ[ˆ[İ^ˆ[ÛX\šÙ\‹œ™\ÜÊ\œ›İÑİÛˆŠBˆ\ÜÙ\ÛÛ\™]˜[X]J››ÙOO™Øİ[Y[˜Xİ]™Q[[Y[OO[›ÙHŠBˆÛÛ\œ™\ÜÊ‘\ØØ\HŠB‚ˆÈX›HÙ[Y][™ÈÜ™X]\ÈHİ\ÜYİ™\œšYH[™š]™\ÈHÚ\™Y\KÜØ]™Hİ]K‚ˆšXÙWØÙ[HİÛ™K›ØØ]ÜŠ	ÖÙ]KXÛÛ[[‹ZÙ^OH”šXÙH—IÊK™š\œİˆšXÙWØÙ[™›ÛXÚÊ
-BˆY]ÜˆHšXÙWØÙ[›ØØ]ÜŠ	Ú[œ]İ\OH›[X™\ˆ—IÊBˆY]Ü‹™š[
-ŠBˆY]Ü‹œ™\ÜÊ‘[\ˆŠBˆYÙKØZ]Ù›Ü—İ[Y[İ]
-ML
-BˆØ]™HHYÙK›ØØ]ÜŠ	ÈÙÛØ˜[\Ø]™IÊBˆ\ÜÙ\Ø]™Kš\×Ù[˜X›Y
+    raw = json.loads((project / "content.json").read_text(encoding="utf-8"))
+    raw["ExternalFixtureChange"] = True
+    (project / "content.json").write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+    stone = page.locator(".lex-column-list-row").filter(has_text="Stone").first
+    cell = stone.locator('[data-column-key="Price"]').first
+    cell.dblclick()
+    cell.locator("input").fill("91")
+    cell.locator("input").press("Enter")
+    page.locator("#global-save").click()
+    dialog = page.get_by_role("alertdialog")
+    dialog.wait_for()
+    assert "changed" in dialog.inner_text().lower()
+    assert page.locator("#global-save").is_enabled()
+    dialog.get_by_role("button", name="Close", exact=True).click()
+    page.locator("#global-save").click(button="right")
+    page.get_by_role("button", name="Discard Changes", exact=True).click()
+    page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
 
-Bˆ\ÜÙ\YÙK™]˜[X]J™\PÛİ[
+    divider = page.locator(".lex-panel-layout-divider").first
+    before = int(divider.get_attribute("aria-valuenow"))
+    divider.focus()
+    divider.press("Shift+ArrowRight")
+    page.wait_for_timeout(150)
+    after = int(divider.get_attribute("aria-valuenow"))
+    assert after != before, (label, before, after)
+    geometry(page, label + "-resized")
 
-HŠHOHBˆ\ÜÙ\YÙK›ØØ]ÜŠ	ÖÙ]K[^\›Ü\OH”šXÙH—H[œ]İ\OH›[X™\ˆ—IÊKš[œ]İ˜[YJ
-HOH‚ˆØ]™K˜ÛXÚÊ
-BˆYÙKØZ]Ù›Ü—Ù[˜İ[ÛŠŠ
-OO™Øİ[Y[œ]Y\TÙ[XİÜŠ	ÈÙÛØ˜[\Ø]™IÊOË™\ØX›YOO]YHŠBˆÛÛ[HœÛÛ‹›ØYÊ
-›Ú™XİÈ˜ÛÛ[šœÛÛˆŠKœ™XYİ^
-[˜ÛÙ[™ÏH]‹NŠJBˆ]ÚH™^
-Ú[™ÙH›ÜˆÚ[™ÙH[ˆÛÛ[ÈÚ[™Ù\È—HYˆÚ[™ÙK™Ù]
-“ÙÓ˜[YHŠHOH“^Y]Üˆ]KÓØš™XİÈšY[İ™\œšY\ÈŠBˆ\ÜÙ\]ÚÈ‘šY[È—VÈŒÎL—VÈ”šXÙH—HOH‚ˆÈ™[Ü[ˆœ›ÛH\ÚËXZÙH[›İ\ˆÚ[™ÙK[™\ØØ\™›İYÚHÚ\™YØ]™HÛÛ›Û	ÜÈÛÛ^Xİ[Û‹‚ˆYÙKœ™[ØY
-ØZ]İ[[H™ÛXÛÛ[ØYYŠBˆYÙKØZ]Ù›Ü—ÜÙ[XİÜŠ	Ë›^\YÙY[\İY]Z[›^XÛÛ[[‹[\İ\›İÉÊBˆYÙK›ØØ]ÜŠ	Ë›^\YÙ\‹\ÙX\˜Ú[œ]	ÊK™š\œİ™š[
-”İÛ™HŠBˆYÙKØZ]Ù›Ü—İ[Y[İ]
-Œ
-BˆİÛ™HHYÙK›ØØ]ÜŠ	Ë›^XÛÛ[[‹[\İ\›İÉÊK™š[\Š\×İ^H”İÛ™HŠK™š\œİˆ\ÜÙ\ˆ[ˆİÛ™K›ØØ]ÜŠ	ÖÙ]KXÛÛ[[‹ZÙ^OH”šXÙH—IÊKš[›™\—İ^
 
-BˆÙ[HİÛ™K›ØØ]ÜŠ	ÖÙ]KXÛÛ[[‹ZÙ^OH”šXÙH—IÊK™š\œİˆÙ[™›ÛXÚÊ
-NÈÙ[›ØØ]ÜŠ	Ú[œ]	ÊK™š[
-NHŠNÈÙ[›ØØ]ÜŠ	Ú[œ]	ÊKœ™\ÜÊ‘[\ˆŠBˆYÙKØZ]Ù›Ü—İ[Y[İ]
-L
-Bˆ\ÜÙ\YÙK›ØØ]ÜŠ	ÈÙÛØ˜[\Ø]™IÊKš\×Ù[˜X›Y
+def exercise_data_map(page, label: str) -> None:
+    page.locator("#plugin-data-map").click()
+    page.wait_for_selector(".lex-data-map-table .lex-column-list-row")
+    assert page.locator(".lex-coverage-icon").count() > 0
+    assert page.locator(".lex-pager").count() == 1
+    geometry(page, label + "-datamap")
+    take(page, f"datamap-{label}.png")
+    row = page.locator(".lex-data-map-table .lex-column-list-row").filter(has_text="Objects.xnb").first
+    row.click()
+    open_button = page.get_by_role("button", name="Open objects", exact=True)
+    if open_button.count():
+        open_button.click()
+        page.wait_for_selector(".sv-table")
 
-BˆYÙK›ØØ]ÜŠ	ÈÙÛØ˜[\Ø]™IÊK˜ÛXÚÊ]ÛHœšYÚŠBˆYÙK™Ù]ØWÜ›ÛJ˜]Ûˆ‹˜[YOH‘\ØØ\™Ú[™Ù\È‹^XİUYJK˜ÛXÚÊ
-BˆYÙKØZ]Ù›Ü—Ù[˜İ[ÛŠŠ
-OO™Øİ[Y[œ]Y\TÙ[XİÜŠ	ÈÙÛØ˜[\Ø]™IÊOË™\ØX›YOO]YHŠBˆYÙKØZ]Ù›Ü—İ[Y[İ]
-ML
-BˆYÙK›ØØ]ÜŠ	Ë›^\YÙ\‹\ÙX\˜Ú[œ]	ÊK™š\œİ™š[
-”İÛ™HŠBˆYÙKØZ]Ù›Ü—İ[Y[İ]
-ML
-Bˆ\ÜÙ\ˆ[ˆYÙK›ØØ]ÜŠ	Ë›^XÛÛ[[‹[\İ\›İÉÊK™š[\Š\×İ^H”İÛ™HŠK™š\œİ›ØØ]ÜŠ	ÖÙ]KXÛÛ[[‹ZÙ^OH”šXÙH—IÊKš[›™\—İ^
 
-B‚ˆÈHİ[HÜš]H]\İİ\™˜XÙH[ˆ\œ›Üˆİ]H[™ÙY\HY]\H[[\ØØ\™Y‚ˆ˜]ÈHœÛÛ‹›ØYÊ
-›Ú™XİÈ˜ÛÛ[šœÛÛˆŠKœ™XYİ^
-[˜ÛÙ[™ÏH]‹NŠJBˆ˜]ÖÈ‘^\›˜[š^\™PÚ[™ÙH—HHYBˆ
-›Ú™XİÈ˜ÛÛ[šœÛÛˆŠKÜš]Wİ^
-œÛÛ‹™[\Ê˜]Ë[™[LŠH
-È—ˆ‹[˜ÛÙ[™ÏH]‹NŠBˆİÛ™HHYÙK›ØØ]ÜŠ	Ë›^XÛÛ[[‹[\İ\›İÉÊK™š[\Š\×İ^H”İÛ™HŠK™š\œİˆÙ[HİÛ™K›ØØ]ÜŠ	ÖÙ]KXÛÛ[[‹ZÙ^OH”šXÙH—IÊK™š\œİˆÙ[™›ÛXÚÊ
-NÈÙ[›ØØ]ÜŠ	Ú[œ]	ÊK™š[
-LHŠNÈÙ[›ØØ]ÜŠ	Ú[œ]	ÊKœ™\ÜÊ‘[\ˆŠBˆYÙK›ØØ]ÜŠ	ÈÙÛØ˜[\Ø]™IÊK˜ÛXÚÊ
-Bˆ\œ›Ü—ÙX[ÙÈHYÙK™Ù]ØWÜ›ÛJ˜[\X[ÙÈŠBˆ\œ›Ü—ÙX[ÙËØZ]Ù›ÜŠ
-Bˆ\ÜÙ\˜Ú[™ÙYˆ[ˆ\œ›Ü—ÙX[ÙËš[›™\—İ^
+def exercise_info(page, label: str, height: int) -> None:
+    page.locator("#plugin-info").click()
+    page.wait_for_selector(".lex-information-panel")
+    body = page.locator(".lex-information-panel .lex-detail-panel-body")
+    body.evaluate("node => { node.scrollTop = node.scrollHeight; }")
+    final = page.get_by_role("button", name="Verify Acceptance Evidence", exact=True)
+    final.scroll_into_view_if_needed()
+    box = final.bounding_box()
+    assert box and box["y"] < height and box["y"] + box["height"] > 0, (label, box)
+    geometry(page, label + "-info")
+    take(page, f"info-{label}.png")
 
-K›İÙ\Š
-Bˆ\ÜÙ\YÙK™]˜[X]J™\PÛİ[
 
-HŠHOHBˆ\œ›Ü—ÙX[ÙË™Ù]ØWÜ›ÛJ˜]Ûˆ‹˜[YOHÛÜÙH‹^XİUYJK˜ÛXÚÊ
-BˆYÙK›ØØ]ÜŠ	ÈÙÛØ˜[\Ø]™IÊK˜ÛXÚÊ]ÛHœšYÚŠBˆYÙK™Ù]ØWÜ›ÛJ˜]Ûˆ‹˜[YOH‘\ØØ\™Ú[™Ù\È‹^XİUYJK˜ÛXÚÊ
-BˆYÙKØZ]Ù›Ü—Ù[˜İ[ÛŠŠ
-OO™Øİ[Y[œ]Y\TÙ[XİÜŠ	ÈÙÛØ˜[\Ø]™IÊOË™\ØX›YOO]YHŠB‚ˆÈÙ^X›Ø\™\™\Ú^™HHÚ\™Y]šY\ˆ[™›İ™H^[İ]İ^\È›İ[™Y‚ˆ]šY\ˆHYÙK›ØØ]ÜŠ	Ë›^\[™[[^[İ]Y]šY\‰ÊK™š\œİˆ™Y›Ü™HH[
-]šY\‹™Ù]Ø]šX]J	Ø\šXK]˜[Y[›İÉÊJBˆ]šY\‹™›Øİ\Ê
-NÈ]šY\‹œ™\ÜÊ”ÚY
-Ğ\œ›İÔšYÚŠBˆYÙKØZ]Ù›Ü—İ[Y[İ]
-ML
-BˆY\ˆH[
-]šY\‹™Ù]Ø]šX]J	Ø\šXK]˜[Y[›İÉÊJBˆ\ÜÙ\Y\ˆOH™Y›Ü™K
-X™[™Y›Ü™KY\ŠBˆ\ÜÙ\ÙÙ[ÛY]JYÙKX™[
-È‹\™\Ú^™YŠB‚ˆÈ]HX\\Ù\ÈÚ\™YÛİ™\˜YÙKÚ[YÜ˜][ÛˆXÛÛ›ÙÜ˜\H[™Ø[ˆ›İ]H˜XÚÈÈØš™XİË‚ˆYÙK›ØØ]ÜŠ	ÈÜYÚ[‹Y]K[X\	ÊK˜ÛXÚÊ
-BˆYÙKØZ]Ù›Ü—ÜÙ[XİÜŠ	Ë›^Y]K[X\]X›H›^XÛÛ[[‹[\İ\›İÉÊBˆ\ÜÙ\YÙK›ØØ]ÜŠ	Ë›^Z[YÜ˜][Û‹\İ]\Ë›^XÛİ™\˜YÙKZXÛÛ‰ÊK˜Ûİ[
+def main() -> int:
+    with tempfile.TemporaryDirectory(prefix="lexeditor-stardew-browser-") as name:
+        root = Path(name)
+        game, project = make_fixture(root)
+        xnb_before = (game / "Content" / "Data" / "Objects.xnb").read_bytes()
+        with StardewValleySession({
+            "LEXEDITOR_STARDEW_ROOT": str(game),
+            "LEXEDITOR_STARDEW_PROJECT": str(project),
+        }) as session, sync_playwright() as play:
+            browser = play.chromium.launch(headless=True, args=["--no-sandbox"])
+            results = []
+            try:
+                for width, height, zoom in ((1440, 900, 1.0), (900, 620, 1.0), (1100, 760, 1.35)):
+                    label = f"{width}x{height}-z{zoom}"
+                    page, errors = open_editor(browser, session.url, width, height, zoom)
+                    try:
+                        exercise_objects(page, project, label)
+                        exercise_data_map(page, label)
+                        exercise_info(page, label, height)
+                        assert not errors, (label, errors)
+                        results.append({"label": label, "passed": True})
+                    finally:
+                        page.close()
+            finally:
+                browser.close()
+        assert (game / "Content" / "Data" / "Objects.xnb").read_bytes() == xnb_before
+        (OUT / "results.json").write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
+        print(json.dumps(results, indent=2))
+    return 0
 
-Hˆˆ\ÜÙ\ÙÙ[ÛY]JYÙKX™[
-È‹Y][X\ŠBˆØÜ™Y[œÚİ
-YÙKˆ™][X\^ÛX™[Kœ™ÈŠBˆÜ[—ÛØš™XİÈHYÙK™Ù]ØWÜ›ÛJ˜]Ûˆ‹˜[YOH“Ü[ˆØš™XİÈ‹^XİUYJBˆYˆÜ[—ÛØš™XİË˜Ûİ[
 
-N‚ˆÜ[—ÛØš™XİË˜ÛXÚÊ
-NÈYÙKØZ]Ù›Ü—ÜÙ[XİÜŠ	Ëœİ‹]X›IÊB‚ˆÈ[™›Ü›X][Ûˆ]\İØÜ›ÛÈ]Èš[˜[XØÙ\[˜ÙHÛÛ›ÛÈ]ÛX[Û\™ÙHØØ[K‚ˆYÙK›ØØ]ÜŠ	ÈÜYÚ[‹Z[™›ÉÊK˜ÛXÚÊ
-BˆYÙKØZ]Ù›Ü—ÜÙ[XİÜŠ	Ë›^Z[™›Ü›X][Û‹\[™[	ÊBˆ[™›×Ø›ÙHHYÙK›ØØ]ÜŠ	Ë›^Z[™›Ü›X][Û‹\[™[›^Y]Z[\[™[X›ÙIÊBˆ[™›×Ø›ÙK™]˜[X]J››ÙOO››ÙKœØÜ›ÛÜ[›ÙKœØÜ›ÛZYÚŠBˆ\İØXİ[ÛˆHYÙK™Ù]ØWÜ›ÛJ˜]Ûˆ‹˜[YOH•™\šYHXØÙ\[˜ÙH]šY[˜ÙH‹^XİUYJBˆ\İØXİ[Û‹œØÜ›ÛÚ[×İšY]×ÚY—Û™YYY
-
-Bˆ›ŞH\İØXİ[Û‹˜›İ[™[™×Ø›Ş
-
-Bˆ\ÜÙ\›Ş[™›ŞÈH—HZYÚ[™›ŞÈH—H
-È›ŞÈšZYÚ—Hˆ
-X™[›Ş
-Bˆ\ÜÙ\ÙÙ[ÛY]JYÙKX™[
-È‹Z[™›ÈŠBˆØÜ™Y[œÚİ
-YÙKˆš[™›Ë^ÛX™[Kœ™ÈŠB‚ˆ\ÜÙ\›İ\œ›ÜœË
-X™[\œ›ÜœÊBˆ™\İ[HÈ›X™[ˆX™[œ\ÜÙYˆYKœ›İÜÈˆYÙK›ØØ]ÜŠ	Ë›^XÛÛ[[‹[\İ\›İÉÊK˜Ûİ[
-
-_BˆYÙK˜ÛÜÙJ
-Bˆ™]\›ˆ™\İ[‚‚™YˆXZ[Š
-HOˆ[‚ˆÚ][\š[K•[\Ü˜\Q\™XİÜJ™Yš^H›^Y]Ü‹\İ\™]ËXœ›İÜÙ\‹HŠH\È˜[YN‚ˆ›ÛİH]
-˜[YJBˆØ[YK›Ú™XİHXZÙWÙš^\™J›Ûİ
-BˆÚ]İ\™]Õ˜[^TÙ\ÜÚ[ÛŠÂˆ“VQUÔ—ÔÕT‘U×Ô“ÓÕˆİŠØ[YJKˆ“VQUÔ—ÔÕT‘U×Ô“Ò‘PÕˆİŠ›Ú™Xİ
-KˆJH\ÈÙ\ÜÚ[Û‹Ş[˜×Ü^]ÜšYÚ
-
-H\È^N‚ˆœ›İÜÙ\ˆH^K˜Ú›ÛZ][K›][˜Ú
-^Xİ]X›WÜ]\Ú][ÚXÚ
-˜Ú›ÛZ][HŠHÜˆ›Û™KXY\ÜÏUYK\™ÜÏVÈ‹K[›Ë\Ø[™›Ş—JBˆN‚ˆ™\İ[ÈHÂˆ[—İšY]ÜÜ
-œ›İÜÙ\‹Ù\ÜÚ[Û‹\››Ú™XİML
-Kˆ[—İšY]ÜÜ
-œ›İÜÙ\‹Ù\ÜÚ[Û‹\››Ú™XİLŒŒ
-Kˆ[—İšY]ÜÜ
-œ›İÜÙ\‹Ù\ÜÚ[Û‹\››Ú™XİLLÍŒ›ÛÛOLKŒÍJKˆBˆš[˜[N‚ˆœ›İÜÙ\‹˜ÛÜÙJ
-BˆÈHœ›İÜÙ\ˆØ]™H\È[[[Û˜[š^\™Hİ]]È›È[œİ[YØ[YHš[HX^HÚ[™ÙK‚ˆ\ÜÙ\
-Ø[YHÈÛÛ[ˆÈ‘]HˆÈ“Øš™XİË˜ˆŠKœ™XYØ]\Ê
-HOHˆœŞ[]XÈØš™XİÈ˜ˆ‚ˆ
-ÕUÈœ™\İ[ËšœÛÛˆŠKÜš]Wİ^
-œÛÛ‹™[\Ê™\İ[Ë[™[LŠH
-È—ˆ‹[˜ÛÙ[™ÏH]‹NŠBˆš[
-œÛÛ‹™[\Ê™\İ[Ë[™[LŠJBˆ™]\›ˆ‚‚šYˆ×Û˜[YW×ÈOH—×ÛXZ[—×È‚ˆ˜Z\ÙHŞ\İ[Q^]
-XZ[Š
-JB
+if __name__ == "__main__":
+    raise SystemExit(main())
