@@ -1,9 +1,8 @@
-"""Final Fantasy VII Rebirth: presentation only, for now.
+"""Final Fantasy VII Rebirth plugin lifecycle.
 
-A deliberately small plugin. Rebirth's packages have not been read here and no
-claim is made about editing them; what this gives you is the shared ReShade
-support pointed at a Rebirth installation, which needs nothing game-specific
-beyond knowing where the game is and which loader it wants.
+Gameplay editing is deliberately bounded to proved IoStore-state DataObject
+fields staged inside an editable project; the installed game stays source-only.
+Presentation support remains ReShade plus the pinned Shader Injector helper.
 
 Rebirth loads through DXGI. Its Win64 folder already contains a d3d12.dll of
 its own - the Agility SDK's - and Lexeditor refuses to overwrite a DLL that is
