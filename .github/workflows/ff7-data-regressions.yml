@@ -70,6 +70,7 @@ jobs:
           python tools/verify_ff7_semantic_surface.py
           python tools/verify_ff7_extended.py
           python tools/verify_ff7_completion.py
+          python tools/verify_ff7_deployment.py
           # Keep the reviewed 38-dataset installed acceptance contract on both OSes.
           python tools/verify_ff7_installed_contract.py
           python tools/verify_ff7_edition_parity.py
