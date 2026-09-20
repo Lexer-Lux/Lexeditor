@@ -350,7 +350,21 @@ def main() -> None:
             assert page.locator(".bannerlord-source textarea").count() == 1
             assert_outer_fit(page, "source")
 
-            # Keyboard help is the shared shell panel and remains reachable.
+            # Keyboard help uses the shared focus/ArrowDown/Escape contract.
+            page.evaluate('state.moduleView="metadata";navigate("module")')
+            page.wait_for_timeout(80)
+            help_marker = page.locator(".lex-info-help").first
+            assert help_marker.count() == 1
+            help_marker.focus()
+            page.wait_for_timeout(40)
+            popover = page.locator(".lex-help-popover")
+            assert popover.count() == 1
+            help_marker.press("ArrowDown")
+            assert page.evaluate("document.activeElement?.classList.contains('lex-help-popover')") is True
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(40)
+            assert page.locator(".lex-help-popover").count() == 0
+
             page.locator("#lexeditor-shortcuts").click()
             page.wait_for_timeout(50)
             assert page.locator(".lex-shortcut-panel, .lex-dialog").count() >= 1
