@@ -149,12 +149,20 @@ def smoke() -> list[str]:
                 raise RuntimeError("RDR plugin reported the wrong project root")
             with urllib.request.urlopen(session.url, timeout=10) as response:
                 html = response.read().decode("utf-8")
+            with urllib.request.urlopen(session.url + "assets/editor.js", timeout=10) as response:
+                editor_js = response.read().decode("utf-8")
             if ('id="lexeditor-shell"' not in html or
                     '/shared/framework.js' not in html or
+                    '/assets/editor.css' not in html or
+                    '/assets/editor.js' not in html or
+                    '/assets/strings.js' not in html or
                     "Lexeditor - RDR" not in html):
-                raise RuntimeError("RDR plugin did not serve the managed editor interface")
-            if '{id:"files",label:"Files"}' in html or 'help:()=>navigate("datamap")' not in html:
-                raise RuntimeError("RDR editor exposed a Files tab or omitted the Data Map button")
+                raise RuntimeError("RDR plugin did not serve the modular managed editor interface")
+            if ('{id:"files",label:"Files"}' in editor_js
+                    or 'help:()=>navigate("datamap")' not in editor_js
+                    or '{id:"strings",label:"Strings"}' not in editor_js):
+                raise RuntimeError(
+                    "RDR editor exposed a Files tab or omitted Data Map/String Table navigation")
             data_map = request_json(session.url + "api/data-map")
             if (data_map.get("contract") != "Lexeditor.data-map"
                     or len(data_map.get("rows", [])) < 3000):
@@ -307,7 +315,7 @@ PLUGIN = GamePlugin(
     plugin_id="rdr",
     name="Red Dead Redemption",
     subtitle="RDR",
-    description="Edit RDR tuning, weapons, vehicles, AI, effects, population, and more.",
+    description="Edit verified RDR1 inventory, shop, localization, loot, mission, and runtime override data.",
     accent="#a92b20",
     check=check,
     launch=launch,
