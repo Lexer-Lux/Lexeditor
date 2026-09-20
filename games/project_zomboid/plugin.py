@@ -278,8 +278,7 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="project-zomboid", name="Project Zomboid", subtitle="BUILD 42",
-    description="Create, inspect, edit, and locally deploy Project Zomboid Build 42 mods.",
+    plugin_id="project-zomboid", name="Project Zomboid",
     accent="#708057", check=check, launch=launch, smoke=smoke,
     session_factory=ProjectZomboidSession, process_names=("ProjectZomboid64.exe",),
     projects=ModProjectSpec(
