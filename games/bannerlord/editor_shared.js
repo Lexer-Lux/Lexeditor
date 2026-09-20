@@ -12,12 +12,14 @@ const BLUI={
   pager:LexeditorUI.pager,
   panelLayout:LexeditorUI.panelLayout,
   tabbedPanel:LexeditorUI.tabbedPanel,
-  infoIcon:LexeditorUI.infoIcon
+  infoIcon:LexeditorUI.infoIcon,
+  creditsPanel:LexeditorUI.creditsPanel
 };
 state.uiTables=state.uiTables||{};
 state.tweakPage=state.tweakPage||0;
 state.gauntletView=state.gauntletView||"files";
 state.moduleDataView=state.moduleDataView||"files";
+state.infoView=state.infoView||"setup";
 
 function uiState(key){
   return state.uiTables[key]||(state.uiTables[key]={page:0,pageSize:12,selected:null,query:"",sort:{key:"",dir:1}});
@@ -147,37 +149,36 @@ function renderInfo(){
   const issues=deployment.issues||[],assets=deployment.assets||{},overrides=deployment.runtimeOverrides||{};
   const setup=BLUI.detailPanel({
     title:deployment.projectName||deployment.moduleId||state.module?.name||"Bannerlord",
-    icon:BLUI.infoIcon(),meta:"Setup, deployment & runtime",
+    icon:BLUI.infoIcon(),meta:"Setup & loading",
     body:[
       BLUI.detailSection({title:"PROJECT & INSTALLATION",body:[
         readField("Project",state.project?.root||"—"),
         readField("Game root",deployment.gameRoot||"Selected Bannerlord installation"),
         readField("Module ID",deployment.moduleId||state.module?.id||"—"),
-        readField("Deployed module",deployment.deployedRoot||"Not deployed"),
-        readField("Runnable",deployment.runnable?"Yes":"No"),
-        readField("Project deployed",deployment.deployed?"Yes":"No"),
-        readField("Project/deployed sync",deployment.inSync?"Yes":"No")
+        readField("Deployed module",deployment.deployedRoot||"Not deployed")
       ]}),
       BLUI.detailSection({title:"SETUP & UPDATE BOUNDARIES",body:[
         readField("Runtime loader","Bannerlord native module system","No third-party loader or runtime helper is installed by this plugin. Bannerlord itself owns the module loader, so there is no Bannerlord helper entry to pin or place in Lexeditor's Updates drawer."),
-        readField("Build toolchain","System dotnet SDK","Only the Build page invokes dotnet. Lexeditor does not install or auto-update the machine's .NET SDK; if the toolchain is absent, Build returns an explicit error instead of silently modifying the system."),
+        readField("Build toolchain","System dotnet SDK","Only the Build page invokes dotnet. Lexeditor does not install or auto-update the machine's .NET SDK. Windows SDK redistribution uses Microsoft's .NET product licensing and third-party notices, so a bundled compiler toolchain requires a separate pinned-distribution/license review rather than being silently copied into Lexeditor."),
         readField("Modding Kit schemas","Optional local XmlSchemas","XSD enrichment reads schemas from a locally installed Bannerlord Modding Kit or game toolchain when present. These game/toolkit-owned schemas are not bundled or redistributed; absent or ambiguous schemas fall back to conservative literal editing.")
       ]}),
-      issues.length?BLUI.detailSection({title:"CURRENT ISSUES",body:issues.map((issue,index)=>readField(`Issue ${index+1}`,issue))}):
-        BLUI.detailSection({title:"CURRENT ISSUES",body:[readField("Static checks","No deployment problem detected")]}),
-      BLUI.detailSection({title:"RUNTIME OVERRIDES",body:Object.keys(overrides).length?
-        Object.entries(overrides).map(([key,row])=>readField(key,row.exists?(row.valid?`${row.keys} keys`:`Invalid JSON: ${row.error||"parse error"}`):"Not present")):
-        [readField("Overrides","None deployed")]}),
       bannerlordModLoaderSection()
     ]
   });
-  const diagnostics=BLUI.detailPanel({
-    title:"Deployment details",meta:"Native module outputs",
+  const deploymentPanel=BLUI.detailPanel({
+    title:"Deployment & runtime",meta:deployment.runnable?"Runnable":"Needs attention",
     body:[
+      BLUI.detailSection({title:"STATUS",body:[
+        readField("Runnable",deployment.runnable?"Yes":"No"),
+        readField("Project deployed",deployment.deployed?"Yes":"No"),
+        readField("Project/deployed sync",deployment.inSync?"Yes":"No"),
+        readField("Descriptor sync",deployment.descriptorInSync?"Yes":"No")
+      ]}),
+      issues.length?BLUI.detailSection({title:"CURRENT ISSUES",body:issues.map((issue,index)=>readField(`Issue ${index+1}`,issue))}):
+        BLUI.detailSection({title:"CURRENT ISSUES",body:[readField("Static checks","No deployment problem detected")]}),
       BLUI.detailSection({title:"VERSIONS",body:[
         readField("Project version",deployment.projectVersion||"—"),
-        readField("Deployed version",deployment.deployedVersion||"—"),
-        readField("Descriptor sync",deployment.descriptorInSync?"Yes":"No")
+        readField("Deployed version",deployment.deployedVersion||"—")
       ]}),
       BLUI.detailSection({title:"DEPENDENCIES",body:(deployment.dependencies||[]).length?
         deployment.dependencies.map((row,index)=>readField(row.id||`Relation ${index+1}`,deploymentDependencyText(row))):
@@ -188,11 +189,18 @@ function renderInfo(){
       BLUI.detailSection({title:"ASSETS",body:[
         readField("GUI",assets.gui?`${assets.gui.source||0} source · ${assets.gui.deployed||0} deployed · ${assets.gui.inSync?"in sync":"different"}`:"None"),
         readField("ModuleData",assets.moduleData?`${assets.moduleData.source||0} source · ${assets.moduleData.deployed||0} deployed · ${assets.moduleData.inSync?"in sync":"different"}`:"None")
-      ]})
+      ]}),
+      BLUI.detailSection({title:"RUNTIME OVERRIDES",body:Object.keys(overrides).length?
+        Object.entries(overrides).map(([key,row])=>readField(key,row.exists?(row.valid?`${row.keys} keys`:`Invalid JSON: ${row.error||"parse error"}`):"Not present")):
+        [readField("Overrides","None deployed")]})
     ]
   });
-  main.replaceChildren(BLUI.panelLayout([setup,diagnostics],"bannerlord-info-layout",{
-    layoutKey:"bannerlord-info",stackAt:1000,defaultSizes:[55,45]
+  const content=state.infoView==="credits"?BLUI.creditsPanel("bannerlord"):
+    state.infoView==="deployment"?deploymentPanel:setup;
+  main.replaceChildren(BLUI.tabbedPanel({
+    tabs:[{id:"setup",label:"Setup & Loading"},{id:"deployment",label:"Deployment"},{id:"credits",label:"Credits"}],
+    active:state.infoView,label:"Bannerlord information",
+    change:value=>{state.infoView=value;render()},content
   }));
 }
 
