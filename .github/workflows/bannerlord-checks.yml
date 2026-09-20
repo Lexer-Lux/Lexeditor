@@ -8,6 +8,7 @@ on:
       - 'tests/test_bannerlord*.py'
       - 'tests/test_project_create_rollback.py'
       - 'tests/bannerlord_browser_check.py'
+      - 'tests/bannerlord_ui_audit_check.py'
       - 'tests/data_map_browser_check.py'
       - 'tests/test_data_map_coverage.py'
       - 'desktop_host.py'
@@ -23,6 +24,7 @@ on:
       - 'tests/test_bannerlord*.py'
       - 'tests/test_project_create_rollback.py'
       - 'tests/bannerlord_browser_check.py'
+      - 'tests/bannerlord_ui_audit_check.py'
       - 'tests/data_map_browser_check.py'
       - 'tests/test_data_map_coverage.py'
       - 'desktop_host.py'
@@ -69,6 +71,7 @@ jobs:
       - run: python -m pip install playwright
       - run: python -m playwright install --with-deps chromium
       - run: python tests/bannerlord_browser_check.py out/bannerlord-browser
+      - run: python tests/bannerlord_ui_audit_check.py out/bannerlord-ui-audit
       - run: python tests/data_map_browser_check.py out/bannerlord-data-map-browser
         env:
           DATAMAP_GAMES: bannerlord
@@ -78,6 +81,7 @@ jobs:
           name: bannerlord-browser-fixture
           path: |
             out/bannerlord-browser
+            out/bannerlord-ui-audit
             out/bannerlord-data-map-browser
           retention-days: 7
 
