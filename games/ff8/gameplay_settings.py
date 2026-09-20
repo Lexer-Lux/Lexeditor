@@ -67,6 +67,7 @@ DEFAULT_XP_BARS = False
 DEFAULT_HP_BARS = False
 DEFAULT_GF_HP_BARS = False
 DEFAULT_INGAME_TIME = menu_qol_issue_61.DEFAULT_INGAME_TIME
+DEFAULT_INTERACTION_INDICATORS = False
 DEFAULT_FLAT_STAT_ABILITIES = flat_stat_abilities.DEFAULT_FLAT_STAT_ABILITIES
 DEFAULT_MAX_SPELL_ENABLED = max_spell.DEFAULT_MAX_SPELL_ENABLED
 DEFAULT_MAX_SPELL = max_spell.DEFAULT_MAX_SPELL
@@ -80,6 +81,7 @@ ACCEPTED_TWEAKS = frozenset({
     "streamlinedDraw", "betterCard", "fixedCommandMenu", "trueAtbWait",
     "modernControls", "vibrationConsolidation", "betterTargeting",
     "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "gfHpBars", "inGameTime",
+    "interactionIndicators",
     "flatStatAbilities", "maxSpellEnabled", "noMagicConsumption", "dropsAfterMug",
     "dropChance", "gfHpCasting",
 })
@@ -359,6 +361,11 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
     in_game_time = data.get("inGameTime", DEFAULT_INGAME_TIME)
     if not isinstance(in_game_time, bool):
         in_game_time = DEFAULT_INGAME_TIME
+    interaction_indicators = data.get(
+        "interactionIndicators", DEFAULT_INTERACTION_INDICATORS,
+    )
+    if not isinstance(interaction_indicators, bool):
+        interaction_indicators = DEFAULT_INTERACTION_INDICATORS
     no_magic_consumption = data.get("noMagicConsumption") is True
     gf_casting = data.get("gfHpCasting") is True
     gf_costs = gf_hp_casting.costs(data.get("gfHpCastingCosts"))
@@ -418,6 +425,7 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "hpBars": hp_bars,
         "gfHpBars": gf_hp_bars,
         "inGameTime": in_game_time,
+        "interactionIndicators": interaction_indicators,
         "noMagicConsumption": no_magic_consumption,
         "gfHpCasting": gf_casting,
         "gfHpCastingCosts": gf_costs,
@@ -745,6 +753,7 @@ def _set_ffnx_runtime_tweaks(config: Path, *, xp_bars: bool, hp_bars: bool,
                              modern_controls: bool = False, party_switch: bool = False,
                              gf_hp_bars: bool = False,
                              in_game_time: bool = False,
+                             interaction_indicators: bool = False,
                              no_magic_consumption: bool = False,
                              camera_speed: float = DEFAULT_CAMERA_SPEED) -> None:
     """Set derivative options without changing unrelated FFNx settings."""
@@ -754,6 +763,7 @@ def _set_ffnx_runtime_tweaks(config: Path, *, xp_bars: bool, hp_bars: bool,
         ("enable_ff8_hp_bars", hp_bars),
         ("enable_ff8_gf_hp_bars", gf_hp_bars),
         ("enable_ff8_ingame_time", in_game_time),
+        ("enable_ff8_interaction_indicators", interaction_indicators),
         ("enable_ff8_better_targeting", better_targeting),
         ("enable_ff8_fast_start", fast_start),
         ("enable_ff8_modern_controls", modern_controls),
@@ -840,6 +850,7 @@ def initialize_project(project_root: Path) -> None:
         "hpBars": False,
         "gfHpBars": False,
         "inGameTime": False,
+        "interactionIndicators": False,
         "noMagicConsumption": False,
         "dropsAfterMug": False,
         "dropChance": False,
@@ -951,6 +962,10 @@ def save(data: dict, game_root: Path | None = None,
     hp_bars = _boolean(data.get("hpBars", DEFAULT_HP_BARS), "HP Bars")
     gf_hp_bars = _boolean(data.get("gfHpBars", DEFAULT_GF_HP_BARS), "GF HP Bars")
     in_game_time = _boolean(data.get("inGameTime", DEFAULT_INGAME_TIME), "In-game Time")
+    interaction_indicators = _boolean(
+        data.get("interactionIndicators", DEFAULT_INTERACTION_INDICATORS),
+        "Interaction Indicators",
+    )
     no_magic_consumption = _boolean(data.get("noMagicConsumption", False), "No Magic Consumption")
     drops_after_mug = _boolean(data.get("dropsAfterMug", False), "Drops After Mug")
     drop_chance_enabled = _boolean(data.get("dropChance", False), "Drop Chance")
@@ -1050,6 +1065,7 @@ def save(data: dict, game_root: Path | None = None,
         "hpBars": hp_bars,
         "gfHpBars": gf_hp_bars,
         "inGameTime": in_game_time,
+        "interactionIndicators": interaction_indicators,
         "noMagicConsumption": no_magic_consumption,
         "gfHpCasting": gf_casting,
         "gfHpCastingCosts": gf_costs,
@@ -1067,8 +1083,9 @@ def save(data: dict, game_root: Path | None = None,
     install_needed = bool(
         install_runtime
         and
-        (shared_magic_inventory or xp_bars or hp_bars or gf_hp_bars or in_game_time or better_targeting or fast_start_enabled
-         or modern_controls or party_switch or no_magic_consumption)
+        (shared_magic_inventory or xp_bars or hp_bars or gf_hp_bars or in_game_time or
+         interaction_indicators or better_targeting or fast_start_enabled or
+         modern_controls or party_switch or no_magic_consumption)
         and not shared_magic_status.get("sharedMagicInventoryRuntime")
     )
     changed_files = [
@@ -1134,8 +1151,8 @@ def save(data: dict, game_root: Path | None = None,
         if install_runtime:
             _set_ffnx_runtime_tweaks(
                 game / "FFNx.toml", xp_bars=xp_bars, hp_bars=hp_bars, gf_hp_bars=gf_hp_bars,
-                in_game_time=in_game_time, better_targeting=better_targeting,
-                fast_start=fast_start_enabled,
+                in_game_time=in_game_time, interaction_indicators=interaction_indicators,
+                better_targeting=better_targeting, fast_start=fast_start_enabled,
                 modern_controls=modern_controls, party_switch=party_switch,
                 no_magic_consumption=no_magic_consumption,
                 camera_speed=camera_speed,
