@@ -12,14 +12,12 @@ const BLUI={
   pager:LexeditorUI.pager,
   panelLayout:LexeditorUI.panelLayout,
   tabbedPanel:LexeditorUI.tabbedPanel,
-  infoIcon:LexeditorUI.infoIcon,
-  creditsPanel:LexeditorUI.creditsPanel
+  infoIcon:LexeditorUI.infoIcon
 };
 state.uiTables=state.uiTables||{};
 state.tweakPage=state.tweakPage||0;
 state.gauntletView=state.gauntletView||"files";
 state.moduleDataView=state.moduleDataView||"files";
-state.infoView=state.infoView||"setup";
 
 function uiState(key){
   return state.uiTables[key]||(state.uiTables[key]={page:0,pageSize:12,selected:null,query:"",sort:{key:"",dir:1}});
@@ -147,9 +145,10 @@ function deploymentDependencyText(row){
 function renderInfo(){
   const deployment=state.deployment||{};
   const issues=deployment.issues||[],assets=deployment.assets||{},overrides=deployment.runtimeOverrides||{};
-  const setup=BLUI.detailPanel({
+  main.replaceChildren(BLUI.detailPanel({
+    className:"lex-information-panel",
     title:deployment.projectName||deployment.moduleId||state.module?.name||"Bannerlord",
-    icon:BLUI.infoIcon(),meta:"Setup & loading",
+    icon:BLUI.infoIcon(),meta:"Setup, deployment & runtime",
     body:[
       BLUI.detailSection({title:"PROJECT & INSTALLATION",body:[
         readField("Project",state.project?.root||"—"),
@@ -159,16 +158,11 @@ function renderInfo(){
       ]}),
       BLUI.detailSection({title:"SETUP & UPDATE BOUNDARIES",body:[
         readField("Runtime loader","Bannerlord native module system","No third-party loader or runtime helper is installed by this plugin. Bannerlord itself owns the module loader, so there is no Bannerlord helper entry to pin or place in Lexeditor's Updates drawer."),
-        readField("Build toolchain","System dotnet SDK","Only the Build page invokes dotnet. Lexeditor does not install or auto-update the machine's .NET SDK. Windows SDK redistribution uses Microsoft's .NET product licensing and third-party notices, so a bundled compiler toolchain requires a separate pinned-distribution/license review rather than being silently copied into Lexeditor."),
+        readField("Build toolchain","System dotnet SDK","Only the Build page invokes dotnet. Lexeditor does not install or auto-update the machine's .NET SDK. The current shared helper contract is for mandatory runtime helpers and would incorrectly block the editor when an optional build-only SDK is absent; a managed/pinned dotnet toolchain therefore needs shared optional-helper support before Bannerlord can expose it through Updates."),
         readField("Modding Kit schemas","Optional local XmlSchemas","XSD enrichment reads schemas from a locally installed Bannerlord Modding Kit or game toolchain when present. These game/toolkit-owned schemas are not bundled or redistributed; absent or ambiguous schemas fall back to conservative literal editing.")
       ]}),
-      bannerlordModLoaderSection()
-    ]
-  });
-  const deploymentPanel=BLUI.detailPanel({
-    title:"Deployment & runtime",meta:deployment.runnable?"Runnable":"Needs attention",
-    body:[
-      BLUI.detailSection({title:"STATUS",body:[
+      bannerlordModLoaderSection(),
+      BLUI.detailSection({title:"DEPLOYMENT STATUS",body:[
         readField("Runnable",deployment.runnable?"Yes":"No"),
         readField("Project deployed",deployment.deployed?"Yes":"No"),
         readField("Project/deployed sync",deployment.inSync?"Yes":"No"),
@@ -194,16 +188,8 @@ function renderInfo(){
         Object.entries(overrides).map(([key,row])=>readField(key,row.exists?(row.valid?`${row.keys} keys`:`Invalid JSON: ${row.error||"parse error"}`):"Not present")):
         [readField("Overrides","None deployed")]})
     ]
-  });
-  const content=state.infoView==="credits"?BLUI.creditsPanel("bannerlord"):
-    state.infoView==="deployment"?deploymentPanel:setup;
-  main.replaceChildren(BLUI.tabbedPanel({
-    tabs:[{id:"setup",label:"Setup & Loading"},{id:"deployment",label:"Deployment"},{id:"credits",label:"Credits"}],
-    active:state.infoView,label:"Bannerlord information",
-    change:value=>{state.infoView=value;render()},content
   }));
 }
-
 
 state.moduleView=state.moduleView||"metadata";
 state.skillView=state.skillView||"definitions";
