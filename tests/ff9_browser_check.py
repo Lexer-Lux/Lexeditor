@@ -149,10 +149,12 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             targets = field(page, "TARGETS").locator("select")
             expect(targets).to_have_value("SingleEnemy(2)")
             assert set(targets.locator("option").all_text_contents()) == {"SingleEnemy(2)", "ManyAny(3)"}
+            page.screenshot(path=str(OUT / "ff9-magic-actions.png"), full_page=True)
             page.evaluate("state.datasetChoice.magic='status-data';render()")
             page.wait_for_function("state.datasets['status-data']?.rows?.length===1")
             expect(field(page, "SPS EXTRA POSITION").locator('input[type="number"], input[inputmode="decimal"]')).to_have_count(3)
             expect(field(page, "GLOW BASE COLOR").locator('input[type="number"], input[inputmode="decimal"]')).to_have_count(3)
+            page.screenshot(path=str(OUT / "ff9-status-vectors.png"), full_page=True)
 
             page.evaluate("navigate('world')")
             page.wait_for_function("state.datasets['world-transport']?.rows?.length===1")
@@ -163,12 +165,19 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.wait_for_function("state.datasets.encounters?.rows?.length===1")
             expect(numeric_field(page, "MONSTER COUNT")).to_have_attribute("max", "4")
             expect(numeric_field(page, "ENEMY 1 TYPE")).to_have_attribute("max", "0")
+            page.screenshot(path=str(OUT / "ff9-encounters.png"), full_page=True)
 
             page.locator("#plugin-data-map").click()
             page.wait_for_selector(".lex-data-map-view")
-            map_text = page.locator(".lex-data-map-view").inner_text()
-            assert "BattleScene" in map_text and "Other vanilla Unity asset-container content" in map_text
-            page.screenshot(path=str(OUT / "ff9-wide.png"), full_page=True)
+            page.screenshot(path=str(OUT / "ff9-datamap.png"), full_page=True)
+            map_search = page.get_by_role("textbox", name="Search the data map")
+            map_search.fill("BattleScene")
+            page.wait_for_function("state.mapQuery==='BattleScene'")
+            assert "BattleScene" in page.locator(".lex-data-map-view").inner_text()
+            map_search.fill("Other vanilla Unity asset-container content")
+            page.wait_for_function("state.mapQuery==='Other vanilla Unity asset-container content'")
+            assert "Other vanilla Unity asset-container content" in page.locator(".lex-data-map-view").inner_text()
+            map_search.fill("")
 
             page.set_viewport_size({"width": 820, "height": 700})
             page.evaluate("navigate('items')")
