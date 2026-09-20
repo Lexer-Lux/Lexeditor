@@ -3,7 +3,7 @@
   const $=selector=>document.querySelector(selector);
   async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let payload={};try{payload=await response.json()}catch(_error){}if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
 
-  const state={modOnly:false,textPacks:null,textResource:"",textBusy:false,reshade:null,curatedQuery:"",curatedSort:{key:"id",dir:1},
+  const state={modOnly:false,textPacks:null,textResource:"",textBusy:false,reshade:null,curatedQuery:"",curatedSort:{key:"tag",dir:1},
     tab:"misc",catalog:null,info:null,dataMap:null,activeSource:"mine",busy:false,error:"",projectMessage:"",
     asset:"",data:null,dataBaseline:null,selected:0,query:"",sort:{key:"tag",dir:1},
     economy:null,economyKey:"",economyError:"",economyTable:"",economyQuery:"",economySort:{key:"name",dir:1},
@@ -11,16 +11,15 @@
     textLanguage:"US",textAsset:"",textData:null,textBaseline:null,textSelected:0,textQuery:"",textSort:{key:"key",dir:1},
     mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]
   };
-  // An ID is four or five digits wide, so it takes four or five digits of the
-  // table. Left to share the grid it took a fifth of the width and pushed the
-  // record name into a column too narrow to read.
-  const dataColumns=[{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true,width:"74px"},{key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"}];
+  // DataObject entry.index is only the writer's row position, not a game ID.
+  // The FName row tag is the record identity the game actually stores.
+  const dataColumns=[{key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"}];
   const economyColumns=[{key:"tag",label:"ID",sortable:true,width:"minmax(10em,.8fr)"},{key:"name",label:"Item",sortable:true,width:"minmax(14em,1.2fr)"},{key:"buy",label:"Buy",numeric:true,sortable:true},{key:"sale",label:"Sell",numeric:true,sortable:true},{key:"maxCount",label:"Carry Cap",numeric:true,sortable:true}];
   // Four columns at fourteen ems each did not fit the list panel, so the Steal
   // column was cut in half by the panel edge. The minimums are sized so all
   // four fit the default split; the cells ellipsise if a value is longer.
   const lootColumns=[{key:"tag",label:"Enemy / Battle ID",sortable:true,width:"minmax(9em,.9fr)"},{key:"normal",label:"Normal",sortable:true,width:"minmax(8em,1fr)"},{key:"rare",label:"Rare",sortable:true,width:"minmax(8em,1fr)"},{key:"steal",label:"Steal",sortable:true,width:"minmax(8em,1fr)"}];
-  const textColumns=[{key:"number",label:"ID",numeric:true,numberedId:true,sortable:true,width:"minmax(4em,max-content)"},{key:"resource",label:"Resource",sortable:true,width:"minmax(10em,.7fr)"},{key:"key",label:"Text ID",sortable:true,width:"minmax(12em,.8fr)"},{key:"text",label:"Text",sortable:true,width:"minmax(16em,1.2fr)"}];
+  const textColumns=[{key:"resource",label:"Resource",sortable:true,width:"minmax(10em,.7fr)"},{key:"key",label:"Text ID",sortable:true,width:"minmax(12em,.8fr)"},{key:"text",label:"Text",sortable:true,width:"minmax(16em,1.2fr)"}];
   // Any property of the loaded DataObject can be pinned into the table. The pin
   // is the same control every other table uses; what differs here is that the
   // column set is the record's own schema rather than a fixed list, so the
@@ -69,7 +68,7 @@
   const textRecords=()=>textPacks().flatMap(pack=>pack.data.records.map(row=>({
     row, asset:pack.item.asset, resource:pack.item.name,
     id:`${pack.item.asset}#${row.id}`,
-    number:row.id, key:row.key, text:row.text, subentries:row.subentries})));
+    key:row.key, text:row.text, subentries:row.subentries})));
   const selectedRecord=()=>records().find(row=>row.id===state.selected)||records()[0]||null;
   const selectedTextRecord=()=>textRecords().find(row=>row.id===state.textSelected)||textRecords()[0]||null;
   const textPackOf=view=>state.textPacks?.[view?.asset]||null;
@@ -135,7 +134,7 @@
     const q=state.textQuery.toLocaleLowerCase();
     return textRecords()
       .filter(row=>!state.textResource||row.asset===state.textResource)
-      .filter(row=>!q||`${row.number} ${row.resource} ${row.key} ${row.text} ${(row.subentries||[]).map(sub=>`${sub.id} ${sub.text}`).join(" ")}`.toLocaleLowerCase().includes(q))
+      .filter(row=>!q||`${row.resource} ${row.key} ${row.text} ${(row.subentries||[]).map(sub=>`${sub.id} ${sub.text}`).join(" ")}`.toLocaleLowerCase().includes(q))
       .sort((a,b)=>compareValues(a[state.textSort.key],b[state.textSort.key])*state.textSort.dir);
   }
 
@@ -325,7 +324,7 @@
     const spec=curatedSpec(state.tab);
     const prefs=spec?curatedPrefs(spec):dataPreferences();
     const fields=state.data.properties.map(prop=>detailField({label:prop.label,control:propertyControl(row,prop),dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),min:semanticMin(prop),max:semanticMax(prop),help:propertyHelp(prop),pin:prefs.pinButton(propertyColumnKey(prop),prop.label)}));
-    return detailPanel({className:"ff7r-detail",title:row.tag||`Record ${row.id}`,identity:recordId(row.id),meta:currentAsset()?.name||state.asset,body:[detailSection({title:"PROPERTIES",body:fields})]});
+    return detailPanel({className:"ff7r-detail",title:row.tag||"Unnamed record",meta:currentAsset()?.name||state.asset,body:[detailSection({title:"PROPERTIES",body:fields})]});
   }
   function tablePanel(){const rows=sortedRows();return columnList({rows,key:row=>row.id,selected:state.selected,select:row=>{state.selected=row.id;render()},sortState:state.sort,sort:key=>{state.sort=state.sort.key===key?{key,dir:-state.sort.dir}:{key,dir:1};render()},columnPreferences:dataPreferences(),columns:dataTableColumns(),class:"ff7r-table","aria-label":"FF7 Remake DataObject records"})}
   function assetToolbar(){const select=el("select",{"aria-label":"FF7 Remake misc data table",onchange:event=>selectAsset(event.target.value),disabled:state.busy});for(const item of (state.tab==="tweaks"?tweakAssets():gameAssets())){const label=item.group?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.asset;select.append(option)}return LexeditorUI.toolbar(el("label",{},"Table"),select)}
@@ -468,8 +467,7 @@
   }
   function curatedColumns(spec){
     const properties=state.data?.properties||[];
-    return [{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true,width:"74px"},
-      {key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"},
+    return [{key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"},
       ...properties.map(prop=>({key:propertyColumnKey(prop),label:prop.label||prop.name,
         numeric:!prop.array&&["INT","FLOAT"].includes(semanticType(prop)),
         sortable:true,
@@ -515,7 +513,7 @@
       rows:curatedRows(spec),key:row=>row.record.id,
       selected:state.selected,setSelected:row=>{state.selected=row.record.id},
       query:state.curatedQuery,setQuery:value=>{state.curatedQuery=value},
-      searchLabel:`Search ${spec.label}`,searchPlaceholder:"Search record names and IDs",
+      searchLabel:`Search ${spec.label}`,searchPlaceholder:"Search record keys and names",
       sortState:state.curatedSort,
       sort:key=>{state.curatedSort=state.curatedSort.key===key
         ?{key,dir:-state.curatedSort.dir}:{key,dir:1};render()},
@@ -542,7 +540,7 @@
       className:"ff7r-layout",paneClass:"ff7r-pane",splitKey:"ff7r-data",rowsKey:"ff7r-data-rows",
       defaultSplit:36,minLeft:320,minRight:420,
       search:{key:"ff7r-data",value:state.query,label:"Search FF7 Remake records",
-        placeholder:"Search IDs, values, and resolved names",
+        placeholder:"Search record keys, values, and resolved names",
         change:value=>{state.query=value;state.dataPage=0;render()}},
       modOnly:modOnlySpec(),change:next=>{state.dataPage=next.page;render()},
       sync:next=>{state.dataPage=next.page},
@@ -570,7 +568,7 @@
     if(semantic?.descriptionId)fields.push(detailField({label:"DESCRIPTION",
       control:descriptionControl(semantic),
       help:infoHelp("An item's description is one entry in the FF7R text resource that its name also comes from. Editing it here edits that entry: the Text tab shows the same record with the same pending change, and saving writes it into the resource. When another resource is loaded with unsaved changes this stays read-only rather than replacing it, and the button opens the entry on the Text tab.")}));
-    return detailPanel({className:"ff7r-detail",title:semantic?.name||row.tag,identity:recordId(row.id),meta:table.name||"Item settings",body:[detailSection({title:"ITEM SETTINGS",body:fields})]});
+    return detailPanel({className:"ff7r-detail",title:semantic?.name||row.tag,meta:table.name||"Item settings",body:[detailSection({title:"ITEM SETTINGS",body:fields})]});
   }
   // Descriptions live in resident_txtres for the current language, the same
   // resource an item's name comes from. There is exactly one of those per
@@ -716,7 +714,7 @@
         help:infoHelp("Which text resource this entry lives in. Every resource for this language is loaded, so searching and sorting cross all of them; saving writes back only the resources you changed.")}),
       main]})];
     if(subs.length)sections.push(detailSection({title:"SUB-ENTRIES",body:subs}));
-    return detailPanel({className:"ff7r-detail",title:row.key||`Text ${row.id}`,identity:recordId(row.id),meta:`${state.textLanguage} · ${view.resource||"Text resource"}`,body:sections});
+    return detailPanel({className:"ff7r-detail",title:row.key||"Unnamed text entry",meta:`${state.textLanguage} · ${view.resource||"Text resource"}`,body:sections});
   }
   function textTablePanel(){const rows=sortedTextRows();return columnList({rows,key:row=>row.id,selected:state.textSelected,select:row=>{state.textSelected=row.id;render()},sortState:state.textSort,sort:key=>{state.textSort=state.textSort.key===key?{key,dir:-state.textSort.dir}:{key,dir:1};render()},columnPreferences:textPrefs,columns:textColumns,class:"ff7r-table","aria-label":"FF7 Remake localized text entries"})}
   function textPanel(){if(!textAssets().length)return loadingPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");if(state.textBusy||!state.textPacks)return loadingPanel("Loading text","Reading every localized text resource for this language…");if(state.error&&!textRecords().length)return errorPanel(state.error);return LexeditorUI.stack(textLanguageBar(),pagedTable({id:"text",noun:"entries",
