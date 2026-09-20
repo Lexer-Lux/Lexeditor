@@ -35,7 +35,17 @@ SHORTHANDS = {
     "gap": {"row-gap", "column-gap"},
     "flex": {"flex-grow", "flex-shrink", "flex-basis"},
     "outline": {"outline-width", "outline-style", "outline-color"},
+    "grid-row": {"grid-row-start", "grid-row-end"},
+    "grid-column": {"grid-column-start", "grid-column-end"},
+    "grid-area": {"grid-row", "grid-column", "grid-row-start", "grid-row-end", "grid-column-start", "grid-column-end"},
+    "font": {"font-style", "font-variant", "font-weight", "font-stretch", "font-size", "line-height", "font-family"},
 }
+for family in ("margin", "padding", "inset"):
+    for axis in ("block", "inline"):
+        logical = f"{family}-{axis}"
+        ends = {f"{logical}-{end}" for end in ("start", "end")}
+        SHORTHANDS[logical] = ends
+        SHORTHANDS[family].update({logical, *ends})
 for side in SIDES:
     SHORTHANDS[f"border-{side}"] = {f"border-{side}-width", f"border-{side}-style", f"border-{side}-color"}
 SHORTHANDS["border"] = set().union(*(SHORTHANDS[f"border-{s}"] for s in SIDES)) | {

@@ -13,12 +13,12 @@ sys.path.insert(0, str(ROOT))
 from games.ff8.server import create_server
 from playwright.sync_api import sync_playwright
 
-OPEN_AI = """(()=>{const button=[...document.querySelectorAll('.lex-subtab-button')].find(b=>b.textContent.trim().startsWith('AI'));
+OPEN_AI = """(()=>{const button=document.querySelector('[aria-label="Enemy AI scripts"] [role="tab"]');
 const started=performance.now();button.click();
 return new Promise(done=>requestAnimationFrame(()=>setTimeout(()=>done({
   ms:performance.now()-started,
-  instructions:document.querySelectorAll('.enemy-ai-instruction').length,
-  options:document.querySelectorAll('.enemy-ai-content option').length}))))})()"""
+  instructions:document.querySelectorAll('.lex-instruction-row').length,
+  options:document.querySelectorAll('.lex-instruction-pane option').length}))))})()"""
 
 
 def main():
@@ -34,13 +34,13 @@ def main():
             page.goto(f"http://127.0.0.1:{server.server_port}/")
             page.wait_for_function("typeof state==='object' && !state.booting", timeout=60000)
             page.locator('nav [data-tab="enemies"]').click()
-            page.wait_for_selector(".enemy-tabbed-column .lex-subtab-button")
+            page.wait_for_selector('[aria-label="Enemy AI scripts"] [role="tab"]')
             result = page.evaluate(OPEN_AI)
             if not result["instructions"]:
                 print("No AI instructions in this game data; nothing to check.")
                 return
             # A long list holds only its current choice until it is used.
-            longest = page.evaluate("Math.max(...[...document.querySelectorAll('.enemy-ai-content select')].map(s=>s.options.length))")
+            longest = page.evaluate("Math.max(...[...document.querySelectorAll('.lex-instruction-pane select')].map(s=>s.options.length))")
             assert longest <= 24, longest
             assert result["options"] < 2000, result
             assert result["ms"] < 3000, result

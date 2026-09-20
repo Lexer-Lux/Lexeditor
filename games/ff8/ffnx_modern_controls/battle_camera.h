@@ -68,7 +68,8 @@ struct Floor {
 };
 
 inline float pitch_of(const Vec3s &position, const Vec3s &look_at) {
-    const float dy = static_cast<float>(position.y) - look_at.y;
+    // FF8 battle coordinates have positive Y down. Elevation is the inverse.
+    const float dy = static_cast<float>(look_at.y) - position.y;
     const float horizontal = std::hypot(static_cast<float>(position.x) - look_at.x,
                                         static_cast<float>(position.z) - look_at.z);
     return std::atan2(dy, horizontal);
@@ -95,7 +96,7 @@ inline bool orbit(Vec3s &position, const Vec3s &look_at, int raw_x, int raw_y,
     }
 
     const float dx = static_cast<float>(position.x) - look_at.x;
-    const float dy = static_cast<float>(position.y) - look_at.y;
+    const float dy = static_cast<float>(look_at.y) - position.y;
     const float dz = static_cast<float>(position.z) - look_at.z;
     const float horizontal = std::hypot(dx, dz);
     const float radius = std::hypot(horizontal, dy);
@@ -116,7 +117,7 @@ inline bool orbit(Vec3s &position, const Vec3s &look_at, int raw_x, int raw_y,
 
     const float projected = radius * std::cos(pitch);
     position.x = word(static_cast<float>(look_at.x) + projected * std::sin(yaw));
-    position.y = word(static_cast<float>(look_at.y) + radius * std::sin(pitch));
+    position.y = word(static_cast<float>(look_at.y) - radius * std::sin(pitch));
     position.z = word(static_cast<float>(look_at.z) + projected * std::cos(yaw));
     return true;
 }

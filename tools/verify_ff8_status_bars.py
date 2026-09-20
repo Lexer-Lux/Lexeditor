@@ -48,7 +48,7 @@ def source_contract(text: str) -> None:
         "0x004D41B0",
         "battle_menu_sub_4A3D20 + 0x139",
         # Battle HP spans a four-digit field under the drawn digits; GF HP
-        # spans the name. Neither is scaled by max/9999.
+        # spans the name. Battle HP retains its maximum-HP length scale.
         "row.hp_right - field",
         "row.left, row.name_right",
         "result_state + 0x234 + slot * sizeof(std::uint32_t)",
@@ -316,9 +316,9 @@ def main() -> int:
         require(f'checked:settings.{key}' in editor,
                 f"{key} does not have a checkbox")
         require(label in editor, f"{label} is absent from Tweaks")
-    require("under main-menu character names, under character and GF level rows, and on the post-battle report" in editor,
+    require("below character and GF level rows, including the active and reserve party in the main menu" in editor,
             "XP Bars description does not state every rendered surface")
-    require("under each party member's HP number during battle" in editor,
+    require("below the active party's HP numbers in the main menu and in battle" in editor,
             "HP Bars description does not state its battle placement")
 
     print("FF8 FFNx XP/HP bars: executable, source, integration, and mutations verified")

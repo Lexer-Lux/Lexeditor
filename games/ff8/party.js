@@ -1,8 +1,8 @@
-  function renderCharacters(){const rows=[...state.data.characters.rows].sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}));if(!rows.some(row=>row.id===state.selected.characters))state.selected.characters=rows[0]?.id??null;const row=rows.find(candidate=>candidate.id===state.selected.characters);if(!row){$("#toolbar").replaceChildren();$("#main").replaceChildren(el("div",{class:"empty"},"No character records were found."));return}const detailId="character-detail";$("#toolbar").replaceChildren(portraitTabs("characters",rows,row.id,detailId,id=>{state.selected.characters=id;renderCharacters();shell.refresh()}));$("#main").replaceChildren(detailPanel({heading:false,className:"lex-detail detail character-detail",attrs:{id:detailId,role:"tabpanel","aria-labelledby":`characters-tab-${row.id}`,"data-character":row.id},body:characterDetail(row)}))}
+  function renderCharacters(){const rows=[...state.data.characters.rows].sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}));if(!rows.some(row=>row.id===state.selected.characters))state.selected.characters=rows[0]?.id??null;const row=rows.find(candidate=>candidate.id===state.selected.characters);if(!row){$("#toolbar").replaceChildren();$("#main").replaceChildren(LexeditorUI.notice({message:"No character records were found."}));return}const detailId="character-detail";$("#toolbar").replaceChildren(portraitTabs("characters",rows,row.id,detailId,id=>{state.selected.characters=id;renderCharacters();shell.refresh()}));$("#main").replaceChildren(detailPanel({heading:false,className:"lex-detail detail character-detail",attrs:{id:detailId,role:"tabpanel","aria-labelledby":`characters-tab-${row.id}`,"data-character":row.id},body:characterDetail(row)}))}
   const gfPanelOrder=["GF Compatibility","General","Abilities"];
   function gfFieldsByPanel(row){const routed=new Map(gfPanelOrder.map(group=>[group,[]])),seen=new Set();for(const field of row.fields){if(seen.has(field.field)||!routed.has(field.group))throw new Error(`GF field routing failed: ${field.field}`);seen.add(field.field);routed.get(field.group).push(field)}if(seen.size!==row.fields.length)throw new Error("GF field routing omitted a field");return routed}
-  function gfEntityLabel(field){const target=gfByName(field.label);return target?hoverable({class:"gf-entity-label",content:[el("span",{class:"gf-link-portrait-slot"},el("img",{class:"gf-link-portrait",src:`/assets/portraits/gfs/${target.id}.png`,alt:""})),el("span",{},field.label)],targetType:"gf",targetId:target.id,targetLabel:`${field.label} GF`,activate:()=>openGFByName(field.label)}):field.label}
-  function gfFieldRow(field,row){return detailField({className:"gf-field-row",attrs:{"data-field":field.field},label:gfEntityLabel(field),help:field.help?infoHelp(field.help):null,control:fieldSourceControl(field,"gfs",row.id)})}
+  function gfEntityLabel(field){const target=gfByName(field.label);return target?hoverable({content:LexeditorUI.inlineLabel(el("img",{src:`/assets/portraits/gfs/${target.id}.png`,alt:""}),el("span",{},field.label)),targetType:"gf",targetId:target.id,targetLabel:`${field.label} GF`,activate:()=>openGFByName(field.label)}):field.label}
+  function gfFieldRow(field,row){return detailField({attrs:{"data-field":field.field},label:gfEntityLabel(field),help:field.help?infoHelp(field.help):null,control:fieldSourceControl(field,"gfs",row.id)})}
   function gfCompatibilityLabel(field){return gfEntityLabel(field)}
   function sortGfTable(kind,key){const [active,direction]=state.gfSorts[kind];state.gfSorts[kind]=[key,active===key?-direction:1];renderGFs()}
   // GF compatibility reads the same wherever it appears: one sortable table of
@@ -12,14 +12,13 @@
     const [sortKey,sortDir]=state.gfSorts.compatibility;
     const sorted=[...fields].sort((a,b)=>sortDir*String(sortKey==="value"?gfCompatibilityFormat(a.value):a.label)
       .localeCompare(String(sortKey==="value"?gfCompatibilityFormat(b.value):b.label),undefined,{numeric:true,sensitivity:"base"}));
-    const table=columnList({rows:sorted,key:field=>field.field,class:"gf-compat-table ff8-record-list",editable:true,
-      sortState:{key:sortKey,dir:sortDir},sort:key=>sortGfTable("compatibility",key),
+    const table=columnList({rows:sorted,key:field=>field.field,editable:true,fill:true,
+      sortState:{key:sortKey,dir:sortDir},sort:key=>{state.gfSorts.compatibility=[key,sortKey===key?-sortDir:1];if(view==="magic")renderKernel("magic","Magic");else renderGFs()},
       template:"minmax(135px,1fr) minmax(75px,100px)",
-      columns:[{key:"label",label:"GF",sortable:true,render:gfCompatibilityLabel},
+      columns:[{key:"label",label:"GF",help:view==="magic"?"Casting this spell changes compatibility with each listed GF by this amount.":"Summoning this GF changes the summoner’s compatibility with each listed GF by this amount.",sortable:true,render:gfCompatibilityLabel},
         {key:"value",label:"Change",sortable:true,render:field=>fieldSourceControl(field,view,rowId)}]});
-    return detailSection({className:"gf-panel compatibility",title:"COMPATIBILITY",
-      help:infoHelp("Each time this GF is summoned from the command menu, the summoner's compatibility with the listed GFs changes by these amounts."),
-      body:table,attrs:{"data-gf-panel":"compatibility"}});
+    table.dataset.gfPanel="compatibility";
+    return table;
   }
   const GF_CURVE_FIELDS=["gf_hp_modifier_1","gf_hp_modifier_2","gf_hp_modifier_3","gf_level_modifier_1","gf_level_modifier_2"];
   function gfPanel(title,fields,row,className){if(className==="compatibility")return compatibilityPanel(fields,"gfs",row.id);
@@ -28,7 +27,7 @@
     const curveFields=fields.filter(field=>GF_CURVE_FIELDS.includes(field.field));
     const rest=fields.filter(field=>!GF_CURVE_FIELDS.includes(field.field));
     const growth=className==="general"?gfStatGrowth(curveFields,row.id):null;
-    return detailSection({className:`gf-panel ${className}`,title,body:[growth,...(growth?rest:fields).map(field=>gfFieldRow(field,row))].filter(Boolean),attrs:{"data-gf-panel":className,"aria-label":title}})}
+    return detailSection({title,body:[growth,...(growth?rest:fields).map(field=>gfFieldRow(field,row))].filter(Boolean),attrs:{"data-gf-panel":className,"aria-label":title}})}
   // In "Ability" mode the stored number is 100 + the ability slot. Showing
   // that raw number made the prerequisite unreadable, so the slot is chosen
   // by name and the offset is applied here rather than by the reader.
@@ -52,15 +51,17 @@
     select.value=isSlot?"slot":"level";
     return select;
   }
-  function gfAbilities(fields,row){const groups=new Map();for(const field of fields){const key=field.row||field.field;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(field)}const find=(values,suffix="")=>values.find(field=>suffix?field.field.endsWith(suffix):/^ability\d+$/.test(field.field)),rows=[...groups].map(([key,values])=>({key,ability:find(values),level:find(values,"_level_or_prereq"),alternate:find(values,"_alt_prereq")})),[sortKey,sortDir]=state.gfSorts.abilities,sorted=rows.sort((a,b)=>sortDir*String(displayFieldValue(a[sortKey])).localeCompare(String(displayFieldValue(b[sortKey])),undefined,{numeric:true,sensitivity:"base"}));sorted.forEach(entry=>{entry.id=Number(String(entry.key).replace(/^ability/,""))||0});const slotNames=sorted.map(entry=>[entry.id,entry.ability?.lookup?.entries?.find(o=>Number(o.value)===Number(entry.ability.value))?.name||`slot ${entry.id}`]).sort((a,b)=>a[0]-b[0]);const table=columnList({rows:sorted,key:entry=>entry.key,class:"gf-ability-table ff8-record-list",editable:true,sortState:{key:sortKey,dir:sortDir},sort:key=>sortGfTable("abilities",key),template:"52px minmax(125px,1.2fr) minmax(140px,1fr) minmax(90px,.8fr)",columns:[{key:"slot",label:"Slot",sortable:false,numberedId:true,render:entry=>entry.id},{key:"ability",label:"Ability",sortable:true,render:entry=>entry.ability?fieldSourceControl(entry.ability,"gfs",row.id):"—"},{key:"level",label:"Prereq",help:"Choose whether this ability unlocks at a GF level or after another ability slot is learned. Values 1–100 are a GF level; 101–121 are the matching ability slot on this GF.",sortable:true,render:entry=>entry.level?el("div",{class:"gf-prereq-cell"},gfPrereqKind(entry.level,row),Number(entry.level.value)>100?gfPrereqSlot(entry.level,slotNames):fieldSourceControl(entry.level,"gfs",row.id)):"—"},{key:"alternate",label:"Alt. Prereq",help:"Points to another ability slot on this GF. This ability stays available only while that other ability is unfinished. 255 means no alternate restriction.",sortable:true,render:entry=>entry.alternate?fieldSourceControl(entry.alternate,"gfs",row.id):"—"}]});    return detailSection({className:"gf-panel abilities",title:"ABILITIES",
+  function gfAbilities(fields,row){const groups=new Map();for(const field of fields){const key=field.row||field.field;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(field)}const find=(values,suffix="")=>values.find(field=>suffix?field.field.endsWith(suffix):/^ability\d+$/.test(field.field)),rows=[...groups].map(([key,values])=>({key,ability:find(values),level:find(values,"_level_or_prereq"),alternate:find(values,"_alt_prereq")})),[sortKey,sortDir]=state.gfSorts.abilities,sorted=rows.sort((a,b)=>sortDir*String(displayFieldValue(a[sortKey])).localeCompare(String(displayFieldValue(b[sortKey])),undefined,{numeric:true,sensitivity:"base"}));sorted.forEach(entry=>{entry.id=Number(String(entry.key).replace(/^ability/,""))||0});const slotNames=sorted.map(entry=>[entry.id,entry.ability?.lookup?.entries?.find(o=>Number(o.value)===Number(entry.ability.value))?.name||`slot ${entry.id}`]).sort((a,b)=>a[0]-b[0]);const table=columnList({rows:sorted,key:entry=>entry.key,editable:true,sortState:{key:sortKey,dir:sortDir},sort:key=>sortGfTable("abilities",key),template:"52px minmax(125px,1.2fr) minmax(140px,1fr) minmax(90px,.8fr)",columns:[{key:"slot",label:"Slot",sortable:false,numberedId:true,render:entry=>entry.id},{key:"ability",label:"Ability",sortable:true,render:entry=>entry.ability?fieldSourceControl(entry.ability,"gfs",row.id):"—"},{key:"level",label:"Prereq",help:"Choose whether this ability unlocks at a GF level or after another ability slot is learned. Values 1–100 are a GF level; 101–121 are the matching ability slot on this GF.",sortable:true,render:entry=>entry.level?LexeditorUI.controlGroup([gfPrereqKind(entry.level,row),Number(entry.level.value)>100?gfPrereqSlot(entry.level,slotNames):fieldSourceControl(entry.level,"gfs",row.id)]):"—"},{key:"alternate",label:"Alt. Prereq",help:"Points to another ability slot on this GF. This ability stays available only while that other ability is unfinished. 255 means no alternate restriction.",sortable:true,render:entry=>entry.alternate?fieldSourceControl(entry.alternate,"gfs",row.id):"—"}]});    return detailSection({title:"ABILITIES",
       body:table,attrs:{"data-gf-panel":"abilities"}})}
   function renderGFs(){
     const rows=[...state.data.gfs.rows].sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}));
     if(!rows.some(row=>row.id===state.selected.gfs))state.selected.gfs=rows[0]?.id??null;
-    const row=rows.find(candidate=>candidate.id===state.selected.gfs);if(!row){$("#toolbar").replaceChildren();$("#main").replaceChildren(el("div",{class:"empty"},"No GF records were found."));return}
+    const row=rows.find(candidate=>candidate.id===state.selected.gfs);if(!row){$("#toolbar").replaceChildren();$("#main").replaceChildren(LexeditorUI.notice({message:"No GF records were found."}));return}
     const subtabs=portraitTabs("gfs",rows,row.id,"gf-detail",id=>{state.selected.gfs=id;renderGFs();shell.refresh()});
     $("#toolbar").replaceChildren(subtabs);
-    const routed=gfFieldsByPanel(row),panels=gfPanelOrder.map(group=>group==="Abilities"?gfAbilities(routed.get(group),row):gfPanel(group==="GF Compatibility"?"COMPATIBILITY":group.toLocaleUpperCase(),routed.get(group),row,group==="General"?"general":"compatibility"));
+    const routed=gfFieldsByPanel(row),defaults=state.data.init.gfs.rows.find(value=>Number(value.id)===Number(row.id));
+    const center=tabbedPanel({tabs:[{id:'properties',label:'Properties'},{id:'defaults',label:'Defaults',help:'Initial GF state used when a new game begins. Changes do not alter an existing save.'}],active:state.gfDetailTab||'properties',label:'GF details',change:id=>{state.gfDetailTab=id;renderGFs()},content:state.gfDetailTab==='defaults'?(defaults?startingFields(defaults.fields,'gf',defaults.id):LexeditorUI.detailNote('No initial state for this GF.')):gfPanel('',routed.get('General'),row,'general')});
+    const panels=[compatibilityPanel(routed.get('GF Compatibility'),'gfs',row.id),center,gfAbilities(routed.get('Abilities'),row)];
     const layout=panelLayout(panels,"gf-three-panel",{layoutKey:"ff8-gfs",defaultSizes:[.9,1.05,1.4],minSizes:[230,245,470],stackAt:1000});
     Object.assign(layout,{id:"gf-detail"});layout.setAttribute("role","tabpanel");layout.setAttribute("aria-labelledby",`gfs-tab-${row.id}`);layout.dataset.gf=row.id;$("#main").replaceChildren(layout);
   }
@@ -70,9 +71,9 @@
       if(!groups.has(field.group))groups.set(field.group,[]);
       groups.get(field.group).push(field);
     }
-    return el("div",{class:"field-groups"},...[...groups].map(([name,rows])=>{
-      return detailSection({className:"field-group",title:name,body:rows.map(field=>
-        detailField({className:"field-row",label:field.label,help:field.help?infoHelp(field.help):null,
+    return LexeditorUI.tileGrid([...groups].map(([name,rows])=>{
+      return detailSection({title:name,body:rows.map(field=>
+        detailField({label:field.label,help:field.help?infoHelp(field.help):null,
           control:fieldSourceControl(field,view,rowId),pin:prefs?.pinButton(`field:${field.field}`,field.label)}))});
     }));
   }
@@ -84,23 +85,17 @@
   const booleanGlyph=value=>value?"\u2713":"\u00d7";
   const booleanMark=value=>el("span",{class:"lex-boolean-mark lex-ui-symbol"},booleanGlyph(value));
   function flagSourceControl(field,view,rowId){
-    const lookup=field.lookup,vanillaField=rowOf(state.vanilla,view,rowId)?.fields?.find(value=>value.field===field.field),referenceFields=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,field:rowOf(state.referenceData[reference.id],view,rowId)?.fields?.find(value=>value.field===field.field)})),iconOnly=["element","j_status"].includes(String(lookup.name));
-    // Named flags are one property of switches, like an item's USE FLAGS: the
-    // reference compares the whole word. Icon-only lists keep their grid.
-    if(!iconOnly){
-      const word=value=>Number(value??0),bitOf=entry=>Number(entry.mask??entry.value);
-      const switches=toggleRow({label:field.label,value:()=>word(field.value),toggles:lookup.entries.map(entry=>{const bit=bitOf(entry);return{
-        key:String(bit),label:entry.name,icon:conceptIcon(lookup.name,entry.name),help:entry.description||null,checked:(word(field.value)&bit)===bit,
-        change:checked=>{field.value=checked?(word(field.value)|bit):(word(field.value)&~bit);shell.refresh()}}})});
-      return sourceControl(switches,()=>word(field.value),vanillaField?word(vanillaField.value):undefined,
-        referenceFields.filter(reference=>reference.field).map(reference=>({name:reference.name,shortName:reference.shortName,value:word(reference.field.value)})),
-        value=>{field.value=word(value);render()},value=>`0x${word(value).toString(16).toLocaleUpperCase()}`);
-    }
-    return el("div",{class:`flag-list flag-list-${String(lookup.name||"flags").replace(/[^a-z0-9_-]/gi,"-")} ${iconOnly?"flag-list-icon-toggles":""}`},...lookup.entries.map(entry=>{
-      const bit=Number(entry.mask??entry.value),read=value=>(Number(value??0)&bit)===bit,apply=checked=>{field.value=checked?(Number(field.value)|bit):(Number(field.value)&~bit)},setState=checked=>{stateMark.textContent=booleanGlyph(checked);stateMark.classList.toggle("positive",checked);stateMark.classList.toggle("negative",!checked)},input=el("input",{type:"checkbox",checked:read(field.value),"aria-label":entry.name,onchange:event=>{apply(event.target.checked);setState(event.target.checked);shell.refresh()}}),stateMark=el("span",{class:`ff8-flag-state ${read(field.value)?"positive":"negative"}`,"aria-hidden":"true"},booleanGlyph(read(field.value))),control=el("label",{class:iconOnly?"ff8-icon-toggle":"ff8-flag-toggle",title:entry.name},input,conceptIcon(lookup.name,entry.name),iconOnly?stateMark:el("span",{},entry.name));
-      const refs=referenceFields.filter(reference=>reference.field).map(reference=>({name:reference.name,shortName:reference.shortName,value:read(reference.field.value)}));
-      return sourceControl(control,()=>read(field.value),read(vanillaField?.value),refs,apply,booleanMark);
-    }))
+    const lookup=field.lookup,word=value=>Number(value??0);
+    const vanillaField=rowOf(state.vanilla,view,rowId)?.fields?.find(value=>value.field===field.field);
+    const references=referenceValues(view,rowId,value=>value?.fields?.find(entry=>entry.field===field.field)?.value);
+    const switches=toggleRow({label:field.label,value:()=>word(field.value),toggles:lookup.entries.map(entry=>{
+      const bit=Number(entry.mask??entry.value);
+      return {key:String(bit),label:entry.name,icon:LexeditorUI.inlineLabel(conceptIcon(lookup.name,entry.name)),
+        help:entry.description||null,checked:(word(field.value)&bit)===bit,
+        change:checked=>{field.value=checked?(word(field.value)|bit):(word(field.value)&~bit);noteFieldEdit(view,field)}};
+    })});
+    return sourceControl(switches,()=>word(field.value),vanillaField?word(vanillaField.value):undefined,
+      references,value=>{field.value=word(value)},value=>`0x${word(value).toString(16).toUpperCase()}`);
   }
   function hitRateSourceControl(field,view,rowId){const vanilla=rowOf(state.vanilla,view,rowId)?.fields?.find(value=>value.field===field.field)?.value,references=referenceValues(view,rowId,value=>value?.fields?.find(entry=>entry.field===field.field)?.value);// FF8 stores hit rate as a percentage, not a fraction of 255: the battle formula clamps "hit rate + LUCK/2 - EVA" to 0-100 before rolling. A weapon reading 98 is 98%, not 38.43%. Values above 100 are the always-hit range.
     const input=numberControl(field.value,0,255,1,value=>{field.value=Math.max(0,Math.min(255,Math.round(Number(value)||0)));noteFieldEdit(view,field)},{"aria-label":field.label});return sourceControl(unitField(input,"%"),()=>field.value,vanilla,references,value=>{field.value=Math.max(0,Math.min(255,Math.round(Number(value)||0)))},value=>`${formatNumber(value)}%`,{internal:true})}
@@ -120,8 +115,11 @@
   function fieldSourceControl(field,view,rowId,options={}){if(!field)return el("span",{},"—");if(view&&field.lookup?.type==="flags")return flagSourceControl(field,view,rowId);if(view&&field.field==="hit_rate")return hitRateSourceControl(field,view,rowId);const compatibility=field.formula==="gf_compat",control=compatibility?gfCompatibilityControl(field):fieldControl(field);if(!view)return control;const vanillaField=rowOf(state.vanilla,view,rowId)?.fields?.find(value=>value.field===field.field),boolean=field.control==="boolean",read=value=>boolean?Boolean(value):value,references=referenceValues(view,rowId,value=>read(value?.fields?.find(entry=>entry.field===field.field)?.value)),format=compatibility?gfCompatibilityFormat:(boolean?booleanMark:undefined);return sourceControl(control,()=>read(field.value),read(vanillaField?.value),references,value=>field.value=boolean?Boolean(value):value,format,options)}
   const elementIcons={Fire:288,Ice:289,Thunder:290,Earth:291,Poison:292,Wind:293,Water:294,Holy:295};
   const statusIcons={Death:272,Poison:273,Petrify:274,Petrifying:274,Darkness:275,Silence:276,Berserk:277,Zombie:278,Sleep:279,Slow:280,Stop:281,Curse:282,"Curse (unused for attack)":282,Confuse:283,Confusion:283,Drain:284};
-  function conceptIcon(lookup,name){const id=lookup==="element"?elementIcons[name]:statusIcons[name];return id?el("img",{class:"ff8-concept-icon",src:`/assets/icons/${id}.png`,alt:"",title:`${name} game icon`}):null}
-  function fieldControl(field){const lookup=field.lookup;if(field.control==="boolean")return el("input",{type:"checkbox",checked:Boolean(field.value),"aria-label":field.label,onchange:event=>{field.value=event.target.checked;shell.refresh()}});if(lookup?.type==="enum")return lookup.name==="item"?itemSelectControl(field.value,lookup.entries.map(entry=>({...entry,iconId:itemById(entry.value)?.iconId})),value=>field.value=value):selectControl(field.value,lookup.entries,value=>field.value=value);if(lookup?.type==="flags"){return el("div",{class:`flag-list flag-list-${String(lookup.name||"flags").replace(/[^a-z0-9_-]/gi,"-")}`},...lookup.entries.map(entry=>{const bit=Number(entry.mask??entry.value),checked=(field.value&bit)===bit;return el("label",{title:entry.name},el("input",{type:"checkbox",checked,"aria-label":entry.name,onchange:event=>{field.value=event.target.checked?(field.value|bit):(field.value&~bit);shell.refresh()}}),conceptIcon(lookup.name,entry.name),entry.name)}))}if(field.field==="hit_rate")return ratio255Control(field.value,value=>field.value=value,field.label);const control=numberControl(field.value,field.minimum,field.maximum,field.control==="percent"?.1:1,value=>field.value=value);return field.control==="percent"?unitField(control,"%"):control}
+  function conceptIcon(lookup,name){const id=lookup==="element"?elementIcons[name]:statusIcons[name];return id?LexeditorUI.inlineLabel(el("img",{src:`/assets/icons/${id}.png`,alt:"",title:`${name} game icon`})):null}
+  function fieldControl(field){const lookup=field.lookup;if(field.control==="boolean")return el("input",{type:"checkbox",checked:Boolean(field.value),"aria-label":field.label,onchange:event=>{field.value=event.target.checked;shell.refresh()}});if(lookup?.type==="enum")return lookup.name==="item"?itemSelectControl(field.value,lookup.entries.map(entry=>({...entry,iconId:itemById(entry.value)?.iconId})),value=>field.value=value):selectControl(field.value,lookup.entries,value=>field.value=value);if(lookup?.type==="flags"){return LexeditorUI.toggleRow({label:field.label,value:()=>field.value,toggles:lookup.entries.map(entry=>{
+    const bit=Number(entry.mask??entry.value);
+    return {label:entry.name,bit,checked:(field.value&bit)===bit,icon:conceptIcon(lookup.name,entry.name),change:checked=>{field.value=checked?(field.value|bit):(field.value&~bit);shell.refresh()}};
+  })})}if(field.field==="hit_rate")return ratio255Control(field.value,value=>field.value=value,field.label);const control=numberControl(field.value,field.minimum,field.maximum,field.control==="percent"?.1:1,value=>field.value=value);return field.control==="percent"?unitField(control,"%"):control}
 
   function enemyDisplayName(name){
     const text=String(name??""),match=text.match(/^\{([^{}]+)\}$/);
@@ -148,17 +146,17 @@
   function enemyStatGrowth(fields,rowId){
     const cards=enemyCurveOrder.map(stat=>{
       const statFields=enemyCurveFields(fields,stat),variables=statFields.map((field,index)=>({label:"ABCD"[index],control:fieldSourceControl(field,"enemies",rowId,{internal:true})}));
-      return curveEditor({title:stat,className:"ff8-character-curve ff8-enemy-curve",overlayExtrema:true,variables,domain:{min:1,max:100},range:()=>enemyCurveRange(stat,statFields),graphLabel:`${stat} from enemy level 1 to 100`,evaluate:level=>enemyCurveValue(stat,statFields,level),formula:coloredCurveFormula(enemyCurveFormula(stat))});
+      return curveEditor({title:stat,overlayExtrema:true,variables,domain:{min:1,max:100},range:()=>enemyCurveRange(stat,statFields),graphLabel:`${stat} from enemy level 1 to 100`,evaluate:level=>enemyCurveValue(stat,statFields,level),formula:coloredCurveFormula(enemyCurveFormula(stat))});
     });
-    return detailSection({className:"enemy-stat-growth character-stat-growth",title:"STAT CURVES",help:infoHelp("Each graph previews how this enemy stat changes as enemy level changes, using FF8's verified four-byte stat equation."),body:el("div",{class:"character-curve-grid"},...cards)});
+    return LexeditorUI.curveGrid(...cards);
   }
   function magicSearchControl(value,prompt,accept,origin){
     const magic=state.data.magic.rows.find(row=>Number(row.id)===Number(value))||{id:value,name:`Magic ${value}`};
     // The name is an ordinary hoverable and the magnifier is its own control,
     // so following the link and picking a different record stay separate.
-    const link=hoverable({class:"ff8-entity-search-name",content:magicLabel(magic),targetType:"magic",targetId:magic.id,targetLabel:magic.name,activate:()=>{state.selected.magic=Number(magic.id);navigate("magic")}});
-    const finder=el("button",{type:"button",class:"ff8-entity-search-button",title:"Choose magic","aria-label":"Choose magic",onclick:event=>{event.preventDefault();event.stopPropagation();beginSearcher({type:"magic",prompt,target:()=>navigate("magic"),origin,accept})}},searchIcon());
-    return el("span",{class:"ff8-entity-search"},link,finder);
+    const link=hoverable({content:magicLabel(magic),targetType:"magic",targetId:magic.id,targetLabel:magic.name,activate:()=>{state.selected.magic=Number(magic.id);navigate("magic")}});
+    const finder=el("button",{type:"button",title:"Choose magic","aria-label":"Choose magic",onclick:event=>{event.preventDefault();event.stopPropagation();beginSearcher({type:"magic",prompt,target:()=>navigate("magic"),origin,accept})}},searchIcon());
+    return LexeditorUI.choiceField(link,finder);
   }
   function enemyTableRow(dataset,id){return rowOf(dataset,"enemyTables",id)}
   function enemyAiRow(dataset,id){return rowOf(dataset,"enemyAi",id)}
@@ -189,9 +187,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       const quantity=numberControl(entry.quantity,0,255,1,value=>entry.quantity=Math.round(value),
         {'aria-label':`${title} ${tier} choice ${entry.slot+1} quantity`});
       quantity.addEventListener('blur',()=>quantity.value=String(entry.quantity));
-      return el('div',{class:'enemy-tier-entry','data-slot':entry.slot},value,
-        enemyTableSource(unitField(quantity,'×',{unitClass:'enemy-quantity-unit',boxed:false}),row,
-          value=>read(value)?.quantity,value=>entry.quantity=Number(value)));
+      return LexeditorUI.controlGroup([value,enemyTableSource(unitField(quantity,'×'),row,value=>read(value)?.quantity,value=>entry.quantity=Number(value))],{columns:1});
     };
     const table=columnList({
       rows:tiers.map(([tier,label])=>({key:tier,tier,label})),
@@ -209,31 +205,31 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
   }
   function enemyCardChoices(row){
     const choices=state.data.enemyTables.choices.cards;
-    return el('fieldset',{class:'enemy-card-choices',disabled:state.activeSource!=='mine'},...row.tables.cards.map(entry=>{
+    return LexeditorUI.tileGrid(row.tables.cards.map(entry=>{
       const id=Number(entry.cardId),card=rowOf(state.data,'cards',id)||choices.find(value=>Number(value.id)===id);
       const name=card?.name||`Card ${id}`,origin=()=>{state.selected.enemies=row.id;navigate('enemies')};
       const set=value=>{entry.cardId=Number(value);shell.refresh()};
       const placeholder=el('span',{class:'enemy-card-placeholder','aria-hidden':'true'},id===255?'—':'?');
-      const art=el('span',{class:'enemy-card-art'},placeholder);
+      const art=LexeditorUI.iconSlot({content:placeholder});
       if(id>=0&&id<110){
         const image=el('img',{src:`/assets/cards/${id}.png`,alt:name,
           onload:()=>{placeholder.hidden=true},onerror:()=>{image.remove();placeholder.textContent='Art unavailable'}});
         art.append(image);
       }
-      const choose=el('button',{type:'button',class:'enemy-card-finder',disabled:state.activeSource!=='mine',
+      const choose=el('button',{type:'button',disabled:state.activeSource!=='mine',
         'aria-label':`Choose card for slot ${entry.slot+1}: ${name}`,
         title:`Choose card for slot ${entry.slot+1}: ${name}`,onclick:()=>beginSearcher({type:'cards',
           prompt:`Select card ${entry.slot+1} for ${row.name}.`,target:()=>navigate('cards'),origin,accept:set})},
-        art,el('span',{class:'enemy-card-name'},el('span',{},name),searchIcon()));
+        LexeditorUI.figureGrid([{media:art,caption:LexeditorUI.inlineLabel(name,searchIcon())}]));
       // 255 is a real sentinel in the existing schema, not card zero. Keep it
       // selectable even though the Cards tab only contains the 110 real cards.
-      const clear=el('button',{type:'button',class:'enemy-card-clear',disabled:state.activeSource!=='mine'||id===255,
+      const clear=el('button',{type:'button',disabled:state.activeSource!=='mine'||id===255,
         title:'Set to Immune (stored card ID 255)','aria-label':`Clear card slot ${entry.slot+1}`,
         onclick:()=>{set(255);renderEnemies()}},'×');
-      const control=el('div',{class:'enemy-card-choice','data-slot':entry.slot},choose,clear);
+      const control=LexeditorUI.stack({fill:false},choose,LexeditorUI.actionRow(clear));control.dataset.slot=entry.slot;
       return enemyTableSource(control,row,value=>value?.tables.cards.find(value=>value.slot===entry.slot)?.cardId,
         set,value=>rowOf(state.data,'cards',Number(value))?.name||choiceName(choices,value));
-    }));
+    }),{minWidth:120});
   }
   function enemySimpleTables(row){
     const cards=enemyCardChoices(row),devourChoices=state.data.enemyTables.choices.devour||[];
@@ -266,8 +262,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     const help=infoHelp(element?
       'The stored byte is shown as 900 − 10 × byte. 100% is neutral; exactly 0% is immune. Negative values remain distinct and editable. Toggle an icon for full immunity; toggle again to restore the previous value.':
       'Status defence is the stored byte − 100 (−100% to 155%). 155% means immune. Toggle an icon for full immunity; toggle again to restore the previous value.');
-    const grid=el('fieldset',{class:`enemy-defence-grid ${element?'enemy-elements':'enemy-statuses'}`,disabled:state.activeSource!=='mine'},
-      ...row.tables[kind].map(entry=>{
+    const grid=LexeditorUI.tileGrid(row.tables[kind].map(entry=>{
         const name=element?names[entry.slot]:(state.data.enemyTables.choices.statuses||[]).find(value=>Number(value.id)===entry.slot)?.name||`Status ${entry.slot+1}`;
         const read=value=>value?.tables[kind]?.find(value=>value.slot===entry.slot)?.percent;
         const isImmune=()=>Number(entry.percent)===immune;
@@ -280,26 +275,21 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
           value:entry.percent,'aria-label':`${name} defence percent`,oninput:()=>{
             if(input.validity.valid&&input.value!==''){setPercent(input.value);shell.refresh()}
           },onchange:()=>{if(input.value!=='')setPercent(input.value);input.value=entry.percent;sync();shell.refresh()}});
-        const mark=el('span',{class:'enemy-immunity-label','aria-hidden':'true'},'IMMUNE');
         const checkbox=el('input',{type:'checkbox','aria-label':`${name} immune`,onchange:()=>{
           if(checkbox.checked){if(!isImmune())enemyDefencePrevious.set(entry,entry.percent);setPercent(immune)}
           else setPercent(enemyDefencePrevious.get(entry)??neutral);
           input.value=entry.percent;sync();input.dispatchEvent(new Event('change',{bubbles:true}));
         }});
         const icon=conceptIcon(element?'element':'status',aliases[name]||name);
-        // Some defence bytes (e.g. Haste/Unused) have no mapped native menu
-        // icon. Keep a named tile, never a blank or invented game sprite.
-        const fallback=el('span',{class:'enemy-status-fallback',hidden:!!icon,'aria-hidden':'true'},'▧');
-        if(icon)icon.addEventListener('error',()=>{icon.remove();fallback.hidden=false},{once:true});
-        const toggle=el('label',{class:'ff8-icon-toggle enemy-defence-toggle',title:`${name}: toggle immunity`},
-          checkbox,icon,fallback,mark);
-        const tile=el('div',{class:'enemy-defence-tile','data-defence':name},toggle,
-          el('span',{class:'enemy-defence-name'},name),enemyTableSource(unitField(input,'%'),row,read,setPercent,value=>`${value}%`));
+        if(icon)icon.addEventListener('error',()=>icon.remove(),{once:true});
+        const tile=detailSection({title:LexeditorUI.inlineLabel(icon,name),attrs:{'data-defence':name},body:[
+          LexeditorUI.toggleRow({toggles:[{label:'Immune',control:checkbox}]}),
+          detailField({label:'Defence',control:enemyTableSource(unitField(input,'%'),row,read,setPercent,value=>`${value}%`)})]});
         const sync=()=>{const checked=isImmune();checkbox.checked=checked;checkbox.disabled=state.activeSource!=='mine';
-          input.disabled=checked||state.activeSource!=='mine';tile.classList.toggle('immune',checked);mark.hidden=!checked};
+          input.disabled=checked||state.activeSource!=='mine';tile.classList.toggle('immune',checked)};
         sync();return tile;
-      }));
-    return detailSection({className:'enemy-table-section enemy-defence-section',title,help,body:grid});
+      }),{minWidth:190});
+    return detailSection({title,help,body:grid});
   }
   const enemyScanElementNames=['Fire','Ice','Thunder','Earth','Poison','Wind','Water','Holy'];
   function enemyGeneratedScanDetails(row){
@@ -314,10 +304,10 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
   function enemyScanWithDetails(description,details){const text=String(description??''),marker='{NewPage}DETAILS',index=text.indexOf(marker),base=(index>=0?text.slice(0,index):text).replace(/\s+$/,'');return `${base}${base?'{NewPage}':''}${details}`}
   function applyEnemyScanDetails(row){row.scanDescription=enemyScanWithDetails(row.scanDescription,enemyGeneratedScanDetails(row))}
   function enemyScanSection(row,prefs){
-    const input=el("textarea",{rows:6,"aria-label":`Scan description for ${row.name}`,oninput:event=>{row.scanDescription=event.target.value;shell.refresh()}});input.value=row.scanDescription??"";
+    const input=LexeditorUI.textArea({rows:6,"aria-label":`Scan description for ${row.name}`,oninput:event=>{row.scanDescription=event.target.value;shell.refresh()}});input.value=row.scanDescription??"";
     const details=enemyGeneratedScanDetails(row),apply=el('button',{type:'button',class:'secondary-action',disabled:state.activeSource!=='mine',onclick:()=>{applyEnemyScanDetails(row);renderEnemies();shell.refresh()}},'UPDATE DETAILS');
     const applyAll=el('button',{type:'button',class:'secondary-action',disabled:state.activeSource!=='mine',onclick:()=>{for(const enemy of state.data.enemies.rows)if(enemy.available)applyEnemyScanDetails(enemy);renderEnemies();shell.refresh()}},'UPDATE ALL');
-    return detailSection({className:"enemy-scan-section",title:"SCAN",body:[detailField({label:"DESCRIPTION",control:sourceControl(input,()=>row.scanDescription,rowOf(state.vanilla,"enemies",row.id)?.scanDescription,referenceValues("enemies",row.id,value=>value?.scanDescription),value=>row.scanDescription=String(value??"")),pin:prefs?.pinButton("scanDescription","Scan description")}),el('div',{class:'enemy-scan-details-actions'},apply,applyAll),el('pre',{class:'enemy-scan-details-preview'},details)]})
+    return detailSection({className:"enemy-scan-section",title:"SCAN",body:[detailField({label:"DESCRIPTION",control:sourceControl(input,()=>row.scanDescription,rowOf(state.vanilla,"enemies",row.id)?.scanDescription,referenceValues("enemies",row.id,value=>value?.scanDescription),value=>row.scanDescription=String(value??"")),pin:prefs?.pinButton("scanDescription","Scan description")}),LexeditorUI.actionRow(apply,applyAll),LexeditorUI.detailNote(details)]})
   }
   function enemyPropertyLabel(field){const labels={"Medium level starts":"MED LV","High level starts":"HIGH LV","Auto-Reflect":"REFLECT","Auto-Shell":"SHELL","Auto-Protect":"PROTECT","Surprise immunity":"NO SURPRISE","Diablos misses":"NO DIABLOS","Always yields a card":"ALWAYS CARD","Extra XP":"EXTRA XP","Mug rate":"MUG %","Drop rate":"DROP %"};return labels[field.label]||field.label}
   // Each enemy flag is its own field in the data, but on screen they are one
@@ -335,12 +325,12 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
   }
   function enemyProperties(fields,rowId,prefs){
     const numeric=fields.filter(field=>field.control!=='boolean'),flags=fields.filter(field=>field.control==='boolean');
-    const property=field=>el('div',{class:'enemy-property'},
-      el('span',{class:'enemy-property-name',title:field.label},enemyPropertyLabel(field),field.help?infoHelp(field.help):null,
-        prefs?.pinButton(`field:${field.field}`,field.label)),fieldSourceControl(field,'enemies',rowId,{internal:true}));
-    return detailSection({className:'enemy-properties-section',title:'PROPERTIES',body:el('fieldset',{class:'enemy-properties-compact',disabled:state.activeSource!=='mine'},
-      el('div',{class:'enemy-properties-row enemy-properties-numeric',style:`--enemy-property-count:${Math.max(1,numeric.length)}`},...numeric.map(property)),
-      flags.length?enemyFlagsField(flags,rowId,prefs):null)});
+    const result=detailSection({title:'PROPERTIES',body:[
+      LexeditorUI.tileGrid(numeric.map(field=>detailField({label:enemyPropertyLabel(field),help:field.help?infoHelp(field.help):null,
+        pin:prefs?.pinButton(`field:${field.field}`,field.label),control:fieldSourceControl(field,'enemies',rowId,{internal:true})})),{minWidth:280}),
+      flags.length?enemyFlagsField(flags,rowId,prefs):null]});
+    if(state.activeSource!=='mine')result.querySelectorAll('input,select,button').forEach(control=>control.disabled=true);
+    return result;
   }
   function enemyAiCatalog(){return state.data.enemyAi.opcodes||[]}
   function enemyAiMnemonic(name){return String(name).toLocaleUpperCase().replace(/[^A-Z0-9]+/g,"_").replace(/^_+|_+$/g,"")}
@@ -352,13 +342,103 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
   function enemyAiDelete(script,index){const removed=script.instructions[index],replacement=script.instructions[index+1]?.key||script.instructions[index-1]?.key||"end";script.instructions.splice(index,1);for(const instruction of script.instructions)if(instruction.targetKey===removed.key)instruction.targetKey=replacement;enemyAiSyncSource(script);renderEnemies();shell.refresh()}
   function enemyAiMove(script,index,direction){const target=index+direction;if(target<0||target>=script.instructions.length)return;const [instruction]=script.instructions.splice(index,1);script.instructions.splice(target,0,instruction);enemyAiSyncSource(script);renderEnemies();shell.refresh()}
   function enemyAiOperandControl(operand,update){if(operand.control==="boolean")return el("input",{type:"checkbox",checked:Boolean(operand.value),"aria-label":operand.type,onchange:event=>update(event.target.checked?1:0)});if(operand.control==="enum")return selectControl(operand.value,operand.choices,value=>update(Number(value)));return numberControl(operand.value,operand.minimum,operand.maximum,1,value=>update(Number(value)),{"aria-label":operand.type})}
-  function enemyAiOperand(row,script,instruction,operand){if(["jump16","skip16"].includes(operand.type)){const targets=script.instructions.filter(value=>operand.type!=="skip16"||value.offset>=instruction.offset+instruction.size),chosen=targets.find(value=>value.key===instruction.targetKey),control=lazyOptions(el("select",{"aria-label":`${operand.type} target`,onchange:event=>{instruction.targetKey=event.target.value;enemyAiSyncSource(script);renderEnemies();shell.refresh()}},chosen?el("option",{value:chosen.key},chosen.label):el("option",{value:"end"},"END")),()=>[...targets.map(value=>({value:value.key,label:value.label})),{value:"end",label:"END"}]);return el("label",{class:"enemy-ai-operand",title:`${operand.type} target`},el("small",{},"TARGET"),autoFitControlText(control))}const find=dataset=>{const other=enemyAiRow(dataset,row.id)?.scripts?.find(value=>value.id===script.id)?.instructions?.find(value=>value.key===instruction.key||value.offset===instruction.offset);return other?.operands?.find(value=>value.index===operand.index)?.value},references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:find(state.referenceData[reference.id])})).filter(value=>value.value!==undefined),update=value=>{operand.value=value;enemyAiSyncSource(script);shell.refresh()};return el("label",{class:"enemy-ai-operand",title:`${operand.type} operand ${operand.index+1}`},el("small",{},operand.type.toLocaleUpperCase()),sourceControl(enemyAiOperandControl(operand,update),()=>operand.value,find(state.vanilla),references,update))}
+  function enemyAiOperand(row,script,instruction,operand){
+    if(["jump16","skip16"].includes(operand.type)){
+      const targets=script.instructions.filter(value=>operand.type!=="skip16"||value.offset>=instruction.offset+instruction.size);
+      const chosen=targets.find(value=>value.key===instruction.targetKey);
+      const control=lazyOptions(el("select",{"aria-label":`${operand.type} target`,onchange:event=>{instruction.targetKey=event.target.value;enemyAiSyncSource(script);renderEnemies();shell.refresh()}},chosen?el("option",{value:chosen.key},chosen.label):el("option",{value:"end"},"END")),()=>[...targets.map(value=>({value:value.key,label:value.label})),{value:"end",label:"END"}]);
+      return el('label',{class:'lex-instruction-operand'},operand.type==='skip16'?'Otherwise':'Target',control);
+    }
+    const find=dataset=>{const other=enemyAiRow(dataset,row.id)?.scripts?.find(value=>value.id===script.id)?.instructions?.find(value=>value.key===instruction.key||value.offset===instruction.offset);return other?.operands?.find(value=>value.index===operand.index)?.value};
+    const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:find(state.referenceData[reference.id])})).filter(value=>value.value!==undefined);
+    const update=value=>{operand.value=value;enemyAiSyncSource(script);shell.refresh();if(operand.type==='subject')renderEnemies()};
+    const labels={subject:'Test',subject_param:'Parameter',comparator:'Compare',value16:'Value',battle_var:'Variable',local_var:'Variable',global_var:'Variable',u8:'Value',ability_line:'Action',target:'Target'};
+    return el('label',{class:'lex-instruction-operand'},labels[operand.type]||operand.type.replaceAll('_',' '),sourceControl(enemyAiOperandControl(operand,update),()=>operand.value,find(state.vanilla),references,update,undefined,{internal:true}));
+  }
   function enemyAiOpcodeControl(script,instruction,choices){const control=selectControl(instruction.opcode,choices,value=>enemyAiChangeOpcode(script,instruction,value));control.classList.add("enemy-ai-opcode");control.setAttribute("aria-label",`Opcode at ${instruction.label}`);return control}
-  function enemyAiScript(row,script){enemyAiNormalizeScript(script);const opcodeChoices=enemyAiCatalog().map(value=>({id:value.opcode,name:`${value.opcode} · ${value.name}`})),instructions=el("div",{class:"enemy-ai-instructions"},...script.instructions.map((instruction,index)=>el("div",{class:"enemy-ai-instruction","data-offset":instruction.offset},el("span",{class:"enemy-ai-instruction-label"},instruction.label),enemyAiOpcodeControl(script,instruction,opcodeChoices),el("div",{class:"enemy-ai-actions"},el("button",{type:"button",class:"enemy-ai-action",title:"Move instruction up",disabled:index===0,onclick:()=>enemyAiMove(script,index,-1)},"↑"),el("button",{type:"button",class:"enemy-ai-action",title:"Move instruction down",disabled:index===script.instructions.length-1,onclick:()=>enemyAiMove(script,index,1)},"↓"),el("button",{type:"button",class:"enemy-ai-action",title:"Insert instruction after",onclick:()=>enemyAiInsert(script,index)},"+"),el("button",{type:"button",class:"enemy-ai-action",title:"Delete instruction",onclick:()=>enemyAiDelete(script,index)},"−")),instruction.editable?el("div",{class:"enemy-ai-operands"},...instruction.operands.map(operand=>enemyAiOperand(row,script,instruction,operand))):el("span",{class:"enemy-ai-operands readonly-note"},"Preserved; unsupported"),el("code",{class:"enemy-ai-raw",title:instruction.raw},instruction.raw),instruction.targetLabel?el("span",{class:`enemy-ai-branch${instruction.targetValid?"":" invalid"}`},`→ ${instruction.targetLabel}`):null)));return detailSection({className:"enemy-ai-script",title:script.name.toLocaleUpperCase(),body:instructions})}
+  function enemyAiDescription(row,instruction,script){
+    const values=instruction.operands.map(operand=>operand.choices?.find(choice=>Number(choice.id)===Number(operand.value))?.name??operand.value);
+    const targetInstruction=script?.instructions.find(value=>value.key===instruction.targetKey);
+    const target=instruction.targetLabel==='END'?'the end of this script':targetInstruction?`step ${targetInstruction.index+1}`:instruction.targetLabel;
+    const ability=line=>{
+      const table=enemyTableRow(state.data,row.id),choices=state.data.enemyTables?.choices;
+      return ['low','medium','high'].map(tier=>{
+        const entry=table?.tables.abilities[tier]?.find(value=>value.slot===Number(line));
+        if(!entry)return `${tier}: special action ${line}`;
+        const list=entry.type===2?state.data.magic?.rows:entry.type===4?state.data.items?.rows:choices?.enemyAbilities;
+        return `${tier}: ${list?.find(value=>Number(value.id)===entry.abilityId)?.name||`ability ${entry.abilityId}`}`;
+      }).join('; ');
+    };
+    if(!instruction.editable)return 'Unknown instruction bytes are preserved. This part cannot be edited.';
+    switch(Number(instruction.opcode)){
+      case 0:return 'Stop this script.';
+      case 2:{const subject=Number(instruction.operands[0].value),constant=(subject>=80&&subject<=87)||(subject>=96&&subject<=103);return `If ${values[0]}${constant?'':` (parameter ${values[1]})`} ${values[2]} ${values[3]}, run the next step. Otherwise go to ${target}.`;}
+      case 4:return `Target ${values[0]}.`;
+      case 11:return `Choose one action at random: ${values.map(ability).join(' / ')}.`;
+      case 12:return `Use action ${values[0]} (${ability(values[0])}).`;
+      case 14:case 15:case 17:return `Set ${instruction.operands[0].type.replace('_var','')} variable ${values[0]} to ${values[1]}.`;
+      case 18:case 19:case 21:return `Add ${values[1]} to ${instruction.operands[0].type.replace('_var','')} variable ${values[0]}.`;
+      case 35:return Number(instruction.operands[0]?.value)===0?'Continue with the next instruction.':`Go to ${target}.`;
+      case 1:case 24:case 26:{const text=enemyBattleTextRow(state.data,row.id)?.lines?.find(line=>line.id===Number(values[0]))?.text;return `${instruction.name}: ${text||`battle text ${values[0]}`}.`;}
+      default:return `${instruction.name}${values.length?': '+instruction.operands.map((operand,index)=>`${operand.type.replaceAll('_',' ')} ${values[index]}`).join(', '):''}.`;
+    }
+  }
+  function enemyAiScript(row,script){
+    enemyAiNormalizeScript(script);
+    const pageKey=`${row.id}:${script.id}`;
+    state.enemyAiPages??={};
+    state.enemyAiPageSizes??={};
+    const opcodeChoices=enemyAiCatalog().map(value=>({id:value.opcode,name:value.name}));
+    return LexeditorUI.instructionList({rows:script.instructions,page:state.enemyAiPages[pageKey]||0,pageSize:state.enemyAiPageSizes[pageKey],
+      editable:state.activeSource==='mine',changePage:(value,size)=>{state.enemyAiPages[pageKey]=value;state.enemyAiPageSizes[pageKey]=size},
+      controls:instruction=>{
+        const controls=el('div',{class:'lex-instruction-controls'},enemyAiOpcodeControl(script,instruction,opcodeChoices),
+          ...instruction.operands.filter(operand=>{
+            const subject=Number(instruction.operands[0]?.value);
+            return !(instruction.opcode===2&&operand.type==='subject_param'&&operand.value===200&&((subject>=80&&subject<=87)||(subject>=96&&subject<=103)));
+          }).map(operand=>enemyAiOperand(row,script,instruction,operand)));
+        if(state.activeSource!=='mine'||!instruction.editable)controls.querySelectorAll('input,select,button').forEach(control=>control.disabled=true);
+        return controls;
+      },describe:instruction=>enemyAiDescription(row,instruction,script),
+      move:(from,to)=>enemyAiMove(script,from,to-from),
+      insert:index=>enemyAiInsert(script,index),remove:index=>enemyAiDelete(script,index)});
+  }
   function enemyAiSourceReference(dataset,row,scriptId){return enemyAiRow(dataset,row.id)?.scripts?.find(value=>value.id===scriptId)?.source}
-  function enemyAiSourceScript(row,script){const input=el("textarea",{class:"enemy-ai-source-editor",spellcheck:"false",wrap:"off","aria-label":`${script.name} enemy AI source`,oninput:event=>{script.source=event.target.value;shell.refresh()}});input.value=script.source??"";const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:enemyAiSourceReference(state.referenceData[reference.id],row,script.id)})).filter(value=>value.value!==undefined),summary=value=>`${String(value??"").split(/\r?\n/).filter(Boolean).length} lines`;return detailSection({className:"enemy-ai-source-script",title:script.name.toLocaleUpperCase(),body:sourceControl(input,()=>script.source,enemyAiSourceReference(state.vanilla,row,script.id),references,value=>{script.source=String(value??"");shell.refresh()},summary)})}
-  async function enemyAiApplySource(row){const document=enemyAiRow(state.data,row.id);try{const result=await api("/api/enemy-ai/source/compile",post({sources:document.scripts.map(script=>({id:script.id,source:script.source}))}));document.scripts=result.scripts;for(const [index,script] of document.scripts.entries()){script.source=result.sources[index];enemyAiNormalizeScript(script)}setStatus(`Compiled ${row.name} AI source`);renderEnemies();shell.refresh()}catch(error){setStatus("AI source has an error");showAlert({title:"AI source has an error",message:error.message||String(error)})}}
-  function enemyAiPanel(row,table){const ai=enemyAiRow(state.data,row.id),tabs=subtabBar({className:"enemy-ai-view-tabs",tabs:[{id:"structure",label:"Structure"},{id:"source",label:"Source"}],active:state.enemyAiView,label:"Enemy AI editor view",change:value=>{state.enemyAiView=value;renderEnemies()}}),boundary=el("p",{class:"enemy-ai-boundary"},state.enemyAiView==="source"?"Source uses stable labels, exact opcode names, and typed operands. Branch operands name a label. Apply Source validates it and updates the structural view; Save also compiles it through the same fail-closed DAT compiler.":"The five conditional scripts below are decoded and rebuilt with the proved FF8 opcode table. You can replace, insert, delete, and reorder instructions. Branches target instruction labels and are recalculated when the script changes. Unsupported raw tails remain fail-closed.");if(!ai?.available)return el("div",{class:"enemy-ai-content"},tabs,el("p",{class:"readonly-note"},"This enemy has no battle-script section."));if(state.enemyAiView==="source")return el("div",{class:"enemy-ai-content"},tabs,boundary,el("div",{class:"enemy-ai-source-actions"},el("button",{type:"button",class:"enemy-ai-source-apply",onclick:()=>enemyAiApplySource(row)},"Apply Source")),...ai.scripts.map(script=>enemyAiSourceScript(row,script)));const scripts=ai.scripts.map(script=>enemyAiScript(row,script)),actions=table?[detailSection({className:"enemy-action-definitions",title:"ACTION DEFINITIONS",help:infoHelp("These are the fixed low, medium, and high-level action lists referenced by AI commands. They are data tables, not the conditional AI program."),body:["low","medium","high"].map(tier=>enemyAbilitiesSection(table,tier))})]:el("p",{class:"readonly-note"},"No structured action definitions are available for this enemy.");return el("div",{class:"enemy-ai-content"},tabs,boundary,...scripts,actions)}
-  function enemyBattleTextPanel(row,prefs){const scan=enemyScanSection(row,prefs);const document=enemyBattleTextRow(state.data,row.id),help=message=>el("h3",{class:"enemy-battle-text-help"},"BATTLE TEXT ",infoHelp(message));if(!document?.available)return el("div",{class:"enemy-battle-text-content"},scan,help("This enemy has no battle-script section."));if(!document.lines.length)return el("div",{class:"enemy-battle-text-content"},scan,help("This enemy has no local battle dialogue."));const vanilla=enemyBattleTextRow(state.vanilla,row.id),referenceLine=(dataset,id)=>enemyBattleTextRow(dataset,row.id)?.lines?.find(value=>value.id===id)?.text;return el("div",{class:"enemy-battle-text-content"},scan,help("These lines are used by this enemy during battle. Each line number matches a Show Text instruction in the AI view."),...document.lines.map(line=>{const input=el("textarea",{rows:4,maxlength:400,"aria-label":`Battle text line ${line.id} for ${row.name}`,oninput:event=>{line.text=event.target.value;shell.refresh()}});input.value=line.text;const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:referenceLine(state.referenceData[reference.id],line.id)})).filter(value=>value.value!==undefined);return detailSection({className:"enemy-battle-text-line",title:`LINE ${line.id}`,body:sourceControl(input,()=>line.text,vanilla?.lines?.find(value=>value.id===line.id)?.text,references,value=>line.text=String(value??""))})}))}
-  function enemyDetail(row,prefs){const table=enemyTableRow(state.data,row.id),body=[];if(row.available){const other=row.fields.filter(field=>field.group!=="Stat curves");body.push(enemyProperties(other,row.id,prefs))}else body.push(el("p",{class:"readonly-note"},"This enemy file is not available in the extracted game data."));if(table)body.push(enemyPairSection(table,"draw","DRAW","Magic"),enemyPairSection(table,"mug","MUG","Item"),enemyPairSection(table,"drops","DROPS","Item"),...enemySimpleTables(table),enemyDefenceSection(table,"elementDefence","ELEMENT DEFENCE"),enemyDefenceSection(table,"statusDefence","STATUS DEFENCE"));const detail=sharedDetail({...row,name:enemyDisplayName(row.name)},prefs,body,"enemy-detail");return detail}
-  function enemyLeadingPanel(row,prefs){const table=enemyTableRow(state.data,row.id);const tabs=[{id:"stats",label:"Stats"},{id:"ai",label:"AI"},{id:"battleText",label:"Battle Text"}],content=state.enemyPanelTab==="ai"?enemyAiPanel(row,table):state.enemyPanelTab==="battleText"?enemyBattleTextPanel(row,prefs||state.columnPrefs.enemies):row.available?enemyStatGrowth(row.fields.filter(field=>field.group==="Stat curves"),row.id):el("p",{class:"readonly-note"},"Enemy data unavailable"),tabbed=tabbedPanel({className:"enemy-tabbed-column",contentClassName:state.enemyPanelTab==="stats"?"enemy-curve-column":"",tabs,active:state.enemyPanelTab,label:`${row.name} enemy views`,change:value=>{state.enemyPanelTab=value;renderEnemies();shell.refresh()},content});return tabbed}
+  function enemyAiSourceScript(row,script){const input=LexeditorUI.codeField({rows:12,wrap:"off","aria-label":`${script.name} enemy AI source`,oninput:event=>{script.source=event.target.value;shell.refresh()}});input.value=script.source??"";input.readOnly=state.activeSource!=="mine";const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:enemyAiSourceReference(state.referenceData[reference.id],row,script.id)})).filter(value=>value.value!==undefined),summary=value=>`${String(value??"").split(/\r?\n/).filter(Boolean).length} lines`;return sourceControl(input,()=>script.source,enemyAiSourceReference(state.vanilla,row,script.id),references,value=>{script.source=String(value??"");shell.refresh()},summary)}
+  async function enemyAiApplySource(row){const document=enemyAiRow(state.data,row.id);try{const result=await api("/api/enemy-ai/source/compile",post({sources:document.scripts.map(script=>({id:script.id,source:script.source}))}));document.scripts=result.scripts;for(const [index,script] of document.scripts.entries()){script.source=result.sources[index];enemyAiNormalizeScript(script)}setStatus(`Compiled ${row.name} AI source`);renderEnemies();shell.refresh();return true}catch(error){setStatus("AI source has an error");showAlert({title:"AI source has an error",message:error.message||String(error)});return false}}
+  function enemyAiPanel(row){
+    const ai=enemyAiRow(state.data,row.id);
+    if(!ai?.available)return LexeditorUI.detailNote('This enemy has no battle-script section.');
+    state.enemyAiScriptTab??=ai.scripts[0]?.id;
+    const script=ai.scripts.find(value=>value.id===state.enemyAiScriptTab)||ai.scripts[0];
+    const raw=state.enemyAiView==='source';
+    const switchMode=async id=>{
+      if(raw && state.activeSource==='mine' && !(await enemyAiApplySource(row)))return;
+      state.enemyAiScriptTab=id;state.enemyAiView=raw?'structure':'source';renderEnemies();
+    };
+    const help='Right-click a script tab to switch between friendly rows and raw code. Drag a row by its left handle to reorder it; Alt+Up or Alt+Down also moves a focused handle. Branches follow their target instruction. Unknown bytes remain read-only. Raw edits are checked before returning to rows or saving.';
+    const tabs=ai.scripts.map(value=>({id:value.id,label:value.name,help,
+      attrs:{'aria-label':value.name,'aria-description':raw?'Raw code view':'Friendly view',oncontextmenu:event=>{event.preventDefault();switchMode(value.id)}}}));
+    const content=raw?LexeditorUI.pagedPane(enemyAiSourceScript(row,script),
+      LexeditorUI.actionRow(el('button',{type:'button',disabled:state.activeSource!=='mine',onclick:()=>enemyAiApplySource(row)},'Apply code'))):enemyAiScript(row,script);
+    return tabbedPanel({tabs,active:script.id,label:'Enemy AI scripts',change:id=>{state.enemyAiScriptTab=id;renderEnemies()},content});
+  }
+  function enemyBattleTextPanel(row,prefs){const scan=enemyScanSection(row,prefs);const document=enemyBattleTextRow(state.data,row.id),help=message=>LexeditorUI.detailNote(message);if(!document?.available)return LexeditorUI.stack({fill:false},scan,help("This enemy has no battle-script section."));if(!document.lines.length)return LexeditorUI.stack({fill:false},scan,help("This enemy has no local battle dialogue."));const vanilla=enemyBattleTextRow(state.vanilla,row.id),referenceLine=(dataset,id)=>enemyBattleTextRow(dataset,row.id)?.lines?.find(value=>value.id===id)?.text;return LexeditorUI.stack({fill:false},scan,help("These lines are used by this enemy during battle. Each line number matches a Show Text instruction in the AI view."),...document.lines.map(line=>{const input=LexeditorUI.textArea({rows:4,maxlength:400,"aria-label":`Battle text line ${line.id} for ${row.name}`,oninput:event=>{line.text=event.target.value;shell.refresh()}});input.value=line.text;const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:referenceLine(state.referenceData[reference.id],line.id)})).filter(value=>value.value!==undefined);return detailSection({className:"enemy-battle-text-line",title:`LINE ${line.id}`,body:sourceControl(input,()=>line.text,vanilla?.lines?.find(value=>value.id===line.id)?.text,references,value=>line.text=String(value??""))})}))}
+  function enemyDetail(row,prefs){
+    const table=enemyTableRow(state.data,row.id),tab=state.enemyDetailTab||'properties';
+    const tabs=[{id:'properties',label:'Properties'},{id:'loot',label:'Loot'},
+      {id:'renzokuken',label:'Renzokuken'},{id:'defense',label:'Defense'},
+      {id:'text',label:'Text'},{id:'stats',label:'Stats',help:'Edit the coefficients to change how this enemy grows with its level.'}];
+    let body=[];
+    if(tab==='properties'){
+      body=[enemyProperties(row.fields.filter(field=>field.group!=='Stat curves'),row.id,prefs)];
+      if(table)body.push(detailSection({title:'Actions',help:infoHelp('The AI uses these action slots. Each level tier can use a different ability in the same slot.'),body:['low','medium','high'].map(tier=>enemyAbilitiesSection(table,tier))}));
+    }else if(tab==='loot'&&table)body=[enemyPairSection(table,'mug','MUG','Item'),enemyPairSection(table,'draw','DRAW','Magic'),enemyPairSection(table,'drops','DROPS','Item'),...enemySimpleTables(table).slice(0,2)];
+    else if(tab==='renzokuken'&&table)body=enemySimpleTables(table).slice(2);
+    else if(tab==='defense'&&table)body=[enemyDefenceSection(table,'elementDefence','ELEMENT'),enemyDefenceSection(table,'statusDefence','STATUS')];
+    else if(tab==='text')body=[enemyBattleTextPanel(row,prefs)];
+    else if(tab==='stats')body=[enemyStatGrowth(row.fields.filter(field=>field.group==='Stat curves'),row.id)];
+    const panel=tabbedPanel({tabs,active:tab,label:'Enemy details',change:value=>{state.enemyDetailTab=value;renderEnemies()},content:body});
+    return sharedDetail({...row,name:enemyDisplayName(row.name)},prefs,[panel],'enemy-detail');
+  }
+  function enemyLeadingPanel(row){return enemyAiPanel(row)}

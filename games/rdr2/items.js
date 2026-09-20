@@ -59,17 +59,6 @@ function itemSectionMatches(it,section){
   return !section||section==="all"||itemSectionOf(it)===section;
 }
 
-let itemIdentityIconObserver=null;
-function sizeItemIdentityIcon(identity,main){
-  itemIdentityIconObserver?.disconnect();
-  const sync=()=>{
-    const size=Math.max(48,Math.min(96,main.getBoundingClientRect().height));
-    identity.style.setProperty("--item-icon-size",`${size}px`);
-  };
-  itemIdentityIconObserver=new ResizeObserver(sync);
-  itemIdentityIconObserver.observe(main);
-  requestAnimationFrame(sync);
-}
 
 function renderItems() {
   if (!state.catalog) return noData(`This dataset has no catalog_sp.ymt yet (${dsInfo().dir}).`);
@@ -79,7 +68,7 @@ function renderItems() {
   const groups = [...new Set(state.catalog.items.map(i => i.group))].sort();
   if(!ITEM_SECTIONS.some(s=>s.id===f.itemSection))f.itemSection="all";
   const tb = $("#toolbar"); tb.innerHTML = "";
-  const filters=el("div",{class:"item-toolbar-filters"},
+  const filters=LexeditorUI.actionRow(
     el("select", { "aria-label":"Filter items by category", onchange: ev => {
       f.category = ev.target.value;
       f.itemPage=0;
@@ -92,12 +81,10 @@ function renderItems() {
       ...groups.map(g => { const o = el("option", { value: g }, g || "(none)"); if (g === f.group) o.selected = true; return o; })),
     el("select", { "aria-label":"Filter items by source state", title:"Filter by acquisition evidence", onchange: ev => { f.itemSource=ev.target.value;f.itemPage=0;renderItems(); } },
       ...[["all","All source states"],["confirmed","Confirmed acquisition"],["candidate","Candidate only"],["unknown","No known source"],["model","Has model"],["no-name","No localization"]].map(([value,label])=>{const o=el("option",{value},label);if(value===f.itemSource)o.selected=true;return o;})));
-  const metadata=el("div",{class:"item-toolbar-meta toolbar-context-slot"},savebar(saveCatalog));
+  const metadata=LexeditorUI.actionRow(savebar(saveCatalog));
   const addItem=isRO()?el("span"):newButton({title:"Create new item",onclick:createNewItem});
-  tb.append(el("div",{class:"subtabs item-subtabs"},...ITEM_SECTIONS.map(section=>el("button",{
-      class:f.itemSection===section.id?"active":"",
-      onclick:()=>{f.itemSection=section.id;f.itemPage=0;renderItems();}
-    },section.label))));
+  tb.append(LexeditorUI.subtabBar({tabs:ITEM_SECTIONS,active:f.itemSection,
+    change:id=>{f.itemSection=id;f.itemPage=0;renderItems();}}));
 
   const q = f.q.trim().toUpperCase();
   let rows = state.catalog.items.filter(it =>
@@ -116,19 +103,15 @@ function renderItems() {
     splitKey:"rdr2-items",defaultSplit:44,
     search:{key:"rdr2-items",value:f.q,placeholder:"Search items… (e.g. TONIC, PROVISION_)",label:"Search items",change:value=>{f.q=value;f.itemPage=0;renderItems();}},
     filters:[addItem,metadata,filters],
-    className:"lootsplit",fit:{rowSelector:".loot-item",headerSelector:".loot-listhead"},
-    list:{selectedClass:"sel",class:"loot-list list-4col",
-    header:el("div",{class:"loot-listhead"},el("span",{},"Name / Item"),el("span",{},"ID"),el("span",{},"Group"),el("span",{},"Category")),
-    rowClass:"loot-item",render:it=>{
-      const name=localizedValue(it.nameKey);
-      return [
-      el("span",{class:"item-list-name",title:name||"No localized name"},originDisplayName(name||"—",it)),
-      el("span",{class:"item-list-id",title:it.key},it.key),
-      el("span",{class:"item-list-group",title:it.group||"No group"},it.group||"—"),
-      el("span",{class:"item-list-category",title:it.category},it.category.replace("CI_CATEGORY_",""))];
-    }},
+    className:"lootsplit",
+    master:({rows,selected,select})=>columnList({rows,key:it=>it.key,selected,select,
+      columns:[
+        {key:"name",label:"Name / Item",grow:2,render:it=>originDisplayName(localizedValue(it.nameKey).trim()||it.key,it)},
+        {key:"key",label:"ID",grow:2},
+        {key:"group",label:"Group",grow:1},
+        {key:"category",label:"Category",grow:1,render:it=>it.category.replace("CI_CATEGORY_","")}]}),
     detail:it=>itemRow(it),
-    emptyDetail:()=>el("div",{class:"loot-detail-pane lex-detail"},el("div",{class:"loading"},"No items match.")),
+    emptyDetail:()=>LexeditorUI.stack({fill:false},LexeditorUI.stack({fill:false,className:"lex-notice"},"No items match.")),
     sync:next=>{f.itemPage=next.page;f.itemPageSize=next.pageSize;f.itemSel=next.selected||"";},
     change:next=>{f.itemPage=next.page;f.itemPageSize=next.pageSize;f.itemSel=next.selected||"";renderItems();}
   });
@@ -156,12 +139,7 @@ async function createNewItem(){
 }
 
 // "!" badge inside the first price input of a cell (right-aligned, hover text)
-function addInputWarn(container, text) {
-  const m = container.querySelector(".money");
-  if (!m) return;
-  m.classList.add("has-warn");
-  m.append(el("span", { class: "input-warn", title: text }, "!"));
-}
+function addInputWarn(container,text){container.append(fieldHelp(text));}
 
 function priceInput(it, section, cost, part) {
   const editKey = [it.key, section, cost.key, part.item].join("|");
@@ -175,17 +153,17 @@ function priceInput(it, section, cost, part) {
       ev.target.classList.toggle("edited", editKey in state.priceEdits);
       renderToolbarOnly();
     } });
-  return el("span", { class: "money" }, inp);
+  return LexeditorUI.unitField(inp,"$");
 }
 
 function sellPriceCell(it,sellCash,sellRef){
   const edited=state.sellabilityEdits[it.key],sellable=edited?edited.sellable:sellCash.length>0;
-  const cell=el("div",{class:"price-cell"}),controls=el("div",{class:"price-controls"});
+  const cell=LexeditorUI.stack({fill:false,className:"price-cell"}),controls=LexeditorUI.actionRow();
   if(sellable){
     const rows=sellCash.length?sellCash:[[null,{qty:edited?.cents??100,item:"CURRENCY_CASH"}]];
-    for(const [c,p] of rows) controls.append(c?priceInput(it,"sell",c,p):el("span",{class:"money"},el("input",{type:"number",step:"0.01",min:"0",value:fmtMoney(p.qty),onchange:e=>{state.sellabilityEdits[it.key]={sellable:true,cents:Math.round((+e.target.value||0)*100)};renderToolbarOnly();}})));
-    controls.append(el("button",{class:"icon-link",title:"Open Shops filtered to this item's resale information",onclick:()=>goToItemShops(it,"sell")},"⌕"));
-    controls.append(!isRO()?el("button",{class:"icon-link",title:"Make unsellable",onclick:()=>{state.sellabilityEdits[it.key]={sellable:false};render();}},"×"):el("span"));
+    for(const [c,p] of rows) controls.append(c?priceInput(it,"sell",c,p):LexeditorUI.inlineLabel("$",el("input",{type:"number",step:"0.01",min:"0",value:fmtMoney(p.qty),onchange:e=>{state.sellabilityEdits[it.key]={sellable:true,cents:Math.round((+e.target.value||0)*100)};renderToolbarOnly();}})));
+    controls.append(el("button",{class:"lex-ui-symbol icon-link",title:"Open Shops filtered to this item's resale information",onclick:()=>goToItemShops(it,"sell")},"⌕"));
+    controls.append(!isRO()?el("button",{class:"lex-ui-symbol icon-link",title:"Make unsellable",onclick:()=>{state.sellabilityEdits[it.key]={sellable:false};render();}},"×"):el("span"));
   }else{
     controls.append(el("input",{class:"na-price",value:"N/A",readonly:"",title:"No cash sell price is defined."}),!isRO()?newButton({title:"Add a generic SELL_SHOP_DEFAULT payout. This does not choose which merchants accept the item.",onclick:()=>{state.sellabilityEdits[it.key]={sellable:true,cents:100};render();}}):el("span"),el("span"));
   }
@@ -195,12 +173,12 @@ function sellPriceCell(it,sellCash,sellRef){
 }
 
 function buyPriceCell(it,buyCash,buyRef){
-  const edited=state.buyabilityEdits[it.key],buyable=edited?edited.buyable:buyCash.length>0,cell=el("div",{class:"price-cell"}),controls=el("div",{class:"price-controls"});
+  const edited=state.buyabilityEdits[it.key],buyable=edited?edited.buyable:buyCash.length>0,cell=LexeditorUI.stack({fill:false,className:"price-cell"}),controls=LexeditorUI.actionRow();
   if(buyable){
     const rows=buyCash.length?buyCash:[[null,{qty:edited?.cents??100,item:"CURRENCY_CASH"}]];
-    for(const [cost,part] of rows)controls.append(cost?priceInput(it,"buy",cost,part):el("span",{class:"money"},el("input",{type:"number",step:"0.01",min:"0",value:fmtMoney(part.qty),onchange:e=>{state.buyabilityEdits[it.key]={buyable:true,cents:Math.round((+e.target.value||0)*100)};renderToolbarOnly();}})));
-    controls.append(el("button",{class:"icon-link",title:"Open Shops and show which inventories sell this item",onclick:()=>goToItemShops(it,"buy")},"⌕"));
-    controls.append(!isRO()?el("button",{class:"icon-link",title:"Remove cash purchase price; shop membership is unchanged",onclick:()=>{state.buyabilityEdits[it.key]={buyable:false};renderItems();}},"×"):el("span"));
+    for(const [cost,part] of rows)controls.append(cost?priceInput(it,"buy",cost,part):LexeditorUI.inlineLabel("$",el("input",{type:"number",step:"0.01",min:"0",value:fmtMoney(part.qty),onchange:e=>{state.buyabilityEdits[it.key]={buyable:true,cents:Math.round((+e.target.value||0)*100)};renderToolbarOnly();}})));
+    controls.append(el("button",{class:"lex-ui-symbol icon-link",title:"Open Shops and show which inventories sell this item",onclick:()=>goToItemShops(it,"buy")},"⌕"));
+    controls.append(!isRO()?el("button",{class:"lex-ui-symbol icon-link",title:"Remove cash purchase price; shop membership is unchanged",onclick:()=>{state.buyabilityEdits[it.key]={buyable:false};renderItems();}},"×"):el("span"));
   }else{
     controls.append(el("input",{class:"na-price",value:"N/A",readonly:"",title:(it.shopListings||[]).length?"No cash cost; commonly a free/default option already present in a shop inventory":"No generic cash purchase cost is defined"}),!isRO()?newButton({title:"Add COST_SHOP_DEFAULT cash price; also list it in Shops if it is not already present",onclick:()=>{state.buyabilityEdits[it.key]={buyable:true,cents:100};renderItems();}}):el("span"),el("span"));
   }
@@ -218,14 +196,14 @@ function purchaseQuantityCell(it) {
   const bundle=purchaseBundleOf(it);
   const attrs={type:"number",min:"1",step:"1",value:cur,class:editKey in state.yieldEdits?"edited":"",title:bundle?`Raw ${bundle.container} record quantity before the game unpacks its contents`:"Units received for this catalog purchase"};
   if(isRO())attrs.readonly="";else attrs.oninput=ev=>{const value=Math.max(1,Math.round(+ev.target.value||1));if(value===base)delete state.yieldEdits[editKey];else state.yieldEdits[editKey]=value;ev.target.classList.toggle("edited",editKey in state.yieldEdits);renderToolbarOnly();};
-  const fields=el("div",{class:"purchase-fields"},el("div",{class:"purchase-raw"},el("input",attrs)));
+  const fields=LexeditorUI.stack({fill:false},el("input",attrs));
   if(bundle){
     const outAttrs={type:"number",min:"1",step:"1",value:bundle.min,class:bundle.editKey in state.bundleEdits?"edited":"",title:`Usable ${localizedValue(bundle.targetItem?.nameKey)||bundle.target} produced when this ${bundle.container} opens`};
     if(isRO())outAttrs.readonly="";else outAttrs.onchange=ev=>{const value=String(Math.max(1,Math.round(+ev.target.value||1)));const base=String(bundle.source.min||bundle.source.max||"1");if(value===base)delete state.bundleEdits[bundle.editKey];else state.bundleEdits[bundle.editKey]=value;renderToolbarOnly();};
-    fields.append(el("div",{class:"bundle-output"},el("input",outAttrs),
+    fields.append(LexeditorUI.actionRow(el("input",outAttrs),
       itemLink(bundle.target,true,localizedValue(bundle.targetItem?.nameKey)||bundle.target)));
   }
-  return el("div",{class:"purchase-output"}, refField(fields, [
+  return LexeditorUI.stack({fill:false},refField(fields, [
     ["V","vtag",purchaseYieldValue(refItem("vanilla",it.key))],
     ["K","ktag",purchaseYieldValue(refItem("kiddos",it.key))],
     ["1899","p1899tag",purchaseYieldValue(refItem("prices1899",it.key))]
@@ -289,11 +267,8 @@ function pickNewIngredient(output,recipeIndex,rerender){
 }
 
 function validatedKeyEditor(kind,value,values,onSet){
-  const wrap=el("div",{class:"validated-key"});
-  const input=el("input",{class:"key",value,readonly:"readonly",
-    title:`Selected existing ${kind.toLowerCase()} identifier. Use the search button to change it.`});
-  wrap.append(input,el("button",{class:"icon-link",title:`Choose an existing ${kind.toLowerCase()}`,onclick:()=>pickIdentifier(kind,values,input.value,v=>{input.value=v;onSet(v);})},"⌕"));
-  return wrap;
+  const input=el("input",{value,readonly:true,title:`Selected existing ${kind.toLowerCase()} identifier. Use the search button to change it.`});
+  return LexeditorUI.choiceField(input,el("button",{title:`Choose an existing ${kind.toLowerCase()}`,onclick:()=>pickIdentifier(kind,values,input.value,v=>{input.value=v;onSet(v)})},"⌕"));
 }
 
 function linkedCatalogKeyEditor(value,onSet){
@@ -339,7 +314,7 @@ function recipeReferenceControls(it,index){
   const refs=[["V","vtag",refRecipes(it,"vanilla")[index]],["K","ktag",refRecipes(it,"kiddos")[index]]]
     .filter(([, , recipe])=>recipe);
   if(!refs.length)return "";
-  return el("div",{class:"inline-recipe-ref"},
+  return LexeditorUI.stack({fill:false},
     el("span",{class:"cat"},"Reference recipe"),
     ...refs.map(([tag,cls,recipe])=>el("button",{class:"table-link",title:recipeSummary(recipe),
       onclick:()=>applyRecipeReference(it,index,recipe)},el("b",{class:cls},tag+" "),recipeSummary(recipe))));
@@ -359,11 +334,11 @@ function portableCraftEntries(entries){
 }
 
 function craftCell(it) {
-  const cell=el("div",{class:"craft"}),entries=craftView(it),controls=el("div",{class:"craft-summary"});
+  const cell=LexeditorUI.stack({fill:false}),entries=craftView(it),controls=LexeditorUI.actionRow();
   const displayName=localizedValue(it.nameKey);
   const recipeVariant=!entries.length&&displayName?state.catalog.items.find(other=>other!==it&&localizedValue(other.nameKey)===displayName&&craftView(other).length):null;
-  if(recipeVariant)controls.append(el("button",{class:"icon-link",title:`Recipe is stored on ${recipeVariant.key}`,onclick:()=>goToRecipeOutput(recipeVariant.key)},"⌕"));
-  if(entries.length)controls.append(el("button",{class:"icon-link",title:"Open this item's recipes in Crafting",onclick:()=>goToRecipeOutput(it.key)},"⌕"));
+  if(recipeVariant)controls.append(el("button",{class:"lex-ui-symbol icon-link",title:`Recipe is stored on ${recipeVariant.key}`,onclick:()=>goToRecipeOutput(recipeVariant.key)},"⌕"));
+  if(entries.length)controls.append(el("button",{class:"lex-ui-symbol icon-link",title:"Open this item's recipes in Crafting",onclick:()=>goToRecipeOutput(it.key)},"⌕"));
   if(!entries.length&&isRO())controls.append(el("span",{class:"cat"},"none"));
   else if(recipeVariant)controls.append(el("button",{class:"table-link",title:`The game stores this formula on the separate ${recipeVariant.key} record.`,onclick:()=>goToRecipeOutput(recipeVariant.key)},"Recipe on crafted variant"));
   else {
@@ -398,10 +373,10 @@ function itemEffectsCell(it){
       .filter(([, ,entries],index)=>index===0?!!vanilla:!!kiddos);
     const effectChip=(key,removable)=>{
       const known=state.effectByKey[key];
-      const chip=el("span",{class:"chip",title:(known?effectSummary(known):"unknown effect")+"\nkey: "+key},effectLink(key));
+      const chip=LexeditorUI.inlineLabel(effectLink(key));chip.title=(known?effectSummary(known):"Unknown effect")+"\nkey: "+key;
       if(!isRO()&&removable){
-        const remove=el("span",{class:"x",title:"Remove effect"},"×");
-        remove.addEventListener("pointerdown",event=>{
+        const remove=el("button",{type:"button",title:"Remove effect"},"×");
+        remove.addEventListener("click",event=>{
           event.stopPropagation();event.preventDefault();
           const next=[...(state.itemEffectEdits[it.key]??it.effects)];
           next.splice(next.indexOf(key),1);setItemEffects(it,next);draw();renderToolbarOnly();
@@ -424,7 +399,7 @@ function itemEffectsCell(it){
       }});
       const buttons=[add];
       const changed=vanilla&&JSON.stringify([...current].sort())!==JSON.stringify([...(vanilla.effects||[])].sort());
-      if(changed)buttons.push(el("button",{class:"icon-link",title:"Restore the complete Vanilla effect set",onclick:()=>{
+      if(changed)buttons.push(el("button",{class:"lex-ui-symbol icon-link",title:"Restore the complete Vanilla effect set",onclick:()=>{
         setItemEffects(it,[...(vanilla.effects||[])]);draw();renderToolbarOnly();
       }},"↺"));
       controls=el("span",{},...buttons);
@@ -458,7 +433,7 @@ function setQuickSelectSlots(it,slots){
   renderToolbarOnly();
 }
 function quickSelectSlotsCell(it){
-  const wrap=el("div",{class:"quick-select-slots"});
+  const wrap=LexeditorUI.stack({fill:false});
   if(!state.quickSelect?.available){
     wrap.append(el("span",{class:"cat",title:state.quickSelect?.reason||"quickselectitems.ymt is unavailable"},"Unavailable"));
     return wrap;
@@ -479,10 +454,10 @@ function quickSelectSlotsCell(it){
         select.append(option);
       }
       if(!known.includes(row.id))select.prepend(el("option",{value:row.id,selected:""},row.id));
-      wrap.append(el("div",{class:"quick-select-row"},select,
+      wrap.append(LexeditorUI.actionRow(select,
         el("span",{class:"cat quick-select-order",title:"The file stores this sort order. Lexeditor preserves it when the slot changes."},
           row.sortOrder===null?"order: automatic":`order ${row.sortOrder}`),
-        isRO()?"":el("button",{class:"icon-link del",title:"Remove this quick-select assignment",onclick:()=>{
+        isRO()?"":el("button",{class:"lex-ui-symbol icon-link del",title:"Remove this quick-select assignment",onclick:()=>{
           const next=current.slots.filter((_,slotIndex)=>slotIndex!==index).map(entry=>({...entry}));setQuickSelectSlots(it,next);draw();
         }},"×")));
     });
@@ -536,7 +511,7 @@ function itemRow(it) {
     if(slot==="0x550898DE"||slot==="0xAEEE1782")return "Unresolved engine inventory slot. Rockstar stored only this hash; no name was recovered from community string corpora. It is almost always -1 and is not proven to be a player-facing unlimited carry cap or a specific camp/horse context.";
     return `Hashed inventory/upgrade slot ${slot}. Its exact Rockstar name is unresolved; infer its contribution from which item categories use it and the vanilla reference value.`;
   };
-  const carryCell = el("div", {});
+  const carryCell = LexeditorUI.stack({fill:false});
   const permanentFoodBait=/^UPGRADE_FSH_BAIT_(BREAD|CHEESE|CORN)$/.test(it.key);
   const loteRule=(it.carry||[]).find(c=>c.slot==="0x04718245");
   for (const c of (it.carry || []).filter(c=>c.slot!=="0x04718245")) {
@@ -546,7 +521,7 @@ function itemRow(it) {
     const vSlot = vIt && (vIt.carry || []).find(x => x.slot === c.slot);
     const kSlot = kIt && (kIt.carry || []).find(x => x.slot === c.slot);
     const displaySlot=permanentFoodBait&&c.slot==="SLOTID_ANY"&&String(cur)==="-1"?"permanent / unlimited":slotLabel(c.slot);
-    const row = el("div", { class: "carry-row" },
+    const row = LexeditorUI.actionRow(
       el("span", { class: "cat slot-label", title: `${c.slot}\n${slotInfo(c.slot,String(cur))}` }, displaySlot),
       el("input", { type: "number", step: "1", value: cur,
         class: ek in state.carryEdits ? "edited" : "", title:`Capacity contribution from ${slotLabel(c.slot)} (${c.slot})`,
@@ -568,7 +543,7 @@ function itemRow(it) {
       const value=+(state.carryEdits[`${it.key}|${c.slot}`]??c.qty);return sum+(value>0?value:0);
     },0);
     const loteValue=loteRule?+(state.carryEdits[`${it.key}|0x04718245`]??loteRule.qty):0;
-    carryCell.append(el("div",{class:"lote-rule"},
+    carryCell.append(LexeditorUI.actionRow(
       el("span",{class:"cat slot-label"},"LotE 999?"),
       fieldHelp("Sets the Legend of the East satchel contribution so this item's combined applicable capacity is exactly 999."),
       el("input",{type:"checkbox",title:"Set this item's total capacity to 999 with the Legend of the East satchel",...((loteValue+otherTotal===999)?{checked:""}:{}),onchange:ev=>{
@@ -579,7 +554,7 @@ function itemRow(it) {
       else if(rule.qty==="0")delete state.carryEdits[key];else state.carryEdits[key]=rule.qty;
       renderItems();
     }})));
-    carryCell.append(el("div",{class:"addrow carry-add"},newButton({title:"Add another context-specific capacity rule",onclick:()=>{
+    carryCell.append(LexeditorUI.actionRow(newButton({title:"Add another context-specific capacity rule",onclick:()=>{
       const slots=carrySlotOptions(it);
       pickIdentifier("Carry-cap slot",slots,"",slot=>{it.carry=it.carry||[];it.carry.push({slot,qty:"1"});state.carryEdits[`${it.key}|${slot}`]="1";renderItems();});
     }})));
@@ -605,8 +580,7 @@ function itemRow(it) {
       el("div",{class:"name-line"},
         relationshipTitle?el("span",{class:"special-info",title:relationshipTitle},"⚠"):"",
         localizationInput(it.nameKey),
-        el("div",{class:"item-identity-actions"},
-          el("button",{class:"icon-link item-sources",title:"Show acquisition sources",onclick:()=>showItemSources(it)},"⌕")),
+        null,
         el("div",{class: "item-meta-line"},
           el("span",{class:"key item-meta-id"},it.key),
           el("span",{class: "item-meta-taxonomy"},
@@ -616,9 +590,8 @@ function itemRow(it) {
         nameReference));
   // Shown, not clicked: the heading icon's click belongs to the shared model
   // preview, and there is no separate full-size dialog.
-  const iconOptions={showAt:()=>{}};
-  const identity=el("div",{class:"item-identity"},itemIcon(texture,it,iconOptions),identityMain);
-  sizeItemIdentityIcon(identity,identityMain);
+  const identity=el("div",{class:"item-identity"},itemIcon(texture,it),identityMain);
+
   const identityCell = el("div", {},identity);
   const usedInCell = (() => { const uses = recipesUsing(it.key); return el("div", {}, uses.length ?
       el("button", { class:"save", style:"padding:4px 10px", onclick:()=>goToRecipesUsing(it.key) }, `${uses.length} recipe${uses.length===1?"":"s"}`) :
@@ -643,28 +616,25 @@ function itemDetailPane(it, cells){
   // It used to be the first ordinary field in the scrolling body, which is
   // why this plugin also had to grow its own preview button - there was no
   // heading icon for the shared control to take over.
-  const pane = el("section",{class:"lex-detail-panel loot-detail-pane lex-detail item-detail"});
-  const controlFor=cell=>{
-    // Carry the cell's own class (price-cell/purchase-output = flex row for
-    // input + beside refs; plain cells stay block) so each field keeps the
-    // layout its builder intended.
-    const control=el("div",{class:("detail-control "+(cell.className||"")).trim()});
-    while(cell.firstChild)control.append(cell.firstChild);
-    return control;
-  };
-  const field=(label,cell,help)=>{
-    const control=controlFor(cell);
-    return el("div",{class:"detail-field"},
-      el("div",{class:"detail-label"},label,help?fieldHelp(help):""),control);
-  };
+  const controlFor=cell=>cell;
+  const field=(label,cell,help)=>LexeditorUI.detailField({label,control:controlFor(cell),help:help?fieldHelp(help):null});
   const identity=cells.identity.querySelector(".item-identity");
-  const identityIcon=identity?.querySelector(".item-icon");
+  const identityIcon=identity?.querySelector("[data-inventory-icon]");
   const identityMain=identity?.querySelector(".item-identity-main");
-  const heading=el("div",{class:"lex-detail-panel-heading no-actions"},
-    el("div",{class:"lex-detail-panel-icon"},identityIcon||""),
-    el("div",{class:"lex-detail-panel-identity"},identityMain||""));
-  const body=el("div",{class:"lex-detail-panel-body"});
-  pane.append(heading,body);
+  const input=identityMain?.querySelector("input.localized-name")||localizationInput(it.nameKey);
+  const vanilla=state.localization?.vanilla?.[it.nameKey];
+  const name=refField(input,vanilla===undefined?[]:[["V","vtag",vanilla]],input.value,
+    value=>{input.value=value;input.dispatchEvent(new Event("change"));},String);
+  const body=LexeditorUI.stack({fill:false});
+  input.setAttribute("aria-label","Item name");
+  input.placeholder=it.key;
+  const pane=LexeditorUI.detailPanel({titleControl:name,
+    meta:it.key,icon:identityIcon||null,body});
+  body.append(LexeditorUI.controlGroup([
+    {label:"Group",control:LexeditorUI.readonlyField(it.group||"No group")},
+    {label:"Category",control:LexeditorUI.readonlyField(it.category.replace("CI_CATEGORY_",""))}]));
+  const relationship=identityMain?.querySelector(".special-info");
+  if(relationship)body.append(relationship);
   body.append(
     field("Description",cells.description),
     field("Buy price",cells.buy),
@@ -676,6 +646,9 @@ function itemDetailPane(it, cells){
     field("Used in recipes",cells.usedIn),
     field("Effects",cells.effects),
     field("Tags",cells.tags,"Catalog tags. Use + to select a named tag from the full grouped list. Free-entry hashes are not supported."));
+  const sources=LexeditorUI.stack({fill:false},LexeditorUI.detailNote("Loading acquisition sources…"));
+  body.append(LexeditorUI.detailSection({title:"Acquisition sources",body:sources}));
+  fillItemSources(it,sources).catch(error=>sources.replaceChildren(LexeditorUI.detailNote(error.message)));
   return attachItemModelPreview(pane,it);
 }
 
@@ -734,54 +707,23 @@ function brokenImageIcon(){
   path.setAttribute("d","M4 4h16v16H4z M7 16l3-3 2 2 2-2 3 3 M8 8h.01 M5 19 19 5");svg.append(path);return svg;
 }
 
-function markInventoryIconMissing(button,title){
-  button.className="item-icon missing";button.disabled=true;button.onclick=null;
-  button.title=title+"\nPreview image is not available in the local or reference atlas.";
-  button.setAttribute("aria-label","Inventory icon is unavailable");button.replaceChildren(brokenImageIcon());
-}
-
-function itemIcon(texture,it,options={}){
-  const title=texture?`${texture.dict} / ${texture.id}\nType: ${texture.type||"(none)"}`:"No texture reference on this catalog item";
-  const button=el("button",{class:"item-icon loading",title,disabled:"","aria-label":"Checking inventory icon"},modelEyeThrobber());
-  if(!inventoryIconCandidates(texture).length){markInventoryIconMissing(button,title);return button;}
-  loadInventoryIcon(texture).then(src=>{
-    if(!src){markInventoryIconMissing(button,title);return;}
-    const img=el("img",{src,alt:`${localizedValue(it.nameKey)||it.key} icon`});
-    button.className="item-icon";button.title=title;button.replaceChildren(img);
-    if(options.showAt){
-      // Shown, not clicked: the click on this slot belongs to the shared model
-      // preview. The action it used to carry is handed to options.showAt.
-      button.disabled=true;button.classList.add("item-icon-shown");
-      button.setAttribute("aria-hidden","true");button.tabIndex=-1;
-      options.showAt(()=>showItemIcon(texture,it,src),localizedValue(it.nameKey)||it.key);
-      return;
-    }
-    button.disabled=false;
-    button.setAttribute("aria-label",`View ${localizedValue(it.nameKey)||it.key} inventory icon`);
-    button.onclick=()=>showItemIcon(texture,it,src);
+function itemIcon(texture,it){
+  const slot=LexeditorUI.iconSlot({message:"Loading icon…"});
+  slot.dataset.inventoryIcon="";
+  slot.title=texture?`${texture.dict} / ${texture.id}`:"No inventory icon";
+  slot.lexLoaded=loadInventoryIcon(texture).then(src=>{
+    if(src)slot.replaceChildren(el("img",{src,alt:`${localizedValue(it.nameKey)?.trim()||it.key} icon`}));
+    else{slot.dataset.missing="true";slot.replaceChildren(brokenImageIcon());}
   });
-  return button;
-}
-
-function showItemIcon(texture,it,src){
-  if(!src)return;
-  const picker=$("#picker");picker.classList.remove("hidden");
-  const image=el("img",{src,alt:"Inventory icon preview"});
-  const visual=el("div",{class:"icon-preview"},image,
-    el("div",{class:"icon-meta"},el("div",{},`Dictionary: ${texture.dict}`),el("div",{},`Texture ID: ${texture.id}`),el("div",{},`Type: ${texture.type||"(none)"}`),el("div",{},`Catalog item: ${it.key}`)));
-  image.addEventListener("error",()=>visual.replaceChildren(el("div",{class:"icon-preview-error"},"The verified inventory icon became unavailable. Close this preview and try again.")));
-  picker.replaceChildren(el("div",{class:"picker-panel"},
-    el("div",{class:"picker-title"},localizedValue(it.nameKey)||it.key),
-    visual,
-    el("div",{class:"dialog-actions"},el("button",{onclick:()=>{picker.classList.add("hidden");picker.replaceChildren();}},"Close"))));
+  return slot;
 }
 
 function modelPreviewKey(it){return `${state.ds}|${it.key}|${it.model||""}`;}
 
-function modelEyeThrobber(){return el("span",{class:"model-eye-throbber","aria-hidden":"true"});}
+function modelEyeThrobber(){return LexeditorUI.badge("…",{title:"Loading model preview"});}
 
 // The shared model-preview control: the panel's heading icon is the trigger,
-// it turns into the close mark while open, and the model appears in the drawer
+// its magnifier stays visible while open, and the model appears in the drawer
 // that slides over the editing surface. Every plugin gets that same control
 // from the framework. What stays private here is the part that has to be:
 // which archive holds the mesh, whether this machine can read it, and how the
@@ -792,7 +734,13 @@ function attachItemModelPreview(pane,it){
   const icon=window.LexeditorUI?.panelIcon?.(pane);
   if(!icon)return pane;
   const describe=text=>{icon.title=text;icon.setAttribute("aria-label",text);};
-  if(!it.model){describe("This catalog item does not name a model asset");return pane;}
+  const hideEmptyIcon=()=>{
+    const slot=icon.querySelector("[data-inventory-icon]");
+    slot?.lexLoaded?.then(()=>{if(slot.dataset.missing==="true"){
+      icon.parentElement?.classList.add("no-icon");icon.remove();
+    }});
+  };
+  if(!it.model){describe("This catalog item does not name a model asset");hideEmptyIcon();return pane;}
   const key=modelPreviewKey(it);
   let status=state.modelPreviewAvailability[key];
   if(!status){
@@ -802,9 +750,10 @@ function attachItemModelPreview(pane,it){
     status={checking:true,promise};state.modelPreviewAvailability[key]=status;
   }
   const settle=result=>{
-    if(!icon.isConnected)return;
+    if(!pane.contains(icon))return;
     if(result?.available!==true){
       describe(result?.reason||"This installed model is not previewable");
+      hideEmptyIcon();
       return;
     }
     armItemModelPreview(pane,it);
@@ -822,16 +771,17 @@ function attachItemModelPreview(pane,it){
 function armItemModelPreview(pane,it){
   const name=localizedValue(it.nameKey)||it.key;
   let controller=null;
+  const facts=LexeditorUI.stack({fill:false,compact:true});
+  const modelDetails=LexeditorUI.detailSection({title:"Model geometry",body:facts});
   LexeditorUI.attachModelPreview(pane,{
     label:`${name} model`,
     openLabel:`View the real ${it.model} model`,
     closeLabel:`Close the ${it.model} model`,
     content:()=>{
       const canvas=el("canvas",{"aria-label":`Interactive 3D preview of ${it.model}`});
-      const message=el("div",{class:"model-preview-message"},`Preparing the real ${it.model} model\u2026`);
-      const stage=el("div",{class:"model-preview-stage"},canvas,message);
-      const facts=el("div",{class:"model-preview-facts"});
-      const drawer=el("div",{class:"model-preview-drawer-body"},stage,facts);
+      const stage=LexeditorUI.modelStage({message:`Preparing the real ${it.model} model…`}),message=stage.lexMessage;
+      stage.prepend(canvas);
+      const drawer=stage;
       canvas.hidden=true;
       prepareModelPreview(it).promise.then(async task=>{
         if(!drawer.isConnected)return;
@@ -840,17 +790,15 @@ function armItemModelPreview(pane,it){
         if(!drawer.isConnected){controller.dispose();controller=null;return;}
         canvas.hidden=false;
         message.replaceChildren(el("span",{},"Drag to rotate \u00b7 Wheel to zoom \u00b7 Double-click to reset"));
-        // It stops being the stage's whole message and becomes the corner
-        // hint, so it swaps class rather than wearing both.
-        message.classList.remove("model-preview-message");
-        message.classList.add("model-preview-help");
-        facts.append(
+        message.className="lex-model-stage-hint";
+        facts.replaceChildren(
           el("span",{},`${preview.format} \u00b7 LOD ${geometry.lod}`),
           el("span",{},`${preview.summary.vertices.toLocaleString()} vertices`),
           el("span",{},`${preview.summary.triangles.toLocaleString()} triangles`),
           el("span",{title:`${preview.source.outerArchive} \u2192 ${preview.source.archiveChain.join(" \u2192 ")} \u2192 ${preview.source.entry}`},
             `${preview.source.outerArchive} \u2192 ${preview.source.entry}`),
           el("span",{},preview.limitations.join(" ")));
+        if(!modelDetails.isConnected)LexeditorUI.sectionParts(pane).content.append(modelDetails);
         window.__lexModelPreview={item:it.key,model:it.model,preview,geometry,canvas,controller};
         requestAnimationFrame(controller.draw);
       }).catch(error=>{
@@ -859,8 +807,9 @@ function armItemModelPreview(pane,it){
       });
       return drawer;
     },
-    onClose:()=>{
+    onClose:drawer=>{
       controller?.dispose();controller=null;
+      drawer.replaceChildren();
       delete window.__lexModelPreview;
     },
   });
@@ -878,7 +827,7 @@ function prepareModelPreview(it){
   state.modelPreviewLoads[key]=task;return task;
 }
 
-async function formatFileSize(value){
+function formatFileSize(value){
   const bytes=Math.max(0,Number(value)||0);if(bytes<1024)return `${bytes} B`;
   const units=["KB","MB","GB"],power=Math.min(units.length,Math.floor(Math.log(bytes)/Math.log(1024)));
   return `${(bytes/1024**power).toFixed(power>1?2:1)} ${units[power-1]}`;
@@ -888,7 +837,7 @@ async function showLexeditorSettings(){
   document.querySelector(".model-settings-backdrop")?.remove();
   const backdrop=el("div",{class:"lex-dialog-backdrop model-settings-backdrop","data-lex-history-control":"true"});
   const dialog=el("section",{class:"lex-dialog lex-settings-dialog",role:"dialog","aria-modal":"true","aria-label":"Lexeditor settings"});
-  const status=el("div",{class:"preview-settings-status","aria-live":"polite"},"Loading settings…");
+  const status=el("div",{class:"lex-dialog-status","aria-live":"polite"},"Loading settings…");
   let onKey=null;
   const close=()=>{if(onKey)document.removeEventListener("keydown",onKey);backdrop.remove();};
   const closeButton=el("button",{class:"lex-dialog-action",onclick:close},"Close");
@@ -902,7 +851,7 @@ async function showLexeditorSettings(){
     let savedCacheSize=Number(settings.cacheSizeMb);
     const size=el("input",{type:"number",min:String(settings.minCacheSizeMb),max:String(settings.maxCacheSizeMb),step:"1",value:String(settings.cacheSizeMb),"aria-label":"Model preview cache size in MB"});
     const usage=el("div");
-    const path=el("div",{class:"preview-cache-path"});
+    const path=LexeditorUI.detailNote("");
     const update=next=>{
       settings=next;size.value=String(next.cacheSizeMb);
       usage.textContent=`${formatFileSize(next.cacheBytes)} used by ${next.cacheEntries} cached preview${next.cacheEntries===1?"":"s"}.`;
@@ -924,11 +873,9 @@ async function showLexeditorSettings(){
       try{const next=await api("/api/model-preview/cache/clear",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});state.modelPreviewLoads={};update(next);status.textContent=`Cleared ${formatFileSize(next.removedBytes)} from the model-preview cache.`;}
       catch(error){status.textContent=error.message;}finally{clear.disabled=false;clear.dataset.armed="false";clear.textContent="Clear cache";}
     }},"Clear cache");
-    const card=el("section",{class:"preview-settings-card"},el("h3",{},"Item model previews"),
-      el("div",{class:"preview-setting-row"},el("label",{},"Maximum cache size",el("span",{},`Between ${settings.minCacheSizeMb} MB and ${settings.maxCacheSizeMb} MB. Old previews leave the cache first.`)),el("div",{class:"setting-value"},size,el("span",{class:"setting-unit"},"MB"))),
-      el("div",{class:"preview-cache-status"},usage,path,
-        el("div",{},`Supported now: ${settings.supportedFormats.join(", ")}.`),
-        el("div",{},`Not yet: ${settings.notYetSupported.join(", ")}.`)));
+    const card=LexeditorUI.detailSection({title:"Item model previews",body:[
+      LexeditorUI.detailField({label:"Maximum cache size",control:LexeditorUI.unitField(size,"MB"),help:fieldHelp(`Between ${settings.minCacheSizeMb} MB and ${settings.maxCacheSizeMb} MB. Old previews leave the cache first.`)}),
+      LexeditorUI.stack({fill:false},usage,path,LexeditorUI.detailNote(`Supported now: ${settings.supportedFormats.join(", ")}.`),LexeditorUI.detailNote(`Not yet: ${settings.notYetSupported.join(", ")}.`))]});
     dialog.replaceChildren(el("h2",{},"Lexeditor Settings"),el("p",{},"Storage used by editor-only files."),card,status,
       el("div",{class:"lex-dialog-actions"},clear,closeButton,save));
     update(settings);status.textContent="";size.focus();
@@ -1033,7 +980,7 @@ async function createModelRenderer(canvas,geometry){
 }
 
 function itemDescriptionCell(it){
-  if(isRO()&&!it.descriptionKey){const area=el("textarea",{readonly:"readonly",title:"This catalog record has no description field."});area.value="N/A";return el("div",{},area);}
+  if(isRO()&&!it.descriptionKey){const area=LexeditorUI.textArea({readonly:"readonly",title:"This catalog record has no description field."});area.value="N/A";return el("div",{},area);}
   const shared=it.descriptionKey&&state.catalog.items.filter(x=>x.descriptionKey===it.descriptionKey).length>1;
   const generatedDescriptionKey=/^0x[0-9a-f]{8}$/i.test(it.key)
     ? `LEX_DESC_${it.key.slice(2).toUpperCase()}`
@@ -1042,7 +989,7 @@ function itemDescriptionCell(it){
   let editor;
   if(shared&&!state.descriptionKeyEdits[it.key]){
     const attrs={class:"localized-description",placeholder:"No localized description",title:`This text currently shares ${it.descriptionKey}; editing creates the independent key ${key}.`,onchange:ev=>{const value=sanitizeItemDescription(ev.target.value);ev.target.value=value;state.descriptionKeyEdits[it.key]=key;state.localizationEdits[key]=value;ev.target.classList.add("edited");renderToolbarOnly();}};
-    if(isRO())attrs.readonly="readonly";editor=el("textarea",attrs);editor.value=localizedValue(it.descriptionKey);
+    if(isRO())attrs.readonly="readonly";editor=LexeditorUI.textArea(attrs);editor.value=localizedValue(it.descriptionKey);
   }else {
     editor=localizationTextarea(key,it.descriptionKey?"No localized description":"Add an in-game description…",value=>{if(!it.descriptionKey||shared){if(value.trim())state.descriptionKeyEdits[it.key]=key;else delete state.descriptionKeyEdits[it.key];}});
     const originalChange=editor.onchange;

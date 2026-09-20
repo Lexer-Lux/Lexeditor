@@ -290,15 +290,19 @@ function weaponValueControl(data,section,row,current,edited,onChange){
 
 async function renderWeapons() {
   const f=state.filters, section=f.weaponSection||"weapons";f.weaponSection=section;
+  const current=renderScope("renderWeapons");
   if(!state.weaponData[state.ds])state.weaponData[state.ds]=await api("/api/weapons");
   if(state.ds==="mine"&&!state.weaponData.vanilla)state.weaponData.vanilla=await api("/api/weapons",undefined,"vanilla");
   if(!state.weaponReference)state.weaponReference=await api("/api/weapons-reference");
+  if(!current())return;
   const d=state.weaponData[state.ds],tb=$("#toolbar");tb.innerHTML="";
   if(!d.available)return noData("This dataset has no weapons.ymt.");
   const sectionLabels={weapons:"Weapons",ammo:"Ammo types",velocity:"Projectile speed"};
-  const sectionTabs=el("div",{class:"subtabs"},...Object.keys(sectionLabels).map(key=>el("button",{class:key===section?"active":"",onclick:()=>{f.weaponSection=key;f.weapon="";f.weaponPage=0;renderWeapons();}},sectionLabels[key])));
+  const sectionTabs=LexeditorUI.subtabBar({tabs:Object.entries(sectionLabels).map(([id,label])=>({id,label})),active:section,
+    change:key=>{f.weaponSection=key;f.weapon="";f.weaponPage=0;renderWeapons();}});
   if(section==="velocity"){
     if(!state.projectileSpeeds[state.ds])state.projectileSpeeds[state.ds]=await api("/api/weapons/projectile-speeds");
+    if(!current())return;
     return renderProjectileSpeeds(state.projectileSpeeds[state.ds],sectionTabs);
   }
   const records=d[section],names=records.map(x=>x.name).sort();if(!f.weapon||!names.includes(f.weapon))f.weapon=names[0];
@@ -318,9 +322,11 @@ async function renderWeapons() {
   m.append(LexeditorUI.pagedListDetail({modOnly:(()=>{const touched=touchedRecords(Object.values(state.weaponEdits||{}),[],1);
       return {available:!isRO(),value:state.modOnly===true,changed:name=>touched.has(String(name)),
         change:value=>{state.modOnly=value;f.weaponPage=0;renderWeapons();}};})(),
-    rows:listNames,key:n=>n,slots:false,page:f.weaponPage,pageSize:f.weaponPageSize,selected:f.weapon,noun:"records",splitKey:`rdr2-weapons-${section}`,className:"lootsplit",defaultSplit:44,
+    rows:listNames,key:n=>n,slots:false,page:f.weaponPage,pageSize:f.weaponPageSize,selected:f.weapon,noun:"records",splitKey:`rdr2-weapons-${section}`,defaultSplit:44,
     search:{key:`rdr2-weapons-${section}`,value:f.weaponQ||"",placeholder:`Search ${section}…`,change:value=>{f.weaponQ=value;f.weaponPage=0;renderWeapons();}},filters:weaponFilters,
-    master:({rows,selected,select})=>LexeditorUI.list({rows,key:n=>n,selected,selectedClass:"sel",class:"loot-list list-1col",header:el("div",{class:"loot-listhead"},el("span",{},section==="weapons"?"Weapon":"Ammo type")),rowClass:"loot-item",select,render:n=>{const record=records.find(row=>row.name===n);return el("div",{class:"li-key",title:`${n}${localizedValue(n)?" — "+localizedValue(n):""}`},el("span",{class:"k"},originDisplayName(localizedValue(n)||n,record)),localizedValue(n)&&localizedValue(n)!==n?el("span",{class:"li-name"},n):"");}}),
+    master:({rows,selected,select})=>LexeditorUI.columnList({rows,key:n=>n,selected,select,columns:[
+      {key:"name",label:section==="weapons"?"Weapon":"Ammo type",render:n=>originDisplayName(localizedValue(n)?.trim()||n,records.find(row=>row.name===n))},
+      {key:"id",label:"ID",render:n=>n}]}),
     detail:name=>weaponDetail(d,section,records.find(row=>row.name===name),f),sync:next=>{f.weaponPage=next.page;f.weaponPageSize=next.pageSize;f.weapon=next.selected||"";},change:next=>{f.weaponPage=next.page;f.weaponPageSize=next.pageSize;f.weapon=next.selected||"";renderWeapons();}}));
 }
 
@@ -328,7 +334,7 @@ function renderProjectileSpeeds(data,sectionTabs){
   const tb=$("#toolbar"),m=$("#main");tb.innerHTML="";m.innerHTML="";
   if(!data.available){tb.append(sectionTabs);return noData("Projectile-speed data is unavailable.");}
   const edits=state.projectileSpeedEdits;
-  const toolbar=el("div",{class:"record-toolbar"},
+  const toolbar=LexeditorUI.toolbar(
     el("input",{type:"text",placeholder:"Filter cartridges or weapons…",value:state.filters.velocityQ||"",oninput:ev=>{state.filters.velocityQ=ev.target.value;filterRerender(ev,renderWeapons);}}),
     el("span",{class:"count"},`${data.cartridges.length} cartridges`));
   // The issue explicitly forbids editable/displayed per-cartridge values when
@@ -336,7 +342,7 @@ function renderProjectileSpeeds(data,sectionTabs){
   // not offer a save action for settings the game would ignore.
   if(data.runtimeSwitching)toolbar.append(savebar(saveProjectileSpeeds));
   tb.append(sectionTabs,toolbar);
-  const status=el("div",{class:"hint"},
+  const status=LexeditorUI.stack({fill:false,className:"lex-notice"},
     el("b",{},`Global base: ${data.baseSpeed} game-speed units. `),
     data.runtimeSwitching?"The ASI applies the selected cartridge multiplier at runtime.":data.runtimeStatus);
   const q=(state.filters.velocityQ||"").toUpperCase();
@@ -377,13 +383,11 @@ async function saveProjectileSpeeds(){
 // so they are shown honestly (a value where there is one, a note where there
 // is not) rather than faked. Clicking a tile filters the field list to it.
 function weaponBig6(record, fv){
-  const strip=el("div",{class:"weapon-big6"});
+  const strip=LexeditorUI.tileGrid([]);
   const num=v=>{const n=+v;return Number.isFinite(n)?(n%1?n.toFixed(2).replace(/0+$/,"").replace(/\.$/,""):String(n)):null;};
   const tile=(label,value,note,filterField)=>{
-    const t=el("div",{class:"big6-tile"+(value==null?" big6-missing":""),
-      title:note||"",onclick:filterField?()=>{state.filters.weaponFieldQ=filterField;renderWeapons();}:null});
-    t.append(el("div",{class:"big6-label"},label),el("div",{class:"big6-value"},value==null?"—":value));
-    if(note)t.append(el("div",{class:"big6-note"},note));
+    const control=filterField?el("button",{type:"button",title:note||"",onclick:()=>{state.filters.weaponFieldQ=filterField;renderWeapons();}},value??"—"):LexeditorUI.readonlyField(value??"—");
+    const t=LexeditorUI.detailField({label,control,help:note?fieldHelp(note):null});
     return t;
   };
   // Damage modes are named per ammo type (DM_ARROW, DM_AMMO_EXPRESS, ...), so
@@ -446,24 +450,24 @@ function weaponFieldCategory(row){
 }
 
 function weaponDetail(d,section,record,f){
-  const pane=el("div",{class:"loot-detail-pane lex-detail weapon-detail-pane"});
-  if(!record)return pane.appendChild(el("div",{class:"loading"},"Select a weapon."))&&pane;
+  const body=LexeditorUI.stack({fill:false}),pane=LexeditorUI.detailPanel({title:record?LexeditorUI.detailField({label:"Name",control:localizationInput(record.name)}):"Weapon",meta:record?.name,body});
+  if(!record)return pane.appendChild(LexeditorUI.stack({fill:false,className:"lex-notice"},"Select a weapon."))&&pane;
   const vanilla=state.weaponData.vanilla?.[section]?.find(x=>x.name===record.name);
   const wr=state.weaponReference?.[section]?.find(x=>x.name===record.name);
   const byField=(r)=>Object.fromEntries((r?.fields||[]).map(x=>[x.field,x.value]));const vv=byField(vanilla),wv=byField(wr);
   const fv=Object.fromEntries((record.fields||[]).map(x=>[x.field,x.value]));
   const editKey=`${section}|${record.name}`,edits=state.weaponEdits[editKey]||(state.weaponEdits[editKey]={});
-  pane.append(el("div",{class:"weapon-detail-head"},originMarker(record),localizationInput(record.name),el("span",{class:"n"},record.name),el("span",{class:"n"},record.sourceFile||d.file)));
-  if(section==="weapons")pane.append(weaponBig6(record,fv));
-  pane.append(el("div",{class:"weapon-fieldfilter"},el("input",{id:"weapon-field-filter",type:"text",placeholder:"Filter fields…",value:f.weaponFieldQ||"",
+  body.append(LexeditorUI.detailField({label:"Source",control:LexeditorUI.readonlyField(record.sourceFile||d.file)}));
+  if(section==="weapons")body.append(weaponBig6(record,fv));
+  body.append(LexeditorUI.actionRow(el("input",{id:"weapon-field-filter",type:"text",placeholder:"Filter fields…",value:f.weaponFieldQ||"",
     oninput:ev=>{f.weaponFieldQ=ev.target.value;filterRerender(ev,renderWeapons);}}),
-    f.weaponFieldQ?el("button",{class:"icon-link",title:"Clear field filter",onclick:()=>{f.weaponFieldQ="";renderWeapons();}},"×"):""));
+    f.weaponFieldQ?el("button",{class:"lex-ui-symbol icon-link",title:"Clear field filter",onclick:()=>{f.weaponFieldQ="";renderWeapons();}},"×"):""));
   const q=(f.weaponFieldQ||"").toUpperCase();
   const rows=sortedRows("weapons",record.fields.filter(x=>x.field!=="Name"&&(!q||x.field.toUpperCase().includes(q))),{field:x=>x.field,value:x=>x.value,references:x=>vv[x.field]??wv[x.field]??""});
   const grouped=new Map();
   rows.forEach(row=>{const group=weaponFieldCategory(row);if(!grouped.has(group.key))grouped.set(group.key,{...group,rows:[]});grouped.get(group.key).rows.push(row);});
   const order=[...WEAPON_FIELD_CATEGORIES.map(group=>group.key),"unidentified"];
-  const groups=el("div",{class:"weapon-field-groups"});
+  const groups=LexeditorUI.stack({fill:false});
   [...grouped.values()].sort((a,b)=>order.indexOf(a.key)-order.indexOf(b.key)).forEach(group=>{
     const editKey=row=>`${row.targetType||section}|${row.targetName||record.name}|${row.path.join(".")}`;
     const table=columnList({class:"weapon-field-table",align:"start",headerAlign:"start","aria-label":`${group.label} fields`,
@@ -471,7 +475,7 @@ function weaponDetail(d,section,record,f){
       template:"minmax(180px,1fr) minmax(0,1.6fr)",
       columns:[{key:"field",label:"Field",cellClass:"key",
           render:row=>{const help=weaponFieldHelp(row.field);
-            return el("div",{class:"weapon-field-name"},row.field,help?fieldHelp(help):"");}},
+            return LexeditorUI.inlineLabel(el("span",{},row.field),help?fieldHelp(help):null);}},
         {key:"value",label:()=>el("span",{},"My value",fieldHelp("Value with V / WR references beside the control (shared refField layout).")),
           render:row=>{const key=editKey(row),cur=edits[key]?.value??row.value;
             const setValue=value=>{edits[key]={path:row.path,kind:row.kind,value,targetType:row.targetType,targetName:row.targetName};renderToolbarOnly();};
@@ -479,16 +483,13 @@ function weaponDetail(d,section,record,f){
             return refField(control,[["V","vtag",vv[row.field]],["WR","ucotag",wv[row.field]]],cur,
               (value,ev)=>{const target=ev.currentTarget.closest('[role="row"]').querySelector(".weapon-value");
                 if(target){target.value=value;target.dispatchEvent(new Event("change",{bubbles:true}));}},String);}}]});
-    const details=el("details",{class:"weapon-field-group","data-group":group.key},
-      el("summary",{},el("span",{},group.label),el("span",{class:"weapon-group-count"},`${group.rows.length} field${group.rows.length===1?"":"s"}`)),
-      el("p",{class:"weapon-group-description"},group.description),table);
-    // Default state is collapsed. A search opens only its matching categories
-    // so the user can see the result without another click.
-    if(q)details.open=true;
+    const details=LexeditorUI.detailSection({title:`${group.label} (${group.rows.length})`,
+      collapsible:true,open:!!q,attrs:{"data-group":group.key},
+      help:fieldHelp(group.description),body:table});
     groups.append(details);
   });
-  if(!rows.length)groups.append(el("div",{class:"loading"},"No fields match."));
-  pane.append(groups);
+  if(!rows.length)groups.append(LexeditorUI.stack({fill:false,className:"lex-notice"},"No fields match."));
+  body.append(groups);
   return pane;
 }
 

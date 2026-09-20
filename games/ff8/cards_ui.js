@@ -1,14 +1,3 @@
-/* Page-level graph treatment is isolated under /shared so the huge FF8 editor
- * does not grow another bespoke formula renderer. This bootstrap is loaded on
- * every FF8 editor page before any curve card is mounted. */
-(() => {
-  if (document.querySelector('script[data-lex-ff8-graph-design-a]')) return;
-  const script = document.createElement('script');
-  script.src = '/shared/ff8-graph-design-a.js';
-  script.dataset.lexFf8GraphDesignA = 'true';
-  document.head.append(script);
-})();
-
 /* Factory kept independent of the editor's page state. The host supplies its
  * existing list/detail, typed controls, provenance, and history helpers. */
 window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
@@ -22,72 +11,19 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
   const clone = value => JSON.parse(JSON.stringify(value));
   let mode = "cards";
   const playerView = {query:"",page:0,selected:null};
-  if (!document.getElementById("ff8-card-redesign-style")) {
-    const style = document.createElement("style");
-    style.id = "ff8-card-redesign-style";
-    // No white slabs, no black text on them and no drop shadows. Every colour
-    // here is the plugin's own theme token or the card's own blue.
-    style.textContent = `
-      .ff8-card-root{display:grid;grid-template-rows:auto minmax(0,1fr);row-gap:var(--lex-panel-gap);min-height:0;height:100%}
-
-      /* The card. Triple Triad draws a blue player card with a soft lit centre
-         falling to a darker edge, a pale border and the ranks in a diamond in
-         the top-left corner. */
-      .ff8-card-preview{
-        --ff8-card-width:clamp(150px,17vw,208px);
-        position:relative;width:var(--ff8-card-width);aspect-ratio:3/4;
-        flex:0 0 auto;overflow:visible;border-radius:0;
-        border:0;
-        background:
-          radial-gradient(120% 95% at 50% 38%, #6f8fd8 0%, #3f61b4 46%, #22357e 78%, #16215a 100%);
-        box-shadow:none}
-      .ff8-card-preview > img{position:absolute;inset:0;width:100%;height:100%;display:block;
-        object-fit:fill;object-position:center}
-      .ff8-card-ranks{
-        position:absolute;top:5px;left:6px;display:grid;
-        grid-template-areas:"top top" "left right" "bottom bottom";
-        justify-items:center;column-gap:1px;row-gap:0;
-        font:700 clamp(15px,1.5vw,19px)/1 var(--lex-font,"FF8 Menu",Arial,sans-serif)}
-      .ff8-card-rank{
-        grid-area:var(--ff8-rank-area);
-        min-width:1ch;padding:0 1px;border:0;border-radius:2px;
-        background:transparent;color:#fff;font:inherit;text-align:center;cursor:pointer}
-      .ff8-card-rank:is(:hover,:focus-visible){background:#ffffff2e;outline:none}
-      .ff8-card-element{
-        position:absolute;top:6px;right:6px;width:26px;height:26px;padding:0;
-        display:grid;place-items:center;border:0;border-radius:50%;
-        background:#00000055;color:#fff;
-        font:700 10px/1 var(--lex-font,"FF8 Menu",Arial,sans-serif);cursor:pointer}
-      .ff8-card-element:is(:hover,:focus-visible){background:#00000088;outline:none}
-      .ff8-card-element.none{opacity:0}
-      .ff8-card-element.none:is(:hover,:focus-visible){opacity:1}
-      .ff8-card-element img{width:22px;height:22px;object-fit:contain}
-      .ff8-card-element.none{border:1px solid currentColor;font-size:22px}
-      .ff8-card-power{
-        position:absolute;right:6px;bottom:4px;cursor:default;user-select:none;
-        color:#fff;font:700 clamp(17px,1.7vw,22px)/1 var(--lex-font,"FF8 Menu",Arial,sans-serif)}
-      .ff8-card-element-picker{
-        position:fixed;inset:auto;margin:0;padding:5px;z-index:1000;width:260px;
-        color:var(--lex-text);border:1px solid var(--lex-border);
-        background:var(--lex-panel);font:inherit}
-      .ff8-card-element-picker:popover-open{display:grid;grid-template-columns:1fr 1fr;gap:3px}
-      .ff8-card-element-picker button{display:flex;align-items:center;gap:8px;padding:6px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
-      .ff8-card-element-picker button:is(:hover,:focus-visible){background:var(--lex-accent)}
-      .ff8-card-element-picker img,.ff8-card-element-empty{width:22px;height:22px;object-fit:contain}
-
-    `;
-    document.head.append(style);
-  }
   const rank = value => Number(value) === 10 ? "A" : String(value);
   const elementOptions = () => state.data.cards.elements || [];
   const elementName = value => elementOptions()
     .find(entry => Number(entry.id) === Number(value))?.name || "";
+  const elementIcon = value => Number(value) ? el("img", {
+    src:`/assets/card-elements/${Number(value)}.png`,alt:elementName(value)}) : null;
 
   // The card itself is the control. Every rank on it can be typed into and the
   // element corner opens its own list, so the values are edited where they are
   // read instead of only in a column of boxes beside the picture.
   const preview = (row, refresh) => {
     const update = (field, value) => {
+      if(state.activeSource!=="mine")return;
       if (field === "element") {
         if (!elementOptions().some(entry => Number(entry.id) === Number(value))) return;
         row[field] = Number(value);
@@ -100,45 +36,30 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     };
     const rankButton = side => el("button", {
       type: "button",
-      class: "ff8-card-rank",
-      style: `--ff8-rank-area:${side}`,
+      disabled:state.activeSource!=="mine",
       title: `${labels[side]}: click to change`,
       "aria-label": `${labels[side]}, currently ${rank(row[side])}`,
       onclick: () => update(side, (Number(row[side]) % 10) + 1),
       oncontextmenu: event => {event.preventDefault();update(side, Number(row[side]) <= 1 ? 10 : Number(row[side]) - 1);},
     }, rank(row[side]));
-    const picker = el("div", {class:"ff8-card-element-picker", popover:"auto", role:"group", "aria-label":"Choose card element"},
-      ...elementOptions().map(entry => el("button", {type:"button",
-        "aria-label":entry.name, onclick:()=>{picker.hidePopover();update("element",entry.id)}},
-        conceptIcon("element",entry.name) || el("span",{class:"ff8-card-element-empty","aria-hidden":"true"}),
-        el("span",{},entry.name))));
-    picker.addEventListener("keydown",event=>{
-      if (!["ArrowDown","ArrowUp","ArrowRight","ArrowLeft"].includes(event.key)) return;
-      event.preventDefault();const buttons=[...picker.querySelectorAll("button")];
-      const step=["ArrowDown","ArrowRight"].includes(event.key)?1:-1;
-      buttons[(buttons.indexOf(document.activeElement)+step+buttons.length)%buttons.length].focus();
-    });
+    let card;
+    const picker=LexeditorUI.choicePopover({label:"Choose card element",
+      boundary:()=>card,
+      choices:elementOptions().map(entry=>({value:entry.id,label:entry.name,icon:elementIcon(entry.id)})),
+      select:value=>update("element",value)});
     const none = Number(row.element) === 0;
     const element = el("button", {
-      type:"button", class:`ff8-card-element${none ? " none" : ""}`,
+      type:"button",
+      class:none ? "lex-card-corner-empty" : "",
       disabled:state.activeSource !== "mine",
       title:none ? "Add element" : `Change ${elementName(row.element)}`,
       "aria-label":none ? "Add element" : `Change ${elementName(row.element)}`,
-      onclick:()=>{
-        const box=element.getBoundingClientRect();
-        picker.style.left=`${Math.max(4,Math.min(box.right-260,innerWidth-264))}px`;
-        picker.style.top=`${Math.max(4,Math.min(box.bottom+4,innerHeight-220))}px`;
-        picker.showPopover();picker.querySelector("button").focus();
-      },
-    }, none ? "+" : conceptIcon("element",elementName(row.element)));
-    return el("div", {class: "ff8-card-preview"},
-      // A card with no artwork on disk shows the plain blue card, not a broken
-      // image icon and its alt text painted across the ranks.
-      el("img", {src: `/assets/cards/${row.id}.png`, alt: "",
-        onerror: event => {event.target.hidden = true;}}),
-      el("div", {class: "ff8-card-ranks"}, ...sides.map(rankButton)),
-      element, picker,
-      el("span", {class: "ff8-card-power", title: labels.power}, String(row.power)));
+      onclick:()=>picker.openFor(element),
+    }, none ? "+" : elementIcon(row.element));
+    card=LexeditorUI.statCard({image:`/assets/cards/${row.id}.png`,
+      ranks:sides.map(rankButton),corner:element,
+      footer:el("span",{title:labels.power},String(row.power))});
+    return card;
   };
 
   const renameCard = (row, value) => {
@@ -223,44 +144,68 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         : `Finding card players… ${playerAreas?.scanned || 0} of ${playerAreas?.total || "?"} areas read`;
       return detailPanel({className:"ff8-card-player-detail",title:"Card players",body:[el("p",{},text)]});
     }
-    const withPlayers = new Set(playerAreas.keys);
-    const maps = (state.data.fields?.rows || []).filter(row => withPlayers.has(row.key));
-    const query = playerView.query.toLocaleLowerCase();
-    const rows = maps.filter(row => `${row.name} ${row.key}`.toLocaleLowerCase().includes(query));
-    const detail = row => {
-      if (!row._loaded && !row._loading && !row._error) {
-        queueMicrotask(async()=>{await ensureFieldDetail(row);if(state.tab === "cards" && mode === "players") render();});
+    const groups=new Map();
+    for(const entry of playerAreas.players||[]){
+      const key=`${entry.map}:${entry.entity}`;
+      if(!groups.has(key))groups.set(key,{key,map:entry.map,entity:entry.entity,calls:[]});
+      groups.get(key).calls.push(entry.id);
+    }
+    const known=new Map((state.data.characters?.rows||[]).map(row=>[row.name.toLowerCase(),row.name]));
+    const query=playerView.query.toLowerCase();
+    const rows=[...groups.values()].map(entry=>({...entry,
+      name:known.get(entry.entity.toLowerCase())||`Opponent ${entry.entity}`}))
+      .filter(row=>`${row.name} ${row.map}`.toLowerCase().includes(query));
+    const help=[
+      "Selects the opponent's deck. It does not select a single card. The deck catalogue is not decoded here yet.",
+      "The card rules you bring from previous regions. The game uses these when it offers to mix rules.",
+      "The card rules used in this opponent's region. These are separate from the rules you bring with you.",
+      "Percentage chance, from 0 to 100, that this opponent uses an available rare card.",
+      "The gameplay effect of this argument has not been verified. Its original value is retained.",
+      "The gameplay effect of this argument has not been verified. Its original value is retained.",
+      "The gameplay effect of this argument has not been verified. Its original value is retained."];
+    const detail=entry=>{
+      const map=state.data.fields.rows.find(row=>row.key===entry.map);
+      if(!map)return detailPanel({title:entry.name,body:[LexeditorUI.detailNote('Location data is unavailable.')]});
+      if(!map._loaded&&!map._loading&&!map._error)
+        queueMicrotask(async()=>{await ensureFieldDetail(map);if(state.tab==='cards'&&mode==='players')render()});
+      const body=[detailField({label:'Location',control:LexeditorUI.readonlyField(map.name)}),
+        detailField({label:'Map file',control:LexeditorUI.readonlyField(map.key)})];
+      if(!known.has(entry.entity.toLowerCase()))body.push(LexeditorUI.detailNote(
+        `The game identifies this opponent as “${entry.entity}”. A display name has not been established.`));
+      if(map._error)body.push(LexeditorUI.detailNote(`Could not load opponent: ${map._error}`));
+      else if(!map._loaded)body.push(LexeditorUI.detailNote('Loading opponent settings…'));
+      else {
+        const calls=(map.players||[]).filter(player=>player.entity===entry.entity);
+        if(calls.length>1)body.push(LexeditorUI.detailNote('This opponent has more than one card-game setup. The game script decides which setup is used.'));
+        calls.forEach((player,index)=>{
+          const fields=(player.params||[]).map(param=>{
+            const before=state.vanilla?.fields?.rows?.find(row=>row.key===map.key)?.players?.find(row=>row.id===player.id)?.params?.find(row=>row.id===param.id);
+            const update=value=>{param.value=Number(value);noteFieldEdit('fields',{field:param.name});shell.refresh()};
+            const variable=param.mode==='variable',maximum=!variable&&param.id===3?100:0xFFFFFF;
+            const input=numberControl(param.value,0,maximum,1,update,{'aria-label':`${entry.name} ${param.name}`});
+            input.disabled=!param.editable||state.activeSource!=='mine';
+            return detailField({label:param.name+(variable?' variable':''),dataType:'INT',min:0,max:maximum,
+              help:infoHelp(help[param.id]+(variable?' This field holds a game-variable reference, not the value used in the match. Changing it selects a different variable.':'')),
+              control:sourceControl(input,()=>param.value,before?.value,[],update)});
+          });
+          body.push(calls.length===1?LexeditorUI.stack({fill:false},...fields):detailSection({title:`Setup ${index+1}`,body:fields}));
+        });
       }
-      let body;
-      if (row._error) body=[el("p",{},`Could not load this area: ${row._error}`)];
-      else if (!row._loaded) body=[el("p",{},"Loading card players…")];
-      else if (!row.players?.length) body=[el("p",{},"There are no Triple Triad players in this area.")];
-      else body=row.players.map(player=>detailSection({
-        title:player.entity || `Opponent ${player.id}`,
-        body:(player.params || []).map(param=>{
-          const before=state.vanilla?.fields?.rows?.find(value=>value.key===row.key)?.players?.find(value=>value.id===player.id)?.params?.find(value=>value.id===param.id);
-          const update=value=>{param.value=Number(value);noteFieldEdit("fields",{field:param.name});shell.refresh();};
-          const input=numberControl(param.value,0,0xFFFFFF,1,update,{"aria-label":`${player.entity} ${param.name}`});
-          input.disabled=!param.editable || state.activeSource!=="mine";
-          return detailField({label:param.name,dataType:"INT",min:0,max:0xFFFFFF,
-            help:infoHelp(param.mode==="variable" ? "This value selects a game variable. Its value during play controls this choice." : "This value is stored directly in the opponent's card-game settings."),
-            control:sourceControl(input,()=>param.value,before?.value,[],update)});
-        })}));
-      return detailPanel({className:"ff8-card-player-detail",title:row.name,meta:row.key,body});
+      return detailPanel({title:entry.name,body});
     };
     return LexeditorUI.pagedListDetail({rows,key:row=>row.key,selected:playerView.selected,
-      page:playerView.page,pageSize:40,noun:"areas",maxBarrels:1,slots:true,fit:{minRowHeight:28},
-      className:"ff8-card-players",splitKey:"ff8-card-players",rowsKey:"ff8-card-players",
-      search:{key:"ff8-card-players",value:playerView.query,label:"Search card-player areas",change:value=>{playerView.query=value;playerView.page=0;render();}},
-      sync:next=>Object.assign(playerView,next),change:next=>{Object.assign(playerView,next);render();},
+      page:playerView.page,pageSize:40,noun:'players',maxBarrels:1,slots:true,fit:{minRowHeight:28},
+      className:'ff8-card-players',splitKey:'ff8-card-players',rowsKey:'ff8-card-players',
+      search:{key:'ff8-card-players',value:playerView.query,label:'Search card players',change:value=>{playerView.query=value;playerView.page=0;render()}},
+      sync:next=>Object.assign(playerView,next),change:next=>{Object.assign(playerView,next);render()},
       master:({rows,selected,select})=>columnList({rows,key:row=>row.key,selected,select,
-        class:"ff8-record-list",template:"minmax(120px,1fr) minmax(90px,.7fr)",
-        columns:[{key:"name",label:"Area"},{key:"key",label:"File"}]}),
-      detail,emptyDetail:()=>detailPanel({className:"ff8-card-player-detail",title:"Card players",body:[el("p",{},"No areas match this search.")]})});
+        columns:[{key:'name',label:'Player'}]}),detail,
+      emptyDetail:()=>detailPanel({title:'Card players',body:[LexeditorUI.detailNote('No players match this search.')]})});
   };
   render = () => {
     if (state.tab !== "cards") return null;
-    const root = el("div", {class: "ff8-card-root"},
+    const toolbar=document.querySelector('#toolbar');toolbar.replaceChildren();toolbar.hidden=true;
+    const root = LexeditorUI.stack(
       subtabBar({
         flush: true,
         label: "Cards views",
@@ -287,7 +232,6 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
  * page, so the spellbook editor can attach to the existing GF detail surface
  * without duplicating the 300KB host document or creating a second GF editor. */
 (() => {
-  const STYLE_ID = "lexeditor-gf-spellbook-style";
   const PANEL_CLASS = "lexeditor-gf-spellbook";
   const clone = value => JSON.parse(JSON.stringify(value));
   const request = async (url, options) => {
@@ -322,38 +266,13 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     value.addEventListener("change", () => onChange(value.value === "" ? null : Number(value.value)));
     return value;
   };
-  const ensureStyle = () => {
-    if (document.getElementById(STYLE_ID)) return;
-    const style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent = `
-      .${PANEL_CLASS}{margin:0;padding:8px;border:0;border-radius:0;background:var(--lex-panel);color:var(--lex-text);font:inherit}
-      .gf-abilities-views{flex:1;min-height:0;overflow:auto}
-      .gf-abilities-views>[hidden]{display:none!important}
-      .gf-abilities-views>*{height:100%}
-      .${PANEL_CLASS} :is(button,select){color:var(--lex-text);background:var(--lex-panel-2);font:inherit;text-shadow:none;border:1px solid var(--lex-border);border-radius:0;min-height:30px;padding:4px 8px}
-      .${PANEL_CLASS} .ff8-spell-row{grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) auto}
-      .${PANEL_CLASS} h3{margin:0 0 5px;font-size:14px;letter-spacing:.05em}
-      .${PANEL_CLASS} .ff8-spell-note{opacity:.78;font-size:12px;margin:0 0 10px}
-      .${PANEL_CLASS} .ff8-spell-toolbar,.${PANEL_CLASS} .ff8-spell-page-head,.${PANEL_CLASS} .ff8-spell-row{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
-      .${PANEL_CLASS} .ff8-spell-toolbar{margin:8px 0}
-      .${PANEL_CLASS} .ff8-spell-page{padding:8px;margin:8px 0;border:1px solid rgba(160,180,215,.28);border-radius:6px}
-      .${PANEL_CLASS} .ff8-spell-page-head{justify-content:space-between;margin-bottom:6px;font-size:12px;font-weight:700}
-      .${PANEL_CLASS} .ff8-spell-row{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) auto;margin:5px 0}
-      .${PANEL_CLASS} select{min-width:0;width:100%}
-      .${PANEL_CLASS} button{white-space:nowrap}
-      .${PANEL_CLASS} .ff8-spell-status{font-size:12px;min-height:1.3em}
-      @media(max-width:760px){.${PANEL_CLASS} .ff8-spell-row{grid-template-columns:28px 1fr}.${PANEL_CLASS} .ff8-spell-row select{grid-column:2}.${PANEL_CLASS} .ff8-spell-actions{grid-column:2}}
-    `;
-    document.head.append(style);
-  };
   const mount = async () => {
     const host = document.querySelector("#gf-detail[data-gf]");
     if (!host || host.querySelector(`.${PANEL_CLASS}`)) return;
     const gfId = Number(host.dataset.gf);
     if (!Number.isInteger(gfId) || gfId < 0 || gfId > 15) return;
-    const marker = document.createElement("div");
-    marker.className = PANEL_CLASS;
+    const marker = LexeditorUI.stack({fill:false});
+    marker.classList.add(PANEL_CLASS);
     marker.dataset.gf = String(gfId);
     marker.textContent = "Loading GF spellbook…";
     const abilitiesPanel=host.querySelector('[data-gf-panel="abilities"]');
@@ -361,16 +280,15 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     const parts=LexeditorUI.sectionParts(abilitiesPanel);
     const abilitiesContent=parts.content;
     parts.title?.remove();
-    const views=document.createElement('div');views.className='gf-abilities-views';
-    const tabs=LexeditorUI.subtabBar({flush:true,label:'GF abilities and spellbook',active:'abilities',tabs:[{id:'abilities',label:'ABILITIES'},{id:'spellbook',label:'SPELLBOOK'}],change:id=>{
+    const tabbed=LexeditorUI.tabbedPanel({label:'GF abilities and spellbook',active:'abilities',tabs:[{id:'abilities',label:'ABILITIES'},{id:'spellbook',label:'SPELLBOOK'}],content:[abilitiesContent,marker],change:id=>{
       abilitiesContent.hidden=id!=='abilities';marker.hidden=id!=='spellbook';
       tabs.querySelectorAll('[role="tab"]').forEach((tab,index)=>{const active=index===(id==='abilities'?0:1);tab.tabIndex=active?0:-1;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));});
     }});
+    const tabs=tabbed.querySelector('[role="tablist"]');
     const spellTab=tabs.querySelectorAll('button')[1];
     spellTab?.append(LexeditorUI.infoHelp("Choose and order this GF's Magic pages. This needs Lexer's spellbook tweak, with Single GF on and Shared Magic off. It does not change this GF's learnable abilities. Without the tweak, these pages have no effect in battle."));
     marker.hidden=true;
-    views.append(abilitiesContent,marker);abilitiesPanel.append(tabs,views);
-    ensureStyle();
+    host.lexReplacePanel(abilitiesPanel,tabbed);
     try {
       const payload = await request("/api/kernel?section=3&dataset=current");
       if (!marker.isConnected || Number(host.dataset.gf) !== gfId) return;
@@ -387,11 +305,9 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       const note = document.createElement("p");
       note.className = "ff8-spell-note";
       note.textContent = "Ordered Magic pages for this GF. Zero-stock spells remain visible but disabled in battle. Optional requirements use abilities learned by this GF. Runtime requires Single GF and Shared Magic off.";
-      const toolbar = document.createElement("div");
-      toolbar.className = "ff8-spell-toolbar";
-      const body = document.createElement("div");
-      const status = document.createElement("div");
-      status.className = "ff8-spell-status";
+      const toolbar = LexeditorUI.actionRow();
+      const body = LexeditorUI.stack({fill:false});
+      const status = LexeditorUI.detailNote("");
       const setDirty = () => { dirty = true; status.textContent = "Unsaved spellbook changes"; };
       const usedMagic = (except=null) => new Set(pages.flatMap(page => page).filter(slot => slot !== except).map(slot => slot.magicId));
       const draw = () => {
@@ -409,20 +325,19 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
             button("DISABLE", () => {pages=[];setDirty();draw();})
           );
           pages.forEach((page, pageIndex) => {
-            const card = document.createElement("div");
-            card.className = "ff8-spell-page";
-            const head = document.createElement("div");
-            head.className = "ff8-spell-page-head";
+            const card = LexeditorUI.detailSection({title:`PAGE ${pageIndex+1}`});
+            const cardBody=LexeditorUI.sectionParts(card).content;
+            const head = LexeditorUI.actionRow();
             const name = document.createElement("span");
             name.textContent = `PAGE ${pageIndex+1}`;
-            const pageActions = document.createElement("span");
+            const pageActions = LexeditorUI.actionRow();
             pageActions.append(
               button("↑",()=>{if(pageIndex){[pages[pageIndex-1],pages[pageIndex]]=[pages[pageIndex],pages[pageIndex-1]];setDirty();draw();}},"Move page earlier"),
               button("↓",()=>{if(pageIndex<pages.length-1){[pages[pageIndex+1],pages[pageIndex]]=[pages[pageIndex],pages[pageIndex+1]];setDirty();draw();}},"Move page later"),
               button("REMOVE PAGE",()=>{pages.splice(pageIndex,1);setDirty();draw();})
             );
-            head.append(name,pageActions);
-            card.append(head);
+            head.append(pageActions);
+            cardBody.append(head);
             page.forEach((slot, slotIndex) => {
               const row = document.createElement("div");
               row.className = "ff8-spell-row";
@@ -435,18 +350,18 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
                 slot.magicId=value;setDirty();draw();
               });
               const abilitySelect = select(abilities,slot.abilityId,value=>{slot.abilityId=value;setDirty();},"No learned-ability requirement");
-              const actions = document.createElement("span");
-              actions.className = "ff8-spell-actions";
+              const actions = LexeditorUI.actionRow();
               actions.append(
                 button("↑",()=>{if(slotIndex){[page[slotIndex-1],page[slotIndex]]=[page[slotIndex],page[slotIndex-1]];setDirty();draw();}},"Move spell earlier"),
                 button("↓",()=>{if(slotIndex<page.length-1){[page[slotIndex+1],page[slotIndex]]=[page[slotIndex],page[slotIndex+1]];setDirty();draw();}},"Move spell later"),
                 button("×",()=>{page.splice(slotIndex,1);setDirty();draw();},"Remove spell")
               );
-              row.append(index,magicSelect,abilitySelect,actions);
-              card.append(row);
+              cardBody.append(LexeditorUI.detailSection({title:`SPELL ${slotIndex+1}`,body:[
+                LexeditorUI.detailField({label:"Magic",control:magicSelect}),
+                LexeditorUI.detailField({label:"Required ability",control:abilitySelect}),actions]}));
             });
             if (page.length < (meta.slotsPerPage||4)) {
-              card.append(button("ADD SPELL",()=>{
+              cardBody.append(button("ADD SPELL",()=>{
                 const used=usedMagic();const first=magic.find(entry=>!used.has(Number(entry.id)));
                 if(!first){status.textContent="No unused spells remain.";return;}
                 page.push({magicId:Number(first.id),abilityId:null});setDirty();draw();

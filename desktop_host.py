@@ -522,8 +522,6 @@ class HostApi:
                 **row_extra,
                 "id": plugin.plugin_id,
                 "name": plugin.name,
-                "subtitle": plugin.subtitle,
-                "description": plugin.description,
                 "accent": plugin.accent,
                 "ready": installation["canOpen"] and not problems,
                 "problem": (problems or [None])[0],
@@ -1516,8 +1514,6 @@ class HostApi:
 
     def browse_mod_project(self, plugin_id: str) -> dict:
         """Select an existing editable project with the native folder picker."""
-        if not self.mod_library_status(plugin_id)["canManage"]:
-            raise ValueError("Mod management is not supported for this game yet")
         current = self._projects.snapshot(plugin_id)
         selected = self._choose_folder(current.get("current", ""))
         if not selected:
@@ -1528,8 +1524,6 @@ class HostApi:
 
     def create_mod_project(self, plugin_id: str, name: str) -> dict:
         """Clone the plugin's valid starter into a new selected folder."""
-        if not self.mod_library_status(plugin_id)["canManage"]:
-            raise ValueError("Mod management is not supported for this game yet")
         current = Path(self._projects.snapshot(plugin_id)["current"])
         selected = self._choose_folder(str(current.parent))
         if not selected:

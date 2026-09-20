@@ -96,79 +96,55 @@ function sharedTableSort(tab,key,rerender){
 }
 function craftingOutputList(groups,mode,selected,select,rerender){
   const tab=`crafting-${mode}`;
-  const heading=(key,label)=>{const current=state.sorts[tab],active=current?.key===key;
-    return el("button",{class:`craft-sort${active?" sorted":""}`,onclick:()=>sharedTableSort(tab,key,rerender)},
-      el("span",{class:"header-label"},label,active?el("span",{class:"lex-ui-symbol"},current.dir>0?" ▼":" ▲"):""));};
-  return LexeditorUI.list({
-    rows:groups,key:group=>group.key,selected,selectedClass:"sel",select,
-    class:"loot-list craft-output-list",
-    header:el("div",{class:"loot-listhead craft-output-head"},
-      heading("name","Item"),heading("category","Category"),heading("recipes","Recipes")),
-    rowClass:"loot-item craft-output-row",
-    render:group=>[
-      el("div",{class:"craft-output-cell",title:`${group.name} — ${group.key}`},
-        itemLink(group.key,true,el("span",{class:"record-name"},originDisplayName(group.name,group.item))),el("span",{class:"key"},group.key)),
-      el("span",{class:"cat"},craftingCategoryLabel(group.category)),
-      el("span",{class:"cat"},String(group.recipes.length))
-    ]
-  });
+  return columnList({rows:groups,key:group=>group.key,selected,select,
+    sortState:state.sorts[tab],
+    sort:key=>sharedTableSort(tab,key,rerender),columns:[
+      {key:"name",label:"Item",grow:2,render:group=>itemLink(group.key,true,originDisplayName(group.name,group.item))},
+      {key:"key",label:"ID",grow:1},
+      {key:"category",label:"Category",grow:1,render:group=>craftingCategoryLabel(group.category)},
+      {key:"recipes",label:"Recipes",numeric:true,render:group=>group.recipes.length}]});
 }
-function readonlyCraftingField(label,content,wide=false){
-  return el("div",{class:`craft-readonly-field${wide?" wide":""}`},el("span",{},label),el("span",{},content||"—"));
+function readonlyCraftingField(label,content){
+  return LexeditorUI.detailField({label,control:LexeditorUI.readonlyField(content||"—",{format:false})});
 }
 function readonlyCraftingRecipe({recipe},position){
-  const ingredients=el("div",{class:"ingredient-editor"},
-    el("div",{class:"ingredient-head"},el("span",{},"Ingredient"),el("span",{},"Quantity"),el("span")));
-  for(const part of recipe.ingredients||[])ingredients.append(el("div",{class:"ingredient-row"},itemLink(part.item),el("span",{},String(part.quantity)),el("span")));
-  return el("section",{class:"inline-recipe craft-recipe-editor"},
-    el("div",{class:"inline-recipe-actions"},el("b",{},`Recipe ${position+1}`),el("span",{class:"key recipe-id"},recipe.recipe_id)),
-    el("div",{class:"craft-readonly-grid wide"},
-      readonlyCraftingField("Context",CUSTOM_CRAFT_STATIONS[recipe.station]||recipe.station),
-      readonlyCraftingField("Makes",String(recipe.output_quantity)),
-      readonlyCraftingField("Learned",recipe.unlock||"Always known"),
-      readonlyCraftingField("Description",el("span",{class:"craft-readonly-description"},recipe.description||"No description"),true)),
-    ingredients);
+  const ingredients=columnList({rows:(recipe.ingredients||[]).map((part,index)=>({...part,index})),key:part=>part.index,
+    columns:[{key:"item",label:"Ingredient",grow:1,render:part=>itemLink(part.item)},
+      {key:"quantity",label:"Quantity",numeric:true}]});
+  return LexeditorUI.detailSection({title:`Recipe ${position+1}`,body:[
+    readonlyCraftingField("ID",recipe.recipe_id),
+    readonlyCraftingField("Context",CUSTOM_CRAFT_STATIONS[recipe.station]||recipe.station),
+    readonlyCraftingField("Makes",String(recipe.output_quantity)),
+    readonlyCraftingField("Learned",recipe.unlock||"Always known"),
+    readonlyCraftingField("Description",recipe.description||"No description"),ingredients]});
 }
 function customCraftingRecipe(entry,group,position,validation){
   const {recipe,index}=entry,update=(field,value)=>{recipe[field]=value;customCraftingTouch();};
-  const ingredients=el("div",{class:"ingredient-editor"},
-    el("div",{class:"ingredient-head"},el("span",{},"Ingredient"),el("span",{},"Quantity"),el("span")));
-  (recipe.ingredients||[]).forEach((part,partIndex)=>ingredients.append(el("div",{class:"ingredient-row"},
-    linkedCatalogKeyEditor(part.item,value=>{part.item=value;customCraftingTouch();renderCrafting();}),
-    el("input",{type:"number",min:"1",step:"1",value:part.quantity??1,onchange:ev=>{part.quantity=Math.max(1,Math.round(+ev.target.value||1));customCraftingTouch();}}),
-    el("button",{class:"icon-link del",title:"Remove ingredient",onclick:()=>{recipe.ingredients.splice(partIndex,1);customCraftingTouch();renderCrafting();}},"×"))));
-  ingredients.append(el("div",{class:"inline-recipe-actions"},newButton({title:"Add ingredient",onclick:()=>pickIdentifier("Ingredient",catalogItemOptions(),"",value=>{
-    recipe.ingredients.push({item:value,quantity:1});customCraftingTouch();renderCrafting();
-  })})));
-  const name=el("input",{value:recipe.title||"",onchange:ev=>{update("title",ev.target.value.trim());renderCrafting();}});
-  const quantity=el("input",{type:"number",min:"1",step:"1",value:recipe.output_quantity??1,onchange:ev=>update("output_quantity",Math.max(1,Math.round(+ev.target.value||1)))});
-  const unlock=validatedKeyEditor("Recipe unlock",recipe.unlock||"ALWAYS KNOWN",recipeUnlockKeys(),value=>{update("unlock",value==="ALWAYS KNOWN"?"":value);renderCrafting();});
-  const description=el("textarea",{onchange:ev=>update("description",ev.target.value)},recipe.description||"");
-  const errors=(validation.byRow[index]||[]).map(message=>el("div",{class:"custom-craft-error"},message));
-  return el("section",{class:"inline-recipe craft-recipe-editor"},
-    el("div",{class:"inline-recipe-actions"},el("b",{},`Recipe ${position+1}`),el("span",{class:"key recipe-id"},recipe.recipe_id),
-      el("button",{class:"icon-link",title:"Move recipe up",disabled:position===0,onclick:()=>moveCustomCraftingRecipe(group.key,index,-1)},"↑"),
-      el("button",{class:"icon-link",title:"Move recipe down",disabled:position===group.recipes.length-1,onclick:()=>moveCustomCraftingRecipe(group.key,index,1)},"↓")),
-    el("label",{},"Name",name),el("label",{},"Makes",quantity),el("label",{},"Context",customCraftingStationSelect(recipe,value=>{update("station",value);renderCrafting();})),
-    el("label",{class:"wide"},"Learned",unlock),el("label",{class:"wide"},"Description",description),ingredients,
-    el("div",{class:"inline-recipe-actions"},
-      el("button",{onclick:()=>pickIdentifier("Recipe output",catalogItemOptions(),recipe.output_item,value=>{
-        const item=catalogItem(value);recipe.output_item=value;recipe.category=item?.category||"";state.filters.craftSelCustom=value;customCraftingTouch();renderCrafting();
-      })},"Move to another item"),
-      el("button",{class:"remove-recipe",onclick:()=>{state.customCraftingDraft.splice(index,1);customCraftingTouch();renderCrafting();}},"Remove recipe")),
-    ...errors);
+  const ingredients=columnList({rows:(recipe.ingredients||[]).map((part,partIndex)=>({part,partIndex})),key:row=>row.partIndex,editable:true,
+    columns:[{key:"item",label:"Ingredient",grow:1,render:({part})=>linkedCatalogKeyEditor(part.item,value=>{part.item=value;customCraftingTouch();renderCrafting()})},
+      {key:"quantity",label:"Quantity",width:"100px",render:({part})=>el("input",{type:"number",min:1,step:1,value:part.quantity??1,onchange:ev=>{part.quantity=Math.max(1,Math.round(+ev.target.value||1));customCraftingTouch()}})},
+      {key:"remove",label:"",width:"45px",render:({partIndex})=>el("button",{title:"Remove ingredient",onclick:()=>{recipe.ingredients.splice(partIndex,1);customCraftingTouch();renderCrafting()}},"×")}]});
+  const name=el("input",{value:recipe.title||"",onchange:ev=>{update("title",ev.target.value.trim());renderCrafting()}});
+  const quantity=el("input",{type:"number",min:1,step:1,value:recipe.output_quantity??1,onchange:ev=>update("output_quantity",Math.max(1,Math.round(+ev.target.value||1)))});
+  const unlock=validatedKeyEditor("Recipe unlock",recipe.unlock||"ALWAYS KNOWN",recipeUnlockKeys(),value=>{update("unlock",value==="ALWAYS KNOWN"?"":value);renderCrafting()});
+  const description=LexeditorUI.textArea({onchange:ev=>update("description",ev.target.value)});description.value=recipe.description||"";
+  return LexeditorUI.detailSection({title:`Recipe ${position+1}`,body:[LexeditorUI.actionRow(LexeditorUI.recordId(recipe.recipe_id),
+    el("button",{title:"Move recipe up",disabled:position===0,onclick:()=>moveCustomCraftingRecipe(group.key,index,-1)},"↑"),
+    el("button",{title:"Move recipe down",disabled:position===group.recipes.length-1,onclick:()=>moveCustomCraftingRecipe(group.key,index,1)},"↓")),
+    LexeditorUI.tileGrid([{label:"Name",control:name},{label:"Makes",control:quantity},{label:"Context",control:customCraftingStationSelect(recipe,value=>{update("station",value);renderCrafting()})},{label:"Learned",control:unlock},{label:"Description",control:description}].map(LexeditorUI.detailField)),
+    ingredients,LexeditorUI.actionRow(newButton({title:"Add ingredient",onclick:()=>pickIdentifier("Ingredient",catalogItemOptions(),"",value=>{recipe.ingredients.push({item:value,quantity:1});customCraftingTouch();renderCrafting()})}),
+      el("button",{onclick:()=>pickIdentifier("Recipe output",catalogItemOptions(),recipe.output_item,value=>{const item=catalogItem(value);recipe.output_item=value;recipe.category=item?.category||"";state.filters.craftSelCustom=value;customCraftingTouch();renderCrafting()})},"Move to another item"),
+      el("button",{onclick:()=>{state.customCraftingDraft.splice(index,1);customCraftingTouch();renderCrafting()}},"Remove recipe")),
+    ...(validation.byRow[index]||[]).map(message=>LexeditorUI.notice({message,tone:"danger"}))]});
 }
+
 function craftingDetail(group,mode){
-  if(!group)return el("div",{class:"loot-detail-pane lex-detail craft-detail-pane"},el("div",{class:"loading"},"No recipe output is selected."));
-  const pane=el("div",{class:"loot-detail-pane lex-detail craft-detail-pane"});
-  pane.append(el("div",{class:"craft-detail-head"},
-    itemLink(group.key,true,el("span",{class:"record-name"},originDisplayName(group.name,group.item))),
-    el("span",{class:"key"},group.key),el("span",{class:"cat"},craftingCategoryLabel(group.category))));
-  const list=el("div",{class:"craft-recipe-list"});
-  if(mode==="custom"){
-    const validation=customCraftingValidation();group.recipes.forEach((entry,position)=>list.append(customCraftingRecipe(entry,group,position,validation)));
-  }else group.recipes.forEach((entry,position)=>list.append(readonlyCraftingRecipe(entry,position)));
-  pane.append(list);return pane;
+  if(!group)return LexeditorUI.detailPanel({title:"Crafting",body:LexeditorUI.detailNote("No recipe output is selected.")});
+  const validation=mode==="custom"?customCraftingValidation():null;
+  const recipes=group.recipes.map((entry,position)=>mode==="custom"
+    ?customCraftingRecipe(entry,group,position,validation):readonlyCraftingRecipe(entry,position));
+  return LexeditorUI.detailPanel({title:itemLink(group.key,true,originDisplayName(group.name,group.item)),
+    identity:group.key,meta:craftingCategoryLabel(group.category),body:recipes});
 }
 function renderCrafting() {
   const f=state.filters;if(!f.craftMode||(f.craftMode==="custom"&&state.ds!=="mine"))f.craftMode="vanilla";
@@ -180,9 +156,7 @@ function renderCrafting() {
     f[f.craftMode==="custom"?"craftSelCustom":"craftSelVanilla"]=f.craftOutput;f.craftOutput="";
   }
   const mode=f.craftMode,tb=$("#toolbar");tb.innerHTML="";
-  const tabs=el("div",{class:"subtabs"},
-    el("button",{class:mode==="vanilla"?"active":"",onclick:()=>{f.craftMode="vanilla";f.craftQ="";f.craftIngredient="";f.craftPage=0;renderCrafting();}},"VANILLA"),
-    el("button",{class:mode==="custom"?"active":"",disabled:state.ds!=="mine",title:state.ds!=="mine"?"Custom recipes belong to My Mod":"",onclick:()=>{f.craftMode="custom";f.craftQ="";f.craftIngredient="";f.craftPage=0;renderCrafting();}},"CUSTOM"));
+  const tabs=LexeditorUI.subtabBar({active:mode,label:"Recipe source",tabs:[{id:"vanilla",label:"Vanilla"},{id:"custom",label:"Custom",disabled:state.ds!=="mine",help:"Custom recipes belong to My Mod."}],change:value=>{f.craftMode=value;f.craftQ="";f.craftIngredient="";f.craftPage=0;renderCrafting()}});
   const source=mode==="custom"?state.customCraftingDraft:state.customCrafting.vanilla||[];
   const q=(f.craftQ||"").trim().toUpperCase();
   let groups=craftingOutputGroups(source).filter(group=>craftingGroupMatches(group,q,f.craftIngredient));
@@ -199,13 +173,13 @@ function renderCrafting() {
   if(f.craftIngredient)bottomFilters.push(el("button",{title:`Showing recipes that use ${f.craftIngredient}`,onclick:()=>{f.craftIngredient="";f.craftPage=0;renderCrafting();}},`Ingredient: ${f.craftIngredient} ×`));
   if(mode==="custom")bottomFilters.push(newButton({title:"Create recipe",onclick:addCustomCraftingRecipe,disabled:!state.customCrafting.available}),savebar(saveCustomCrafting));
   const m=$("#main");m.innerHTML="";
-  if(mode==="custom"&&!state.customCrafting.available){m.append(el("div",{class:"loading"},`Custom crafting runtime files are unavailable for this profile. Expected ${state.customCrafting.customFile||"custom_crafting_recipes.tsv"}.`));return;}
+  if(mode==="custom"&&!state.customCrafting.available){m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},`Custom crafting runtime files are unavailable for this profile. Expected ${state.customCrafting.customFile||"custom_crafting_recipes.tsv"}.`));return;}
   m.append(LexeditorUI.pagedListDetail({
     modOnly:modOnlySpec(touchedRecords([state.craftEdits]),()=>{f.craftPage=0;},renderCrafting),
     rows:groups,key:group=>group.key,slots:false,page:f.craftPage,pageSize:f.craftPageSize,selected:f[selectedField],noun:"items",
     splitKey:`rdr2-crafting-${mode}`,defaultSplit:44,
     search:{key:`rdr2-crafting-${mode}`,value:f.craftQ||"",placeholder:"Search recipe outputs…",change:value=>{f.craftQ=value;f.craftIngredient="";f.craftPage=0;renderCrafting();}},filters:bottomFilters,
-    className:"lootsplit",fit:{rowSelector:".craft-output-row",headerSelector:".loot-listhead"},
+    className:"lootsplit",
     master:({rows,selected,select})=>craftingOutputList(rows,mode,selected,select,renderCrafting),
     detail:group=>craftingDetail(group,mode),
     sync:next=>{f.craftPage=next.page;f.craftPageSize=next.pageSize;f[selectedField]=next.selected||"";},
@@ -408,10 +382,10 @@ function pickCatalogTag(it,onPick){
   rebuildTagMaps(state.catalog);
   const present=new Set(itemTagsOf(it).map(t=>t.key));
   const options=(tagCatalog().tags||[]).filter(t=>t.pickable&&!present.has(t.key));
-  const backdrop=$("#picker");backdrop.innerHTML="";backdrop.classList.remove("hidden");
-  const panel=el("div",{class:"picker-panel"});
+  const backdrop=pickerHost();backdrop.innerHTML="";backdrop.hidden=false;
+  const panel=LexeditorUI.stack({fill:false,className:"lex-dialog",attrs:{role:"dialog","aria-modal":"true"}});
   const search=el("input",{type:"text",placeholder:"Search tags (e.g. CONSUMABLE, HORSE, FOLDER)…",value:""});
-  const list=el("div",{class:"picker-list"});
+  const list=LexeditorUI.stack({fill:false});
   const draw=()=>{
     const q=search.value.trim().toUpperCase();
     list.innerHTML="";
@@ -424,9 +398,9 @@ function pickCatalogTag(it,onPick){
       list.append(el("div",{class:"picker-group"},group));
       for(const t of rows){
         if(shown>=500)break;
-        list.append(el("button",{class:"picker-option",title:tagDisplayTitle(t),onclick:()=>{
-          onPick({key:t.key,type:t.type});backdrop.classList.add("hidden");
-        }},el("span",{class:"record-name"},t.label),el("span",{class:"key"},t.key)));
+        list.append(el("button",{class:"lex-dialog-action",title:tagDisplayTitle(t),onclick:()=>{
+          onPick({key:t.key,type:t.type});backdrop.hidden=true;
+        }},el("span",{class:"lex-inline-label"},t.label),el("span",{class:"key"},t.key)));
         shown++;
       }
     }
@@ -436,11 +410,11 @@ function pickCatalogTag(it,onPick){
   panel.append(
     el("div",{class:"head"},el("b",{},"Add catalog tag"),
       el("span",{class:"cat",style:"margin-left:auto"},`${options.length} named options · no free-entry hashes`)),
-    search,list,el("button",{onclick:()=>backdrop.classList.add("hidden")},"Cancel"));
+    search,list,el("button",{onclick:()=>backdrop.hidden=true},"Cancel"));
   backdrop.append(panel);draw();search.focus();
 }
 function itemTagsCell(it){
-  const wrap=el("div",{class:"item-tags"});
+  const wrap=LexeditorUI.stack({fill:false});
   const draw=()=>{
     tagCatalog();
     const current=itemTagsOf(it),dirty=it.key in state.itemTagEdits;
@@ -451,11 +425,11 @@ function itemTagsCell(it){
     const references=sources.map(([tag,cls,source])=>[tag,cls,(source.tags||[]).map(normalizeTag).filter(entry=>entry&&!alcoholKeys.has(entry.key))]);
     const tagChip=(tag,removable)=>{
       const unresolved=!isResolvedTag(tag);
-      const chip=el("span",{class:`chip tag-chip${unresolved?" unresolved":""}${dirty?" edited":""}`,title:tagDisplayTitle(tag)},
-        el("span",{class:"tag-label"},tagDisplayLabel(tag)));
+      const chip=LexeditorUI.inlineLabel(
+        el("span",{class:"tag-label"},tagDisplayLabel(tag)),unresolved?LexeditorUI.badge("Unresolved",{tone:"warning"}):null);chip.title=tagDisplayTitle(tag);
       if(!isRO()&&removable){
-        const remove=el("span",{class:"x",title:"Remove tag"},"×");
-        remove.addEventListener("pointerdown",event=>{
+        const remove=el("button",{type:"button",title:"Remove tag"},"×");
+        remove.addEventListener("click",event=>{
           event.stopPropagation();event.preventDefault();
           setItemTags(it,itemTagsOf(it).filter(entry=>entry.key!==normalizeTag(tag).key));draw();renderToolbarOnly();
         });
@@ -493,7 +467,7 @@ function itemTagsCell(it){
         const applies=tags.some(entry=>entry.key==="CI_TAG_ITEM_ALCOHOL")||!!strength;
         return [tag,cls,applies?[{key:"drink-class",value:strength?.key||""}]:[]];
       });
-      const drinkRow=el("div",{class:"multi-ref-entry"},el("label",{class:"alcohol-strength"},"Drink class",select));
+      const drinkRow=LexeditorUI.stack({fill:false},LexeditorUI.detailField({label:"Drink class",control:select}));
       const drinkStack=multiValueReferenceStack(drinkReferences,"drink-class",drinkEntry,{keyOf:entry=>entry.key,entryValue:entry=>entry.value,
         formatValue:value=>alcoholStrengthOptions().find(option=>normalizeTagToken(option.key)===normalizeTagToken(value))?.label||"none"},false);
       if(drinkStack)drinkRow.append(drinkStack);wrap.append(drinkRow);
@@ -523,7 +497,7 @@ function itemTagsCell(it){
               renderToolbarOnly();return;
             }
             state.alcoholEdits[it.key]=value;renderToolbarOnly();}});
-        wrap.append(el("label",{class:"alcohol-strength"},"Drunkenness",input,
+        wrap.append(LexeditorUI.inlineLabel("Drunkenness",input,
           ...(vanilla===undefined?[]:[el("span",{class:"ref"},`V ${fmtCompactNumber(vanilla)}`)]),
           fieldHelp("Actual per-drink drunkenness: 0 adds no drunkenness; 1.0 triggers the game's normal blackout path. Enter the displayed vanilla value to remove an override. Drink class remains a separate coarse tag.")));
       }
@@ -533,17 +507,17 @@ function itemTagsCell(it){
 }
 
 function showEffectUsage(effect,keys){
-  const backdrop=$("#picker");backdrop.innerHTML="";backdrop.classList.remove("hidden");
-  const panel=el("div",{class:"picker-panel"});
+  const backdrop=pickerHost();backdrop.innerHTML="";backdrop.hidden=false;
+  const panel=LexeditorUI.stack({fill:false,className:"lex-dialog",attrs:{role:"dialog","aria-modal":"true"}});
   panel.append(el("div",{class:"head"},el("b",{},`Items using ${humanName("effects",effect.key)||effect.label||effect.key}`),el("span",{class:"cat",style:"margin-left:auto"},`${keys.length} item${keys.length===1?"":"s"}`)));
-  const list=el("div",{class:"picker-list"});
+  const list=LexeditorUI.stack({fill:false});
   keys.map(key=>state.catalog.items.find(it=>it.key===key)).filter(Boolean)
     .sort((a,b)=>(localizedValue(a.nameKey)||a.key).localeCompare(localizedValue(b.nameKey)||b.key))
-    .forEach(it=>list.append(rdrHoverable({content:el("span",{class:"picker-option"},
-      el("span",{class:"record-name"},localizedValue(it.nameKey)||"No localized name"),el("span",{class:"key"},it.key)),
+    .forEach(it=>list.append(rdrHoverable({content:el("span",{class:"lex-dialog-action"},
+      el("span",{class:"lex-inline-label"},localizedValue(it.nameKey)||"No localized name"),el("span",{class:"key"},it.key)),
       targetType:"rdr2-item",targetId:it.key,targetLabel:`${localizedValue(it.nameKey)||it.key} in Items`,
-      activate:()=>{backdrop.classList.add("hidden");goToItem(it.key);}})));
-  panel.append(list,el("button",{onclick:()=>backdrop.classList.add("hidden")},"Close"));backdrop.append(panel);
+      activate:()=>{backdrop.hidden=true;goToItem(it.key);}})));
+  panel.append(list,el("button",{onclick:()=>backdrop.hidden=true},"Close"));backdrop.append(panel);
 }
 
 function effectSummary(e) {
@@ -611,7 +585,7 @@ function effectBehaviorName(e){
 
 function showCreateEffect(){
   if(isRO())return;
-  const backdrop=$("#picker");backdrop.innerHTML="";backdrop.classList.remove("hidden");
+  const backdrop=pickerHost();backdrop.innerHTML="";backdrop.hidden=false;
   const behaviors=[...new Set(state.catalog.effects.map(e=>e.id))].sort((a,b)=>(humanName("behaviors",a)||a).localeCompare(humanName("behaviors",b)||b));
   const durations=[...new Set(state.catalog.effects.map(e=>e.durationcategory))].sort();
   const key=el("input",{placeholder:"LEX_EFFECT_SALTED_BEEF"}),label=el("input",{placeholder:"Salty snack"});
@@ -619,7 +593,7 @@ function showCreateEffect(){
   const value=el("input",{type:"number",value:"0"}),percent=el("input",{type:"number",step:"any",value:"0"});
   const time=el("input",{type:"number",value:"0"}),units=el("select",{},el("option",{value:"0"},"0 — seconds"),el("option",{value:"1"},"1 — minutes"),el("option",{value:"2"},"2 — in-game hours"),el("option",{value:"3"},"3 — in-game days"));
   const duration=el("select",{},...durations.map(id=>el("option",{value:id},id.replace("EFFECT_DURATION_CATEGORY_",""))));
-  const close=()=>{backdrop.classList.add("hidden");backdrop.innerHTML="";};
+  const close=()=>{backdrop.hidden=true;backdrop.innerHTML="";};
   const create=async()=>{try{
     const result=await api("/api/catalog/effects/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:key.value,label:label.value,behavior:behavior.value,value:value.value,percent:percent.value,time:time.value,timeunits:units.value,durationcategory:duration.value})});
     if(result.label){state.labels.effects=state.labels.effects||{};state.labels.effects[result.key]=result.label;}
@@ -627,13 +601,10 @@ function showCreateEffect(){
     const store=refStore("mine");store.catalog=await api("/api/catalog",undefined,"mine");store.effectByKey={};for(const effect of store.catalog.effects)store.effectByKey[effect.key]=effect;
     state.catalog=store.catalog;state.effectByKey=store.effectByKey;state.filters.effQ=result.key;close();await switchDataset("mine");toast(`Created ${result.label||result.key}`);
   }catch(ex){toast("Create effect failed: "+ex.message,true);}};
-  const panel=el("div",{class:"picker-panel"},el("div",{class:"head"},el("b",{},"Create effect record"),el("span",{class:"cat",style:"margin-left:auto"},"catalog_sp.ymt")),
-    el("div",{class:"hint"},"Creates a new data record using an existing engine behavior. It does not create a new engine behavior."),
-    el("div",{class:"effect-create-grid"},
-      el("label",{class:"wide"},"Symbolic effect ID",key),el("label",{class:"wide"},"Editor label",label),
-      el("label",{class:"wide"},"Engine behavior",behavior),el("label",{},"Value",value),el("label",{},"Percent override",percent),
-      el("label",{},"Time",time),el("label",{},"Time units",units),el("label",{class:"wide"},"Duration category",duration)),
-    el("div",{class:"dialog-actions"},el("button",{onclick:close},"Cancel"),el("button",{class:"save",onclick:create},"Create effect")));
+  const panel=LexeditorUI.stack({fill:false,className:"lex-dialog",attrs:{role:"dialog","aria-modal":"true"}},el("div",{class:"head"},el("b",{},"Create effect record"),el("span",{class:"cat",style:"margin-left:auto"},"catalog_sp.ymt")),
+    LexeditorUI.stack({fill:false,className:"lex-notice"},"Creates a new data record using an existing engine behavior. It does not create a new engine behavior."),
+    LexeditorUI.tileGrid([{label:"Symbolic effect ID",control:key},{label:"Editor label",control:label},{label:"Engine behavior",control:behavior},{label:"Value",control:value},{label:"Percent override",control:percent},{label:"Time",control:time},{label:"Time units",control:units},{label:"Duration category",control:duration}].map(LexeditorUI.detailField)),
+    LexeditorUI.actionRow(el("button",{onclick:close},"Cancel"),el("button",{class:"save",onclick:create},"Create effect")));
   backdrop.append(panel);key.focus();
 }
 

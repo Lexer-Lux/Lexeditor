@@ -212,26 +212,30 @@ float scale_y(float value)
     return newRenderer.projectGamePointToScreen(0.0f, value)[1] * ImGui::GetIO().DisplaySize.y;
 }
 
-// FF8's own menu HP gauge, measured from the game at 3x: a colour line one
-// native pixel tall over a black track two pixels tall, so the line carries a
-// one-pixel black shadow and the lost part of the bar stays black. x, y and
-// width are screen units; pixel is one native pixel in screen units.
-//
-// The old bar inset its fill by a pixel on every side. Menu XP bars are one
-// native pixel tall, so the inset ate the whole fill and every XP bar was a
-// black strip.
-void draw_gauge(float x, float y, float width, float pixel, float fraction, ImU32 fill)
+// Measured vanilla reserve HP reference: a 48-native-pixel rail is 264
+// screen pixels wide. Its five-row profile is opaque, 133/255, clear,
+// opaque, 43/255. The clear center shows the panel, not a black slab.
+// Keep that profile proportional to the captured native viewport.
+void draw_gauge(float x, float y, float width, float pixel, float fraction, ImU32 fill, bool reverse = false)
 {
     ImDrawList *draw = ImGui::GetForegroundDrawList();
     const float left = scale_x(x), right = scale_x(x + width);
-    const float top = scale_y(y), line = scale_y(y + pixel), bottom = scale_y(y + 2.0f * pixel);
-    if (right <= left || line <= top) {
+    const float top = scale_y(y);
+    if (right <= left) {
         return;
     }
     fraction = std::clamp(fraction, 0.0f, 1.0f);
-    draw->AddRectFilled(ImVec2(left, top), ImVec2(right, bottom), IM_COL32(0, 0, 0, 255));
-    if (fraction > 0.0f) {
-        draw->AddRectFilled(ImVec2(left, top), ImVec2(left + (right - left) * fraction, line), fill);
+    const float unit = scale_y(pixel) / 5.5f;
+    const float split = reverse ? right - (right-left)*fraction : left + (right-left)*fraction;
+    constexpr unsigned coverage[] = {255,133,0,255,43};
+    for (int row=0; row<5; ++row) {
+        if (!coverage[row]) continue;
+        const float y0=top+row*unit, y1=top+(row+1)*unit;
+        const auto color=(fill & ~IM_COL32_A_MASK) | (coverage[row]<<IM_COL32_A_SHIFT);
+        const auto empty=IM_COL32(0,0,0,coverage[row]);
+        // Adjacent regions avoid blending translucent color over black twice.
+        if (split>left) draw->AddRectFilled(ImVec2(left,y0),ImVec2(split,y1),reverse?empty:color);
+        if (split<right) draw->AddRectFilled(ImVec2(split,y0),ImVec2(right,y1),reverse?color:empty);
     }
 }
 
@@ -278,12 +282,28 @@ float xp_fraction(std::uint32_t exp, std::uint8_t character)
 using ClockRenderer = std::uint32_t(__cdecl *)(void *, std::uint32_t,
     std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t);
 ClockRenderer g_clock_renderer = nullptr;
+using ClockLabelRenderer = std::uint32_t(__cdecl *)(std::uint32_t,std::uint32_t,
+    std::uint32_t,std::uint32_t,std::uint32_t,std::uint32_t,std::uint32_t);
+ClockLabelRenderer g_clock_label_renderer = nullptr;
+bool g_show_clock_time_label = false;
+
+std::uint32_t __cdecl clock_label_hook(std::uint32_t display, std::uint32_t cursor,
+    std::uint32_t label, std::uint32_t x, std::uint32_t y,
+    std::uint32_t texture, std::uint32_t flags)
+{
+    // Native clock glyphs: 0x142 is PLAY, 0x146 is TIME (countdown clock).
+    // Keep the playtime arithmetic; change only the label for our clock call.
+    if (g_show_clock_time_label && label == 0x142) label = 0x146;
+    return g_clock_label_renderer(display,cursor,label,x,y,texture,flags);
+}
 
 std::uint32_t __cdecl main_menu_clock_hook(void *state, std::uint32_t display_list,
     std::uint32_t cursor, std::uint32_t x, std::uint32_t y,
     std::uint32_t seconds, std::uint32_t playtime)
 {
     const auto *mode = getmode_cached();
+    const bool previous_label = g_show_clock_time_label;
+    g_show_clock_time_label = false;
     if (enable_ff8_ingame_time && playtime != 0 && mode != nullptr &&
         mode->driver_mode == MODE_MENU) {
         const std::time_t now = std::time(nullptr);
@@ -291,21 +311,24 @@ std::uint32_t __cdecl main_menu_clock_hook(void *state, std::uint32_t display_li
         if (localtime_s(&local, &now) == 0) {
             seconds = static_cast<std::uint32_t>(
                 local.tm_hour * 3600 + local.tm_min * 60 + local.tm_sec);
+            g_show_clock_time_label = true;
         }
     }
-    return g_clock_renderer(state, display_list, cursor, x, y, seconds, playtime);
+    const auto result = g_clock_renderer(state, display_list, cursor, x, y, seconds, playtime);
+    g_show_clock_time_label = previous_label;
+    return result;
 }
 
 // Capture native widget coordinates and viewport, not guessed screen positions.
-struct MenuXpRow { float x, y, width, fraction; sprite_viewport viewport; };
+struct MenuXpRow { float x, y, width, fraction; sprite_viewport viewport; bool hp; };
 std::array<MenuXpRow, 32> g_menu_xp;
 std::size_t g_menu_xp_count = 0;
-void capture_menu_xp(float x, float y, float width, float fraction)
+void capture_menu_xp(float x, float y, float width, float fraction, bool hp = false)
 {
     const auto *mode = getmode_cached();
     if (!mode || mode->driver_mode != MODE_MENU || !g_active_viewport ||
         !*g_active_viewport || g_menu_xp_count == g_menu_xp.size()) return;
-    g_menu_xp[g_menu_xp_count++] = {x,y,width,fraction,**g_active_viewport};
+    g_menu_xp[g_menu_xp_count++] = {x,y,width,fraction,**g_active_viewport,hp};
 }
 float gf_xp_fraction(unsigned gf)
 {
@@ -344,8 +367,18 @@ std::uint32_t __cdecl main_row_hook(const std::uint8_t *state,unsigned display,u
 {
     if(slot>=0 && slot<3) {
         const auto id=state[0x35+slot];
-        if(id<CHAR_NUM) capture_menu_xp(40,34+Spacing*slot+23,65,
-            xp_fraction(ff8_externals.savemap->chars[id].exp,id));
+        if(id<CHAR_NUM) {
+            if(enable_ff8_xp_bars) capture_menu_xp(114,55+Spacing*slot,48,
+                xp_fraction(ff8_externals.savemap->chars[id].exp,id));
+            if(enable_ff8_hp_bars) {
+                // The menu uses this 32-byte computed-stat record, including
+                // junctions and abilities, for the HP X/Y text at x162.
+                const auto *stats=reinterpret_cast<const std::uint16_t *>(0x01D771B0+32*id);
+                const auto current=stats[4], maximum=stats[5];
+                if(maximum) capture_menu_xp(162,55+Spacing*slot,94,
+                    current/static_cast<float>(maximum),true);
+            }
+        }
     }
     return reinterpret_cast<MainRowWidget>(Address)(state,display,cursor,slot);
 }
@@ -354,7 +387,7 @@ std::uint32_t __cdecl reserve_widget_hook(const std::uint8_t *state,unsigned dis
 {
     for(unsigned slot=0;slot<8;++slot) {
         const auto id=state[0x38+slot];
-        if(id<CHAR_NUM) capture_menu_xp(41+120*(slot%2),128+24*(slot/2),50,
+        if(id<CHAR_NUM) capture_menu_xp(44+120*(slot%2),138+24*(slot/2),48,
             xp_fraction(ff8_externals.savemap->chars[id].exp,id));
     }
     return reinterpret_cast<ReserveWidget>(0x004C2090)(state,display,cursor);
@@ -375,8 +408,10 @@ void draw_menu_xp()
 {
     for(std::size_t i=0;i<g_menu_xp_count;++i) {
         const auto &row=g_menu_xp[i]; const auto &v=row.viewport;
-        draw_gauge(row.x*v.scale_x+v.offset_x,row.y*v.scale_y+v.offset_y,
-            row.width*v.scale_x, v.scale_y,row.fraction,IM_COL32(224,192,48,255));
+        if(row.hp ? enable_ff8_hp_bars : enable_ff8_xp_bars)
+            draw_gauge(row.x*v.scale_x+v.offset_x,row.y*v.scale_y+v.offset_y,
+                row.width*v.scale_x, v.scale_y,row.fraction,
+                row.hp ? IM_COL32(236,0,0,255) : IM_COL32(224,192,48,255));
     }
     g_menu_xp_count=0;
 }
@@ -425,16 +460,14 @@ void draw_battle_hp()
         if (!(row.hp_visible || row.atb_visible) ||
             row.viewport.scale_x <= 0 || row.viewport.scale_y <= 0) continue;
         const auto &v = row.viewport;
-        // A gauge spans the thing it measures and fills by current/max. It
-        // used to be anchored at the ATB gauge's far end and shortened by
-        // max/9999, so a 479-HP character got a two-pixel stub floating past
-        // the end of the ATB frame instead of a bar under its HP.
         auto draw_line = [&](std::uint32_t current, std::uint32_t maximum,
-                             float native_left, float native_right, float native_y, ImU32 color) {
+                             float native_left, float native_right, float native_y, ImU32 color, bool scaled_hp = false) {
             if (!maximum || native_right <= native_left) return;
+            if(scaled_hp) native_left = native_right - (native_right-native_left)*
+                std::min(maximum/9999.0f,1.0f);
             draw_gauge(native_left * v.scale_x + v.offset_x, native_y * v.scale_y + v.offset_y,
                 (native_right - native_left) * v.scale_x, v.scale_y,
-                current / static_cast<float>(maximum), color);
+                current / static_cast<float>(maximum), color, scaled_hp);
         };
         // Native rows are 15 pixels high (004B0FF6) and spaced by 15
         // (004B1978). Text starts at row_y+2 and is 12 pixels high, so the
@@ -444,7 +477,7 @@ void draw_battle_hp()
         if (enable_ff8_hp_bars && row.hp_visible && row.hp_right > row.hp_left) {
             const float field = std::max(row.hp_right - row.hp_left, 4.0f * row.digit);
             draw_line(row.current, row.maximum, row.hp_right - field, row.hp_right,
-                row.top + 14.0f, IM_COL32(236, 0, 0, 255));
+                row.top + 14.0f, IM_COL32(236, 0, 0, 255), true);
         }
         // The blue gauge takes the two pixels above the name, whose text
         // starts at row_y+2, and spans the name's own area.
@@ -486,9 +519,19 @@ void lexeditor_ff8_bars_install()
         replace_call(0x004B127B, reinterpret_cast<void *>(&atb_glyph_hook));
     }
     if (enable_ff8_ingame_time && FF8_US_VERSION &&
-        original_call(0x004C1C6E, 0x004BF020)) {
+        original_call(0x004C1C6E, 0x004BF020) &&
+        original_call(0x004BF099, 0x004B77C0)) {
         g_clock_renderer = reinterpret_cast<ClockRenderer>(get_relative_call(0x004C1C6E, 0));
+        g_clock_label_renderer = reinterpret_cast<ClockLabelRenderer>(get_relative_call(0x004BF099, 0));
+        replace_call(0x004BF099, reinterpret_cast<void *>(&clock_label_hook));
         replace_call(0x004C1C6E, reinterpret_cast<void *>(&main_menu_clock_hook));
+    }
+    // Main-menu HP also needs the active-party row hooks when XP is off.
+    if (FF8_US_VERSION && (enable_ff8_xp_bars || enable_ff8_hp_bars)) {
+        if(original_call(0x4C1ADA,0x4C1D50))
+            replace_call(0x4C1ADA,reinterpret_cast<void *>(&main_row_hook<0x4C1D50,26>));
+        if(original_call(0x4C1AC2,0x4C1ED0))
+            replace_call(0x4C1AC2,reinterpret_cast<void *>(&main_row_hook<0x4C1ED0,52>));
     }
     if (!enable_ff8_xp_bars) return;
 
@@ -499,8 +542,6 @@ void lexeditor_ff8_bars_install()
         };
         for(const unsigned call : {0x4C08F4U,0x4CB66CU,0x4CC846U,0x4F6E8EU,0x4F6F17U,0x4F7361U,0x4F73EEU})
             hook(call,0x4C0780,reinterpret_cast<void *>(&character_widget_hook));
-        hook(0x4C1ADA,0x4C1D50,reinterpret_cast<void *>(&main_row_hook<0x4C1D50,26>));
-        hook(0x4C1AC2,0x4C1ED0,reinterpret_cast<void *>(&main_row_hook<0x4C1ED0,52>));
         hook(0x4C1AED,0x4C2090,reinterpret_cast<void *>(&reserve_widget_hook));
         hook(0x4D3DB5,0x4D3E40,reinterpret_cast<void *>(&gf_list_hook));
         for(const unsigned call : {0x4D3D34U,0x4D3D4AU})
@@ -524,8 +565,8 @@ void lexeditor_ff8_bars_draw()
     if (enable_ff8_hp_bars || enable_ff8_gf_hp_bars) {
         draw_battle_hp();
     }
+    if (enable_ff8_xp_bars || enable_ff8_hp_bars) draw_menu_xp();
     if (enable_ff8_xp_bars) {
-        draw_menu_xp();
         switch (g_capture.surface) {
         case XpSurface::after_battle:
             draw_after_battle_xp();

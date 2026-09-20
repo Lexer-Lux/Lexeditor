@@ -297,8 +297,6 @@ def smoke() -> list[str]:
 PLUGIN = GamePlugin(
     plugin_id="rdr",
     name="Red Dead Redemption",
-    subtitle="RDR",
-    description="Edit RDR tuning, weapons, vehicles, AI, effects, population, and more.",
     accent="#a92b20",
     check=check,
     launch=launch,

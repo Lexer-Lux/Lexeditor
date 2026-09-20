@@ -240,7 +240,7 @@ to redistribute.
 
 Create `games/<game>/__init__.py` and `plugin.py`. Export one `GamePlugin` named
 `PLUGIN`; discovery is automatic. Give it a unique letters/numbers/hyphens ID,
-name, subtitle, description, accent, `check`, `launch`, `session_factory`, and a
+name, accent, `check`, `launch`, `session_factory`, and a
 safe `smoke()` before shipping.
 
 ```python
@@ -264,8 +264,6 @@ def launch():
 PLUGIN = GamePlugin(
     plugin_id="example",
     name="Example",
-    subtitle="Example game",
-    description="Edits the supported Example records.",
     accent="#557788",
     check=check,
     launch=launch,

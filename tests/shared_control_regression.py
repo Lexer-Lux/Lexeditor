@@ -129,6 +129,7 @@ def main():
    assert rails.count()>1
    assert rails.evaluate_all('nodes=>nodes.every(e=>getComputedStyle(e).opacity==="0")')
    flag=page.locator('.lex-toggle').first
+   flag.scroll_into_view_if_needed()
    original=flag.bounding_box()
    flag.locator('input').hover();page.wait_for_timeout(180)
    assert rails.first.evaluate('e=>getComputedStyle(e).opacity')=='1'
@@ -162,7 +163,7 @@ def main():
    page.wait_for_timeout(250)
    assert page.locator('.lex-help-popover').count()==0
    page.evaluate("navigate('graphs')");page.wait_for_timeout(350)
-   assert page.locator('.lex-curve-svg').first.get_attribute('preserveAspectRatio')=='none'
+   assert page.locator('.lex-curve-svg').first.get_attribute('preserveAspectRatio')=='xMidYMid meet'
    page.screenshot(path=str(OUT/'graphs.png'),animations='disabled')
    # Exercise the real source reader/writer through the rendered troop controls.
    with tempfile.TemporaryDirectory() as tmp:

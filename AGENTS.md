@@ -28,6 +28,41 @@
 
 ## GitHub issues are the source of truth
 
+### Standard plugin issue structure
+
+Use one parent issue titled `Plugin`, identified by its game label. Link these
+four actual subissues in this order, with the same game label on each:
+
+1. `Create Editor`: Research existing tools and format knowledge first. Build
+   the plugin and required code, vendor permitted helpers, and record Credits.
+   Integrate every Data Map area with appropriate editable views. Do not hide
+   unsupported rows or call raw-file access full integration. Only Lexer can
+   exclude areas as not worth the effort; ask when scope or value is in doubt.
+   Unknown semantics remain protected until proven; report the gap, not success.
+2. `Implement Mod Loading`: Find, add, load and remove real mods. Support record
+   overrides and composition against vanilla where the format requires them,
+   rather than silently replacing a whole file for unrelated record changes.
+   Define load order, conflicts, dependencies and restoration. Test a documented
+   range of real online mods in isolation, including overlapping edits, and
+   make supported mods work without manual repair. Record unsupported cases.
+3. `Create Theme`: Use the game's fonts, colours and sound effects for a fitting
+   theme. Record asset provenance and distribution rights; extract locally when
+   redistribution is not permitted. Do not publish proprietary assets blindly.
+4. `Create GUI`: Build usable, human-friendly screens with shared controls,
+   clear help and good navigation. Inspect rendered screens and interactions,
+   repair UI defects, and check small windows and large UI scales.
+
+Reuse existing matching issues and preserve their discussion. These four
+subissues track one plugin branch/PR, not four separate implementation PRs.
+Keep game names out of issue titles. Each open issue needs its own truthful
+workflow label. Source, rendered UI, mod compatibility, delivered candidate and
+in-game acceptance are separate checks; the parent is not complete while required
+scope remains. Do not infer permission to merge from completion.
+
+Issue/PR administration belongs here. Keep private worker coordination, chat
+URLs, monitoring, recovery and cleanup out of `docs/ADDING_A_GAME.md`; that guide
+is the public technical methodology for users and their agents.
+
 GitHub issues and their comments are the canonical record of requests and public
 project discussion. Agents may summarize implementation state in an internal
 handoff, but must not mirror or archive complete issue bodies, comments, attachment

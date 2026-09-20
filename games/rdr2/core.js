@@ -92,10 +92,7 @@ const state = {
              mobModelGroup: "gang", mobModelQ: "", mapQ:"", mapStatus:"", mapPage:0 },
 };
 
-function toast(msg, err) {
-  const t = $("#toast");
-  t.textContent = msg; t.className = err ? "err" : ""; t.style.display = "block";
-  setTimeout(() => t.style.display = "none", 2600);
+function toast(msg,err){LexeditorUI.showToast(msg,{tone:err?"danger":""});
 }
 
 const TAB_CONTEXT = {
@@ -114,20 +111,15 @@ const TAB_CONTEXT = {
 };
 
 function fieldHelp(text){return LexeditorUI.infoHelp(text,{class:"field-help"});}
-function rdrSearchField({id,placeholder,label=placeholder,value="",oninput,className=""}){
-  return el("label",{class:`rdr-search ${className}`.trim()},
-    el("span",{class:"rdr-search-icon","aria-hidden":"true"}),
-    el("input",{id,type:"text",placeholder,"aria-label":label,value,oninput}));
+function rdrSearchField({id,placeholder,label=placeholder,value="",oninput}){
+  return LexeditorUI.inlineLabel(LexeditorUI.searchIcon(),el("input",{id,type:"search",placeholder,"aria-label":label,value,oninput}));
 }
+
 function tabContext(){const c=TAB_CONTEXT[state.tab]||{};return typeof c.files==="function"?c.files():c.files||"";}
-function installTabContext(){const tb=$("#toolbar");if(!tb||tb.querySelector(".help-toggle"))return;
-  if(state.tab==="datamap"||state.tab==="settings")return;
-  const target=tb.querySelector(".toolbar-context-slot")||tb.querySelector(".record-toolbar")||tb,anchor=target.querySelector(".savebar");
-  const help=LexeditorUI.infoHelp("About this tab",{class:"help-toggle",onclick:()=>{state.helpOpen[state.tab]=!state.helpOpen[state.tab];render();}});
-  target.insertBefore(help,anchor);
-  const m=$("#main"),existing=m?.querySelector(":scope > .hint");
-  if(existing){existing.classList.add("tab-help");existing.hidden=!state.helpOpen[state.tab];}
-  else if(state.helpOpen[state.tab]&&m)m.prepend(el("div",{class:"hint tab-help"},TAB_CONTEXT[state.tab]?.help||""));}
+function installTabContext(){
+  // Tab help belongs to the shell tab. Keep a page's own status messages visible.
+  $("#toolbar")?.querySelectorAll(".help-toggle").forEach(node=>node.remove());
+}
 
 function filterRerender(ev,rerender){
   const source=ev.currentTarget||ev.target,placeholder=source.placeholder,type=source.type;
@@ -179,13 +171,20 @@ function effectDisplayName(key){
 function humanNameInput(scope,key,placeholder="Add display name…"){return el("input",{class:"human-name",type:"text",value:humanName(scope,key),placeholder,title:"Editor-only human-readable label; stored in this RDR2 plugin's labels.json and never written to the mod.",onchange:async ev=>{const value=ev.target.value;state.labels[scope]=state.labels[scope]||{};if(value.trim())state.labels[scope][key]=value.trim();else delete state.labels[scope][key];await api("/api/labels/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({scope,key,value})});}});}
 function localizedValue(key){return state.localizationEdits[key]??state.localization?.values?.[key]??"";}
 function originMarker(record){
-  if(record?.rdoAdded)return el("span",{class:"origin-icon origin-rdo",title:"Imported from Red Dead Online","aria-label":"Imported from Red Dead Online"});
-  if(record?.customAdded)return el("span",{class:"origin-icon origin-custom",title:"Created locally in LEXEDITOR","aria-label":"Created locally in LEXEDITOR"},"✒️");
+  if(record?.rdoAdded){
+    const ns="http://www.w3.org/2000/svg",icon=document.createElementNS(ns,"svg");
+    for(const [key,value] of Object.entries({viewBox:"0 0 24 24",width:"14",height:"14",fill:"none",stroke:"#8da9ba","stroke-width":"2",role:"img","aria-label":"Imported from Red Dead Online"}))icon.setAttribute(key,value);
+    const title=document.createElementNS(ns,"title");title.textContent="Imported from Red Dead Online";
+    const circle=document.createElementNS(ns,"circle");circle.setAttribute("cx","12");circle.setAttribute("cy","12");circle.setAttribute("r","9");
+    const path=document.createElementNS(ns,"path");path.setAttribute("d","M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18");
+    icon.append(title,circle,path);return icon;
+  }
+  if(record?.customAdded)return el("span",{class:"lex-ui-symbol",title:"Created locally in LEXEDITOR","aria-label":"Created locally in LEXEDITOR"},"✒️");
   return "";
 }
-function originDisplayName(value,record){return el("span",{class:"origin-name"},
-  el("span",{class:"origin-slot","aria-hidden":"true"},originMarker(record)),
-  el("span",{class:"origin-name-text"},value));}
+
+function originDisplayName(value,record){return LexeditorUI.inlineLabel(
+  originMarker(record),el("span",{},value));}
 function catalogItem(key){return state.catalog?.items.find(item=>item.key===key)||null;}
 function sanitizeItemDescription(value){
   return value
@@ -198,9 +197,9 @@ function localizationInput(key,placeholder="No localized name"){
   if(isRO())attrs.readonly="readonly";return el("input",attrs);
 }
 function localizationTextarea(key,placeholder="No localized description",onEdit){
-  if(!key){const area=el("textarea",{readonly:"readonly",title:"This record has no localization key."});area.value="N/A";return area;}
+  if(!key){const area=LexeditorUI.textArea({readonly:"readonly",title:"This record has no localization key."});area.value="N/A";return area;}
   const attrs={class:"localized-description",placeholder,title:`In-game localization: ${key}`,onchange:ev=>{const value=ev.target.value,base=state.localization?.values?.[key]??"";if(value===base)delete state.localizationEdits[key];else state.localizationEdits[key]=value;ev.target.classList.toggle("edited",key in state.localizationEdits);if(onEdit)onEdit(value);renderToolbarOnly();}};
-  if(isRO())attrs.readonly="readonly";const area=el("textarea",attrs);area.value=localizedValue(key);return area;
+  if(isRO())attrs.readonly="readonly";const area=LexeditorUI.textArea(attrs);area.value=localizedValue(key);return area;
 }
 async function saveLocalization(){const edits=Object.entries(state.localizationEdits).map(([key,value])=>({key,value}));if(!edits.length)return 0;const r=await api("/api/localization/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});for(const e of edits)state.localization.values[e.key]=e.value;state.localizationEdits={};return r.saved;}
 
@@ -334,13 +333,12 @@ async function ensureRefLoot(file, rerender) {
   if (rerender) rerender();
 }
 
-async function ensureRefMatrix(rerender) {
+async function ensureRefMatrix() {
   if (state.ds !== "mine") return;
   for (const ds of ["vanilla", "kiddos"]) {
     if (hasScope(ds, "matrix") && state.config.datasets[ds].matrix && !refStore(ds).matrix)
       try { refStore(ds).matrix = await api("/api/matrix", undefined, ds); } catch (e) { /* best effort */ }
   }
-  if (rerender) rerender();
 }
 
 function cashOf(it, section) {
@@ -467,51 +465,48 @@ function refLine(pairs, fmt, apply) { return refStack(pairs, undefined, apply, f
  *  you would give refStack; empty/no-ref collapses to just the control.
  *  opts.bool: compact centered checkbox layout (crime Off column). */
 function refField(control, pairs, current, apply, fmt, opts={}) {
-  const wrap = el("div", { class: opts.bool ? "ref-field ref-field-bool" : "ref-field" }, control);
-  if (pairs) {
-    const ref = refStack(pairs, current, apply, fmt);
-    if (ref) wrap.append(ref);
-  }
-  return wrap;
+  const sources=state.ds==="mine"?(pairs||[]).filter(([, , value])=>value!==null&&value!==undefined&&value!==""):[];
+  const vanilla=sources.find(([tag])=>tag==="V");
+  return LexeditorUI.provenanceControl({control,current:()=>current,vanilla:vanilla?.[2],
+    references:sources.filter(([tag])=>tag!=="V").map(([tag,,value])=>({name:tag,shortName:tag,value})),
+    format:fmt||String,apply:(value,event)=>{current=value;if(event)event.lexReferenceControl=control;apply?.(value,event);}});
 }
 
 function multiValueReferenceStack(references,key,currentEntry,{keyOf,entryValue,formatValue=String},ghost=false){
   if(state.ds!=="mine"||!references.length)return "";
-  const stack=el("span",{class:"multi-ref-stack"});
+  const stack=LexeditorUI.stack({fill:false});
   const comparable=value=>value===undefined||value===null?null:String(value);
   const currentValue=entryValue&&currentEntry?comparable(entryValue(currentEntry)):null;
   for(const [tag,cls,entries] of references){
     const referenceEntry=(entries||[]).find(entry=>keyOf(entry)===key);
     if(!referenceEntry){
-      stack.append(el("span",{class:"multi-ref-state missing",title:`${tag}: this entry is not present`},
-        el("b",{class:cls},tag),el("span",{class:"lex-ui-symbol"},"×")));
+      stack.append(LexeditorUI.badge(`${tag} ×`,{tone:"muted",title:`${tag}: this entry is not present`}));
       continue;
     }
     const referenceValue=entryValue?comparable(entryValue(referenceEntry)):null;
     const matches=!ghost&&(!entryValue||referenceValue===currentValue);
     if(matches||!entryValue||referenceValue===null){
-      stack.append(el("span",{class:"multi-ref-state matching",title:`${tag}: this entry is present${ghost?"":" and matches"}`},
-        el("b",{class:cls},tag),el("span",{class:"lex-ui-symbol"},"✓")));
+      stack.append(LexeditorUI.badge(`${tag} ✓`,{tone:"success",title:`${tag}: this entry is present${ghost?"":" and matches"}`}));
       continue;
     }
     const shown=formatValue(referenceValue,referenceEntry);
-    stack.append(el("span",{class:"multi-ref-state value",title:`${tag}: ${shown}`},el("b",{class:cls},tag),shown));
+    stack.append(LexeditorUI.badge(`${tag}: ${shown}`,{title:`${tag}: ${shown}`}));
   }
   return stack;
 }
 
 function multiValueReferences({kind,current,references,keyOf,entryValue,formatValue,sortKey,renderCurrent,renderGhost,addControl,emptyText="none"}){
-  const wrap=el("div",{class:"multi-ref-field","data-multi-ref-kind":kind});
-  const live=el("div",{class:"multi-ref-current"});
+  const wrap=LexeditorUI.stack({fill:false,attrs:{"data-multi-ref-kind":kind}});
+  const live=LexeditorUI.actionRow();
   const currentKeys=new Set();
   for(const entry of current){
     const key=keyOf(entry);currentKeys.add(key);
-    const row=el("div",{class:"multi-ref-entry","data-multi-ref-key":key},renderCurrent(entry));
+    const row=LexeditorUI.stack({fill:false,attrs:{"data-multi-ref-key":key}},renderCurrent(entry));
     const stack=multiValueReferenceStack(references,key,entry,{keyOf,entryValue,formatValue},false);
     if(stack)row.append(stack);
     live.append(row);
   }
-  if(addControl)live.append(el("span",{class:"multi-ref-add"},addControl));
+  if(addControl)live.append(addControl);
   if(!current.length&&!addControl&&emptyText)live.append(el("span",{class:"cat"},emptyText));
   wrap.append(live);
   if(state.ds==="mine"){
@@ -521,9 +516,9 @@ function multiValueReferences({kind,current,references,keyOf,entryValue,formatVa
     }
     const rows=[...ghosts.entries()].sort((a,b)=>String(sortKey?sortKey(a[1]):a[0]).localeCompare(String(sortKey?sortKey(b[1]):b[0]),undefined,{sensitivity:"base"}));
     if(rows.length){
-      const ghostList=el("div",{class:"multi-ref-ghosts"});
+      const ghostList=LexeditorUI.actionRow();
       for(const [key,entry] of rows){
-        const row=el("div",{class:"multi-ref-entry multi-ref-ghost","data-multi-ref-key":key},(renderGhost||renderCurrent)(entry));
+        const row=LexeditorUI.stack({fill:false,attrs:{"data-multi-ref-key":key}},(renderGhost||renderCurrent)(entry));
         const stack=multiValueReferenceStack(references,key,entry,{keyOf,entryValue,formatValue},true);
         if(stack)row.append(stack);ghostList.append(row);
       }
@@ -537,14 +532,16 @@ function multiValueReferences({kind,current,references,keyOf,entryValue,formatVa
 // compact line beside the value rather than adding another row below it.
 function carryRefLine(pairs, fmt) {
   if (state.ds !== "mine") return "";
-  const div=el("div",{class:"ref carry-ref"});
+  const div=LexeditorUI.actionRow();
   for(const [tag,cls,val] of pairs)
     div.append(el("span",{},el("b",{class:cls},tag+" "),val===null||val===undefined?"—":fmt(val)));
   return div;
 }
 
 function applyToInput(ev, newVal) {
-  const inp = ev.target.closest("td, .cellwrap")?.querySelector("input, textarea");
+  const control=ev.lexReferenceControl;
+  const inp = control?.matches("input,textarea,select")?control:
+    control?.querySelector("input,textarea,select")||ev.target.closest("td, .cellwrap, .price-cell")?.querySelector("input,textarea,select");
   if (!inp) return;
   inp.value = newVal;
   inp.dispatchEvent(new Event("change", {bubbles:true}));
@@ -565,7 +562,7 @@ async function switchDataset(ds) {
   if (!state.store[ds]) state.store[ds] = { catalog: null, quickSelect:null, effectByKey: {}, loot: {}, matrix: null, shops:null };
   const st = state.store[ds];
   if (!st.catalog && dsInfo().catalog) {
-    $("#main").replaceChildren(el("div", { class: "loading" }, "Loading dataset…"));
+    $("#main").replaceChildren(LexeditorUI.stack({fill:false,className:"lex-notice"}, "Loading dataset…"));
   }
   // Request independent data together, but publish it only after both complete.
   // Explicit dataset ids prevent a later UI selection from redirecting a request.
@@ -626,7 +623,7 @@ async function boot() {
 
 function noData(msg) {
   const m = $("#main"); m.innerHTML = "";
-  m.append(el("div", { class: "loading" }, msg));
+  m.append(LexeditorUI.stack({fill:false,className:"lex-notice"}, msg));
 }
 
 async function loadLoot(file) {
@@ -657,7 +654,7 @@ function findLootTable(key) {
 
 function renderInfo(){
   $("#toolbar").replaceChildren(el("span",{},"RDR2 plugin information"));
-  $("#main").replaceChildren(el("div",{class:"hint"},
+  $("#main").replaceChildren(LexeditorUI.stack({fill:false,className:"lex-notice"},
     el("h2",{},"Ready"),
     el("p",{},"Installed game files and extracted reference data stay read-only. The mod selector in the top bar controls the editable mod."),
     el("p",{},`${Object.keys(state.config?.datasets||{}).length} source datasets are available to comparison controls.`)),
@@ -767,16 +764,14 @@ function mobArchetypeLink(layer,name,content=null){
     targetLabel:`${name} in Mobs`,activate:()=>navigate("mobs",{mobView:"archetypes",mobLayer:layer,mobGroup:record.group,mobQ:name})});
 }
 
-async function showItemSources(it){
+async function fillItemSources(it,list){
   let scriptRows=[];
   if(it.scriptReferenceCount){
     try{scriptRows=(await api(`/api/item-script-provenance?item=${encodeURIComponent(it.key)}`)).rows||[];}
     catch(error){scriptRows=[{type:"Script index unavailable",confidence:"error",detail:error.message,acquisition:false}];}
   }
-  const backdrop=$("#picker");backdrop.innerHTML="";backdrop.classList.remove("hidden");
-  const panel=el("div",{class:"picker-panel"},el("div",{class:"head"},el("b",{},localizedValue(it.nameKey)||it.key),el("span",{class:"cat",style:"margin-left:auto"},"ACQUISITION SOURCES")));
-  const list=el("div",{class:"picker-list"});
-  const section=(title,rows)=>{list.append(el("h3",{},title));if(!rows.length)list.append(el("div",{class:"cat"},"None indexed"));else rows.forEach(row=>list.append(el("div",{class:"picker-option"},row)));};
+  list.replaceChildren();
+  const section=(title,rows)=>list.append(LexeditorUI.detailSection({title,body:LexeditorUI.stack({fill:false},...(rows.length?rows:["None indexed"]).map(row=>typeof row==="string"?LexeditorUI.detailNote(row):row))}));
   const provenanceRow=x=>el("div",{},
     el("b",{},x.type||"Reference"),
     x.confidence?el("span",{class:"cat"},` · ${x.confidence}`):"",
@@ -793,14 +788,14 @@ async function showItemSources(it){
   ]);
   section("Shops selling this item to you",(it.shopListings||[]).map(x=>rdrHoverable({
     content:el("span",{},`${shopLabel(x.shop)} · listing count ${x.quantities.join("/")}`),targetType:"rdr2-shop",targetId:x.shop,
-    targetLabel:`${shopLabel(x.shop)} in Shops`,activate:()=>{backdrop.classList.add("hidden");goToShop(x.shop);}})));
+    targetLabel:`${shopLabel(x.shop)} in Shops`,activate:()=>goToShop(x.shop)})));
   section("Crafting",craftView(it).map(x=>rdrHoverable({content:el("span",{},`${x.key} · yields ${x.yield}`),
     targetType:"rdr2-crafting-output",targetId:it.key,targetLabel:`${localizedValue(it.nameKey)||it.key} in Crafting`,
-    activate:()=>{backdrop.classList.add("hidden");goToRecipeOutput(it.key);}})));
+    activate:()=>goToRecipeOutput(it.key)})));
   section("Direct loot-table membership (reachability resolved below)",(it.lootSources||[]).map(x=>rdrHoverable({
     content:el("span",{},`${x.table} · rate ${x.rate??"default"}${x.min||x.max?` · qty ${x.min||"default"}–${x.max||x.min||"default"}`:""}${x.condition?` · ${x.condition}`:""}`),
     targetType:"rdr2-loot-table",targetId:`${x.file}|${x.table}`,targetLabel:`${x.table} in Loot Tables`,
-    activate:()=>{backdrop.classList.add("hidden");goToLootTable(x.file,x.table);}})));
+    activate:()=>goToLootTable(x.file,x.table)})));
   section("Skinning yields",(it.skinningSources||[]).map(x=>`${x.animal} · ${x.skin}/${x.damage} · ×${x.qty}`));
   const provenance=it.provenanceSources||[];
   section("Confirmed acquisition paths",provenance.filter(x=>x.acquisition&&x.confidence==="confirmed").map(provenanceRow));
@@ -814,22 +809,32 @@ async function showItemSources(it){
     summary.possibleCutContent?"Possible cut content after exhaustive indexed coverage":"Not labelled cut content; at least one acquisition layer is incomplete or evidence exists"
   ]);
   section("Coverage",(state.catalog.provenanceCoverage||[]).map(x=>provenanceRow({type:x.layer,confidence:x.status,detail:x.detail,acquisition:false})));
-  panel.append(list,el("button",{onclick:()=>backdrop.classList.add("hidden")},"Close"));backdrop.append(panel);
+  return list;
 }
 
+function pickerHost(){
+  let root=document.getElementById("picker");
+  if(!root){
+    root=el("div",{id:"picker",class:"lex-dialog-backdrop",hidden:true});
+    root.addEventListener("click",event=>{if(event.target===root)root.hidden=true});
+    root.addEventListener("keydown",event=>{if(event.key==="Escape"){event.stopPropagation();root.hidden=true}});
+    document.body.append(root);
+  }
+  return root;
+}
 function pickIdentifier(title, values, current, onPick) {
-  const backdrop=$("#picker"); backdrop.innerHTML=""; backdrop.classList.remove("hidden");
-  const panel=el("div",{class:"picker-panel"});
+  const backdrop=pickerHost(); backdrop.innerHTML=""; backdrop.hidden=false;
+  const panel=LexeditorUI.stack({fill:false,className:"lex-dialog",attrs:{role:"dialog","aria-modal":"true"}});
   const search=el("input",{type:"text",placeholder:`Search ${title.toLowerCase()}…`,value:""});
-  const list=el("div",{class:"picker-list"});
+  const list=LexeditorUI.stack({fill:false});
   const normalize=v=>typeof v==="string"?{value:v,label:v}:v;
   const options=values.map(normalize);
   const draw=()=>{const q=search.value.trim().toUpperCase();list.innerHTML="";
-    options.filter(v=>!q||`${v.label} ${v.value}`.toUpperCase().includes(q)).slice(0,400).forEach(v=>list.append(el("button",{class:"picker-option",onclick:()=>{onPick(v.value);backdrop.classList.add("hidden");}},v.label)));
+    options.filter(v=>!q||`${v.label} ${v.value}`.toUpperCase().includes(q)).slice(0,400).forEach(v=>list.append(el("button",{class:"lex-dialog-action",onclick:()=>{onPick(v.value);backdrop.hidden=true;}},v.label)));
   };
   search.addEventListener("input",draw);
   panel.append(el("div",{class:"head"},el("b",{},title),el("span",{class:"cat",style:"margin-left:auto"},`${options.length} valid identifiers`)),search,list,
-    el("button",{onclick:()=>backdrop.classList.add("hidden")},"Cancel"));backdrop.append(panel);draw();search.focus();
+    el("button",{onclick:()=>backdrop.hidden=true},"Cancel"));backdrop.append(panel);draw();search.focus();
 }
 
 function recipesUsing(itemKey) {
@@ -841,7 +846,19 @@ function recipesUsing(itemKey) {
   return found;
 }
 
+// A page load may finish after the user selects another page or dataset.
+// Call the returned check after each asynchronous read, before using the result.
+let renderRevision=0;
+const pageRevisions=new Map();
+function renderScope(page){
+  const revision=(pageRevisions.get(page)||0)+1;
+  pageRevisions.set(page,revision);
+  const navigation=renderRevision,tab=state.tab,dataset=state.ds;
+  return ()=>navigation===renderRevision&&tab===state.tab&&dataset===state.ds&&revision===pageRevisions.get(page);
+}
+
 function render() {
+  renderRevision++;
   document.querySelectorAll("nav button").forEach(b =>
     b.classList.toggle("active", b.dataset.tab === state.tab));
   if (state.booting) {
@@ -859,7 +876,11 @@ function render() {
   document.body.classList.toggle("weapon-detail-view",state.tab==="weapons");
   document.body.classList.toggle("shop-workspace-view",
     state.tab==="shops" && state.filters.shopMode!=="report");
-  if(state.renderedTab!==state.tab){const main=$("#main");if(main)main.scrollLeft=0;state.renderedTab=state.tab;}
+  if(state.renderedTab!==state.tab){
+    const main=$("#main");
+    if(main){main.scrollLeft=0;main.replaceChildren(LexeditorUI.notice({message:"Loading…"}));}
+    state.renderedTab=state.tab;
+  }
   const rendered=Promise.resolve(TABS[state.tab]()).finally(()=>installTabContext());
   refreshGlobalSave();
   return rendered;
@@ -920,10 +941,10 @@ async function saveAllChanges() {
 
 function savebar(onSave) {
   if (isRO()) {
-    return el("div", { class: "savebar" }, el("span", { class: "robadge" }, "READ-ONLY REFERENCE"));
+    return LexeditorUI.stack({fill:false,className:"savebar"}, LexeditorUI.badge("Read-only reference"));
   }
   const n = dirtyCount();
   queueMicrotask(refreshGlobalSave);
-  return el("div", { class: "savebar" },
+  return LexeditorUI.stack({fill:false,className:"savebar"},
     el("span", { class: "dirty" }, n ? `${n} unsaved change${n > 1 ? "s" : ""} · use header SAVE` : ""));
 }

@@ -317,11 +317,6 @@ def smoke() -> list[str]:
 PLUGIN = GamePlugin(
     plugin_id="palworld",
     name=DISPLAY_NAME,
-    subtitle="Official mod packages",
-    description=(
-        "Author, build and locally test Palworld v0.7+ packages with schema-aware PalSchema patches; "
-        "stage and reversibly activate server-compatible packages on the Windows dedicated server while installed game data stays read-only."
-    ),
     accent="#55c7d9",
     check=check,
     launch=launch,

@@ -15,7 +15,7 @@
   const ITEM_PARTY_FLAGS=["Zidane","Vivi","Garnet","Steiner","Freya","Quina","Eiko","Amarant","Cinna","Marcus","Blank","Beatrix"];
   const choices=tab=>tab==="accessories"?["items"]:tab==="characters"?CHARACTER_NAV_KEYS:state.catalog.filter(value=>value.tab===tab).map(value=>value.key);
   function activeKey(){const available=choices(state.tab);return state.datasetChoice[state.tab]||available[0]||null}
-  function viewRows(data,key){let rows=data.rows;if(state.tab==="accessories")rows=rows.filter(row=>row.values.Accessory===true);const query=(state.query[key]||"").toLocaleLowerCase();if(query)rows=rows.filter(row=>`${row.id} ${row.name} ${Object.values(row.values).join(" ")}`.toLocaleLowerCase().includes(query));const sort=state.sort[key]||{key:"name",dir:1};return [...rows].sort((left,right)=>{const a=sort.key==="name"?left.name:sort.key==="id"?left.id:left.values[sort.key],b=sort.key==="name"?right.name:sort.key==="id"?right.id:right.values[sort.key];return (typeof a==="string"?a.localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"}):Number(a)-Number(b))*sort.dir})}
+  function viewRows(data,key){let rows=data.rows;if(state.tab==="accessories")rows=rows.filter(row=>row.values.Accessory===true);const query=(state.query[key]||"").toLocaleLowerCase();if(query)rows=rows.filter(row=>`${row.id} ${row.name} ${Object.values(row.values).join(" ")}`.toLocaleLowerCase().includes(query));const sort=state.sort[key]||{key:"name",dir:1};const column=columnsFor(data,key).find(value=>value.key===sort.key);return [...rows].sort((left,right)=>{const value=row=>column?.sortValue?column.sortValue(row):sort.key==="name"?row.name:sort.key==="id"?row.id:row.values[sort.key];const a=value(left),b=value(right);return (typeof a==="string"?a.localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"}):Number(a)-Number(b))*sort.dir})}
   function changedFields(data,row){const original=data.originalByLine[String(row.line)];const values={};for(const field of data.fields)if(field.editable&&JSON.stringify(row.values[field.key])!==JSON.stringify(original.values[field.key]))values[field.key]=row.values[field.key];return values}
   // "Mod contents only" keeps the rows this project has actually changed. A row
   // counts as changed when an editable field differs from the copy the dataset
@@ -35,8 +35,36 @@
   function installData(payload){payload.originalRows=clone(payload.rows);payload.originalByLine=Object.fromEntries(payload.originalRows.map(row=>[String(row.line),row]));state.datasets[payload.key]=payload;if(!payload.rows.some(row=>row.line===state.selected[payload.key]))state.selected[payload.key]=payload.rows[0]?.line??null;return payload}
   async function loadDataset(key,force=false){if(!key)return null;if(!force&&state.datasets[key]&&!state.datasets[key].unavailable)return state.datasets[key];const meta=catalogRow(key);try{return installData(await api(`/api/dataset?key=${encodeURIComponent(key)}`))}catch(error){state.datasets[key]={key,unavailable:true,error:error.message,relativePath:meta?.relativePath};return state.datasets[key]}}
   function fieldValue(row,field){const value=row.values[field.key];if(field.kind==="boolean")return booleanMark(value);return value===""?"—":String(value)}
-  function columnsFor(data,key){const useful=data.fields.filter(field=>!["id","comment","name"].includes(field.key.toLocaleLowerCase())).slice(0,3);return [{key:"id",label:"ID",numberedId:true,sortable:true},{key:"name",label:"Name",sortable:true,width:"minmax(9em,1.6fr)"},...useful.map(field=>({key:field.key,label:field.label,sortable:true,width:"minmax(0,1fr)",numeric:["integer","number"].includes(field.kind),sortValue:row=>row.values[field.key],render:row=>fieldValue(row,field)}))]}
-  function prefsFor(data,key,columns){if(!prefCache[key])prefCache[key]=columnPreferences(`ff9-${key}`,columns,()=>render());return prefCache[key]}
+  // The list and detail fields use the same column definitions, including
+  // the linked records in equipment and character views.
+  function columnSources(data,key){
+    const sources=[{data,row:record=>record,prefix:""}];
+    const add=(name,row)=>{const linked=state.datasets[name];if(linked&&!linked.unavailable)sources.push({data:linked,row,prefix:`${name}:`})};
+    if(key.startsWith("equipment-")){
+      const spec=equipmentSpec(key.slice(10));
+      add(spec.specific,record=>rowById(state.datasets[spec.specific],record.values[spec.id]));
+      add("item-stats",record=>rowById(state.datasets["item-stats"],record.values.BonusId));
+    }else if(key==="characters"){
+      const param=record=>rowById(state.datasets["character-parameters"],record.id);
+      add("character-parameters",param);
+      add("default-equipment",record=>rowById(state.datasets["default-equipment"],param(record)?.values.DefaultEquipmentSet));
+      add("command-sets",record=>rowById(state.datasets["command-sets"],param(record)?.values.DefaultCommandSet));
+    }
+    return sources;
+  }
+  function columnsFor(data,key){
+    const columns=[{key:"id",label:"ID",numberedId:true,sortable:true},{key:"name",label:"Name",sortable:true,width:"minmax(9em,1.6fr)"}];
+    for(const source of columnSources(data,key)){
+      source.data.fields.filter(field=>!["id","comment","name"].includes(field.key.toLocaleLowerCase())).forEach((field,index)=>{
+        const value=record=>source.row(record)?.values[field.key];
+        columns.push({key:source.prefix+field.key,label:field.label,pinned:!source.prefix&&index<3,
+          sortable:true,width:"minmax(0,1fr)",numeric:["integer","number"].includes(field.kind),sortValue:value,
+          render:record=>{const linked=source.row(record);return linked?fieldValue(linked,field):"—"}});
+      });
+    }
+    return columns;
+  }
+  function prefsFor(data,key,columns=columnsFor(data,key)){if(!prefCache[key])prefCache[key]=columnPreferences(`ff9-${key}`,columns,()=>render());return prefCache[key]}
   function tablePanel(data,key,rows,selected,select){const columns=columnsFor(data,key);return columnList({rows,key:row=>row.line,selected,select,sortState:state.sort[key]||{key:"name",dir:1},sort:column=>{const current=state.sort[key]||{key:"name",dir:1};state.sort[key]=current.key===column?{key:column,dir:-current.dir}:{key:column,dir:1};state.page[key]=0;render()},columnPreferences:prefsFor(data,key,columns),columns,class:"ff9-table","aria-label":`${data.label} table`})}
   const EXPLAINED_READ_ONLY={
     "shops:Comment":"Final Fantasy 9 has no shop names. Memoria's shop export carries only Comment, Id and Items, and it fills Comment with a generated placeholder such as “Shop 0000” so the rows can be told apart. Lexeditor shows it as the shop's name, but the game never reads it, so editing it would rename nothing.",
@@ -151,9 +179,19 @@
     return FIELD_HELP[`${dataKey}:${field.key}`]||"";
   }
   function setValue(data,row,field,value){row.values[field.key]=value;shell.refresh()}
-  function fieldControl(data,row,field){const note=readOnlyNote(data,field),semantic=note||semanticFieldHelp(data,field);let control;if(note||!field.editable||field.kind==="stored")control=readonlyField(String(row.values[field.key]??""));else if(field.kind==="boolean")control=el("input",{type:"checkbox",checked:!!row.values[field.key],onchange:event=>setValue(data,row,field,event.target.checked)});else if(field.kind==="integer"||field.kind==="number")control=el("input",{type:"number",min:field.min,max:field.max,step:field.step||1,value:row.values[field.key],oninput:event=>{if(event.target.value!=="")setValue(data,row,field,Number(event.target.value))}});else control=el("input",{type:"text",value:row.values[field.key]??"",oninput:event=>setValue(data,row,field,event.target.value)});return detailField({label:field.label.toLocaleUpperCase(),help:semantic?infoHelp(semantic):null,control,dataType:note?"READ ONLY":field.declaredType,min:field.min,max:field.max})}
+  function fieldPin(data,field){
+    const key=["accessories","armor","weapons"].includes(state.tab)?`equipment-${state.tab}`:activeKey();
+    const base=state.datasets[key.startsWith("equipment-")?"items":key];
+    if(!base)return null;
+    const source=columnSources(base,key).find(value=>value.data.key===data.key);
+    if(!source)return null;
+    const column=field.key.toLocaleLowerCase();
+    if(column==="comment"||source.prefix&&["id","name"].includes(column))return null;
+    return prefsFor(base,key).pinButton(["id","name"].includes(column)?column:source.prefix+field.key,field.label);
+  }
+  function fieldControl(data,row,field){const note=readOnlyNote(data,field),semantic=note||semanticFieldHelp(data,field);let control;if(note||!field.editable||field.kind==="stored")control=readonlyField(String(row.values[field.key]??""));else if(field.kind==="boolean")control=el("input",{type:"checkbox",checked:!!row.values[field.key],onchange:event=>setValue(data,row,field,event.target.checked)});else if(field.kind==="integer"||field.kind==="number")control=el("input",{type:"number",min:field.min,max:field.max,step:field.step||1,value:row.values[field.key],oninput:event=>{if(event.target.value!=="")setValue(data,row,field,Number(event.target.value))}});else control=el("input",{type:"text",value:row.values[field.key]??"",oninput:event=>setValue(data,row,field,event.target.value)});return detailField({label:field.label.toLocaleUpperCase(),pin:fieldPin(data,field),help:semantic?infoHelp(semantic):null,control,dataType:note?"READ ONLY":field.declaredType,min:field.min,max:field.max})}
   const fieldRows=(data,row,exclude=[])=>{const blocked=new Set(exclude.map(String));return data&&row?data.fields.filter(field=>!blocked.has(field.key)&&field.key.toLocaleLowerCase()!=="id"&&field.key.toLocaleLowerCase()!=="comment").map(field=>fieldControl(data,row,field)):[]};
-  function boolProperty(data,row,label,keys,help){const fields=new Map(data.fields.map(field=>[field.key,field]));const toggles=keys.filter(key=>fields.has(key)).map(key=>({key,label:key,checked:!!row.values[key],disabled:state.activeSource!=="mine",change:value=>setValue(data,row,fields.get(key),value)}));return toggles.length?detailField({label,help:help?infoHelp(help):null,control:toggleRow({label,toggles}),dataType:"FLAGS"}):null}
+  function boolProperty(data,row,label,keys,help){const fields=new Map(data.fields.map(field=>[field.key,field]));const toggles=keys.filter(key=>fields.has(key)).map(key=>({key,label:key,pin:fieldPin(data,fields.get(key)),checked:!!row.values[key],disabled:state.activeSource!=="mine",change:value=>setValue(data,row,fields.get(key),value)}));return toggles.length?detailField({label,help:help?infoHelp(help):null,control:toggleRow({label,toggles}),dataType:"FLAGS"}):null}
   function itemSections(data,row,title="ITEM DATA"){const grouped=[...ITEM_CATEGORY_FLAGS,...ITEM_PARTY_FLAGS];const body=fieldRows(data,row,grouped);const categories=boolProperty(data,row,"CATEGORIES",ITEM_CATEGORY_FLAGS,"These switches decide which FF9 item/equipment categories this record belongs to and whether it behaves as a normal usable item. More than one category can apply to the same underlying item record.");const party=boolProperty(data,row,"EQUIPPABLE BY",ITEM_PARTY_FLAGS,"Each switch controls whether that character is allowed to equip this record. Guest-character switches matter only while that character is actually available.");if(categories)body.push(categories);if(party)body.push(party);return detailSection({title,body})}
   function detail(data,row){if(data.key==="items")return detailPanel({className:"ff9-detail",title:row.name,identity:recordId(row.id),meta:`Items · ${data.source} CSV`,body:[itemSections(data,row)]});const editable=data.fields.filter(field=>field.editable&&field.kind!=="stored"&&!readOnlyNote(data,field)),stored=data.fields.filter(field=>!field.editable||field.kind==="stored"||readOnlyNote(data,field));const body=[];if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));return detailPanel({className:"ff9-detail",title:row.name,identity:recordId(row.id),meta:`${data.label} · ${data.source} CSV`,body})}
   // A tab whose data could not be read says so, and where the project lives.

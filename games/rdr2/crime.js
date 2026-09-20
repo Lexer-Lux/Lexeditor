@@ -68,7 +68,7 @@ function normalizeBountyHunters(data){
   d.presets.forEach(p=>{p.preset=safeDisplay(p.preset,"Responder");p.label=safeDisplay(p.label,BOUNTY_PRESENTATION.presets[p.preset]||humanizeId(p.preset,"Responder"));p.loadouts=Array.isArray(p.loadouts)?p.loadouts:[];});
   return d;
 }
-function scrollableCrimeTable(table){return el("div",{class:"crime-table-scroll"},table);}
+function scrollableCrimeTable(table){return table;}
 
 function bountyNumber(setting,label,help,reference=null){
   if(!setting)return el("span",{},"—");
@@ -76,23 +76,21 @@ function bountyNumber(setting,label,help,reference=null){
   const input=el("input",{type:"number",min:"0",step:"any",value:cur,disabled:isRO(),class:setting.id in state.bountyHunterEdits?"edited":"",
     onchange:ev=>{const v=ev.target.value;if(v===setting.value)delete state.bountyHunterEdits[setting.id];else state.bountyHunterEdits[setting.id]=v;renderToolbarOnly();refreshGlobalSave();}});
   const refs=state.ds==="mine"&&reference?[["V","vtag",String(reference.value).replace(/f$/i,"")]]:null;
-  const labelNode=label===""?"":el("span",{class:"key"},safeDisplay(label,"Setting"),help?fieldHelp(help):"");
-  return el("label",{class:"setting-row"},labelNode,
-    // Bounty tuning needs an explicit side-by-side vanilla value. Do not fold
-    // an equal reference into the generic tick-only compact state here.
-    refField(input,refs,undefined,v=>applyToControl(input,v),String));
+  const control=refField(input,refs,undefined,v=>applyToControl(input,v),String);
+  return label===""?control:LexeditorUI.detailField({label:safeDisplay(label,"Setting"),control,help:help?fieldHelp(help):null});
 }
 
 async function renderBountyHunters(){
-  const d=await ensureBountyHunters(),m=$("#main");m.innerHTML="";
+  const current=renderScope("renderBountyHunters");
+  const d=await ensureBountyHunters();if(!current())return;const m=$("#main");m.innerHTML="";
   if(!d.available)return noData("The dedicated bountyhunters.meta has not been staged in this dataset.");
   const vsetting=id=>{const s=d.settings.find(x=>x.id===id);return s?.vanilla==null?null:{id,value:s.vanilla};};
   const vcool=id=>{for(const r of d.cooldowns)for(const [bound,settingId] of Object.entries(r.ids))if(settingId===id&&r.vanilla?.[bound]!=null)return {id,value:r.vanilla[bound]};return null;};
   const vphase=id=>{for(const p of d.phases){if(p.multiplierId===id&&p.multiplierVanilla!=null)return {id,value:p.multiplierVanilla};for(const g of p.groups)for(const [key,settingId] of Object.entries(g.ids))if(settingId===id&&g.vanilla?.[key]!=null)return {id,value:g.vanilla[key]};}return null;};
-  m.append(el("div",{class:"hint"},el("b",{},"Bounty-hunter-only response: "),"threshold, encounter spacing, five escalation phases, hunter composition and dog support. Shared law combat/loadout specs are deliberately read-only below; changing them here would also retune ordinary lawmen."));
+  m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},"Bounty-hunter-only response: "),"threshold, encounter spacing, five escalation phases, hunter composition and dog support. Shared law combat/loadout specs are deliberately read-only below; changing them here would also retune ordinary lawmen."));
   const setting=id=>{const x=d.settings.find(s=>s.id===id);return x&&{...x,value:String(x.value).replace(/f$/i,"")};};
-  const top=el("section",{class:"bounty-trigger"},el("h2",{},"Encounter trigger"));
-  for(const s of d.settings)top.append(bountyNumber(setting(s.id),s.label,s.help,vsetting(s.id)));m.append(top);
+  const top=LexeditorUI.stack({fill:false});
+  for(const s of d.settings)top.append(bountyNumber(setting(s.id),s.label,s.help,vsetting(s.id)));m.append(LexeditorUI.detailSection({title:"Encounter trigger",body:top}));
   const tierHelp="Rockstar stores five rows labelled WANTED_CLEAN, WANTED_LEVEL1, WANTED_LEVEL2, WANTED_LEVEL3 and WANTED_LEVEL4+. These are the player's current wanted/search state, not bounty-dollar ranges. Clean means no active wanted level; it does not mean the regional bounty balance is zero. ‘Wanted 4+’ means level 4 and any higher engine tier.";
   const bound=(r,k)=>r.ids[k]?bountyNumber({id:r.ids[k],value:safeDisplay(r[k],"")},"","",vcool(r.ids[k])):el("span",{},"—");
   const cool=columnList({class:"cooldown-table",align:"start",headerAlign:"start","aria-label":"Encounter spacing",
@@ -105,7 +103,7 @@ async function renderBountyHunters(){
       {key:"min",label:"Min hours",render:r=>bound(r,"min")},
       {key:"max",label:"Max hours",render:r=>bound(r,"max")}]});
   m.append(el("section",{},el("h2",{},"Encounter spacing"),
-    el("div",{class:"hint bounty-tier-explainer"},el("b",{},"Wanted tier is current pursuit state, not bounty value. "),
+    LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},"Wanted tier is current pursuit state, not bounty value. "),
       "Clean means no active wanted/search level; Arthur can still owe a regional bounty, so the bounty-acquired and hunter-encounter cooldown tables legitimately contain Clean rows. Min and Max are the stored randomized delay range in in-game hours."),
     scrollableCrimeTable(cool)));
   const poolHelp="Fixed responders are always requested by that phase. Random responders are alternatives selected by their relative Weight. Chance is a separate 0–1 gate, used here for police dogs.";
@@ -134,7 +132,7 @@ async function renderBountyHunters(){
     rows:d.presets,key:p=>p.preset,localSort:false,
     template:"minmax(180px,1fr) minmax(0,1.6fr) minmax(160px,1fr) minmax(140px,1fr)",
     columns:[{key:"label",label:"Responder",cellClass:"key",
-        render:p=>el("span",{},p.label,el("span",{class:"setting-source"},p.preset))},
+        render:p=>el("span",{},p.label,LexeditorUI.detailNote(p.preset))},
       {key:"loadouts",label:"Weapons / weights",
         render:p=>p.loadouts.map(x=>safeDisplay(x.name,"Loadout")+(x.weight?` (${x.weight})`:"")).join(", ")},
       {key:"combat",label:"Combat profile",render:p=>mobArchetypeLink("combat",safeDisplay(p.combatInfo))},
@@ -157,7 +155,8 @@ function normalizeHonorActions(data){
 }
 async function ensureHonorActions(){if(!state.honorActions)state.honorActions=normalizeHonorActions(await api("/api/honor-actions"));return state.honorActions;}
 async function renderHonorActions(){
-  const d=await ensureHonorActions(),m=$("#main");m.innerHTML="";
+  const current=renderScope("renderHonorActions");
+  const d=await ensureHonorActions();if(!current())return;const m=$("#main");m.innerHTML="";
   if(!d.available)return noData("Honor runtime controls are unavailable for this profile.");
   const table=(title,rows,tier)=>{
     const enabledBox=r=>{
@@ -180,16 +179,16 @@ async function renderHonorActions(){
       template:tier?"minmax(160px,1fr) 110px minmax(160px,1fr)":"minmax(220px,1fr) 110px",
       columns:[{key:"name",label:tier?"Vanilla amount":"Honor event",cellClass:"key",
           render:r=>el("span",{},tier?safeDisplay(r.vanilla):safeDisplay(r.label,humanizeId(r.id,"Honor event")),
-            el("span",{class:"setting-source"},safeDisplay(r.id,"honor_control")))},
+            LexeditorUI.detailNote(safeDisplay(r.id,"honor_control")))},
         {key:"enabled",label:"Enabled",cellClass:"bool-cell",render:enabledBox},
         ...(tier?[{key:"amount",label:"Replacement amount",render:amountBox}]:[])]});
-    return el("section",{class:"honor-card"},el("h2",{},title),list);};
+    return LexeditorUI.detailSection({title,body:list});};
   // Amounts used to be buried below all 21 event toggles, which made the page
   // look toggle-only. Put the editable table first and state its proven shared
   // scope instead of inventing independent per-event values the game lacks.
-  m.append(el("div",{class:"hint"},el("b",{},"Honor amounts are editable in the first table. "),
+  m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},"Honor amounts are editable in the first table. "),
     "Each replacement changes every action that uses that vanilla amount; event toggles remain independent."),
-    el("div",{class:"honor-stack"},
+    LexeditorUI.stack({fill:false},
       table("Editable honor amounts",d.tiers,true),table("Independent event toggles",d.events,false)));
 }
 async function saveHonorActions(){const edits=Object.entries(state.honorActionEdits).map(([id,v])=>({id,...v}));if(!edits.length)return 0;const r=await api("/api/honor-actions/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.honorActionEdits={};state.honorActions=null;toast(`Saved ${r.saved} honor control(s)`);renderCrime();return r.saved;}
@@ -270,15 +269,16 @@ async function switchCrimeSection(value) {
 }
 
 async function renderCrime() {
+  const current=renderScope("renderCrime");
   const f = state.filters;
   if(!f.crimeSection)f.crimeSection="crimes";
   if (!state.config.datasets[state.ds].crime)
     return noData(`This dataset has no crimeinformation.meta (${dsInfo().dir}).`);
   const data = await ensureCrime(state.ds);
   if (state.ds === "mine") { await ensureCrime("vanilla"); await ensureCrime("crimeTweaks"); }
+  if(!current())return;
   const tb = $("#toolbar"); tb.innerHTML = "";
-  const sectionTabs=el("div",{class:"subtabs"},
-    ...[["bounty","Bounty hunters"],["crimes","Crime rules"],["dispatch","Dispatch & wanted"],["honor","Honor actions"]].map(([value,label])=>el("button",{class:f.crimeSection===value?"active":"",onclick:()=>switchCrimeSection(value)},label)));
+  const sectionTabs=LexeditorUI.subtabBar({active:f.crimeSection,label:"Crime view",tabs:[["bounty","Bounty hunters"],["crimes","Crime rules"],["dispatch","Dispatch & wanted"],["honor","Honor actions"]].map(([id,label])=>({id,label})),change:switchCrimeSection});
   tb.append(sectionTabs);
   if(f.crimeSection==="dispatch"){
     tb.append(el("span",{class:"count"},`${refStore(state.ds).dispatch?.rows.length||0} settings`),savebar(saveCrime));
@@ -289,7 +289,7 @@ async function renderCrime() {
     await renderBountyHunters();refreshGlobalSave();installTabContext();return;
   }
   if(f.crimeSection==="honor"){
-    const d=await ensureHonorActions();tb.append(el("span",{class:"count"},`${d.events?.length||0} events · ${d.tiers?.length||0} shared tiers`),savebar(saveHonorActions));
+    const d=await ensureHonorActions();if(!current())return;tb.append(el("span",{class:"count"},`${d.events?.length||0} events · ${d.tiers?.length||0} shared tiers`),savebar(saveHonorActions));
     await renderHonorActions();refreshGlobalSave();installTabContext();return;
   }
   tb.append(el("input", { type: "text", placeholder: "Search crimes… (e.g. MURDER, ROBBERY)", value: f.crimeQ || "",

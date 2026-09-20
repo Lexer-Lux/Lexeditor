@@ -106,7 +106,7 @@ function decimalSettingValue(value){
   return String(value).trim()!==""&&/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?$/i.test(String(value).trim());
 }
 
-function renderSettingField(section,setting){
+function renderSettingField(section,setting,context=""){
   const compound=`${section.name}|${setting.key}`,current=state.settingEdits[compound]??setting.value;
   const label=settingLabel(section.name,setting.key),dev=settingIsDeveloper(section.name,setting.key);
   const constBoundary=settingConstBoundary(section.name,setting.key);
@@ -124,7 +124,7 @@ function renderSettingField(section,setting){
     const options=choices.some(([value])=>value===String(current))?choices:[[String(current),`${current} (current value)`],...choices];
     const select=el("select",{"aria-label":label,onchange:ev=>{changeValue(ev.target.value);ev.target.classList.toggle("edited",compound in state.settingEdits);}},
       ...options.map(([value,text])=>el("option",{value,...(value===String(current)?{selected:true}:{})},text)));
-    control=el("span",{class:"setting-value"},select);
+    control=select;
   }else{
     const numeric=decimalSettingValue(current);
     const range=settingRange(section.name,setting.key);
@@ -144,47 +144,18 @@ function renderSettingField(section,setting){
       ...(compound==="Campsites|Key"?{inputmode:"text"}:{}),
       onchange:commit});
     const unit=numeric||compound==="Campsites|Key"?settingUnit(section.name,setting.key):"";
-    control=el("span",{class:"setting-value"},input,...(unit?[el("span",{class:"setting-unit"},unit)]:[]));
+    control=unit?LexeditorUI.unitField(input,unit):input;
   }
   const help=settingHelp(section,setting);
-  return el("div",{class:["settings-field",dev?"dev":"",constBoundary?"const":""].filter(Boolean).join(" ")},
-    el("div",{class:"settings-field-label"},
-      el("span",{class:"settings-field-name"},label,
-        dev?el("span",{class:"setting-dev-chip",title:"Developer setting: the runtime gates it behind developer mode, or the INI documents it as a probe/trace."},"DEV"):"",
-        constBoundary?el("span",{class:"setting-const-chip",title:`Constant setting. ${constBoundary}`},"CONST"):"",
-        help?fieldHelp(help):""),
-      el("span",{class:"setting-source"},`${section.name} / ${setting.key}`)),
-    el("div",{class:"settings-field-control"},control));
+  const title=LexeditorUI.inlineLabel(el("span",{},label),dev?LexeditorUI.badge("DEV"):null,constBoundary?LexeditorUI.badge("CONST"):null);
+  const toggle=control.matches?.('input[type="checkbox"]')?control:null;
+  return LexeditorUI.detailPanel({title,help:help||`Change ${label}.`,meta:context,identity:toggle,
+    body:toggle?[]:LexeditorUI.detailField({label:"Value",control})});
 }
 
 function renderSettingCategory(category){
-  const subs=el("div",{class:"settings-subs"});
-  for(const sub of category.subs){
-    const fields=el("div",{class:"settings-fields"});
-    for(const {section,setting} of sub.entries)fields.append(renderSettingField(section,setting));
-    subs.append(el("div",{class:"settings-sub"},
-      sub.title?el("h3",{},sub.title,sub.help?fieldHelp(sub.help):""):"",fields));
-  }
-  return el("section",{class:"settings-section"},
-    el("h2",{},category.title,category.help?fieldHelp(category.help):""),subs);
-}
-
-function arrangeSettingsCategories(layout,categories){
-  const sections=categories.map(renderSettingCategory);
-  let renderedColumnCount=0,frame=0;
-  const arrange=()=>{
-    frame=0;
-    if(!layout.isConnected)return;
-    const columnCount=Math.max(1,Number.parseInt(
-      getComputedStyle(layout).getPropertyValue("--settings-lane-count"),10)||1);
-    if(columnCount===renderedColumnCount)return;
-    const columns=Array.from({length:columnCount},()=>el("div",{class:"settings-column"}));
-    sections.forEach((section,index)=>columns[index%columnCount].append(section));
-    layout.replaceChildren(...columns);
-    renderedColumnCount=columnCount;
-  };
-  const observer=new ResizeObserver(()=>{if(!frame)frame=requestAnimationFrame(arrange);});
-  observer.observe(layout);layout.__settingsColumnsObserver=observer;arrange();
+  return category.subs.flatMap(sub=>sub.entries.map(({section,setting})=>renderSettingField(section,setting,
+    [category.title,sub.title].filter(Boolean).join(" · "))));
 }
 
 // Resolve the schema against the INI that actually loaded. Sections and keys the
@@ -237,14 +208,16 @@ function discardSettings(){
 }
 
 async function renderSettings(){
+  const current=renderScope("renderSettings");
   const tb=$("#toolbar");tb.innerHTML="";
   if(!state.settings)state.settings=await api("/api/settings");
+  if(!current())return;
   // No per-tab save control here, deliberately: RDR2's settings are saved by
   // the one global save button along with everything else, so the editor has a
   // single place to press. A second save on this tab is what
   // verify_rdr2_tweaks_shared_save exists to prevent.
   const m=$("#main");m.querySelector(".settings-layout")?.__settingsColumnsObserver?.disconnect();m.innerHTML="";
-  if(!state.settings.available){m.append(el("div",{class:"loading"},"GameplayTweaks.ini is not installed for this editor profile. Catalog, loot, crafting, and other data editing remain available."));installTabContext();return;}
-  m.append(LexeditorUI.settingsColumns(buildSettingsCategories().filter(category=>category.subs.length).map(renderSettingCategory)));
+  if(!state.settings.available){m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},"GameplayTweaks.ini is not installed for this editor profile. Catalog, loot, crafting, and other data editing remain available."));installTabContext();return;}
+  m.append(LexeditorUI.settingsColumns(buildSettingsCategories().filter(category=>category.subs.length).flatMap(renderSettingCategory)));
   installTabContext();
 }

@@ -17,9 +17,9 @@ def main():
   # there is nothing here to check.
   page.route('**/api/card-players',lambda route:route.fulfill(
       content_type='application/json',
-      body='{"ready":true,"error":null,"keys":["test","garden"],"scanned":2,"total":2}'))
+      body='{"ready":true,"error":null,"keys":["garden"],"players":[{"map":"garden","id":0,"entity":"Student","script":"talk"}],"scanned":2,"total":2}'))
   page.goto('http://fixture/')
-  page.set_content('<main id="main" style="height:800px"></main>')
+  page.set_content('<div id="toolbar">Old character tabs</div><main id="main" style="height:800px"></main>')
   page.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
   css=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8')
   page.add_style_tag(content=css)
@@ -34,10 +34,11 @@ def main():
   assert page.locator('select').count()==0
   assert page.get_by_role('button',name='SAVE PLAYERS').count()==0
   assert page.get_by_role('table').count()==1
-  assert page.get_by_label('Search card-player areas',exact=True).count()==1
-  assert page.get_by_text('There are no Triple Triad players in this area.').is_visible()
-  page.get_by_text('Garden',exact=True).click()
-  control=page.locator('.ff8-card-player-detail input')
+  assert page.get_by_label('Search card players',exact=True).count()==1
+  assert page.locator('#toolbar').is_hidden()
+  assert page.locator('.lex-column-list-row').filter(has_text='Opponent Student').count()==1
+  assert page.locator('.lex-column-list-row').filter(has_text='Garden').count()==0
+  control=page.get_by_label('Opponent Student Deck level',exact=True)
   control.fill('5')
   assert page.evaluate('model.data.fields.rows[1].players[0].params[0].value')==5
   assert page.evaluate('calls[0][0]')=='fields'

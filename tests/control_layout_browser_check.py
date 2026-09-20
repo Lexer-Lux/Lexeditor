@@ -27,7 +27,7 @@ def main():
             page.get_by_role('textbox',name='New mod name',exact=True).fill('Layout sample')
             page.get_by_role('button',name='Create Sample',exact=True).click()
             page.get_by_role('button',name='Active mod project',exact=True).click()
-            row=page.locator('div.lex-project-menu-item').first
+            row=page.locator('div.lex-project-menu-item:has(.lex-project-folder)').first
             box=row.locator(':scope > .lex-project-source-status').bounding_box()
             folder=row.locator('.lex-project-folder')
             f=folder.bounding_box()
@@ -195,9 +195,11 @@ def main():
                 # the panel's edge, give or take its own rule and the fit pass's
                 # rounding. More than that is the dead band this guards against.
                 seat=page.evaluate('''()=>{
-                  const bar=document.querySelector('.lex-pager');
+                  const owner=document.querySelector('#main .lex-paged-list-detail');
+                  const bar=owner?.querySelector(':scope > .lex-pager');
                   if(!bar)return null;
-                  const rows=[...document.querySelectorAll('#main .lex-column-list-row')]
+                  const rows=[...owner.querySelectorAll('.lex-column-list-row')]
+                    .filter(n=>n.closest('.lex-paged-list-detail')===owner && !n.closest('.lex-component-sample'))
                     .map(n=>n.getBoundingClientRect()).filter(r=>r.height>2);
                   if(!rows.length)return null;
                   const side=parseFloat(getComputedStyle(document.querySelector('#main')).paddingLeft);

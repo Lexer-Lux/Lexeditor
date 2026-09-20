@@ -8,8 +8,7 @@
       detailSection({title:"GAME",body:[
         detailField({label:"STATE",control:value(game.ready?"Ready":"Needs attention"),
           help:infoHelp(game.ready?"Ready means Lexeditor found the configured FF8 installation and can read the game files this editor depends on.":"Not ready means one or more required FF8 paths or files are missing or unreadable; the reported installation problems identify the concrete cause.")}),
-        detailField({label:"FOLDER",control:value(game.root),
-          pin:el("button",{class:"ff8-folder-button",type:"button",title:"Open the game folder","aria-label":"Open the game folder",onclick:openFolder},folderIcon())}),
+        detailField({label:"FOLDER",control:LexeditorUI.choiceField(value(game.root),el("button",{type:"button",title:"Open the game folder","aria-label":"Open the game folder",onclick:openFolder},"Open"))}),
         detailField({label:"EXECUTABLE",control:value(game.executable)}),
       ]}),
       detailSection({title:"GAME DATA",body:[
@@ -37,7 +36,7 @@
   }
   const settingsPayload=()=>({flyingEvaBonus:state.data.settings.flyingEvaBonus,flyingEvaEnabled:state.data.settings.flyingEvaEnabled,autoSortInventory:state.data.settings.autoSortInventory,autoSortMagic:state.data.settings.autoSortMagic,enhancedAbilityMenu:state.data.settings.enhancedAbilityMenu,singleGf:state.data.settings.singleGf,fixedCommandMenu:state.data.settings.fixedCommandMenu,universalItem:state.data.settings.universalItem,scannedTargetScan:state.data.settings.scannedTargetScan,partySwitch:state.data.settings.partySwitch,drawOncePerEnemy:state.data.settings.drawOncePerEnemy,streamlinedDraw:state.data.settings.streamlinedDraw,formulaeRework:state.data.settings.formulaeRework,trueAtbWait:state.data.settings.trueAtbWait,betterTargeting:state.data.settings.betterTargeting,modernControls:state.data.settings.modernControls,vibrationConsolidation:state.data.settings.vibrationConsolidation,sharedMagicInventory:state.data.settings.sharedMagicInventory,damageLimitRemoval:state.data.settings.damageLimitRemoval,betterCard:state.data.settings.betterCard,fastStart:state.data.settings.fastStart,xpBars:state.data.settings.xpBars,hpBars:state.data.settings.hpBars,gfHpBars:state.data.settings.gfHpBars,inGameTime:state.data.settings.inGameTime,noMagicConsumption:state.data.settings.noMagicConsumption,gfHpCasting:state.data.settings.gfHpCasting,gfHpCastingCosts:state.data.settings.gfHpCastingCosts,dropsAfterMug:state.data.settings.dropsAfterMug,dropChance:state.data.settings.dropChance,flatStatAbilities:state.data.settings.flatStatAbilities,maxSpellEnabled:state.data.settings.maxSpellEnabled,maxSpell:state.data.settings.maxSpell});
   function renderGameplaySettings(){
-    if(state.activeSource!=="mine"){$("#main").replaceChildren(el("section",{class:"settings-view"},el("div",{class:"readonly-note"},"Vanilla uses no Lexeditor gameplay tweaks. Select a mod to configure Tweaks.")));return}
+    if(state.activeSource!=="mine"){$("#main").replaceChildren(LexeditorUI.notice({message:"Vanilla uses no Lexeditor gameplay tweaks. Select a mod to configure Tweaks."}));return}
     const settings=state.data.settings;
     const flying=numberControl(settings.flyingEvaBonus,settings.minimum,settings.maximum,1,value=>settings.flyingEvaBonus=value,{"aria-label":"Flying EVA Bonus"});
     const flyingEnabled=el("input",{type:"checkbox",checked:settings.flyingEvaEnabled,"aria-label":"Enable Flying EVA Bonus",onchange:event=>{settings.flyingEvaEnabled=event.target.checked;shell.refresh()}});
@@ -57,7 +56,7 @@
     // shipped rate. It belongs to this tweak, so it sits in this row rather
     // than becoming a tweak of its own that does nothing on its own.
     const cameraSpeed=numberControl(settings.cameraSpeed,settings.cameraSpeedMinimum,settings.cameraSpeedMaximum,0.1,value=>{settings.cameraSpeed=value},{"aria-label":"Battle camera speed"});
-    const modernControlsControl=el("span",{class:"tweak-value"},modernControls,unitField(cameraSpeed,"×"));
+    const modernControlsControl=LexeditorUI.actionRow(modernControls,unitField(cameraSpeed,"×"));
     const vibrationConsolidation=el("input",{type:"checkbox",checked:settings.vibrationConsolidation,"aria-label":"Vibration Rationalization",onchange:event=>{settings.vibrationConsolidation=event.target.checked;shell.refresh()}});
     const betterTargeting=el("input",{type:"checkbox",checked:settings.betterTargeting,"aria-label":"Better Targeting",onchange:event=>{settings.betterTargeting=event.target.checked;shell.refresh()}});
     const damageLimitRemoval=el("input",{type:"checkbox",checked:settings.damageLimitRemoval,"aria-label":"Remove Damage Limit",onchange:event=>{settings.damageLimitRemoval=event.target.checked;shell.refresh()}});
@@ -75,12 +74,17 @@
     const flatStatAbilities=el("input",{type:"checkbox",checked:settings.flatStatAbilities,"aria-label":"Flat +Stat Abilities",onchange:event=>{settings.flatStatAbilities=event.target.checked;shell.refresh()}});
     const maxSpellEnabled=el("input",{type:"checkbox",checked:settings.maxSpellEnabled,"aria-label":"Enable Max Spell",onchange:event=>{settings.maxSpellEnabled=event.target.checked;shell.refresh()}});
     const maxSpellValue=numberControl(settings.maxSpell,settings.maxSpellMinimum,settings.maxSpellMaximum,1,value=>settings.maxSpell=value,{"aria-label":"Maximum spell stock"});
-    const row=(title,description,control,className="")=>el("div",{class:"setting-row"},el("div",{class:"setting-copy"},el("strong",{},title),description instanceof Element?description:el("p",{},description)),el("label",{class:`setting-control ${className}`.trim()},control));
+    const row=(title,description,control)=>{
+      const toggle=control.matches?.('input[type="checkbox"]')?control:control.querySelector?.('input[type="checkbox"]');
+      if(toggle&&toggle!==control)toggle.remove();
+      return detailPanel({title,help:description,actions:toggle,
+        body:control===toggle?[]:detailField({label:"",control})});
+    };
     // The number is a percentage of effective EVA, so it carries its unit. A
     // bare number here reads as flat points and the row label alone does not
     // say which.
-    const flyingControl=el("span",{class:"tweak-value"},flyingEnabled,unitField(flying,"% EVA"));
-    const maxSpellControl=el("span",{class:"tweak-value"},maxSpellEnabled,maxSpellValue);
+    const flyingControl=LexeditorUI.actionRow(flyingEnabled,unitField(flying,"% EVA"));
+    const maxSpellControl=LexeditorUI.actionRow(maxSpellEnabled,maxSpellValue);
     const view=el("section",{class:"settings-view"},
       row("AUTO-SORT INVENTORY","Sorts the inventory before the Item screen opens, then runs the normal Item-screen initialization.",autoSort,"boolean"),
       row("AUTO-SORT MAGIC MENU","Uses the Attack, Restore, Indirect order for every character when the Magic menu opens.",autoSortMagic,"boolean"),
@@ -98,7 +102,7 @@
       row("FLYING EVA BONUS","Adds the selected effective EVA to intrinsic flying targets against grounded melee attacks. A hit rate of 255 does not bypass it.",flyingControl,"value-toggle"),
       row("GF HP CASTING","Battle Magic spends the spell’s GF HP cost instead of spell stock. Set costs in Magic → Attack Data. Requires Monogamy and No Magic Consumption. A character without a GF or enough GF HP cannot cast.",gfHpCasting,"boolean"),
       row('GF "MP" BARS',"Shows a blue bar above each party name for the junctioned GF's HP, which is spent like MP, including damage it takes while being summoned. Requires Monogamy. With more than one GF junctioned the bar is hidden and the FFNx log says why.",gfHpBars,"boolean"),
-      row("HP BARS","Shows a red bar under each party member's HP number during battle; the lost part turns black.",hpBars,"boolean"),
+      row("HP BARS","Shows thin red HP bars below the active party's HP numbers in the main menu and in battle. The lost part is black.",hpBars,"boolean"),
       row("IN-GAME TIME","Shows your computer's local clock where the main menu shows play time. It does not replace FF8's saved play-time counter: that keeps counting, and timed events still measure against it.",inGameTime,"boolean"),
       row("MAX SPELL","Sets the maximum stock for each spell. A full stack keeps the same junction effect as 100 spells in vanilla.",maxSpellControl,"value-toggle"),
       row("MODERN CONTROLS",settings.modernControlsBlocker||el("div",{},el("p",{},"Modern bindings for battle and the world map. The number is the camera turn rate as a multiple of the shipped speed, from 0.2 to 4."),el("ul",{class:"tweak-bindings"},el("li",{},"Right stick: turns the battle camera while it is idle, and rotates the world map camera. Up tilts the view up. The camera stops level with what it looks at."),el("li",{},"RT / R2 / left mouse button: fire. The gunblade trigger, and Irvine's shots."),el("li",{},"LT / L2 / right mouse button: hold to flee."),el("li",{},"B / Circle / Backspace: end Irvine's Shot early."),el("li",{},"RT and LT on the world map: accelerate and reverse vehicles."))),modernControlsControl,"value-toggle"),
@@ -110,9 +114,10 @@
       row("TRUE ATB WAIT","Works only when the game is set to ATB Wait mode. Stops all party and enemy ATB filling while any party member is ready to act. Active mode keeps its normal behavior.",trueAtbWait,"boolean"),
       row("UNIVERSAL ITEM","Look Right opens the normal battle Item menu without using an equipped command slot. The shortcut follows the configured input mapping.",universalItem,"boolean"),
       row("VIBRATION RATIONALIZATION","Start uses the normal field and battle pause behavior instead of FFNx's separate vibration screen.",vibrationConsolidation,"boolean"),
-      row("XP BARS","Shows yellow XP bars under main-menu character names, under character and GF level rows, and on the post-battle report.",xpBars,"boolean"));
-    $("#main").replaceChildren(LexeditorUI.settingsColumns([...view.children],tweakTabProps()));
-    bindSettingDependencies(view,[{
+      row("XP BARS","Shows thin yellow XP bars below character and GF level rows, including the active and reserve party in the main menu, and on the post-battle report.",xpBars,"boolean"));
+    const settingsView=LexeditorUI.settingsColumns([...view.children],tweakTabProps());
+    $("#main").replaceChildren(settingsView);
+    bindSettingDependencies(settingsView,[{
       key:"singleGf->fixedCommandMenu",
       dependency:singleGf,
       dependent:fixedCommandMenu,
@@ -126,7 +131,7 @@
     // Weights out of 256, from drop_chance.py.
     const vanilla={normal:[178,51,15,12],rare:[128,114,14,0]},rework={normal:[137,68,34,17],rare:[94,70,53,39]};
     const percent=value=>`${(value/256*100).toFixed(1)}%`;
-    const change=(before,after)=>el("span",{class:before===0?"drop-chance-unlocked":""},`${percent(before)} → ${percent(after)}`);
+    const change=(before,after)=>LexeditorUI.badge(`${percent(before)} → ${percent(after)}`,{tone:before===0?"warning":""});
     return el("div",{},
       el("p",{},el("strong",{},"Fixes a vanilla bug: "),"with the Rare Item ability, the fourth loot slot - usually the rarest item an enemy has - can never drop or be Mugged. The rework makes it reachable again and evens out the odds of the rarer slots, with and without Rare Item."),
       columnList({class:"drop-chance-table","aria-label":"Drop Chance slot probabilities, vanilla to rework",
@@ -146,40 +151,58 @@
   }
 
   const DEFAULT_FLYING_EVA_BONUS=25;
-  function formulaInput(label,key,min,max,step=1){return el("label",{class:"formula-preview-input"},label,numberControl(state.formula[key],min,max,step,value=>{state.formula[key]=value}))}
+  function formulaInput(label,key,min,max,step=1){return detailField({label,control:numberControl(state.formula[key],min,max,step,value=>{state.formula[key]=value})})}
   function renderFormulae(){
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
     const f=state.formula,weapons=state.data.weapons?.rows||[],settings=state.data.settings;
     if(!weapons.some(row=>Number(row.id)===Number(f.weaponId)))f.weaponId=weapons[0]?.id??0;
     const weapon=weapons.find(row=>Number(row.id)===Number(f.weaponId)),weaponField=name=>weapon?.fields?.find(field=>field.field===name),fieldValue=name=>Number(weaponField(name)?.value??0);
     const formulaeRework=el("input",{type:"checkbox",checked:settings.formulaeRework,disabled:state.activeSource!=="mine"||!settings.formulaeReworkAvailable,"aria-label":"Formulae Rework",onchange:event=>{settings.formulaeRework=event.target.checked;shell.refresh();renderFormulae()}});
-    const preset=()=>el("label",{class:"formula-preset"},el("strong",{},"WEAPON PRESET"),selectControl(f.weaponId,weapons.map(row=>({id:row.id,name:row.name})),value=>{f.weaponId=value;renderFormulae()}));
+    const preset=()=>detailField({label:"Weapon preset",control:selectControl(f.weaponId,weapons.map(row=>({id:row.id,name:row.name})),value=>{f.weaponId=value;renderFormulae()})});
     const formulaTerm=(name,label,help)=>{const field=weaponField(name);return field?detailField({label,help:infoHelp(help),control:fieldSourceControl(field,"weapons",weapon.id)}):null};
     const boost=()=>state.data.settings.flyingEvaEnabled?state.data.settings.flyingEvaBonus:0;
     const calculate=()=>{const strength=Math.min(255,Math.max(0,Math.trunc(Number(f.strength)+fieldValue("str_bonus")))),inner=Math.trunc((265-Number(f.vitality))*(strength+Math.trunc(strength*strength/16))/256),middle=Math.max(0,Math.trunc(fieldValue("attack_power")*inner/16)),low=Math.max(0,Math.trunc(middle*240/256)),average=Math.max(0,middle),high=Math.max(0,Math.trunc(middle*272/256)),flyingPenalty=f.flying&&Boolean(fieldValue("melee"))&&!f.float?boost():0,luckTerm=settings.formulaeRework?Number(f.luck):Math.floor(Number(f.luck)/2),effective=Math.max(0,Math.min(100,fieldValue("hit_rate")+luckTerm-Number(f.eva)-Number(f.targetLuck)-flyingPenalty)),chance=Math.max(0,Math.min(100,(Math.floor(255*effective/100)+1)/256*100));return{low,average,high,flyingPenalty,chance}};
-    const checkbox=(label,key)=>el("label",{},el("input",{type:"checkbox",checked:f[key],onchange:event=>{f[key]=event.target.checked;updateOutputs()}}),label);
-    const damageOutput=el("div",{class:"formula-output"}),accuracyOutput=el("div",{class:"formula-output"});
-    const damage=el("section",{class:"formula-card"},el("h2",{},"PHYSICAL DAMAGE"),preset(),el("h3",{class:"formula-subheading"},"FORMULA"),el("div",{class:"formula-expression"},"STR = min(255, attacker STR + weapon STR bonus)",el("br"),"DAMAGE = floor(POWER × floor((265 − VIT) × (STR + floor(STR² / 16)) / 256) / 16) × RANDOM / 256",el("br"),"RANDOM = 240 to 272"),el("h3",{class:"formula-subheading"},"EDITABLE FORMULA TERMS"),el("div",{class:"formula-terms"},formulaTerm("attack_power","WEAPON ATTACK POWER","The selected weapon's stored attack power."),formulaTerm("str_bonus","WEAPON STR BONUS","The selected weapon's stored Strength bonus.")),el("h3",{class:"formula-subheading"},"PREVIEW INPUTS"),el("div",{class:"formula-preview-inputs"},formulaInput("Attacker STR","strength",0,255),formulaInput("Target VIT","vitality",0,255)),damageOutput);
+    const checkbox=(label,key)=>detailField({label,control:el("input",{type:"checkbox",checked:f[key],onchange:event=>{f[key]=event.target.checked;updateOutputs()}})});
+    const damageOutput=LexeditorUI.detailNote(""),accuracyOutput=LexeditorUI.detailNote("");
+    const section=(title,body)=>detailSection({title,body});
+    const damage=section("PHYSICAL DAMAGE",[
+      preset(),section("FORMULA",[
+        LexeditorUI.mathFormula("STR = min(255, attacker STR + weapon STR bonus)"),
+        LexeditorUI.mathFormula("DAMAGE = floor(POWER * floor((265 - VIT) * (STR + floor(STR^2 / 16)) / 256) / 16) * RANDOM / 256"),
+        LexeditorUI.detailNote("RANDOM = 240 to 272")]),
+      section("EDITABLE FORMULA TERMS",[
+        formulaTerm("attack_power","Weapon attack power","The selected weapon's stored attack power."),
+        formulaTerm("str_bonus","Weapon STR bonus","The selected weapon's stored Strength bonus.")]),
+      section("PREVIEW INPUTS",[formulaInput("Attacker STR","strength",0,255),formulaInput("Target VIT","vitality",0,255)]),damageOutput]);
     const flyingTerm=sourceControl(unitField(numberControl(boost(),0,100,1,value=>state.data.settings.flyingEvaBonus=value),"%"),()=>state.data.settings.flyingEvaBonus,DEFAULT_FLYING_EVA_BONUS,[],value=>state.data.settings.flyingEvaBonus=Number(value),value=>`${formatNumber(value)}%`);
     const accuracyLuck=settings.formulaeRework?"attacker LUCK":"floor(attacker LUCK / 2)";
-    const accuracy=el("section",{class:"formula-card"},el("h2",{},"PHYSICAL ACCURACY"),preset(),el("p",{},"A hit rate of 255 receives no bypass."),el("h3",{class:"formula-subheading"},"FORMULA"),el("div",{class:"formula-expression"},`EFFECTIVE = clamp(hit rate + ${accuracyLuck} − target EVA − target LUCK − flying penalty, 0, 100)`,el("br"),"HIT CHANCE = (floor(255 × EFFECTIVE / 100) + 1) / 256 × 100%"),el("h3",{class:"formula-subheading"},"EDITABLE FORMULA TERMS"),el("div",{class:"formula-terms"},formulaTerm("hit_rate","WEAPON HIT RATE","Weapon accuracy contributes directly to effective hit chance before target Evasion and Luck; FF8's special 255 value uses the always-hit bypass."),formulaTerm("melee","MELEE WEAPON","Marks the attack as close-range for this formula; grounded melee attacks take the flying-target accuracy penalty."),detailField({label:"FLYING EVA BONUS",help:infoHelp("This penalty applies to grounded melee attackers when the target is flying."),control:flyingTerm})),el("h3",{class:"formula-subheading"},"PREVIEW INPUTS"),el("div",{class:"formula-preview-inputs"},formulaInput("Attacker LUCK","luck",0,255),formulaInput("Target EVA","eva",0,255),formulaInput("Target LUCK","targetLuck",0,255),checkbox("Target is flying","flying"),checkbox("Attacker has Float","float")),accuracyOutput);
+    const accuracy=section("PHYSICAL ACCURACY",[
+      preset(),LexeditorUI.detailNote("A hit rate of 255 receives no bypass."),
+      section("FORMULA",[
+        LexeditorUI.mathFormula(`EFFECTIVE = clamp(hit rate + ${accuracyLuck} - target EVA - target LUCK - flying penalty, 0, 100)`),
+        LexeditorUI.mathFormula("HIT CHANCE = (floor(255 * EFFECTIVE / 100) + 1) / 256 * 100%")]),
+      section("EDITABLE FORMULA TERMS",[
+        formulaTerm("hit_rate","Weapon hit rate","Weapon accuracy contributes directly to effective hit chance before target Evasion and Luck; FF8's special 255 value uses the always-hit bypass."),
+        formulaTerm("melee","Melee weapon","Marks the attack as close-range for this formula; grounded melee attacks take the flying-target accuracy penalty."),
+        detailField({label:"Flying EVA bonus",help:infoHelp("This penalty applies to grounded melee attackers when the target is flying."),control:flyingTerm})]),
+      section("PREVIEW INPUTS",[formulaInput("Attacker LUCK","luck",0,255),formulaInput("Target EVA","eva",0,255),formulaInput("Target LUCK","targetLuck",0,255),checkbox("Target is flying","flying"),checkbox("Attacker has Float","float")]),accuracyOutput]);
     function updateOutputs(){const value=calculate();damageOutput.textContent=`DAMAGE: ${formatNumber(value.low)} TO ${formatNumber(value.high)} · AVERAGE ${formatNumber(value.average)}`;accuracyOutput.textContent=`FLYING PENALTY: ${formatNumber(value.flyingPenalty)}% · HIT CHANCE: ${formatNumber(value.chance,{maximumFractionDigits:1})}%`}
     // The backend owns the complete requested inventory and each row's runtime
     // status. A formula cannot disappear from this page merely because its native
     // implementation is unfinished.
     const formulaRows=settings.formulaeReworkFormulas||[];
-    const reworkCard=formula=>el("section",{class:"formula-card formula-rework","data-formula-id":formula.id},
-      el("h2",{},`${String(formula.name||formula.id).toUpperCase()} · ${formula.status==="implemented"?"IMPLEMENTED":"INCOMPLETE"}`),
-      el("h3",{class:"formula-subheading"},"REWORKED"),
-      el("div",{class:"formula-expression"},formula.replacement||"Not specified"),
-      el("h3",{class:"formula-subheading"},"VANILLA"),
-      el("div",{class:"formula-expression formula-vanilla"},formula.vanilla||"Not documented"),
-      formula.blocker?el("p",{class:"readonly-note"},`INCOMPLETE: ${formula.blocker}`):null);
+    const reworkCard=formula=>detailSection({title:`${String(formula.name||formula.id).toUpperCase()} · ${formula.status==="implemented"?"IMPLEMENTED":"INCOMPLETE"}`,
+      attrs:{"data-formula-id":formula.id},body:[
+        section("REWORKED",LexeditorUI.mathFormula(formula.replacement||"Not specified")),
+        section("VANILLA",LexeditorUI.mathFormula(formula.vanilla||"Not documented")),
+        formula.blocker?LexeditorUI.detailNote(`INCOMPLETE: ${formula.blocker}`):null].filter(Boolean)});
     const implementedCount=formulaRows.filter(formula=>formula.status==="implemented").length;
-    const master=el("section",{class:"formula-rework-master"},el("h2",{},"FORMULAE REWORK"),el("label",{class:"formula-rework-toggle"},el("span",{},"Use Lexer's reworked battle formulae"),formulaeRework),el("p",{},`${implementedCount}/${formulaRows.length} requested runtime formulae are implemented. The owning toggle remains unavailable until every listed formula has a guarded game patch.`));
-    const rework=formulaRows.map(reworkCard);
-    const view=el("div",{class:"formulae-view",oninput:()=>requestAnimationFrame(updateOutputs)},master,damage,accuracy,...rework);updateOutputs();
-    $("#main").replaceChildren(view);
+    const master=section("FORMULAE REWORK",[
+      detailField({label:"Use Lexer's reworked battle formulae",control:formulaeRework}),
+      LexeditorUI.detailNote(`${implementedCount}/${formulaRows.length} requested runtime formulae are implemented. The owning toggle remains unavailable until every listed formula has a guarded game patch.`)]);
+    const view=LexeditorUI.stack({fill:false},master,LexeditorUI.tileGrid([damage,accuracy,...formulaRows.map(reworkCard)],{minWidth:450}));
+    view.addEventListener("input",()=>requestAnimationFrame(updateOutputs));updateOutputs();
+    $("#main").replaceChildren(detailPanel({heading:false,body:view}));
   }
 
   function startingDataEdits(){const edits=[],current=state.data.init,before=state.base.init;if(!current||!before)return edits;for(const kind of ["general","config"])current[kind].fields.forEach((field,index)=>{if(field.value!==before[kind].fields[index].value)edits.push({kind,id:0,field:field.field,value:field.value})});for(const [key,kind] of [["gfs","gf"],["characters","character"]])for(const row of current[key].rows){const base=before[key].rows.find(value=>value.id===row.id);row.fields.forEach((field,index)=>{if(field.value!==base.fields[index].value)edits.push({kind,id:row.id,field:field.field,value:field.value})});if(kind==="character")row.magics.forEach((slot,index)=>{const old=base.magics[index];if(slot.magicId!==old.magicId||slot.quantity!==old.quantity)edits.push({kind:"magic",id:row.id,slot:slot.slot,magicId:slot.magicId,quantity:slot.quantity})})}current.inventory.rows.forEach((slot,index)=>{const old=before.inventory.rows[index];if(slot.itemId!==old.itemId||slot.quantity!==old.quantity)edits.push({kind:"inventory",id:0,slot:slot.slot,itemId:slot.itemId,quantity:slot.quantity})});return edits}
@@ -283,42 +306,38 @@
   function displayModName(name){return name==="Lexer's Mod for FF8"?"Lexer's Mod":name}
   function projectSources(){
     const rows=[{key:"vanilla",label:"Vanilla",path:state.dashboard?.baseline?.root||"Extracted unchanged FF8 data",readOnly:true,enabled:true}];
-    for(const mod of state.mods?.rows||[])if(mod.enabled||mod.selected)rows.push({key:mod.selected?"mine":`mod:${mod.id}`,label:displayModName(mod.name),path:mod.path,readOnly:!mod.selected,enabled:mod.enabled});
+    for(const mod of state.mods?.rows||[])rows.push({key:mod.selected?"mine":`mod:${mod.id}`,label:displayModName(mod.name),path:mod.path,readOnly:!mod.selected,enabled:mod.enabled,managed:true,removable:!mod.selected,
+      settings:(mod.folderConfig||[]).map(option=>({...option,value:mod.folderOptions?.[option.id]??option.default})),
+      notes:[mod.error,mod.folderError,...(state.mods?.composition?.conflicts||[]).filter(conflict=>conflict.claimants?.includes(mod.id)).map(conflict=>`${conflict.path}: ${conflict.winner||"Higher priority mod takes precedence"}`)].filter(Boolean)});
     return rows;
   }
-  async function openModOrder(){
-    let [latest,featured]=await Promise.all([api("/api/mods"),api("/api/mods/featured")]),working=clone(latest.rows||[]);
-    const backdrop=el("div",{class:"lex-dialog-backdrop","data-lex-history-control":true});
-    const list=el("div",{class:"ff8-mod-list"}),featuredList=el("div",{class:"ff8-featured-list"}),conflicts=el("div",{class:"ff8-mod-conflicts"});
-    const close=()=>backdrop.remove();
-    const renderConflicts=composition=>{
-      const rows=composition?.conflicts||[];
-      conflicts.replaceChildren(el("strong",{},"CONFLICTS"),...(rows.length?rows.map(row=>el("div",{class:"ff8-mod-conflict"},el("span",{},row.path),el("b",{},`Winner: ${row.winner}`),el("small",{},`Claimants, low to high: ${row.claimants.join(" → ")}`))):[el("div",{class:"readonly-note"},"No file conflicts in the active order.")]));
-    };
-    const applyResult=result=>{latest=result;working=clone(result.rows||[]);state.mods=result;draw();renderConflicts(result.composition);shell.refresh()};
-    const confirmDelete=mod=>{
-      const layer=el("div",{class:"lex-dialog-backdrop","data-lex-history-control":true}),cancel=el("button",{class:"lex-dialog-action",type:"button",onclick:()=>layer.remove()},"Cancel"),remove=el("button",{class:"lex-dialog-action primary",type:"button"},"Delete Mod");
-      remove.onclick=async()=>{remove.disabled=cancel.disabled=true;try{if(state.activeSource===`mod:${mod.id}`)await switchProjectSource("mine");const result=await api(`/api/mods/${encodeURIComponent(mod.id)}`,{method:"DELETE"});applyResult(result);featured=await api("/api/mods/featured");drawFeatured();layer.remove();setStatus(`Deleted ${mod.name}`)}catch(error){layer.remove();showAlert({title:"Could not delete mod",message:error.message||String(error)})}};
-      layer.append(el("section",{class:"lex-dialog",role:"alertdialog","aria-modal":"true"},el("h2",{},`DELETE ${mod.name.toUpperCase()}?`),el("p",{},"This removes only this managed mod. It does not remove FFNx, the game, other mods, or your editable project."),el("div",{class:"lex-dialog-actions"},cancel,remove)));document.body.append(layer);remove.focus();
-    };
-    const installFeatured=async entry=>{const button=featuredList.querySelector(`[data-featured-id="${CSS.escape(entry.id)}"] button`);if(button)button.disabled=true;try{const result=await api("/api/mods/featured/install",post({id:entry.id}));applyResult(result);featured=await api("/api/mods/featured");drawFeatured();setStatus(`Installed ${result.installed?.name||entry.name}`)}catch(error){showAlert({title:`Could not download ${entry.name}`,message:error.message||String(error)});if(button)button.disabled=false}};
-    const drawFeatured=()=>featuredList.replaceChildren(...(featured.rows||[]).map(entry=>{const installed=working.find(mod=>mod.id===entry.id),selected=installed?.selected,button=el("button",{class:"ff8-mod-action",type:"button",disabled:!!selected,onclick:()=>installFeatured(entry)},selected?"SOURCE PROJECT":installed?"Update Latest":"Download Latest");return el("div",{class:"ff8-featured-row","data-featured-id":entry.id},el("span",{},el("b",{},displayModName(entry.name))," ",el("small",{class:"ff8-mod-badge"},"★ FEATURED")),button)}));
-    const draw=()=>list.replaceChildren(...working.map((mod,index)=>{
-      const check=el("input",{type:"checkbox",checked:mod.enabled,disabled:!!mod.error,"aria-label":`Enable ${mod.name}`,onchange:event=>{mod.enabled=event.target.checked;row.dataset.enabled=String(mod.enabled)}});
-      const up=el("button",{class:"ff8-mod-move",type:"button",disabled:index===0,title:"Move toward lower priority",onclick:()=>{[working[index-1],working[index]]=[working[index],working[index-1]];draw()}},"↑");
-      const down=el("button",{class:"ff8-mod-move",type:"button",disabled:index===working.length-1,title:"Move toward higher priority",onclick:()=>{[working[index],working[index+1]]=[working[index+1],working[index]];draw()}},"↓");
-      const remove=mod.selected?el("span",{"aria-hidden":"true"}):el("button",{class:"ff8-mod-action",type:"button",title:`Delete ${mod.name}`,onclick:()=>confirmDelete(mod)},"Delete…");
-      const folderOptions=el("span",{class:"ff8-mod-folder-options"},...(mod.folderConfig||[]).map(definition=>{const select=el("select",{"aria-label":`${mod.name}: ${definition.name}`,onchange:event=>{mod.folderOptions=mod.folderOptions||{};mod.folderOptions[definition.id]=Number(event.target.value)}},...definition.values.map(choice=>el("option",{value:String(choice.value),selected:Number(mod.folderOptions?.[definition.id]??definition.default)===Number(choice.value)},choice.name)));return el("label",{class:"ff8-mod-folder-option"},el("span",{},definition.name),select)}));
-      const info=el("span",{class:"ff8-mod-name"},el("b",{},displayModName(mod.name)," ",mod.featured?el("small",{class:"ff8-mod-badge"},"★ FEATURED"):null),el("small",{},mod.error||`${mod.selected?"EDIT TARGET":mod.container==="iroj"?"IROJ ARCHIVE":"READ-ONLY FOLDER"}${mod.version?` · ${mod.version}`:""} · ${mod.path}`),mod.folderError?el("small",{class:"ff8-mod-folder-error"},`Conditional folders disabled: ${mod.folderError}`):null,(mod.folderConfig||[]).length?folderOptions:null);
-      const row=el("div",{class:"ff8-mod-row","data-enabled":String(mod.enabled),"data-mod-id":mod.id},check,info,remove,up,down);return row;
-    }));
-    const archiveInput=el("input",{type:"file",accept:".iroj",hidden:true,onchange:async event=>{const file=event.target.files?.[0];if(!file)return;importButton.disabled=true;try{const result=await api(`/api/mods/import?filename=${encodeURIComponent(file.name)}`,{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:file});working.splice(0,working.length,...clone(result.rows||[]));draw();setStatus(`Imported ${result.imported?.name||file.name}`)}catch(error){showAlert({title:"Could not import IROJ",message:error.message||String(error)})}finally{event.target.value="";importButton.disabled=false}}});
-    const importButton=el("button",{class:"lex-dialog-action",type:"button",onclick:()=>archiveInput.click()},"Import IROJ…");
-    const cancel=el("button",{class:"lex-dialog-action",type:"button",onclick:close},"Cancel");
-    const save=el("button",{class:"lex-dialog-action primary",type:"button",onclick:async()=>{save.disabled=true;try{state.mods=await api("/api/mods/configure",post({order:working.map(row=>row.id),enabled:Object.fromEntries(working.map(row=>[row.id,row.enabled])),folderOptions:Object.fromEntries(working.map(row=>[row.id,row.folderOptions||{}]))}));if(state.activeSource.startsWith("mod:")&&!state.mods.rows.some(row=>`mod:${row.id}`===state.activeSource&&row.enabled))await switchProjectSource("mine");renderConflicts(state.mods.composition);shell.refresh();setStatus("Saved FF8 mod load order")}catch(error){showAlert({title:"Could not save load order",message:error.message||String(error)})}finally{save.disabled=false}}},"Save Order");
-    renderConflicts(latest.composition);draw();drawFeatured();
-    backdrop.append(el("section",{class:"lex-dialog ff8-mod-order",role:"dialog","aria-modal":"true","aria-label":"FF8 mod load order"},el("h2",{},"FF8 MOD LOAD ORDER"),el("div",{class:"ff8-mod-priority"},el("span",{},"LOW PRIORITY"),el("span",{},"HIGH PRIORITY")),list,featuredList,conflicts,archiveInput,el("div",{class:"lex-dialog-actions"},importButton,cancel,save)));
-    document.body.append(backdrop);
+  async function changeProjectSource(key,change){
+    const latest=await api("/api/mods"),rows=clone(latest.rows||[]);
+    const index=rows.findIndex(row=>(row.selected?"mine":`mod:${row.id}`)===key);
+    if(index<0)throw Error("This mod is no longer available.");
+    const row=rows[index];
+    if(change.remove){
+      if(row.selected)throw Error("The editable project cannot be removed here.");
+      if(state.activeSource===key)await switchProjectSource("mine");
+      state.mods=await api(`/api/mods/${encodeURIComponent(row.id)}`,{method:"DELETE"});
+    }else{
+      if(change.enabled!==undefined)row.enabled=change.enabled;
+      if(change.option)row.folderOptions={...row.folderOptions,[change.option]:change.value};
+      if(change.move){const target=index+change.move;if(target>=0&&target<rows.length){rows.splice(index,1);rows.splice(target,0,row);}}
+      state.mods=await api("/api/mods/configure",post({order:rows.map(row=>row.id),enabled:Object.fromEntries(rows.map(row=>[row.id,row.enabled])),folderOptions:Object.fromEntries(rows.map(row=>[row.id,row.folderOptions||{}]))}));
+    }
+    shell.refresh();
+  }
+  function addProjectSource(){
+    return new Promise((resolve,reject)=>{
+      const input=el("input",{type:"file",accept:".iroj",hidden:true});
+      input.addEventListener("cancel",()=>{input.remove();resolve()});
+      input.addEventListener("change",async()=>{try{
+        const file=input.files?.[0];if(file)state.mods=await api(`/api/mods/import?filename=${encodeURIComponent(file.name)}`,{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:file});
+        shell.refresh();resolve();
+      }catch(error){reject(error)}finally{input.remove()}});
+      document.body.append(input);input.click();
+    });
   }
   function discardAll(){for(const name of editableDatasets)if(state.data[name])state.data[name].rows=clone(state.base[name]||[]);state.data.init=clone(state.base.init||{});state.data.settings=clone(state.base.settings||{});state.platformConfig=clone(state.savedPlatformConfig);shell.history?.clear();setStatus("Restored the last saved state");render();shell.refresh()}
   let cardsUI;
@@ -330,7 +349,7 @@
   function render(){document.querySelectorAll("nav button[data-tab]").forEach(button=>button.classList.toggle("active",button.dataset.tab===state.tab));if(state.booting||state.bootFailed)return;const toolbar=$("#toolbar");toolbar.hidden=false;toolbar.classList.toggle("portrait-toolbar",state.tab==="gfs"||state.tab==="characters");views[state.tab]();shell.refresh()}
   async function prepareGameplayLaunch(){if(dirtyCount())await saveAll();const result=await api("/api/settings/activate",post({}));if(!result.ready)throw new Error("The FFNx gameplay patch did not pass its launch check.");setStatus("Gameplay patch ready")}
   async function confirmGameplayPatch(){for(let attempt=0;attempt<40;attempt++){await new Promise(resolve=>setTimeout(resolve,500));const status=await api("/api/settings/runtime");if(status.loaded){setStatus("FFNx loaded the gameplay patch");return}if(status.logReady&&attempt>5){showAlert({title:"FFNx did not load the gameplay patch",message:status.message});return}}showAlert({title:"FFNx patch check timed out",message:"FFNx did not write a current patch result within 20 seconds. The game can remain open, but these gameplay settings are not confirmed active."})}
-  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff8",name:"Final Fantasy 8",themeName:"ff8",theme:{bg:"#000",panel:"#626262","panel-2":"#4f4f4f",border:"#929292",text:"#fff",muted:"#d0d0d0",accent:"#aa2432","accent-text":"#fff",highlight:"#fff",success:"#d8d8d8",font:'"FF8 Menu","Arial Narrow",sans-serif',"heading-font":'"FF8 Menu","Arial Narrow",sans-serif'}},tabs:[["characters","Characters"],["cards","Cards"],["encounters","Encounters"],["maps","Maps"],["enemies","Enemies"],["formulae","Formulae"],["gfs","GFs"],["items","Items"],["refine","Refine"],["abilities","Abilities"],["magic","Magic"],["text","Text"],["shops","Shops"],["starting","Start"],["weapons","Weapons"],["settings","Tweaks"]].map(([id,label])=>({id,label})),activeTab:()=>state.tab,navigate,resetView:tab=>{state.columnPrefs[tab]?.reset?.()},help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the FF8 Data Map",info:()=>navigate("dashboard"),infoActive:()=>state.tab==="dashboard",infoTitle:"Open FF8 setup and runtime information",projectSnapshot:async()=>({canCreate:false,projects:[]}),projectSources:projectSources,projectActiveSource:()=>state.activeSource,selectProjectSource:switchProjectSource,sourcesReplaceProjects:true,manageProjectSources:openModOrder,pendingChanges:()=>LexeditorUI.pendingChangeList({...state.base,platformConfig:state.savedPlatformConfig},{...historyCapture(),platformConfig:state.platformConfig}),dirtyCount,readonly:()=>state.activeSource!=="mine",save:saveAll,discard:discardAll,beforeLaunch:prepareGameplayLaunch,afterLaunch:confirmGameplayPatch,history:{capture:historyCapture,restore:historyRestore,render,enabled:()=>!state.booting&&state.activeSource==="mine",limit:50}});
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff8",name:"Final Fantasy 8",themeName:"ff8",theme:{bg:"#000",panel:"#626262","panel-2":"#4f4f4f",border:"#929292",text:"#fff",muted:"#d0d0d0",accent:"#aa2432","accent-text":"#fff",highlight:"#fff",success:"#d8d8d8",font:'"FF8 Menu","Arial Narrow",sans-serif',"heading-font":'"FF8 Menu","Arial Narrow",sans-serif'}},tabs:[["characters","Characters"],["cards","Cards"],["encounters","Encounters"],["maps","Maps"],["enemies","Enemies"],["formulae","Formulae"],["gfs","GFs"],["items","Items"],["refine","Refine"],["abilities","Abilities"],["magic","Magic"],["text","Text"],["shops","Shops"],["starting","New Game"],["weapons","Weapons"],["settings","Tweaks"]].map(([id,label])=>({id,label})),activeTab:()=>state.tab,navigate,resetView:tab=>{state.columnPrefs[tab]?.reset?.()},help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the FF8 Data Map",info:()=>navigate("dashboard"),infoActive:()=>state.tab==="dashboard",infoTitle:"Open FF8 setup and runtime information",projectSnapshot:async()=>({canCreate:false,projects:[]}),projectSources:projectSources,projectActiveSource:()=>state.activeSource,selectProjectSource:switchProjectSource,sourcesReplaceProjects:true,changeProjectSource,addProjectSource,pendingChanges:()=>LexeditorUI.pendingChangeList({...state.base,platformConfig:state.savedPlatformConfig},{...historyCapture(),platformConfig:state.platformConfig}),dirtyCount,readonly:()=>state.activeSource!=="mine",save:saveAll,discard:discardAll,beforeLaunch:prepareGameplayLaunch,afterLaunch:confirmGameplayPatch,history:{capture:historyCapture,restore:historyRestore,render,enabled:()=>!state.booting&&state.activeSource==="mine",limit:50}});
   async function boot(){try{[state.dashboard,state.datamap]=await Promise.all([api("/api/dashboard"),api("/api/datamap")]);LexeditorUI.configureThemeSounds(state.dashboard.themeSounds);await reloadEditable();state.booting=false;setStatus(state.dashboard.runtime.installed?"FFNx ready":"FFNx needed for in-game loading");render();LexeditorUI.finishPluginLoading()}catch(error){state.booting=false;state.bootFailed=true;LexeditorUI.finishPluginLoading();$("#main").replaceChildren(el("div",{class:"empty"},`Failed to load FF8 plugin: ${error.message}`));setStatus("Load failed")}}
   window.addEventListener("lexeditor-settings-ready",()=>{if(!state.booting&&state.tab==="dashboard")renderDashboard()});
   window.addEventListener("beforeunload",event=>{if(!window.__lexeditorNavigating&&dirtyCount())event.preventDefault()});

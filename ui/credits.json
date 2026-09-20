@@ -204,13 +204,18 @@
     "ff8": {
       "contributions": [
         {
+          "name": "Final Fantasy Inside contributors",
+          "role": "CARDGAME opcode research: deck, carried rules, region rules, rare-card probability, and three arguments whose effects remain unknown.",
+          "url": "https://wiki.ffrtt.ru/index.php/FF8/Field/Script/Opcodes/13A_CARDGAME"
+        },
+        {
           "name": "HobbitDur",
-          "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas, editor references, and Cid packed world Draw Point coordinate conversion.",
+          "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas, Ifrit AI instruction-row design and ai_cronos target/condition reference, and Cid packed world Draw Point coordinate conversion.",
           "url": "https://github.com/HobbitDur/FF8UltimateEditor"
         },
         {
           "name": "Julian Xhokaxhiu (TrueOdin), Tang-Tang Zhou (vertex2995), Jérôme Arzel (myst6re), CosmosXIII and FFNx contributors",
-          "role": "FFNx runtime, game hooks and reverse-engineering references.",
+          "role": "FFNx runtime, game hooks and reverse-engineering references, including the embedded Triple Triad card and icon TIM locations.",
           "url": "https://github.com/julianxhokaxhiu/FFNx"
         },
         {

@@ -249,7 +249,7 @@
   function boolInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];return el("input",{type:"checkbox",checked:!!current,disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.checked);else setArrayValue(row,prop,index,event.target.checked)}})}
   function nameInput(row,prop,index=null,source=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.value);else setArrayValue(row,prop,index,event.target.value)}});for(const name of (source||state.data).names){const option=el("option",{value:name},name);option.selected=name===current;select.append(option)}return select}
   function semanticItemInput(row,prop,index){const current=row.values[prop.name]?.[index]??"";const choices=[...(state.loot?.itemChoices||[])];if(current&&!choices.some(choice=>choice.id===current))choices.unshift({id:current,name:current});const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>setArrayValue(row,prop,index,event.target.value)});for(const choice of choices){const option=el("option",{value:choice.id},choice.name&&choice.name!==choice.id?`${choice.name} (${choice.id})`:choice.id);option.selected=choice.id===current;select.append(option)}return select}
-  function readonlyResolved(value){const resolved=resolvedText(value);return resolved?el("div",{class:"ff7r-resolved"},readonlyField(resolved),el("small",{},value)):readonlyField(String(value??""))}
+  function readonlyResolved(value){const resolved=resolvedText(value);return resolved?el("div",{},readonlyField(resolved),detailNote(value)):readonlyField(String(value??""))}
   // A value's storage type is not always the type a person should edit. CanSale
   // is stored as a byte but only ever means yes or no, so it is presented as a
   // switch and written back as 0 or 1. Add a field here when the schema type is
@@ -314,10 +314,9 @@
   function propertyControl(row,prop,source=null){
     if(!prop.array)return scalarControl(row,prop,null,source);
     const values=row.values[prop.name]||[];
-    if(!values.length)return el("div",{class:"ff7r-array ff7r-array-empty"},
-      el("span",{},"None"));
-    return el("div",{class:"ff7r-array"},...values.map((_value,index)=>
-      el("label",{},el("span",{},`#${index+1}`),scalarControl(row,prop,index,source))));
+    if(!values.length)return readonlyField("None");
+    return LexeditorUI.controlGroup(values.map((_value,index)=>
+      ({label:`#${index+1}`,control:scalarControl(row,prop,index,source)})));
   }
   function propertyHelp(prop){if(!prop.editable)return infoHelp("This DataObject stores this value in a form Lexeditor cannot safely rewrite in place.");if(prop.type==="ENUM")return infoHelp("This value is an Unreal FName. A same-size edit can choose only a name already present in this .uasset's name table.");if(prop.array)return infoHelp("Existing array elements are editable. Resizing the array would move later row data and is not yet supported.");return null}
 
@@ -329,8 +328,8 @@
     return detailPanel({className:"ff7r-detail",title:row.tag||`Record ${row.id}`,identity:recordId(row.id),meta:currentAsset()?.name||state.asset,body:[detailSection({title:"PROPERTIES",body:fields})]});
   }
   function tablePanel(){const rows=sortedRows();return columnList({rows,key:row=>row.id,selected:state.selected,select:row=>{state.selected=row.id;render()},sortState:state.sort,sort:key=>{state.sort=state.sort.key===key?{key,dir:-state.sort.dir}:{key,dir:1};render()},columnPreferences:dataPreferences(),columns:dataTableColumns(),class:"ff7r-table","aria-label":"FF7 Remake DataObject records"})}
-  function assetToolbar(){const select=el("select",{"aria-label":"FF7 Remake misc data table",onchange:event=>selectAsset(event.target.value),disabled:state.busy});for(const item of (state.tab==="tweaks"?tweakAssets():gameAssets())){const label=item.group?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.asset;select.append(option)}return el("div",{class:"ff7r-toolbar"},el("label",{},"Table"),select)}
-  function dataPanel(){if(state.busy&&state.tab==="data")return loadingPanel("Loading DataObject","Reading the selected gameplay .uasset/.uexp pair…");if(state.error&&!state.data)return errorPanel(state.error);return el("div",{class:"ff7r-view"},assetToolbar(),pagedDataPanel())}
+  function assetToolbar(){const select=el("select",{"aria-label":"FF7 Remake misc data table",onchange:event=>selectAsset(event.target.value),disabled:state.busy});for(const item of (state.tab==="tweaks"?tweakAssets():gameAssets())){const label=item.group?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.asset;select.append(option)}return LexeditorUI.toolbar(el("label",{},"Table"),select)}
+  function dataPanel(){if(state.busy&&state.tab==="data")return loadingPanel("Loading DataObject","Reading the selected gameplay .uasset/.uexp pair…");if(state.error&&!state.data)return errorPanel(state.error);return LexeditorUI.stack(assetToolbar(),pagedDataPanel())}
   // The DataObject list uses the shared paged Table + Detail, so its search and
   // paging live in the standard bottom bar instead of a private top strip.
   // Tweaks are settings, not records, and they are not seventeen destinations
@@ -349,7 +348,7 @@
       el("h3",{},`${state.tweaksPending} more group${state.tweaksPending===1?"":"s"} still reading`),
       el("p",{},"These take longer to read than the rest and will appear here when they arrive.")));
     cards.push(LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade,act:actReshade}));
-    return el("div",{class:"ff7r-view ff7r-tweaks-view"},
+    return LexeditorUI.stack(
       LexeditorUI.settingsColumns(cards,{className:"ff7r-tweaks"}));
   }
   // A group with one record shows its properties by name. A group with several
@@ -511,7 +510,7 @@
       change:value=>{state.curatedAsset=value;state.selected=null;state.pages[spec.id]=0;
         state.asset=value;loadAsset(value).then(()=>render());},
     }):null;
-    return el("div",{class:"ff7r-view"},picker,pagedTable({id:spec.id,noun:spec.noun,
+    return LexeditorUI.stack(picker,pagedTable({id:spec.id,noun:spec.noun,
       modOnly:modOnlySpec(row=>row.record),
       rows:curatedRows(spec),key:row=>row.record.id,
       selected:state.selected,setSelected:row=>{state.selected=row.record.id},
@@ -601,7 +600,7 @@
   function descriptionControl(semantic){
     const record=descriptionRecord(semantic.descriptionId);
     if(record&&state.activeSource==="mine"){
-      const box=el("textarea",{rows:2,class:"ff7r-description-input",
+      const box=LexeditorUI.textArea({rows:2,
         "aria-label":`Description for ${semantic.name||semantic.textId||"this item"}`,
         oninput:event=>{record.text=event.target.value;refreshShell()}});
       box.value=record.text??"";
@@ -609,9 +608,8 @@
     }
     const shown=(record?record.text:semantic.description)
       || `(${state.textLanguage||"US"} has no text for ${semantic.descriptionId})`;
-    return el("div",{class:"ff7r-description"},
-      el("div",{class:"ff7r-description-text"},shown),
-      el("button",{type:"button",class:"ff7r-description-edit",
+    return LexeditorUI.actionRow(detailNote(shown),
+      el("button",{type:"button",
         title:`Open ${semantic.descriptionId} on the Text tab`,
         onclick:()=>editDescription(semantic.descriptionId)},"Edit text…"));
   }
@@ -626,7 +624,7 @@
     if(match)state.textSelected=match.id;
     render();
   }
-  function economyPanel(){if(state.busy&&isEconomyTab(state.tab))return loadingPanel("Loading item settings","Discovering installed FF7R Item/Equipment/Materia tables…");if(state.economyError)return errorPanel(state.economyError);if(state.economy&&!state.economy.available)return loadingPanel("Item settings unavailable","The installed FF7R archives did not expose a validated Item/Equipment/Materia table containing BuyValue, SaleValue, CanSale, or MaxCount.");const table=currentEconomyTable();if(!table)return loadingPanel("Item settings","Open this tab to discover installed FF7R item tables.");if(state.data?.asset!==table.asset)return loadingPanel("Loading item table","Reading the selected item DataObject…");return el("div",{class:"ff7r-view"},pagedTable({id:`economy-${state.tab}`,noun:"items",
+  function economyPanel(){if(state.busy&&isEconomyTab(state.tab))return loadingPanel("Loading item settings","Discovering installed FF7R Item/Equipment/Materia tables…");if(state.economyError)return errorPanel(state.economyError);if(state.economy&&!state.economy.available)return loadingPanel("Item settings unavailable","The installed FF7R archives did not expose a validated Item/Equipment/Materia table containing BuyValue, SaleValue, CanSale, or MaxCount.");const table=currentEconomyTable();if(!table)return loadingPanel("Item settings","Open this tab to discover installed FF7R item tables.");if(state.data?.asset!==table.asset)return loadingPanel("Loading item table","Reading the selected item DataObject…");return LexeditorUI.stack(pagedTable({id:`economy-${state.tab}`,noun:"items",
       modOnly:modOnlySpec(row=>row.record),
       rows:economyViewRows(),key:row=>row.record.id,selected:state.selected,
       setSelected:row=>{state.selected=row.record.id},
@@ -641,7 +639,14 @@
   function lootSummary(record,spec){if(!spec)return"—";const items=record.values[spec.itemProperty]||[],chances=spec.percentProperty?(record.values[spec.percentProperty]||[]):[],quantities=spec.quantityProperty?(record.values[spec.quantityProperty]||[]):[];if(!items.length)return"—";return items.map((item,index)=>{let suffix="";if(index<chances.length)suffix=` ${chances[index]}%`;else if(index<quantities.length)suffix=` [${quantities[index]}]`;return`${lootChoiceName(item)}${suffix}`}).join(", ")}
   function lootViewRows(){const q=state.lootQuery.toLocaleLowerCase();return records().map(record=>({record,tag:record.tag,normal:lootSummary(record,lootSpec("normal")),rare:lootSummary(record,lootSpec("rare")),steal:lootSummary(record,lootSpec("steal"))})).filter(row=>!q||`${row.tag} ${row.normal} ${row.rare} ${row.steal}`.toLocaleLowerCase().includes(q)).sort((a,b)=>compareValues(a[state.lootSort.key],b[state.lootSort.key])*state.lootSort.dir)}
   function lootTablePanel(){const rows=lootViewRows();return columnList({rows,key:row=>row.record.id,selected:state.selected,select:row=>{state.selected=row.record.id;render()},sortState:state.lootSort,sort:key=>{state.lootSort=state.lootSort.key===key?{key,dir:-state.lootSort.dir}:{key,dir:1};render()},columnPreferences:lootPrefs,columns:lootColumns,class:"ff7r-table","aria-label":"FF7 Remake enemy drops and steals"})}
-  function lootSlotControl(row,spec,index){const itemProp=property(spec.itemProperty);if(!itemProp)return readonlyField("Installed schema no longer matches this semantic slot.");const slot=el("div",{class:"ff7r-loot-slot"},el("label",{},el("span",{},"ITEM"),semanticItemInput(row,itemProp,index)));if(spec.percentProperty){const chanceProp=property(spec.percentProperty);if(chanceProp)slot.append(el("label",{},el("span",{},"CHANCE %"),percentInput(row,chanceProp,index)))}if(spec.quantityProperty){const quantityProp=property(spec.quantityProperty);if(quantityProp){const label=el("label",{},el("span",{},stealFieldLabel(spec)),numericInput(row,quantityProp,index));const note=stealFieldHelp(spec);if(note)label.append(note);slot.append(label)}}return slot}
+  function lootSlotControl(row,spec,index){
+    const itemProp=property(spec.itemProperty);
+    if(!itemProp)return readonlyField("Installed schema no longer matches this semantic slot.");
+    const parts=[{label:"ITEM",control:semanticItemInput(row,itemProp,index)}];
+    if(spec.percentProperty){const prop=property(spec.percentProperty);if(prop)parts.push({label:"CHANCE %",control:percentInput(row,prop,index)})}
+    if(spec.quantityProperty){const prop=property(spec.quantityProperty);if(prop)parts.push({label:stealFieldLabel(spec),title:stealFieldHelp(spec),control:numericInput(row,prop,index)})}
+    return LexeditorUI.controlGroup(parts,{columns:parts.length});
+  }
   // BattleItemPossession gives steal a single numeric array and no percent
   // array. Calling it QUANTITY produced readings like "25 bladed staffs" for a
   // unique weapon, which no steal table can mean. Until the field's meaning is
@@ -659,7 +664,7 @@
     const labels={normal:"NORMAL DROPS",rare:"RARE DROPS",steal:"STEAL"};for(const spec of state.loot?.groups||[]){const itemProp=property(spec.itemProperty),items=itemProp?(row.values[itemProp.name]||[]):[];const body=items.length?items.map((_item,index)=>detailField({label:`SLOT ${index+1}`,control:lootSlotControl(row,spec,index),help:spec.percentProperty?infoHelp("Chance is the installed raw percent field, constrained by this semantic editor to 0–100."):null})): [detailNote("This drop array is empty on this record, so there are no slots to edit.")];sections.push(detailSection({title:labels[spec.kind]||spec.kind.toUpperCase(),body}))}
     return detailPanel({className:"ff7r-detail",title:row.tag||"Battle",body:sections});
   }
-  function lootPanel(){if(state.busy&&state.tab==="loot")return loadingPanel("Loading enemy loot","Discovering BattleItemPossession and validated drop arrays…");if(state.lootError)return errorPanel(state.lootError);if(state.loot&&!state.loot.available)return loadingPanel("Enemy loot unavailable",state.loot.reason||"BattleItemPossession was not found or did not contain recognized drop/steal arrays.");if(!state.loot)return loadingPanel("Enemy loot","Open this tab to discover the installed FF7R loot table.");if(state.data?.asset!==state.loot.asset)return loadingPanel("Loading enemy loot","Reading BattleItemPossession…");return el("div",{class:"ff7r-view"},pagedTable({id:"loot",noun:"enemies",
+  function lootPanel(){if(state.busy&&state.tab==="loot")return loadingPanel("Loading enemy loot","Discovering BattleItemPossession and validated drop arrays…");if(state.lootError)return errorPanel(state.lootError);if(state.loot&&!state.loot.available)return loadingPanel("Enemy loot unavailable",state.loot.reason||"BattleItemPossession was not found or did not contain recognized drop/steal arrays.");if(!state.loot)return loadingPanel("Enemy loot","Open this tab to discover the installed FF7R loot table.");if(state.data?.asset!==state.loot.asset)return loadingPanel("Loading enemy loot","Reading BattleItemPossession…");return LexeditorUI.stack(pagedTable({id:"loot",noun:"enemies",
       modOnly:modOnlySpec(row=>row.record),
       rows:lootViewRows(),key:row=>row.record.id,selected:state.selected,
       setSelected:row=>{state.selected=row.record.id},
@@ -698,7 +703,7 @@
       change:value=>{state.textResource=String(value||"");state.pages.text=0;render()},
     });
   }
-  function textArea(value,oninput,sub=false){const area=el("textarea",{class:`ff7r-textarea${sub?" ff7r-subtext":""}`,value:value??"",disabled:state.activeSource!=="mine",oninput:event=>oninput(event.target.value)});area.value=value??"";return area}
+  function textArea(value,oninput,sub=false){const area=LexeditorUI.textArea({rows:sub?3:5,value:value??"",disabled:state.activeSource!=="mine",oninput:event=>oninput(event.target.value)});area.value=value??"";return area}
   function textRecordPanel(view=selectedTextRecord()){
     if(!view)return detailPanel({className:"ff7r-detail",title:"No text entry",body:[detailSection({title:"TEXT",body:[detailField({label:"STATE",control:readonlyField("No text entries were loaded for this language.")})]})]});
     const row=view.row;
@@ -714,7 +719,7 @@
     return detailPanel({className:"ff7r-detail",title:row.key||`Text ${row.id}`,identity:recordId(row.id),meta:`${state.textLanguage} · ${view.resource||"Text resource"}`,body:sections});
   }
   function textTablePanel(){const rows=sortedTextRows();return columnList({rows,key:row=>row.id,selected:state.textSelected,select:row=>{state.textSelected=row.id;render()},sortState:state.textSort,sort:key=>{state.textSort=state.textSort.key===key?{key,dir:-state.textSort.dir}:{key,dir:1};render()},columnPreferences:textPrefs,columns:textColumns,class:"ff7r-table","aria-label":"FF7 Remake localized text entries"})}
-  function textPanel(){if(!textAssets().length)return loadingPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");if(state.textBusy||!state.textPacks)return loadingPanel("Loading text","Reading every localized text resource for this language…");if(state.error&&!textRecords().length)return errorPanel(state.error);return el("div",{class:"ff7r-view"},textLanguageBar(),pagedTable({id:"text",noun:"entries",
+  function textPanel(){if(!textAssets().length)return loadingPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");if(state.textBusy||!state.textPacks)return loadingPanel("Loading text","Reading every localized text resource for this language…");if(state.error&&!textRecords().length)return errorPanel(state.error);return LexeditorUI.stack(textLanguageBar(),pagedTable({id:"text",noun:"entries",
       filters:[textResourceFilter()],
       rows:sortedTextRows(),key:row=>row.id,selected:state.textSelected,
       setSelected:row=>{state.textSelected=row.id},
@@ -725,13 +730,13 @@
       split:40,minLeft:360,minRight:420,detail:()=>textRecordPanel()}))}
 
   function loadingPanel(title,message){return detailPanel({className:"ff7r-detail",title,body:[detailSection({title:"DATA",body:[detailField({label:"STATE",control:readonlyField(message)})]})]})}
-  function errorPanel(message){return detailPanel({className:"ff7r-detail",title:"Resource unavailable",body:[detailSection({title:"ERROR",body:[detailField({label:"DETAIL",control:el("div",{class:"ff7r-message ff7r-error"},message)})]})]})}
+  function errorPanel(message){return detailPanel({className:"ff7r-detail",title:"Resource unavailable",body:[detailSection({title:"ERROR",body:[detailField({label:"DETAIL",control:LexeditorUI.notice({tone:"warning",message})})]})]})}
   function openMapRow(row){const asset=row.target||row.view;if(!asset)return;if(textAssets().some(entry=>entry.asset===asset)){state.textResource=asset;return navigate("text")}if(assets().some(entry=>entry.asset===asset)){state.asset=asset;state.data=null;state.dataBaseline=null;return navigate("data")}return navigate(asset)}
   function dataMapPanel(){const rows=state.dataMap?.rows||[];return LexeditorUI.dataMap({rows,open:openMapRow,page:state.mapPage,query:state.mapQuery,status:state.mapStatus,sort:state.mapSort,changePage:value=>{state.mapPage=value;render()},changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changeSort:key=>{state.mapSort=state.mapSort[0]===key?[key,-state.mapSort[1]]:[key,1];render()}}).content}
   async function projectAction(kind){if(dirtyCount()){state.projectMessage="Save or discard all current gameplay/text changes before building or deploying.";render();return}state.busy=true;state.projectMessage=`${kind==="deploy"?"Building and deploying":"Building"}…`;render();try{const result=await api(`/api/${kind}`,{});state.projectMessage=`${kind==="deploy"?"Deployed":"Built"}: ${result.path}`;state.info=await api("/api/info")}catch(error){state.projectMessage=`Error: ${error.message}`}finally{state.busy=false;render()}}
-  function projectPanel(){const info=state.info||{};return detailPanel({className:"ff7r-detail",title:"Mod Project",meta:"Gameplay and text edits share one project; installed base PAKs are never overwritten",body:[detailSection({title:"PROJECT",body:[detailField({label:"ROOT",control:readonlyField(info.projectRoot||"—")}),detailField({label:"BUILD",control:readonlyField(info.buildPath||"—")}),detailField({label:"DEPLOY",control:readonlyField(info.deployPath||"—")}),detailField({label:"MOUNT",control:readonlyField(info.pakMountPoint||"../../../")})]}),detailSection({title:"ACTIONS",body:[detailField({label:"MOD PAK",control:el("div",{class:"ff7r-actions"},el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("build")},"Build Mod PAK"),el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("deploy")},"Build & Deploy to ~mods"))}),detailField({label:"STATUS",control:el("div",{class:"ff7r-message"},state.projectMessage||"Save edits, then build a separate _P.pak or explicitly deploy it to FF7R's ~mods folder.")})]})]})}
+  function projectPanel(){const info=state.info||{};return detailPanel({className:"ff7r-detail",title:"Mod Project",meta:"Gameplay and text edits share one project; installed base PAKs are never overwritten",body:[detailSection({title:"PROJECT",body:[detailField({label:"ROOT",control:readonlyField(info.projectRoot||"—")}),detailField({label:"BUILD",control:readonlyField(info.buildPath||"—")}),detailField({label:"DEPLOY",control:readonlyField(info.deployPath||"—")}),detailField({label:"MOUNT",control:readonlyField(info.pakMountPoint||"../../../")})]}),detailSection({title:"ACTIONS",body:[detailField({label:"MOD PAK",control:LexeditorUI.actionRow(el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("build")},"Build Mod PAK"),el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("deploy")},"Build & Deploy to ~mods"))}),detailField({label:"STATUS",control:detailNote(state.projectMessage||"Save edits, then build a separate _P.pak or explicitly deploy it to FF7R's ~mods folder.")})]})]})}
   function infoPanel(){const info=state.info||{};return detailPanel({className:"ff7r-detail",title:"Information",icon:infoIcon(),meta:"FINAL FANTASY VII REMAKE INTERGRADE",body:[detailSection({title:"GAME",body:[detailField({label:"ROOT",control:readonlyField(info.gameRoot||"—")}),detailField({label:"DATAOBJECTS",control:readonlyField(String(info.dataObjects??"—"))}),detailField({label:"TEXT RESOURCES",control:readonlyField(String(info.textResources??"—"))}),detailField({label:"LANGUAGES",control:readonlyField((info.textLanguages||[]).join(", ")||"—")}),detailField({label:"PAK VERSION",control:readonlyField(info.pakVersion||"Detected when archives are indexed")})]}),detailSection({title:"SEMANTIC EDITORS",body:[detailField({label:"ITEMS",control:readonlyField("Validated BuyValue / SaleValue / CanSale / MaxCount fields from installed Item, Equipment, and Materia DataObjects")}),detailField({label:"ENEMY LOOT",control:readonlyField("BattleItemPossession normal/rare drop item arrays, raw percent chances, and steal item/quantity arrays")})]}),detailSection({title:"HELPER",body:[detailField({label:"REPAK",control:readonlyField(info.helper?.installed?`${info.helper.version} installed`:"Not installed")}),detailField({label:"MOUNT POINT",control:readonlyField(info.pakMountPoint||"../../../")})]}),detailSection({title:"EDITOR COVERAGE",body:[detailField({label:"GAMEPLAY",control:readonlyField("DataObject booleans, bytes, 16/32-bit numbers, floats, existing FNames and fixed array elements")}),detailField({label:"TEXT",control:readonlyField("Variable-length localized text and existing text sub-entry contents")}),detailField({label:"READ ONLY",control:readonlyField("DataObject structural row/property changes, array resizing, text IDs and text entry structure")})]}),
-      detailSection({title:"PROJECT",body:[detailField({label:"ROOT",control:readonlyField(info.projectRoot||"—")}),detailField({label:"BUILD",control:readonlyField(info.buildPath||"—")}),detailField({label:"DEPLOY",control:readonlyField(info.deployPath||"—")}),detailField({label:"MOD PAK",control:el("div",{class:"ff7r-actions"},el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("build")},"Build Mod PAK"),el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("deploy")},"Build & Deploy to ~mods"))}),detailField({label:"STATUS",control:el("div",{class:"ff7r-message"},state.projectMessage||"Save edits, then build a separate _P.pak or explicitly deploy it to FF7R's ~mods folder.")})]}),
+      detailSection({title:"PROJECT",body:[detailField({label:"ROOT",control:readonlyField(info.projectRoot||"—")}),detailField({label:"BUILD",control:readonlyField(info.buildPath||"—")}),detailField({label:"DEPLOY",control:readonlyField(info.deployPath||"—")}),detailField({label:"MOD PAK",control:LexeditorUI.actionRow(el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("build")},"Build Mod PAK"),el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("deploy")},"Build & Deploy to ~mods"))}),detailField({label:"STATUS",control:detailNote(state.projectMessage||"Save edits, then build a separate _P.pak or explicitly deploy it to FF7R's ~mods folder.")})]}),
       LexeditorUI.modLoaderSection({
         loader:"Unreal reads loose PAK archives from End/Content/Paks/~mods. No external loader or script hook is required.",
         output:"Lexeditor packs your project's content folder into Lexeditor-FF7R_P.pak and, on an explicit Deploy, copies that one file into ~mods.",

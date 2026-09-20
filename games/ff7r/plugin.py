@@ -231,8 +231,6 @@ PLUGIN = GamePlugin(
     name=DISPLAY_NAME,
     # Remake runs through Steam; Lexeditor only stops a copy that is running.
     can_launch=False,
-    subtitle="FF7 Remake",
-    description="Edit FF7 Remake gameplay DataObjects and localized text, then build project overlays as mod PAKs.",
     accent="#1d6fb8",
     check=check,
     launch=launch,

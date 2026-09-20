@@ -1,9 +1,11 @@
 // ----- Shop inventories -----
 async function renderShops(){
+  const current=renderScope("renderShops");
   if(!dsInfo().catalog)return noData(`This dataset has no catalog_sp.ymt (${dsInfo().dir}).`);
-  const st=refStore(state.ds);if(!st.shops)st.shops=await api("/api/shops");state.shops=st.shops;
+  const st=refStore(state.ds);if(!st.shops)st.shops=await api("/api/shops");if(!current())return;state.shops=st.shops;
   if(state.ds==="mine"&&(!state.shopBuyers||!state.shopBuyers.available))state.shopBuyers=await api("/api/shop-buyers");
   if(state.ds==="mine")for(const ds of ["vanilla","kiddos"]){const rs=refStore(ds);if(state.config.datasets[ds].catalog&&!rs.shops)rs.shops=await api("/api/shops",undefined,ds);}
+  if(!current())return;
   const f=state.filters,tb=$("#toolbar"),m=$("#main");tb.innerHTML="";
   const shops=[...st.shops.shops].sort((a,b)=>shopLabel(a.type).localeCompare(shopLabel(b.type)));
   const shopTypes=[...new Set([...shops.map(shop=>shop.type),...(state.shopBuyers?.shops||[])])]
@@ -11,15 +13,13 @@ async function renderShops(){
   if(!shopTypes.includes(f.shopType))f.shopType=shopTypes.includes("ST_GENERAL")?"ST_GENERAL":shopTypes[0]||"";
   if(f.shopMode==="report"){
     if(!state.shopAcceptance)state.shopAcceptance=await api("/api/shops/acceptance");
+    if(!current())return;
     tb.append(el("button",{onclick:()=>{f.shopMode="workspace";render();}},el("span",{class:"lex-ui-symbol"},"‹")," BACK TO SHOPS"),
       el("button",{class:"active",disabled:true},"ACCEPTANCE REPORT"));
     m.innerHTML="";
     renderShopAcceptanceReport(m);
     refreshGlobalSave();return;
   }
-  const previous={buys:document.querySelector(".shop-panel-buys .shop-ledger-list")?.scrollTop||0,
-    shops:document.querySelector(".shop-picker-list")?.scrollTop||0,
-    sells:document.querySelector(".shop-panel-sells .shop-ledger-list")?.scrollTop||0};
   const buyQ=(f.shopBuyQ||"").trim().toUpperCase(),sellQ=(f.shopSellQ||"").trim().toUpperCase();
   const selected=shops.find(shop=>shop.type===f.shopType)||null;
   tb.append(el("button",{class:"acceptance-report",title:"Shows the saved effective acceptance report. Save pending shop changes first.",onclick:()=>{f.shopMode="report";render();}},"ACCEPTANCE REPORT"),
@@ -30,9 +30,6 @@ async function renderShops(){
   const sells=renderShopLedger("sells",f.shopType,selected,sellQ);
   m.append(LexeditorUI.panelLayout([buys,picker,sells],"shop-workspace",{
     layoutKey:"rdr2-shops",defaultSizes:[1,.5,1],minSizes:[330,190,330]}));
-  buys.querySelector(".shop-ledger-list").scrollTop=previous.buys;
-  picker.querySelector(".shop-picker-list").scrollTop=previous.shops;
-  sells.querySelector(".shop-ledger-list").scrollTop=previous.sells;
   refreshGlobalSave();
 }
 
@@ -78,16 +75,16 @@ function stageShopSellAddition(shop,it,plan){
   ensureShopPanelPrice(it,"buy");
   const row=newShopListing(it.key,plan);
   shop.items.push(row);state.shopDirty.add(shop.type);
-  $("#picker").classList.add("hidden");refreshGlobalSave();renderShops();
+  pickerHost().hidden=true;refreshGlobalSave();renderShops();
 }
 
 function showShopCatalogueDestination(shop,it,plan){
-  const backdrop=$("#picker");backdrop.innerHTML="";backdrop.classList.remove("hidden");
-  const options=el("div",{class:"shop-category-options"});
+  const backdrop=pickerHost();backdrop.innerHTML="";backdrop.hidden=false;
+  const options=LexeditorUI.stack({fill:false});
   for(const category of plan.categories||[]){
     const layouts=[...new Set((category.pages||[]).map(page=>page.layout))];
     const occupancy=(category.pages||[]).map(page=>`${page.occupancy}/${page.capacity??"?"}`).join(" · ")||"no pages yet";
-    options.append(el("button",{class:"shop-category-option",onclick:async()=>{
+    options.append(el("button",{class:"lex-dialog-action",onclick:async()=>{
       try{
         const selected=await api(`/api/shops/catalogue-placement?item=${encodeURIComponent(it.key)}&shop=${encodeURIComponent(shop.type)}&category=${encodeURIComponent(category.key)}`);
         stageShopSellAddition(shop,it,selected);
@@ -95,11 +92,11 @@ function showShopCatalogueDestination(shop,it,plan){
     }},el("b",{},category.path.join(" › ")),el("span",{},`PAGE LAYOUT ${layouts.join(", ")||"from proved item page"}`),
       el("span",{},`PAGE OCCUPANCY ${occupancy}`)));
   }
-  const panel=el("div",{class:"picker-panel shop-catalogue-destination"},
+  const panel=LexeditorUI.stack({fill:false,className:"lex-dialog",attrs:{role:"dialog","aria-modal":"true"}},
     el("div",{class:"head"},el("b",{},"CATALOGUE DESTINATION"),el("span",{class:"cat",style:"margin-left:auto"},shopLabel(shop.type))),
-    el("div",{class:"hint"},plan.reason),options,
-    ...(options.children.length?[]:[el("div",{class:"hint"},"This shop has no printed catalogue category, so Lexeditor cannot stage the listing.")]),
-    el("div",{class:"dialog-actions"},el("button",{onclick:()=>backdrop.classList.add("hidden")},"CANCEL")));
+    LexeditorUI.stack({fill:false,className:"lex-notice"},plan.reason),options,
+    ...(options.children.length?[]:[LexeditorUI.stack({fill:false,className:"lex-notice"},"This shop has no printed catalogue category, so Lexeditor cannot stage the listing.")]),
+    LexeditorUI.actionRow(el("button",{onclick:()=>backdrop.hidden=true},"CANCEL")));
   backdrop.append(panel);
 }
 
@@ -130,7 +127,7 @@ function shopPanelPrice(it,section,active){
     if(section==="sell")state.shopAcceptance=null;
     ev.target.classList.toggle("edited",edited);refreshGlobalSave();
   };
-  return el("span",{class:"money"},el("input",attrs));
+  return LexeditorUI.unitField(el("input",attrs),"$");
 }
 
 function shopRequirementText(requirement){
@@ -174,40 +171,39 @@ function validateShopRequirementDraft(groups){
 }
 
 function showShopRequirements(shop,row,it){
-  const backdrop=$("#picker"),readonly=isRO(),draft=JSON.parse(JSON.stringify(shopRequirementGroups(row))),options=shopRequirementOptions();
+  const backdrop=pickerHost(),readonly=isRO(),draft=JSON.parse(JSON.stringify(shopRequirementGroups(row))),options=shopRequirementOptions();
   const renderEditor=()=>{
-    backdrop.innerHTML="";backdrop.classList.remove("hidden");
+    backdrop.innerHTML="";backdrop.hidden=false;
     const typeList=`shop-condition-types-${Date.now()}`,keyList=`shop-condition-keys-${Date.now()}`;
-    const panel=el("div",{class:"picker-panel shop-requirement-editor"},el("div",{class:"head"},
+    const panel=LexeditorUI.stack({fill:false,className:"lex-dialog",attrs:{role:"dialog","aria-modal":"true"}},el("div",{class:"head"},
       el("b",{},localizedValue(it.nameKey)||it.key),el("span",{class:"cat",style:"margin-left:auto"},`${shopLabel(shop.type)} · AVAILABILITY`)),
-      el("div",{class:"hint"},"Each card is one real requirement group. Count is the group's stored threshold. Conditions inside a group keep their exact type, key, state, and lock fields; Lexeditor does not invent AND/OR meaning."),
+      LexeditorUI.stack({fill:false,className:"lex-notice"},"Each card is one real requirement group. Count is the group's stored threshold. Conditions inside a group keep their exact type, key, state, and lock fields; Lexeditor does not invent AND/OR meaning."),
       el("datalist",{id:typeList},...options.types.map(value=>el("option",{value}))),
       el("datalist",{id:keyList},...options.keys.map(value=>el("option",{value}))));
-    const grid=el("div",{class:"shop-requirement-grid"});
+    const grid=LexeditorUI.stack({fill:false});
     draft.forEach((group,groupIndex)=>{
-      const card=el("section",{class:"shop-requirement-card"},el("div",{class:"shop-requirement-group-head"},
-        el("b",{},`GROUP ${groupIndex+1}`),el("label",{},"COUNT",el("input",{type:"number",step:"1",value:group.count??"1",disabled:readonly,
-          oninput:ev=>group.count=ev.target.value})),el("span"),
-        el("button",{class:"del",disabled:readonly,title:"Remove this requirement group",onclick:()=>{draft.splice(groupIndex,1);renderEditor();}},"×")));
-      (group.requirements||[]).forEach((requirement,requirementIndex)=>card.append(el("div",{class:"shop-requirement-row"},
-        el("label",{},"TYPE",el("input",{list:typeList,value:requirement.type||"",disabled:readonly,oninput:ev=>requirement.type=ev.target.value})),
-        el("label",{},"KEY",el("input",{list:keyList,value:requirement.key||"",disabled:readonly,oninput:ev=>requirement.key=ev.target.value})),
-        el("label",{},"STATE",el("input",{type:"number",step:"1",value:requirement.state??"1",disabled:readonly,oninput:ev=>requirement.state=ev.target.value})),
-        el("label",{},"LOCK",el("select",{disabled:readonly,onchange:ev=>requirement.lock=ev.target.value},
-          ...["false","true"].map(value=>el("option",{value,selected:String(requirement.lock)===value},value.toUpperCase())))),
-        el("button",{class:"del",disabled:readonly,title:"Remove this condition",onclick:()=>{group.requirements.splice(requirementIndex,1);renderEditor();}},"×"))));
-      card.append(newButton({disabled:readonly,title:"Add condition",onclick:()=>{group.requirements.push({type:"",key:"",state:"1",lock:"false"});renderEditor();}}));
-      grid.append(card);
+      const content=LexeditorUI.stack({fill:false});
+      content.append(LexeditorUI.detailField({label:"Count",control:el("input",{type:"number",step:1,value:group.count??"1",disabled:readonly,oninput:ev=>group.count=ev.target.value})}));
+      for(const [requirementIndex,requirement] of (group.requirements||[]).entries())content.append(LexeditorUI.detailSection({title:`Condition ${requirementIndex+1}`,body:[
+        LexeditorUI.tileGrid([
+          {label:"Type",control:el("input",{list:typeList,value:requirement.type||"",disabled:readonly,oninput:ev=>requirement.type=ev.target.value})},
+          {label:"Key",control:el("input",{list:keyList,value:requirement.key||"",disabled:readonly,oninput:ev=>requirement.key=ev.target.value})},
+          {label:"State",control:el("input",{type:"number",step:1,value:requirement.state??"1",disabled:readonly,oninput:ev=>requirement.state=ev.target.value})},
+          {label:"Lock",control:el("input",{type:"checkbox",checked:String(requirement.lock)==="true",disabled:readonly,onchange:ev=>requirement.lock=String(ev.target.checked)})}].map(LexeditorUI.detailField)),
+        el("button",{disabled:readonly,title:"Remove this condition",onclick:()=>{group.requirements.splice(requirementIndex,1);renderEditor()}},"Remove condition")]}));
+      content.append(LexeditorUI.actionRow(newButton({disabled:readonly,title:"Add condition",onclick:()=>{group.requirements.push({type:"",key:"",state:"1",lock:"false"});renderEditor()}}),
+        el("button",{disabled:readonly,title:"Remove this requirement group",onclick:()=>{draft.splice(groupIndex,1);renderEditor()}},"Remove group")));
+      grid.append(LexeditorUI.detailSection({title:`Group ${groupIndex+1}`,body:content}));
     });
-    if(!draft.length)grid.append(el("div",{class:"hint"},"No requirement groups. This listing is always available in this shop."));
-    panel.append(grid,el("div",{class:"shop-requirement-actions"},
+    if(!draft.length)grid.append(LexeditorUI.stack({fill:false,className:"lex-notice"},"No requirement groups. This listing is always available in this shop."));
+    panel.append(grid,LexeditorUI.actionRow(
       newButton({disabled:readonly,title:"Add condition group",onclick:()=>{draft.push({count:"1",requirements:[]});renderEditor();}}),
-      el("span"),el("button",{onclick:()=>backdrop.classList.add("hidden")},readonly?"CLOSE":"CANCEL"),
+      el("span"),el("button",{onclick:()=>backdrop.hidden=true},readonly?"CLOSE":"CANCEL"),
       readonly?null:el("button",{class:"active",onclick:()=>{
         const cleaned=normalizeShopRequirementDraft(draft),error=validateShopRequirementDraft(cleaned);
         if(error){toast(error,true);return;}
         row.requirementGroups=cleaned;row.requirements=cleaned.flatMap(group=>group.requirements);
-        state.shopDirty.add(shop.type);backdrop.classList.add("hidden");refreshGlobalSave();renderShops();
+        state.shopDirty.add(shop.type);backdrop.hidden=true;refreshGlobalSave();renderShops();
       }},"APPLY")));
     backdrop.append(panel);
   };
@@ -215,7 +211,7 @@ function showShopRequirements(shop,row,it){
 }
 
 function shopRowIdentity(it){
-  const name=localizedValue(it.nameKey);return itemLink(it.key,true,el("div",{class:"shop-item-name",title:`${it.key}${name?" — "+name:""}`},
+  const name=localizedValue(it.nameKey);return itemLink(it.key,true,el("div",{class:"lex-stack lex-stack-natural",title:`${it.key}${name?" — "+name:""}`},
     el("span",{class:"k"},originDisplayName(name||it.key,it)),name?el("span",{class:"li-name"},it.key):""));
 }
 
@@ -260,23 +256,10 @@ function shopCatalogueFilterModel(shop){
 
 function shopCatalogueFilterTabs(model){
   if(!model.top.length)return [];
-  const topCount=model.top.length+1;
-  const top=el("div",{class:"shop-catalogue-tabs",style:`--shop-tab-count:${topCount}`,
-    "aria-label":"Catalogue categories"},
-    el("button",{class:model.topSelected?"":"active","data-catalogue-category":"all",onclick:()=>{
-      state.filters.shopSellCategory="";state.filters.shopSellSubcategory="";renderShops();
-    }},"All"),...model.top.map(category=>el("button",{class:model.topSelected===category.id?"active":"",
-      "data-catalogue-category":category.id,onclick:()=>{state.filters.shopSellCategory=category.id;
-        state.filters.shopSellSubcategory="";renderShops();}},category.label)));
-  if(!model.topSelected||!model.second.length)return [top];
-  const secondCount=model.second.length+1;
-  const second=el("div",{class:"shop-catalogue-tabs secondary",style:`--shop-tab-count:${secondCount}`,
-    "aria-label":"Catalogue subcategories"},
-    el("button",{class:model.secondSelected?"":"active","data-catalogue-subcategory":"all",onclick:()=>{
-      state.filters.shopSellSubcategory="";renderShops();
-    }},"All"),...model.second.map(category=>el("button",{class:model.secondSelected===category.id?"active":"",
-      "data-catalogue-subcategory":category.id,onclick:()=>{state.filters.shopSellSubcategory=category.id;renderShops();}},category.label)));
-  return [top,second];
+  const picker=(label,rows,current,change)=>LexeditorUI.detailField({label,control:el("select",{"aria-label":label,onchange:event=>change(event.target.value)},...[{id:"",label:"All"},...rows].map(row=>el("option",{value:row.id,selected:row.id===current},row.label)))});
+  return [LexeditorUI.controlGroup([
+    picker("Catalogue category",model.top,model.topSelected,value=>{state.filters.shopSellCategory=value;state.filters.shopSellSubcategory="";renderShops()}),
+    ...(model.topSelected&&model.second.length?[picker("Subcategory",model.second,model.secondSelected,value=>{state.filters.shopSellSubcategory=value;renderShops()})]:[])])];
 }
 
 function shopListingMatchesCatalogueFilter(listing,model){
@@ -293,10 +276,10 @@ function shopAvailabilityButton(side,shopType,shop,it,status){
   const title=side==="buys"?status.title:(shop
     ?available?`Listed in ${shopLabel(shopType)}. Click to remove it from this shop.`:`Not listed in ${shopLabel(shopType)}. Click to add it to this shop.`
     :"This shop type has no catalog inventory container.");
-  const attrs={class:`shop-availability ${available?"on":status.kind==="unknown"?"unknown":"off"}`,title,
+  const attrs={type:"checkbox",checked:available,title,
     "aria-label":title,disabled,onclick:ev=>{ev.stopPropagation();if(side==="buys")toggleShopBuy(shopType,it,status);else toggleShopSell(shop,it,available);}};
   if(side==="buys")attrs.oncontextmenu=ev=>{ev.preventDefault();ev.stopPropagation();resetShopBuy(shopType,it);};
-  return el("button",attrs,available?"✓":"×");
+  return el("input",attrs);
 }
 
 function renderShopLedger(side,shopType,shop,q){
@@ -308,42 +291,33 @@ function renderShopLedger(side,shopType,shop,q){
     (buying||shopListingMatchesCatalogueFilter(row.listing,catalogueFilter)))
     .filter(row=>q||row.status.active||(buying&&row.status.kind==="reject"));
   rows.sort((a,b)=>(localizedValue(a.it.nameKey)||a.it.key).localeCompare(localizedValue(b.it.nameKey)||b.it.key));
-  const total=rows.length,shown=rows.slice(0,600),title=buying?"BUYS":"SELLS";
-  const header=buying
-    ?el("div",{class:"shop-ledger-head"},el("span"),el("span",{},"Item"),el("span",{},"Price"),el("span"))
-    :el("div",{class:"shop-ledger-head"},el("span"),el("span",{},"Item"),el("span",{},"Availability"),el("span",{},"Price"),el("span"));
-  const list=LexeditorUI.list({rows:shown,key:row=>row.it.key,selected:null,class:"shop-ledger-list",
-    header,rowClass:row=>`shop-ledger-row${row.status.active?"":" inactive"}`,select:()=>{},render:row=>[
-      el("button",{class:"shop-item-jump",title:`Open ${localizedValue(row.it.nameKey)||row.it.key} in Items`,
-        onclick:ev=>{ev.stopPropagation();goToItem(row.it.key);}},"🔍"),
-      shopRowIdentity(row.it),
-      buying?null:shopConditionCell(shop,row.listing,row.it),
-      el("div",{class:"shop-item-price"},shopPanelPrice(row.it,buying?"sell":"buy",row.status.active)),
-      shopAvailabilityButton(side,shopType,shop,row.it,row.status)]});
-  const subtitle=buying
-    ?"We can't see the actual state of each item's sellability but we can change it, so what you see here are custom overrides. Left-click to toggle, right-click to clear."
-    :shop?`${total}${total>600?"+":""} matching stock listings · catalogue tabs filter the printed categories; availability remains editable per listing.`:"No catalog inventory exists for this shop type.";
-  const filterKey=buying?"shopBuyQ":"shopSellQ",searchLabel=buying?"BUYS":"SELLS";
-  const search=rdrSearchField({id:`shop-${side}-search`,className:"shop-panel-search",
-    placeholder:`Search ${searchLabel}…`,label:`Search ${searchLabel}`,value:state.filters[filterKey]||"",
-    oninput:ev=>{state.filters[filterKey]=ev.target.value;state.filters.shopExact="";filterRerender(ev,renderShops);}});
-  return el("section",{class:`shop-panel shop-panel-${side}`},el("div",{class:"shop-panel-head"},
-    el("h2",{class:"shop-panel-title"},title),search,el("div",{class:"shop-panel-subtitle"},subtitle)),
-    ...(buying?[]:shopCatalogueFilterTabs(catalogueFilter)),list);
+  const pageKey=`shop-${side}-page`,pageSize=15,total=rows.length;
+  const pages=Math.max(1,Math.ceil(total/pageSize)),page=Math.min(pages-1,Math.max(0,state.filters[pageKey]||0));
+  state.filters[pageKey]=page;
+  const list=columnList({rows:rows.slice(page*pageSize,(page+1)*pageSize),key:row=>row.it.key,editable:true,
+    columns:[{key:"item",label:"Item",grow:2,render:row=>itemLink(row.it.key,true,originDisplayName(localizedValue(row.it.nameKey).trim()||row.it.key,row.it))},
+      ...(buying?[]:[{key:"condition",label:"Availability",grow:1,render:row=>shopConditionCell(shop,row.listing,row.it)}]),
+      {key:"price",label:"Price",numeric:true,render:row=>shopPanelPrice(row.it,buying?"sell":"buy",row.status.active)},
+      {key:"active",label:buying?"Buys":"Sells",render:row=>shopAvailabilityButton(side,shopType,shop,row.it,row.status)}]});
+  const filterKey=buying?"shopBuyQ":"shopSellQ",title=buying?"BUYS":"SELLS";
+  const pager=LexeditorUI.pager({inline:true,page,pages,total,pageSize,
+    change:value=>{state.filters[pageKey]=value;renderShops()},
+    search:{value:state.filters[filterKey]||"",label:`Search ${title}`,placeholder:`Search ${title}…`,
+      change:value=>{state.filters[filterKey]=value;state.filters[pageKey]=0;state.filters.shopExact="";renderShops()}}});
+  const content=LexeditorUI.stack(
+    ...(buying?[]:shopCatalogueFilterTabs(catalogueFilter)),LexeditorUI.pagedPane(list,pager));
+  return LexeditorUI.detailPanel({title,tone:buying?"success":"danger",help:buying
+    ?"These are custom sellability overrides. The game's compiled category rules are not available. Click to toggle; right-click to clear an override."
+    :"Items this shop sells. Filter by the printed catalogue categories and edit availability for each listing.",body:content});
 }
 
 function renderShopPicker(shopTypes,shops,selected){
   const rows=shopTypes.map(type=>({type,shop:shops.find(shop=>shop.type===type)||null}));
-  const list=LexeditorUI.list({rows,key:row=>row.type,selected,selectedClass:"sel",class:"shop-picker-list",
-    header:el("div",{class:"shop-picker-head"},el("div",{class:"shop-picker-title"},
-      el("span",{class:"shop-picker-total"},String(shopTypes.length))," SHOPS")),
-    rowClass:"shop-picker-row",select:row=>{state.filters.shopType=row.type;state.filters.shopSellCategory="";
-      state.filters.shopSellSubcategory="";renderShops();},render:row=>{
-      const explicit=state.catalog.items.reduce((count,it)=>count+(shopBuyState(row.type,it).active?1:0),0);
-      return el("div",{},el("span",{class:"shop-name"},shopLabel(row.type)),
-        el("span",{class:"shop-counts"},`${explicit}+ buys · ${row.shop?.items.length||0} sells`));
-    }});
-  return el("section",{class:"shop-panel shop-panel-picker"},list);
+  return columnList({rows,key:row=>row.type,selected,
+    select:row=>{state.filters.shopType=row.type;state.filters.shopSellCategory="";state.filters.shopSellSubcategory="";
+      state.filters["shop-buys-page"]=0;state.filters["shop-sells-page"]=0;renderShops()},
+    columns:[{key:"name",label:`${shopTypes.length} Shops`,grow:1,render:row=>LexeditorUI.stack({fill:false,compact:true},
+      el("strong",{},shopLabel(row.type)),LexeditorUI.detailNote(`${row.shop?.items.length||0} listings`))}]});
 }
 
 const ACCEPTANCE_COLS=[
@@ -356,9 +330,9 @@ const ACCEPTANCE_COLS=[
 
 function renderShopAcceptanceReport(m){
   const a=state.shopAcceptance;
-  if(!a||!a.available)return m.append(el("div",{class:"hint"},a?.reason||"No merchant baseline captured yet."));
-  if(dirtyCount())m.append(el("div",{class:"hint"},el("b",{},"Unsaved shop changes are not in this report. "),"Return to Shops, save them, and reopen the report."));
-  m.append(el("div",{class:"hint"},el("b",{},"What this is: "),
+  if(!a||!a.available)return m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},a?.reason||"No merchant baseline captured yet."));
+  if(dirtyCount())m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},"Unsaved shop changes are not in this report. "),"Return to Shops, save them, and reopen the report."));
+  m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},"What this is: "),
     "each shop's real, effective acceptance rules — the four things we can actually prove, and one honest unknown. ",
     el("b",{},"The unknown column is the normal case and does not mean “no”. "),
     "Rockstar decides ordinary acceptance in compiled shop category rules that appear in no data file and in no script. ",
@@ -383,7 +357,7 @@ function renderShopAcceptanceReport(m){
       columns:[{key:"shop",label:"Shop",render:r=>shopLink(r.shop)},
         {key:"item",label:"Item",render:r=>itemLink(r.item)},
         {key:"source",label:"Source"}]}));
-    if(conflicts.length>300)m.append(el("div",{class:"hint"},`Showing 300 of ${conflicts.length}.`));
+    if(conflicts.length>300)m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},`Showing 300 of ${conflicts.length}.`));
   }
   const stray=Object.entries(a.unresolvedListed||{}).filter(([,v])=>v.length);
   if(stray.length){
@@ -407,7 +381,7 @@ function renderShopItemPicker(items,m){
         localizedValue(it.nameKey)||"No localized name"),itemLink(it.key))}]}));
 }
 
-const NAME_CELL_FOR=it=>el("span",{},el("span",{class:"record-name"},originDisplayName(localizedValue(it.nameKey)||"No localized name",it)),itemLink(it.key,false));
+const NAME_CELL_FOR=it=>el("span",{},el("span",{class:"lex-inline-label"},originDisplayName(localizedValue(it.nameKey)||"No localized name",it)),itemLink(it.key,false));
 function shopListing(shop,item){return shop.items.find(row=>row.item===item);}
 function newShopListing(item,placement=null){
   const destination=placement?.destination;
@@ -433,7 +407,7 @@ function renderShopMatrix(it,shops,m,mode){
     rows:[it],key:row=>row.key,localSort:false,
     template:`31% minmax(0,1fr)${selling?" minmax(0,1fr)":""}`,
     columns:[{key:"item",label:"Item",render:row=>el("span",{},
-        el("span",{class:"record-name"},originDisplayName(localizedValue(row.nameKey)||"No localized name",row)),
+        el("span",{class:"lex-inline-label"},originDisplayName(localizedValue(row.nameKey)||"No localized name",row)),
         itemLink(row.key,false))},
       {key:"price",label:selling?"Global buy price":"Global sell price",
         render:row=>selling?buyPriceCell(row,cashParts(row.buy,"buy"),shopPriceRef(row,"buy"))
@@ -464,7 +438,7 @@ function renderShopMatrix(it,shops,m,mode){
             onchange:ev=>setMerchantOverride(row.type,it.key,ev.target.value)},
             ...[["default","Vanilla"],["accept","Accept"],["reject","Reject"]].map(([value,label])=>
               el("option",{value,...(override===value?{selected:true}:{})},label)));}}]}));
-  if(!selling)m.append(el("div",{class:"hint"},el("b",{},"Merchant overrides: "),"Vanilla preserves Rockstar's category decision. Accept adds a PDATA exception; Reject greys the Sell action when that item is selected in this merchant's satchel."));
+  if(!selling)m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},"Merchant overrides: "),"Vanilla preserves Rockstar's category decision. Accept adds a PDATA exception; Reject greys the Sell action when that item is selected in this merchant's satchel."));
 }
 
 const SHOP_LABELS={ST_TAILOR:"Tailor",ST_NEWSPAPER_BOY:"Newspaper seller",ST_CLOTHING:"Clothing catalog",ST_BUTCHER:"Butcher",ST_HANDHELD:"Handheld catalog",ST_TRAPPER:"Trapper",ST_TRAIN_STATION:"Train station",ST_CAMP_SHAVING:"Camp shaving",ST_GENERAL:"General store",ST_BARBER:"Barber",ST_MARKET:"Market",ST_FENCE:"Fence",ST_FRENCH_MARKET:"French Market",ST_HORSE_SHOP:"Stable / horse shop",ST_HORSE_TRAINER:"Horse trainer",ST_HAIR:"Hair services",ST_EXOTIC:"Exotics",ST_QUARTERMASTER:"Quartermaster",ST_DOCTOR:"Doctor",ST_PEARSON:"Pearson",ST_WEAPON_MOD_STORE:"Weapon customization",ST_BAIT:"Bait shop",ST_GUNSMITH:"Gunsmith","0xC314BB67":"Unresolved catalog shop 0xC314BB67"};
@@ -487,70 +461,6 @@ function pickShopForItem(it,shops){
 }
 function shopPriceRef(it,section){const v=refItem("vanilla",it.key),k=refItem("kiddos",it.key),p=refItem("prices1899",it.key);return refStack([["V","vtag",cashOf(v,section)],["K","ktag",cashOf(k,section)],["1899","p1899tag",cashOf(p,section)]],section==="buy"?it.buy:it.sell,(x,e)=>applyToInput(e,fmtMoney(x)),x=>"$"+fmtMoney(x));}
 function shopItemMatches(it,q){return state.filters.shopExact?it?.key===state.filters.shopExact:(!q||itemSearchText(it).includes(q));}
-function renderShopInventory(shop,q,m){
-  if(!shop)return;
-  let rows=shop.items.map(row=>({row,it:state.catalog.items.find(i=>i.key===row.item)})).filter(x=>shopItemMatches(x.it,q));
-  rows=sortedRows("shops-buy",rows,{name:x=>localizedValue(x.it?.nameKey)||x.row.item,price:x=>cashOf(x.it,"buy")??Infinity,qty:x=>effectivePurchaseYieldOf(x.it),requirements:x=>x.row.requirements.map(r=>`${r.type}:${r.key}:${r.state}`).join("|")});
-  $("#toolbar").insertBefore(el("span",{class:"count"},`${rows.length} of ${shop.items.length} listings`),$("#toolbar").lastChild);
-  const exact=state.catalog.items.find(it=>it.key.toUpperCase()===q);
-  const soldBy=exact?state.shops.shops.filter(candidate=>candidate.items.some(row=>row.item===exact.key)):[];
-  if(exact)m.append(el("div",{class:"hint"},el("b",{},"Sold by: "),...soldBy.length?soldBy.map((candidate,index)=>shopLink(candidate.type,`${index?" · ":""}${shopLabel(candidate.type)}`)):["no standard shop inventory"]));
-  m.append(el("div",{class:"hint"},el("b",{},`${shopLabel(shop.type)}: `),"each row is something this shop can sell to the player. Price and purchase output are global catalog values shared by every shop; requirements belong to this listing only."));
-  const table=columnList({class:"shop-table",align:"start",headerAlign:"start","aria-label":"Shop inventory",
-    rows:rows.slice(0,600).filter(entry=>entry.it),key:({row})=>row.item,editable:true,
-    template:"31% 165px 155px minmax(0,1fr) 40px",
-    columns:[{key:"name",label:"Item",sortValue:({it})=>localizedValue(it.nameKey)||it.key,
-        render:({it})=>NAME_CELL_FOR(it)},
-      {key:"price",label:"Global buy price",sortValue:({it})=>cashOf(it,"buy")??Infinity,
-        render:({it})=>buyPriceCell(it,cashParts(it.buy,"buy"),shopPriceRef(it,"buy"))},
-      {key:"qty",sortValue:({it})=>effectivePurchaseYieldOf(it),
-        label:()=>el("span",{},"Purchase output",fieldHelp("What one purchase ultimately provides. Bundle containers show both the raw purchased container and the usable items produced when it opens.")),
-        render:({it})=>purchaseQuantityCell(it)},
-      {key:"requirements",label:"Availability requirements",cellClass:"requirements",
-        sortValue:({row})=>row.requirements.map(r=>`${r.type}:${r.key}:${r.state}`).join("|"),
-        render:({row})=>row.requirements.length?row.requirements.map(r=>`${r.type}: ${r.key}${r.state?` = ${r.state}`:""}`).join(" · "):"Always available in this inventory"},
-      {key:"remove",label:"",sortable:false,render:({row})=>el("span",{class:"del",title:"Remove from this shop inventory",
-        onclick:()=>{shop.items.splice(shop.items.indexOf(row),1);state.shopDirty.add(shop.type);renderShops();}},"×")}]});
-  m.append(table,el("div",{class:"addrow"},newButton({title:"Add item to this shop",onclick:()=>pickIdentifier("Catalog item",state.catalog.items.map(x=>x.key).sort(),"",v=>{if(!shop.items.some(x=>x.item===v)){shop.items.push(newShopListing(v));state.shopDirty.add(shop.type);}renderShops();})})));
-}
-function renderAllShopInventories(shops,q,m){
-  const grouped=new Map();
-  shops.forEach(shop=>shop.items.forEach(row=>{const it=state.catalog.items.find(i=>i.key===row.item);if(!it||!shopItemMatches(it,q))return;const group=grouped.get(it.key)||{it,listings:[]};group.listings.push({shop,row});grouped.set(it.key,group);}));
-  let rows=sortedRows("shops-buy-all",[...grouped.values()],{name:x=>localizedValue(x.it.nameKey)||x.it.key,price:x=>cashOf(x.it,"buy")??Infinity,qty:x=>effectivePurchaseYieldOf(x.it),shops:x=>x.listings.map(v=>shopLabel(v.shop.type)).sort().join("|")});
-  $("#toolbar").insertBefore(el("span",{class:"count"},`${rows.length} matching items`),$("#toolbar").lastChild);
-  m.append(el("div",{class:"hint"},el("b",{},"Global catalog prices: "),"an item's buy price and purchase output are shared by every shop. Shop membership and availability requirements are edited separately below."));
-  m.append(columnList({class:"shop-table",align:"start",headerAlign:"start","aria-label":"Items sold by shop",
-    rows:rows.slice(0,1000),key:({it})=>it.key,editable:true,
-    template:"31% 165px 155px minmax(0,1fr)",
-    columns:[{key:"name",label:"Item",sortValue:({it})=>localizedValue(it.nameKey)||it.key,
-        render:({it})=>NAME_CELL_FOR(it)},
-      {key:"price",label:"Global buy price",sortValue:({it})=>cashOf(it,"buy")??Infinity,
-        render:({it})=>buyPriceCell(it,cashParts(it.buy,"buy"),shopPriceRef(it,"buy"))},
-      {key:"qty",label:"Purchase output",sortValue:({it})=>effectivePurchaseYieldOf(it),
-        render:({it})=>purchaseQuantityCell(it)},
-      {key:"shops",label:"Sold by / availability",cellClass:"requirements",
-        sortValue:({listings})=>listings.map(v=>shopLabel(v.shop.type)).sort().join("|"),
-        render:({listings})=>el("span",{},...listings.sort((a,b)=>shopLabel(a.shop.type).localeCompare(shopLabel(b.shop.type))).map(({shop,row})=>
-          el("div",{},el("button",{class:"table-link",onclick:()=>{state.filters.shopType=shop.type;renderShops();}},shopLabel(shop.type))," — ",
-            row.requirements.length?row.requirements.map(r=>`${r.type}: ${r.key}${r.state?` = ${r.state}`:""}`).join(" · "):"always available",
-            el("span",{class:"del",title:`Remove from ${shopLabel(shop.type)}`,
-              onclick:()=>{shop.items.splice(shop.items.indexOf(row),1);state.shopDirty.add(shop.type);renderShops();}}," ×"))))}]}));
-}
-function renderShopSellPrices(q,m){
-  let rows=state.catalog.items.filter(it=>(cashOf(it,"sell")!==null||q)&&shopItemMatches(it,q));
-  rows=sortedRows("shops-sell",rows,{name:it=>localizedValue(it.nameKey)||it.key,price:it=>cashOf(it,"sell")??Infinity});
-  $("#toolbar").insertBefore(el("span",{class:"count"},`${rows.length} matching items${rows.length>600?" (showing 600)":""}`),$("#toolbar").lastChild);
-  m.append(el("div",{class:"hint"},el("b",{},"BUYS: "),"The price field is the only proven global sellability control. It is editable. Merchant-specific acceptance cannot be derived from PDATA; its exceptions are displayed read-only and never mean that a blank merchant rejects an item."));
-  m.append(columnList({class:"shop-table",align:"start",headerAlign:"start","aria-label":"Sell prices",
-    rows:rows.slice(0,600),key:it=>it.key,editable:true,
-    template:"31% 165px minmax(0,1fr)",
-    columns:[{key:"name",label:"Item",sortValue:it=>localizedValue(it.nameKey)||it.key,
-        render:it=>NAME_CELL_FOR(it)},
-      {key:"price",label:"Sell price",sortValue:it=>cashOf(it,"sell")??Infinity,
-        render:it=>sellPriceCell(it,cashParts(it.sell,"sell"),shopPriceRef(it,"sell"))},
-      {key:"known",label:"What is known",sortable:false,render:it=>globalSaleStatusCell(it)}]}));
-}
-
 function merchantAccepted(shop,item){
   return !!state.shopBuyers?.buyers?.[shop]?.includes(item);
 }

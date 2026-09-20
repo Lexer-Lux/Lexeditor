@@ -114,6 +114,9 @@ class Handler(PluginRequestHandler):
                 self.file_response(PLUGIN_ROOT / path.lstrip("/"))
             elif path == "/assets/ff8-menu.ttf":
                 self.file_response(ensure_font())
+            elif path.startswith("/assets/card-elements/") and path.endswith(".png"):
+                element = int(Path(path).stem)
+                self.binary_response(card_art.element_png_bytes(element), "image/png")
             elif path.startswith("/assets/cards/") and path.endswith(".png"):
                 card_id = int(path.rsplit("/", 1)[-1].removesuffix(".png"))
                 self.binary_response(card_art.png_bytes(card_id), "image/png")

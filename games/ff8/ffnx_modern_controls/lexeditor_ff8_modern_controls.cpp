@@ -161,7 +161,12 @@ std::uint32_t update(unsigned site, void *movement, void *input, void *player, v
     auto *yaw = reinterpret_cast<std::uint16_t *>(static_cast<std::uint8_t *>(camera) + 10);
     const auto pitch_before = active ? *pitch : 0;
     const auto before = active ? *yaw : 0;
+    auto *legacy_turn = static_cast<std::int8_t *>(input) + 14;
+    const auto saved_turn = active ? *legacy_turn : 0;
+    // Native world input +14 contains only the L1/R1 camera turn amount.
+    if (active) *legacy_turn = 0;
     const auto result = original_update(movement, input, player, camera);
+    if (active) *legacy_turn = saved_turn;
     if (!active) { manual.reset(); manual_pitch.reset(); last_frame = ~0u; return result; }
     const auto pitch_native_after = *pitch;
     const auto native_after = *yaw;
@@ -171,7 +176,7 @@ std::uint32_t update(unsigned site, void *movement, void *input, void *player, v
         *reinterpret_cast<const std::uint8_t *>(0x02036B70)};
     const bool reset_state = last_frame == ~0u ||
         std::memcmp(state, last_state, sizeof state) != 0;
-    const bool shoulder = *(static_cast<const std::int8_t *>(input) + 14) != 0;
+    const bool shoulder = false;
     if (last_frame != frame_counter) {
         *yaw = static_cast<std::uint16_t>(manual.update(before, native_after,
             right_stick_x, shoulder, reset_state));
@@ -202,6 +207,21 @@ std::uint32_t update(unsigned site, void *movement, void *input, void *player, v
 }
 std::uint32_t __cdecl update_fog(void *a, void *b, void *c, void *d) { return update(0, a, b, c, d); }
 std::uint32_t __cdecl update_clear(void *a, void *b, void *c, void *d) { return update(1, a, b, c, d); }
+
+std::uint32_t __cdecl world_actions() {
+    const auto original = reinterpret_cast<std::uint32_t(__cdecl *)()>(0x0054A7F0);
+    if (!lexeditor_ff8_modern_controls_world_active()) return original();
+    const int parity = *reinterpret_cast<const std::int16_t *>(kWorldInputParity);
+    if (parity < 0 || parity > 1) return original();
+    auto *keys = reinterpret_cast<std::uint32_t *>(kWorldInputStates) + parity;
+    const auto camera_toggle = *keys & kR2;
+    // 0054A845 tests R2's rising edge before toggling overhead camera mode.
+    // Mask only this consumer; R2 remains available to vehicle acceleration.
+    *keys &= ~kR2;
+    const auto result = original();
+    *keys = (*keys & ~kR2) | camera_toggle;
+    return result;
+}
 
 void __cdecl update_battle_camera() {
     original_battle_update();
@@ -279,10 +299,16 @@ void lexeditor_ff8_modern_controls_install() {
     const unsigned char first[] = {0xE8, 0xD7, 0x7E, 0x01, 0x00};
     const unsigned char second[] = {0xE8, 0x6F, 0x6A, 0x01, 0x00};
     if (!std::memcmp(reinterpret_cast<void *>(0x0053FBB4), first, sizeof first) &&
-        !std::memcmp(reinterpret_cast<void *>(0x0054101C), second, sizeof second)) {
+        !std::memcmp(reinterpret_cast<void *>(0x0054101C), second, sizeof second) &&
+        *reinterpret_cast<const unsigned char *>(0x0053FD4A) == 0xE8 &&
+        get_relative_call(0x0053FD4A,0) == 0x0054A7F0 &&
+        *reinterpret_cast<const unsigned char *>(0x0054111A) == 0xE8 &&
+        get_relative_call(0x0054111A,0) == 0x0054A7F0) {
         original_update = reinterpret_cast<CameraUpdate>(0x00557A90);
         replace_call(0x0053FBB4, reinterpret_cast<void *>(&update_fog));
         replace_call(0x0054101C, reinterpret_cast<void *>(&update_clear));
+        replace_call(0x0053FD4A, reinterpret_cast<void *>(&world_actions));
+        replace_call(0x0054111A, reinterpret_cast<void *>(&world_actions));
         world_installed = true;
     } else {
         ffnx_warning("Lexeditor Modern Controls: unsupported world-camera call sites; world camera changes not installed.\n");

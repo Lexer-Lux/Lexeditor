@@ -44,9 +44,9 @@ function lootDataRefs(key){
 
 // Ordered most-specific first: a concrete world pickup beats a script name beats a guess.
 function lootSourceCell(t){
-  const cell=el("div",{class:"sources"});
+  const cell=LexeditorUI.actionRow();
   const u=lootUsageOf(t.key), refs=lootDataRefs(t.key);
-  const chip=(cls,text,title)=>el("span",{class:`srcchip ${cls}`,title:title||""},text);
+  const chip=(cls,text,title)=>LexeditorUI.badge(text,{title:title||"",tone:cls==="src-pickup"?"success":""});
   if(u?.pickups?.length)
     cell.append(chip("src-pickup","looted from "+u.pickups.join(", "),
       "The world prop you interact with. Script maps this model straight to this table."));
@@ -58,7 +58,7 @@ function lootSourceCell(t){
   if(u?.mpScripts?.length&&!u?.scripts?.length&&!u?.pickups?.length)
     cell.append(chip("src-mp","multiplayer only","Only referenced by online scripts; inert in story mode."));
   for(const r of refs.slice(0,4))
-    cell.append(el("span",{class:"srcchip src-data",title:`Entry in ${r.file}`,
+    cell.append(el("button",{type:"button",title:`Entry in ${r.file}`,
       onclick:ev=>{ev.stopPropagation();state.lootFile=r.file;state.filters.lootQ=r.key;renderLoot();}},"◂ "+r.key));
   if(refs.length>4)cell.append(chip("src-data",`+${refs.length-4} more tables`));
   if(!cell.childNodes.length)
@@ -67,16 +67,19 @@ function lootSourceCell(t){
   return cell;
 }
 
-function lootTabButtons(){const files=[...dsInfo().lootFiles].sort((a,b)=>(LOOT_TAB_LABELS[a]||a).localeCompare(LOOT_TAB_LABELS[b]||b));return el("div",{class:"subtabs"},
-  el("button",{class:state.lootFile==="__all"?"active":"",onclick:async()=>{state.lootFile="__all";state.filters.lootQ="";state.filters.lootPage=0;await ensureAllLoot();renderLoot();}},"All tables"),
-  el("button",{class:state.lootFile==="__sounds"?"active":"",onclick:()=>{state.lootFile="__sounds";renderLoot();}},"Pickup sounds"),
-  ...files.map(file=>el("button",{class:file===state.lootFile?"active":"",onclick:async()=>{state.lootFile=file;state.filters.lootQ="";state.filters.lootPage=0;await loadLoot(file);renderLoot();}},LOOT_TAB_LABELS[file]||file)),
-  ...(dsInfo().matrix?[el("button",{class:state.lootFile==="__matrix"?"active":"",onclick:()=>{state.lootFile="__matrix";state.filters.lootQ="";state.filters.lootPage=0;renderMatrix();}},"Skinning")]:[]));}
+function lootTabButtons(){
+  const files=[...dsInfo().lootFiles].sort((a,b)=>(LOOT_TAB_LABELS[a]||a).localeCompare(LOOT_TAB_LABELS[b]||b));
+  return LexeditorUI.subtabBar({active:state.lootFile,label:"Loot view",tabs:[{id:"__all",label:"All tables"},{id:"__sounds",label:"Pickup sounds"},...files.map(id=>({id,label:LOOT_TAB_LABELS[id]||id})),...(dsInfo().matrix?[{id:"__matrix",label:"Skinning"}]:[])],change:value=>{
+    state.lootFile=value;state.filters.lootQ="";state.filters.lootPage=0;renderLoot();
+  }});
+}
 async function renderLootSounds(){
+  const current=renderScope("renderLootSounds");
   document.body.classList.remove("loot-split-view");
   $("#toolbar").replaceChildren(lootTabButtons(),savebar(saveLootSounds));
-  const main=$("#main");main.replaceChildren(el("div",{class:"loading"},"Loading sound mappings…"));
+  const main=$("#main");main.replaceChildren(LexeditorUI.stack({fill:false,className:"lex-notice"},"Loading sound mappings…"));
   const data=await api("/api/loot-sounds");
+  if(!current())return;
   if(state.tab!=="loot"||state.lootFile!=="__sounds")return;
   main.replaceChildren();
   if(!data.available){main.append(el("p",{},"Pickup sound data is missing. Prepare this game's reference files to edit it."));return;}
@@ -84,21 +87,35 @@ async function renderLootSounds(){
   const rows=data.rows.filter(row=>`${row.key} ${row.section} ${row.value}`.toLowerCase().includes(query));
   const selected=rows.find(row=>row.id===state.lootSoundSelected)||rows[0];
   state.lootSoundSelected=selected?.id;
-  const list=el("select",{size:18,"aria-label":"Pickup sound mappings",style:"width:100%;height:100%;min-width:0",onchange:event=>{state.lootSoundSelected=event.target.value;renderLootSounds();}},
-    ...rows.map(row=>{const option=el("option",{value:row.id},`${row.key} (${row.section}, map ${row.map+1})`);option.selected=row.id===selected?.id;return option;}));
-  const detail=el("section",{style:"padding:12px;min-width:0"},el("h2",{},"Sound routing"));
-  if(selected){
-    const choices=selected.section==="Sounds"?data.categories:data.soundSets;
-    const control=el("select",{"aria-label":selected.section==="Sounds"?"Sound category":"Sound set",disabled:isRO()?"":null,style:"width:100%;min-width:0",onchange:event=>{
-      if(event.target.value===selected.value)delete state.lootSoundEdits[selected.id];else state.lootSoundEdits[selected.id]=event.target.value;refreshGlobalSave();
-    }},...choices.map(value=>{const option=el("option",{value},value);option.selected=value===((isRO()?undefined:state.lootSoundEdits[selected.id])??selected.value);return option;}));
-    detail.append(el("label",{},selected.section==="Sounds"?"Sound category":"Sound set",control));
-  }
-  detail.append(el("p",{},"Choose the sound used when an item is picked up."),
-    el("p",{},"Casing sounds: Tweaks → Spent Casings → Pickup Sound Name and Pickup Sound Set."));
-  const search=el("input",{type:"search",placeholder:"Find an item or sound",value:state.lootSoundQuery||"","aria-label":"Find pickup sound",onchange:event=>{state.lootSoundQuery=event.target.value;renderLootSounds();}});
-  const master=el("div",{style:"display:flex;flex-direction:column;gap:8px;min-height:0"},search,el("span",{},`${rows.length} of ${data.rows.length} mappings`),list);
-  main.append(el("div",{style:"display:grid;grid-template-columns:minmax(220px,1fr) minmax(220px,1fr);gap:12px;height:100%;min-height:0;overflow:auto"},master,detail));
+  main.append(LexeditorUI.pagedListDetail({
+    rows,key:row=>row.id,selected:selected?.id,noun:"mappings",pageSize:15,slots:true,
+    page:state.lootSoundPage||0,change:view=>{
+      state.lootSoundPage=view.page;state.lootSoundSelected=view.selected;
+      if(view.reason!=="select"&&view.reason!=="sync")renderLootSounds();
+    },
+    splitKey:"rdr2-loot-sounds",defaultSplit:45,
+    select:id=>{state.lootSoundSelected=id;},
+    search:{value:state.lootSoundQuery||"",label:"Find pickup sound",change:value=>{
+      state.lootSoundQuery=value;state.lootSoundPage=0;renderLootSounds();}},
+    master:view=>LexeditorUI.columnList({rows:view.rows,key:row=>row.id,
+      selected:view.selected,select:view.select,columns:[
+        {key:"key",label:"Item"},{key:"section",label:"Section"},
+        {key:"map",label:"Map",render:row=>String(row.map+1)}]}),
+    detail:row=>{
+      const label=row.section==="Sounds"?"Sound category":"Sound set";
+      const choices=row.section==="Sounds"?data.categories:data.soundSets;
+      const control=el("select",{"aria-label":label,disabled:isRO()?"":null,onchange:event=>{
+        if(event.target.value===row.value)delete state.lootSoundEdits[row.id];
+        else state.lootSoundEdits[row.id]=event.target.value;
+        refreshGlobalSave();
+      }},...choices.map(value=>el("option",{value,
+        selected:value===((isRO()?undefined:state.lootSoundEdits[row.id])??row.value)},value)));
+      return LexeditorUI.detailPanel({title:row.key,meta:row.section,body:[
+        LexeditorUI.detailField({label,control,help:LexeditorUI.infoHelp("Choose the sound used when this item is picked up.")}),
+        LexeditorUI.detailNote("Casing sounds: Tweaks → Spent Casings → Pickup Sound Name and Pickup Sound Set.")
+      ]});
+    }
+  }));
 }
 async function saveLootSounds(){
   if(isRO())return 0;
@@ -108,6 +125,7 @@ async function saveLootSounds(){
   state.lootSoundEdits={};refreshGlobalSave();if(state.tab==="loot"&&state.lootFile==="__sounds")await renderLootSounds();return result.saved;
 }
 async function renderLoot() {
+  const current=renderScope("renderLoot");
   if(state.lootFile==="__sounds")return renderLootSounds();
   if(state.lootFile==="__matrix"){
     document.body.classList.remove("loot-split-view");
@@ -126,18 +144,21 @@ async function renderLoot() {
     el("span",{class:"cat",title:allView?"every loot file":state.lootFile},allView?"all loot files":state.lootFile),
     savebar(saveLoot)];
   const m = $("#main"); m.innerHTML = "";
-  if (!state.lootFile) { m.append(el("div", { class: "loading" }, `This dataset has no loot files yet (${dsInfo().dir}).`)); return; }
+  if (!state.lootFile) { m.append(LexeditorUI.stack({fill:false,className:"lex-notice"}, `This dataset has no loot files yet (${dsInfo().dir}).`)); return; }
   if (!allView && !state.loot[state.lootFile]) {
-    m.append(el("div", { class: "loading" }, "Loading…"));
+    m.append(LexeditorUI.stack({fill:false,className:"lex-notice"}, "Loading…"));
     await loadLoot(state.lootFile);
   }
+  if(!current())return;
   await ensureAllLoot();
+  if(!current())return;
   if (!state.lootUsage) state.lootUsage = await api("/api/loot-usage").catch(() => ({ tables: {}, missing: true }));
+  if(!current())return;
   m.innerHTML = "";
   for (const file of allView ? Object.keys(state.loot) : [state.lootFile])
     ensureRefLoot(file, () => { if (state.tab === "loot") renderLoot(); });
 
-  if (state.lootUsage?.missing) m.append(el("div",{class:"hint warn"},
+  if (state.lootUsage?.missing) m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},
     el("b",{},"Sources unavailable: "),"the RDR2 plugin service predates /api/loot-usage. Return to the Lexeditor main menu and reopen RDR2 to refresh it; table→table references below still work."));
 
   if(state.helpOpen.loot)m.append(el("div", { class: "hint" },
@@ -184,14 +205,14 @@ async function renderLoot() {
       columns:[
         {key:"table",label:"Table",sortable:true,grow:1,render:({t,file})=>
           // One line, ellipsized. The file lives in the detail pane, not here.
-          el("div",{class:"li-key",title:`${t.key}${lootTableName(t)?" — "+lootTableName(t):""}\n${LOOT_TAB_LABELS[file]||file}`},
+          el("div",{class:"lex-inline-label",title:`${t.key}${lootTableName(t)?" — "+lootTableName(t):""}\n${LOOT_TAB_LABELS[file]||file}`},
             el("span",{class:"k"},t.key),
             lootTableName(t)&&lootTableName(t)!==t.key?el("span",{class:"li-name"},lootTableName(t)):"")},
         {key:"entries",label:"Entries",sortable:true,render:({t})=>String(t.entries.length)},
         {key:"type",label:"Drop type",sortable:true,render:({t})=>(t.type||"").replace("Drop","")}]
     }),
     detail:row=>lootDetail(row.t,row.file),
-    emptyDetail:()=>el("div",{class:"loot-detail-pane lex-detail"},el("div",{class:"loading"},"No tables match that search.")),
+    emptyDetail:()=>LexeditorUI.stack({fill:false},LexeditorUI.stack({fill:false,className:"lex-notice"},"No tables match that search.")),
     sync:next=>{f.lootPage=next.page;f.lootPageSize=next.pageSize;f.lootSel=next.selected||"";},
     change:next=>{f.lootPage=next.page;f.lootPageSize=next.pageSize;f.lootSel=next.selected||"";renderLoot();}
   });
@@ -211,27 +232,19 @@ function lootFileOf(key){
 }
 
 function lootDetail(t, file) {
-  const pane = el("div",{class:"loot-detail-pane lex-detail"});
+  const body=LexeditorUI.stack({fill:false});
   const u = lootUsageOf(t.key);
   const typeSel = el("select",{class:"droptype",title:
       "AggregateDrop: every entry rolled independently, several can hit at once.\n"+
       "ContinuousLinearDrop: one roll across the combined rates, entries are mutually exclusive.",
     onchange:ev=>{t.type=ev.target.value;markLootDirty(t.key,file);renderLoot();}},
     ...["AggregateDrop","ContinuousLinearDrop"].map(v=>{const o=el("option",{value:v},v);if(t.type===v)o.selected=true;return o;}));
-  const deleteBtn=!isRO()?el("button",{class:"icon-link",style:"color:#d77b70;width:auto;padding:0 8px",
+  const deleteBtn=!isRO()?el("button",{class:"lex-ui-symbol icon-link",style:"color:#d77b70;width:auto;padding:0 8px",
     title:"Delete this table from the loot file. Refused if any other table still references it as a Table entry.",
     onclick:()=>deleteLootTableDialog(t,file)},"Delete"):el("span");
-  pane.append(el("div",{class:"detail-head"},
-    el("div",{},el("span",{class:"k big"},t.key),
-      lootTableName(t)?el("span",{class:"n"},lootTableName(t)):""),
-    el("div",{class:"detail-meta"},typeSel,
-      refStack([["V","vtag",state.store.vanilla?.loot?.[file]?.tables.find(x=>x.key===t.key)?.type??null],
-                ["K","ktag",state.store.kiddos?.loot?.[file]?.tables.find(x=>x.key===t.key)?.type??null]],
-        t.type,v=>{t.type=v;markLootDirty(t.key,file);renderLoot();}),
-      lootRollSummary(t),deleteBtn)));
-  pane.append(el("div",{class:"detail-sources"},el("span",{class:"cat"},"Sources"),lootSourceCell(t)));
-  pane.append(lootEntryGrid(t, file, 0, new Set([t.key])));
-  return pane;
+  body.append(LexeditorUI.detailField({label:"Drop type",control:refField(typeSel,[["V","vtag",state.store.vanilla?.loot?.[file]?.tables.find(x=>x.key===t.key)?.type??null],["K","ktag",state.store.kiddos?.loot?.[file]?.tables.find(x=>x.key===t.key)?.type??null]],t.type,v=>{t.type=v;markLootDirty(t.key,file);renderLoot()})}),
+    lootRollSummary(t),LexeditorUI.detailSection({title:"Sources",body:lootSourceCell(t)}),lootEntryGrid(t,file,0,new Set([t.key])));
+  return LexeditorUI.detailPanel({title:lootTableName(t)||t.key,meta:t.key,actions:deleteBtn,body});
 }
 
 async function createLootTableDialog(){
@@ -297,10 +310,7 @@ function lootRollSummary(t){
 // One editable grid of entries. Nested Table entries expand in place at depth+1 and
 // edit the real child table, marking that child's own file dirty.
 function lootEntryGrid(t, file, depth, seen) {
-  const grid = el("div",{class:"entrygrid",style:depth?`margin-left:${depth*18}px`:""});
-  if(!depth) grid.append(el("div",{class:"entry headrow"},
-    el("span",{}),el("span",{},"Name"),el("span",{},"Rate"),
-    el("span",{},"Min"),el("span",{},"Max"),el("span",{},"Condition"),el("span",{})));
+  const grid=LexeditorUI.stack({fill:false});
   // Match the reference entry by name, falling back to position. The fallback is what
   // makes a reference on the NAME field possible at all: when the name is the thing that
   // changed, a name-keyed lookup can never find its own counterpart.
@@ -327,7 +337,7 @@ function lootEntryGrid(t, file, depth, seen) {
     const openKey=`${t.key}|${i}`;
     const isOpen=!state.lootCollapsed.has(openKey)&&depth<3;
     const expander=target&&!cyclic
-      ? el("span",{class:"expander",title:isOpen?"Collapse this table":"Expand this table",
+      ? el("button",{type:"button",title:isOpen?"Collapse this table":"Expand this table",
           onclick:()=>{isOpen?state.lootCollapsed.add(openKey):state.lootCollapsed.delete(openKey);renderLoot();}},isOpen?"▾":"▸")
       : el("span",{});
     // Name and type are one decision, not two: picking a loot table makes the entry a
@@ -343,14 +353,14 @@ function lootEntryGrid(t, file, depth, seen) {
         else if(e.type==="Table")e.type="Item";   // leaving Table: default to plain Item
         markLootDirty(t.key,file);renderLoot();});
     };
-    const typeTag=el("span",{class:"typetag",title:isTable
+    const typeTag=el("button",{type:"button",title:isTable
         ? "This entry rolls another loot table. Click the name to point it somewhere else."
         : `Item kind: ${e.type}. Click to change between Item / Collectible / Money / Ammo / Weapon / Horse — these all name a catalog item, so the name alone cannot tell them apart.`,
       onclick:ev=>{ev.stopPropagation();
         if(isTable)return;
         pickIdentifier("Entry type",LOOT_ENTRY_TYPES.filter(x=>x!=="Table"),e.type,
           v=>{e.type=v;markLootDirty(t.key,file);renderLoot();});}},e.type||"?");
-    const nameBtn=el("button",{class:"icon-link",title:isTable?"Choose a different loot table":"Choose a different catalog item",
+    const nameBtn=el("button",{class:"lex-ui-symbol icon-link",title:isTable?"Choose a different loot table":"Choose a different catalog item",
       onclick:()=>setKind(isTable?"Table":"Item")},"✎");
     const mention=isTable
       ? target?lootTableLink(target.file,target.table.key,el("span",{class:"nametext"},e.name)):el("span",{class:"badref",title:"No loot table with this name"},e.name||"!")
@@ -361,29 +371,19 @@ function lootEntryGrid(t, file, depth, seen) {
       onchange:ev=>{e.rewardcondition=ev.target.value;markLootDirty(t.key,file);}},
       el("option",{value:""},"Always / no condition"),
       ...conditions.map(v=>{const o=el("option",{value:v},v);if(e.rewardcondition===v)o.selected=true;return o;}));
-    grid.append(el("div",{class:"entry"},
-      expander,
-      // The name deserves a reference more than anything else here: it is what tells you
-      // this entry used to drop something different.
-      el("div",{class:"namecell"},mention,typeTag,nameBtn,
-        refStack(refPairs("name",e.name,i),e.name,v=>{e.name=v;markLootDirty(t.key,file);renderLoot();})),
-      el("div",{class:"ratecell"},inp("rate",{type:"number",step:"0.05",min:"0"}),
-        refStack(refPairs("rate",e.name,i),e.rate,(v,ev)=>applyToInput(ev,v))),
-      el("div",{class:"rangecell"},inp("min",{type:"number",step:"1",placeholder:"default",title:"Blank = do not override quantity."}),
-        refStack(refPairs("min",e.name,i),e.min,(v,ev)=>applyToInput(ev,v))),
-      el("div",{class:"rangecell"},inp("max",{type:"number",step:"1",placeholder:"default",title:"Blank = do not override quantity."}),
-        refStack(refPairs("max",e.name,i),e.max,(v,ev)=>applyToInput(ev,v))),
-      el("div",{class:"rangecell"},conditionSel,
-        refStack(refPairs("rewardcondition",e.name,i),e.rewardcondition,(v,ev)=>{e.rewardcondition=v;markLootDirty(t.key,file);renderLoot();})),
-      el("span",{class:"del",title:"remove entry",onclick:()=>{t.entries.splice(i,1);markLootDirty(t.key,file);renderLoot();}},"×")));
-    if(cyclic) grid.append(el("div",{class:"entryref cyc"},`↻ ${e.name} already appears higher in this chain`));
+    const numeric=(field,attrs)=>{const control=inp(field,attrs);return refField(control,refPairs(field,e.name,i),e[field],value=>applyToControl(control,value))};
+    grid.append(LexeditorUI.detailSection({title:`Entry ${i+1}`,body:[
+      LexeditorUI.actionRow(expander,mention,typeTag,nameBtn,refStack(refPairs("name",e.name,i),e.name,v=>{e.name=v;markLootDirty(t.key,file);renderLoot()}),
+        el("button",{title:"Remove entry",onclick:()=>{t.entries.splice(i,1);markLootDirty(t.key,file);renderLoot()}},"×")),
+      LexeditorUI.tileGrid([
+        {label:"Rate",control:numeric("rate",{type:"number",step:"0.05",min:0})},
+        {label:"Min",control:numeric("min",{type:"number",step:1,placeholder:"default",title:"Blank = do not override quantity."})},
+        {label:"Max",control:numeric("max",{type:"number",step:1,placeholder:"default",title:"Blank = do not override quantity."})},
+        {label:"Condition",control:refField(conditionSel,refPairs("rewardcondition",e.name,i),e.rewardcondition,v=>{e.rewardcondition=v;markLootDirty(t.key,file);renderLoot()})}].map(LexeditorUI.detailField),{minWidth:150})]}));
+    if(cyclic) grid.append(LexeditorUI.detailNote(`↻ ${e.name} already appears higher in this chain`));
     if(target&&isOpen){
       const childFile=lootFileOf(target.table.key);
-      grid.append(el("div",{class:"nested"},
-        el("div",{class:"nested-head"},
-          el("span",{class:"k"},target.table.key),
-          el("span",{class:"nested-meta"},`${target.table.type} · ${LOOT_TAB_LABELS[childFile]||childFile}`)),
-        lootEntryGrid(target.table, childFile, depth+1, new Set([...seen,target.table.key]))));
+      grid.append(LexeditorUI.detailSection({title:target.table.key,body:[LexeditorUI.detailNote(`${target.table.type} · ${LOOT_TAB_LABELS[childFile]||childFile}`),lootEntryGrid(target.table,childFile,depth+1,new Set([...seen,target.table.key]))]}));
     }
   });
   // ContinuousLinearDrop is one roll across the combined rates, so whatever the rates do
@@ -392,21 +392,9 @@ function lootEntryGrid(t, file, depth, seen) {
   if(t.type==="ContinuousLinearDrop"){
     const sum=+t.entries.map(e=>parseFloat(e.rate)||0).reduce((a,b)=>a+b,0).toFixed(3);
     const left=+(1-sum).toFixed(3);
-    grid.append(el("div",{class:"entry nothing-row"},
-      el("span",{}),
-      el("div",{class:"namecell"},
-        el("button",{class:"namebtn",disabled:"",tabindex:"-1"},"(nothing)"),
-        fieldHelp(left>=0
-          ? "Not a real entry. This table rolls once across the combined rates, so the "+
-            (left>0?"portion they leave uncovered":"remainder")+" is the chance you get no item at all. "+
-            "It moves automatically as you edit the rates above; make them sum to 1.0 to always get exactly one entry."
-          : "Not a real entry. The rates above already sum past 1.0, so there is no leftover "+
-            "\"nothing\" chance — and beyond 1.0 this table is expected to yield more than one entry per roll.")),
-      el("div",{class:"ratecell"},el("input",{value:left>=0?left.toFixed(2):"0.00",disabled:"",
-        title:"Automatic: 1.0 minus the rates above"})),
-      el("span",{}),el("span",{}),el("span",{}),el("span",{})));
+    grid.append(LexeditorUI.detailField({label:"Nothing",control:LexeditorUI.readonlyField(left>=0?left.toFixed(2):"0.00"),help:fieldHelp("Automatic: 1.0 minus the rates above. This is the chance that no entry is selected. Rates above 1.0 can yield more than one entry.")}));
   }
-  grid.append(el("div",{class:"addrow"},
+  grid.append(LexeditorUI.actionRow(
     newButton({title:"Add a catalog item directly to this table",
       onclick:()=>pickIdentifier("Catalog item",validLootNames("Item"),"",name=>{t.entries.push({name,rate:"1.0",type:"Item"});markLootDirty(t.key,file);renderLoot();})}),
     newButton({title:"Add a reference that rolls another loot table or reusable Item Group",
@@ -451,14 +439,15 @@ async function saveLoot() {
 
 // ----- Skinning matrix -----
 async function renderMatrix() {
+  const current=renderScope("renderMatrix");
   const f = state.filters;
   if (!dsInfo().matrix) return noData(`This dataset has no loot_items_matrix.meta yet (${dsInfo().dir}).`);
   const st = state.store[state.ds];
   if (!st.matrix) st.matrix = await api("/api/matrix");
+  if(!current())return;
   state.matrix = st.matrix;
-  if (state.ds === "mine" && (!refStore("vanilla").matrix || !refStore("kiddos").matrix)) {
-    ensureRefMatrix(render); return;
-  }
+  await ensureRefMatrix();
+  if(!current())return;
   const tb = $("#toolbar"); tb.innerHTML = "";
   const animals = [...state.matrix.animals].sort((a, b) => a.key.localeCompare(b.key));
   const animalQuery = (f.animalQ || "").trim().toUpperCase();
@@ -481,7 +470,7 @@ async function renderMatrix() {
     el("b", {}, "DamageQuality"), " (the kill-quality result from weapon/damage cleanliness rules) × ", el("b", {}, "SkinQuality"),
     " (the animal's inherent Poor/Good/Perfect quality, plus special Rare/Legendary variants). Change the yielded item or quantity to change results."));
   if (animalQuery && !filteredAnimals.length) {
-    m.append(el("div", { class: "loading" }, `No animals match “${f.animalQ}”.`));
+    m.append(LexeditorUI.stack({fill:false,className:"lex-notice"}, `No animals match “${f.animalQ}”.`));
     return;
   }
   const a = animals.find(x => x.key === f.animal);
@@ -493,11 +482,9 @@ async function renderMatrix() {
   // The yields render as a nested grid inside one cell, so that column's own
   // heading uses the same grid or "Item given"/"Qty" float free of the controls
   // they label.
-  const yieldHead=()=>el("div",{class:"yield-head"},el("div",{class:"yield-row"},
-    el("span",{}),yieldSortLabel("item","Item given"),yieldSortLabel("qty","Qty"),el("span",{})));
+  const yieldHead=()=>LexeditorUI.actionRow(yieldSortLabel("item","Item given"),yieldSortLabel("qty","Quantity"));
   const matrixRows=[];
-  const stars = q => { const n = {Poor:1, Good:2, Perfect:3}[q]; if(n===undefined)return el("span",{class:"stars",title:`Special skin quality: ${q}`},q.toUpperCase());return el("span", { class:"stars", title:q },
-    el("span", {class:"on"}, "★".repeat(n)), el("span", {class:"off"}, "★".repeat(3-n))); };
+  const stars=q=>{const n={Poor:1,Good:2,Perfect:3}[q];return LexeditorUI.badge(n===undefined?q.toUpperCase():"★".repeat(n)+"☆".repeat(3-n),{title:q})};
   const qualSel = (row, field) => el("span", {}, el("select", { onchange: ev => { row[field] = ev.target.value; state.matrixDirty.add(a.key); renderMatrix(); } },
     ...["Poor", "Good", "Perfect",...(field==="skin"?["Rare","Legendary"]:[])].map(v => { const o = el("option", { value: v }, v); if (row[field] === v) o.selected = true; return o; })), stars(row[field]));
   const rank = {Poor:1, Good:2, Perfect:3, Rare:4, Legendary:5};
@@ -518,7 +505,7 @@ async function renderMatrix() {
       return animal?.rows.find(x => x.damage === row.damage && x.skin === row.skin && x.item === row.item) ||
         animal?.rows.find(x => x.damage === row.damage && x.skin === row.skin) || null;
     };
-    const yields=el("div",{class:"yield-list"});
+    const yields=LexeditorUI.stack({fill:false});
     group.rows.sort((x,y)=>x.item.localeCompare(y.item)).forEach(yieldRow=>{
       const referenceItem=yieldRow._referenceItem;
       const vr=state.store.vanilla?.matrix?.animals.find(x=>x.key===a.key)?.rows.find(x=>x.damage===yieldRow.damage&&x.skin===yieldRow.skin&&x.item===referenceItem);
@@ -530,15 +517,15 @@ async function renderMatrix() {
         state.matrixDirty.add(a.key);
         renderMatrix();
       };
-      yields.append(el("div",{class:"yield-row"},
-        itemLink(yieldRow.item,true,localizedValue(catalogItem(yieldRow.item)?.nameKey)||yieldRow.item),
-        el("input",{class:"wide key",list:"dl-items",value:yieldRow.item,onchange:ev=>{yieldRow.item=ev.target.value;state.matrixDirty.add(a.key);renderToolbarOnly();}}),
-        el("input",{type:"number",step:"1",min:"1",value:yieldRow.qty??1,placeholder:"1",onchange:ev=>{yieldRow.qty=Math.max(1,Math.round(+ev.target.value||1));state.matrixDirty.add(a.key);renderToolbarOnly();}}),
-        el("span",{class:"del",title:"Remove yield",onclick:()=>{a.rows.splice(a.rows.indexOf(yieldRow),1);state.matrixDirty.add(a.key);renderMatrix();}},"×"),
+      const quantity=el("input",{type:"number",step:1,min:1,value:yieldRow.qty??1,placeholder:"1",onchange:ev=>{yieldRow.qty=Math.max(1,Math.round(+ev.target.value||1));state.matrixDirty.add(a.key);renderToolbarOnly()}});
+      yields.append(LexeditorUI.stack({fill:false},LexeditorUI.controlGroup([
+        {label:"Item",control:linkedCatalogKeyEditor(yieldRow.item,value=>{yieldRow.item=value;state.matrixDirty.add(a.key);renderMatrix()})},
+        {label:"Quantity",control:quantity},
+        el("button",{title:"Remove yield",onclick:()=>{a.rows.splice(a.rows.indexOf(yieldRow),1);state.matrixDirty.add(a.key);renderMatrix()}},"×")]),
         refLine([["V","vtag",vr?`${vr.item} ×${vr.qty??1}`:null],["K","ktag",kr?`${kr.item} ×${kr.qty??1}`:null]],v=>v,
-          (value,ev)=>applyYieldReference(ev.currentTarget.querySelector(".vtag")?vr:kr))));
+          value=>applyYieldReference(vr&&value===`${vr.item} ×${vr.qty??1}`?vr:kr))));
     });
-    yields.append(el("div",{class:"addrow"},newButton({title:"Add yield",onclick:()=>{a.rows.push({damage:group.damage,skin:group.skin,item:"",qty:1});state.matrixDirty.add(a.key);renderMatrix();}})));
+    yields.append(LexeditorUI.actionRow(newButton({title:"Add yield",onclick:()=>{a.rows.push({damage:group.damage,skin:group.skin,item:"",qty:1});state.matrixDirty.add(a.key);renderMatrix();}})));
     matrixRows.push({group,yields,qual:groupQualSel});
   });
   m.append(columnList({class:"matrix-table",align:"start",headerAlign:"start","aria-label":"Yields by quality",

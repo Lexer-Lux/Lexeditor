@@ -1,6 +1,9 @@
 """Screenshot every tab of every plugin, opened the way the app opens them.
 
-    python tools/visual_snapshot.py <output-folder> [--styles] [plugin ...]
+    .venv/Scripts/python.exe tools/visual_snapshot.py <output-folder> [--styles] [plugin ...]
+
+Use the project's Python runtime. Native plugin decoders can require its
+Python ABI; an unrelated system Python can open pages but fail to load models.
 
 Run it from a checkout (the current one, or an older worktree) to capture how
 that version looks with the installed games and the current mod projects. Two
@@ -22,6 +25,7 @@ import json
 
 import sys
 import time
+from urllib.parse import urlsplit
 from pathlib import Path
 
 ROOT = Path.cwd()
@@ -34,6 +38,7 @@ from desktop_host import HostApi  # noqa: E402
 
 SIZE = {"width": 1600, "height": 900}
 STYLES = False
+TABS_FILTER = set()
 
 # The properties that decide how an element looks and where it sits.
 PROPERTIES = """
@@ -83,20 +88,28 @@ CAPTURE = """props => {
 
 def settle(page, ms=700):
     page.wait_for_timeout(ms)
+    page.wait_for_function(r"""() => {
+      if (document.documentElement.classList.contains('lex-transition-loading')) return false;
+      const main = document.querySelector('#main');
+      if (!main || !main.children.length) return false;
+      return ![...main.querySelectorAll('.loading,.lex-notice')].some(node =>
+        node.offsetParent !== null && /^loading\b/i.test(node.textContent.trim()));
+    }""", timeout=90000)
 
 
-SUBTABS = "#main .lex-subtab-bar:not([hidden]) > .lex-subtab-button"
+SUBTABS = ":is(#main,#toolbar) .lex-subtab-bar:not([hidden]) > .lex-subtab-button"
 
 # Views a plugin keeps off its tab bar, opened by name with its navigate().
 # Blank's demonstration pages are the live samples for the heavier components.
 EXTRA_VIEWS = {"blank": ["one", "two", "three", "subtabs", "tweaks", "graphs"],
-               "warband": ["dashboard", "datamap", "manuals"]}
+               "warband": ["dashboard", "datamap", "manuals"],
+               "rdr": ["project", "datamap"]}
 
 
 def visible_subtab_count(page, depth: int) -> int:
     """How many subtab buttons the depth-th visible subtab bar holds."""
     return page.evaluate("""([selector, depth]) => {
-      const bars = [...document.querySelectorAll('#main .lex-subtab-bar:not([hidden])')]
+      const bars = [...document.querySelectorAll(':is(#main,#toolbar) .lex-subtab-bar:not([hidden])')]
         .filter(bar => bar.offsetParent !== null);
       return bars[depth] ? bars[depth].querySelectorAll(':scope > .lex-subtab-button').length : 0;
     }""", [SUBTABS, depth])
@@ -104,7 +117,7 @@ def visible_subtab_count(page, depth: int) -> int:
 
 def click_subtab(page, depth: int, index: int) -> bool:
     return page.evaluate("""([depth, index]) => {
-      const bars = [...document.querySelectorAll('#main .lex-subtab-bar:not([hidden])')]
+      const bars = [...document.querySelectorAll(':is(#main,#toolbar) .lex-subtab-bar:not([hidden])')]
         .filter(bar => bar.offsetParent !== null);
       const button = bars[depth]?.querySelectorAll(':scope > .lex-subtab-button')[index];
       if (!button) return false;
@@ -172,10 +185,23 @@ def shoot_plugin(browser, api, plugin_id: str, out: Path) -> list[str]:
             return [f"{plugin_id}: cannot open ({error})".replace("\n", " ")[:300]]
     page = browser.new_page(viewport=SIZE)
     errors = []
-    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.on("pageerror", lambda error: errors.append(getattr(error, "stack", None) or str(error)))
     try:
-        page.route("**/api/**", lambda route: route.abort()
-                   if route.request.method not in ("GET", "HEAD") else route.continue_())
+        # This POST renders a supplied preview in memory; it does not save it.
+        def read_only_route(route):
+            # RDR configures its helper during boot. The UI only needs the
+            # following dashboard read; snapshots must not change that helper.
+            if (plugin_id == "rdr" and route.request.method == "POST"
+                    and urlsplit(route.request.url).path == "/api/redhook/configure"):
+                route.fulfill(json={"configured": False, "snapshot": True})
+                return
+            preview = (plugin_id == "ff8" and route.request.method == "POST"
+                       and urlsplit(route.request.url).path == "/api/field/background-preview")
+            if route.request.method in ("GET", "HEAD") or preview:
+                route.continue_()
+            else:
+                route.abort()
+        page.route("**/api/**", read_only_route)
         page.goto(opened["url"].split("?")[0], wait_until="domcontentloaded", timeout=60000)
         deadline = time.time() + 90
         while time.time() < deadline:
@@ -186,6 +212,8 @@ def shoot_plugin(browser, api, plugin_id: str, out: Path) -> list[str]:
         settle(page, 2500)
         tabs = page.evaluate("[...document.querySelectorAll('nav button[data-tab]')]"
                              ".map(b=>b.dataset.tab).filter(Boolean)")
+        if TABS_FILTER:
+            tabs = [tab for tab in tabs if tab in TABS_FILTER]
         for tab in tabs or [None]:
             if tab:
                 try:
@@ -209,7 +237,7 @@ def shoot_plugin(browser, api, plugin_id: str, out: Path) -> list[str]:
                 # Leave the tab as it was found for the next one.
                 page.locator(f'nav button[data-tab="{tab}"]').first.click(timeout=5000)
                 settle(page, 400)
-        for view in EXTRA_VIEWS.get(plugin_id, []):
+        for view in ([] if TABS_FILTER else EXTRA_VIEWS.get(plugin_id, [])):
             page.evaluate(f"navigate('{view}')")
             settle(page, 1200)
             select_first_row(page)
@@ -219,16 +247,23 @@ def shoot_plugin(browser, api, plugin_id: str, out: Path) -> list[str]:
                     capture(page, out, f"{plugin_id}-view-{view}-sub{'-'.join(map(str, path))}")
     except Exception as error:  # noqa: BLE001
         notes.append(f"{plugin_id}: {error}".replace("\n", " ")[:300])
+        if not page.is_closed():
+            notes.append(f"{plugin_id}: visible status: " + page.locator('body').inner_text()[-1600:])
+            page.screenshot(path=str(out / f"{plugin_id}-failure.png"))
     finally:
         if errors:
-            notes.append(f"{plugin_id}: page errors: " + " | ".join(errors[:3])[:300])
+            notes.append(f"{plugin_id}: page errors: " + " | ".join(errors[:3])[:6000])
         page.close()
     return notes
 
 
 def main() -> int:
-    global STYLES
+    global STYLES, TABS_FILTER
     args = sys.argv[1:]
+    for arg in list(args):
+        if arg.startswith('--tabs='):
+            TABS_FILTER = set(arg.split('=', 1)[1].split(','))
+            args.remove(arg)
     if "--styles" in args:
         STYLES = True
         args.remove("--styles")

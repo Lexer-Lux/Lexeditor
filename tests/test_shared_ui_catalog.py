@@ -19,7 +19,7 @@ from generate_component_usage import exports  # noqa: E402
 def catalogued() -> list[str]:
     source = (ROOT / "ui" / "component-catalog.js").read_text(encoding="utf-8")
     body = source[source.index("const entries = ["):source.index("window.LexeditorComponentCatalog")]
-    return re.findall(r'^\s{4}\{id: "([A-Za-z_][A-Za-z0-9_]*)", level:', body, re.M)
+    return re.findall(r'^\s*\{id:\s*"([A-Za-z_][A-Za-z0-9_]*)",\s*level:', body, re.M)
 
 
 class SharedUiCatalogTests(unittest.TestCase):

@@ -13,7 +13,7 @@ HELPERS=[
  {'pluginId':'ff9','plugin':'Final Fantasy 9','helper':'Memoria','pinned':'v2025.07.04','installedVersion':'v2025.07.04','error':'Fixture GitHub outage: this must not hide other helpers'},
  {'pluginId':'warband','plugin':'Mount & Blade: Warband','helper':'WSE2','pinned':'v1.1.5.1','packageVersion':'1.1.5.1-lex1','installedVersion':'v1.1.5.1','installedStatus':'verified','latest':'v1.1.5.1','published':'2026-08-28T20:12:29Z','behind':False,'releaseNotes':'https://github.com/Ruslan-700/WSE2-Releases/releases/tag/v1.1.5.1'},
 ]
-PLUGIN={'id':'warband','name':'Mount & Blade: Warband','subtitle':'Warband','status':'broken','canOpen':False,'scanInProgress':False,'root':'C:/Fixture/Warband','problems':['WSE2 differs from the pinned package. Use Install/Repair WSE2.'],'statusText':'Broken','resident':False,'coverArt':{'state':'missing'},'helperName':'WSE2','helperInstalled':False,'helperInstallable':True}
+PLUGIN={'id':'warband','name':'Mount & Blade: Warband','status':'broken','canOpen':False,'scanInProgress':False,'root':'C:/Fixture/Warband','problems':['WSE2 differs from the pinned package. Use Install/Repair WSE2.'],'statusText':'Broken','resident':False,'coverArt':{'state':'missing'},'helperName':'WSE2','helperInstalled':False,'helperInstallable':True}
 
 def main():
     OUTPUT.mkdir(parents=True,exist_ok=True)

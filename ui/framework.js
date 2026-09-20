@@ -241,18 +241,22 @@
     const supplied = Number(loadingParameters.get("lexLoadStarted"));
     return Number.isFinite(supplied) && supplied > 0 ? supplied : Date.now();
   })();
-  if (!embeddedEditor && loadingParameters.get("lexTransition") === "load") {
+  if (document.getElementById("lexeditor-shell") && transitionKind !== "resume") {
     pluginLoadingScreen = element("div", {
       class: ["lex-plugin-loading-screen",
         loadingParameters.get("lexLoadStarted") ? "continued" : ""].filter(Boolean).join(" "),
       role: "status", "aria-live": "polite",
       "aria-label": "Loading game editor",
     }, element("blockquote", {class: "lex-plugin-loading-quote"},
-      loadingParameters.get("lexQuote") || "Loading editor…"),
+      loadingParameters.get("lexQuote") || sessionStorage.getItem("lex-loading-quote") || "Loading editor…"),
     element("span", {class: "lex-plugin-loading-pulse", "aria-hidden": "true"}));
     document.body.append(pluginLoadingScreen);
     // The root already painted an identical screen; hand over without a blink.
     document.documentElement.classList.add("lex-loading-live");
+    if(loadingParameters.get("lexQuote"))sessionStorage.setItem("lex-loading-quote",loadingParameters.get("lexQuote"));
+    for(const type of ["keydown","pointerdown","click"])document.addEventListener(type,event=>{
+      if(document.documentElement.classList.contains("lex-loading-live")){event.preventDefault();event.stopImmediatePropagation();}
+    },true);
   }
 
   const finishPluginLoading = async () => {
@@ -311,101 +315,6 @@
   };
   // Listened for from the start: the window bar's own toast is not made here.
   document.addEventListener("pointermove", ghostToasts, {passive: true});
-  // Scrollbars take no room. The system bar is hidden everywhere and one thumb
-  // per axis is drawn over whichever box is being scrolled, or whose edge the
-  // pointer is near, then fades. A system bar was a solid track down the side
-  // of every scrolling panel, taking width from the content and never matching
-  // the theme. The thumb can be dragged like the bar it replaces.
-  const installOverlayScrollbars = () => {
-    const axes = {
-      y: {overflow: "overflowY", size: "clientHeight", extent: "scrollHeight", offset: "scrollTop",
-        start: "top", length: "height", pointer: "clientY"},
-      x: {overflow: "overflowX", size: "clientWidth", extent: "scrollWidth", offset: "scrollLeft",
-        start: "left", length: "width", pointer: "clientX"},
-    };
-    const EDGE = 14, MINIMUM = 24, INSET = 2;
-    const bars = {};
-    let drag = null;
-    const scrolls = (node, axis) => node instanceof Element &&
-      node[axes[axis].extent] > node[axes[axis].size] + 1 &&
-      (node === document.scrollingElement || /auto|scroll/.test(getComputedStyle(node)[axes[axis].overflow]));
-    const layout = (bar) => {
-      const {target, axis} = bar;
-      const a = axes[axis];
-      if (!target?.isConnected || !scrolls(target, axis)) { bar.node.classList.remove("visible"); return false; }
-      const box = target === document.scrollingElement
-        ? {top: 0, left: 0, width: innerWidth, height: innerHeight, right: innerWidth, bottom: innerHeight}
-        : target.getBoundingClientRect();
-      const track = box[a.length] - INSET * 2;
-      const thumb = Math.max(MINIMUM, track * target[a.size] / target[a.extent]);
-      const range = target[a.extent] - target[a.size];
-      const at = (track - thumb) * (range ? target[a.offset] / range : 0);
-      bar.track = track; bar.thumbLength = thumb;
-      bar.node.style.cssText = axis === "y"
-        ? `left:${box.right - 9}px;top:${box.top + INSET}px;height:${track}px`
-        : `top:${box.bottom - 9}px;left:${box.left + INSET}px;width:${track}px`;
-      bar.thumb.style.cssText = axis === "y"
-        ? `height:${thumb}px;transform:translateY(${at}px)`
-        : `width:${thumb}px;transform:translateX(${at}px)`;
-      return true;
-    };
-    const show = (target, axis) => {
-      const bar = bars[axis];
-      bar.target = target;
-      // A page that rebuilds its body takes the bars with it.
-      if (!bar.node.isConnected && document.body) document.body.append(bar.node);
-      if (!layout(bar)) return;
-      bar.node.classList.add("visible");
-      clearTimeout(bar.timer);
-      bar.timer = setTimeout(function fade() {
-        if (drag?.bar === bar || bar.node.matches(":hover")) { bar.timer = setTimeout(fade, 400); return; }
-        bar.node.classList.remove("visible");
-      }, 900);
-    };
-    for (const axis of Object.keys(axes)) {
-      const thumb = element("div", {class: "lex-overlay-scrollbar-thumb"});
-      const node = element("div", {class: `lex-overlay-scrollbar lex-overlay-scrollbar-${axis}`, "aria-hidden": "true"}, thumb);
-      const bar = bars[axis] = {axis, node, thumb, target: null, timer: 0, track: 0, thumbLength: 0};
-      thumb.addEventListener("pointerdown", event => {
-        if (!bar.target || event.button !== 0) return;
-        event.preventDefault();
-        event.stopPropagation();
-        thumb.setPointerCapture(event.pointerId);
-        drag = {bar, from: event[axes[axis].pointer], offset: bar.target[axes[axis].offset]};
-        node.classList.add("dragging");
-      });
-      thumb.addEventListener("pointermove", event => {
-        if (drag?.bar !== bar) return;
-        const a = axes[axis], target = bar.target;
-        const free = Math.max(1, bar.track - bar.thumbLength);
-        target[a.offset] = drag.offset + (event[a.pointer] - drag.from) * (target[a.extent] - target[a.size]) / free;
-      });
-      const release = () => { if (drag?.bar === bar) { drag = null; node.classList.remove("dragging"); show(bar.target, axis); } };
-      thumb.addEventListener("pointerup", release);
-      thumb.addEventListener("pointercancel", release);
-    }
-    const mount = () => document.body.append(bars.y.node, bars.x.node);
-    if (document.body) mount(); else document.addEventListener("DOMContentLoaded", mount, {once: true});
-    document.addEventListener("scroll", event => {
-      const target = event.target === document ? document.scrollingElement : event.target;
-      for (const axis of Object.keys(axes)) {
-        if (bars[axis].target === target && bars[axis].node.classList.contains("visible")) layout(bars[axis]);
-        else if (scrolls(target, axis)) show(target, axis);
-      }
-    }, {capture: true, passive: true});
-    // Near a scrolling box's edge, its thumb comes up so it can be grabbed.
-    document.addEventListener("pointermove", event => {
-      if (drag) return;
-      for (let node = event.target; node instanceof Element; node = node.parentElement) {
-        const box = node.getBoundingClientRect();
-        if (box.right - event.clientX <= EDGE && scrolls(node, "y")) { show(node, "y"); return; }
-        if (box.bottom - event.clientY <= EDGE && scrolls(node, "x")) { show(node, "x"); return; }
-      }
-    }, {passive: true});
-    addEventListener("resize", () => Object.values(bars).forEach(bar => bar.node.classList.contains("visible") && layout(bar)));
-  };
-  installOverlayScrollbars();
-
   const showToast = (message, options = {}) => {
     if (!toastStack || !toastStack.isConnected) {
       toastStack = element("div", {class: "lex-toast-stack", role: "status", "aria-live": "polite"});
@@ -416,7 +325,8 @@
     const header = document.querySelector(".lex-shell-header");
     if (header) document.documentElement.style.setProperty("--lex-shell-header-bottom",
       `${Math.round(header.getBoundingClientRect().bottom)}px`);
-    const toast = element("div", {class: "lex-toast"}, message);
+    const tone = options === true ? "warning" : options.tone;
+    const toast = element("div", {class: ["lex-toast", tone ? `lex-tone-${tone}` : ""].filter(Boolean).join(" ")}, message);
     toastStack.append(toast);
     while (toastStack.children.length > 4) toastStack.firstElementChild.remove();
     setTimeout(() => {
@@ -491,9 +401,8 @@
     activeHelpPopup = null;
   };
 
-  // Native control tooltips are an operational/accessibility fallback. They are
-  // deliberately separate from the circular ? info bubble, which is reserved for
-  // authored semantic help about what a property means and affects.
+  // Optional descriptions for callers that need accessible control summaries.
+  // These are not installed as hover tooltips.
   const controlHelp = control => {
     if (!(control instanceof Element) || !control.matches("button,input,select,textarea,[role='button'],[role='slider'],[role='separator']")) return "";
     const authored = String(control.getAttribute("aria-description") || "").trim();
@@ -530,22 +439,29 @@
   };
 
   const installControlHelp = (root = document.body) => {
-    const annotate = node => {
+    // Keep descriptions available to assistive tools, without native hover boxes.
+    const strip = node => {
       if (!(node instanceof Element)) return;
-      const controls = [node.matches?.("button,input,select,textarea,[role='button'],[role='slider'],[role='separator']") ? node : null,
-        ...node.querySelectorAll?.("button,input,select,textarea,[role='button'],[role='slider'],[role='separator']") || []].filter(Boolean);
-      controls.forEach(control => {
-        if (control.title) return;
-        const text = controlHelp(control);
-        if (!text) return;
-        control.title = text;
-        if (!control.getAttribute("aria-description") && !control.matches("button,[role='button']")) control.setAttribute("aria-description", text);
-      });
+      for (const control of [node, ...node.querySelectorAll('[title]')]) {
+        const text = control.getAttribute('title');
+        if (!text) continue;
+        control.dataset.lexTitle = text;
+        if (!control.hasAttribute('aria-description')) control.setAttribute('aria-description', text);
+        control.removeAttribute('title');
+      }
+      for (const title of [node, ...node.querySelectorAll('svg title')]) {
+        if (!title.matches('svg title')) continue;
+        const svg=title.closest('svg');
+        if (!svg.hasAttribute('aria-label')) svg.setAttribute('aria-label',title.textContent);
+        title.remove();
+      }
     };
-    annotate(root);
-    if (typeof MutationObserver !== "function") return () => {};
-    const observer = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(annotate)));
-    observer.observe(root, {childList:true, subtree:true});
+    strip(root);
+    const observer = new MutationObserver(records => records.forEach(record => {
+      if (record.type === 'attributes') strip(record.target);
+      else record.addedNodes.forEach(strip);
+    }));
+    observer.observe(root, {childList:true, subtree:true, attributes:true, attributeFilter:['title']});
     return () => observer.disconnect();
   };
 
@@ -889,9 +805,9 @@
     // the name appeared twice and the copy at the top - the one being read -
     // was the copy that could not be changed. A panel that hands over
     // `renameRecord` gets a heading that can be typed into in place.
-    const title = options.title instanceof Node
-      ? options.title
-      : typeof options.renameRecord === "function"
+    const title = options.titleControl
+        ? element("h2", {class:"lex-detail-panel-title lex-detail-panel-rename"}, options.titleControl)
+        : typeof options.renameRecord === "function"
         ? element("h2", {class: "lex-detail-panel-title lex-detail-panel-rename"},
           element("input", {
             type: "text",
@@ -900,7 +816,8 @@
             title: options.renameLabel || "Record name",
             oninput: event => options.renameRecord(event.target.value, event),
           }))
-        : element("h2", {class: "lex-detail-panel-title"}, String(options.title ?? ""));
+        : element("h2", {class: "lex-detail-panel-title"}, options.title ?? "");
+    if (options.help) title.append(infoHelp(options.help));
     const identity = element("div", {class: "lex-detail-panel-identity"},
       title,
       // The identity slot is the big ghosted record number, sized to the
@@ -920,7 +837,7 @@
       options.actions ? element("div", {class: "lex-detail-panel-actions"}, options.actions) : null);
     return element("section", {
       ...(options.attrs || {}),
-      class: ["lex-detail-panel", "lex-detail", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
+      class: ["lex-detail-panel", "lex-detail", options.tone ? `lex-panel-tone-${options.tone}` : "", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
     }, heading, options.paginate ? paginateSettings(element("div", {class: bodyClass}, options.body || [])) : element("div", {class: bodyClass}, options.body || []));
   };
 
@@ -1027,6 +944,9 @@
     const minimum = Math.max(8, Number(options.minimum) || 11);
     // The size the text needs, read with the control at its natural size.
     const measure = () => {
+      // Off-page controls have no width. Fitting them to zero made their font
+      // tiny, so pagination measured a shorter card than the one later shown.
+      if (!control.getClientRects().length || control.clientWidth <= 0) return "";
       const style = getComputedStyle(control);
       const maximum = Number.parseFloat(style.fontSize) || 16;
       const horizontal = (Number.parseFloat(style.paddingLeft) || 0) +
@@ -1122,7 +1042,7 @@
       panel.style?.setProperty("--lex-panel-reference-rail-width", `${widest}px`);
       panel.style?.setProperty("--lex-reference-tag-width", `${tag}px`);
       for (const control of controls) {
-        control.style.setProperty("--lex-reference-rail-width", `${widest}px`);
+        control.style.setProperty("--lex-reference-requested-width", `${widest}px`);
         control.style.setProperty("--lex-reference-tag-width", `${tag}px`);
       }
     }
@@ -1145,11 +1065,12 @@
 
   // Shared Detail internals. A game supplies its theme and field controls;
   // this component owns the repeated section and field structure.
-  const detailSection = (options = {}) => element("section", {
+  const detailSection = (options = {}) => element(options.collapsible ? "details" : "section", {
     ...(options.attrs || {}),
     class: ["lex-detail-section", options.className || ""].filter(Boolean).join(" "),
     "aria-label": options.ariaLabel || (typeof options.title === "string" ? options.title : null),
-  }, options.title ? element("h3", {class: "lex-detail-section-title"},
+    ...(options.collapsible && options.open ? {open: true} : {}),
+  }, options.title ? element(options.collapsible ? "summary" : "h3", {class: "lex-detail-section-title"},
     options.title, options.help || null) : null,
   element("div", {class: "lex-detail-section-content"}, options.body || []));
 
@@ -1165,7 +1086,7 @@
 
   const sectionParts = section => ({
     title: section?.querySelector(":scope > .lex-detail-section-title") || null,
-    content: section?.querySelector(":scope > .lex-detail-section-content") || null,
+    content: section?.querySelector(":scope > .lex-detail-section-content, :scope > .lex-detail-panel-body") || null,
   });
 
   // Every piece of the shell's own text a game may want to redraw - Warband
@@ -1195,10 +1116,88 @@
   const actionRow = (...children) => element("div", {class: "lex-action-row"}, ...children);
 
   // A table that is its own pane, with its pager under it.
-  const pagedPane = (content, pagerNode) => element("div", {class: "lex-paged-pane"}, content, pagerNode);
+  const pagedPane = (content, pagerNode) => element("div", {class: "lex-paged-pane"},
+    element("div", {class: "lex-paged-pane-content"}, content), pagerNode);
+
+  // One instruction per row, with a stable footer outside the page content.
+  // Callers supply controls and meaning; sizing and reordering are shared.
+  const instructionList = (options = {}) => {
+    const rows = options.rows || [];
+    let pageSize = options.pageSize || 8, page = options.page || 0, dragged = null, pageTimer;
+    const body = element("div", {class:"lex-instruction-list", role:"list"});
+    const footer = element("div", {class:"lex-instruction-footer"});
+    const root = pagedPane(body, footer);
+    root.classList.add("lex-instruction-pane");
+    const repaint = () => {
+      const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+      page = Math.max(0, Math.min(page, pages - 1));
+      options.changePage?.(page,pageSize);
+      body.replaceChildren(...rows.slice(page * pageSize, (page + 1) * pageSize).map((row, offset) => {
+        const index = page * pageSize + offset;
+        const editable = options.editable !== false && row.editable !== false;
+        const handle = element("button", {type:"button", class:"lex-instruction-handle",
+          draggable:String(editable), disabled:!editable, "aria-label":`Move instruction ${index + 1}`,
+          "aria-description":"Drag to reorder. With keyboard focus, press Alt and an arrow key.",
+          ondragstart:event=>{dragged=index;event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",String(index));},
+          ondragend:()=>{dragged=null;clearTimeout(pageTimer);},
+          onkeydown:event=>{
+            if (!event.altKey || !["ArrowUp","ArrowDown"].includes(event.key)) return;
+            event.preventDefault();
+            const target=index+(event.key==="ArrowUp"?-1:1);
+            if(target>=0&&target<rows.length)options.move?.(index,target);
+          }}, "⠿");
+        const description=element("div",{class:"lex-instruction-description"},options.describe?.(row,index));
+        return element("div", {class:"lex-instruction-row",role:"listitem",
+          oninput:()=>{description.textContent=options.describe?.(row,index)||'';},
+          "data-instruction-index":index,"data-offset":row.offset,
+          ondragover:event=>{if(dragged!==null&&editable){event.preventDefault();event.dataTransfer.dropEffect="move";}},
+          ondrop:event=>{if(dragged===null||!editable)return;event.preventDefault();const from=dragged;dragged=null;if(from!==index)options.move?.(from,index);}},
+          handle, element("span",{class:"lex-instruction-index","aria-hidden":"true"},index+1),
+          element("div",{class:"lex-instruction-controls"},options.controls?.(row,index)),
+          description,
+          element("div",{class:"lex-instruction-actions"},
+            element("button",{type:"button",disabled:!editable,"aria-label":`Insert after instruction ${index+1}`,onclick:()=>options.insert?.(index)},"+"),
+            element("button",{type:"button",disabled:!editable,"aria-label":`Delete instruction ${index+1}`,onclick:()=>options.remove?.(index)},"−")));
+      }));
+      if(!rows.length)body.append(element("button",{type:"button",disabled:options.editable===false,onclick:()=>options.insert?.(-1)},"Add instruction"));
+      footer.replaceChildren(pager({inline:true,page,pages,pageSize,total:rows.length,noun:"instructions",change:value=>{page=value;repaint();}}));
+      for(const [label,delta] of [["Previous page",-1],["Next page",1]]){
+        const button=footer.querySelector(`[aria-label="${label}"]`);
+        button?.addEventListener('dragover',event=>{
+          if(dragged===null||button.disabled)return;
+          event.preventDefault();
+          if(!pageTimer)pageTimer=setTimeout(()=>{pageTimer=null;if(dragged!==null){page+=delta;repaint();}},600);
+        });
+        button?.addEventListener('dragleave',()=>{clearTimeout(pageTimer);pageTimer=null;});
+      }
+    };
+    repaint();
+    wheelPages(root, direction => {
+      const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+      page = (page + direction + pages) % pages;
+      repaint();
+    });
+    const resize = new ResizeObserver(() => {
+      if(!root.isConnected)return;
+      const available=root.querySelector('.lex-paged-pane-content').clientHeight;
+      const height=Math.max(96,...[...body.children].map(node=>node.offsetHeight));
+      const count=Math.max(1,Math.floor(available / height));
+      if(available>0&&count!==pageSize){page=Math.floor(page*pageSize/count);pageSize=count;repaint();}
+    });
+    resize.observe(root);
+    return root;
+  };
 
   // Graphs side by side, as many to a row as fit at a readable width.
-  const curveGrid = (...cards) => element("div", {class: "lex-curve-grid"}, ...cards);
+  const tileGrid = (cards = [], options = {}) => element("div", {
+    class:"lex-tile-grid",
+    style:`--lex-tile-min-width:${Math.max(80,Number(options.minWidth)||320)}px;${options.columns ? `--lex-tile-columns:repeat(${Math.max(1,Math.floor(options.columns))},minmax(0,1fr))` : ""}`,
+  }, ...cards);
+  const curveGrid = (...cards) => {
+    const grid=tileGrid(cards);
+    grid.classList.add("lex-curve-grid");
+    return grid;
+  };
 
   // A game as the home screen shows it: its cover, or its initial when there
   // is no cover, over its name. A faded card is a game that is not involved.
@@ -1221,13 +1220,25 @@
 
   // A bar over the content it switches: the bar keeps its height and the
   // content takes the rest of the page.
-  const stack = (...children) => element("div", {class: "lex-stack"}, ...children);
+  const toolbar = (...children) => element("div", {class:"lex-toolbar"}, ...children);
+  const inlineLabel = (...children) => element("span", {class:"lex-inline-label"}, ...children);
+  const choiceField = (value, action) => element("span", {class:"lex-choice-field"}, value, action);
+  const textArea = (options = {}) => element("textarea", {rows:4, ...options,
+    class:["lex-text-area", options.class || ""].filter(Boolean).join(" ")});
+
+  const stack = (...children) => {
+    const options=children[0] && typeof children[0]==="object" && !(children[0] instanceof Node)
+      ? children.shift() : {};
+    return element("div", {...(options.attrs||{}),class:["lex-stack",options.fill===false?"lex-stack-natural":"",options.compact?"lex-stack-compact":"",options.className||""].filter(Boolean).join(" ")}, ...children);
+  };
 
   // Text in a game's own bitmap font. The game measures its glyphs; each is
   // {width, quad} or {width, text} for a character the font lacks. A quad is
   // where the glyph sits in its slot and where it sits in the atlas, which the
   // stylesheet names as --lex-bitmap-atlas.
-  const bitmapText = (options = {}) => element("span", {
+  const bitmapText = (options = {}) => options.canvas
+    ? element("span", {class:"lex-bitmap-text", "aria-label":options.label}, options.canvas)
+    : element("span", {
     class: "lex-bitmap-text",
     "aria-label": options.label,
     style: `--lex-bitmap-line-height:${options.lineHeight}px`,
@@ -1270,6 +1281,68 @@
   // Pictures side by side, each over its caption: [{media, caption}].
   const figureGrid = (items = []) => element("div", {class: "lex-figure-grid"},
     ...items.map(item => element("figure", {}, item.media, element("figcaption", {}, item.caption))));
+
+  // Map coordinates are fractions of the image, independent of UI zoom.
+  const imageMap = (options = {}) => {
+    const stage=element("div",{class:"lex-image-map-stage",style:`aspect-ratio:${Number(options.ratio)||4/3};--lex-map-columns:${Number(options.columns)||1};--lex-map-rows:${Number(options.rows)||1}`},
+      options.image?element("img",{src:options.image,alt:options.label||"Map",draggable:false}):null);
+    if(options.cells?.length)stage.append(element("div",{class:"lex-image-map-cells"},...options.cells.map(cell=>
+      element("button",{type:"button",class:cell.selected?"selected":"",title:cell.title||cell.label,
+        "aria-label":cell.label,"aria-pressed":!!cell.selected,onclick:()=>options.select?.(cell.id)}))));
+    for(const point of options.points||[])stage.append(element("button",{type:"button",class:"lex-image-map-point",
+      style:`left:${point.x*100}%;top:${point.y*100}%`,title:point.label,"aria-label":point.label,
+      onclick:event=>{event.stopPropagation();point.activate?.();}}));
+    if(options.place)stage.addEventListener("click",event=>{
+      if(event.target.closest("button"))return;
+      const box=stage.getBoundingClientRect();
+      options.place({x:Math.max(0,Math.min(1,(event.clientX-box.left)/box.width)),y:Math.max(0,Math.min(1,(event.clientY-box.top)/box.height))});
+    });
+    const root=element("div",{class:options.fill===false?"lex-image-map lex-image-map-natural":"lex-image-map","aria-label":options.label||"Map"},stage);
+    root.style.setProperty("--lex-map-ratio", String(Number(options.ratio)||4/3));
+    root.lexStage=stage;
+    return root;
+  };
+
+  const statCard = (options = {}) => element("div", {class:"lex-stat-card"},
+    options.image ? element("img", {src:options.image,alt:options.label || "",
+      onerror:event=>{event.target.hidden=true;}}) : null,
+    element("div", {class:"lex-stat-card-ranks"}, ...(options.ranks || [])),
+    options.corner ? element("div", {class:"lex-stat-card-corner"}, options.corner) : null,
+    options.footer ? element("div", {class:"lex-stat-card-footer"}, options.footer) : null);
+
+  const choicePopover = (options = {}) => {
+    const popup = element("div", {class:"lex-choice-popover",popover:"auto",role:"group",
+      "aria-label":options.label || "Choose a value"}, ...(options.choices || []).map(choice =>
+      element("button", {type:"button","aria-label":choice.label,onclick:()=>{popup.hidePopover();options.select?.(choice.value);}},
+        choice.icon || null, element("span",{},choice.label))));
+    popup.addEventListener("keydown", event => {
+      if (!["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(event.key)) return;
+      event.preventDefault();
+      const buttons=[...popup.querySelectorAll("button")], step=["ArrowUp","ArrowLeft"].includes(event.key)?-1:1;
+      buttons[(buttons.indexOf(document.activeElement)+step+buttons.length)%buttons.length]?.focus();
+    });
+    popup.openFor = anchor => {
+      if (!popup.isConnected) document.body.append(popup);
+      popup.showPopover();
+      const boundary=options.boundary?.(anchor);
+      const bounds=boundary?.getBoundingClientRect() || {left:0,top:0,right:innerWidth,bottom:innerHeight,width:innerWidth,height:innerHeight};
+      if(boundary){popup.style.maxWidth=`${bounds.width-8}px`;popup.style.maxHeight=`${bounds.height-8}px`;}
+      const at=anchor.getBoundingClientRect(),box=popup.getBoundingClientRect();
+      popup.style.left=`${Math.max(bounds.left+4,Math.min(at.right-box.width,bounds.right-box.width-4))}px`;
+      popup.style.top=`${Math.max(bounds.top+4,Math.min(at.bottom+4,bounds.bottom-box.height-4))}px`;
+      if(boundary){
+        const leave=event=>{if(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom)popup.hidePopover();};
+        document.addEventListener("pointermove",leave);
+        const cleanup=event=>{if(event.newState==="closed"){
+          document.removeEventListener("pointermove",leave);popup.removeEventListener("toggle",cleanup);
+        }};
+        popup.addEventListener("toggle",cleanup);
+      }
+      popup.querySelector("button")?.focus();
+    };
+    popup.addEventListener("toggle",event=>{if(event.newState==="closed")popup.remove();});
+    return popup;
+  };
 
   // Records joined by arrows on a stage the caller has laid out. Each node is
   // {id, x, y, label, sub, missing}, with (x, y) its centre; each edge runs
@@ -1323,6 +1396,13 @@
   // the author's.
   const detailText = text => element("p", {class: "lex-detail-text"}, text);
 
+  // A word or two that classifies a record - Project or Vanilla - in a
+  // heading's action slot. A tone colours it.
+  const badge = (text, options = {}) => element("span", {
+    title:options.title,
+    class: ["lex-badge", options.tone ? `lex-tone-${options.tone}` : ""].filter(Boolean).join(" "),
+  }, text);
+
   // A log's text as it was written.
   const logView = text => element("pre", {class: "lex-log"}, text);
 
@@ -1351,10 +1431,13 @@
       // The Boxicons pin tip is at 3.71,21.71 in its 24-by-24 view box.
       const tipX = icon.width * 3.71 / 24;
       const tipY = icon.height * 21.71 / 24;
-      const targetX = target.right + (outward ? inset : -inset);
+      const lock=control.closest(".lex-detail-field")?.querySelector(".lex-field-readonly-lock");
+      const lockInset=lock ? lock.getBoundingClientRect().width + 12 * (owner.width/control.offsetWidth || 1) : 0;
+      const targetX = target.right - lockInset + (outward ? inset : -inset);
       const targetY = target.top + (outward ? -inset : inset);
-      pin.style.setProperty("left", `${targetX - owner.left - tipX}px`, "important");
-      pin.style.setProperty("top", `${targetY - owner.top - tipY}px`, "important");
+      const scale = owner.width / control.offsetWidth || 1;
+      pin.style.setProperty("left", `${(targetX - owner.left - tipX) / scale}px`, "important");
+      pin.style.setProperty("top", `${(targetY - owner.top - tipY) / scale}px`, "important");
       pin.style.setProperty("right", "auto", "important");
     };
     requestAnimationFrame(position);
@@ -1369,16 +1452,15 @@
   // switch. Rather than a component per combination - multiNumberRow, toggleRow,
   // and whatever the next shape would have been - a row takes a list of parts.
   // One row holding several properties of any kind - numbers, choices,
-  // switches, bare controls - side by side. The row is one grid and every part
-  // is a subgrid of it (copy button, name, box), so the names in a column share
-  // a width and every box in that column starts at the same place, the way a
-  // property's box does whatever its name. A switch is one part spanning all
-  // three. toggleRow and multiNumberRow are this row with their parts pre-made.
+  // switches, bare controls - side by side. Named parts wrap to a new row
+  // before their controls become too narrow. Bare controls keep equal lanes.
+  // toggleRow and multiNumberRow use this row with their parts pre-made.
   const detailPart = (part, options = {}) => {
     if (part instanceof Element && part.matches(".lex-toggle")) return part;
     const control = part instanceof Element ? part : part.control;
     const caption = element("label", {class: "lex-detail-part-label lex-multi-number-label"},
-      part instanceof Element ? "" : (part.label ?? ""));
+      part instanceof Element ? "" : (part.label ?? ""),
+      !(part instanceof Element) && part.help ? infoHelp(part.help) : null);
     const item = element("div", {
       class: "lex-detail-part lex-multi-number-item",
       title: (part instanceof Element ? "" : part.title) || undefined,
@@ -1403,12 +1485,15 @@
     const switches = list.length > 0 && list.every(part => part instanceof Element && part.matches(".lex-toggle"));
     const columns = Math.max(1, Number(options.columns) || Math.min(3, list.length) || 1);
     return element("div", {
-      class: ["lex-detail-parts", switches ? "lex-detail-parts-switches" : "", options.className || ""]
+      class: ["lex-detail-parts", switches ? "lex-detail-parts-switches" : "", !switches && list.every(part=>part instanceof Element) ? "lex-detail-parts-bare" : "", options.stacked ? "lex-detail-parts-stacked" : "", options.className || ""]
         .filter(Boolean).join(" "),
       style: `--lex-part-columns:${columns};--lex-multi-number-columns:${columns}`,
+      "data-lex-copy-parts": options.copy ? "" : null,
       role: options.role, "aria-label": options.label,
     }, ...list.map(part => detailPart(part, options)));
   };
+
+  const controlGroup = (parts, options = {}) => detailParts(parts, options);
 
   const detailField = (options = {}) => {
     if (Array.isArray(options.controls)) {
@@ -1516,9 +1601,7 @@
     const helpMarker = options.help || (suppliedHelp ? infoHelp(suppliedHelp) : null);
     if (input) {
       if (!input.getAttribute("aria-label") && labelText) input.setAttribute("aria-label", labelText);
-      // Semantic authored help is also useful to assistive technology. When no
-      // semantic help exists, installControlHelp may still add an operational
-      // native tooltip/description, but that never creates a circular ?.
+      // Keep authored help available to assistive technology.
       if (suppliedHelp && !input.getAttribute("aria-description"))
         input.setAttribute("aria-description", suppliedHelp);
     }
@@ -1592,6 +1675,8 @@
       host.classList.add("lex-has-readonly-lock");
       host.append(lock);
     }
+    if (pin && input && !control?.classList?.contains("lex-source-control"))
+      anchorDetailPin(pin, node.querySelector(".lex-detail-field-control"), input);
     node.lexRejectValue = rejectValue;
 
     // A bounded number draws its own value as a fill behind the box, and on
@@ -1773,7 +1858,7 @@
   // onto as many lines as it needs instead of shrinking to fit one.
   const toggleRow = (options = {}) => {
     const toggles = (options.toggles || []).map(toggle => {
-      const input = element("input", {
+      const input = toggle.control || element("input", {
         type: "checkbox",
         checked: !!toggle.checked,
         disabled: !!toggle.disabled,
@@ -1787,7 +1872,8 @@
       const label = element("label", {
         class: ["lex-toggle", toggle.className || ""].filter(Boolean).join(" "),
         "data-lex-toggle": toggle.key || toggle.label || "",
-      }, rail, input, toggle.icon || null, element("span", {class: "lex-toggle-name"}, toggle.label));
+      }, rail, toggle.decorateControl ? toggle.decorateControl(input) : input,
+      toggle.icon || null, element("span", {class: "lex-toggle-name"}, toggle.label));
       if (toggle.help) rail.append(infoHelp(toggle.help));
       // A switch that is also a table column carries its pin in its corner,
       // the same place every other pinnable property keeps one.
@@ -1841,11 +1927,14 @@
     ? element("div", {class: "lex-subtab-bar lex-subtab-bar-single", hidden: true})
     : element("div", {
     class: ["lex-subtab-bar", options.flush === true ? "lex-subtab-bar-flush" : "",
+      options.images ? "lex-subtab-bar-images" : "",
       options.className || ""].filter(Boolean).join(" "),
     role: "tablist",
     "aria-label": options.label || "Subsections",
   }, ...(options.tabs || []).map((tab, index) => element("button", {
     type: "button",
+    ...(tab.attrs || {}),
+    disabled:!!tab.disabled,
     class: ["lex-subtab-button", tab.id === options.active ? "active" : ""].filter(Boolean).join(" "),
     role: "tab",
     "aria-selected": String(tab.id === options.active),
@@ -1862,7 +1951,7 @@
     });
     return help;
   })() : null,
-  (key => key ? element("span", {
+  (key => key && options.shortcuts !== false ? element("span", {
     class: "lex-tab-shortcut", "aria-hidden": "true",
   }, key) : "")(shortcutKeyFor(index + 1)))));
 
@@ -1874,6 +1963,64 @@
     : position === 10 ? "0"
     : position === 11 ? "-"
     : position === 12 ? "=" : "");
+
+  const mathFormula = (source) => {
+    const [expression, ...notes] = String(source).split(";");
+    const normalized = expression.replaceAll("−","-").replaceAll("·","*")
+      .replaceAll("×","*").replaceAll("⌊","floor(").replaceAll("⌋",")").replaceAll("²","^2");
+    const namespace = "http://www.w3.org/1998/Math/MathML";
+    const node = (tag, ...children) => {
+      const result = document.createElementNS(namespace, tag);
+      result.append(...children);
+      return result;
+    };
+    const tokens = normalized.match(/[A-Za-z_][A-Za-z_0-9]*|\d+(?:\.\d+)?|[()+\-*/^=,]/g) || [];
+    let index = 0;
+    const priority = {"=": 1, "+": 2, "-": 2, "*": 3, "/": 3, "^": 4};
+    const atom = () => {
+      const token = tokens[index++];
+      if (token == null) throw new Error("Missing expression");
+      if (token === "-") return node("mrow", node("mo", "−"), atom());
+      if (token === "(") {
+        const value = parse(1);
+        if (tokens[index++] !== ")") throw new Error("Missing closing parenthesis");
+        return node("mrow", node("mo", "("), value, node("mo", ")"));
+      }
+      if (/^\d/.test(token)) return node("mn", token);
+      if (!/^[A-Za-z_]/.test(token)) throw new Error("Unexpected token");
+      const name = node("mi", token);
+      if (/^[ABCD]$/.test(token)) name.setAttribute("class", `lex-curve-variable-${token.toLowerCase()}`);
+      if (tokens[index] !== "(") return name;
+      index++;
+      const argument = parse(1);
+      if (tokens[index++] !== ")") throw new Error("Missing function argument");
+      if (token === "floor") return node("mrow", node("mo", "⌊"), argument, node("mo", "⌋"));
+      if (token === "trunc") name.setAttribute("mathvariant", "normal");
+      return node("mrow", name, node("mo", "("), argument, node("mo", ")"));
+    };
+    const parse = minimum => {
+      let left = atom();
+      while ((priority[tokens[index]] || 0) >= minimum) {
+        const operator = tokens[index++], rank = priority[operator];
+        const right = parse(rank + (operator === "^" ? 0 : 1));
+        left = operator === "/" ? node("mfrac", left, right)
+          : operator === "^" ? node("msup", left, right)
+          : node("mrow", left, node("mo", operator === "*" ? "·" : operator === "-" ? "−" : operator), right);
+      }
+      return left;
+    };
+    try {
+      if (tokens.join("") !== normalized.replace(/\s/g,"")) throw new Error("Unsupported notation");
+      const value = parse(1);
+      if (index !== tokens.length) throw new Error("Unsupported expression");
+      const math = node("math", value);
+      math.setAttribute("aria-label", expression);
+      return element("span", {class:"lex-math-formula", title:String(source)}, math,
+        notes.length ? element("small", {}, notes.join(";")) : null);
+    } catch (_error) {
+      return element("span", {class:"lex-math-formula"}, String(source));
+    }
+  };
 
   const curveEditor = (options = {}) => {
     const domain = options.domain || {min: 1, max: 100};
@@ -1889,7 +2036,7 @@
     // Formula glyphs and labels must never be non-uniformly stretched. The
     // graph owns a 2:1 user-space viewport; letterbox if a caller gives the
     // drawing a differently shaped box instead of distorting that viewport.
-    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     svg.setAttribute("role", "img");
     svg.setAttribute("aria-label", options.graphLabel || `${options.title || "Value"} curve`);
     const grid = document.createElementNS(svgNamespace, "path");
@@ -1911,6 +2058,9 @@
     const formulaText = document.createElementNS(svgNamespace, "text");
     formulaText.setAttribute("class", "lex-curve-path-formula");
     formulaText.setAttribute("dy", "-7");
+    const mathematical = options.formula?.classList?.contains("lex-math-formula");
+    const mathOverlay = mathematical ? options.formula.cloneNode(true) : null;
+    if (mathematical) formulaText.style.display = "none";
     const formulaPath = document.createElementNS(svgNamespace, "textPath");
     // Glyphs on a textPath rotate to the LOCAL segment slope. On a nearly
     // straight line the sampling jaggies are steep over a few units, so an
@@ -2017,6 +2167,7 @@
       style:`--lex-curve-title-chars:${Math.max(1,String(options.title||"CURVE").length)}`,
     },
       svg,
+      mathOverlay,
       axisTop,
       axisBottom,
       element("span", {class: "lex-curve-axis lex-curve-axis-start"}, formatNumber(domain.min)),
@@ -2089,8 +2240,9 @@
       if (!bounds.width || !bounds.height || !svg.contains(event.target)) return;
       const ratio = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
       const x = Math.round(domain.min + ratio * (domain.max - domain.min));
-      const y = Number(options.evaluate?.(x));
-      if (!Number.isFinite(y)) { clearProbe(); return; }
+      const raw = options.evaluate?.(x);
+      const y = Number(raw);
+      if (raw == null || !Number.isFinite(y)) { clearProbe(); return; }
       const range = getRange();
       const spanX = Math.max(1, domain.max - domain.min);
       const spanY = Math.max(1, range.max - range.min);
@@ -2281,6 +2433,32 @@
       }
     };
 
+    const positionMath = () => {
+      if (!mathOverlay || !root.isConnected || !line.getAttribute("d")) return;
+      const length = line.getTotalLength(), matrix = svg.getScreenCTM();
+      if (!length || !matrix) return;
+      const point = ratio => {
+        const value = line.getPointAtLength(length * ratio);
+        return new DOMPoint(value.x,value.y).matrixTransform(matrix);
+      };
+      const center = point(.5), before = point(.47), after = point(.53);
+      const angle = Math.max(-40,Math.min(40,Math.atan2(after.y-before.y,after.x-before.x)*180/Math.PI));
+      const bounds = plot.getBoundingClientRect(), scale = bounds.width / plot.offsetWidth || 1;
+      mathOverlay.style.left = `${(center.x-bounds.left)/scale}px`;
+      mathOverlay.style.top = `${(center.y-bounds.top)/scale-7}px`;
+      mathOverlay.style.setProperty("--lex-formula-angle",`${angle}deg`);
+      mathOverlay.style.removeProperty("font-size");
+      const available = svg.getBoundingClientRect().width / scale * .84;
+      if (mathOverlay.scrollWidth > available) {
+        const size = parseFloat(getComputedStyle(mathOverlay).fontSize);
+        mathOverlay.style.fontSize = `${Math.max(7.5,size*available/mathOverlay.scrollWidth)}px`;
+      }
+    };
+    if (mathOverlay && typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(positionMath);
+      observer.observe(plot);
+    }
+
     const draw = () => {
       const range = getRange();
       axisTop.textContent = formatNumber(range.max);
@@ -2288,19 +2466,24 @@
       const samples = [];
       const first = Math.ceil(domain.min), last = Math.floor(domain.max);
       for (let x = first; x <= last; x += 1) {
-        const value = Number(options.evaluate?.(x));
-        if (!Number.isFinite(value)) continue;
+        const raw = options.evaluate?.(x);
+        const value = Number(raw);
+        if (raw == null || !Number.isFinite(value)) continue;
         samples.push({x, value});
       }
       if (!samples.length) {
         line.removeAttribute("d");
         fill.removeAttribute("d");
+        bars.replaceChildren();
+        rangeLow.textContent = rangeHigh.textContent = "";
+        if (mathOverlay) mathOverlay.hidden = true;
         minimum.textContent = maximum.textContent = "—";
         status.textContent = options.invalidText || "INVALID CURVE";
         root.classList.add("invalid");
         return;
       }
       root.classList.remove("invalid");
+      if (mathOverlay) mathOverlay.hidden = false;
       status.textContent = "";
       const values = samples.map(sample => sample.value);
       minimum.textContent = formatNumber(Math.min(...values), options.valueFormat || {});
@@ -2425,8 +2608,13 @@
           .map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`)
           .join(" ");
       };
-      layoutFormula(buildGuide);
-      requestAnimationFrame(() => layoutFormula(buildGuide));
+      if (mathOverlay) {
+        positionMath();
+        requestAnimationFrame(positionMath);
+      } else {
+        layoutFormula(buildGuide);
+        requestAnimationFrame(() => layoutFormula(buildGuide));
+      }
     };
     let pending = false;
     const scheduleDraw = () => {
@@ -2836,7 +3024,9 @@
   };
 
   const paginateSettings = (content, options = {}) => {
+    content.classList.add("lex-tweak-card-grid");
     const cards = [...content.children];
+    if(options.columnMajor)cards.sort((a,b)=>(a.querySelector(".lex-detail-panel-title,.lex-detail-section-title")?.textContent||a.textContent).localeCompare(b.querySelector(".lex-detail-panel-title,.lex-detail-section-title")?.textContent||b.textContent,undefined,{sensitivity:"base"}));
     const size = options.pageSize || 0;
     let page = 0;
     // Where each page starts, as an index into the visible cards. Cards differ
@@ -2851,10 +3041,12 @@
     // Fill each page until one more card would overflow the box. A caller
     // that genuinely wants a fixed count passes pageSize.
     const overflows = () => scroll.scrollHeight > scroll.clientHeight + 1;
-    const columnsFit = () => {
-      const top = scroll.getBoundingClientRect().top;
-      return [...content.querySelectorAll(":scope > .lex-tweak-column")].every(column =>
-        column.children.length < 2 || column.getBoundingClientRect().bottom - top <= scroll.clientHeight + 1);
+    let cardHeights = new WeakMap();
+    const columnCount = length => {
+      const width=content.clientWidth||scroll.clientWidth;
+      const gap=parseFloat(getComputedStyle(content).columnGap)||12;
+      const target=parseFloat(getComputedStyle(content).getPropertyValue("--lex-tweak-card-width"))||320;
+      return Number.isInteger(options.columns)&&options.columns>0?options.columns:Math.max(1,Math.min(length,Math.floor((width+gap)/(target+gap))||1));
     };
     const paginate = visible => {
       pagedCount = visible.length;
@@ -2863,58 +3055,52 @@
         starts = Array.from({length: Math.max(1, Math.ceil(visible.length / per))}, (_, index) => index * per);
         return;
       }
-      const next = [0];
-      for (let from = 0; from < visible.length;) {
-        let count = 1;
-        while (from + count < visible.length) {
-          // A card taller than the window overflows on its own, so "does the
-          // page still fit" gave it a page to itself and stranded every card
-          // after it. A column may run past the window only when it holds
-          // that one card; any column of several must fit.
-          deal(visible.slice(from, from + count + 1));
-          if (!columnsFit()) break;
-          count += 1;
-        }
-        from += count;
-        if (from < visible.length) next.push(from);
+      // Measure each card once at its final column width. No repeated DOM
+      // rebuilds to try every possible page size.
+      cardHeights=new WeakMap();
+      deal(visible);
+      for(const card of visible){
+        // Integer offsetHeight rounds down fractional font and border sizes.
+        // Round upward before packing a tall column so the error cannot add
+        // up into an extra scroll row on later pages.
+        const box=card.getBoundingClientRect();
+        const scale=box.width/Math.max(1,card.offsetWidth);
+        cardHeights.set(card,Math.ceil(box.height/scale)+1);
+        if(options.strictColumns && (card.scrollWidth>card.clientWidth+1 || card.offsetWidth>card.parentElement.clientWidth+1 || card.offsetHeight>scroll.clientHeight+1))
+          throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title')?.textContent||card.textContent.slice(0,80)}`);
       }
-      starts = next;
+      const count=columnCount(visible.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
+      const available=scroll.clientHeight,loads=Array(count).fill(0),next=[0];
+      let orderedLane=0;
+      for(let index=0;index<visible.length;index++){
+        const height=cardHeights.get(visible[index])||0;
+        let lane=options.columnMajor?orderedLane:loads.indexOf(Math.min(...loads));
+        if(loads[lane]>0&&loads[lane]+gap+height>available+1){
+          if(options.columnMajor&&lane<count-1)lane=++orderedLane;
+          else {next.push(index);loads.fill(0);lane=0;orderedLane=0;}
+        }
+        loads[lane]+=(loads[lane]?gap:0)+height;
+      }
+      starts=next;
     };
 
-    // How many columns the width allows, and the deal itself. Cards go round
-    // the columns in order, then the tallest column hands its last card to the
-    // shortest for as long as that makes the page shorter - so a card carrying
-    // a table does not decide the height of four unrelated cards.
-    const columnTarget = () => parseFloat(getComputedStyle(content)
-      .getPropertyValue("--lex-tweak-card-width")) || 320;
+    // Measure at the final width, then fill ordered columns from top to bottom.
     const deal = onPage => {
-      const width = content.clientWidth || scroll.clientWidth;
-      const gap = parseFloat(getComputedStyle(content).columnGap) || 12;
-      const target = columnTarget();
-      const count = options.columns === 1 ? 1 : Math.max(1, Math.min(onPage.length,
-        Math.floor((width + gap) / (target + gap)) || 1));
-      const columns = Array.from({length: count}, () =>
-        element("div", {class: "lex-tweak-column"}));
-      onPage.forEach((card, index) => columns[index % count].append(card));
-      // Cards that are not on this page stay in the document, hidden. An edit
-      // typed into one and then paged away from is still there when the reader
-      // comes back, and it is still part of the form being saved; detaching
-      // them would take the control out of the page entirely.
-      const off = element("div", {class: "lex-tweak-off-page", hidden: "hidden"},
-        ...cards.filter(card => !onPage.includes(card)));
-      content.replaceChildren(...columns, off);
-      if (count < 2) return;
-      const heights = () => columns.map(column => column.getBoundingClientRect().height);
-      for (let guard = 0; guard < onPage.length; guard += 1) {
-        const tall = heights();
-        const from = tall.indexOf(Math.max(...tall));
-        const to = tall.indexOf(Math.min(...tall));
-        const moving = columns[from].lastElementChild;
-        if (from === to || !moving || columns[from].children.length < 2) break;
-        const before = Math.max(...tall);
-        columns[to].append(moving);
-        if (Math.max(...heights()) >= before) { columns[from].append(moving); break; }
-      }
+      const count=columnCount(onPage.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
+      const columns=Array.from({length:count},()=>element("div",{class:"lex-tweak-column"})),loads=Array(count).fill(0);
+      let orderedLane=0;
+      onPage.forEach((card,index)=>{
+        const measured=cardHeights.get(card);
+        let lane=measured===undefined?index%count:loads.indexOf(Math.min(...loads));
+        if(options.columnMajor&&measured!==undefined){
+          if(loads[orderedLane]>0&&loads[orderedLane]+gap+measured>scroll.clientHeight+1)orderedLane=Math.min(count-1,orderedLane+1);
+          lane=orderedLane;
+        }
+        columns[lane].append(card);loads[lane]+=(loads[lane]?gap:0)+(measured||0);
+      });
+      const shown=new Set(onPage);
+      const off=element("div",{class:"lex-tweak-off-page",hidden:true},...cards.filter(card=>!shown.has(card)));
+      content.replaceChildren(...columns,off);
     };
 
     const render = () => {
@@ -2965,6 +3151,7 @@
         frame = requestAnimationFrame(() => {frame = 0; refit();});
       });
       observer.observe(scroll);
+      document.fonts?.ready.then(() => { if (root.isConnected) refit(); });
       root.lexPageObserver = observer;
     }
     requestAnimationFrame(refit);
@@ -2972,7 +3159,7 @@
   };
   const settingsColumns = (sections, options = {}) => {
     const content = element("div", {class:"lex-tweak-card-grid"}, ...(sections || []).filter(Boolean));
-    const root = paginateSettings(content, options);
+    const root = paginateSettings(content, {columns:6,columnMajor:true,strictColumns:true,...options});
     root.classList.add("lex-settings-columns");
     if(options.className) root.classList.add(...options.className.split(/\s+/));
     if(options.columnWidth) content.style.setProperty("--lex-tweak-card-width",options.columnWidth);
@@ -3531,11 +3718,10 @@
       const rows=count?.()?changes?.() || []:[];
       const value=x=>x===undefined?"Not set":x===null?"None":typeof x==='boolean'?(x?'On':'Off'):typeof x==='object'?JSON.stringify(x):String(x);
       popup=element('div',{class:'lex-help-popover lex-save-preview',role:'tooltip',id:`save-preview-${Math.random().toString(36).slice(2)}`},
-        element('strong',{},'Pending changes'),
         rows.length?element('ul',{},...rows.map(row=>element('li',{},element('strong',{},row.label),element('div',{},element('span',{},value(row.before)), ' → ',element('span',{},value(row.after)))))):element('p',{},count?.()?'Change details are unavailable.':'No pending changes.'));
       document.body.append(popup);button.setAttribute('aria-describedby',popup.id);
       const r=button.getBoundingClientRect(),box=popup.getBoundingClientRect();
-      popup.style.left=`${Math.max(8,Math.min(r.left,innerWidth-box.width-8))}px`;
+      popup.style.left=`${Math.max(8,Math.min(r.left+r.width/2-box.width/2,innerWidth-box.width-8))}px`;
       popup.style.top=`${Math.max(8,Math.min(r.bottom+8,innerHeight-box.height-8))}px`;
       popup.addEventListener('mouseenter',()=>clearTimeout(timer));popup.addEventListener('mouseleave',leave);
     };
@@ -3806,7 +3992,7 @@ ${contents.path}`});
       mode.textContent = selectedSource?.readOnly === false ? "📝" : "🔒";
       mode.setAttribute("aria-label", selectedSource?.readOnly === false ? "Editable" : "Read only");
       name.textContent = selectedSource?.label || current?.name || "Select a mod";
-      status.hidden = !selectedSource;
+      status.hidden = true;
       status.textContent = selectedSource?.enabled === false ? "×" : "✓";
       status.className = `lex-project-source-status ${selectedSource?.enabled === false ? "disabled" : "enabled"}`;
       status.setAttribute("aria-label", selectedSource?.enabled === false ? "Disabled" : "Enabled");
@@ -3869,24 +4055,58 @@ ${contents.path}`});
           element("span", {class: "lex-project-menu-item-actions"}, rename, folder, about),
           select.querySelector(".lex-project-source-status"));
       });
-      const sourceRows = sources.map(row => element("button", {
-        class: `lex-project-menu-item-select lex-project-menu-item lex-project-reference${String(row.key) === activeSource ? " active" : ""}`,
-        type: "button", role: "menuitem", title: row.path || "Read-only reference",
-        onclick: () => {
-          closeMenu();
-          if (String(row.key) !== activeSource) guarded(async () => {
-            await options.selectProjectSource?.(row.key);
-            render(snapshot);
-          });
-        },
-      }, element("span", {class: "lex-project-source-mode", "aria-label":row.readOnly === false ? "Editable" : "Read only"}, row.readOnly === false ? "📝" : "🔒"),
-      element("span", {class: "lex-project-menu-name"}, row.label),
-      element("span", {class: "lex-project-menu-path"}, row.path || "Read-only reference"),
-      // A reference has no folder of its own to rename, open or report on, but
-      // it holds the lane those buttons occupy so that every row in the menu
-      // puts its name, its description and its tick in the same place.
-      element("span", {class: "lex-project-menu-item-actions", "aria-hidden": "true"}),
-      element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`, "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓")));
+      const sourceRows = sources.map((row,index) => {
+        const select=element("button", {
+          class:`lex-project-menu-item-select${String(row.key)===activeSource?" active":""}`,
+          type:"button",role:"menuitem","aria-label":row.label,
+          onclick:()=>{closeMenu();if(String(row.key)!==activeSource)guarded(async()=>{
+            await options.selectProjectSource?.(row.key);render(snapshot);
+          });}
+        },element("span",{class:"lex-project-source-mode"},row.readOnly===false?"📝":"🔒"),
+          element("span",{class:"lex-project-menu-name"},row.label),
+          element("span",{class:"lex-project-menu-path"},row.path||"Read-only reference"));
+        const actions=element("span",{class:"lex-project-menu-item-actions"});
+        const run=async operation=>{try{await operation();render(snapshot)}catch(error){showAlert({title:"Could not update mods",message:error.message})}};
+        const sourceStatus=row.managed && options.changeProjectSource
+          ? element("input",{type:"checkbox",checked:row.enabled!==false,
+            class:"lex-project-source-status",
+            "aria-label":`Enable ${row.label}`,onchange:event=>run(()=>options.changeProjectSource(row.key,{enabled:event.target.checked}))})
+          : null;
+        if(row.managed && options.changeProjectSource){
+          actions.append(element("button",{type:"button",class:"lex-mod-drag-handle",draggable:"true",
+            "aria-label":`Reorder ${row.label}`,"aria-description":"Drag onto another mod. Alt+Up or Alt+Down moves one place.",
+            ondragstart:event=>{event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("application/x-lex-mod",String(index));},
+            onkeydown:event=>{if(event.altKey&&["ArrowUp","ArrowDown"].includes(event.key)){
+              event.preventDefault();const delta=event.key==="ArrowUp"?-1:1;
+              if(sources[index+delta]?.managed)run(()=>options.changeProjectSource(row.key,{move:delta}));
+            }}},"⠿"));
+          if(row.removable)actions.append(element("button",{type:"button","aria-label":`Remove ${row.label}`,
+            onclick:async()=>{if(await confirmAction({title:`Remove ${row.label}?`,message:"Remove this managed mod from the library?",confirmLabel:"Remove"}))run(()=>options.changeProjectSource(row.key,{remove:true}))}},"×"));
+          if(row.settings?.length || row.notes?.length)actions.append(element("button",{
+            type:"button","aria-label":`Options for ${row.label}`,onclick:()=>{
+              closeMenu();
+              const backdrop=element("div",{class:"lex-dialog-backdrop"});
+              const close=()=>backdrop.remove();
+              const body=(row.settings||[]).map(setting=>detailField({label:setting.name,
+                control:element("select",{"aria-label":setting.name,onchange:event=>run(()=>
+                  options.changeProjectSource(row.key,{option:setting.id,value:Number(event.target.value)}))},
+                  ...setting.values.map(value=>element("option",{value:value.value,
+                    selected:value.value===setting.value},value.name)))}));
+              body.push(...(row.notes||[]).map(detailText));
+              backdrop.append(element("section",{class:"lex-dialog",role:"dialog","aria-modal":"true","aria-label":`${row.label} options`},
+                detailPanel({title:row.label,body}),element("div",{class:"lex-dialog-actions"},
+                  element("button",{type:"button",onclick:close},"Close"))));
+              backdrop.addEventListener("keydown",event=>{if(event.key==="Escape")close()});
+              document.body.append(backdrop);backdrop.querySelector("select,button")?.focus();
+            }},"⚙"));
+        }
+        return element("div",{class:`lex-project-menu-item lex-project-reference${String(row.key)===activeSource?" active":""}`,
+          ondragover:event=>{if(row.managed&&event.dataTransfer.types.includes("application/x-lex-mod")){event.preventDefault();event.dataTransfer.dropEffect="move";}},
+          ondrop:event=>{const from=Number(event.dataTransfer.getData("application/x-lex-mod"));
+            if(!row.managed||!sources[from]?.managed)return;event.preventDefault();
+            if(from!==index)run(()=>options.changeProjectSource(sources[from].key,{move:index-from}));
+          }},select,actions,sourceStatus);
+      });
       const create = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
         // Adding or finding a project is not mod-library work and never was:
@@ -3915,19 +4135,17 @@ ${contents.path}`});
           return result;
         }); },
       }, "🔍 Find a Mod");
-      const manage = element("button", {
-        class: "lex-project-menu-action", type: "button", role: "menuitem",
-        disabled: !modSupport?.canManage,
-        hidden: !options.manageProjectSources,
-        onclick: () => { closeMenu(); options.manageProjectSources?.(); },
-      }, "Load Order…");
+      const addSource=options.addProjectSource?element("button",{
+        class:"lex-project-menu-action",type:"button",role:"menuitem",
+        onclick:async()=>{closeMenu();try{await options.addProjectSource();render(snapshot)}catch(error){showAlert({title:"Could not add mod",message:error.message})}}
+      },"➕ Add a Mod"):null;
       // A game without mod management says so where the mod buttons would be,
       // instead of offering buttons it cannot back up.
       menu.replaceChildren(...sourceRows, ...projects,
-        modSupport && !modSupport.canManage
+        modSupport && !modSupport.canManage && !options.addProjectSource
           ? element("p", {class:"lex-dialog-status"}, modSupport.message || "Mod management is not supported for this game yet.")
-          : element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, create, browse, manage,
-            element("button", {type:"button", class:"lex-project-menu-action", onclick:() => { closeMenu(); openModLibrary(options.plugin.id); }}, "Mod library…")));
+          : element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, addSource || create, browse,
+            options.sourcesReplaceProjects ? null : element("button", {type:"button", class:"lex-project-menu-action", onclick:() => { closeMenu(); openModLibrary(options.plugin.id); }}, "Mod library…")));
       measureNameColumn();
     };
     trigger.onclick = event => { event.stopPropagation(); toggleMenu(); };
@@ -4466,26 +4684,27 @@ ${contents.path}`});
     .replace(/^Error:\s*/i, "");
 
   const mountGitHubWorkspace = (options, button, header, repository, navigationChanged = () => {}) => {
-    const workflows = ["actionable", "waiting", "unfeasible"];
+    const workflows = ["actionable", "untested", "waiting", "unfeasible"];
+    const workflowNames={actionable:"Actionable",untested:"Needs Testing",waiting:"Waiting",unfeasible:"Unfeasible"};
     const state = {
       open: false, loaded: false, busy: false, filter: "actionable", query: "",
-      issues: [], labels: [], selected: null, issue: null,
+      issues: [], labels: [], selected: null, issue: null, page:0,
     };
     const hasLabel = (issue, name) => (issue?.labels || []).some(label => label.name === name);
     const status = element("div", {class: "lex-github-status", "aria-live": "polite"});
-    const search = element("input", {
-      type: "search", placeholder: "Search issues…", "aria-label": "Search GitHub issues",
-      oninput: event => { state.query = event.target.value; renderList(); },
-    });
-    const refresh = element("button", {
-      class: "lex-github-refresh", title: "Refresh issues", "aria-label": "Refresh GitHub issues",
-      onclick: () => loadIssues(),
-    }, "↻");
-    const workflowButtons = workflows.map(workflow => element("button", {
-      class: "lex-github-workflow-tab", "data-workflow": workflow,
-      onclick: () => selectWorkflow(workflow),
-    }, workflow.toUpperCase()));
-    const subtabs = element("div", {class: "lex-github-subtabs", role: "tablist"}, ...workflowButtons);
+    const refresh = element("button", {class:"lex-github-refresh", "aria-label":"Refresh GitHub issues",onclick:()=>loadIssues()},"↻");
+    const subtabs=subtabBar({label:"Issue workflow",tabs:workflows.map(id=>({id,label:workflowNames[id]})),active:state.filter,change:selectWorkflow});
+    const workflowButtons=[...subtabs.querySelectorAll('[role=tab]')];
+    workflowButtons.forEach((control,index)=>control.dataset.workflow=workflows[index]);
+    const footer=element("div",{class:"lex-github-footer"});
+    const stateIcon=issue=>{
+      const closed=String(issue.state).toLowerCase()==='closed';
+      const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+      svg.setAttribute('viewBox','0 0 16 16');svg.setAttribute('class',`lex-github-state-icon ${closed?'closed':'open'}`);
+      svg.setAttribute('role','img');svg.setAttribute('aria-label',closed?'Closed issue':'Open issue');
+      svg.innerHTML='<circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/>'+(closed?'<path d="m4.5 8 2.3 2.3 4.7-4.7" fill="none" stroke="currentColor" stroke-width="1.5"/>':'<circle cx="8" cy="8" r="1.5" fill="currentColor"/>');
+      return svg;
+    };
     const issueList = element("div", {class: "lex-list lex-github-issue-list", role: "list"});
     const editor = element("section", {class: "lex-detail lex-github-editor"},
       element("div", {class: "lex-github-empty"}, "Select an issue."));
@@ -4498,16 +4717,13 @@ ${contents.path}`});
     const root = element("section", {
       class: "lex-github-workspace", hidden: true, "data-lex-history-control": true,
       "aria-label": `${repository.repository} GitHub issues`,
-    },
-      subtabs,
-      element("div", {class: "lex-github-toolbar"},
-        element("div", {class: "lex-github-repository"}, repository.repository),
-        search, status, refresh),
-      layout);
+    },subtabs,status,layout,footer);
     header.after(root);
+    new ResizeObserver(()=>{if(state.open)root.style.top=`${header.getBoundingClientRect().bottom}px`;}).observe(header);
 
     const setStatus = (message, error = false) => {
       status.textContent = message || "";
+      status.hidden=!message;
       status.classList.toggle("error", error);
     };
     const setBusy = busy => {
@@ -4527,7 +4743,7 @@ ${contents.path}`});
       for (const control of workflowButtons) {
         const workflow = control.dataset.workflow;
         const count = state.issues.filter(issue => hasLabel(issue, workflow)).length;
-        control.textContent = `${workflow.toUpperCase()} ${count}`;
+        control.querySelector(".lex-tab-label-text").textContent = workflowNames[workflow];
         control.classList.toggle("active", workflow === state.filter);
         control.setAttribute("aria-selected", String(workflow === state.filter));
       }
@@ -4543,8 +4759,10 @@ ${contents.path}`});
     };
 
     function renderList() {
-      const rows = visibleRows();
-      issueList.replaceChildren(...rows.map(issue => element("button", {
+      const rows = visibleRows(),pageSize=15,pages=Math.max(1,Math.ceil(rows.length/pageSize));
+      state.page=Math.min(state.page,pages-1);
+      footer.replaceChildren(pager({inline:true,page:state.page,pages,pageSize,total:rows.length,change:value=>{state.page=value;renderList()},filters:[refresh],search:{key:"github-issues",label:"Search GitHub issues",value:state.query,change:value=>{state.query=value;state.page=0;renderList()}}}));
+      issueList.replaceChildren(...rows.slice(state.page*pageSize,(state.page+1)*pageSize).map(issue => element("button", {
         class: `lex-list-row lex-github-issue-row${state.selected === issue.number ? " selected" : ""}`,
         role: "listitem", onclick: () => loadIssue(issue.number),
         "aria-label": `Issue ${issue.number}: ${issue.title}`,
@@ -4556,7 +4774,7 @@ ${contents.path}`});
           title: hasLabel(issue, "high priority") ? "High priority" : "",
           "aria-label": hasLabel(issue, "high priority") ? "High priority" : "",
         }, hasLabel(issue, "high priority") ? "!" : ""),
-        element("span", {class: `lex-github-state ${String(issue.state).toLowerCase()}`}, issue.state))));
+        stateIcon(issue))));
       if (!rows.length) issueList.append(element("div", {class: "lex-github-empty"},
         workflowRows().length ? "No issues match this search." : `No ${state.filter} issues.`));
     }
@@ -4591,6 +4809,7 @@ ${contents.path}`});
         class: "lex-github-title-input", value: issue.title,
         "aria-label": `Title for issue ${issue.number}`,
       });
+      autoFitControlText(title);
       const body = element("textarea", {
         class: "lex-github-body-input", "aria-label": `Body for issue ${issue.number}`,
       }, issue.body || "");
@@ -4612,49 +4831,17 @@ ${contents.path}`});
       };
 
       const selectedLabels = new Set((issue.labels || []).map(label => label.name));
-      const labelEditor = element("div", {class: "lex-github-label-editor"});
-      for (const label of state.labels.filter(row => row.name !== "high priority")) {
-        const checkbox = element("input", {
-          type: "checkbox", checked: selectedLabels.has(label.name), "data-label": label.name,
-        });
-        const control = element("label", {
-          class: "lex-github-label-option",
-          style: `--github-label:#${label.color || "808080"}`,
-          title: label.description || label.name,
-        }, checkbox, element("span", {}, label.name));
-        checkbox.onchange = async () => {
-          if (checkbox.checked && workflows.includes(label.name)) {
-            labelEditor.querySelectorAll("input").forEach(input => {
-              if (input !== checkbox && workflows.includes(input.dataset.label)) input.checked = false;
-            });
-          }
-          const desired = [...labelEditor.querySelectorAll("input:checked")].map(input => input.dataset.label);
-          if (selectedLabels.has("high priority")) desired.push("high priority");
-          labelEditor.querySelectorAll("input").forEach(input => { input.disabled = true; });
-          setStatus(`Updating labels on #${issue.number}…`);
-          try {
-            const updated = await callWindow(
-              "github_set_issue_labels", options.plugin.id, issue.number, desired,
-            );
-            if (!updated) throw new Error("The GitHub bridge is unavailable");
-            await finishUpdatedIssue(updated, `Updated labels on #${issue.number}.`);
-          } catch (error) {
-            setStatus(`Label update failed: ${githubError(error)}`, true);
-            renderIssue();
-          }
-        };
-        labelEditor.append(control);
-      }
-      editor.replaceChildren(
-        element("div", {class: "lex-github-title-row"},
-          element("span", {class: "lex-github-detail-number"}, `#${issue.number}`), title,
-          element("span", {class: `lex-github-state ${String(issue.state).toLowerCase()}`}, issue.state)),
-        body,
-        element("div", {class: "lex-github-edit-actions"}, save, editStatus,
-          element("span", {class: "lex-github-updated"}, `Updated ${githubDate(issue.updatedAt)}`)),
-        element("section", {class: "lex-github-labels-section"},
-          element("h3", {}, "LABELS"), labelEditor));
-
+      const labelEditor=element("div",{class:"lex-github-workflow-actions","aria-label":"Issue workflow"},...workflows.map(workflow=>{
+        const control=element("button",{class:"lex-github-workflow-state","data-workflow":workflow,"aria-pressed":String(selectedLabels.has(workflow))},workflowNames[workflow]);
+        control.onclick=async()=>{
+          const desired=[...selectedLabels].filter(name=>!workflows.includes(name));desired.push(workflow);
+          labelEditor.querySelectorAll('button').forEach(button=>button.disabled=true);
+          try {const updated=await callWindow("github_set_issue_labels",options.plugin.id,issue.number,desired);
+            if(!updated)throw new Error("The GitHub bridge is unavailable");
+            await finishUpdatedIssue(updated,`Updated workflow on #${issue.number}.`);
+          }catch(error){setStatus(`Workflow update failed: ${githubError(error)}`,true);renderIssue();}
+        };return control;
+      }));
       const priorityActive = selectedLabels.has("high priority");
       const priority = element("button", {
         class: `lex-github-priority-toggle${priorityActive ? " active" : ""}`,
@@ -4679,6 +4866,8 @@ ${contents.path}`});
           renderIssue();
         }
       };
+      editor.replaceChildren(detailPanel({titleControl:title,identity:recordId(issue.number),icon:priority,actions:stateIcon(issue),body:[body,
+        element("div",{class:"lex-github-edit-actions"},save,editStatus),labelEditor]}));
       const commentsFeed = element("div", {class: "lex-github-comments-feed"});
       if (!(issue.comments || []).length) {
         commentsFeed.append(element("div", {class: "lex-github-empty"}, "No comments."));
@@ -4719,7 +4908,7 @@ ${contents.path}`});
       });
       commentsPanel.replaceChildren(
         element("div", {class: "lex-github-comments-head"},
-          element("h3", {}, `COMMENTS ${(issue.comments || []).length}`), priority),
+          element("h3", {}, `COMMENTS ${(issue.comments || []).length}`)),
         commentsFeed,
         element("div", {class: "lex-github-comment-composer"}, commentBody, post));
       requestAnimationFrame(() => { commentsFeed.scrollTop = commentsFeed.scrollHeight; });
@@ -4755,6 +4944,7 @@ ${contents.path}`});
     async function selectWorkflow(workflow) {
       if (!workflows.includes(workflow)) return;
       state.filter = workflow;
+      state.page=0;
       renderSubtabs();
       renderList();
       const current = visibleRows().find(issue => issue.number === state.selected);
@@ -4782,7 +4972,7 @@ ${contents.path}`});
         state.selected = next?.number || null;
         state.issue = null;
         renderList();
-        setStatus(`${workflowRows().length} ${state.filter} issue${workflowRows().length === 1 ? "" : "s"}.`);
+        setStatus("");
         if (state.selected) await loadIssue(state.selected);
         else renderIssue();
       } catch (error) {
@@ -4798,6 +4988,7 @@ ${contents.path}`});
     const show = () => {
       state.open = true;
       root.hidden = false;
+      root.style.top=`${header.getBoundingClientRect().bottom}px`;
       document.body.dataset.lexGithubOpen = "true";
       header.classList.add("lex-github-open");
       header.querySelectorAll("nav button").forEach(control => control.classList.toggle("active", control === button));
@@ -4805,7 +4996,7 @@ ${contents.path}`});
       button.setAttribute("aria-pressed", "true");
       navigationChanged();
       if (!state.loaded) loadIssues();
-      else search.focus();
+      else root.querySelector('input[type="search"]')?.focus();
     };
     const hide = () => {
       state.open = false;
@@ -4890,9 +5081,17 @@ ${contents.path}`});
     document.body.dataset.lexPlugin = options.plugin.id;
     document.body.dataset.lexTheme = options.plugin.themeName || options.plugin.id;
     applyTheme(options.plugin.theme);
+    if (pluginLoadingScreen) callWindow("loading_quote", options.plugin.id).then(result => {
+      if (!result?.quote) return;
+      sessionStorage.setItem("lex-loading-quote", result.quote);
+      const quote = document.querySelector(".lex-plugin-loading-quote");
+      if (quote) quote.textContent = result.quote;
+    }).catch(() => {});
 
     const brand = element("button", {
       class: "lex-brand-button",
+      onmousedown:event=>event.preventDefault(),
+      onselectstart:event=>event.preventDefault(),
       title: "Return to main menu",
       "aria-label": "Return to main menu",
       "data-lex-history-control": true,
@@ -4925,7 +5124,7 @@ ${contents.path}`});
     // Tweaks is an ordinary page. It was grouped with Settings, which pushed it
     // out of the run of tabs and gave it a paler fill, so a page the reader
     // uses constantly read as chrome. Settings is the only tab that sits apart.
-    const isSpecialTab = tab => tab.special === true || tab.id === "settings";
+    const isSpecialTab = tab => tab.special === true || tab.id === "settings" || tab.id === "tweaks";
     const orderedTabs = [...options.tabs].sort((left, right) => {
       const leftSettings = isSpecialTab(left);
       const rightSettings = isSpecialTab(right);
@@ -4955,7 +5154,7 @@ ${contents.path}`});
         "data-tab": tab.id,
         class: [tab.id === options.activeTab() ? "active" : "",
         isSpecialTab(tab) ? "lex-settings-tab" : "",
-        tab.id === "tweaks" ? "lex-tweaks-tab" : ""].filter(Boolean).join(" "),
+        isSpecialTab(tab) || tab.id === "tweaks" ? "lex-tweaks-tab" : ""].filter(Boolean).join(" "),
         onclick: () => {
           playThemeSound("confirm");
           githubWorkspace?.hide();
@@ -5906,11 +6105,12 @@ ${contents.path}`});
         if (root.classList.contains("lex-fitted-page")) replacement.classList.add("lex-fitted-page");
         if (root.style.height) replacement.style.height = root.style.height;
       }
-      root?.replaceWith(replacement);
+      if (root?.parentElement?.lexReplacePanel) root.parentElement.lexReplacePanel(root, replacement);
+      else root?.replaceWith(replacement);
       // A local sort replaces the table in place, so anything outside it - the
       // pager summary - only learns of the new order from this event.
       replacement.dispatchEvent(new CustomEvent("lex-column-sorted",
-        {bubbles: true, detail: {key: column.key, dir: nextDirection}}));
+        {bubbles: true, detail: {key: column.key, dir: nextDirection, previous:root}}));
     };
     let suppressSortUntil = 0;
     const pointerColumn = options.pointerColumn ||
@@ -6013,9 +6213,9 @@ ${contents.path}`});
       selected: options.selected,
       selectedClass: options.selectedClass,
       select: options.select,
-      class: ["lex-column-list", options.class || ""].filter(Boolean).join(" "),
+      class: ["lex-column-list", options.fill ? "lex-table-fill" : "", options.class || ""].filter(Boolean).join(" "),
       role: "table",
-      style: `--lex-column-list-template:${template};grid-template-columns:var(--lex-column-list-template)`,
+      style: `--lex-column-list-template:${template};--lex-table-row-count:${Math.max(1,options.rows.length)};grid-template-columns:var(--lex-column-list-template)`,
       "aria-label": options["aria-label"],
       "aria-rowcount": options.rows.length + 1,
       // A tiny table whose columns are named by the row beside them - FF8's
@@ -6101,6 +6301,17 @@ ${contents.path}`});
       node.classList?.add("lex-panel-layout-pane");
       if (options.paneClass) node.classList?.add(options.paneClass);
     });
+    // Selection replaces a detail pane without rebuilding its layout. Keep
+    // the resize controller pointed at the mounted replacement, not the old
+    // detached node (whose measured width and height are both zero).
+    root.lexReplacePanel = (current, replacement) => {
+      const index = nodes.indexOf(current);
+      if (index < 0) throw new Error("The replaced panel does not belong to this layout.");
+      replacement.classList.add("lex-panel-layout-pane");
+      if (options.paneClass) replacement.classList.add(options.paneClass);
+      nodes[index] = replacement;
+      current.replaceWith(replacement);
+    };
     let minimumFractions = Array.from({length: nodes.length}, (_, index) =>
       Math.max(0, Math.min(.95, Number(options.minimumFractions?.[index]) || 0)));
     const minimumTotal = minimumFractions.reduce((sum, value) => sum + value, 0);
@@ -6160,7 +6371,7 @@ ${contents.path}`});
         tabindex: "0",
         "aria-label": options.dividerLabels?.[index] ||
           `Resize panel ${index + 1} and panel ${index + 2}`,
-        "aria-orientation": "vertical",
+        "aria-orientation": vertical ? "horizontal" : "vertical",
         title: "Drag to resize panels. Right-click to reset.",
       });
       if (options.dividerClass) divider.classList.add(options.dividerClass);
@@ -6194,25 +6405,25 @@ ${contents.path}`});
     const resizePair = (index, delta, persist = false, edge = "", initialWidths = null) => {
       const widths = initialWidths ? [...initialWidths]
         : nodes.map(node => vertical ? node.getBoundingClientRect().height : node.getBoundingClientRect().width);
-      const pairWidth = Math.max(1, widths[index] + widths[index + 1]);
-      const requestedMinimum = minSizes[index] + minSizes[index + 1];
-      // When the window is narrower than both requested minimums, preserve
-      // their ratio instead of abandoning the clamp. Abandoning it let a
-      // multi-barrel table cut off its final column before resizing stopped.
-      const minimumScale = Math.min(1, pairWidth / Math.max(1, requestedMinimum));
-      const leftMinimum = minSizes[index] * minimumScale;
-      const rightMinimum = minSizes[index + 1] * minimumScale;
-      const low = Math.max(leftMinimum,
-        pairWidth * minimumFractions[index]);
-      const high = Math.max(low, Math.min(pairWidth - rightMinimum,
-        pairWidth * (1 - minimumFractions[index + 1])));
-      let left = widths[index] + delta;
-      if (edge === "home") left = low;
-      if (edge === "end") left = high;
-      left = Math.max(low, Math.min(high, left));
-      if (!initialWidths && Math.abs(left - widths[index]) < .25) return false;
-      widths[index] = left;
-      widths[index + 1] = pairWidth - left;
+      if (!root.isConnected || widths.some(value => value <= 0)) return false;
+      const total = widths.reduce((sum,value)=>sum+value,0);
+      const minimumScale = Math.min(1,total/minSizes.reduce((sum,value)=>sum+value,0));
+      const minimums = minSizes.map((value,i)=>Math.max(value*minimumScale,total*minimumFractions[i]));
+      if(edge==="home")delta=-total;
+      if(edge==="end")delta=total;
+      // When the adjacent pane reaches its minimum, use spare room in the
+      // next pane too. A narrow centre list must not trap the left divider.
+      const donors=delta>0
+        ? widths.map((_,i)=>i).filter(i=>i>index)
+        : widths.map((_,i)=>i).filter(i=>i<=index).reverse();
+      let remaining=Math.abs(delta),applied=0;
+      for(const donor of donors){
+        const taken=Math.min(remaining,Math.max(0,widths[donor]-minimums[donor]));
+        widths[donor]-=taken;remaining-=taken;applied+=taken;
+        if(remaining<.25)break;
+      }
+      if(applied<.25)return false;
+      widths[delta>0?index:index+1]+=applied;
       setSizes(widths, persist);
       return true;
     };
@@ -6259,11 +6470,12 @@ ${contents.path}`});
       divider.addEventListener("pointercancel", event => finishDrag(divider, event));
       divider.addEventListener("lostpointercapture", event => finishDrag(divider, event));
       divider.addEventListener("keydown", event => {
-        const pairWidth = nodes[index].getBoundingClientRect().width +
-          nodes[index + 1].getBoundingClientRect().width;
+        const dimension = vertical ? "height" : "width";
+        const pairWidth = nodes[index].getBoundingClientRect()[dimension] +
+          nodes[index + 1].getBoundingClientRect()[dimension];
         const step = pairWidth * (event.shiftKey ? .05 : .02);
-        if (event.key === "ArrowLeft") resizePair(index, -step, true);
-        else if (event.key === "ArrowRight") resizePair(index, step, true);
+        if (event.key === (vertical ? "ArrowUp" : "ArrowLeft")) resizePair(index, -step, true);
+        else if (event.key === (vertical ? "ArrowDown" : "ArrowRight")) resizePair(index, step, true);
         else if (event.key === "Home") resizePair(index, 0, true, "home");
         else if (event.key === "End") resizePair(index, 0, true, "end");
         else return;
@@ -6376,7 +6588,16 @@ ${contents.path}`});
       // Same rows, same space, same answer. Re-sorting a column rebuilds the
       // rows, and measuring the rebuilt ones handed back a different row height
       // each time, so the table changed size when you sorted it.
-      const stability = `${rows.length}:${Math.round(availableNode.clientHeight)}:${Math.round(listNode.clientWidth)}`;
+      const ownerRect = availableNode.getBoundingClientRect();
+      const scale = ownerRect.height / availableNode.offsetHeight || 1;
+      const pagerNode = availableNode.querySelector?.(":scope > .lex-pager");
+      const pagerInFlow = pagerNode && getComputedStyle(pagerNode).position !== "fixed";
+      const visibleBottom = Math.min(ownerRect.bottom, innerHeight,
+        pagerNode && !pagerInFlow ? pagerNode.getBoundingClientRect().top : Infinity);
+      const availableHeight = Math.max(0, Math.min(availableNode.clientHeight,
+        (visibleBottom - ownerRect.top) / scale) -
+        (pagerInFlow ? pagerNode.getBoundingClientRect().height / scale : 0));
+      const stability = `${rows.length}:${availableHeight.toFixed(2)}:${Math.round(listNode.clientWidth)}`;
       if (lastStability === stability && lastStableGeometry) {
         options.resize?.(lastStableGeometry.height, lastStableGeometry);
         return;
@@ -6389,27 +6610,15 @@ ${contents.path}`});
       const configuredRowHeight = parseFloat(
         getComputedStyle(listNode).getPropertyValue("--lex-fitted-row-height")
       );
-      const measuredRowHeight = rows[0].getBoundingClientRect().height;
+      const measuredRowHeight = rows[0].getBoundingClientRect().height / scale;
       const naturalRowHeight = configuredRowHeight > 0 ? configuredRowHeight : measuredRowHeight;
       if (!(naturalRowHeight > 0) || !(availableNode.clientHeight > 0)) return;
-      const headerHeight = header?.getBoundingClientRect().height || 0;
+      const headerHeight = (header?.getBoundingClientRect().height || 0) / scale;
       const listStyle = getComputedStyle(listNode);
       const borderHeight = (parseFloat(listStyle.borderTopWidth) || 0) +
         (parseFloat(listStyle.borderBottomWidth) || 0);
-      // availableNode is the complete paged view. A pager that sits IN that
-      // view occupies real height in its second grid row, and counting that as
-      // list space produced one clipped row plus a vertical scrollbar. A pager
-      // pinned to the window occupies none: the page already reserves its
-      // height as padding under #main, so subtracting it here reserved the
-      // same band twice and left exactly one pager's worth of empty ground
-      // between the last row and the bar.
-      const pagerNode = availableNode.querySelector?.(":scope > .lex-pager");
-      const pagerInFlow = pagerNode && getComputedStyle(pagerNode).position !== "fixed";
-      const pagerHeight = pagerInFlow
-        ? pagerNode.getBoundingClientRect().height
-        : pagerNode ? 0
-        : parseFloat(getComputedStyle(availableNode).getPropertyValue("--lex-pager-height")) || 0;
-      const availableHeight = Math.max(0, availableNode.clientHeight - pagerHeight);
+      // Fit to the visible intersection. Some callers reserve fixed-pager
+      // space already; others do not. Never assume either layout.
       const available = Math.max(0, availableHeight - borderHeight - headerHeight);
       const minimumRowHeight = Math.max(0, Number(options.minRowHeight) || 0);
       const capacity = minimumRowHeight > 0 ? Math.max(1, Math.floor((available - 0.5) / minimumRowHeight)) : Infinity;
@@ -6615,9 +6824,9 @@ ${contents.path}`});
       onchange: event => spec.change?.(event.target.checked),
     });
     return element("label", {
-      class: `lex-pager-filter lex-pager-toggle${spec.disabled ? " disabled" : ""}`,
+      class: `lex-pager-filter lex-pager-toggle${spec.disabled ? " disabled" : ""}${spec.lines ? " multiline" : ""}`,
       title: String(spec.title || spec.label || ""),
-    }, input, element("span", {}, String(spec.label || "Filter")));
+    }, input, element("span", {}, spec.lines ? spec.lines.join("\n") : String(spec.label || "Filter")));
   };
 
   const pagerSelect = spec => {
@@ -7032,6 +7241,7 @@ ${contents.path}`});
       ? makeDetail(picked)
       : (typeof options.emptyDetail === "function" ? options.emptyDetail() : options.emptyDetail || element("div", {class: "lex-detail"}));
     let leadingNode = typeof options.leadingPanel === "function" && picked ? options.leadingPanel(picked) : null;
+    let trailingNode = typeof options.trailingPanel === "function" && picked ? options.trailingPanel(picked) : null;
     let masterNodes = [];
     const select = (record,event={}) => {
       const nextSelected = keyOf(record);
@@ -7058,14 +7268,20 @@ ${contents.path}`});
       if (detailNode.classList.contains("lex-panel-layout-pane")) replacement.classList.add("lex-panel-layout-pane");
       const fixedHeight = detailNode.style.height;
       if (fixedHeight) replacement.style.height = fixedHeight;
-      detailNode.replaceWith(replacement);
+      root.lexReplacePanel(detailNode, replacement);
       detailNode = replacement;
       if (leadingNode) {
         const nextLeading = options.leadingPanel(record);
         nextLeading.classList.add("lex-panel-layout-pane");
-        leadingNode.replaceWith(nextLeading);
+        root.lexReplacePanel(leadingNode, nextLeading);
         leadingNode = nextLeading;
         refreshReferences(nextLeading);
+      }
+      if (trailingNode) {
+        const nextTrailing = options.trailingPanel(record);
+        root.lexReplacePanel(trailingNode, nextTrailing);
+        trailingNode = nextTrailing;
+        refreshReferences(nextTrailing);
       }
       refreshReferences(replacement);
       return true;
@@ -7132,13 +7348,22 @@ ${contents.path}`});
       7 * (barrels - 1);
     const root = leadingNode ? panelLayout([leadingNode, masterNode, detailNode],
       `lex-list-detail lex-master-detail lex-list-detail-resizable lex-leading-list-detail ${options.className || ""}`, {
-        defaultSizes: [options.defaultLeadingWidth || 25, 30, 45],
+        defaultSizes: options.panelSizes || [options.defaultLeadingWidth || 25, 30, 45],
         minSizes: [Math.max(220, Number(options.minLeading) || 300), barrelPanelMinimum, Math.max(240, Number(options.minRight) || 360)],
         storageKey: options.splitKey ? `lexeditor:leading-list-detail:${options.splitKey}` : "",
         dividerClass: "lex-list-detail-divider",
         dividerAccessories: [null, barrelControl],
         dividerLabels: ["Resize secondary panel and list", "Resize list and detail panels"],
         eventName: "lex-list-detail-resize",
+      }) : trailingNode ? panelLayout([masterNode, detailNode, trailingNode],
+      `lex-list-detail lex-master-detail ${options.className || ""}`, {
+        defaultSizes:options.panelSizes || [30,30,40],
+        minSizes:[barrelPanelMinimum, Math.max(240, Number(options.minRight) || 300), Math.max(240, Number(options.minTrailing) || 360)],
+        storageKey:options.splitKey ? `lexeditor:trailing-list-detail:${options.splitKey}` : "",
+        dividerClass:"lex-list-detail-divider",
+        dividerAccessories:[barrelControl,null],
+        dividerLabels:["Resize list and detail panels","Resize detail and related records"],
+        eventName:"lex-list-detail-resize",
       }) : listDetail(masterNode, detailNode, options.className || "", {
       splitKey: options.splitKey,
       defaultSplit: options.defaultSplit,
@@ -7149,12 +7374,17 @@ ${contents.path}`});
       paneClass: options.paneClass,
     });
     root.classList.add("lex-paged-list-detail");
+    root.addEventListener("lex-column-sorted", event => {
+      const index = masterNodes.indexOf(event.detail.previous);
+      if (index >= 0) masterNodes[index] = event.target;
+    });
     root.dataset.lexPage = String(page);
     root.dataset.lexPageSize = String(pageSize);
     const bottomTools = [...(options.filters || [])];
     if (modOnly) {
       bottomTools.unshift(pagerToggle({
         label: modOnly.label || "Mod contents only",
+        lines: modOnly.label ? undefined : ["Mod", "contents", "only"],
         title: modOnly.available === false
           ? (modOnly.unavailableTitle
             || "Available once an editable mod and its vanilla baseline are both loaded.")
@@ -7460,7 +7690,7 @@ ${contents.path}`});
       // glyph width for game fonts; the old .38em estimate clipped values such
       // as "V DEFAULT" and two-digit numbers against native select chrome.
       const reserve = Math.max(2.75, Math.min(8.5, referenceCharacters * .58 + .65));
-      root.style.setProperty("--lex-internal-reference-width", `${reserve}em`);
+      root.style.setProperty("--lex-internal-reference-requested-width", `${reserve}em`);
     } else {
       // Sizing the rail per control makes value boxes on the same panel end at
       // different edges, because one reference reading "V 25" needs less room
@@ -7727,24 +7957,21 @@ ${contents.path}`});
       return element("input", {...common, type: "text", value: shown,
         oninput: event => options.change(field.id, field.kind === "list" ? event.target.value.split(",").map(value => value.trim()).filter(Boolean) : event.target.value)});
     };
-    const sections = config.sections.map(section => {
+    const sections = config.sections.flatMap(section => {
       const fields = section.fields.map(field => {
         const searchText = `${section.label} ${field.label} ${field.key} ${field.description}`.toLocaleLowerCase();
-        const node = detailField({
-          className: "lex-platform-config-field", label: field.label.toLocaleUpperCase(),
+        const control = controlFor(field);
+        const node = detailPanel({
+          className: "lex-platform-config-field lex-platform-config-section", title: field.label,
           help: field.description ? infoHelp(field.description) : null,
-          dataType: field.kind === "boolean" ? "BOOL" : field.kind === "integer" || field.kind === "enum" ? "INT" : field.kind === "number" ? "FLOAT" : field.kind === "list" ? "LIST" : "STRING",
-          min: field.minimum, max: field.maximum, control: controlFor(field),
+          actions: field.kind === "boolean" ? control : null,
+          body: field.kind === "boolean" ? [] : control,
         });
         node.dataset.platformSearch = searchText;
         node.hidden = !!query && !searchText.includes(query);
         return node;
       });
-      const sectionNode = element("details", {class: "lex-platform-config-section", open: true},
-        element("summary", {}, section.label),
-        element("div", {class: "lex-platform-config-fields"}, ...fields));
-      sectionNode.hidden = fields.every(field => field.hidden);
-      return sectionNode;
+      return fields;
     });
     let paged;
     const applySearch = value => {
@@ -7752,18 +7979,13 @@ ${contents.path}`});
       const normalized = String(value).toLocaleLowerCase();
       const root = document.querySelector(".lex-platform-config");
       if (!root) return;
-      for (const section of root.querySelectorAll(".lex-platform-config-section")) {
-        const fields = [...section.querySelectorAll(".lex-platform-config-field")];
-        for (const field of fields) field.hidden = !!normalized && !field.dataset.platformSearch.includes(normalized);
-        section.hidden = fields.every(field => field.hidden);
+      for (const field of sections) {
+        field.hidden = !!normalized && !field.dataset.platformSearch.includes(normalized);
       }
       paged.refreshPages();
     };
     paged = paginateSettings(element("div", {class:"lex-platform-config-sections"}, ...sections), {
-      // One column: these cards are whole sections, each already holding a
-      // grid of fields. Dealing them side by side squeezes those inner grids
-      // to a single narrow lane.
-      columns: 1,
+      columns: 6, columnMajor: true, strictColumns: true,
       // A plugin whose Tweaks page divides into groups hands the bar down
       // rather than drawing a second one above this view.
       tabs: options.tabs, activeTab: options.activeTab,
@@ -7776,7 +7998,7 @@ ${contents.path}`});
       paged)
   };
 
-  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, curveGrid, gameCard, componentSample, stack, bitmapText, modelStage, iconSlot, figureGrid, treeGraph, codeField, logView, detailText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 
@@ -7789,8 +8011,15 @@ ${contents.path}`});
   const attachModelPreview = (panel, spec) => {
     if (!(panel instanceof Element) || !spec) return panel;
     const heading = panel.querySelector(':scope > .lex-detail-panel-heading');
-    const icon = heading?.querySelector('.lex-detail-panel-icon');
-    if (!heading || !icon) return panel;
+    let icon = heading?.querySelector('.lex-detail-panel-icon');
+    if (!heading) return panel;
+    if (panel.lexModelPreview) return panel;
+    if (!icon) {
+      icon = ui.element('div',{class:'lex-detail-panel-icon'},ui.iconSlot({message:'No image'}));
+      heading.prepend(icon);
+    }
+    heading.classList.remove('no-icon');
+    heading.classList.add('lex-model-preview-heading');
     // The content may be a node or a factory. A preview that has to read a
     // mesh out of a game archive should not pay for that until someone opens
     // the drawer, and a factory is how a plugin says so.
@@ -7808,7 +8037,7 @@ ${contents.path}`});
     const closeMark = document.createElement('span');
     closeMark.className = 'lex-model-preview-close';
     closeMark.setAttribute('aria-hidden', 'true');
-    closeMark.textContent = '×';
+    closeMark.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></svg>';
     icon.append(iconContent, closeMark);
 
     const drawer = document.createElement('section');
@@ -7852,12 +8081,13 @@ ${contents.path}`});
       busy = true;
       try {
         // pointerdown is captured before the browser focuses the role=button.
-        // Use that box so changing focus state cannot make the replacement X
+        // Use that box so changing focus state cannot make the magnifier
         // jump before the click handler even starts.
         frozenSlot = activationSlot || snapshotSlot();
         activationSlot = null;
         if (!drawer.childNodes.length) {
-          const content = await getContent?.();
+          const pending = getContent?.();
+          const content = pending instanceof Promise ? await pending : pending;
           if (content instanceof Node) drawer.append(content);
         }
         drawer.hidden = false;
@@ -7875,8 +8105,9 @@ ${contents.path}`});
       busy = true;
       try {
         ++slotLockGeneration;
-        await onClose?.(drawer);
         panel.classList.remove('lex-model-preview-open');
+        await new Promise(resolve => setTimeout(resolve, 150));
+        await onClose?.(drawer);
         drawer.hidden = true;
         releaseIconSlot();
         activationSlot = null;
@@ -7987,52 +8218,23 @@ ${contents.path}`});
     }));
   }, true);
 
-  // A tab bar that has to wrap splits evenly between its rows. Left alone,
-  // flex packs the first row full and strands whichever tabs are left over on
-  // a second row of one or two, which reads as a mistake rather than a layout.
-  // The natural row count is measured with the balancing removed, then each
-  // row is given its equal share.
+  // Every tab stays in one row. Equal lanes give the label fitter a bound.
+  const tabLabelObserver=new ResizeObserver(()=>scheduleFit());
   const balanceTabRows = () => {
     for (const bar of document.querySelectorAll('.lex-shell-header nav, .lex-subtab-bar')) {
-      const tabs = [...bar.children].filter(node =>
-        node instanceof HTMLElement && node.offsetParent !== null);
-      if (tabs.length < 2) { bar.removeAttribute('data-lex-tab-rows'); continue; }
-      bar.removeAttribute('data-lex-tab-rows');
-      bar.removeAttribute('data-lex-tab-tight');
-      bar.style.removeProperty('--lex-tab-columns');
-      tabs.forEach(tab => tab.style.removeProperty('--lex-tab-span'));
-      const rowCount = () => new Set(tabs.map(tab => Math.round(tab.offsetTop))).size;
-      if (rowCount() < 2) continue;
-      // Wrapping is the last resort, so the bar tightens first and is measured
-      // again: a bar that now fits on one line keeps its tabs full size and
-      // needs no balancing at all.
-      bar.dataset.lexTabTight = "";
-      const rows = rowCount();
-      if (rows < 2) continue;
-      // As even as the count allows: seven tabs over three rows is three, two
-      // and two, never three, three and one. The bar becomes a grid of as many
-      // columns as every row divides into, and each tab spans its own row's
-      // share of them.
-      const counts = Array.from({length: rows}, (_, index) =>
-        Math.floor(tabs.length / rows) + (index < tabs.length % rows ? 1 : 0));
-      const divisor = (a, b) => b ? divisor(b, a % b) : a;
-      const columns = counts.reduce((carry, count) => carry * count / divisor(carry, count), 1);
-      bar.dataset.lexTabRows = String(rows);
-      bar.style.setProperty('--lex-tab-columns', String(columns));
-      let index = 0;
-      counts.forEach(count => {
-        for (let seat = 0; seat < count; seat += 1) {
-          tabs[index]?.style.setProperty('--lex-tab-span', String(columns / count));
-          index += 1;
-        }
-      });
+      const tabs=[...bar.children].filter(node=>node instanceof HTMLElement && !node.hidden);
+      bar.dataset.lexTabRows='1';
+      bar.dataset.lexTabTight='';
+      bar.style.setProperty('--lex-tab-columns',String(Math.max(1,tabs.length)));
+      tabs.forEach(tab=>tab.style.removeProperty('--lex-tab-span'));
+      bar.querySelectorAll('.lex-tab-label-text').forEach(label=>tabLabelObserver.observe(label));
     }
   };
   let balancePending = false;
   const scheduleBalance = () => {
     if (balancePending) return;
     balancePending = true;
-    requestAnimationFrame(() => { balancePending = false; balanceTabRows(); });
+    requestAnimationFrame(() => { balancePending = false; balanceTabRows(); scheduleFit(); });
   };
   window.addEventListener('resize', scheduleBalance);
   document.fonts?.ready?.then(scheduleBalance).catch(() => {});
@@ -8079,12 +8281,20 @@ ${contents.path}`});
       return;
     }
     const key = fitKey(label);
-    if (fitted.get(label) === key) return;
+    if (fitted.get(label) === key && label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight + 1) return;
     label.style.fontSize = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
+    if(label.classList.contains('lex-tab-label-text')) {
+      const range=document.createRange();range.selectNodeContents(label);
+      const fits=()=>{const css=getComputedStyle(label);return range.getBoundingClientRect().width <= label.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight)-3;};
+      while(size>1&&!fits()){size-=.5;label.style.fontSize=`${size}px`;}
+      fitted.set(label,fitKey(label));
+      return;
+    }
     // Width gets no slack: a word may no longer wrap mid-way, so a name one
     // pixel too wide pokes past the label edge every other name ends on.
-    while (size > 6 && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth)) {
+    const minimum=label.classList.contains('lex-tab-label-text')?1:6;
+    while (size > minimum && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth)) {
       size -= .5;
       label.style.fontSize = `${size}px`;
     }
@@ -8092,7 +8302,7 @@ ${contents.path}`});
     // the key is the same one computed above and the label settles in one pass.
     fitted.set(label, key);
   };
-  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label';
+  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text';
   const fitAllLabels = root => {
     if (root instanceof Element && root.matches?.(LABEL_SELECTOR)) fitLabel(root);
     root.querySelectorAll?.(LABEL_SELECTOR).forEach(fitLabel);
@@ -8140,6 +8350,10 @@ ${contents.path}`});
   // face arrives, and the few extra pixels that brings are enough to clip a
   // line that had just fitted. Re-fit once the fonts are actually in.
   document.fonts?.ready?.then(() => scheduleFit());
+  document.fonts?.addEventListener?.('loadingdone', () => {
+    document.querySelectorAll(LABEL_SELECTOR).forEach(label => fitted.delete(label));
+    scheduleBalance();
+  });
   scheduleFit();
 })();
 
@@ -8243,11 +8457,15 @@ ${contents.path}`});
           input.dispatchEvent(new Event("input", {bubbles: true}));
         }
         input.value = window.LexeditorUI.formatNumber(bounded);
+        window.LexeditorUI.autoFitControlText(input, {minimum:8});
       };
       input.type = "text";
       input.inputMode = "decimal";
       input.autocomplete = "off";
-      input.addEventListener("focus", () => { input.value = plain(); });
+      input.addEventListener("focus", () => {
+        input.value = plain();
+        input.select();
+      });
       input.addEventListener("blur", show);
       // A plugin that writes a fresh value into the box while it sits unfocused
       // re-groups it; while it is focused the reader's own digits stand.

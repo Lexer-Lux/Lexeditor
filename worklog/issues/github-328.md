@@ -4,10 +4,11 @@
 
 ## Requirements and decisions
 
-Latest human test: main-menu XP bars missing; Status bar in Help box. Show XP
-below main-menu names, below the shared character level row (including Magic),
-and below GF list/detail level rows. Preserve the battle HP/GF HP requirements
-on the live issue. Do not claim visual acceptance from native checks.
+Latest human test (September 19): match the supplied vanilla reserve HP rail.
+Main-menu XP belongs below LV for active and reserve characters, not below
+names. Add active-party HP below HP X/Y. Preserve the battle placement,
+right-to-left fill and maximum-HP scaling requirements on the live issue.
+Do not claim visual acceptance from native checks.
 
 ## Current implementation and evidence
 
@@ -25,8 +26,16 @@ XP Bars remains enabled in FFNx.toml. Source package backup is hash-checked unde
 Lexeditor helpers/backups/ffnx/xp-widgets-source-20260912.
 Installed runtime backup: helpers/backups/ffnx/20260912-085703-176333.
 
-## Next agent work
+## Current candidate (2026-09-19, second replacement)
 
-Human checks are now prepared on the live issue: main-menu active/reserve rows,
-Status, Magic, GF list/details, and post-battle page transitions. Live rendering
-is not yet accepted. Return a failed check to actionable with the exact screen.
+The previous one-line candidate failed the human test. The replacement uses the new vanilla close-up supplied on September 19: two horizontal lines, one above the other. Pixel measurements establish their spacing and partial edge coverage. The shared gauge applies this design to HP, GF HP/MP and XP, while keeping each gauge's placement and fill direction.
+
+The driver was rebuilt, package-checked and installed. The production drawing check covers the measured pixel profile, fill directions and three scales. Menu capture checks and linked-driver checks passed. This is prepared for human acceptance, not yet visually accepted in-game.
+
+Acceptance test (no build needed):
+- [ ] Restart FF8 through Lexeditor with the bar tweaks enabled. Compare the bars with the supplied vanilla close-up: two horizontal lines, not a thick box or a single hairline.
+- [ ] In the main menu, check active/reserve XP below LV and active HP below HP X/Y. Reserve XP must match native HP height and width.
+- [ ] In battle, check HP below its numbers, right-to-left fill and track length based on maximum HP. Check the GF MP bar too.
+- [ ] Check character, Magic, GF and result level widgets. Report the screen and a screenshot for any mismatch.
+
+Installed candidate: `D:/SteamLibrary/steamapps/common/FINAL FANTASY VIII/AF3DN.P`, SHA-256 `398062ac3da8c632bcb75410dd51406792c11bafa85108fe5f4913f553c68663`. The prior driver was backed up. Settings and saves were preserved. No visible game window was opened.

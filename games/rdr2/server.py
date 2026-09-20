@@ -4389,11 +4389,19 @@ def _weapon_shell_nodes(root):
     return nodes
 
 
+def _weapon_identity_key(name):
+    """A readable asset name and an extracted hash identify the same record."""
+    match = re.fullmatch(r"(?:UNK_MEMBER_)?0x([0-9a-f]{8})", name, re.IGNORECASE)
+    return int(match.group(1), 16) if match else joaat(name)
+
+
 def _weapon_shell_status(root, vanilla_root):
-    current = _weapon_shell_nodes(root)
-    vanilla = _weapon_shell_nodes(vanilla_root)
+    current = {_weapon_identity_key(name): node for name, node in _weapon_shell_nodes(root).items()}
+    vanilla_nodes = _weapon_shell_nodes(vanilla_root)
+    vanilla = {_weapon_identity_key(name): node for name, node in vanilla_nodes.items()}
+    names = {_weapon_identity_key(name): name for name in vanilla_nodes}
     targets = {name: node for name, node in vanilla.items() if (node.text or "").strip()}
-    missing = sorted(set(targets) - set(current))
+    missing = sorted(names[key] for key in set(targets) - set(current))
     blank = sum(1 for name in targets
                 if name in current and not (current[name].text or "").strip())
     return {"available": bool(targets) and not missing, "blank": blank,
@@ -4431,12 +4439,12 @@ def get_weapon_shell_vfx_status(ds="mine"):
 
 
 def _set_weapon_shell_vfx(root, vanilla_root, blanked):
-    current = _weapon_shell_nodes(root)
+    current = {_weapon_identity_key(name): node for name, node in _weapon_shell_nodes(root).items()}
     vanilla = _weapon_shell_nodes(vanilla_root)
     changed = 0
     for name, vanilla_node in vanilla.items():
         vanilla_value = (vanilla_node.text or "").strip()
-        node = current.get(name)
+        node = current.get(_weapon_identity_key(name))
         if node is None or not vanilla_value:
             continue
         value = "" if blanked else vanilla_value

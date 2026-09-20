@@ -1,9 +1,7 @@
 // ----- Effects -----
 function effectSectionTabs(){
   const section=state.filters.effectSection||"effects";
-  return el("div",{class:"subtabs"},
-    ...[["effects","Effects"],["behaviors","Behavior IDs"]].map(([key,label])=>
-      el("button",{class:key===section?"active":"",onclick:()=>{state.filters.effectSection=key;renderEffects();}},label)));
+  return LexeditorUI.subtabBar({active:section,label:"Effects view",tabs:[{id:"effects",label:"Effects"},{id:"behaviors",label:"Behavior IDs"}],change:key=>{state.filters.effectSection=key;renderEffects()}});
 }
 
 function behaviorChoices(){
@@ -13,17 +11,7 @@ function behaviorChoices(){
 
 function behaviorDetail(row){
   const effects=state.catalog.effects.filter(effect=>effect.id===row.id);
-  const pane=el("div",{class:"loot-detail-pane lex-detail item-detail effect-detail"});
-  const help=effectBehaviorHelp({id:row.id});
-  pane.append(el("div",{class:"detail-field effect-identity"},el("div",{class:"detail-control"},
-    el("div",{class:"effect-detail-head"},humanNameInput("behaviors",row.id,effectBehaviorName({id:row.id})||"Name this behavior…")),
-    el("div",{class:"effect-detail-id"},row.id),help?el("p",{class:"hint"},help):"")));
-  const usage=el("div",{class:"effect-usage-list"});
-  for(const effect of effects)usage.append(effectLink(effect.key,
-    `${humanName("effects",effect.key)||effect.symbol||effect.label||effect.key} · ${effect.key}`));
-  pane.append(el("div",{class:"detail-field"},el("div",{class:"detail-label"},"Used by"),
-    el("div",{class:"detail-control"},usage.childElementCount?usage:el("span",{class:"cat"},"No effects"))));
-  return pane;
+  return LexeditorUI.detailPanel({title:LexeditorUI.detailField({label:"Name",control:humanNameInput("behaviors",row.id,effectBehaviorName({id:row.id})||"Name this behavior…")}),meta:row.id,help:effectBehaviorHelp({id:row.id}),body:LexeditorUI.detailSection({title:"Used by",body:effects.length?LexeditorUI.stack({fill:false},...effects.map(effect=>effectLink(effect.key,`${humanName("effects",effect.key)||effect.symbol||effect.label||effect.key} · ${effect.key}`))):LexeditorUI.detailNote("No effects")})});
 }
 
 function renderBehaviors(){
@@ -48,7 +36,7 @@ function renderBehaviors(){
       class:"loot-list behavior-column-list",headerClass:"loot-listhead",
       template:"minmax(180px,1.5fr) minmax(130px,1fr) 72px",sortState:state.sorts.behaviors,sort:key=>sharedTableSort("behaviors",key,renderBehaviors),
       columns:[
-        {key:"name",label:"Behavior name",sortable:true,render:row=>el("div",{class:"effect-column-primary"},el("span",{class:"record-name"},row.name||"Unlabeled"))},
+        {key:"name",label:"Behavior name",sortable:true,render:row=>LexeditorUI.stack({fill:false},el("span",{class:"lex-inline-label"},row.name||"Unlabeled"))},
         {key:"id",label:"Behavior ID",sortable:true,cellClass:"technical-id"},
         {key:"used",label:"Used by",sortable:true,render:row=>String(row.used)}],rowClass:"loot-item behavior-column-row"}),
     detail:behaviorDetail,
@@ -70,32 +58,28 @@ function effectNumberEditor(e,field,currentBehavior){
   const input=el("input",{type:"number",step:field==="percent"?"any":"1",value:field==="percent"?fmtCompactNumber(cur):cur,...(inactive?{readonly:"readonly"}:{}),title:tierMismatch?`${role}. Warning: ${fmtCompactNumber(percentNow)}% normally maps to display tier ${expectedTier}.`:role,
     class:ek in state.effectEdits?"edited":"",onchange:ev=>{const value=ev.target.value;
       if(Number(value)===Number(e[field]))delete state.effectEdits[ek];else state.effectEdits[ek]=value;renderEffects();renderToolbarOnly();}});
-  const control=field==="percent"?el("div",{class:"number-suffix"},input,el("span",{},"%"))
-    :tierMismatch?el("div",{class:"number-suffix"},input,fieldHelp(`Display tier ${cur} contradicts ${fmtCompactNumber(percentNow)}%; expected tier ${expectedTier}.`)):input;
+  const control=field==="percent"?LexeditorUI.unitField(input,"%")
+    :tierMismatch?LexeditorUI.inlineLabel(input,fieldHelp(`Display tier ${cur} contradicts ${fmtCompactNumber(percentNow)}%; expected tier ${expectedTier}.`)):input;
   const vEff=state.store.vanilla?.effectByKey?.[e.key],kEff=state.store.kiddos?.effectByKey?.[e.key];
   return refField(control,[["V","vtag",vEff?vEff[field]:null],["K","ktag",kEff?kEff[field]:null]],cur,
     inactive?null:(value,event)=>applyToInput(event,value),value=>(+value%1?(+value).toFixed(2):String(+value)));
 }
 
 function effectDetail(e,behaviors,used){
-  const pane=el("div",{class:"loot-detail-pane lex-detail item-detail effect-detail"});
+  const body=[];
   const behaviorKey=e.key+"|id",currentBehavior=state.effectEdits[behaviorKey]??e.id;
-  const field=(label,control,help="")=>el("div",{class:"detail-field"},
-    el("div",{class:"detail-label"},label,help?fieldHelp(help):""),el("div",{class:"detail-control"},control));
-  pane.append(el("div",{class:"detail-field effect-identity"},el("div",{class:"detail-control"},
-    el("div",{class:"effect-detail-head"},originMarker(e),humanNameInput("effects",e.key)),
-    el("div",{class:"effect-detail-id"},`${e.symbol||e.label?`${e.symbol||e.label} · `:""}${e.key}`))));
+  const field=(label,control,help="")=>LexeditorUI.detailField({label,control,help:help?fieldHelp(help):null});
   const behavior=el("select",{value:currentBehavior,class:behaviorKey in state.effectEdits?"edited":"",...(isRO()?{disabled:true}:{}),onchange:event=>{
     const value=event.target.value;if(value===e.id)delete state.effectEdits[behaviorKey];else state.effectEdits[behaviorKey]=value;renderEffects();renderToolbarOnly();
   }},...behaviors.map(id=>el("option",{value:id,selected:id===currentBehavior},`${humanName("behaviors",id)||effectBehaviorName({id})||id}${humanName("behaviors",id)||effectBehaviorName({id})?` — ${id}`:""}`)));
-  pane.append(field("Behavior ID",el("div",{},behavior,behaviorLink(currentBehavior)),effectBehaviorHelp({id:currentBehavior})),
+  body.push(field("Behavior ID",LexeditorUI.controlGroup([behavior,behaviorLink(currentBehavior)]),effectBehaviorHelp({id:currentBehavior})),
     field("Engine value / display tier",effectNumberEditor(e,"value",currentBehavior)),
     field("Percent override",effectNumberEditor(e,"percent",currentBehavior)),
     field("Time",effectNumberEditor(e,"time",currentBehavior)),
     field("Time units",effectNumberEditor(e,"timeunits",currentBehavior)),
     field("Duration category",el("span",{class:"cat"},e.durationcategory.replace("EFFECT_DURATION_CATEGORY_",""))));
-  pane.append(field("Used by",used.length?el("button",{class:"table-link",title:"Show every item using this effect",onclick:()=>showEffectUsage(e,used)},`${used.length} item${used.length===1?"":"s"}`):el("span",{class:"cat"},"No items")));
-  return pane;
+  body.push(field("Used by",used.length?el("button",{class:"table-link",title:"Show every item using this effect",onclick:()=>showEffectUsage(e,used)},`${used.length} item${used.length===1?"":"s"}`):el("span",{class:"cat"},"No items")));
+  return LexeditorUI.detailPanel({title:field("Name",humanNameInput("effects",e.key)),meta:`${e.symbol||e.label?`${e.symbol||e.label} · `:""}${e.key}`,actions:originMarker(e),body});
 }
 
 function effectColumnList(rows,selected,select,usage){
@@ -106,9 +90,9 @@ function effectColumnList(rows,selected,select,usage){
     template:"minmax(170px,2fr) minmax(130px,1.5fr) 58px 64px 48px 52px minmax(82px,1fr) 58px",
     sortState:state.sorts.effects,sort:key=>sharedTableSort("effects",key,renderEffects),rowClass:"loot-item effect-column-row",
     columns:[
-      {...column("name","Effect","Editor label and catalog reference."),render:e=>el("div",{class:"effect-column-primary"},
-        el("span",{class:"record-name"},originDisplayName(humanName("effects",e.key)||e.symbol||e.label||e.key,e)),el("span",{class:"key"},e.key))},
-      {...column("id","Behavior ID","Engine operation selected by this effect."),render:e=>el("div",{class:"effect-column-behavior"},
+      {...column("name","Effect","Editor label and catalog reference."),render:e=>LexeditorUI.stack({fill:false},
+        el("span",{class:"lex-inline-label"},originDisplayName(humanName("effects",e.key)||e.symbol||e.label||e.key,e)),el("span",{class:"key"},e.key))},
+      {...column("id","Behavior ID","Engine operation selected by this effect."),render:e=>LexeditorUI.stack({fill:false},
         behaviorLink(current(e,"id"),humanName("behaviors",current(e,"id"))||effectBehaviorName({id:current(e,"id")})||current(e,"id")),el("span",{class:"technical-id"},current(e,"id")))},
       {...column("value","Value"),render:e=>String(current(e,"value"))},
       {...column("percent","Percent","Gameplay magnitude. Engine Value is the wheel preview tier: 1≈12.5%, 3=25%, 5=50%, 8=75%, 10=100%."),render:e=>`${fmtCompactNumber(current(e,"percent"))}%`},

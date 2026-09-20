@@ -28,6 +28,46 @@ def exports() -> list[str]:
     return sorted(names)
 
 
+def shared_dependencies(source: str) -> dict[str, set[str]]:
+    """Calls and aliases between the framework's named top-level helpers.
+
+    Include private helpers: pagedListDetail calls fitListPage, which can call
+    other components. Functions in this module are declared at two spaces.
+    Nested callbacks belong to their enclosing helper.
+    """
+    # Keep newlines and indentation so declaration boundaries remain intact.
+    # Strings and comments cannot introduce calls or helper declarations.
+    source = re.sub(r'//[^\n]*|/\*[\s\S]*?\*/|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|`(?:\\.|[^`\\])*`',
+                    lambda match: re.sub(r'[^\n]', ' ', match.group()), source)
+    declarations = list(re.finditer(r'^  (?:const|let|function)\s+([A-Za-z_$][\w$]*)\b', source, re.M))
+    known = {match[1] for match in declarations}
+    graph = {}
+    for index, match in enumerate(declarations):
+        body = source[match.end():declarations[index+1].start() if index+1<len(declarations) else len(source)]
+        calls = set(re.findall(r'(?<![\w.])([A-Za-z_$][\w$]*)\s*\(', body))
+        alias = re.match(r'\s*=\s*([A-Za-z_$][\w$]*)\s*;', body)
+        if alias:
+            calls.add(alias[1])
+        graph[match[1]] = (calls & known) - {match[1]}
+    graph['el'] = {'element'}
+    return graph
+
+
+def propagate_usage(found: dict[str, set[str]], graph: dict[str, set[str]]) -> None:
+    """Each caller's plugins also use its direct and indirect components."""
+    for caller, plugins in list(found.items()):
+        pending = list(graph.get(caller, set()))
+        seen = {caller}
+        while pending:
+            callee = pending.pop()
+            if callee in seen:
+                continue
+            seen.add(callee)
+            if callee in found:
+                found[callee].update(plugins)
+            pending.extend(graph.get(callee, set()))
+
+
 def usage() -> dict[str, list[str]]:
     names = exports()
     found: dict[str, set[str]] = {name: set() for name in names}
@@ -53,6 +93,7 @@ def usage() -> dict[str, list[str]]:
                         component in destructured
                         and re.search(rf"\b{re.escape(component)}\s*\(", text)):
                     found[component].add(name)
+    propagate_usage(found, shared_dependencies((ROOT / 'ui/framework.js').read_text(encoding='utf-8')))
     return {name: sorted(plugins) for name, plugins in found.items()}
 
 

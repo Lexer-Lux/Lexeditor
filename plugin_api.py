@@ -120,8 +120,6 @@ class GamePlugin:
 
     plugin_id: str
     name: str
-    subtitle: str
-    description: str
     accent: str
     check: CheckFunction
     launch: LaunchFunction
@@ -176,7 +174,7 @@ def validate_plugin(plugin: GamePlugin) -> None:
     """Reject incomplete or unsafe descriptors at discovery time."""
     if not plugin.plugin_id or not plugin.plugin_id.replace("-", "").isalnum():
         raise ValueError("plugin_id must contain letters, numbers, or hyphens")
-    for field in (plugin.name, plugin.subtitle, plugin.description, plugin.accent):
+    for field in (plugin.name, plugin.accent):
         if not field:
             raise ValueError(f"{plugin.plugin_id} has an empty descriptor field")
     if plugin.cover_art is not None:

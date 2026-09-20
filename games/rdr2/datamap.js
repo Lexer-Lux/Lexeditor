@@ -1,6 +1,8 @@
 // ----- Data map -----
 async function renderDataMap() {
+  const current=renderScope("renderDataMap");
   if(!state.datamap)state.datamap=await api("/api/datamap");
+  if(!current())return;
   const f=state.filters,view=LexeditorUI.dataMap({
     rows:state.datamap.rows,query:f.mapQ,status:f.mapStatus,page:f.mapPage,
     sort:state.dataMapSort,pageSize:100,

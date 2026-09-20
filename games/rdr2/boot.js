@@ -14,7 +14,7 @@ const rdr2Shell=LexeditorUI.mountShell({
     ["ai","AI"],["challenges","Challenges"],["crime","Crime & Law"],["crafting","Crafting"],
     ["effects","Effects"],["items","Items"],["loot","Loot Tables"],
     ["mobs","Mobs"],["shops","Shops"],["settings","Tweaks"],["weapons","Weapons"]
-  ].map(([id,label])=>({id,label})),
+  ].map(([id,label])=>({id,label,help:TAB_CONTEXT[id]?.help})),
   activeTab:()=>state.tab,
   navigate,
   help:()=>navigate("datamap"),
@@ -43,4 +43,4 @@ history.replaceState(navigationState(),"",location.hash||"#items");
 window.addEventListener("popstate",ev=>{if(!ev.state?.lexeditor)return;state.tab=ev.state.tab;state.filters=ev.state.filters;state.lootFile=ev.state.lootFile;
   render().finally(()=>requestAnimationFrame(()=>window.scrollTo(ev.state.scrollX||0,ev.state.scrollY||0)));});
 window.addEventListener("beforeunload", ev => { if (!window.__lexeditorNavigating && dirtyCount()) ev.preventDefault(); });
-boot().catch(ex => { LexeditorUI.finishPluginLoading(); $("#main").innerHTML = ""; $("#main").append(el("div", { class: "loading" }, "Failed to load: " + ex.message)); });
+boot().catch(ex => { LexeditorUI.finishPluginLoading(); $("#main").innerHTML = ""; $("#main").append(LexeditorUI.stack({fill:false,className:"lex-notice"}, "Failed to load: " + ex.message)); });

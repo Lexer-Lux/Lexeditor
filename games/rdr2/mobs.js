@@ -33,16 +33,25 @@ const MOB_HEALTH_COLUMNS=[
 ];
 
 async function renderMobs(){
+  const current=renderScope("renderMobs");
   const f=state.filters;
   if(!state.mobs)state.mobs=await api("/api/mobs");
+  if(!current())return;
   if(f.mobView==="models")return renderMobModels();
   return renderMobArchetypes();
 }
 
 function mobViewTabs(active){
   const f=state.filters;
-  return el("div",{class:"subtabs"},...[["archetypes","Archetypes"],["models","Observed Models"]].map(([key,label])=>
-    el("button",{class:key===active?"active":"",onclick:()=>{f.mobView=key;renderMobs();}},label)));
+  return LexeditorUI.subtabBar({tabs:[{id:"combat",label:"Combat profiles",help:MOB_LAYERS.combat.hint},
+    {id:"health",label:"Health archetypes",help:MOB_LAYERS.health.hint},{id:"models",label:"Observed Models"}],
+    active:active==="models"?"models":f.mobLayer||"combat",
+    change:key=>{f.mobView=key==="models"?"models":"archetypes";if(key!=="models")f.mobLayer=key;renderMobs()}});
+}
+function mobGroupFilter(groups,key,rerender){
+  const select=el("select",{"aria-label":"Group",onchange:event=>{state.filters[key]=event.target.value;rerender()}},
+    ...groups.map(([value,label])=>el("option",{value,selected:value===state.filters[key]},label)));
+  return LexeditorUI.detailField({label:"Group",control:select});
 }
 
 // Per-model evidence is read-only. The model -> archetype binding is in no data
@@ -53,18 +62,20 @@ const MOB_MODEL_STATS=[
   ["FireVulnerability","Fire vuln"],["MeleeProperties/KnockedOutHealthThreshold","KO at"],
 ];
 async function renderMobModels(){
+  const current=renderScope("renderMobModels");
   const f=state.filters;
   if(!state.mobModels)state.mobModels=await api("/api/mob-models");
+  if(!current())return;
   const data=state.mobModels,tb=$("#toolbar");tb.innerHTML="";
   if(!f.mobModelGroup)f.mobModelGroup="gang";
   const groups=[["gang","Gangs"],["ambient","Ambient"],["unique","Unique"],["scenario","Scenario"]];
   tb.append(mobViewTabs("models"),
-    el("div",{class:"mode-tabs"},...groups.map(([key,label])=>el("button",{class:key===f.mobModelGroup?"active":"",onclick:()=>{f.mobModelGroup=key;renderMobModels();}},label))),
+    mobGroupFilter(groups,"mobModelGroup",renderMobModels),
     el("input",{type:"text",placeholder:"Filter observed model…",value:f.mobModelQ||"",oninput:ev=>{f.mobModelQ=ev.target.value;filterRerender(ev,renderMobModels);}}));
   const m=$("#main");m.innerHTML="";
-  if(!data.probeAvailable){m.append(el("div",{class:"hint"},el("b",{},"No model observations are available. "),
+  if(!data.probeAvailable){m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},"No model observations are available. "),
     "MobProbe writes this read-only evidence after it sees models in the running game. Use Archetypes to edit the real combat and health data."));return;}
-  m.append(el("div",{class:"hint"},el("b",{},`MobProbe observed ${data.probedCount} models. `),
+  m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},`MobProbe observed ${data.probedCount} models. `),
     "Possible health profiles are shown only as candidates. Equal HP does not prove a model-to-profile binding."));
   const archetypes=state.mobs?.health?.records?.filter(r=>r.section==="HealthConfig")||[];
   const statOf=(name,field)=>{const rec=archetypes.find(r=>r.name===name);if(!rec)return "";
@@ -72,7 +83,7 @@ async function renderMobModels(){
   const q=(f.mobModelQ||"").toUpperCase();
   const rows=data.models.filter(r=>r.observedHealth!==null&&r.group===f.mobModelGroup&&(!q||r.model.includes(q)));
   tb.append(el("span",{class:"count"},`${rows.length} observed`));
-  if(!rows.length){m.append(el("div",{class:"hint"},"No observed models match this group and filter."));return;}
+  if(!rows.length){m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},"No observed models match this group and filter."));return;}
   const getters={model:r=>r.model,hp:r=>r.observedHealth??Infinity,archetype:r=>r.candidates.length===1?r.candidates[0]:""};
   m.append(columnList({class:"mob-model-table",align:"start",headerAlign:"start","aria-label":"Mob models",
     rows:sortedRows("mob-models",rows,getters),key:r=>r.model,localSort:false,
@@ -94,22 +105,19 @@ async function renderMobArchetypes(){
   const layer=MOB_LAYERS[layerKey],data=state.mobs[layer.file];
   const tb=$("#toolbar");tb.innerHTML="";
   tb.append(mobViewTabs("archetypes"),
-    el("div",{class:"subtabs"},...Object.entries(MOB_LAYERS).map(([key,info])=>
-      el("button",{class:key===layerKey?"active":"",onclick:()=>{f.mobLayer=key;renderMobs();}},info.label))),
-    el("div",{class:"mode-tabs"},...[["humans","Humans"],["animals","Animals"],["other","Other"]].map(([key,label])=>
-      el("button",{class:key===f.mobGroup?"active":"",onclick:()=>{f.mobGroup=key;renderMobs();}},label))),
+    mobGroupFilter([["humans","Humans"],["animals","Animals"],["other","Other"]],"mobGroup",renderMobs),
     el("input",{type:"text",placeholder:"Filter record…",value:f.mobQ||"",oninput:ev=>{f.mobQ=ev.target.value;filterRerender(ev,renderMobs);}}),
     savebar(saveMobs));
   const m=$("#main");m.innerHTML="";
   if(!data||!data.available)return noData(`No ${layerKey==="health"?"pedhealth.meta":"combatbehaviour.meta"} in this dataset and no vanilla extract to fall back on.`);
-  m.append(el("div",{class:"hint"},el("b",{},layer.label+": "),layer.hint,
+  m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},el("b",{},layer.label+": "),layer.hint,
     el("div",{class:"subtle"},`Source: ${data.source}. Accuracy is finished off by pedaccuracy.meta on the AI tab, which ships only companion and Default — that global stack is what halves incoming accuracy against a moving target.`)));
   const columns=layerKey==="health"?MOB_HEALTH_COLUMNS:MOB_COMBAT_COLUMNS;
   const q=(f.mobQ||"").toUpperCase();
   let rows=data.records.filter(r=>r.group===f.mobGroup&&(!q||r.name.toUpperCase().includes(q)));
   if(layerKey==="health")rows=rows.filter(r=>r.section==="HealthConfig");
   tb.insertBefore(el("span",{class:"count"},`${rows.length} record${rows.length===1?"":"s"}`),tb.querySelector(".savebar"));
-  if(!rows.length)return m.append(el("div",{class:"hint"},"Nothing in this group matches the filter."));
+  if(!rows.length)return m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},"Nothing in this group matches the filter."));
   const fieldOf=(record,name)=>record.fields.find(x=>x.field===name);
   const getters={name:r=>r.name};
   columns.forEach(col=>{getters[col[0]]=r=>{const hit=fieldOf(r,col[0]);if(!hit)return "";const n=parseFloat(hit.value);return Number.isFinite(n)&&String(n)!==""?n:hit.value;};});
