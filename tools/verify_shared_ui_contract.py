@@ -130,6 +130,9 @@ for plugin in sorted((ROOT / "games").iterdir()):
     if not (plugin / "editor.html").is_file():
         continue
     editor = (plugin / "editor.html").read_text(encoding="utf-8")
+    page_module = plugin / "editor.js"
+    if page_module.is_file():
+        editor += "\n" + page_module.read_text(encoding="utf-8")
     require("modLoaderSection(" in editor,
             f"{plugin.name} does not render the shared MOD LOADER section")
     for field in ("loader:", "output:", "order:", "safety:", "removal:"):

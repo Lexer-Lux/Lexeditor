@@ -371,6 +371,26 @@ def _overflow(page, label: str):
     assert geometry["main"] <= geometry["mainClient"] + 1, (label, "main overflow", geometry)
 
 
+def _assert_detail_owns_vertical_scroll(page, label: str):
+    geometry = page.evaluate("""() => {
+      const shell = document.querySelector('.lex-shell-header')?.getBoundingClientRect();
+      const main = document.querySelector('#main')?.getBoundingClientRect();
+      const detail = document.querySelector('.ffxx2-content .lex-detail-panel-body');
+      return {
+        documentTop: document.scrollingElement?.scrollTop || 0,
+        shellBottom: shell?.bottom || 0,
+        mainTop: main?.top || 0,
+        detailTop: detail?.scrollTop || 0,
+        detailHeight: detail?.clientHeight || 0,
+        detailScrollHeight: detail?.scrollHeight || 0,
+      };
+    }""")
+    assert geometry["documentTop"] <= 1, (label, "outer document scrolled", geometry)
+    assert geometry["mainTop"] + 1 >= geometry["shellBottom"], (label, "shell overlaps editor content", geometry)
+    assert geometry["detailScrollHeight"] > geometry["detailHeight"], (label, "tall Detail has no inner scroll range", geometry)
+    assert geometry["detailTop"] > 0, (label, "last control did not scroll the Detail body", geometry)
+
+
 def _open_dataset(page, group: str, dataset: str):
     page.get_by_role("button", name=group, exact=True).click()
     page.get_by_role("tab").filter(has_text=dataset).click()
@@ -439,6 +459,7 @@ def _exercise_tall_panels(page):
     last = page.get_by_label("Dressphere 0 ability 16", exact=True)
     last.scroll_into_view_if_needed()
     expect(last).to_be_visible()
+    _assert_detail_owns_vertical_scroll(page, "desktop:dresspheres")
     last.click()
     last.press("ControlOrMeta+A")
     last.press_sequentially(str(0x5ABC), delay=15)
@@ -449,6 +470,7 @@ def _exercise_tall_panels(page):
     final_mix = page.get_by_label("Partner 111 result command ID", exact=True)
     final_mix.scroll_into_view_if_needed()
     expect(final_mix).to_be_visible()
+    _assert_detail_owns_vertical_scroll(page, "desktop:mix")
 
 
 def _screenshot_all(page, output: Path, suffix: str):
@@ -502,11 +524,13 @@ def run(output: Path, executable: str | None) -> None:
             last = narrow.get_by_label("Dressphere 0 ability 16", exact=True)
             last.scroll_into_view_if_needed()
             expect(last).to_be_visible()
+            _assert_detail_owns_vertical_scroll(narrow, "narrow:dresspheres")
             narrow.screenshot(path=str(output / "dresspheres-narrow.png"))
             _open_dataset(narrow, "FFX Battle", "Rikku Mix Results")
             final_mix = narrow.get_by_label("Partner 111 result command ID", exact=True)
             final_mix.scroll_into_view_if_needed()
             expect(final_mix).to_be_visible()
+            _assert_detail_owns_vertical_scroll(narrow, "narrow:mix")
             _overflow(narrow, "narrow:mix")
             narrow.screenshot(path=str(output / "mix-narrow.png"))
             assert not narrow_errors, narrow_errors
@@ -522,12 +546,14 @@ def run(output: Path, executable: str | None) -> None:
             last = scaled.get_by_label("Dressphere 0 ability 16", exact=True)
             last.scroll_into_view_if_needed()
             expect(last).to_be_visible()
+            _assert_detail_owns_vertical_scroll(scaled, "150pct:dresspheres")
             _overflow(scaled, "150pct:dresspheres")
             scaled.screenshot(path=str(output / "dresspheres-150pct.png"))
             _open_dataset(scaled, "FFX Battle", "Rikku Mix Results")
             final_mix = scaled.get_by_label("Partner 111 result command ID", exact=True)
             final_mix.scroll_into_view_if_needed()
             expect(final_mix).to_be_visible()
+            _assert_detail_owns_vertical_scroll(scaled, "150pct:mix")
             _overflow(scaled, "150pct:mix")
             scaled.screenshot(path=str(output / "mix-150pct.png"))
             assert not scaled_errors, scaled_errors
