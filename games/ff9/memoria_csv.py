@@ -79,6 +79,23 @@ def _comment_text(suffix: list[str]) -> str:
     return text.strip()
 
 
+_FIELD_LABELS = {
+    "SPSExtraPos": "SPS Extra Position",
+    "SHPExtraPos": "SHP Extra Position",
+    "ColorBase": "Glow Base Color",
+}
+
+
+def _field_label(column: str) -> str:
+    if column in _FIELD_LABELS:
+        return _FIELD_LABELS[column]
+    value = column.replace("_", " ")
+    value = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", value)
+    value = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", value)
+    value = re.sub(r"(?<=[A-Za-z0-9])\(", " (", value)
+    return " ".join(value.split())
+
+
 class MemoriaCsvDocument:
     def __init__(self, path: Path):
         self.path = path
@@ -147,7 +164,7 @@ class MemoriaCsvDocument:
             normalized = declared.strip().casefold()
             values = [row["raw"][column].strip() for row in self.rows]
             descriptor: dict[str, Any] = {
-                "key": column, "label": column.replace("_", " "),
+                "key": column, "label": _field_label(column),
                 "declaredType": declared or "String",
                 # Id is source identity and Comment is an upstream annotation,
                 # not gameplay data. Neither should masquerade as a writable

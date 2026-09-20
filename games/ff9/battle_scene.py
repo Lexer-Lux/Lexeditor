@@ -1,8 +1,9 @@
 """Read vanilla FF9 battle scenes from p0data2 and write Memoria raw16 overlays.
 
-The Unity 5 archive layout follows Hades Workshop's public UnityArchiver parser;
-Lexeditor only reads the installed archive. Saves are standalone raw16 files in
-the selected Memoria project and never rewrite p0data2.bin.
+The Unity serialized-file/container facts used here were cross-checked against
+the permissively licensed UnityPy reader and Hades Workshop's published FF9
+research. No third-party parser or binary is bundled or invoked. Lexeditor only
+reads the installed archive; saves are standalone raw16 project overlays.
 """
 from __future__ import annotations
 

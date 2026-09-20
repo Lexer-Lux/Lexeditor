@@ -22,7 +22,7 @@ from typing import Callable
 
 from .memoria_patcher import inspect_payload, installation_files
 from .memoria_recovery import Recovery, atomic_json, digest, install_lock, root_key, verify_install
-from plugin_files import fetch_file
+from plugin_files import atomic_write, fetch_file
 
 LOCAL_DATA = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parents[2] / "out")) / "Lexeditor"
 STATE_PATH = LOCAL_DATA / "helpers" / "memoria.json"
@@ -35,7 +35,7 @@ REPOSITORY = "https://github.com/Albeoris/Memoria"
 ASSET_NAME = "Memoria.Patcher.exe"
 MAX_ASSET_BYTES = 120 * 1024 * 1024
 MANAGED_RELATIVE = Path("x64") / "FF9_Data" / "Managed"
-CONFIG_NAME = "Memoria.ini"
+CONFIG_NAME = "Memoria.ini"\nSETTINGS_NAME = "Settings.ini"
 Progress = Callable[[int, int, str], None]
 JsonFetcher = Callable[[str], dict]
 FileFetcher = Callable[[str, Path, "Progress | None"], None]
@@ -178,6 +178,71 @@ def installed_version(game_root: Path) -> str:
     return _binary_version(managed / "Memoria.Prime.dll") or _binary_version(managed / "Assembly-CSharp.dll")
 
 
+def _decode_ini(raw: bytes) -> tuple[str, str, bytes]:
+    if raw.startswith(b"\xef\xbb\xbf"):
+        return raw[3:].decode("utf-8"), "utf-8", b"\xef\xbb\xbf"
+    try:
+        return raw.decode("utf-8"), "utf-8", b""
+    except UnicodeDecodeError:
+        return raw.decode("cp1252"), "cp1252", b""
+
+
+def _disable_launcher_updates(raw: bytes) -> bytes:
+    """Disable Memoria's own automatic update checks without normalizing other settings."""
+    text, encoding, bom = _decode_ini(raw)
+    newline = "\r\n" if "\r\n" in text else "\n"
+    had_final = text.endswith(("\n", "\r"))
+    lines = text.splitlines()
+    section = None
+    section_end = len(lines)
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            if section is not None:
+                section_end = index
+                break
+            if stripped.casefold() == "[memoria]":
+                section = index
+    if section is None:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.extend(["[Memoria]", "CheckUpdates = False"])
+    else:
+        found = False
+        for index in range(section + 1, section_end):
+            match = re.match(r"^(\s*CheckUpdates\s*=\s*)([^;#]*?)(\s*(?:[;#].*)?)$", lines[index], flags=re.I)
+            if not match:
+                continue
+            lines[index] = match.group(1) + "False" + match.group(3)
+            found = True
+            break
+        if not found:
+            lines.insert(section_end, "CheckUpdates = False")
+    updated = newline.join(lines) + (newline if had_final else "")
+    return bom + updated.encode(encoding)
+
+
+def _launcher_updates_disabled(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    try:
+        text, _, _ = _decode_ini(path.read_bytes())
+    except (OSError, UnicodeError):
+        return False
+    section = ""
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            section = stripped[1:-1].strip().casefold()
+            continue
+        if section != "memoria":
+            continue
+        match = re.match(r"^\s*CheckUpdates\s*=\s*([^;#]+)", line, flags=re.I)
+        if match:
+            return match.group(1).strip().casefold() in {"false", "0", "no", "off"}
+    return False
+
+
 def _control_root(state_path: Path) -> Path:
     return Path(state_path).parent / "memoria-transactions"
 
@@ -188,7 +253,7 @@ def _pending(root: Path, state_path: Path) -> Path:
 
 def status(game_root: Path, state_path: Path = STATE_PATH) -> dict:
     root = Path(game_root).resolve()
-    config, managed = root / CONFIG_NAME, root / MANAGED_RELATIVE
+    config, settings, managed = root / CONFIG_NAME, root / SETTINGS_NAME, root / MANAGED_RELATIVE
     assemblies = sorted(path.name for path in managed.glob("Memoria*.dll") if path.is_file()) if managed.is_dir() else []
     installed = config.is_file() and bool(assemblies) and (managed / "Assembly-CSharp.dll").is_file()
     record = _state_for_root(root, state_path)
@@ -204,7 +269,8 @@ def status(game_root: Path, state_path: Path = STATE_PATH) -> dict:
     pending = _read_state(_pending(root, state_path))
     return {"runtime": "Memoria", "installed": installed, "configured": config.is_file(),
             "assemblies": assemblies, "version": version, "pinned": PINNED_RELEASE,
-            "managedPath": str(managed), "configPath": str(config), "source": REPOSITORY,
+            "managedPath": str(managed), "configPath": str(config), "settingsPath": str(settings),
+            "updatesDisabled": _launcher_updates_disabled(settings), "source": REPOSITORY,
             "lastInstalled": str(record.get("installed", "")) if recorded else "",
             "recoveryRequired": bool(pending), "recoveryBackup": str(pending.get("journal", "")),
             "message": ("An interrupted Memoria installation needs recovery before further changes." if pending else
@@ -261,6 +327,8 @@ def install(game_root: Path, *, fetch_json: JsonFetcher = _fetch_json,
             raise RuntimeError("Recover the interrupted Memoria installation before installing again")
         patcher, published = stage(fetch_json=fetch_json, fetch_file=fetch_file, cache_root=cache_root, progress=progress)
         files = installation_files(inspect_payload(patcher), root)
+        if not any(Path(entry.relative_path).name.casefold() == SETTINGS_NAME.casefold() for entry in files):
+            raise RuntimeError("The pinned Memoria patcher does not contain Settings.ini; automatic update checks cannot be disabled safely")
         _require_closed(root)  # The player may have started FF9 during download.
         recovery = Recovery.prepare(root, files, _control_root(state_path) / "backups")
         atomic_json(pointer, {"journal": str(recovery.journal), "root": str(root)})
@@ -280,11 +348,18 @@ def install(game_root: Path, *, fetch_json: JsonFetcher = _fetch_json,
             _require_closed(root)
             verify_install(root, files)
             recovery.preserve_config()
-            if not status(root, state_path)["installed"]:
+            settings = root / SETTINGS_NAME
+            if not settings.is_file():
+                raise RuntimeError("The Memoria patcher did not produce Settings.ini")
+            atomic_write(settings, _disable_launcher_updates(settings.read_bytes()))
+            current_status = status(root, state_path)
+            if not current_status["installed"]:
                 raise RuntimeError("The Memoria patcher did not produce a usable x64 runtime")
+            if not current_status["updatesDisabled"]:
+                raise RuntimeError("Memoria automatic update checks are still enabled")
             managed = root / MANAGED_RELATIVE
             runtime_hashes = {name: digest(managed / name) for name in
-                              ["Assembly-CSharp.dll", *status(root, state_path)["assemblies"]]}
+                              ["Assembly-CSharp.dll", *current_status["assemblies"]]}
             with install_lock(Path(state_path), _control_root(state_path) / "state-locks"):
                 state = _read_state(state_path)
                 entries = state.get("installations", {})

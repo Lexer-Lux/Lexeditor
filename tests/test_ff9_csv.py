@@ -265,3 +265,16 @@ def test_comments_are_source_annotations_not_editable_gameplay_fields(store):
 def test_no_id_tables_never_invent_a_displayed_record_id(store, key, data, expected):
     fixture(store, key, data)
     assert store.load(key)["rows"][0]["id"] == expected
+
+
+def test_field_labels_are_humanized_without_changing_keys(store):
+    fixture(store, "status-data",
+            b"# Comment;Id;SPSExtraPos;SHPExtraPos;ColorBase\n"
+            b"# ;Int32;Vector3;Vector3;Int32[3]\n"
+            b"Petrify;0;1, 2, 3;4, 5, 6;-48, -72, -88;# Petrify\n")
+    loaded = store.load("status-data")
+    labels = {field["key"]: field["label"] for field in loaded["fields"]}
+    assert labels["SPSExtraPos"] == "SPS Extra Position"
+    assert labels["SHPExtraPos"] == "SHP Extra Position"
+    assert labels["ColorBase"] == "Glow Base Color"
+    assert csv._field_label("DefaultCommandSet") == "Default Command Set"

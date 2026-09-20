@@ -1,0 +1,188 @@
+"""Rendered FF9 acceptance using the real loopback service and synthetic fixtures only."""
+from __future__ import annotations
+
+import hashlib
+from pathlib import Path
+import runpy
+import shutil
+import sys
+import tempfile
+
+from playwright.sync_api import expect, sync_playwright
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from games.ff9 import memoria_baseline
+from games.ff9.plugin import FF9Session
+
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "ff9-browser"
+OUT.mkdir(parents=True, exist_ok=True)
+archive = runpy.run_path(str(ROOT / "tests" / "test_ff9_battle_scene.py"))["archive"]
+
+
+def csv_bytes(relative: str) -> bytes:
+    if relative == "Items/Items.csv":
+        rows = []
+        for item_id in range(36):
+            price = 250 + item_id
+            rows.append(
+                f"{item_id};{item_id};-1;-1;{price};{price//2};0;0;1;0;;"
+                + ";".join("1" if flag == 0 else "0" for flag in range(8))
+                + f";{item_id};" + ";".join("1" if char == 0 else "0" for char in range(12))
+                + f";# Item {item_id:02d}\n"
+            )
+        return (
+            "# Id;WeaponId;ArmorId;EffectId;Price;SellingPrice;GraphicsId;ColorId;Quality;BonusId;AbilityIds;"
+            "Weapon;Armlet;Helmet;Armor;Accessory;Item;Gem;Usable;Order;Zidane;Vivi;Garnet;Steiner;Freya;Quina;Eiko;Amarant;Cinna;Marcus;Blank;Beatrix\n"
+            "# Int32;Int32;Int32;Int32;UInt32;Int32;UInt8;UInt8;Single;Int32;Ability[];"
+            "Bit;Bit;Bit;Bit;Bit;Bit;Bit;Bit;Single;Bit;Bit;Bit;Bit;Bit;Bit;Bit;Bit;Bit;Bit;Bit;Bit\n"
+            + "".join(rows)
+        ).encode()
+    if relative == "Battle/Actions.csv":
+        return (
+            "# Comment;id;menuWindow;targets;defaultAlly;forDead;defaultOnDead;defaultCamera;animationId1;animationId2;scriptId;power;elements;rate;category;statusIndex;mp;type;commandTitle\n"
+            "# ;Int32;UInt8;UInt8;Boolean;Boolean;Boolean;Boolean;Int16;UInt16;Int32;Int32;UInt8;Int32;UInt8;Int32;Int32;UInt8;UInt8\n"
+            "Fire;1;Hp(1);SingleEnemy(2);0;0;0;0;1;2;3;16;1;100;0;0;6;1;255;# Fire\n"
+            "Cure;2;Hp(1);ManyAny(3);1;1;0;0;9;8;10;16;0;0;71;0;6;1;255;# Cure\n"
+        ).encode()
+    if relative == "Battle/StatusData.csv":
+        return (
+            "# Comment;Id;Priority(unused);OprCount(tick);ContiCount(duration);ClearOnApply;ImmunityProvided;SPSEffect;SPSAttach;SPSExtraPos;SHPEffect;SHPAttach;SHPExtraPos;ColorKind;ColorPriority;ColorBase\n"
+            "# ;Int32;UInt8;UInt8;UInt16;Status[];Status[];Int32;Int32;Vector3;Int32;Int32;Vector3;Int32;Int32;Int32[3]\n"
+            "Petrify;0;2;0;0;;;-1;0;1, 2, 3;-1;0;4, 5, 6;-1;0;-48, -72, -88;# Petrify\n"
+        ).encode()
+    if relative == "Characters/Leveling.csv":
+        return b"# Experience;BonusHP;BonusMP\n# UInt32;UInt16;UInt16\n0;250;200;# Level 1\n16;314;206;# Level 2\n"
+    if relative == "World/TransportControls.csv":
+        return b"# type;flg_gake;speed_move;flg_fly;encount;radius\n# Byte;Byte;Int16;Boolean;Boolean;Int16\n0;0;112;0;1;0;# Walking\n"
+    if relative == "World/WeatherColors.csv":
+        return b"# light0.vx;light0.vy;light0.vz;fogAMP;offsetX;scaleY\n# Int16;Int16;Int16;UInt16;Single;Single\n100;100;100;4096;0;0;# Daylight 0\n"
+    if relative == "Items/ShopItems.csv":
+        return b"# Comment;Id;Items\n# ;Int32;Int32[]\nShop 0000;0;1, 2;# Shop 0000 Test Shop\n"
+    return b"# Id;Value\n# Int32;UInt8\n0;1;# Synthetic\n"
+
+
+def field(page, label: str):
+    row = page.locator(".lex-detail-field").filter(has=page.get_by_text(label, exact=True)).first
+    expect(row).to_be_visible()
+    return row
+
+
+with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
+    temp = Path(name)
+    game, project, data_root = temp / "game", temp / "project", temp / "data"
+    for relative in ("FF9_Launcher.exe", "x64/FF9.exe", "x64/FF9_Data/Managed/Assembly-CSharp.dll"):
+        target = game / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"synthetic")
+    target = game / "StreamingAssets/p0data2.bin"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(archive())
+    (project / "StreamingAssets/Data").mkdir(parents=True)
+
+    hashes = {}
+    for relative in memoria_baseline.FILES:
+        payload = csv_bytes(relative)
+        target = data_root / "StreamingAssets/Data" / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+        hashes[relative] = hashlib.sha256(payload).hexdigest()
+
+    shim = temp / "shim"
+    shim.mkdir()
+    (shim / "sitecustomize.py").write_text(
+        "from games.ff9 import memoria_baseline as b\n" + f"b.FILES={hashes!r}\nb._last=None\n",
+        encoding="utf-8",
+    )
+    separator = ";" if sys.platform == "win32" else ":"
+    env = {
+        "LEXEDITOR_FF9_ROOT": str(game),
+        "LEXEDITOR_FF9_DATA_ROOT": str(data_root),
+        "LEXEDITOR_FF9_PROJECT": str(project),
+        "LOCALAPPDATA": str(temp / "local"),
+        "PYTHONPATH": str(shim) + separator + str(ROOT),
+    }
+    errors = []
+    with FF9Session(env) as session, sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True, args=["--no-sandbox"])
+        try:
+            page = browser.new_page(viewport={"width": 1440, "height": 900})
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.goto(session.url, wait_until="domcontentloaded")
+            page.wait_for_function("typeof state==='object'&&state.dashboard&&typeof shell==='object'")
+            page.wait_for_selector(".lex-paged-list-detail")
+            assert page.locator(".lex-column-list-row").count() >= 10
+
+            price = field(page, "PRICE").locator('input[type="number"]').first
+            expect(price).to_have_value("250")
+            save = page.locator("#global-save")
+            price.fill("333")
+            expect(save).to_be_enabled()
+            save.click(button="right")
+            page.get_by_role("button", name="Discard Changes", exact=True).click()
+            expect(price).to_have_value("250")
+            expect(save).to_be_disabled()
+
+            price.fill("333")
+            save.click()
+            page.wait_for_function("dirtyCount()===0")
+            overlay = project / "StreamingAssets/Data/Items/Items.csv"
+            assert overlay.is_file() and b"0;0;-1;-1;333;" in overlay.read_bytes()
+            page.reload(wait_until="domcontentloaded")
+            page.wait_for_selector(".lex-paged-list-detail")
+            expect(field(page, "PRICE").locator('input[type="number"]').first).to_have_value("333")
+
+            page.evaluate("navigate('magic')")
+            page.wait_for_function("state.datasets.actions?.rows?.length===2")
+            targets = field(page, "TARGETS").locator("select")
+            expect(targets).to_have_value("SingleEnemy(2)")
+            assert set(targets.locator("option").all_text_contents()) == {"SingleEnemy(2)", "ManyAny(3)"}
+            page.evaluate("state.datasetChoice.magic='status-data';render()")
+            page.wait_for_function("state.datasets['status-data']?.rows?.length===1")
+            expect(field(page, "SPS EXTRA POSITION").locator('input[type="number"]')).to_have_count(3)
+            expect(field(page, "GLOW BASE COLOR").locator('input[type="number"]')).to_have_count(3)
+
+            page.evaluate("navigate('world')")
+            page.wait_for_function("state.datasets['world-transport']?.rows?.length===1")
+            assert "ID" not in page.locator(".lex-column-list-header").inner_text().split()
+            assert page.locator(".lex-detail-panel-heading .lex-record-id").count() == 0
+
+            page.evaluate("navigate('encounters')")
+            page.wait_for_function("state.datasets.encounters?.rows?.length===1")
+            expect(field(page, "MONSTER COUNT").locator('input[type="number"]').first).to_have_attribute("max", "4")
+            expect(field(page, "ENEMY 1 TYPE").locator('input[type="number"]').first).to_have_attribute("max", "0")
+
+            page.locator("#plugin-data-map").click()
+            page.wait_for_selector(".lex-data-map-view")
+            map_text = page.locator(".lex-data-map-view").inner_text()
+            assert "BattleScene" in map_text and "Other vanilla Unity asset-container content" in map_text
+            page.screenshot(path=str(OUT / "ff9-wide.png"), full_page=True)
+
+            page.set_viewport_size({"width": 820, "height": 700})
+            page.evaluate("navigate('items')")
+            page.wait_for_selector(".lex-paged-list-detail")
+            metrics = page.evaluate("()=>({body:document.body.scrollWidth,viewport:innerWidth,main:document.querySelector('main').scrollWidth,width:document.querySelector('main').clientWidth})")
+            assert metrics["body"] <= metrics["viewport"] + 2 and metrics["main"] <= metrics["width"] + 2, metrics
+            page.screenshot(path=str(OUT / "ff9-narrow.png"), full_page=True)
+
+            page.set_viewport_size({"width": 1000, "height": 700})
+            page.evaluate("document.documentElement.style.zoom='1.25';navigate('items')")
+            page.wait_for_selector(".lex-paged-list-detail")
+            expect(page.locator("#global-save")).to_be_visible()
+            page.screenshot(path=str(OUT / "ff9-scale-125.png"), full_page=True)
+            page.evaluate("document.documentElement.style.zoom='1'")
+
+            page.evaluate("document.querySelector('#main').replaceChildren(statusPanel('Actions','Verified source','Loading records…'))")
+            expect(page.get_by_text("Loading records…", exact=True)).to_be_visible()
+            page.evaluate("state.datasets.actions={key:'actions',unavailable:true,error:'Synthetic source failure'};renderDataset(state.datasets.actions,'actions')")
+            expect(page.get_by_text("Synthetic source failure", exact=True)).to_be_visible()
+            expect(page.get_by_text("Source currently unavailable", exact=True)).to_be_visible()
+            page.screenshot(path=str(OUT / "ff9-error.png"), full_page=True)
+        finally:
+            browser.close()
+    assert session.wait_closed(), "FF9 browser child service did not close"
+    assert not errors, errors
+
+print("FF9 rendered browser acceptance passed")

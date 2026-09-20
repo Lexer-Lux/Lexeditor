@@ -264,6 +264,10 @@
         detailField({label:"STATE",control:value(state.busy?"Working…":runtime.recoveryRequired?"Recovery required":runtime.installed?"Installed":"Not installed"),help:infoHelp(runtime.message||"")}),
         detailField({label:"VERSION",control:value(runtime.version||"Unknown")}),
         detailField({label:"PINNED RELEASE",control:value(runtime.pinned||"—")}),
+        detailField({label:"UPDATES",control:value(runtime.installed
+          ?(runtime.updatesDisabled?"Memoria automatic checks disabled":"Memoria automatic checks need repair")
+          :"Pinned installs are managed by Lexeditor"),
+          help:infoHelp("Lexeditor pins Memoria and reports newer upstream releases through the shared Updates drawer. Memoria's own automatic update check is disabled after install so the runtime cannot silently move away from the tested version.")}),
         detailField({label:"ACTIONS",control:actions,help:infoHelp("Play opens Memoria's launcher, where its own settings can be edited. Installation keeps recovery copies and preserves existing INI files.")}),
         ...(runtime.recoveryRequired?[detailField({label:"RECOVERY COPY",control:value(runtime.recoveryBackup)})]:[]),
         ...(state.runtimeError?[el("p",{role:"alert"},state.runtimeError)]:[]),

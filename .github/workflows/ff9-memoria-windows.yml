@@ -52,14 +52,18 @@ jobs:
 
               installed = manager.install(root, state_path=state, cache_root=cache)
               assert installed["installed"], installed
+              assert installed["updatesDisabled"], installed
               assert (root / "Memoria.ini").read_bytes() == original_ini
+              assert "CheckUpdates = False" in (root / "Settings.ini").read_text(encoding="utf-8-sig")
               for platform in ("x64", "x86"):
                   assert (root / platform / "FF9_Data" / "Managed" / "Memoria.Prime.dll").is_file()
               assert (root / "FF9_Launcher.exe").stat().st_size > len(b"synthetic launcher marker")
 
               reinstalled = manager.install(root, state_path=state, cache_root=cache)
               assert reinstalled["installed"]
+              assert reinstalled["updatesDisabled"], reinstalled
               assert (root / "Memoria.ini").read_bytes() == original_ini
+              assert "CheckUpdates = False" in (root / "Settings.ini").read_text(encoding="utf-8-sig")
               assert reinstalled["lastInstalled"]
               print(json.dumps({"version": reinstalled["version"],
                                 "pinned": reinstalled["pinned"],
