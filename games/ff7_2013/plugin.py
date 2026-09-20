@@ -11,7 +11,7 @@ from pathlib import Path
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from service_session import LocalPluginSession, request_json
-from games.ff7.plugin import prepare_product, kernel_save_payload
+from games.ff7.plugin import PLUGIN as SHARED_PLUGIN, prepare_product, kernel_save_payload
 from games.ff7.kernel import Kernel, resolve_kernel
 
 
@@ -27,13 +27,6 @@ DEFAULT_PROJECT = Path(os.environ.get(
 PROJECT_TEMPLATE = DEFAULT_DATA / "project-template"
 PROJECT_KERNEL_PATH = Path("data/lang-en/kernel/KERNEL.BIN")
 
-PROJECT_CONTENT_TYPES = (
-    ("Kernel data", (".bin",)),
-    ("Field and world data", (".lgp", ".flevel", ".tex")),
-    ("Textures", (".png", ".dds")),
-    ("Audio", (".ogg", ".wav")),
-    ("Executable text", (".exe",)),
-)
 
 
 def check() -> list[str]:
@@ -144,7 +137,7 @@ PLUGIN = GamePlugin(
     plugin_id="ff7-2013",
     name="Final Fantasy 7 (Original)",
     subtitle="FFVII 2013",
-    description="Uses the shared structured FFVII editors for the 2013 Steam release; project saves keep installed game data unchanged.",
+    description="Uses the shared structured FFVII editors for the English 2013 Steam release; project saves keep installed game data unchanged.",
     accent="#3155b7",
     cover_art=LEXEDITOR_ROOT / "assets" / "covers" / "ff7-original.png",
     check=check,
@@ -157,7 +150,7 @@ PLUGIN = GamePlugin(
         default_root=DEFAULT_PROJECT,
         required_paths=(PROJECT_KERNEL_PATH.as_posix(),),
         template_root=PROJECT_TEMPLATE,
-        content_types=PROJECT_CONTENT_TYPES,
+        content_types=SHARED_PLUGIN.projects.content_types,
     ),
     installation=GameInstallSpec(
         root_env="LEXEDITOR_FF7_2013_ROOT",
