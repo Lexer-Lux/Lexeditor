@@ -259,26 +259,49 @@
     state.submoduleIndex=Math.max(0,Math.min(state.submoduleIndex,state.module.submodules.length-1));render();refresh();
   }
   function renderSubmodules(){
-    const rows=state.module.submodules||[];
-    const record=rows[state.submoduleIndex];
-    const master=el("div",{class:"bl-master"},
-      el("div",{class:"bl-master-head"},el("strong",{},"Submodules"),el("button",{type:"button",onclick:addSubmodule},"+ Add")),
-      el("div",{class:"bl-list"},...rows.map((row,index)=>el("button",{type:"button",class:`bl-item${index===state.submoduleIndex?" active":""}`,onclick:()=>{state.submoduleIndex=index;render()}},
-        row.name||"(new submodule)",el("small",{},row.dllName||row.classType||"No DLL/class yet"))))
-    );
-    const detail=!record?el("div",{class:"bl-detail"},el("div",{class:"bl-empty"},"Select or add a submodule.")):el("div",{class:"bl-detail"},
-      el("section",{class:"bl-panel"},el("h2",{},record.name||"New submodule"),
-        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeSubmodule},"Remove")),
-        el("div",{class:"bl-grid"},
-          ...fieldRow("Name",textInput(record.name,value=>record.name=value)),
-          ...fieldRow("DLL name",textInput(record.dllName,value=>record.dllName=value)),
-          ...fieldRow("Class type",textInput(record.classType,value=>record.classType=value))
-        ),
-        el("h2",{},"Assemblies"),renderAssemblies(record),
-        el("div",{class:"bl-note"},"Additional assemblies declared under this SubModule are preserved and edited as explicit DLL names."),
-        el("h2",{},"Tags"),renderTags(record)
-      ));
-    main.replaceChildren(el("div",{class:"bl-split"},master,detail));
+    const items=(state.module.submodules||[]).map((row,index)=>({
+      index,row,name:row.name||"",dllName:row.dllName||"",classType:row.classType||"",
+      searchText:`${row.name||""} ${row.dllName||""} ${row.classType||""}`
+    }));
+    const columns=[
+      {key:"name",label:"Name",edit:(item,value)=>{item.row.name=String(value);refresh()},editValue:item=>item.row.name},
+      {key:"dllName",label:"DLL",edit:(item,value)=>{item.row.dllName=String(value);refresh()},editValue:item=>item.row.dllName},
+      {key:"classType",label:"Class type",edit:(item,value)=>{item.row.classType=String(value);refresh()},editValue:item=>item.row.classType}
+    ];
+    const detail=item=>{
+      const row=item.row;
+      const assemblies=(row.assemblies||[]).map((assembly,index)=>({index,assembly,value:assembly.value||""}));
+      const tags=(row.tags||[]).map((tag,index)=>({index,tag,key:tag.key||"",value:tag.value||""}));
+      return BLUI.detailPanel({
+        title:row.name||"Submodule",renameRecord:value=>{row.name=value;refresh()},identity:row.dllName||null,
+        actions:[uiButton("Remove submodule",()=>{state.submoduleIndex=item.index;removeSubmodule()},{danger:true})],
+        body:[
+          BLUI.detailSection({title:"ENTRY POINT",body:[
+            textField("DLL name",row.dllName||"",value=>row.dllName=value,"Assembly Bannerlord loads for this submodule."),
+            textField("Class type",row.classType||"",value=>row.classType=value,"Fully qualified MBSubModuleBase class Bannerlord instantiates.")
+          ]}),
+          BLUI.detailSection({title:"ASSEMBLIES",help:BLUI.infoHelp("Additional assemblies explicitly declared under this SubModule."),body:[
+            BLUI.columnList({rows:assemblies,key:item=>item.index,selected:null,columns:[
+              {key:"value",label:"DLL",edit:(item,value)=>{item.assembly.value=String(value);refresh()},editValue:item=>item.assembly.value},
+              {key:"remove",label:"",sortable:false,render:item=>uiButton("Remove",()=>{row.assemblies.splice(item.index,1);render();refresh()},{danger:true})}
+            ],refresh:()=>{render();refresh()},class:"bannerlord-nested-table","aria-label":"Submodule assemblies"}),
+            el("div",{class:"bannerlord-inline-actions"},uiButton("Add assembly",()=>addAssembly(row)))
+          ]}),
+          BLUI.detailSection({title:"TAGS",help:BLUI.infoHelp("Bannerlord SubModule tags are preserved as explicit key/value pairs, including unknown attributes outside the edited values."),body:[
+            BLUI.columnList({rows:tags,key:item=>item.index,selected:null,columns:[
+              {key:"key",label:"Key",edit:(item,value)=>{item.tag.key=String(value);refresh()},editValue:item=>item.tag.key},
+              {key:"value",label:"Value",edit:(item,value)=>{item.tag.value=String(value);refresh()},editValue:item=>item.tag.value},
+              {key:"remove",label:"",sortable:false,render:item=>uiButton("Remove",()=>{row.tags.splice(item.index,1);render();refresh()},{danger:true})}
+            ],refresh:()=>{render();refresh()},class:"bannerlord-nested-table","aria-label":"Submodule tags"}),
+            el("div",{class:"bannerlord-inline-actions"},uiButton("Add tag",()=>addTag(row)))
+          ]})
+        ]
+      });
+    };
+    main.replaceChildren(tableView({
+      key:"submodules",rows:items,keyOf:item=>item.index,columns,detail,noun:"submodules",placeholder:"Search submodules…",
+      selected:state.submoduleIndex,setSelected:value=>state.submoduleIndex=Number(value),filters:[uiButton("+ Add",addSubmodule)]
+    }));
   }
 
   function addGameType(xml){
@@ -304,22 +327,38 @@
     state.xmlIndex=Math.max(0,Math.min(state.xmlIndex,state.module.xmls.length-1));render();refresh();
   }
   function renderXmls(){
-    const rows=state.module.xmls||[];
-    const record=rows[state.xmlIndex];
-    const master=el("div",{class:"bl-master"},
-      el("div",{class:"bl-master-head"},el("strong",{},"XML registrations"),el("button",{type:"button",onclick:addXml},"+ Add")),
-      el("div",{class:"bl-list"},...rows.map((row,index)=>el("button",{type:"button",class:`bl-item${index===state.xmlIndex?" active":""}`,onclick:()=>{state.xmlIndex=index;render()}},
-        row.id||"(new XML)",el("small",{},row.path||"No path yet"))))
-    );
-    const detail=!record?el("div",{class:"bl-detail"},el("div",{class:"bl-empty"},"No Xmls/XmlNode registrations in this project.")):el("div",{class:"bl-detail"},
-      el("section",{class:"bl-panel"},el("h2",{},record.id||"New XML registration"),
-        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeXml},"Remove")),
-        el("div",{class:"bl-grid"},
-          ...fieldRow("ID",textInput(record.id,value=>record.id=value)),
-          ...fieldRow("Path",textInput(record.path,value=>record.path=value))
-        ),
-        el("h2",{},"Included game types"),renderGameTypes(record),
-        el("div",{class:"bl-note"},"New XML registrations require at least one IncludedGameTypes/GameType entry; Lexeditor will not guess Campaign or another game type for you.")
-      ));
-    main.replaceChildren(el("div",{class:"bl-split"},master,detail));
+    const items=(state.module.xmls||[]).map((row,index)=>({
+      index,row,id:row.id||"",path:row.path||"",gameTypes:(row.includedGameTypes||[]).map(value=>value.value).join(", "),
+      searchText:`${row.id||""} ${row.path||""} ${(row.includedGameTypes||[]).map(value=>value.value).join(" ")}`
+    }));
+    const columns=[
+      {key:"id",label:"Internal name",edit:(item,value)=>{item.row.id=String(value);refresh()},editValue:item=>item.row.id},
+      {key:"path",label:"Resource path",edit:(item,value)=>{item.row.path=String(value);refresh()},editValue:item=>item.row.path},
+      {key:"gameTypes",label:"Game types"}
+    ];
+    const detail=item=>{
+      const row=item.row;
+      const types=(row.includedGameTypes||[]).map((entry,index)=>({index,entry,value:entry.value||""}));
+      return BLUI.detailPanel({
+        title:row.id||"XML registration",meta:row.path||"",
+        actions:[uiButton("Remove registration",()=>{state.xmlIndex=item.index;removeXml()},{danger:true})],
+        body:[
+          BLUI.detailSection({title:"REGISTRATION",body:[
+            textField("Internal name",row.id||"",value=>row.id=value,"Bannerlord's XML registration identifier."),
+            textField("Resource path",row.path||"",value=>row.path=value,"Module-relative registered XML resource path.")
+          ]}),
+          BLUI.detailSection({title:"INCLUDED GAME TYPES",help:BLUI.infoHelp("Every newly-created registration must name at least one game type. Lexeditor does not guess Campaign or another type."),body:[
+            BLUI.columnList({rows:types,key:value=>value.index,selected:null,columns:[
+              {key:"value",label:"Game type",edit:(value,next)=>{value.entry.value=String(next);refresh()},editValue:value=>value.entry.value},
+              {key:"remove",label:"",sortable:false,render:value=>uiButton("Remove",()=>{row.includedGameTypes.splice(value.index,1);render();refresh()},{danger:true})}
+            ],refresh:()=>{render();refresh()},class:"bannerlord-nested-table","aria-label":"Included Bannerlord game types"}),
+            el("div",{class:"bannerlord-inline-actions"},uiButton("Add game type",()=>addGameType(row)))
+          ]})
+        ]
+      });
+    };
+    main.replaceChildren(tableView({
+      key:"xmls",rows:items,keyOf:item=>item.index,columns,detail,noun:"XML registrations",placeholder:"Search XML registrations…",
+      selected:state.xmlIndex,setSelected:value=>state.xmlIndex=Number(value),filters:[uiButton("+ Add",addXml)]
+    }));
   }
