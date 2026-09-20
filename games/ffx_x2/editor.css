@@ -2,7 +2,7 @@
   --ffxx2-blue:#5f8fd3;
   --ffxx2-deep:#10182b;
 }
-html,body{height:100%;margin:0}
+html,body{height:100%;margin:0;overflow:hidden}
 body{
   background:
     radial-gradient(circle at 76% 6%,color-mix(in srgb,var(--lex-accent) 20%,transparent),transparent 33%),
