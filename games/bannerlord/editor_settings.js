@@ -8,37 +8,28 @@ const dirtyCountWithoutMcm=dirtyCount;
 dirtyCount=function(){return dirtyCountWithoutMcm()+Number(mcmDirty())};
 
 function renderMcmDefaults(){
-  if(!state.mcmDefaults?.available){
-    main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"MCM Defaults"),el("div",{class:"bl-empty"},"This project does not contain typed MCM defaults in src/LexerSkillTweaksSettings.cs.")));return
-  }
-  const rows=state.mcmDefaults.settings||[];
-  const record=rows[state.mcmIndex];
-  const master=el("div",{class:"bl-master"},
-    el("div",{class:"bl-master-head"},el("strong",{},`MCM Defaults (${rows.length})`)),
-    el("div",{class:"bl-list"},...rows.map((row,index)=>el("button",{type:"button",class:`bl-item${index===state.mcmIndex?" active":""}`,onclick:()=>{state.mcmIndex=index;render()}},
-      row.label,el("small",{},`${row.group} · ${row.kind}${row.requireRestart?" · restart":""}`))))
-  );
-  let control=null;
-  if(record){
-    if(record.kind==="bool")control=checkbox(record.default,value=>record.default=value);
-    else control=numberInput(record.default,value=>record.default=record.kind==="int"?Math.round(value):value,{
-      min:record.min,max:record.max,step:record.kind==="int"?1:"any"
+  if(!state.mcmDefaults?.available){main.replaceChildren(uiEmpty("Tweaks","This project does not contain typed MCM defaults in src/LexerSkillTweaksSettings.cs."));return}
+  const grouped=new Map();
+  for(const row of state.mcmDefaults.settings||[]){const group=row.group||"Other";if(!grouped.has(group))grouped.set(group,[]);grouped.get(group).push(row)}
+  const cards=[...grouped].map(([group,rows])=>BLUI.detailSection({title:group,body:rows.map(row=>{
+    let control;
+    if(row.kind==="bool")control=checkbox(row.default,value=>row.default=value);
+    else control=numberInput(row.default,value=>row.default=row.kind==="int"?Math.round(value):value,{min:row.min,max:row.max,step:row.kind==="int"?1:"any"});
+    const explanation=[row.hint||"",row.requireRestart?"Requires a restart before Bannerlord uses the new default.":"Changes the C# default for new or unspecified MCM profile values; it does not overwrite an existing player's saved MCM profile."].filter(Boolean).join(" ");
+    return BLUI.detailField({
+      label:row.label,control,
+      min:row.kind==="bool"?undefined:row.min,max:row.kind==="bool"?undefined:row.max,
+      dataType:row.kind==="bool"?"BOOL":row.kind==="int"?"INT":"FLOAT",
+      help:BLUI.infoHelp(explanation)
     });
-  }
-  const detail=!record?el("div",{class:"bl-detail"},el("div",{class:"bl-empty"},"No supported MCM defaults parsed.")):el("div",{class:"bl-detail"},
-    el("section",{class:"bl-panel"},el("h2",{},record.label),
-      el("div",{class:"bl-grid"},
-        ...fieldRow("Property",el("code",{},record.property)),
-        ...fieldRow("Group",record.group),
-        ...fieldRow("Default",control),
-        ...(record.kind==="bool"?[]:fieldRow("Range",`${record.min} to ${record.max}`)),
-        ...fieldRow("Restart required",record.requireRestart?"Yes":"No"),
-        ...fieldRow("Source expression",el("code",{},record.defaultExpression||"implicit language default"))
-      ),
-      el("div",{class:"bl-note"},record.hint||"No MCM hint text."),
-      el("div",{class:"bl-note"},"This edits the C# default backing field, not your currently saved MCM user profile. Lexeditor derives the control type and bounds from the SettingProperty attribute and refuses out-of-range writes.")
-    ));
-  main.replaceChildren(el("div",{class:"bl-split"},master,detail));
+  })}));
+  const pageSize=6,pages=Math.max(1,Math.ceil(cards.length/pageSize));
+  state.tweakPage=Math.max(0,Math.min(state.tweakPage,pages-1));
+  const shown=cards.slice(state.tweakPage*pageSize,(state.tweakPage+1)*pageSize);
+  main.replaceChildren(el("div",{class:"bannerlord-tweaks-page"},
+    BLUI.settingsColumns(shown,{className:"bannerlord-tweaks"}),
+    BLUI.pager({page:state.tweakPage,pages,total:cards.length,pageSize,change:value=>{state.tweakPage=value;render()}})
+  ));
 }
 
 renderDataMap=function(){
