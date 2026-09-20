@@ -190,6 +190,26 @@
           "name": "Microsoft / DirectX Shader Compiler",
           "role": "dxc, dxcompiler and dxil, shipped inside the Shader Injector release to recompile its shaders.",
           "url": "https://github.com/microsoft/DirectXShaderCompiler"
+        },
+        {
+          "name": "Yoraiz0r / FF7RebirthDataObjectEditor",
+          "role": "MIT-licensed Rebirth editor used as a public behavior cross-check for editing extracted DataObject .uasset files in original IoStore state. No code is vendored.",
+          "url": "https://github.com/Yoraiz0r/FF7RebirthDataObjectEditor"
+        },
+        {
+          "name": "Synthlight / FF7R2-DataObject-Parser",
+          "role": "CC BY-NC 4.0 Rebirth format documentation used to independently verify DataObject layout and published PlayerParameter property names. Lexeditor does not vendor or adapt this implementation.",
+          "url": "https://github.com/Synthlight/FF7R2-DataObject-Parser"
+        },
+        {
+          "name": "trumank / retoc",
+          "role": "MIT-licensed IoStore CLI reviewed as the pinned DirectoryIndex extraction route. It is not automatically invoked because its Oodle dependency may be acquired when absent.",
+          "url": "https://github.com/trumank/retoc"
+        },
+        {
+          "name": "matyamod / UnrealReZen (ff7r branch)",
+          "role": "GPL-3.0 FF7R2 packaging reference used to verify UE4.26, End/Content mounting and the Rebirth dependency-manifest workaround. No code is bundled or invoked.",
+          "url": "https://github.com/matyamod/UnrealReZen"
         }
       ],
       "thanks": [],

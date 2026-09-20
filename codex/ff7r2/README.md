@@ -1,0 +1,136 @@
+# Final Fantasy VII Rebirth (ff7r2)
+
+## Scope and audited baseline
+
+This note is Rebirth-only. Remake remains a separate plugin/worker under games/ff7r.
+Shared Unreal/helper framework changes are blockers here rather than changes this PR competes for.
+
+The work began from master a47f0a57f8b44113b0ca1d42e5795f59f707372a and was rebased onto live master 72ee978a2ff36686a6349696b19860057356468a after concurrent shared-UI work landed.
+
+Current-master references read for this audit:
+- AGENTS.md — ec8d363d7fa9b937c8849dfa4c13c7c0fc5d1fde
+- docs/ADDING_A_GAME.md — 78a987c5f61d3f28fb6f4195d08717c98dcb2af8
+- docs/UI-MANUAL.md — 14a3269992031d7e7893fcb127728a48b944e71f
+- games/blank/editor.html — cd3c79bab8a5b13b3167a26e8fe4e0617c940802
+- games/rdr2/editor.html — 9d11f8a0bd35526dbb4959fd3e964a4f72472718, including shared paged Table + Detail and Data Map patterns
+- codex/ff7r/README.md — 5a25913ede861eb84ba30419ab21a47a0fbee8c6, used only where Remake/Rebirth Unreal context is explicitly shared
+
+Requested paths unavailable on that master:
+- ui/component-catalog.js
+- codex/ff7r2/
+- a game-specific worklog/ff7r2/
+
+Those absences are recorded rather than silently replacing the requested files.
+
+## Public Rebirth evidence
+
+### DataObject
+
+Synthlight/FF7R2-DataObject-Parser is CC BY-NC 4.0. It is used only as public format
+documentation and a cross-check; no implementation code is vendored or adapted.
+It documents original IoStore-state Rebirth DataObjects and published
+PlayerParameter fields including HPMax, MPMax, Strength, Vitality, Magic, Spilit,
+Dexterity, Luck, Experience, SPMax and TreeLevel.
+
+Yoraiz0r/FF7RebirthDataObjectEditor is MIT. It independently confirms editing
+Rebirth DataObject .uasset files after extraction while keeping them in their
+original IoStore state and demonstrates byte-proxy editing as a conservative write path.
+
+Lexeditor's independent bounded implementation therefore:
+- reads real row FName identity and property descriptors;
+- exposes only fixed-width scalar values that can be patched in place;
+- keeps FString, FName-map, arrays and browser-unsafe 64-bit integers read-only;
+- validates storage bounds and finite floats;
+- patches a copy of the source bytes and preserves every untouched byte;
+- rejects unproved package shapes rather than falling back to raw hex/files editing.
+
+PlayerParameter is the only gameplay table promoted to the first structured UI.
+BattlePlayerParameter remains not integrated because public evidence shows
+behavior-linked arrays and the current writer intentionally does not resize arrays.
+
+### IoStore extraction
+
+trumank/retoc v0.1.5 is MIT and supports DirectoryIndex IoStore containers,
+including list/path discovery and extraction of a selected raw chunk.
+
+Pinned Windows release reviewed:
+- retoc_cli-x86_64-pc-windows-msvc.zip
+- SHA-256 cc036b06ad3bdcf7003690b00d82719980c374e48a95bf0654f9959148d263aa
+
+Issue #469 reports Rebirth UTOC version 2 / DirectoryIndex and an unencrypted
+pakchunk3-WindowsNoEditor containing PlayerParameter and BattlePlayerParameter.
+
+retoc is not automatically invoked by this PR. Its Oodle loader can fetch
+oo2core_9_win64.dll when absent. Rebirth itself does not provide that DLL as a
+loose redistributable file, so Lexeditor will not silently acquire or bundle it.
+
+### FF7R2 packaging
+
+matyamod/UnrealReZen branch ff7r is GPL-3.0 and is the public FF7R2-specific
+packaging reference. Its GUI/source establish GAME_UE4_26, mount point
+../../../End/Content/, top-only game archive scanning, and a Rebirth-specific
+dependency-manifest workaround.
+
+Release reviewed: ff7r2_v1, asset UnrealReZen_FF7R2_815f48a.zip.
+
+Lexeditor does not invoke it automatically because its startup path can acquire
+Oodle when absent. The project therefore stages the exact End/Content asset path
+without claiming package/install success.
+
+## Current public leads for unresolved requests
+
+The issue audit was refreshed on 2026-09-19 rather than treating the five open
+gameplay requests as one generic IoStore blocker.
+
+- #470 Chocobo whistle: no matching public Rebirth implementation was found.
+  The requested behavior still needs a proved runtime/asset hook for legal riding,
+  safe placement, instant mount and vanilla fallback.
+- #471 Formulae / Steal: Gantz79's public "100 Percent Steal and Drop Rate" mod
+  demonstrates that a packaged Rebirth tweak can force rates, but its published
+  description does not expose the actual Steal formula, named inputs, roll-vs-
+  no-item failure distinction, or source asset. It is evidence of feasibility,
+  not enough semantics for a Formulae screen.
+- #472 blue benches / cushion: the public "Refreshed Chocobo Rest Stops (Static
+  Mesh)" mod confirms rest-stop mesh replacement is practical and also shows this
+  is not safely reducible to one universal bench mesh. The Lexeditor request also
+  needs the gameplay identity of restable benches plus cushion consumption.
+- #473 minimap zoom: the 2026 "FF7 Rebirth Accessibility - Visibility Overhaul"
+  publicly enlarges the minimap/HUD and can resize HUD windows, while
+  FF7RebirthFix exposes gameplay/camera FOV changes. Neither documents a world-
+  minimap zoom scalar or persistence path, so those controls are not conflated
+  with the requested zoom setting.
+- #477 Faster Queen's Blood: current public research found no implementation that
+  proves the legal-move predicate, turn-skip transition, no-moves-for-both end
+  condition, or intro input-state hook. Lexeditor will not recreate those rules
+  from guesswork.
+
+FF7R Row Forger (published July 2026) is also a useful ecosystem signal: its
+public description says it can edit/add rows in most Resident DataObject tables
+and uses FModel plus UnrealReZen. It explicitly forks the Synthlight/LordGregory
+parser, however, so its parser code is not imported here; Lexeditor retains its
+independent bounded implementation and the licensing boundary recorded above.
+
+## Implemented project boundary
+
+Project marker: lexeditor-project.json
+
+Read-only extracted input:
+source/End/Content/DataObject/Resident/PlayerParameter.uasset
+
+Saved staged output:
+content/End/Content/DataObject/Resident/PlayerParameter.uasset
+
+Save verifies the currently loaded file hash, applies only proved fixed-width
+edits, writes atomically to the project staging path, and never changes the
+extracted source or installed game. Discard reloads the last on-disk state.
+Reopen creates a new parse from disk. Revert staged file removes only the project
+candidate and falls back to the extracted source.
+
+## Honest acceptance boundary
+
+Synthetic structural tests can prove parser shape handling, bounded editing,
+byte preservation, service save/discard/reopen behavior and rendered UI
+interactions. They cannot prove that an arbitrary live Rebirth asset revision
+matches the public layout, that an IoStore patch produced by an external packer
+loads, or that edited gameplay values behave as intended in-game. Those claims
+remain pending real-game acceptance.

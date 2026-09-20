@@ -13,16 +13,19 @@ import json
 import mimetypes
 import os
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from games.ff7r2 import shader_injector
+from games.ff7r2.dataobject import DataObjectError, DataObjectPackage
 from plugin_http import PluginRequestHandler
 
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
-MAX_BODY_BYTES = 64 * 1024
+MAX_BODY_BYTES = 512 * 1024
+PROJECT_ENV = "LEXEDITOR_FF7R2_PROJECT"
+PLAYER_PARAMETER = Path("End/Content/DataObject/Resident/PlayerParameter.uasset")
 
 
 def game_root() -> Path | None:
@@ -32,6 +35,152 @@ def game_root() -> Path | None:
     root = Path(value)
     return root if root.is_dir() else None
 
+
+
+def project_root() -> Path | None:
+    value = os.environ.get(PROJECT_ENV, "").strip()
+    if not value:
+        return None
+    root = Path(value)
+    return root if root.is_dir() else None
+
+
+def project_read_only() -> bool:
+    return os.environ.get("LEXEDITOR_MOD_READ_ONLY", "0") == "1"
+
+
+def source_path() -> Path | None:
+    root = project_root()
+    return root / "source" / PLAYER_PARAMETER if root else None
+
+
+def output_path() -> Path | None:
+    root = project_root()
+    return root / "content" / PLAYER_PARAMETER if root else None
+
+
+def active_player_path(source: str = "mine") -> tuple[Path, str]:
+    baseline = source_path()
+    candidate = output_path()
+    if baseline is None:
+        raise DataObjectError("No FF7 Rebirth project is selected.")
+    if not baseline.is_file():
+        raise DataObjectError(
+            "PlayerParameter source is missing. Place the extracted IoStore-state "
+            f"asset at source/{PLAYER_PARAMETER.as_posix()} inside this project."
+        )
+    if source == "vanilla":
+        return baseline, "source"
+    if source != "mine":
+        raise DataObjectError("source must be mine or vanilla")
+    if candidate is not None and candidate.is_file():
+        return candidate, "project"
+    return baseline, "source"
+
+
+def player_payload(source: str = "mine") -> dict:
+    path, origin = active_player_path(source)
+    package = DataObjectPackage.from_bytes(path.read_bytes())
+    payload = package.payload()
+    root = project_root()
+    payload.update({
+        "source": origin,
+        "path": str(path),
+        "projectRelativePath": str(path.relative_to(root)).replace("\\", "/") if root else "",
+        "readOnly": project_read_only() or source == "vanilla",
+    })
+    return payload
+
+
+def workspace_payload() -> dict:
+    root = project_root()
+    baseline = source_path()
+    candidate = output_path()
+    game = game_root()
+    return {
+        "projectRoot": str(root) if root else "",
+        "projectName": root.name if root else "",
+        "readOnly": project_read_only(),
+        "game": {
+            "root": str(game) if game else "",
+            "found": game is not None,
+            "renderer": "dxgi",
+            "binaries": str(game / "End/Binaries/Win64") if game else "",
+        },
+        "playerParameter": {
+            "relative": PLAYER_PARAMETER.as_posix(),
+            "sourceRelative": f"source/{PLAYER_PARAMETER.as_posix()}",
+            "outputRelative": f"content/{PLAYER_PARAMETER.as_posix()}",
+            "sourcePresent": bool(baseline and baseline.is_file()),
+            "outputPresent": bool(candidate and candidate.is_file()),
+        },
+        "delivery": {
+            "staged": bool(candidate and candidate.is_file()),
+            "path": str(candidate) if candidate and candidate.is_file() else "",
+            "packaged": False,
+            "installed": False,
+            "reason": (
+                "Lexeditor stages the proved DataObject edit without touching the game. "
+                "FF7R2 IoStore packaging is not automated until its Oodle dependency can "
+                "be supplied explicitly and a real-game patch is accepted."
+            ),
+        },
+        "tooling": {
+            "shaderInjector": {"pinned": shader_injector.VERSION, "managedBySharedUpdates": True},
+            "retoc": {
+                "pinned": "v0.1.5",
+                "license": "MIT",
+                "integrated": False,
+                "reason": (
+                    "The public release can acquire Oodle when the DLL is absent; "
+                    "Lexeditor will not trigger that silent network dependency."
+                ),
+            },
+            "unrealReZen": {
+                "reference": "matyamod/UnrealReZen ff7r",
+                "license": "GPL-3.0",
+                "integrated": False,
+                "reason": (
+                    "The FF7R2 fork documents UE4.26 packaging, but its startup path "
+                    "can acquire Oodle. Packaging remains explicit until that dependency "
+                    "and real-game output are safely verified."
+                ),
+            },
+        },
+    }
+
+
+def _write_player_candidate(body: dict) -> dict:
+    if project_read_only():
+        raise DataObjectError("This project is read-only.")
+    current, _origin = active_player_path("mine")
+    package = DataObjectPackage.from_bytes(current.read_bytes())
+    expected = str(body.get("sha256") or "")
+    if expected and expected != package.payload()["activeSha256"]:
+        raise DataObjectError("PlayerParameter changed on disk. Reopen it before saving.")
+    edits = body.get("changes")
+    if not isinstance(edits, list):
+        raise DataObjectError("changes must be an array")
+    changed = package.apply_edits(edits)
+    target = output_path()
+    if target is None:
+        raise DataObjectError("No FF7 Rebirth project is selected.")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(target.suffix + ".tmp")
+    temporary.write_bytes(package.to_bytes())
+    temporary.replace(target)
+    payload = player_payload("mine")
+    payload["changedFields"] = changed
+    return payload
+
+
+def _reset_player_candidate() -> dict:
+    if project_read_only():
+        raise DataObjectError("This project is read-only.")
+    target = output_path()
+    if target and target.is_file():
+        target.unlink()
+    return player_payload("mine")
 
 def injector_folder() -> Path | None:
     """The folder Shader Injector is declared to live in, if the game has it."""
@@ -51,15 +200,87 @@ def injector_state() -> dict:
 
 
 def data_map_payload() -> dict:
-    """The files this plugin reads or writes, and what it does with each.
-
-    Rebirth's own data is not edited here - the plugin manages presentation
-    tools - so the map lists those tools' files, where they live, and how far
-    the plugin understands them.
-    """
     binaries = f"{shader_injector.INSTALL_FOLDER}/"
     cache = "Documents/" + "/".join(shader_injector.CACHE_FOLDER) + "/"
     rows = [
+        {
+            "filename": PLAYER_PARAMETER.as_posix(),
+            "controls": "Characters — real row FName identity and fixed-width scalar controls",
+            "coverage": "parse / bounded edit / byte-preserving save / reopen to project staging",
+            "notes": (
+                "Implemented from public Rebirth format evidence and synthetic structural "
+                "fixtures. Real installed-game acceptance is still pending."
+            ),
+            "status": "partial", "target": "characters",
+        },
+        {
+            "filename": "End/Content/DataObject/Resident/BattlePlayerParameter.uasset",
+            "controls": "None", "coverage": "Public format research only",
+            "notes": (
+                "Known table includes arrays and behavior-linked fields. Array resizing "
+                "and semantics have not been proved in Lexeditor."
+            ), "status": "not-integrated",
+        },
+        {
+            "filename": "pakchunk3-WindowsNoEditor.utoc / .ucas",
+            "controls": "None", "coverage": "IoStore source extraction research",
+            "notes": (
+                "retoc v0.1.5 can address DirectoryIndex containers, but its Oodle "
+                "dependency must be supplied explicitly before Lexeditor may invoke it."
+            ), "status": "not-integrated",
+        },
+        {
+            "filename": "FF7R2 IoStore patch package (.utoc/.ucas/.pak)",
+            "controls": "None", "coverage": "Staging path only; package/install unavailable",
+            "notes": (
+                "The FF7R2 UnrealReZen fork is documented, but automatic packaging "
+                "would currently permit silent Oodle acquisition and has no real-game acceptance."
+            ), "status": "not-integrated",
+        },
+        {
+            "filename": "Chocobo whistle behavior (#470)",
+            "controls": "None", "coverage": "No proved asset/runtime path",
+            "notes": (
+                "Requires safe teleport/mount placement plus vanilla fallback in no-ride "
+                "areas. Current public research found no matching Rebirth implementation."
+            ), "status": "not-integrated",
+        },
+        {
+            "filename": "Formulae / Steal (#471)",
+            "controls": "None", "coverage": "Packaged rate tweak exists; actual formula is not documented",
+            "notes": (
+                "A public 100% Steal/Drop packaged mod proves some Rebirth data can change "
+                "rates, but it does not identify the game's Steal formula, named terms, or "
+                "failure-message branch required by #471."
+            ), "status": "not-integrated",
+        },
+        {
+            "filename": "Blue benches / cushion (#472)",
+            "controls": "None", "coverage": "Static-mesh modding is public; restability/cushion path unproved",
+            "notes": (
+                "Public rest-stop mesh mods show multiple bench assets are involved. #472 "
+                "also needs the gameplay distinction between restable/non-restable benches "
+                "and universal cushion consumption, so a global mesh swap is insufficient."
+            ), "status": "not-integrated",
+        },
+        {
+            "filename": "Minimap zoom (#473)",
+            "controls": "None", "coverage": "HUD/minimap size mods exist; zoom scalar/path unproved",
+            "notes": (
+                "Public accessibility mods can enlarge the minimap/HUD, but that is not "
+                "evidence for the world-minimap zoom value #473 requests. No proved scalar "
+                "or persistence path has been found."
+            ), "status": "not-integrated",
+        },
+        {
+            "filename": "Faster Queen's Blood (#477)",
+            "controls": "None", "coverage": "No matching public implementation or proved rules hook",
+            "notes": (
+                "The request depends on the game's own legal-move test, turn transition and "
+                "intro input state. Current public research found no implementation proving "
+                "those hooks, so Lexeditor does not approximate the rules."
+            ), "status": "not-integrated",
+        },
         {"filename": binaries + shader_injector.DLL,
          "controls": "Shader Injector's loader. Installed, switched on and off by renaming it to "
                      + shader_injector.DISABLED_DLL + ", and removed.",
@@ -106,9 +327,17 @@ class Handler(PluginRequestHandler):
             self.send_json({"apiVersion": 1, "pluginId": "ff7r2",
                             "name": "Final Fantasy VII Rebirth",
                             "hosted": True, "windowHost": "webview2",
-                            "capabilities": ["reshade", "shader-injector", "data-map"]})
+                            "capabilities": ["reshade", "shader-injector", "data-map",\n                            "player-parameter", "fixed-width-edit", "project-staging"]})
         elif path == "/api/datamap":
             self.send_json(data_map_payload())
+        elif path == "/api/workspace":
+            self.send_json(workspace_payload())
+        elif path == "/api/player-parameter":
+            try:
+                source = parse_qs(urlparse(self.path).query).get("source", ["mine"])[0]
+                self.send_json(player_payload(source))
+            except (OSError, DataObjectError) as error:
+                self.send_json({"error": str(error), "workspace": workspace_payload()}, 404)
         elif path == "/api/game":
             root = game_root()
             binaries = root / "End/Binaries/Win64" if root else None
@@ -122,7 +351,7 @@ class Handler(PluginRequestHandler):
         elif path == "/api/shader-injector":
             try:
                 self.send_json(injector_state())
-            except (OSError, ValueError) as error:
+            except (OSError, ValueError, DataObjectError) as error:
                 self.send_json({"error": str(error)}, 500)
         else:
             self.send_json({"error": "Not found"}, 404)
@@ -136,6 +365,7 @@ class Handler(PluginRequestHandler):
             self.send_json({"error": "Cross-origin writes are not permitted"}, 403)
             return
         actions = {
+            "/api/player-parameter/save", "/api/player-parameter/reset",
             "/api/shader-injector/install", "/api/shader-injector/uninstall",
             "/api/shader-injector/enabled", "/api/shader-injector/settings",
             "/api/shader-injector/clear-cache",
@@ -150,6 +380,12 @@ class Handler(PluginRequestHandler):
             body = json.loads(self.rfile.read(size) or b"{}") if size else {}
             if not isinstance(body, dict):
                 raise ValueError("Request must be a JSON object")
+            if path == "/api/player-parameter/save":
+                self.send_json(_write_player_candidate(body))
+                return
+            if path == "/api/player-parameter/reset":
+                self.send_json(_reset_player_candidate())
+                return
             folder = injector_folder()
             if folder is None:
                 raise ValueError("Locate Final Fantasy VII Rebirth before changing Shader Injector.")
