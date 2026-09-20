@@ -139,6 +139,8 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
         'lexeditor_ff8_gf_spellbooks.h', 'lexeditor_ff8_gf_spellbooks.cpp',
         'reptile_atb_runtime.h', 'lexeditor_ff8_reptile_atb.h',
         'lexeditor_ff8_reptile_atb.cpp',
+        'interaction_indicator.h', 'lexeditor_ff8_interaction_indicators.h',
+        'lexeditor_ff8_interaction_indicators.cpp',
     ]
     for name in extension_files:
         destination = source / 'src' / ('ff8' if name.endswith('.inc') else '') / name
@@ -150,6 +152,10 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
             ('bool enable_ff8_party_switch;', 'bool enable_ff8_party_switch;\nbool enable_ff8_no_magic_consumption;'),
             ('\tenable_ff8_party_switch = config["enable_ff8_party_switch"].value_or(false);',
              '\tenable_ff8_party_switch = config["enable_ff8_party_switch"].value_or(false);\n\tenable_ff8_no_magic_consumption = config["enable_ff8_no_magic_consumption"].value_or(false);'),
+            ('bool enable_ff8_no_magic_consumption;',
+             'bool enable_ff8_no_magic_consumption;\nbool enable_ff8_interaction_indicators;'),
+            ('\tenable_ff8_no_magic_consumption = config["enable_ff8_no_magic_consumption"].value_or(false);',
+             '\tenable_ff8_no_magic_consumption = config["enable_ff8_no_magic_consumption"].value_or(false);\n\tenable_ff8_interaction_indicators = config["enable_ff8_interaction_indicators"].value_or(false);'),
             ('bool enable_ff8_hp_bars;','bool enable_ff8_hp_bars;\nbool enable_ff8_gf_hp_bars;'),
             ('\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);',
              '\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);\n\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);'),
@@ -159,11 +165,15 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
         ],
         'src/cfg.h':[
             ('extern bool enable_ff8_party_switch;', 'extern bool enable_ff8_party_switch;\nextern bool enable_ff8_no_magic_consumption;'),
+            ('extern bool enable_ff8_no_magic_consumption;',
+             'extern bool enable_ff8_no_magic_consumption;\nextern bool enable_ff8_interaction_indicators;'),
             ('extern bool enable_ff8_hp_bars;','extern bool enable_ff8_hp_bars;\nextern bool enable_ff8_gf_hp_bars;'),
             ('extern bool enable_ff8_gf_hp_bars;','extern bool enable_ff8_gf_hp_bars;\nextern bool enable_ff8_ingame_time;'),
         ],
         'misc/FFNx.toml':[
             ('enable_ff8_party_switch = false', 'enable_ff8_party_switch = false\n\n# Keep spell stock on successful field/battle casts; items still consume.\nenable_ff8_no_magic_consumption = false'),
+            ('enable_ff8_no_magic_consumption = false',
+             'enable_ff8_no_magic_consumption = false\n\n# Show non-invasive field interaction and Triple Triad opponent HUD cues.\nenable_ff8_interaction_indicators = false'),
             ('enable_ff8_hp_bars = false','enable_ff8_hp_bars = false\n\n# Blue junctioned-GF HP bar above each party name.\nenable_ff8_gf_hp_bars = false'),
             ('enable_ff8_gf_hp_bars = false','enable_ff8_gf_hp_bars = false\n\n# Show the computer local clock on FF8 main menu without changing PLAY time.\nenable_ff8_ingame_time = false'),
         ],
@@ -173,13 +183,13 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
     # not any bar is switched on.
     changes['src/overlay.cpp'] = [
         ('#include "lexeditor_ff8_bars.h"',
-         '#include "lexeditor_ff8_bars.h"\n#include "lexeditor_ff8_toast.h"'),
+         '#include "lexeditor_ff8_bars.h"\n#include "lexeditor_ff8_toast.h"\n#include "lexeditor_ff8_interaction_indicators.h"'),
         ('    lexeditor_ff8_bars_draw();',
-         '    lexeditor_ff8_bars_draw();\n    lexeditor_ff8_toast_draw();'),
+         '    lexeditor_ff8_bars_draw();\n    lexeditor_ff8_toast_draw();\n    lexeditor_ff8_interaction_indicators_draw();'),
     ]
     changes['src/renderer.cpp'] = [
         ('#include "lexeditor_ff8_bars.h"',
-         '#include "lexeditor_ff8_bars.h"\n#include "lexeditor_ff8_toast.h"'),
+         '#include "lexeditor_ff8_bars.h"\n#include "lexeditor_ff8_toast.h"\n#include "lexeditor_ff8_interaction_indicators.h"'),
     ]
     changes['src/ff8_opengl.cpp'] = [
         ('#include "lexeditor_ff8_party_switch.h"', '#include "lexeditor_ff8_party_switch.h"\n#include "lexeditor_ff8_stock_tweaks.h"\n#include "lexeditor_ff8_gf_spellbooks.h"\n#include "lexeditor_ff8_reptile_atb.h"'),
@@ -220,7 +230,8 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
         text = raw.decode('utf-8').replace('\r\n', '\n')
         gate = 'if (enable_devtools || lexeditor_ff8_bars_enabled())'
         wanted = ('if (enable_devtools || lexeditor_ff8_bars_enabled() || '
-                  'lexeditor_ff8_toast_enabled())')
+                  'lexeditor_ff8_toast_enabled() || '
+                  'lexeditor_ff8_interaction_indicators_enabled())')
         if wanted not in text and gate in text:
             text = text.replace(gate, wanted)
             path.write_bytes(text.replace('\n', newline).encode('utf-8'))
