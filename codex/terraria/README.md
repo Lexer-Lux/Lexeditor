@@ -6,6 +6,8 @@ Lexeditor's Terraria plugin targets **tModLoader 1.4.4 stable v2026.07.3.0** (th
 
 Current stable tModLoader is the loader, build system, source-project workflow, local package format and Workshop path. Lexeditor therefore authors native tModLoader projects and hands compilation/loading back to tModLoader instead of inventing a parallel Terraria mod format.
 
+Before enabling the native build handoff on Windows, Lexeditor reads the installed `tModLoader.dll` file-version metadata without executing it. tModLoader's tagged source derives `BuildInfo.tMLVersion` from the assembly informational version, so Lexeditor parses that same build-identifier shape and requires exact **stable 2026.07.3.0**. Preview, newer/older, missing, or unreadable version metadata fails closed and remains visible in Info instead of being guessed compatible.
+
 ## Native source-project shape
 
 A modern source mod uses:
@@ -186,6 +188,7 @@ Missing `enabled.json` **or the JSON literal `null`** is treated as an empty ena
 ## Loader / deployment model
 
 - **Loader/runtime:** tModLoader itself; Lexeditor ships no second Terraria loader.
+- **Helper/update boundary:** tModLoader is the external Steam runtime/application (app `1281930`), not a redistributable Lexeditor helper. It depends on the user's Steam/Terraria installation, so Lexeditor neither bundles it nor registers a fake helper in the Updates drawer. Steam owns installation/update; Lexeditor performs exact read-only runtime-version verification and never auto-updates tModLoader.
 - **Authoring:** native `ModSources` project.
 - **Metadata:** preservation-safe structured `build.txt` editing.
 - **Localization:** supported single-line HJSON edit/create/delete subset, with complex grammar untouched.
