@@ -68,11 +68,11 @@ class StardewContentPackTests(unittest.TestCase):
         css = (paths.PLUGIN_ROOT / "editor.css").read_text(encoding="utf-8")
         javascript = (paths.PLUGIN_ROOT / "editor.js").read_text(encoding="utf-8")
         server_source = (paths.PLUGIN_ROOT / "server.py").read_text(encoding="utf-8")
-        script_tags = re.findall(r"<script\\b[^>]*>", html, flags=re.IGNORECASE)
+        script_tags = re.findall(r"<script[^>]*>", html, flags=re.IGNORECASE)
 
         self.assertNotIn("<style", html.casefold())
         self.assertTrue(script_tags)
-        self.assertTrue(all(re.search(r"\\bsrc\\s*=", tag, flags=re.IGNORECASE) for tag in script_tags))
+        self.assertTrue(all("src=" in tag.casefold() for tag in script_tags))
         self.assertIn('href="editor.css"', html)
         self.assertIn('src="editor.js"', html)
         self.assertLessEqual(css.count(";"), 30)
