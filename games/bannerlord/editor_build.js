@@ -43,20 +43,7 @@
     }).finally(()=>{state.building=false;renderBuild();refresh()});
   }
 
-  function deploySummary(){
-    const d=state.deployResult;
-    if(!d)return null;
-    if(d.error)return el("div",{class:"bl-list-block"},el("h3",{},"Asset deployment"),el("div",{},d.error));
-    const copied=d.copied||[],unchanged=d.unchanged||[],backups=d.backups||[];
-    return el("div",{class:"bl-list-block"},
-      el("h3",{},"Asset deployment"),
-      el("div",{},`${copied.length} copied · ${unchanged.length} unchanged · ${backups.length} backup(s) · 0 deleted`),
-      el("div",{class:"bl-note"},`Target: ${d.target||"—"}`),
-      copied.length?el("ul",{},...copied.map(value=>el("li",{},value))):null,
-      el("div",{class:"bl-note"},"Runtime balance JSON is intentionally excluded so build/deploy cannot overwrite values managed by the Runtime tab."));
-  }
-
-  async function selectBuildProject(name){
+    async function selectBuildProject(name){
     if(!name)return;
     try{
       const project=await api(`/api/project?project=${encodeURIComponent(name)}`);
@@ -140,7 +127,7 @@
     }catch(error){showAlert?.(String(error.message||error),"Bannerlord source error")}
   }
   function renderSource(){
-    if(!state.source){main.replaceChildren(el("div",{class:"bl-empty"},"No source file selected."));return}
+    if(!state.source){main.replaceChildren(uiEmpty("Source","No source file selected."));return}
     const textarea=el("textarea",{value:state.source.text,spellcheck:"false",oninput:event=>{state.source.text=event.target.value;refresh()}});
     main.replaceChildren(el("section",{class:"bl-source"},
       el("div",{class:"bl-source-head"},el("strong",{},"Source only"),el("code",{},state.source.path),el("span",{},`${state.source.encoding} · ${state.source.size} bytes`)),
@@ -148,22 +135,7 @@
     ));
   }
 
-  function renderDataMap(){
-    const view=LexeditorUI.dataMap({
-      rows:state.datamap.rows,query:state.query,status:state.mapStatus,page:state.page,sort:state.sort,
-      tableClass:"bannerlord-data-map",
-      open:row=>{if(row.target==="module")navigate("module");else if(row.target==="build")navigate("build");else if(row.target==="skills")navigate("skills");else if(row.target==="effects")navigate("effects");else if(row.target==="perks")navigate("perks");else if(row.target==="xp")navigate("xp")},
-      openSource,
-      changeQuery:value=>{state.query=value;state.page=0;renderDataMap()},
-      changeStatus:value=>{state.mapStatus=value;state.page=0;renderDataMap()},
-      changePage:value=>{state.page=value;renderDataMap()},
-      changeSort:key=>{const [active,direction]=state.sort;state.sort=[key,active===key?-direction:1];renderDataMap()}
-    });
-    main.replaceChildren(view.content);
-  }
+  function renderDataMap(){}
+  function navigate(tab){state.tab=tab}
+  function render(){}
 
-  function navigate(tab){state.tab=tab;render()}
-  function render(){
-    const views={module:renderModule,dependencies:renderDependencies,submodules:renderSubmodules,xmls:renderXmls,skills:renderSkills,effects:renderEffects,perks:renderPerks,xp:renderXpSources,build:renderBuild,deployment:renderDeployment,datamap:renderDataMap,source:renderSource};
-    (views[state.tab]||renderModule)();refresh();
-  }
