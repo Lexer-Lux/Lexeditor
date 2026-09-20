@@ -1918,6 +1918,13 @@ class Handler(BaseHTTPRequestHandler):
                     self.json_response({"error": "shared UI asset not found"}, 404)
                 else:
                     self.file_response(target)
+            elif path.startswith("/assets/"):
+                asset_root = (PLUGIN_ROOT / "assets").resolve()
+                target = (asset_root / path.removeprefix("/assets/")).resolve()
+                if asset_root not in target.parents or not target.is_file():
+                    self.json_response({"error": "RDR plugin asset not found"}, 404)
+                else:
+                    self.file_response(target)
             elif path.startswith("/fonts/"):
                 name = Path(path.removeprefix("/fonts/")).name
                 candidates = (
