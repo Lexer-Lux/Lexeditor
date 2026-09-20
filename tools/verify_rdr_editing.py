@@ -195,6 +195,93 @@ class EditingTests(unittest.TestCase):
         self.assertEqual(server.save_loot(document)["saved"], 1)
         self.assertEqual(server.loot_payload()["document"], document)
 
+    def test_string_table_index_edit_reopen_and_vanilla_source(self):
+        index = server.string_tables_index()
+        self.assertEqual(index["counts"]["tables"], 2)
+        self.assertEqual(index["counts"]["available"], 2)
+        self.assertEqual(index["counts"]["records"], 8)
+        self.assertFalse(any(
+            row["path"].casefold().endswith("_ps3.strtbl")
+            for row in index["tables"]
+        ))
+
+        path = "tune/stringtable/global.strtbl"
+        payload = server.string_table_payload("tuning", path)
+        row = next(
+            entry for entry in payload["rows"]
+            if entry["languageIndex"] == 0 and entry["identifier"] == "HELLO"
+        )
+        source = Path(payload["table"]["sourcePath"])
+        source_bytes = source.read_bytes()
+        result = server.save_string_table("tuning", path, [{
+            "languageIndex": row["languageIndex"],
+            "entryIndex": row["entryIndex"],
+            "expectedHash": row["hash"],
+            "expectedText": row["text"],
+            "value": "Hello from New Austin",
+        }])
+        self.assertEqual(result["saved"], 1)
+        self.assertEqual(source.read_bytes(), source_bytes)
+        project = Path(payload["table"]["projectPath"])
+        self.assertTrue(project.is_file())
+
+        reopened = server.string_table_payload("tuning", path)
+        current = next(
+            entry for entry in reopened["rows"]
+            if entry["languageIndex"] == 0 and entry["identifier"] == "HELLO"
+        )
+        self.assertEqual(current["text"], "Hello from New Austin")
+        vanilla = server.string_table_payload("tuning", path, True)
+        original = next(
+            entry for entry in vanilla["rows"]
+            if entry["languageIndex"] == 0 and entry["identifier"] == "HELLO"
+        )
+        self.assertEqual(original["text"], "Hello")
+
+        no_change = server.save_string_table("tuning", path, [{
+            "languageIndex": current["languageIndex"],
+            "entryIndex": current["entryIndex"],
+            "expectedHash": current["hash"],
+            "expectedText": current["text"],
+            "value": current["text"],
+        }])
+        self.assertEqual(no_change["saved"], 0)
+
+    def test_string_table_stale_identity_does_not_write(self):
+        path = "content/dlc/zombiepack/zombiepack_standalone.strtbl"
+        payload = server.string_table_payload("content", path)
+        row = payload["rows"][0]
+        project = Path(payload["table"]["projectPath"])
+        with self.assertRaisesRegex(ValueError, "text changed"):
+            server.save_string_table("content", path, [{
+                "languageIndex": row["languageIndex"],
+                "entryIndex": row["entryIndex"],
+                "expectedHash": row["hash"],
+                "expectedText": "stale text",
+                "value": "changed",
+            }])
+        self.assertFalse(project.exists())
+
+    def test_data_map_routes_supported_strings_and_keeps_ps3_duplicate_visible(self):
+        payload = server.data_map_payload()
+        rows = {row["filename"]: row for row in payload["rows"]}
+        pc = rows[
+            "game/content.rpf:/content/dlc/zombiepack/zombiepack_standalone.strtbl"
+        ]
+        ps3 = rows[
+            "game/content.rpf:/content/dlc/zombiepack/zombiepack_standalone_ps3.strtbl"
+        ]
+        tuning = rows["game/tune_d11generic.rpf:/tune/stringtable/global.strtbl"]
+        loot = rows[f"game/content.rpf:/{server.loot_script.ARCHIVE_PATH}"]
+        self.assertEqual((pc["status"], pc["target"], pc["openable"]),
+                         ("partial", "strings", True))
+        self.assertEqual((tuning["status"], tuning["target"], tuning["openable"]),
+                         ("partial", "strings", True))
+        self.assertEqual((ps3["status"], ps3["target"], ps3["openable"]),
+                         ("not-integrated", "", False))
+        self.assertEqual((loot["status"], loot["target"], loot["openable"]),
+                         ("partial", "loot", True))
+
     def test_mission_identity_schema_and_reward_limits(self):
         for document in (None, [], {"schemaVersion": True},
                          {"schemaVersion": 1, "contract": "LexerRDR.mission-rewards", "overrides": {}},
