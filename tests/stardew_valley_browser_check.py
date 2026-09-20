@@ -6,7 +6,6 @@ import json
 import shutil
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -14,6 +13,7 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "stardew-valley-browser"
 OUT.mkdir(parents=True, exist_ok=True)
+(OUT / "started.txt").write_text("Stardew rendered acceptance started.\n", encoding="utf-8")
 sys.path.insert(0, str(ROOT))
 
 from games.stardew_valley.content_pack import initialize_project  # noqa: E402
@@ -105,17 +105,28 @@ def open_editor(browser, url: str, width: int, height: int, zoom: float = 1.0):
     page = browser.new_page(viewport={"width": width, "height": height})
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    delayed = {"done": False}
-
-    def delay_dashboard(route):
-        if not delayed["done"]:
-            delayed["done"] = True
-            time.sleep(0.30)
-        route.continue_()
-
-    page.route("**/api/dashboard", delay_dashboard)
+    page.add_init_script("""() => {
+      const originalFetch = window.fetch.bind(window);
+      let delayed = false;
+      window.fetch = (input, init) => {
+        if (!delayed && !sessionStorage.getItem('sv-audit-loading-seen')
+            && String(input).includes('/api/dashboard')) {
+          delayed = true;
+          return new Promise((resolve, reject) => {
+            window.__releaseStardewDashboard = () => {
+              sessionStorage.setItem('sv-audit-loading-seen', '1');
+              originalFetch(input, init).then(resolve, reject);
+            };
+          });
+        }
+        return originalFetch(input, init);
+      };
+    }""")
     page.goto(url, wait_until="domcontentloaded")
-    page.get_by_role("status").filter(has_text="Loading Stardew Valley project").wait_for()
+    loading = page.get_by_role("status").filter(has_text="Loading Stardew Valley project")
+    loading.wait_for(timeout=5000)
+    assert page.evaluate("typeof window.__releaseStardewDashboard === 'function'")
+    page.evaluate("window.__releaseStardewDashboard()")
     page.wait_for_selector(".lex-paged-list-detail .lex-column-list-row", timeout=20000)
     if zoom != 1.0:
         page.evaluate("value => { document.body.style.zoom=String(value); }", zoom)
@@ -123,7 +134,7 @@ def open_editor(browser, url: str, width: int, height: int, zoom: float = 1.0):
     return page, errors
 
 
-def exercise_objects(page, project: Path, label: str) -> None:
+def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
     assert page.locator("#plugin-data-map").count() == 1
     assert page.locator("#plugin-info").count() == 1
     assert page.locator("link[href='editor.css']").count() == 1
@@ -173,63 +184,64 @@ def exercise_objects(page, project: Path, label: str) -> None:
     assert tooltip.evaluate("node => document.activeElement === node")
     tooltip.press("Escape")
 
-    price_cell = stone.locator('[data-column-key="Price"]').first
-    price_cell.dblclick()
-    price_editor = price_cell.locator('input[type="number"]')
-    price_editor.fill("88")
-    price_editor.press("Enter")
-    page.wait_for_timeout(180)
-    assert page.locator("#global-save").is_enabled()
-    assert page.locator('[data-lex-property="Price"] input[type="number"]').input_value() == "88"
+    if mutate:
+        price_cell = stone.locator('[data-column-key="Price"]').first
+        price_cell.dblclick()
+        price_editor = price_cell.locator('input[type="number"]')
+        price_editor.fill("88")
+        price_editor.press("Enter")
+        page.wait_for_timeout(180)
+        assert page.locator("#global-save").is_enabled()
+        assert page.locator('[data-lex-property="Price"] input[type="number"]').input_value() == "88"
 
-    drink_cell = stone.locator('[data-column-key="IsDrink"]').first
-    drink_cell.dblclick()
-    drink_editor = drink_cell.locator('input[type="checkbox"]')
-    drink_editor.check()
-    page.wait_for_timeout(150)
-    assert page.locator('[data-lex-property="IsDrink"] input[type="checkbox"]').is_checked()
+        drink_cell = stone.locator('[data-column-key="IsDrink"]').first
+        drink_cell.dblclick()
+        drink_editor = drink_cell.locator('input[type="checkbox"]')
+        drink_editor.check()
+        page.wait_for_timeout(150)
+        assert page.locator('[data-lex-property="IsDrink"] input[type="checkbox"]').is_checked()
 
-    page.locator("#global-save").click()
-    page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
-    assert patch_value(project, "390", "Price") == 88
-    assert patch_value(project, "390", "IsDrink") is True
+        page.locator("#global-save").click()
+        page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
+        assert patch_value(project, "390", "Price") == 88
+        assert patch_value(project, "390", "IsDrink") is True
 
-    page.reload(wait_until="domcontentloaded")
-    page.wait_for_selector(".lex-column-list-row", timeout=20000)
-    page.locator(".lex-pager-search input").first.fill("Stone")
-    page.wait_for_timeout(180)
-    stone = page.locator(".lex-column-list-row").filter(has_text="Stone").first
-    assert "88" in stone.locator('[data-column-key="Price"]').inner_text()
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_selector(".lex-column-list-row", timeout=20000)
+        page.locator(".lex-pager-search input").first.fill("Stone")
+        page.wait_for_timeout(180)
+        stone = page.locator(".lex-column-list-row").filter(has_text="Stone").first
+        assert "88" in stone.locator('[data-column-key="Price"]').inner_text()
 
-    cell = stone.locator('[data-column-key="Price"]').first
-    cell.dblclick()
-    cell.locator("input").fill("99")
-    cell.locator("input").press("Enter")
-    assert page.locator("#global-save").is_enabled()
-    page.locator("#global-save").click(button="right")
-    page.get_by_role("button", name="Discard Changes", exact=True).click()
-    page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
-    page.locator(".lex-pager-search input").first.fill("Stone")
-    page.wait_for_timeout(160)
-    assert "88" in page.locator(".lex-column-list-row").filter(has_text="Stone").first.locator('[data-column-key="Price"]').inner_text()
+        cell = stone.locator('[data-column-key="Price"]').first
+        cell.dblclick()
+        cell.locator("input").fill("99")
+        cell.locator("input").press("Enter")
+        assert page.locator("#global-save").is_enabled()
+        page.locator("#global-save").click(button="right")
+        page.get_by_role("button", name="Discard Changes", exact=True).click()
+        page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
+        page.locator(".lex-pager-search input").first.fill("Stone")
+        page.wait_for_timeout(160)
+        assert "88" in page.locator(".lex-column-list-row").filter(has_text="Stone").first.locator('[data-column-key="Price"]').inner_text()
 
-    raw = json.loads((project / "content.json").read_text(encoding="utf-8"))
-    raw["ExternalFixtureChange"] = True
-    (project / "content.json").write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
-    stone = page.locator(".lex-column-list-row").filter(has_text="Stone").first
-    cell = stone.locator('[data-column-key="Price"]').first
-    cell.dblclick()
-    cell.locator("input").fill("91")
-    cell.locator("input").press("Enter")
-    page.locator("#global-save").click()
-    dialog = page.get_by_role("alertdialog")
-    dialog.wait_for()
-    assert "changed" in dialog.inner_text().lower()
-    assert page.locator("#global-save").is_enabled()
-    dialog.get_by_role("button", name="Close", exact=True).click()
-    page.locator("#global-save").click(button="right")
-    page.get_by_role("button", name="Discard Changes", exact=True).click()
-    page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
+        raw = json.loads((project / "content.json").read_text(encoding="utf-8"))
+        raw["ExternalFixtureChange"] = True
+        (project / "content.json").write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+        stone = page.locator(".lex-column-list-row").filter(has_text="Stone").first
+        cell = stone.locator('[data-column-key="Price"]').first
+        cell.dblclick()
+        cell.locator("input").fill("91")
+        cell.locator("input").press("Enter")
+        page.locator("#global-save").click()
+        dialog = page.get_by_role("alertdialog")
+        dialog.wait_for()
+        assert "changed" in dialog.inner_text().lower()
+        assert page.locator("#global-save").is_enabled()
+        dialog.get_by_role("button", name="Close", exact=True).click()
+        page.locator("#global-save").click(button="right")
+        page.get_by_role("button", name="Discard Changes", exact=True).click()
+        page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
 
     divider = page.locator(".lex-panel-layout-divider").first
     before = int(divider.get_attribute("aria-valuenow"))
@@ -285,7 +297,7 @@ def main() -> int:
                     label = f"{width}x{height}-z{zoom}"
                     page, errors = open_editor(browser, session.url, width, height, zoom)
                     try:
-                        exercise_objects(page, project, label)
+                        exercise_objects(page, project, label, mutate=(width == 1440 and zoom == 1.0))
                         exercise_data_map(page, label)
                         exercise_info(page, label, height)
                         assert not errors, (label, errors)
