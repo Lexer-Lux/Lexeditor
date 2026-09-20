@@ -9,6 +9,7 @@ on:
       - 'plugin_api.py'
       - 'project_manager.py'
       - 'tests/test_terraria_*.py'
+      - 'tests/terraria_browser_check.py'
       - '.github/workflows/terraria-checks.yml'
   pull_request:
     paths:
@@ -17,6 +18,7 @@ on:
       - 'plugin_api.py'
       - 'project_manager.py'
       - 'tests/test_terraria_*.py'
+      - 'tests/terraria_browser_check.py'
       - '.github/workflows/terraria-checks.yml'
 
 concurrency:
@@ -29,7 +31,7 @@ permissions:
 jobs:
   terraria:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,6 +43,20 @@ jobs:
           python -m unittest discover -s tests -p 'test_terraria_*.py'
       - name: Editor JavaScript syntax
         run: node --check games/terraria/editor.js
+      - name: Install browser acceptance
+        run: |
+          python -m pip install --disable-pip-version-check 'playwright>=1.50,<2'
+          python -m playwright install --with-deps chromium
+      - name: Render Terraria UI acceptance
+        run: python tests/terraria_browser_check.py out/terraria-browser
+      - name: Preserve Terraria rendered evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraria-browser-${{ github.sha }}
+          path: out/terraria-browser
+          retention-days: 7
+          if-no-files-found: ignore
 
   acceptance-candidate:
     name: Windows acceptance candidate
