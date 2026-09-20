@@ -327,7 +327,8 @@ class Handler(PluginRequestHandler):
             self.send_json({"apiVersion": 1, "pluginId": "ff7r2",
                             "name": "Final Fantasy VII Rebirth",
                             "hosted": True, "windowHost": "webview2",
-                            "capabilities": ["reshade", "shader-injector", "data-map",\n                            "player-parameter", "fixed-width-edit", "project-staging"]})
+                            "capabilities": ["reshade", "shader-injector", "data-map",
+                            "player-parameter", "fixed-width-edit", "project-staging"]})
         elif path == "/api/datamap":
             self.send_json(data_map_payload())
         elif path == "/api/workspace":
