@@ -117,6 +117,10 @@ def inline_editor() -> str:
         "/api/deployment": DEPLOYMENT, "/api/datamap": DATA_MAP,
         "/api/module-data-files": {"files": ["ModuleData/items.xml"]},
         "/api/gauntlet-files": {"files": ["GUI/Prefabs/Test.xml"]},
+        "/shared/credits.json": {"plugins": {"bannerlord": {
+            "contributions": [{"name": "Fixture Bannerlord reference", "role": "Rendered Credits fixture.", "url": "https://example.invalid/bannerlord"}],
+            "thanks": [], "licenses": []
+        }}},
     }
     stub = f'''window.__bannerlordRequests=[];
 const __fixtures={json.dumps(fixtures)};
