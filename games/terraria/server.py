@@ -37,6 +37,7 @@ from .structured_content import (
     structured_content_state,
     update_structured_content,
 )
+from .runtime import inspect_runtime
 from .source_text import (
     create_source,
     delete_source,
@@ -443,7 +444,7 @@ def _read_log_tail(path: Path) -> str:
     return (prefix + data).decode("utf-8", errors="replace")
 
 
-def build_status(platform_name: str | None = None) -> dict:
+def build_status(platform_name: str | None = None, version_reader=None) -> dict:
     platform_name = os.name if platform_name is None else platform_name
     project = project_root()
     payload = {
@@ -463,7 +464,11 @@ def build_status(platform_name: str | None = None) -> dict:
     except ValueError as error:
         payload["reason"] = str(error)
         return payload
-    payload["installRoot"] = str(install)
+    runtime = inspect_runtime(install, platform_name=platform_name, version_reader=version_reader)
+    payload.update(runtime)
+    if not runtime["runtimeSupported"]:
+        payload["reason"] = runtime["runtimeReason"]
+        return payload
     if payload["building"]:
         payload["reason"] = "A Terraria build is already running."
         return payload
@@ -477,12 +482,13 @@ def _result_local_state(project: Path) -> dict:
     return state
 
 
-def build_project(run_command=None, platform_name: str | None = None) -> dict:
+def build_project(run_command=None, platform_name: str | None = None, version_reader=None) -> dict:
     platform_name = os.name if platform_name is None else platform_name
-    if platform_name != "nt":
-        raise ValueError("Native Terraria build handoff is supported on Windows only.")
+    status = build_status(platform_name=platform_name, version_reader=version_reader)
+    if not status.get("available"):
+        raise ValueError(status.get("reason") or "Native Terraria build handoff is unavailable.")
 
-    install = _installation_root()
+    install = Path(status["installRoot"])
     project = _source_project_root()
     save_root = Path(TMODLOADER_SAVE_ROOT).resolve()
     runner = subprocess.run if run_command is None else run_command

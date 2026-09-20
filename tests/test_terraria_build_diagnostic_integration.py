@@ -40,7 +40,7 @@ class TerrariaBuildDiagnosticIntegrationTests(unittest.TestCase):
                     output = f"{source}(7,9): error CS0103: The name 'Nope' does not exist in the current context\n"
                     return subprocess.CompletedProcess(command, 1, stdout=output, stderr="")
 
-                result = server.build_project(run_command=fake_run, platform_name="nt")
+                result = server.build_project(run_command=fake_run, platform_name="nt", version_reader=lambda _path: "1.4.4.9+2026.7.3.0|2026.7|stable|Stable|deadbeef|0")
                 self.assertFalse(result["ok"])
                 self.assertEqual(result["exitCode"], 1)
                 self.assertEqual(len(result["diagnostics"]), 1)

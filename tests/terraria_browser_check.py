@@ -97,7 +97,16 @@ def main() -> None:
 
                     page.locator("#plugin-info").click()
                     page.get_by_text("MOD LOADER", exact=True).wait_for()
-                    assert "External Steam runtime" in page.locator("#main").inner_text()
+                    ownership = page.get_by_text("External Steam runtime", exact=False)
+                    for _ in range(8):
+                        if ownership.is_visible():
+                            break
+                        next_page = page.locator("#main .lex-tweaks-pages").get_by_role("button", name="Next page")
+                        if not next_page.count() or next_page.is_disabled():
+                            break
+                        next_page.click()
+                        page.wait_for_timeout(80)
+                    assert ownership.is_visible(), page.locator("#main").inner_text()
                     no_horizontal_overflow(page, "info-desktop")
 
                     page.locator("#plugin-data-map").click()

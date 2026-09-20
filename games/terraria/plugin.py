@@ -8,6 +8,7 @@ from pathlib import Path
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from service_session import LocalPluginSession
+from .runtime import inspect_runtime
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -97,7 +98,13 @@ def discover_projects() -> list[Path]:
 
 
 def check() -> list[str]:
-    return []
+    if os.name != "nt":
+        return []
+    root = Path(os.environ.get("LEXEDITOR_TERRARIA_ROOT", r"C:\Program Files (x86)\Steam\steamapps\common\tModLoader"))
+    if not root.is_dir():
+        return []
+    runtime = inspect_runtime(root)
+    return [] if runtime["runtimeSupported"] else [runtime["runtimeReason"]]
 
 
 class TerrariaSession(LocalPluginSession):
