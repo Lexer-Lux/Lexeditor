@@ -148,6 +148,202 @@ SCHEMAS = {
         ],
         "columns": ["id", "tonemap", "flags"],
     },
+    "party-templates": {
+        "label": "Party templates", "filename": "module_party_templates.py", "variable": "party_templates",
+        "status": "partial",
+        "notes": "Names have semantic controls. Flags, encounter menu, faction, personality and the documented maximum-six troop-stack list remain validated expressions.",
+        "fields": [
+            _f("id", "ID", "identity", "Stable pt_* source identity."),
+            _f("name", "Name", "string", "Party-template display name."),
+            _f("flags", "Flags", "expr", "Party/map-icon behavior flags."),
+            _f("menu", "Encounter menu", "expr", "Menu used when this party is met; 0 uses the default encounter system."),
+            _f("faction", "Faction", "expr", "Faction assigned to generated parties."),
+            _f("personality", "Personality", "expr", "AI personality expression."),
+            _f("stacks", "Troop stacks", "expr", "Up to six (troop, minimum, maximum, optional member flags) stack records."),
+        ],
+        "columns": ["name", "id", "faction"],
+    },
+    "parties": {
+        "label": "Parties", "filename": "module_parties.py", "variable": "parties",
+        "status": "partial", "minFields": 11, "maxFields": 12,
+        "notes": "Names, map coordinates and optional direction have semantic controls. Reference/AI fields and troop stacks remain validated expressions.",
+        "fields": [
+            _f("id", "ID", "identity", "Stable p_* source identity."),
+            _f("name", "Name", "string", "Party display name."),
+            _f("flags", "Flags", "expr", "Party behavior and map-icon flags."),
+            _f("menu", "Encounter menu", "expr", "Encounter menu; 0 uses the default system."),
+            _f("template", "Party template", "expr", "pt_* template; pt_none means no template."),
+            _f("faction", "Faction", "expr", "fac_* faction reference."),
+            _f("personality", "Personality", "expr", "Party AI personality."),
+            _f("aiBehavior", "AI behavior", "expr", "ai_bhvr_* behavior."),
+            _f("aiTarget", "AI target", "expr", "Initial AI target party."),
+            _f("coordinates", "Initial coordinates", "vec2", "Initial world-map X and Y coordinates.", components=["X", "Y"], container="tuple"),
+            _f("stacks", "Troop stacks", "expr", "List of (troop, count, member flags) stacks."),
+            _f("direction", "Direction", "number", "Optional starting direction in degrees.", optional=True),
+        ],
+        "columns": ["name", "id", "faction"],
+    },
+    "map-icons": {
+        "label": "Map icons", "filename": "module_map_icons.py", "variable": "map_icons",
+        "status": "partial", "minFields": 5, "maxFields": 8,
+        "notes": "ID, flags, mesh, scale and sound are the documented common prefix and are editable. Optional offsets and custom trigger tails have multiple record shapes and remain source-only.",
+        "fields": [
+            _f("id", "ID", "identity", "Stable icon_* source identity."),
+            _f("flags", "Flags", "expr", "Map-icon behavior flags."),
+            _f("mesh", "Mesh", "string", "World-map mesh name."),
+            _f("scale", "Scale", "number", "World-map icon scale.", min=0),
+            _f("sound", "Sound", "expr", "Sound event used by the icon."),
+        ],
+        "columns": ["id", "mesh", "scale"],
+    },
+    "scenes": {
+        "label": "Scenes", "filename": "module_scenes.py", "variable": "scenes",
+        "status": "partial", "minFields": 10, "maxFields": 11,
+        "notes": "Indoor mesh/body, movement bounds, water level, terrain code and optional outer terrain are structured. Flags/reference lists remain expressions; .sco layout still belongs to Warband's scene editor.",
+        "fields": [
+            _f("id", "ID", "identity", "Stable scn_* source identity."),
+            _f("flags", "Flags", "expr", "sf_* scene generation/behavior flags."),
+            _f("mesh", "Indoor mesh", "string", "Indoor scene mesh; use \"none\" for outdoor scenes."),
+            _f("body", "Indoor body", "string", "Indoor collision body; use \"none\" for outdoor scenes."),
+            _f("minPosition", "Minimum position", "vec2", "Minimum player X/Y movement boundary.", components=["X", "Y"], container="tuple"),
+            _f("maxPosition", "Maximum position", "vec2", "Maximum player X/Y movement boundary.", components=["X", "Y"], container="tuple"),
+            _f("waterLevel", "Water level", "number", "Scene water height."),
+            _f("terrainCode", "Terrain code", "string", "Terrain-generator code for outdoor scenes."),
+            _f("relatedScenes", "Related scenes", "expr", "Deprecated directly-accessible scene references."),
+            _f("chestTroops", "Chest troops", "expr", "Troops whose inventories are exposed by chest variations."),
+            _f("outerTerrain", "Outer terrain", "string", "Optional outer-terrain mesh name.", optional=True),
+        ],
+        "columns": ["id", "mesh", "waterLevel"],
+    },
+    "scene-props": {
+        "label": "Scene props", "filename": "module_scene_props.py", "variable": "scene_props",
+        "status": "partial",
+        "notes": "Visual mesh is structured. Flags, physics object and associated trigger operation blocks remain validated expressions.",
+        "fields": [
+            _f("id", "ID", "identity", "Stable spr_* source identity."),
+            _f("flags", "Flags", "expr", "Scene-prop behavior flags."),
+            _f("mesh", "Mesh", "string", "Visual mesh name."),
+            _f("physicsObject", "Physics object", "expr", "Collision/physics object reference; some records use 0."),
+            _f("triggers", "Triggers", "expr", "Simple-trigger operation list associated with the prop."),
+        ],
+        "columns": ["id", "mesh", "physicsObject"],
+    },
+    "mission-templates": {
+        "label": "Mission templates", "filename": "module_mission_templates.py", "variable": "mission_templates",
+        "status": "partial",
+        "notes": "Mission descriptions are semantic text. Flags/type and spawn/trigger operation lists remain validated expressions.",
+        "fields": [
+            _f("id", "ID", "identity", "Stable mt_* source identity."),
+            _f("flags", "Flags", "expr", "Mission-template flags."),
+            _f("missionType", "Mission type", "expr", "Default meeting-system type such as charge/charge_with_ally, or -1 for custom missions."),
+            _f("description", "Description", "text", "Text describing the mission."),
+            _f("spawns", "Spawn records", "expr", "Entry/spawn/alter/AI flags, troop count and optional equipment."),
+            _f("triggers", "Triggers", "expr", "Mission trigger operation list."),
+        ],
+        "columns": ["description", "id", "missionType"],
+    },
+    "game-menus": {
+        "label": "Game menus", "filename": "module_game_menus.py", "variable": "game_menus",
+        "status": "partial",
+        "notes": "Menu text and mesh-name are structured. Flags, activation operations and nested options remain validated expressions.",
+        "fields": [
+            _f("id", "ID", "identity", "Stable menu_* source identity."),
+            _f("flags", "Flags", "expr", "Game-menu flags and optional text-color expression."),
+            _f("text", "Menu text", "text", "Text displayed when the menu opens."),
+            _f("mesh", "Mesh", "string", "Documented unused mesh-name field; Native uses \"none\"."),
+            _f("operations", "Activation operations", "expr", "Operation block run when the menu activates."),
+            _f("options", "Menu options", "expr", "Nested option records with id, conditions, text and consequences."),
+        ],
+        "columns": ["id", "text", "mesh"],
+    },
+    "presentations": {
+        "label": "Presentations", "filename": "module_presentations.py", "variable": "presentations",
+        "status": "partial",
+        "notes": "Stable presentation records are browsable. Flags, background mesh and trigger operation list remain validated expressions.",
+        "fields": [
+            _f("id", "ID", "identity", "Stable prsnt_* source identity."),
+            _f("flags", "Flags", "expr", "Presentation behavior flags."),
+            _f("backgroundMesh", "Background mesh", "expr", "Background mesh reference."),
+            _f("triggers", "Triggers", "expr", "Presentation simple-trigger operation list."),
+        ],
+        "columns": ["id", "backgroundMesh", "flags"],
+    },
+    "tableaus": {
+        "label": "Tableau materials", "filename": "module_tableau_materials.py", "variable": "tableaus",
+        "status": "partial",
+        "notes": "Sample material, dimensions and documented mesh bounds are semantic controls. Flags and executable operation block remain expressions.",
+        "fields": [
+            _f("id", "ID", "identity", "Stable tab_* source identity."),
+            _f("flags", "Flags", "expr", "Tableau behavior flags."),
+            _f("sampleMaterial", "Sample material", "string", "Sample material used by the tableau."),
+            _f("width", "Width", "integer", "Generated tableau texture width in pixels.", min=1),
+            _f("height", "Height", "integer", "Generated tableau texture height in pixels.", min=1),
+            _f("minX", "Mesh min X", "integer", "Mesh minimum X; divided by 1000 by the Module System."),
+            _f("minY", "Mesh min Y", "integer", "Mesh minimum Y; divided by 1000 by the Module System."),
+            _f("maxX", "Mesh max X", "integer", "Mesh maximum X; divided by 1000 by the Module System."),
+            _f("maxY", "Mesh max Y", "integer", "Mesh maximum Y; divided by 1000 by the Module System."),
+            _f("operations", "Operations", "expr", "Operation block executed when the tableau is activated."),
+        ],
+        "columns": ["id", "sampleMaterial", "width"],
+    },
+    "skins": {
+        "label": "Skins", "filename": "module_skins.py", "variable": "skins",
+        "status": "partial", "minFields": 15, "maxFields": 18,
+        "notes": "Body/calf/hand/head meshes, skeleton and scale are structured. Face/hair/beard/texture/voice lists plus optional blood/constraint expressions remain source expressions.",
+        "fields": [
+            _f("id", "ID", "identity", "Stable skin identity."),
+            _f("flags", "Flags", "expr", "Skin flags; the reference Module System notes this is normally 0."),
+            _f("bodyMesh", "Body mesh", "string", "Body mesh name."),
+            _f("calfMesh", "Calf mesh", "string", "Left calf mesh name."),
+            _f("handMesh", "Hand mesh", "string", "Left hand mesh name."),
+            _f("headMesh", "Head mesh", "string", "Head mesh name."),
+            _f("faceKeys", "Face keys", "expr", "Face morph-key definition/reference."),
+            _f("hairMeshes", "Hair meshes", "expr", "Hair mesh list."),
+            _f("beardMeshes", "Beard meshes", "expr", "Beard mesh list."),
+            _f("hairTextures", "Hair textures", "expr", "Hair texture list."),
+            _f("beardTextures", "Beard textures", "expr", "Beard texture list."),
+            _f("faceTextures", "Face textures", "expr", "Face texture/color records."),
+            _f("voices", "Voices", "expr", "Voice-event/sound mappings."),
+            _f("skeleton", "Skeleton", "string", "Skeleton resource name."),
+            _f("scale", "Scale", "number", "Skin scale; upstream notes this setting does not fully work."),
+            _f("bloodParticles1", "Blood particles 1", "expr", "Optional first blood particle-system reference.", optional=True),
+            _f("bloodParticles2", "Blood particles 2", "expr", "Optional second blood particle-system reference.", optional=True),
+            _f("faceConstraints", "Face constraints", "expr", "Optional face-key constraint list.", optional=True),
+        ],
+        "columns": ["id", "bodyMesh", "scale"],
+    },
+    "particle-systems": {
+        "label": "Particle systems", "filename": "module_particle_systems.py", "variable": "particle_systems",
+        "status": "partial",
+        "notes": "Emission/lifetime/turbulence values, two-key color/alpha/scale curves, emit vectors and rotation controls are semantic. Flags remain a validated expression.",
+        "fields": [
+            _f("id", "ID", "identity", "Stable psys_* source identity."),
+            _f("flags", "Flags", "expr", "Particle-system behavior flags."),
+            _f("mesh", "Particle mesh", "string", "Mesh rendered for each particle."),
+            _f("particlesPerSecond", "Particles / second", "number", "Particles emitted each second.", min=0),
+            _f("particleLife", "Particle life", "number", "Particle lifetime in seconds.", min=0),
+            _f("damping", "Damping", "number", "Speed lost to friction."),
+            _f("gravity", "Gravity", "number", "Gravity strength; negative values float upward."),
+            _f("turbulenceSize", "Turbulence size", "number", "Random turbulence size in meters.", min=0),
+            _f("turbulenceStrength", "Turbulence strength", "number", "Strength of turbulence."),
+            _f("alphaKey1", "Alpha key 1", "vec2", "Curve key (normalized time, magnitude).", components=["Time", "Magnitude"], container="tuple"),
+            _f("alphaKey2", "Alpha key 2", "vec2", "Curve key (normalized time, magnitude).", components=["Time", "Magnitude"], container="tuple"),
+            _f("redKey1", "Red key 1", "vec2", "Red curve key.", components=["Time", "Magnitude"], container="tuple"),
+            _f("redKey2", "Red key 2", "vec2", "Red curve key.", components=["Time", "Magnitude"], container="tuple"),
+            _f("greenKey1", "Green key 1", "vec2", "Green curve key.", components=["Time", "Magnitude"], container="tuple"),
+            _f("greenKey2", "Green key 2", "vec2", "Green curve key.", components=["Time", "Magnitude"], container="tuple"),
+            _f("blueKey1", "Blue key 1", "vec2", "Blue curve key.", components=["Time", "Magnitude"], container="tuple"),
+            _f("blueKey2", "Blue key 2", "vec2", "Blue curve key.", components=["Time", "Magnitude"], container="tuple"),
+            _f("scaleKey1", "Scale key 1", "vec2", "Scale curve key.", components=["Time", "Magnitude"], container="tuple"),
+            _f("scaleKey2", "Scale key 2", "vec2", "Scale curve key.", components=["Time", "Magnitude"], container="tuple"),
+            _f("emitBox", "Emit box size", "vec3", "Dimensions of the emission box.", components=["X", "Y", "Z"], container="tuple"),
+            _f("emitVelocity", "Emit velocity", "vec3", "Initial particle velocity.", components=["X", "Y", "Z"], container="tuple"),
+            _f("emitRandomness", "Direction randomness", "number", "Randomness applied to emission direction."),
+            _f("rotationSpeed", "Rotation speed", "number", "Initial rotation speed in degrees per second."),
+            _f("rotationDamping", "Rotation damping", "number", "How quickly particle rotation stops.", min=0),
+        ],
+        "columns": ["id", "mesh", "particlesPerSecond"],
+    },
 }
 
 SCHEMA_BY_FILENAME = {schema["filename"]: key for key, schema in SCHEMAS.items()}
@@ -278,14 +474,15 @@ def _decode(expression: str, field: dict):
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
             raise ValueError("expected a finite numeric literal")
         return value
-    if kind == "vec4":
+    if kind in {"vec2", "vec3", "vec4"}:
+        count = int(kind[-1])
         value = ast.literal_eval(expression)
-        if not isinstance(value, (list, tuple)) or len(value) != 4:
-            raise ValueError("expected four numeric values")
+        if not isinstance(value, (list, tuple)) or len(value) != count:
+            raise ValueError(f"expected {count} numeric values")
         result = []
         for item in value:
             if isinstance(item, bool) or not isinstance(item, (int, float)) or not math.isfinite(float(item)):
-                raise ValueError("expected four finite numeric values")
+                raise ValueError(f"expected {count} finite numeric values")
             result.append(item)
         return result
     return expression.strip()
@@ -328,7 +525,7 @@ def _records(text: str, schema: dict):
         else:
             row["id"] = identity
         display = row["fields"].get("name")
-        for key in ("file", "resource", "value"):
+        for key in ("file", "resource", "value", "text", "description", "mesh", "sampleMaterial", "bodyMesh"):
             if isinstance(display, str):
                 break
             display = row["fields"].get(key)
@@ -409,19 +606,21 @@ def _encode(value, spec: dict):
         if "max" in spec and number > spec["max"]:
             raise ValueError(f"{spec['label']} must be at most {spec['max']}")
         return str(int(number)) if number.is_integer() else format(number, ".15g")
-    if kind == "vec4":
-        if not isinstance(value, (list, tuple)) or len(value) != 4:
-            raise ValueError(f"{spec['label']} needs four numbers")
+    if kind in {"vec2", "vec3", "vec4"}:
+        count = int(kind[-1])
+        if not isinstance(value, (list, tuple)) or len(value) != count:
+            raise ValueError(f"{spec['label']} needs {count} numbers")
         rendered = []
         for item in value:
             try:
                 number = float(item)
             except Exception as error:
-                raise ValueError(f"{spec['label']} needs four numbers") from error
+                raise ValueError(f"{spec['label']} needs {count} numbers") from error
             if not math.isfinite(number):
                 raise ValueError(f"{spec['label']} needs finite numbers")
             rendered.append(str(int(number)) if number.is_integer() else format(number, ".15g"))
-        return "[" + ", ".join(rendered) + "]"
+        opening, closing = ("(", ")") if spec.get("container") == "tuple" else ("[", "]")
+        return opening + ", ".join(rendered) + closing
     return _expression(value)
 
 

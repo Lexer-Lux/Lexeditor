@@ -406,22 +406,11 @@ def modules_with_manual() -> list[str]:
 
 SOURCE_ONLY_NOTES = {
     "module.ini": "Warband engine/module INI directives are available as source. Resource load order and engine flags do not yet have a dedicated bounded settings screen.",
-    "module_skins.py": "Skin records contain face-key constraints and nested hair, beard, face-texture and voice lists. No dedicated safe editor is implemented.",
     "module_animations.py": "Animation records contain variable sequence lists and order-sensitive hardcoded animation slots. No dedicated safe sequence editor is implemented.",
-    "module_parties.py": "Party records contain AI targets, coordinates and nested troop stacks; no dedicated party editor is implemented.",
-    "module_party_templates.py": "Party templates contain nested troop-stack ranges and behavior expressions; no dedicated template editor is implemented.",
-    "module_map_icons.py": "Map icons have several record shapes, including trigger operation lists. No dedicated icon/trigger editor is implemented.",
-    "module_scenes.py": "Scene source combines terrain codes, bounds and reference lists while .sco layouts remain Warband scene-editor data.",
-    "module_scene_props.py": "Scene props combine mesh/collision fields with operation-list triggers; no dedicated prop editor is implemented.",
     "module_scripts.py": "Script records are operation blocks. Lexeditor has no structured Warband operation editor.",
     "module_triggers.py": "Global triggers are timing/condition/consequence operation blocks without stable record IDs.",
     "module_simple_triggers.py": "Simple triggers are timed operation blocks without stable record IDs.",
-    "module_mission_templates.py": "Mission templates include spawn records and trigger operation blocks; no dedicated editor is implemented.",
-    "module_game_menus.py": "Game menus contain activation, condition and consequence operation blocks; no dedicated menu editor is implemented.",
     "module_dialogs.py": "Dialogs are state transitions with condition/consequence operation blocks and no independent stable record ID.",
-    "module_presentations.py": "Presentations are scripted overlay/trigger operation blocks; no dedicated presentation editor is implemented.",
-    "module_tableau_materials.py": "Tableau records end in executable operation blocks; no dedicated tableau editor is implemented.",
-    "module_particle_systems.py": "Particle systems have interdependent keyframes and vectors; no dedicated particle-system editor is implemented.",
 }
 
 def data_map_rows() -> dict:

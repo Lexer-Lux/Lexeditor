@@ -65,15 +65,14 @@
     function fieldControl(dataset,row,spec,readOnly){
       const value=effective(dataset,row,spec.key),problem=row.fieldProblems?.[spec.key];
       const disabled=readOnly||spec.kind==="identity"||!!problem;
-      if(spec.kind==="vec4"){
-        if(!Array.isArray(value)||value.length!==4)return LexeditorUI.el("input",{value:String(value??""),disabled:true,title:problem||"This vector is not a four-number literal; edit it in source."});
-        const root=LexeditorUI.el("div",{class:"warband-vector4"});
-        value.forEach((component,index)=>{
-          const input=LexeditorUI.el("input",{type:"number",step:"any",value:component,disabled,
-            "aria-label":spec.components?.[index]||spec.label+" "+(index+1),
-            oninput:event=>{if(event.target.value==="")return;const next=[...effective(dataset,row,spec.key)];next[index]=Number(event.target.value);setField(dataset,row,spec.key,next);}});
-          root.append(LexeditorUI.el("label",{},LexeditorUI.el("span",{},spec.components?.[index]||String(index+1)),input));
-        });return root;
+      if(/^vec[234]$/.test(spec.kind)){
+        const count=Number(spec.kind.slice(3));
+        if(!Array.isArray(value)||value.length!==count)return LexeditorUI.readonlyField(String(value??""),{format:false});
+        return LexeditorUI.multiNumberRow(value.map((component,index)=>({
+          label:spec.components?.[index]||String(index+1),
+          control:LexeditorUI.el("input",{type:"number",step:"any",value:component,disabled,
+            oninput:event=>{if(event.target.value==="")return;const next=[...effective(dataset,row,spec.key)];next[index]=Number(event.target.value);setField(dataset,row,spec.key,next);}})
+        })),{columns:Math.min(count,3)});
       }
       const attrs={value:value??"",disabled};
       if(spec.kind==="integer"||spec.kind==="number"){
@@ -83,9 +82,11 @@
         attrs.oninput=event=>{if(event.target.value==="")return;setField(dataset,row,spec.key,spec.kind==="integer"?Number.parseInt(event.target.value,10):Number(event.target.value));};
         return LexeditorUI.el("input",attrs);
       }
-      if(spec.kind==="text"||spec.kind==="expr"){
-        attrs.class=spec.kind==="expr"?"warband-module-expression":"warband-module-text";
-        attrs.oninput=event=>setField(dataset,row,spec.key,event.target.value);return LexeditorUI.el("textarea",attrs);
+      if(spec.kind==="expr"){
+        const control=LexeditorUI.codeField({value:value??"",disabled,oninput:event=>setField(dataset,row,spec.key,event.target.value)});return control;
+      }
+      if(spec.kind==="text"){
+        return LexeditorUI.textArea({value:value??"",rows:4,disabled,oninput:event=>setField(dataset,row,spec.key,event.target.value)});
       }
       attrs.oninput=event=>setField(dataset,row,spec.key,event.target.value);return LexeditorUI.el("input",attrs);
     }
@@ -96,12 +97,12 @@
       const fields=data.schema.fields.filter(spec=>row.presentFields?.includes(spec.key)).map(spec=>{
         const description=row.fieldProblems?.[spec.key]?(spec.help||"")+" This field is not a supported literal in this record: "+row.fieldProblems[spec.key]+". Use source editing for this field.":spec.help||"";
         return LexeditorUI.detailField({label:spec.label,property:spec.key,
-          dataType:({identity:"ID",string:"STRING",text:"STRING",expr:"EXPR",integer:"INT",number:"FLOAT",vec4:"VECTOR4"})[spec.kind]||"VALUE",
+          dataType:({identity:"ID",string:"STRING",text:"STRING",expr:"EXPR",integer:"INT",number:"FLOAT",vec2:"VECTOR2",vec3:"VECTOR3",vec4:"VECTOR4"})[spec.kind]||"VALUE",
           description,control:fieldControl(dataset,row,spec,readOnly)});
       });
       return LexeditorUI.detailPanel({className:"warband-module-detail",title:row.name||row.id,identity:row.id,
         meta:data.schema.status==="integrated"?"Structured":"Structured partial",
-        body:[LexeditorUI.detailGroup({title:data.schema.label,body:fields}),LexeditorUI.el("p",{class:"warband-module-note"},data.schema.notes)]});
+        body:[LexeditorUI.detailGroup({title:data.schema.label,body:fields}),LexeditorUI.detailNote(data.schema.notes)]});
     }
     function render(){
       const rows=availableRows();if(!active||!rows.some(row=>row.dataset===active))activate();
