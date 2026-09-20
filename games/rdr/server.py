@@ -1256,8 +1256,11 @@ def _loot_script_sources() -> tuple[bytes, str]:
         with tempfile.TemporaryDirectory(prefix="rdr-loot-script-") as folder:
             work = Path(folder)
             for command, target in (("unpack", "u"), ("decompile", "d")):
-                subprocess.run([str(tool), command, str(archive), str(work / target),
-                                wanted], check=True, capture_output=True, timeout=600)
+                subprocess.run(
+                    [str(tool), command, str(archive), str(work / target), wanted],
+                    check=True, capture_output=True, timeout=600,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
             script.write_bytes(next((work / "u").rglob("*.wsc")).read_bytes())
             decompiled.write_text(
                 next((work / "d").rglob("*.c")).read_text(encoding="utf-8", errors="replace"),
