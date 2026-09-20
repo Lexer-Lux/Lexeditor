@@ -19,7 +19,7 @@ A modern source mod uses:
 - HJSON localization and packaged resources;
 - tModLoader's own build pipeline to produce `<save-root>/Mods/<ModName>.tmod`.
 
-Lexeditor-created projects use that native layout. Project names are validated **before filesystem mutation** as conservative ASCII C# identifiers and reject C# keywords plus tModLoader's reserved `Mod`, `ModLoader` and `tModLoader` names. Creation renders matching namespace/assembly/source names and a `Localization/en-US.hjson` starter.
+Lexeditor-created projects use that native layout. Terraria's initializer validates project names as conservative ASCII C# identifiers and rejects C# keywords plus tModLoader's reserved `Mod`, `ModLoader` and `tModLoader` names before it renders or renames Terraria source files. Current shared `ProjectManager` no longer exposes a game-specific preflight hook before its generic folder create/rename operation; enforcing that tModLoader-only rule before the folder operation itself is therefore a shared-framework dependency, not an API this plugin reintroduces. Creation renders matching namespace/assembly/source names and a `Localization/en-US.hjson` starter.
 
 Renaming the project folder changes the tModLoader internal/package name. Lexeditor deliberately does **not** attempt a global semantic C# namespace/type refactor when a project is renamed; source identifiers remain ordinary author-controlled C#.
 

@@ -2,7 +2,7 @@
   "schema": 1,
   "plugins": {
     "blank": {
-      "loader": "Template only \u2014 not implemented.",
+      "loader": "Template only — not implemented.",
       "structure": "Template only. A shipping plugin must declare its mod root or package format and the file layout users should install or edit.",
       "overriding": "Template only. A shipping plugin must declare whether mods stack, replace whole files, merge semantic records, or are mutually exclusive."
     },
@@ -55,6 +55,11 @@
       "loader": "Two loaders sit beside ff7rebirth_.exe in End/Binaries/Win64, each under a name Windows loads for the game. ReShade is dxgi.dll. Shader Injector 2.2.1 is dsound.dll, with its ShaderInjector folder, and replaces the game's own lighting, shadow, water and post-process shaders while it runs. Rebirth's own d3d12.dll, or a DirectX 12 fix installed under that name, is never overwritten.",
       "structure": "A Rebirth project holds a reshade/ folder with the preset .ini and any shaders its author wrote. Shader Injector ships inside Lexeditor as upstream's pinned release archive and is extracted into the game folder on request; ShaderInjector.ini beside the executable holds its settings, and the ShaderInjector folder holds the shaders people edit.",
       "overriding": "ReShade applies one preset at a time over the finished frame. Shader Injector changes shaders before that, so the two stack rather than compete. Files the player has edited in the ShaderInjector folder are kept on reinstall and removal, and a PAK mod from elsewhere is untouched."
+    },
+    "terraria": {
+      "loader": "tModLoader 1.4.4 stable. Lexeditor targets tModLoader's native source-project, build, local-mod and Workshop ecosystem instead of patching vanilla Terraria or shipping another loader.",
+      "structure": "Editable source mods live under the tModLoader save root at ModSources/<ModName>/ with build.txt, a .csproj importing ..\\tModLoader.targets, C# source, localization and content assets. tModLoader owns compiled .tmod output and enabled-mod state.",
+      "overriding": "tModLoader loads multiple mods through its API/dependency model rather than whole-file replacement order. Lexeditor does not invent cross-mod file priority or semantically merge unrelated source projects; runtime interactions and conflicts follow tModLoader and the participating mods."
     }
   }
 }
