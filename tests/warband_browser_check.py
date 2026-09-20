@@ -124,7 +124,7 @@ def main():
                     page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('')
                     page.get_by_role('searchbox',name='Search the data map',exact=True).fill('module_skills.py')
                     page.locator('.lex-column-list-row').filter(has_text='module_skills.py').click()
-                    page.get_by_role('button',name='Open records',exact=True).click()
+                    page.get_by_role('button',name='Open misc',exact=True).click()
                     page.locator('.warband-module-state').wait_for(state='visible')
                     assert 'Loading structured Module System records' in page.locator('.warband-module-state').inner_text()
                     page.locator('.warband-module-detail').wait_for(state='visible')
@@ -133,6 +133,13 @@ def main():
                     assert max_level.get_attribute('type')=='number'
                     assert page.locator('.warband-module-detail [data-lex-property="description"] textarea').count()==1
                     assert page.locator('.warband-module-detail [data-lex-property="flags"] textarea').count()==1
+                    # Shared table editing mirrors the selected record's scalar Detail field.
+                    cell=page.locator('.warband-record-list .lex-column-list-row').first.locator('[data-column-key="maxLevel"]')
+                    cell.dblclick()
+                    cell.locator('input').fill('12');cell.locator('input').press('Enter')
+                    assert page.locator('.warband-module-detail [data-lex-property="maxLevel"] input').input_value()=='12'
+                    page.get_by_role('button',name='Discard changes',exact=True).click()
+                    max_level=page.locator('.warband-module-detail [data-lex-property="maxLevel"] input')
                     max_level.fill('11')
                     assert page.evaluate('moduleRecords.dirtyCount()')==1
                     page.get_by_role('button',name='Discard changes',exact=True).click()
@@ -141,7 +148,7 @@ def main():
                     page.locator('.lex-save-icon').click()
                     page.wait_for_function('moduleRecords.dirtyCount()===0 && !state.build.running')
                     page.get_by_role('button',name='Items',exact=True).click()
-                    page.get_by_role('button',name='Module Data',exact=True).click()
+                    page.get_by_role('button',name='Misc.',exact=True).click()
                     page.locator('.warband-module-detail').wait_for(state='visible')
                     assert page.locator('.warband-module-detail [data-lex-property="maxLevel"] input').input_value()=='11'
                     page.screenshot(path=str(ARTIFACTS/f'module-data-{width}.png'),full_page=True)

@@ -53,7 +53,7 @@
       active=dataset||active||availableRows().find(row=>row.coverage==="structured"&&row.openable)?.dataset||availableRows()[0]?.dataset||"";
       viewState(active);
     }
-    function open(dataset){activate(dataset);state.tab="records";renderApp();}
+    function open(dataset){activate(dataset);state.tab="misc";renderApp();}
     function fieldControl(dataset,row,spec,readOnly){
       const value=effective(dataset,row,spec.key),problem=row.fieldProblems?.[spec.key];
       const disabled=readOnly||spec.kind==="identity"||!!problem;
@@ -111,7 +111,21 @@
       const local=viewState(active),query=local.query.trim().toLocaleLowerCase();
       const filtered=(data.rows||[]).filter(row=>!query||[row.id,row.name,...Object.values(row.fields||{}).map(value=>Array.isArray(value)?value.join(" "):value)].some(value=>String(value??"").toLocaleLowerCase().includes(query)));
       if(!filtered.length&&!query){main().replaceChildren(LexeditorUI.el("section",{class:"card warband-module-state"},LexeditorUI.el("h2",{},"No "+data.schema.label.toLowerCase()+" records"),LexeditorUI.el("p",{},data.filename+" contains an empty "+data.schema.label.toLowerCase()+" list.")));return;}
-      const columns=data.schema.columns.map(key=>{const spec=data.schema.fields.find(field=>field.key===key)||{label:key};return {key,label:spec.label,sortable:false,render:row=>{const value=effective(active,row,key),text=Array.isArray(value)?value.join(", "):String(value??"");return LexeditorUI.el("span",{class:"warband-cell-text",title:text},text);}};});
+      const columns=data.schema.columns.map(key=>{
+        const spec=data.schema.fields.find(field=>field.key===key)||{label:key};
+        const column={key,label:spec.label,sortable:false,
+          render:row=>{const value=effective(active,row,key),text=Array.isArray(value)?value.join(", "):String(value??"");return LexeditorUI.el("span",{class:"warband-cell-text",title:text},text);}};
+        if(["string","text","integer","number"].includes(spec.kind)){
+          column.editValue=row=>effective(active,row,key);
+          column.edit=(row,value)=>{
+            const parsed=spec.kind==="integer"?Number.parseInt(value,10):spec.kind==="number"?Number(value):value;
+            if((spec.kind==="integer"||spec.kind==="number")&&!Number.isFinite(parsed))return;
+            setField(active,row,key,parsed);renderApp();
+          };
+          if(spec.kind==="integer"||spec.kind==="number"){column.numeric=true;column.step=spec.kind==="integer"?1:"any";if(spec.min!==undefined)column.min=spec.min;if(spec.max!==undefined)column.max=spec.max;}
+        }
+        return column;
+      });
       const selectedRow=filtered.find(row=>String(row.recordIndex)===local.selected)||filtered[0];if(selectedRow)local.selected=String(selectedRow.recordIndex);
       main().replaceChildren(LexeditorUI.pagedListDetail({rows:filtered,key:row=>String(row.recordIndex),selected:local.selected,
         noun:data.schema.label.toLowerCase(),splitKey:"warband-module-"+active,className:"warband-paged-table warband-module-data",slots:false,

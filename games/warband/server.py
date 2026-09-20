@@ -446,7 +446,7 @@ def data_map_rows() -> dict:
                 notes = "Troop names, factions, attributes, flags and equipment have controls. Advanced fields use source expressions. Saves preserve record IDs and upgrade code, then use the project build."
             elif dataset and source_available:
                 schema = MODULE_RECORD_SCHEMAS[dataset]
-                coverage, status, view = "structured", schema["status"], "records"
+                coverage, status, view = "structured", schema["status"], "misc"
                 notes = schema["notes"]
             elif source_available:
                 coverage, status = "source", "not-integrated"
