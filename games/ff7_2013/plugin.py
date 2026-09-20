@@ -11,7 +11,8 @@ from pathlib import Path
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from service_session import LocalPluginSession, request_json
-from games.ff7.plugin import PLUGIN as SHARED_PLUGIN, prepare_product, kernel_save_payload
+from games.ff7.plugin import prepare_product, kernel_save_payload
+from games.ff7.plugin import PLUGIN as SHARED_PLUGIN
 from games.ff7.kernel import Kernel, resolve_kernel
 
 
