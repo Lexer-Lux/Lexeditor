@@ -54,7 +54,7 @@ def main():
                     body="<html><body></body></html>", content_type="text/html"))
                 page.goto("http://fixture.test/")
                 page.add_style_tag(path=str(ROOT / "ui/framework.css"))
-                page.add_style_tag(path=str(ROOT / "games/ff7r/theme.css"))
+                page.add_style_tag(path=str(ROOT / "games/ff7r/game-appearance.css"))
                 page.expose_binding("hostCall", bridge)
                 page.evaluate("""() => { window.pywebview = {api:new Proxy({}, {
                     get:(_,name)=>(...args)=>window.hostCall(name,args)})}; }""")

@@ -27,7 +27,7 @@ def main():
             page.get_by_role('textbox',name='New mod name',exact=True).fill('Layout sample')
             page.get_by_role('button',name='Create Sample',exact=True).click()
             page.get_by_role('button',name='Active mod project',exact=True).click()
-            row=page.locator('div.lex-project-menu-item').first
+            row=page.locator('div.lex-project-menu-item:has(.lex-project-folder)').first
             box=row.locator(':scope > .lex-project-source-status').bounding_box()
             folder=row.locator('.lex-project-folder')
             f=folder.bounding_box()
@@ -190,25 +190,37 @@ def main():
                 # box around it: the pane reached the bar while its content
                 # stopped a pager's height short, which is the band that was
                 # reported three times and measured away twice.
+                # The bar sits one panel gap below the panel - the same gap the
+                # panel keeps from the window's sides - and the last row ends at
+                # the panel's edge, give or take its own rule and the fit pass's
+                # rounding. More than that is the dead band this guards against.
                 seat=page.evaluate('''()=>{
-                  const bar=document.querySelector('.lex-pager');
+                  const owner=document.querySelector('#main .lex-paged-list-detail');
+                  const bar=owner?.querySelector(':scope > .lex-pager');
                   if(!bar)return null;
-                  const rows=[...document.querySelectorAll('#main .lex-column-list-row')]
+                  const rows=[...owner.querySelectorAll('.lex-column-list-row')]
+                    .filter(n=>n.closest('.lex-paged-list-detail')===owner && !n.closest('.lex-component-sample'))
                     .map(n=>n.getBoundingClientRect()).filter(r=>r.height>2);
                   if(!rows.length)return null;
-                  return Math.round(bar.getBoundingClientRect().top-Math.max(...rows.map(r=>r.bottom)));}''')
+                  const side=parseFloat(getComputedStyle(document.querySelector('#main')).paddingLeft);
+                  return {gap:bar.getBoundingClientRect().top-Math.max(...rows.map(r=>r.bottom)),side};}''')
                 if seat is not None:
-                    assert -2<=seat<=6,seat
+                    assert -1<=seat['gap']-seat['side']<=3,seat
                 page.screenshot(path=str(OUT/f'blank-{width}.png'))
             page.set_viewport_size({'width':1600,'height':1000})
-            page.locator('nav button[data-tab=two]').click()
+            page.evaluate("navigate('two')")
             page.locator('[role=columnheader][data-column-key=name]').click(position={'x':3,'y':3})
             page.mouse.move(0,0);page.wait_for_timeout(150)
             sort=page.locator('[data-lex-sort] .lex-field-type-rail').first
-            data=sort.evaluate("""e=>{const s=getComputedStyle(e,'::after'),r=e.getBoundingClientRect(),f=e.closest('.lex-detail-field').getBoundingClientRect();return {y:r.top+parseFloat(s.top),center:f.top+f.height/2,x:r.left-f.left}}""")
-            assert abs(data['y']-data['center'])<1 and abs(data['x'])<1,data
+            # The sorted property's arrow rides its type marker, which sits just
+            # left of the property's name (8px of air), not in the far gutter.
+            data=sort.evaluate("""e=>{const s=getComputedStyle(e,'::after'),r=e.getBoundingClientRect(),field=e.closest('.lex-detail-field'),f=field.getBoundingClientRect();
+              const holder=field.querySelector(':scope > .lex-detail-field-label .lex-detail-field-label-text')||field.querySelector(':scope > .lex-detail-field-label');
+              const text=[...holder.childNodes].find(n=>n.nodeType===3&&n.textContent.trim());const range=document.createRange();range.selectNodeContents(text);
+              return {y:r.top+parseFloat(s.top),center:f.top+f.height/2,air:range.getBoundingClientRect().left-r.right}}""")
+            assert abs(data['y']-data['center'])<1 and abs(data['air']-8)<1,data
             page.screenshot(path=str(OUT/'sorted-detail.png'))
-            page.locator('nav button[data-tab=one]').click()
+            page.evaluate("navigate('one')")
             page.locator('.lex-detail-field').first.wait_for()
             page.mouse.move(0,0);page.wait_for_timeout(250)
             # A reference pillar reserves its room in advance. Nothing the
@@ -417,7 +429,7 @@ def main():
             assert page.locator('.lex-project-menu-item .lex-project-about').count()>0
             assert page.locator('.lex-project-remove').count()==0
             page.keyboard.press('Escape')
-            page.locator('nav button[data-tab=subtabs]').click()
+            page.evaluate("navigate('subtabs')")
             for tab in page.locator('.lex-subtab-button').all():
                 tab.hover()
                 data=tab.evaluate("""e=>{const r=e.getBoundingClientRect(),b=e.querySelector('.lex-tab-shortcut').getBoundingClientRect(),l=e.querySelector('.lex-tab-label').getBoundingClientRect();return {height:b.height,top:b.top-r.top,gap:b.left-l.right}}""")
