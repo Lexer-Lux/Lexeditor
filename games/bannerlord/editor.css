@@ -14,14 +14,11 @@ button,input,select,textarea{font:inherit}
 .bannerlord-build-log{max-height:38vh;margin:0;padding:10px;overflow:auto;color:#d8dee9;background:#101216;font:12px/1.45 "Cascadia Mono",Consolas,monospace;white-space:pre-wrap}
 .bannerlord-tweaks-page{display:flex;flex-direction:column;height:100%;min-height:0}
 .bannerlord-tweaks{flex:1;min-height:0;overflow:auto}
-.bl-source{display:flex;flex-direction:column;height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel)}
-.bl-source-head{display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--lex-border)}
-.bl-source-head code{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bl-source textarea{flex:1;min-height:0;width:100%;padding:12px;resize:none;border:0;outline:0;color:var(--lex-text);background:var(--lex-panel);font:12px/1.45 "Cascadia Mono",Consolas,monospace;tab-size:4}
-.bl-control{display:flex;align-items:center;gap:8px;min-width:0}
-.bl-note{color:var(--lex-muted)}
-.bl-list-block{padding:8px 0}
-.bl-list-block h3{margin:0 0 6px}
+.bannerlord-source{display:flex;flex-direction:column;height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel)}
+.bannerlord-source-head{display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--lex-border)}
+.bannerlord-source-head code{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bannerlord-source textarea{flex:1;min-height:0;width:100%;padding:12px;resize:none;border:0;outline:0;color:var(--lex-text);background:var(--lex-panel);font:12px/1.45 "Cascadia Mono",Consolas,monospace;tab-size:4}
+.bannerlord-required-control{display:flex;align-items:center;gap:8px;min-width:0}
 code{overflow-wrap:anywhere}
 @media(max-width:900px){
   main{padding:max(6px,var(--lex-panel-gap))}
