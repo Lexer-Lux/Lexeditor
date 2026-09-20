@@ -1850,7 +1850,7 @@ def dashboard_payload() -> dict:
             "Loot ASI override": str(LOOT_FILE),
             "Installed game": str(GAME_ROOT),
             "Prepared vanilla data": str(PREPARED_ROOT),
-            "Prepared inventory data": str(CONTENT_PREPARED_ROOT),
+            "Prepared content data": str(CONTENT_PREPARED_ROOT),
             "Prepared shop data": str(GRINGO_UNPACKED_ROOT),
         },
         "manifest": manifest,
@@ -1861,7 +1861,7 @@ def dashboard_payload() -> dict:
         "problems": paths.check()
         + ([] if PREPARED_ROOT.is_dir() else [f"Prepared RDR data is missing: {PREPARED_ROOT}"])
         + ([] if CONTENT_PREPARED_ROOT.is_dir() else [
-            f"Prepared RDR inventory data is missing: {CONTENT_PREPARED_ROOT}"])
+            f"Prepared RDR content data is missing: {CONTENT_PREPARED_ROOT}"])
         + ([] if GRINGO_UNPACKED_ROOT.is_dir() else [
             f"Prepared RDR shop data is missing: {GRINGO_UNPACKED_ROOT}"])
         + ([] if SETTINGS_FILE.is_file() else [f"Project settings are missing: {SETTINGS_FILE}"])
