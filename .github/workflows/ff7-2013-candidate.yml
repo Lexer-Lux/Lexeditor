@@ -104,3 +104,74 @@ jobs:
           path: dist/Lexeditor/
           retention-days: 7
           if-no-files-found: error
+
+
+  rendered-discard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out the exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Install rendered-test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r requirements-test.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Exercise FF7 2013 Discard in the real shared UI
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+          import unittest
+
+          sys.path.insert(0, str(Path("tools").resolve()))
+          import verify_ff7_rendered_neutral as neutral
+
+          target = neutral.target
+          out = Path("out/ff7-2013-acceptance")
+          out.mkdir(parents=True, exist_ok=True)
+
+          class FF72013Discard(target.RenderedTests):
+              def test_discard_restores_saved_baseline(self):
+                  self.install()
+                  self.open("ff7-2013")
+                  self.navigate("armor")
+                  control = self.control("armor", "defense")
+                  original = int(control.input_value())
+                  changed = original + 1 if original < 255 else original - 1
+                  control.fill(str(changed))
+                  self.page.wait_for_function("dirtyCount() > 0")
+                  self.page.locator("#global-save").click(button="right")
+                  dialog = self.page.locator(".lex-discard-dialog")
+                  dialog.wait_for(state="visible")
+                  self.page.screenshot(path=str(out / "ff7-2013-discard-confirmation.png"))
+                  dialog.get_by_role("button", name="Discard Changes", exact=True).click()
+                  self.page.wait_for_function("dirtyCount() === 0")
+                  restored = self.control("armor", "defense")
+                  self.assertEqual(int(restored.input_value()), original)
+                  self.page.screenshot(path=str(out / "ff7-2013-after-discard.png"))
+                  self.originals_unchanged()
+                  self.assertEqual(self.errors, [])
+
+          suite = unittest.defaultTestLoader.loadTestsFromTestCase(FF72013Discard)
+          raise SystemExit(0 if unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful() else 1)
+          PY
+
+      - name: Retain FF7 2013 Discard screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ff7-2013-rendered-discard
+          path: out/ff7-2013-acceptance/
+          retention-days: 7
+          if-no-files-found: error
