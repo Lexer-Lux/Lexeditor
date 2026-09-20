@@ -13,3 +13,18 @@ CI run 34040197660 passed seven coverage tests on Windows/Linux and 24 rendered 
 ## Remaining acceptance
 
 In the normal updated master checkout, follow Data Maps in `docs/warband-acceptance.md`: open each installed plugin's Map, filter/sort/page/resize and follow the available interface links. Warband skills must be Source only; missing files must not claim an editable interface. Notes may scroll in the detail pane, while list rows and the bottom pager stay fitted. Close source views without saving. Report plugin, source row, screenshot and incorrect destination/claim. The cross-plugin development audit is complete; actual installed-editor acceptance remains. No new design answer or code build is needed.
+
+
+## PR #489 Warband completion audit — 2026-09-19
+
+PR #489 (codex/warband-plugin-completion) now preserves the modular Warband UI and plugin contracts from master 72ee978a2ff36686a6349696b19860057356468a as a merge parent.
+
+- [x] Raw Module System source presence no longer counts as partial integration.
+- [x] Skills, quests, strings, source info pages, music, sounds, meshes, factions and post-processing use a shared Misc. Table + Detail editor backed by span-preserving source patches, stale-SHA refusal, duplicate-ID checks, backups and atomic replacement. IDs remain fixed because other Module System files reference them.
+- [x] Sea-Monster/WarbandModuleSystem 1.171 at 66c67147692707b85c457db10a112627118733a5 is the MIT-licensed schema/export reference; no upstream code or proprietary game dump is bundled.
+- [ ] Remaining documented stable-ID Module System families still need safe scalar/vector subsets audited into Misc. where practical. Scripts, triggers, dialogs and animation operation/sequence logic remain source-only unless represented honestly.
+- [ ] Current modular browser acceptance must pass loading/empty/error, paging, Detail/table edits, discard, Save/build and reopen at the three fixture viewport sizes, followed by screenshot inspection.
+- [x] WSE2 setup already uses the real bundled pinned package, explicit offline Install/Repair, integrity verification, rollback and read-only upstream checks; its self-updating launcher is excluded and never invoked.
+- [ ] Final isolated candidate and human installed-game checklist remain after branch-native checks complete; fixture evidence does not establish Steam/WSE2/game behavior.
+
+Current master provides ui/component-catalog.js and it was reviewed after the concurrent UI refactor. PR #489 introduces no shared component or shared-framework selector.
