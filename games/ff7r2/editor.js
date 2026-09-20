@@ -236,16 +236,22 @@
   let selectedRecord=null, recordPage=0, recordPageSize=12, recordQuery="";
   let recordSort={key:"key",dir:1};
 
+  const playerValueColumn=(key,label,pinned=true)=>({
+    key,label,numeric:true,sortable:true,pinned,
+    editValue:row=>row[key],
+    editor:(row,commit)=>playerCellEditor(row,key,commit),
+    edit:(row,value)=>editPlayerTableValue(row,key,value),
+  });
   const PLAYER_COLUMNS=[
     {key:"key",label:"Record",sortable:true},
-    {key:"HPMax",label:"HP Max",numeric:true,sortable:true},
-    {key:"MPMax",label:"MP Max",numeric:true,sortable:true},
-    {key:"Strength",label:"Strength",numeric:true,sortable:true},
-    {key:"Vitality",label:"Vitality",numeric:true,sortable:true,pinned:false},
-    {key:"Magic",label:"Magic",numeric:true,sortable:true,pinned:false},
-    {key:"Spilit",label:"Spilit",numeric:true,sortable:true,pinned:false},
-    {key:"Dexterity",label:"Dexterity",numeric:true,sortable:true,pinned:false},
-    {key:"Luck",label:"Luck",numeric:true,sortable:true,pinned:false},
+    playerValueColumn("HPMax","HP Max"),
+    playerValueColumn("MPMax","MP Max"),
+    playerValueColumn("Strength","Strength"),
+    playerValueColumn("Vitality","Vitality",false),
+    playerValueColumn("Magic","Magic",false),
+    playerValueColumn("Spilit","Spilit",false),
+    playerValueColumn("Dexterity","Dexterity",false),
+    playerValueColumn("Luck","Luck",false),
   ];
   const playerPrefs=columnPreferences("ff7r2-player-parameter",PLAYER_COLUMNS,()=>render());
 
@@ -307,6 +313,36 @@
   }
 
   function fieldOf(row,name){return (row?.fields||[]).find(field=>field.name===name)}
+  function playerFieldNumber(field,value){
+    if(!field?.editable||field.kind==="bool"||field.kind==="array"||field.kind==="name"||field.kind==="string")return null;
+    const raw=String(value??"").replaceAll(",","").replace(/\s/g,"");
+    if(raw==="")return null;
+    let next=Number(raw);
+    if(!Number.isFinite(next))return null;
+    if(field.kind!=="float"&&!Number.isInteger(next))return null;
+    if(Number.isSafeInteger(field.minimum)&&next<field.minimum)return null;
+    if(Number.isSafeInteger(field.maximum)&&next>field.maximum)return null;
+    return next;
+  }
+  function editPlayerTableValue(row,key,value){
+    const field=fieldOf(row,key),next=playerFieldNumber(field,value);
+    if(next===null)return;
+    field.value=next;row[key]=next;shell.refresh?.();
+  }
+  function playerCellEditor(row,key,commit){
+    const field=fieldOf(row,key);
+    const attrs={type:"number",value:String(field?.value??""),"aria-label":key+" table value",
+      step:field?.kind==="float"?"any":"1"};
+    if(Number.isSafeInteger(field?.minimum))attrs.min=field.minimum;
+    if(Number.isSafeInteger(field?.maximum))attrs.max=field.maximum;
+    const input=el("input",attrs);
+    input.addEventListener("keydown",event=>{
+      if(event.key==="Enter"){event.preventDefault();const next=playerFieldNumber(field,input.value);if(next!==null)commit(next)}
+      if(event.key==="Escape"){event.preventDefault();commit(undefined)}
+    });
+    input.addEventListener("blur",()=>{const next=playerFieldNumber(field,input.value);commit(next===null?undefined:next)});
+    return input;
+  }
   function savedRow(row){return (savedPlayer?.records||[]).find(item=>item.id===row.id)}
   function savedField(row,field){return fieldOf(savedRow(row),field.name)}
 
