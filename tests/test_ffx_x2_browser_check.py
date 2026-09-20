@@ -8,7 +8,6 @@ from __future__ import annotations
 import argparse
 import copy
 import json
-import re
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -374,7 +373,7 @@ def _overflow(page, label: str):
 
 def _open_dataset(page, group: str, dataset: str):
     page.get_by_role("button", name=group, exact=True).click()
-    page.get_by_role("tab", name=re.compile("^" + re.escape(dataset))).click()
+    page.get_by_role("tab").filter(has_text=dataset).click()
     expect(page.locator(".ffxx2-content .lex-master-detail")).to_be_visible()
     expect(page.locator(".ffxx2-content .lex-column-list")).to_be_visible()
     expect(page.locator(".ffxx2-content .lex-detail-panel")).to_be_visible()
@@ -429,7 +428,7 @@ def _exercise_keyboard_help(page):
     expect(page.locator(".ffxx2-info-grid")).to_be_visible()
     expect(page.locator(".lex-detail-section").filter(has_text="MOD LOADER")).to_be_visible()
     page.get_by_role("button", name="FFX Battle", exact=True).click()
-    page.get_by_role("tab", name=re.compile("^Player Base Stats")).click()
+    page.get_by_role("tab").filter(has_text="Player Base Stats").click()
     expect(page.locator(".lex-info-help").first).to_be_visible()
     page.locator(".lex-info-help").first.focus()
     assert page.locator(".lex-info-help").first.evaluate("node => document.activeElement === node")

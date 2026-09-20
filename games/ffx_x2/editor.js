@@ -146,6 +146,14 @@ function animationSpec(label,table){
 }
 function hex16(value){return "0x"+Number(value||0).toString(16).toUpperCase().padStart(4,"0")}
 function numberText(value){return Number.isFinite(Number(value))?formatNumber(Number(value)):String(value==null?"":value)}
+function choiceLabel(field,value){
+  return field.choices?.find(pair=>Number(pair[0])===Number(value))?.[1] || ("Unknown "+value);
+}
+function elementMaskLabel(value){
+  const bits=[[1,"Fire"],[2,"Ice"],[4,"Thunder"],[8,"Water"],[16,"Holy"]];
+  const labels=bits.filter(([bit])=>(Number(value)&bit)!==0).map(([_bit,label])=>label);
+  return labels.length?labels.join(" · "):"None";
+}
 function equal(a,b){return JSON.stringify(a)===JSON.stringify(b)}
 function rowKey(row){return Number(row.id)}
 function labelForRow(spec,row){return spec.label.replace(/s$/,"")+" record "+row.id}
@@ -265,13 +273,18 @@ function columnsFor(key){
       base.push({
         key:f.key,label:f.label,sortable:true,numeric:f.type!=="select",min:f.min,max:f.max,step:f.step,
         choices:f.type==="select"?undefined:null,pinned:f.pinned!==false,help:f.help,
-        edit:(row,value)=>{row[f.key]=f.type==="select"?Number(value):Number(value);markChanged()},
+        render:f.type==="select"?(row=>choiceLabel(f,row[f.key])):undefined,
+        sortValue:f.type==="select"?(row=>choiceLabel(f,row[f.key])):undefined,
+        edit:(row,value)=>{row[f.key]=Number(value);markChanged()},
         editor:f.type==="select"?(row,commit)=>choiceEditor(f,row,commit):undefined
       });
     }
   }else if(spec.kind==="elements"){
     base.push({key:"abilityId",label:"Ability ID",sortable:true,render:row=>hex16(row.abilityId)});
-    for(const name of ["strike","absorb","immune","resist","weak"])base.push({key:name,label:name[0].toUpperCase()+name.slice(1),numeric:true,sortable:true,pinned:name==="strike"});
+    for(const name of ["strike","absorb","immune","resist","weak"])base.push({
+      key:name,label:name[0].toUpperCase()+name.slice(1),sortable:true,pinned:name==="strike",
+      render:row=>elementMaskLabel(row[name]),sortValue:row=>row[name]
+    });
   }else if(spec.kind==="mix"){
     base.push({key:"originCommandId",label:"First ingredient",sortable:true,render:row=>hex16(row.originCommandId)});
     base.push({key:"definedResults",label:"Defined results",numeric:true,sortable:true});
