@@ -240,7 +240,8 @@ def main() -> None:
             page.get_by_role("button", name="Validate all", exact=True).click()
             page.wait_for_function("state.moduleDataValidation && !state.moduleDataValidating && state.moduleDataValidation.scanned===1")
             assert page.evaluate("state.moduleDataValidation.issues") == 1
-            assert "1 schema issue" in page.locator("#main").inner_text()
+            validation_summary = page.locator(".lex-detail-field").filter(has_text="Summary").locator("input.lex-readonly-field").first
+            assert validation_summary.input_value().startswith("1 schema issue")
 
             missing_panel = page.locator(".lex-detail-section").filter(has_text="MISSING REQUIRED ATTRIBUTES")
             missing_panel.locator('input[type="checkbox"]').first.check()
