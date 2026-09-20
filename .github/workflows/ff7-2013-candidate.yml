@@ -163,7 +163,9 @@ jobs:
                   self.originals_unchanged()
                   self.assertEqual(self.errors, [])
 
-          suite = unittest.defaultTestLoader.loadTestsFromTestCase(FF72013Discard)
+          # This job owns the 2013-specific Discard interaction only. The full shared
+          # FF7 rendered suite runs independently in ff7-data-regressions.
+          suite = unittest.TestSuite([FF72013Discard("test_discard_restores_saved_baseline")])
           raise SystemExit(0 if unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful() else 1)
           PY
 
