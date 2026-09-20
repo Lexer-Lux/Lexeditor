@@ -40,6 +40,11 @@ const tableFieldKeys={
   timedactions:["actionAnim"],
 };
 const tableColumnOverrides={
+  evolved:{
+    MaxItems:{width:"6.5rem"},
+    MinimumWater:{label:"Min Water",width:"7.5rem"},
+    ResultItem:{width:"minmax(7.5rem,1fr)"},
+  },
   animationmeshes:{
     keepMeshAnimations:{label:"Keep Anims",width:"8rem"},
     meshFile:{width:"minmax(9rem,1fr)"},
