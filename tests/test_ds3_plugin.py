@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from games.ds3.server import _path_within
+from games.ds3.server import _data_map, _path_within
 from games.ds3.formats import (
     BND4View,
     DS3FormatError,
@@ -139,6 +139,14 @@ class DS3FormatTests(unittest.TestCase):
             self.assertTrue(_path_within(game, game))
             self.assertTrue(_path_within(game / "mods" / "test", game))
             self.assertFalse(_path_within(outside, game))
+
+    def test_data_map_uses_real_installed_file_paths(self):
+        rows = _data_map()["rows"]
+        self.assertEqual(len({row["id"] for row in rows}), len(rows))
+        self.assertTrue(all(row["filename"] == "Game/Data0.bdt" for row in rows))
+        integrated = [row for row in rows if row["status"] == "integrated"]
+        self.assertEqual(len(integrated), len(TARGET_TABLES))
+        self.assertTrue(all(row.get("targets") for row in integrated))
 
     def test_all_pinned_schemas_parse(self):
         for table in TARGET_TABLES:

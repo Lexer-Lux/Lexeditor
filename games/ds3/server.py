@@ -116,32 +116,25 @@ def _data_map() -> dict:
     rows = []
     for table in TARGET_TABLES:
         rows.append({
-            "filename": f"Game/Data0.bdt → {table}.param",
-            "controls": f"{TABLE_LABELS[table]} parameter rows",
+            "id": f"data0:{table}",
+            "filename": "Game/Data0.bdt",
+            "controls": f"{TABLE_LABELS[table]} — {table}.param",
             "notes": (
                 "Structured editing uses pinned Smithbox PARAMDEF, field-layout, annotation, "
                 "enum, reference, and row-name metadata. Only audited fixed-width cells are changed."
             ),
             "coverage": "structured",
             "status": "integrated",
-            "target": table,
+            "targets": [{"id": table, "label": TABLE_LABELS[table]}],
         })
     rows.append({
-        "filename": "Game/Data0.bdt → other members",
+        "id": "data0:other",
+        "filename": "Game/Data0.bdt",
         "controls": "Other regulation parameters",
         "notes": (
             "Not exposed yet. Their archive bytes are retained unchanged when an integrated "
-            "field is edited and exported."
-        ),
-        "coverage": "unavailable",
-        "status": "not-integrated",
-    })
-    rows.append({
-        "filename": "Other Dark Souls III game archives",
-        "controls": "Maps, models, text, events, and other systems",
-        "notes": (
-            "Later scope only. This plugin does not claim format-specific editing for these files "
-            "and does not substitute a raw file or hex editor."
+            "field is edited and exported. Maps, models, text, events, and 3D editing remain "
+            "later scope rather than being represented as a generic raw-file editor."
         ),
         "coverage": "unavailable",
         "status": "not-integrated",
