@@ -1703,12 +1703,14 @@ def _provisional_data_map_rows() -> list[dict]:
     if CONTENT_PREPARED_ROOT.is_dir():
         for source in CONTENT_PREPARED_ROOT.rglob("*.strtbl"):
             relative = PurePosixPath(source.relative_to(CONTENT_PREPARED_ROOT).as_posix())
-            if not _string_table_supported(relative):
-                continue
-            try:
-                string_tables.parse(source.read_bytes())
-                supported = True
-            except (OSError, ValueError, struct.error):
+            pc_table = _string_table_supported(relative)
+            if pc_table:
+                try:
+                    string_tables.parse(source.read_bytes())
+                    supported = True
+                except (OSError, ValueError, struct.error):
+                    supported = False
+            else:
                 supported = False
             rows.append({
                 "filename": f"game/content.rpf:/{relative.as_posix()}",
@@ -1717,6 +1719,9 @@ def _provisional_data_map_rows() -> list[dict]:
                     "String Tables edits only displayed UTF-16 text; identifiers, "
                     "hashes, glyph metrics and layout metadata stay read-only."
                     if supported else
+                    "This PS3-targeted string-table duplicate is indexed but intentionally "
+                    "not exposed by the RDR1 PC editor."
+                    if not pc_table else
                     "The prepared string table did not pass the structured STRTBL parser."
                 ),
                 "status": "partial" if supported else "not-integrated",
