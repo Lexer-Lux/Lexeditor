@@ -279,6 +279,9 @@ def main() -> int:
                         identity_text = page.locator('.pz-record-table .lex-column-list-cell[data-column-key="id"] .lex-column-cell-text').first
                         identity_fit = identity_text.evaluate("(node) => ({client:node.clientWidth, scroll:node.scrollWidth, text:node.textContent})")
                         assert identity_fit["scroll"] <= identity_fit["client"] + 1, (tab, identity_fit)
+                        for header in page.locator(".pz-record-table .lex-column-list-head-cell .lex-column-sort").all():
+                            header_fit = header.evaluate("(node) => ({client:node.clientWidth, scroll:node.scrollWidth, text:node.textContent})")
+                            assert header_fit["scroll"] <= header_fit["client"] + 1, (tab, header_fit)
                         assert_layout(page, f"{tab}-desktop")
                         screenshot(page, args.screenshots, f"{index:02d}-{tab}-desktop")
 
@@ -343,7 +346,13 @@ def main() -> int:
                     # Script Inventory is independently paged/searchable and includes the read-only entity family.
                     navigate(page, "scripts", ".pz-script-layout")
                     assert page.locator(".pz-script-table.lex-column-list").count() == 1
+                    assert int(page.locator(".lex-page-total").inner_text()) >= 2
+                    script_search = page.get_by_label("Search Build 42 script records")
+                    script_search.fill("ReadOnlyEntity")
+                    page.wait_for_function("document.querySelectorAll('.pz-script-table .lex-list-row').length===1")
                     assert page.get_by_text("ReadOnlyEntity", exact=True).count() >= 1
+                    script_search.fill("")
+                    page.wait_for_function("document.querySelectorAll('.pz-script-table .lex-list-row').length>1")
                     assert_layout(page, "scripts-desktop")
                     screenshot(page, args.screenshots, "13-scripts-desktop")
 

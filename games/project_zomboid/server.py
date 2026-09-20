@@ -166,8 +166,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(core.deployment_state(self.project()))
             else:
                 self.send_json({"error": "Not found"}, 404)
+        except (BrokenPipeError, ConnectionResetError):
+            return
         except (core.ProjectZomboidError, OSError) as error:
-            self.send_json({"error": str(error)}, 400)
+            try:
+                self.send_json({"error": str(error)}, 400)
+            except (BrokenPipeError, ConnectionResetError):
+                return
 
     def do_POST(self):
         try:
@@ -277,8 +282,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": "Not found"}, 404)
                 return
             self.send_json(result)
+        except (BrokenPipeError, ConnectionResetError):
+            return
         except (core.ProjectZomboidError, OSError) as error:
-            self.send_json({"error": str(error)}, 400)
+            try:
+                self.send_json({"error": str(error)}, 400)
+            except (BrokenPipeError, ConnectionResetError):
+                return
 
 
 def create_server(port: int = PORT) -> ThreadingHTTPServer:

@@ -39,6 +39,17 @@ const tableFieldKeys={
   mannequins:["outfit","pose","female"],
   timedactions:["actionAnim"],
 };
+const tableColumnOverrides={
+  animationmeshes:{
+    keepMeshAnimations:{label:"Keep Anims",width:"8rem"},
+    meshFile:{width:"minmax(9rem,1fr)"},
+  },
+  sounds:{
+    category:{width:"7rem"},
+    loop:{width:"5rem"},
+    maxInstancesPerEmitter:{label:"Max Instances",width:"minmax(9rem,1fr)"},
+  },
+};
 function draftToken(kind,row,key){return [kind,kind==="metadata"?"metadata":row.key,key].join("\u001f")}
 function baseValue(row,key){return String(row?.fields?.[key]??"")}
 function draftValue(kind,row,key){const entry=drafts.get(draftToken(kind,row,key));return entry?entry.value:baseValue(row,key)}
@@ -320,11 +331,12 @@ function structuredDetail(kind,row){
   ]});
 }
 function tableFieldColumn(kind,spec){
-  const config=structuredConfigs[kind];
-  const column={key:spec.key,label:spec.label,sortable:true,help:spec.help,
+  const config=structuredConfigs[kind],override=tableColumnOverrides[kind]?.[spec.key]||{};
+  const column={key:spec.key,label:override.label||spec.label,sortable:true,help:spec.help,
     render:row=>{const value=draftValue(kind,row,spec.key);return spec.type==="bool"?(String(value).toLowerCase()==="true"?"Yes":"No"):value||"—"},
     sortValue:row=>draftValue(kind,row,spec.key),editValue:row=>draftValue(kind,row,spec.key),
     edit:(row,value)=>setDraftValue(kind,row,spec,value),editor:(row,commit)=>cellEditor(kind,row,spec,commit)};
+  if(override.width)column.width=override.width;
   if(spec.type==="number"){column.numeric=true;column.min=spec.min;column.max=spec.max;column.step=spec.step}
   return column;
 }
