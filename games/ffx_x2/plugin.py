@@ -286,8 +286,17 @@ def smoke() -> list[str]:
                         raise
                     time.sleep(0.25)
             if ('id="lexeditor-shell"' not in html or '/shared/framework.js' not in html
-                    or "FFX Treasure Rewards" not in html or "FFX Item Shops" not in html):
-                raise RuntimeError("FFX/X-2 plugin did not serve the structured editor shell")
+                    or './editor.js' not in html or './editor.css' not in html
+                    or '<style' in html or '<script>' in html):
+                raise RuntimeError("FFX/X-2 plugin did not serve the markup-only shared editor shell")
+            with urllib.request.urlopen(session.url + "editor.js", timeout=5) as response:
+                editor_js = response.read().decode("utf-8")
+            with urllib.request.urlopen(session.url + "editor.css", timeout=5) as response:
+                editor_css = response.read().decode("utf-8")
+            if ("pagedListDetail" not in editor_js or "columnList" not in editor_js
+                    or "dataMap" not in editor_js or "mountShell" not in editor_js
+                    or len(editor_css) > 6000):
+                raise RuntimeError("FFX/X-2 page modules do not use the shared UI within the plugin CSS budget")
         if not session.wait_closed():
             raise RuntimeError("FFX/X-2 child port is still open after host shutdown")
     return [
@@ -298,7 +307,8 @@ def smoke() -> list[str]:
         "staged-baseline and archive-baseline structured saves both passed",
         "installed VBF stayed byte-identical while project overrides changed",
         "file-only Fahrenheit EFL deploy/loadorder/revert path passed for both overrides",
-        "shared editor shell served and child service stopped cleanly",
+        "markup-only shared editor shell and bounded page modules served cleanly",
+        "shared Table + Detail, Data Map and shell component contracts are present",
     ]
 
 

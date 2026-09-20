@@ -358,7 +358,7 @@ def _map_structured_row(game: str, archive_path: str, controls: str, builder, no
         note = f"Recognized structured table, but it is unavailable: {error}"
     return {
         "filename": archive_path, "controls": controls, "notes": note,
-        "status": status, "coverage": "structured-record-editor",
+        "status": status, "coverage": "structured",
         "openable": status == "integrated", "game": key,
     }
 
@@ -372,7 +372,7 @@ def data_map() -> dict:
             "controls": "Validated VBF archive index, search, read-only extraction to project overlay",
             "notes": f"{paths.GAME_LABELS[key]} archive. Installed bytes are read-only. Extract creates a Fahrenheit EFL project copy.",
             "status": "integrated" if state["ready"] else "partial",
-            "coverage": "archive-index-and-extract", "openable": state["ready"], "target": "archives", "game": key,
+            "coverage": "view", "openable": state["ready"], "target": f"archive-{key}", "game": key,
         })
     structured_x = [
         (treasures.ARCHIVE_PATH, "Structured treasure reward editor", treasures.payload,
@@ -414,6 +414,11 @@ def data_map() -> dict:
     for archive_path, controls, builder, notes, target in structured_x:
         row = _map_structured_row("x", archive_path, controls, builder, notes)
         row["target"] = target
+        if target == "ffx-commands":
+            row["datasetKey"] = next(
+                spec.key for spec in ffx_commands.TABLES.values()
+                if spec.archive_path == archive_path
+            )
         rows.append(row)
     x2_ability_row = _map_structured_row(
         "x2", ffx2_abilities.ARCHIVE_PATH,
@@ -472,7 +477,7 @@ def data_map() -> dict:
         {"filename": "fahrenheit/mods/lexeditor-ffx-x2/efl/{x,x2}/**", "controls": "Reversible file-only Fahrenheit deployment",
          "notes": "Deploy copies only the selected Lexeditor project into its owned Fahrenheit mod folder and preserves unrelated loadorder entries.",
          "status": "integrated" if deployment.status(paths.GAME_ROOT, paths.PROJECT_ROOT)["fahrenheitReady"] else "partial",
-         "coverage": "deployment", "openable": True, "target": "deployment"},
+         "coverage": "view", "openable": True, "target": "info"},
     ])
     return {"contract": "Lexeditor.data-map", "rows": rows}
 
@@ -514,10 +519,21 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate"); self.send_header("Content-Length", str(len(data)))
         self.end_headers(); self.wfile.write(data)
+    def send_page_module(self, relative: str):
+        """Serve one declared page-local JS/CSS module without exposing arbitrary plugin files."""
+        if relative not in {"editor.js", "editor.css"}:
+            self.json_response({"error": "Page module not found"}, 404); return
+        root = PLUGIN_ROOT.resolve()
+        target = (root / relative).resolve()
+        if root not in target.parents or not target.is_file():
+            self.json_response({"error": "Page module not found"}, 404); return
+        self.file_response(target)
     def do_GET(self):
         parsed = urlparse(self.path); route = parsed.path
         try:
             if route == "/": self.file_response(PLUGIN_ROOT / "editor.html")
+            elif route == "/editor.js": self.send_page_module("editor.js")
+            elif route == "/editor.css": self.send_page_module("editor.css")
             elif route.startswith("/shared/"):
                 shared = (LEXEDITOR_ROOT / "ui").resolve(); target = (shared / route.removeprefix("/shared/")).resolve()
                 self.file_response(target) if shared in target.parents and target.is_file() else self.json_response({"error": "Shared UI asset not found"}, 404)
