@@ -43,6 +43,23 @@ uses flag bit 0 at `+0x1C`, GF ID+0x40 at `+0x1D`, and live current/max HP
 at `+0x18/+0x1A`. Use those live values for the summoning GF instead of
 its saved HP. The overlay aggregates current/max for multiple junctioned GFs.
 
+## Main-menu clock label
+
+Native clock routine `0x4BF020` calls the icon renderer `0x4B77C0` at
+`0x4BF099`. Playtime uses icon `0x142`; the countdown uses `0x146`.
+Decoding those entries from the installed `menu/icon.sp1` and `icon.tex`
+confirms the artwork reads PLAY and TIME, respectively. Keep these private
+game assets outside the repository.
+
+For local wall-clock display, keep the native playtime selector and replace
+only PLAY with TIME during that clock call. Changing the selector would
+change the native clock arithmetic. `verify_ff8_clock_label.py` executes the
+production hooks through 64 combinations of enable, mode, conversion success,
+selector and previous scope. It checks argument/return forwarding, fallback,
+countdown preservation and scope restoration. `verify_ff8_xp_widgets.py`
+independently checks the native selector-to-icon calls. These checks do not
+prove final screen placement in a running game.
+
 ## Test boundary
 
 Native execution tests exercise these instructions with resource I/O stubbed.

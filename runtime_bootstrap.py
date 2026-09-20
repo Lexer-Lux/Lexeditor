@@ -9,10 +9,8 @@ import sys
 SERVICE_MODULES = frozenset({
     'games.blank.server', 'games.ff7.server', 'games.ff7r.server', 'games.ff7r.themed_server',
     'games.ff8.server', 'games.ff9.server', 'games.palworld.full_server', 'games.rdr.server', 'games.rdr2.server',
-    'games.warband.server',
+    'games.warband.server', 'games.ff7r2.server', 'games.chrono_trigger.server',
 })
-SERVICE_MODULES = SERVICE_MODULES | frozenset({'games.chrono_trigger.server',
-                                               'games.ff7r2.server'})
 
 
 def user_data_dir() -> Path:

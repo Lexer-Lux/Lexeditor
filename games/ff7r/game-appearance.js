@@ -63,7 +63,7 @@
     const stored = node.dataset.lexFf7rBitmapLabel;
     const label = String(stored || node.textContent || "").replace(/\s+/g, " ").trim();
     if (!label) return false;
-    if (stored && node.querySelector(":scope > canvas.ff7r-bitmap-label")) return true;
+    if (stored && node.lexBitmapCanvas?.isConnected) return true;
     const measured = measureLabel(label, bitmapState.glyphs);
     if (!measured) return false;
 
@@ -75,7 +75,6 @@
     const height = Math.max(1, Math.ceil((measured.maxY - measured.minY) * scale));
     const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
     const canvas = document.createElement("canvas");
-    canvas.className = "ff7r-bitmap-label";
     canvas.setAttribute("aria-hidden", "true");
     canvas.width = Math.ceil(width * dpr);
     canvas.height = Math.ceil(height * dpr);
@@ -101,14 +100,14 @@
 
     node.dataset.lexFf7rBitmapLabel = label;
     if (!node.getAttribute("aria-label")) node.setAttribute("aria-label", label);
-    node.replaceChildren(canvas);
-    node.classList.add("ff7r-bitmapized");
+    node.replaceChildren(LexeditorUI.bitmapText({label,canvas}));
+    node.lexBitmapCanvas = canvas;
     return true;
   }
 
   function bitmapizeDocument() {
     if (!bitmapState) return;
-    document.querySelectorAll("#lexeditor-shell button[data-tab], .lex-detail-panel-title")
+    (window.LexeditorUI?.shellTextNodes?.() || [])
       .forEach(bitmapize);
   }
 

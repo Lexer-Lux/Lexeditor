@@ -1,5 +1,8 @@
 """Contract tests for the FF8 Formulae Rework inventory and implemented arithmetic."""
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 import unittest
 
 from games.ff8 import formulae_rework, healing_rework, luck_accuracy
@@ -71,9 +74,7 @@ class FormulaeReworkTests(unittest.TestCase):
         self.assertIn("stored-rate", row["blocker"])
 
     def test_editor_does_not_hard_code_a_fake_complete_formula_inventory(self):
-        editor = (Path(__file__).resolve().parents[1] / "games/ff8/editor.html").read_text(
-            encoding="utf-8"
-        )
+        editor = plugin_ui("ff8")
         self.assertNotIn("formula cards below define the complete requested rework", editor)
 
     def test_settings_module_alias_cannot_be_shadowed_by_boolean(self):

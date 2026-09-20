@@ -204,13 +204,18 @@
     "ff8": {
       "contributions": [
         {
+          "name": "Final Fantasy Inside contributors",
+          "role": "CARDGAME opcode research: deck, carried rules, region rules, rare-card probability, and three arguments whose effects remain unknown.",
+          "url": "https://wiki.ffrtt.ru/index.php/FF8/Field/Script/Opcodes/13A_CARDGAME"
+        },
+        {
           "name": "HobbitDur",
-          "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas, editor references, and Cid packed world Draw Point coordinate conversion.",
+          "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas, Ifrit AI instruction-row design and ai_cronos target/condition reference, and Cid packed world Draw Point coordinate conversion.",
           "url": "https://github.com/HobbitDur/FF8UltimateEditor"
         },
         {
           "name": "Julian Xhokaxhiu (TrueOdin), Tang-Tang Zhou (vertex2995), Jérôme Arzel (myst6re), CosmosXIII and FFNx contributors",
-          "role": "FFNx runtime, game hooks and reverse-engineering references.",
+          "role": "FFNx runtime, game hooks and reverse-engineering references, including the embedded Triple Triad card and icon TIM locations.",
           "url": "https://github.com/julianxhokaxhiu/FFNx"
         },
         {
@@ -566,28 +571,39 @@
     "chrono-trigger": {
       "contributions": [
         {
-          "name": "jimzrt / ChronoMod contributors",
-          "role": "Steam resources.bin ARC1 archive format reference.",
-          "url": "https://github.com/jimzrt/ChronoMod"
-        },
-        {
           "name": "GitExl / CTViewer contributors",
-          "role": "Steam scene, overworld, map, tileset, palette and script format references.",
+          "role": "MIT-licensed current-PC reference for Steam ARC1 resources, area exits, treasure and other separated PC layouts.",
           "url": "https://github.com/GitExl/CTViewer"
         },
         {
-          "name": "OnemusCT / Temporal Redux contributors",
-          "role": "PC Atel event command widths and behavior references.",
-          "url": "https://github.com/OnemusCT/temporal-redux"
+          "name": "NaGaa95 / ct_nx contributors",
+          "role": "MIT-licensed independent reference for ARC1 handling and ChronoMod-compatible CTP package semantics.",
+          "url": "https://github.com/NaGaa95/ct_nx"
+        },
+        {
+          "name": "jimzrt / ChronoMod contributors",
+          "role": "Historical resources.bin interoperability evidence only; no source code is copied because the audited repository has no clear top-level license.",
+          "url": "https://github.com/jimzrt/ChronoMod"
         },
         {
           "name": "TheRealBiggs / CTExt contributors",
-          "role": "Chrono Trigger Steam loose-file and CTP runtime loading model.",
+          "role": "Steam loose-file and CTP runtime behavior evidence only; no binary or source is bundled because the audited repository has no clear top-level license.",
           "url": "https://github.com/TheRealBiggs/ctext"
+        },
+        {
+          "name": "OnemusCT / Temporal Redux contributors",
+          "role": "GPLv3 event-format research reference only; no code is copied into the fresh fixed-format editing slice.",
+          "url": "https://github.com/OnemusCT/temporal-redux"
         }
       ],
       "thanks": [],
-      "licenses": []
+      "licenses": [
+        {
+          "name": "Chrono Trigger research sources — licenses and evidence limits",
+          "sourcePath": "games/chrono_trigger/THIRD_PARTY.md",
+          "text": "# Chrono Trigger research sources and licenses\n\nNo third-party source is vendored by this plugin. The implementation is a small independent Python implementation of publicly demonstrated Steam layouts.\n\n## CTViewer\n\nSource: https://github.com/GitExl/CTViewer\n\nRevision audited: `2e5a206e09f0028fd5a1ca6cb9a9ed18bfc64fea` (2026-07-19).\n\nUsed as the primary current-PC reference for `resources.bin`, scene exits, treasure records, current-PC scene/world families and the explicit separation between PC and SNES layouts.\n\nLicense (MIT), copyright 2025 Dennis Meuwissen. The complete upstream license is available at `LICENSE.txt` in CTViewer.\n\n## ct_nx\n\nSource: https://github.com/NaGaa95/ct_nx\n\nRevision audited: `e6bc0b4b032df2dbc62a6f142fe08ae0470b61fe` (2026-07-08).\n\nUsed as an independent MIT-licensed corroborating reference for the Steam/Android ARC1 layout and ChronoMod-compatible `.ctp` semantics: standard ZIP members whose paths match `resources.bin` resource paths, applied without changing the original archive.\n\nLicense: MIT. Copyright (C) 2021 Andy Nguyen, fgsfds. The complete upstream license is in ct_nx `LICENSE`.\n\n## Evidence-only references (no code copied or bundled)\n\n- jimzrt / ChronoMod — `4566e9dea7a3510cbb442991cd9efa223b95fdc7` (2025-07-11), historical `resources.bin` tooling. No clear top-level repository license was found during this audit, so its code is not reused.\n- TheRealBiggs / CTExt — `892c47166c56f6d20a2c805c303586096e8d466a` (2026-07-04), Steam loose-file / CTP runtime behavior. No clear top-level repository license was found during this audit, so it is not bundled or copied.\n- OnemusCT / Temporal Redux — `d8d4e38c0bf08b51a29441ef7ea2a489d63da58f` (2026-09-02), GPLv3 event-editor research. It is not copied into this replacement; event editing remains outside the first low-cost slice.\n- julianxhokaxhiu / CTNx — `fda83d565897737d9853cb5ba0b4e7e5d87aa674` (2024-11-14), GPLv3 reimplementation research. It is edition-adjacent evidence only and is not used to transfer SNES/DS layouts into Steam.\n"
+        }
+      ]
     }
   }
 }

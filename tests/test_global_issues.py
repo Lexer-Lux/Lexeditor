@@ -48,7 +48,7 @@ class Quotes(unittest.TestCase):
 
 class Helpers(unittest.TestCase):
     def host(self):
-        a=GamePlugin('a','A','A','A','#fff',lambda:[],lambda:0,
+        a=GamePlugin('a','A','#fff',lambda:[],lambda:0,
                      helper_name='Runtime',helper_status=Mock(return_value={'installed':True,'version':'1.1'}),
                      helper_upstream=Mock(return_value={'pinned':'1.0','latest':'1.2','published':'2026-09-01T00:00:00Z','behind':True}),
                      helper_install=Mock(side_effect=AssertionError('Must not install')))

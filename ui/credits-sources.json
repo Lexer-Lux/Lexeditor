@@ -292,28 +292,38 @@
     "chrono-trigger": {
       "contributions": [
         {
-          "name": "jimzrt / ChronoMod contributors",
-          "role": "Steam resources.bin ARC1 archive format reference.",
-          "url": "https://github.com/jimzrt/ChronoMod"
-        },
-        {
           "name": "GitExl / CTViewer contributors",
-          "role": "Steam scene, overworld, map, tileset, palette and script format references.",
+          "role": "MIT-licensed current-PC reference for Steam ARC1 resources, area exits, treasure and other separated PC layouts.",
           "url": "https://github.com/GitExl/CTViewer"
         },
         {
-          "name": "OnemusCT / Temporal Redux contributors",
-          "role": "PC Atel event command widths and behavior references.",
-          "url": "https://github.com/OnemusCT/temporal-redux"
+          "name": "NaGaa95 / ct_nx contributors",
+          "role": "MIT-licensed independent reference for ARC1 handling and ChronoMod-compatible CTP package semantics.",
+          "url": "https://github.com/NaGaa95/ct_nx"
+        },
+        {
+          "name": "jimzrt / ChronoMod contributors",
+          "role": "Historical resources.bin interoperability evidence only; no source code is copied because the audited repository has no clear top-level license.",
+          "url": "https://github.com/jimzrt/ChronoMod"
         },
         {
           "name": "TheRealBiggs / CTExt contributors",
-          "role": "Chrono Trigger Steam loose-file and CTP runtime loading model.",
+          "role": "Steam loose-file and CTP runtime behavior evidence only; no binary or source is bundled because the audited repository has no clear top-level license.",
           "url": "https://github.com/TheRealBiggs/ctext"
+        },
+        {
+          "name": "OnemusCT / Temporal Redux contributors",
+          "role": "GPLv3 event-format research reference only; no code is copied into the fresh fixed-format editing slice.",
+          "url": "https://github.com/OnemusCT/temporal-redux"
         }
       ],
       "thanks": [],
-      "licenses": []
+      "licenses": [
+        {
+          "name": "Chrono Trigger research sources — licenses and evidence limits",
+          "sourcePath": "games/chrono_trigger/THIRD_PARTY.md"
+        }
+      ]
     }
   }
 }

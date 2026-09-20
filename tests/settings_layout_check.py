@@ -56,13 +56,13 @@ def main():
             }""")
             for width in (900,2048):
                 page.set_viewport_size({'width':width,'height':700});page.wait_for_timeout(300)
-                panel=page.locator('.lex-tweaks-columns')
-                metrics=panel.evaluate('e=>({w:e.clientWidth,sw:e.scrollWidth,h:e.clientHeight,sh:e.scrollHeight,fragments:[...e.querySelectorAll(".lex-settings-column > section")].map(c=>c.getClientRects().length)})')
+                panel=page.locator('.lex-tweaks-scroll')
+                metrics=panel.evaluate('e=>({w:e.clientWidth,sw:e.scrollWidth,h:e.clientHeight,sh:e.scrollHeight,fragments:[...e.querySelectorAll(".lex-tweak-column > section")].map(c=>c.getClientRects().length)})')
                 assert metrics['sw']<=metrics['w']+1 and metrics['sh']>metrics['h'],metrics
                 assert all(n==1 for n in metrics['fragments']),metrics
                 panel.evaluate('e=>e.scrollTop=e.scrollHeight')
                 assert panel.evaluate('e=>e.scrollTop')>0
-                assert panel.locator('.lex-detail-field').last.evaluate('(e)=>{const a=e.getBoundingClientRect(),b=e.closest(".lex-tweaks-columns").getBoundingClientRect();return a.bottom<=b.bottom+1}')
+                assert panel.locator('.lex-detail-field').last.evaluate('(e)=>{const a=e.getBoundingClientRect(),b=e.closest(".lex-tweaks-scroll").getBoundingClientRect();return a.bottom<=b.bottom+1}')
                 page.screenshot(path=str(Path(tempfile.gettempdir())/f'lex-tweaks-scroll-{width}.png'))
             browser.close()
     finally:server.shutdown();server.server_close();thread.join(timeout=2)

@@ -39,6 +39,32 @@ Before coding, write down the intended scope in the PR or Worklog:
 Do not merge a plugin just because CI is green. Parser, browser, installed-runtime,
 deployment and in-game acceptance are different evidence levels.
 
+## The plugin's UI files
+
+One shape, checked by `tools/verify_shared_ui_contract.py`:
+
+- `editor.html` — the page. Every plugin with a UI has exactly this file, under
+  exactly this name, and it holds **markup only**: no inline `<script>` beyond
+  the one-line transition boot in `<head>`, and no inline `<style>`.
+- `<name>.js` / `<name>.css` — a module of that page, named for what it holds
+  (`items.js`, `crime.js`, `editor.css`, `troop_trees.js`), loaded by the page
+  with a **relative** path (`<script src="items.js">`), so the page works
+  whether its own service or a test server serves it. A module nothing loads is
+  deleted, not kept. The modules run in the order the page lists them, sharing
+  one global scope, so a value one module reads at load time must be defined by
+  a module the page lists earlier.
+- The plugin's service routes them with `self.send_page_module(PLUGIN_ROOT,
+  path)` from `plugin_http.py`; `tests/plugin_module_routes_check.py` starts
+  every service, asks it for each module its page names, and loads the page to
+  see that the modules can still see each other.
+- No theme file. A theme is tokens handed to `mountShell`. A stylesheet may set
+  tokens and style the game's own classes; a selector naming a shared class
+  (`.lex-…`) is counted by `tools/verify_shared_ui_budget.py`, and that count
+  may fall but never rise.
+
+Every shared component is listed in `ui/component-catalog.js` and shown in
+Blank. A component exported without being catalogued fails the tests.
+
 ## 1. Research before writing parsers
 
 This is usually the highest-leverage step. **Do not start by reverse-engineering a
@@ -214,7 +240,7 @@ to redistribute.
 
 Create `games/<game>/__init__.py` and `plugin.py`. Export one `GamePlugin` named
 `PLUGIN`; discovery is automatic. Give it a unique letters/numbers/hyphens ID,
-name, subtitle, description, accent, `check`, `launch`, `session_factory`, and a
+name, accent, `check`, `launch`, `session_factory`, and a
 safe `smoke()` before shipping.
 
 ```python
@@ -238,8 +264,6 @@ def launch():
 PLUGIN = GamePlugin(
     plugin_id="example",
     name="Example",
-    subtitle="Example game",
-    description="Edits the supported Example records.",
     accent="#557788",
     check=check,
     launch=launch,

@@ -114,8 +114,6 @@ def smoke() -> list[str]:
 PLUGIN = GamePlugin(
     plugin_id="ff7-2013",
     name="Final Fantasy 7 (Original)",
-    subtitle="FFVII 2013",
-    description="Edits character, battle, encounter, shop and text data for the 2013 Steam product.",
     accent="#3155b7",
     cover_art=LEXEDITOR_ROOT / "assets" / "covers" / "ff7-original.png",
     check=check,

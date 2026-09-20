@@ -122,14 +122,13 @@ def smoke() -> list[str]:
 PLUGIN = GamePlugin(
     plugin_id="chrono-trigger",
     name="Chrono Trigger",
-    subtitle="Steam",
-    description="Steam editor for localized text, area exits, treasure and safe CTP mod projects.",
     accent="#d3a348",
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=ChronoTriggerSession,
     process_names=("Chrono Trigger.exe",),
+    mods_load=False,
     projects=ModProjectSpec(
         root_env="LEXEDITOR_CHRONO_TRIGGER_PROJECT",
         default_root=paths.PROJECT_ROOT,

@@ -27,8 +27,16 @@ css = text("ui/framework.css")
 manual = text("docs/UI-MANUAL.md")
 host = text("desktop_host.py")
 github = text("github_integration.py")
-blank = text("games/blank/editor.html")
-warband = text("games/warband/editor.html")
+def plugin_ui(plugin):
+    """A plugin's whole UI: the page and the modules it loads beside it."""
+    parts = [(plugin / "editor.html").read_text(encoding="utf-8")]
+    parts += [path.read_text(encoding="utf-8")
+              for path in sorted(plugin.glob("*.js")) + sorted(plugin.glob("*.css"))]
+    return "\n".join(parts)
+
+
+blank = plugin_ui(ROOT / "games" / "blank")
+warband = plugin_ui(ROOT / "games" / "warband")
 
 # Shared chrome is global by construction. Every real editor shell must load the
 # shared framework, and a game theme may not swap the info-bubble glyph back to
@@ -129,7 +137,7 @@ for phrase in ("most human-friendly semantic control", "checkless toggle", "Bitf
 for plugin in sorted((ROOT / "games").iterdir()):
     if not (plugin / "editor.html").is_file():
         continue
-    editor = (plugin / "editor.html").read_text(encoding="utf-8")
+    editor = plugin_ui(plugin)
     require("modLoaderSection(" in editor,
             f"{plugin.name} does not render the shared MOD LOADER section")
     for field in ("loader:", "output:", "order:", "safety:", "removal:"):
@@ -146,8 +154,9 @@ require("MOD LOADER" in framework and "MOD_LOADER_FIELDS" in framework,
 # more than one line, and are the reason "I get this browser message" was a bug
 # report. Every question and every message is Lexeditor's own.
 for source_path in [ROOT / "ui" / "framework.js", ROOT / "ui" / "chooser.html"] + [
-        plugin / "editor.html" for plugin in sorted((ROOT / "games").iterdir())
-        if (plugin / "editor.html").is_file()]:
+        path for plugin in sorted((ROOT / "games").iterdir())
+        if (plugin / "editor.html").is_file()
+        for path in [plugin / "editor.html", *sorted(plugin.glob("*.js"))]]:
     text = source_path.read_text(encoding="utf-8")
     for banned in ("window.confirm(", "window.alert(", "window.prompt("):
         require(banned not in text,
@@ -158,17 +167,80 @@ require("const confirmAction = options =>" in framework,
 
 require("reshadeSection" in framework,
         "the shared ReShade section is not defined in the framework")
-require("reshadeSection(" in (ROOT / "games" / "blank" / "editor.html").read_text(encoding="utf-8"),
+require("reshadeSection(" in plugin_ui(ROOT / "games" / "blank"),
         "games/blank does not demonstrate the shared ReShade section")
 for plugin in sorted((ROOT / "games").iterdir()):
     if not (plugin / "editor.html").is_file():
         continue
-    editor = (plugin / "editor.html").read_text(encoding="utf-8")
+    editor = plugin_ui(plugin)
     if 'id:"tweaks"' not in editor and "id: \"tweaks\"" not in editor:
         continue
     require("reshadeSection(" in editor,
             f"{plugin.name} has a Tweaks page but does not offer the shared "
             "ReShade section")
+
+# A game that brings its own face states what the face does to text. Without
+# this, the shared UI is sized for Lexend and every other font rides high, gets
+# clipped, or is patched back into place with per-plugin paddings.
+for plugin in sorted((ROOT / "games").iterdir()):
+    if not plugin.is_dir() or plugin.name.startswith("__"):
+        continue
+    for path in sorted(plugin.glob("*.html")) + sorted(plugin.glob("*.css")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if "--lex-font:" not in text and "--lex-font :" not in text:
+            continue
+        require("--lex-font-size-adjust" in text and "--lex-text-nudge" in text,
+                f"{plugin.name}/{path.name} sets its own --lex-font but not "
+                "--lex-font-size-adjust and --lex-text-nudge; the shared UI "
+                "cannot size text for a face it knows nothing about")
+
+# A page is a page. Its script and its stylesheet live in modules beside it, so
+# a game's code can be read, diffed and reviewed by the part it belongs to
+# instead of as one six-thousand-line file. The only inline script allowed is
+# the one-line transition boot in <head>, which has to run before anything is
+# loaded, and it is the shared one every page carries.
+for plugin in sorted((ROOT / "games").iterdir()):
+    if not (plugin / "editor.html").is_file():
+        continue
+    page = (plugin / "editor.html").read_text(encoding="utf-8")
+    inline_scripts = [block for block in re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", page, re.S)
+                      if "lexTransition" not in block]
+    require(not inline_scripts,
+            f"{plugin.name}/editor.html keeps "
+            f"{sum(len(block.splitlines()) for block in inline_scripts)} lines of script inline; "
+            "a page loads its script from a module beside it")
+    require(not re.search(r"<style[^>]*>", page),
+            f"{plugin.name}/editor.html keeps its styles inline; "
+            "a page links a stylesheet beside it")
+
+# One shape for a plugin's UI files. A game that invents its own arrangement is
+# a game whose pages drift: the next one copies whatever it finds.
+#
+#   editor.html   the page. Every plugin with a UI has exactly this name.
+#   <page>.js     a module of that page, named for what it holds, loaded by it.
+#   <page>.css    the same, for styles a page of this game needs.
+#
+# A theme is not a file: it is tokens handed to mountShell. A stylesheet may set
+# tokens and style the game's own classes, never a shared component's.
+for plugin in sorted((ROOT / "games").iterdir()):
+    if not plugin.is_dir() or plugin.name.startswith("__"):
+        continue
+    pages = sorted(path for path in plugin.glob("*.html"))
+    modules = sorted(path for path in plugin.glob("*.js")) + sorted(plugin.glob("*.css"))
+    if not pages and not modules:
+        continue
+    require([path.name for path in pages] == ["editor.html"],
+            f"{plugin.name} has {[path.name for path in pages] or 'no page'}; a plugin's page is editor.html")
+    page = (plugin / "editor.html").read_text(encoding="utf-8")
+    server = (plugin / "server.py").read_text(encoding="utf-8") if (plugin / "server.py").is_file() else ""
+    themed = (plugin / "themed_server.py").read_text(encoding="utf-8") if (plugin / "themed_server.py").is_file() else ""
+    for module in modules:
+        require(module.name in page or module.name in server or module.name in themed,
+                f"{plugin.name}/{module.name} is not loaded by its page or served by its plugin; "
+                "a module belongs to the page that uses it")
+        require(not module.stem.startswith("theme"),
+                f"{plugin.name}/{module.name} is a theme file; a theme is tokens passed to "
+                "mountShell, and game-derived assets belong in a module named for what they are")
 
 # Property geometry / labels / metadata.
 # Pin the single definition, not the number. Three separate declarations of

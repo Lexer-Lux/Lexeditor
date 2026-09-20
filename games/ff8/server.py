@@ -17,6 +17,7 @@ from .ffnx_manager import status as ffnx_status
 from .game_font import ensure_font
 from theme_sounds import ensure_theme_sounds, sound_file
 from platform_config import load_config, save_config
+from plugin_http import PluginRequestHandler
 
 
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
@@ -78,29 +79,8 @@ def dashboard() -> dict:
     }
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(PluginRequestHandler):
     server_version = "LexeditorFF8/1"
-
-    def log_message(self, _format, *_args):
-        return
-
-    def json_response(self, payload, status=200):
-        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
-    def file_response(self, target: Path):
-        data = target.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
 
     def binary_response(self, data: bytes, content_type: str, filename: str | None = None):
         self.send_response(200)
@@ -122,12 +102,21 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 self.file_response(PLUGIN_ROOT / "editor.html")
-            elif path == "/cards_ui.js":
-                self.file_response(PLUGIN_ROOT / "cards_ui.js")
+            elif path.endswith((".js", ".css")) and "/" not in path.lstrip("/"):
+                # The page is a page: its script and its stylesheet live in
+                # modules beside it, named for what they hold.
+                module = (PLUGIN_ROOT / path.lstrip("/")).resolve()
+                if module.parent != PLUGIN_ROOT.resolve() or not module.is_file():
+                    self.json_response({"error": "Not found"}, 404)
+                else:
+                    self.file_response(module)
             elif path in ("/assets/licenses/FF8UltimateEditor-GPL-3.0.txt", "/assets/licenses/FFNx-GPL-3.0.txt", "/assets/licenses/Deling-GPL-3.0.txt", "/assets/licenses/OpenVIII-MIT.txt"):
                 self.file_response(PLUGIN_ROOT / path.lstrip("/"))
             elif path == "/assets/ff8-menu.ttf":
                 self.file_response(ensure_font())
+            elif path.startswith("/assets/card-elements/") and path.endswith(".png"):
+                element = int(Path(path).stem)
+                self.binary_response(card_art.element_png_bytes(element), "image/png")
             elif path.startswith("/assets/cards/") and path.endswith(".png"):
                 card_id = int(path.rsplit("/", 1)[-1].removesuffix(".png"))
                 self.binary_response(card_art.png_bytes(card_id), "image/png")

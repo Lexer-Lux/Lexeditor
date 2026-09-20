@@ -3,12 +3,15 @@ import re,tempfile
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 def main():
  with sync_playwright() as pw:
   browser=pw.chromium.launch(headless=True);page=browser.new_page(viewport={'width':1440,'height':1000})
   page.route('http://fixture/',lambda r:r.fulfill(body='<main style="height:850px;width:900px"></main>',content_type='text/html'));page.goto('http://fixture/')
   page.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  page.add_style_tag(content=re.search(r'<style>(.*?)</style>',(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8'),re.S).group(1))
+  page.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
   page.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
   page.evaluate("""()=>{
    const U=LexeditorUI;window.draw=reverse=>{const rows=Array.from({length:64},(_,id)=>({id,name:id===42?"Gunblade (Seifer's Hyperion battle prop) with a very long name":'G-Soldier'}));if(reverse)rows.reverse();

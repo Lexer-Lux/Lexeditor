@@ -22,6 +22,12 @@ from . import executable_text, paths
 TIM_OFFSET = 0x7A9B10
 CARD_COUNT = 110
 CELL_SIZE = 64
+# FFNx src/ff8_data.cpp resolves this TIM through 00534640+125.
+# Each element has four 16x16 animation frames; the card uses the first.
+ICONS_TIM_OFFSET = 0x796A90
+ELEMENT_CELLS = {1: (0, 16, 3), 2: (64, 16, 6), 4: (128, 16, 9),
+                 8: (192, 16, 12), 16: (0, 32, 15), 32: (64, 32, 18),
+                 64: (128, 32, 21), 128: (192, 32, 24)}
 
 
 def _read_atlas(exe: bytes) -> tuple[tuple[tuple[int, int, int, int], ...], bytes]:
@@ -82,3 +88,46 @@ def png_bytes(card_id: int, game_root: Path | None = None) -> bytes:
     exe = ((game_root or paths.GAME_ROOT) / 'FF8_EN.exe').resolve()
     stat = exe.stat()
     return _cached_cards(str(exe), stat.st_size, stat.st_mtime_ns)[card_id]
+
+
+def _render_elements(exe: bytes) -> dict[int, bytes]:
+    executable_text._validate_executable(exe)
+    start = ICONS_TIM_OFFSET
+    magic, flags, clut_size, _, _, pw, ph = struct.unpack_from('<III4H', exe, start)
+    if (magic, flags, clut_size, pw, ph) != (16, 8, 3084, 48, 32):
+        raise ValueError('Unsupported Triple Triad icon palette')
+    header = start + 8 + clut_size
+    length, _, _, words, height = struct.unpack_from('<I4H', exe, header)
+    if (length, words, height) != (73740, 192, 192) or header + length > len(exe):
+        raise ValueError('Unsupported Triple Triad icon image')
+    pixels = exe[header + 12:header + length]
+    images = {}
+    for element, (x, y, palette) in ELEMENT_CELLS.items():
+        colors = []
+        for index in range(16):
+            color = struct.unpack_from('<H', exe, start + 20 + (palette * 16 + index) * 2)[0]
+            colors.append(tuple(round((color >> shift & 31) * 255 / 31)
+                                for shift in (0, 5, 10)) + (0 if color == 0 else 255,))
+        rgba = bytearray()
+        for row in range(y, y + 16):
+            for column in range(x, x + 16):
+                packed = pixels[row * words * 2 + column // 2]
+                rgba.extend(colors[(packed >> (4 * (column % 2))) & 15])
+        image = Image.frombytes('RGBA', (16, 16), bytes(rgba))
+        output = BytesIO()
+        image.save(output, format='PNG')
+        images[element] = output.getvalue()
+    return images
+
+
+@lru_cache(maxsize=2)
+def _cached_elements(exe_path: str, size: int, mtime_ns: int) -> dict[int, bytes]:
+    return _render_elements(Path(exe_path).read_bytes())
+
+
+def element_png_bytes(element: int, game_root: Path | None = None) -> bytes:
+    if isinstance(element, bool) or not isinstance(element, int) or element not in ELEMENT_CELLS:
+        raise ValueError('Unknown Triple Triad element')
+    exe = ((game_root or paths.GAME_ROOT) / 'FF8_EN.exe').resolve()
+    stat = exe.stat()
+    return _cached_elements(str(exe), stat.st_size, stat.st_mtime_ns)[element]

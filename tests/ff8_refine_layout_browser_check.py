@@ -3,15 +3,18 @@ import re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 def main():
- s=(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8')
+ s=plugin_ui('ff8')
  detail=s[s.index('  function refineDetail'):s.index('  function renderRefine')]
  columns=re.search(r'const columns=(\[.*?\]);',s[s.index('  function renderRefine'):],re.S).group(1)
  with sync_playwright() as pw:
   b=pw.chromium.launch(headless=True);p=b.new_page(viewport={'width':1500,'height':900})
   p.route('http://fixture/',lambda r:r.fulfill(content_type='text/html',body='<body data-lex-plugin="ff8"><div id="list" style="width:700px"></div><div id="detail" style="width:700px"></div></body>'));p.goto('http://fixture/')
   p.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  p.add_style_tag(content=re.search(r'<style>(.*?)</style>',s,re.S).group(1))
+  p.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
   p.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
   p.on('pageerror', lambda error: print(error))
   p.add_script_tag(content="""const {el,detailField,infoHelp,readonlyField,columnList}=LexeditorUI;
