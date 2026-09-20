@@ -510,18 +510,6 @@ def _scalar_field(node: ET.Element) -> dict | None:
 def items_payload(vanilla_only: bool = False) -> dict:
     rows = []
     source_rows = []
-    rows.append({
-        "filename": f"game/content.rpf:/{loot_script.ARCHIVE_PATH}",
-        "controls": "Corpse loot script item-enum switch",
-        "notes": (
-            "Loot Tables exposes only the verified item-enum call sites and "
-            "writes a length-preserving WSC override; the rest of the script stays read-only."
-        ),
-        "status": "partial",
-        "coverage": "structured",
-        "target": "loot",
-        "openable": True,
-    })
     for source_id, definition in INVENTORY_SOURCES.items():
         try:
             source, vanilla, project, active = _inventory_paths(source_id, vanilla_only)
@@ -1682,13 +1670,72 @@ def _provisional_data_map_rows() -> list[dict]:
     rows = []
     if PREPARED_ROOT.is_dir():
         for source in PREPARED_ROOT.rglob("*"):
-            if source.is_file():
+            if not source.is_file():
+                continue
+            relative = PurePosixPath(source.relative_to(PREPARED_ROOT).as_posix())
+            if _string_table_supported(relative):
+                try:
+                    string_tables.parse(source.read_bytes())
+                    supported = True
+                except (OSError, ValueError, struct.error):
+                    supported = False
                 rows.append({
-                    "filename": f"game/tune_d11generic.rpf:/{source.relative_to(PREPARED_ROOT).as_posix()}",
+                    "filename": f"game/tune_d11generic.rpf:/{relative.as_posix()}",
+                    "controls": "Localized string-table entries",
+                    "notes": (
+                        "String Tables edits only displayed UTF-16 text; identifiers, "
+                        "hashes, glyph metrics and layout metadata stay read-only."
+                        if supported else
+                        "The prepared string table did not pass the structured STRTBL parser."
+                    ),
+                    "status": "partial" if supported else "not-integrated",
+                    "coverage": "structured" if supported else "unavailable",
+                    "target": "strings" if supported else "",
+                    "openable": supported,
+                })
+            else:
+                rows.append({
+                    "filename": f"game/tune_d11generic.rpf:/{relative.as_posix()}",
                     "controls": "Prepared tuning data",
                     "notes": "Prepared from tune_d11generic.rpf; a format-specific editor is not mapped yet.",
                     "status": "not-integrated", "coverage": "unavailable",
                 })
+    if CONTENT_PREPARED_ROOT.is_dir():
+        for source in CONTENT_PREPARED_ROOT.rglob("*.strtbl"):
+            relative = PurePosixPath(source.relative_to(CONTENT_PREPARED_ROOT).as_posix())
+            if not _string_table_supported(relative):
+                continue
+            try:
+                string_tables.parse(source.read_bytes())
+                supported = True
+            except (OSError, ValueError, struct.error):
+                supported = False
+            rows.append({
+                "filename": f"game/content.rpf:/{relative.as_posix()}",
+                "controls": "Localized string-table entries",
+                "notes": (
+                    "String Tables edits only displayed UTF-16 text; identifiers, "
+                    "hashes, glyph metrics and layout metadata stay read-only."
+                    if supported else
+                    "The prepared string table did not pass the structured STRTBL parser."
+                ),
+                "status": "partial" if supported else "not-integrated",
+                "coverage": "structured" if supported else "unavailable",
+                "target": "strings" if supported else "",
+                "openable": supported,
+            })
+    rows.append({
+        "filename": f"game/content.rpf:/{loot_script.ARCHIVE_PATH}",
+        "controls": "Corpse loot script item-enum switch",
+        "notes": (
+            "Loot Tables exposes only the verified item-enum call sites and writes "
+            "a length-preserving WSC override; the rest of the script stays read-only."
+        ),
+        "status": "partial",
+        "coverage": "structured",
+        "target": "loot",
+        "openable": True,
+    })
     for source_id, definition in INVENTORY_SOURCES.items():
         available = (CONTENT_PREPARED_ROOT / definition["relative"]).is_file()
         rows.append({
