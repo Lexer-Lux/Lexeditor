@@ -31,14 +31,20 @@ def no_horizontal_overflow(page, label: str) -> None:
     assert data["main"] <= data["mainClient"] + 3, (label, data)
 
 
+def wait_editor_ready(page) -> None:
+    # The shared framework intentionally keeps an input-blocking loading screen
+    # up for a configurable minimum. Visual acceptance starts after it is gone.
+    page.locator(".lex-plugin-loading-screen").wait_for(state="detached", timeout=6000)
+
+
 def capture(page, screenshots: list[str], name: str) -> None:
+    wait_editor_ready(page)
     path = OUT / name
     page.screenshot(path=str(path), full_page=True)
     screenshots.append(path.name)
 
 
-def reveal_settings_text(page, text: str) -> None:
-    target = page.get_by_text(text, exact=False).first
+def reveal_settings_locator(page, target, label: str) -> None:
     for _ in range(12):
         if target.count() and target.is_visible():
             return
@@ -50,7 +56,11 @@ def reveal_settings_text(page, text: str) -> None:
             break
         next_button.click()
         page.wait_for_timeout(80)
-    assert target.count() and target.is_visible(), (text, page.locator("#main").inner_text())
+    assert target.count() and target.is_visible(), (label, page.locator("#main").inner_text())
+
+
+def reveal_settings_text(page, text: str) -> None:
+    reveal_settings_locator(page, page.get_by_text(text, exact=False).first, text)
 
 
 def main() -> None:
@@ -127,7 +137,11 @@ def main() -> None:
 
                     page.locator("#plugin-info").click()
                     page.get_by_text("MOD LOADER", exact=True).wait_for()
-                    reveal_settings_text(page, "External Steam runtime")
+                    reveal_settings_locator(
+                        page,
+                        page.locator('input.lex-readonly-field[value*="External Steam runtime"]').first,
+                        "External Steam runtime",
+                    )
                     no_horizontal_overflow(page, "info-desktop")
                     capture(page, screenshots, "info-desktop.png")
 
@@ -166,6 +180,7 @@ def main() -> None:
                     # structured value survives a fresh UI boot.
                     page.reload(wait_until="domcontentloaded")
                     page.locator(".lex-detail-panel").first.wait_for()
+                    wait_editor_ready(page)
                     page.evaluate('navigate("content")')
                     page.get_by_role("searchbox", name="Search managed Terraria content").fill("AcceptanceItem")
                     page.get_by_text("AcceptanceItem", exact=True).first.click()
