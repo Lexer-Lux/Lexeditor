@@ -87,7 +87,7 @@ def geometry(page, label: str) -> dict:
         rootBottom:root?.getBoundingClientRect().bottom||0,
         pagerBottom:pager?.getBoundingClientRect().bottom||0
       };
-    }""")
+    })()""")
     assert metrics["bodyWidth"] <= metrics["viewport"][0] + 2, (label, metrics)
     assert metrics["bodyHeight"] <= metrics["viewport"][1] + 2, (label, metrics)
     assert metrics["mainScrollWidth"] <= metrics["mainWidth"] + 2, (label, metrics)
@@ -105,7 +105,7 @@ def open_editor(browser, url: str, width: int, height: int, zoom: float = 1.0):
     page = browser.new_page(viewport={"width": width, "height": height})
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.add_init_script("""() => {
+    page.add_init_script("""(() => {
       const originalFetch = window.fetch.bind(window);
       let delayed = false;
       window.fetch = (input, init) => {
