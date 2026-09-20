@@ -11,7 +11,7 @@ WARBAND = (ROOT / "games" / "warband" / "editor.html").read_text(encoding="utf-8
 RDR = (
     (ROOT / "games" / "rdr" / "editor.html").read_text(encoding="utf-8")
     + "\n"
-    + (ROOT / "games" / "rdr" / "assets" / "editor.js").read_text(encoding="utf-8")
+    + (ROOT / "games" / "rdr" / "editor.js").read_text(encoding="utf-8")
 )
 RDR2 = (ROOT / "games" / "rdr2" / "editor.html").read_text(encoding="utf-8")
 
