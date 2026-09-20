@@ -61,9 +61,14 @@
   }
   function boolControl(key){
     const declared=key in current.values;
-    const checkbox=el("input",{type:"checkbox","aria-label":controlLabel(key),checked:declared?!!current.values[key]:false,disabled:!current.editable,onchange:event=>setValue(key,event.target.checked)});
-    if(declared)return checkbox;
-    return el("span",{class:"terraria-build-row"},checkbox,el("span",{class:"terraria-build-path"},"Not declared — check to add"));
+    return el("input",{
+      type:"checkbox","aria-label":controlLabel(key),
+      "aria-description":declared?"":"Not declared in build.txt. Check to add this property.",
+      title:declared?"":"Not declared — check to add",
+      checked:declared?!!current.values[key]:false,
+      disabled:!current.editable,
+      onchange:event=>setValue(key,event.target.checked),
+    });
   }
   function sideControl(){
     const select=el("select",{"aria-label":"Side",disabled:!current.editable,onchange:event=>setValue("side",event.target.value)});

@@ -129,6 +129,14 @@ def main() -> None:
                     translation = page.get_by_label("Translation mod", exact=True)
                     translation.scroll_into_view_if_needed()
                     assert translation.is_visible()
+                    package_checks = page.locator('.lex-detail-section').filter(has_text="PACKAGE").locator('input[type="checkbox"]')
+                    assert package_checks.count() == 6
+                    rows = package_checks.evaluate_all("""nodes => nodes.map(node => {
+                      const row=node.closest('.lex-detail-field').getBoundingClientRect();
+                      const box=node.getBoundingClientRect();
+                      return {rowLeft:row.left,rowRight:row.right,boxLeft:box.left,boxRight:box.right};
+                    })""")
+                    assert all(item["boxLeft"] >= item["rowLeft"] and item["boxRight"] <= item["rowRight"] for item in rows), rows
                     no_horizontal_overflow(page, "metadata-desktop")
                     capture(page, screenshots, "metadata-desktop.png")
 
@@ -176,8 +184,8 @@ def main() -> None:
                     page.wait_for_timeout(100)
                     assert page.locator(".lex-paged-list-detail").get_attribute("data-lex-page") == "1"
                     page.get_by_role("button", name="First page").first.click()
-                    name_sort = page.locator('button.lex-column-sort[title="Sort by Name"]')
-                    family_sort = page.locator('button.lex-column-sort[title="Sort by Family"]')
+                    name_sort = page.locator('button.lex-column-sort[data-lex-title="Sort by Name"]')
+                    family_sort = page.locator('button.lex-column-sort[data-lex-title="Sort by Family"]')
                     boxes = [name_sort.bounding_box(), family_sort.bounding_box()]
                     assert boxes[0] and boxes[1] and boxes[0]["x"] + boxes[0]["width"] <= boxes[1]["x"] + 1, boxes
                     name_sort.click()
