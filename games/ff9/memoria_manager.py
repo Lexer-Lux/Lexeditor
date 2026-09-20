@@ -33,6 +33,10 @@ RELEASE_API = f"{RELEASES_API}/tags/{PINNED_RELEASE}"
 LATEST_RELEASE_API = f"{RELEASES_API}/latest"
 REPOSITORY = "https://github.com/Albeoris/Memoria"
 ASSET_NAME = "Memoria.Patcher.exe"
+PINNED_ASSET_SHA256 = "23b9fb8cf2b79cf7f0ae051b91eaf7e17cb714c8873823ee38fed6aecc073def"
+PINNED_ASSET_SIZE = 23_479_904
+PINNED_PUBLISHED_AT = "2025-07-04T20:27:01Z"
+PINNED_ASSET_URL = f"{REPOSITORY}/releases/download/{PINNED_RELEASE}/{ASSET_NAME}"
 MAX_ASSET_BYTES = 120 * 1024 * 1024
 MANAGED_RELATIVE = Path("x64") / "FF9_Data" / "Managed"
 CONFIG_NAME = "Memoria.ini"
@@ -83,6 +87,16 @@ def _fetch_json(url: str) -> dict:
     if len(data) > 2 * 1024 * 1024:
         raise RuntimeError("The Memoria release metadata is too large")
     return json.loads(data.decode("utf-8"))
+
+
+def pinned_release() -> dict:
+    """Return the exact audited helper asset without a release-metadata lookup."""
+    return {
+        "version": PINNED_RELEASE, "published": PINNED_PUBLISHED_AT,
+        "name": ASSET_NAME, "url": PINNED_ASSET_URL,
+        "sha256": PINNED_ASSET_SHA256, "size": PINNED_ASSET_SIZE,
+        "source": REPOSITORY,
+    }
 
 
 def release(fetch_json: JsonFetcher = _fetch_json) -> dict:
@@ -286,9 +300,12 @@ def available(fetch_json: JsonFetcher = _fetch_json) -> dict:
         return {"available": False, "error": str(error)}
 
 
-def stage(*, fetch_json: JsonFetcher = _fetch_json, fetch_file: FileFetcher = _fetch_file,
+def stage(*, fetch_json: JsonFetcher | None = None, fetch_file: FileFetcher = _fetch_file,
           cache_root: Path = CACHE_ROOT, progress: Progress | None = None) -> tuple[Path, dict]:
-    published = release(fetch_json)
+    # Installation is pinned by repository-owned URL/SHA/size and therefore does
+    # not depend on GitHub release-metadata rate limits. Tests and diagnostics can
+    # still inject release metadata to exercise the validation path explicitly.
+    published = pinned_release() if fetch_json is None else release(fetch_json)
     cache = Path(cache_root)
     cache.mkdir(parents=True, exist_ok=True)
     target = cache / f"Memoria-{PINNED_RELEASE}.exe"
@@ -312,7 +329,7 @@ def _require_closed(root: Path) -> None:
         raise RuntimeError("Close Final Fantasy 9, its launcher and any patcher before modifying Memoria")
 
 
-def install(game_root: Path, *, fetch_json: JsonFetcher = _fetch_json,
+def install(game_root: Path, *, fetch_json: JsonFetcher | None = None,
             fetch_file: FileFetcher = _fetch_file, cache_root: Path = CACHE_ROOT,
             state_path: Path = STATE_PATH, progress: Progress | None = None,
             runner: Callable[[list[str], Path], int] | None = None) -> dict:

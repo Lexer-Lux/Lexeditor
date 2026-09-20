@@ -13,6 +13,8 @@ import sys
 import pytest
 
 from games.ff9 import memoria_manager as manager
+from games.ff9 import memoria_update as update
+from games.ff9.plugin import PLUGIN
 from games.ff9.memoria_patcher import MAGIC, inspect_payload, installation_files
 from games.ff9.memoria_recovery import Recovery, digest, root_key, install_lock
 
@@ -332,3 +334,30 @@ def test_shared_updates_contract_is_metadata_only(tmp_path):
     assert result["pinned"] == manager.PINNED_RELEASE
     assert result["latest"] == manager.PINNED_RELEASE and result["behind"] is False
     assert not (tmp_path / "Memoria.Patcher.exe").exists()
+
+
+def test_pinned_helper_metadata_is_repository_owned():
+    release = manager.pinned_release()
+    assert release["version"] == manager.PINNED_RELEASE
+    assert release["url"] == manager.PINNED_ASSET_URL
+    assert release["sha256"] == manager.PINNED_ASSET_SHA256
+    assert release["size"] == manager.PINNED_ASSET_SIZE
+    assert release["published"] == manager.PINNED_PUBLISHED_AT
+
+
+def test_stage_default_uses_repository_pin_without_metadata_lookup(tmp_path, monkeypatch):
+    payload = b"synthetic pinned helper"
+    metadata = {
+        "version": manager.PINNED_RELEASE, "published": "fixture",
+        "name": manager.ASSET_NAME, "url": manager.PINNED_ASSET_URL,
+        "sha256": hashlib.sha256(payload).hexdigest(), "size": len(payload),
+        "source": manager.REPOSITORY,
+    }
+    monkeypatch.setattr(manager, "pinned_release", lambda: metadata)
+    calls = []
+    def fetch_file(url, target, progress):
+        calls.append(url)
+        target.write_bytes(payload)
+    staged, published = manager.stage(fetch_file=fetch_file, cache_root=tmp_path)
+    assert calls == [manager.PINNED_ASSET_URL]
+    assert staged.read_bytes() == payload and published == metadata

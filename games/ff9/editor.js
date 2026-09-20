@@ -198,6 +198,7 @@
   function setValue(data,row,field,value){row.values[field.key]=value;shell.refresh()}
   function fieldPin(data,field){
     const key=["accessories","armor","weapons"].includes(state.tab)?`equipment-${state.tab}`:activeKey();
+    if(!key)return null;
     const base=state.datasets[key.startsWith("equipment-")?"items":key];
     if(!base)return null;
     const source=columnSources(base,key).find(value=>value.data.key===data.key);
