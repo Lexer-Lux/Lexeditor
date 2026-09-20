@@ -72,6 +72,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Prove Windows file-version metadata reader
+        shell: pwsh
+        run: python -c "from pathlib import Path; import sys; from games.terraria.runtime import windows_product_version; value=windows_product_version(Path(sys.executable)); print(value); assert value.strip()"
       - name: Build packaged acceptance runner
         shell: pwsh
         run: |
