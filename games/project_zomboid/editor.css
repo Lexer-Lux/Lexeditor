@@ -5,3 +5,4 @@ main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
 .pz-record-layout,.pz-script-layout,.pz-metadata,.lex-data-map-view,.lex-information-panel{height:100%;min-height:0}
 .pz-shared-actions{display:flex;align-items:center;gap:8px}
 .pz-shared-actions button{padding:7px 12px}
+.pz-record-detail,.pz-metadata,.pz-script-layout .lex-detail-panel,.lex-data-map-detail,.lex-information-panel{--lex-detail-label-width:minmax(min(9em,30%),20%)}

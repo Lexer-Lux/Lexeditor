@@ -16,6 +16,24 @@ STRUCTURED = (
     "animationmeshes", "items", "evolved", "crafts", "fixing", "fluids",
     "vehicles", "sounds", "models", "mannequins", "timedactions",
 )
+SURFACES = (
+    ("metadata", ".pz-metadata"),
+    ("animationmeshes", ".pz-record-layout"),
+    ("items", ".pz-record-layout"),
+    ("evolved", ".pz-record-layout"),
+    ("crafts", ".pz-record-layout"),
+    ("fixing", ".pz-record-layout"),
+    ("fluids", ".pz-record-layout"),
+    ("vehicles", ".pz-record-layout"),
+    ("sounds", ".pz-record-layout"),
+    ("models", ".pz-record-layout"),
+    ("mannequins", ".pz-record-layout"),
+    ("timedactions", ".pz-record-layout"),
+    ("scripts", ".pz-script-layout"),
+    ("datamap", ".lex-data-map-view"),
+    ("info", ".lex-information-panel"),
+)
+
 SEMANTIC_CONTROL = {
     "animationmeshes": 'input[type="checkbox"]',
     "items": 'input[type="number"]',
@@ -215,6 +233,47 @@ def navigate(page, tab: str, selector: str) -> None:
     page.wait_for_timeout(80)
 
 
+def assert_detail_reachable(page, label: str) -> dict | None:
+    bodies = page.locator(".lex-detail-panel-body")
+    if not bodies.count():
+        return None
+    body = bodies.last
+    value = body.evaluate(
+        """node => {
+          node.scrollTop = node.scrollHeight;
+          return {scrollTop:node.scrollTop, scrollHeight:node.scrollHeight, clientHeight:node.clientHeight};
+        }"""
+    )
+    assert value["scrollTop"] + value["clientHeight"] >= value["scrollHeight"] - 2, (label, value)
+    return value
+
+
+def assert_table_fit(page, label: str) -> None:
+    table = page.locator(".pz-record-table")
+    if not table.count():
+        return
+    identity = table.locator('.lex-column-list-cell[data-column-key="id"] .lex-column-cell-text').first
+    if identity.count():
+        fit = identity.evaluate("(node) => ({client:node.clientWidth, scroll:node.scrollWidth, text:node.textContent})")
+        assert fit["scroll"] <= fit["client"] + 1, (label, fit)
+    for header in table.locator(".lex-column-list-head-cell .lex-column-sort").all():
+        fit = header.evaluate("(node) => ({client:node.clientWidth, scroll:node.scrollWidth, text:node.textContent})")
+        assert fit["scroll"] <= fit["client"] + 1, (label, fit)
+
+
+def render_surface_set(page, folder: Path | None, prefix: str, width: int, height: int, zoom: float = 1.0) -> dict:
+    page.set_viewport_size({"width": width, "height": height})
+    page.evaluate("(value) => { document.documentElement.style.zoom = value === 1 ? '' : String(value); }", zoom)
+    results = {}
+    for index, (tab, selector) in enumerate(SURFACES, start=1):
+        navigate(page, tab, selector)
+        results[tab] = assert_layout(page, f"{tab}-{prefix}")
+        assert_table_fit(page, f"{tab}-{prefix}")
+        assert_detail_reachable(page, f"{tab}-{prefix}")
+        screenshot(page, folder, f"{prefix}-{index:02d}-{tab}")
+    return results
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--screenshots", type=Path)
@@ -369,36 +428,23 @@ def main() -> int:
                     page.locator(".lex-information-panel").wait_for()
                     assert page.get_by_text("MOD LOADER", exact=True).count() == 1
                     assert page.get_by_role("button", name="Deploy Local Mod").count() == 1
-                    assert page.get_by_text("Project Zomboid native Build 42 mod system.", exact=True).count() == 1
+                    assert page.get_by_display_value("Project Zomboid native Build 42 mod system.").count() == 1
                     assert_layout(page, "info-desktop")
                     screenshot(page, args.screenshots, "15-info-desktop")
 
-                    # Small desktop: no outer overflow, fitted table rows do not become a second scrollbar.
-                    page.set_viewport_size({"width": 900, "height": 620})
-                    navigate(page, "vehicles", ".pz-record-layout")
-                    small = assert_layout(page, "vehicles-small")
-                    detail = page.locator(".pz-record-detail")
-                    detail.evaluate("(node) => { node.scrollTop = node.scrollHeight; }")
-                    last = page.locator(".pz-record-detail .lex-detail-section").last
-                    assert last.bounding_box() is not None
-                    screenshot(page, args.screenshots, "16-vehicles-small")
+                    # Every surface must remain usable at a narrow desktop size.
+                    narrow = render_surface_set(page, args.screenshots, "narrow", 820, 700)
 
-                    # Simulate the desktop host's 150% UI scale and recheck the tallest panel.
-                    page.set_viewport_size({"width": 1100, "height": 760})
-                    page.evaluate("document.documentElement.style.zoom='1.5'")
-                    navigate(page, "metadata", ".pz-metadata")
-                    scaled = assert_layout(page, "metadata-150-percent")
-                    metadata_panel = page.locator(".pz-metadata")
-                    metadata_panel.evaluate("(node) => { node.scrollTop = node.scrollHeight; }")
-                    assert page.locator('.pz-metadata input[aria-label="Load Before"]').bounding_box() is not None
-                    screenshot(page, args.screenshots, "17-metadata-scale150")
+                    # Every surface must also survive the desktop host's maximum 150% UI scale.
+                    scaled = render_surface_set(page, args.screenshots, "scale150", 1100, 760, 1.5)
                     page.evaluate("document.documentElement.style.zoom=''")
 
                     assert not errors, errors
                     print({
-                        "screens": 15,
+                        "screens": len(SURFACES),
+                        "renderedConfigurations": len(SURFACES) * 3,
                         "items": 55,
-                        "small": small,
+                        "narrow": narrow,
                         "scaled": scaled,
                         "result": "Project Zomboid rendered UI acceptance passed",
                     })
