@@ -119,8 +119,10 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 expect(page.get_by_text("BattlePlayerParameter.uasset", exact=False)).to_be_visible()
                 expect(page.get_by_text("Faster Queen", exact=False)).to_be_visible()
                 assert page.locator(".lex-integration-status.partial").count() >= 1
-                player_map_row = page.locator(".lex-column-list-row").filter(has_text="PlayerParameter.uasset").first
-                player_map_row.click()
+                player_map_file = page.get_by_text(
+                    "End/Content/DataObject/Resident/PlayerParameter.uasset", exact=True)
+                expect(player_map_file).to_be_visible()
+                player_map_file.click()
                 open_characters = page.get_by_role("button", name="Open characters")
                 expect(open_characters).to_be_visible()
                 page.screenshot(path=str(OUT / "data-map.png"), full_page=True)
