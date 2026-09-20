@@ -153,7 +153,7 @@ def run(output: Path, executable: str | None) -> None:
 
                 page.evaluate("state.tab='strings'; stringsUI.render()")
                 expect(page.locator(".string-detail textarea")).to_have_value("Hello")
-                expect(page.locator(".rdr-record-list .lex-column-list-row")).to_have_count(1)
+                expect(page.locator(".rdr-record-list .lex-column-list-row:not(.lex-filler-row)")).to_have_count(1)
                 expect(page.locator(".string-detail .lex-detail-field")).to_have_count(7)
                 page.screenshot(path=str(output / f"rdr-strings-{width}.png"), full_page=True)
 
