@@ -240,7 +240,7 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
         drink_cell = stone.locator('[data-column-key="IsDrink"]').first
         drink_cell.dblclick()
         drink_editor = drink_cell.locator('input[type="checkbox"]')
-        drink_editor.check()
+        drink_editor.click()
         page.wait_for_timeout(150)
         assert page.get_by_role("checkbox", name="Drink", exact=True).is_checked()
 
