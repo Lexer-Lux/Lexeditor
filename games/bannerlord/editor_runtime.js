@@ -41,55 +41,68 @@ function enableRuntimeOverride(row,enabled){
 function renderRuntimeOverrides(){
   const value=state.runtimeOverrides;
   if(!value?.available){
-    main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"Runtime Overrides"),
-      el("div",{class:"bl-empty"},"The selected Bannerlord module must be deployed and contain supported custom effect/XP definitions before runtime overrides can be edited."),
-      el("button",{type:"button",onclick:()=>reloadRuntimeOverrides(false)},"Reload")));return
+    main.replaceChildren(uiEmpty("Runtime Overrides","Deploy the selected module with supported custom effect and XP definitions before editing runtime overrides.",[
+      uiButton("Reload",()=>reloadRuntimeOverrides(false))
+    ]));return
   }
   const effectMode=state.runtimeKind==="effects";
-  const rows=effectMode?(value.effects||[]):(value.xpSources||[]);
-  state.runtimeIndex=Math.max(0,Math.min(state.runtimeIndex,Math.max(0,rows.length-1)));
-  const record=rows[state.runtimeIndex];
-  const master=el("div",{class:"bl-master"},
-    el("div",{class:"bl-master-head"},
-      el("strong",{},effectMode?`Runtime Effects (${rows.length})`:`Runtime XP (${rows.length})`),
-      el("button",{type:"button",class:effectMode?"active":"",onclick:()=>{state.runtimeKind="effects";state.runtimeIndex=0;render()}},"Effects"),
-      el("button",{type:"button",class:!effectMode?"active":"",onclick:()=>{state.runtimeKind="xp";state.runtimeIndex=0;render()}},"XP"),
-      el("button",{type:"button",onclick:()=>reloadRuntimeOverrides()},"Reload")),
-    el("div",{class:"bl-list"},...rows.map((row,index)=>el("button",{
-      type:"button",class:`bl-item${index===state.runtimeIndex?" active":""}`,onclick:()=>{state.runtimeIndex=index;render()}
-    },row.label,el("small",{},`${row.skillId} · ${row.overridden?"override":"source default"}`))))
-  );
-  let detail;
-  if(!record)detail=el("div",{class:"bl-detail"},el("div",{class:"bl-empty"},"No supported runtime values."));
-  else{
-    const controls=[
-      ...fieldRow(effectMode?"Effect ID":"Source ID",el("code",{},record.id)),
-      ...fieldRow("Skill",record.skillId),
-      ...fieldRow("Override deployed value",checkbox(record.overridden,value=>enableRuntimeOverride(record,value)))
+  const items=(effectMode?(value.effects||[]):(value.xpSources||[])).map((row,index)=>({
+    index,row,label:row.label,skill:row.skillId,overridden:!!row.overridden,
+    low:effectMode?Number(row.low):undefined,high:effectMode?Number(row.high):undefined,amount:effectMode?undefined:Number(row.amount),
+    searchText:`${row.label} ${row.id} ${row.skillId} ${row.overridden?"override":"source default"}`
+  }));
+  const columns=effectMode?[
+    {key:"label",label:"Effect"},{key:"skill",label:"Skill"},
+    {key:"overridden",label:"Override",render:item=>item.row.overridden?"On":"Off",
+      edit:(item,value)=>enableRuntimeOverride(item.row,!!value),editor:(item,commit)=>cellBool(item.row.overridden,commit)},
+    {key:"low",label:"Level 0",numeric:true,edit:(item,value)=>{if(item.row.overridden){item.row.low=Number(value);refresh()}},editValue:item=>item.row.low,
+      editor:(item,commit)=>item.row.overridden?cellNumber(item.row.low,commit,{step:"any"}):uiText(item.row.low)},
+    {key:"high",label:"Level 100",numeric:true,edit:(item,value)=>{if(item.row.overridden){item.row.high=Number(value);refresh()}},editValue:item=>item.row.high,
+      editor:(item,commit)=>item.row.overridden?cellNumber(item.row.high,commit,{step:"any"}):uiText(item.row.high)}
+  ]:[
+    {key:"label",label:"XP source"},{key:"skill",label:"Skill"},
+    {key:"overridden",label:"Override",render:item=>item.row.overridden?"On":"Off",
+      edit:(item,value)=>enableRuntimeOverride(item.row,!!value),editor:(item,commit)=>cellBool(item.row.overridden,commit)},
+    {key:"amount",label:"XP",numeric:true,edit:(item,value)=>{if(item.row.overridden){item.row.amount=Math.max(0,Number(value));refresh()}},editValue:item=>item.row.amount,
+      editor:(item,commit)=>item.row.overridden?cellNumber(item.row.amount,commit,{min:0,step:"any"}):uiText(item.row.amount)}
+  ];
+  const detail=item=>{
+    const row=item.row;
+    const fields=[
+      readField("Internal name",row.id,"Stable deployed JSON key."),
+      readField("Skill",row.skillId),
+      boolField("Override deployed value",row.overridden,value=>enableRuntimeOverride(row,value),"When enabled, deployed ModuleData JSON takes precedence over the C# source default without rebuilding.")
     ];
     if(effectMode){
-      controls.push(
-        ...fieldRow("Source default @0",`${record.defaultLow}${record.suffix||""}`),
-        ...fieldRow("Source default @100",`${record.defaultHigh}${record.suffix||""}`),
-        ...fieldRow("Runtime @0",numberInput(record.low,value=>record.low=value,{disabled:!record.overridden,step:"any"})),
-        ...fieldRow("Runtime @100",numberInput(record.high,value=>record.high=value,{disabled:!record.overridden,step:"any"})),
-        ...fieldRow("Runtime slope",String((Number(record.high)-Number(record.low))/100))
+      fields.push(
+        readField("Source default @0",`${row.defaultLow}${row.suffix||""}`),
+        readField("Source default @100",`${row.defaultHigh}${row.suffix||""}`),
+        BLUI.detailField({label:"Runtime @0",control:numberInput(row.low,value=>row.low=value,{disabled:!row.overridden,step:"any"}),help:BLUI.infoHelp("Deployed gameplay magnitude at custom skill level 0.")}),
+        BLUI.detailField({label:"Runtime @100",control:numberInput(row.high,value=>row.high=value,{disabled:!row.overridden,step:"any"}),help:BLUI.infoHelp("Deployed gameplay magnitude at custom skill level 100.")}),
+        readField("Runtime slope",(Number(row.high)-Number(row.low))/100)
       );
     }else{
-      controls.push(
-        ...fieldRow("Source default",`${record.defaultAmount} XP`),
-        ...fieldRow("Runtime amount",numberInput(record.amount,value=>record.amount=value,{disabled:!record.overridden,min:0,step:"any"}))
+      fields.push(
+        readField("Source default",`${row.defaultAmount} XP`),
+        BLUI.detailField({label:"Runtime amount",control:numberInput(row.amount,value=>row.amount=Math.max(0,value),{disabled:!row.overridden,min:0,step:"any"}),min:0,help:BLUI.infoHelp("Deployed XP amount used instead of the C# fallback while this override is enabled.")})
       );
     }
-    detail=el("div",{class:"bl-detail"},el("section",{class:"bl-panel"},
-      el("h2",{},record.label),el("div",{class:"bl-grid"},...controls),
-      el("div",{class:"bl-note"},record.overridden?
-        "This value is written to the deployed module's ModuleData JSON and takes precedence over the C# default at runtime.":
-        "No deployed override is active. Bannerlord will use the C# source default. Enable the override to tune runtime behavior without rebuilding."),
-      el("div",{class:"bl-note"},`Deployed module: ${value.deployedRoot}`)
-    ));
-  }
-  main.replaceChildren(el("div",{class:"bl-split"},master,detail));
+    return BLUI.detailPanel({title:row.label,meta:row.id,body:[
+      BLUI.detailSection({title:"DEPLOYED VALUE",body:fields}),
+      BLUI.detailSection({title:"LOCATION",body:[readField("Deployed module",value.deployedRoot)]})
+    ]});
+  };
+  const table=tableView({
+    key:`runtime-${state.runtimeKind}`,rows:items,keyOf:item=>item.index,columns,detail,
+    noun:effectMode?"runtime effects":"runtime XP sources",
+    placeholder:effectMode?"Search runtime effects…":"Search runtime XP…",
+    selected:state.runtimeIndex,setSelected:value=>state.runtimeIndex=Number(value),
+    filters:[uiButton("Reload",()=>reloadRuntimeOverrides())]
+  });
+  main.replaceChildren(BLUI.tabbedPanel({
+    tabs:[{id:"effects",label:"Effects"},{id:"xp",label:"XP"}],active:state.runtimeKind,label:"Runtime override type",
+    change:kind=>{state.runtimeKind=kind;state.runtimeIndex=0;render()},content:table
+  }));
 }
 
 const renderDataMapBeforeRuntime=renderDataMap;
