@@ -14,6 +14,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from games.ff8 import (  # noqa: E402
     battle_shortcuts,
@@ -183,7 +184,10 @@ def main() -> int:
                 "universalItem": True,
             }, game_root=installed, project_root=project)
             assert result["saved"] == 1
-            assert json.loads(gameplay_settings.settings_path(project).read_text()) == {
+            # What was saved is stored as given. The file also carries every
+            # later tweak's default, so it is not pinned whole.
+            saved = json.loads(gameplay_settings.settings_path(project).read_text())
+            expected = {
                 "autoSortInventory": False,
                 "autoSortMagic": False,
                 "enhancedAbilityMenu": False,
@@ -210,6 +214,8 @@ def main() -> int:
                 "maxSpellEnabled": False,
                 "maxSpell": gameplay_settings.DEFAULT_MAX_SPELL,
             }
+            assert expected.items() <= saved.items(), {k: saved.get(k) for k in expected if saved.get(k) != expected[k]}
+            assert saved["cameraSpeed"] == gameplay_settings.DEFAULT_CAMERA_SPEED
             assert gameplay_settings.patch_path(project).read_text(encoding="utf-8") == gameplay_settings.build_hext(
                 25, auto_sort=False, single_gf_enabled=True,
                 universal_item=True,
@@ -372,7 +378,8 @@ def main() -> int:
                         assert saved_config.count(flag + " =") == 1
                         assert f"{flag} = {str(enabled).lower()}" in saved_config
 
-    editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    from plugin_source import plugin_source
+    editor = plugin_source("ff8")
     assert "MONOGAMY" in editor
     assert "lex-setting-default-control" not in editor
     assert "maximumGfsPerCharacter" not in editor

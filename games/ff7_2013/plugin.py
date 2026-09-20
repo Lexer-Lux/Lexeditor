@@ -33,6 +33,7 @@ PROJECT_KERNEL_PATH = Path("data/lang-en/kernel/KERNEL.BIN")
 def check() -> list[str]:
     required = (
         SHARED_PLUGIN_ROOT / "editor.html",
+        SHARED_PLUGIN_ROOT / "editor.js",
         SHARED_PLUGIN_ROOT / "kernel.py",
         SHARED_PLUGIN_ROOT / "server.py",
     )
@@ -160,8 +161,6 @@ def smoke() -> list[str]:
 PLUGIN = GamePlugin(
     plugin_id="ff7-2013",
     name="Final Fantasy 7 (Original)",
-    subtitle="FFVII 2013",
-    description="Uses the shared structured FFVII editors for the English 2013 Steam release; project saves keep installed game data unchanged.",
     accent="#3155b7",
     cover_art=LEXEDITOR_ROOT / "assets" / "covers" / "ff7-original.png",
     check=check,

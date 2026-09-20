@@ -8,6 +8,7 @@ are executed.
 from pathlib import Path
 import argparse
 import json
+import re
 from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +58,14 @@ window.fetch=async function(url,options={}) {
                       '<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
     html=html.replace('<script src="/shared/framework.js"></script>',
                       '<script>'+fixture+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')+'</script>')
+    # The page loads its own script and stylesheet from modules beside it. There
+    # is no server here, so they are inlined in the order the page lists them.
+    for module in re.findall(r'<script src="/?([A-Za-z0-9_.-]+\.js)"></script>', html):
+        html=html.replace(f'<script src="{module}"></script>',
+                          '<script>'+(ROOT/'games/rdr2'/module).read_text(encoding='utf-8')+'</script>')
+    for sheet in re.findall(r'<link rel="stylesheet" href="/?([A-Za-z0-9_.-]+\.css)">', html):
+        html=html.replace(f'<link rel="stylesheet" href="{sheet}">',
+                          '<style>'+(ROOT/'games/rdr2'/sheet).read_text(encoding='utf-8')+'</style>')
     return html
 
 

@@ -38,18 +38,14 @@ def html_for(game):
     window.__lexeditorPlugin={id:"'''+game+'''",name:"Fixture edition",edition:"Fixture"};'''
     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')+'</script>')
-    if '<script src="/cards_ui.js"></script>' in html:
-        html=html.replace('<script src="/cards_ui.js"></script>','<script>'+(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8')+'</script>')
-    # A plugin whose code lives in its own script files needs them inlined, or
-    # nothing of it runs and the page looks like a plugin that failed to boot.
-    for owner, names in (
-        ('chrono_trigger', ('event_editor.js', 'map_previews.js', 'ui-integration.js')),
-        ('palworld', ('build-ui-pre.js', 'editor.js', 'build-ui.js')),
-    ):
-        if game != owner:
-            continue
-        for name in names:
-            html=html.replace(f'<script src="/{name}"></script>', '<script>'+(ROOT/'games'/owner/name).read_text(encoding='utf-8')+'</script>')
+    # A plugin page loads its code and styles from modules beside it. There is
+    # no server here, so every one the page names is inlined where it stands,
+    # or nothing of the plugin runs and it looks like a plugin that failed to boot.
+    folder=ROOT/'games'/source_game
+    html=re.sub(r'<script src="(?!/shared/)/?([A-Za-z0-9_./-]+\.js)"></script>',
+                lambda m:'<script>'+(folder/Path(m[1]).name).read_text(encoding='utf-8').replace('</script','<\\/script')+'</script>',html)
+    html=re.sub(r'<link rel="stylesheet" href="(?!/shared/)/?([A-Za-z0-9_./-]+\.css)">',
+                lambda m:'<style>'+(folder/Path(m[1]).name).read_text(encoding='utf-8')+'</style>',html)
     # No third-party requests are made by these HTML documents in this harness.
     return html
 
@@ -88,8 +84,7 @@ with sync_playwright() as p:
                       if(typeof state.config!=="undefined")state.config={datasets:{mine:{readonly:false,label:"My Mod"}}};
                       navigate("datamap");
                     }''',ROWS)
-                if game == 'chrono_trigger':
-                    page.evaluate('state.busy=false;render();refreshShell();')
+                    page.evaluate('state.busy=false;render();if(typeof refreshShell==="function")refreshShell();else if(typeof shell!=="undefined"&&shell.refresh)shell.refresh();')
                 page.wait_for_selector('.lex-data-map-table')
                 page.wait_for_timeout(600)
                 # A preview/source/parser does not produce an editable badge.
