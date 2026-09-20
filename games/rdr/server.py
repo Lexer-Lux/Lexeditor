@@ -339,6 +339,18 @@ def _scalar_field(node: ET.Element) -> dict | None:
 def items_payload(vanilla_only: bool = False) -> dict:
     rows = []
     source_rows = []
+    rows.append({
+        "filename": f"game/content.rpf:/{loot_script.ARCHIVE_PATH}",
+        "controls": "Corpse loot script item-enum switch",
+        "notes": (
+            "Loot Tables exposes only the verified item-enum call sites and "
+            "writes a length-preserving WSC override; the rest of the script stays read-only."
+        ),
+        "status": "partial",
+        "coverage": "structured",
+        "target": "loot",
+        "openable": True,
+    })
     for source_id, definition in INVENTORY_SOURCES.items():
         try:
             source, vanilla, project, active = _inventory_paths(source_id, vanilla_only)
@@ -1501,7 +1513,7 @@ def _provisional_data_map_rows() -> list[dict]:
         for source in PREPARED_ROOT.rglob("*"):
             if source.is_file():
                 rows.append({
-                    "filename": source.relative_to(PREPARED_ROOT).as_posix(),
+                    "filename": f"game/tune_d11generic.rpf:/{source.relative_to(PREPARED_ROOT).as_posix()}",
                     "controls": "Prepared tuning data",
                     "notes": "Prepared from tune_d11generic.rpf; a format-specific editor is not mapped yet.",
                     "status": "not-integrated", "coverage": "unavailable",
@@ -1509,7 +1521,7 @@ def _provisional_data_map_rows() -> list[dict]:
     for source_id, definition in INVENTORY_SOURCES.items():
         available = (CONTENT_PREPARED_ROOT / definition["relative"]).is_file()
         rows.append({
-            "filename": definition["relative"].as_posix(),
+            "filename": f"game/content.rpf:/{definition['relative'].as_posix()}",
             "controls": f'{definition["label"]} inventory records',
             "notes": "Only direct scalar item fields are editable in Items; nested XML structure is preserved." if available else "Prepared inventory XML is missing.",
             "status": "partial" if available else "not-integrated",
@@ -1527,7 +1539,7 @@ def _provisional_data_map_rows() -> list[dict]:
                 supported = False
             writable = supported and paths.RPF6_TOOL.is_file() and (GRINGO_PACKED_ROOT / relative).is_file()
             rows.append({
-                "filename": "gringores/" + relative.as_posix(),
+                "filename": "game/gringores.rpf:/" + relative.as_posix(),
                 "controls": "ShopInventory records" if supported else "Gringo interaction resource",
                 "notes": ("Only the proved ShopInventory price, quantity and stock fields are exposed."
                           if writable else "Shop records can be viewed; the packed source or resource writer is missing."
