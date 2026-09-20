@@ -40,6 +40,21 @@ def html_for(game):
     window.fetch=()=>new Promise(()=>{});
     window.__lexeditorPlugin={id:"'''+game+'''",name:"Fixture edition",edition:"Fixture"};'''
     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
+    def inline_plugin_style(match):
+        source=match.group(1)
+        relative=source.lstrip('/')
+        candidates=(ROOT/'games'/relative,ROOT/'games'/source_game/relative)
+        games_root=(ROOT/'games').resolve()
+        for candidate in candidates:
+            resolved=candidate.resolve()
+            try:
+                resolved.relative_to(games_root)
+            except ValueError:
+                continue
+            if resolved.is_file() and resolved.suffix.casefold()=='.css':
+                return '<style>'+resolved.read_text(encoding='utf-8')+'</style>'
+        return match.group(0)
+    html=re.sub(r'<link rel="stylesheet" href="([^"]+)">',inline_plugin_style,html)
     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')+'</script>')
     def inline_plugin_script(match):
         source=match.group(1)
