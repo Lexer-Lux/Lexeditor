@@ -206,7 +206,7 @@ def data_map_payload() -> dict:
         {
             "filename": PLAYER_PARAMETER.as_posix(),
             "controls": "Characters — real row FName identity and fixed-width scalar controls",
-            "coverage": "parse / bounded edit / byte-preserving save / reopen to project staging",
+            "coverage": "structured",
             "notes": (
                 "Implemented from public Rebirth format evidence and synthetic structural "
                 "fixtures. Real installed-game acceptance is still pending."
@@ -215,7 +215,7 @@ def data_map_payload() -> dict:
         },
         {
             "filename": "End/Content/DataObject/Resident/BattlePlayerParameter.uasset",
-            "controls": "None", "coverage": "Public format research only",
+            "controls": "None", "coverage": "unavailable",
             "notes": (
                 "Known table includes arrays and behavior-linked fields. Array resizing "
                 "and semantics have not been proved in Lexeditor."
@@ -223,7 +223,7 @@ def data_map_payload() -> dict:
         },
         {
             "filename": "pakchunk3-WindowsNoEditor.utoc / .ucas",
-            "controls": "None", "coverage": "IoStore source extraction research",
+            "controls": "None", "coverage": "unavailable",
             "notes": (
                 "retoc v0.1.5 can address DirectoryIndex containers, but its Oodle "
                 "dependency must be supplied explicitly before Lexeditor may invoke it."
@@ -231,7 +231,7 @@ def data_map_payload() -> dict:
         },
         {
             "filename": "FF7R2 IoStore patch package (.utoc/.ucas/.pak)",
-            "controls": "None", "coverage": "Staging path only; package/install unavailable",
+            "controls": "None", "coverage": "unavailable",
             "notes": (
                 "The FF7R2 UnrealReZen fork is documented, but automatic packaging "
                 "would currently permit silent Oodle acquisition and has no real-game acceptance."
@@ -239,7 +239,7 @@ def data_map_payload() -> dict:
         },
         {
             "filename": "Chocobo whistle behavior (#470)",
-            "controls": "None", "coverage": "No proved asset/runtime path",
+            "controls": "None", "coverage": "unavailable",
             "notes": (
                 "Requires safe teleport/mount placement plus vanilla fallback in no-ride "
                 "areas. Current public research found no matching Rebirth implementation."
@@ -247,7 +247,7 @@ def data_map_payload() -> dict:
         },
         {
             "filename": "Formulae / Steal (#471)",
-            "controls": "None", "coverage": "Packaged rate tweak exists; actual formula is not documented",
+            "controls": "None", "coverage": "unavailable",
             "notes": (
                 "A public 100% Steal/Drop packaged mod proves some Rebirth data can change "
                 "rates, but it does not identify the game's Steal formula, named terms, or "
@@ -256,7 +256,7 @@ def data_map_payload() -> dict:
         },
         {
             "filename": "Blue benches / cushion (#472)",
-            "controls": "None", "coverage": "Static-mesh modding is public; restability/cushion path unproved",
+            "controls": "None", "coverage": "unavailable",
             "notes": (
                 "Public rest-stop mesh mods show multiple bench assets are involved. #472 "
                 "also needs the gameplay distinction between restable/non-restable benches "
@@ -265,7 +265,7 @@ def data_map_payload() -> dict:
         },
         {
             "filename": "Minimap zoom (#473)",
-            "controls": "None", "coverage": "HUD/minimap size mods exist; zoom scalar/path unproved",
+            "controls": "None", "coverage": "unavailable",
             "notes": (
                 "Public accessibility mods can enlarge the minimap/HUD, but that is not "
                 "evidence for the world-minimap zoom value #473 requests. No proved scalar "
@@ -274,7 +274,7 @@ def data_map_payload() -> dict:
         },
         {
             "filename": "Faster Queen's Blood (#477)",
-            "controls": "None", "coverage": "No matching public implementation or proved rules hook",
+            "controls": "None", "coverage": "unavailable",
             "notes": (
                 "The request depends on the game's own legal-move test, turn transition and "
                 "intro input state. Current public research found no implementation proving "
