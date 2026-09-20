@@ -67,55 +67,72 @@ function gauntletElementLabel(element){
 
 function renderGauntlet(){
   if(state.gauntletFiles===null){
-    main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"Gauntlet Prefabs"),el("div",{class:"bl-empty"},"Scanning GUI/Prefabs…")));
+    main.replaceChildren(uiLoading("Gauntlet","Scanning GUI/Prefabs…"));
     ensureGauntletFiles().then(()=>render());return;
   }
   if(!state.gauntletFiles.length){
-    main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"Gauntlet Prefabs"),el("div",{class:"bl-empty"},"No XML prefabs found under GUI/Prefabs.")));return;
+    main.replaceChildren(uiEmpty("Gauntlet","No XML prefabs were found under GUI/Prefabs."));return;
   }
-  if(!state.gauntlet){
-    loadGauntlet(state.gauntletFiles[0],false);return;
+  if(state.gauntletView==="files"||!state.gauntlet){
+    const files=state.gauntletFiles.map((path,index)=>({index,path,name:path.split(/[\\/]/).pop(),searchText:path}));
+    const columns=[{key:"name",label:"Prefab"},{key:"path",label:"Resource path"}];
+    const detail=item=>BLUI.detailPanel({
+      title:item.name,meta:item.path,
+      actions:[uiButton("Open widgets",()=>{state.gauntletView="widgets";loadGauntlet(item.path,false)})],
+      body:[BLUI.detailSection({title:"PREFAB",body:[
+        readField("Resource path",item.path,"Module-relative Gauntlet prefab path."),
+        readField("Editor","Existing widget attributes","Opening the prefab shows its XML elements as a searchable, paginated Table + Detail editor.")
+      ]})]
+    });
+    main.replaceChildren(tableView({
+      key:"gauntlet-files",rows:files,keyOf:item=>item.path,columns,detail,noun:"Gauntlet prefab files",
+      placeholder:"Search prefab files…",selected:uiState("gauntlet-files").selected,setSelected:()=>{}
+    }));return;
   }
 
-  const filter=state.gauntletFilter.trim().toLowerCase();
-  const rows=(state.gauntlet.elements||[]).filter(element=>{
-    if(!filter)return true;
-    const attributes=(element.attributes||[]).map(row=>`${row.name} ${row.value}`).join(" ");
-    return `${element.tag} ${element.path} ${element.hint||""} ${attributes}`.toLowerCase().includes(filter);
+  const items=(state.gauntlet.elements||[]).map(element=>({
+    element,key:element.path,tag:element.tag,hint:element.hint||"",line:Number(element.line),attributes:(element.attributes||[]).length,
+    searchText:`${element.tag} ${element.path} ${element.hint||""} ${(element.attributes||[]).map(attribute=>`${attribute.name} ${attribute.value}`).join(" ")}`
+  }));
+  const columns=[
+    {key:"tag",label:"XML tag"},{key:"hint",label:"Binding / hint"},
+    {key:"line",label:"Line",numeric:true},{key:"attributes",label:"Attributes",numeric:true}
+  ];
+  const detail=item=>BLUI.detailPanel({
+    title:gauntletElementLabel(item.element),meta:state.gauntlet.relativePath,
+    body:[
+      BLUI.detailSection({title:"ELEMENT",body:[
+        readField("Resource path",state.gauntlet.relativePath),
+        readField("Element path",item.element.path),
+        readField("XML tag",item.element.tag),
+        readField("Source line",item.element.line)
+      ]}),
+      BLUI.detailSection({title:"ATTRIBUTES",body:(item.element.attributes||[]).map(attribute=>
+        BLUI.detailField({
+          label:attribute.name,control:gauntletControl(attribute),
+          help:BLUI.infoHelp(attribute.kind==="enum"?
+            "Known Gauntlet enum. Lexeditor edits the existing literal and preserves the surrounding prefab XML.":
+            attribute.kind==="bool"?
+              "Literal Bannerlord UI boolean. Bindings such as @IsEnabled remain text and are not coerced.":
+              attribute.kind==="number"?
+                "Literal numeric Gauntlet attribute. Lexeditor does not invent bounds that the prefab does not provide.":
+                "Existing Gauntlet attribute. Lexeditor patches only this value span and preserves comments and formatting.")
+        })
+      )})
+    ]
   });
-  let record=(state.gauntlet.elements||[]).find(element=>element.path===state.gauntletElementPath);
-  if(!record&&rows.length){record=rows[0];state.gauntletElementPath=record.path}
-
-  const fileSelect=select(state.gauntlet.relativePath,state.gauntletFiles.map(path=>[path,path]),value=>loadGauntlet(value));
-  const master=el("div",{class:"bl-master"},
-    el("div",{class:"bl-master-head"},el("strong",{},`Widgets (${state.gauntlet.elementCount||0})`),
-      el("button",{type:"button",onclick:()=>reloadGauntlet()},"Reload")),
-    el("div",{class:"bl-list-block"},fileSelect),
-    el("div",{class:"bl-list-block"},textInput(state.gauntletFilter,value=>{state.gauntletFilter=value;render()},{placeholder:"Filter widgets / attributes"})),
-    el("div",{class:"bl-list"},...rows.map(element=>el("button",{
-      type:"button",class:`bl-item${element.path===state.gauntletElementPath?" active":""}`,
-      style:`padding-left:${11+Math.min(element.depth,12)*14}px`,
-      onclick:()=>{state.gauntletElementPath=element.path;render()}
-    },gauntletElementLabel(element),el("small",{},`line ${element.line} · ${element.attributes?.length||0} attribute(s)`))))
-  );
-
-  let detail;
-  if(!record)detail=el("div",{class:"bl-detail"},el("div",{class:"bl-empty"},"No matching widget."));
-  else{
-    const attributeRows=(record.attributes||[]).flatMap(attribute=>fieldRow(attribute.name,gauntletControl(attribute)));
-    detail=el("div",{class:"bl-detail"},el("section",{class:"bl-panel"},
-      el("h2",{},gauntletElementLabel(record)),
-      el("div",{class:"bl-grid"},
-        ...fieldRow("Element path",el("code",{},record.path)),
-        ...fieldRow("XML tag",record.tag),
-        ...fieldRow("Source line",String(record.line)),
-        ...attributeRows
-      ),
-      el("div",{class:"bl-note"},"Bindings such as @IsEnabled remain text values; literal booleans, numeric values, and known Gauntlet enums get typed controls. Lexeditor edits existing attributes only in this slice."),
-      el("div",{class:"bl-note"},"Writes are surgical: the backend patches only changed attribute-value spans, validates the resulting XML, creates a .lexeditor.bak backup, and preserves surrounding comments/formatting.")
-    ));
-  }
-  main.replaceChildren(el("div",{class:"bl-split"},master,detail));
+  const filters=[
+    uiButton("Prefab files",()=>{
+      if(gauntletDirty())showAlert?.("Save or reload the current prefab before switching files.","Unsaved Gauntlet changes");
+      else{state.gauntletView="files";render()}
+    }),
+    uiButton("Reload",()=>reloadGauntlet())
+  ];
+  main.replaceChildren(tableView({
+    key:`gauntlet-${state.gauntlet.relativePath}`,rows:items,keyOf:item=>item.key,columns,detail,noun:"Gauntlet elements",
+    placeholder:"Search widgets and attributes…",selected:state.gauntletElementPath,
+    setSelected:value=>state.gauntletElementPath=String(value),filters
+  }));
 }
 
 function gauntletEdits(){
