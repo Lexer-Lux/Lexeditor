@@ -304,7 +304,7 @@
         },
         {
           "name": "MinHook — BSD 2-Clause License",
-          "sourcePath": "games/rdr2/native_runtime/gameplay_tweaks/third_party/minhook/LICENSE.txt"
+          "sourcePath": "games/rdr2/native_runtime/GameplayTweaks/third_party/minhook/LICENSE.txt"
         }
       ]
     }
