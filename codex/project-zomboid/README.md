@@ -136,6 +136,10 @@ The deployment-state file is not treated as authority to traverse an arbitrary p
 
 Symlinks are refused in this deployment path, including replacement of the deployed root with a link after deployment. Lexeditor state/temp files are not copied into the game-visible mod. Clean owned deployments can be replaced transactionally and removed completely; foreign, linked, changed, or state-tampered deployments are deliberately left untouched for the user to reconcile.
 
+## Helper and update boundary
+
+Project Zomboid Build 42 local mods do not require a Lexeditor-bundled third-party helper. Lexeditor writes an authoring project and deploys an owned copy through Project Zomboid's native user-mod directory. Consequently there is no helper executable or archive to pin, redistribute, license, install during first-time setup, list in the shared helper Updates drawer, or update automatically. This is a native-loader boundary, not an undocumented exemption; if a future feature introduces a helper, it must meet the normal pinned-version, redistribution-license, first-time setup, shared-update and user-initiated-update requirements before shipping.
+
 ## Research references
 
 - Official Project Zomboid release/status pages — current stable build boundary.

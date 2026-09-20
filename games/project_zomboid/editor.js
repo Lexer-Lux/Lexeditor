@@ -326,7 +326,7 @@ function renderStructured(kind){
   if(state.selected&&!rows.some(row=>row.key===state.selected))state.selected=null;
   if(!state.selected&&rows.length)state.selected=rows[0].key;
   const tableSpecs=(tableFieldKeys[kind]||[]).map(key=>config.fields.find(spec=>spec.key===key)).filter(Boolean);
-  const view=LexeditorUI.pagedListDetail({rows,key:row=>row.key,selected:state.selected,page:state.page,pageSize:state.pageSize,noun:config.noun,className:"pz-record-layout",splitKey:"project-zomboid-"+kind,rowsKey:"project-zomboid-"+kind,
+  const view=LexeditorUI.pagedListDetail({rows,key:row=>row.key,selected:state.selected,page:state.page,pageSize:state.pageSize,noun:config.noun,slots:false,className:"pz-record-layout",splitKey:"project-zomboid-"+kind,rowsKey:"project-zomboid-"+kind,fit:{minRowHeight:34},
     search:{key:"project-zomboid-"+kind,value:state.query,label:"Search "+config.title,change:value=>{state.query=value;state.page=0;renderStructured(kind)}},
     sync:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.selected!==null)state.selected=next.selected},
     change:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.selected!==null)state.selected=next.selected;renderStructured(kind)},
@@ -377,7 +377,7 @@ function scriptDetail(row){
 }
 function renderScripts(){
   const rows=scriptRows();if(scriptState.selected&&!rows.some(row=>row.key===scriptState.selected))scriptState.selected=null;if(!scriptState.selected&&rows.length)scriptState.selected=rows[0].key;
-  const view=LexeditorUI.pagedListDetail({rows,key:row=>row.key,selected:scriptState.selected,page:scriptState.page,pageSize:scriptState.pageSize,noun:"script records",className:"pz-script-layout",splitKey:"project-zomboid-scripts",rowsKey:"project-zomboid-scripts",
+  const view=LexeditorUI.pagedListDetail({rows,key:row=>row.key,selected:scriptState.selected,page:scriptState.page,pageSize:scriptState.pageSize,noun:"script records",slots:false,className:"pz-script-layout",splitKey:"project-zomboid-scripts",rowsKey:"project-zomboid-scripts",fit:{minRowHeight:34},
     search:{key:"project-zomboid-scripts",value:scriptState.query,label:"Search Build 42 script records",change:value=>{scriptState.query=value;scriptState.page=0;renderScripts()}},
     sync:next=>{scriptState.page=next.page;scriptState.pageSize=next.pageSize;if(next.selected!==null)scriptState.selected=next.selected},
     change:next=>{scriptState.page=next.page;scriptState.pageSize=next.pageSize;if(next.selected!==null)scriptState.selected=next.selected;renderScripts()},

@@ -281,5 +281,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": str(error)}, 400)
 
 
+def create_server(port: int = PORT) -> ThreadingHTTPServer:
+    return ThreadingHTTPServer(("127.0.0.1", port), Handler)
+
+
 if __name__ == "__main__":
-    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    create_server().serve_forever()
