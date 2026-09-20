@@ -1,0 +1,10 @@
+html,body{height:100%}
+body{display:flex;flex-direction:column;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
+main{flex:1 1 auto;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
+.sv-layout,.sv-detail{height:100%;min-height:0}
+.sv-override{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.55rem;align-items:center;width:100%}
+.sv-override>label{display:flex;gap:.35rem;align-items:center;white-space:nowrap;color:var(--lex-muted)}
+.sv-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:.55rem;width:100%}
+.sv-actions>button{width:100%}
+.sv-state{margin:0;padding:1rem;color:var(--lex-muted);overflow-wrap:anywhere}
+.sv-state[role="alert"]{color:#ffb0a8;white-space:pre-wrap}
