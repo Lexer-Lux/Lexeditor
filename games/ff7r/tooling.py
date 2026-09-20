@@ -186,12 +186,12 @@ def get_file(pak: Path, internal_path: str) -> bytes:
     # fetch an Oodle library beside itself when one is missing; Lexeditor must
     # never allow a helper to silently download a dependency. The compatibility
     # fallback therefore runs only when an Oodle library is already explicit.
-    from .pak_reader import PakError, oodle_library, read_file
+    from .pak_reader import PakError, read_file, repak_oodle_library
 
     try:
         return read_file(Path(pak), internal_path)
     except PakError as error:
-        if oodle_library() is None:
+        if repak_oodle_library() is None:
             raise RuntimeError(
                 "FF7R direct PAK reading failed and the repak fallback is disabled because "
                 "no explicit Oodle library is present beside repak. Lexeditor will not let "
