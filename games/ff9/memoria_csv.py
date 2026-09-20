@@ -148,18 +148,59 @@ class MemoriaCsvDocument:
             values = [row["raw"][column].strip() for row in self.rows]
             descriptor: dict[str, Any] = {
                 "key": column, "label": column.replace("_", " "),
-                "declaredType": declared or "String", "editable": column.casefold() != "id",
+                "declaredType": declared or "String",
+                # Id is source identity and Comment is an upstream annotation,
+                # not gameplay data. Neither should masquerade as a writable
+                # property merely because it occupies a CSV cell.
+                "editable": column.casefold() not in {"id", "comment"},
             }
             if normalized in _BOOLEAN_TYPES:
                 descriptor["kind"] = "boolean"
             elif normalized in _INTEGER_RANGES:
-                symbolic = any(value and not re.fullmatch(r"[-+]?\d+", value) for value in values)
+                minimum, maximum = _INTEGER_RANGES[normalized]
+                raw_values = [value for value in values if value]
+                symbolic = any(not re.fullmatch(r"[-+]?\d+", value) for value in raw_values)
                 if symbolic:
-                    descriptor.update(kind="stored", editable=False)
+                    choices: list[str] = []
+                    enum_like = True
+                    for value in raw_values:
+                        match = re.fullmatch(r".+\(\s*([-+]?\d+)\s*\)", value)
+                        if not match or not minimum <= int(match.group(1)) <= maximum:
+                            enum_like = False
+                            break
+                        if value not in choices:
+                            choices.append(value)
+                    if enum_like and choices:
+                        descriptor.update(kind="enum", choices=choices, min=minimum, max=maximum)
+                    else:
+                        descriptor.update(kind="stored", editable=False)
                 else:
-                    descriptor.update(kind="integer", min=_INTEGER_RANGES[normalized][0], max=_INTEGER_RANGES[normalized][1])
+                    descriptor.update(kind="integer", min=minimum, max=maximum)
             elif normalized in _FLOAT_TYPES:
                 descriptor.update(kind="number", step="any")
+            elif normalized == "vector3":
+                descriptor.update(kind="fixed-list", length=3, itemKind="number", step="any", vector3=True)
+            elif (fixed := re.fullmatch(r"(byte|uint8|sbyte|int8|uint16|int16|uint32|int32|uint64|int64)\[(\d+)\]", normalized)):
+                length = int(fixed.group(2))
+                item_type = fixed.group(1)
+                if 1 <= length <= 32 and all(
+                    not value or len([token for token in value.split(",") if token.strip()]) == length
+                    for value in values
+                ):
+                    minimum, maximum = _INTEGER_RANGES[item_type]
+                    descriptor.update(kind="fixed-list", length=length, itemKind="integer",
+                                      itemMin=minimum, itemMax=maximum)
+                else:
+                    descriptor.update(kind="stored", editable=False)
+            elif (fixed := re.fullmatch(r"(single|float|double)\[(\d+)\]", normalized)):
+                length = int(fixed.group(2))
+                if 1 <= length <= 32 and all(
+                    not value or len([token for token in value.split(",") if token.strip()]) == length
+                    for value in values
+                ):
+                    descriptor.update(kind="fixed-list", length=length, itemKind="number", step="any")
+                else:
+                    descriptor.update(kind="stored", editable=False)
             elif normalized.endswith("[]"):
                 item_type = normalized[:-2].strip()
                 descriptor.update(kind="list", itemType=item_type)
@@ -200,6 +241,27 @@ class MemoriaCsvDocument:
             if not math.isfinite(value):
                 raise ValueError(f"{field['key']} contains a non-finite number")
             return value
+        if kind == "fixed-list":
+            tokens = [token.strip() for token in raw.split(",") if token.strip()]
+            if field.get("vector3"):
+                values = [float(token) for token in tokens]
+                if any(not math.isfinite(value) for value in values):
+                    raise ValueError(f"{field['key']} contains a non-finite number")
+                if len(values) == 0:
+                    return [0.0, 0.0, 0.0]
+                if len(values) == 1:
+                    return [values[0], 0.0, 0.0]
+                if len(values) == 2:
+                    return [values[0], 0.0, values[1]]
+                return values[:3]
+            if len(tokens) != field["length"]:
+                raise ValueError(f"{field['key']} must contain exactly {field['length']} values")
+            if field.get("itemKind") == "integer":
+                return [int(token) for token in tokens]
+            values = [float(token) for token in tokens]
+            if any(not math.isfinite(value) for value in values):
+                raise ValueError(f"{field['key']} contains a non-finite number")
+            return values
         return raw
 
     def apply(self, changes: list[dict[str, Any]]) -> None:
@@ -242,6 +304,28 @@ class MemoriaCsvDocument:
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
                 raise ValueError(f"{field['key']} must be a finite number")
             return format(value, ".15g")
+        if kind == "enum":
+            if not isinstance(value, str) or value not in field.get("choices", []):
+                raise ValueError(f"{field['key']} must be one of its named values")
+            return value
+        if kind == "fixed-list":
+            if not isinstance(value, list) or len(value) != field["length"]:
+                raise ValueError(f"{field['key']} must contain exactly {field['length']} values")
+            serialized: list[str] = []
+            if field.get("itemKind") == "integer":
+                minimum, maximum = field["itemMin"], field["itemMax"]
+                for item in value:
+                    if isinstance(item, bool) or not isinstance(item, int):
+                        raise ValueError(f"{field['key']} must contain only whole numbers")
+                    if not minimum <= item <= maximum:
+                        raise ValueError(f"{field['key']} entries must be from {minimum} through {maximum}")
+                    serialized.append(str(item))
+            else:
+                for item in value:
+                    if isinstance(item, bool) or not isinstance(item, (int, float)) or not math.isfinite(item):
+                        raise ValueError(f"{field['key']} must contain only finite numbers")
+                    serialized.append(format(item, ".15g"))
+            return ", ".join(serialized)
         if kind == "list":
             if not isinstance(value, str) or "\n" in value or "\r" in value or ";" in value:
                 raise ValueError(f"{field['key']} must be a comma-separated one-line list")

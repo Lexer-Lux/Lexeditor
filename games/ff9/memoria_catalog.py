@@ -1,6 +1,7 @@
 """Complete pinned Memoria CSV catalog layered on the proven CSV reader."""
 from __future__ import annotations
 from typing import Any
+import re
 from . import memoria_csv as base
 Dataset = base.Dataset
 
@@ -80,7 +81,23 @@ class CompleteMemoriaCsvDocument(base.MemoriaCsvDocument):
             rows = [row for row in rows if row["raw"].get(dataset.filter_column) == dataset.filter_value]
         fields = {field["key"]: field for field in self.fields}
         has_id = any(column.casefold() == "id" for column in self.columns)
-        return [{"line": row["line"], "id": (int(row["id"]) if has_id and str(row["id"]).lstrip("-+").isdigit() else row["id"] if has_id else index + 1), "name": row["name"], "values": {key: self._public_value(value, fields[key]) for key, value in row["raw"].items()}} for index, row in enumerate(rows)]
+
+        def source_identity(row: dict[str, Any]) -> Any:
+            if has_id:
+                value = row["id"]
+                return int(value) if str(value).lstrip("-+").isdigit() else value
+            # Level is real domain identity even though the upstream leveling
+            # file stores it in the source comment instead of a dedicated Id
+            # column. Other no-Id tables deliberately expose no synthetic ID.
+            if dataset.key == "leveling":
+                match = re.fullmatch(r"Level\s+(\d+)", str(row["name"]).strip(), flags=re.IGNORECASE)
+                if match:
+                    return int(match.group(1))
+            return None
+
+        return [{"line": row["line"], "id": source_identity(row), "name": row["name"],
+                 "values": {key: self._public_value(value, fields[key]) for key, value in row["raw"].items()}}
+                for row in rows]
 
 def install() -> None:
     base.DATASETS = DATASETS
