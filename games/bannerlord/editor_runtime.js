@@ -104,34 +104,3 @@ function renderRuntimeOverrides(){
     change:kind=>{state.runtimeKind=kind;state.runtimeIndex=0;render()},content:table
   }));
 }
-
-const renderDataMapBeforeRuntime=renderDataMap;
-renderDataMap=function(){
-  const view=LexeditorUI.dataMap({
-    rows:state.datamap.rows,query:state.query,status:state.mapStatus,page:state.page,sort:state.sort,
-    tableClass:"bannerlord-data-map",
-    open:row=>{
-      if(row.target==="runtime")navigate("runtime");
-      else if(row.target==="module")navigate("module");
-      else if(row.target==="build")navigate("build");
-      else if(row.target==="skills")navigate("skills");
-      else if(row.target==="effects")navigate("effects");
-      else if(row.target==="perks")navigate("perks");
-      else if(row.target==="xp")navigate("xp");
-      else if(row.target==="settings")navigate("settings");
-    },
-    openSource,
-    changeQuery:value=>{state.query=value;state.page=0;renderDataMap()},
-    changeStatus:value=>{state.mapStatus=value;state.page=0;renderDataMap()},
-    changePage:value=>{state.page=value;renderDataMap()},
-    changeSort:key=>{const [active,direction]=state.sort;state.sort=[key,active===key?-direction:1];renderDataMap()}
-  });
-  main.replaceChildren(view.content);
-};
-
-render=function(){
-  const views={module:renderModule,dependencies:renderDependencies,submodules:renderSubmodules,xmls:renderXmls,
-    skills:renderSkills,effects:renderEffects,perks:renderPerks,xp:renderXpSources,settings:renderMcmDefaults,
-    runtime:renderRuntimeOverrides,build:renderBuild,deployment:renderDeployment,datamap:renderDataMap,source:renderSource};
-  (views[state.tab]||renderModule)();refresh();
-};
