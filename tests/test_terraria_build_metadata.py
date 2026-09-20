@@ -173,6 +173,19 @@ class TerrariaBuildMetadataTests(unittest.TestCase):
                         manager.create("terraria", str(parent), invalid)
                     self.assertFalse((parent / invalid).exists())
 
+    @unittest.expectedFailure
+    def test_shared_project_rename_rejects_tmodloader_invalid_name(self):
+        """Shared ProjectManager currently has no game-specific rename preflight hook."""
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            parent = base / "ModSources"
+            parent.mkdir()
+            manager = ProjectManager(
+                {"terraria": terraria_plugin.PLUGIN},
+                path=base / "projects.json",
+            )
+            manager.create("terraria", str(parent), "Example_Mod")
+            root = (parent / "Example_Mod").resolve()
             with self.assertRaises(ValueError):
                 manager.rename("terraria", str(root), "Bad Mod")
             self.assertTrue(root.is_dir())
@@ -235,7 +248,11 @@ class TerrariaBuildMetadataTests(unittest.TestCase):
                     artifact.write_bytes(b"TMOD")
                     return subprocess.CompletedProcess(command, 0, stdout="Building ExampleMod\n", stderr="")
 
-                result = server.build_project(run_command=fake_run, platform_name="nt")
+                result = server.build_project(
+                    run_command=fake_run,
+                    platform_name="nt",
+                    version_reader=lambda _path: "1.4.4.9+2026.7.3.0|2026.7|stable|Stable|deadbeef|0",
+                )
                 self.assertTrue(result["ok"])
                 self.assertTrue(result["artifactExists"])
                 self.assertEqual(

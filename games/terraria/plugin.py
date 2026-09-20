@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
+import tempfile
 from pathlib import Path
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
@@ -52,9 +54,32 @@ def validate_mod_name(name: str) -> None:
         raise ValueError(f"tModLoader reserves the mod name {name}")
 
 
+def _is_fresh_template_copy(root: Path) -> bool:
+    """Recognize only Lexeditor's untouched packaged skeleton before rollback."""
+    markers = (
+        root / "build.txt",
+        root / "LexeditorTerrariaMod.csproj",
+        root / "LexeditorTerrariaMod.cs",
+    )
+    try:
+        texts = [path.read_text(encoding="utf-8-sig") for path in markers]
+    except OSError:
+        return False
+    return all("__LEXEDITOR_ID__" in text or "__LEXEDITOR_DISPLAY_NAME__" in text for text in texts)
+
+
 def initialize_project(root: Path) -> None:
     """Turn the packaged skeleton into one valid tModLoader source project."""
-    validate_mod_name(root.name)
+    try:
+        validate_mod_name(root.name)
+    except ValueError:
+        # Current shared ProjectManager copies the template before it calls the
+        # initializer and no longer exposes a plugin validation hook. Roll back
+        # only an untouched packaged skeleton so an invalid Terraria name does
+        # not leave junk behind. Never remove an arbitrary existing project.
+        if _is_fresh_template_copy(root):
+            shutil.rmtree(root)
+        raise
     mod_id = root.name
     replacements = {
         "__LEXEDITOR_DISPLAY_NAME__": root.name,
@@ -119,6 +144,27 @@ class TerrariaSession(LocalPluginSession):
         )
 
 
+def smoke() -> list[str]:
+    """Exercise Terraria project creation without touching a game or user save root."""
+    with tempfile.TemporaryDirectory(prefix="lexeditor-terraria-smoke-") as directory:
+        project = Path(directory) / "LexeditorTerrariaSmoke"
+        shutil.copytree(TEMPLATE_ROOT, project)
+        initialize_project(project)
+        expected = (
+            project / "build.txt",
+            project / "LexeditorTerrariaSmoke.csproj",
+            project / "LexeditorTerrariaSmoke.cs",
+            project / "Localization" / "en-US.hjson",
+        )
+        missing = [path.name for path in expected if not path.is_file()]
+        if missing:
+            raise RuntimeError("Terraria smoke project is incomplete: " + ", ".join(missing))
+    return [
+        "tModLoader source template initializes in an isolated temporary project",
+        "smoke test leaves installed Terraria/tModLoader and user ModSources untouched",
+    ]
+
+
 def launch() -> int:
     from desktop_host import run_host
     return run_host({"terraria": PLUGIN}, "terraria")
@@ -130,6 +176,7 @@ PLUGIN = GamePlugin(
     accent="#77b255",
     check=check,
     launch=launch,
+    smoke=smoke,
     session_factory=TerrariaSession,
     projects=ModProjectSpec(
         root_env="LEXEDITOR_TERRARIA_PROJECT",
