@@ -345,7 +345,7 @@ def main() -> None:
             # Raw source remains reachable as a specialized source surface.
             page.evaluate('document.body.style.zoom="";state.source={path:"src/Test.cs",absolutePath:"C:/fixture/src/Test.cs",encoding:"utf-8",size:10,text:"class X{}"};state.savedSourceText="class X{}";navigate("source")')
             page.wait_for_timeout(80)
-            assert page.locator(".bl-source textarea").count() == 1
+            assert page.locator(".bannerlord-source textarea").count() == 1
             assert_outer_fit(page, "source")
 
             # Keyboard help is the shared shell panel and remains reachable.
