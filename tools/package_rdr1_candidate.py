@@ -21,6 +21,17 @@ OMIT_PREFIXES = (
     PurePosixPath("tools/magic-rdr/cli"),
     PurePosixPath("tools/magic-rdr/source"),
 )
+ROOT_RUNTIME_SUFFIXES = {".py", ".txt", ".cmd", ".ps1"}
+RDR_TEST_TOOLS = {
+    "tools/package_rdr1_candidate.py",
+    "tools/rdr_test_support.py",
+    "tools/verify_rdr_editing.py",
+    "tools/verify_rdr_cache_reuse_71.py",
+    "tools/verify_rdr_items_split_issue_19.py",
+    "tests/test_rdr_string_tables.py",
+    "tools/magic-rdr/README.md",
+}
+FONT_SUFFIXES = {".ttf", ".otf", ".woff", ".woff2"}
 REQUIRED = (
     "app.py",
     "games/rdr/plugin.py",
@@ -34,6 +45,25 @@ REQUIRED = (
 )
 
 
+def _candidate_path(path: PurePosixPath) -> bool:
+    text = path.as_posix()
+    if any(path == prefix or prefix in path.parents for prefix in OMIT_PREFIXES):
+        return False
+    if path.suffix.casefold() in FONT_SUFFIXES:
+        return False
+    if len(path.parts) == 1:
+        return path.suffix.casefold() in ROOT_RUNTIME_SUFFIXES or text in {
+            "README.md", "pytest.ini",
+        }
+    if text == "games/__init__.py" or path.parts[:2] == ("games", "rdr"):
+        return True
+    if path.parts[0] == "ui":
+        return True
+    if path.parts[0] == "assets":
+        return True
+    return text in RDR_TEST_TOOLS
+
+
 def tracked_files(root: Path) -> list[PurePosixPath]:
     payload = subprocess.check_output(["git", "-C", str(root), "ls-files", "-z"])
     paths = []
@@ -41,9 +71,8 @@ def tracked_files(root: Path) -> list[PurePosixPath]:
         if not raw:
             continue
         path = PurePosixPath(raw.decode("utf-8"))
-        if any(path == prefix or prefix in path.parents for prefix in OMIT_PREFIXES):
-            continue
-        paths.append(path)
+        if _candidate_path(path):
+            paths.append(path)
     return sorted(paths, key=str)
 
 
@@ -86,6 +115,14 @@ def build(root: Path, output: Path, commit: str) -> dict:
             "gameEnv": "RDR_GAME_ROOT",
         },
         "files": len(files),
+        "scope": {
+            "gamePlugins": ["rdr"],
+            "sharedRuntime": True,
+            "sharedUI": True,
+            "rdrAcceptanceTools": True,
+            "otherGamePlugins": False,
+            "fontFiles": False,
+        },
     }
 
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -136,6 +173,20 @@ def verify(archive_path: Path, commit: str) -> dict:
         ]
         if forbidden:
             raise RuntimeError("Candidate redistributed omitted MagicRDR content")
+        other_games = sorted(
+            name for name in names
+            if name.startswith("games/") and not (
+                name == "games/__init__.py" or name.startswith("games/rdr/")
+            )
+        )
+        if other_games:
+            raise RuntimeError("Candidate contains another game plugin")
+        fonts = sorted(
+            name for name in names
+            if PurePosixPath(name).suffix.casefold() in FONT_SUFFIXES
+        )
+        if fonts:
+            raise RuntimeError("Candidate contains font files")
         manifest = json.loads(archive.read("RDR1-CANDIDATE.json"))
         if manifest.get("sourceCommit") != commit:
             raise RuntimeError("Candidate manifest commit does not match the requested commit")
