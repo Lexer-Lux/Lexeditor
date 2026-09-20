@@ -415,7 +415,7 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
 
         # Return to the explicit misc fixture.
         page.evaluate("""async asset => {
-          state.asset=asset; await loadAsset(asset); await navigate("data");
+          state.asset=asset; await loadAsset(asset); await navigate("misc");
         }""", MISC)
         page.wait_for_function("state.data && !state.busy")
 
@@ -433,7 +433,7 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         open_button = page.locator(".lex-data-map-open").first
         expect(open_button).to_be_visible()
         open_button.click()
-        page.wait_for_function("state.tab==='data' && state.data && !state.busy")
+        page.wait_for_function("state.tab==='misc' && state.data && !state.busy")
         assert page.evaluate("state.asset") in set(fixtures()["data"])
 
         # The map must lead to the first-class screen that owns each target,
@@ -465,7 +465,7 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         page.screenshot(path=str(output / "info-remove-1200.png"), full_page=True)
 
         # Explicit state surfaces: loading, error and empty data.
-        page.evaluate("""() => {state.tab="data";state.busy=true;render();}""")
+        page.evaluate("""() => {state.tab="misc";state.busy=true;render();}""")
         assert "Loading DataObject" in page.locator("#main").inner_text()
         page.screenshot(path=str(output / "state-loading.png"), full_page=True)
 
