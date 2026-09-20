@@ -88,7 +88,7 @@ def geometry(page, label: str) -> dict:
         rootBottom:root?.getBoundingClientRect().bottom||0,
         pagerBottom:pager?.getBoundingClientRect().bottom||0
       };
-    })()""")
+    }""")
     assert metrics["bodyWidth"] <= metrics["viewport"][0] + 2, (label, metrics)
     assert metrics["bodyHeight"] <= metrics["viewport"][1] + 2, (label, metrics)
     assert metrics["mainScrollWidth"] <= metrics["mainWidth"] + 2, (label, metrics)
