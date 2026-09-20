@@ -1,335 +1,533 @@
-"""Synthetic rendered acceptance for the FFX/X-2 editor composition.
+"""Rendered acceptance for the shared FFX/X-2 editor.
 
-Exercises the production editor plus its dynamically composed UI modules without an
-installed game, proprietary assets, Fahrenheit binaries, or network access.
+Loads the production markup, CSS, JavaScript and shared framework as separate
+resources. Synthetic data is intentionally multi-page; no game payload is used.
 """
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
+BASE = "https://lexeditor.test"
 
 
-def _state(archive_path: str, **extra):
+def _state(path: str, rows: list[dict], **extra) -> dict:
     return {
-        "source": "installed",
-        "archivePath": archive_path,
+        "source": "archive",
+        "archivePath": path,
         "headerMd5": "0123456789abcdef0123456789abcdef",
         "baselineSha256": "a" * 64,
+        "rows": rows,
         **extra,
     }
 
 
-def responses() -> dict[str, object]:
-    item_slots = [0x2000, 0x2001] + [0] * 14
-    gear_slots = [0x100, 0x101] + [0] * 14
-    return {
+def _rows(count: int, factory):
+    return [factory(index) for index in range(count)]
+
+
+def fixture_store() -> dict[str, object]:
+    count = 36
+    elements = [
+        {"bit": 1, "key": "fire", "label": "Fire"},
+        {"bit": 2, "key": "ice", "label": "Ice"},
+        {"bit": 4, "key": "thunder", "label": "Thunder"},
+        {"bit": 8, "key": "water", "label": "Water"},
+        {"bit": 16, "key": "holy", "label": "Holy"},
+    ]
+    store: dict[str, object] = {
         "/api/dashboard": {
-            "game": {"ready": True, "root": "C:/Games/FINAL FANTASY FFX&FFX-2 HD Remaster"},
-            "archives": [
-                {"game": "x", "ready": True, "fileCount": 12000, "bytes": 400_000_000},
-                {"game": "x2", "ready": True, "fileCount": 9000, "bytes": 300_000_000},
-            ],
-            "project": {"fileCount": 1, "root": "C:/Lexeditor/Projects/ffx-x2"},
-            "theme": {
-                "source": "fallback",
-                "background": {"ready": False},
-                "font": {"webReady": False, "atlasRecognized": 0, "atlasCached": 0},
-                "textures": {"recognized": 0, "cached": 0},
-                "sfx": {"webReady": False, "recognizedBanks": 0, "cachedBanks": 0},
+            "game": {
+                "ready": True,
+                "root": "C:/Games/FINAL FANTASY FFX&FFX-2 HD Remaster",
+                "steamAppId": "359870",
             },
+            "project": {"root": "C:/Lexeditor/Projects/ffx-x2", "fileCount": 4},
             "deployment": {
                 "fahrenheitReady": True,
-                "fahrenheitRoot": "C:/Games/FINAL FANTASY FFX&FFX-2 HD Remaster/fahrenheit",
-                "projectFileCount": 1,
+                "projectFileCount": 4,
                 "deployed": False,
-                "deployedChangedExternally": False,
             },
+            "launch": {
+                "ready": True,
+                "stage0Ready": True,
+                "stage1Ready": True,
+                "games": {
+                    "x": {"ready": True, "launchReady": True},
+                    "x2": {"ready": True, "launchReady": True},
+                },
+            },
+            "theme": {},
+            "problems": [],
         },
         "/api/datamap": {
             "rows": [
                 {
                     "filename": "FFX_Data/new_uspc/battle/kernel/ply_save.bin",
-                    "status": "integrated",
                     "controls": "Base HP/MP and eight base stats",
                     "notes": "Synthetic browser fixture",
+                    "status": "integrated",
+                    "coverage": "structured",
                     "target": "ffx-player-stats",
                 },
                 {
-                    "filename": "FFX2_Data/new_uspc/battle/kernel/accessory.bin",
+                    "filename": "FFX2_Data/new_uspc/battle/kernel/job.bin",
+                    "controls": "Dressphere ability trees",
+                    "notes": "Sixteen requirement / learned-ability pairs",
                     "status": "integrated",
-                    "controls": "Base abilities and price",
-                    "notes": "Creature extension remains opaque",
-                    "target": "ffx2-accessories",
+                    "coverage": "structured",
+                    "target": "ffx2-jobs",
                 },
-            ]
-        },
-        "/api/archive?game=x&q=&limit=150": {
-            "game": "x",
-            "total": 1,
-            "headerMd5": "0123456789abcdef0123456789abcdef",
-            "entries": [
                 {
-                    "path": "FFX_Data/ffx_ps2/ffx/master/new_uspc/battle/kernel/ply_save.bin",
-                    "eflPath": "FFX_Data/new_uspc/battle/kernel/ply_save.bin",
-                    "bytes": 296,
-                    "staged": False,
-                }
+                    "filename": "data/FFX_Data.vbf",
+                    "controls": "Read-only archive browser",
+                    "notes": "Byte-exact project extraction",
+                    "status": "integrated",
+                    "coverage": "view",
+                    "target": "archive-x",
+                },
             ],
         },
         "/api/treasures": _state(
             "FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/takara.bin",
-            recordSize=4,
-            rows=[{"id": 0, "kind": 2, "quantity": 1, "typeId": 0x2000}],
+            _rows(count, lambda i: {
+                "id": i, "kind": [0, 2, 5, 10][i % 4], "kindName": "Fixture",
+                "quantity": (i % 9) + 1, "typeId": 0x2000 + i, "summary": f"Reward {i}",
+            }),
+            minIndex=0, maxIndex=count - 1, recordSize=4,
         ),
         "/api/item-prices": _state(
             "FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/item_rate.bin",
-            commandBase=0x2000,
-            rows=[{"id": 0, "commandId": 0x2000, "gilPrice": 50}],
+            _rows(count, lambda i: {"id": i, "ordinal": i, "commandId": 0x2000 + i, "gilPrice": 100 + i * 25}),
+            minIndex=0, maxIndex=count - 1, recordSize=4, commandBase=0x2000,
         ),
         "/api/auto-ability-prices": _state(
             "FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/arms_rate.bin",
-            abilityBase=0x8000,
-            rows=[{"id": 0, "abilityId": 0x8000, "gilPrice": 100}],
-        ),
-        "/api/ctb-base": _state(
-            "FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/ctb_base.bin",
-            rows=[{"id": 0, "agility": 1, "tickSpeed": 30, "icvBonus": 5, "minIcv": 85, "maxIcv": 90}],
-        ),
-        "/api/mix-table": _state(
-            "FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/prepare.bin",
-            commandBase=0x2000,
-            rows=[{"id": 0, "originCommandId": 0x2000, "definedResults": 1, "resultCommandIds": [0x2010, 0]}],
-        ),
-        "/api/item-shops": _state(
-            "FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/item_shop.bin",
-            rows=[{"id": 0, "occupiedSlots": 2, "legacyRate": 100, "itemIds": item_slots}],
-        ),
-        "/api/gear-shops": _state(
-            "FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/arms_shop.bin",
-            rows=[{"id": 0, "occupiedSlots": 2, "legacyRate": 100, "gearIds": gear_slots}],
-        ),
-        "/api/ffx2-abilities": _state(
-            "FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/command.bin",
-            recordSize=0x58,
-            rows=[{
-                "id": 0,
-                "nameOffset": 1,
-                "nameKey": 2,
-                "descriptionOffset": 3,
-                "descriptionKey": 4,
-                "animation1": 10,
-                "animation2": 11,
-            }],
-        ),
-        "/api/ffx2-accessories": _state(
-            "FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/accessory.bin",
-            recordSize=0x54,
-            rows=[{
-                "id": 0,
-                "icon": 7,
-                "price": 500,
-                "nameOffset": 1,
-                "nameKey": 2,
-                "helpOffset": 3,
-                "helpKey": 4,
-                "abilityIds": [0x8000, 0x8001, 0, 0],
-            }],
-        ),
-        "/api/ffx2-jobs": _state(
-            "FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/job.bin",
-            recordSize=0xE4, abilityCount=16, abilityOffset=0x3C,
-            rows=[{
-                "id": 0, "icon": 9, "berserkAction": 0x3000,
-                "nameOffset": 1, "nameKey": 2, "helpOffset": 3, "helpKey": 4,
-                "abilities": [
-                    {"requirementId": 0x4000 + slot, "abilityId": 0x5000 + slot}
-                    for slot in range(16)
-                ],
-            }],
-        ),
-        "/api/launch": {
-            "platformSupported": True,
-            "stage0Ready": True,
-            "stage1Ready": True,
-            "games": {
-                "x": {"ready": True, "launchReady": True, "reason": ""},
-                "x2": {"ready": True, "launchReady": True, "reason": ""},
-            },
-        },
-        "/api/play": {"launched": True},
-        "/api/ffx-commands?table=command": _state(
-            "FFX_Data/ffx_ps2/ffx/master/new_uspc/battle/kernel/command.bin",
-            table="command",
-            label="Commands",
-            recordSize=0x60,
-            rows=[{"id": 0, "animation1": 20, "animation2": 21}],
-        ),
-        "/api/ffx-auto-abilities": _state(
-            "FFX_Data/ffx_ps2/ffx/master/new_uspc/battle/kernel/a_ability.bin",
-            elementMask=0x1F,
-            elements=[
-                {"bit": 0x01, "label": "Fire"},
-                {"bit": 0x02, "label": "Ice"},
-                {"bit": 0x04, "label": "Thunder"},
-                {"bit": 0x08, "label": "Water"},
-                {"bit": 0x10, "label": "Holy"},
-            ],
-            rows=[{
-                "id": 0,
-                "abilityId": 0x8000,
-                "strike": 0x01,
-                "absorb": 0,
-                "immune": 0,
-                "resist": 0,
-                "weak": 0x02,
-                "unknownBits": {"strike": 0, "absorb": 0, "immune": 0, "resist": 0, "weak": 0},
-            }],
+            _rows(count, lambda i: {"id": i, "ordinal": i, "abilityId": 0x8000 + i, "gilPrice": 500 + i * 50}),
+            minIndex=0, maxIndex=count - 1, recordSize=4, abilityBase=0x8000,
         ),
         "/api/ffx-player-stats": _state(
             "FFX_Data/ffx_ps2/ffx/master/new_uspc/battle/kernel/ply_save.bin",
-            recordSize=0x94,
-            rows=[{
-                "id": 0,
-                "baseHp": 520,
-                "baseMp": 12,
-                "strength": 15,
-                "defense": 10,
-                "magic": 5,
-                "magicDefense": 5,
-                "agility": 10,
-                "luck": 17,
-                "evasion": 5,
-                "accuracy": 10,
-            }],
+            _rows(count, lambda i: {
+                "id": i, "baseHp": 520 + i * 10, "baseMp": 12 + i,
+                "strength": 15 + i % 20, "defense": 10 + i % 20, "magic": 5 + i % 20,
+                "magicDefense": 5 + i % 20, "agility": 10 + i % 20, "luck": 17 + i % 10,
+                "evasion": 5 + i % 20, "accuracy": 10 + i % 20,
+            }),
+            minIndex=0, maxIndex=count - 1, recordSize=0x94,
+        ),
+        "/api/ffx-auto-abilities": _state(
+            "FFX_Data/ffx_ps2/ffx/master/new_uspc/battle/kernel/a_ability.bin",
+            _rows(count, lambda i: {
+                "id": i, "abilityId": 0x8000 + i,
+                "strike": i % 32, "absorb": (i + 1) % 32, "immune": (i + 2) % 32,
+                "resist": (i + 3) % 32, "weak": (i + 4) % 32,
+                "unknownBits": {"strike": 0, "absorb": 0, "immune": 0, "resist": 0, "weak": 0},
+            }),
+            minIndex=0, maxIndex=count - 1, recordSize=0x6C, elementMask=31, elements=elements,
+        ),
+        "/api/ctb-base": _state(
+            "FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/ctb_base.bin",
+            _rows(count, lambda i: {
+                "id": i, "agility": i, "tickSpeed": 70 - i % 30, "icvBonus": i % 16,
+                "minIcv": 10 + i, "maxIcv": 20 + i,
+            }),
+            minIndex=0, maxIndex=count - 1, recordSize=2,
+        ),
+        "/api/mix-table": _state(
+            "FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/prepare.bin",
+            _rows(count, lambda i: {
+                "id": i, "ordinal": i, "originCommandId": 0x2000 + i,
+                "definedResults": 112,
+                "resultCommandIds": [0x3000 + ((i * 112 + slot) % 0x0FFF) for slot in range(112)],
+            }),
+            minIndex=0, maxIndex=count - 1, recordSize=0xE0, partnerCount=112, commandBase=0x2000,
+        ),
+        "/api/item-shops": _state(
+            "FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/item_shop.bin",
+            _rows(count, lambda i: {
+                "id": i, "legacyRate": 100 + i, "occupiedSlots": 16,
+                "itemIds": [0x2000 + ((i + slot) % 100) for slot in range(16)],
+            }),
+            minIndex=0, maxIndex=count - 1, recordSize=0x22, slotCount=16,
+        ),
+        "/api/gear-shops": _state(
+            "FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/arms_shop.bin",
+            _rows(count, lambda i: {
+                "id": i, "legacyRate": 100 + i, "occupiedSlots": 16,
+                "gearIds": [0x0100 + ((i + slot) % 100) for slot in range(16)],
+            }),
+            minIndex=0, maxIndex=count - 1, recordSize=0x22, slotCount=16,
+        ),
+        "/api/ffx2-abilities": _state(
+            "FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/command.bin",
+            _rows(count, lambda i: {
+                "id": i, "nameOffset": i * 4, "nameKey": 0x1000 + i,
+                "descriptionOffset": i * 4 + 2, "descriptionKey": 0x2000 + i,
+                "animation1": 100 + i, "animation2": 200 + i,
+            }),
+            minIndex=0, maxIndex=count - 1, recordSize=0x8C,
+        ),
+        "/api/ffx2-accessories": _state(
+            "FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/accessory.bin",
+            _rows(count, lambda i: {
+                "id": i, "nameOffset": i * 4, "nameKey": 0x1000 + i,
+                "helpOffset": i * 4 + 2, "helpKey": 0x2000 + i, "icon": i % 64,
+                "abilityIds": [0x4000 + i * 4 + slot for slot in range(4)],
+                "price": 500 + i * 100,
+            }),
+            minIndex=0, maxIndex=count - 1, recordSize=0x54, abilityCount=4,
+        ),
+        "/api/ffx2-jobs": _state(
+            "FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/job.bin",
+            _rows(count, lambda i: {
+                "id": i, "nameOffset": i * 4, "nameKey": 0x1000 + i,
+                "helpOffset": i * 4 + 2, "helpKey": 0x2000 + i, "icon": i % 64,
+                "berserkAction": 0x3000 + i,
+                "abilities": [
+                    {"requirementId": 0x4000 + i * 16 + slot, "abilityId": 0x5000 + i * 16 + slot}
+                    for slot in range(16)
+                ],
+            }),
+            minIndex=0, maxIndex=count - 1, recordSize=0xE4, abilityCount=16, abilityOffset=0x3C,
         ),
     }
+    for table, label in [
+        ("command", "Commands"), ("item", "Items"),
+        ("monmagic1", "Monster Magic 1"), ("monmagic2", "Monster Magic 2"),
+    ]:
+        store[f"/api/ffx-commands?table={table}"] = _state(
+            f"FFX_Data/new_uspc/battle/kernel/{table}.bin",
+            _rows(count, lambda i, table=table: {"id": i, "animation1": 1000 + i, "animation2": 2000 + i}),
+            table=table, label=label, minIndex=0, maxIndex=count - 1,
+            recordSize=0x60 if table in {"command", "item"} else 0x5C,
+        )
+    return store
 
 
-def document() -> str:
-    fixture = """
-window.__requests=[];window.__responses=RESPONSES;
-history.replaceState=()=>{};history.pushState=()=>{};
-window.fetch=async function(url,options={}) {
-  const parsed=new URL(url,'https://lexeditor.test/');
-  const key=parsed.pathname+parsed.search;
-  const body=options.body?JSON.parse(options.body):null;
-  window.__requests.push({path:key,method:options.method||'GET',body});
-  const data=Object.prototype.hasOwnProperty.call(window.__responses,key)
-    ? window.__responses[key]
-    : (window.__responses[parsed.pathname]||{});
-  return new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json'}});
-};
-""".replace("RESPONSES", json.dumps(responses()))
-    html = (ROOT / "games/ffx_x2/editor.html").read_text(encoding="utf-8")
-    html = html.replace(
-        '<link rel="stylesheet" href="/shared/framework.css">',
-        "<style>" + (ROOT / "ui/framework.css").read_text(encoding="utf-8") + "</style>",
-    )
-    html = html.replace(
-        '<script src="/shared/framework.js"></script>',
-        "<script>" + fixture + "</script><script>" +
-        (ROOT / "ui/framework.js").read_text(encoding="utf-8") + "</script>",
-    )
-    return html.replace("<head>", '<head><base href="https://lexeditor.test/">', 1)
-
-
-SHARED_SCRIPTS = {
-    "/shared/ffx-x2-accessories.js": ROOT / "ui/ffx-x2-accessories.js",
-    "/shared/ffx-x2-jobs.js": ROOT / "ui/ffx-x2-jobs.js",
-    "/shared/ffx-x2-launch.js": ROOT / "ui/ffx-x2-launch.js",
-    "/shared/ffx-commands.js": ROOT / "ui/ffx-commands.js",
-    "/shared/ffx-auto-abilities.js": ROOT / "ui/ffx-auto-abilities.js",
-    "/shared/ffx-player-stats.js": ROOT / "ui/ffx-player-stats.js",
+SAVE_TO_GET = {
+    "/api/treasures/save": "/api/treasures",
+    "/api/item-prices/save": "/api/item-prices",
+    "/api/auto-ability-prices/save": "/api/auto-ability-prices",
+    "/api/ffx-auto-abilities/save": "/api/ffx-auto-abilities",
+    "/api/ffx-player-stats/save": "/api/ffx-player-stats",
+    "/api/ctb-base/save": "/api/ctb-base",
+    "/api/mix-table/save": "/api/mix-table",
+    "/api/item-shops/save": "/api/item-shops",
+    "/api/gear-shops/save": "/api/gear-shops",
+    "/api/ffx2-abilities/save": "/api/ffx2-abilities",
+    "/api/ffx2-accessories/save": "/api/ffx2-accessories",
+    "/api/ffx2-jobs/save": "/api/ffx2-jobs",
 }
+
+
+def _apply_save(store: dict[str, object], path: str, request: dict) -> dict:
+    if path == "/api/ffx-commands/save":
+        source = f"/api/ffx-commands?table={request['table']}"
+    else:
+        source = SAVE_TO_GET[path]
+    result = copy.deepcopy(store[source])
+    by_id = {row["id"]: row for row in result["rows"]}
+    for edit in request["edits"]:
+        row = by_id[edit["id"]]
+        if path == "/api/mix-table/save":
+            for change in edit["results"]:
+                row["resultCommandIds"][change["partner"]] = change["resultCommandId"]
+        elif path in {"/api/item-shops/save", "/api/gear-shops/save"}:
+            key = "itemIds" if path == "/api/item-shops/save" else "gearIds"
+            value_key = "itemId" if path == "/api/item-shops/save" else "gearId"
+            for change in edit["slots"]:
+                row[key][change["slot"]] = change[value_key]
+            row["occupiedSlots"] = sum(value != 0 for value in row[key])
+        elif path == "/api/ffx2-accessories/save":
+            if "price" in edit:
+                row["price"] = edit["price"]
+            for change in edit.get("abilities", []):
+                row["abilityIds"][change["slot"]] = change["abilityId"]
+        elif path == "/api/ffx2-jobs/save":
+            for change in edit["abilities"]:
+                row["abilities"][change["slot"]] = {
+                    "requirementId": change["requirementId"],
+                    "abilityId": change["abilityId"],
+                }
+        else:
+            for key, value in edit.items():
+                if key != "id":
+                    row[key] = value
+    result["baselineSha256"] = "b" * 64
+    result["source"] = "project"
+    result["staged"] = True
+    result["saved"] = len(request["edits"])
+    store[source] = copy.deepcopy(result)
+    return result
+
+
+def _archive_entries(game: str) -> list[dict]:
+    prefix = "FFX_Data" if game == "x" else "FFX2_Data"
+    return [
+        {
+            "path": f"{game}_ps2/{game}/master/new_uspc/battle/kernel/fixture_{i:04d}.bin",
+            "eflPath": f"{prefix}/{game}_ps2/{game}/master/new_uspc/battle/kernel/fixture_{i:04d}.bin",
+            "bytes": 256 + i,
+            "blocks": 1 + i % 4,
+            "staged": i % 11 == 0,
+        }
+        for i in range(520)
+    ]
+
+
+def _serve(page, store: dict[str, object]):
+    assets = {
+        "/": ("text/html", ROOT / "games/ffx_x2/editor.html"),
+        "/editor.js": ("application/javascript", ROOT / "games/ffx_x2/editor.js"),
+        "/editor.css": ("text/css", ROOT / "games/ffx_x2/editor.css"),
+        "/shared/framework.js": ("application/javascript", ROOT / "ui/framework.js"),
+        "/shared/framework.css": ("text/css", ROOT / "ui/framework.css"),
+    }
+    saves = set(SAVE_TO_GET) | {"/api/ffx-commands/save"}
+
+    def handler(route):
+        parsed = urlparse(route.request.url)
+        path = parsed.path
+        if path in assets:
+            content_type, target = assets[path]
+            route.fulfill(status=200, content_type=content_type, body=target.read_text(encoding="utf-8"))
+            return
+        if path == "/api/archive":
+            query = parse_qs(parsed.query)
+            game = query.get("game", ["x"])[0]
+            needle = query.get("q", [""])[0].casefold()
+            offset = int(query.get("offset", ["0"])[0])
+            limit = int(query.get("limit", ["250"])[0])
+            rows = [row for row in _archive_entries(game) if needle in row["path"].casefold()]
+            payload = {
+                "game": game,
+                "headerMd5": "0123456789abcdef0123456789abcdef",
+                "total": len(rows), "offset": offset, "limit": limit,
+                "entries": rows[offset:offset + limit],
+            }
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+            return
+        key = path + (("?" + parsed.query) if parsed.query else "")
+        if route.request.method == "POST":
+            request = route.request.post_data_json or {}
+            if path in saves:
+                payload = _apply_save(store, path, request)
+            elif path == "/api/play":
+                payload = {"launched": True, "game": request.get("game")}
+            elif path == "/api/project/extract":
+                payload = {"created": True, "eflPath": request.get("path", "")}
+            elif path.endswith("/deploy"):
+                store["/api/dashboard"]["deployment"]["deployed"] = True
+                payload = store["/api/dashboard"]["deployment"]
+            elif path.endswith("/revert"):
+                store["/api/dashboard"]["deployment"]["deployed"] = False
+                payload = store["/api/dashboard"]["deployment"]
+            else:
+                payload = {}
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+            return
+        payload = store.get(key, store.get(path))
+        if payload is None:
+            route.fulfill(status=404, content_type="application/json", body=json.dumps({"error": f"Missing fixture for {key}"}))
+            return
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
+
+    page.route("**/*", handler)
+
+
+DATASETS = {
+    "FFX Battle": [
+        "Player Base Stats", "Auto-Ability Elements", "CTB Timing", "Rikku Mix Results",
+        "Commands Animations", "Items Animations", "Monster Magic 1 Animations", "Monster Magic 2 Animations",
+    ],
+    "FFX Economy": ["Treasure Rewards", "Item / Command Prices", "Auto-Ability Prices"],
+    "FFX Shops": ["Item Shops", "Gear Shops"],
+    "FFX-2": ["FFX-2 Abilities", "FFX-2 Accessories", "FFX-2 Dresspheres"],
+    "Archives": ["FFX Archive", "FFX-2 Archive"],
+}
+
+
+def _overflow(page, label: str):
+    geometry = page.evaluate("""() => ({
+      viewport: innerWidth,
+      doc: document.documentElement.scrollWidth,
+      body: document.body.scrollWidth,
+      main: document.querySelector('#main')?.scrollWidth || 0,
+      mainClient: document.querySelector('#main')?.clientWidth || 0
+    })""")
+    assert geometry["doc"] <= geometry["viewport"] + 1, (label, "document overflow", geometry)
+    assert geometry["body"] <= geometry["viewport"] + 1, (label, "body overflow", geometry)
+    assert geometry["main"] <= geometry["mainClient"] + 1, (label, "main overflow", geometry)
+
+
+def _open_dataset(page, group: str, dataset: str):
+    page.get_by_role("tab", name=group, exact=True).click()
+    page.get_by_role("tab", name=dataset, exact=True).click()
+    expect(page.locator(".ffxx2-content .lex-master-detail")).to_be_visible()
+    expect(page.locator(".ffxx2-content .lex-column-list")).to_be_visible()
+    expect(page.locator(".ffxx2-content .lex-detail-panel")).to_be_visible()
+
+
+def _exercise_shared_table(page):
+    _open_dataset(page, "FFX Economy", "Treasure Rewards")
+    pager = page.locator(".ffxx2-content .lex-pager")
+    expect(pager.get_by_role("button", name="Next page")).to_be_enabled()
+    pager.get_by_role("button", name="Next page").click()
+    expect(pager.locator(".lex-page-number")).to_have_value("2")
+    pager.get_by_role("button", name="Previous page").click()
+    expect(pager.locator(".lex-page-number")).to_have_value("1")
+
+    page.locator(".ffxx2-content .lex-column-list-head-cell[data-column-key='quantity']").click()
+    rows = page.locator(".ffxx2-content .lex-column-list-row")
+    rows.nth(1).click()
+    expect(page.locator(".ffxx2-content .lex-detail-panel")).to_be_visible()
+
+    search = page.locator(".ffxx2-content input[type='search']")
+    search.fill("Reward 35")
+    expect(page.locator(".ffxx2-content .lex-column-list-row")).to_have_count(1)
+    search.fill("")
+    expect(page.locator(".ffxx2-content .lex-column-list-row").first).to_be_visible()
+
+    cell = page.locator(".ffxx2-content .lex-column-list-row").first.locator("[data-column-key='quantity']")
+    cell.dblclick()
+    editor = cell.locator("input")
+    editor.fill("77")
+    editor.press("Enter")
+    expect(page.locator("#global-save")).to_be_enabled()
+
+    page.locator("#global-save").click(button="right")
+    expect(page.get_by_role("alertdialog", name="Discard unsaved changes?")).to_be_visible()
+    page.get_by_role("button", name="Discard Changes").click()
+    expect(page.locator("#global-save")).to_be_disabled()
+
+    cell = page.locator(".ffxx2-content .lex-column-list-row").first.locator("[data-column-key='quantity']")
+    cell.dblclick()
+    editor = cell.locator("input")
+    editor.fill("78")
+    editor.press("Enter")
+    page.locator("#global-save").click()
+    expect(page.locator("#global-save")).to_be_disabled()
+
+
+def _exercise_keyboard_help(page):
+    page.keyboard.press("Control+M")
+    expect(page.locator(".lex-data-map")).to_be_visible()
+    expect(page.locator(".lex-integration-status")).to_have_count(3)
+    page.keyboard.press("F1")
+    expect(page.locator(".ffxx2-info-grid")).to_be_visible()
+    expect(page.locator(".lex-detail-section").filter(has_text="MOD LOADER")).to_be_visible()
+    page.get_by_role("tab", name="FFX Battle", exact=True).click()
+    page.get_by_role("tab", name="Player Base Stats", exact=True).click()
+    expect(page.locator(".lex-info-help").first).to_be_visible()
+    page.locator(".lex-info-help").first.focus()
+    assert page.locator(".lex-info-help").first.evaluate("node => document.activeElement === node")
+
+
+def _exercise_tall_panels(page):
+    _open_dataset(page, "FFX-2", "FFX-2 Dresspheres")
+    last = page.get_by_label("Dressphere 0 ability 16", exact=True)
+    last.scroll_into_view_if_needed()
+    expect(last).to_be_visible()
+    last.click()
+    last.press("ControlOrMeta+A")
+    last.press_sequentially(str(0x5ABC), delay=15)
+    expect(last).to_be_focused()
+    expect(last).to_have_value(str(0x5ABC))
+
+    _open_dataset(page, "FFX Battle", "Rikku Mix Results")
+    final_mix = page.get_by_label("Partner 111 result command ID", exact=True)
+    final_mix.scroll_into_view_if_needed()
+    expect(final_mix).to_be_visible()
+
+
+def _screenshot_all(page, output: Path, suffix: str):
+    for group, datasets in DATASETS.items():
+        for dataset in datasets:
+            _open_dataset(page, group, dataset)
+            _overflow(page, f"{suffix}:{dataset}")
+            safe = dataset.lower().replace(" ", "-").replace("/", "-")
+            page.screenshot(path=str(output / f"{safe}-{suffix}.png"))
+    page.locator("#plugin-data-map").click()
+    expect(page.locator(".lex-data-map")).to_be_visible()
+    page.screenshot(path=str(output / f"data-map-{suffix}.png"))
+    page.locator("#plugin-info").click()
+    expect(page.locator(".ffxx2-info-grid")).to_be_visible()
+    page.screenshot(path=str(output / f"info-{suffix}.png"))
 
 
 def run(output: Path, executable: str | None) -> None:
     output.mkdir(parents=True, exist_ok=True)
+    store = fixture_store()
     with sync_playwright() as playwright:
         options = {"headless": True}
         if executable:
             options["executable_path"] = executable
         browser = playwright.chromium.launch(**options)
         try:
-            for width, height in ((1200, 800), (760, 700)):
-                page = browser.new_page(viewport={"width": width, "height": height})
-                errors: list[str] = []
-                page.on("pageerror", lambda error: errors.append(str(error)))
+            page = browser.new_page(viewport={"width": 1440, "height": 900})
+            errors: list[str] = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            _serve(page, store)
+            page.goto(BASE + "/", wait_until="networkidle")
+            expect(page.get_by_role("tab", name="FFX Battle", exact=True)).to_be_visible()
+            _exercise_shared_table(page)
+            page.reload(wait_until="networkidle")
+            _open_dataset(page, "FFX Economy", "Treasure Rewards")
+            quantity = page.get_by_label("Quantity", exact=True)
+            expect(quantity).to_have_value("78")
+            _exercise_keyboard_help(page)
+            _exercise_tall_panels(page)
+            _screenshot_all(page, output, "desktop")
+            assert not errors, errors
+            page.close()
 
-                def serve_shared(route):
-                    path = urlparse(route.request.url).path
-                    target = SHARED_SCRIPTS.get(path)
-                    if target:
-                        route.fulfill(status=200, content_type="application/javascript", body=target.read_text(encoding="utf-8"))
-                    else:
-                        route.abort()
+            narrow = browser.new_page(viewport={"width": 760, "height": 720})
+            narrow_errors: list[str] = []
+            narrow.on("pageerror", lambda error: narrow_errors.append(str(error)))
+            _serve(narrow, store)
+            narrow.goto(BASE + "/", wait_until="networkidle")
+            _open_dataset(narrow, "FFX-2", "FFX-2 Dresspheres")
+            _overflow(narrow, "narrow:dresspheres")
+            last = narrow.get_by_label("Dressphere 0 ability 16", exact=True)
+            last.scroll_into_view_if_needed()
+            expect(last).to_be_visible()
+            narrow.screenshot(path=str(output / "dresspheres-narrow.png"))
+            _open_dataset(narrow, "FFX Battle", "Rikku Mix Results")
+            final_mix = narrow.get_by_label("Partner 111 result command ID", exact=True)
+            final_mix.scroll_into_view_if_needed()
+            expect(final_mix).to_be_visible()
+            _overflow(narrow, "narrow:mix")
+            narrow.screenshot(path=str(output / "mix-narrow.png"))
+            assert not narrow_errors, narrow_errors
+            narrow.close()
 
-                page.route("**/*", serve_shared)
-                page.set_content(document(), wait_until="domcontentloaded")
-
-                expect(page.locator(".ffxx2-nav [data-view]")).to_have_count(17)
-                expect(page.locator("#ffxx2-play-controls")).to_have_count(1)
-                expect(page.locator("#ffxx2-mod-loader .lex-detail-field")).to_have_count(5)
-                expect(page.locator("#ffxx2-mod-loader")).to_contain_text("MOD LOADER")
-                expect(page.get_by_role("textbox", name="LOADER", exact=True)).to_have_value("Fahrenheit's External File Loader (EFL) loads this plugin's file-only overlay.")
-                expect(page.locator("#ffx-command-rows [data-ffx-command]")).to_have_count(1)
-                expect(page.locator("#ffx-auto-ability-fields [data-element-group]")).to_have_count(5)
-                expect(page.locator("#ffx-player-fields .ffxx2-slot")).to_have_count(10)
-                expect(page.locator("#x2-accessory-fields .ffxx2-slot")).to_have_count(5)
-                expect(page.locator("#x2-job-fields .ffxx2-slot")).to_have_count(16)
-                expect(page.locator("#error")).to_have_text("")
-                assert not errors, errors
-
-                expect(page.locator("#ffxx2-play-x")).to_be_enabled()
-                expect(page.locator("#ffxx2-play-x2")).to_be_enabled()
-                page.locator("#ffxx2-play-x").click()
-                expect(page.locator("#ffxx2-play-status")).to_contain_text("FFX launched through Fahrenheit Stage 0")
-                play_requests = page.evaluate("window.__requests.filter(r=>r.path==='/api/play')")
-                assert play_requests[-1] == {"path": "/api/play", "method": "POST", "body": {"game": "x"}}, play_requests
-
-                page.locator('[data-view="ffx-player-stats"]').click()
-                expect(page.locator('[data-panel="ffx-player-stats"]')).to_be_visible()
-                base_hp = page.get_by_label("Base HP for player-stat record 0")
-                expect(base_hp).to_have_value("520")
-                base_hp.fill("999")
-                expect(page.locator("#ffx-player-save")).to_be_enabled()
-                expect(page.locator("#ffx-player-summary")).to_contain_text("unsaved base-stat edit")
-
-                page.locator('[data-view="ffx2-accessories"]').click()
-                expect(page.locator('[data-panel="ffx2-accessories"]')).to_be_visible()
-                expect(page.get_by_label("Accessory 0 price")).to_have_value("500")
-
-                page.locator('[data-view="ffx2-jobs"]').click()
-                expect(page.locator('[data-panel="ffx2-jobs"]')).to_be_visible()
-                expect(page.get_by_label("Dressphere 0 ability 1 requirement")).to_have_value(f"{0x4000:,}")
-                ability = page.get_by_role("textbox", name="Dressphere 0 ability 1", exact=True)
-                expect(ability).to_have_value(f"{0x5000:,}")
-                ability.click()
-                ability.press("ControlOrMeta+A")
-                ability.press_sequentially(str(0x5ABC), delay=20)
-                expect(ability).to_be_focused()
-                expect(ability).to_have_value(str(0x5ABC))
-                expect(page.locator("#x2-job-save")).to_be_enabled()
-
-                geometry = page.evaluate("""() => ({
-                  viewport: innerWidth,
-                  document: document.documentElement.scrollWidth,
-                  workspace: document.querySelector('.ffxx2-workspace').getBoundingClientRect().width,
-                  panel: document.querySelector('[data-panel="ffx2-jobs"]').getBoundingClientRect().width,
-                })""")
-                assert geometry["document"] <= geometry["viewport"] + 1, (width, "document overflow", geometry)
-                assert geometry["workspace"] <= geometry["viewport"] + 1, (width, "workspace overflow", geometry)
-                assert geometry["panel"] > 0, (width, "active panel collapsed", geometry)
-                assert not errors, errors
-                page.screenshot(path=str(output / f"ffx-x2-accessories-{width}.png"), full_page=True)
-                page.close()
-                print(f"PASS: FFX/X-2 composed editor at {width}x{height}")
+            scaled = browser.new_page(viewport={"width": 1200, "height": 800})
+            scaled_errors: list[str] = []
+            scaled.on("pageerror", lambda error: scaled_errors.append(str(error)))
+            _serve(scaled, store)
+            scaled.goto(BASE + "/", wait_until="networkidle")
+            scaled.evaluate("document.documentElement.style.zoom='1.5'")
+            _open_dataset(scaled, "FFX-2", "FFX-2 Dresspheres")
+            last = scaled.get_by_label("Dressphere 0 ability 16", exact=True)
+            last.scroll_into_view_if_needed()
+            expect(last).to_be_visible()
+            _overflow(scaled, "150pct:dresspheres")
+            scaled.screenshot(path=str(output / "dresspheres-150pct.png"))
+            _open_dataset(scaled, "FFX Battle", "Rikku Mix Results")
+            final_mix = scaled.get_by_label("Partner 111 result command ID", exact=True)
+            final_mix.scroll_into_view_if_needed()
+            expect(final_mix).to_be_visible()
+            _overflow(scaled, "150pct:mix")
+            scaled.screenshot(path=str(output / "mix-150pct.png"))
+            assert not scaled_errors, scaled_errors
+            scaled.close()
         finally:
             browser.close()
 

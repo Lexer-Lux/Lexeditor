@@ -12,12 +12,6 @@ on:
       - 'service_session.py'
       - 'ui/framework.js'
       - 'ui/framework.css'
-      - 'ui/ffx-auto-abilities.js'
-      - 'ui/ffx-player-stats.js'
-      - 'ui/ffx-commands.js'
-      - 'ui/ffx-x2-accessories.js'
-      - 'ui/ffx-x2-jobs.js'
-      - 'ui/ffx-x2-launch.js'
       - 'ui/credits-sources.json'
       - 'ui/credits.json'
       - 'ui/mod-loading.json'
@@ -32,12 +26,6 @@ on:
       - 'service_session.py'
       - 'ui/framework.js'
       - 'ui/framework.css'
-      - 'ui/ffx-auto-abilities.js'
-      - 'ui/ffx-player-stats.js'
-      - 'ui/ffx-commands.js'
-      - 'ui/ffx-x2-accessories.js'
-      - 'ui/ffx-x2-jobs.js'
-      - 'ui/ffx-x2-launch.js'
       - 'ui/credits-sources.json'
       - 'ui/credits.json'
       - 'ui/mod-loading.json'
@@ -79,17 +67,11 @@ jobs:
             $errors | Format-List
             exit 1
           }
-      - name: Editor JavaScript syntax
+      - name: Editor module and markup contract
         shell: bash
         run: >-
-          python -c "from pathlib import Path; import re; s=Path('games/ffx_x2/editor.html').read_text(encoding='utf-8'); Path('ffx-x2-inline.js').write_text('\\n'.join(re.findall(r'<script(?![^>]*src=)[^>]*>(.*?)</script>', s, re.S)), encoding='utf-8')"
-          && node --check ffx-x2-inline.js
-          && node --check ui/ffx-auto-abilities.js
-          && node --check ui/ffx-player-stats.js
-          && node --check ui/ffx-commands.js
-          && node --check ui/ffx-x2-accessories.js
-          && node --check ui/ffx-x2-jobs.js
-          && node --check ui/ffx-x2-launch.js
+          node --check games/ffx_x2/editor.js
+          && python -c "from pathlib import Path; h=Path('games/ffx_x2/editor.html').read_text(encoding='utf-8'); c=Path('games/ffx_x2/editor.css').read_text(encoding='utf-8'); assert '<style' not in h and '<script>' not in h; assert './editor.js' in h and './editor.css' in h; assert len(c) <= 6000; print('markup-only editor + CSS budget OK')"
       - name: Plugin and metadata contracts
         run: >-
           python -c "from games.ffx_x2.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ffx_x2.server' in SERVICE_MODULES; print(PLUGIN.name)"
