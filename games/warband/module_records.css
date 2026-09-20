@@ -1,0 +1,12 @@
+.warband-module-data{height:100%}
+.warband-module-detail{min-width:0;min-height:0;overflow:auto;background:#f7edcf}
+.warband-module-detail textarea{width:100%;min-height:92px;resize:vertical;padding:7px 9px;color:var(--lex-text);border:1px solid var(--lex-border);border-radius:4px;background:#fffaf0}
+.warband-module-detail .warband-module-expression{min-height:72px;font:12px/1.4 "Cascadia Mono",Consolas,monospace}
+.warband-module-detail .warband-module-text{min-height:110px}
+.warband-module-note{margin:12px 16px 16px;padding:9px 11px;border:1px solid #c8ae78;background:#efe0b9;color:var(--lex-muted)}
+.warband-module-state{max-width:860px;margin:24px auto}
+.warband-vector4{display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:7px 10px}
+.warband-vector4 label{display:grid;gap:3px;color:var(--lex-muted);font-size:11px}
+.warband-vector4 input{width:100%}
+@media(max-width:760px){.warband-vector4{grid-template-columns:1fr}.warband-module-note{margin:8px}}
+

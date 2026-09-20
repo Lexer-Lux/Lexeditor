@@ -9,6 +9,7 @@
     build:{cursor:0,lines:[],running:false,returnCode:null},status:"Ready"
   };
 
+  let moduleRecords=null;
   async function api(path,options){const response=await fetch(path,options);const value=await response.json();if(value.error)throw new Error(value.error);return value;}
   // "Mod contents only" keeps the records this project has actually changed.
   // Warband records edits against the record itself, so the filter is the set
@@ -21,9 +22,9 @@
       change:value=>{state.modOnly=value;state.pages[view]=0;render()}};
   }
   function itemDirtyCount(){return Object.values(state.itemEdits).reduce((total,row)=>total+Object.keys(row.fields||{}).length,0);}
-  function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+itemDirtyCount()+Object.values(state.troopEdits).reduce((n,r)=>n+Object.keys(r.fields).length,0)+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
-  function historyCapture(){return {troopEdits:clone(state.troopEdits),settingEdits:clone(state.settingEdits),itemEdits:clone(state.itemEdits),catalogDraft:state.catalogDraft,selectedFile:state.selectedFile,catalogFile:clone(state.catalogFile)};}
-  async function historyRestore(snapshot){state.troopEdits=clone(snapshot.troopEdits||{});state.settingEdits=clone(snapshot.settingEdits);state.itemEdits=clone(snapshot.itemEdits||{});state.catalogDraft=snapshot.catalogDraft;state.selectedFile=snapshot.selectedFile;state.catalogFile=clone(snapshot.catalogFile);}
+  function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+itemDirtyCount()+Object.values(state.troopEdits).reduce((n,r)=>n+Object.keys(r.fields).length,0)+(moduleRecords?.dirtyCount()||0)+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
+  function historyCapture(){return {troopEdits:clone(state.troopEdits),settingEdits:clone(state.settingEdits),itemEdits:clone(state.itemEdits),moduleRecords:moduleRecords?.snapshot(),catalogDraft:state.catalogDraft,selectedFile:state.selectedFile,catalogFile:clone(state.catalogFile)};}
+  async function historyRestore(snapshot){state.troopEdits=clone(snapshot.troopEdits||{});state.settingEdits=clone(snapshot.settingEdits);state.itemEdits=clone(snapshot.itemEdits||{});moduleRecords?.restore(snapshot.moduleRecords);state.catalogDraft=snapshot.catalogDraft;state.selectedFile=snapshot.selectedFile;state.catalogFile=clone(snapshot.catalogFile);}
   function effectiveSetting(row){return state.settingEdits[row.line]??row.value;}
   function setStatus(text){state.status=text;const target=$("#plugin-status");if(target)target.textContent=text;}
   function bitmapText(text,pixels){
@@ -294,6 +295,7 @@
   }
 
   async function selectCatalog(row){
+    if(moduleRecords?.fileHasEdits(row.filename)){showAlert({title:"Structured edits are open",items:[{item:row.filename,issue:"Discard or save the Misc. changes before opening this file as raw source."}],closeLabel:"Close"});return;}
     if(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text&&!confirm("Discard the unsaved source-file edit?"))return;
     state.selectedFile=row.filename;state.catalogFile=await api(`/api/catalog/file?name=${encodeURIComponent(row.filename)}`);state.catalogDraft=state.catalogFile.text||"";shell.history.clear();renderDataMap();
   }
@@ -315,7 +317,7 @@
     window.LexeditorUI?.dismissDialogs?.();
     const view=LexeditorUI.dataMap({rows:state.datamap.rows,query:state.filters.datamap,
       status:state.filters.mapStatus,page:state.pages.datamap,sort:state.sorts.datamap,
-      tableClass:"warband-record-list",open:row=>navigate(row.view),openSource:selectCatalog,
+      tableClass:"warband-record-list",open:row=>row.dataset?moduleRecords.open(row.dataset):navigate(row.view),openSource:selectCatalog,
       changeQuery:value=>{state.filters.datamap=value;state.pages.datamap=0;renderDataMap()},
       changeStatus:value=>{state.filters.mapStatus=value;state.pages.datamap=0;renderDataMap()},
       changePage:value=>{state.pages.datamap=value;renderDataMap()},
@@ -378,17 +380,19 @@
         if(state.catalogFile?.filename==="module_items.py"){state.catalogFile=await api("/api/catalog/file?name=module_items.py");state.catalogDraft=state.catalogFile.text;}
         setStatus(`Saved ${result.saved} item records`);
       }
+      const moduleResult=await moduleRecords.saveAll();
+      if(moduleResult.saved){if(moduleResult.files.includes(state.catalogFile?.filename)){state.catalogFile=await api("/api/catalog/file?name="+encodeURIComponent(state.catalogFile.filename));state.catalogDraft=state.catalogFile.text;}setStatus("Saved "+moduleResult.saved+" Module System records");}
       if(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text){const result=await api("/api/catalog/file/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:state.catalogFile.filename,text:state.catalogDraft,encoding:state.catalogFile.encoding})});state.catalogFile.text=state.catalogDraft;setStatus(`Saved ${state.catalogFile.filename}; backup created`);}
       await buildSavedModule();
       shell.history.clear();shell.refresh();render();
     }catch(error){setStatus("Save failed");showAlert({title:"Save failed",items:[{item:"Save",issue:error.message||String(error)}],closeLabel:"Confirm and Close"});}
   }
 
-  const views={items:renderItems,manuals:renderManuals,upgrades:renderUpgrades,troops:renderTroops,tweaks:renderSettings,datamap:renderDataMap,dashboard:renderDashboard};
+  const views={items:renderItems,misc:()=>moduleRecords.render(),manuals:renderManuals,upgrades:renderUpgrades,troops:renderTroops,tweaks:renderSettings,datamap:renderDataMap,dashboard:renderDashboard};
   function navigate(tab){disposeWarbandPreview();state.tab=tab;render();}
   function renderVanilla(){$("#toolbar").replaceChildren();$("#main").replaceChildren(detailPanel({className:"lex-information-panel",title:"Vanilla",body:[LexeditorUI.detailSection({body:[
     LexeditorUI.detailText("The installed Native module is read-only. Its generated text files do not contain the Module System source used by this editor."),
-    LexeditorUI.detailText("Select a mod to edit Items, Troops, Troop Trees, or Tweaks.")]})]}))}
+    LexeditorUI.detailText("Select a mod to edit Items, Misc., Troops, Troop Trees, or Tweaks.")]})]}))}
   function render(){document.querySelectorAll("nav button").forEach(button=>button.classList.toggle("active",button.dataset.tab===state.tab));if(state.booting)return;if(state.activeSource!=="mine"&&!['manuals','datamap','dashboard'].includes(state.tab))renderVanilla();else views[state.tab]();shell.refresh();}
   async function switchProjectSource(value){state.activeSource=String(value||"mine")==="vanilla"?"vanilla":"mine";shell.history?.clear();render()}
   
