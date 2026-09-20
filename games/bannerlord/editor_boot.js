@@ -133,8 +133,10 @@
 
   async function discardAllChanges(){
     const runtimeRequest=api("/api/runtime-overrides").catch(error=>({available:false,error:String(error.message||error),effects:[],xpSources:[]}));
+    const selectedProject=state.project?.projectFile?.name||"";
+    const projectRequest=api(`/api/project${selectedProject?`?project=${encodeURIComponent(selectedProject)}`:""}`);
     const requests=[
-      api("/api/module"),api("/api/project"),api("/api/skills"),api("/api/effects"),api("/api/perks"),
+      api("/api/module"),projectRequest,api("/api/skills"),api("/api/effects"),api("/api/perks"),
       api("/api/xp-sources"),api("/api/settings-defaults"),runtimeRequest,api("/api/deployment"),api("/api/datamap")
     ];
     const gauntletPath=state.gauntlet?.relativePath||"";
