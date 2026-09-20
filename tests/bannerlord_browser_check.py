@@ -111,6 +111,8 @@ def inline_editor(shared_ui_root: Path | None = None) -> str:
                         "<style>" + (shared_ui_root / "ui/framework.css").read_text(encoding="utf-8") + "</style>")
     html = html.replace('<link rel="stylesheet" href="./editor.css">',
                         "<style>" + (ROOT / "games/bannerlord/editor.css").read_text(encoding="utf-8") + "</style>")
+    credits_fixture = json.loads((ROOT / "ui/credits.json").read_text(encoding="utf-8"))
+    mod_loading_fixture = json.loads((ROOT / "ui/mod-loading.json").read_text(encoding="utf-8"))
     fixtures = {
         "/api/module": MODULE, "/api/project": PROJECT, "/api/skills": EMPTY_SKILLS,
         "/api/effects": EMPTY_EFFECTS, "/api/perks": EMPTY_PERKS, "/api/xp-sources": EMPTY_XP,
@@ -118,10 +120,9 @@ def inline_editor(shared_ui_root: Path | None = None) -> str:
         "/api/deployment": DEPLOYMENT, "/api/datamap": DATA_MAP,
         "/api/module-data-files": {"files": ["ModuleData/items.xml"]},
         "/api/gauntlet-files": {"files": ["GUI/Prefabs/Test.xml"]},
-        "/shared/credits.json": {"plugins": {"bannerlord": {
-            "contributions": [{"name": "Fixture Bannerlord reference", "role": "Rendered Credits fixture.", "url": "https://example.invalid/bannerlord"}],
-            "thanks": [], "licenses": []
-        }}},
+        "/credits.json": credits_fixture, "/shared/credits.json": credits_fixture,
+        "/mod-loading.json": mod_loading_fixture, "/shared/mod-loading.json": mod_loading_fixture,
+        "/distribution-notices.json": [], "/shared/distribution-notices.json": [],
     }
     stub = f'''window.__bannerlordRequests=[];
 const __fixtures={json.dumps(fixtures)};
@@ -226,7 +227,7 @@ def main() -> None:
             assert source_request["body"]["text"] == "after"
             assert source_request["body"]["originalText"] == "before"
 
-            page.evaluate('state.infoView="setup";navigate("info")')
+            page.evaluate('navigate("info")')
             page.get_by_text("MOD LOADER", exact=True).wait_for()
             deployment_text = page.locator("#main").inner_text()
             assert "MOD LOADER" in deployment_text
@@ -274,7 +275,7 @@ def main() -> None:
             build_view.get_by_role("button", name="Sync assets", exact=True).click()
             page.wait_for_function("state.deployResult && state.deployResult.copied.length===1")
 
-            page.evaluate('state.infoView="deployment";navigate("info")')
+            page.evaluate('navigate("info")')
             page.get_by_text("ASSETS", exact=True).wait_for()
             deployment_text = page.locator("#main").inner_text()
             assert "GUI" in deployment_text
