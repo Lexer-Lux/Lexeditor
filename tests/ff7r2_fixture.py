@@ -9,7 +9,11 @@ def _serialized_name(value: str) -> bytes:
 
 
 def fixture() -> bytes:
-    names = ["None", "Cloud", "Tifa", "HPMax", "MPMax", "Strength", "Spilit"]
+    records = ["Cloud", "Tifa"] + [f"TestCharacter{index:02d}" for index in range(3, 25)]
+    properties = ["HPMax", "MPMax", "Strength", "Spilit"]
+    names = ["None", *records, *properties]
+    name_index = {name: index for index, name in enumerate(names)}
+
     blob = bytearray(b"\0" * 64)
     names_offset = len(blob)
     for name in names:
@@ -30,7 +34,7 @@ def fixture() -> bytes:
     graph_size = 4
 
     inner = len(blob)
-    blob += struct.pack("<iI", 0, 0)
+    blob += struct.pack("<iI", name_index["None"], 0)
     blob += struct.pack("<i", 0)
     archive = len(blob)
     blob += b"\0" * 12
@@ -38,20 +42,22 @@ def fixture() -> bytes:
 
     root = bytearray(b"\0" * 88)
     keys_at = 88
-    properties_at = keys_at + 2 * 20
-    entries_at = properties_at + 4 * 12
-    struct.pack_into("<Qii", root, 0, (keys_at << 1) | 1, 2, 2)
+    properties_at = keys_at + len(records) * 20
+    entries_at = properties_at + len(properties) * 12
+    struct.pack_into("<Qii", root, 0, (keys_at << 1) | 1, len(records), len(records))
     struct.pack_into("<Qii", root, 40, 0, 0, 0)
     prop_header = 56
     struct.pack_into("<Qii", root, prop_header,
-                     ((properties_at - prop_header) << 1) | 1, 4, 4)
+                     ((properties_at - prop_header) << 1) | 1,
+                     len(properties), len(properties))
     entry_header = 72
     struct.pack_into("<Qii", root, entry_header,
-                     ((entries_at - entry_header) << 1) | 1, 2, 2)
+                     ((entries_at - entry_header) << 1) | 1,
+                     len(records), len(records))
     blob += root
 
     key_positions = []
-    for index in range(2):
+    for index, _name in enumerate(records):
         key_positions.append(len(blob) - frozen_start)
         blob += b"\0" * 8 + struct.pack("<iiI", index, -1, 1)
 
@@ -61,20 +67,26 @@ def fixture() -> bytes:
         prop_positions.append(len(blob) - frozen_start)
         blob += b"\0" * 8 + struct.pack("<i", type_id)
 
-    for row in [(1000, 50, 30, 22), (900, 60, 25, 30)]:
+    for index, _name in enumerate(records):
+        if index == 0:
+            row = (1000, 50, 30, 22)
+        elif index == 1:
+            row = (900, 60, 25, 30)
+        else:
+            row = (800 + index * 25, 40 + index, 20 + index, 18 + index)
         blob += struct.pack("<iihh", *row)
 
     frozen_size = len(blob) - frozen_start
     struct.pack_into("<IIHH", blob, archive, frozen_size, frozen_size, 0, 0)
 
-    minimal = [
-        (1, key_positions[0]), (2, key_positions[1]),
-        (3, prop_positions[0]), (4, prop_positions[1]),
-        (5, prop_positions[2]), (6, prop_positions[3]),
-    ]
+    minimal = []
+    for record_name, offset in zip(records, key_positions):
+        minimal.append((name_index[record_name], offset))
+    for property_name, offset in zip(properties, prop_positions):
+        minimal.append((name_index[property_name], offset))
     blob += struct.pack("<iii", 0, 0, len(minimal))
-    for name_index, offset in minimal:
-        blob += struct.pack("<iII", name_index, 0, 1)
+    for serialized_name_index, offset in minimal:
+        blob += struct.pack("<iII", serialized_name_index, 0, 1)
         blob += struct.pack("<I", offset)
 
     struct.pack_into(
