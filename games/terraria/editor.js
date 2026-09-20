@@ -48,21 +48,25 @@
   function structuredDirty(){return !!(structuredSaved&&structuredCurrent&&JSON.stringify(structuredSaved.values)!==JSON.stringify(structuredCurrent.values))}
   const dirtyCount=()=>dirtyKeys().length+localizationDirtyEntries().length+(sourceDirty()?1:0)+(structuredDirty()?1:0);
   function setValue(key,value){current.values[key]=value;render();shell?.refresh?.()}
-  function textControl(key,{placeholder=""}={}){
-    return el("input",{type:"text",value:current.values[key]??"",placeholder,disabled:!current.editable,oninput:event=>{current.values[key]=event.target.value;shell?.refresh?.()}});
+  function controlLabel(key){
+    const words=String(key).replace(/([a-z0-9])([A-Z])/g,"$1 $2").replace(/[_-]+/g," ").trim().toLowerCase();
+    return words ? words[0].toUpperCase()+words.slice(1) : "Value";
   }
-  function listControl(key,{placeholder=""}={}){
+  function textControl(key,{placeholder="",label=controlLabel(key)}={}){
+    return el("input",{type:"text",value:current.values[key]??"",placeholder,"aria-label":label,disabled:!current.editable,oninput:event=>{current.values[key]=event.target.value;shell?.refresh?.()}});
+  }
+  function listControl(key,{placeholder="",label=controlLabel(key)}={}){
     const values=Array.isArray(current.values[key])?current.values[key]:[];
-    return el("textarea",{class:"terraria-list",value:values.join("\n"),placeholder,disabled:!current.editable,oninput:event=>{current.values[key]=event.target.value.split(/\r?\n/).map(value=>value.trim()).filter(Boolean);shell?.refresh?.()}});
+    return el("textarea",{class:"terraria-list",value:values.join("\n"),placeholder,"aria-label":label,disabled:!current.editable,oninput:event=>{current.values[key]=event.target.value.split(/\r?\n/).map(value=>value.trim()).filter(Boolean);shell?.refresh?.()}});
   }
   function boolControl(key){
     const declared=key in current.values;
-    const checkbox=el("input",{type:"checkbox",checked:declared?!!current.values[key]:false,disabled:!current.editable,onchange:event=>setValue(key,event.target.checked)});
+    const checkbox=el("input",{type:"checkbox","aria-label":controlLabel(key),checked:declared?!!current.values[key]:false,disabled:!current.editable,onchange:event=>setValue(key,event.target.checked)});
     if(declared)return checkbox;
     return el("span",{class:"terraria-build-row"},checkbox,el("span",{class:"terraria-build-path"},"Not declared — check to add"));
   }
   function sideControl(){
-    const select=el("select",{disabled:!current.editable,onchange:event=>setValue("side",event.target.value)});
+    const select=el("select",{"aria-label":"Side",disabled:!current.editable,onchange:event=>setValue("side",event.target.value)});
     for(const value of ["Both","Client","Server","NoSync"]){const option=el("option",{value},value);option.selected=current.values.side===value;select.append(option)}
     return select;
   }
