@@ -74,12 +74,15 @@ jobs:
     name: Stardew rendered UI acceptance
     needs: plugin-regressions
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Compile scoped browser acceptance
         run: python -m py_compile tests/stardew_valley_browser_check.py
       - name: Install scoped browser acceptance dependencies
@@ -117,7 +120,7 @@ jobs:
     name: Windows isolated installed-acceptance candidate
     needs: [plugin-regressions, browser-acceptance]
     runs-on: windows-2022
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -137,15 +140,22 @@ jobs:
           git archive --format=zip HEAD -o $archive
           Expand-Archive -LiteralPath $archive -DestinationPath $candidate -Force
 
-          # Use the exact current-master shared UI revision which passed the
-          # merge-target rendered acceptance in this workflow run.
           $sharedEvidence = Join-Path $env:RUNNER_TEMP 'stardew-rendered-evidence\shared-overlay'
           $sharedShaPath = Join-Path $sharedEvidence 'shared-master-sha.txt'
-          if (-not (Test-Path -LiteralPath $sharedShaPath)) {
-              throw 'Rendered acceptance did not provide a tested current-master shared UI revision.'
+          foreach ($requiredShared in @('framework.js', 'framework.css', 'shared-master-sha.txt')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $sharedEvidence $requiredShared))) {
+              throw "Rendered acceptance is missing shared overlay evidence: $requiredShared"
+            }
           }
           $sharedSha = (Get-Content -LiteralPath $sharedShaPath -Raw).Trim()
-          if ($sharedSha -notmatch '^[0-9a-f]{40}          # They are deliberately not shipped in this acceptance package.
+          if ($sharedSha -notmatch '^[0-9a-f]{40}$') {
+            throw "Invalid rendered shared UI commit: $sharedSha"
+          }
+          Copy-Item -LiteralPath (Join-Path $sharedEvidence 'framework.js') -Destination (Join-Path $candidate 'ui\framework.js') -Force
+          Copy-Item -LiteralPath (Join-Path $sharedEvidence 'framework.css') -Destination (Join-Path $candidate 'ui\framework.css') -Force
+
+          # Production entry points target the installed workspace and are
+          # deliberately excluded from this isolated acceptance package.
           Remove-Item -LiteralPath (Join-Path $candidate 'Lexeditor.cmd') -Force
           Remove-Item -LiteralPath (Join-Path $candidate 'install.ps1') -Force
 
@@ -231,7 +241,6 @@ jobs:
           Normal Lexeditor.cmd/install.ps1 entry points are intentionally omitted from this package.
           This candidate has not passed real-game acceptance merely because CI packaged it.
           "@ | Set-Content -LiteralPath (Join-Path $candidate 'STARDEW-PR465-CANDIDATE.txt') -Encoding utf8
-
       - name: Verify isolated candidate bootstrap and smoke path
         shell: pwsh
         run: |
@@ -244,7 +253,9 @@ jobs:
             'games\stardew_valley\ACCEPTANCE.md',
             'START-STARDEW-PR465.cmd',
             'PREPARE-STARDEW-PR465.ps1',
-            'STARDEW-PR465-CANDIDATE.txt'
+            'STARDEW-PR465-CANDIDATE.txt',
+            'ui\framework.js',
+            'ui\framework.css'
           )) {
             if (-not (Test-Path -LiteralPath (Join-Path $candidate $required))) {
               throw "Candidate is missing required file: $required"
@@ -264,12 +275,6 @@ jobs:
             throw 'Candidate launcher invokes the production installer/launcher.'
           }
 
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $candidate 'PREPARE-STARDEW-PR465.ps1')
-          if ($LASTEXITCODE -ne 0) { throw 'Candidate preparation failed.' }
-
-          $env:LOCALAPPDATA = Join-Path $candidate 'candidate-data\LocalAppData'
-          $env:LEXEDITOR_STARDEW_PROJECT = Join-Path $candidate "candidate-data\stardew-pr465-$shortSha"
-          $venvPython = Join-Path $candidate '.venv-pr465\Scripts\python.exe'
           $sharedEvidence = Join-Path $env:RUNNER_TEMP 'stardew-rendered-evidence\shared-overlay'
           foreach ($sharedFile in @('framework.js', 'framework.css')) {
             $expectedHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $sharedEvidence $sharedFile)).Hash
@@ -278,158 +283,6 @@ jobs:
               throw "Candidate shared UI differs from rendered acceptance: $sharedFile"
             }
           }
-          $verify = @'
-          import os
-          from pathlib import Path
-          from games.stardew_valley import paths
-          from games.stardew_valley.plugin import PLUGIN, smoke
-
-          expected = Path(os.environ["LEXEDITOR_STARDEW_PROJECT"]).resolve()
-          assert paths.DEFAULT_PROJECT_ROOT == expected
-          assert paths.PROJECT_ROOT == expected
-          assert PLUGIN.projects.default_root == expected
-          assert (expected / "manifest.json").is_file()
-          assert (expected / "content.json").is_file()
-          print(*smoke(), sep="\n")
-          '@
-          Push-Location $candidate
-          try {
-            $verify | & $venvPython -
-            if ($LASTEXITCODE -ne 0) { throw 'Candidate isolated smoke verification failed.' }
-          } finally {
-            Pop-Location
-          }
-
-      - name: Upload isolated installed-acceptance candidate
-        uses: actions/upload-artifact@v4
-        with:
-          name: Lexeditor-Stardew-Valley-PR465-${{ github.sha }}
-          path: ${{ runner.temp }}/Lexeditor-Stardew-Valley-PR465
-          if-no-files-found: error
-          retention-days: 30
-) {
-              throw "Invalid rendered shared UI commit: $sharedSha"
-          }
-          Copy-Item -LiteralPath (Join-Path $sharedEvidence 'framework.js') -Destination (Join-Path $candidate 'ui\framework.js') -Force
-          Copy-Item -LiteralPath (Join-Path $sharedEvidence 'framework.css') -Destination (Join-Path $candidate 'ui\framework.css') -Force
-
-          # The normal production entry points target Lexeditor's installed workspace.
-          # They are deliberately not shipped in this acceptance package.
-          Remove-Item -LiteralPath (Join-Path $candidate 'Lexeditor.cmd') -Force
-          Remove-Item -LiteralPath (Join-Path $candidate 'install.ps1') -Force
-
-          @"
-          @echo off
-          setlocal
-          cd /d "%~dp0"
-          set "LOCALAPPDATA=%~dp0candidate-data\LocalAppData"
-          set "LEXEDITOR_STARDEW_PROJECT=%~dp0candidate-data\stardew-pr465-$shortSha"
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0PREPARE-STARDEW-PR465.ps1"
-          if errorlevel 1 exit /b %errorlevel%
-          start "" "%~dp0.venv-pr465\Scripts\pythonw.exe" "%~dp0app.py" --game stardew-valley
-          "@ | Set-Content -LiteralPath (Join-Path $candidate 'START-STARDEW-PR465.cmd') -Encoding ascii
-
-          @"
-          `$ErrorActionPreference = 'Stop'
-          `$root = Split-Path -Parent `$MyInvocation.MyCommand.Path
-          `$venvRoot = Join-Path `$root '.venv-pr465'
-          `$venvPython = Join-Path `$venvRoot 'Scripts\python.exe'
-          `$env:LOCALAPPDATA = Join-Path `$root 'candidate-data\LocalAppData'
-          `$env:LEXEDITOR_STARDEW_PROJECT = Join-Path `$root 'candidate-data\stardew-pr465-$shortSha'
-
-          if (-not (Test-Path -LiteralPath `$venvPython)) {
-              `$py = Get-Command py -ErrorAction SilentlyContinue
-              if (`$py) {
-                  & py -3 -m venv `$venvRoot
-              } else {
-                  & python -m venv `$venvRoot
-              }
-              if (`$LASTEXITCODE -ne 0) { throw 'Could not create candidate-local Python environment.' }
-          }
-
-          `$dependencyReady = `$false
-          try {
-              & `$venvPython -c "import PIL, fontTools, texfury, webview, cryptography; from importlib.metadata import version; raise SystemExit(0 if version('pywebview') == '6.2.1' else 1)" 2>`$null
-              `$dependencyReady = `$LASTEXITCODE -eq 0
-          } catch {
-              `$dependencyReady = `$false
-          }
-          if (-not `$dependencyReady) {
-              & `$venvPython -m pip install --disable-pip-version-check -r (Join-Path `$root 'requirements.txt')
-              if (`$LASTEXITCODE -ne 0) { throw 'Could not install candidate-local Python requirements.' }
-          }
-
-          New-Item -ItemType Directory -Force -Path `$env:LOCALAPPDATA | Out-Null
-          `$init = @'
-          import os
-          import shutil
-          from pathlib import Path
-          from games.stardew_valley import paths
-          from games.stardew_valley.content_pack import initialize_project
-
-          root = Path(os.environ["LEXEDITOR_STARDEW_PROJECT"]).resolve()
-          if not root.exists():
-              root.parent.mkdir(parents=True, exist_ok=True)
-              shutil.copytree(paths.PROJECT_TEMPLATE_ROOT, root)
-          initialize_project(root)
-          if paths.DEFAULT_PROJECT_ROOT != root or paths.PROJECT_ROOT != root:
-              raise SystemExit(f"candidate project isolation failed: {paths.DEFAULT_PROJECT_ROOT} / {paths.PROJECT_ROOT} != {root}")
-          '@
-          Push-Location `$root
-          try {
-              `$init | & `$venvPython -
-              if (`$LASTEXITCODE -ne 0) { throw 'Could not initialize isolated Stardew acceptance project.' }
-          } finally {
-              Pop-Location
-          }
-          "@ | Set-Content -LiteralPath (Join-Path $candidate 'PREPARE-STARDEW-PR465.ps1') -Encoding utf8
-
-          @"
-          Stardew Valley PR #465 installed-acceptance candidate
-          Branch: stardew-valley-plugin
-          Commit: $env:GITHUB_SHA
-          Recommended extraction root: C:\Lexeditor-Candidates\Stardew-PR465-$shortSha
-          Do not extract over or run from the active C:\Lexeditor workspace.
-          Start only with: START-STARDEW-PR465.cmd
-          Candidate Python environment: .venv-pr465
-          Candidate user data: candidate-data\LocalAppData\Lexeditor
-          Candidate Stardew project: candidate-data\stardew-pr465-$shortSha
-          Test instructions: games\stardew_valley\ACCEPTANCE.md
-          Normal Lexeditor.cmd/install.ps1 entry points are intentionally omitted from this package.
-          This candidate has not passed real-game acceptance merely because CI packaged it.
-          "@ | Set-Content -LiteralPath (Join-Path $candidate 'STARDEW-PR465-CANDIDATE.txt') -Encoding utf8
-
-      - name: Verify isolated candidate bootstrap and smoke path
-        shell: pwsh
-        run: |
-          $candidate = Join-Path $env:RUNNER_TEMP 'Lexeditor-Stardew-Valley-PR465'
-          $shortSha = $env:GITHUB_SHA.Substring(0, 12)
-          foreach ($required in @(
-            'requirements.txt',
-            'app.py',
-            'games\stardew_valley\plugin.py',
-            'games\stardew_valley\ACCEPTANCE.md',
-            'START-STARDEW-PR465.cmd',
-            'PREPARE-STARDEW-PR465.ps1',
-            'STARDEW-PR465-CANDIDATE.txt'
-          )) {
-            if (-not (Test-Path -LiteralPath (Join-Path $candidate $required))) {
-              throw "Candidate is missing required file: $required"
-            }
-          }
-          foreach ($forbidden in @('Lexeditor.cmd', 'install.ps1')) {
-            if (Test-Path -LiteralPath (Join-Path $candidate $forbidden)) {
-              throw "Candidate unexpectedly contains production installer entry point: $forbidden"
-            }
-          }
-
-          $launcher = Get-Content -LiteralPath (Join-Path $candidate 'START-STARDEW-PR465.cmd') -Raw
-          if ($launcher -match [regex]::Escape('C:\Lexeditor')) {
-            throw 'Candidate launcher hardcodes the active C:\Lexeditor workspace.'
-          }
-          if ($launcher -match 'install\.ps1|Lexeditor\.cmd') {
-            throw 'Candidate launcher invokes the production installer/launcher.'
-          }
 
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $candidate 'PREPARE-STARDEW-PR465.ps1')
           if ($LASTEXITCODE -ne 0) { throw 'Candidate preparation failed.' }
@@ -458,7 +311,6 @@ jobs:
           } finally {
             Pop-Location
           }
-
       - name: Upload isolated installed-acceptance candidate
         uses: actions/upload-artifact@v4
         with:
