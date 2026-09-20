@@ -266,10 +266,11 @@ def main() -> None:
             assert gauntlet_request["body"]["edits"][0]["attribute"] == "IsEnabled"
 
             page.evaluate('navigate("build")')
-            page.get_by_role("button", name="Build", exact=True).wait_for()
+            build_view = page.locator("#main")
+            build_view.get_by_role("button", name="Build", exact=True).wait_for()
             for label in ("Build", "Build + Deploy", "Sync assets"):
-                assert page.get_by_role("button", name=label, exact=True).is_enabled()
-            page.get_by_role("button", name="Sync assets", exact=True).click()
+                assert build_view.get_by_role("button", name=label, exact=True).is_enabled()
+            build_view.get_by_role("button", name="Sync assets", exact=True).click()
             page.wait_for_function("state.deployResult && state.deployResult.copied.length===1")
 
             page.evaluate('state.infoView="deployment";navigate("info")')
