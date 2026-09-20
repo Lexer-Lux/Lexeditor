@@ -376,8 +376,8 @@ class Handler(PluginRequestHandler):
             return
         try:
             size = int(self.headers.get("Content-Length", "0") or 0)
-            if size > MAX_BODY_BYTES:
-                raise ValueError("Request is too large")
+            if not 0 <= size <= MAX_BODY_BYTES:
+                raise ValueError("Request size is invalid or too large")
             body = json.loads(self.rfile.read(size) or b"{}") if size else {}
             if not isinstance(body, dict):
                 raise ValueError("Request must be a JSON object")
