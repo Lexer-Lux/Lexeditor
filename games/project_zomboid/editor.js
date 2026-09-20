@@ -45,6 +45,10 @@ const tableColumnOverrides={
     MinimumWater:{label:"Min Water",width:"7.5rem"},
     ResultItem:{width:"minmax(7.5rem,1fr)"},
   },
+  fluids:{
+    DisplayName:{label:"Display Name",width:"minmax(8rem,1fr)"},
+    ColorReference:{label:"Color",width:"7rem"},
+  },
   animationmeshes:{
     keepMeshAnimations:{label:"Keep Anims",width:"8rem"},
     meshFile:{width:"minmax(9rem,1fr)"},
