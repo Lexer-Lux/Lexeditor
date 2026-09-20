@@ -22,6 +22,7 @@ from .dump_troops import parse_troops
 from .troop_editor import troop_data, save_troops
 from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
 from .model_preview import PreviewUnavailable, preview as item_preview, texture_path as preview_texture_path
+from plugin_http import PluginRequestHandler
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -546,10 +547,7 @@ class BuildState:
 BUILD_STATE = BuildState()
 
 
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, _format, *_args):
-        return
-
+class Handler(PluginRequestHandler):
     def json_response(self, value, status=200):
         data = json.dumps(value, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
@@ -578,6 +576,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 self.file_response(PLUGIN_ROOT / "editor.html")
+            elif self.send_page_module(PLUGIN_ROOT, path):
+                return
             elif path == "/warband/troop_editor.js":
                 self.file_response(PLUGIN_ROOT / "troop_editor.js")
             elif path == "/warband/troop_trees.js":

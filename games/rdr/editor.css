@@ -1,0 +1,12 @@
+@font-face{font-family:Redemption;src:url('/fonts/Redemption.ttf') format('truetype');font-display:swap}
+@font-face{font-family:RDRLino;src:url('/fonts/RDRLino-Regular.woff2') format('woff2');font-display:swap}
+:root{
+  --lex-bg:#11100f;--lex-panel:#1a1816;--lex-panel-2:#211e1a;--lex-border:#4e4237;
+  --lex-text:#e8ded0;--lex-muted:#aa9b89;--lex-accent:#a92b20;--lex-accent-text:#fff5e8;
+  --lex-highlight:#c99a50;--lex-success:#69955d;--lex-warning:#e3786e;--lex-font:RDRLino,"Segoe UI",sans-serif;--lex-font-size-adjust:none;--lex-text-nudge:0px;
+  --lex-heading-font:Redemption,Georgia,serif;--lex-radius:2px;
+  --lex-page-bg:radial-gradient(circle at top,#231c17 0,#11100f 55%);
+  --lex-field-border:1px solid #2a2419;--lex-field-label-fg:var(--lex-highlight);--lex-field-control-fg:var(--lex-text);
+  --lex-input-bg:#29241f;
+  --lex-notice-bg:#211d19;
+}

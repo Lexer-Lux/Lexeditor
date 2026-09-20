@@ -3,6 +3,9 @@ import json,re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 def main():
  with sync_playwright() as pw:
   browser=pw.chromium.launch(headless=True);page=browser.new_page()
@@ -10,7 +13,7 @@ def main():
   page.route('**/api/kernel?*',lambda r:r.fulfill(body=json.dumps({'rows':[{'id':10,'spellbook':None}],'spellbook':{'magicOptions':[],'abilityOptions':[]}}),content_type='application/json'))
   page.goto('http://fixture/')
   page.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  page.add_style_tag(content=re.search(r'<style>(.*?)</style>',(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8'),re.S).group(1))
+  page.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
   page.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
   page.add_script_tag(content=(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8'))
   page.get_by_role('tab',name='SPELLBOOK').wait_for()
