@@ -69,6 +69,47 @@ The reverse-engineering projects are factual format cross-checks; their source i
 - `worklog/acceptance/ffx-x2/run-verifier.ps1` runs the strict real-install command, writes UTF-8 acceptance JSON, fails unless `acceptanceReady` is true, and can compare both installed VBF header MD5/SHA-256 values against a baseline report after deploy/launch tests.
 - `worklog/acceptance/ffx-x2/README.md` defines the remaining real-install draft-exit procedure, starting with byte-identical EFL replacements before any gameplay edit.
 
+## Current shared-UI / guide audit
+
+Reviewed against current `master` `72ee978`, not the older branch snapshots:
+
+- `AGENTS.md` `41355ce` — workflow/test-readiness rules.
+- `docs/ADDING_A_GAME.md` `7fe6d35` — markup-only page modules, shared UI budget, helper/update rules and acceptance ladder.
+- `docs/UI-MANUAL.md` `14a3269` — Table + Detail identity/group/help semantics.
+- `ui/component-catalog.js` `a11e52e` — shared component inventory.
+- Blank gallery: `games/blank/editor.html` `b0b235d`, `editor.js` `bec94d0`, `editor.css` `4e01602`.
+- RDR2 Table + Detail references: `items.js` `a42f987`, `loot.js` `5483171`, `crafting.js` `a92cd8c`, `effects.js` `ae814a1`.
+
+Requirement / gap / evidence:
+
+- **Markup-only page + relative modules:** done. FFX/X-2 uses markup-only `editor.html`, relative `editor.js` / `editor.css`, and the shared `PluginRequestHandler.send_page_module` route.
+- **Shared shell / Info / Data Map:** done. Info and Data Map are shell actions, not content tabs; Data Map uses the shared integration icons and standard coverage vocabulary.
+- **Shared UI budget:** done. FFX/X-2 HTML/JS/CSS contain zero local selectors naming `.lex-*` and zero hand-built table-row elements; the scoped workflow enforces that zero budget.
+- **Every record list is paged Table + Detail:** done for all 16 structured tables and both archive browsers. The synthetic acceptance fixture uses 36 records per structured table and 520 archive entries so paging/search/sort/selection are multi-page behavior.
+- **Cell editors + semantic controls:** done where semantics are proved. Numeric bounds match parser write guards; treasure kind is a fixed-choice select while preserving unknown existing values; elemental masks are decomposed switches. Opaque/unproved fields remain read-only or absent.
+- **Identity / grouping / help:** record IDs are real table IDs; no row index is presented as a fabricated game ID. Detail groups are semantic (context, editable fields, shop inventories, ability pairs) and help explains game effect rather than repeating storage metadata.
+- **Loading / empty / error:** page navigation clears to an explicit loading state; datasets have explicit empty and error states.
+- **Tall panels / small windows / large UI scale:** acceptance checks the final dressphere ability pair and Mix partner 111 with the outer document fixed and the Detail body owning vertical scrolling. Desktop, 760px and 150% scale-equivalent captures are produced for inspection.
+- **Save / discard / reopen:** synthetic acceptance exercises Table cell edit -> dirty -> discard and edit -> Save -> reload persistence. Production saves still use VBF-header MD5 + exact table SHA-256 stale-write guards and project-only writes.
+- **Tweaks pagination:** not applicable. This plugin has no independently proved settings/tweak surface; all current writable data are records. No speculative Tweaks tab was invented.
+- **Shared API transition:** current master removed `GamePlugin.subtitle` / `description`; the feature branch reconciles to that API and does not add replacement metadata.
+
+### Fahrenheit helper/update audit
+
+The current guide requires runtime helpers to be pinned, bundled, first-time installable, exposed through the shared Updates drawer, and unable to self-update.
+
+Research checked Fahrenheit `v1.0.0-alpha11` (published 2026-09-19):
+
+- release asset `fahrenheit_release_v1.0.0-alpha11.zip` publishes SHA-256 `ac51291edf0483f0f47be7c24b50bb2169c566722f384098d62433477674dc89`;
+- Fahrenheit source is LGPL-3.0-or-later and the release is signed;
+- Fahrenheit's own README separately says the repository `assets` folder may be used in Fahrenheit forks but not for other purposes;
+- its runtime project copies `assets/*.ttf` into `resources/fonts` before the release script zips the complete deployment tree;
+- the runtime GUI loads the resulting Noto Sans font files from `resources/fonts` at startup. The third-party notices identify those fonts as SIL OFL, but Lexeditor must not treat that as permission to redistribute Fahrenheit's restricted asset copies wholesale without a separately verified package provenance.
+
+Therefore **the upstream release ZIP is not accepted as a Lexeditor-bundled helper as-is**. A stripped/minimal package is also not yet accepted: the exact signed runtime dependency set and replacement provenance for the required fonts have not been verified end-to-end. Registering only `helper_status` is not a safe partial solution because the shared installation manager marks a missing helper as **Broken** and prevents opening the editor, while this plugin can still safely edit project data without Fahrenheit installed.
+
+Current safe behavior remains interoperability with an existing Fahrenheit installation; Play/deploy readiness remains gated separately. Helper Install/Repair and Updates-drawer registration stay blocked until a complete license-safe pinned package can be assembled and tested. Lexeditor does not invoke any Fahrenheit updater or perform automatic helper updates.
+
 ## Regression guarantees
 
 - FFX animation-family tests cover all four tables, exact expected record sizes, fixed selector validation, cross-table stale-baseline rejection, and byte-diff confinement to selected record `+0x10..+0x13` only.

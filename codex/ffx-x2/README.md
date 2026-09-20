@@ -285,6 +285,14 @@ A verifier pass proves inventory/layout compatibility only. It does not prove re
 
 Lexeditor may derive bounded cosmetic assets from the user's own installed VBFs and optional `metamenu.vbf`. Browser-ready assets may be cached privately; recognized non-browser-ready font atlases, textures and FMOD banks may be cached for later conversion. No proprietary theme asset is committed, and theme extraction is never an editing/deployment readiness gate.
 
+## Fahrenheit helper packaging limit
+
+The plugin currently interoperates with an existing Fahrenheit install; it does not install or update Fahrenheit.
+
+The current helper audit targets upstream `v1.0.0-alpha11` (2026-09-19). Its release ZIP is built from the complete `artifacts/deploy` tree. Fahrenheit is LGPL-3.0-or-later, but the upstream README separately restricts the repository `assets` directory to Fahrenheit forks. The runtime build copies `assets/*.ttf` into `resources/fonts`, and the GUI loads those Noto Sans files at runtime. Fahrenheit's third-party notices identify Noto Sans as SIL OFL, so a future Lexeditor package may be possible using separately verified OFL originals, but redistributing the upstream release ZIP wholesale is not treated as license-safe.
+
+A minimal stripped package is not claimed yet because the complete signed runtime dependency set has not been proved after removing/replacing those asset copies. Until that work is complete, Lexeditor must not expose a helper Install/Repair action or imply that its Updates drawer can safely replace Fahrenheit. Existing-install status and real-game Stage 0 acceptance remain separate from helper packaging.
+
 ## Current coverage
 
 Integrated:
