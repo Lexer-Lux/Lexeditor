@@ -379,7 +379,8 @@ def main() -> int:
                     assert page.get_by_text("Item054", exact=True).count() >= 1
                     search.fill("")
                     page.wait_for_function("document.querySelectorAll('.pz-record-table .lex-list-row').length>1")
-                    page.get_by_title("Sort by Weight").click()
+                    page.locator('.pz-record-table .lex-column-list-head-cell[data-column-key="Weight"]').click()
+                    page.wait_for_function("structuredState.items.sort.key==='Weight'")
                     page.locator(".pz-record-table .lex-list-row").nth(1).click()
                     page.get_by_label("Next page").click()
                     page.wait_for_function("structuredState.items.page===1")
