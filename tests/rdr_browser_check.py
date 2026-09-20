@@ -98,8 +98,16 @@ window.fetch=async function(url,options={}) {
         (ROOT / "ui/framework.js").read_text(encoding="utf-8") + "</script>",
     )
     html = html.replace(
-        '<script src="/assets/strings.js"></script>',
-        "<script>" + (ROOT / "games/rdr/assets/strings.js").read_text(encoding="utf-8") + "</script>",
+        '<link rel="stylesheet" href="editor.css">',
+        "<style>" + (ROOT / "games/rdr/editor.css").read_text(encoding="utf-8") + "</style>",
+    )
+    html = html.replace(
+        '<script src="strings.js"></script>',
+        "<script>" + (ROOT / "games/rdr/strings.js").read_text(encoding="utf-8") + "</script>",
+    )
+    html = html.replace(
+        '<script src="editor.js"></script>',
+        "<script>" + (ROOT / "games/rdr/editor.js").read_text(encoding="utf-8") + "</script>",
     )
     return html.replace("<head>", '<head><base href="https://lexeditor.test/">', 1)
 
@@ -116,14 +124,7 @@ def run(output: Path, executable: str | None) -> None:
                 page = browser.new_page(viewport={"width": width, "height": height})
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))
-                def route_asset(route):
-                    if route.request.url.endswith("/assets/editor.css"):
-                        route.fulfill(path=str(ROOT / "games/rdr/assets/editor.css"), content_type="text/css")
-                    elif route.request.url.endswith("/assets/editor.js"):
-                        route.fulfill(path=str(ROOT / "games/rdr/assets/editor.js"), content_type="text/javascript")
-                    else:
-                        route.abort()
-                page.route("**/*", route_asset)
+                page.route("**/*", lambda route: route.abort())
                 page.set_content(document(), wait_until="domcontentloaded")
                 page.wait_for_function("!state.booting")
                 assert not errors, errors
@@ -152,7 +153,7 @@ def run(output: Path, executable: str | None) -> None:
 
                 page.evaluate("state.tab='strings'; stringsUI.render()")
                 expect(page.locator(".string-detail textarea")).to_have_value("Hello")
-                expect(page.locator(".rdr-string-row")).to_have_count(2)
+                expect(page.locator(".rdr-record-list .lex-column-list-row")).to_have_count(1)
                 expect(page.locator(".string-detail .lex-detail-field")).to_have_count(7)
                 page.screenshot(path=str(output / f"rdr-strings-{width}.png"), full_page=True)
 
