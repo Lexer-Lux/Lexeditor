@@ -57,8 +57,7 @@
   }
   function dirtyCount(){return Number(moduleDirty())+Number(projectDirty())+Number(skillsDirty())+Number(effectsDirty())+Number(perksDirty())+Number(xpSourcesDirty())+Number(sourceDirty())}
 
-  function fieldRow(label,control){return [el("div",{class:"bl-label"},label),el("div",{class:"bl-control"},control)]}
-  function textInput(value,change,attrs={}){
+    function textInput(value,change,attrs={}){
     return el("input",{type:"text",value:value??"",...attrs,oninput:event=>{change(event.target.value);refresh()}});
   }
   function checkbox(value,change){
@@ -225,32 +224,12 @@
     submodule.tags.push({index:null,key:"",value:"",attributes:{}});
     render();refresh();
   }
-  function renderTags(submodule){
-    const rows=(submodule.tags||[]).map((tag,index)=>el("div",{class:"bl-tag-row"},
-      textInput(tag.key,value=>tag.key=value,{placeholder:"key"}),
-      textInput(tag.value,value=>tag.value=value,{placeholder:"value"}),
-      el("button",{type:"button",onclick:()=>{submodule.tags.splice(index,1);render();refresh()},title:"Remove tag"},"×")
-    ));
-    return el("div",{class:"bl-tags"},
-      ...rows,
-      el("div",{class:"bl-actions"},el("button",{type:"button",onclick:()=>addTag(submodule)},"+ Add tag"))
-    );
-  }
-  function addAssembly(submodule){
+    function addAssembly(submodule){
     submodule.assemblies=submodule.assemblies||[];
     submodule.assemblies.push({index:null,value:"",attributes:{}});
     render();refresh();
   }
-  function renderAssemblies(submodule){
-    return el("div",{class:"bl-tags"},
-      ...(submodule.assemblies||[]).map((assembly,index)=>el("div",{class:"bl-tag-row",style:"grid-template-columns:minmax(180px,1fr) auto"},
-        textInput(assembly.value,value=>assembly.value=value,{placeholder:"Additional assembly DLL"}),
-        el("button",{type:"button",onclick:()=>{submodule.assemblies.splice(index,1);render();refresh()},title:"Remove assembly"},"×")
-      )),
-      el("div",{class:"bl-actions"},el("button",{type:"button",onclick:()=>addAssembly(submodule)},"+ Add assembly"))
-    );
-  }
-  function addSubmodule(){
+    function addSubmodule(){
     state.module.submodules.push({index:null,name:"",dllName:"",classType:"",assemblies:[],tags:[]});
     state.submoduleIndex=state.module.submodules.length-1;render();refresh();
   }
@@ -309,16 +288,7 @@
     xml.includedGameTypes.push({index:null,value:"",attributes:{}});
     render();refresh();
   }
-  function renderGameTypes(xml){
-    return el("div",{class:"bl-tags"},
-      ...(xml.includedGameTypes||[]).map((row,index)=>el("div",{class:"bl-tag-row",style:"grid-template-columns:minmax(180px,1fr) auto"},
-        textInput(row.value,value=>row.value=value,{placeholder:"GameType value"}),
-        el("button",{type:"button",onclick:()=>{xml.includedGameTypes.splice(index,1);render();refresh()}},"×")
-      )),
-      el("div",{class:"bl-actions"},el("button",{type:"button",onclick:()=>addGameType(xml)},"+ Add game type"))
-    );
-  }
-  function addXml(){
+    function addXml(){
     state.module.xmls.push({index:null,id:"",path:"",includedGameTypes:[]});
     state.xmlIndex=state.module.xmls.length-1;render();refresh();
   }
