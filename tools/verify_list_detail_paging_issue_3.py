@@ -8,9 +8,11 @@ ROOT = Path(__file__).resolve().parents[1]
 FRAMEWORK = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 FRAMEWORK_CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
 RDR2 = (ROOT / "games" / "rdr2" / "editor.html").read_text(encoding="utf-8")
-RDR = ((ROOT / "games" / "rdr" / "editor.html").read_text(encoding="utf-8") + "
-" +
-       (ROOT / "games" / "rdr" / "assets" / "editor.js").read_text(encoding="utf-8"))
+RDR = (
+    (ROOT / "games" / "rdr" / "editor.html").read_text(encoding="utf-8")
+    + "\n"
+    + (ROOT / "games" / "rdr" / "assets" / "editor.js").read_text(encoding="utf-8")
+)
 WARBAND = (ROOT / "games" / "warband" / "editor.html").read_text(encoding="utf-8")
 ITEMS = RDR2[RDR2.index("function renderItems()") : RDR2.index("async function createNewItem")]
 CRAFTING = RDR2[RDR2.index("function renderCrafting()") : RDR2.index("function priceQtyInput")]
