@@ -48,7 +48,6 @@ RDR2_FONT_ROOT = LEXEDITOR_ROOT / "games" / "rdr2" / "assets" / "fonts"
 
 def check() -> list[str]:
     required = (
-        (PROJECT_ROOT, "RDR project"),
         (PLUGIN_ROOT / "server.py", "RDR plugin service"),
         (PLUGIN_ROOT / "editor.html", "RDR plugin interface"),
         (PLUGIN_ROOT / "extractor.py", "RDR preparation service"),
