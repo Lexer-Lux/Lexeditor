@@ -47,10 +47,12 @@ not copy a top-level tab bar or create unrelated private button styling.
 
 ## Table panels
 
-**Column order is fixed.** A numeric ID is the first column and the record's
-name is the second. Where the ID is itself a name-like string, the name may
-come first, because two name-shaped columns in the other order read as a
-duplicate. Everything else follows.
+**Default identity order:** real numeric ID first, readable name second, and
+internal name third when all three exist. Omit absent fields. Without a numeric
+ID, put the readable name first, then the internal name. If only a string key
+exists, show that key. A parser row index, list position, or generated counter is
+not a game ID and must not appear as an ID column or detail badge. Preserve the
+user's saved pin and column-order choices.
 
 A column lights when its **header** is hovered. A cell lights itself and its
 matching property in the detail panel, not the whole column.

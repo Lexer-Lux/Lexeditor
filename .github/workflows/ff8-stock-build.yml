@@ -41,12 +41,10 @@ jobs:
           git -C ffnx checkout --detach FETCH_HEAD
           git -C ffnx submodule update --init
           python editor/tools/prepare_ff8_native_build.py ffnx --patch-output candidate/ISSUE51_DERIVATIVE_SOURCE.patch
-      - uses: actions/download-artifact@v4
+      - uses: actions/cache/restore@v4
         with:
-          name: ff8-x86-release-dependencies
-          run-id: 34041996271
-          github-token: ${{ github.token }}
           path: D:\vcpkg-cache
+          key: ffnx-c056db-x86-v145-release-only-v1-34185578900
       - name: Initialize pinned Release-only toolchain
         shell: pwsh
         run: |
@@ -73,7 +71,7 @@ jobs:
             if (-not (Select-String -Path ffnx/.build/CMakeCache.txt -Pattern "^${gate}:BOOL=ON$" -Quiet)) { throw "Required compile gate disabled: $gate" }
           }
       - uses: actions/cache/save@v4
-        if: always()
+        if: steps.configure.outcome == 'success'
         with:
           path: D:\vcpkg-cache
           key: ffnx-c056db-x86-v145-release-only-v1-${{ github.run_id }}

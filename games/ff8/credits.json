@@ -1,13 +1,18 @@
 {
   "contributions": [
     {
+      "name": "Final Fantasy Inside contributors",
+      "role": "CARDGAME opcode research: deck, carried rules, region rules, rare-card probability, and three arguments whose effects remain unknown.",
+      "url": "https://wiki.ffrtt.ru/index.php/FF8/Field/Script/Opcodes/13A_CARDGAME"
+    },
+    {
       "name": "HobbitDur",
-      "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas and editor references.",
+      "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas, Ifrit AI instruction-row design and ai_cronos target/condition reference, and Cid packed world Draw Point coordinate conversion.",
       "url": "https://github.com/HobbitDur/FF8UltimateEditor"
     },
     {
       "name": "Julian Xhokaxhiu (TrueOdin), Tang-Tang Zhou (vertex2995), Jérôme Arzel (myst6re), CosmosXIII and FFNx contributors",
-      "role": "FFNx runtime, game hooks and reverse-engineering references.",
+      "role": "FFNx runtime, game hooks and reverse-engineering references, including the embedded Triple Triad card and icon TIM locations.",
       "url": "https://github.com/julianxhokaxhiu/FFNx"
     },
     {
@@ -17,7 +22,7 @@
     },
     {
       "name": "Jérôme Arzel (myst6re) and Deling contributors",
-      "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, encounters and world-map format references.",
+      "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, encounters and world-map format references; Japanese glyph mapping from src/qt/fonts/sysfnt_jp.txt (GPL v3 or later).",
       "url": "https://github.com/myst6re/deling"
     },
     {

@@ -38,8 +38,14 @@ def html_for(game):
     window.__lexeditorPlugin={id:"'''+game+'''",name:"Fixture edition",edition:"Fixture"};'''
     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')+'</script>')
-    if '<script src="/cards_ui.js"></script>' in html:
-        html=html.replace('<script src="/cards_ui.js"></script>','<script>'+(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8')+'</script>')
+    # A plugin page loads its code and styles from modules beside it. There is
+    # no server here, so every one the page names is inlined where it stands,
+    # or nothing of the plugin runs and it looks like a plugin that failed to boot.
+    folder=ROOT/'games'/source_game
+    html=re.sub(r'<script src="(?!/shared/)/?([A-Za-z0-9_./-]+\.js)"></script>',
+                lambda m:'<script>'+(folder/Path(m[1]).name).read_text(encoding='utf-8').replace('</script','<\\/script')+'</script>',html)
+    html=re.sub(r'<link rel="stylesheet" href="(?!/shared/)/?([A-Za-z0-9_./-]+\.css)">',
+                lambda m:'<style>'+(folder/Path(m[1]).name).read_text(encoding='utf-8')+'</style>',html)
     # No third-party requests are made by these HTML documents in this harness.
     return html
 
@@ -53,10 +59,22 @@ with sync_playwright() as p:
                 page=browser.new_page(viewport={'width':width,'height':height})
                 page.on('pageerror',lambda e:errors.append(str(e)))
                 page.set_content(html_for(game),wait_until='domcontentloaded')
-                if page.evaluate('typeof state') == 'undefined' and game != 'blank':
+                # Most plugins keep one `state` object the map can be seeded
+                # into. Palworld keeps its own named globals instead, so it is
+                # seeded through those rather than being called broken for not
+                # having a variable of that name.
+                booted = page.evaluate(
+                    'typeof state !== "undefined" || typeof mapRows !== "undefined"')
+                if not booted and game != 'blank':
                     raise AssertionError((game,width,height,'plugin state missing',errors,page.locator('body').inner_text()[:1200]))
                 if game=='blank':
                     page.evaluate('navigate("datamap")')
+                elif game=='palworld':
+                    page.evaluate('''rows=>{
+                      mapRows=rows;
+                      model=model||{ModName:"Data map sample",PackageName:"sample"};
+                      navigate("datamap");
+                    }''',ROWS)
                 else:
                     page.evaluate('''rows=>{
                       state.dataMap={rows};state.datamap={rows};state.booting=false;
@@ -66,6 +84,7 @@ with sync_playwright() as p:
                       if(typeof state.config!=="undefined")state.config={datasets:{mine:{readonly:false,label:"My Mod"}}};
                       navigate("datamap");
                     }''',ROWS)
+                    page.evaluate('state.busy=false;render();if(typeof refreshShell==="function")refreshShell();else if(typeof shell!=="undefined"&&shell.refresh)shell.refresh();')
                 page.wait_for_selector('.lex-data-map-table')
                 page.wait_for_timeout(600)
                 # A preview/source/parser does not produce an editable badge.
@@ -102,10 +121,15 @@ with sync_playwright() as p:
                     assert page.locator('.lex-data-map-table .lex-column-list-row').first.inner_text()==first,game
                     # Verify this plugin's actual open adapter (including FF9 dataset selection),
                     # without requiring another editor's unrelated fixture data.
-                    page.evaluate('navigate=(target,filters)=>{window.mapOpened={target,filters}}')
-                    page.locator('.lex-data-map-open').first.click()
-                    assert page.evaluate('mapOpened.target')=='items',game
-                    if game=='ff9':assert page.evaluate('state.datasetChoice.items')=='fixture-data'
+                    # A plugin whose map declares no open target - Palworld's
+                    # rows point at package files, not at an editor tab - has no
+                    # adapter to verify, so only the filter is checked there.
+                    opens=page.locator('.lex-data-map-open').count()
+                    if opens:
+                        page.evaluate('navigate=(target,filters)=>{window.mapOpened={target,filters}}')
+                        page.locator('.lex-data-map-open').first.click()
+                        assert page.evaluate('mapOpened.target')=='items',game
+                        if game=='ff9':assert page.evaluate('state.datasetChoice.items')=='fixture-data'
                     page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('source')
                     page.wait_for_timeout(200)
                     assert page.locator('.lex-data-map-open').count()==0,game

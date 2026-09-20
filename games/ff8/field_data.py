@@ -17,6 +17,7 @@ import json
 from pathlib import Path, PureWindowsPath
 import struct
 import tempfile
+import threading
 
 from . import (field_background, field_dialogue, field_encounters, field_scripts,
                field_walkmesh, paths, runtime_layout)
@@ -28,8 +29,10 @@ FIELD_PREFIX = "field"
 BASELINE_SUBDIR = Path("field/mapdata")
 DIRECT_SUBDIR = Path("field/mapdata")
 CARDGAME_DWORD = 0x0000013A
-PARAM_NAMES = ("Deck ID", "Game rules", "Trade rules", "Rare card chance",
-               "AI search profile", "AI strategy profile", "Allowed card levels")
+# https://wiki.ffrtt.ru/index.php/FF8/Field/Script/Opcodes/13A_CARDGAME
+# The last three arguments have no demonstrated gameplay meaning.
+PARAM_NAMES = ("Deck ID", "Known rules", "Region rules", "Rare card chance",
+               "Unknown setting 1", "Unknown setting 2", "Unknown setting 3")
 LITERAL_OPCODE = 0x07
 VARIABLE_OPCODES = {0x0A, 0x0C, 0x0E, 0x10, 0x11, 0x12}
 EDITABLE_OPCODES = {LITERAL_OPCODE, *VARIABLE_OPCODES}
@@ -550,6 +553,58 @@ def _encounter_source_paths(key: str, dataset: str) -> tuple[Path | None, Path |
     return resolved[0], resolved[1]
 
 
+_card_scan = {"thread": None, "keys": None, "players": [], "scanned": 0, "total": 0, "error": None}
+_card_scan_lock = threading.Lock()
+
+
+def _card_player_scan() -> None:
+    """Find every area with a Triple Triad player, once per game install.
+
+    Players are only ever edited in place, never added, so the set of areas
+    comes from the game's own scripts and is cached against the same
+    fingerprint as the map index.
+    """
+    try:
+        destination = paths.BASELINE_ROOT / "field/card-players.json"
+        fingerprint = _fingerprint()
+        if destination.is_file():
+            try:
+                cached = json.loads(destination.read_text(encoding="utf-8"))
+                if cached.get("source") == fingerprint and isinstance(cached.get("keys"), list) and isinstance(cached.get("players"), list):
+                    _card_scan.update(keys=cached["keys"], players=cached["players"], scanned=len(ensure_index()["rows"]),
+                                      total=len(ensure_index()["rows"]))
+                    return
+            except (OSError, ValueError, TypeError):
+                pass
+        rows = ensure_index()["rows"]
+        _card_scan.update(total=len(rows), scanned=0)
+        keys, players = [], []
+        for row in rows:
+            jsm, sym, _ = ensure_map_baseline(row["key"])
+            found = _parse_card_players(jsm.read_bytes(), sym.read_bytes() if sym is not None else b"") if jsm is not None else []
+            if found:
+                keys.append(row["key"])
+                players.extend({"map":row["key"], "id":player["id"],
+                                "entity":player["entity"], "script":player["script"]} for player in found)
+            _card_scan["scanned"] += 1
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps({"source": fingerprint, "keys": keys, "players":players}, indent=2) + "\n",
+                               encoding="utf-8")
+        _card_scan.update(keys=keys, players=players)
+    except Exception as error:
+        _card_scan["error"] = str(error)
+
+
+def card_player_areas() -> dict:
+    """Which areas have card players; starts the one-time scan if needed."""
+    with _card_scan_lock:
+        if _card_scan["keys"] is None and _card_scan["error"] is None and _card_scan["thread"] is None:
+            _card_scan["thread"] = threading.Thread(target=_card_player_scan, daemon=True)
+            _card_scan["thread"].start()
+    return {"ready": _card_scan["keys"] is not None, "keys": _card_scan["keys"] or [], "players":_card_scan["players"],
+            "scanned": _card_scan["scanned"], "total": _card_scan["total"], "error": _card_scan["error"]}
+
+
 def index_rows(dataset: str = "current") -> dict:
     # Indexing is independent of mod contents; dataset is accepted for the same
     # API contract as other tabs and validated here to fail closed.
@@ -634,7 +689,7 @@ def map_rows(key: str, dataset: str = "current") -> dict:
             if raw is not None else [],
             "scripts": scripts,
             "entrances": entrances,
-            "dialogue": field_dialogue.read(dialogue_raw)["lines"]
+            "dialogue": field_dialogue.read(dialogue_raw, map_name=row["name"])["lines"]
             if dialogue_raw is not None else [],
             "source": str(jsm) if jsm is not None else None,
             "sha256": hashlib.sha256(raw).hexdigest() if raw is not None else None,
@@ -803,7 +858,7 @@ def _prepare_dialogue_edits(key: str, edits: list[dict]) -> tuple[Path, bytes, i
     raw, changed = field_dialogue.apply_edits(source.read_bytes(), [
         {"id": int(edit.get("line", -1)), "text": str(edit.get("text", ""))}
         for edit in edits
-    ])
+    ], map_name=row["name"])
     destination = (paths.DIRECT_ROOT / DIRECT_SUBDIR / row["group"] / row["name"] /
                    f"{row['name']}.msd")
     return destination, raw, changed

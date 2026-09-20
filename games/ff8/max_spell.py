@@ -12,6 +12,28 @@ SCALE_CAVE = 0x027A1800
 HP_SCALE_CAVE = 0x027A1820
 LIMIT_VALUE = 0x027A1840
 
+# Junction readers must bound old save stocks before multiplying by spell
+# power. Lowering the stock cap must not amplify an existing 79-stock stack
+# to 7.9 times full strength, or delete that stock from the save.
+JUNCTION_STOCK_READS = (
+    (0x004963CB, "8A 1C 45 F9 E0 CF 01", 3),
+    (0x004966E5, "8A 14 4D F9 E0 CF 01", 2),
+    (0x00496788, "8A 14 4D F9 E0 CF 01", 2),
+    (0x00496893, "8A 04 4D F9 E0 CF 01", 0),
+    (0x00496921, "8A 04 4D F9 E0 CF 01", 0),
+    (0x004969D1, "8A 04 4D F9 E0 CF 01", 0),
+    (0x00496AAE, "8A 0C 45 F9 E0 CF 01", 1),
+    (0x00496BC1, "8A 04 4D F9 E0 CF 01", 0),
+    (0x00496C9D, "8A 0C 45 F9 E0 CF 01", 1),
+)
+STOCK_READ_CAVES = {register: 0x027A1850 + register * 0x20 for register in range(4)}
+
+
+def _bounded_stock_read(original: bytes, register: int) -> bytes:
+    absolute = bytes((5 + register * 8,)) + LIMIT_VALUE.to_bytes(4, "little")
+    # Preserve flags and every register except the original destination byte.
+    return b"\x9C" + original + b"\x3A" + absolute + b"\x76\x06\x8A" + absolute + b"\x9D\xC3"
+
 # Proven stock comparisons and clamps in the character, battle, Draw, and menu
 # inventory paths. Only the immediate cap byte changes.
 STOCK_LIMIT_SITES = (
@@ -19,10 +41,11 @@ STOCK_LIMIT_SITES = (
     (0x0047EDF5, 0x64), (0x0047EE66, 0x64),
     (0x00486A8C, 0x64), (0x00486B95, 0x64),
     (0x0048CB99, 0x64),
-    (0x004A48DD, 0x64), (0x004A4910, 0x64),
     (0x004C2CCE, 0x64), (0x004C2CD2, 0x64),
     (0x004C2CFB, 0x64), (0x004C2CFF, 0x64),
 )
+# 004A48DD and 004A4910 compare battle-result character levels with 100.
+# They are not Magic stock caps and must retain their native values.
 UNSIGNED_STOCK_BRANCHES = (
     (0x00486A8D, 0x7D, 0x73),
     (0x00486B96, 0x7D, 0x73),
@@ -134,6 +157,15 @@ def build_hext(enabled: bool, limit: int = DEFAULT_MAX_SPELL) -> str:
     for address, original, kind in JUNCTION_SITES:
         replacement = _junction_replacement(address, original, kind)
         rows.append(f"{address:X} = {replacement.hex(' ').upper()}")
+    emitted = set()
+    for address, original_hex, register in JUNCTION_STOCK_READS:
+        original = bytes.fromhex(original_hex)
+        cave = STOCK_READ_CAVES[register]
+        if cave not in emitted:
+            payload = _bounded_stock_read(original, register)
+            rows.extend((f"{cave:X}:{len(payload):X}", f"{cave:X} = {payload.hex(' ').upper()}"))
+            emitted.add(cave)
+        rows.append(f"{address:X} = {_fit(_call(address, cave), len(original)).hex(' ').upper()}")
     for address, original in STOCK_LIMIT_SITES:
         if original != 0x64:
             raise AssertionError("Unexpected stock-limit baseline")
@@ -149,6 +181,10 @@ def build_hext(enabled: bool, limit: int = DEFAULT_MAX_SPELL) -> str:
 
 
 def verify_executable(stream) -> None:
+    for address, original_hex, _register in JUNCTION_STOCK_READS:
+        stream.seek(address - 0x400000)
+        if stream.read(7) != bytes.fromhex(original_hex):
+            raise RuntimeError("The installed FF8 junction stock reader does not match the verified build")
     stream.seek(HP_SITE - 0x400000)
     if stream.read(len(HP_ORIGINAL)) != HP_ORIGINAL:
         raise RuntimeError("The installed FF8 Max Spell HP-junction bytes do not match the verified build")

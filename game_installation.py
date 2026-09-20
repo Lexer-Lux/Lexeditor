@@ -408,7 +408,9 @@ class GameInstallationManager:
                     statusText="The saved game directory needs attention. Searching again…",
                 )
 
-        had_root = bool(preferred)
+        # A removed game is absent, not a damaged installation. Keep the saved
+        # path for future discovery, but do not check its project or helper.
+        had_root = bool(preferred and Path(preferred).is_dir())
         if manual is not None:
             with self._lock:
                 if not self._current(plugin_id, generation):
@@ -418,7 +420,7 @@ class GameInstallationManager:
         self._update(
             plugin_id, generation,
             status="warning" if had_root or manual is not None else "not-added",
-            root=str(Path(preferred or manual).resolve()) if (preferred or manual) else None,
+            root=str(Path(manual or preferred).resolve()) if (manual or had_root) else None,
             problems=last_problems or [f"Lexeditor could not find {plugin.name}."],
             scanStatus="not-found",
             scanInProgress=False,

@@ -72,7 +72,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-projects-", ignore_cleanup_er
     (template / "data" / "required.txt").write_text("seed", encoding="utf-8")
     def initialize_project(target: Path) -> None:
         (target / "initialized.txt").write_text("new project only", encoding="utf-8")
-    plugin = GamePlugin("test", "Test", "TEST", "Test plugin", "#fff",
+    plugin = GamePlugin("test", "Test",   "#fff",
                         lambda: [], lambda: None,
                         projects=ModProjectSpec("TEST_PROJECT", template,
                                                 ("data/required.txt",), template,

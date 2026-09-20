@@ -14,7 +14,6 @@ SmokeFunction = Callable[[], list[str]]
 ProgressFunction = Callable[[int, int, str], None]
 PrepareFunction = Callable[[Path, Path, ProgressFunction], object]
 InitializeProjectFunction = Callable[[Path], None]
-ValidateProjectNameFunction = Callable[[str], None]
 
 
 class PluginSession(Protocol):
@@ -46,7 +45,6 @@ class ModProjectSpec:
     required_paths: tuple[str, ...] = ()
     template_root: Path = Path()
     initialize: InitializeProjectFunction | None = None
-    validate_name: ValidateProjectNameFunction | None = None
     # Some games have more than one shape of editable thing. Warband has
     # Module System source projects and compiled installed modules, and a
     # root counts as valid when it satisfies any one group.
@@ -77,6 +75,17 @@ class GameInstallSpec:
     # that runs its own updater. Lexeditor pins helper versions, so it starts
     # the game directly and keeps that decision.
     launch_path: str = ""
+    # Where a renderer wrapper - ReShade - has to sit for this game to load
+    # it: the folder holding the executable that actually renders, relative to
+    # the installation root. Declared per game and never guessed. Lexeditor
+    # inferred it once from launch_path, wrote the DLL where nothing would
+    # load it, and reported success.
+    #
+    # "" means the installation root, which is a statement, not a default: a
+    # game whose renderer wrapper belongs somewhere else must say so.
+    reshade_root: str = ""
+    # The loader name ReShade goes in under for this game ("dxgi", "d3d9", ...).
+    reshade_renderer: str = ""
 
 
 @dataclass(frozen=True)
@@ -111,8 +120,6 @@ class GamePlugin:
 
     plugin_id: str
     name: str
-    subtitle: str
-    description: str
     accent: str
     check: CheckFunction
     launch: LaunchFunction
@@ -137,12 +144,29 @@ class GamePlugin:
     # Executable names this game runs as. The shell uses them so a game it did
     # not start itself is still reported as running, and can still be stopped.
     process_names: tuple[str, ...] = ()
+    # False for a game Lexeditor must not start itself - one that only runs
+    # properly through its store launcher. Play is then greyed out; Stop still
+    # works on a copy the player started.
+    can_launch: bool = True
     game_process_factory: Callable[[], GameProcessController] | None = None
     # Root-aware helper hooks prevent installing into an import-time default
     # after the user locates a different game folder. Legacy hooks remain valid.
     helper_status_for_root: Callable[[Path | None], dict] | None = None
     helper_install_for_root: Callable[[Path], dict] | None = None
     helper_pinned: str = ""
+    # Named follow-up steps a helper's first-time setup can ask for, such as
+    # purging a shader cache the helper cannot work with. The shell shows the
+    # step beside the game with its button; it never runs one by itself.
+    helper_actions: dict[str, Callable[[Path | None], dict]] | None = None
+    # Explicit mod-loader adapter; editable project support alone is not proof
+    # that imported packages can be enabled and removed in the game.
+    mod_adapter: object | None = None
+    # Does a mod built here actually load in the game? Stated by the plugin,
+    # never inferred: an adapter that exists is not an adapter that works. The
+    # developer page reads this, and the answer is no until someone proves
+    # otherwise in the game itself.
+    mods_load: bool = False
+    managed_mod: object | None = None
 
 
 
@@ -150,7 +174,7 @@ def validate_plugin(plugin: GamePlugin) -> None:
     """Reject incomplete or unsafe descriptors at discovery time."""
     if not plugin.plugin_id or not plugin.plugin_id.replace("-", "").isalnum():
         raise ValueError("plugin_id must contain letters, numbers, or hyphens")
-    for field in (plugin.name, plugin.subtitle, plugin.description, plugin.accent):
+    for field in (plugin.name, plugin.accent):
         if not field:
             raise ValueError(f"{plugin.plugin_id} has an empty descriptor field")
     if plugin.cover_art is not None:
@@ -202,6 +226,13 @@ def validate_plugin(plugin: GamePlugin) -> None:
                 for login in repository.authorized_logins
         ):
             raise ValueError(f"{plugin.plugin_id} has invalid authorized GitHub logins")
+    if plugin.installation is not None:
+        declared = plugin.installation.reshade_root
+        if declared:
+            path = Path(declared)
+            if path.is_absolute() or ".." in path.parts:
+                raise ValueError(
+                    f"{plugin.plugin_id} has an unsafe ReShade folder: {declared}")
     if plugin.projects is not None:
         projects = plugin.projects
         if not projects.root_env or not projects.default_root.is_absolute():

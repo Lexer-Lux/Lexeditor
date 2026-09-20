@@ -42,10 +42,15 @@ def relative_target(pe: pefile.PE, address: int) -> int:
 
 def source_contract(text: str) -> None:
     required = (
-        "ff8_externals.menu_callbacks[16].func",
-        "ff8_externals.menu_callbacks[5].func",
+        # Menu XP follows the native widgets (38c9dad), not menu callbacks.
+        "0x004C2090",
+        "0x004D3E40",
+        "0x004D41B0",
         "battle_menu_sub_4A3D20 + 0x139",
-        "static_cast<std::uint8_t *>(state) + 0x36",
+        # Battle HP spans a four-digit field under the drawn digits; GF HP
+        # spans the name. Battle HP retains its maximum-HP length scale.
+        "row.hp_right - field",
+        "row.left, row.name_right",
         "result_state + 0x234 + slot * sizeof(std::uint32_t)",
         "g_result_state(0)",
         "result_state[0x38] != 0",
@@ -112,7 +117,8 @@ int main() {
             f'@call "{vcvars}" >nul\n'
             '@cl /nologo /EHsc /std:c++17 projection.cpp /Fe:projection.exe >build.log 2>&1\n'
             '@if errorlevel 1 (type build.log & exit /b 1)\n'
-            '@projection.exe\n', encoding="utf-8")
+            # By full path: cmd may be told not to look in its own directory.
+            f'@"{temp / "projection.exe"}"\n', encoding="utf-8")
         result = subprocess.run(["cmd.exe", "/c", str(temp / "run.cmd")], cwd=temp,
                                 capture_output=True, text=True)
         require(result.returncode == 0, "projection C++ execution failed: " + result.stdout + result.stderr)
@@ -154,7 +160,9 @@ def verify_applied_tree(root: Path) -> None:
 
 def mutation_checks(source: str, applied: Path) -> None:
     mutations = (
-        (" + 0x36", " + 0x35"),
+        ("0x004D41B0", "0x004D41B1"),
+        # The HP bar once hung off the ATB gauge's end; keep it on the digits.
+        ("row.hp_right - field", "row.right - field"),
         (" + 0x234 +", " + 0x230 +"),
         ("result_state[0x38] != 0", "false"),
         ("mode->driver_mode != MODE_BATTLE", "false"),
@@ -164,7 +172,7 @@ def mutation_checks(source: str, applied: Path) -> None:
     for old, new in mutations:
         # The title-menu guard and the end-of-frame expiry both clear capture.
         # Remove both when testing that the expiry contract is meaningful.
-        mutated = source.replace(old, new) if old == "g_capture = {};" else source.replace(old, new, 1)
+        mutated = source.replace(old, new) if old in ("g_capture = {};", "mode->driver_mode == MODE_MENU") else source.replace(old, new, 1)
         try:
             source_contract(mutated)
         except AssertionError:
@@ -195,6 +203,12 @@ def main() -> int:
     require(hashlib.sha256(EXE.read_bytes()).hexdigest() == EXE_SHA256,
             "installed FF8_EN.exe is not the supported Steam English build")
     pe = pefile.PE(str(EXE), fast_load=True)
+    require(image_bytes(pe, 0x004B0CCF, 4) == bytes.fromhex("66 8B 46 4A"),
+            "battle name width field changed")
+    require(image_bytes(pe, 0x004B0CDF, 5) == bytes.fromhex("B8 60 00 00 00")
+            and image_bytes(pe, 0x004B0CEA, 2) == bytes.fromhex("2B C1")
+            and image_bytes(pe, 0x004B0CF0, 2) == bytes.fromhex("03 C2"),
+            "battle name alignment is no longer origin + 96 - name width")
 
     # Native callback and renderer identities.
     require(struct.unpack("<I", image_bytes(pe, 0x00B87F00, 4))[0] == 0x004CDFA0,
@@ -209,6 +223,11 @@ def main() -> int:
             "main-menu callback prologue changed")
     require(struct.unpack("<I", image_bytes(pe, 0x004E67C3, 4))[0] == 0x004E5550,
             "main-menu callback renderer changed")
+    require(relative_target(pe, 0x004C1C6E) == 0x004BF020,
+            "main menu clock draw call changed")
+    require(image_bytes(pe, 0x004C1C54, 11) == bytes.fromhex(
+        "8B 0D 28 E9 CF 01 BA 01 00 00 00"),
+            "main menu playtime argument changed")
     require(image_bytes(pe, 0x004CEF92, 10) == bytes.fromhex("33 C0 8A 47 36 8D 0C C0 8D 14"),
             "Status selected-character read changed")
     require(image_bytes(pe, 0x004CEFA5, 7) == bytes.fromhex("8D 0C D5 E8 E0 CF 01"),
@@ -286,7 +305,9 @@ def main() -> int:
                 "HP bar activation was not replaced")
 
     gameplay_source = (ROOT / "games/ff8/gameplay_settings.py").read_text(encoding="utf-8")
-    editor = (ROOT / "games/ff8/editor.html").read_text(encoding="utf-8")
+    # The page and the modules it loads beside it.
+    editor = "\n".join(path.read_text(encoding="utf-8") for path in
+                       [ROOT / "games/ff8/editor.html", *sorted((ROOT / "games/ff8").glob("*.js"))])
     for key, label in (("xpBars", "XP BARS"), ("hpBars", "HP BARS")):
         require(f'"{key}": False' in gameplay_source,
                 f"new mods do not default {key} off")
@@ -295,9 +316,9 @@ def main() -> int:
         require(f'checked:settings.{key}' in editor,
                 f"{key} does not have a checkbox")
         require(label in editor, f"{label} is absent from Tweaks")
-    require("main menu, Status screen, and post-battle report" in editor,
+    require("below character and GF level rows, including the active and reserve party in the main menu" in editor,
             "XP Bars description does not state every rendered surface")
-    require("bottom-right during battle" in editor,
+    require("below the active party's HP numbers in the main menu and in battle" in editor,
             "HP Bars description does not state its battle placement")
 
     print("FF8 FFNx XP/HP bars: executable, source, integration, and mutations verified")

@@ -36,6 +36,21 @@
         "name": "Lexend Project authors",
         "role": "Bundled Lexend interface font.",
         "url": "https://github.com/googlefonts/lexend"
+      },
+      {
+        "name": "crosire / ReShade",
+        "role": "The post-processing loader Lexeditor bundles, pinned to 6.8.0, and installs per game.",
+        "url": "https://github.com/crosire/reshade"
+      },
+      {
+        "name": "4lex4nder and Frans Bouma / ReshadeEffectShaderToggler",
+        "role": "The add-on Lexeditor installs beside ReShade to run effects before a game draws its HUD.",
+        "url": "https://github.com/4lex4nder/ReshadeEffectShaderToggler"
+      },
+      {
+        "name": "AMD / FidelityFX CAS",
+        "role": "The Contrast Adaptive Sharpening algorithm Lexeditor's Sharpen effect implements.",
+        "url": "https://github.com/GPUOpen-Effects/FidelityFX-CAS"
       }
     ],
     "licenses": [
@@ -48,6 +63,16 @@
         "name": "Lexend — source notice",
         "sourcePath": "ui/assets/fonts/SOURCE.md",
         "text": "# Lexend source record\n\nLexeditor bundles the unmodified Lexend variable font as its neutral interface\nfont.\n\n- Family: Lexend\n- Font version: 1.007\n- Weight axis: 100 through 900; default 400\n- Local file: `Lexend-Variable.ttf`\n- Original file: `ofl/lexend/Lexend[wght].ttf`\n- File size: 175,756 bytes\n- SHA-256: `3ADD53E641FBC81DA64DA4BB254285E2831B52B029527BC0714E2B9610832EE6`\n- Distribution source: `https://github.com/google/fonts`\n- Pinned Google Fonts commit: `e2332cf862ac3145c0ee5f24f04f4c1819b2410b`\n- Upstream project: `https://github.com/googlefonts/lexend`\n- Upstream source commit recorded by Google Fonts:\n  `20491885ca2cf7ffc556432973e7bdbc701952b5`\n- License: SIL Open Font License 1.1 (`OFL.txt`)\n\nThe local filename is shorter for stable CSS addressing. The font bytes and\ninternal font names are unchanged.\n"
+      },
+      {
+        "name": "ReShade — BSD 3-Clause License",
+        "sourcePath": "tools/reshade/6.8.0/LICENSE.md",
+        "text": "Copyright 2014 Patrick Mours. All rights reserved.\n\nRedistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:\n\n  * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.\n  * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.\n  * Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
+      },
+      {
+        "name": "ReshadeEffectShaderToggler — MIT License",
+        "sourcePath": "tools/reshade/addons/REST-1.3.23.633/LICENSE.txt",
+        "text": "MIT License\n\nCopyright (c) 2023 alex\nCopyright (c) 2022 Frans Bouma\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE."
       }
     ]
   },
@@ -154,16 +179,43 @@
         }
       ]
     },
+    "ff7r2": {
+      "contributions": [
+        {
+          "name": "David Matos (frostbone25) / Shader Injector",
+          "role": "The D3D12 shader-replacement mod Lexeditor bundles for Rebirth, pinned to the 2.2.1 Maximum quality release.",
+          "url": "https://github.com/frostbone25/ShaderInjector"
+        },
+        {
+          "name": "Microsoft / DirectX Shader Compiler",
+          "role": "dxc, dxcompiler and dxil, shipped inside the Shader Injector release to recompile its shaders.",
+          "url": "https://github.com/microsoft/DirectXShaderCompiler"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Shader Injector — MIT License",
+          "sourcePath": "games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt",
+          "text": "MIT License\n\nCopyright (c) 2026 David Matos\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+        }
+      ]
+    },
     "ff8": {
       "contributions": [
         {
+          "name": "Final Fantasy Inside contributors",
+          "role": "CARDGAME opcode research: deck, carried rules, region rules, rare-card probability, and three arguments whose effects remain unknown.",
+          "url": "https://wiki.ffrtt.ru/index.php/FF8/Field/Script/Opcodes/13A_CARDGAME"
+        },
+        {
           "name": "HobbitDur",
-          "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas and editor references.",
+          "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas, Ifrit AI instruction-row design and ai_cronos target/condition reference, and Cid packed world Draw Point coordinate conversion.",
           "url": "https://github.com/HobbitDur/FF8UltimateEditor"
         },
         {
           "name": "Julian Xhokaxhiu (TrueOdin), Tang-Tang Zhou (vertex2995), Jérôme Arzel (myst6re), CosmosXIII and FFNx contributors",
-          "role": "FFNx runtime, game hooks and reverse-engineering references.",
+          "role": "FFNx runtime, game hooks and reverse-engineering references, including the embedded Triple Triad card and icon TIM locations.",
           "url": "https://github.com/julianxhokaxhiu/FFNx"
         },
         {
@@ -173,7 +225,7 @@
         },
         {
           "name": "Jérôme Arzel (myst6re) and Deling contributors",
-          "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, encounters and world-map format references.",
+          "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, encounters and world-map format references; Japanese glyph mapping from src/qt/fonts/sysfnt_jp.txt (GPL v3 or later).",
           "url": "https://github.com/myst6re/deling"
         },
         {
@@ -515,43 +567,6 @@
           "text": "MIT License\n\nCopyright (c) 2021 WesternGamer\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
         }
       ]
-    },
-    "chrono-trigger": {
-      "contributions": [
-        {
-          "name": "jimzrt / ChronoMod contributors",
-          "role": "Steam resources.bin ARC1 archive format reference.",
-          "url": "https://github.com/jimzrt/ChronoMod"
-        },
-        {
-          "name": "GitExl / CTViewer contributors",
-          "role": "Steam scene, overworld, map, tileset, palette and script format references.",
-          "url": "https://github.com/GitExl/CTViewer"
-        },
-        {
-          "name": "OnemusCT / Temporal Redux contributors",
-          "role": "PC Atel event command widths and behavior references.",
-          "url": "https://github.com/OnemusCT/temporal-redux"
-        },
-        {
-          "name": "TheRealBiggs / CTExt contributors",
-          "role": "Chrono Trigger Steam loose-file and CTP runtime loading model.",
-          "url": "https://github.com/TheRealBiggs/ctext"
-        }
-      ],
-      "thanks": [],
-      "licenses": []
-    },
-    "terraria": {
-      "contributions": [
-        {
-          "name": "tModLoader team / tModLoader",
-          "role": "Terraria mod loader, source-project/build conventions, ExampleMod, build.txt semantics and API reference.",
-          "url": "https://github.com/tModLoader/tModLoader"
-        }
-      ],
-      "thanks": [],
-      "licenses": []
     }
   }
 }
