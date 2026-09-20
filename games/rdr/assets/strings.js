@@ -134,12 +134,11 @@
       const vanilla = state.vanilla.stringTable && state.vanilla.stringTable.rows &&
         state.vanilla.stringTable.rows.find(function (entry) { return entry.id === row.id; });
       const control = el("textarea", {
-        value: value(row),
         disabled: state.activeSource !== "mine",
         spellcheck: true,
         "aria-label": "Localized text",
         oninput: function (event) { edit(row, event.target.value); }
-      });
+      }, value(row));
       return UI.detailPanel({
         className: "record-detail string-detail",
         title: row.identifier || row.hash,
