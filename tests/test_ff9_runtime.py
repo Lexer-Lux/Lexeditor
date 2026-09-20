@@ -361,3 +361,36 @@ def test_stage_default_uses_repository_pin_without_metadata_lookup(tmp_path, mon
     staged, published = manager.stage(fetch_file=fetch_file, cache_root=tmp_path)
     assert calls == [manager.PINNED_ASSET_URL]
     assert staged.read_bytes() == payload and published == metadata
+
+
+def test_real_patcher_shape_without_settings_is_recoverable(setup):
+    root, kwargs, files, metadata = setup
+    files.pop("Settings.ini")
+    payload = pack(files)
+    metadata["assets"][0]["digest"] = "sha256:" + hashlib.sha256(payload).hexdigest()
+    metadata["assets"][0]["size"] = len(payload)
+    kwargs["fetch_file"] = lambda _url, target, _progress: target.write_bytes(payload)
+    result = manager.install(root, **kwargs)
+    assert result["installed"] and result["updatesDisabled"]
+    settings = root / manager.SETTINGS_NAME
+    assert settings.is_file()
+    assert settings.read_bytes() == b"[Memoria]\r\nCheckUpdates = False\r\n"
+
+
+def test_new_settings_file_is_removed_if_install_rolls_back(setup, monkeypatch):
+    root, kwargs, files, metadata = setup
+    files.pop("Settings.ini")
+    payload = pack(files)
+    metadata["assets"][0]["digest"] = "sha256:" + hashlib.sha256(payload).hexdigest()
+    metadata["assets"][0]["size"] = len(payload)
+    kwargs["fetch_file"] = lambda _url, target, _progress: target.write_bytes(payload)
+    real_status = manager.status
+    def reject_after_settings(game_root, state_path=manager.STATE_PATH):
+        value = real_status(game_root, state_path)
+        if (Path(game_root) / manager.SETTINGS_NAME).is_file():
+            value = {**value, "installed": False}
+        return value
+    monkeypatch.setattr(manager, "status", reject_after_settings)
+    with pytest.raises(RuntimeError, match="previous game files were restored"):
+        manager.install(root, **kwargs)
+    assert not (root / manager.SETTINGS_NAME).exists()

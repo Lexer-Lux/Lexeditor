@@ -20,7 +20,7 @@ import tempfile
 import urllib.request
 from typing import Callable
 
-from .memoria_patcher import inspect_payload, installation_files
+from .memoria_patcher import PayloadFile, inspect_payload, installation_files
 from .memoria_recovery import Recovery, atomic_json, digest, install_lock, root_key, verify_install
 from plugin_files import atomic_write, fetch_file
 
@@ -345,10 +345,14 @@ def install(game_root: Path, *, fetch_json: JsonFetcher | None = None,
             raise RuntimeError("Recover the interrupted Memoria installation before installing again")
         patcher, published = stage(fetch_json=fetch_json, fetch_file=fetch_file, cache_root=cache_root, progress=progress)
         files = installation_files(inspect_payload(patcher), root)
+        # v2025.07.04 does not carry Settings.ini as a patcher payload record,
+        # but the launcher reads it from the game root. Track it explicitly in
+        # the recovery journal before Lexeditor changes or creates it.
+        recovery_files = files
         if not any(Path(entry.relative_path).name.casefold() == SETTINGS_NAME.casefold() for entry in files):
-            raise RuntimeError("The pinned Memoria patcher does not contain Settings.ini; automatic update checks cannot be disabled safely")
+            recovery_files = (*files, PayloadFile(SETTINGS_NAME, 0, ""))
         _require_closed(root)  # The player may have started FF9 during download.
-        recovery = Recovery.prepare(root, files, _control_root(state_path) / "backups")
+        recovery = Recovery.prepare(root, recovery_files, _control_root(state_path) / "backups")
         atomic_json(pointer, {"journal": str(recovery.journal), "root": str(root)})
         try:
             _require_closed(root)  # Also recheck after the recovery copy.
@@ -367,9 +371,8 @@ def install(game_root: Path, *, fetch_json: JsonFetcher | None = None,
             verify_install(root, files)
             recovery.preserve_config()
             settings = root / SETTINGS_NAME
-            if not settings.is_file():
-                raise RuntimeError("The Memoria patcher did not produce Settings.ini")
-            atomic_write(settings, _disable_launcher_updates(settings.read_bytes()))
+            settings_raw = settings.read_bytes() if settings.is_file() else b"[Memoria]\r\n"
+            atomic_write(settings, _disable_launcher_updates(settings_raw))
             current_status = status(root, state_path)
             if not current_status["installed"]:
                 raise RuntimeError("The Memoria patcher did not produce a usable x64 runtime")
