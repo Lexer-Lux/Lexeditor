@@ -70,6 +70,15 @@ def field(page, label: str):
     return row
 
 
+def numeric_field(page, label: str):
+    # Shared Detail converts wide-range numbers to grouped text inputs so they
+    # can display thousands separators while unfocused. Small ranges stay
+    # type=number. Both are the same semantic numeric control.
+    control = field(page, label).locator('input[type="number"], input[inputmode="decimal"]').first
+    expect(control).to_be_visible()
+    return control
+
+
 with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
     temp = Path(name)
     game, project, data_root = temp / "game", temp / "project", temp / "data"
@@ -115,8 +124,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.wait_for_selector(".lex-paged-list-detail")
             assert page.locator(".lex-column-list-row").count() >= 10
 
-            price = field(page, "PRICE").locator('input[type="number"]').first
+            price = numeric_field(page, "PRICE")
             expect(price).to_have_value("250")
+            page.screenshot(path=str(OUT / "ff9-items-wide.png"), full_page=True)
             save = page.locator("#global-save")
             price.fill("333")
             expect(save).to_be_enabled()
@@ -132,7 +142,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             assert overlay.is_file() and b"0;0;-1;-1;333;" in overlay.read_bytes()
             page.reload(wait_until="domcontentloaded")
             page.wait_for_selector(".lex-paged-list-detail")
-            expect(field(page, "PRICE").locator('input[type="number"]').first).to_have_value("333")
+            expect(numeric_field(page, "PRICE")).to_have_value("333")
 
             page.evaluate("navigate('magic')")
             page.wait_for_function("state.datasets.actions?.rows?.length===2")
@@ -141,8 +151,8 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             assert set(targets.locator("option").all_text_contents()) == {"SingleEnemy(2)", "ManyAny(3)"}
             page.evaluate("state.datasetChoice.magic='status-data';render()")
             page.wait_for_function("state.datasets['status-data']?.rows?.length===1")
-            expect(field(page, "SPS EXTRA POSITION").locator('input[type="number"]')).to_have_count(3)
-            expect(field(page, "GLOW BASE COLOR").locator('input[type="number"]')).to_have_count(3)
+            expect(field(page, "SPS EXTRA POSITION").locator('input[type="number"], input[inputmode="decimal"]')).to_have_count(3)
+            expect(field(page, "GLOW BASE COLOR").locator('input[type="number"], input[inputmode="decimal"]')).to_have_count(3)
 
             page.evaluate("navigate('world')")
             page.wait_for_function("state.datasets['world-transport']?.rows?.length===1")
@@ -151,8 +161,8 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
 
             page.evaluate("navigate('encounters')")
             page.wait_for_function("state.datasets.encounters?.rows?.length===1")
-            expect(field(page, "MONSTER COUNT").locator('input[type="number"]').first).to_have_attribute("max", "4")
-            expect(field(page, "ENEMY 1 TYPE").locator('input[type="number"]').first).to_have_attribute("max", "0")
+            expect(numeric_field(page, "MONSTER COUNT")).to_have_attribute("max", "4")
+            expect(numeric_field(page, "ENEMY 1 TYPE")).to_have_attribute("max", "0")
 
             page.locator("#plugin-data-map").click()
             page.wait_for_selector(".lex-data-map-view")
