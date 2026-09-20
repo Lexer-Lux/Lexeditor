@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import paths
+from . import paths, deployment
 from .extended import FAMILIES, ERRORS as EXTENDED_ERRORS, load_extended, save_extended, resolve_source, model
 from .datasets import CATEGORIES, UNRESOLVED, READ_ERRORS, load_datasets, save_datasets
 from .storage import target_path
@@ -113,7 +113,7 @@ def save_extended_data(payload: object) -> dict:
 
 
 def platform_data() -> dict:
-    return load_config(GAME_ROOT / "FFNx.toml", "FFNx", "toml", game="FF7")
+    return deployment.ffnx_config(GAME_ROOT)
 
 
 def save_platform_data(payload: object) -> dict:
@@ -123,7 +123,10 @@ def save_platform_data(payload: object) -> dict:
                for field in section["fields"]}
     if set(payload["changes"]) - allowed:
         raise ValueError("FFNx change set contains settings unavailable for FF7")
-    result = save_config(GAME_ROOT / "FFNx.toml", "FFNx", "toml",
+    current = platform_data()
+    if not current.get("available"):
+        raise FileNotFoundError(current.get("message") or "FFNx.toml is unavailable")
+    result = save_config(Path(current["path"]), "FFNx", "toml",
         str(payload.get("sha256", "")), payload["changes"],
         (EXECUTABLE, "FFVII.exe", "FF7_Launcher.exe", "FF7_EN.exe", "ff7.exe", "ff7_en"))
     for section in result["sections"]:
@@ -163,12 +166,18 @@ def data_map() -> dict:
         available = platform_data()["available"]
         note = ("Tweaks edits FF7 and shared runtime settings in place, with backups and stale-write protection."
                 if available else "Available after FFNx creates its configuration in the game directory.")
-        status = "integrated" if available else "partial"
+        status = "partial"
     except READ_ERRORS as error:
         available, note, status = False, str(error), "blocked"
     rows.append({"filename": "FFNx.toml", "controls": "FFNx runtime settings",
-        "notes": note, "status": status, "openable": available,
-        "sourcePath": str(config), "category": "tweaks"})
+        "notes": note + (" Lexeditor exposes typed scalar/list settings and preserves unknown lines; this is not a claim that every FFNx feature has a bespoke control." if available else ""),
+        "status": status, "openable": available,
+        "sourcePath": str(platform_data().get("path") or config), "category": "tweaks"})
+    deploy_config = deployment.ffnx_config(GAME_ROOT)
+    rows.append({"filename": "FFNx Direct Mode", "controls": "Project deployment",
+        "notes": "Exports/deploys only proved Direct Mode mappings: KERNEL data sections 1-9, KERNEL2 text sections 10-27, scene blocks, field encounter section 7 and enc_w.bin. Executable-backed edits remain project-only.",
+        "status": "partial", "openable": True,
+        "sourcePath": str(deploy_config.get("path") or ""), "category": "deployment"})
     for row in rows:
         row["coverage"] = "structured" if row["openable"] else "unavailable"
         row["target"] = row["category"]
@@ -258,7 +267,7 @@ class Handler(BaseHTTPRequestHandler):
                     "apiVersion": 1, "pluginId": PLUGIN_ID, "name": PLUGIN_NAME,
                     "edition": PLUGIN_EDITION, "hosted": HOSTED, "windowHost": WINDOW_HOST,
                     "projectRoot": str(PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
-                    "capabilities": ["data-map", "kernel-data", "save"],
+                    "capabilities": ["data-map", "kernel-data", "save", "ffnx-direct-export", "ffnx-direct-deploy"],
                 })
             elif path == "/api/dashboard":
                 self.json_response(dashboard())
@@ -268,6 +277,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response(editor_data())
             elif path == "/api/platform-config":
                 self.json_response(platform_data())
+            elif path == "/api/deployment":
+                plan = deployment.build_plan(GAME_ROOT, PROJECT_ROOT)
+                self.json_response({key:value for key,value in plan.items() if key != "_payload"})
             else:
                 self.json_response({"error": "Not found"}, 404)
         except Exception as error:
@@ -276,10 +288,26 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             path = urlparse(self.path).path
-            if path not in {"/api/save", "/api/platform-config/save", "/api/extended/save"}:
+            if path not in {"/api/save", "/api/platform-config/save", "/api/extended/save", "/api/deployment/export", "/api/deployment/deploy", "/api/deployment/remove"}:
                 self.json_response({"error": "Not found"}, 404)
                 return
             length = int(self.headers.get("Content-Length", "0"))
+            if path.startswith("/api/deployment/"):
+                if length > 64 * 1024:
+                    raise ValueError("FF7 deployment payload is too large")
+                if length:
+                    payload = json.loads(self.rfile.read(length).decode("utf-8"))
+                    if payload not in ({}, None):
+                        raise ValueError("FF7 deployment actions do not accept data changes")
+                if path == "/api/deployment/export":
+                    self.json_response(deployment.export_project(GAME_ROOT, PROJECT_ROOT))
+                elif path == "/api/deployment/deploy":
+                    import process_probe
+                    self.json_response(deployment.deploy_project(GAME_ROOT, PROJECT_ROOT,
+                        running_check=lambda: os.name == "nt" and bool(process_probe.live_processes(deployment.PROCESS_NAMES))))
+                else:
+                    self.json_response(deployment.remove_deployment(GAME_ROOT))
+                return
             if length < 2 or length > (16 if path == "/api/extended/save" else 4) * 1024 * 1024:
                 raise ValueError("FF7 save payload has an invalid size")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
