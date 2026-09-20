@@ -204,6 +204,20 @@ def assert_outer_fit(page, label):
     assert metrics["main"]["bottom"] <= metrics["viewportHeight"] + 2, (label, "main bottom clipped", metrics)
 
 
+def assert_pager_fit(page, label):
+    pager = page.locator(".lex-pager").first
+    if not pager.count():
+        return
+    metrics = pager.evaluate("""node=>{
+      const box=node.getBoundingClientRect();
+      const visible=[...node.children].filter(child=>getComputedStyle(child).display!=="none" && !child.hidden);
+      const right=visible.length?Math.max(...visible.map(child=>child.getBoundingClientRect().right)):box.right;
+      return {left:box.left,right:box.right,width:box.width,scrollWidth:node.scrollWidth,clientWidth:node.clientWidth,contentRight:right};
+    }""")
+    assert metrics["scrollWidth"] <= metrics["clientWidth"] + 2, (label, "pager horizontal overflow", metrics)
+    assert metrics["contentRight"] <= metrics["right"] + 1, (label, "pager controls clipped", metrics)
+
+
 def settle_screen(page, label):
     if label == "datamap":
         page.locator(".lex-data-map-table").wait_for()
@@ -397,6 +411,8 @@ def main() -> None:
             for name, command in PAGES:
                 page.evaluate(command);settle_screen(page, name)
                 assert_outer_fit(page, f"{name}-small")
+                if name == "datamap":
+                    assert_pager_fit(page, f"{name}-small")
                 screenshot(page, name, "small")
                 results.append({"screen": name, "mode": "small", "status": "passed"})
 
