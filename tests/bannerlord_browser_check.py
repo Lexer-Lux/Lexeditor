@@ -190,6 +190,7 @@ def main() -> None:
 
             page.evaluate('state.moduleView="dependencies";navigate("module")')
             legacy_row = page.locator(".lex-column-list-row").filter(has_text="LegacyBrowserDep")
+            legacy_row.wait_for()
             assert legacy_row.count() == 1
             legacy_row.click()
             detail_text = page.locator(".lex-detail-panel").last.inner_text()
