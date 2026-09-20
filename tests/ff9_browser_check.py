@@ -79,6 +79,11 @@ def numeric_field(page, label: str):
     return control
 
 
+def wait_loaded(page):
+    page.wait_for_function("!document.documentElement.classList.contains('lex-loading-live')")
+    page.locator(".lex-plugin-loading-screen").wait_for(state="detached")
+
+
 with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
     temp = Path(name)
     game, project, data_root = temp / "game", temp / "project", temp / "data"
@@ -122,6 +127,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.goto(session.url, wait_until="domcontentloaded")
             page.wait_for_function("typeof state==='object'&&state.dashboard&&typeof shell==='object'")
             page.wait_for_selector(".lex-paged-list-detail")
+            wait_loaded(page)
             assert page.locator(".lex-column-list-row").count() >= 10
 
             price = numeric_field(page, "PRICE")
@@ -142,6 +148,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             assert overlay.is_file() and b"0;0;-1;-1;333;" in overlay.read_bytes()
             page.reload(wait_until="domcontentloaded")
             page.wait_for_selector(".lex-paged-list-detail")
+            wait_loaded(page)
             expect(numeric_field(page, "PRICE")).to_have_value("333")
 
             page.evaluate("navigate('magic')")
@@ -170,7 +177,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.locator("#plugin-data-map").click()
             page.wait_for_selector(".lex-data-map-view")
             page.screenshot(path=str(OUT / "ff9-datamap.png"), full_page=True)
-            map_search = page.get_by_role("textbox", name="Search the data map")
+            map_search = page.get_by_role("searchbox", name="Search the data map")
             map_search.fill("BattleScene")
             page.wait_for_function("state.mapQuery==='BattleScene'")
             assert "BattleScene" in page.locator(".lex-data-map-view").inner_text()
