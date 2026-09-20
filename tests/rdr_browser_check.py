@@ -116,7 +116,14 @@ def run(output: Path, executable: str | None) -> None:
                 page = browser.new_page(viewport={"width": width, "height": height})
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))
-                page.route("**/*", lambda route: route.abort())
+                def route_asset(route):
+                    if route.request.url.endswith("/assets/editor.css"):
+                        route.fulfill(path=str(ROOT / "games/rdr/assets/editor.css"), content_type="text/css")
+                    elif route.request.url.endswith("/assets/editor.js"):
+                        route.fulfill(path=str(ROOT / "games/rdr/assets/editor.js"), content_type="text/javascript")
+                    else:
+                        route.abort()
+                page.route("**/*", route_asset)
                 page.set_content(document(), wait_until="domcontentloaded")
                 page.wait_for_function("!state.booting")
                 assert not errors, errors
