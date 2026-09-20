@@ -252,6 +252,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 self.editor_response()
+            elif path == "/editor.js":
+                self.file_response(PLUGIN_ROOT / "editor.js")
             elif path.startswith("/shared/"):
                 shared = (LEXEDITOR_ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()
