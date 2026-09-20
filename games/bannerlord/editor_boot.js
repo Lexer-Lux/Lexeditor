@@ -131,20 +131,93 @@
     }catch(error){showAlert?.(String(error.message||error),"Bannerlord save failed")}
   }
 
+  async function discardAllChanges(){
+    const runtimeRequest=api("/api/runtime-overrides").catch(error=>({available:false,error:String(error.message||error),effects:[],xpSources:[]}));
+    const requests=[
+      api("/api/module"),api("/api/project"),api("/api/skills"),api("/api/effects"),api("/api/perks"),
+      api("/api/xp-sources"),api("/api/settings-defaults"),runtimeRequest,api("/api/deployment"),api("/api/datamap")
+    ];
+    const gauntletPath=state.gauntlet?.relativePath||"";
+    const moduleDataPath=state.moduleData?.relativePath||"";
+    const sourcePath=state.source?.path||"";
+    if(gauntletPath)requests.push(api(`/api/gauntlet?path=${encodeURIComponent(gauntletPath)}`));
+    if(moduleDataPath)requests.push(api(`/api/module-data?path=${encodeURIComponent(moduleDataPath)}`));
+    if(sourcePath)requests.push(api(`/api/source?path=${encodeURIComponent(sourcePath)}`));
+    const values=await Promise.all(requests);
+    const [module,project,skills,effects,perks,xpSources,mcmDefaults,runtimeOverrides,deployment,datamap]=values;
+    state.module=module;state.savedModule=clone(module);
+    state.project=project;state.savedProject=clone(project);
+    state.skills=skills;state.savedSkills=clone(skills);
+    state.effects=effects;state.savedEffects=clone(effects);
+    state.perks=perks;state.savedPerks=clone(perks);
+    state.xpSources=xpSources;state.savedXpSources=clone(xpSources);
+    state.mcmDefaults=mcmDefaults;state.savedMcmDefaults=clone(mcmDefaults);
+    state.runtimeOverrides=runtimeOverrides;state.savedRuntimeOverrides=clone(runtimeOverrides);
+    state.deployment=deployment;state.datamap=datamap;
+    let offset=10;
+    if(gauntletPath){state.gauntlet=values[offset++];state.savedGauntlet=clone(state.gauntlet)}
+    if(moduleDataPath){state.moduleData=prepareModuleData(values[offset++]);state.savedModuleData=clone(state.moduleData)}
+    if(sourcePath){state.source=values[offset++];state.savedSourceText=state.source.text}
+    render();refresh();
+  }
+
+  renderDataMap=function(){
+    const open=row=>{
+      if(row.target==="module"){state.moduleView="metadata";navigate("module")}
+      else if(row.target==="dependencies"){state.moduleView="dependencies";navigate("module")}
+      else if(row.target==="submodules"){state.moduleView="submodules";navigate("module")}
+      else if(row.target==="xmls"){state.moduleView="xmls";navigate("module")}
+      else if(row.target==="skills"){state.skillView="definitions";navigate("skills")}
+      else if(row.target==="effects"){state.skillView="effects";navigate("skills")}
+      else if(row.target==="perks"){state.skillView="perks";navigate("skills")}
+      else if(row.target==="xp"){state.skillView="xp";navigate("skills")}
+      else if(row.target==="settings")navigate("tweaks")
+      else if(row.target==="runtime")navigate("runtime")
+      else if(row.target==="gauntlet"){state.gauntletView="widgets";loadGauntlet(row.editorPath||row.filename)}
+      else if(row.target==="moduledata"){state.moduleDataView="records";loadModuleData(row.editorPath||row.filename)}
+      else if(row.target==="build")navigate("build")
+    };
+    const view=LexeditorUI.dataMap({
+      rows:state.datamap.rows,query:state.query,status:state.mapStatus,page:state.page,sort:state.sort,
+      tableClass:"bannerlord-data-map",open,openSource,
+      changeQuery:value=>{state.query=value;state.page=0;renderDataMap()},
+      changeStatus:value=>{state.mapStatus=value;state.page=0;renderDataMap()},
+      changePage:value=>{state.page=value;renderDataMap()},
+      changeSort:key=>{const [active,direction]=state.sort;state.sort=[key,active===key?-direction:1];renderDataMap()}
+    });
+    main.replaceChildren(view.content);
+  };
+
+  navigate=function(tab){
+    state.tab=tab;
+    const title=tab==="datamap"?"Data Map":tab==="info"?"Information":tab==="tweaks"?"Tweaks":String(tab).replace(/^\w/,value=>value.toUpperCase());
+    main.replaceChildren(uiLoading(title,"Loading page…"));
+    requestAnimationFrame(()=>render());
+  };
+
+  render=function(){
+    const views={
+      module:renderModuleArea,skills:renderSkillsArea,tweaks:renderMcmDefaults,runtime:renderRuntimeOverrides,
+      gauntlet:renderGauntlet,moduledata:renderModuleData,build:renderBuild,info:renderInfo,
+      datamap:renderDataMap,source:renderSource
+    };
+    try{(views[state.tab]||renderModuleArea)()}
+    catch(error){main.replaceChildren(uiError("Bannerlord UI error",String(error.message||error)))}
+    refresh();
+  };
+
   const shell=LexeditorUI.mountShell({
     host:"#lexeditor-shell",brand:"LEXEDITOR",
     plugin:{id:"bannerlord",themeName:"bannerlord",theme:{accent:"#8d2f25",highlight:"#a56b34"}},
     tabs:[
-      {id:"module",label:"Module"},{id:"dependencies",label:"Dependencies"},
-      {id:"submodules",label:"Submodules"},{id:"xmls",label:"XML"},
-      {id:"skills",label:"Skills"},{id:"effects",label:"Effects"},
-      {id:"perks",label:"Perks"},{id:"xp",label:"XP"},{id:"settings",label:"Settings"},
-      {id:"runtime",label:"Runtime"},{id:"gauntlet",label:"Gauntlet"},{id:"moduledata",label:"ModuleData"},{id:"build",label:"Build"},{id:"deployment",label:"Deployment"}
+      {id:"module",label:"Module"},{id:"skills",label:"Skills"},{id:"tweaks",label:"Tweaks"},
+      {id:"runtime",label:"Runtime"},{id:"gauntlet",label:"Gauntlet"},
+      {id:"moduledata",label:"ModuleData"},{id:"build",label:"Build"}
     ],
     activeTab:()=>state.tab,navigate,
     help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the Bannerlord Data Map",
-    info:()=>navigate("deployment"),infoActive:()=>state.tab==="deployment",infoTitle:"Open Bannerlord deployment information",
-    dirtyCount,readonly:()=>false,save
+    info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open Bannerlord setup, deployment, and runtime information",
+    dirtyCount,readonly:()=>false,save,discard:discardAllChanges
   });
 
   const runtimeRequest=api("/api/runtime-overrides").catch(error=>({available:false,error:String(error.message||error),effects:[],xpSources:[]}));
@@ -160,6 +233,6 @@
     state.deployment=deployment;
     state.datamap=datamap;render();
   }).catch(error=>{
-    main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"Bannerlord plugin error"),el("div",{class:"bl-note"},String(error.message||error))));
+    main.replaceChildren(uiError("Bannerlord plugin error",String(error.message||error)));
     refresh();
   });
