@@ -24,9 +24,17 @@
         const record=bucket[recordKey]||(bucket[recordKey]={recordIndex:row.recordIndex,originalId:row.id,fields:{}});
         record.fields[key]=copy(value);
       }
-      refreshShell();
+      refreshDirtyChrome();
     }
     const datasetDirtyCount=dataset=>Object.values(editBucket(dataset)).reduce((n,row)=>n+Object.keys(row.fields||{}).length,0);
+    function refreshDirtyChrome(){
+      const dirty=active?datasetDirtyCount(active):0;
+      const discard=toolbar().querySelector("[data-warband-module-discard]");
+      if(discard)discard.disabled=!dirty;
+      const count=toolbar().querySelector("[data-warband-module-dirty]");
+      if(count)count.textContent=dirty+" unsaved field"+(dirty===1?"":"s");
+      refreshShell();
+    }
     const dirtyCount=()=>Object.keys(edits).reduce((n,dataset)=>n+datasetDirtyCount(dataset),0);
     const snapshot=()=>({edits:copy(edits),active,view:copy(view)});
     function restore(value){
@@ -100,8 +108,8 @@
       const selector=LexeditorUI.el("select",{"aria-label":"Warband Module System dataset",onchange:event=>{active=event.target.value;viewState(active);renderApp();}},
         ...rows.map(row=>LexeditorUI.el("option",{value:row.dataset,selected:row.dataset===active},row.recordLabel||row.dataset)));
       const dirty=datasetDirtyCount(active);
-      const discard=LexeditorUI.el("button",{type:"button",disabled:!dirty,onclick:()=>{edits[active]={};setStatus("Discarded unsaved "+labelFor(active)+" changes");refreshShell();renderApp();}},"Discard changes");
-      toolbar().replaceChildren(selector,discard,LexeditorUI.el("span",{class:"count"},dirty+" unsaved field"+(dirty===1?"":"s")));
+      const discard=LexeditorUI.el("button",{type:"button",disabled:!dirty,"data-warband-module-discard":"1",onclick:()=>{edits[active]={};setStatus("Discarded unsaved "+labelFor(active)+" changes");refreshShell();renderApp();}},"Discard changes");
+      toolbar().replaceChildren(selector,discard,LexeditorUI.el("span",{class:"count","data-warband-module-dirty":"1"},dirty+" unsaved field"+(dirty===1?"":"s")));
       const entry=cache.get(active);
       if(!entry){main().replaceChildren(LexeditorUI.el("section",{class:"card warband-module-state"},"Loading structured Module System records…"));load(active);return;}
       if(entry.loading&&!entry.data){main().replaceChildren(LexeditorUI.el("section",{class:"card warband-module-state"},"Loading structured Module System records…"));return;}
