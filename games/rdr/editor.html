@@ -6,16 +6,13 @@
   <title>Lexeditor - RDR</title>
   <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
   <link rel="stylesheet" href="/shared/framework.css">
-  <link rel="stylesheet" href="/assets/editor.css">
-
+  <link rel="stylesheet" href="editor.css">
 </head>
 <body>
   <div id="lexeditor-shell"></div>
   <div id="toolbar"></div>
   <main id="main"><div>Loading Red Dead Redemption data…</div></main>
   <script src="/shared/framework.js"></script>
-  <script src="/assets/strings.js"></script>
-  <script src="/assets/editor.js"></script>
-
+  <script src="strings.js"></script>\n  <script src="editor.js"></script>
 </body>
 </html>
