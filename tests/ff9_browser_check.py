@@ -84,6 +84,13 @@ def wait_loaded(page):
     page.locator(".lex-plugin-loading-screen").wait_for(state="detached")
 
 
+def assert_table_headers_fit(page):
+    overflow = page.evaluate("""()=>[...document.querySelectorAll('.lex-column-list-head-cell')]
+      .filter(cell=>cell.offsetParent!==null && cell.scrollWidth>cell.clientWidth+1)
+      .map(cell=>({text:cell.innerText.trim(),client:cell.clientWidth,scroll:cell.scrollWidth}))""")
+    assert not overflow, overflow
+
+
 with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
     temp = Path(name)
     game, project, data_root = temp / "game", temp / "project", temp / "data"
@@ -129,6 +136,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.wait_for_selector(".lex-paged-list-detail")
             wait_loaded(page)
             assert page.locator(".lex-column-list-row").count() >= 10
+            assert_table_headers_fit(page)
 
             price = numeric_field(page, "PRICE")
             expect(price).to_have_value("250")
@@ -161,6 +169,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.wait_for_function("state.datasets['status-data']?.rows?.length===1")
             expect(field(page, "SPS EXTRA POSITION").locator('input[type="number"], input[inputmode="decimal"]')).to_have_count(3)
             expect(field(page, "GLOW BASE COLOR").locator('input[type="number"], input[inputmode="decimal"]')).to_have_count(3)
+            assert_table_headers_fit(page)
             page.screenshot(path=str(OUT / "ff9-status-vectors.png"), full_page=True)
 
             page.evaluate("navigate('world')")
@@ -191,6 +200,10 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.wait_for_selector(".lex-paged-list-detail")
             metrics = page.evaluate("()=>({body:document.body.scrollWidth,viewport:innerWidth,main:document.querySelector('main').scrollWidth,width:document.querySelector('main').clientWidth})")
             assert metrics["body"] <= metrics["viewport"] + 2 and metrics["main"] <= metrics["width"] + 2, metrics
+            last_field = field(page, "EQUIPPABLE BY")
+            last_field.scroll_into_view_if_needed()
+            expect(last_field).to_be_visible()
+            field(page, "WEAPON ID").scroll_into_view_if_needed()
             page.screenshot(path=str(OUT / "ff9-narrow.png"), full_page=True)
 
             page.set_viewport_size({"width": 1000, "height": 700})

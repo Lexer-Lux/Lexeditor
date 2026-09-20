@@ -59,7 +59,7 @@
     for(const source of columnSources(data,key)){
       source.data.fields.filter(field=>!["id","comment","name"].includes(field.key.toLocaleLowerCase())).forEach((field,index)=>{
         const value=record=>source.row(record)?.values[field.key];
-        columns.push({key:source.prefix+field.key,label:field.label,pinned:!source.prefix&&index<3,
+        columns.push({key:source.prefix+field.key,label:field.label,pinned:!source.prefix&&index<1,
           sortable:true,width:"minmax(0,1fr)",numeric:["integer","number"].includes(field.kind),sortValue:value,
           render:record=>{const linked=source.row(record);return linked?fieldValue(linked,field):"—"}});
       });
