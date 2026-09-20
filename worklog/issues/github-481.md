@@ -13,7 +13,7 @@ Scope: FF8 only.
 - [x] Unsupported layout fails closed behind FF8 US plus the already-verified
   battle and seven shared-character-widget call identities.
 - [x] Disabled candidate selects FFNx's original `common_draw_paletted2D`.
-- [ ] Lexeditor tweak persistence/UI and disable transaction checks.
+- [x] Lexeditor tweak persistence/UI and disable transaction checks.
 - [ ] Windows derivative build + isolated artifact evidence on this branch.
 - [ ] Actual FF8 battle/menu visual acceptance (cannot be proven by CI).
 

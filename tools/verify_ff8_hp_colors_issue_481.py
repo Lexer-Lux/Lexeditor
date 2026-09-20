@@ -15,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 HEADER = ROOT / "games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_hp_colors.h"
 SOURCE = ROOT / "games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp"
 PREPARE = ROOT / "tools/prepare_ff8_native_build.py"
+SETTINGS = ROOT / "games/ff8/gameplay_settings.py"
+EDITOR = ROOT / "games/ff8/editor.html"
 
 
 def require(value: bool, message: str) -> None:
@@ -25,6 +27,8 @@ def require(value: bool, message: str) -> None:
 def static_contract() -> None:
     source = SOURCE.read_text(encoding="utf-8")
     prepare = PREPARE.read_text(encoding="utf-8")
+    settings = SETTINGS.read_text(encoding="utf-8")
+    editor = EDITOR.read_text(encoding="utf-8")
     for token in (
         "lexeditor_ff8_hp_should_tint",
         "g_better_hp_runtime_ready",
@@ -50,6 +54,14 @@ def static_contract() -> None:
         in prepare,
         "disabled candidate must select FFNx's unmodified paletted draw function",
     )
+    require("DEFAULT_BETTER_HP_COLORS = False" in settings,
+            "Lexeditor Better HP Colors must default off")
+    require('"betterHpColors"' in settings and '"Better HP Colors"' in settings,
+            "Lexeditor persistence/validation registration is missing")
+    require('("enable_ff8_better_hp_colors", better_hp_colors)' in settings,
+            "FFNx config writer is missing Better HP Colors")
+    require('"aria-label":"Better HP Colors"' in editor and 'row("BETTER HP COLORS"' in editor,
+            "FF8 Tweaks UI is missing Better HP Colors")
 
 
 def compile_contract(compiler: str) -> None:
