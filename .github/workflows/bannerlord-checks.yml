@@ -71,18 +71,44 @@ jobs:
       - run: python -m pip install playwright
       - run: python -m playwright install --with-deps chromium
       - run: python tests/bannerlord_browser_check.py out/bannerlord-browser
-      - run: python tests/bannerlord_ui_audit_check.py out/bannerlord-ui-audit
-      - run: python tests/data_map_browser_check.py out/bannerlord-data-map-browser
+      - name: Branch-native rendered UI audit
+        run: python tests/bannerlord_ui_audit_check.py out/bannerlord-ui-audit-branch
+      - name: Branch-native scoped Data Map audit
+        run: python tests/data_map_browser_check.py out/bannerlord-data-map-browser-branch
         env:
           DATAMAP_GAMES: bannerlord
+      - name: Materialize current master shared UI
+        shell: bash
+        run: |
+          git fetch --no-tags --depth=1 origin master:refs/remotes/origin/master
+          mkdir -p out/current-master-ui/ui
+          git show origin/master:ui/framework.js > out/current-master-ui/ui/framework.js
+          git show origin/master:ui/framework.css > out/current-master-ui/ui/framework.css
+          git rev-parse origin/master > out/current-master-ui/MASTER_SHA
+      - name: Current-master rendered UI audit
+        shell: bash
+        run: |
+          LEXEDITOR_SHARED_UI_ROOT="$PWD/out/current-master-ui" \
+          LEXEDITOR_SHARED_UI_SHA="$(cat out/current-master-ui/MASTER_SHA)" \
+          python tests/bannerlord_ui_audit_check.py out/bannerlord-ui-audit-master
+      - name: Current-master scoped Data Map audit
+        shell: bash
+        env:
+          DATAMAP_GAMES: bannerlord
+        run: |
+          LEXEDITOR_SHARED_UI_ROOT="$PWD/out/current-master-ui" \
+          python tests/data_map_browser_check.py out/bannerlord-data-map-browser-master
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: bannerlord-browser-fixture
           path: |
             out/bannerlord-browser
-            out/bannerlord-ui-audit
-            out/bannerlord-data-map-browser
+            out/bannerlord-ui-audit-branch
+            out/bannerlord-data-map-browser-branch
+            out/bannerlord-ui-audit-master
+            out/bannerlord-data-map-browser-master
+            out/current-master-ui/MASTER_SHA
           retention-days: 7
 
   package-candidate:
