@@ -182,9 +182,7 @@ PAGES = [
     ("moduledata-files", 'state.moduleDataView="files";navigate("moduledata")'),
     ("moduledata-records", 'state.moduleDataView="records";navigate("moduledata")'),
     ("build", 'navigate("build")'),
-    ("info-setup", 'state.infoView="setup";navigate("info")'),
-    ("info-deployment", 'state.infoView="deployment";navigate("info")'),
-    ("info-credits", 'state.infoView="credits";navigate("info")'),
+    ("info", 'navigate("info")'),
     ("datamap", 'navigate("datamap")'),
     ("source", 'state.source={path:"src/Test.cs",absolutePath:"C:/fixture/src/Test.cs",encoding:"utf-8",size:10,text:"class X{}"};state.savedSourceText="class X{}";navigate("source")'),
 ]
@@ -211,9 +209,12 @@ def settle_screen(page, label):
         page.locator(".lex-data-map-table").wait_for()
     elif label == "source":
         page.locator(".bannerlord-source textarea").wait_for()
-    elif label == "info-credits":
+    elif label == "info":
+        page.locator(".lex-information-panel").wait_for()
+        page.locator(".lex-plugin-mod-loading").wait_for()
         page.locator(".lex-plugin-credits").wait_for()
-        page.get_by_text("Fixture Bannerlord reference", exact=True).wait_for()
+        page.get_by_text("Lexer / Lexers Mod for Bannerlord", exact=True).wait_for()
+        assert page.locator('.lex-information-panel [role="alert"]').count() == 0, "Bannerlord Info contains shared metadata error"
     else:
         page.wait_for_timeout(100)
 
@@ -424,6 +425,15 @@ def main() -> None:
             box = last.bounding_box()
             assert box and box["y"] < 800 and box["y"] + box["height"] > 0, box
             screenshot(page, "tweaks-last-controls", "150pct")
+
+            # The bottom of the unified Info panel, including shared Credits, must also be reachable.
+            page.evaluate('document.body.style.zoom="1.5";navigate("info")')
+            settle_screen(page, "info")
+            info_last = page.locator(".lex-plugin-credits").last
+            info_last.scroll_into_view_if_needed()
+            info_box = info_last.bounding_box()
+            assert info_box and info_box["y"] < 800 and info_box["y"] + info_box["height"] > 0, info_box
+            screenshot(page, "info-last-controls", "150pct")
 
             # Raw source remains reachable and editable as a specialized source surface.
             page.evaluate('document.body.style.zoom="";state.source={path:"src/Test.cs",absolutePath:"C:/fixture/src/Test.cs",encoding:"utf-8",size:10,text:"class X{}"};state.savedSourceText="class X{}";navigate("source")')
