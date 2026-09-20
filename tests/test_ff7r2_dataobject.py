@@ -12,8 +12,11 @@ def test_fixture_parses_real_record_identity_and_scalar_types():
     cloud = package.records[0]
     assert {field.name: field.value for field in cloud.fields} == {
         "HPMax": 1000, "MPMax": 50, "Strength": 30, "Spilit": 22,
+        "Mode": "ModeA",
     }
-    assert all(field.editable for field in cloud.fields)
+    assert all(field.editable for field in cloud.fields if field.name != "Mode")
+    mode = next(field for field in cloud.fields if field.name == "Mode")
+    assert mode.kind == "name" and mode.editable is False
 
 
 def test_fixed_width_edits_roundtrip_and_preserve_every_other_byte():
@@ -49,3 +52,12 @@ def test_out_of_storage_range_is_rejected_without_mutation():
             {"nameIndex": 1, "property": "Strength", "value": 40000},
         ])
     assert package.to_bytes() == source
+
+
+
+def test_frozen_name_property_rejects_byte_patch_edit():
+    package = DataObjectPackage.from_bytes(fixture())
+    with pytest.raises(DataObjectError, match="read-only"):
+        package.apply_edits([
+            {"nameIndex": 1, "property": "Mode", "value": "ModeB"},
+        ])

@@ -285,7 +285,7 @@ class DataObjectPackage:
             fields: list[Field] = []
             for prop in properties:
                 field, cursor = cls._read_field(
-                    data, cursor, frozen_start, names, prop,
+                    data, cursor, frozen_start, names, offset_names, prop,
                     f"{key.display}.{prop.name}")
                 fields.append(field)
             records.append(Record(key=key, fields=fields))
@@ -335,7 +335,8 @@ class DataObjectPackage:
 
     @classmethod
     def _read_field(cls, data: bytes, cursor: int, frozen_start: int,
-                    names: list[str], prop: Property, what: str) -> tuple[Field, int]:
+                    names: list[str], offset_names: dict[int, FName],
+                    prop: Property, what: str) -> tuple[Field, int]:
         type_name, kind, size, minimum, maximum = _TYPES[prop.type_id]
 
         if prop.is_array:
@@ -367,9 +368,12 @@ class DataObjectPackage:
                 else "Fixed-width in-place edit; every other asset byte is preserved."
             )
         elif prop.type_id == 11:
-            value = cls._read_fname(data, cursor, names, what).display
+            # Frozen NameProperty bytes are placeholders. Rebirth's minimal-name
+            # map assigns the actual FName to this frozen-object offset.
+            mapped = offset_names.get(cursor - frozen_start)
+            value = mapped.display if mapped is not None else ""
             editable = False
-            note = "Existing FName is read-only; name-map edits are not implemented."
+            note = "Existing frozen FName is read-only; name-map edits are not implemented."
         elif prop.type_id == 10:
             packed = _u64(data, cursor, f"{what} string pointer")
             signed = struct.unpack("<q", struct.pack("<Q", packed))[0]

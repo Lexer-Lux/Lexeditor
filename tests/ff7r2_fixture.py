@@ -10,8 +10,8 @@ def _serialized_name(value: str) -> bytes:
 
 def fixture() -> bytes:
     records = ["Cloud", "Tifa"] + [f"TestCharacter{index:02d}" for index in range(3, 25)]
-    properties = ["HPMax", "MPMax", "Strength", "Spilit"]
-    names = ["None", *records, *properties]
+    properties = ["HPMax", "MPMax", "Strength", "Spilit", "Mode"]
+    names = ["None", *records, *properties, "ModeA", "ModeB"]
     name_index = {name: index for index, name in enumerate(names)}
 
     blob = bytearray(b"\0" * 64)
@@ -61,12 +61,13 @@ def fixture() -> bytes:
         key_positions.append(len(blob) - frozen_start)
         blob += b"\0" * 8 + struct.pack("<iiI", index, -1, 1)
 
-    prop_types = [7, 7, 5, 5]
+    prop_types = [7, 7, 5, 5, 11]
     prop_positions = []
     for type_id in prop_types:
         prop_positions.append(len(blob) - frozen_start)
         blob += b"\0" * 8 + struct.pack("<i", type_id)
 
+    mode_positions = []
     for index, _name in enumerate(records):
         if index == 0:
             row = (1000, 50, 30, 22)
@@ -75,19 +76,28 @@ def fixture() -> bytes:
         else:
             row = (800 + index * 25, 40 + index, 20 + index, 18 + index)
         blob += struct.pack("<iihh", *row)
+        mode_positions.append(len(blob) - frozen_start)
+        blob += b"\0" * 8  # Frozen NameProperty placeholder.
 
     frozen_size = len(blob) - frozen_start
     struct.pack_into("<IIHH", blob, archive, frozen_size, frozen_size, 0, 0)
 
-    minimal = []
+    offset_groups: dict[int, list[int]] = {}
+    def add_name_offset(serialized_name_index: int, offset: int) -> None:
+        offset_groups.setdefault(serialized_name_index, []).append(offset)
+
     for record_name, offset in zip(records, key_positions):
-        minimal.append((name_index[record_name], offset))
+        add_name_offset(name_index[record_name], offset)
     for property_name, offset in zip(properties, prop_positions):
-        minimal.append((name_index[property_name], offset))
-    blob += struct.pack("<iii", 0, 0, len(minimal))
-    for serialized_name_index, offset in minimal:
-        blob += struct.pack("<iII", serialized_name_index, 0, 1)
-        blob += struct.pack("<I", offset)
+        add_name_offset(name_index[property_name], offset)
+    for index, offset in enumerate(mode_positions):
+        add_name_offset(name_index["ModeA" if index % 2 == 0 else "ModeB"], offset)
+
+    blob += struct.pack("<iii", 0, 0, len(offset_groups))
+    for serialized_name_index, offsets in offset_groups.items():
+        blob += struct.pack("<iII", serialized_name_index, 0, len(offsets))
+        for offset in offsets:
+            blob += struct.pack("<I", offset)
 
     struct.pack_into(
         "<9i", blob, 24,
