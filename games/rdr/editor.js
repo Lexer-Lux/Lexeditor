@@ -50,6 +50,15 @@
     else control=el("input",{type:"text",value,spellcheck:false,disabled:state.activeSource!=="mine",oninput:event=>editItem(item,field,event.target.value)});
     return sourceControl(control,()=>itemValue(item,field),vanilla,next=>editItem(item,field,String(next)));
   }
+  const ITEM_FIELD_LABELS={
+    MaxItemCount:"Max count",HUDReticleIndex:"Reticle",SpawnTimeOut:"Timeout",
+    mp_EquipStringId:"Equip text",mp_UnequipStringId:"Unequip text"
+  };
+  function itemFieldLabel(name){
+    if(ITEM_FIELD_LABELS[name])return ITEM_FIELD_LABELS[name];
+    return String(name||"").replace(/^mp_/i,"").replace(/_/g," ")
+      .replace(/([a-z0-9])([A-Z])/g,"$1 $2").replace(/\bId\b/g,"ID").trim();
+  }
   function itemDetail(){
     const item=(state.items?.rows||[]).find(row=>row.id===state.itemSelected);
     if(!item)return LexeditorUI.detailPanel({className:"record-detail item-detail",title:"Select an inventory item",body:[LexeditorUI.detailNote("Edits become full XML overrides in C:\\RDRMod. The installed content.rpf stays unchanged.")]});
@@ -69,14 +78,14 @@
       meta:item.name||"",
       actions:projectBadge(item),
       body:[
-        detailField("Record type",shown(item.type),"","The XML element this record comes from. It decides which fields the game reads."),
+        detailField("Type",shown(item.type),"","The XML element this record comes from. It decides which fields the game reads."),
         detailField("Dataset",shown(item.sourceLabel),"","Which shipped data file this item was defined in: the base game or one of its DLC."),
-        detailField("Vanilla source",shown(item.sourcePath),"","The untouched file inside the installed content.rpf. Lexeditor never writes here."),
-        detailField("Project override",shown(item.projectPath),"","Where your edit is written, as a full XML override. The game loads this instead of the vanilla file."),
+        detailField("Source",shown(item.sourcePath),"","The untouched file inside the installed content.rpf. Lexeditor never writes here."),
+        detailField("Override",shown(item.projectPath),"","Where your edit is written, as a full XML override. The game loads this instead of the vanilla file."),
         // No bubble on the data fields themselves. A generic note repeated on
         // every scalar is noise, and the four rows above already say where the
         // value comes from and where an edit is written.
-        ...rest.map(field=>detailField(field.field,scalarControl(item,field)))]});
+        ...rest.map(field=>detailField(itemFieldLabel(field.field),scalarControl(item,field)))]});
   }
   function renderItems(){
     const rows=matchingItems();
@@ -89,9 +98,9 @@
   }
 
   const SHOP_FIELDS=[
-    {field:"PriceModifier",key:"priceModifier",label:"Price modifier",step:"0.01",min:"0",max:"1000",help:"Multiplier applied to the base item price"},
-    {field:"QuantityPerPurchase",key:"quantityPerPurchase",label:"Quantity per purchase",step:"1",min:"0",max:"2147483647",help:"Units received for one purchase"},
-    {field:"TotalAvailableQuantity",key:"totalAvailableQuantity",label:"Available stock",step:"1",min:"-1",max:"2147483647",help:"-1 is reserved for records that use unlimited stock"}
+    {field:"PriceModifier",key:"priceModifier",label:"Price",step:"0.01",min:"0",max:"1000",help:"Multiplier applied to the base item price"},
+    {field:"QuantityPerPurchase",key:"quantityPerPurchase",label:"Buy qty",step:"1",min:"0",max:"2147483647",help:"Units received for one purchase"},
+    {field:"TotalAvailableQuantity",key:"totalAvailableQuantity",label:"Stock",step:"1",min:"-1",max:"2147483647",help:"-1 is reserved for records that use unlimited stock"}
   ];
   function matchingShops(){const needle=state.shopQuery.trim().toLowerCase();return (state.shops?.rows||[]).filter(item=>(!needle||[item.name,item.shop,item.category].some(value=>String(value||"").toLowerCase().includes(needle)))&&(!state.shopName||item.shop===state.shopName)&&(!state.shopCategory||item.category===state.shopCategory));}
   function shopBaseline(item,field){
@@ -113,10 +122,10 @@
     const item=(state.shops?.rows||[]).find(row=>row.id===state.shopSelected);
     if(!item)return LexeditorUI.detailPanel({className:"record-detail shop-detail",title:"Select a shop item",body:[LexeditorUI.detailNote("Edits create a packed WGD override. The installed gringores.rpf stays unchanged.")]});
     return LexeditorUI.detailPanel({className:"record-detail shop-detail",title:item.name,actions:projectBadge(item),body:[
-      detailField("Shop",shown(item.shop)),detailField("Stock type",shown(item.category)),
-      detailField("Root hash",shown(item.rootHash)),
-      detailField("Vanilla resource",shown(item.sourcePath)),
-      detailField("Project override",shown(item.projectPath)),
+      detailField("Shop",shown(item.shop)),detailField("Type",shown(item.category)),
+      detailField("Root",shown(item.rootHash)),
+      detailField("Source",shown(item.sourcePath)),
+      detailField("Override",shown(item.projectPath)),
       LexeditorUI.notice({title:"Live ShopInventory fields.",message:"The save preserves the other Gringo components and packs a verified resource override."}),
       ...SHOP_FIELDS.map(field=>{const control=el("input",{type:"number",step:field.step,min:field.min,max:field.max,value:shopValue(item,field),disabled:state.activeSource!=="mine",oninput:event=>editShop(item,field,event.target.value)}),vanilla=state.vanilla.shops?.rows?.find(row=>row.id===item.id)?.[field.key];return detailField(field.label,sourceControl(control,()=>shopValue(item,field),vanilla===undefined?undefined:String(vanilla),value=>editShop(item,field,String(value))),field.help)})
     ]});
@@ -135,9 +144,9 @@
   }
 
   const MISSION_REWARDS=[
-    {key:"cash",label:"Cash reward",help:"Changes the cash awarded when this mission completes; it does not alter prices, pickups, or other missions."},
-    {key:"fame",label:"Fame reward",help:"Changes this mission's completion Fame award independently of its cash and Honor rewards."},
-    {key:"honor",label:"Honor reward",help:"Changes this mission's completion Honor adjustment independently of its cash and Fame rewards."}
+    {key:"cash",label:"Cash",help:"Changes the cash awarded when this mission completes; it does not alter prices, pickups, or other missions."},
+    {key:"fame",label:"Fame",help:"Changes this mission's completion Fame award independently of its cash and Honor rewards."},
+    {key:"honor",label:"Honor",help:"Changes this mission's completion Honor adjustment independently of its cash and Fame rewards."}
   ];
   function missionArea(mission){return String(mission.assetPath||"").split("/")[2]||"Unknown";}
   function matchingMissions(){const needle=state.missionQuery.trim().toLowerCase();return (state.missions?.missions||[]).filter(mission=>(!needle||[mission.id,mission.name,mission.scriptName,mission.localizationKey,mission.assetPath].some(value=>String(value||"").toLowerCase().includes(needle)))&&(!state.missionArea||missionArea(mission)===state.missionArea));}
@@ -154,9 +163,9 @@
     if(!mission)return LexeditorUI.detailPanel({className:"record-detail mission-detail",title:"No mission selected"});
     const limits=state.missions.limits;
     return LexeditorUI.detailPanel({className:"record-detail mission-detail",title:mission.name,actions:projectBadge(mission),body:[
-      detailField("Mission ID",shown(String(mission.id))),detailField("Script",shown(mission.scriptName)),detailField("Area",shown(missionArea(mission))),
-      detailField("Localization key",shown(mission.localizationKey)),detailField("Archive path",shown(mission.archivePath)),
-      detailField("Reward evidence",shown(`${mission.rewardSource.function} / ${mission.rewardSource.case}`)),
+      detailField("ID",shown(String(mission.id))),detailField("Script",shown(mission.scriptName)),detailField("Area",shown(missionArea(mission))),
+      detailField("Text key",shown(mission.localizationKey)),detailField("Source",shown(mission.archivePath)),
+      detailField("Evidence",shown(`${mission.rewardSource.function} / ${mission.rewardSource.case}`)),
       LexeditorUI.notice({title:"The extracted mission table stays read-only.",message:"Save writes only cash, fame, or honor values that differ from the base into LexerRDR.missions.json."}),
       ...MISSION_REWARDS.map(reward=>{const rewardLimits=limits.rewards[reward.key],control=el("input",{type:"number",inputmode:"numeric",min:String(rewardLimits.minimum),max:String(rewardLimits.maximum),step:String(limits.step),value:missionValue(mission,reward.key),disabled:state.activeSource!=="mine",oninput:event=>editMission(mission,reward.key,event.target.value)});return detailField(reward.label,
         sourceControl(control,()=>missionValue(mission,reward.key),String(mission.baseRewards[reward.key]),value=>editMission(mission,reward.key,String(value))),
