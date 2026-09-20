@@ -415,8 +415,7 @@
         detailField({label:"LINES",control:readonlyField(String(sourceCurrent.lines))}),
         detailField({label:"SIZE",control:readonlyField(`${sourceCurrent.bytes} bytes`)}),
       ]}),
-      detailSection({title:"C# SOURCE",body:[]}),
-      detailField({label:"",className:"lex-text-editor",control:editor,help:infoHelp("Raw author-controlled C#. tModLoader compiler diagnostics remain authoritative; Lexeditor preserves BOM/newline style and refuses stale writes.")}),
+      detailField({label:"C# SOURCE",className:"lex-text-editor lex-detail-field-stacked",control:editor,help:infoHelp("Raw author-controlled C#. tModLoader compiler diagnostics remain authoritative; Lexeditor preserves BOM/newline style and refuses stale writes.")}),
       detailSection({title:"ACTIONS",body:[
         detailField({label:"RENAME / MOVE",control:el("button",{class:"lex-dialog-action",type:"button",disabled:sourceLoading||dirtyCount()>0,onclick:renameSourceFileAction},"Rename / move")}),
         detailField({label:"DELETE SOURCE",control:el("button",{class:"lex-dialog-action",type:"button",disabled:sourceLoading||dirtyCount()>0,onclick:deleteSourceFileAction},"Delete source")}),
