@@ -55,5 +55,34 @@ int main() {
     g_hp_rows[1].atb_visible=false;draw_list.rectangles.clear();draw_battle_hp();assert(draw_list.rectangles.size()==8);
     mode.driver_mode=MODE_MENU;draw_list.rectangles.clear();draw_battle_hp();assert(draw_list.rectangles.empty());
     mode.driver_mode=MODE_BATTLE;lexeditor_ff8_bars_draw();assert(!g_hp_rows[0].atb_visible);
-    std::puts("PASS: compiled production bar capture/draw: all slots, native geometry/scaling, opposite fill directions, live GF damage, multiple GFs, independent toggles and stale-frame clearing.");
+
+    // Exercise the production paletted wrapper itself: white/yellow native HP
+    // glyph batches are tinted only in an audited scope and every byte is
+    // restored after the delegated FFNx draw.
+    nvertex vertices[4]{};
+    for(auto &vertex:vertices) vertex.color.color=0xFFFFFFFFU;
+    unsigned char palettes[2]{0x0E,0x0E};
+    ff8_indexed_vertices iv{};
+    iv.count=2;iv.vertexcount=4;iv.vertices=vertices;iv.palettes=palettes;
+    g_better_hp_runtime_ready=true;enable_ff8_better_hp_colors=true;
+    g_hp_tint={true,50,100};paletted_draw_calls=0;
+    lexeditor_ff8_hp_colors_draw_paletted2D(
+        nullptr,reinterpret_cast<indexed_vertices *>(&iv),nullptr);
+    assert(paletted_draw_calls==1);
+    assert((observed_palettes==std::vector<unsigned char>{0x0F,0x0F}));
+    for(auto color:observed_colors) assert((color&0x00FFFFFFU)==0x0000FFFFU);
+    assert(palettes[0]==0x0E && palettes[1]==0x0E);
+    for(auto &vertex:vertices) assert(vertex.color.color==0xFFFFFFFFU);
+
+    // Native status palette has precedence and disabled mode delegates exactly.
+    palettes[0]=0x04;palettes[1]=0x04;observed_palettes.clear();
+    lexeditor_ff8_hp_colors_draw_paletted2D(
+        nullptr,reinterpret_cast<indexed_vertices *>(&iv),nullptr);
+    assert((observed_palettes==std::vector<unsigned char>{0x04,0x04}));
+    enable_ff8_better_hp_colors=false;palettes[0]=0x0E;palettes[1]=0x0E;
+    lexeditor_ff8_hp_colors_draw_paletted2D(
+        nullptr,reinterpret_cast<indexed_vertices *>(&iv),nullptr);
+    assert((observed_palettes==std::vector<unsigned char>{0x0E,0x0E}));
+
+    std::puts("PASS: compiled production bar capture/draw plus issue #481 tint/delegate/restore policy.");
 }

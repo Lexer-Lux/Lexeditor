@@ -32,8 +32,17 @@ def compile_and_run(text: str, name: str):
 
 def bars_source():
     source=(ROOT/'games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp').read_text()
+    # GCC cannot parse MSVC's x86 naked/inline-asm bridge. The Windows FFNx
+    # build compiles that exact function; this cross-platform harness replaces
+    # only the bridge body while retaining the production scope/render logic.
+    hook_start=source.index('void __declspec(naked) __cdecl hp_number_hook()')
+    hook_end=source.index('std::uint32_t __cdecl hp_glyph_hook',hook_start)
+    source=source[:hook_start]+'void __cdecl hp_number_hook() {}\n\n'+source[hook_end:]
     source='\n'.join(line for line in source.splitlines() if not line.startswith('#include'))
-    return (FIXTURES/'bars_harness.cpp').read_text()+source+'\n'+(FIXTURES/'bars_cases.cpp').read_text()
+    header=(ROOT/'games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_hp_colors.h').read_text()
+    header='\n'.join(line for line in header.splitlines()
+                     if not line.startswith('#include') and not line.startswith('#pragma'))
+    return (FIXTURES/'bars_harness.cpp').read_text()+header+'\n'+source+'\n'+(FIXTURES/'bars_cases.cpp').read_text()
 
 
 if __name__=='__main__':

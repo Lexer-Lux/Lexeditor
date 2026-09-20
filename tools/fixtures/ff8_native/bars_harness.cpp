@@ -34,6 +34,41 @@ static ImDrawList *GetForegroundDrawList(){return &draw_list;}
 struct Renderer {
     std::array<float,2> projectGamePointToScreen(float x,float y) {return {x/640,y/480};}
 } newRenderer;
+
+struct polygon_set {};
+struct indexed_vertices {};
+struct game_obj {};
+struct TestVertexColor {
+    union {
+        std::uint32_t color;
+        struct { std::uint8_t b,g,r,a; };
+    };
+};
+struct nvertex { TestVertexColor color{0xFFFFFFFFU}; };
+struct ff8_indexed_vertices {
+    std::uint32_t field_0=0,field_4=0,count=0,vertexcount=0,field_10=0;
+    nvertex *vertices=nullptr;
+    std::uint32_t indexcount=0,field_1C=0;
+    std::uint16_t *indices=nullptr;
+    std::uint32_t field_24=0;
+    unsigned char *palettes=nullptr;
+    void *graphics_object=nullptr;
+};
+constexpr int TEXTCOLOR_YELLOW=0;
+constexpr int TEXTCOLOR_WHITE=1;
+static std::uint32_t text_colors[2]{0x0E,0x0F};
+static int paletted_draw_calls=0;
+static std::vector<unsigned char> observed_palettes;
+static std::vector<std::uint32_t> observed_colors;
+static void common_draw_paletted2D(polygon_set *,indexed_vertices *iv,game_obj *) {
+    ++paletted_draw_calls;
+    auto *native=reinterpret_cast<ff8_indexed_vertices *>(iv);
+    observed_palettes.assign(native->palettes,native->palettes+native->count);
+    observed_colors.clear();
+    for(std::uint32_t i=0;i<native->vertexcount;++i)
+        observed_colors.push_back(native->vertices[i].color.color);
+}
+
 struct sprite_viewport { float width=0,height=0,field_8=0,field_C=0,scale_x=1,scale_y=1,offset_x=0,offset_y=0; };
 struct ff8_char_computed_stats {
     std::uint8_t unk1[370]{};std::uint16_t curr_hp=0,max_hp=0;std::uint8_t tail[90]{};
@@ -60,13 +95,17 @@ struct Externals {
     std::uintptr_t engine_reset_viewport_sub_4972D0=0,battle_menu_sub_4A3D20=0;
     Callback menu_callbacks[17]{};
 } ff8_externals;
-static bool ff8=true,enable_ff8_hp_bars=true,enable_ff8_xp_bars=false,enable_ff8_gf_hp_bars=true,enable_ff8_ingame_time=false;
+static bool ff8=true,enable_ff8_hp_bars=true,enable_ff8_xp_bars=false,enable_ff8_gf_hp_bars=true,enable_ff8_ingame_time=false,enable_ff8_better_hp_colors=false;
 constexpr int MODE_BATTLE=1,MODE_MENU=2;
 struct Mode {int driver_mode=MODE_BATTLE;} mode;
 static Mode *getmode_cached(){return &mode;}
 static std::uintptr_t get_absolute_value(std::uintptr_t,int){return 0;}
 static std::uintptr_t get_relative_call(std::uintptr_t,int){return 0;}
 static void replace_call(std::uintptr_t,void*){}
+static std::uint32_t replace_function(std::uint32_t,void*){return 17;}
+static void unreplace_function(std::uint32_t){}
+static void rereplace_function(std::uint32_t){}
+#define ffnx_error(...) ((void)0)
 static void patch_code_dword(std::uintptr_t,std::uint32_t){}
 #ifndef _WIN32
 static int localtime_s(std::tm *out,const std::time_t *value){return localtime_r(value,out)?0:1;}
