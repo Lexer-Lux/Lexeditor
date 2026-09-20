@@ -27,6 +27,14 @@ DEFAULT_PROJECT = Path(os.environ.get(
 PROJECT_TEMPLATE = DEFAULT_DATA / "project-template"
 PROJECT_KERNEL_PATH = Path("data/lang-en/kernel/KERNEL.BIN")
 
+PROJECT_CONTENT_TYPES = (
+    ("Kernel data", (".bin",)),
+    ("Field and world data", (".lgp", ".flevel", ".tex")),
+    ("Textures", (".png", ".dds")),
+    ("Audio", (".ogg", ".wav")),
+    ("Executable text", (".exe",)),
+)
+
 
 def check() -> list[str]:
     required = (
@@ -87,6 +95,26 @@ def smoke() -> list[str]:
                 raise RuntimeError("The legacy FF7 product returned the wrong identity")
             if identity.get("capabilities") != ["data-map", "kernel-data", "save"]:
                 raise RuntimeError("The legacy FF7 product did not expose the proved editor capabilities")
+            editor_root = identity.get("editorRoot")
+            if not isinstance(editor_root, str) or Path(editor_root).resolve() != SHARED_PLUGIN_ROOT.resolve():
+                raise RuntimeError("The legacy FF7 product stopped using the shared FF7 editor")
+            data_map = request_json(session.url + "api/datamap")
+            rows = data_map.get("rows")
+            if not isinstance(rows, list) or not rows:
+                raise RuntimeError("The legacy FF7 product returned an empty Data Map")
+            required_targets = {"items", "weapons", "armor", "accessories", "materia", "characters", "tweaks"}
+            targets = {row.get("target") for row in rows}
+            if not required_targets <= targets:
+                raise RuntimeError("The legacy FF7 Data Map is missing required structured surfaces")
+            inconsistent = [
+                row.get("target") for row in rows
+                if bool(row.get("openable")) != (row.get("coverage") == "structured")
+            ]
+            if inconsistent:
+                raise RuntimeError(
+                    "The legacy FF7 Data Map disagrees about structured/openable coverage: "
+                    + ", ".join(str(value) for value in inconsistent)
+                )
             data = request_json(session.url + "api/data")
             expected_counts = {"items": 128, "weapons": 128, "armor": 32, "accessories": 32, "materia": 96}
             if {key: len(data["records"][key]) for key in expected_counts} != expected_counts:
@@ -105,7 +133,8 @@ def smoke() -> list[str]:
         if not session.wait_closed():
             raise RuntimeError("The legacy FF7 child service stayed open")
     return [
-        "legacy FF7 product identity and editor capabilities confirmed",
+        "legacy FF7 product identity, shared editor and capabilities confirmed",
+        "Data Map structured/openable coverage contract confirmed",
         "416 English KERNEL.BIN records decoded",
         "bounded armor edit saved to the legacy project and survived binary readback",
     ]
@@ -115,7 +144,7 @@ PLUGIN = GamePlugin(
     plugin_id="ff7-2013",
     name="Final Fantasy 7 (Original)",
     subtitle="FFVII 2013",
-    description="Edits character, battle, encounter, shop and text data for the 2013 Steam product.",
+    description="Uses the shared structured FFVII editors for the 2013 Steam release; project saves keep installed game data unchanged.",
     accent="#3155b7",
     cover_art=LEXEDITOR_ROOT / "assets" / "covers" / "ff7-original.png",
     check=check,
@@ -128,6 +157,7 @@ PLUGIN = GamePlugin(
         default_root=DEFAULT_PROJECT,
         required_paths=(PROJECT_KERNEL_PATH.as_posix(),),
         template_root=PROJECT_TEMPLATE,
+        content_types=PROJECT_CONTENT_TYPES,
     ),
     installation=GameInstallSpec(
         root_env="LEXEDITOR_FF7_2013_ROOT",
@@ -136,6 +166,7 @@ PLUGIN = GamePlugin(
         steam_app_id="39140",
         install_dir_names=("FINAL FANTASY VII",),
         default_roots=(DEFAULT_ROOT, Path(r"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VII")),
+        launch_path="ff7_en.exe",
         prepare=prepare,
     ),
 )
