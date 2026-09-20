@@ -103,11 +103,12 @@ GAUNTLET = {
 }
 
 
-def inline_editor() -> str:
+def inline_editor(shared_ui_root: Path | None = None) -> str:
+    shared_ui_root = shared_ui_root or ROOT
     html = (ROOT / "games/bannerlord/editor.html").read_text(encoding="utf-8")
     html = html.replace("<head>", '<head><base href="http://127.0.0.1:9/">', 1)
     html = html.replace('<link rel="stylesheet" href="/shared/framework.css">',
-                        "<style>" + (ROOT / "ui/framework.css").read_text(encoding="utf-8") + "</style>")
+                        "<style>" + (shared_ui_root / "ui/framework.css").read_text(encoding="utf-8") + "</style>")
     html = html.replace('<link rel="stylesheet" href="./editor.css">',
                         "<style>" + (ROOT / "games/bannerlord/editor.css").read_text(encoding="utf-8") + "</style>")
     fixtures = {
@@ -162,7 +163,7 @@ window.fetch=async function(input,options={{}}){{
   return new Response(JSON.stringify(__fixtures[path]||{{}}),{{status:200}});
 }};'''
     html = html.replace('<script src="/shared/framework.js"></script>',
-                        "<script>" + stub + "</script><script>" + (ROOT / "ui/framework.js").read_text(encoding="utf-8") + "</script>")
+                        "<script>" + stub + "</script><script>" + (shared_ui_root / "ui/framework.js").read_text(encoding="utf-8") + "</script>")
     for name in (
         "editor_alerts.js", "editor_core.js", "editor_shared.js", "editor_balancing.js", "editor_build.js",
         "editor_settings.js", "editor_runtime.js", "editor_gauntlet.js", "editor_moduledata.js",
