@@ -150,7 +150,7 @@
         body: [
           detailField("Table", state.stringTable.table.label, "",
             "The PC STRTBL resource that owns this localized text."),
-          detailField("Identifier", row.identifier || "Hash only", "",
+          detailField("Key", row.identifier || "Hash only", "",
             "The stable game key when the identifier table resolves this hash uniquely."),
           detailField("Hash", el("code", {}, row.hash), "",
             "The game lookup hash is identity metadata and is not rewritten."),
@@ -158,9 +158,9 @@
             row.sharedLanguageBlock
               ? "These language slots share one physical block in the source table; Lexeditor preserves that sharing."
               : "The language block that owns this text."),
-          detailField("Vanilla source", el("code", {title: row.sourcePath}, row.sourcePath), "",
+          detailField("Source", el("code", {title: row.sourcePath}, row.sourcePath), "",
             "Read-only prepared bytes from the installed archive."),
-          detailField("Project override", el("code", {title: row.projectPath}, row.projectPath), "",
+          detailField("Override", el("code", {title: row.projectPath}, row.projectPath), "",
             "Save writes a separate STRTBL override; the installed archive stays unchanged."),
           detailField("Text",
             sourceControl(control, function () { return value(row); },
