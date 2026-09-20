@@ -243,6 +243,7 @@ def main() -> int:
                     page.on("pageerror", lambda error: errors.append(str(error)))
                     page.goto(f"http://127.0.0.1:{service.server_port}/", wait_until="domcontentloaded")
                     page.locator(".pz-metadata").wait_for(state="visible")
+                    screenshot(page, args.screenshots, "00-initial-metadata")
                     assert page.locator('link[href="editor.css"]').count() == 1
                     assert page.locator('script[src="editor.js"]').count() == 1
 
@@ -252,7 +253,10 @@ def main() -> int:
                     page.evaluate("render()")
                     page.locator(".pz-metadata").wait_for(state="visible")
                     page.evaluate("renderLoadError(new Error('Rendered acceptance error state'))")
-                    assert page.get_by_text("Rendered acceptance error state", exact=True).count() == 1
+                    error_panel = page.locator(".lex-information-panel")
+                    assert "Project Zomboid could not load" in error_panel.inner_text()
+                    assert "Rendered acceptance error state" in error_panel.inner_text()
+                    screenshot(page, args.screenshots, "00-error-state")
                     page.evaluate("render()")
 
                     # Metadata is intentionally tall: semantic controls, help, and its last field stay reachable.
