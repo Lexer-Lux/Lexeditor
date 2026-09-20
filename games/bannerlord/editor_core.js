@@ -79,32 +79,41 @@
 
   function renderModule(){
     const m=state.module;
-    if(!m){main.replaceChildren(el("div",{class:"bl-empty"},"No SubModule.xml loaded."));return}
-    main.replaceChildren(el("section",{class:"bl-card"},
-      el("h2",{},m.name||m.id||"Bannerlord Module"),
-      el("div",{class:"bl-grid"},
-        ...fieldRow("Name",textInput(m.name,value=>setModuleField("name",value))),
-        ...fieldRow("ID",textInput(m.id,value=>setModuleField("id",value))),
-        ...fieldRow("Version",textInput(m.version,value=>setModuleField("version",value))),
-        ...fieldRow("Module category",select(m.moduleCategory||"",[["","Legacy / not set"],["Singleplayer","Singleplayer"],["SingleplayerOptional","Singleplayer optional"],["Multiplayer","Multiplayer"],["MultiplayerOptional","Multiplayer optional"],["Server","Server"],["ServerOptional","Server optional"]],value=>setModuleField("moduleCategory",value))),
-        ...fieldRow("Module type",select(m.moduleType||"",[["","Default / not set"],["Community","Community"],["Official","Official"],["OfficialOptional","Official optional"]],value=>setModuleField("moduleType",value))),
-        ...fieldRow("URL",textInput(m.url||"",value=>setModuleField("url",value),{placeholder:"Optional module/project URL"})),
-        ...fieldRow("Update info",textInput(m.updateInfo||"",value=>setModuleField("updateInfo",value),{placeholder:"NexusMods:1234;GitHub:user/repo"})),
-        ...fieldRow("Default module",checkbox(m.defaultModule,value=>setModuleField("defaultModule",value))),
-        ...fieldRow("Single-player",checkbox(m.singleplayer,value=>setModuleField("singleplayer",value))),
-        ...fieldRow("Multi-player",checkbox(m.multiplayer,value=>setModuleField("multiplayer",value))),
-        ...fieldRow("SubModule.xml",el("code",{},m.path)),
-        ...fieldRow("Native dependencies",String((m.dependencies||[]).length)),
-        ...fieldRow("BLSE dependency metadata",String((m.communityDependencies||[]).length)),
-        ...fieldRow("Legacy launcher dependencies",String((m.legacyDependencies||[]).length)),
-        ...fieldRow("Modules forced after this",String((m.modulesToLoadAfterThis||[]).length)),
-        ...fieldRow("Incompatible modules",String((m.incompatibleModules||[]).length)),
-        ...fieldRow("Submodules",String((m.submodules||[]).length)),
-        ...fieldRow("XML registrations",String((m.xmls||[]).length))
-      ),
-      el("div",{class:"bl-note"},"Update info accepts NexusMods:<id>, GitHub:<user>/<repo>, or both separated by a semicolon. Missing module metadata is inserted before dependency/submodule/XML sections; existing node order is preserved."),
-      el("div",{class:"bl-note"},"The remaining SubModule.xml records have dedicated list/detail tabs so record identity stays in the master list and editable fields stay in the detail pane.")
-    ));
+    if(!m){main.replaceChildren(uiEmpty("Module","No SubModule.xml is loaded."));return}
+    const categories=[["","Legacy / not set"],["Singleplayer","Singleplayer"],["SingleplayerOptional","Singleplayer optional"],["Multiplayer","Multiplayer"],["MultiplayerOptional","Multiplayer optional"],["Server","Server"],["ServerOptional","Server optional"]];
+    const types=[["","Default / not set"],["Community","Community"],["Official","Official"],["OfficialOptional","Official optional"]];
+    main.replaceChildren(BLUI.detailPanel({
+      title:m.name||m.id||"Bannerlord Module",
+      renameRecord:value=>setModuleField("name",value),
+      renameLabel:"Module display name",
+      identity:m.id||null,
+      meta:m.version||"",
+      body:[
+        BLUI.detailSection({title:"IDENTITY",body:[
+          textField("Module ID",m.id,value=>setModuleField("id",value),"The stable Bannerlord module identifier used by dependencies, deployment folder naming and the launch module list."),
+          textField("Version",m.version,value=>setModuleField("version",value),"Bannerlord and dependency metadata use this version for compatibility checks."),
+          selectField("Category",m.moduleCategory||"",categories,value=>setModuleField("moduleCategory",value),"Bannerlord's current module category controls which launcher or game contexts consider this module."),
+          selectField("Module type",m.moduleType||"",types,value=>setModuleField("moduleType",value),"Community versus official classification stored in SubModule.xml.")
+        ]}),
+        BLUI.detailSection({title:"DISCOVERY & COMPATIBILITY",body:[
+          textField("Project URL",m.url||"",value=>setModuleField("url",value),"Optional community metadata link shown to mod tooling.",{placeholder:"https://…"}),
+          textField("Update info",m.updateInfo||"",value=>setModuleField("updateInfo",value),"Supported community update grammar is NexusMods:<id>, GitHub:<user>/<repo>, or both separated by a semicolon.",{placeholder:"NexusMods:1234;GitHub:user/repo"}),
+          boolField("Default module",m.defaultModule,value=>setModuleField("defaultModule",value),"Legacy Bannerlord flag retained for compatibility with older module descriptors."),
+          boolField("Single-player",m.singleplayer,value=>setModuleField("singleplayer",value),"Legacy flag declaring that this module participates in single-player."),
+          boolField("Multi-player",m.multiplayer,value=>setModuleField("multiplayer",value),"Legacy flag declaring that this module participates in multiplayer.")
+        ]}),
+        BLUI.detailSection({title:"STRUCTURE",body:[
+          readField("Descriptor",m.path),
+          readField("Native dependencies",(m.dependencies||[]).length),
+          readField("BLSE metadata",(m.communityDependencies||[]).length),
+          readField("Legacy relations",(m.legacyDependencies||[]).length),
+          readField("Forced-after relations",(m.modulesToLoadAfterThis||[]).length),
+          readField("Incompatibilities",(m.incompatibleModules||[]).length),
+          readField("Submodules",(m.submodules||[]).length),
+          readField("XML registrations",(m.xmls||[]).length)
+        ]})
+      ]
+    }));
   }
 
   function relationList(kind){
