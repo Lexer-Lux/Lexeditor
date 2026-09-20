@@ -162,68 +162,62 @@
     render();refresh();
   }
   function renderDependencies(){
-    const rows=dependencyRows();
-    const selection=state.dependencySelection;
-    const list=relationList(selection.kind);
-    const record=list[selection.index];
-    const master=el("div",{class:"bl-master"},
-      el("div",{class:"bl-master-head"},el("strong",{},"Module relations"),
-        el("button",{type:"button",onclick:()=>addDependency("dependency"),title:"Add native dependency"},"+ Dep"),
-        el("button",{type:"button",onclick:()=>addDependency("community"),title:"Add BLSE/BUTR dependency metadata"},"+ BLSE"),
-        el("button",{type:"button",onclick:()=>addDependency("loadAfter"),title:"Force another module to load after this module"},"+ After"),
-        el("button",{type:"button",onclick:()=>addDependency("incompatible"),title:"Add incompatible module"},"+ Inc")),
-      el("div",{class:"bl-list"},...rows.map(item=>{
-        const active=item.kind===selection.kind&&item.index===selection.index;
-        const label=item.kind==="dependency"?"Native dependency":item.kind==="community"?`BLSE ${item.row.order||"metadata"}`:item.kind==="legacy"?legacyRelationLabel(item.row):item.kind==="loadAfter"?"Loads after this":"Incompatible";
-        const version=item.row.dependentVersion||item.row.version||"";
-        const flags=item.kind==="community"?[item.row.optional?"optional":"",item.row.incompatible?"incompatible":""].filter(Boolean).join(" · "):"";
-        return el("button",{type:"button",class:`bl-item${active?" active":""}`,onclick:()=>{state.dependencySelection={kind:item.kind,index:item.index};render()}},
-          item.row.id||"(new module)",el("small",{},label+(version?` · ${version}`:"")+(flags?` · ${flags}`:"")));
-      }))
-    );
-    let detail;
-    if(!record)detail=el("div",{class:"bl-detail"},el("div",{class:"bl-empty"},"Select or add a module relation."));
-    else if(selection.kind==="community")detail=el("div",{class:"bl-detail"},
-      el("section",{class:"bl-panel"},el("h2",{},record.id||"New BLSE dependency metadata"),
-        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),
-        el("div",{class:"bl-grid"},
-          ...fieldRow("Module ID",textInput(record.id,value=>record.id=value)),
-          ...fieldRow("Order",select(record.order||"",[["","No ordering edge"],["LoadBeforeThis","Dependency loads before this module"],["LoadAfterThis","Dependency loads after this module"]],value=>record.order=value)),
-          ...fieldRow("Version / range",textInput(record.version,value=>record.version=value,{placeholder:"v2.0.* or v2.0.0-v2.3.*"})),
-          ...fieldRow("Optional",checkbox(record.optional,value=>record.optional=value)),
-          ...fieldRow("Incompatible",checkbox(record.incompatible,value=>record.incompatible=value))
-        ),
-        el("div",{class:"bl-note"},"BLSE/BUTR community metadata is evaluated before duplicate native dependency rows. Required rows can load either before or after this module; optional rows constrain order only when otherwise enabled. Unknown attributes on existing rows are preserved.")));
-    else if(selection.kind==="legacy")detail=el("div",{class:"bl-detail"},
-      el("section",{class:"bl-panel"},el("h2",{},record.id||legacyRelationLabel(record)),
-        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),
-        el("div",{class:"bl-grid"},
-          ...fieldRow("Module ID",textInput(record.id,value=>record.id=value)),
-          ...fieldRow("Legacy shape",el("code",{},record.origin||"legacy dependency"))
-        ),
-        el("div",{class:"bl-note"},record.order==="LoadAfterThis"?"This historical LoadAfterModules relation is required and orders the target after the current module.":"This historical optional-dependency relation never auto-enables its target; it only affects precedence when the module is otherwise enabled."),
-        el("div",{class:"bl-note"},"Lexeditor edits or removes existing legacy rows while preserving their original element shape and unknown attributes. Creating a new legacy relation remains source-only because several incompatible historical XML shapes exist.")));
-    else if(selection.kind==="incompatible")detail=el("div",{class:"bl-detail"},
-      el("section",{class:"bl-panel"},el("h2",{},record.id||"New incompatible module"),
-        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),
-        el("div",{class:"bl-grid"},...fieldRow("Module ID",textInput(record.id,value=>record.id=value))),
-        el("div",{class:"bl-note"},"If this module is enabled too, Bannerlord treats the relation as incompatible. New rows use the current <Module Id=…> shape; older existing rows keep their original element shape.")));
-    else if(selection.kind==="loadAfter")detail=el("div",{class:"bl-detail"},
-      el("section",{class:"bl-panel"},el("h2",{},record.id||"New inverse dependency"),
-        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),
-        el("div",{class:"bl-grid"},...fieldRow("Module ID",textInput(record.id,value=>record.id=value))),
-        el("div",{class:"bl-note"},"Bannerlord will force this module to load after the current module. This is an ordering constraint, not a request to enable the target module.")));
-    else detail=el("div",{class:"bl-detail"},
-      el("section",{class:"bl-panel"},el("h2",{},record.id||"New dependency"),
-        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),
-        el("div",{class:"bl-grid"},
-          ...fieldRow("Module ID",textInput(record.id,value=>record.id=value)),
-          ...fieldRow("Dependent version",textInput(record.dependentVersion,value=>record.dependentVersion=value,{placeholder:"Optional"})),
-          ...fieldRow("Optional",checkbox(record.optional,value=>record.optional=value))
-        ),
-        el("div",{class:"bl-note"},"Optional dependencies constrain order only when already enabled; Lexeditor Play does not auto-enable an optional module merely because it is installed. Unknown dependency attributes are preserved when an existing row is edited.")
-      ));
-    main.replaceChildren(el("div",{class:"bl-split"},master,detail));
+    const items=dependencyRows().map(item=>{
+      const row=item.row;
+      const kindLabel=item.kind==="dependency"?"Native":item.kind==="community"?"BLSE":item.kind==="legacy"?"Legacy":item.kind==="loadAfter"?"Load after this":"Incompatible";
+      return {kind:item.kind,index:item.index,row,id:row.id||"",kindLabel,version:row.dependentVersion||row.version||"",optional:!!row.optional,
+        searchText:`${row.id||""} ${kindLabel} ${row.dependentVersion||row.version||""} ${row.origin||""}`};
+    });
+    const selected=`${state.dependencySelection.kind}:${state.dependencySelection.index}`;
+    const columns=[
+      {key:"kindLabel",label:"Relation",sortable:true,help:"Native, BLSE/BUTR, preserved legacy, inverse load-after, or incompatibility relation."},
+      {key:"id",label:"Module ID",sortable:true,edit:(item,value)=>{item.row.id=String(value);refresh()},editValue:item=>item.row.id,
+        help:"Stable target module identifier used by Bannerlord dependency resolution."},
+      {key:"version",label:"Version",sortable:true,help:"Native dependent version or BLSE community version/range when that relation supports one."},
+      {key:"optional",label:"Optional",sortable:true,render:item=>item.optional?"Yes":"No"}
+    ];
+    const filters=[
+      uiButton("+ Native",()=>addDependency("dependency"),{title:"Add a native dependency"}),
+      uiButton("+ BLSE",()=>addDependency("community"),{title:"Add BLSE/BUTR dependency metadata"}),
+      uiButton("+ After",()=>addDependency("loadAfter"),{title:"Force a module to load after this module"}),
+      uiButton("+ Incompatible",()=>addDependency("incompatible"),{title:"Add an incompatible module"})
+    ];
+    const detail=item=>{
+      const row=item.row,fields=[
+        textField("Module ID",row.id||"",value=>row.id=value,"The target module's stable Bannerlord ID. Duplicate relation precedence is resolved by this ID.")
+      ];
+      if(item.kind==="dependency"){
+        fields.push(
+          textField("Dependent version",row.dependentVersion||"",value=>row.dependentVersion=value,"Native launcher-style dependent version. Lexeditor reports mismatches as launcher-style warnings."),
+          boolField("Optional",row.optional,value=>row.optional=value,"Optional dependencies affect order only when the target is already enabled; Lexeditor Play does not auto-enable them.")
+        );
+      }else if(item.kind==="community"){
+        fields.push(
+          selectField("Order",row.order||"",[["","No ordering edge"],["LoadBeforeThis","Dependency loads before this module"],["LoadAfterThis","Dependency loads after this module"]],value=>row.order=value,"BLSE/BUTR ordering edge relative to the current module."),
+          textField("Version / range",row.version||"",value=>row.version=value,"BLSE community versions support minimums, wildcards and inclusive ranges.",{placeholder:"v2.0.* or v2.0.0-v2.3.*"}),
+          boolField("Optional",row.optional,value=>row.optional=value,"An optional BLSE relation constrains ordering only when the target is otherwise enabled."),
+          boolField("Incompatible",row.incompatible,value=>row.incompatible=value,"An incompatible BLSE relation cannot also carry an ordering edge.")
+        );
+      }else if(item.kind==="legacy"){
+        fields.push(
+          readField("Legacy shape",row.origin||"legacy dependency","Lexeditor preserves the historical XML element shape and unknown attributes; it only edits or removes rows that already exist."),
+          readField("Meaning",row.order==="LoadAfterThis"?"Required legacy load-after relation":"Optional legacy compatibility relation")
+        );
+      }else if(item.kind==="loadAfter"){
+        fields.push(readField("Meaning","Target loads after this module","This orders modules but does not enable the target module."));
+      }else{
+        fields.push(readField("Meaning","Incompatible module","Bannerlord should not run both modules together."));
+      }
+      return BLUI.detailPanel({title:item.kindLabel,identity:row.id||null,meta:item.version||"",
+        actions:[uiButton("Remove",()=>{state.dependencySelection={kind:item.kind,index:item.index};removeDependency()},{danger:true})],
+        body:[BLUI.detailSection({title:"RELATION",body:fields})]});
+    };
+    main.replaceChildren(tableView({
+      key:"dependencies",rows:items,keyOf:item=>`${item.kind}:${item.index}`,columns,detail,noun:"module relations",
+      placeholder:"Search module relations…",selected,
+      setSelected:value=>{const [kind,index]=String(value).split(":");state.dependencySelection={kind,index:Number(index)}},
+      filters
+    }));
   }
 
   function addTag(submodule){
