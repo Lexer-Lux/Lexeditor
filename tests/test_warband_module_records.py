@@ -20,6 +20,17 @@ skills = [
     "module_meshes.py": 'meshes=[("panel",render_order_plus_1,"panel_mesh",0,0,0,0,0,0,1,1,1)]\n',
     "module_factions.py": 'factions=[("kingdom","Kingdom",0,0.9,[("outlaws",-0.5)],[],0xFF00FF)]\n',
     "module_postfx.py": 'postfx_params=[("default",0,3,[1,2,3,4],[5,6,7,8],[9,10,11,12])]\n',
+    "module_party_templates.py": 'party_templates=[("bandits","Bandits",icon_gray_knight,0,fac_outlaws,bandit_personality,[(trp_bandit,3,7)])]\n',
+    "module_parties.py": 'parties=[("town","Town",pf_is_static,0,pt_none,fac_neutral,0,ai_bhvr_hold,0,(1.5,2.5),[],90)]\n',
+    "module_map_icons.py": 'map_icons=[("player",0,"player",0.15,snd_footstep,0.1,0.2,0)]\n',
+    "module_scenes.py": 'scenes=[("arena",sf_generate,"none","none",(-10,-20),(10,20),-1.0,"0x0",[],[],"outer_terrain_plain")]\n',
+    "module_scene_props.py": 'scene_props=[("door",spr_use_time(1),"door_mesh","bo_door",[(ti_on_scene_prop_use,[])])]\n',
+    "module_mission_templates.py": 'mission_templates=[("battle",mtf_battle_mode,-1,"Battle",[],[])]\n',
+    "module_game_menus.py": 'game_menus=[("camp",0,"Camp","none",[],[("leave",[],"Leave",[])])]\n',
+    "module_presentations.py": 'presentations=[("sheet",0,mesh_load_window,[])]\n',
+    "module_tableau_materials.py": 'tableaus=[("shield",0,"sample",512,256,-128,0,128,256,[])]\n',
+    "module_skins.py": 'skins=[("man",0,"body","calf","hand","head",face_keys,["hair"],[],["hair_tex"],[],[],[],"skel_human",1.0)]\n',
+    "module_particle_systems.py": 'particle_systems=[("dust",psf_billboard_3d,"dust",5,2.0,10,0.05,10.0,39.0,(0.2,0.5),(1,0),(0,1),(1,1),(0,0.9),(1,0.9),(0,0.78),(1,0.78),(0,2),(1,3.5),(0.2,0.3,0.2),(0,0,3.9),0.5,130,0.5)]\n',
 }
 
 
@@ -117,6 +128,30 @@ class ModuleRecordTests(unittest.TestCase):
             save_dataset(self.root, "strings", data["sha256"], [{
                 "recordIndex": 0, "originalId": "dup", "fields": {"value": "No"},
             }])
+
+    def test_particle_vectors_preserve_tuple_shape_and_optional_fields(self):
+        particles = dataset_data(self.root, "particle-systems")
+        row = particles["rows"][0]
+        self.assertEqual(row["fields"]["emitBox"], [0.2, 0.3, 0.2])
+        self.assertEqual(row["fields"]["emitVelocity"], [0, 0, 3.9])
+        save_dataset(self.root, "particle-systems", particles["sha256"], [{
+            "recordIndex": 0, "originalId": "dust",
+            "fields": {"emitBox": [1, 2, 3], "rotationSpeed": 90},
+        }])
+        text = (self.root / "module_particle_systems.py").read_text()
+        self.assertIn("(1, 2, 3)", text)
+        reread = dataset_data(self.root, "particle-systems")
+        self.assertEqual(reread["rows"][0]["fields"]["emitBox"], [1, 2, 3])
+        self.assertEqual(reread["rows"][0]["fields"]["rotationSpeed"], 90)
+
+        scene = dataset_data(self.root, "scenes")
+        self.assertEqual(scene["rows"][0]["fields"]["outerTerrain"], "outer_terrain_plain")
+        party = dataset_data(self.root, "parties")
+        self.assertEqual(party["rows"][0]["fields"]["coordinates"], [1.5, 2.5])
+        self.assertEqual(party["rows"][0]["fields"]["direction"], 90)
+        icon = dataset_data(self.root, "map-icons")
+        self.assertEqual(icon["rows"][0]["fields"]["mesh"], "player")
+        self.assertNotIn("offsetX", icon["rows"][0]["fields"])
 
     def test_noop_save_does_not_create_backup(self):
         data = dataset_data(self.root, "strings")

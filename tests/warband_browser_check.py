@@ -49,7 +49,24 @@ RECORD_SOURCES={
     'module_meshes.py':'meshes=[("panel",render_order_plus_1,"panel_mesh",0,0,0,0,0,0,1,1,1)]\n',
     'module_factions.py':'factions=[("kingdom","Kingdom",0,0.9,[("outlaws",-0.5)],[],0xFF00FF)]\n',
     'module_postfx.py':'postfx_params=[("default",0,3,[1,2,3,4],[5,6,7,8],[9,10,11,12])]\n',
+    'module_party_templates.py':'party_templates=[("bandits","Bandits",icon_gray_knight,0,fac_outlaws,bandit_personality,[(trp_bandit,3,7)])]\n',
+    'module_parties.py':'parties=[("town","Town",pf_is_static,0,pt_none,fac_neutral,0,ai_bhvr_hold,0,(1.5,2.5),[],90)]\n',
+    'module_map_icons.py':'map_icons=[("player",0,"player",0.15,snd_footstep,0.1,0.2,0)]\n',
+    'module_scenes.py':'scenes=[("arena",sf_generate,"none","none",(-10,-20),(10,20),-1.0,"0x0",[],[],"outer_terrain_plain")]\n',
+    'module_scene_props.py':'scene_props=[("door",spr_use_time(1),"door_mesh","bo_door",[(ti_on_scene_prop_use,[])])]\n',
+    'module_mission_templates.py':'mission_templates=[("battle",mtf_battle_mode,-1,"Battle",[],[])]\n',
+    'module_game_menus.py':'game_menus=[("camp",0,"Camp","none",[],[("leave",[],"Leave",[])])]\n',
+    'module_presentations.py':'presentations=[("sheet",0,mesh_load_window,[])]\n',
+    'module_tableau_materials.py':'tableaus=[("shield",0,"sample",512,256,-128,0,128,256,[])]\n',
+    'module_skins.py':'skins=[("man",0,"body","calf","hand","head",face_keys,["hair"],[],["hair_tex"],[],[],[],"skel_human",1.0)]\n',
+    'module_particle_systems.py':'particle_systems=[("dust",psf_billboard_3d,"dust",5,2.0,10,0.05,10.0,39.0,(0.2,0.5),(1,0),(0,1),(1,1),(0,0.9),(1,0.9),(0,0.78),(1,0.78),(0,2),(1,3.5),(0.2,0.3,0.2),(0,0,3.9),0.5,130,0.5)]\n',
 }
+// Enough real source records to prove the shared fitted pager, not a one-page demo.
+RECORD_SOURCES['module_skills.py']='skills=[\n'+',\n'.join(
+    ('("power_strike","Power Strike",sf_base_att_str,10,"Hit harder.")' if i==0 else
+     f'("skill_{i:03}","Skill {i:03}",sf_base_att_int,10,"Fixture skill {i:03}.")')
+    for i in range(45)
+)+'\n]\n'
 
 
 def main():
@@ -132,6 +149,11 @@ def main():
                     assert max_level.get_attribute('type')=='number'
                     assert page.locator('.warband-module-detail [data-lex-property="description"] textarea').count()==1
                     assert page.locator('.warband-module-detail [data-lex-property="flags"] textarea').count()==1
+                    assert page.get_by_role('button',name='Next page',exact=True).is_enabled()
+                    page.get_by_role('button',name='Next page',exact=True).click()
+                    assert page.locator('.lex-page-number').input_value()=='2'
+                    page.get_by_role('button',name='Previous page',exact=True).click()
+                    assert page.locator('.lex-page-number').input_value()=='1'
                     cell=page.locator('.warband-record-list .lex-column-list-row').first.locator('[data-column-key="maxLevel"]')
                     cell.dblclick();cell.locator('input').fill('12');cell.locator('input').press('Enter')
                     assert page.locator('.warband-module-detail [data-lex-property="maxLevel"] input').input_value()=='12'
@@ -152,6 +174,10 @@ def main():
                     page.wait_for_function('document.querySelector(".warband-module-state")?.textContent.includes("Synthetic sound parse failure")')
                     page.get_by_role('button',name='Retry',exact=True).click()
                     page.locator('.warband-module-detail').wait_for(state='visible')
+                    page.get_by_role('combobox',name='Warband Module System dataset',exact=True).select_option('particle-systems')
+                    page.locator('.warband-module-detail').wait_for(state='visible')
+                    assert page.locator('.warband-module-detail [data-lex-property="emitBox"] input[type="number"]').count()==3
+                    assert page.locator('.warband-module-detail [data-lex-property="rotationSpeed"] input[type="number"]').count()==1
                     page.evaluate('navigate("upgrades")');page.get_by_role('combobox',name='Troop tree faction',exact=True).select_option('fac_north')
                     # Each tree is a subtab now. Select the recruit component
                     # rather than the independent militia tree.
