@@ -7,6 +7,7 @@ in-game acceptance.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -19,6 +20,10 @@ from bannerlord_browser_check import inline_editor  # noqa: E402
 
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "bannerlord-ui-audit"
 OUT.mkdir(parents=True, exist_ok=True)
+_SHARED_UI_ENV = os.environ.get("LEXEDITOR_SHARED_UI_ROOT", "").strip()
+SHARED_UI_ROOT = Path(_SHARED_UI_ENV).resolve() if _SHARED_UI_ENV else ROOT
+MERGE_TARGET_UI = SHARED_UI_ROOT != ROOT
+SHARED_UI_SHA = os.environ.get("LEXEDITOR_SHARED_UI_SHA", "").strip()
 
 INJECT = r"""
 (()=>{
@@ -253,7 +258,7 @@ def main() -> None:
         try:
             page = browser.new_page(viewport={"width": 1440, "height": 900})
             page.on("pageerror", lambda error: errors.append(str(error)))
-            page.set_content(inline_editor(), wait_until="domcontentloaded")
+            page.set_content(inline_editor(SHARED_UI_ROOT), wait_until="domcontentloaded")
             page.wait_for_function("state.module && state.project && state.datamap", timeout=8000)
             page.evaluate(INJECT)
             page.wait_for_timeout(200)
@@ -264,8 +269,15 @@ def main() -> None:
             assert page.locator('nav button[data-tab="deployment"]').count() == 0
             page.locator("#plugin-data-map").click()
             page.wait_for_function('state.tab==="datamap"')
-            assert page.locator(".lex-integration-status.integrated").count() > 0
-            assert page.locator(".lex-integration-status.integrated .lex-status-mark").count() > 0
+            if MERGE_TARGET_UI:
+                assert page.locator(".lex-integration-status.integrated").count() > 0
+                assert page.locator(".lex-integration-status.integrated .lex-status-mark").count() > 0
+                assert page.locator(".lex-column-list-header").get_by_text("Integration", exact=True).count() == 1
+            else:
+                # The feature branch predates master's shared Integration Data Map.
+                # Keep this native-candidate pass for layout sanity; the strict
+                # current-guide assertion is made in the merge-target pass above.
+                assert page.locator(".lex-coverage-cell").count() > 0
             page.locator("#plugin-info").click()
             page.wait_for_function('state.tab==="info"')
 
@@ -332,7 +344,7 @@ def main() -> None:
             # control must be reachable at enlarged scale.
             page.evaluate('state.tweakPage=0;navigate("tweaks")');page.wait_for_timeout(100)
             assert "Group 11" not in page.locator("#main").inner_text()
-            tweaks_pager = page.locator(".bannerlord-tweaks-page .lex-pager")
+            tweaks_pager = page.locator(".lex-tweaks-pages .lex-pager" if MERGE_TARGET_UI else ".bannerlord-tweaks-page .lex-pager")
             assert tweaks_pager.count() == 1
             tweaks_pager.get_by_role("button", name="Next page", exact=True).click()
             page.wait_for_timeout(100)
@@ -374,7 +386,7 @@ def main() -> None:
         finally:
             browser.close()
 
-    report={"fixtureOnly":True,"results":results,"errors":errors}
+    report={"fixtureOnly":True,"sharedUi":"current-master" if MERGE_TARGET_UI else "branch-native","sharedUiSha":SHARED_UI_SHA,"results":results,"errors":errors}
     (OUT / "results.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     assert not errors, errors
     print(json.dumps({"checks":len(results),"errors":errors}, indent=2))
