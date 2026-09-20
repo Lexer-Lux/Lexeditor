@@ -31,6 +31,6 @@ def test_loot_chance_editor_is_percent_bounded_and_reuses_generic_save_path():
     assert 'min:0,max:100' in html
     assert 'Math.max(0,Math.min(100,value))' in html
     assert 'api("/api/save"' in html
-    assert '["data","loot","text","tweaks"].includes(state.tab)' in html
+    assert '["misc","loot","text","tweaks"].includes(state.tab)' in html
     assert "isEconomyTab(state.tab)" in html
     assert "!!curatedSpec(state.tab)" in html
