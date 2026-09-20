@@ -36,7 +36,7 @@ def bars_source():
     # build compiles that exact function; this cross-platform harness replaces
     # only the bridge body while retaining the production scope/render logic.
     hook_start=source.index('void __declspec(naked) __cdecl hp_number_hook()')
-    hook_end=source.index('std::uint32_t __cdecl hp_glyph_hook',hook_start)
+    hook_end=source.index('// Native 004B77F9 reads the menu sprite table.',hook_start)
     source=source[:hook_start]+'void __cdecl hp_number_hook() {}\n\n'+source[hook_end:]
     source='\n'.join(line for line in source.splitlines() if not line.startswith('#include'))
     header=(ROOT/'games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_hp_colors.h').read_text()
