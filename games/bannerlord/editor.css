@@ -3,7 +3,7 @@
 body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:14px/1.4 var(--lex-font)}
 main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
 button,input,select,textarea{font:inherit}
-#main>.lex-paged-list-detail,#main>.lex-detail-panel,#main>.lex-panel-layout,#main>.lex-tabbed-panel{height:100%;min-height:0}
+#main>*{height:100%;min-height:0}
 .bannerlord-table-detail{height:100%;min-height:0}
 .bannerlord-state-panel{height:100%;overflow:auto}
 .bannerlord-action{padding:6px 10px;border:1px solid var(--lex-border);color:var(--lex-text);background:var(--lex-panel-2);cursor:pointer}
@@ -13,7 +13,7 @@ button,input,select,textarea{font:inherit}
 .bannerlord-build-layout,.bannerlord-info-layout{height:100%;min-height:0}
 .bannerlord-build-log{max-height:38vh;margin:0;padding:10px;overflow:auto;color:#d8dee9;background:#101216;font:12px/1.45 "Cascadia Mono",Consolas,monospace;white-space:pre-wrap}
 .bannerlord-tweaks-page{display:flex;flex-direction:column;height:100%;min-height:0}
-.bannerlord-tweaks-page>.lex-settings-columns{flex:1;min-height:0;overflow:auto}
+.bannerlord-tweaks{flex:1;min-height:0;overflow:auto}
 .bl-source{display:flex;flex-direction:column;height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel)}
 .bl-source-head{display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--lex-border)}
 .bl-source-head code{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
