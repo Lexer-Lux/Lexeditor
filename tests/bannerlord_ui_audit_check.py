@@ -288,6 +288,7 @@ def main() -> None:
             assert page.locator('nav button[data-tab="deployment"]').count() == 0
             page.locator("#plugin-data-map").click()
             page.wait_for_function('state.tab==="datamap"')
+            page.locator(".lex-data-map-table").wait_for()
             if MERGE_TARGET_UI:
                 assert page.locator(".lex-integration-status.integrated").count() > 0
                 assert page.locator(".lex-integration-status.integrated .lex-status-mark").count() > 0
