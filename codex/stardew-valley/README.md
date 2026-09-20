@@ -34,6 +34,22 @@ StardewXnbHack is the canonical first read-side bridge because the Stardew moddi
 
 Content Patcher's documented `EditData` shape uses a `content.json` root with a `Format` version and `Changes` array. An object field edit targets `Data/Objects` and places per-record field edits under `Fields`; this is preferable to replacing a whole record when only a few fields changed. The first editor therefore keeps vanilla values separate from project overrides and only serializes fields whose **Override** control is enabled.
 
+## Helper/setup audit
+
+The current plugin runtime requires **two independently versioned helpers**: SMAPI and Content Patcher. The current shared `GamePlugin` helper contract exposes one `helper_name` / status / pinned / upstream / install row per game, and the shared Updates drawer renders one row from that contract. Stardew therefore cannot honestly show distinct installed, pinned, and newest-upstream versions for both required helpers without a shared helper-model change. That shared API work is outside this game-owned PR.
+
+Audited upstream delivery facts:
+
+- **SMAPI 4.5.2** is the current stable GitHub release. Upstream publishes `SMAPI-4.5.2-installer.zip` and `SMAPI-4.5.2-installer-double-zipped.zip` with GitHub SHA-256 digests, so SMAPI has a reproducible pinned release source suitable for a future bundled-helper path.
+- **Content Patcher 2.9.1** is the current source version. The official StardewMods repository has no GitHub Releases feed for Content Patcher; its manifest advertises `Nexus:1915` as the update key. Its project build references `Newtonsoft.Json.dll`, `SMAPI.Toolkit.dll`, and `TMXTile.dll` from an installed game's `smapi-internal` directory, so this CI/Chat environment cannot manufacture and verify an official-equivalent binary without installed runtime inputs.
+- SMAPI's `CheckForUpdates` setting performs background **update checks and console alerts**; it does not automatically install updates. Content Patcher's manifest supplies an update key but no self-updater. There is therefore no automatic helper writer to disable in the currently audited upstream behavior; turning off SMAPI's check would suppress notices rather than prevent automatic file replacement.
+
+Result: first-time bundled helper installation and two-row Updates-drawer reporting remain genuine shared/delivery blockers, not silent exemptions. The Stardew plugin continues to fail closed for deployment when SMAPI or a compatible Content Patcher is missing, and the Information screen reports the detected runtime state.
+
+## Shared API dependency
+
+The live remote branch still passes `subtitle` and `description` to `GamePlugin` because the remote shared API currently defines those fields. Lexer has a local shared-API change removing that metadata. This Stardew PR must not independently modify the shared `GamePlugin` API or add new subtitle/description metadata; once the shared change lands, the Stardew constructor should simply follow the updated API during normal branch reconciliation.
+
 ## Installed acceptance contract
 
 The editor has an explicit real-install acceptance flow instead of treating synthetic smoke tests as installation proof:
