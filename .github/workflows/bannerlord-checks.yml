@@ -74,10 +74,12 @@ jobs:
       - name: Branch-native rendered UI audit
         run: python tests/bannerlord_ui_audit_check.py out/bannerlord-ui-audit-branch
       - name: Branch-native scoped Data Map audit
+        if: always()
         run: python tests/data_map_browser_check.py out/bannerlord-data-map-browser-branch
         env:
           DATAMAP_GAMES: bannerlord
       - name: Materialize current master shared UI
+        if: always()
         shell: bash
         run: |
           git fetch --no-tags --depth=1 origin master:refs/remotes/origin/master
@@ -86,12 +88,14 @@ jobs:
           git show origin/master:ui/framework.css > out/current-master-ui/ui/framework.css
           git rev-parse origin/master > out/current-master-ui/MASTER_SHA
       - name: Current-master rendered UI audit
+        if: always()
         shell: bash
         run: |
           LEXEDITOR_SHARED_UI_ROOT="$PWD/out/current-master-ui" \
           LEXEDITOR_SHARED_UI_SHA="$(cat out/current-master-ui/MASTER_SHA)" \
           python tests/bannerlord_ui_audit_check.py out/bannerlord-ui-audit-master
       - name: Current-master scoped Data Map audit
+        if: always()
         shell: bash
         env:
           DATAMAP_GAMES: bannerlord
