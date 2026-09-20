@@ -84,7 +84,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 expect(source_hp).to_be_disabled()
                 page.evaluate('switchProjectSource("mine")')
                 page.wait_for_function(
-                    "()=>document.querySelector('input[aria-label=\"HPMax\"]')?.value==='1234'")
+                    "()=>document.querySelector('input[aria-label=\"HPMax\"]')?.value.replaceAll(',','').replaceAll(' ','')==='1234'")
 
                 page.evaluate('navigate("datamap")')
                 page.wait_for_selector(".lex-data-map")
