@@ -244,8 +244,16 @@ def exercise_table(page, label):
     sort_button = page.locator(".lex-column-list-header .lex-column-sort").first
     if sort_button.count():
         sort_button.click()
-        page.wait_for_timeout(80)
-        assert page.locator(".lex-column-list-header [data-lex-sort]").count() >= 1, (label, "sort state not exposed")
+        sorted_header = page.locator('.lex-column-list-head-cell[aria-sort="ascending"], .lex-column-list-head-cell[aria-sort="descending"]').first
+        sorted_header.wait_for()
+        first_direction = sorted_header.get_attribute("aria-sort")
+        assert first_direction in {"ascending", "descending"}, (label, "sort state not exposed")
+        page.locator(".lex-column-list-header .lex-column-sort").first.click()
+        page.wait_for_function(
+            """direction=>[...document.querySelectorAll('.lex-column-list-head-cell')].some(
+                node=>['ascending','descending'].includes(node.getAttribute('aria-sort')) && node.getAttribute('aria-sort')!==direction)""",
+            arg=first_direction,
+        )
 
     rows = page.locator(".lex-column-list").first.locator(".lex-column-list-row")
     if rows.count() > 1:
