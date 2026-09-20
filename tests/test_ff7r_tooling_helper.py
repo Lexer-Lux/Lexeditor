@@ -40,7 +40,7 @@ def test_repak_fallback_never_triggers_oodle_autodownload(monkeypatch, tmp_path)
 
     calls = []
     monkeypatch.setattr(pak_reader, "read_file", reject)
-    monkeypatch.setattr(pak_reader, "oodle_library", lambda: None)
+    monkeypatch.setattr(pak_reader, "repak_oodle_library", lambda: None)
     monkeypatch.setattr(tooling, "_command", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     with pytest.raises(RuntimeError, match="download Oodle automatically"):
@@ -56,7 +56,7 @@ def test_repak_fallback_is_allowed_when_oodle_is_already_explicit(monkeypatch, t
     explicit = tmp_path / "oo2core_9_win64.dll"
     explicit.write_bytes(b"fixture")
     monkeypatch.setattr(pak_reader, "read_file", reject)
-    monkeypatch.setattr(pak_reader, "oodle_library", lambda: explicit)
+    monkeypatch.setattr(pak_reader, "repak_oodle_library", lambda: explicit)
     monkeypatch.setattr(
         tooling,
         "_command",
@@ -77,3 +77,19 @@ def test_helper_status_declares_no_automatic_updates(monkeypatch, tmp_path):
     assert status["pinned"] == "v0.2.3"
     assert status["autoUpdate"] is False
     assert status["source"] == "https://github.com/trumank/repak"
+
+
+def test_direct_reader_finds_the_game_owned_oodle_library(monkeypatch, tmp_path):
+    game = tmp_path / "game"
+    pak = game / "End" / "Content" / "Paks" / "pakchunk0.pak"
+    pak.parent.mkdir(parents=True)
+    pak.write_bytes(b"fixture")
+    shipped = (
+        game / "Engine" / "Binaries" / "ThirdParty" / "Oodle" / "Win64"
+        / "oo2core_7_win64.dll"
+    )
+    shipped.parent.mkdir(parents=True)
+    shipped.write_bytes(b"fixture-oodle")
+    monkeypatch.setattr(pak_reader, "repak_oodle_library", lambda: None)
+
+    assert pak_reader.oodle_library(pak) == shipped
