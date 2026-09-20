@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -61,6 +62,30 @@ class StardewContentPackTests(unittest.TestCase):
         ).splitlines()
         expected = str(isolated.resolve())
         self.assertEqual(output, [expected, expected, expected])
+
+    def test_editor_uses_external_modules_shared_controls_and_small_css_budget(self):
+        html = (paths.PLUGIN_ROOT / "editor.html").read_text(encoding="utf-8")
+        css = (paths.PLUGIN_ROOT / "editor.css").read_text(encoding="utf-8")
+        javascript = (paths.PLUGIN_ROOT / "editor.js").read_text(encoding="utf-8")
+        server_source = (paths.PLUGIN_ROOT / "server.py").read_text(encoding="utf-8")
+        script_tags = re.findall(r"<script\\b[^>]*>", html, flags=re.IGNORECASE)
+
+        self.assertNotIn("<style", html.casefold())
+        self.assertTrue(script_tags)
+        self.assertTrue(all(re.search(r"\\bsrc\\s*=", tag, flags=re.IGNORECASE) for tag in script_tags))
+        self.assertIn('href="editor.css"', html)
+        self.assertIn('src="editor.js"', html)
+        self.assertLessEqual(css.count(";"), 30)
+        self.assertNotIn(".lex-", css)
+        for token in (
+            "LexeditorUI.mountShell(", "LexeditorUI.dataMap(", "pagedListDetail({", "columnList({",
+            'editor: numericCellEditor("Price"', "editor: booleanCellEditor", "infoHelp(",
+            'label: "Sell price"', 'label: "Edibility"', 'label: "Drink"',
+        ):
+            self.assertIn(token, javascript)
+        self.assertIn("send_page_module", server_source)
+        self.assertIn('"/editor.css"', server_source)
+        self.assertIn('"/editor.js"', server_source)
 
     def test_project_identity_is_stable_and_distinguishes_same_named_projects(self):
         first = self.root / "one" / "Same Name"

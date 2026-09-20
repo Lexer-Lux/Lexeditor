@@ -48,7 +48,10 @@ jobs:
           html = Path('games/stardew_valley/editor.html').read_text(encoding='utf-8')
           css = Path('games/stardew_valley/editor.css').read_text(encoding='utf-8')
           js = Path('games/stardew_valley/editor.js').read_text(encoding='utf-8')
-          if '<style' in html.casefold() or re.search(r'<script(?![^>]*\\bsrc=)[^>]*>', html, flags=re.I):
+          script_tags = re.findall(r'<script\\b[^>]*>', html, flags=re.I)
+          if '<style' in html.casefold() or not script_tags or any(
+              not re.search(r'\\bsrc\\s*=', tag, flags=re.I) for tag in script_tags
+          ):
               raise SystemExit('Stardew editor.html must stay markup-only')
           if 'href="editor.css"' not in html or 'src="editor.js"' not in html:
               raise SystemExit('Stardew editor modules are not linked relatively')
