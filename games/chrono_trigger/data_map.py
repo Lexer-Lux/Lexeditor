@@ -13,7 +13,7 @@ ROWS = [
     ("Game/field/atel/Atel_*.dat", "Events and cutscenes", "Public tools document substantial script structure, but variable command boundaries and safe resizing make this a later editor rather than part of the low-cost first slice.", "not-integrated", None),
     ("Game/field/MapTable + BGSetTable + ChipTable + map_bin", "Area maps", "CTViewer can render current-PC maps. The fresh replacement does not yet expose map painting or raster preview.", "not-integrated", None),
     ("Game/field/BGAnime/bganimeinfo_*.dat", "Animated map tiles", "Descriptor knowledge exists, but runtime phase and safe animation editing are not established for this replacement.", "not-integrated", None),
-    ("Game/field/palette_bin/plt*.bin", "Area palettes", "CTViewer establishes 256-color PC palettes. A semantic color editor is feasible follow-up work but is not in the first checkpoint.", "not-integrated", None),
+    ("Game/field/palette_bin/plt*.bin + Game/world/plt_bin/plt*.bin", "Area and world palettes", "Edit the 256 RGB555 colors in current-PC field and world palettes. The two-byte prefix, bit 15 of every color, and trailing bytes are preserved.", "integrated", "palettes"),
     ("Game/common/bankc6.bin + Game/world/*", "World maps and navigation", "CTViewer documents current-PC world headers, exits/triggers and scripts. The fresh replacement has not yet integrated them.", "not-integrated", None),
     ("Game/chara/*", "Characters and sprites", "Recognized current-PC assets; no format-specific editor is implemented yet.", "not-integrated", None),
     ("Game/common/*DataTable*.dat", "Gameplay tables", "Candidate item/accessory/enemy/tech/shop tables exist in the Steam archive, but no independently verified typed record schema is claimed yet.", "not-integrated", None),
@@ -40,7 +40,7 @@ def build_data_map(store: OverlayStore) -> dict:
         elif filename.startswith("Game/field/BGAnime"):
             present = any(path.startswith("Game/field/BGAnime/") for path in available)
         elif filename.startswith("Game/field/palette_bin"):
-            present = any(path.startswith("Game/field/palette_bin/") for path in available)
+            present = any(path.startswith(("Game/field/palette_bin/", "Game/world/plt_bin/")) for path in available)
         elif filename.startswith("Game/common/bankc6"):
             present = "Game/common/bankc6.bin" in available
         elif filename.startswith("Game/chara"):

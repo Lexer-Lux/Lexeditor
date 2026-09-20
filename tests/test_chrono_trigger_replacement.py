@@ -9,6 +9,7 @@ from pathlib import Path
 
 from games.chrono_trigger.archive import ArchiveError, ResourcesBin, _decode
 from games.chrono_trigger.field_data import load_exits, load_treasure, save_exits, save_treasure
+from games.chrono_trigger.palette_data import load_palette, save_palette
 from games.chrono_trigger.project import OverlayStore
 from games.chrono_trigger.scene_data import load_scenes, save_scene
 from games.chrono_trigger.text_data import load_messages, save_messages
@@ -95,6 +96,23 @@ class FreshChronoTriggerTests(unittest.TestCase):
             self.assertEqual(saved["trailingBytes"], 2)
             project_bytes, _ = store.read(row["path"], "mine")
             self.assertEqual(project_bytes[-2:], b"\\xAA\\xBB")
+            self.assertEqual(archive.read_bytes(), original)
+
+    def test_palette_edit_preserves_prefix_high_bit_trailing_and_vanilla(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original = archive.read_bytes()
+            path = "Game/field/palette_bin/plt4.bin"
+            data = load_palette(store, path)
+            self.assertEqual((data["rows"][0]["hex"], data["prefixHex"], data["trailingBytes"]), ("#FF0000", "1234", 1))
+            self.assertTrue(data["rows"][0]["preservedBit15"])
+            saved = save_palette(store, path, data["sha256"], [{"token": "0", "hex": "#00FF00"}])
+            self.assertEqual(saved["rows"][0]["hex"], "#00FF00")
+            self.assertTrue(saved["rows"][0]["preservedBit15"])
+            raw, _ = store.read(path, "mine")
+            self.assertEqual(raw[:2], b"\x12\x34")
+            self.assertEqual(raw[-1:], b"\xCC")
+            self.assertTrue(struct.unpack_from("<H", raw, 2)[0] & 0x8000)
             self.assertEqual(archive.read_bytes(), original)
 
     def test_exit_edit_preserves_unknown_bits_and_archive(self):

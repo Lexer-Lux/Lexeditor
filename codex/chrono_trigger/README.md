@@ -58,3 +58,7 @@ Merged PR #454 is not the architecture to continue. It became broad and research
 ### Mapinfo area headers (PC)
 
 Each `Game/field/Mapinfo/mapinfo_<scene>.dat` starts with a fixed 24-byte PC header: nine modeled `u16` references (music, L1/L2 tileset, L1/L2 assembly, L3 tileset, palette, palette animation, map, chip animation, event script), one unmodelled PC `u16`, then four raw camera-mask bytes. CTViewer treats `scrollLeft == 0x80` as the disabled/full-map camera sentinel. Lexeditor preserves the unmodelled word and all trailing bytes; it does not transfer the shorter SNES header layout.
+
+### Fixed PC palettes
+
+Current-PC field and world palette files are read by CTViewer after skipping a two-byte prefix, then reading exactly 256 little-endian 15-bit colors. Bits 0–4 are red, 5–9 green, and 10–14 blue; the audited renderer ignores bit 15. Lexeditor edits only those RGB components, preserving the two-byte prefix, each color's bit 15, and any trailing bytes.

@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlparse
 from .archive import ResourcesBin
 from .data_map import build_data_map
 from .field_data import load_exits, load_treasure, save_exits, save_treasure
+from .palette_data import load_palette, palette_files, save_palette
 from .project import OverlayStore
 from .scene_data import load_scenes, save_scene
 from .text_data import languages, load_messages, save_messages, text_files
@@ -82,7 +83,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({
                     "apiVersion": 1, "pluginId": "chrono-trigger", "name": "Chrono Trigger",
                     "hosted": True, "windowHost": "webview2",
-                    "capabilities": ["data-map", "localization-text", "area-settings", "field-exits", "treasure", "project-overlay", "ctp-export"],
+                    "capabilities": ["data-map", "localization-text", "area-settings", "field-exits", "treasure", "palettes", "project-overlay", "ctp-export"],
                 })
             if route == "/api/dashboard":
                 langs = languages(STORE)
@@ -97,6 +98,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(load_messages(STORE, query["path"], query.get("source", "mine")))
             if route == "/api/scenes":
                 return self.send_json(load_scenes(STORE, query.get("source", "mine"), query.get("language", "en")))
+            if route == "/api/palette-files":
+                return self.send_json({"rows": palette_files(STORE)})
+            if route == "/api/palette":
+                return self.send_json(load_palette(STORE, query["path"], query.get("source", "mine")))
             if route == "/api/exits":
                 return self.send_json(load_exits(STORE, query.get("source", "mine")))
             if route == "/api/treasure":
@@ -117,6 +122,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = save_messages(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/scenes/save":
                 result = save_scene(STORE, int(body["id"]), str(body["sha256"]), dict(body.get("values") or {}), str(body.get("language", "en")))
+            elif route == "/api/palette/save":
+                result = save_palette(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/exits/save":
                 result = save_exits(STORE, str(body["dataSha256"]), str(body["offsetSha256"]), list(body.get("edits") or []))
             elif route == "/api/treasure/save":

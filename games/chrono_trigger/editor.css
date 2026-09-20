@@ -9,6 +9,7 @@ main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
 .ct-layout,.lex-paged-list-detail{height:100%}
 .ct-table,.ct-detail{height:100%;min-height:0}
 .ct-detail .lex-detail-panel-body{padding:10px;gap:10px}
+.ct-color-input{width:100%;min-height:44px;padding:2px;border:1px solid var(--lex-border);background:var(--lex-panel)}
 .ct-long-text{width:100%;min-height:8rem;resize:vertical;font:inherit}
 .ct-actions{display:flex;flex-wrap:wrap;gap:8px}
 .ct-loading,.ct-empty,.ct-error{display:grid;place-items:center;height:100%;padding:24px;text-align:center;border:1px solid var(--lex-border);background:var(--lex-panel)}

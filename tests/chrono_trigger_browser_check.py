@@ -69,12 +69,24 @@ TREASURE = {
          "itemName": "", "trailingWord": 48879, "editable": False, "byteOffset": 10},
     ],
 }
+PALETTE_FILES = {"rows": [{"path": "Game/field/palette_bin/plt4.bin", "id": 4, "kind": "Area", "label": "Area palette 4"}]}
+PALETTE = {
+    "path": "Game/field/palette_bin/plt4.bin", "source": "vanilla", "sha256": "palette-sha-1",
+    "prefixHex": "1234", "trailingBytes": 1,
+    "rows": [
+        {"token": str(index), "index": index, "hex": "#FF0000" if index == 0 else "#000000",
+         "red5": 31 if index == 0 else 0, "green5": 0, "blue5": 0,
+         "preservedBit15": index == 0}
+        for index in range(256)
+    ],
+}
 DATA_MAP = {"rows": [
     {"filename": "resources.bin", "controls": "Steam resource archive", "notes": "Read-only ARC1 source.", "coverage": "source", "status": "partial", "openable": False, "target": "info"},
     {"filename": "Localize/<lang>/msg/*.txt", "controls": "Dialogue, menu and item text", "notes": "Keyed text editor.", "coverage": "structured", "status": "integrated", "openable": True, "target": "text"},
     {"filename": "Game/common/MapJumpOffsetTbl.dat + MapJumpDataTbl.dat", "controls": "Area exits", "notes": "Existing fixed-size exits.", "coverage": "structured", "status": "integrated", "openable": True, "target": "exits"},
     {"filename": "Game/common/TakaraOffsetTbl.dat + TakaraDataTbl.dat", "controls": "Treasure chests", "notes": "Existing fixed-size treasure.", "coverage": "structured", "status": "integrated", "openable": True, "target": "treasure"},
     {"filename": "Game/field/Mapinfo/mapinfo_*.dat", "controls": "Area settings", "notes": "Fixed Steam area headers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "scenes"},
+    {"filename": "Game/field/palette_bin/plt*.bin + Game/world/plt_bin/plt*.bin", "controls": "Area and world palettes", "notes": "Fixed 256-color RGB555 palettes.", "coverage": "structured", "status": "integrated", "openable": True, "target": "palettes"},
 ]}
 CHANGES = {"rows": []}
 
@@ -92,7 +104,7 @@ def editor_html() -> str:
     )
     fixtures = {
         "dashboard": DASHBOARD, "textFiles": TEXT_FILES, "messages": MESSAGES, "scenes": SCENES,
-        "exits": EXITS, "treasure": TREASURE, "dataMap": DATA_MAP, "changes": CHANGES,
+        "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "dataMap": DATA_MAP, "changes": CHANGES,
     }
     stub = r"""
     window.__posts=[];
@@ -117,6 +129,9 @@ def editor_html() -> str:
           const row=f.scenes.rows.find(value=>value.id===body.id);
           if(row){Object.assign(row,body.values||{});row.sha256="scene-sha-saved";row.source="project";}
           result=row;
+        }else if(path==="/api/palette/save"){
+          for(const edit of body.edits||[]){const row=f.palette.rows.find(value=>value.token===edit.token);if(row)row.hex=edit.hex;}
+          f.palette.sha256="palette-sha-saved";f.palette.source="project";result=f.palette;
         }else if(path==="/api/exits/save")result=f.exits;
         else if(path==="/api/treasure/save")result=f.treasure;
         else result={};
@@ -126,6 +141,8 @@ def editor_html() -> str:
       else if(path==="/api/text-files")result=f.textFiles;
       else if(path==="/api/messages")result=f.messages;
       else if(path==="/api/scenes")result=f.scenes;
+      else if(path==="/api/palette-files")result=f.paletteFiles;
+      else if(path==="/api/palette")result=f.palette;
       else if(path==="/api/exits")result=f.exits;
       else if(path==="/api/treasure")result=f.treasure;
       else {status=404;result={error:"Unknown fixture request "+path};}
@@ -191,6 +208,12 @@ def main():
                 assert "Ruby Vest" in page.locator("#main").inner_text()
                 assert "PRESERVED WORD" in page.locator("#main").inner_text()
                 page.screenshot(path=str(ARTIFACTS/f"treasure-{width}.png"),full_page=True)
+
+                page.locator(".lex-tab-label-text",has_text="Palettes").click()
+                page.wait_for_function("state.tab === 'palettes' && !state.busy")
+                assert page.locator('input[type="color"]').count()==1
+                assert "BIT 15" in page.locator("#main").inner_text()
+                page.screenshot(path=str(ARTIFACTS/f"palettes-{width}.png"),full_page=True)
 
                 page.locator("#plugin-data-map").click()
                 page.wait_for_function("state.tab === 'datamap' && !state.busy")

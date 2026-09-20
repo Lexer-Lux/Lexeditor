@@ -87,6 +87,7 @@ def smoke() -> list[str]:
             ("Localize/en/msg/cmes0.txt", b"FLD_001,Hello\r\nFLD_002,World\r\n"),
             ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\r\n"),
             ("Game/field/Mapinfo/mapinfo_1.dat", scene_header),
+            ("Game/field/palette_bin/plt4.bin", palette),
             ("Game/common/MapJumpOffsetTbl.dat", exits_offset),
             ("Game/common/MapJumpDataTbl.dat", exits_data),
             ("Game/common/TakaraOffsetTbl.dat", treasure_offset),
@@ -107,6 +108,13 @@ def smoke() -> list[str]:
             saved_scene = request_json(session.url + "api/scenes/save", {"id": scene["id"], "sha256": scene["sha256"], "language": "en", "values": {"musicIndex": 42, "cameraUnbounded": True}})
             if saved_scene["musicIndex"] != 42 or saved_scene["unknownWord"] != 0xBEEF or saved_scene["trailingBytes"] != 2:
                 raise RuntimeError("Area settings edit did not preserve the unmodelled PC header data")
+            palette_files_result = request_json(session.url + "api/palette-files")
+            if palette_files_result["rows"][0]["path"] != "Game/field/palette_bin/plt4.bin":
+                raise RuntimeError("Palette catalogue did not find the Steam field palette")
+            palette_data = request_json(session.url + "api/palette?path=Game%2Ffield%2Fpalette_bin%2Fplt4.bin")
+            saved_palette = request_json(session.url + "api/palette/save", {"path": palette_data["path"], "sha256": palette_data["sha256"], "edits": [{"token": "0", "hex": "#00FF00"}]})
+            if saved_palette["rows"][0]["hex"] != "#00FF00" or not saved_palette["rows"][0]["preservedBit15"] or saved_palette["prefixHex"] != "1234" or saved_palette["trailingBytes"] != 1:
+                raise RuntimeError("Palette edit did not preserve fixed Steam palette metadata")
             exits = request_json(session.url + "api/exits")
             saved_exits = request_json(session.url + "api/exits/save", {"dataSha256": exits["dataSha256"], "offsetSha256": exits["offsetSha256"], "edits": [{"token": "0:0", "values": {"destinationId": 8, "facing": 2}}]})
             if saved_exits["rows"][0]["destinationId"] != 8 or saved_exits["rows"][0]["unknownFacingBits"] != 0xA0:
@@ -117,7 +125,7 @@ def smoke() -> list[str]:
                 raise RuntimeError("Treasure edit failed to preserve the unknown trailing word")
             exported = request_json(session.url + "api/export", {})
             with zipfile.ZipFile(exported["path"]) as ctp:
-                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat"}:
+                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/palette_bin/plt4.bin", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat"}:
                     raise RuntimeError("CTP export did not contain exactly the changed resources")
         if (game / "resources.bin").read_bytes() != original_archive:
             raise RuntimeError("Fresh Chrono Trigger plugin modified resources.bin")
@@ -125,6 +133,7 @@ def smoke() -> list[str]:
         "read-only ARC1 source archive validated",
         "keyed Steam text edit survived project-overlay readback",
         "fixed 24-byte area settings edit preserved the unmodelled word and trailing bytes",
+        "256-color RGB555 palette edit preserved prefix, bit 15 and trailing bytes",
         "fixed-size area exit edit preserved unknown flag bits",
         "treasure edit preserved the unknown trailing word",
         "deterministic CTP export contained only changed archive-relative resources",
