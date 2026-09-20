@@ -123,8 +123,10 @@ def open_editor(browser, url: str, width: int, height: int, zoom: float = 1.0):
       };
     }""")
     page.goto(url, wait_until="domcontentloaded")
-    loading = page.get_by_role("status").filter(has_text="Loading Stardew Valley project")
-    loading.wait_for(timeout=5000)
+    loading = page.locator("#main .sv-state", has_text="Loading Stardew Valley project")
+    loading.wait_for(state="attached", timeout=5000)
+    assert loading.is_visible()
+    assert loading.bounding_box() is not None
     assert page.evaluate("typeof window.__releaseStardewDashboard === 'function'")
     page.evaluate("window.__releaseStardewDashboard()")
     page.wait_for_selector(".lex-paged-list-detail .lex-column-list-row", timeout=20000)
