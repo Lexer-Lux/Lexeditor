@@ -112,6 +112,22 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def send_page_module(self, requested: str):
+        """Serve one editor-local JS/CSS module without exposing arbitrary files."""
+        relative = Path(str(requested or "").lstrip("/"))
+        if relative.is_absolute() or ".." in relative.parts:
+            self.send_json({"error": "Unsafe Bannerlord page module path"}, 400)
+            return
+        target = (PLUGIN_ROOT / relative).resolve()
+        if (
+            PLUGIN_ROOT not in target.parents
+            or target.suffix.casefold() not in {".js", ".css"}
+            or not target.is_file()
+        ):
+            self.send_json({"error": "Bannerlord page module not found"}, 404)
+            return
+        self.send_file(target)
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
@@ -119,6 +135,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/":
             self.send_file(PLUGIN_ROOT / "editor.html")
+            return
+        if path == "/editor.css" or (path.startswith("/editor_") and path.endswith(".js")):
+            self.send_page_module(path.removeprefix("/"))
             return
         if path.startswith("/shared/"):
             shared = (LEXEDITOR_ROOT / "ui").resolve()
