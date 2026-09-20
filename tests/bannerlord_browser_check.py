@@ -179,7 +179,8 @@ def main() -> None:
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.set_content(inline_editor(), wait_until="domcontentloaded")
             page.wait_for_function("state.module && state.project && state.datamap", timeout=8000)
-            body = page.locator("#main").inner_text()\n            assert "Fixture Module" in body, (body, errors)
+            body = page.locator("#main").inner_text()
+            assert "Fixture Module" in body, (body, errors)
 
             page.evaluate('state.moduleView="dependencies";navigate("module")')
             legacy_row = page.locator(".lex-column-list-row").filter(has_text="LegacyBrowserDep")
