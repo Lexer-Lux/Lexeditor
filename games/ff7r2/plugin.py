@@ -13,10 +13,11 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import tempfile
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from games.ff7r2 import shader_injector
-from service_session import LocalPluginSession
+from service_session import LocalPluginSession, request_json
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -48,12 +49,44 @@ def launch() -> int:
     return run_host({"ff7r2": PLUGIN}, "ff7r2")
 
 
+def smoke() -> list[str]:
+    """Exercise the managed Rebirth service without game or proprietary data."""
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-smoke-") as temp_name:
+        project = Path(temp_name) / "project"
+        project.mkdir()
+        (project / "lexeditor-project.json").write_text(
+            '{"format":1,"game":"ff7r2"}\n', encoding="utf-8")
+        session = Ff7r2Session({"LEXEDITOR_FF7R2_PROJECT": str(project)})
+        with session:
+            identity = request_json(session.url + "api/plugin")
+            required = {"data-map", "player-parameter", "fixed-width-edit", "project-staging"}
+            if identity.get("pluginId") != "ff7r2" or not required.issubset(identity.get("capabilities", [])):
+                raise RuntimeError("FF7R2 service returned the wrong managed identity/capabilities")
+            mapped = request_json(session.url + "api/datamap")
+            player = next((row for row in mapped.get("rows", [])
+                           if row.get("target") == "characters"), None)
+            if not player or player.get("coverage") != "structured" or player.get("status") != "partial":
+                raise RuntimeError("FF7R2 Data Map did not report bounded PlayerParameter coverage")
+            workspace = request_json(session.url + "api/workspace")
+            if workspace.get("playerParameter", {}).get("sourcePresent") is not False:
+                raise RuntimeError("FF7R2 smoke unexpectedly found proprietary source data")
+        if not session.wait_closed():
+            raise RuntimeError("FF7R2 child service port is still open after smoke shutdown")
+    return [
+        "managed FF7R2 service identity and bounded capabilities confirmed",
+        "Data Map exposes PlayerParameter as partial structured coverage",
+        "empty project reports no proprietary source data",
+        "host-owned child service stopped cleanly",
+    ]
+
+
 PLUGIN = GamePlugin(
     plugin_id="ff7r2",
     name="Final Fantasy VII Rebirth",
     accent="#3f7fd0",
     check=check,
     launch=launch,
+    smoke=smoke,
     session_factory=Ff7r2Session,
     projects=ModProjectSpec(
         root_env="LEXEDITOR_FF7R2_PROJECT",
