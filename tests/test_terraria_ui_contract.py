@@ -20,11 +20,11 @@ class TerrariaUiContractTests(unittest.TestCase):
         self.assertNotIn("<style", html)
         self.assertNotIn("<script>", html)
 
-    def test_server_serves_only_known_relative_page_modules(self):
+    def test_server_uses_shared_page_module_route(self):
         source = SERVER.read_text(encoding="utf-8")
-        self.assertIn("def send_page_module", source)
-        self.assertIn('{"editor.js", "editor.css"}', source)
-        self.assertIn('path in {"/editor.js", "/editor.css"}', source)
+        self.assertIn("PluginRequestHandler", source)
+        self.assertIn("self.send_page_module(PLUGIN_ROOT, path)", source)
+        self.assertNotIn("def send_page_module", source)
 
     def test_editor_uses_shared_data_views_and_shell_info(self):
         js = JS.read_text(encoding="utf-8")

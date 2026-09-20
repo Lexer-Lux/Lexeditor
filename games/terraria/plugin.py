@@ -127,8 +127,6 @@ def launch() -> int:
 PLUGIN = GamePlugin(
     plugin_id="terraria",
     name="Terraria",
-    subtitle="tModLoader 1.4.4",
-    description="Create and edit native tModLoader source mods without modifying vanilla Terraria.",
     accent="#77b255",
     check=check,
     launch=launch,
@@ -139,7 +137,6 @@ PLUGIN = GamePlugin(
         required_paths=("build.txt",),
         template_root=TEMPLATE_ROOT,
         initialize=initialize_project,
-        validate_name=validate_mod_name,
         discover=discover_projects,
     ),
     installation=GameInstallSpec(

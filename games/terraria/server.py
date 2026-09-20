@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import binascii
 from hashlib import sha256
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 import json
 import mimetypes
 import os
@@ -14,6 +14,7 @@ import subprocess
 import tempfile
 import threading
 from urllib.parse import parse_qs, urlparse
+from plugin_http import PluginRequestHandler
 
 from .assets import (
     ASSET_TYPES,
@@ -580,38 +581,7 @@ def data_map() -> dict:
     return {"root": str(root), "rows": rows}
 
 
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, _format, *_args):
-        return
-
-    def send_json(self, payload, status=200):
-        data = json.dumps(payload).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
-    def send_bytes(self, data: bytes, content_type: str):
-        self.send_response(200)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
-    def send_file(self, target: Path):
-        data = target.read_bytes()
-        self.send_bytes(data, mimetypes.guess_type(target.name)[0] or "application/octet-stream")
-
-    def send_page_module(self, name: str):
-        if name not in {"editor.js", "editor.css"}:
-            raise ValueError("Unknown Terraria page module")
-        target = (PLUGIN_ROOT / name).resolve()
-        if target.parent != PLUGIN_ROOT.resolve() or not target.is_file():
-            raise ValueError("Terraria page module is unavailable")
-        self.send_file(target)
-
+class Handler(PluginRequestHandler):
     def read_json(self) -> object:
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -637,8 +607,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path in {"/", "/index.html"}:
                 self.send_file(PLUGIN_ROOT / "editor.html")
-            elif path in {"/editor.js", "/editor.css"}:
-                self.send_page_module(path.removeprefix("/"))
+            elif self.send_page_module(PLUGIN_ROOT, path):
+                return
             elif path.startswith("/shared/"):
                 shared = (ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()
