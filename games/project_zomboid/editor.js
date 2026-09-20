@@ -2,11 +2,11 @@
 const main=document.getElementById("main");
 let tab="metadata",metadata=null,animationMeshes={rows:[],errors:[]},items={rows:[],errors:[]},evolved={rows:[],errors:[]},crafts={rows:[],errors:[]},fixings={rows:[],errors:[]},fluids={rows:[],errors:[]},vehicles={rows:[],errors:[]},sounds={rows:[],errors:[]},models={rows:[],errors:[]},mannequins={rows:[],errors:[]},timedActions={rows:[],errors:[]},scripts={rows:[],counts:{},errors:[]},datamap={rows:[]},deployment=null,shell=null;
 const shellTabs=[
-  {id:"metadata",label:"Mod Metadata"},
-  {id:"animationmeshes",label:"Animation Meshes"},
+  {id:"metadata",label:"Metadata"},
+  {id:"animationmeshes",label:"Anim Meshes"},
   {id:"items",label:"Items"},
-  {id:"evolved",label:"Evolved Recipes"},
-  {id:"crafts",label:"Craft Recipes"},
+  {id:"evolved",label:"Evolved"},
+  {id:"crafts",label:"Crafting"},
   {id:"fixing",label:"Fixing"},
   {id:"fluids",label:"Fluids"},
   {id:"vehicles",label:"Vehicles"},
@@ -16,7 +16,12 @@ const shellTabs=[
   {id:"timedactions",label:"Timed Actions"},
   {id:"scripts",label:"Scripts"},
 ];
-const editorTabs=new Map(shellTabs.map(row=>[row.label,row.id]));
+const editorTabs=new Map([
+  ["Mod Metadata","metadata"],["Animation Meshes","animationmeshes"],["Items","items"],
+  ["Evolved Recipes","evolved"],["Craft Recipes","crafts"],["Fixing","fixing"],
+  ["Fluids","fluids"],["Vehicles","vehicles"],["Sounds","sounds"],["Models","models"],
+  ["Mannequins","mannequins"],["Timed Actions","timedactions"],["Scripts","scripts"],
+]);
 const mapState={page:0,query:"",status:"",sort:["filename",1]};
 const scriptState={selected:null,page:0,pageSize:15,query:"",sort:{key:"name",dir:1}};
 const drafts=new Map();
@@ -74,7 +79,15 @@ async function reload(){
     render();
   }catch(error){setStatus(error.message,true);renderLoadError(error)}
 }
-function renderLoadError(error){main.replaceChildren(LexeditorUI.detailPanel({className:"lex-information-panel",title:"Project Zomboid could not load",identity:null,meta:"Plugin load error",body:[LexeditorUI.detailSection({title:"ERROR",body:[sharedReadonly("Message",error.message||String(error),"Resolve this project/install problem, then reload the plugin.")]} )]}))}
+function renderLoadError(error){
+  const message=error.message||String(error);
+  main.replaceChildren(LexeditorUI.detailPanel({className:"lex-information-panel",title:"Project Zomboid could not load",identity:null,meta:"Plugin load error",body:[
+    LexeditorUI.detailSection({title:"ERROR",body:[
+      LexeditorUI.detailNote(message,{className:"pz-error-message"}),
+      sharedReadonly("Recovery","Reload after fixing the project or install problem.","The error above is the actual load failure. Fix its cause, then reload this plugin."),
+    ]}),
+  ]}));
+}
 function renderMetadata(){
   const row={key:"metadata",fields:metadata.fields,duplicateKeys:metadata.duplicateKeys};
   const sections=metadataSpecs.map(group=>LexeditorUI.detailSection({title:group.title,body:group.fields.map(spec=>sharedControl("metadata",row,spec))}));

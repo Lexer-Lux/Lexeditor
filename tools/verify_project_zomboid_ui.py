@@ -244,6 +244,8 @@ def main() -> int:
                     page.goto(f"http://127.0.0.1:{service.server_port}/", wait_until="domcontentloaded")
                     page.locator(".pz-metadata").wait_for(state="visible")
                     screenshot(page, args.screenshots, "00-initial-metadata")
+                    tab_texts = page.locator(".lex-plugin-tab").all_inner_texts()
+                    assert all("…" not in value and not value.endswith("...") for value in tab_texts), tab_texts
                     assert page.locator('link[href="editor.css"]').count() == 1
                     assert page.locator('script[src="editor.js"]').count() == 1
 

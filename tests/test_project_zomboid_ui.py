@@ -83,6 +83,9 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertIn("discard:discardChanges", text)
         self.assertIn("emptyDetail:", text)
         self.assertIn("renderLoading(", text)
+        self.assertIn("pz-error-message", text)
+        self.assertIn('{id:"animationmeshes",label:"Anim Meshes"}', text)
+        self.assertIn('["Animation Meshes","animationmeshes"]', text)
 
     def test_animation_mesh_ui_exposes_only_single_value_typed_fields(self):
         text = editor_script()
