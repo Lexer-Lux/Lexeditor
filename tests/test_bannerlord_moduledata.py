@@ -185,7 +185,7 @@ class BannerlordModuleDataTests(unittest.TestCase):
 
     def test_moduledata_editor_sends_revision_and_exposes_reload(self):
         text=(Path(__file__).resolve().parents[1]/"games"/"bannerlord"/"editor_moduledata.js").read_text(encoding="utf-8")
-        self.assertIn('sourceHash:state.savedModuleData.sourceHash||""',text);self.assertIn("async function reloadModuleData",text);self.assertIn('onclick:()=>reloadModuleData()',text)
+        self.assertIn('sourceHash:state.savedModuleData.sourceHash||""',text);self.assertIn("async function reloadModuleData",text);self.assertIn('uiButton("Reload",()=>reloadModuleData())',text)
 
     def test_moduledata_root_redirection_outside_project_is_rejected(self):
         temporary, project, _source = self.fixture()
