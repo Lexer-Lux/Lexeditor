@@ -79,7 +79,7 @@
   }
   function metadataPanel(){
     if(!current)return loadingPanel("Loading build.txt…");
-    const panel=detailPanel({title:"build.txt",identity:"TMOD",meta:"tModLoader package metadata",paginate:true,body:[
+    const panel=detailPanel({title:"build.txt",identity:"TMOD",meta:"tModLoader package metadata",body:[
       ...warnings(),
       detailSection({title:"IDENTITY",body:[
         detailField({label:"DISPLAY NAME",control:textControl("displayName"),dataType:"STRING",help:infoHelp("The player-facing mod name shown by tModLoader.")}),
@@ -168,7 +168,7 @@
 
   function dependenciesPanel(){
     if(!current)return loadingPanel("Loading build.txt…");
-    const panel=detailPanel({title:"References & Build",identity:"TMOD",meta:"tModLoader dependency and package rules",paginate:true,body:[
+    const panel=detailPanel({title:"References & Build",identity:"TMOD",meta:"tModLoader dependency and package rules",body:[
       ...warnings(),
       detailSection({title:"DEPENDENCIES",body:[
         detailField({label:"MOD REFERENCES",control:listControl("modReferences",{placeholder:"ExampleMod\nExampleLibrary@1.2"}),dataType:"LIST",help:infoHelp("Required tModLoader mods. Version-qualified dependencies use ModName@1.2. A mod cannot also appear as a weak reference or DLL reference.")}),
