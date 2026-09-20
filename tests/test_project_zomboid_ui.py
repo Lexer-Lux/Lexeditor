@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EDITOR = ROOT / "games" / "project_zomboid" / "editor.html"
 EDITOR_JS = ROOT / "games" / "project_zomboid" / "editor.js"
 EDITOR_CSS = ROOT / "games" / "project_zomboid" / "editor.css"
+SERVER = ROOT / "games" / "project_zomboid" / "server.py"
 
 def editor_script() -> str:
     return EDITOR_JS.read_text(encoding="utf-8")
@@ -19,12 +20,23 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertIn('href="editor.css"', html)
         self.assertIn('src="editor.js"', html)
         self.assertIn('src="/shared/framework.js"', html)
-        self.assertIn("modLoaderSection(", html)
+        whole_ui = html + "\n" + editor_script()
+        self.assertIn("modLoaderSection(", whole_ui)
         for field in ("loader:", "output:", "order:", "safety:", "removal:"):
-            self.assertIn(field, html)
+            self.assertIn(field, whole_ui)
         self.assertNotIn("<style", html)
         self.assertNotRegex(html, r"<script(?:\s[^>]*)?>\s*[^<\s]")
-        self.assertLessEqual(len(EDITOR_CSS.read_text(encoding="utf-8").splitlines()), 24)
+        css = EDITOR_CSS.read_text(encoding="utf-8")
+        self.assertLessEqual(len(css.splitlines()), 12)
+        self.assertNotRegex(css, r"\.lex-[a-z0-9-]+")
+
+    def test_service_uses_shared_page_module_handler(self):
+        source = SERVER.read_text(encoding="utf-8")
+        self.assertIn("from plugin_http import PluginRequestHandler", source)
+        self.assertIn("class Handler(PluginRequestHandler):", source)
+        self.assertIn("self.send_page_module(PLUGIN_ROOT, path)", source)
+        self.assertNotIn("def send_page_module(", source)
+        self.assertNotIn("BaseHTTPRequestHandler", source)
 
     def test_editor_exposes_every_structured_script_adapter(self):
         text = editor_script()
@@ -78,7 +90,6 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         text = editor_script()
         self.assertIn('className:"pz-metadata"', text)
         self.assertIn('className:"pz-script-layout"', text)
-        self.assertIn('className:"lex-information-panel"', text)
         self.assertIn('label:"Search Build 42 script records"', text)
         self.assertNotIn("<table>", text)
         self.assertNotIn('class="notice"', text)

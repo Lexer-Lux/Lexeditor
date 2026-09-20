@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 import json
-import mimetypes
 import os
 from pathlib import Path
+
+from plugin_http import PluginRequestHandler
 from urllib.parse import urlparse
 
 from . import animationsmesh, core, craftrecipe, datamap, evolvedrecipe, fixing, fluid, mannequin, model, sound, timedaction, vehicle, zedscript
@@ -54,36 +55,7 @@ def _guard_known_select_values(root: Path, payload: dict, reader, domains: dict[
         )
 
 
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, _format, *_args):
-        return
-
-    def send_json(self, payload, status=200):
-        data = json.dumps(payload).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(data)
-
-    def send_file(self, target: Path):
-        data = target.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
-    def send_page_module(self, request_path: str):
-        name = request_path.removeprefix("/")
-        target = (PLUGIN_ROOT / name).resolve()
-        if name not in {"editor.js", "editor.css"} or target.parent != PLUGIN_ROOT.resolve() or not target.is_file():
-            self.send_json({"error": "Project Zomboid editor module not found"}, 404)
-            return
-        self.send_file(target)
-
+class Handler(PluginRequestHandler):
     def read_json(self):
         raw_length = self.headers.get("Content-Length", "")
         try:
@@ -109,8 +81,8 @@ class Handler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             if path == "/":
                 self.send_file(PLUGIN_ROOT / "editor.html")
-            elif path in {"/editor.js", "/editor.css"}:
-                self.send_page_module(path)
+            elif self.send_page_module(PLUGIN_ROOT, path):
+                return
             elif path.startswith("/shared/"):
                 shared = (ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()
