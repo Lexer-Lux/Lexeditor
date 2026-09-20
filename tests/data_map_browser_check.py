@@ -11,6 +11,8 @@ import shutil
 import sys
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+_SHARED_UI_ENV=os.environ.get('LEXEDITOR_SHARED_UI_ROOT','').strip()
+SHARED_UI_ROOT=Path(_SHARED_UI_ENV).resolve() if _SHARED_UI_ENV else ROOT
 OUT=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/'out'/'data-map-browser'
 OUT.mkdir(parents=True,exist_ok=True)
 # Derived, never hand-listed: a hardcoded tuple silently skipped ff7r, so its
@@ -39,7 +41,7 @@ def html_for(game):
     history.replaceState=(s,u)=>replace(s,u);history.pushState=(s,u)=>push(s,u);
     window.fetch=()=>new Promise(()=>{});
     window.__lexeditorPlugin={id:"'''+game+'''",name:"Fixture edition",edition:"Fixture"};'''
-    html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
+    html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(SHARED_UI_ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
     def inline_plugin_style(match):
         source=match.group(1)
         relative=source.lstrip('/')
@@ -55,7 +57,7 @@ def html_for(game):
                 return '<style>'+resolved.read_text(encoding='utf-8')+'</style>'
         return match.group(0)
     html=re.sub(r'<link rel="stylesheet" href="([^"]+)">',inline_plugin_style,html)
-    html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')+'</script>')
+    html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(SHARED_UI_ROOT/'ui/framework.js').read_text(encoding='utf-8')+'</script>')
     def inline_plugin_script(match):
         source=match.group(1)
         relative=source.lstrip('/')
