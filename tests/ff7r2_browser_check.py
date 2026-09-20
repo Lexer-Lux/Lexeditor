@@ -80,8 +80,19 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 hp = page.locator('input[aria-label="HPMax"]')
                 expect(hp).to_have_count(1)
                 assert hp.input_value().replace(",", "").replace(" ", "") == "1000", hp.input_value()
+
+                cloud_row = page.locator(".lex-column-list-row").filter(has_text="Cloud").first
+                cloud_hp_cell = cloud_row.locator('[data-column-key="HPMax"]')
+                cloud_hp_cell.dblclick()
+                table_hp = cloud_hp_cell.locator('input[aria-label="HPMax table value"]')
+                expect(table_hp).to_be_visible()
+                table_hp.fill("1100")
+                table_hp.press("Enter")
+                page.wait_for_function(
+                    "()=>document.querySelector('input[aria-label=\"HPMax\"]')?.value.replaceAll(',','').replaceAll(' ','')==='1100'")
                 page.screenshot(path=str(OUT / "characters-desktop.png"), full_page=True)
 
+                hp = page.locator('input[aria-label="HPMax"]')
                 hp.fill("1234")
                 hp.press("Tab")
                 expect(page.locator("#global-save")).to_be_enabled()

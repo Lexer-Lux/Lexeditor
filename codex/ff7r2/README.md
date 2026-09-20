@@ -5,22 +5,22 @@
 This note is Rebirth-only. Remake remains a separate plugin/worker under games/ff7r.
 Shared Unreal/helper framework changes are blockers here rather than changes this PR competes for.
 
-The work began from master a47f0a57f8b44113b0ca1d42e5795f59f707372a and was rebased onto live master 72ee978a2ff36686a6349696b19860057356468a after concurrent shared-UI work landed.
+The work began from master a47f0a57f8b44113b0ca1d42e5795f59f707372a and has been repeatedly reconciled against live master as concurrent shared-UI and Rebirth presentation work landed. The latest audited master is 72ee978a2ff36686a6349696b19860057356468a.
 
 Current-master references read for this audit:
-- AGENTS.md — ec8d363d7fa9b937c8849dfa4c13c7c0fc5d1fde
-- docs/ADDING_A_GAME.md — 78a987c5f61d3f28fb6f4195d08717c98dcb2af8
+- AGENTS.md — 41355ce0b783c55a03ad250ed279666f785c6e67
+- docs/ADDING_A_GAME.md — 7fe6d35dd82fa3fe4e6378ca558ecbb0a316c4c0
 - docs/UI-MANUAL.md — 14a3269992031d7e7893fcb127728a48b944e71f
-- games/blank/editor.html — cd3c79bab8a5b13b3167a26e8fe4e0617c940802
-- games/rdr2/editor.html — 9d11f8a0bd35526dbb4959fd3e964a4f72472718, including shared paged Table + Detail and Data Map patterns
+- ui/component-catalog.js — a11e52e31ee92bce495c6cbf54a66d4597d52139
+- games/blank/editor.html — b0b235d010952bf0c7524dcce172ef72f7cf63e4
+- games/rdr2/editor.html — 899bfdb45cbf25da55aed43a590db6ee476b523b, including shared paged Table + Detail and Data Map patterns
 - codex/ff7r/README.md — 5a25913ede861eb84ba30419ab21a47a0fbee8c6, used only where Remake/Rebirth Unreal context is explicitly shared
 
-Requested paths unavailable on that master:
-- ui/component-catalog.js
-- codex/ff7r2/
-- a game-specific worklog/ff7r2/
+Still unavailable on that master:
+- codex/ff7r2/ (this PR creates the Rebirth codex)
+- a game-specific worklog/ff7r2/ (this PR keeps its concise task handoff under worklog/requests instead)
 
-Those absences are recorded rather than silently replacing the requested files.
+The component catalog did not exist at the original branch baseline; it was added on master during this PR and was re-read rather than retaining the obsolete unavailable-path note.
 
 ## Public Rebirth evidence
 
