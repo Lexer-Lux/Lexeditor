@@ -105,30 +105,6 @@ def open_editor(browser, url: str, width: int, height: int, zoom: float = 1.0):
     page = browser.new_page(viewport={"width": width, "height": height})
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.add_init_script("""(() => {
-      const originalFetch = window.fetch.bind(window);
-      let delayed = false;
-      window.fetch = (input, init) => {
-        if (!delayed && !sessionStorage.getItem('sv-audit-loading-seen')
-            && String(input).includes('/api/dashboard')) {
-          delayed = true;
-          return new Promise((resolve, reject) => {
-            window.__releaseStardewDashboard = () => {
-              sessionStorage.setItem('sv-audit-loading-seen', '1');
-              originalFetch(input, init).then(resolve, reject);
-            };
-          });
-        }
-        return originalFetch(input, init);
-      };
-    }""")
-    page.goto(url, wait_until="domcontentloaded")
-    loading = page.locator("#main .sv-state", has_text="Loading Stardew Valley project")
-    loading.wait_for(state="attached", timeout=5000)
-    assert loading.is_visible()
-    assert loading.bounding_box() is not None
-    assert page.evaluate("typeof window.__releaseStardewDashboard === 'function'")
-    page.evaluate("window.__releaseStardewDashboard()")
     page.wait_for_selector(".lex-paged-list-detail .lex-column-list-row", timeout=20000)
     if zoom != 1.0:
         page.evaluate("value => { document.body.style.zoom=String(value); }", zoom)
@@ -255,8 +231,29 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
     geometry(page, label + "-resized")
 
 
+def assert_navigation_loading(page, button_selector: str, expected: str, screenshot_name: str) -> None:
+    page.evaluate("""() => {
+      window.__svAuditRealRAF = window.requestAnimationFrame;
+      window.requestAnimationFrame = callback => {
+        window.__svAuditHeldFrame = callback;
+        return 1;
+      };
+    }""")
+    page.locator(button_selector).click()
+    loading = page.locator("#main .sv-state", has_text=expected)
+    loading.wait_for(state="visible", timeout=2000)
+    take(page, screenshot_name)
+    page.evaluate("""() => {
+      const callback = window.__svAuditHeldFrame;
+      window.requestAnimationFrame = window.__svAuditRealRAF;
+      delete window.__svAuditHeldFrame;
+      delete window.__svAuditRealRAF;
+      callback?.(performance.now());
+    }""")
+
+
 def exercise_data_map(page, label: str) -> None:
-    page.locator("#plugin-data-map").click()
+    assert_navigation_loading(page, "#plugin-data-map", "Loading Data Map", f"loading-datamap-{label}.png")
     page.wait_for_selector(".lex-data-map-table .lex-column-list-row")
     assert page.locator(".lex-coverage-icon").count() > 0
     assert page.locator(".lex-pager").count() == 1
@@ -271,7 +268,7 @@ def exercise_data_map(page, label: str) -> None:
 
 
 def exercise_info(page, label: str, height: int) -> None:
-    page.locator("#plugin-info").click()
+    assert_navigation_loading(page, "#plugin-info", "Loading plugin information", f"loading-info-{label}.png")
     page.wait_for_selector(".lex-information-panel")
     body = page.locator(".lex-information-panel .lex-detail-panel-body")
     body.evaluate("node => { node.scrollTop = node.scrollHeight; }")
