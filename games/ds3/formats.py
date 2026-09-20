@@ -329,6 +329,7 @@ class ParamSchema:
     description: str
     fields: tuple[FieldSpec, ...]
     enums: dict[str, dict[str, str]]
+    row_names: dict[int, str]
 
     def field(self, key: str) -> FieldSpec:
         for field in self.fields:
@@ -353,16 +354,34 @@ def load_schema(root: Path, table: str) -> ParamSchema:
     layout = json.loads((root / "layouts" / f"{table}.json").read_text("utf-8-sig"))
     groups = {}
     for group in layout.get("Groups", []):
-        name = str(group.get("Name") or group.get("Key") or "Other")
-        if name.upper() == "TODO": name = str(group.get("Key") or "Other")
-        for key in group.get("Fields", []): groups[str(key)] = name
+        names = group.get("Names", [])
+        english = next(
+            (entry.get("Name") for entry in names
+             if isinstance(entry, dict) and entry.get("Language") == "English"),
+            None,
+        )
+        name = str(english or group.get("Name") or group.get("Key") or "Other")
+        if name.upper() == "TODO":
+            name = str(group.get("Key") or "Other")
+        for key in group.get("Fields", []):
+            groups[str(key)] = name
     ann_path = root / "annotations" / f"{param_type}.json"
     annotations = json.loads(ann_path.read_text("utf-8-sig")) if ann_path.is_file() else {}
     ann_fields = {str(item.get("Field")): item for item in annotations.get("Fields", [])}
     description = str(annotations.get("Description") or table)
     enum_cache: dict[str, dict[str, str]] = {}
+    row_names_path = root / "row_names" / f"{table}.json"
+    row_names: dict[int, str] = {}
+    if row_names_path.is_file():
+        raw_names = json.loads(row_names_path.read_text("utf-8-sig"))
+        for entry in raw_names.get("Entries", []):
+            if not isinstance(entry, dict) or "ID" not in entry:
+                continue
+            names = [str(value).strip() for value in entry.get("Entries", []) if str(value).strip()]
+            if names:
+                row_names[int(entry["ID"])] = names[0]
 
-    fields=[]; offset=0; bit_type=None; bit_offset=0; bit_storage_offset=0
+    fields=[]; offset=0; bit_limit=None; bit_offset=0; bit_storage_offset=0
     for node in def_root.findall(".//Fields/Field"):
         definition = (node.get("Def") or "").strip()
         m=_DEF_RE.match(definition)
@@ -374,14 +393,19 @@ def load_schema(root: Path, table: str) -> ParamSchema:
         key=nm.group("name"); array_len=int(nm.group("array") or "1"); bits=nm.group("bits"); bit_size=int(bits) if bits else None
         storage_bits=_TYPE_SIZE[dtype]*8
         if bit_size is None:
-            bit_type=None; bit_offset=0
+            bit_limit=None; bit_offset=0
             field_offset=offset
             offset += _TYPE_SIZE[dtype] * array_len
         else:
-            if array_len != 1: raise DS3FormatError(f"Bitfield arrays are unsupported: {definition}")
-            if bit_size <= 0 or bit_size > storage_bits: raise DS3FormatError(f"Invalid bitfield width: {definition}")
-            if bit_type != dtype or bit_offset + bit_size > storage_bits:
-                bit_type=dtype; bit_offset=0; bit_storage_offset=offset; offset += _TYPE_SIZE[dtype]
+            if array_len != 1:
+                raise DS3FormatError(f"Bitfield arrays are unsupported: {definition}")
+            if bit_size <= 0 or bit_size > storage_bits:
+                raise DS3FormatError(f"Invalid bitfield width: {definition}")
+            # PARAM packs adjacent bitfields by storage width; signedness/type
+            # affects interpretation, not whether a new storage word begins.
+            if bit_limit != storage_bits or bit_offset + bit_size > storage_bits:
+                bit_limit=storage_bits; bit_offset=0; bit_storage_offset=offset
+                offset += _TYPE_SIZE[dtype]
             field_offset=bit_storage_offset
         attrs=meta_nodes.get(key, {})
         ann=ann_fields.get(key, {})
@@ -413,7 +437,10 @@ def load_schema(root: Path, table: str) -> ParamSchema:
             reference=attrs.get("Refs"),padding=(dtype=="dummy8" or "Padding" in attrs or key.lower().startswith("pad")),
         ))
         if bit_size is not None: bit_offset += bit_size
-    return ParamSchema(table,param_type,data_version,offset,description,tuple(fields),enum_cache)
+    return ParamSchema(
+        table, param_type, data_version, offset, description,
+        tuple(fields), enum_cache, row_names,
+    )
 
 
 def _read_int(data: bytes, field: FieldSpec, endian: str):
@@ -495,11 +522,16 @@ class RegulationDocument:
                 raise DS3FormatError(f"{table} row size {param.detected_row_size} does not match audited metadata {schema.row_size}")
             self.entries[table]=entry; self.params[table]=param
         self._plain=plain
+        self._original_plain=plain
         self._dirty=set()
+
+    def _display_name(self, table: str, row: ParamRow) -> str:
+        schema = self.schemas[table]
+        return row.name or schema.row_names.get(row.row_id) or f"Row {row.row_id}"
 
     def list_rows(self, table: str):
         param=self.params[table]
-        return [{"id":r.row_id,"name":r.name or f"Row {r.row_id}"} for r in param.rows]
+        return [{"id":r.row_id,"name":self._display_name(table,r)} for r in param.rows]
 
     def read_row(self, table: str, row_id: int):
         schema=self.schemas[table]; param=self.params[table]; row=param.row(row_id)
@@ -515,7 +547,12 @@ class RegulationDocument:
                 "minimum":field.minimum,"maximum":field.maximum,"enum":schema.enums.get(field.enum,{}),"enumName":field.enum,
                 "reference":field.reference,"dtype":field.dtype,
             })
-        return {"id":row.row_id,"name":row.name or f"Row {row.row_id}","fields":fields,"description":schema.description}
+        return {
+            "id": row.row_id,
+            "name": self._display_name(table, row),
+            "fields": fields,
+            "description": schema.description,
+        }
 
     def edit(self, table: str, row_id: int, field_key: str, value):
         schema=self.schemas[table]; field=schema.field(field_key); param=self.params[table]; row=param.row(row_id)
@@ -530,7 +567,15 @@ class RegulationDocument:
         self._plain=new_plain; self.binder=BND4View(new_plain)
         self.entries[table]=self.binder.find_param(table)
         self.params[table]=ParamView(self.binder.member_bytes(self.entries[table]))
-        self._dirty.add((table,row_id,field_key))
+        original_member = BND4View(self._original_plain).member_bytes(entry)
+        original_row_bytes = original_member[row.data_offset:row.data_offset+schema.row_size]
+        original_value = read_field(original_row_bytes,field,param.endian)
+        dirty_key=(table,row_id,field_key)
+        current_value=read_field(patched,field,param.endian)
+        if current_value == original_value:
+            self._dirty.discard(dirty_key)
+        else:
+            self._dirty.add(dirty_key)
         return self.read_row(table,row_id)
 
     @property
