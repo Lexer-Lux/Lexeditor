@@ -51,6 +51,7 @@ jobs:
             games/__init__.py
             games/ff7/*.py
             games/ff7/*.html
+            games/ff7/*.js
             games/ff7_2013/*.py
             ui/**/*.js
             ui/**/*.css
