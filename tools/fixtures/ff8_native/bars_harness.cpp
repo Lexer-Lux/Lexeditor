@@ -94,6 +94,7 @@ static void replace_call(std::uintptr_t,void*){}
 static std::uint32_t replace_function(std::uint32_t,void*){return 17;}
 static void unreplace_function(std::uint32_t){}
 static void rereplace_function(std::uint32_t){}
+static void ffnx_error(const char*,...){}
 static void patch_code_dword(std::uintptr_t,std::uint32_t){}
 #ifndef _WIN32
 static int localtime_s(std::tm *out,const std::time_t *value){return localtime_r(value,out)?0:1;}
