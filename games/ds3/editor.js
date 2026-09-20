@@ -112,7 +112,7 @@
       change:next=>{table.page=next.page;table.pageSize=next.pageSize;if(next.selected!==null)table.selected=next.selected;render()},
       master:({rows:listed,selected,select})=>columnList({
         rows:listed,key:row=>row.id,selected,
-        select:value=>{select(value);table.selected=value;void loadDetail(id,value,true).then(()=>render())},
+        select:row=>{select(row);table.selected=row.id;void loadDetail(id,row.id,true).then(()=>render())},
         sortState:{key:table.sort[0],dir:table.sort[1]},
         sort:key=>{table.sort=[key,table.sort[0]===key?-table.sort[1]:1];table.page=0;render()},
         columns:[
