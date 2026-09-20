@@ -3,9 +3,12 @@ import re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 
 def main():
-    source = (ROOT / 'games/ff8/editor.html').read_text(encoding='utf-8')
+    source = plugin_ui('ff8')
     world = re.search(r'const tabsData=(\[.*?\]),wrap=', source).group(1)
     maps = re.search(r'className:"ff8-maps-tabs",tabs:(\[.*?\]),active:', source).group(1)
     with sync_playwright() as pw:
@@ -14,7 +17,7 @@ def main():
         page.route('http://fixture/', lambda r: r.fulfill(body='<body data-lex-plugin="ff8"><main></main></body>', content_type='text/html'))
         page.goto('http://fixture/')
         page.add_style_tag(content=(ROOT / 'ui/framework.css').read_text(encoding='utf-8'))
-        page.add_style_tag(content=re.search(r'<style>(.*?)</style>', source, re.S).group(1))
+        page.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
         page.add_script_tag(content=(ROOT / 'ui/framework.js').read_text(encoding='utf-8'))
         page.evaluate("""groups => {
             window.changes = 0;

@@ -16,12 +16,13 @@ struct sprite_viewport {float scale_x,scale_y,offset_x,offset_y;};
 struct Mode {int driver_mode;};
 constexpr int MODE_MENU=1;
 Mode mode{MODE_MENU}; bool has_mode=true;
+bool enable_ff8_hp_bars=false, enable_ff8_xp_bars=true;
 Mode *getmode_cached(){return has_mode?&mode:nullptr;}
 sprite_viewport viewport{2,2,80,0};
 sprite_viewport *active=&viewport, **g_active_viewport=&active;
 #define IM_COL32(r,g,b,a) 0
 std::vector<std::array<float,5>> bars;
-void draw_bar(float x,float y,float w,float h,float f,unsigned){bars.push_back({x,y,w,h,f});}
+void draw_gauge(float x,float y,float w,float h,float f,unsigned){bars.push_back({x,y,w,h,f});}
 ''' + capture + draw + r'''
 int main(){
  capture_menu_xp(79,88,70,.75f);
@@ -37,6 +38,13 @@ int main(){
  active=&viewport;has_mode=false;capture_menu_xp(0,0,1,1);assert(g_menu_xp_count==0);
  has_mode=true;for(int i=0;i<40;++i)capture_menu_xp(0,0,1,1);
  assert(g_menu_xp_count==32);draw_menu_xp();assert(bars.size()==34);
+ enable_ff8_xp_bars=false;enable_ff8_hp_bars=true;
+ capture_menu_xp(44,138,48,.5f);
+ capture_menu_xp(162,55,94,.635f,true);
+ draw_menu_xp();assert(bars.size()==35);
+ assert((bars.back()==std::array<float,5>{496,185,282,3,.635f}));
+ enable_ff8_hp_bars=false;
+ capture_menu_xp(162,55,94,.635f,true);draw_menu_xp();assert(bars.size()==35);
 }
 '''
 vcvars = Path(r'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars32.bat')

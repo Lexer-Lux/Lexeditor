@@ -1,0 +1,41 @@
+@font-face {
+  font-family: "Lex FF7R Local";
+  src:
+    url("/theme-assets/font.woff2") format("woff2"),
+    url("/theme-assets/font.woff") format("woff"),
+    url("/theme-assets/font.ttf") format("truetype"),
+    url("/theme-assets/font.otf") format("opentype");
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+}
+
+:root {
+  --lex-page-bg:linear-gradient(105deg,rgba(4,9,15,.93),rgba(7,18,29,.82)),var(--lex-ff7r-background-image),radial-gradient(circle at 78% -10%,rgba(54,182,238,.16),transparent 42%);
+  --lex-page-background-size:cover;
+  --lex-page-background-position:center;
+  --lex-page-background-attachment:fixed;
+  --lex-page-letter-spacing:.008em;
+  --lex-page-overlay-content:"";
+  --lex-page-overlay-opacity:.28;
+  --lex-page-overlay-bg:linear-gradient(rgba(130,203,236,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(130,203,236,.035) 1px,transparent 1px),linear-gradient(118deg,transparent 0 48%,rgba(108,207,249,.045) 49% 50%,transparent 51% 100%);
+  --lex-page-overlay-size:34px 34px,34px 34px,180px 180px;
+  --lex-shell-header-border:color-mix(in srgb,var(--lex-highlight) 52%,transparent);
+  --lex-shell-shadow:0 7px 22px rgba(0,0,0,.38),0 1px 0 rgba(171,229,255,.08) inset;
+  --lex-command-row-bg:linear-gradient(90deg,rgba(8,19,29,.97),rgba(12,29,43,.94) 58%,rgba(8,18,27,.97));
+  --lex-nav-bg:var(--lex-command-row-bg);
+  --lex-toolbar-padding:8px 12px 8px 15px;
+  --lex-toolbar-border:1px solid color-mix(in srgb,var(--lex-border) 76%,transparent);
+  --lex-toolbar-bg:linear-gradient(96deg,rgba(15,35,51,.95),rgba(8,20,31,.88)),var(--lex-ff7r-panel-image);
+  --lex-toolbar-shadow:0 12px 27px rgba(0,0,0,.20),0 0 16px rgba(54,182,238,.055) inset;
+  --lex-surface-border-color:color-mix(in srgb,var(--lex-border) 76%,transparent);
+  --lex-surface-bg:linear-gradient(118deg,rgba(11,27,41,.965),rgba(8,19,29,.93)),var(--lex-ff7r-panel-image);
+  --lex-surface-background-position:center;
+  --lex-surface-background-size:cover;
+  --lex-surface-shadow:0 14px 32px rgba(0,0,0,.24),0 0 0 1px rgba(145,219,250,.03) inset,18px 0 42px rgba(43,161,211,.025) inset;
+  --lex-input-bg:rgba(5,15,24,.76);
+  --lex-input-border:1px solid color-mix(in srgb,var(--lex-border) 82%,transparent);
+  --lex-input-radius:1px;
+  --lex-input-shadow:0 1px 0 rgba(189,231,249,.035) inset;
+  --lex-bitmap-opacity:.94;
+}

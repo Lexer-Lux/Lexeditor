@@ -1,0 +1,1039 @@
+{
+  "components": {
+    "EditHistory": [
+      "blank",
+      "ff7",
+      "ff7r"
+    ],
+    "NavigationHistory": [],
+    "actionRow": [
+      "blank",
+      "ff7r",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "applyTheme": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "autoFitControlText": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "badge": [
+      "blank",
+      "ff8",
+      "palworld",
+      "rdr",
+      "rdr2"
+    ],
+    "beginSearcher": [
+      "ff8"
+    ],
+    "bindSettingDependencies": [
+      "ff8"
+    ],
+    "bitmapText": [
+      "ff7r",
+      "warband"
+    ],
+    "booleanMark": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "bottomSearch": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "callWindow": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "choiceField": [
+      "blank",
+      "ff8",
+      "rdr2"
+    ],
+    "choicePopover": [
+      "blank",
+      "ff8"
+    ],
+    "clone": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "closeButton": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "codeField": [
+      "blank",
+      "ff8",
+      "warband"
+    ],
+    "columnList": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "columnPreferences": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff8",
+      "ff9"
+    ],
+    "componentSample": [
+      "blank"
+    ],
+    "configureThemeSounds": [
+      "ff7",
+      "ff7r",
+      "ff8"
+    ],
+    "confirmAction": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "confirmDiscardChanges": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "confirmUnsavedExit": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "controlGroup": [
+      "blank",
+      "ff7r",
+      "ff8",
+      "rdr2"
+    ],
+    "controlHelp": [
+      "blank"
+    ],
+    "copyText": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "createWindowActions": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "creditsPanel": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "curveEditor": [
+      "blank",
+      "ff8"
+    ],
+    "curveGrid": [
+      "blank",
+      "ff8"
+    ],
+    "dataMap": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "decorateSearchCandidate": [
+      "blank",
+      "ff8"
+    ],
+    "detailField": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "detailGroup": [
+      "blank",
+      "warband"
+    ],
+    "detailNote": [
+      "blank",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "detailPanel": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "detailRow": [
+      "blank"
+    ],
+    "detailSection": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "detailText": [
+      "blank",
+      "rdr",
+      "warband"
+    ],
+    "dismissDialogs": [],
+    "el": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "element": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "enabledMark": [
+      "blank",
+      "ff8"
+    ],
+    "figureGrid": [
+      "blank",
+      "ff8",
+      "warband"
+    ],
+    "finishPluginLoading": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "finishSearcher": [
+      "ff8"
+    ],
+    "fitListPage": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "folderIcon": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "formatNumber": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "gameCard": [
+      "blank"
+    ],
+    "hasEnabledProperty": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "hoverable": [
+      "blank",
+      "ff8",
+      "rdr2",
+      "warband"
+    ],
+    "iconSlot": [
+      "blank",
+      "ff8",
+      "rdr2",
+      "warband"
+    ],
+    "imageMap": [
+      "blank",
+      "ff8"
+    ],
+    "infoHelp": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "infoIcon": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "inlineLabel": [
+      "blank",
+      "ff8",
+      "rdr2"
+    ],
+    "installBrowserHistoryGuard": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "installControlHelp": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "installExtendedMouseHistory": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "installWindowFrame": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "instructionList": [
+      "ff8"
+    ],
+    "integrationStatus": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "lazyOptions": [
+      "ff8"
+    ],
+    "list": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "listDetail": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "logView": [
+      "blank",
+      "rdr",
+      "warband"
+    ],
+    "magnitudeValue": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "masterDetail": [
+      "warband"
+    ],
+    "mathFormula": [
+      "blank",
+      "ff8"
+    ],
+    "modLoaderSection": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "modelStage": [
+      "blank",
+      "rdr2",
+      "warband"
+    ],
+    "mountShell": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "multiNumberRow": [
+      "blank",
+      "ff8"
+    ],
+    "newButton": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "notice": [
+      "blank",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "numberValue": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "openGameFolder": [
+      "blank",
+      "ff8"
+    ],
+    "openSettings": [
+      "blank"
+    ],
+    "pagedListDetail": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "pagedPane": [
+      "blank",
+      "ff8",
+      "rdr2"
+    ],
+    "pager": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "pagerSelect": [
+      "blank",
+      "ff7r"
+    ],
+    "pagerToggle": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "paginateSettings": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "panelIcon": [],
+    "panelLayout": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "pendingChangeList": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "platformConfigView": [
+      "ff7",
+      "ff8"
+    ],
+    "playThemeSound": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "provenanceControl": [
+      "blank",
+      "ff7",
+      "ff8",
+      "rdr",
+      "rdr2"
+    ],
+    "readonlyField": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "recordId": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "referenceDisplay": [
+      "blank",
+      "ff7",
+      "ff8",
+      "rdr",
+      "rdr2"
+    ],
+    "refreshReferences": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "reshadeSection": [
+      "blank",
+      "ff7r",
+      "ff7r2",
+      "ff9"
+    ],
+    "saveIcon": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "searchIcon": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "sectionParts": [
+      "ff8",
+      "rdr2"
+    ],
+    "settingsColumns": [
+      "blank",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "rdr",
+      "rdr2"
+    ],
+    "settingsIcon": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "settingsSaveControl": [
+      "blank",
+      "rdr",
+      "rdr2"
+    ],
+    "sharedSettings": [
+      "blank",
+      "ff7",
+      "ff8"
+    ],
+    "shellTextNodes": [],
+    "showAlert": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "showToast": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "soundCoverageTable": [
+      "blank",
+      "ff7",
+      "ff8"
+    ],
+    "stack": [
+      "ff7r",
+      "ff8",
+      "palworld",
+      "rdr2",
+      "warband"
+    ],
+    "statCard": [
+      "blank",
+      "ff8"
+    ],
+    "subtabBar": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "tabbedPanel": [
+      "blank",
+      "ff7",
+      "ff8"
+    ],
+    "textArea": [
+      "blank",
+      "ff7r",
+      "ff8",
+      "palworld",
+      "rdr2"
+    ],
+    "tileGrid": [
+      "blank",
+      "ff8",
+      "rdr2"
+    ],
+    "toggleRow": [
+      "blank",
+      "ff7",
+      "ff8",
+      "ff9"
+    ],
+    "toolbar": [
+      "blank",
+      "ff7r",
+      "ff8",
+      "palworld",
+      "rdr2"
+    ],
+    "treeGraph": [
+      "blank",
+      "warband"
+    ],
+    "uiScaleControl": [
+      "blank",
+      "ff7",
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "ff9",
+      "palworld",
+      "rdr",
+      "rdr2",
+      "warband"
+    ],
+    "unitField": [
+      "blank",
+      "ff8",
+      "rdr2"
+    ]
+  },
+  "shell": [
+    "EditHistory",
+    "NavigationHistory",
+    "applyTheme",
+    "autoFitControlText",
+    "booleanMark",
+    "bottomSearch",
+    "callWindow",
+    "clone",
+    "closeButton",
+    "columnList",
+    "confirmAction",
+    "confirmDiscardChanges",
+    "confirmUnsavedExit",
+    "copyText",
+    "createWindowActions",
+    "creditsPanel",
+    "dataMap",
+    "detailField",
+    "detailPanel",
+    "detailSection",
+    "element",
+    "finishSearcher",
+    "fitListPage",
+    "folderIcon",
+    "formatNumber",
+    "hasEnabledProperty",
+    "infoHelp",
+    "infoIcon",
+    "installBrowserHistoryGuard",
+    "installControlHelp",
+    "installExtendedMouseHistory",
+    "installWindowFrame",
+    "integrationStatus",
+    "list",
+    "listDetail",
+    "magnitudeValue",
+    "newButton",
+    "numberValue",
+    "pagedListDetail",
+    "pagedPane",
+    "pager",
+    "pagerToggle",
+    "paginateSettings",
+    "panelLayout",
+    "pendingChangeList",
+    "playThemeSound",
+    "readonlyField",
+    "recordId",
+    "referenceDisplay",
+    "refreshReferences",
+    "saveIcon",
+    "searchIcon",
+    "settingsIcon",
+    "settingsSaveControl",
+    "sharedSettings",
+    "showAlert",
+    "showToast",
+    "subtabBar",
+    "tileGrid",
+    "uiScaleControl",
+    "unitField"
+  ]
+}

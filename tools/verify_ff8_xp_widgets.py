@@ -13,9 +13,10 @@ for target,calls in {0x4C0780:[0x4C08F4,0x4CB66C,0x4CC846,0x4F6E8E,0x4F6F17,0x4F
   assert image[call-0x400000]==0xe8
   assert call+5+struct.unpack_from('<i',image,call-0x400000+1)[0]==target
 
-def widget(address,args):
+def widget(address,args,setup=None):
  u=Uc(UC_ARCH_X86,UC_MODE_32);u.mem_map(0,0x3000000);u.mem_write(0x400000,image)
  stack=0x2900000;stop=0x2800000
+ if setup: setup(u)
  u.mem_write(stack,struct.pack('<'+'I'*(len(args)+1),stop,*args));u.reg_write(UC_X86_REG_ESP,stack)
  calls=[]
  def hook(u,pc,size,user):
@@ -41,4 +42,24 @@ for x,y in [(0,0),(31,19),(140,72)]:
  calls=widget(0x4D41B0,[0x2000000,1,2,x,y,3])
  level=next(args for target,args in calls if target==0x4BF330)
  assert level[3:5]==(x+79,y+75),level
+
+def menu_state(u):
+ u.mem_write(0x2000035,bytes([0,1,2,3,4,255,255,255,255,255,255]))
+ for slot in range(8):
+  u.mem_write(0x1D771B0+32*slot+8,struct.pack('<HHBB',635,1000,11+slot,30))
+
+for address,spacing in [(0x4C1D50,26),(0x4C1ED0,52)]:
+ for slot in range(3):
+  calls=widget(address,[0x2000000,1,2,slot],menu_state)
+  level=next(args for target,args in calls if target==0x4B77C0 and args[2]==0x145)
+  assert level[3:5]==(114,46+spacing*slot),level
+calls=widget(0x4C2090,[0x2000000,1,2],menu_state)
+levels=[args[3:5] for target,args in calls if target==0x4B77C0 and args[2]==0x145]
+assert levels==[(44,129),(164,129)],levels
+for selector,label in [(1,0x142),(0,0x146)]:
+ calls=widget(0x4BF020,[0x2000000,1,2,20,30,3660,selector])
+ native_label=next(args for target,args in calls if target==0x4B77C0)
+ assert native_label[2:5]==(label,20,30),native_label
 print("PASS: 13 native call sites; shared character and GF list level coordinates at three offsets")
+print("PASS: active and reserve main-menu LV positions from native widgets")
+print("PASS: native playtime and countdown clock label selectors")

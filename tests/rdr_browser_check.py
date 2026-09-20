@@ -4,6 +4,9 @@ Uses the production RDR1 editor plus shared framework with synthetic API data. N
 installed game, game assets, native runtime, or network access is required.
 """
 from pathlib import Path
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import inline_modules
 import argparse
 import json
 from playwright.sync_api import sync_playwright, expect
@@ -75,6 +78,7 @@ window.fetch=async function(url,options={}) {
         "<script>" + fixture + "</script><script>" +
         (ROOT / "ui/framework.js").read_text(encoding="utf-8") + "</script>",
     )
+    html = inline_modules("rdr", html)
     return html.replace("<head>", '<head><base href="https://lexeditor.test/">', 1)
 
 

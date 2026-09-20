@@ -18,6 +18,7 @@ import tempfile
 from typing import Any
 
 from .package import InfoDocument, PackageValidationError
+from plugin_files import atomic_write
 
 
 BUILD_DIRNAME = "build"
@@ -181,19 +182,6 @@ def _package_digest(records: list[dict[str, Any]]) -> str:
     return digest.hexdigest()
 
 
-def _atomic_write(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(data)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temp_name, path)
-    finally:
-        Path(temp_name).unlink(missing_ok=True)
-
-
 def _paths(project: Path) -> tuple[Path, Path, Path]:
     project = Path(project).resolve()
     build_root = project / BUILD_DIRNAME
@@ -309,7 +297,7 @@ def build(project: Path) -> dict[str, Any]:
             backup.rmdir()
             os.replace(target, backup)
         os.replace(staging, target)
-        _atomic_write(manifest_path, manifest_bytes)
+        atomic_write(manifest_path, manifest_bytes)
         if backup is not None and backup.exists():
             shutil.rmtree(backup)
     except BaseException:
@@ -320,7 +308,7 @@ def build(project: Path) -> dict[str, Any]:
         if original_manifest is None:
             manifest_path.unlink(missing_ok=True)
         else:
-            _atomic_write(manifest_path, original_manifest)
+            atomic_write(manifest_path, original_manifest)
         if staging.exists():
             shutil.rmtree(staging, ignore_errors=True)
         raise
