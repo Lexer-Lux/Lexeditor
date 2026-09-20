@@ -317,7 +317,10 @@
     return LexeditorUI.controlGroup(values.map((_value,index)=>
       ({label:`#${index+1}`,control:scalarControl(row,prop,index,source)})));
   }
-  function propertyHelp(prop){if(!prop.editable)return infoHelp("This DataObject stores this value in a form Lexeditor cannot safely rewrite in place.");if(prop.type==="ENUM")return infoHelp("This value is an Unreal FName. A same-size edit can choose only a name already present in this .uasset's name table.");if(prop.array)return infoHelp("Existing array elements are editable. Resizing the array would move later row data and is not yet supported.");return null}
+  // Generic package metadata tells us storage constraints, not gameplay meaning.
+  // Shared help pips are semantic only, so unknown fields deliberately get no
+  // pip; first-class surfaces add authored help where the consequence is known.
+  function propertyHelp(_prop){return null}
 
   function recordPanel(row=selectedRecord()){
     if(!row)return detailPanel({className:"ff7r-detail",title:"No record",body:[detailSection({title:"DATA",body:[detailNote("This DataObject has no rows.")]})]});
