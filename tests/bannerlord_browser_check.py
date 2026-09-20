@@ -108,6 +108,8 @@ def inline_editor() -> str:
     html = html.replace("<head>", '<head><base href="http://127.0.0.1:9/">', 1)
     html = html.replace('<link rel="stylesheet" href="/shared/framework.css">',
                         "<style>" + (ROOT / "ui/framework.css").read_text(encoding="utf-8") + "</style>")
+    html = html.replace('<link rel="stylesheet" href="./editor.css">',
+                        "<style>" + (ROOT / "games/bannerlord/editor.css").read_text(encoding="utf-8") + "</style>")
     fixtures = {
         "/api/module": MODULE, "/api/project": PROJECT, "/api/skills": EMPTY_SKILLS,
         "/api/effects": EMPTY_EFFECTS, "/api/perks": EMPTY_PERKS, "/api/xp-sources": EMPTY_XP,
@@ -158,11 +160,11 @@ window.fetch=async function(input,options={{}}){{
     html = html.replace('<script src="/shared/framework.js"></script>',
                         "<script>" + stub + "</script><script>" + (ROOT / "ui/framework.js").read_text(encoding="utf-8") + "</script>")
     for name in (
-        "editor_alerts.js", "editor_core.js", "editor_balancing.js", "editor_build.js",
+        "editor_alerts.js", "editor_core.js", "editor_shared.js", "editor_balancing.js", "editor_build.js",
         "editor_settings.js", "editor_runtime.js", "editor_gauntlet.js", "editor_moduledata.js",
         "editor_moduledata_validation.js", "editor_boot.js",
     ):
-        html = html.replace(f'<script src="/bannerlord/{name}"></script>',
+        html = html.replace(f'<script src="./{name}"></script>',
                             "<script>" + (ROOT / "games/bannerlord" / name).read_text(encoding="utf-8") + "</script>")
     return html
 
@@ -179,16 +181,16 @@ def main() -> None:
             page.wait_for_function("state.module && state.project && state.datamap", timeout=8000)
             assert "Fixture Module" in page.locator("#main").inner_text()
 
-            page.evaluate('navigate("dependencies")')
-            legacy_row = page.locator("button.bl-item").filter(has_text="LegacyBrowserDep")
+            page.evaluate('state.moduleView="dependencies";navigate("module")')
+            legacy_row = page.locator(".lex-column-list-row").filter(has_text="LegacyBrowserDep")
             assert legacy_row.count() == 1
             legacy_row.click()
-            detail_text = page.locator(".bl-detail").inner_text()
+            detail_text = page.locator(".lex-detail-panel").last.inner_text()
             assert "Legacy shape" in detail_text
             assert "LoadAfterModules" in detail_text
-            assert "historical LoadAfterModules relation is required" in detail_text
+            assert "Required legacy load-after relation" in detail_text
             assert page.get_by_role("button", name="+ Legacy", exact=True).count() == 0
-            legacy_id = page.locator('.bl-detail .bl-grid input[type="text"]').first
+            legacy_id = page.locator(".lex-detail-field").filter(has_text="Module ID").locator('input[type="text"]').first
             legacy_id.fill("LegacyBrowserRenamed")
             assert page.evaluate("moduleDirty()") is True
             assert page.evaluate("state.module.legacyDependencies[0].id") == "LegacyBrowserRenamed"
@@ -213,7 +215,7 @@ def main() -> None:
             assert source_request["body"]["text"] == "after"
             assert source_request["body"]["originalText"] == "before"
 
-            page.evaluate('navigate("deployment")')
+            page.evaluate('navigate("info")')
             deployment_text = page.locator("#main").inner_text()
             assert "MOD LOADER" in deployment_text
             loader_values = page.locator("#main .lex-detail-field input").evaluate_all(
@@ -221,16 +223,16 @@ def main() -> None:
             )
             assert any("Bannerlord's native module loader" in value for value in loader_values), loader_values
 
-            page.evaluate('navigate("moduledata")')
+            page.evaluate('state.moduleDataView="records";navigate("moduledata")')
             page.wait_for_function("state.moduleData && state.moduleData.schemaIssueCount===1")
-            assert page.locator('.bl-detail input[type="checkbox"]').first.is_checked()
+            assert page.locator('.lex-detail-panel input[type="checkbox"]').first.is_checked()
             assert page.get_by_role("button", name="Validate all", exact=True).is_enabled()
             page.get_by_role("button", name="Validate all", exact=True).click()
             page.wait_for_function("state.moduleDataValidation && !state.moduleDataValidating && state.moduleDataValidation.scanned===1")
             assert page.evaluate("state.moduleDataValidation.issues") == 1
             assert "1 schema issue" in page.locator("#main").inner_text()
 
-            missing_panel = page.locator(".bl-list-block").filter(has_text="Missing required attributes")
+            missing_panel = page.locator(".lex-detail-section").filter(has_text="MISSING REQUIRED ATTRIBUTES")
             missing_panel.locator('input[type="checkbox"]').first.check()
             missing_panel.locator('input[type="text"]').first.fill("browser_fixture")
             assert page.evaluate("moduleDataDirty()") is True
@@ -240,25 +242,25 @@ def main() -> None:
             assert request["body"]["edits"][0]["addRequired"] is True
             assert request["body"]["edits"][0]["attribute"] == "id"
 
-            page.evaluate('navigate("gauntlet")')
+            page.evaluate('state.gauntletView="widgets";navigate("gauntlet")')
             page.wait_for_function("state.gauntlet && state.gauntlet.elementCount===3")
-            page.locator("button.bl-item").filter(has_text="Widget").click()
-            page.locator('.bl-detail input[type="checkbox"]').check()
+            page.locator(".lex-column-list-row").filter(has_text="Widget").click()
+            page.locator('.lex-detail-panel input[type="checkbox"]').first.check()
             page.evaluate("save()")
             page.wait_for_function("!gauntletDirty()")
             gauntlet_request = page.evaluate("window.__bannerlordRequests.find(row=>row.path==='/api/gauntlet/save')")
             assert gauntlet_request["body"]["edits"][0]["attribute"] == "IsEnabled"
 
             page.evaluate('navigate("build")')
-            for label in ("dotnet build", "Build + deploy", "Sync assets"):
+            for label in ("Build", "Build + Deploy", "Sync assets"):
                 assert page.get_by_role("button", name=label, exact=True).is_enabled()
             page.get_by_role("button", name="Sync assets", exact=True).click()
             page.wait_for_function("state.deployResult && state.deployResult.copied.length===1")
 
-            page.evaluate('navigate("deployment")')
+            page.evaluate('navigate("info")')
             deployment_text = page.locator("#main").inner_text()
-            assert "GUI assets" in deployment_text
-            assert "ModuleData assets" in deployment_text
+            assert "GUI" in deployment_text
+            assert "ModuleData" in deployment_text
             assert "Project/deployed sync" in deployment_text
 
             page.evaluate('navigate("datamap")')
@@ -267,6 +269,14 @@ def main() -> None:
             filenames = page.evaluate("state.datamap.rows.map(row=>row.filename)")
             assert "ModuleData/items.xml" in filenames
             assert "GUI/Prefabs/Test.xml" in filenames
+
+            # Right-click Save invokes the shared discard confirmation and reloads the saved state.
+            page.evaluate('state.module.name="Discard me";render()')
+            page.wait_for_function("moduleDirty()")
+            page.locator("#global-save").click(button="right")
+            page.get_by_role("button", name="Discard Changes", exact=True).click()
+            page.wait_for_function("!moduleDirty()")
+            assert page.evaluate("state.module.name") != "Discard me"
 
             page.screenshot(path=str(ARTIFACTS / "bannerlord-editor.png"), full_page=True)
 
