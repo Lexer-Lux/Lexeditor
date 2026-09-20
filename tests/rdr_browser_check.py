@@ -31,6 +31,25 @@ def document() -> str:
         "rewards": {"cash": 0, "fame": 0, "honor": 50},
         "baseRewards": {"cash": 0, "fame": 0, "honor": 50}, "project": False,
     }
+    string_table = {
+        "table": {"id": "tuning:tune/stringtable/global.strtbl", "source": "tuning",
+                  "sourceLabel": "Tuning", "path": "tune/stringtable/global.strtbl",
+                  "label": "global", "available": True, "sourcePath": "prepared/global.strtbl",
+                  "projectPath": "project/global.strtbl", "project": False,
+                  "rowCount": 1, "languageCount": 1, "version": 256, "identifierCount": 1},
+        "rows": [{"id": "tuning:tune/stringtable/global.strtbl:0:0:12345678",
+                  "tableId": "tuning:tune/stringtable/global.strtbl", "source": "tuning",
+                  "sourceLabel": "Tuning", "path": "tune/stringtable/global.strtbl",
+                  "sourcePath": "prepared/global.strtbl", "projectPath": "project/global.strtbl",
+                  "project": False, "languageIndex": 0, "languageIndexes": [0],
+                  "language": "English", "entryIndex": 0, "hash": "0x12345678",
+                  "hashValue": 305419896, "identifier": "HELLO",
+                  "identifierCandidates": ["HELLO"], "text": "Hello",
+                  "sharedLanguageBlock": False}],
+        "counts": {"records": 1, "languages": 1, "identifiers": 1},
+    }
+    strings = {"tables": [string_table["table"]],
+               "counts": {"tables": 1, "available": 1, "records": 1, "project": 0}}
     missions = {
         "missions": [mission],
         "limits": {"step": 1, "rewards": {
@@ -46,6 +65,9 @@ def document() -> str:
         "/api/items?dataset=vanilla": items,
         "/api/shops": {"rows": []},
         "/api/shops?dataset=vanilla": {"rows": []},
+        "/api/string-tables": strings,
+        "/api/string-tables?dataset=vanilla": strings,
+        "/api/string-table": string_table,
         "/api/missions": missions,
         "/api/missions?dataset=vanilla": missions,
         "/api/settings": {"available": False, "sections": [], "reason": "Synthetic fixture"},
@@ -74,6 +96,10 @@ window.fetch=async function(url,options={}) {
         '<script src="/shared/framework.js"></script>',
         "<script>" + fixture + "</script><script>" +
         (ROOT / "ui/framework.js").read_text(encoding="utf-8") + "</script>",
+    )
+    html = html.replace(
+        '<script src="/assets/strings.js"></script>',
+        "<script>" + (ROOT / "games/rdr/assets/strings.js").read_text(encoding="utf-8") + "</script>",
     )
     return html.replace("<head>", '<head><base href="https://lexeditor.test/">', 1)
 
@@ -116,6 +142,12 @@ def run(output: Path, executable: str | None) -> None:
                 }""").json_value()
                 assert 0.075 <= geometry["ratio"] <= 0.125, (width, "RDR1 bypassed shared ~10% label lane", geometry)
                 page.screenshot(path=str(output / f"rdr-items-{width}.png"), full_page=True)
+
+                page.evaluate("state.tab='strings'; stringsUI.render()")
+                expect(page.locator(".string-detail textarea")).to_have_value("Hello")
+                expect(page.locator(".rdr-string-row")).to_have_count(2)
+                expect(page.locator(".string-detail .lex-detail-field")).to_have_count(7)
+                page.screenshot(path=str(output / f"rdr-strings-{width}.png"), full_page=True)
 
                 page.evaluate("state.tab='missions'; state.missionSelected=2; renderMissions()")
                 expect(page.locator(".mission-detail .lex-detail-field")).to_have_count(9)
