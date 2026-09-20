@@ -31,13 +31,16 @@ class CoverageTests(unittest.TestCase):
     def test_structured_settings_and_items_count_integrated(self):
         rows={r['filename']:r for r in server.data_map_rows()['rows']}
         self.assertEqual(rows['settings.ini']['coverage'],'structured')
-        self.assertEqual(rows['module_skills.py']['coverage'],'source')
+        self.assertEqual(rows['module_skills.py']['coverage'],'structured')
+        self.assertEqual(rows['module_skills.py']['status'],'partial')
+        self.assertEqual(rows['module_skills.py']['view'],'misc')
         self.assertEqual(rows['module_items.py']['coverage'],'structured')
         self.assertEqual(rows['module_items.py']['status'],'integrated')
         self.assertEqual(rows['module_items.py']['view'],'items')
         self.assertEqual(rows['module_troops.py']['view'],'troops')
         self.assertEqual(server.data_map_rows()['counts']['integrated'],2)
         self.assertTrue(rows['module_skills.py']['openable'])
+        self.assertEqual(rows['module_skills.py']['dataset'],'skills')
         self.assertFalse(rows['module_quests.py']['openable'])
         self.assertEqual(rows['module_quests.py']['coverage'],'unavailable')
 
