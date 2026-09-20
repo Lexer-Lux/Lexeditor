@@ -80,9 +80,13 @@ def smoke() -> list[str]:
         target.parent.mkdir(parents=True)
         shutil.copy2(source, target)
         (game / "ff7_en.exe").write_bytes(b"test")
-        with FF7LegacySession({"LEXEDITOR_FF7_ROOT": str(game),
-                "LEXEDITOR_FF7_DATA_ROOT": str(root / "data"),
-                "LEXEDITOR_FF7_PROJECT": str(root / "project")}) as session:
+        project = root / "project"
+        session_env = {
+            "LEXEDITOR_FF7_ROOT": str(game),
+            "LEXEDITOR_FF7_DATA_ROOT": str(root / "data"),
+            "LEXEDITOR_FF7_PROJECT": str(project),
+        }
+        with FF7LegacySession(session_env) as session:
             identity = request_json(session.url + "api/plugin")
             if identity.get("pluginId") != "ff7-2013":
                 raise RuntimeError("The legacy FF7 product returned the wrong identity")
@@ -127,11 +131,18 @@ def smoke() -> list[str]:
                 raise RuntimeError("The legacy FF7 project save did not survive binary readback")
         if not session.wait_closed():
             raise RuntimeError("The legacy FF7 child service stayed open")
+        with FF7LegacySession(session_env) as reopened:
+            reopened_data = request_json(reopened.url + "api/data")
+            reopened_defense = reopened_data["records"]["armor"][0]["values"]["defense"]
+            if reopened_defense != changed:
+                raise RuntimeError("The legacy FF7 project edit did not survive a fresh service reopen")
+        if not reopened.wait_closed():
+            raise RuntimeError("The reopened legacy FF7 child service stayed open")
     return [
         "legacy FF7 product identity, shared editor and capabilities confirmed",
         "Data Map structured/openable coverage contract confirmed",
         "416 English KERNEL.BIN records decoded",
-        "bounded armor edit saved to the legacy project and survived binary readback",
+        "bounded armor edit saved to the legacy project, survived binary readback and reopened",
     ]
 
 
