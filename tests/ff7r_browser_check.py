@@ -436,6 +436,23 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         page.wait_for_function("state.tab==='data' && state.data && !state.busy")
         assert page.evaluate("state.asset") in set(fixtures()["data"])
 
+        # The map must lead to the first-class screen that owns each target,
+        # not funnel everything through Misc or lose virtual resources.
+        for target, expected in (
+            (EQUIPMENT, "equipment"),
+            (ITEM, "item"),
+            (LOOT, "loot"),
+            (PLAYER, "characters"),
+            (ABILITY, "abilities"),
+            (ENEMY, "enemies"),
+            (TWEAK, "tweaks"),
+            (TEXT, "text"),
+        ):
+            page.evaluate("target => openMapRow({target})", target)
+            page.wait_for_function("expected => state.tab===expected && !state.busy && !state.textBusy && !(state.tweaksPending>0)", expected)
+            assert page.evaluate("state.tab") == expected, (target, expected)
+        page.screenshot(path=str(output / "datamap-routing-1200.png"), full_page=True)
+
         page.locator("#plugin-info").click()
         page.wait_for_function("state.tab==='info'")
         expect(page.get_by_role("heading", name="Information", exact=True)).to_be_visible()
