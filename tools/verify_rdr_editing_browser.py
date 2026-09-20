@@ -56,6 +56,7 @@ def main():
                     page.evaluate('navigate("items")')
                     page.locator('.item-detail input[type=number]').first.fill('9')
                     page.evaluate('navigate("missions")')
+                    page.locator('.rdr-record-entry').first.click()
                     page.locator('.mission-detail input[type=number]').first.fill('')
                     requests = []
                     page.on('request', lambda request: requests.append(request.url) if request.method == 'POST' else None)
