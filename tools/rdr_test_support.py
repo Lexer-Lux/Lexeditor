@@ -59,7 +59,7 @@ def _joaat(value: str) -> int:
 def string_table_bytes():
     """Small ordinary PC STRTBL with one shared language block."""
     identifiers = ("HELLO", "GOODBYE")
-    prefix = bytearray(struct.pack("<i", 3) + bytes(12))
+    prefix = bytearray(struct.pack("<i", 11) + bytes(44))
     prefix += struct.pack("<Ii", 256, len(identifiers))
     for identifier in identifiers:
         raw = identifier.encode("ascii")
@@ -79,7 +79,8 @@ def string_table_bytes():
     spanish = struct.pack("<I", 2) + entry("HELLO", "Hola") + entry("GOODBYE", "Adiós")
     english_offset = len(prefix)
     spanish_offset = english_offset + len(english)
-    for index, offset in enumerate((english_offset, spanish_offset, spanish_offset)):
+    positions = [english_offset] + [0] * 8 + [spanish_offset, spanish_offset]
+    for index, offset in enumerate(positions):
         struct.pack_into("<I", prefix, 4 + index * 4, offset)
     return bytes(prefix) + english + spanish
 
