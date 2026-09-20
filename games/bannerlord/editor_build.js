@@ -129,8 +129,8 @@
   function renderSource(){
     if(!state.source){main.replaceChildren(uiEmpty("Source","No source file selected."));return}
     const textarea=el("textarea",{value:state.source.text,spellcheck:"false",oninput:event=>{state.source.text=event.target.value;refresh()}});
-    main.replaceChildren(el("section",{class:"bl-source"},
-      el("div",{class:"bl-source-head"},el("strong",{},"Source only"),el("code",{},state.source.path),el("span",{},`${state.source.encoding} · ${state.source.size} bytes`)),
+    main.replaceChildren(el("section",{class:"bannerlord-source"},
+      el("div",{class:"bannerlord-source-head"},el("strong",{},"Source only"),el("code",{},state.source.path),el("span",{},`${state.source.encoding} · ${state.source.size} bytes`)),
       textarea
     ));
   }
