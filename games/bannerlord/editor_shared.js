@@ -122,3 +122,55 @@ function bannerlordModLoaderSection(){
     removal:"Stop launching the module and remove its deployed Modules/<SubModule ID> folder to uninstall it. The separate source project is left untouched."
   });
 }
+
+
+function renderInfo(){
+  const deployment=state.deployment||{};
+  const issues=deployment.issues||[],assets=deployment.assets||{},overrides=deployment.runtimeOverrides||{};
+  const setup=BLUI.detailPanel({
+    title:deployment.projectName||deployment.moduleId||state.module?.name||"Bannerlord",
+    icon:BLUI.infoIcon(),meta:"Setup, deployment & runtime",
+    body:[
+      BLUI.detailSection({title:"PROJECT & INSTALLATION",body:[
+        readField("Project",state.project?.root||"—"),
+        readField("Game root",deployment.gameRoot||"Selected Bannerlord installation"),
+        readField("Module ID",deployment.moduleId||state.module?.id||"—"),
+        readField("Deployed module",deployment.deployedRoot||"Not deployed"),
+        readField("Runnable",deployment.runnable?"Yes":"No"),
+        readField("Project deployed",deployment.deployed?"Yes":"No"),
+        readField("Project/deployed sync",deployment.inSync?"Yes":"No")
+      ]}),
+      BLUI.detailSection({title:"SETUP & UPDATE BOUNDARIES",body:[
+        readField("Runtime loader","Bannerlord native module system","No third-party loader or runtime helper is installed by this plugin. Bannerlord itself owns the module loader, so there is no Bannerlord helper entry to pin or place in Lexeditor's Updates drawer."),
+        readField("Build toolchain","System dotnet SDK","Only the Build page invokes dotnet. Lexeditor does not install or auto-update the machine's .NET SDK; if the toolchain is absent, Build returns an explicit error instead of silently modifying the system."),
+        readField("Modding Kit schemas","Optional local XmlSchemas","XSD enrichment reads schemas from a locally installed Bannerlord Modding Kit or game toolchain when present. These game/toolkit-owned schemas are not bundled or redistributed; absent or ambiguous schemas fall back to conservative literal editing.")
+      ]}),
+      issues.length?BLUI.detailSection({title:"CURRENT ISSUES",body:issues.map((issue,index)=>readField(`Issue ${index+1}`,issue))}):
+        BLUI.detailSection({title:"CURRENT ISSUES",body:[readField("Static checks","No deployment problem detected")]}),
+      BLUI.detailSection({title:"RUNTIME OVERRIDES",body:Object.keys(overrides).length?
+        Object.entries(overrides).map(([key,row])=>readField(key,row.exists?(row.valid?`${row.keys} keys`:`Invalid JSON: ${row.error||"parse error"}`):"Not present")):
+        [readField("Overrides","None deployed")]}),
+      bannerlordModLoaderSection()
+    ]
+  });
+  const diagnostics=BLUI.detailPanel({
+    title:"Deployment details",meta:"Native module outputs",
+    body:[
+      BLUI.detailSection({title:"VERSIONS",body:[
+        readField("Project version",deployment.projectVersion||"—"),
+        readField("Deployed version",deployment.deployedVersion||"—"),
+        readField("Descriptor sync",deployment.descriptorInSync?"Yes":"No")
+      ]}),
+      BLUI.detailSection({title:"BINARIES",body:(deployment.binaries||[]).length?
+        deployment.binaries.map((row,index)=>readField(row.name||`Binary ${index+1}`,row.exists?`${row.size} bytes · ${row.classType||"module assembly"}`:"Missing")):
+        [readField("Binaries","No SubModule DLL entries")]}),
+      BLUI.detailSection({title:"ASSETS",body:[
+        readField("GUI",assets.gui?`${assets.gui.source||0} source · ${assets.gui.deployed||0} deployed · ${assets.gui.inSync?"in sync":"different"}`:"None"),
+        readField("ModuleData",assets.moduleData?`${assets.moduleData.source||0} source · ${assets.moduleData.deployed||0} deployed · ${assets.moduleData.inSync?"in sync":"different"}`:"None")
+      ]})
+    ]
+  });
+  main.replaceChildren(BLUI.panelLayout([setup,diagnostics],"bannerlord-info-layout",{
+    layoutKey:"bannerlord-info",stackAt:1000,defaultSizes:[55,45]
+  }));
+}
