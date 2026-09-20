@@ -4,12 +4,42 @@
 
 ## Requirements and decisions
 
-Read the live GitHub issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
+- Show a distinct ordinary-interaction cue and an additional Triple Triad cue.
+- The issue accepts a fixed-HUD position, so this branch does not guess field-model projection.
+- The tweak is default-off and observational: it never presses a button, writes the native interaction request, or starts field script execution.
 
 ## Current implementation and evidence
 
-Reconcile live code, PRs and existing topic/session worklogs. Do not infer build, deployment, gameplay success, or acceptance from documentation alone.
+Draft PR: #501 on `codex/ff8-interaction-indicators-302`.
 
-## Next agent work
+The supported Steam English `FF8_EN.exe` was supplied privately and verified as
+SHA-256 `064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570`.
+No executable bytes or binary dump are committed.
 
-Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+Executable-backed analysis establishes that field interaction selection:
+- uses the player/entity table at `01D9CF88`, player index `01CD8FD0` and entity count `01D9D019`;
+- filters disabled/non-talk entities, same-X/Y entities and targets outside the strict +/-256 Z range;
+- uses native direction/distance helper `00477380`, native talk radii, and chooses the smallest facing error below `0x40`;
+- writes Cross/Square interaction mode only after selection. This implementation mirrors the selection but never performs that write.
+
+The field VM uses entity script base + 2 for Talk. Runtime instructions are dwords from
+`01D9CF50`; the entry table is `01D9D0E4`; opcode `0x13A` dispatches to the verified
+CARDGAME handler. The indicator therefore adds CARD only when the selected entity's direct
+Talk-script range contains CARDGAME. Independent FF8UltimateEditor real-file tests identify
+four `bghall_1` card players whose CARDGAME is directly in their `talk` scripts, which
+supports this classification strategy without copying their proprietary fixtures.
+
+A pure C++ policy harness passes locally for CARDGAME decoding, wraparound facing error,
+strict Z bounds and strict talk-radius bounds. The branch also contains setting/config/UI
+round-trip tests and a Windows FFNx build gate.
+
+## Remaining acceptance boundary
+
+- Download and inspect a successful exact-head Windows FFNx candidate; source success alone is not delivery.
+- Validate the runtime CARDGAME classifier against retail field data. Smallest useful fixture:
+  `bghall_1.jsm` plus `bghall_1.sym` from the same Steam English install.
+- In a live game, verify ordinary targets show INTERACT, the four known Garden card players add
+  CARD, out-of-range/facing-away/locked states show nothing, and Cross/Square behavior remains
+  byte-for-byte native with the tweak disabled. Screenshots/logs are required for visual/runtime acceptance.
+
+Keep the issue actionable until these delivery/runtime checks are recorded.
