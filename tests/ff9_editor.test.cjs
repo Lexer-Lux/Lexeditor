@@ -38,7 +38,7 @@ async function editor() {
     if ('tag' in value) return [value];
     return Object.values(value).flatMap(carried);
   };
-  for (const name of ['columnList','columnPreferences','detailPanel','detailSection','detailField','readonlyField','recordId','pagedListDetail','booleanMark','subtabBar','infoHelp','infoIcon','modLoaderSection','reshadeSection','pagerToggle','pagerSelect','showToast'])
+  for (const name of ['columnList','columnPreferences','detailPanel','detailSection','detailField','multiNumberRow','readonlyField','recordId','pagedListDetail','booleanMark','subtabBar','infoHelp','infoIcon','modLoaderSection','reshadeSection','pagerToggle','pagerSelect','showToast'])
     ui[name] = (...args) => node(name, args[0], ...carried(args[0]));
   // Lexeditor asks its own questions now instead of calling window.confirm, so
   // the answer this test wants comes from the same flag it always did.
@@ -204,4 +204,26 @@ test('FF9 uses shared multi-boolean properties and conceptual character/equipmen
   assert.match(source, /renderEquipmentComposite/);
   e.run('state.catalog=[{key:"characters",tab:"characters"},{key:"character-parameters",tab:"characters"},{key:"default-equipment",tab:"characters"},{key:"leveling",tab:"characters"}]');
   assert.deepEqual(Array.from(e.run('choices("characters")')), ['characters','leveling']);
+});
+
+
+test('semantic CSV controls and source identity stay truthful', async () => {
+  const e=await editor();
+  e.run(`installData({key:"actions",label:"Actions",source:"baseline",fields:[
+    {key:"Id",label:"Id",kind:"integer",editable:false,declaredType:"Int32"},
+    {key:"targets",label:"targets",kind:"enum",editable:true,declaredType:"UInt8",choices:["SingleEnemy(2)","ManyAny(3)"]},
+    {key:"Offset",label:"Offset",kind:"fixed-list",editable:true,declaredType:"Vector3",length:3,itemKind:"number",vector3:true}
+  ],rows:[{line:7,id:4,name:"Fire",values:{Id:4,targets:"SingleEnemy(2)",Offset:[1,2,3]}}]})`);
+  const enumField=e.run('fieldControl(state.datasets.actions,state.datasets.actions.rows[0],state.datasets.actions.fields[1])');
+  const vectorField=e.run('fieldControl(state.datasets.actions,state.datasets.actions.rows[0],state.datasets.actions.fields[2])');
+  assert.ok(JSON.stringify(enumField).includes('SingleEnemy(2)'));
+  assert.ok(JSON.stringify(vectorField).includes('multiNumberRow'));
+  assert.deepEqual(Array.from(e.run('columnsFor(state.datasets.actions,"actions").map(column=>column.key)')),['id','name','targets','Offset']);
+
+  e.run(`installData({key:"leveling",label:"Leveling",source:"baseline",fields:[
+    {key:"Experience",label:"Experience",kind:"integer",editable:true,declaredType:"UInt32",min:0,max:4294967295}
+  ],rows:[{line:7,id:1,name:"Level 1",values:{Experience:0}}]})`);
+  assert.deepEqual(Array.from(e.run('columnsFor(state.datasets.leveling,"leveling").map(column=>column.key)')),['name','Experience']);
+  const detailNode=e.run('detail(state.datasets.leveling,state.datasets.leveling.rows[0])');
+  assert.ok(!JSON.stringify(detailNode).includes('recordId'));
 });
