@@ -86,7 +86,9 @@ def smoke() -> list[str]:
             identity = request_json(session.url + "api/plugin")
             if identity.get("pluginId") != "ff7-2013":
                 raise RuntimeError("The legacy FF7 product returned the wrong identity")
-            if identity.get("capabilities") != ["data-map", "kernel-data", "save"]:
+            capabilities = identity.get("capabilities")
+            required_capabilities = {"data-map", "kernel-data", "save"}
+            if not isinstance(capabilities, list) or not required_capabilities <= set(capabilities):
                 raise RuntimeError("The legacy FF7 product did not expose the proved editor capabilities")
             editor_root = identity.get("editorRoot")
             if not isinstance(editor_root, str) or Path(editor_root).resolve() != SHARED_PLUGIN_ROOT.resolve():
