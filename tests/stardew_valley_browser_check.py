@@ -104,13 +104,43 @@ def take(page, name: str) -> None:
 
 def open_editor(browser, url: str, width: int, height: int, zoom: float = 1.0):
     page = browser.new_page(viewport={"width": width, "height": height})
-    errors = []
-    page.on("pageerror", lambda error: errors.append(str(error)))
-    page.wait_for_selector(".lex-paged-list-detail .lex-column-list-row", timeout=20000)
+    page_errors: list[str] = []
+    console_errors: list[str] = []
+    network_errors: list[str] = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+    page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
+    page.on("requestfailed", lambda request: network_errors.append(
+        f"{request.method} {request.url}: {request.failure or 'request failed'}"
+    ))
+    page.on("response", lambda response: network_errors.append(
+        f"{response.status} {response.request.method} {response.url}"
+    ) if response.status >= 400 else None)
+
+    page.goto(url, wait_until="domcontentloaded")
+    try:
+        page.wait_for_selector(".lex-paged-list-detail .lex-column-list-row", timeout=20000)
+    except Exception:
+        label = f"{width}x{height}-z{zoom}"
+        diagnostics = {
+            "requestedUrl": url,
+            "pageUrl": page.url,
+            "title": page.title(),
+            "status": page.locator('[role="status"]').all_inner_texts(),
+            "alerts": page.locator('[role="alert"]').all_inner_texts(),
+            "mainText": page.locator("#main").inner_text() if page.locator("#main").count() else "",
+            "mainHtml": page.locator("#main").inner_html() if page.locator("#main").count() else "",
+            "pageErrors": page_errors,
+            "consoleErrors": console_errors,
+            "networkErrors": network_errors,
+        }
+        (OUT / f"boot-diagnostics-{label}.json").write_text(
+            json.dumps(diagnostics, indent=2) + "\n", encoding="utf-8")
+        page.screenshot(path=str(OUT / f"boot-failure-{label}.png"), full_page=True)
+        raise
     if zoom != 1.0:
         page.evaluate("value => { document.body.style.zoom=String(value); }", zoom)
         page.wait_for_timeout(250)
-    return page, errors + console_errors
+    return page, page_errors + console_errors + network_errors
 
 
 def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
