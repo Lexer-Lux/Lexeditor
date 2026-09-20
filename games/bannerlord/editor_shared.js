@@ -174,3 +174,30 @@ function renderInfo(){
     layoutKey:"bannerlord-info",stackAt:1000,defaultSizes:[55,45]
   }));
 }
+
+
+state.moduleView=state.moduleView||"metadata";
+state.skillView=state.skillView||"definitions";
+
+function wrapCurrentViewInTabs({tabs,active,label,change}){
+  const content=[...main.childNodes];
+  main.replaceChildren(BLUI.tabbedPanel({tabs,active,label,change,content}));
+}
+function renderModuleArea(){
+  const renderers={metadata:renderModule,dependencies:renderDependencies,submodules:renderSubmodules,xmls:renderXmls};
+  (renderers[state.moduleView]||renderModule)();
+  wrapCurrentViewInTabs({
+    tabs:[{id:"metadata",label:"Metadata"},{id:"dependencies",label:"Dependencies"},{id:"submodules",label:"Submodules"},{id:"xmls",label:"XML"}],
+    active:state.moduleView,label:"Module structure",
+    change:value=>{state.moduleView=value;render()}
+  });
+}
+function renderSkillsArea(){
+  const renderers={definitions:renderSkills,effects:renderEffects,perks:renderPerks,xp:renderXpSources};
+  (renderers[state.skillView]||renderSkills)();
+  wrapCurrentViewInTabs({
+    tabs:[{id:"definitions",label:"Skills"},{id:"effects",label:"Effects"},{id:"perks",label:"Perks"},{id:"xp",label:"XP Sources"}],
+    active:state.skillView,label:"Skill overhaul data",
+    change:value=>{state.skillView=value;render()}
+  });
+}
