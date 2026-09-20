@@ -289,6 +289,8 @@ def _serve(page, store: dict[str, object]):
         "/editor.css": ("text/css", ROOT / "games/ffx_x2/editor.css"),
         "/shared/framework.js": ("application/javascript", ROOT / "ui/framework.js"),
         "/shared/framework.css": ("text/css", ROOT / "ui/framework.css"),
+        "/shared/mod-loading.json": ("application/json", ROOT / "ui/mod-loading.json"),
+        "/shared/credits.json": ("application/json", ROOT / "ui/credits.json"),
     }
     saves = set(SAVE_TO_GET) | {"/api/ffx-commands/save"}
 
@@ -536,12 +538,15 @@ def run(output: Path, executable: str | None) -> None:
             assert not narrow_errors, narrow_errors
             narrow.close()
 
-            scaled = browser.new_page(viewport={"width": 1200, "height": 800})
+            scaled_context = browser.new_context(
+                viewport={"width": 800, "height": 533},
+                device_scale_factor=1.5,
+            )
+            scaled = scaled_context.new_page()
             scaled_errors: list[str] = []
             scaled.on("pageerror", lambda error: scaled_errors.append(str(error)))
             _serve(scaled, store)
             scaled.goto(BASE + "/", wait_until="networkidle")
-            scaled.evaluate("document.documentElement.style.zoom='1.5'")
             _open_dataset(scaled, "FFX-2", "FFX-2 Dresspheres")
             last = scaled.get_by_label("Dressphere 0 ability 16", exact=True)
             last.scroll_into_view_if_needed()
@@ -557,7 +562,7 @@ def run(output: Path, executable: str | None) -> None:
             _overflow(scaled, "150pct:mix")
             scaled.screenshot(path=str(output / "mix-150pct.png"))
             assert not scaled_errors, scaled_errors
-            scaled.close()
+            scaled_context.close()
         finally:
             browser.close()
 
