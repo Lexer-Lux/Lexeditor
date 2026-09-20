@@ -68,6 +68,8 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertIn('type:"checkbox"', text)
         self.assertIn("edit:(row,value)=>setDraftValue", text)
         self.assertIn("editor:(row,commit)=>cellEditor", text)
+        self.assertIn('width:"minmax(9rem,1.25fr)"', text)
+        self.assertNotIn('{key:"module",label:"Module",sortable:true,help:"ZedScript module containing the record."}', text)
         self.assertNotIn('class="split"', text)
 
     def test_metadata_scripts_and_info_use_shared_surfaces(self):
@@ -84,7 +86,7 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertIn("emptyDetail:", text)
         self.assertIn("renderLoading(", text)
         self.assertIn("pz-error-message", text)
-        self.assertIn('{id:"animationmeshes",label:"Anim Meshes"}', text)
+        self.assertIn('{id:"animationmeshes",label:"Anims"}', text)
         self.assertIn('["Animation Meshes","animationmeshes"]', text)
 
     def test_animation_mesh_ui_exposes_only_single_value_typed_fields(self):

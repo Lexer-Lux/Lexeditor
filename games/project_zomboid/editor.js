@@ -3,7 +3,7 @@ const main=document.getElementById("main");
 let tab="metadata",metadata=null,animationMeshes={rows:[],errors:[]},items={rows:[],errors:[]},evolved={rows:[],errors:[]},crafts={rows:[],errors:[]},fixings={rows:[],errors:[]},fluids={rows:[],errors:[]},vehicles={rows:[],errors:[]},sounds={rows:[],errors:[]},models={rows:[],errors:[]},mannequins={rows:[],errors:[]},timedActions={rows:[],errors:[]},scripts={rows:[],counts:{},errors:[]},datamap={rows:[]},deployment=null,shell=null;
 const shellTabs=[
   {id:"metadata",label:"Metadata"},
-  {id:"animationmeshes",label:"Anim Meshes"},
+  {id:"animationmeshes",label:"Anims"},
   {id:"items",label:"Items"},
   {id:"evolved",label:"Evolved"},
   {id:"crafts",label:"Crafting"},
@@ -27,13 +27,13 @@ const scriptState={selected:null,page:0,pageSize:15,query:"",sort:{key:"name",di
 const drafts=new Map();
 const STRUCTURED_KINDS=["animationmeshes","items","evolved","crafts","fixing","fluids","vehicles","sounds","models","mannequins","timedactions"];
 const tableFieldKeys={
-  animationmeshes:["keepMeshAnimations","meshFile","postProcess"],
+  animationmeshes:["keepMeshAnimations","meshFile"],
   items:["Weight","ItemType","DisplayCategory"],
   evolved:["MaxItems","MinimumWater","ResultItem"],
   crafts:["category","time","CanWalk"],
   fixing:["ConditionModifier"],
   fluids:["DisplayName","ColorReference"],
-  vehicles:["engineForce","engineQuality","gearRatioCount"],
+  vehicles:["engineForce","gearRatioCount"],
   sounds:["category","loop","maxInstancesPerEmitter"],
   models:["scale","shader","static"],
   mannequins:["outfit","pose","female"],
@@ -346,7 +346,7 @@ function renderStructured(kind){
     master:({rows:shown,selected,select})=>LexeditorUI.columnList({rows:shown,key:row=>row.key,selected,select,sortState:state.sort,refresh:()=>renderStructured(kind),
       sort:key=>{state.sort=state.sort.key===key?{key,dir:-state.sort.dir}:{key,dir:1};state.page=0;renderStructured(kind)},
       class:"pz-record-table","aria-label":config.title,
-      columns:[{key:"id",label:"Record",sortable:true,help:"ZedScript record name declared by the mod."},{key:"module",label:"Module",sortable:true,help:"ZedScript module containing the record."},...tableSpecs.map(spec=>tableFieldColumn(kind,spec))]}),
+      columns:[{key:"id",label:"Record",sortable:true,width:"minmax(9rem,1.25fr)",help:"ZedScript record name declared by the mod. The source module remains visible in Detail."},...tableSpecs.map(spec=>tableFieldColumn(kind,spec))]}),
     detail:row=>structuredDetail(kind,row),
     emptyDetail:()=>renderEmpty(config.title,state.query?`No ${config.noun} match this search.`:`No ${config.noun} are present in the selected Build 42 project.`)});
   main.replaceChildren(view);shell?.refresh?.();

@@ -276,6 +276,9 @@ def main() -> int:
                         assert page.locator(".pz-record-table .lex-cell-editable").count() >= 1, tab
                         assert page.locator(f".pz-record-detail {SEMANTIC_CONTROL[tab]}").count() >= 1, tab
                         assert page.locator(".pz-record-detail .lex-info-help").count() >= 1, tab
+                        identity_text = page.locator('.pz-record-table .lex-column-list-cell[data-column-key="id"] .lex-column-cell-text').first
+                        identity_fit = identity_text.evaluate("(node) => ({client:node.clientWidth, scroll:node.scrollWidth, text:node.textContent})")
+                        assert identity_fit["scroll"] <= identity_fit["client"] + 1, (tab, identity_fit)
                         assert_layout(page, f"{tab}-desktop")
                         screenshot(page, args.screenshots, f"{index:02d}-{tab}-desktop")
 
@@ -302,18 +305,18 @@ def main() -> int:
                     editor.press("Enter")
                     page.wait_for_function("dirtyCount()===1")
                     assert not page.locator("#global-save").is_disabled()
-                    assert page.get_by_label("Weight").input_value() == "0.75"
+                    assert page.locator('.pz-record-detail input[aria-label="Weight"]').input_value() == "0.75"
                     page.locator("#global-save").click(button="right")
                     page.get_by_role("button", name="Discard Changes").click()
                     page.wait_for_function("dirtyCount()===0")
-                    assert page.get_by_label("Weight").input_value() == "0.25"
+                    assert page.locator('.pz-record-detail input[aria-label="Weight"]').input_value() == "0.25"
 
                     # Two edits in the same script file prove SHA refresh across sequential record saves.
-                    page.get_by_label("Weight").fill("0.75")
-                    page.get_by_label("Weight").press("Tab")
+                    page.locator('.pz-record-detail input[aria-label="Weight"]').fill("0.75")
+                    page.locator('.pz-record-detail input[aria-label="Weight"]').press("Tab")
                     page.locator(".pz-record-table .lex-list-row").nth(1).click()
-                    page.get_by_label("Weight").fill("0.85")
-                    page.get_by_label("Weight").press("Tab")
+                    page.locator('.pz-record-detail input[aria-label="Weight"]').fill("0.85")
+                    page.locator('.pz-record-detail input[aria-label="Weight"]').press("Tab")
                     page.wait_for_function("dirtyCount()===2")
                     page.keyboard.press("Control+S")
                     page.wait_for_function("dirtyCount()===0", timeout=15000)
@@ -322,10 +325,10 @@ def main() -> int:
                     navigate(page, "items", ".pz-record-layout")
                     page.get_by_label("Search Items").fill("Item000")
                     page.wait_for_function("document.querySelectorAll('.pz-record-table .lex-list-row').length===1")
-                    assert page.get_by_label("Weight").input_value() == "0.75"
+                    assert page.locator('.pz-record-detail input[aria-label="Weight"]').input_value() == "0.75"
                     page.get_by_label("Search Items").fill("Item001")
                     page.wait_for_timeout(120)
-                    assert page.get_by_label("Weight").input_value() == "0.85"
+                    assert page.locator('.pz-record-detail input[aria-label="Weight"]').input_value() == "0.85"
                     page.get_by_label("Search Items").fill("NO_SUCH_RECORD")
                     assert page.get_by_text("No items match this search.", exact=True).count() == 1
                     page.get_by_label("Search Items").fill("")
@@ -378,7 +381,7 @@ def main() -> int:
                     scaled = assert_layout(page, "metadata-150-percent")
                     metadata_panel = page.locator(".pz-metadata")
                     metadata_panel.evaluate("(node) => { node.scrollTop = node.scrollHeight; }")
-                    assert page.get_by_label("Load Before").bounding_box() is not None
+                    assert page.locator('.pz-metadata input[aria-label="Load Before"]').bounding_box() is not None
                     screenshot(page, args.screenshots, "17-metadata-scale150")
                     page.evaluate("document.documentElement.style.zoom=''")
 
