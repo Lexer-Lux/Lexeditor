@@ -13,6 +13,7 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "stardew-valley-browser"
 OUT.mkdir(parents=True, exist_ok=True)
+LAYOUT_FAILURES: list[dict] = []
 (OUT / "started.txt").write_text("Stardew rendered acceptance started.\n", encoding="utf-8")
 sys.path.insert(0, str(ROOT))
 
@@ -79,6 +80,17 @@ def geometry(page, label: str) -> dict:
       const main=document.querySelector('#main');
       const root=main?.firstElementChild;
       const pager=document.querySelector('.lex-pager');
+      const offenders=[...document.querySelectorAll('body *')].map(node=>{
+        const box=node.getBoundingClientRect();
+        return {
+          tag:node.tagName.toLowerCase(),
+          id:node.id||'',
+          className:typeof node.className==='string'?node.className:'',
+          left:Math.round(box.left*10)/10,
+          right:Math.round(box.right*10)/10,
+          width:Math.round(box.width*10)/10
+        };
+      }).filter(row=>row.right>innerWidth+1||row.left<-1).slice(0,20);
       return {
         viewport:[innerWidth,innerHeight],
         bodyWidth:document.body.scrollWidth,
@@ -86,15 +98,23 @@ def geometry(page, label: str) -> dict:
         mainWidth:main?.clientWidth||0,
         mainScrollWidth:main?.scrollWidth||0,
         rootBottom:root?.getBoundingClientRect().bottom||0,
-        pagerBottom:pager?.getBoundingClientRect().bottom||0
+        pagerBottom:pager?.getBoundingClientRect().bottom||0,
+        offenders
       };
     }""")
-    assert metrics["bodyWidth"] <= metrics["viewport"][0] + 2, (label, metrics)
-    assert metrics["bodyHeight"] <= metrics["viewport"][1] + 2, (label, metrics)
-    assert metrics["mainScrollWidth"] <= metrics["mainWidth"] + 2, (label, metrics)
-    assert metrics["rootBottom"] <= metrics["viewport"][1] + 2, (label, metrics)
-    if metrics["pagerBottom"]:
-        assert metrics["pagerBottom"] <= metrics["viewport"][1] + 2, (label, metrics)
+    failures = []
+    if metrics["bodyWidth"] > metrics["viewport"][0] + 2:
+        failures.append("body horizontal overflow")
+    if metrics["bodyHeight"] > metrics["viewport"][1] + 2:
+        failures.append("body vertical overflow")
+    if metrics["mainScrollWidth"] > metrics["mainWidth"] + 2:
+        failures.append("main horizontal overflow")
+    if metrics["rootBottom"] > metrics["viewport"][1] + 2:
+        failures.append("screen bottom clipped")
+    if metrics["pagerBottom"] and metrics["pagerBottom"] > metrics["viewport"][1] + 2:
+        failures.append("pager clipped")
+    if failures:
+        LAYOUT_FAILURES.append({"label": label, "failures": failures, "metrics": metrics})
     return metrics
 
 
@@ -344,7 +364,11 @@ def main() -> int:
                 browser.close()
         assert (game / "Content" / "Data" / "Objects.xnb").read_bytes() == xnb_before
         (OUT / "results.json").write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
+        (OUT / "layout-failures.json").write_text(
+            json.dumps(LAYOUT_FAILURES, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(results, indent=2))
+        if LAYOUT_FAILURES:
+            raise AssertionError("Rendered layout failures:\n" + json.dumps(LAYOUT_FAILURES, indent=2))
     return 0
 
 
