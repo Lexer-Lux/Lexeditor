@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from pathlib import Path, PurePosixPath
 
-from . import mission_rewards, paths
+from . import loot_script, mission_rewards, paths, string_tables
 from .server import _shop_records
 
 
@@ -197,6 +197,39 @@ def _shop_records_by_file(gringo_cache: Path) -> tuple[dict[str, dict], int]:
     return result, len(shop_ids)
 
 
+def _string_table_records(caches: dict[str, Path]) -> dict[tuple[str, str], dict]:
+    records: dict[tuple[str, str], dict] = {}
+    for archive_id, cache_name in (("tuning", "tuning"), ("content", "content")):
+        root = caches[cache_name]
+        if not root.is_dir():
+            continue
+        for target in sorted(root.rglob("*.strtbl")):
+            source_path = target.relative_to(root).as_posix()
+            if source_path.casefold().endswith("_ps3.strtbl"):
+                continue
+            try:
+                table = string_tables.parse(target.read_bytes())
+                row_count = len(string_tables.rows(table))
+                records[(archive_id, source_path)] = {
+                    "supported": True,
+                    "recordCount": row_count,
+                    "languageBlocks": len(table.blocks),
+                    "identifiers": len(table.identifiers),
+                    "version": table.version,
+                    "reason": "",
+                }
+            except (OSError, ValueError, struct.error) as error:
+                records[(archive_id, source_path)] = {
+                    "supported": False,
+                    "recordCount": 0,
+                    "languageBlocks": 0,
+                    "identifiers": 0,
+                    "version": None,
+                    "reason": str(error),
+                }
+    return records
+
+
 def _setting_count(path: Path) -> int:
     if not path.is_file():
         return 0
@@ -252,6 +285,7 @@ def _archive_row(
     prepared: bool,
     inventory_records: dict[str, int],
     shops_by_file: dict[str, dict],
+    string_table_records: dict[tuple[str, str], dict],
 ) -> dict:
     archive = definition["archive"]
     archive_id = definition["id"]
@@ -265,7 +299,46 @@ def _archive_row(
     editable_fields: list[str] = []
     write_target = ""
 
-    if source_path in INVENTORY_PATHS:
+    lowered = source_path.casefold()
+    string_table = string_table_records.get((archive_id, source_path))
+
+    if archive_id == "content" and source_path == loot_script.ARCHIVE_PATH:
+        status = "partial"
+        target = "loot"
+        openable = True
+        record_unit = "verified item-enum call sites"
+        editable_fields = ["item enum constants at verified lookup call sites"]
+        write_target = f"mod/{source_path}"
+        caveat = (
+            "Loot Tables rewrites only the verified item-enum pushes in this WSC. "
+            "The rest of the compiled script remains untouched."
+        )
+    elif lowered.endswith("_ps3.strtbl"):
+        caveat = (
+            "This is a console-targeted PS3 string-table duplicate. The RDR1 PC "
+            "plugin does not expose it for editing."
+        )
+    elif lowered.endswith(".strtbl") and string_table:
+        record_count = string_table["recordCount"]
+        record_unit = "localized strings"
+        if string_table["supported"]:
+            status = "partial"
+            target = "strings"
+            openable = prepared
+            editable_fields = ["displayed UTF-16 text"]
+            project_root = "tune_d11generic" if archive_id == "tuning" else "content"
+            write_target = f"mod/{project_root}/{source_path}"
+            caveat = (
+                "String Tables edits displayed text only. Identifier bytes, hashes, "
+                "glyph metrics, layout metadata, shared language blocks, and unknown "
+                "padding stay structurally preserved."
+            )
+        else:
+            caveat = (
+                "The prepared PC string table failed the bounded STRTBL parser and "
+                "remains unavailable rather than being exposed as raw binary."
+            )
+    elif source_path in INVENTORY_PATHS:
         status = "partial"
         target = "items"
         openable = prepared
@@ -399,8 +472,8 @@ def _project_rows(project_root: Path, setting_count: int, loot_counts: dict,
 def build_data_map(data_root: Path, game_root: Path, project_root: Path) -> dict:
     manifest_path = data_root / "manifest.json"
     manifest = _load_json(manifest_path)
-    if manifest.get("version") != 3:
-        raise ValueError("RDR data-map generation requires cache manifest version 3")
+    if manifest.get("version") != 4:
+        raise ValueError("RDR data-map generation requires cache manifest version 4")
     tool = paths.RPF6_TOOL
     if not tool.is_file():
         raise FileNotFoundError(f"Missing RPF6 index tool: {tool}")
@@ -415,6 +488,7 @@ def build_data_map(data_root: Path, game_root: Path, project_root: Path) -> dict
 
     inventory_records, inventory_types = _inventory_records(caches["content"])
     shops_by_file, shop_count = _shop_records_by_file(caches["gringoresUnpacked"])
+    string_table_records = _string_table_records(caches)
     setting_count = _setting_count(project_root / "LexerRDR.ini")
     loot_counts = _loot_counts(project_root / "LexerRDR.loot.json")
     mission_document = mission_rewards.load_generated()
@@ -447,7 +521,7 @@ def build_data_map(data_root: Path, game_root: Path, project_root: Path) -> dict
             _archive_row(
                 definition, indexed_row,
                 indexed_row["sourcePath"] in prepared_files,
-                inventory_records, shops_by_file,
+                inventory_records, shops_by_file, string_table_records,
             )
             for indexed_row in indexed
         )
@@ -459,6 +533,12 @@ def build_data_map(data_root: Path, game_root: Path, project_root: Path) -> dict
     shop_file_count = sum(value["items"] > 0 for value in shops_by_file.values())
     item_count = sum(inventory_records.values())
     shop_item_count = sum(value["items"] for value in shops_by_file.values())
+    supported_string_tables = {
+        key: value for key, value in string_table_records.items() if value["supported"]
+    }
+    string_table_entry_count = sum(
+        value["recordCount"] for value in supported_string_tables.values()
+    )
 
     datasets = [
         {
@@ -495,6 +575,28 @@ def build_data_map(data_root: Path, game_root: Path, project_root: Path) -> dict
             "details": {"recordsByFile": shops_by_file},
         },
         {
+            "id": "string-tables",
+            "label": "String Tables",
+            "sourceArchive": "RDR1 PC tuning and content archives",
+            "sourcePaths": ["tune/**/*.strtbl", "content/**/*.strtbl"],
+            "fileCount": len(string_table_records),
+            "supportedFileCount": len(supported_string_tables),
+            "recordCount": string_table_entry_count,
+            "recordUnit": "localized strings",
+            "status": "partial",
+            "target": "strings",
+            "editability": "Displayed UTF-16 text in parsed PC STRTBL records.",
+            "caveats": [
+                "Identifiers, hashes, glyph/layout metadata and PS3 duplicates remain read-only."
+            ],
+            "details": {
+                "recordsByFile": {
+                    f"{archive_id}:{source_path}": value
+                    for (archive_id, source_path), value in sorted(string_table_records.items())
+                },
+            },
+        },
+        {
             "id": "tuning-index",
             "label": "Tuning archive index",
             "sourceArchive": "game/tune_d11generic.rpf",
@@ -504,8 +606,11 @@ def build_data_map(data_root: Path, game_root: Path, project_root: Path) -> dict
             "recordUnit": "",
             "status": "not-integrated",
             "target": None,
-            "editability": "Read-only Data Map coverage.",
-            "caveats": ["No dedicated editor is connected to these prepared files."],
+            "editability": "Read-only Data Map coverage except parsed PC STRTBL entries.",
+            "caveats": [
+                "String Tables handles parsed PC .strtbl text; the other prepared tuning files "
+                "remain read-only until a format-specific editor is verified."
+            ],
         },
         {
             "id": "content-index",
@@ -517,8 +622,14 @@ def build_data_map(data_root: Path, game_root: Path, project_root: Path) -> dict
             "recordUnit": "",
             "status": "partial",
             "target": None,
-            "editability": "Only the two inventory XML files have a dedicated editor.",
-            "caveats": ["Game scripts are research evidence and are not rewritten."],
+            "editability": (
+                "Inventory XML, parsed PC string tables, and the verified corpse-loot "
+                "WSC call sites have format-specific editors."
+            ),
+            "caveats": [
+                "Other content scripts and resources remain read-only unless a separate "
+                "verified feature owns an exact bounded transformation."
+            ],
         },
         {
             "id": "settings",
@@ -582,6 +693,7 @@ def build_data_map(data_root: Path, game_root: Path, project_root: Path) -> dict
                 "items": item_count,
                 "shopItems": shop_item_count,
                 "shops": shop_count,
+                "stringTableEntries": string_table_entry_count,
                 "settings": setting_count,
                 "lootOverrides": sum(loot_counts.values()),
                 "missions": mission_count,
