@@ -200,7 +200,7 @@
         );
       }else if(item.kind==="legacy"){
         fields.push(
-          readField("Legacy shape",row.origin||"legacy dependency","Lexeditor preserves the historical XML element shape and unknown attributes; it only edits or removes rows that already exist."),
+          readField("Legacy shape",row.origin||"legacy dependency","Lexeditor preserves the historical XML element shape and unknown attributes; it only edits or removes rows that already exist. Creating a new legacy relation remains source-only."),
           readField("Meaning",row.order==="LoadAfterThis"?"Required legacy load-after relation":"Optional legacy compatibility relation")
         );
       }else if(item.kind==="loadAfter"){
