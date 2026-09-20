@@ -136,7 +136,7 @@ class BannerlordGauntletTests(unittest.TestCase):
 
     def test_gauntlet_editor_sends_revision_and_exposes_reload(self):
         text=(Path(__file__).resolve().parents[1]/"games"/"bannerlord"/"editor_gauntlet.js").read_text(encoding="utf-8")
-        self.assertIn('sourceHash:state.savedGauntlet.sourceHash||""',text);self.assertIn("async function reloadGauntlet",text);self.assertIn('onclick:()=>reloadGauntlet()',text)
+        self.assertIn('sourceHash:state.savedGauntlet.sourceHash||""',text);self.assertIn("async function reloadGauntlet",text);self.assertIn('uiButton("Reload",()=>reloadGauntlet())',text)
 
     def test_prefab_root_redirection_outside_project_is_rejected(self):
         temporary, project, _source = self.fixture()
