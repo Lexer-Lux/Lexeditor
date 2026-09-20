@@ -34,6 +34,12 @@ from .minimap_semantics import (
     save_minimap_visibility_edits,
 )
 from .native_probe import probe_installed_exe
+from .project_deployment import (
+    deploy_built_pak,
+    deployed_pak_path,
+    deployment_status as project_deployment_status,
+    remove_deployed_pak,
+)
 from .no_more_cheats_tweaks import (
     has_enabled_no_more_cheats,
     materialize_no_more_cheats,
@@ -128,9 +134,83 @@ def text_payload(asset: str, *, vanilla: bool = False) -> dict:
     )
 
 
+def _virtual_data_map_row(item: dict) -> dict | None:
+    """Describe Lexeditor-only FF7R resources without pretending they are cooked assets."""
+    synthetic = str(item.get("synthetic", ""))
+    if not synthetic:
+        return None
+    asset = str(item["asset"])
+    label = str(item.get("name") or asset)
+    if synthetic.endswith("-probe"):
+        return {
+            "filename": f"{asset} (generated research view)",
+            "target": asset,
+            "controls": (
+                f"Read-only {label} evidence gathered from installed data or executable probes."
+            ),
+            "notes": (
+                "This virtual research surface has no mutation path. Candidate strings, rows, "
+                "functions and correlations remain evidence only until the corresponding FF7R "
+                "issue has an authoritative implementation and installed-game validation."
+            ),
+            "coverage": "view",
+            "status": "partial",
+        }
+
+    controls = {
+        "runtime-settings": (
+            "Validated project controls for cutscene speed, HP rebalance and Better Sprint, "
+            "plus read-only manifest/build/heartbeat readiness."
+        ),
+        "atb-settings": (
+            "ATB tweak enable state plus bounded movement and dodge settings; unresolved native "
+            "terms remain deployment-blocked until their hooks are validated."
+        ),
+        "atb-resident": "Installed ATB-related ResidentParameter candidates with only proven editable fields enabled.",
+        "atb-guard": "Data-backed guard-reaction ATB values discovered from installed DataObjects.",
+        "atb-abilities": "Data-backed BattleAbility ATB action costs discovered from installed DataObjects.",
+        "encounter-tweaks": (
+            "Reversible Chapter 5 encounter toggle; build-time materialization runs only after "
+            "installed encounter identity and parallel-array shape checks pass."
+        ),
+        "graphics-tweaks": (
+            "Reversible eye-adaptation project setting with managed Engine.ini deployment gated "
+            "by a verified FFVIIHook-style INI unlocker."
+        ),
+        "no-more-cheats": (
+            "Reversible menu-suppression setting; build rescans installed text/DataObjects and "
+            "fails closed unless all requested menu owners are uniquely validated."
+        ),
+        "better-lockon": (
+            "Reversible Better Lock-on project setting; only validated installed-source edits "
+            "are materialized during build."
+        ),
+    }.get(
+        synthetic,
+        f"Typed project controls for {label}, with unsupported/read-only evidence left non-editable.",
+    )
+    return {
+        "filename": f"{asset} (Lexeditor project resource)",
+        "target": asset,
+        "controls": controls,
+        "notes": (
+            "This is a Lexeditor virtual resource, not a .uasset/.uexp pair. Editable values are "
+            "stored in project configuration and materialized only by the feature-specific safe "
+            "path; source-side support does not substitute for installed-game acceptance."
+        ),
+        "coverage": "structured",
+        "status": "partial",
+    }
+
+
 def data_map_payload() -> dict:
     rows = []
     for item in catalog().get("assets", []):
+        virtual = _virtual_data_map_row(item)
+        if virtual is not None:
+            rows.append(virtual)
+            continue
+
         asset_name = Path(item["asset"]).name.casefold()
         semantic = []
         if asset_name in ECONOMY_TABLE_NAMES:
@@ -139,15 +219,6 @@ def data_map_payload() -> dict:
             semantic.append("enemy normal/rare drops, chances and steal data")
         if asset_name == ENEMY_TERRITORY_TABLE_NAME:
             semantic.append("authored minimap forced-hide flags when HideNavimap is a scalar boolean")
-        group = str(item.get("group", ""))
-        if group == "Lexeditor ATB":
-            semantic.append("reversible ATB tweak config materialized only when the ATB tweak is enabled")
-        if group == "Lexeditor Encounters":
-            semantic.append("reversible authored encounter edits materialized only when their tweak is enabled")
-        if group == "Lexeditor Graphics":
-            semantic.append("reversible Engine.ini graphics overrides applied only by explicit deployment")
-        if group == "Lexeditor Tweaks":
-            semantic.append("reversible semantic tweaks materialized only after installed-source ownership validation")
         controls = (
             "Structured DataObject records; booleans, fixed-width numbers, floats "
             "and existing FNames are editable."
@@ -182,13 +253,19 @@ def data_map_payload() -> dict:
         })
     rows.append({
         "filename": "runtime/LexeditorFF7RRuntime.json + LexeditorFF7RRuntime.dll",
-        "target": "NativeMods runtime behavior",
-        "controls": "Cutscene base-speed multiplier and tap/hold minimap behavior.",
-        "notes": (
-            "Native runtime behavior is separate from PAK edits. Deployment/readiness uses build/manifest validation; "
-            "Runtime Active additionally requires a live DLL heartbeat from the current FF7R process."
+        "target": "Lexeditor/RuntimeTweaks",
+        "controls": (
+            "NativeMods runtime configuration/DLL for cutscene-speed composition and opt-in "
+            "HP, sprint and ATB runtime behavior when every requested hook is validated."
         ),
-        "coverage": "runtime-contract",
+        "notes": (
+            "Runtime deployment is separate from PAK edits and fails closed on missing build/hook "
+            "validation. Runtime Active additionally requires a live DLL heartbeat from the current "
+            "FF7R process. The former #414 tap/hold minimap experiment is retired because the retail "
+            "game already exposes player-controlled Compass / Minimap / None cycling; legacy minimap "
+            "config is accepted only for migration and stripped from canonical runtime configuration."
+        ),
+        "coverage": "view",
         "status": "partial",
     })
     return {"rows": rows}
@@ -203,6 +280,7 @@ def info_payload() -> dict:
     })
     runtime = runtime_status(GAME_ROOT, PROJECT_ROOT)
     graphics = graphics_status(GAME_ROOT, PROJECT_ROOT)
+    project_deployment = project_deployment_status(GAME_ROOT)
     return {
         "gameRoot": str(GAME_ROOT),
         "dataRoot": str(DATA_ROOT),
@@ -213,13 +291,12 @@ def info_payload() -> dict:
         "helper": helper_status(),
         "runtime": runtime,
         "graphics": graphics,
+        "projectDeployment": project_deployment,
         "engineIniPath": graphics["engineIniPath"],
         "pakVersion": preferred_pak_version(current),
         "pakMountPoint": FF7R_MOUNT_POINT,
         "buildPath": str(PROJECT_ROOT / "build" / "Lexeditor-FF7R_P.pak"),
-        "deployPath": str(
-            GAME_ROOT / "End" / "Content" / "Paks" / "~mods" / "Lexeditor-FF7R_P.pak"
-        ),
+        "deployPath": str(deployed_pak_path(GAME_ROOT)),
     }
 
 
@@ -291,12 +368,7 @@ def build_mod() -> dict:
 
 def deploy_mod() -> dict:
     built = Path(build_mod()["path"])
-    target = GAME_ROOT / "End" / "Content" / "Paks" / "~mods" / "Lexeditor-FF7R_P.pak"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_suffix(target.suffix + ".tmp")
-    shutil.copy2(built, temporary)
-    temporary.replace(target)
-    return {"path": str(target), "size": target.stat().st_size}
+    return deploy_built_pak(GAME_ROOT, built)
 
 
 def deploy_project() -> dict:
@@ -430,7 +502,7 @@ class Handler(PluginRequestHandler):
                         "enemy-loot", "minimap-visibility", "runtime-config", "native-probe",
                         "encounter-tweaks", "graphics-tweaks", "no-more-cheats", "better-lockon", "save", "economy-save",
                         "enemy-loot-save", "minimap-visibility-save", "text-save", "build",
-                        "deploy", "runtime-deploy", "graphics-deploy",
+                        "deploy", "deploy-remove", "runtime-deploy", "graphics-deploy",
                     ],
                 })
             if path == "/api/catalog":
@@ -571,6 +643,8 @@ class Handler(PluginRequestHandler):
                 return self.send_json(build_mod())
             if path == "/api/deploy":
                 return self.send_json(deploy_project())
+            if path == "/api/deploy/remove":
+                return self.send_json(remove_deployed_pak(GAME_ROOT))
             return self.send_json({"error": "Not found"}, 404)
         except (ValueError, KeyError, IndexError, TypeError, FileNotFoundError) as error:
             return self.send_json({"error": str(error)}, 400)
