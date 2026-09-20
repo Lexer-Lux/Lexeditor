@@ -27,6 +27,23 @@ MESSAGES = {
         {"token": "2:FLD_003", "key": "FLD_003", "text": "Need anything?", "line": 2},
     ],
 }
+SCENES = {
+    "language": "en", "source": "mine",
+    "rows": [
+        {"token": "1", "id": 1, "name": "Millennial Fair", "path": "Game/field/Mapinfo/mapinfo_1.dat",
+         "source": "vanilla", "sha256": "scene-sha-1", "musicIndex": 10,
+         "layer12TilesetIndex": 1, "layer12AssemblyIndex": 2, "layer3TilesetIndex": 3,
+         "paletteIndex": 4, "paletteAnimationIndex": 5, "mapIndex": 6, "chipAnimationIndex": 7,
+         "scriptIndex": 8, "unknownWord": 48879, "cameraUnbounded": False,
+         "scrollLeft": 0, "scrollTop": 1, "scrollRight": 14, "scrollBottom": 15, "trailingBytes": 2},
+        {"token": "2", "id": 2, "name": "Guardia Forest", "path": "Game/field/Mapinfo/mapinfo_2.dat",
+         "source": "vanilla", "sha256": "scene-sha-2", "musicIndex": 12,
+         "layer12TilesetIndex": 4, "layer12AssemblyIndex": 5, "layer3TilesetIndex": 6,
+         "paletteIndex": 7, "paletteAnimationIndex": 8, "mapIndex": 9, "chipAnimationIndex": 10,
+         "scriptIndex": 11, "unknownWord": 4660, "cameraUnbounded": True,
+         "scrollLeft": 128, "scrollTop": 0, "scrollRight": 0, "scrollBottom": 0, "trailingBytes": 0},
+    ],
+}
 EXITS = {
     "source": "vanilla", "dataSha256": "exit-data-1", "offsetSha256": "exit-offset-1",
     "rows": [
@@ -57,7 +74,7 @@ DATA_MAP = {"rows": [
     {"filename": "Localize/<lang>/msg/*.txt", "controls": "Dialogue, menu and item text", "notes": "Keyed text editor.", "coverage": "structured", "status": "integrated", "openable": True, "target": "text"},
     {"filename": "Game/common/MapJumpOffsetTbl.dat + MapJumpDataTbl.dat", "controls": "Area exits", "notes": "Existing fixed-size exits.", "coverage": "structured", "status": "integrated", "openable": True, "target": "exits"},
     {"filename": "Game/common/TakaraOffsetTbl.dat + TakaraDataTbl.dat", "controls": "Treasure chests", "notes": "Existing fixed-size treasure.", "coverage": "structured", "status": "integrated", "openable": True, "target": "treasure"},
-    {"filename": "Game/field/Mapinfo/mapinfo_*.dat", "controls": "Area settings", "notes": "Recognized, not yet integrated.", "coverage": "unavailable", "status": "not-integrated", "openable": False, "target": None},
+    {"filename": "Game/field/Mapinfo/mapinfo_*.dat", "controls": "Area settings", "notes": "Fixed Steam area headers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "scenes"},
 ]}
 CHANGES = {"rows": []}
 
@@ -74,7 +91,7 @@ def editor_html() -> str:
         "<style>" + (ROOT / "games/chrono_trigger/editor.css").read_text(encoding="utf-8") + "</style>",
     )
     fixtures = {
-        "dashboard": DASHBOARD, "textFiles": TEXT_FILES, "messages": MESSAGES,
+        "dashboard": DASHBOARD, "textFiles": TEXT_FILES, "messages": MESSAGES, "scenes": SCENES,
         "exits": EXITS, "treasure": TREASURE, "dataMap": DATA_MAP, "changes": CHANGES,
     }
     stub = r"""
@@ -96,6 +113,10 @@ def editor_html() -> str:
           result=f.messages;
         }else if(path==="/api/export"){
           result={path:"C:/Mods/ChronoFresh/build/ChronoFresh.ctp",fileCount:f.changes.rows.length,files:f.changes.rows.map(x=>x.path)};
+        }else if(path==="/api/scenes/save"){
+          const row=f.scenes.rows.find(value=>value.id===body.id);
+          if(row){Object.assign(row,body.values||{});row.sha256="scene-sha-saved";row.source="project";}
+          result=row;
         }else if(path==="/api/exits/save")result=f.exits;
         else if(path==="/api/treasure/save")result=f.treasure;
         else result={};
@@ -104,6 +125,7 @@ def editor_html() -> str:
       else if(path==="/api/changes")result=f.changes;
       else if(path==="/api/text-files")result=f.textFiles;
       else if(path==="/api/messages")result=f.messages;
+      else if(path==="/api/scenes")result=f.scenes;
       else if(path==="/api/exits")result=f.exits;
       else if(path==="/api/treasure")result=f.treasure;
       else {status=404;result={error:"Unknown fixture request "+path};}
@@ -150,6 +172,13 @@ def main():
                 page.wait_for_function("dirtyCount() === 0 && state.text.rows[0].text.includes('rendered acceptance')")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/messages/save')")
                 page.screenshot(path=str(ARTIFACTS/f"text-{width}.png"),full_page=True)
+
+                page.locator(".lex-tab-label-text",has_text="Areas").click()
+                page.wait_for_function("state.tab === 'scenes' && !state.busy")
+                assert "Millennial Fair" in page.locator("#main").inner_text()
+                assert "PC WORD" in page.locator("#main").inner_text()
+                assert "0xBEEF" in page.locator("#main").inner_text()
+                page.screenshot(path=str(ARTIFACTS/f"areas-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Area Exits").click()
                 page.wait_for_function("state.tab === 'exits' && !state.busy")

@@ -54,3 +54,7 @@ A CTP is a normal ZIP. Each member path equals the `resources.bin` path it repla
 ## Historical failure boundary
 
 Merged PR #454 is not the architecture to continue. It became broad and research-heavy before it delivered enough practical editing. Its code is historical evidence only. Fresh work should prefer useful fixed-size/typed formats with synthetic roundtrip tests and CTP output before adding expensive runtime-research surfaces.
+
+### Mapinfo area headers (PC)
+
+Each `Game/field/Mapinfo/mapinfo_<scene>.dat` starts with a fixed 24-byte PC header: nine modeled `u16` references (music, L1/L2 tileset, L1/L2 assembly, L3 tileset, palette, palette animation, map, chip animation, event script), one unmodelled PC `u16`, then four raw camera-mask bytes. CTViewer treats `scrollLeft == 0x80` as the disabled/full-map camera sentinel. Lexeditor preserves the unmodelled word and all trailing bytes; it does not transfer the shorter SNES header layout.

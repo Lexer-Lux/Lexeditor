@@ -81,9 +81,12 @@ def smoke() -> list[str]:
         exits_data = b"HEAD" + struct.pack("<BBBBHBB", 2, 3, 1, 0xA5, 7, 8, 9)
         treasure_offset = struct.pack("<IHH", 2, 0, 1)
         treasure_data = b"HEAD" + struct.pack("<BBHH", 4, 5, 0x1002, 0xCAFE)
+        scene_header = struct.pack("<10H4B", 10, 1, 2, 3, 4, 5, 6, 7, 8, 0xBEEF, 0, 1, 14, 15) + b"\\xAA\\xBB"
         _fixture_archive(game / "resources.bin", [
             ("Localize/en/msg/item.txt", b"0000,Sword\r\n0001,Armor\r\n0002,Mail\r\n"),
             ("Localize/en/msg/cmes0.txt", b"FLD_001,Hello\r\nFLD_002,World\r\n"),
+            ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\r\n"),
+            ("Game/field/Mapinfo/mapinfo_1.dat", scene_header),
             ("Game/common/MapJumpOffsetTbl.dat", exits_offset),
             ("Game/common/MapJumpDataTbl.dat", exits_data),
             ("Game/common/TakaraOffsetTbl.dat", treasure_offset),
@@ -99,6 +102,11 @@ def smoke() -> list[str]:
             saved = request_json(session.url + "api/messages/save", {"path": message["path"], "sha256": message["sha256"], "edits": [{"line": 0, "key": "FLD_001", "text": "Changed"}]})
             if saved["rows"][0]["text"] != "Changed":
                 raise RuntimeError("Text edit did not survive readback")
+            scenes = request_json(session.url + "api/scenes?language=en")
+            scene = scenes["rows"][0]
+            saved_scene = request_json(session.url + "api/scenes/save", {"id": scene["id"], "sha256": scene["sha256"], "language": "en", "values": {"musicIndex": 42, "cameraUnbounded": True}})
+            if saved_scene["musicIndex"] != 42 or saved_scene["unknownWord"] != 0xBEEF or saved_scene["trailingBytes"] != 2:
+                raise RuntimeError("Area settings edit did not preserve the unmodelled PC header data")
             exits = request_json(session.url + "api/exits")
             saved_exits = request_json(session.url + "api/exits/save", {"dataSha256": exits["dataSha256"], "offsetSha256": exits["offsetSha256"], "edits": [{"token": "0:0", "values": {"destinationId": 8, "facing": 2}}]})
             if saved_exits["rows"][0]["destinationId"] != 8 or saved_exits["rows"][0]["unknownFacingBits"] != 0xA0:
@@ -109,13 +117,14 @@ def smoke() -> list[str]:
                 raise RuntimeError("Treasure edit failed to preserve the unknown trailing word")
             exported = request_json(session.url + "api/export", {})
             with zipfile.ZipFile(exported["path"]) as ctp:
-                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat"}:
+                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat"}:
                     raise RuntimeError("CTP export did not contain exactly the changed resources")
         if (game / "resources.bin").read_bytes() != original_archive:
             raise RuntimeError("Fresh Chrono Trigger plugin modified resources.bin")
     return [
         "read-only ARC1 source archive validated",
         "keyed Steam text edit survived project-overlay readback",
+        "fixed 24-byte area settings edit preserved the unmodelled word and trailing bytes",
         "fixed-size area exit edit preserved unknown flag bits",
         "treasure edit preserved the unknown trailing word",
         "deterministic CTP export contained only changed archive-relative resources",

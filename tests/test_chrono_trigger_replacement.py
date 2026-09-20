@@ -10,6 +10,7 @@ from pathlib import Path
 from games.chrono_trigger.archive import ArchiveError, ResourcesBin, _decode
 from games.chrono_trigger.field_data import load_exits, load_treasure, save_exits, save_treasure
 from games.chrono_trigger.project import OverlayStore
+from games.chrono_trigger.scene_data import load_scenes, save_scene
 from games.chrono_trigger.text_data import load_messages, save_messages
 
 
@@ -46,6 +47,8 @@ class FreshChronoTriggerTests(unittest.TestCase):
         build_archive(archive, [
             ("Localize/en/msg/item.txt", b"0000,Sword\r\n0001,Armor\r\n0002,Mail\r\n"),
             ("Localize/en/msg/cmes0.txt", b"FLD_1,Hello, traveler\r\nFLD_2,World\r\n"),
+            ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\r\n"),
+            ("Game/field/Mapinfo/mapinfo_1.dat", struct.pack("<10H4B", 10, 1, 2, 3, 4, 5, 6, 7, 8, 0xBEEF, 0, 1, 14, 15) + b"\\xAA\\xBB"),
             ("Game/common/MapJumpOffsetTbl.dat", struct.pack("<IHH", 2, 0, 1)),
             ("Game/common/MapJumpDataTbl.dat", b"HEAD" + struct.pack("<BBBBHBB", 2, 3, 1, 0xA5, 7, 8, 9)),
             ("Game/common/TakaraOffsetTbl.dat", struct.pack("<IHH", 2, 0, 1)),
@@ -77,6 +80,22 @@ class FreshChronoTriggerTests(unittest.TestCase):
             raw, source = store.read(data["path"])
             self.assertEqual(source, "project")
             self.assertIn(b"FLD_1,Changed, still one record\r\n", raw)
+
+    def test_scene_edit_preserves_unknown_word_trailing_bytes_and_vanilla(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original = archive.read_bytes()
+            scenes = load_scenes(store, language="en")
+            row = scenes["rows"][0]
+            self.assertEqual((row["id"], row["name"], row["unknownWord"], row["trailingBytes"]), (1, "Millennial Fair", 0xBEEF, 2))
+            saved = save_scene(store, row["id"], row["sha256"], {"musicIndex": 42, "cameraUnbounded": True}, "en")
+            self.assertEqual(saved["musicIndex"], 42)
+            self.assertTrue(saved["cameraUnbounded"])
+            self.assertEqual(saved["unknownWord"], 0xBEEF)
+            self.assertEqual(saved["trailingBytes"], 2)
+            project_bytes, _ = store.read(row["path"], "mine")
+            self.assertEqual(project_bytes[-2:], b"\\xAA\\xBB")
+            self.assertEqual(archive.read_bytes(), original)
 
     def test_exit_edit_preserves_unknown_bits_and_archive(self):
         with tempfile.TemporaryDirectory() as tmp:
