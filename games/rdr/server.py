@@ -20,7 +20,7 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import parse_qs, urlparse
 
 from . import (camera_features, input_remaps, loot_script, map_icon_features,
-               mission_rewards, paths, script_features)
+               mission_rewards, paths, script_features, string_tables)
 from .archive_deployment import (
     ArchiveSpec, deploy_archives, deployment_status, revert_archives,
 )
@@ -66,6 +66,20 @@ INVENTORY_SOURCES = {
     "dlc": {
         "label": "Undead Nightmare DLC",
         "relative": PurePosixPath("content/init/inventory/dlc_inventory.xml"),
+    },
+}
+STRING_TABLE_SOURCES = {
+    "tuning": {
+        "label": "Tuning",
+        "prepared": PREPARED_ROOT,
+        "project": OVERRIDE_ROOT,
+        "prefix": "tune",
+    },
+    "content": {
+        "label": "Content",
+        "prepared": CONTENT_PREPARED_ROOT,
+        "project": CONTENT_OVERRIDE_ROOT,
+        "prefix": "content",
     },
 }
 PORT = int(os.environ.get("LEXEDITOR_PORT", "8767"))
@@ -284,6 +298,163 @@ def save_file(value: str, text: str, encoding: str) -> dict:
         "projectPath": str(target),
         "backup": str(backup) if backup else "",
         "bytes": len(encoded),
+    }
+
+
+def _string_table_supported(relative: PurePosixPath) -> bool:
+    return (
+        relative.suffix.casefold() == ".strtbl"
+        and not relative.name.casefold().endswith("_ps3.strtbl")
+    )
+
+
+def _string_table_paths(
+        source_id: str, relative_value: str, vanilla_only: bool = False,
+) -> tuple[dict, PurePosixPath, Path, Path, Path]:
+    source = STRING_TABLE_SOURCES.get(source_id)
+    if source is None:
+        raise ValueError(f"Unknown string-table source: {source_id}")
+    relative = safe_relative(relative_value)
+    if (not _string_table_supported(relative) or not relative.parts
+            or relative.parts[0].casefold() != source["prefix"]):
+        raise ValueError("String-table path is not supported by the RDR1 PC editor")
+    vanilla = under(source["prepared"], relative)
+    project = under(source["project"], relative)
+    if not vanilla.is_file():
+        raise FileNotFoundError(
+            f"Prepared RDR string table not found: {relative.as_posix()}"
+        )
+    active = project if project.is_file() and not vanilla_only else vanilla
+    return source, relative, vanilla, project, active
+
+
+def _string_table_metadata(
+        source_id: str, relative: PurePosixPath, vanilla_only: bool = False,
+) -> dict:
+    source, relative, vanilla, project, active = _string_table_paths(
+        source_id, relative.as_posix(), vanilla_only)
+    try:
+        table = string_tables.parse(active.read_bytes())
+    except (OSError, ValueError, struct.error) as error:
+        return {
+            "id": f"{source_id}:{relative.as_posix()}",
+            "source": source_id,
+            "sourceLabel": source["label"],
+            "path": relative.as_posix(),
+            "label": relative.stem,
+            "available": False,
+            "reason": str(error),
+            "sourcePath": str(vanilla),
+            "projectPath": str(project),
+            "project": project.is_file() and not vanilla_only,
+            "rowCount": 0,
+            "languageCount": 0,
+        }
+    return {
+        "id": f"{source_id}:{relative.as_posix()}",
+        "source": source_id,
+        "sourceLabel": source["label"],
+        "path": relative.as_posix(),
+        "label": relative.stem,
+        "available": True,
+        "reason": "",
+        "sourcePath": str(vanilla),
+        "projectPath": str(project),
+        "project": project.is_file() and not vanilla_only,
+        "rowCount": sum(len(block.entries) for block in table.blocks.values()),
+        "languageCount": len(table.blocks),
+        "version": table.version,
+        "identifierCount": len(table.identifiers),
+    }
+
+
+def string_tables_index(vanilla_only: bool = False) -> dict:
+    tables = []
+    for source_id, definition in STRING_TABLE_SOURCES.items():
+        prepared_root = definition["prepared"]
+        if not prepared_root.is_dir():
+            continue
+        for target in sorted(prepared_root.rglob("*.strtbl")):
+            relative = PurePosixPath(target.relative_to(prepared_root).as_posix())
+            if not _string_table_supported(relative):
+                continue
+            tables.append(_string_table_metadata(source_id, relative, vanilla_only))
+    return {
+        "tables": tables,
+        "counts": {
+            "tables": len(tables),
+            "available": sum(bool(row["available"]) for row in tables),
+            "records": sum(int(row.get("rowCount", 0)) for row in tables),
+            "project": sum(bool(row.get("project")) for row in tables),
+        },
+    }
+
+
+def string_table_payload(
+        source_id: str, relative_value: str, vanilla_only: bool = False,
+) -> dict:
+    source, relative, vanilla, project, active = _string_table_paths(
+        source_id, relative_value, vanilla_only)
+    table = string_tables.parse(active.read_bytes())
+    table_id = f"{source_id}:{relative.as_posix()}"
+    rows = []
+    for row in string_tables.rows(table):
+        current = dict(row)
+        current.update({
+            "id": (
+                f"{table_id}:{row['languageIndex']}:{row['entryIndex']}:"
+                f"{row['hashValue']:08X}"
+            ),
+            "tableId": table_id,
+            "source": source_id,
+            "sourceLabel": source["label"],
+            "path": relative.as_posix(),
+            "sourcePath": str(vanilla),
+            "projectPath": str(project),
+            "project": project.is_file() and not vanilla_only,
+        })
+        rows.append(current)
+    return {
+        "table": _string_table_metadata(source_id, relative, vanilla_only),
+        "rows": rows,
+        "counts": {
+            "records": len(rows),
+            "languages": len(table.blocks),
+            "identifiers": len(table.identifiers),
+        },
+    }
+
+
+def save_string_table(source_id: str, relative_value: str, edits: list[dict]) -> dict:
+    _source, relative, vanilla, project, active = _string_table_paths(
+        source_id, relative_value)
+    if not isinstance(edits, list):
+        raise ValueError("String-table edits must be a list")
+    source_bytes = active.read_bytes()
+    candidate, changed = string_tables.apply_text_edits(source_bytes, edits)
+    if not changed:
+        return {
+            "saved": 0,
+            "path": relative.as_posix(),
+            "projectPath": str(project),
+            "backup": "",
+        }
+    if len(candidate) > MAX_TEXT_BYTES:
+        raise ValueError("Edited string table is too large")
+    string_tables.parse(candidate)
+    backup = backup_file(project)
+    atomic_bytes(project, candidate)
+    written = project.read_bytes()
+    if written != candidate:
+        raise RuntimeError("Saved string table did not read back exactly")
+    string_tables.parse(written)
+    return {
+        "saved": changed,
+        "path": relative.as_posix(),
+        "projectPath": str(project),
+        "backup": str(backup) if backup else "",
+        "bytes": len(candidate),
+        "sourceUnchanged": sha256_file(vanilla),
     }
 
 
@@ -1717,7 +1888,7 @@ class Handler(BaseHTTPRequestHandler):
                     "editorRoot": str(PLUGIN_ROOT),
                     "capabilities": [
                         "prepared-files", "project-overrides", "source-editor",
-                        "items", "shops", "missions", "loot-asi-override", "settings",
+                        "items", "shops", "string-tables", "missions", "loot-asi-override", "settings",
                         "data-map", "redhook-prerequisite", "github-workspace",
                         "archive-copy-deployment",
                     ],
@@ -1734,6 +1905,15 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response(items_payload(query.get("dataset", ["current"])[0] == "vanilla"))
             elif path == "/api/shops":
                 self.json_response(shops_payload(query.get("dataset", ["current"])[0] == "vanilla"))
+            elif path == "/api/string-tables":
+                self.json_response(string_tables_index(
+                    query.get("dataset", ["current"])[0] == "vanilla"))
+            elif path == "/api/string-table":
+                self.json_response(string_table_payload(
+                    query.get("source", [""])[0],
+                    query.get("path", [""])[0],
+                    query.get("dataset", ["current"])[0] == "vanilla",
+                ))
             elif path == "/api/loot":
                 self.json_response(loot_payload())
             elif path == "/api/loot/script":
@@ -1772,6 +1952,12 @@ class Handler(BaseHTTPRequestHandler):
                     str(body.get("rootHash", "")),
                     body.get("itemIndex", -1),
                     str(body.get("expectedName", "")),
+                    body.get("edits", []),
+                ))
+            elif path == "/api/string-table/save":
+                self.json_response(save_string_table(
+                    str(body.get("source", "")),
+                    str(body.get("path", "")),
                     body.get("edits", []),
                 ))
             elif path == "/api/loot/save":
