@@ -1,0 +1,80 @@
+name: Build release installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Branch, tag, or commit to package
+        required: true
+        default: master
+        type: string
+  pull_request:
+    paths:
+      - .github/workflows/distribution-build.yml
+      - tools/build_distribution.py
+      - tests/test_distribution_hygiene.py
+      - requirements.txt
+      - runtime_bootstrap.py
+      - app.py
+
+permissions:
+  contents: read
+
+jobs:
+  native-installers:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out the requested source revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.sha }}
+          submodules: false
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python build dependencies
+        run: python -m pip install -r requirements.txt pyinstaller
+
+      - name: Install Linux native webview backend
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libnss3 libasound2t64
+          python -m pip install PySide6
+
+      - name: Install Windows installer compiler
+        if: runner.os == 'Windows'
+        run: choco install innosetup --yes --no-progress
+
+      - name: Verify distribution resource hygiene
+        run: python -m unittest discover -s tests -p 'test_distribution_hygiene.py' -v
+
+      - name: Build native application and installer
+        run: python tools/build_distribution.py
+
+      - name: Record exact packaged revision
+        run: python -c "from pathlib import Path; import subprocess; p=Path('build/distribution/source-sha.txt'); p.parent.mkdir(parents=True,exist_ok=True); p.write_text(subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()+'\\n',encoding='utf-8')"
+
+      - name: Verify one native installer was produced
+        run: python -c "from pathlib import Path; p=Path('dist/installers'); files=[x for x in p.iterdir() if x.is_file()]; assert len(files)==1, files; print(files[0])"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Lexeditor-${{ runner.os }}-${{ github.sha }}
+          path: |
+            dist/installers/
+            build/distribution/smoke.json
+            build/distribution/source-sha.txt
+            build/Lexeditor/warn-Lexeditor.txt
+          if-no-files-found: error
+          retention-days: 30
