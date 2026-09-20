@@ -35,7 +35,8 @@ REPOSITORY = "https://github.com/Albeoris/Memoria"
 ASSET_NAME = "Memoria.Patcher.exe"
 MAX_ASSET_BYTES = 120 * 1024 * 1024
 MANAGED_RELATIVE = Path("x64") / "FF9_Data" / "Managed"
-CONFIG_NAME = "Memoria.ini"\nSETTINGS_NAME = "Settings.ini"
+CONFIG_NAME = "Memoria.ini"
+SETTINGS_NAME = "Settings.ini"
 Progress = Callable[[int, int, str], None]
 JsonFetcher = Callable[[str], dict]
 FileFetcher = Callable[[str, Path, "Progress | None"], None]

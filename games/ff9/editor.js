@@ -34,7 +34,8 @@
   function dirtyCount(){if(state.activeSource!=="mine")return 0;let count=Object.keys(featureChanges()).length;for(const data of Object.values(state.datasets))if(data?.rows)for(const row of data.rows)count+=Object.keys(changedFields(data,row)).length;return count}
   function installData(payload){payload.originalRows=clone(payload.rows);payload.originalByLine=Object.fromEntries(payload.originalRows.map(row=>[String(row.line),row]));state.datasets[payload.key]=payload;if(!payload.rows.some(row=>row.line===state.selected[payload.key]))state.selected[payload.key]=payload.rows[0]?.line??null;return payload}
   async function loadDataset(key,force=false){if(!key)return null;if(!force&&state.datasets[key]&&!state.datasets[key].unavailable)return state.datasets[key];const meta=catalogRow(key);try{return installData(await api(`/api/dataset?key=${encodeURIComponent(key)}`))}catch(error){state.datasets[key]={key,unavailable:true,error:error.message,relativePath:meta?.relativePath};return state.datasets[key]}}
-  function sourceHasId(data){return data.fields.some(field=>field.key.toLocaleLowerCase()==="id")}\n  function fieldValue(row,field){const value=row.values[field.key];if(field.kind==="boolean")return booleanMark(value);if(field.kind==="fixed-list"&&Array.isArray(value))return value.join(", ");return value===""?"—":String(value)}
+  function sourceHasId(data){return data.fields.some(field=>field.key.toLocaleLowerCase()==="id")}
+  function fieldValue(row,field){const value=row.values[field.key];if(field.kind==="boolean")return booleanMark(value);if(field.kind==="fixed-list"&&Array.isArray(value))return value.join(", ");return value===""?"—":String(value)}
   // The list and detail fields use the same column definitions, including
   // the linked records in equipment and character views.
   function columnSources(data,key){
@@ -53,7 +54,8 @@
     return sources;
   }
   function columnsFor(data,key){
-    const columns=[{key:"name",label:"Name",sortable:true,width:"minmax(9em,1.6fr)"}];\n    if(sourceHasId(data))columns.unshift({key:"id",label:"ID",numberedId:data.rows.every(row=>row.id===null||row.id===undefined||/^[-+]?\\d+$/.test(String(row.id))),sortable:true});
+    const columns=[{key:"name",label:"Name",sortable:true,width:"minmax(9em,1.6fr)"}];
+    if(sourceHasId(data))columns.unshift({key:"id",label:"ID",numberedId:data.rows.every(row=>row.id===null||row.id===undefined||/^[-+]?\\d+$/.test(String(row.id))),sortable:true});
     for(const source of columnSources(data,key)){
       source.data.fields.filter(field=>!["id","comment","name"].includes(field.key.toLocaleLowerCase())).forEach((field,index)=>{
         const value=record=>source.row(record)?.values[field.key];
