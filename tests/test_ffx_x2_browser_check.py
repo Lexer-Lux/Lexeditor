@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import re
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -368,8 +369,8 @@ def _overflow(page, label: str):
 
 
 def _open_dataset(page, group: str, dataset: str):
-    page.get_by_role("tab", name=group, exact=True).click()
-    page.get_by_role("tab", name=dataset, exact=True).click()
+    page.get_by_role("button", name=group, exact=True).click()
+    page.get_by_role("tab", name=re.compile("^" + re.escape(dataset))).click()
     expect(page.locator(".ffxx2-content .lex-master-detail")).to_be_visible()
     expect(page.locator(".ffxx2-content .lex-column-list")).to_be_visible()
     expect(page.locator(".ffxx2-content .lex-detail-panel")).to_be_visible()
@@ -423,8 +424,8 @@ def _exercise_keyboard_help(page):
     page.keyboard.press("F1")
     expect(page.locator(".ffxx2-info-grid")).to_be_visible()
     expect(page.locator(".lex-detail-section").filter(has_text="MOD LOADER")).to_be_visible()
-    page.get_by_role("tab", name="FFX Battle", exact=True).click()
-    page.get_by_role("tab", name="Player Base Stats", exact=True).click()
+    page.get_by_role("button", name="FFX Battle", exact=True).click()
+    page.get_by_role("tab", name=re.compile("^Player Base Stats")).click()
     expect(page.locator(".lex-info-help").first).to_be_visible()
     page.locator(".lex-info-help").first.focus()
     assert page.locator(".lex-info-help").first.evaluate("node => document.activeElement === node")
@@ -476,7 +477,7 @@ def run(output: Path, executable: str | None) -> None:
             page.on("pageerror", lambda error: errors.append(str(error)))
             _serve(page, store)
             page.goto(BASE + "/", wait_until="networkidle")
-            expect(page.get_by_role("tab", name="FFX Battle", exact=True)).to_be_visible()
+            expect(page.get_by_role("button", name="FFX Battle", exact=True)).to_be_visible()
             _exercise_shared_table(page)
             page.reload(wait_until="networkidle")
             _open_dataset(page, "FFX Economy", "Treasure Rewards")
