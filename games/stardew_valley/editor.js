@@ -175,11 +175,12 @@ function fieldControl(row, key, kind, min, max, help) {
   const fallback = kind === "boolean" ? false : kind === "price" ? 0 : EDIBILITY_MIN;
   const inherited = baseValue(row, key);
   const shown = enabled ? row.fields[key] : (inherited ?? fallback);
+  const valueLabel = key === "Price" ? "Sell price" : key === "IsDrink" ? "Drink" : "Edibility";
   const input = el("input", kind === "boolean" ? {
-    type: "checkbox", checked: !!shown, disabled: !enabled || state.busy || row.draft,
+    type: "checkbox", checked: !!shown, disabled: !enabled || state.busy || row.draft, "aria-label": valueLabel,
     onchange: event => { row.fields[key] = event.target.checked; shell.refresh(); },
   } : {
-    type: "number", min, max, step: 1, value: shown, disabled: !enabled || state.busy || row.draft,
+    type: "number", min, max, step: 1, value: shown, disabled: !enabled || state.busy || row.draft, "aria-label": valueLabel,
     oninput: event => {
       const value = clampInteger(event.target.value, min, max);
       if (value !== null) row.fields[key] = value;
@@ -200,7 +201,7 @@ function fieldControl(row, key, kind, min, max, help) {
     help: infoHelp(help),
     control: el("div", {class: "sv-override"}, el("label", {}, override, "Override"), input),
     dataType: kind === "boolean" ? "BOOL" : "INT", min, max,
-    pin: prefs.pinButton(key, key === "Price" ? "Sell price" : key === "IsDrink" ? "Drink" : "Edibility"),
+    pin: prefs.pinButton(key, valueLabel),
     attrs: {"data-lex-property": key},
   });
 }

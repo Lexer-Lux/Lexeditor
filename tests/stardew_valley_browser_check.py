@@ -235,14 +235,14 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
         price_editor.press("Enter")
         page.wait_for_timeout(180)
         assert page.locator("#global-save").is_enabled()
-        assert page.locator('[data-lex-property="Price"] input').input_value() == "88"
+        assert page.get_by_role("spinbutton", name="Sell price", exact=True).input_value() == "88"
 
         drink_cell = stone.locator('[data-column-key="IsDrink"]').first
         drink_cell.dblclick()
         drink_editor = drink_cell.locator('input[type="checkbox"]')
         drink_editor.check()
         page.wait_for_timeout(150)
-        assert page.locator('[data-lex-property="IsDrink"] input[type="checkbox"]').is_checked()
+        assert page.get_by_role("checkbox", name="Drink", exact=True).is_checked()
 
         page.locator("#global-save").click()
         page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
