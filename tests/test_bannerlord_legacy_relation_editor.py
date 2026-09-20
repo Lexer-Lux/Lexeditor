@@ -219,7 +219,7 @@ class BannerlordLegacyRelationEditorTests(unittest.TestCase):
         text = editor.read_text(encoding="utf-8")
         self.assertIn("legacyDependencies:m.legacyDependencies||[]", text)
         self.assertIn("legacyDependenciesBaseline", text)
-        self.assertIn('selection.kind==="legacy"', text)
+        self.assertIn('item.kind==="legacy"', text)
         self.assertIn("Creating a new legacy relation remains source-only", text)
 
 
