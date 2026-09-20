@@ -182,8 +182,11 @@ PAGES = [
     ("moduledata-files", 'state.moduleDataView="files";navigate("moduledata")'),
     ("moduledata-records", 'state.moduleDataView="records";navigate("moduledata")'),
     ("build", 'navigate("build")'),
-    ("info", 'navigate("info")'),
+    ("info-setup", 'state.infoView="setup";navigate("info")'),
+    ("info-deployment", 'state.infoView="deployment";navigate("info")'),
+    ("info-credits", 'state.infoView="credits";navigate("info")'),
     ("datamap", 'navigate("datamap")'),
+    ("source", 'state.source={path:"src/Test.cs",absolutePath:"C:/fixture/src/Test.cs",encoding:"utf-8",size:10,text:"class X{}"};state.savedSourceText="class X{}";navigate("source")'),
 ]
 
 
@@ -201,6 +204,40 @@ def assert_outer_fit(page, label):
     assert metrics["bodyHeight"] <= metrics["viewportHeight"] + 3, (label, "outer vertical overflow", metrics)
     assert metrics["main"]["right"] <= metrics["viewportWidth"] + 2, (label, "main right clipped", metrics)
     assert metrics["main"]["bottom"] <= metrics["viewportHeight"] + 2, (label, "main bottom clipped", metrics)
+
+
+def settle_screen(page, label):
+    if label == "datamap":
+        page.locator(".lex-data-map-table").wait_for()
+    elif label == "source":
+        page.locator(".bannerlord-source textarea").wait_for()
+    elif label == "info-credits":
+        page.locator(".lex-plugin-credits").wait_for()
+        page.get_by_text("Fixture Bannerlord reference", exact=True).wait_for()
+    else:
+        page.wait_for_timeout(100)
+
+
+def exercise_resizer(page, label):
+    divider = page.locator(".lex-panel-layout-divider").first
+    if not divider.count():
+        raise AssertionError((label, "expected shared resizable panel divider"))
+    before = divider.get_attribute("aria-valuenow")
+    divider.focus()
+    divider.press("ArrowRight")
+    page.wait_for_function(
+        """before=>{const d=document.querySelector('.lex-panel-layout-divider');
+          return !!d && d.getAttribute('aria-valuenow')!==before}""",
+        arg=before,
+    )
+    moved = page.locator(".lex-panel-layout-divider").first.get_attribute("aria-valuenow")
+    assert moved != before, (label, "keyboard resize did not move divider")
+    page.locator(".lex-panel-layout-divider").first.click(button="right")
+    page.wait_for_function(
+        """before=>{const d=document.querySelector('.lex-panel-layout-divider');
+          return !!d && d.getAttribute('aria-valuenow')===before}""",
+        arg=before,
+    )
 
 
 def exercise_table(page, label):
@@ -309,12 +346,20 @@ def main() -> None:
 
             for name, command in PAGES:
                 page.evaluate(command)
-                page.wait_for_timeout(100)
+                settle_screen(page, name)
                 assert "Bannerlord UI error" not in page.locator("#main").inner_text(), name
                 assert_outer_fit(page, name)
                 exercise_table(page, name)
                 screenshot(page, name, "desktop")
                 results.append({"screen": name, "mode": "desktop", "status": "passed"})
+
+            # Resizing belongs to the shared layout and must remain keyboard-accessible.
+            page.evaluate('state.moduleView="dependencies";navigate("module")')
+            settle_screen(page, "module-dependencies")
+            exercise_resizer(page, "module-dependencies")
+            page.evaluate('navigate("build")')
+            settle_screen(page, "build")
+            exercise_resizer(page, "build")
 
             # Direct cell editor on a real editable shared table cell.
             page.evaluate('state.skillView="effects";navigate("skills")')
@@ -349,7 +394,7 @@ def main() -> None:
             page.set_viewport_size({"width": 900, "height": 620})
             page.evaluate('document.body.style.zoom=""')
             for name, command in PAGES:
-                page.evaluate(command);page.wait_for_timeout(70)
+                page.evaluate(command);settle_screen(page, name)
                 assert_outer_fit(page, f"{name}-small")
                 screenshot(page, name, "small")
                 results.append({"screen": name, "mode": "small", "status": "passed"})
@@ -359,8 +404,9 @@ def main() -> None:
             page.set_viewport_size({"width": 1200, "height": 800})
             page.evaluate('document.body.style.zoom="1.5"')
             for name, command in PAGES:
-                page.evaluate(command);page.wait_for_timeout(70)
+                page.evaluate(command);settle_screen(page, name)
                 assert_outer_fit(page, f"{name}-150pct")
+                screenshot(page, name, "150pct")
                 results.append({"screen": name, "mode": "150pct", "status": "passed"})
 
             # Tweaks must expose later groups through the shared pager and the last
@@ -379,10 +425,15 @@ def main() -> None:
             assert box and box["y"] < 800 and box["y"] + box["height"] > 0, box
             screenshot(page, "tweaks-last-controls", "150pct")
 
-            # Raw source remains reachable as a specialized source surface.
+            # Raw source remains reachable and editable as a specialized source surface.
             page.evaluate('document.body.style.zoom="";state.source={path:"src/Test.cs",absolutePath:"C:/fixture/src/Test.cs",encoding:"utf-8",size:10,text:"class X{}"};state.savedSourceText="class X{}";navigate("source")')
-            page.wait_for_timeout(80)
-            assert page.locator(".bannerlord-source textarea").count() == 1
+            settle_screen(page, "source")
+            source_box = page.locator(".bannerlord-source textarea")
+            assert source_box.count() == 1
+            source_box.fill("class Y{}")
+            assert page.evaluate("sourceDirty()") is True
+            page.evaluate('state.source.text=state.savedSourceText;render();refresh()')
+            assert page.evaluate("sourceDirty()") is False
             assert_outer_fit(page, "source")
 
             # Keyboard help uses the shared focus/ArrowDown/Escape contract.
