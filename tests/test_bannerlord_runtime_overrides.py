@@ -304,7 +304,7 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
         text = editor.read_text(encoding="utf-8")
         self.assertIn("async function reloadRuntimeOverrides", text)
         self.assertIn("Discard unsaved Runtime Override changes", text)
-        self.assertIn('onclick:()=>reloadRuntimeOverrides()', text)
+        self.assertIn('uiButton("Reload",()=>reloadRuntimeOverrides())', text)
 
     def test_runtime_overrides_require_an_existing_deployed_module(self):
         temporary, project, game, deployed = self.fixture()
