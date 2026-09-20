@@ -69,45 +69,68 @@
     if(!project){
       const files=state.project?.projectFiles||[];
       if(files.length>1){
-        main.replaceChildren(el("section",{class:"bl-card"},
-          el("h2",{},"Choose build project"),
-          el("div",{class:"bl-list-block"},
-            el("div",{class:"bl-note"},state.project?.projectError||"Several .csproj files exist. Lexeditor will not choose one alphabetically."),
-            select("",[["","Choose .csproj"],...files.map(name=>[name,name])],value=>selectBuildProject(value))
-          )));return
+        main.replaceChildren(BLUI.detailPanel({
+          title:"Build",meta:"Choose project",
+          body:[BLUI.detailSection({title:"PROJECT",body:[
+            selectField("Project file","",[["","Choose .csproj"],...files.map(name=>[name,name])],value=>selectBuildProject(value),"Lexeditor will not guess which top-level project to build when several exist.")
+          ]})]
+        }));return;
       }
-      main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"Build"),el("div",{class:"bl-empty"},"No .csproj exists in this project.")));return
+      main.replaceChildren(uiEmpty("Build","No .csproj exists in this project."));return;
     }
-    const editable=project.editableProperties||[];
-    const props=project.properties||{};
-    const left=el("section",{class:"bl-card"},el("h2",{},project.name),
-      el("div",{class:"bl-grid"},...editable.flatMap(name=>fieldRow(name,projectControl(name,props[name]??"")))),
-      el("div",{class:"bl-note"},`SDK: ${project.sdk||"(classic MSBuild)"} · ${project.references.length} assembly references · ${project.packages.length} packages`),
-      Object.keys(project.ambiguousProperties||{}).length?el("div",{class:"bl-note"},`Read-only ambiguous MSBuild properties: ${Object.entries(project.ambiguousProperties).map(([name,reason])=>`${name} (${reason})`).join("; ")}. Lexeditor does not evaluate MSBuild conditions.`):null,
-      el("div",{class:"bl-note"},"Lexeditor-hosted builds pin BannerlordDir, GameBin, ModuleDir, and OutputPath to the selected Bannerlord installation. Project-local values remain editable for external builds but cannot redirect Lexeditor Build / Build + deploy."),
-      el("div",{class:"bl-note"},"Trust boundary: dotnet build executes the selected project's MSBuild targets and tasks with your user permissions. Path pinning protects Lexeditor's standard Bannerlord output roots; it is not a sandbox. Build only projects you trust.")
-    );
-    const referenceLines=project.references.map(row=>`${row.include}${row.metadata?.HintPath?` — ${row.metadata.HintPath}`:""}`);
-    const packageLines=project.packages.map(row=>`${row.include}${row.metadata?.Version?` ${row.metadata.Version}`:""}`);
-    const targetLines=project.targets.map(row=>`${row.name||"(unnamed target)"}${row.afterTargets?` after ${row.afterTargets}`:""}${row.beforeTargets?` before ${row.beforeTargets}`:""}`);
+    const editable=project.editableProperties||[],props=project.properties||{};
     const blocked=state.building||dirtyCount()>0;
-    const right=el("section",{class:"bl-card"},
-      el("h2",{},"Build & project inventory"),
-      el("div",{class:"bl-build-toolbar"},
+    const properties=BLUI.detailPanel({
+      title:project.name,meta:`${project.sdk||"classic MSBuild"} · ${project.references.length} references · ${project.packages.length} packages`,
+      body:[
+        BLUI.detailSection({title:"EDITABLE PROJECT PROPERTIES",body:editable.map(name=>BLUI.detailField({
+          label:name,control:projectControl(name,props[name]??""),
+          help:BLUI.infoHelp(["BannerlordDir","GameBin","ModuleDir","OutputPath"].includes(name)?
+            "Lexeditor-hosted builds pin this path to the selected Bannerlord installation or module even if the project file contains another value.":
+            "Lexeditor edits only a unique unconditional MSBuild property. Conditional or duplicate definitions stay read-only.")
+        }))}),
+        Object.keys(project.ambiguousProperties||{}).length?BLUI.detailSection({
+          title:"READ-ONLY AMBIGUOUS PROPERTIES",
+          body:Object.entries(project.ambiguousProperties).map(([name,reason])=>readField(name,reason))
+        }):null
+      ].filter(Boolean)
+    });
+    const refs=project.references.map(row=>`${row.include}${row.metadata?.HintPath?` — ${row.metadata.HintPath}`:""}`);
+    const packages=project.packages.map(row=>`${row.include}${row.metadata?.Version?` ${row.metadata.Version}`:""}`);
+    const targets=project.targets.map(row=>`${row.name||"(unnamed target)"}${row.afterTargets?` after ${row.afterTargets}`:""}${row.beforeTargets?` before ${row.beforeTargets}`:""}`);
+    const inventory=BLUI.detailPanel({
+      title:"Build & Deploy",meta:state.buildResult?(state.buildResult.succeeded?"Last build passed":"Last build failed"):"No build run yet",
+      actions:[
         select(state.buildConfiguration,[["Debug","Debug"],["Release","Release"]],value=>state.buildConfiguration=value),
-        el("button",{type:"button",class:"bl-build-button",disabled:blocked,onclick:()=>runBuild(false)},state.building?"Working…":"dotnet build"),
-        el("button",{type:"button",class:"bl-build-button",disabled:blocked,onclick:()=>runBuild(true)},"Build + deploy"),
-        el("button",{type:"button",class:"bl-build-button",disabled:blocked,onclick:syncAssets},"Sync assets"),
-        state.buildResult?el("strong",{},state.buildResult.succeeded?"PASS":""):null
-      ),
-      dirtyCount()>0?el("div",{class:"bl-note"},"Save pending Lexeditor edits before build/deploy. These actions operate on files on disk, not unsaved controls."):null,
-      el("div",{class:"bl-list-block"},el("h3",{},"References"),referenceLines.length?el("ul",{},...referenceLines.map(v=>el("li",{},v))):el("div",{class:"bl-note"},"No assembly references.")),
-      el("div",{class:"bl-list-block"},el("h3",{},"Packages"),packageLines.length?el("ul",{},...packageLines.map(v=>el("li",{},v))):el("div",{class:"bl-note"},"No package references.")),
-      el("div",{class:"bl-list-block"},el("h3",{},"Targets"),targetLines.length?el("ul",{},...targetLines.map(v=>el("li",{},v))):el("div",{class:"bl-note"},"No explicit MSBuild targets.")),
-      deploySummary(),
-      el("pre",{class:"bl-build-log"},state.buildResult?.output||"Build output will appear here. Lexeditor invokes dotnet directly without a shell. Asset deployment is additive and never deletes deployed files.")
-    );
-    main.replaceChildren(el("div",{class:"bl-build-layout"},left,right));
+        uiButton(state.building?"Working…":"Build",()=>runBuild(false),{disabled:blocked}),
+        uiButton("Build + Deploy",()=>runBuild(true),{disabled:blocked}),
+        uiButton("Sync assets",syncAssets,{disabled:blocked})
+      ],
+      body:[
+        dirtyCount()>0?BLUI.detailSection({title:"SAVE REQUIRED",body:[
+          readField("Pending changes",dirtyCount(),"Build and deployment operate on files on disk. Save Lexeditor edits first so the game receives the values currently shown.")
+        ]}):null,
+        BLUI.detailSection({title:"TOOLCHAIN",body:[
+          readField("Compiler","dotnet build","Build requires a system .NET SDK available on PATH. Bannerlord uses its native module loader; dotnet is a development toolchain prerequisite, not a runtime loader or self-updating helper managed by Lexeditor."),
+          readField("Trust boundary","Project-defined MSBuild targets run with your user permissions","Hosted path pinning protects Lexeditor's standard outputs but is not a sandbox. Build only projects you trust.")
+        ]}),
+        BLUI.detailSection({title:"REFERENCES",body:refs.length?refs.map((value,index)=>readField(`Reference ${index+1}`,value)):[readField("References","None")]}),
+        BLUI.detailSection({title:"PACKAGES",body:packages.length?packages.map((value,index)=>readField(`Package ${index+1}`,value)):[readField("Packages","None")]}),
+        BLUI.detailSection({title:"TARGETS",body:targets.length?targets.map((value,index)=>readField(`Target ${index+1}`,value)):[readField("Targets","None")]}),
+        state.deployResult?BLUI.detailSection({title:"LAST ASSET SYNC",body:[
+          readField("Target",state.deployResult.target||"—"),
+          readField("Copied",(state.deployResult.copied||[]).length),
+          readField("Unchanged",(state.deployResult.unchanged||[]).length),
+          readField("Backups",(state.deployResult.backups||[]).length)
+        ]}):null,
+        BLUI.detailSection({title:"OUTPUT",body:[
+          BLUI.detailField({label:"Build log",control:el("pre",{class:"bannerlord-build-log"},state.buildResult?.output||"Build output appears here.")})
+        ]})
+      ].filter(Boolean)
+    });
+    main.replaceChildren(BLUI.panelLayout([properties,inventory],"bannerlord-build-layout",{
+      layoutKey:"bannerlord-build",stackAt:1000,defaultSizes:[44,56]
+    }));
   }
 
   async function openSource(row){
