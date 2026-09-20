@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import os
+import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -18,6 +20,9 @@ from runtime_bootstrap import user_data_dir
 
 REPAK_VERSION = "0.2.3"
 REPAK_TAG = f"v{REPAK_VERSION}"
+REPAK_SOURCE = "https://github.com/trumank/repak"
+REPAK_RELEASE = f"{REPAK_SOURCE}/releases/tag/{REPAK_TAG}"
+LATEST_RELEASE_API = "https://api.github.com/repos/trumank/repak/releases/latest"
 FF7R_MOUNT_POINT = "../../../"
 # Public FF7R asset archive key, documented by the FF7R Data Editor project.
 FF7R_AES_KEY = "0x23989837645C9D28BA58072B2076E895B853A7C9E1C5591B814C4FD2A2D7B782"
@@ -58,10 +63,57 @@ def helper_status() -> dict:
         "installed": installed,
         "version": REPAK_TAG if installed else "",
         "pinned": REPAK_TAG,
+        "packageVersion": REPAK_TAG,
         "path": str(target),
+        "source": REPAK_SOURCE,
+        "releaseNotes": REPAK_RELEASE,
+        # repak has no self-updater. Lexeditor also never changes the pinned
+        # release unless the user explicitly chooses Install/Repair.
+        "autoUpdate": False,
         "message": "" if installed else f"Install pinned repak {REPAK_TAG} to read and build FF7R PAK archives.",
     }
 
+
+def _version_tuple(value: str) -> tuple[int, int, int] | None:
+    match = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)", str(value).strip())
+    return tuple(map(int, match.groups())) if match else None
+
+
+def _fetch_json(url: str) -> dict:
+    request = urllib.request.Request(url, headers={"User-Agent": "Lexeditor-FF7R/1"})
+    with urllib.request.urlopen(request, timeout=15) as response:
+        raw = response.read(1024 * 1024 + 1)
+    if len(raw) > 1024 * 1024:
+        raise RuntimeError("repak release metadata is too large")
+    return json.loads(raw)
+
+
+def upstream_release(fetch_json=None) -> dict:
+    """Report upstream availability without changing the pinned helper."""
+    base = {
+        "runtime": "repak",
+        "pinned": REPAK_TAG,
+        "packageVersion": REPAK_TAG,
+        "source": REPAK_SOURCE,
+        "releaseNotes": REPAK_RELEASE,
+        "autoUpdate": False,
+    }
+    try:
+        payload = (fetch_json or _fetch_json)(LATEST_RELEASE_API)
+        latest = str(payload.get("tag_name", ""))
+        parsed = _version_tuple(latest)
+        pinned = _version_tuple(REPAK_TAG)
+        if parsed is None or pinned is None or payload.get("draft") or payload.get("prerelease"):
+            raise RuntimeError("Upstream did not return a stable repak release")
+        return {
+            **base,
+            "latest": latest,
+            "published": str(payload.get("published_at", "")),
+            "releaseNotes": str(payload.get("html_url") or f"{REPAK_SOURCE}/releases/tag/{latest}"),
+            "behind": parsed > pinned,
+        }
+    except Exception as error:
+        return {**base, "error": str(error), "behind": False}
 
 def _download_spec():
     key = "win32" if os.name == "nt" else sys.platform
@@ -129,14 +181,22 @@ def list_pak(pak: Path) -> list[str]:
 
 
 def get_file(pak: Path, internal_path: str) -> bytes:
-    # repak cannot read this game's compressed entries; see pak_reader for the
-    # defect. Read directly, and keep repak as the fallback so an archive shape
-    # the reader rejects still has its original path.
-    from .pak_reader import PakError, read_file
+    # repak cannot read this game's legacy Custom/Oodle entries correctly, so
+    # the direct reader is authoritative. repak's default oodle feature can
+    # fetch an Oodle library beside itself when one is missing; Lexeditor must
+    # never allow a helper to silently download a dependency. The compatibility
+    # fallback therefore runs only when an Oodle library is already explicit.
+    from .pak_reader import PakError, oodle_library, read_file
 
     try:
         return read_file(Path(pak), internal_path)
-    except PakError:
+    except PakError as error:
+        if oodle_library() is None:
+            raise RuntimeError(
+                "FF7R direct PAK reading failed and the repak fallback is disabled because "
+                "no explicit Oodle library is present beside repak. Lexeditor will not let "
+                "repak download Oodle automatically."
+            ) from error
         result = _command("get", "--strip-prefix", FF7R_MOUNT_POINT,
                           str(Path(pak)), internal_path, binary=True)
         return bytes(result.stdout)
