@@ -33,7 +33,7 @@ PROJECT_ROOT = DEFAULT_PROJECT_ROOT
 
 def check() -> list[str]:
     problems: list[str] = []
-    for relative in ("editor.html", "server.py", "project_template/manifest.json", "project_template/content.json"):
+    for relative in ("editor.html", "editor.css", "editor.js", "server.py", "project_template/manifest.json", "project_template/content.json"):
         if not (PLUGIN_ROOT / relative).is_file():
             problems.append(f"Missing Stardew Valley plugin file: {relative}")
     return problems

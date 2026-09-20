@@ -25,6 +25,21 @@ POST_ROUTES = {
     "/api/deployment/revert",
     "/api/acceptance/begin",
 }
+PAGE_MODULES = {"editor.css", "editor.js"}
+
+
+def send_page_module(handler, name: str) -> None:
+    """Serve one plugin-owned editor module without exposing arbitrary paths."""
+    if name not in PAGE_MODULES:
+        handler.json_response({"error": "Editor module not found"}, 404)
+        return
+    root = PLUGIN_ROOT.resolve()
+    target = (root / name).resolve()
+    if root not in target.parents or not target.is_file():
+        handler.json_response({"error": "Editor module not found"}, 404)
+        return
+    handler.file_response(target)
+
 
 
 def objects_dataset() -> dict:
@@ -127,6 +142,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             if path == "/": self.file_response(PLUGIN_ROOT / "editor.html")
+            elif path in {"/editor.css", "/editor.js"}:
+                send_page_module(self, path.removeprefix("/"))
             elif path.startswith("/shared/"):
                 shared = (LEXEDITOR_ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()
