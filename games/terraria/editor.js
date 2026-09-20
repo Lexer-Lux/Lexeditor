@@ -252,7 +252,7 @@
     if(!row)return emptyPanel("Managed Content","No managed content is selected.");
     if(structuredLoading||structuredCurrent?.path!==row.path)return loadingPanel(`Loading ${row.name}…`);
     const schema={fields:structuredCurrent.schema||[]};
-    return detailPanel({title:row.name,meta:`${row.kind} · ${row.path}`,paginate:true,body:[
+    return detailPanel({title:row.name,meta:`${row.kind} · ${row.path}`,body:[
       ...schemaSections(schema,structuredCurrent.values,()=>{render();shell?.refresh?.()},{disabled:!structuredCurrent.editable}),
       detailSection({title:"SOURCE BOUNDARY",body:[
         detailField({label:"FILE",control:readonlyField(row.path)}),
@@ -351,7 +351,7 @@
       detailField({label:"VALUE",dataType:"STRING",control:el("input",{type:"text",value:locNewValue,"aria-label":"New localization value",oninput:event=>{locNewValue=event.target.value}})}),
       detailField({label:"ACTION",control:el("button",{class:"lex-dialog-action primary",type:"button",onclick:addLocalizationEntry},"Add key")}),
     ]}):null;
-    return detailPanel({title:entry.key,meta:`${locCurrent.culture||"Unknown culture"} · ${locCurrent.path}`,paginate:true,body:[
+    return detailPanel({title:entry.key,meta:`${locCurrent.culture||"Unknown culture"} · ${locCurrent.path}`,body:[
       detailSection({title:"TEXT",body:[detailField({label:"VALUE",dataType:"STRING",control,help:infoHelp("The player-facing localized string used by tModLoader for this effective key.")})]}),
       detailSection({title:"SOURCE",body:[
         detailField({label:"RESOURCE",control:readonlyField(locCurrent.path)}),
@@ -409,7 +409,7 @@
     const editor=el("textarea",{class:"terraria-source-editor",spellcheck:false,value:sourceCurrent.text,"aria-label":`C# source ${sourceCurrent.path}`,oninput:event=>{sourceCurrent.text=event.target.value;shell?.refresh?.()},onkeydown:event=>{if(event.key!=="Tab")return;event.preventDefault();const target=event.target,start=target.selectionStart,end=target.selectionEnd;target.setRangeText("\t",start,end,"end");sourceCurrent.text=target.value;shell?.refresh?.()}});
     if(sourceGotoLine){const line=sourceGotoLine;sourceGotoLine=0;setTimeout(()=>{const rows=editor.value.split("\n");let start=0;for(let i=1;i<line&&i<=rows.length;i++)start+=rows[i-1].length+1;const end=start+(rows[Math.min(line-1,rows.length-1)]||"").length;editor.focus();editor.setSelectionRange(start,end);editor.scrollTop=Math.max(0,(line-5)*20)},0)}
     const rename=el("input",{type:"text",value:sourceRenamePath||sourceCurrent.path,"aria-label":"Rename C# source path",disabled:sourceLoading||dirtyCount()>0,oninput:event=>{sourceRenamePath=event.target.value}});
-    return detailPanel({title:basename(row.path),meta:row.path,paginate:true,body:[
+    return detailPanel({title:basename(row.path),meta:row.path,body:[
       detailSection({title:"FILE",body:[
         detailField({label:"PATH",control:rename,dataType:"STRING"}),
         detailField({label:"LINES",control:readonlyField(String(sourceCurrent.lines))}),
@@ -465,7 +465,7 @@
     if(assetImportMode)return assetImportDetail();if(!row)return emptyPanel("Assets","No asset is selected.");if(assetLoading||assetCurrent?.path!==row.path)return loadingPanel(`Loading ${row.path}…`);
     const locked=assetLoading||dirtyCount()>0,dimensions=assetCurrent.width&&assetCurrent.height?`${assetCurrent.width} × ${assetCurrent.height}`:"Not decoded";
     const rename=el("input",{type:"text",value:assetRenamePath||assetCurrent.path,"aria-label":"Rename asset path",disabled:locked,oninput:event=>{assetRenamePath=event.target.value}});
-    return detailPanel({title:basename(row.path),meta:row.path,paginate:true,body:[
+    return detailPanel({title:basename(row.path),meta:row.path,body:[
       detailSection({title:"PREVIEW",body:[assetPreview()]}),
       detailSection({title:"FILE",body:[
         detailField({label:"PATH",dataType:"STRING",control:rename}),detailField({label:"FORMAT",control:readonlyField(assetCurrent.kind||assetCurrent.extension)}),detailField({label:"SIZE",control:readonlyField(`${assetCurrent.bytes} bytes`)}),detailField({label:"DIMENSIONS",control:readonlyField(dimensions)}),
