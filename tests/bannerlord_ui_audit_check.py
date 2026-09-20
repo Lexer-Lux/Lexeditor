@@ -227,8 +227,8 @@ def exercise_table(page, label):
         needle = "__no_such_bannerlord_record__"
         search.fill(needle)
         page.wait_for_function(
-            """([value])=>Object.values(state.uiTables||{}).some(row=>row.query===value)""",
-            arg=[needle],
+            """()=>{const table=document.querySelector('.lex-column-list');
+              return !!table && !table.querySelector('.lex-column-list-row:not(.lex-filler-row)')}"""
         )
         table = page.locator(".lex-column-list").first
         real_rows = table.locator(".lex-column-list-row:not(.lex-filler-row)")
@@ -237,7 +237,8 @@ def exercise_table(page, label):
         search = page.locator(".lex-pager").first.locator('input[type="search"]').first
         search.fill("")
         page.wait_for_function(
-            """()=>Object.values(state.uiTables||{}).every(row=>row.query!=="__no_such_bannerlord_record__")"""
+            """()=>{const table=document.querySelector('.lex-column-list');
+              return !!table && !!table.querySelector('.lex-column-list-row:not(.lex-filler-row)')}"""
         )
         assert page.locator(".lex-column-list").first.locator(".lex-column-list-row:not(.lex-filler-row)").count() > 0, (label, "clearing search did not restore records")
 
