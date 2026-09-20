@@ -1646,9 +1646,13 @@ def _normalize_data_map_rows(rows, *, trusted: bool = False, interfaces=None) ->
         notes = str(source.get("notes") or source.get("description") or "").strip()
         if not trusted:
             notes = capability.get("notes", "No verified format-specific interface is connected to this source. " + notes)
+        controls = str(
+            (capability.get("controls") if not trusted else "")
+            or source.get("controls") or source.get("system") or ""
+        ).strip()
         normalized.append({
             "filename": filename,
-            "controls": str(source.get("controls") or source.get("system") or "").strip(),
+            "controls": controls,
             "notes": notes, "coverage": coverage,
             "status": status,
             "target": target,
