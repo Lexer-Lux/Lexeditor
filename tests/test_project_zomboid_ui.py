@@ -63,6 +63,8 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertIn("LexeditorUI.detailPanel({", text)
         self.assertIn("LexeditorUI.infoHelp(", text)
         self.assertIn('type:"checkbox"', text)
+        self.assertIn("edit:(row,value)=>setDraftValue", text)
+        self.assertIn("editor:(row,commit)=>cellEditor", text)
         self.assertNotIn('class="split"', text)
 
     def test_metadata_scripts_and_info_use_shared_surfaces(self):
@@ -73,6 +75,11 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertIn('label:"Search Build 42 script records"', text)
         self.assertNotIn("<table>", text)
         self.assertNotIn('class="notice"', text)
+        self.assertIn("dirtyCount,", text)
+        self.assertIn("save:saveAllChanges", text)
+        self.assertIn("discard:discardChanges", text)
+        self.assertIn("emptyDetail:", text)
+        self.assertIn("renderLoading(", text)
 
     def test_animation_mesh_ui_exposes_only_single_value_typed_fields(self):
         text = editor_script()

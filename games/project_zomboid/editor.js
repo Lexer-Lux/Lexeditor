@@ -19,26 +19,107 @@ const shellTabs=[
 const editorTabs=new Map(shellTabs.map(row=>[row.label,row.id]));
 const mapState={page:0,query:"",status:"",sort:["filename",1]};
 const scriptState={selected:null,page:0,pageSize:15,query:"",sort:{key:"name",dir:1}};
+const drafts=new Map();
+const STRUCTURED_KINDS=["animationmeshes","items","evolved","crafts","fixing","fluids","vehicles","sounds","models","mannequins","timedactions"];
+const tableFieldKeys={
+  animationmeshes:["keepMeshAnimations","meshFile","postProcess"],
+  items:["Weight","ItemType","DisplayCategory"],
+  evolved:["MaxItems","MinimumWater","ResultItem"],
+  crafts:["category","time","CanWalk"],
+  fixing:["ConditionModifier"],
+  fluids:["DisplayName","ColorReference"],
+  vehicles:["engineForce","engineQuality","gearRatioCount"],
+  sounds:["category","loop","maxInstancesPerEmitter"],
+  models:["scale","shader","static"],
+  mannequins:["outfit","pose","female"],
+  timedactions:["actionAnim"],
+};
+function draftToken(kind,row,key){return [kind,kind==="metadata"?"metadata":row.key,key].join("\u001f")}
+function baseValue(row,key){return String(row?.fields?.[key]??"")}
+function draftValue(kind,row,key){const entry=drafts.get(draftToken(kind,row,key));return entry?entry.value:baseValue(row,key)}
+function setDraftValue(kind,row,spec,value){
+  const token=draftToken(kind,row,spec.key),original=baseValue(row,spec.key),next=String(value);
+  if(next===original)drafts.delete(token);
+  else drafts.set(token,{token,kind,rowKey:kind==="metadata"?"metadata":row.key,field:spec.key,label:spec.label,original,value:next});
+  shell?.refresh?.();
+}
+function dirtyCount(){return drafts.size}
+function clearDraftsFor(kind,rowKey){
+  for(const [token,entry] of drafts)if(entry.kind===kind&&(rowKey===undefined||entry.rowKey===rowKey))drafts.delete(token);
+}
+function fieldAvailability(row,spec){
+  const original=baseValue(row,spec.key),present=original!=="",ambiguous=(row.duplicateKeys||[]).includes(spec.key);
+  const choices=spec.type==="select"?[...(typeof spec.choices==="function"?spec.choices(row):spec.choices||[])]:[];
+  const unknownSelect=spec.type==="select"&&present&&!choices.includes(original);
+  return{original,present,ambiguous,choices,unknownSelect,disabled:(!present&&spec.addable!==true)||ambiguous||spec.locked===true||unknownSelect};
+}
+function renderLoading(message="Reading the Build 42 project…"){
+  main.replaceChildren(LexeditorUI.detailPanel({className:"lex-information-panel pz-loading",title:"Loading Project Zomboid",meta:"Build 42 editor",body:[
+    LexeditorUI.el("p",{class:"lex-detail-note",role:"status"},message),
+  ]}));
+}
+function renderEmpty(title,message){
+  return LexeditorUI.detailPanel({className:"pz-empty-state",title,meta:"No records",body:[
+    LexeditorUI.el("p",{class:"lex-detail-note"},message),
+  ]});
+}
 async function api(path,options={}){const response=await fetch(path,{...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});let payload={};try{payload=await response.json()}catch{}if(!response.ok)throw new Error(payload.error||`Request failed (${response.status})`);return payload}
 function setStatus(message,error=false){LexeditorUI.showToast?.(message,error)}
-async function reload(){try{[metadata,animationMeshes,items,evolved,crafts,fixings,fluids,vehicles,sounds,models,mannequins,timedActions,scripts,datamap,deployment]=await Promise.all([api("/api/mod-info"),api("/api/animationmeshes"),api("/api/items"),api("/api/evolvedrecipes"),api("/api/craftrecipes"),api("/api/fixings"),api("/api/fluids"),api("/api/vehicles"),api("/api/sounds"),api("/api/models"),api("/api/mannequins"),api("/api/timedactions"),api("/api/zedscript"),api("/api/datamap"),api("/api/deployment")]);render()}catch(error){setStatus(error.message,true);renderLoadError(error)}}
+async function reload(){
+  renderLoading();
+  try{
+    [metadata,animationMeshes,items,evolved,crafts,fixings,fluids,vehicles,sounds,models,mannequins,timedActions,scripts,datamap,deployment]=await Promise.all([
+      api("/api/mod-info"),api("/api/animationmeshes"),api("/api/items"),api("/api/evolvedrecipes"),api("/api/craftrecipes"),api("/api/fixings"),api("/api/fluids"),api("/api/vehicles"),api("/api/sounds"),api("/api/models"),api("/api/mannequins"),api("/api/timedactions"),api("/api/zedscript"),api("/api/datamap"),api("/api/deployment")
+    ]);
+    render();
+  }catch(error){setStatus(error.message,true);renderLoadError(error)}
+}
 function renderLoadError(error){main.replaceChildren(LexeditorUI.detailPanel({className:"lex-information-panel",title:"Project Zomboid could not load",identity:null,meta:"Plugin load error",body:[LexeditorUI.detailSection({title:"ERROR",body:[sharedReadonly("Message",error.message||String(error),"Resolve this project/install problem, then reload the plugin.")]} )]}))}
 function renderMetadata(){
-  const row={fields:metadata.fields,duplicateKeys:metadata.duplicateKeys},readers={};
-  const build=spec=>{const value=sharedControl(row,spec);if(value.read)readers[spec.key]=value.read;return value.field};
-  const sections=metadataSpecs.map(group=>LexeditorUI.detailSection({title:group.title,body:group.fields.map(build)}));
-  const save=LexeditorUI.el("button",{type:"button",class:"lex-command-primary",onclick:()=>saveMetadata(readers)},"Save Metadata");
-  main.replaceChildren(LexeditorUI.detailPanel({className:"pz-metadata",title:metadata.fields.name||"Mod Metadata",identity:null,meta:metadata.path,body:[
+  const row={key:"metadata",fields:metadata.fields,duplicateKeys:metadata.duplicateKeys};
+  const sections=metadataSpecs.map(group=>LexeditorUI.detailSection({title:group.title,body:group.fields.map(spec=>sharedControl("metadata",row,spec))}));
+  main.replaceChildren(LexeditorUI.detailPanel({className:"pz-metadata",title:draftValue("metadata",row,"name")||"Mod Metadata",identity:null,meta:metadata.path,body:[
     LexeditorUI.detailSection({title:"SOURCE",body:[sharedReadonly("File",metadata.path,"Build 42 mod.info source. Lexeditor patches modeled keys and preserves unrelated lines.")]}),
     ...sections,
     LexeditorUI.detailSection({title:"PRESERVATION",body:[
       sharedReadonly("Unmodeled Lines",String(metadata.unmodeledLines),"Non-empty lines outside the modeled scalar keys are preserved unless the file itself is externally changed."),
       sharedReadonly("Duplicate Keys",metadata.duplicateKeys.length?metadata.duplicateKeys.join(", "):"None","Duplicated keys are shown but their controls are disabled so Lexeditor cannot make an ambiguous write."),
     ]}),
-    LexeditorUI.detailSection({title:"ACTIONS",body:[LexeditorUI.el("div",{class:"pz-shared-actions"},save)]}),
   ]}));
 }
-async function saveMetadata(readers){const edits={};for(const [key,read] of Object.entries(readers)){const value=read();if(String(value)!==String(metadata.fields?.[key]??""))edits[key]=value}if(!Object.keys(edits).length){setStatus("No metadata changes to save");return}try{metadata=await api("/api/mod-info/save",{method:"POST",body:JSON.stringify({sha256:metadata.sha256,edits})});setStatus("Metadata saved");await reload()}catch(error){setStatus(error.message,true)}}
+async function saveAllChanges(){
+  if(!dirtyCount())return;
+  let saved=0;
+  try{
+    const metadataEdits={};
+    for(const entry of drafts.values())if(entry.kind==="metadata")metadataEdits[entry.field]=entry.value;
+    if(Object.keys(metadataEdits).length){
+      metadata=await api("/api/mod-info/save",{method:"POST",body:JSON.stringify({sha256:metadata.sha256,edits:metadataEdits})});
+      saved+=Object.keys(metadataEdits).length;clearDraftsFor("metadata");
+    }
+    for(const kind of STRUCTURED_KINDS){
+      const config=structuredConfigs[kind];
+      const rowKeys=[...new Set([...drafts.values()].filter(entry=>entry.kind===kind).map(entry=>entry.rowKey))];
+      for(const rowKey of rowKeys){
+        const row=(config.rows()||[]).find(candidate=>candidate.key===rowKey);
+        if(!row)throw new Error(`The edited ${config.saved.toLowerCase()} is no longer present. Discard or reload before saving.`);
+        const edits={};
+        for(const entry of drafts.values())if(entry.kind===kind&&entry.rowKey===rowKey)edits[entry.field]=entry.value;
+        const result=await api(config.save,{method:"POST",body:JSON.stringify({path:row.path,module:row.module,id:row.id,sha256:row.sha256,edits})});
+        saved+=Object.keys(edits).length;clearDraftsFor(kind,rowKey);
+        if(result?.sha256){
+          for(const otherKind of STRUCTURED_KINDS)for(const other of structuredConfigs[otherKind].rows()||[])if(other.path===row.path)other.sha256=result.sha256;
+        }
+      }
+    }
+    setStatus(`Saved ${saved} change${saved===1?"":"s"}`);
+    await reload();
+  }catch(error){setStatus(error.message,true);shell?.refresh?.();throw error}
+}
+async function discardChanges(){
+  const count=dirtyCount();drafts.clear();render();shell?.refresh?.();
+  if(count)setStatus(`Discarded ${count} unsaved change${count===1?"":"s"}`);
+}
 const structuredState=Object.fromEntries(["animationmeshes","items","evolved","crafts","fixing","fluids","vehicles","sounds","models","mannequins","timedactions"].map(id=>[id,{selected:null,page:0,pageSize:15,query:"",sort:{key:"id",dir:1}}]));
 const boolField=(key,label,help,extra={})=>({key,label,type:"bool",help,...extra});
 const textField=(key,label,help,extra={})=>({key,label,type:"text",help,...extra});
@@ -168,73 +249,93 @@ const structuredConfigs={
   ]},
 };
 function sharedReadonly(label,value,help){return LexeditorUI.detailField({label:label.toUpperCase(),control:LexeditorUI.readonlyField(value),help:LexeditorUI.infoHelp(help)})}
-function sharedControl(row,spec){
-  const raw=row.fields?.[spec.key]??"",present=raw!=="",ambiguous=(row.duplicateKeys||[]).includes(spec.key);
-  const disabled=(!present&&spec.addable!==true)||ambiguous||spec.locked===true;
-  let control,read=null,dataType="STRING";
+function sharedControl(kind,row,spec){
+  const availability=fieldAvailability(row,spec),raw=draftValue(kind,row,spec.key);
+  let control,dataType="STRING";
   if(spec.type==="bool"){
-    control=LexeditorUI.el("input",{type:"checkbox",checked:String(raw).toLowerCase()==="true",disabled,"aria-label":spec.label});
-    dataType="BOOL";if(!disabled)read=()=>control.checked?"true":"false";
+    control=LexeditorUI.el("input",{type:"checkbox",checked:String(raw).toLowerCase()==="true",disabled:availability.disabled,"aria-label":spec.label});
+    dataType="BOOL";
   }else if(spec.type==="select"){
-    const values=[...(typeof spec.choices==="function"?spec.choices(row):spec.choices||[])];
-    if(raw&&!values.includes(raw))values.unshift(raw);
-    control=LexeditorUI.el("select",{disabled,"aria-label":spec.label},...values.map(value=>{const option=LexeditorUI.el("option",{value},value);option.selected=value===raw;return option}));
-    dataType="ENUM";if(!disabled)read=()=>control.value;
+    const values=[...availability.choices];if(availability.original&&!values.includes(availability.original))values.unshift(availability.original);
+    control=LexeditorUI.el("select",{disabled:availability.disabled,"aria-label":spec.label},...values.map(value=>{const option=LexeditorUI.el("option",{value},value);option.selected=value===raw;return option}));
+    dataType="ENUM";
   }else if(spec.type==="textarea"){
-    control=LexeditorUI.el("textarea",{disabled,"aria-label":spec.label});control.value=raw;
-    if(!disabled)read=()=>control.value;
+    control=LexeditorUI.el("textarea",{disabled:availability.disabled,"aria-label":spec.label});control.value=raw;dataType="TEXT";
   }else{
-    const attrs={type:spec.type==="number"?"number":"text",value:raw,disabled,"aria-label":spec.label};
+    const attrs={type:spec.type==="number"?"number":"text",value:raw,disabled:availability.disabled,"aria-label":spec.label};
     if(spec.min!==undefined)attrs.min=spec.min;if(spec.max!==undefined)attrs.max=spec.max;if(spec.step!==undefined)attrs.step=spec.step;
-    control=LexeditorUI.el("input",attrs);
-    dataType=spec.type==="number"?(spec.integer?"INT":"FLOAT"):"STRING";
-    if(!disabled)read=()=>control.value;
+    control=LexeditorUI.el("input",attrs);dataType=spec.type==="number"?(spec.integer?"INT":"FLOAT"):"STRING";
+  }
+  if(!availability.disabled){
+    const update=()=>setDraftValue(kind,row,spec,spec.type==="bool"?(control.checked?"true":"false"):control.value);
+    control.addEventListener("input",update);control.addEventListener("change",update);
   }
   let help=spec.help;
-  if(!present)help+=spec.addable===true?" Saving a non-empty value adds this key to mod.info.":" This property is absent in this record, so Lexeditor leaves it absent.";
-  else if(ambiguous)help+=" This property appears more than once, so editing is disabled to avoid an ambiguous write.";
-  return{field:LexeditorUI.detailField({label:spec.label.toUpperCase(),control,dataType,min:spec.min,max:spec.max,help:LexeditorUI.infoHelp(help)}),read};
+  if(!availability.present)help+=spec.addable===true?" Saving a non-empty value adds this key to mod.info.":" This property is absent in this record, so Lexeditor leaves it absent.";
+  else if(availability.ambiguous)help+=" This property appears more than once, so editing is disabled to avoid an ambiguous write.";
+  else if(availability.unknownSelect)help+=" This Build 42 value is newer than Lexeditor's known choices, so editing is disabled rather than normalizing it.";
+  return LexeditorUI.detailField({label:spec.label.toUpperCase(),control,dataType,min:spec.min,max:spec.max,help:LexeditorUI.infoHelp(help)});
 }
-async function saveStructured(kind,row,readers){
-  const config=structuredConfigs[kind],edits={};
-  for(const [key,read] of Object.entries(readers)){const value=read();if(String(value)!==String(row.fields?.[key]??""))edits[key]=value}
-  if(!Object.keys(edits).length){setStatus("No changes to save");return}
-  try{
-    await api(config.save,{method:"POST",body:JSON.stringify({path:row.path,module:row.module,id:row.id,sha256:row.sha256,edits})});
-    setStatus(config.saved+" saved");await reload();
-  }catch(error){setStatus(error.message,true)}
+function cellEditor(kind,row,spec,commit){
+  const availability=fieldAvailability(row,spec),raw=draftValue(kind,row,spec.key);
+  if(spec.type==="bool"){
+    const box=LexeditorUI.el("input",{type:"checkbox",checked:String(raw).toLowerCase()==="true",disabled:availability.disabled,"aria-label":spec.label});
+    box.addEventListener("change",()=>commit(box.checked?"true":"false"));
+    box.addEventListener("keydown",event=>{if(event.key==="Escape"){event.preventDefault();commit(undefined)}});
+    return box;
+  }
+  if(spec.type==="select"){
+    const values=[...availability.choices];if(availability.original&&!values.includes(availability.original))values.unshift(availability.original);
+    const select=LexeditorUI.el("select",{disabled:availability.disabled,"aria-label":spec.label},...values.map(value=>LexeditorUI.el("option",{value},value)));
+    select.value=raw;select.addEventListener("change",()=>commit(select.value));
+    select.addEventListener("keydown",event=>{if(event.key==="Escape"){event.preventDefault();commit(undefined)}});
+    return select;
+  }
+  const input=LexeditorUI.el("input",{type:spec.type==="number"?"number":"text",value:raw,disabled:availability.disabled,"aria-label":spec.label});
+  if(spec.min!==undefined)input.min=spec.min;if(spec.max!==undefined)input.max=spec.max;if(spec.step!==undefined)input.step=spec.step;
+  input.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();commit(input.value)}if(event.key==="Escape"){event.preventDefault();commit(undefined)}});
+  input.addEventListener("blur",()=>commit(input.value));
+  return input;
 }
 function structuredDetail(kind,row){
-  const config=structuredConfigs[kind],readers={},fields=config.fields.map(spec=>{const built=sharedControl(row,spec);if(built.read)readers[spec.key]=built.read;return built.field});
-  const limits=sharedReadonly("Unmodeled Data","Preserved",config.limits);
-  const extras=config.summary?config.summary(row):[];
-  const save=LexeditorUI.el("button",{type:"button",class:"lex-command-primary",disabled:Object.keys(readers).length===0,onclick:()=>saveStructured(kind,row,readers)},"Save "+config.saved);
+  const config=structuredConfigs[kind],fields=config.fields.map(spec=>sharedControl(kind,row,spec));
+  const limits=sharedReadonly("Unmodeled Data","Preserved",config.limits),extras=config.summary?config.summary(row):[];
   return LexeditorUI.detailPanel({className:"pz-record-detail",title:row.fullType||row.id,identity:null,meta:row.path,body:[
     LexeditorUI.detailSection({title:"SOURCE",body:[sharedReadonly("Module",row.module||"—","The ZedScript module containing this record."),sharedReadonly("File",row.path,"Project-relative source file. Saves patch this file atomically.")]}),
     LexeditorUI.detailSection({title:"PROPERTIES",body:fields}),
     LexeditorUI.detailSection({title:"PRESERVATION",body:[limits,...extras]}),
-    LexeditorUI.detailSection({title:"ACTIONS",body:[LexeditorUI.el("div",{class:"pz-shared-actions"},save)]}),
   ]});
+}
+function tableFieldColumn(kind,spec){
+  const config=structuredConfigs[kind];
+  const column={key:spec.key,label:spec.label,sortable:true,help:spec.help,
+    render:row=>{const value=draftValue(kind,row,spec.key);return spec.type==="bool"?(String(value).toLowerCase()==="true"?"Yes":"No"):value||"—"},
+    sortValue:row=>draftValue(kind,row,spec.key),editValue:row=>draftValue(kind,row,spec.key),
+    edit:(row,value)=>setDraftValue(kind,row,spec,value),editor:(row,commit)=>cellEditor(kind,row,spec,commit)};
+  if(spec.type==="number"){column.numeric=true;column.min=spec.min;column.max=spec.max;column.step=spec.step}
+  return column;
 }
 function structuredRows(kind){
   const config=structuredConfigs[kind],state=structuredState[kind],query=state.query.trim().toLocaleLowerCase(),rows=[...(config.rows()||[])];
-  const filtered=rows.filter(row=>!query||[row.id,row.fullType,row.module,row.path].some(value=>String(value||"").toLocaleLowerCase().includes(query)));
-  const {key,dir}=state.sort;
-  return filtered.sort((a,b)=>dir*String(a[key]??"").localeCompare(String(b[key]??""),undefined,{numeric:true}));
+  const filtered=rows.filter(row=>!query||[row.id,row.fullType,row.module,row.path,...config.fields.map(spec=>draftValue(kind,row,spec.key))].some(value=>String(value||"").toLocaleLowerCase().includes(query)));
+  const {key,dir}=state.sort,spec=config.fields.find(field=>field.key===key);
+  return filtered.sort((a,b)=>dir*String(spec?draftValue(kind,a,key):(a[key]??"")).localeCompare(String(spec?draftValue(kind,b,key):(b[key]??"")),undefined,{numeric:true}));
 }
 function renderStructured(kind){
   const config=structuredConfigs[kind],state=structuredState[kind],rows=structuredRows(kind);
   if(state.selected&&!rows.some(row=>row.key===state.selected))state.selected=null;
   if(!state.selected&&rows.length)state.selected=rows[0].key;
+  const tableSpecs=(tableFieldKeys[kind]||[]).map(key=>config.fields.find(spec=>spec.key===key)).filter(Boolean);
   const view=LexeditorUI.pagedListDetail({rows,key:row=>row.key,selected:state.selected,page:state.page,pageSize:state.pageSize,noun:config.noun,className:"pz-record-layout",splitKey:"project-zomboid-"+kind,rowsKey:"project-zomboid-"+kind,
     search:{key:"project-zomboid-"+kind,value:state.query,label:"Search "+config.title,change:value=>{state.query=value;state.page=0;renderStructured(kind)}},
     sync:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.selected!==null)state.selected=next.selected},
     change:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.selected!==null)state.selected=next.selected;renderStructured(kind)},
-    master:({rows:shown,selected,select})=>LexeditorUI.columnList({rows:shown,key:row=>row.key,selected,select,sortState:state.sort,
+    master:({rows:shown,selected,select})=>LexeditorUI.columnList({rows:shown,key:row=>row.key,selected,select,sortState:state.sort,refresh:()=>renderStructured(kind),
       sort:key=>{state.sort=state.sort.key===key?{key,dir:-state.sort.dir}:{key,dir:1};state.page=0;renderStructured(kind)},
       class:"pz-record-table","aria-label":config.title,
-      columns:[{key:"id",label:"Record",sortable:true},{key:"module",label:"Module",sortable:true},{key:"path",label:"File",sortable:true}]}),
-    detail:row=>structuredDetail(kind,row)});
+      columns:[{key:"id",label:"Record",sortable:true,help:"ZedScript record name declared by the mod."},{key:"module",label:"Module",sortable:true,help:"ZedScript module containing the record."},...tableSpecs.map(spec=>tableFieldColumn(kind,spec))]}),
+    detail:row=>structuredDetail(kind,row),
+    emptyDetail:()=>renderEmpty(config.title,state.query?`No ${config.noun} match this search.`:`No ${config.noun} are present in the selected Build 42 project.`)});
   main.replaceChildren(view);shell?.refresh?.();
 }
 function renderAnimationMeshes(){renderStructured("animationmeshes")}
@@ -283,7 +384,8 @@ function renderScripts(){
     master:({rows:shown,selected,select})=>LexeditorUI.columnList({rows:shown,key:row=>row.key,selected,select,sortState:scriptState.sort,
       sort:key=>{scriptState.sort=scriptState.sort.key===key?{key,dir:-scriptState.sort.dir}:{key,dir:1};scriptState.page=0;renderScripts()},
       class:"pz-script-table","aria-label":"Build 42 Script Inventory",columns:[{key:"kind",label:"Kind",sortable:true},{key:"name",label:"Record",sortable:true},{key:"module",label:"Module",sortable:true},{key:"path",label:"File",sortable:true}]}),
-    detail:scriptDetail});
+    detail:scriptDetail,
+    emptyDetail:()=>renderEmpty("Script Inventory",scriptState.query?"No script records match this search.":"No recognized Build 42 ZedScript records are present.")});
   main.replaceChildren(view);shell?.refresh?.();
 }
 function renderDatamap(){const rows=datamap.rows.map(row=>{const editorTargets=String(row.editor||"").split(",").map(value=>value.trim()).filter(value=>editorTabs.has(value)).map(label=>({id:editorTabs.get(label),label})),scriptView=String(row.filename||"").endsWith(".txt"),targets=[...editorTargets,...(scriptView?[{id:"scripts",label:"Script Inventory"}]:[])];const editable=editorTargets.length>0;return{filename:row.filename,controls:row.editor||(scriptView?"Script Inventory":"Recognized Build 42 data"),notes:row.notes,status:(editable||scriptView)?"partial":"not-integrated",coverage:editable?"structured":scriptView?"view":"unavailable",targets}});const view=LexeditorUI.dataMap({rows,page:mapState.page,query:mapState.query,status:mapState.status,sort:mapState.sort,open:row=>navigate(row.target),changePage:value=>{mapState.page=value;renderDatamap()},changeQuery:value=>{mapState.query=value;mapState.page=0;renderDatamap()},changeStatus:value=>{mapState.status=value;mapState.page=0;renderDatamap()},changeSort:key=>{mapState.sort=mapState.sort[0]===key?[key,-mapState.sort[1]]:[key,1];renderDatamap()}});mapState.page=view.page;main.replaceChildren(view.content)}
@@ -304,7 +406,10 @@ function renderInfo(){
 }
 async function changeDeployment(path){try{deployment=await api(path,{method:"POST",body:"{}"});setStatus(path.endsWith("undeploy")?"Owned deployment removed":"Local mod deployed");await reload()}catch(error){setStatus(error.message,true)}}
 function render(){if(tab==="metadata")renderMetadata();else if(tab==="animationmeshes")renderAnimationMeshes();else if(tab==="items")renderItems();else if(tab==="evolved")renderEvolved();else if(tab==="crafts")renderCrafts();else if(tab==="fixing")renderFixings();else if(tab==="fluids")renderFluids();else if(tab==="vehicles")renderVehicles();else if(tab==="sounds")renderSounds();else if(tab==="models")renderModels();else if(tab==="mannequins")renderMannequins();else if(tab==="timedactions")renderTimedActions();else if(tab==="scripts")renderScripts();else if(tab==="datamap")renderDatamap();else if(tab==="info")renderInfo();else renderMetadata();shell?.refresh?.()}
-function navigate(value){tab=value;render()}
+function navigate(value){
+  tab=value;renderLoading(`Opening ${shellTabs.find(entry=>entry.id===value)?.label||value}…`);shell?.refresh?.();
+  queueMicrotask(render);
+}
 shell=LexeditorUI.mountShell({
   host:"#lexeditor-shell",
   brand:"LEXEDITOR",
@@ -318,5 +423,8 @@ shell=LexeditorUI.mountShell({
   info:()=>navigate("info"),
   infoActive:()=>tab==="info",
   infoTitle:"Open Project Zomboid setup and deployment information",
+  dirtyCount,
+  save:saveAllChanges,
+  discard:discardChanges,
 });
 void reload().finally(()=>LexeditorUI.finishPluginLoading?.());
