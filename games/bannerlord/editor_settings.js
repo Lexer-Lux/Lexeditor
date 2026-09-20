@@ -23,6 +23,13 @@ function renderMcmDefaults(){
       help:BLUI.infoHelp(explanation)
     });
   })}));
+  // Current master owns Tweaks pagination inside settingsColumns. This feature
+  // branch still carries the older shared framework, so keep one compatibility
+  // fallback until the PR is combined with master; never draw two pagers.
+  if(typeof LexeditorUI.paginateSettings==="function"){
+    main.replaceChildren(BLUI.settingsColumns(cards,{className:"bannerlord-tweaks"}));
+    return;
+  }
   const pageSize=6,pages=Math.max(1,Math.ceil(cards.length/pageSize));
   state.tweakPage=Math.max(0,Math.min(state.tweakPage,pages-1));
   const shown=cards.slice(state.tweakPage*pageSize,(state.tweakPage+1)*pageSize);
