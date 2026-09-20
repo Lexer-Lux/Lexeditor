@@ -94,25 +94,25 @@ jobs:
           Copy-Item ffnx/COPYING.TXT candidate/LICENSE
           Copy-Item ffnx/misc/FFNx.toml candidate/FFNx.toml.sample
           @'
-Issue #481 live acceptance — not performed by CI
-
-Use ONLY an isolated copy of Steam English FF8 whose FF8_EN.exe SHA-256 is:
-064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570
-
-1. Keep the normal installation untouched. In the isolated test copy, use this AF3DN.P
-   and FFNx.toml.sample; set enable_ff8_better_hp_colors = true and launch there.
-2. In battle, capture one living character at full HP, ~75%, 50%, ~37.5%, 25%,
-   low nonzero HP, and KO. Full must be vanilla white; 50% yellow; 25% orange;
-   low nonzero approaches red continuously. KO must match vanilla, not the gradient.
-3. Check the same damaged character in the main menu and the Status/Junction
-   character panels that use FF8's shared character widget. There must be no hard
-   palette jump between adjacent HP values.
-4. Exercise any vanilla status/presentation that changes the HP palette. That native
-   presentation must win; Better HP Colors must not recolour it.
-5. Set enable_ff8_better_hp_colors = false, relaunch the same isolated copy, and
-   compare battle/menu HP with unmodified FFNx. It must be vanilla exactly.
-6. Record FF8_EN.exe hash, FFNx.log, tested screens/HP values, and screenshots.
-'@ | Set-Content candidate/ISSUE481-ACCEPTANCE.txt
+          Issue #481 live acceptance — not performed by CI
+          
+          Use ONLY an isolated copy of Steam English FF8 whose FF8_EN.exe SHA-256 is:
+          064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570
+          
+          1. Keep the normal installation untouched. In the isolated test copy, use this AF3DN.P
+             and FFNx.toml.sample; set enable_ff8_better_hp_colors = true and launch there.
+          2. In battle, capture one living character at full HP, ~75%, 50%, ~37.5%, 25%,
+             low nonzero HP, and KO. Full must be vanilla white; 50% yellow; 25% orange;
+             low nonzero approaches red continuously. KO must match vanilla, not the gradient.
+          3. Check the same damaged character in the main menu and the Status/Junction
+             character panels that use FF8's shared character widget. There must be no hard
+             palette jump between adjacent HP values.
+          4. Exercise any vanilla status/presentation that changes the HP palette. That native
+             presentation must win; Better HP Colors must not recolour it.
+          5. Set enable_ff8_better_hp_colors = false, relaunch the same isolated copy, and
+             compare battle/menu HP with unmodified FFNx. It must be vanilla exactly.
+          6. Record FF8_EN.exe hash, FFNx.log, tested screens/HP values, and screenshots.
+          '@ | Set-Content candidate/ISSUE481-ACCEPTANCE.txt
           "Editor source: $env:GITHUB_SHA" | Set-Content candidate/BUILD.txt
           'FFNx source: c056db2783f376a340fcefa6a48cc33618998876' | Add-Content candidate/BUILD.txt
           'MSVC x86 Release; static Release-only dependencies; Shared Magic and Live Conditions compiled; game deployment disabled.' | Add-Content candidate/BUILD.txt
