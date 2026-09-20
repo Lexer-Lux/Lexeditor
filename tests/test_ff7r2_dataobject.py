@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import struct
-
 import pytest
 
 from games.ff7r2.dataobject import DataObjectError, DataObjectPackage
+from ff7r2_fixture import fixture
 
 
-from ff7r2_fixture import fixture\n\n\ndef test_fixture_parses_real_record_identity_and_scalar_types():
+def test_fixture_parses_real_record_identity_and_scalar_types():
     package = DataObjectPackage.from_bytes(fixture())
     assert [record.key.text for record in package.records] == ["Cloud", "Tifa"]
     cloud = package.records[0]
@@ -30,8 +29,12 @@ def test_fixed_width_edits_roundtrip_and_preserve_every_other_byte():
     edited = package.to_bytes()
     touched = set(range(hp.offset, hp.offset + hp.size))
     touched.update(range(strength.offset, strength.offset + strength.size))
-    assert all(before == after for index, (before, after) in enumerate(zip(source, edited))
-               if index not in touched)
+    assert all(
+        before == after
+        for index, (before, after) in enumerate(zip(source, edited))
+        if index not in touched
+    )
+
     reopened = DataObjectPackage.from_bytes(edited)
     values = {field.name: field.value for field in reopened.records[0].fields}
     assert values["HPMax"] == 1234
