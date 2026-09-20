@@ -46,39 +46,32 @@ async function validateAllModuleData(){
   }
 }
 
-function moduleDataValidationBlock(){
+function moduleDataValidationSection(){
   const report=state.moduleDataValidation;
   if(!report)return null;
   const clean=report.rows.filter(row=>row.ok&&!row.issues).length;
   const schemaMisses=report.rows.filter(row=>row.ok&&!row.schema).length;
-  const heading=state.moduleDataValidating?
-    `Validating ModuleData… ${report.scanned}/${report.total||"?"}`:
-    `ModuleData validation · ${report.scanned} file(s)`;
-  return el("div",{class:"bl-list-block"},
-    el("h3",{},heading),
-    el("div",{},`${report.issues} schema issue(s) · ${report.errors} parse/read error(s) · ${clean} clean · ${report.schemas} XSD match(es) · ${schemaMisses} without XSD`),
-    report.rows.length?el("div",{class:"bl-list"},...report.rows.map(row=>el("button",{
-      type:"button",class:"bl-item",onclick:()=>loadModuleData(row.path)
-    },
-      `${row.ok?(row.issues?"⚠":"✓"):"✗"} ${row.path}`,
-      el("small",{},row.ok?
-        `${row.records} record(s) · ${row.schema?`XSD ${row.schema}`:"no XSD"}${row.issues?` · ${row.issues} issue(s)`:""}`:
-        row.error)
-    ))):el("div",{class:"bl-note"},"No ModuleData files scanned yet."));
+  const rows=report.rows.map((row,index)=>({
+    index,row,path:row.path,status:row.ok?(row.issues?"Issues":"Clean"):"Error",
+    records:Number(row.records||0),schema:row.schema||"none",issues:Number(row.issues||0),
+    searchText:`${row.path} ${row.schema||""} ${row.error||""}`
+  }));
+  return BLUI.detailSection({
+    title:state.moduleDataValidating?`PROJECT VALIDATION · ${report.scanned}/${report.total||"?"}`:`PROJECT VALIDATION · ${report.scanned} FILE(S)`,
+    help:BLUI.infoHelp("Validate all reparses every project ModuleData XML file and applies a Bannerlord XSD only when the installed schema match is unique. It does not rewrite files."),
+    body:[
+      readField("Summary",`${report.issues} schema issue(s) · ${report.errors} parse/read error(s) · ${clean} clean · ${report.schemas} XSD match(es) · ${schemaMisses} without XSD`),
+      rows.length?BLUI.columnList({
+        rows,key:item=>item.index,selected:null,columns:[
+          {key:"path",label:"File"},
+          {key:"status",label:"Status"},
+          {key:"records",label:"Records",numeric:true},
+          {key:"schema",label:"XSD"},
+          {key:"issues",label:"Issues",numeric:true},
+          {key:"open",label:"",sortable:false,render:item=>uiButton("Open",()=>{state.moduleDataView="records";loadModuleData(item.row.path)})}
+        ],
+        class:"bannerlord-validation-table","aria-label":"ModuleData validation results"
+      }):readField("Files","No ModuleData files scanned yet")
+    ]
+  });
 }
-
-const renderModuleDataBeforeValidation=renderModuleData;
-renderModuleData=function(){
-  renderModuleDataBeforeValidation();
-  const head=main.querySelector(".bl-master-head");
-  const master=main.querySelector(".bl-master");
-  if(!head||!master)return;
-  head.append(el("button",{
-    type:"button",
-    disabled:state.moduleDataValidating,
-    onclick:validateAllModuleData,
-    title:"Parse every project ModuleData XML file and apply any uniquely matched installed Bannerlord XSD"
-  },state.moduleDataValidating?"Validating…":"Validate all"));
-  const block=moduleDataValidationBlock();
-  if(block)head.insertAdjacentElement("afterend",block);
-};
