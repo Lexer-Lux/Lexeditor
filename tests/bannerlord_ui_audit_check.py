@@ -333,13 +333,15 @@ def main() -> None:
 
             # Empty and error states use shared panels rather than blank/custom pages.
             page.evaluate('state.effects.available=false;state.skillView="effects";navigate("skills")')
-            page.wait_for_timeout(80)
+            empty_state = page.locator(".lex-detail-field").filter(has_text="State").locator("input.lex-readonly-field").first
+            empty_state.wait_for()
+            assert "does not contain" in empty_state.input_value()
             assert page.locator(".lex-detail-panel").count() >= 1
-            assert "does not contain" in page.locator("#main").inner_text()
             page.evaluate('state.effects.available=true;state.effects=clone(state.savedEffects);render()')
             page.evaluate('window.__savedRenderBuild=renderBuild;renderBuild=()=>{throw new Error("fixture render failure")};navigate("build")')
-            page.wait_for_timeout(80)
-            assert "fixture render failure" in page.locator("#main").inner_text()
+            error_state = page.locator(".lex-detail-field").filter(has_text="What happened").locator("input.lex-readonly-field").first
+            error_state.wait_for()
+            assert error_state.input_value() == "fixture render failure"
             assert page.locator(".lex-detail-panel").count() >= 1
             page.evaluate('renderBuild=window.__savedRenderBuild;delete window.__savedRenderBuild;navigate("build")')
 
