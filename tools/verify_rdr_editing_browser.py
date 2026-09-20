@@ -32,7 +32,7 @@ def main():
                     page.on('pageerror', lambda error: errors.append(str(error)))
                     page.goto(f'http://127.0.0.1:{service.server_port}/')
                     page.wait_for_function('typeof state !== "undefined" && !state.booting')
-                    assert page.locator('.rdr-record-entry').count(), page.locator('#main').inner_text()
+                    assert page.locator('.lex-column-list-row:not(.lex-filler-row)').count(), page.locator('#main').inner_text()
                     for tab in ('items', 'shops', 'strings', 'missions'):
                         for width, height in ((1600, 900), (1280, 720)):
                             page.set_viewport_size({'width': width, 'height': height})
@@ -40,7 +40,7 @@ def main():
                             page.wait_for_timeout(500)
                             result = page.evaluate('''() => {
                               const list=document.querySelector('.rdr-record-list'),rect=list.getBoundingClientRect();
-                              const rows=[...list.querySelectorAll('.rdr-record-entry')];
+                              const rows=[...list.querySelectorAll('.lex-column-list-row:not(.lex-filler-row)')];
                               const detail=document.querySelector('.lex-detail'),bounds=detail.getBoundingClientRect();
                               return {rows:rows.length,cut:rows.filter(row=>row.getBoundingClientRect().bottom>rect.bottom+1).length,
                                 scroll:list.scrollHeight>list.clientHeight+1,
@@ -56,7 +56,7 @@ def main():
                     page.evaluate('navigate("items")')
                     page.locator('.item-detail input[type=number]').first.fill('9')
                     page.evaluate('navigate("missions")')
-                    page.locator('.rdr-record-entry').first.click()
+                    page.locator('.lex-column-list-row:not(.lex-filler-row)').first.click()
                     page.locator('.mission-detail input[type=number]').first.fill('')
                     requests = []
                     page.on('request', lambda request: requests.append(request.url) if request.method == 'POST' else None)
@@ -124,7 +124,7 @@ def main():
                     paths['LOOT_FILE'].write_text('{broken')
                     page.reload()
                     page.wait_for_function('typeof state !== "undefined" && !state.booting')
-                    assert page.locator('.rdr-record-entry').count()
+                    assert page.locator('.lex-column-list-row:not(.lex-filler-row)').count()
                     page.evaluate('navigate("loot")')
                     assert page.get_by_text('Loot ASI override is unavailable', exact=True).count()
                     page.evaluate('navigate("settings")')
