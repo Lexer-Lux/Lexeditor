@@ -107,7 +107,7 @@ function numericCellEditor(key, min, max) {
   return (row, commit) => {
     const input = el("input", {
       type: "number", min, max, step: 1, value: effective(row, key) ?? (key === "Price" ? 0 : EDIBILITY_MIN),
-      "aria-label": `Edit ${key}`,
+      "aria-label": key === "Price" ? "Sell price" : key,
     });
     let finished = false;
     const finish = cancel => {
@@ -129,7 +129,7 @@ function numericCellEditor(key, min, max) {
 }
 function booleanCellEditor(row, commit) {
   const input = el("input", {
-    type: "checkbox", checked: !!effective(row, "IsDrink"), "aria-label": "Edit IsDrink",
+    type: "checkbox", checked: !!effective(row, "IsDrink"), "aria-label": "Drink",
   });
   let finished = false;
   const finish = value => { if (!finished) { finished = true; commit(value); } };

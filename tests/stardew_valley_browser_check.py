@@ -219,7 +219,7 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
         assert page.locator("html").get_attribute("data-lex-project-readonly") == "false"
         price_cell.dblclick()
         page.wait_for_timeout(120)
-        price_editor = price_cell.locator('input[type="number"]')
+        price_editor = price_cell.locator('input[aria-label="Sell price"]')
         if price_editor.count() != 1:
             diagnostics = {
                 "cell": price_cell.evaluate("node => node.outerHTML"),
@@ -235,7 +235,7 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
         price_editor.press("Enter")
         page.wait_for_timeout(180)
         assert page.locator("#global-save").is_enabled()
-        assert page.locator('[data-lex-property="Price"] input[type="number"]').input_value() == "88"
+        assert page.locator('[data-lex-property="Price"] input').input_value() == "88"
 
         drink_cell = stone.locator('[data-column-key="IsDrink"]').first
         drink_cell.dblclick()
