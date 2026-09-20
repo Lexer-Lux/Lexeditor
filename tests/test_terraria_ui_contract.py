@@ -26,9 +26,27 @@ class TerrariaUiContractTests(unittest.TestCase):
         self.assertIn('{"editor.js", "editor.css"}', source)
         self.assertIn('path in {"/editor.js", "/editor.css"}', source)
 
-    def test_css_and_js_are_real_modules(self):
-        self.assertTrue(JS.read_text(encoding="utf-8").strip().startswith('"use strict";'))
-        self.assertIn(":root", CSS.read_text(encoding="utf-8"))
+    def test_editor_uses_shared_data_views_and_shell_info(self):
+        js = JS.read_text(encoding="utf-8")
+        for token in (
+            "pagedListDetail(", "columnList(", "LexeditorUI.dataMap(",
+            'info:()=>navigate("info")', 'help:()=>navigate("datamap")',
+            'tabbedPanel({className:"terraria-localization-tabs"',
+            'edit:(row,value)=>void editLocalizationCell(row,value)',
+            'boolControl("noCompile")', 'boolControl("playableOnPreview")',
+            'boolControl("translationMod")', "Not declared — check to add",
+        ):
+            self.assertIn(token, js)
+        self.assertNotIn("confirm(", js)
+        self.assertNotIn("terraria-map", js)
+        self.assertNotIn("terraria-localization-table", js)
+
+    def test_plugin_css_stays_small_and_does_not_reimplement_shared_components(self):
+        css = CSS.read_text(encoding="utf-8")
+        nonblank = [line for line in css.splitlines() if line.strip()]
+        self.assertLessEqual(len(nonblank), 60)
+        for forbidden in (".lex-pager{", ".lex-detail-panel{", ".lex-column-list{", ".lex-data-map{"):
+            self.assertNotIn(forbidden, css)
 
 
 if __name__ == "__main__":
