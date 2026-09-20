@@ -8,7 +8,7 @@ from ff7r2_fixture import fixture
 
 def test_fixture_parses_real_record_identity_and_scalar_types():
     package = DataObjectPackage.from_bytes(fixture())
-    assert [record.key.text for record in package.records] == ["Cloud", "Tifa"]
+    assert [record.key.text for record in package.records[:2]] == ["Cloud", "Tifa"]\n    assert len(package.records) == 24
     cloud = package.records[0]
     assert {field.name: field.value for field in cloud.fields} == {
         "HPMax": 1000, "MPMax": 50, "Strength": 30, "Spilit": 22,
