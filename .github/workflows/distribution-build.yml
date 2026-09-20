@@ -68,12 +68,64 @@ jobs:
       - name: Verify one native installer was produced
         run: python -c "from pathlib import Path; p=Path('dist/installers'); files=[x for x in p.iterdir() if x.is_file()]; assert len(files)==1, files; print(files[0])"
 
+      - name: Install, smoke and uninstall Linux package
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo dpkg -i dist/installers/*.deb
+          test -x /opt/lexeditor/Lexeditor
+          test -f /usr/share/applications/lexeditor.desktop
+          grep -Fx 'Exec=/opt/lexeditor/Lexeditor' /usr/share/applications/lexeditor.desktop
+          grep -Fx 'Terminal=false' /usr/share/applications/lexeditor.desktop
+          mkdir -p "$RUNNER_TEMP/lexeditor-home"
+          HOME="$RUNNER_TEMP/lexeditor-home" /opt/lexeditor/Lexeditor --smoke-service "$GITHUB_WORKSPACE/build/distribution/installed-smoke.json"
+          sudo dpkg -r lexeditor
+          test ! -e /opt/lexeditor/Lexeditor
+          test ! -e /usr/share/applications/lexeditor.desktop
+
+      - name: Install, smoke and remove macOS package
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          PKG="$(find dist/installers -maxdepth 1 -name '*.pkg' -print -quit)"
+          test -n "$PKG"
+          sudo installer -pkg "$PKG" -target /
+          test -x /Applications/Lexeditor.app/Contents/MacOS/Lexeditor
+          mkdir -p "$RUNNER_TEMP/lexeditor-home"
+          HOME="$RUNNER_TEMP/lexeditor-home" /Applications/Lexeditor.app/Contents/MacOS/Lexeditor --smoke-service "$GITHUB_WORKSPACE/build/distribution/installed-smoke.json"
+          sudo rm -rf /Applications/Lexeditor.app
+          sudo pkgutil --forget io.github.lexer-lux.lexeditor >/dev/null || true
+          test ! -e /Applications/Lexeditor.app
+
+      - name: Install, smoke and uninstall Windows package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist\installers\*.exe | Select-Object -First 1
+          if (-not $installer) { throw 'Windows installer was not produced' }
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Installer failed with exit code $($process.ExitCode)" }
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\Lexeditor\Lexeditor.exe'
+          $uninstaller = Join-Path $env:LOCALAPPDATA 'Programs\Lexeditor\unins000.exe'
+          $startShortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Lexeditor\Lexeditor.lnk'
+          if (-not (Test-Path $app)) { throw "Installed executable missing: $app" }
+          if (-not (Test-Path $startShortcut)) { throw "Start Menu shortcut missing: $startShortcut" }
+          & $app '--smoke-service' (Join-Path $env:GITHUB_WORKSPACE 'build\distribution\installed-smoke.json')
+          if ($LASTEXITCODE -ne 0) { throw "Installed smoke failed with exit code $LASTEXITCODE" }
+          $process = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Uninstaller failed with exit code $($process.ExitCode)" }
+          if (Test-Path $app) { throw "Installed executable remained after uninstall: $app" }
+
+      - name: Verify installed smoke report
+        run: python -c "from pathlib import Path; import json; p=Path('build/distribution/installed-smoke.json'); r=json.loads(p.read_text('utf-8')); assert r.get('passed') and r.get('childStopped'), r; print(r)"
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: Lexeditor-${{ runner.os }}-${{ github.sha }}
           path: |
             dist/installers/
             build/distribution/smoke.json
+            build/distribution/installed-smoke.json
             build/distribution/source-sha.txt
             build/Lexeditor/warn-Lexeditor.txt
           if-no-files-found: error
