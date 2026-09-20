@@ -58,9 +58,9 @@ def _candidate_path(path: PurePosixPath) -> bool:
     if text == "games/__init__.py" or path.parts[:2] == ("games", "rdr"):
         return True
     if path.parts[0] == "ui":
-        return True
+        return not text.startswith("ui/assets/blank-game")
     if path.parts[0] == "assets":
-        return True
+        return text in {"assets/lexeditor.ico", "assets/lexeditor.png"}
     return text in RDR_TEST_TOOLS
 
 
