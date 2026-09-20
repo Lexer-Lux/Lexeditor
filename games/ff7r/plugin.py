@@ -11,7 +11,7 @@ from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from runtime_bootstrap import user_data_dir
 from service_session import project_session, request_json
 
-from .tooling import REPAK_TAG, helper_install, helper_status
+from .tooling import REPAK_TAG, helper_install, helper_status, upstream_release
 from .mod_support import PakModAdapter
 from managed_mods import ManagedModSpec
 
@@ -267,6 +267,7 @@ PLUGIN = GamePlugin(
     helper_status=helper_status,
     helper_install=helper_install,
     helper_pinned=REPAK_TAG,
+    helper_upstream=upstream_release,
     projects=ModProjectSpec(
         root_env="LEXEDITOR_FF7R_PROJECT",
         default_root=DEFAULT_PROJECT,
