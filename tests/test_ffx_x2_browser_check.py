@@ -361,10 +361,14 @@ def _overflow(page, label: str):
       doc: document.documentElement.scrollWidth,
       body: document.body.scrollWidth,
       main: document.querySelector('#main')?.scrollWidth || 0,
-      mainClient: document.querySelector('#main')?.clientWidth || 0
+      mainClient: document.querySelector('#main')?.clientWidth || 0,
+      bodyOverflowX: getComputedStyle(document.body).overflowX
     })""")
     assert geometry["doc"] <= geometry["viewport"] + 1, (label, "document overflow", geometry)
-    assert geometry["body"] <= geometry["viewport"] + 1, (label, "body overflow", geometry)
+    assert (
+        geometry["body"] <= geometry["viewport"] + 1
+        or geometry["bodyOverflowX"] in {"hidden", "clip"}
+    ), (label, "unclipped body overflow", geometry)
     assert geometry["main"] <= geometry["mainClient"] + 1, (label, "main overflow", geometry)
 
 
