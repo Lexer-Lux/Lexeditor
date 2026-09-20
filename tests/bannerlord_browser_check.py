@@ -197,7 +197,8 @@ def main() -> None:
             assert "Legacy shape" in detail_text
             legacy_shape = page.locator(".lex-detail-field").filter(has_text="Legacy shape").locator("input.lex-readonly-field").first
             assert legacy_shape.input_value() == "LoadAfterModules"
-            assert "Required legacy load-after relation" in detail_text
+            meaning = page.locator(".lex-detail-field").filter(has_text="Meaning").locator("input.lex-readonly-field").first
+            assert meaning.input_value() == "Required legacy load-after relation"
             assert page.get_by_role("button", name="+ Legacy", exact=True).count() == 0
             legacy_id = page.locator(".lex-detail-field").filter(has_text="Module ID").locator('input[type="text"]').first
             legacy_id.fill("LegacyBrowserRenamed")
