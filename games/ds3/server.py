@@ -44,6 +44,12 @@ _DOCUMENT: RegulationDocument | None = None
 _SOURCE_PATH: Path | None = None
 
 
+def _path_within(path: Path, root: Path) -> bool:
+    candidate = Path(path).resolve()
+    boundary = Path(root).resolve()
+    return candidate == boundary or boundary in candidate.parents
+
+
 def _project_output() -> Path:
     return PROJECT / "Data0.bdt"
 
@@ -179,6 +185,10 @@ def _save() -> dict:
     global _DOCUMENT
     with _LOCK:
         document = _document()
+        if _path_within(PROJECT, GAME_ROOT):
+            raise ValueError(
+                f"DS3 projects must stay outside the game installation: {PROJECT}"
+            )
         if not PROJECT.is_dir() or not (PROJECT / PROJECT_MARKER).is_file():
             raise FileNotFoundError(
                 f"Selected DS3 project is missing {PROJECT_MARKER}: {PROJECT}"

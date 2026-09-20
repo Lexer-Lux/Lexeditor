@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import struct
+import tempfile
 import unittest
 from pathlib import Path
 
+from games.ds3.server import _path_within
 from games.ds3.formats import (
     BND4View,
     DS3FormatError,
@@ -129,6 +131,15 @@ def _field_value(document: RegulationDocument, table: str, row_id: int, key: str
 
 
 class DS3FormatTests(unittest.TestCase):
+    def test_project_boundary_rejects_game_install_subfolders(self):
+        with tempfile.TemporaryDirectory(prefix="lexeditor-ds3-boundary-") as name:
+            root = Path(name).resolve()
+            game = root / "game"
+            outside = root / "mods"
+            self.assertTrue(_path_within(game, game))
+            self.assertTrue(_path_within(game / "mods" / "test", game))
+            self.assertFalse(_path_within(outside, game))
+
     def test_all_pinned_schemas_parse(self):
         for table in TARGET_TABLES:
             schema = load_schema(METADATA, table)
