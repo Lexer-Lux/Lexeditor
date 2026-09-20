@@ -171,51 +171,104 @@ async function runModuleDataRecordAction(action,record){
 }
 
 function renderModuleData(){
-  if(state.moduleDataFiles===null){main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"ModuleData XML"),el("div",{class:"bl-empty"},"Scanning ModuleData…")));ensureModuleDataFiles().then(()=>render());return}
-  if(!state.moduleDataFiles.length){main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"ModuleData XML"),el("div",{class:"bl-empty"},"No XML files found under ModuleData.")));return}
-  if(!state.moduleData){loadModuleData(state.moduleDataFiles[0],false);return}
-
-  const filter=state.moduleDataFilter.trim().toLowerCase();
-  const records=(state.moduleData.records||[]).filter(record=>!filter||`${record.tag} ${record.id||""} ${record.name||""} ${record.path}`.toLowerCase().includes(filter));
-  let record=(state.moduleData.records||[]).find(row=>row.path===state.moduleDataRecordPath);
-  if(!record&&records.length){record=records[0];applyModuleDataRecordSelection(record)}
-  const nodes=record?(state.moduleData.elements||[]).filter(element=>element.path===record.path||element.path.startsWith(record.path+"/")):[];
-  let node=nodes.find(element=>element.path===state.moduleDataElementPath);
-  if(!node&&nodes.length){node=nodes[0];state.moduleDataElementPath=node.path}
-
-  const fileSelect=select(state.moduleData.relativePath,state.moduleDataFiles.map(path=>[path,path]),value=>loadModuleData(value));
-  const schema=state.moduleData.schema,issueCount=state.moduleData.schemaIssueCount||0;
-  const master=el("div",{class:"bl-master"},
-    el("div",{class:"bl-master-head"},el("strong",{},`${state.moduleData.rootTag} (${state.moduleData.recordCount||0})`),
-      el("button",{type:"button",onclick:()=>reloadModuleData()},"Reload")),
-    el("div",{class:"bl-list-block"},fileSelect),
-    el("div",{class:"bl-list-block"},schema?el("div",{},el("strong",{},`XSD: ${schema.id||"matched schema"}`),el("small",{},` · ${schema.path||""}`),el("div",{class:"bl-note"},issueCount?`⚠ ${issueCount} schema issue(s) detected in this document.`:"No XSD attribute issues detected.")):el("div",{class:"bl-note"},"No unique installed Bannerlord XSD matched; using conservative literal typing.")),
-    el("div",{class:"bl-list-block"},textInput(state.moduleDataFilter,value=>{state.moduleDataFilter=value;render()},{placeholder:"Filter records"})),
-    el("div",{class:"bl-list"},...records.map(row=>el("button",{type:"button",class:`bl-item${row.path===state.moduleDataRecordPath?" active":""}`,onclick:()=>selectModuleDataRecord(row.path)},moduleDataRecordLabel(row),el("small",{},`${row.schemaIssueCount?`⚠ ${row.schemaIssueCount} issue(s) · `:""}${row.id||"no id"} · line ${row.line}`))))
-  );
-
-  let detail;
-  if(!record)detail=el("div",{class:"bl-detail"},el("div",{class:"bl-empty"},"This XML has no top-level object records."));
-  else{
-    const nodeChoices=nodes.map(element=>[element.path,`${element.schemaIssues?.length?"⚠ ":""}${"· ".repeat(Math.max(0,element.depth-1))}${element.tag}${element.hint?` · ${element.hint}`:""}`]);
-    const attributeRows=node?(node.attributes||[]).flatMap(attribute=>fieldRow(moduleDataAttributeLabel(attribute),moduleDataControl(attribute))):[];
-    const boundNotes=node?(node.attributes||[]).flatMap(attribute=>{const constraints=[];if(attribute.min!==undefined)constraints.push(`min ${attribute.min}`);if(attribute.max!==undefined)constraints.push(`max ${attribute.max}`);if(attribute.fixed!==undefined)constraints.push(`fixed ${attribute.fixed}`);if(attribute.default!==undefined)constraints.push(`default ${attribute.default}`);if(attribute.schemaIssue)constraints.push(`⚠ ${attribute.schemaIssue}`);return constraints.length?[el("div",{class:"bl-note"},`${attribute.name}: ${constraints.join(" · ")}`)]:[]}):[];
-    const missing=node?.missingRequired||[];
-    const issuePanel=node?.schemaIssues?.length?el("div",{class:"bl-list-block"},el("h3",{},"XSD issues"),el("ul",{},...node.schemaIssues.map(value=>el("li",{},value)))):null;
-    const missingPanel=missing.length?el("div",{class:"bl-list-block"},el("h3",{},"Missing required attributes"),el("div",{class:"bl-grid"},...missing.flatMap(value=>fieldRow(`${value.name}${value.schemaType?` · ${value.schemaType}`:""}`,missingRequiredControl(value)))),el("div",{class:"bl-note"},"Check an attribute to repair it on Save. Lexeditor only inserts attributes the active XSD marks as required; all other structural XML changes remain source-only.")):null;
-    const lifecycle=el("div",{class:"bl-actions"},
-      record.id?textInput(state.moduleDataNewId,value=>{state.moduleDataNewId=value},{placeholder:"New duplicate ID",spellcheck:"false"}):null,
-      el("button",{type:"button",onclick:()=>runModuleDataRecordAction("duplicate",record)},"Duplicate record"),
-      el("button",{type:"button",class:"danger",onclick:()=>runModuleDataRecordAction("delete",record)},"Delete record"));
-    detail=el("div",{class:"bl-detail"},el("section",{class:"bl-panel"},
-      el("h2",{},moduleDataRecordLabel(record)),lifecycle,
-      el("div",{class:"bl-grid"},...fieldRow("Record path",el("code",{},record.path)),...fieldRow("Record ID",record.id||"—"),...fieldRow("Record name",record.name||"—"),...fieldRow("Record XSD issues",String(record.schemaIssueCount||0)),...fieldRow("Nested node",select(state.moduleDataElementPath,nodeChoices,value=>{state.moduleDataElementPath=value;render()})),...(node?[...fieldRow("XML tag",node.tag),...fieldRow("Source line",String(node.line)),...attributeRows]:[])),
-      issuePanel,missingPanel,...boundNotes,
-      el("div",{class:"bl-note"},schema?"Bannerlord XSD metadata is active: enums become selects, booleans checkboxes, numeric bounds are enforced, integer types reject fractions, fixed values are read-only, malformed existing values are flagged, and missing required attributes can be repaired surgically.":"Without a unique installed XSD match, Lexeditor only infers literal booleans and numbers; references, localization strings, IDs, enums, and other values remain text."),
-      el("div",{class:"bl-note"},"Duplicate/Delete are explicit immediate operations with backups and are disabled logically while this document has unsaved attribute edits. Duplicating preserves the complete nested record body and changes only its top-level id when one exists."),
-      el("div",{class:"bl-note"},"Unknown child elements and attributes are deliberately preserved, and attribute saves patch only changed/added spans instead of reserializing the document.")));
+  if(state.moduleDataFiles===null){
+    main.replaceChildren(uiLoading("ModuleData","Scanning ModuleData…"));
+    ensureModuleDataFiles().then(()=>render());return;
   }
-  main.replaceChildren(el("div",{class:"bl-split"},master,detail));
+  if(!state.moduleDataFiles.length){
+    main.replaceChildren(uiEmpty("ModuleData","No XML files were found under ModuleData."));return;
+  }
+  if(state.moduleDataView==="files"||!state.moduleData){
+    const files=state.moduleDataFiles.map((path,index)=>({index,path,name:path.split(/[\\/]/).pop(),searchText:path}));
+    const columns=[{key:"name",label:"XML file"},{key:"path",label:"Resource path"}];
+    const detail=item=>BLUI.detailPanel({
+      title:item.name,meta:item.path,
+      actions:[uiButton("Open records",()=>{state.moduleDataView="records";loadModuleData(item.path,false)})],
+      body:[BLUI.detailSection({title:"MODULE DATA",body:[
+        readField("Resource path",item.path),
+        readField("Editor","Top-level records and nested attributes","Opening the XML shows top-level object records in the shared Table + Detail editor. Installed Modding Kit XSDs enrich controls only when a unique schema matches.")
+      ]})]
+    });
+    main.replaceChildren(tableView({
+      key:"moduledata-files",rows:files,keyOf:item=>item.path,columns,detail,noun:"ModuleData XML files",
+      placeholder:"Search ModuleData files…",selected:uiState("moduledata-files").selected,setSelected:()=>{},
+      filters:[uiButton("Validate all",()=>validateAllModuleData(),{disabled:!!state.moduleDataValidating})]
+    }));return;
+  }
+
+  const records=(state.moduleData.records||[]).map(record=>({
+    record,key:record.path,tag:record.tag,id:record.id||"",name:record.name||"",
+    issues:Number(record.schemaIssueCount||0),line:Number(record.line),
+    searchText:`${record.tag} ${record.id||""} ${record.name||""} ${record.path}`
+  }));
+  const columns=[
+    {key:"name",label:"Name"},{key:"id",label:"Internal name"},
+    {key:"tag",label:"XML tag"},{key:"issues",label:"XSD issues",numeric:true}
+  ];
+  const detail=item=>{
+    const record=item.record;
+    const nodes=(state.moduleData.elements||[]).filter(element=>element.path===record.path||element.path.startsWith(record.path+"/"));
+    let node=nodes.find(element=>element.path===state.moduleDataElementPath);
+    if(!node&&nodes.length){node=nodes[0];state.moduleDataElementPath=node.path}
+    const nodeChoices=nodes.map(element=>[element.path,`${element.schemaIssues?.length?"⚠ ":""}${"· ".repeat(Math.max(0,element.depth-1))}${element.tag}${element.hint?` · ${element.hint}`:""}`]);
+    const actions=[
+      record.id?textInput(state.moduleDataNewId,value=>{state.moduleDataNewId=value},{placeholder:"New duplicate ID",spellcheck:"false","aria-label":"New duplicate record ID"}):null,
+      uiButton("Duplicate",()=>runModuleDataRecordAction("duplicate",record)),
+      uiButton("Delete",()=>runModuleDataRecordAction("delete",record),{danger:true})
+    ].filter(Boolean);
+    const attributeFields=node?(node.attributes||[]).map(attribute=>BLUI.detailField({
+      label:moduleDataAttributeLabel(attribute),control:moduleDataControl(attribute),
+      min:attribute.min,max:attribute.max,
+      dataType:attribute.kind==="bool"?"BOOL":attribute.kind==="enum"?"ENUM":attribute.integer?"INT":attribute.kind==="number"?"FLOAT":undefined,
+      help:BLUI.infoHelp(attribute.schemaIssue?attribute.schemaIssue:
+        attribute.fixed!==undefined?"The matched Bannerlord XSD fixes this value, so Lexeditor leaves it read-only.":
+        attribute.kind==="enum"?"The matched Bannerlord XSD supplies this finite choice list.":
+        attribute.kind==="number"?"Numeric type and any shown bounds come from the matched Bannerlord XSD.":
+        "Existing XML attribute. Without an unambiguous schema Lexeditor does not invent reference, enum, or range semantics.")
+    })):[];
+    const missing=node?.missingRequired||[];
+    const validation=typeof moduleDataValidationSection==="function"?moduleDataValidationSection():null;
+    return BLUI.detailPanel({
+      title:record.name||record.id||record.tag,meta:state.moduleData.relativePath,actions,
+      body:[
+        BLUI.detailSection({title:"RECORD",body:[
+          readField("Resource path",state.moduleData.relativePath),
+          readField("Record path",record.path),
+          readField("Internal name",record.id||"none"),
+          readField("Name",record.name||"none"),
+          readField("XSD issues",record.schemaIssueCount||0),
+          nodes.length?selectField("Nested node",state.moduleDataElementPath,nodeChoices,value=>{state.moduleDataElementPath=value;render()},"Choose which nested XML element's attributes are shown."):readField("Nested node","none")
+        ]}),
+        node?BLUI.detailSection({title:"ATTRIBUTES",body:[
+          readField("XML tag",node.tag),readField("Source line",node.line),...attributeFields
+        ]}):null,
+        missing.length?BLUI.detailSection({
+          title:"MISSING REQUIRED ATTRIBUTES",
+          help:BLUI.infoHelp("These fields are offered only because the matched Bannerlord XSD marks them required. Check one to add it on Save."),
+          body:missing.map(attribute=>BLUI.detailField({
+            label:attribute.name,control:missingRequiredControl(attribute),
+            help:attribute.schemaType?BLUI.infoHelp(`Required ${attribute.schemaType} attribute from the matched XSD.`):null
+          }))
+        }):null,
+        node?.schemaIssues?.length?BLUI.detailSection({title:"XSD ISSUES",body:node.schemaIssues.map((issue,index)=>readField(`Issue ${index+1}`,issue))}):null,
+        validation
+      ].filter(Boolean)
+    });
+  };
+  const filters=[
+    uiButton("XML files",()=>{
+      if(moduleDataDirty())showAlert?.("Save or reload the current ModuleData changes before switching files.","Unsaved ModuleData changes");
+      else{state.moduleDataView="files";render()}
+    }),
+    uiButton("Reload",()=>reloadModuleData()),
+    uiButton(state.moduleDataValidating?"Validating…":"Validate all",()=>validateAllModuleData(),{disabled:!!state.moduleDataValidating})
+  ];
+  main.replaceChildren(tableView({
+    key:`moduledata-${state.moduleData.relativePath}`,rows:records,keyOf:item=>item.key,columns,detail,noun:"ModuleData records",
+    placeholder:"Search ModuleData records…",selected:state.moduleDataRecordPath,
+    setSelected:value=>{const record=(state.moduleData.records||[]).find(row=>row.path===String(value));applyModuleDataRecordSelection(record)},
+    filters
+  }));
 }
 
 function moduleDataEdits(){
