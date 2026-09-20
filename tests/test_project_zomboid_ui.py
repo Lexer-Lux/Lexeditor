@@ -6,11 +6,25 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 EDITOR = ROOT / "games" / "project_zomboid" / "editor.html"
+EDITOR_JS = ROOT / "games" / "project_zomboid" / "editor.js"
+EDITOR_CSS = ROOT / "games" / "project_zomboid" / "editor.css"
+
+def editor_script() -> str:
+    return EDITOR_JS.read_text(encoding="utf-8")
 
 
 class ProjectZomboidUiContractTests(unittest.TestCase):
+    def test_editor_html_is_markup_only_and_loads_relative_modules(self):
+        html = EDITOR.read_text(encoding="utf-8")
+        self.assertIn('href="editor.css"', html)
+        self.assertIn('src="editor.js"', html)
+        self.assertIn('src="/shared/framework.js"', html)
+        self.assertNotIn("<style", html)
+        self.assertNotRegex(html, r"<script(?:\s[^>]*)?>\s*[^<\s]")
+        self.assertLessEqual(len(EDITOR_CSS.read_text(encoding="utf-8").splitlines()), 24)
+
     def test_editor_exposes_every_structured_script_adapter(self):
-        text = EDITOR.read_text(encoding="utf-8")
+        text = editor_script()
         for tab in ("animationmeshes", "items", "evolved", "crafts", "fixing", "fluids", "vehicles", "sounds", "models", "mannequins", "timedactions"):
             with self.subTest(tab=tab):
                 self.assertIn(f'id:"{tab}"', text)
@@ -31,7 +45,7 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
                 self.assertIn(save, text)
 
     def test_shared_shell_owns_data_map_and_info_navigation(self):
-        text = EDITOR.read_text(encoding="utf-8")
+        text = editor_script()
         self.assertIn("LexeditorUI.mountShell({", text)
         self.assertIn('help:()=>navigate("datamap")', text)
         self.assertIn('info:()=>navigate("info")', text)
@@ -43,7 +57,7 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertNotIn('data-tab="deployment"', text)
 
     def test_structured_editors_use_shared_paged_table_and_detail_controls(self):
-        text = EDITOR.read_text(encoding="utf-8")
+        text = editor_script()
         self.assertIn("LexeditorUI.pagedListDetail({", text)
         self.assertIn("LexeditorUI.columnList({", text)
         self.assertIn("LexeditorUI.detailPanel({", text)
@@ -52,7 +66,7 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertNotIn('class="split"', text)
 
     def test_metadata_scripts_and_info_use_shared_surfaces(self):
-        text = EDITOR.read_text(encoding="utf-8")
+        text = editor_script()
         self.assertIn('className:"pz-metadata"', text)
         self.assertIn('className:"pz-script-layout"', text)
         self.assertIn('className:"lex-information-panel"', text)
@@ -61,7 +75,7 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertNotIn('class="notice"', text)
 
     def test_animation_mesh_ui_exposes_only_single_value_typed_fields(self):
-        text = EDITOR.read_text(encoding="utf-8")
+        text = editor_script()
         for field_name in ("keepMeshAnimations", "meshFile", "postProcess"):
             with self.subTest(field=field_name):
                 self.assertIn(f'"{field_name}"', text)
@@ -70,14 +84,14 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertIn("Repeated animation source lists are preserved", text)
 
     def test_craft_recipe_ui_exposes_schema_typed_skill_fields(self):
-        text = EDITOR.read_text(encoding="utf-8")
+        text = editor_script()
         for field_name in ("AutoLearnAll", "AutoLearnAny", "SkillRequired", "Tooltip"):
             with self.subTest(field=field_name):
                 self.assertIn(f'"{field_name}"', text)
         self.assertIn("Skill:level;Skill:level", text)
 
     def test_deployment_renders_shared_mod_loader_section(self):
-        text = EDITOR.read_text(encoding="utf-8")
+        text = editor_script()
         self.assertIn("LexeditorUI.modLoaderSection(", text)
         self.assertIn('loader:"Project Zomboid native Build 42 mod system."', text)
         self.assertIn('removal:"Remove the owned local deployment; the authoring project is preserved."', text)

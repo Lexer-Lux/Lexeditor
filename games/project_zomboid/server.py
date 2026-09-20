@@ -76,6 +76,14 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def send_page_module(self, request_path: str):
+        name = request_path.removeprefix("/")
+        target = (PLUGIN_ROOT / name).resolve()
+        if name not in {"editor.js", "editor.css"} or target.parent != PLUGIN_ROOT.resolve() or not target.is_file():
+            self.send_json({"error": "Project Zomboid editor module not found"}, 404)
+            return
+        self.send_file(target)
+
     def read_json(self):
         raw_length = self.headers.get("Content-Length", "")
         try:
@@ -101,6 +109,8 @@ class Handler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             if path == "/":
                 self.send_file(PLUGIN_ROOT / "editor.html")
+            elif path in {"/editor.js", "/editor.css"}:
+                self.send_page_module(path)
             elif path.startswith("/shared/"):
                 shared = (ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()
