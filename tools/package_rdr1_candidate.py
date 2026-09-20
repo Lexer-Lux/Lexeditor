@@ -37,9 +37,9 @@ REQUIRED = (
     "games/rdr/plugin.py",
     "games/rdr/server.py",
     "games/rdr/editor.html",
-    "games/rdr/assets/editor.css",
-    "games/rdr/assets/editor.js",
-    "games/rdr/assets/strings.js",
+    "games/rdr/editor.css",
+    "games/rdr/editor.js",
+    "games/rdr/strings.js",
     "games/rdr/string_tables.py",
     "tools/magic-rdr/README.md",
 )
