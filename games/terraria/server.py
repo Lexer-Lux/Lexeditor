@@ -598,6 +598,14 @@ class Handler(BaseHTTPRequestHandler):
         data = target.read_bytes()
         self.send_bytes(data, mimetypes.guess_type(target.name)[0] or "application/octet-stream")
 
+    def send_page_module(self, name: str):
+        if name not in {"editor.js", "editor.css"}:
+            raise ValueError("Unknown Terraria page module")
+        target = (PLUGIN_ROOT / name).resolve()
+        if target.parent != PLUGIN_ROOT.resolve() or not target.is_file():
+            raise ValueError("Terraria page module is unavailable")
+        self.send_file(target)
+
     def read_json(self) -> object:
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -621,8 +629,10 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         try:
-            if path == "/":
+            if path in {"/", "/index.html"}:
                 self.send_file(PLUGIN_ROOT / "editor.html")
+            elif path in {"/editor.js", "/editor.css"}:
+                self.send_page_module(path.removeprefix("/"))
             elif path.startswith("/shared/"):
                 shared = (ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()

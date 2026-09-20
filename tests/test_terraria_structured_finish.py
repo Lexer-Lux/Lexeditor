@@ -117,11 +117,11 @@ class TerrariaStructuredFinishTests(unittest.TestCase):
             else: os.environ["LEXEDITOR_TERRARIA_PROJECT"]=previous_project
 
     def test_absent_build_booleans_are_addable_in_editor(self):
-        html=Path("games/terraria/editor.html").read_text(encoding="utf-8")
-        self.assertIn("Not declared — check to add",html)
-        self.assertIn('boolControl("noCompile")',html)
-        self.assertIn('boolControl("playableOnPreview")',html)
-        self.assertIn('boolControl("translationMod")',html)
+        editor=Path("games/terraria/editor.js").read_text(encoding="utf-8")
+        self.assertIn("Not declared — check to add",editor)
+        self.assertIn('boolControl("noCompile")',editor)
+        self.assertIn('boolControl("playableOnPreview")',editor)
+        self.assertIn('boolControl("translationMod")',editor)
 
 
 if __name__ == "__main__":
