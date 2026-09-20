@@ -76,6 +76,21 @@ def tracked_files(root: Path) -> list[PurePosixPath]:
     return sorted(paths, key=str)
 
 
+def _candidate_bytes(root: Path, relative: PurePosixPath) -> bytes:
+    target = (root / Path(*relative.parts)).resolve()
+    if not target.is_file():
+        raise RuntimeError(f"Tracked candidate file is unavailable: {relative}")
+    if relative.as_posix() in {
+        "ui/credits.json", "ui/credits-sources.json", "ui/mod-loading.json",
+    }:
+        document = json.loads(target.read_text(encoding="utf-8-sig"))
+        plugins = document.get("plugins")
+        if isinstance(plugins, dict) and "rdr" in plugins:
+            document["plugins"] = {"rdr": plugins["rdr"]}
+        return (json.dumps(document, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    return target.read_bytes()
+
+
 def build(root: Path, output: Path, commit: str) -> dict:
     root = root.resolve()
     output = output.resolve()
@@ -128,10 +143,7 @@ def build(root: Path, output: Path, commit: str) -> dict:
     output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for relative in files:
-            target = (root / Path(*relative.parts)).resolve()
-            if not target.is_file():
-                raise RuntimeError(f"Tracked candidate file is unavailable: {relative}")
-            archive.write(target, str(relative))
+            archive.writestr(str(relative), _candidate_bytes(root, relative))
         archive.writestr(
             "RDR1-CANDIDATE.json",
             json.dumps(manifest, indent=2, sort_keys=True) + "\n",
@@ -148,6 +160,8 @@ def build(root: Path, output: Path, commit: str) -> dict:
                 "  LEXEDITOR_RDR_RPF6_TOOL=<existing>\\tools\\magic-rdr\\app\\Rpf6ReadCli.exe\n"
                 "  LEXEDITOR_RDR_RPF6_NAMES=<existing>\\tools\\magic-rdr\\app\\Settings\\ImportedFileNames.txt\n"
                 "Use an isolated LEXEDITOR_RDR_PROJECT and LEXEDITOR_RDR_EXTRACT_ROOT.\n"
+                "This candidate contains only games/rdr; its copied Credits/Mod Loading metadata "
+                "is narrowed to that plugin so shared discovery remains valid.\n"
                 "RDR_GAME_ROOT may point at the installed game; preparation reads source "
                 "archives and writes only the isolated cache/project until Deploy Project "
                 "is explicitly invoked.\n"
@@ -192,6 +206,12 @@ def verify(archive_path: Path, commit: str) -> dict:
             raise RuntimeError("Candidate manifest commit does not match the requested commit")
         if not manifest.get("acceptance", {}).get("doNotOverwriteExistingLexeditor"):
             raise RuntimeError("Candidate isolation warning is missing")
+        for metadata_name in ("ui/credits.json", "ui/mod-loading.json"):
+            metadata = json.loads(archive.read(metadata_name))
+            if set(metadata.get("plugins", {})) != {"rdr"}:
+                raise RuntimeError(
+                    f"Candidate metadata is not narrowed to RDR1: {metadata_name}"
+                )
     return manifest
 
 
