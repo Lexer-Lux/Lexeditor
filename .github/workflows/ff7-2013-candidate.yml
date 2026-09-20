@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'games/ff7_2013/**'
+      - 'tools/verify_ff7_2013_rendered.py'
       - '.github/workflows/ff7-2013-candidate.yml'
 
 permissions:
@@ -127,47 +128,7 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Exercise FF7 2013 Discard in the real shared UI
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import sys
-          import unittest
-
-          sys.path.insert(0, str(Path("tools").resolve()))
-          import verify_ff7_rendered_neutral as neutral
-
-          target = neutral.target
-          out = Path("out/ff7-2013-acceptance")
-          out.mkdir(parents=True, exist_ok=True)
-
-          class FF72013Discard(target.RenderedTests):
-              def test_discard_restores_saved_baseline(self):
-                  self.install()
-                  self.open("ff7-2013")
-                  self.navigate("armor")
-                  control = self.control("armor", "defense")
-                  original = int(control.input_value())
-                  changed = original + 1 if original < 255 else original - 1
-                  control.fill(str(changed))
-                  self.page.wait_for_function("dirtyCount() > 0")
-                  self.page.locator("#global-save").click(button="right")
-                  dialog = self.page.locator(".lex-discard-dialog")
-                  dialog.wait_for(state="visible")
-                  self.page.screenshot(path=str(out / "ff7-2013-discard-confirmation.png"))
-                  dialog.get_by_role("button", name="Discard Changes", exact=True).click()
-                  self.page.wait_for_function("dirtyCount() === 0")
-                  restored = self.control("armor", "defense")
-                  self.assertEqual(int(restored.input_value()), original)
-                  self.page.screenshot(path=str(out / "ff7-2013-after-discard.png"))
-                  self.originals_unchanged()
-                  self.assertEqual(self.errors, [])
-
-          # This job owns the 2013-specific Discard interaction only. The full shared
-          # FF7 rendered suite runs independently in ff7-data-regressions.
-          suite = unittest.TestSuite([FF72013Discard("test_discard_restores_saved_baseline")])
-          raise SystemExit(0 if unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful() else 1)
-          PY
+        run: python tools/verify_ff7_2013_rendered.py
 
       - name: Retain FF7 2013 Discard screenshots
         uses: actions/upload-artifact@v4
