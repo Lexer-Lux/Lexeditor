@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-FF7 = ROOT / "games" / "ff7" / "editor.html"
+FF7 = ROOT / "games" / "ff7" / "editor.html"\nFF7_JS = ROOT / "games" / "ff7" / "editor.js"
 BLANK = ROOT / "games" / "blank" / "editor.html"
 NEUTRAL = ROOT / "ui" / "neutral.css"
 
@@ -20,8 +20,10 @@ def main() -> None:
 
     # "Blank UI, no overrides" is literal for FF7: it may supply data/classes
     # for semantics/testing, but it owns no CSS at all.
-    if "<style" in ff7.casefold() or "style=" in ff7.casefold():
+    if "<style" in ff7.casefold() or "style=" in ff7.casefold() or "style=" in ff7_js.casefold():
         raise AssertionError("FF7 contains local CSS/style overrides")
+    if '<script src="/editor.js"></script>' not in ff7:
+        raise AssertionError("FF7 page logic is not modularized into editor.js")
     for marker in (
         '<link rel="stylesheet" href="/shared/framework.css">',
         '<link rel="stylesheet" href="/shared/neutral.css">',
@@ -71,7 +73,7 @@ def main() -> None:
         "minLeft:320",
         "minRight:360",
     )
-    missing_layout = [value for value in layout_contract if value not in ff7]
+    missing_layout = [value for value in layout_contract if value not in ff7_code]
     if missing_layout:
         raise AssertionError("FF7 master/detail geometry drifted from Blank: " + ", ".join(missing_layout))
 
@@ -83,13 +85,13 @@ def main() -> None:
         'class:"ff7-map-controls"',
         'class:"ff7-tweak-panel"',
     ):
-        if legacy in ff7:
+        if legacy in ff7_code:
             raise AssertionError(f"FF7 still hand-builds shared UI markup: {legacy}")
     required_helpers = (
         "subtabBar", "tabbedPanel", "detailPanel", "detailSection", "detailField",
         "columnList", "pagedListDetail", "readonlyField", "infoIcon",
     )
-    missing_helpers = [name for name in required_helpers if name not in ff7]
+    missing_helpers = [name for name in required_helpers if name not in ff7_code]
     if missing_helpers:
         raise AssertionError("FF7 stopped using required shared UI helpers: " + ", ".join(missing_helpers))
 
