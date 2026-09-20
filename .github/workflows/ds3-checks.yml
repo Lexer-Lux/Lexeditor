@@ -1,0 +1,35 @@
+name: Dark Souls 3 checks
+
+on:
+  push:
+    branches:
+      - codex/ds3-plugin
+    paths:
+      - 'games/ds3/**'
+      - 'tests/test_ds3_plugin.py'
+      - 'tests/ds3_browser_check.py'
+      - '.github/workflows/ds3-checks.yml'
+  pull_request:
+    paths:
+      - 'games/ds3/**'
+      - 'tests/test_ds3_plugin.py'
+      - 'tests/ds3_browser_check.py'
+      - '.github/workflows/ds3-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install DS3 format dependency
+        run: python -m pip install 'cryptography>=42'
+      - name: Compile DS3 plugin
+        run: python -m compileall -q games/ds3 tests/test_ds3_plugin.py
+      - name: DS3 regulation regressions
+        run: python -m unittest discover -s tests -p 'test_ds3_plugin.py' -v
