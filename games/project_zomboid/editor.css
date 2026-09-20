@@ -6,3 +6,10 @@ main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
 .pz-shared-actions{display:flex;align-items:center;gap:8px}
 .pz-shared-actions button{padding:7px 12px}
 .pz-record-detail,.pz-metadata,.pz-script-layout .lex-detail-panel,.lex-data-map-detail,.lex-information-panel{--lex-detail-label-width:minmax(min(9em,30%),20%)}
+@media(max-width:850px){
+  #lexeditor-shell .lex-tab-label-text{font-size:.88em;letter-spacing:0}
+  .pz-record-layout.lex-paged-list-detail,.pz-script-layout.lex-paged-list-detail,.lex-data-map-view.lex-paged-list-detail{grid-template-columns:1fr!important;grid-template-rows:minmax(120px,.42fr) minmax(150px,.58fr) auto;gap:var(--lex-panel-gap)}
+  .pz-record-layout>.lex-barrelled-master,.pz-script-layout>.lex-barrelled-master,.lex-data-map-view>.lex-barrelled-master{grid-column:1;grid-row:1}
+  .pz-record-layout>.lex-detail,.pz-script-layout>.lex-detail,.lex-data-map-view>.lex-detail{grid-column:1;grid-row:2}
+  .pz-record-layout>.lex-pager,.pz-script-layout>.lex-pager,.lex-data-map-view>.lex-pager{grid-column:1;grid-row:3}
+}

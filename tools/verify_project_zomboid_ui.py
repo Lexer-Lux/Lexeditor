@@ -261,6 +261,24 @@ def assert_table_fit(page, label: str) -> None:
         assert fit["scroll"] <= fit["client"] + 1, (label, fit)
 
 
+def assert_stacked_master_detail(page, label: str) -> None:
+    master = page.locator(".lex-barrelled-master").first
+    detail = page.locator(".lex-detail").last
+    if not master.count():
+        return
+    master_box = master.bounding_box()
+    detail_box = detail.bounding_box()
+    assert master_box and detail_box, (label, master_box, detail_box)
+    assert master_box["height"] >= 100 and detail_box["height"] >= 120, (label, master_box, detail_box)
+    assert master_box["y"] + master_box["height"] <= detail_box["y"] + 3, (label, master_box, detail_box)
+
+
+def assert_tab_labels_fit(page, label: str) -> None:
+    for node in page.locator("#lexeditor-shell .lex-tab-label-text").all():
+        fit = node.evaluate("(node) => ({client:node.clientWidth, scroll:node.scrollWidth, text:node.textContent})")
+        assert fit["scroll"] <= fit["client"] + 1, (label, fit)
+
+
 def render_surface_set(page, folder: Path | None, prefix: str, width: int, height: int, zoom: float = 1.0) -> dict:
     # Native Lexeditor uses WebView2 ZoomFactor, not CSS zoom. Browser zoom keeps
     # 100vh equal to the visible viewport while reducing the CSS-pixel viewport
@@ -270,11 +288,14 @@ def render_surface_set(page, folder: Path | None, prefix: str, width: int, heigh
     effective_height = max(1, round(height / zoom))
     page.set_viewport_size({"width": effective_width, "height": effective_height})
     results = {}
+    assert_tab_labels_fit(page, prefix)
     for index, (tab, selector) in enumerate(SURFACES, start=1):
         navigate(page, tab, selector)
         results[tab] = assert_layout(page, f"{tab}-{prefix}")
         assert_table_fit(page, f"{tab}-{prefix}")
         assert_detail_reachable(page, f"{tab}-{prefix}")
+        if effective_width <= 850:
+            assert_stacked_master_detail(page, f"{tab}-{prefix}")
         screenshot(page, folder, f"{prefix}-{index:02d}-{tab}")
     return results
 
@@ -447,9 +468,20 @@ def main() -> int:
 
                     # Every surface must remain usable at a narrow desktop size.
                     narrow = render_surface_set(page, args.screenshots, "narrow", 820, 700)
+                    navigate(page, "items", ".pz-record-layout")
+                    narrow_rows = page.locator(".pz-record-table .lex-list-row")
+                    assert narrow_rows.count() >= 2
+                    narrow_key = narrow_rows.nth(1).get_attribute("data-key")
+                    narrow_rows.nth(1).click()
+                    page.wait_for_function("(key) => structuredState.items.selected===key", arg=narrow_key)
+                    assert page.locator(".pz-record-table").bounding_box()["height"] >= 100
+                    assert page.locator(".pz-record-detail").bounding_box()["height"] >= 120
 
                     # Every surface must also survive the desktop host's maximum 150% UI scale.
                     scaled = render_surface_set(page, args.screenshots, "scale150", 1100, 760, 1.5)
+                    navigate(page, "items", ".pz-record-layout")
+                    assert page.locator(".pz-record-table").bounding_box()["height"] >= 100
+                    assert page.locator(".pz-record-detail").bounding_box()["height"] >= 120
                     assert not errors, errors
                     print({
                         "screens": len(SURFACES),
