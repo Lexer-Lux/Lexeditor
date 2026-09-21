@@ -216,31 +216,31 @@ def main():
                 page.locator("#main").get_by_text("PC WORD", exact=True).wait_for()
                 assert "Millennial Fair" in page.locator("#main").inner_text()
                 assert "PC WORD" in page.locator("#main").inner_text()
-                assert "0xBEEF" in page.locator("#main").inner_text()
+                assert page.get_by_label("PC WORD",exact=True).input_value()=="0xBEEF"
                 page.screenshot(path=str(ARTIFACTS/f"areas-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Worlds").click()
                 page.locator("#main").get_by_text("PALETTE ANIMATION BYTE", exact=True).wait_for()
                 assert "World 0" in page.locator("#main").inner_text()
-                assert "0xFD10" in page.locator("#main").inner_text()
-                page.locator('#main input[type="number"]').first.fill("42")
+                assert page.get_by_label("BYTE OFFSET",exact=True).input_value()=="0xFD10"
+                page.get_by_label("MAP",exact=True).fill("42")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("document.querySelector('#global-save')?.disabled")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/worlds/save')")
-                assert page.locator('#main input[type="number"]').first.input_value()=="42"
+                assert page.get_by_label("MAP",exact=True).input_value()=="42"
                 page.screenshot(path=str(ARTIFACTS/f"worlds-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Area Exits").click()
                 page.locator("#main").get_by_text("PRESERVED BITS", exact=True).wait_for()
                 assert "PRESERVED BITS" in page.locator("#main").inner_text()
-                assert "0xA0" in page.locator("#main").inner_text()
+                assert page.get_by_label("PRESERVED BITS",exact=True).input_value()=="0xA0"
                 page.screenshot(path=str(ARTIFACTS/f"exits-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Treasure").click()
                 page.locator("#main").get_by_text("PRESERVED WORD", exact=True).wait_for()
                 assert "Ruby Vest" in page.locator("#main").inner_text()
-                assert "PRESERVED WORD" in page.locator("#main").inner_text()
+                assert page.get_by_label("PRESERVED WORD",exact=True).input_value()=="0xCAFE"
                 page.screenshot(path=str(ARTIFACTS/f"treasure-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Palettes").click()
