@@ -119,6 +119,8 @@ def _parse_file(store: OverlayStore, path: str, source: str, language: str) -> d
     script_end = script_start + script_address_count * 2
     if script_end > len(payload):
         raise ValueError("World script-address block is truncated")
+    for row in rows:
+        row["scriptAddressCount"] = script_address_count
     return {
         "path": path,
         "tableId": table_id,
