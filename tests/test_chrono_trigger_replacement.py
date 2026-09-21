@@ -14,6 +14,7 @@ from games.chrono_trigger.palette_data import load_palette, save_palette
 from games.chrono_trigger.project import OverlayStore
 from games.chrono_trigger.scene_data import load_scenes, save_scene
 from games.chrono_trigger.text_data import load_messages, save_messages
+from games.chrono_trigger.tileset_data import load_graphics_sets, save_graphics_set, load_tile_assemblies, save_tile_assembly
 from games.chrono_trigger.world_data import (
     BANK_PATH, HEADER_OFFSET, HEADER_SIZE, WORLD_COUNT, load_worlds, save_worlds,
 )
@@ -53,6 +54,12 @@ class FreshChronoTriggerTests(unittest.TestCase):
         palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
         bank = bytearray(b"\xA5" * (HEADER_OFFSET + WORLD_COUNT * HEADER_SIZE + 3))
         bank[HEADER_OFFSET:HEADER_OFFSET + HEADER_SIZE] = bytes(range(HEADER_SIZE))
+        graphics_sets = bytes([1, 2, 3, 4, 5, 6, 7, 0xFF]) + b"\xDD"
+        assembly_l12 = bytearray(512 * 4 * 3 + 1)
+        struct.pack_into("<HB", assembly_l12, 0, 300 | 0x0400 | (5 << 12), 0xA1)
+        assembly_l12[-1] = 0xCC
+        assembly_l3 = bytearray(256 * 4 * 3)
+        struct.pack_into("<HB", assembly_l3, 0, 77 | 0x0800 | (3 << 12), 0x41)
         chip_animation = (
             bytes([2, 2]) + struct.pack("<H", 64) + bytes([0x1A, 0x4B])
             + struct.pack("<HH", 96, 128)
@@ -74,6 +81,9 @@ class FreshChronoTriggerTests(unittest.TestCase):
             ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\r\n"),
             ("Localize/en/msg/w_map.txt", b"0000,Truce Canyon\r\n0001,Medina\r\n"),
             ("Game/world/EventTable/EventTable_0004.dat", world_event),
+            ("Game/field/BGSetTable/bgsettable_4.dat", graphics_sets),
+            ("Game/field/ChipTable/ChipTable_0004.dat", bytes(assembly_l12)),
+            ("Game/field/ChipTable/ChipTableBg3_0002.dat", bytes(assembly_l3)),
             ("Game/field/BGAnime/bganimeinfo_4.dat", chip_animation),
             ("Game/field/Mapinfo/mapinfo_1.dat", struct.pack("<10H4B", 10, 1, 2, 3, 4, 5, 6, 7, 8, 0xBEEF, 0, 1, 14, 15) + b"\xAA\xBB"),
             ("Game/field/palette_bin/plt4.bin", palette),
@@ -190,6 +200,56 @@ class FreshChronoTriggerTests(unittest.TestCase):
             self.assertEqual(archive.read_bytes(), original_archive)
             with self.assertRaises(ValueError):
                 save_worlds(store, saved["sha256"], [{"token": "0", "values": {"paletteAnimationIndex": 3}}])
+
+    def test_graphics_set_edit_preserves_sentinel_shape_trailing_and_archive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            data = load_graphics_sets(store)
+            row = data["rows"][0]
+            self.assertEqual(([row[f"graphicsSet{i}"] for i in range(8)], row["trailingBytes"]),
+                             ([1, 2, 3, 4, 5, 6, 7, 255], 1))
+            before, _ = store.read(row["path"], "mine")
+            saved = save_graphics_set(store, row["path"], row["sha256"], {
+                "graphicsSet0": 9, "graphicsSet7": 8,
+            })
+            self.assertEqual((saved["graphicsSet0"], saved["graphicsSet7"], saved["trailingBytes"]),
+                             (9, 8, 1))
+            after, origin = store.read(row["path"], "mine")
+            self.assertEqual(origin, "project")
+            self.assertEqual(after[1:7], before[1:7])
+            self.assertEqual(after[-1:], b"\xDD")
+            self.assertEqual(len(after), len(before))
+            self.assertEqual(archive.read_bytes(), original_archive)
+
+    def test_tile_assembly_edit_preserves_unknown_priority_bits_and_other_corners(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            data = load_tile_assemblies(store)
+            self.assertEqual({(file["kind"], file["tileCount"]) for file in data["files"]},
+                             {("layer12", 512), ("layer3", 256)})
+            row = next(value for value in data["rows"] if value["token"] == "layer12:4:0:0")
+            self.assertEqual((row["chipIndex"], row["paletteIndex"], row["flipHorizontal"],
+                              row["flipVertical"], row["priority"], row["unknownPriorityBits"],
+                              row["fileTrailingBytes"]), (300, 5, True, False, True, 0xA0, 1))
+            before, _ = store.read(row["path"], "mine")
+            saved = save_tile_assembly(store, row["path"], row["sha256"], [{
+                "token": row["token"], "values": {
+                    "chipIndex": 511, "paletteIndex": 6, "flipHorizontal": False,
+                    "flipVertical": True, "priority": False,
+                },
+            }])
+            updated = saved["rows"][0]
+            self.assertEqual((updated["chipIndex"], updated["paletteIndex"], updated["flipHorizontal"],
+                              updated["flipVertical"], updated["priority"], updated["unknownPriorityBits"]),
+                             (511, 6, False, True, False, 0xA0))
+            after, origin = store.read(row["path"], "mine")
+            self.assertEqual(origin, "project")
+            self.assertEqual(after[3:], before[3:])
+            self.assertEqual(after[-1:], b"\xCC")
+            self.assertEqual(len(after), len(before))
+            self.assertEqual(archive.read_bytes(), original_archive)
 
     def test_chip_animation_edit_preserves_counts_low_nibbles_and_later_records(self):
         with tempfile.TemporaryDirectory() as tmp:
