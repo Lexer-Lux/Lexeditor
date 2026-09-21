@@ -81,7 +81,8 @@ def smoke() -> list[str]:
         exits_data = b"HEAD" + struct.pack("<BBBBHBB", 2, 3, 1, 0xA5, 7, 8, 9)
         treasure_offset = struct.pack("<IHH", 2, 0, 1)
         treasure_data = b"HEAD" + struct.pack("<BBHH", 4, 5, 0x1002, 0xCAFE)
-        scene_header = struct.pack("<10H4B", 10, 1, 2, 3, 4, 5, 6, 7, 8, 0xBEEF, 0, 1, 14, 15) + b"\\xAA\\xBB"
+        scene_header = struct.pack("<10H4B", 10, 1, 2, 3, 4, 5, 6, 7, 8, 0xBEEF, 0, 1, 14, 15) + b"\xAA\xBB"
+        palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
         _fixture_archive(game / "resources.bin", [
             ("Localize/en/msg/item.txt", b"0000,Sword\r\n0001,Armor\r\n0002,Mail\r\n"),
             ("Localize/en/msg/cmes0.txt", b"FLD_001,Hello\r\nFLD_002,World\r\n"),
@@ -155,6 +156,7 @@ PLUGIN = GamePlugin(
         root_env="LEXEDITOR_CHRONO_TRIGGER_PROJECT",
         default_root=paths.PROJECT_ROOT,
         required_paths=(PROJECT_MARKER,),
+        template_root=ROOT / "games" / "chrono_trigger" / "project_template",
         initialize=initialize_project,
         content_types=(("Steam resource overrides", (".txt", ".dat", ".bin", ".bmp", ".png")),),
     ),
