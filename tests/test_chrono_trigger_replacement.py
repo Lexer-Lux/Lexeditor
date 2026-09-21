@@ -8,6 +8,7 @@ import zipfile
 from pathlib import Path
 
 from games.chrono_trigger.archive import ArchiveError, ResourcesBin, _decode
+from games.chrono_trigger.animation_data import load_chip_animations, save_chip_animations
 from games.chrono_trigger.field_data import load_exits, load_treasure, save_exits, save_treasure
 from games.chrono_trigger.palette_data import load_palette, save_palette
 from games.chrono_trigger.project import OverlayStore
@@ -52,6 +53,12 @@ class FreshChronoTriggerTests(unittest.TestCase):
         palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
         bank = bytearray(b"\xA5" * (HEADER_OFFSET + WORLD_COUNT * HEADER_SIZE + 3))
         bank[HEADER_OFFSET:HEADER_OFFSET + HEADER_SIZE] = bytes(range(HEADER_SIZE))
+        chip_animation = (
+            bytes([2, 2]) + struct.pack("<H", 64) + bytes([0x1A, 0x4B])
+            + struct.pack("<HH", 96, 128)
+            + bytes([1]) + struct.pack("<H", 160) + bytes([0x80]) + struct.pack("<H", 192)
+            + b"\xEE"
+        )
         world_event = (
             bytes([2])
             + struct.pack("<BBBHBBB", 0x85, 0xC7, 0, 12, 0xAD, 9, 10)
@@ -67,6 +74,7 @@ class FreshChronoTriggerTests(unittest.TestCase):
             ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\r\n"),
             ("Localize/en/msg/w_map.txt", b"0000,Truce Canyon\r\n0001,Medina\r\n"),
             ("Game/world/EventTable/EventTable_0004.dat", world_event),
+            ("Game/field/BGAnime/bganimeinfo_4.dat", chip_animation),
             ("Game/field/Mapinfo/mapinfo_1.dat", struct.pack("<10H4B", 10, 1, 2, 3, 4, 5, 6, 7, 8, 0xBEEF, 0, 1, 14, 15) + b"\xAA\xBB"),
             ("Game/field/palette_bin/plt4.bin", palette),
             ("Game/common/MapJumpOffsetTbl.dat", struct.pack("<IHH", 2, 0, 1)),
@@ -182,6 +190,37 @@ class FreshChronoTriggerTests(unittest.TestCase):
             self.assertEqual(archive.read_bytes(), original_archive)
             with self.assertRaises(ValueError):
                 save_worlds(store, saved["sha256"], [{"token": "0", "values": {"paletteAnimationIndex": 3}}])
+
+    def test_chip_animation_edit_preserves_counts_low_nibbles_and_later_records(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            data = load_chip_animations(store)
+            self.assertEqual(len(data["rows"]), 2)
+            row = data["rows"][0]
+            meta = data["files"][0]
+            self.assertEqual((row["frameCount"], row["destinationChip"], row["durationCode0"],
+                              row["durationLowBits0"], row["sourceChip1"]), (2, 2, 0x10, 0x0A, 4))
+            self.assertEqual((meta["declaredCount"], meta["parsedCount"], meta["trailingBytes"]), (2, 2, 1))
+            before, _ = store.read(row["path"], "mine")
+            saved = save_chip_animations(store, row["path"], row["sha256"], [{
+                "token": row["token"],
+                "values": {"destinationChip": 7, "durationCode0": 0x20, "sourceChip1": 9},
+            }])
+            updated = saved["rows"][0]
+            self.assertEqual((updated["destinationChip"], updated["durationCode0"],
+                              updated["durationTicks0"], updated["durationLowBits0"],
+                              updated["sourceChip1"]), (7, 0x20, 12, 0x0A, 9))
+            after, origin = store.read(row["path"], "mine")
+            self.assertEqual(origin, "project")
+            self.assertEqual(after[4] & 0x0F, before[4] & 0x0F)
+            self.assertEqual(after[10:], before[10:])
+            self.assertEqual(len(after), len(before))
+            self.assertEqual(archive.read_bytes(), original_archive)
+            with self.assertRaises(ValueError):
+                save_chip_animations(store, row["path"], saved["sha256"], [{
+                    "token": row["token"], "values": {"durationCode0": 0x30},
+                }])
 
     def test_world_navigation_edit_preserves_semantics_unknown_blocks_and_archive(self):
         with tempfile.TemporaryDirectory() as tmp:
