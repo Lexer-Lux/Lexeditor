@@ -90,6 +90,40 @@ WORLD_ROW.update({f"layer12Graphics{index}": index for index in range(8)})
 WORLD_ROW.update({f"layer3Graphics{index}": 8 + index for index in range(2)})
 WORLD_ROW.update({f"spriteGraphics{index}": 12 + index for index in range(4)})
 WORLDS = {"path": "Game/common/bankc6.bin", "source": "vanilla", "sha256": "world-sha-1", "rows": [WORLD_ROW]}
+WORLD_FILES = {
+    "tiles": [{"path": "Game/world/Map/Map_0000.dat", "id": 0, "label": "World map 0"}],
+    "properties": [{"path": "Game/world/Id/Id_0000.dat", "id": 0, "label": "World properties 0"}],
+    "music": [{"path": "Game/world/SeId/SeId_0000.dat", "id": 0, "label": "World music 0"}],
+    "colors": [{"path": "Game/world/colanim_bin/0_colanim.bin", "id": 0, "label": "World colors 0"}],
+}
+WORLD_MAP = {
+    "path": "Game/world/Map/Map_0000.dat", "mapId": 0, "source": "vanilla",
+    "sha256": "world-map-sha-1", "width": 96, "height": 64, "trailingBytes": 1,
+    "rows": [
+        {"token": "0:1:0", "mapId": 0, "layer": 1, "index": 0, "xTile": 0, "yTile": 0, "tileIndex": 3},
+        {"token": "0:2:0", "mapId": 0, "layer": 2, "index": 0, "xTile": 0, "yTile": 0, "tileIndex": 260},
+    ],
+}
+WORLD_PROPS = {
+    "path": "Game/world/Id/Id_0000.dat", "fileId": 0, "source": "vanilla",
+    "sha256": "world-props-sha-1", "trailingBytes": 1,
+    "rows": [{"token": "0:0", "fileId": 0, "tileIndex": 256,
+              "topLeft": 1, "topRight": 2, "bottomLeft": 3, "bottomRight": 4}],
+}
+WORLD_MUSIC = {
+    "path": "Game/world/SeId/SeId_0000.dat", "fileId": 0, "source": "vanilla",
+    "sha256": "world-music-sha-1", "trailingBytes": 1,
+    "rows": [{"token": "0:0", "fileId": 0, "index": 0, "xTile": 0, "yTile": 0,
+              "leftMusic": 10, "rightMusic": 5}],
+}
+WORLD_COLORS = {
+    "path": "Game/world/colanim_bin/0_colanim.bin", "fileId": 0, "source": "vanilla",
+    "sha256": "world-colors-sha-1", "trailingBytes": 1,
+    "rows": [
+        {"token": "0", "index": 0, "hex": "#FF0000", "red5": 31, "green5": 0, "blue5": 0, "preservedBit15": True},
+        {"token": "1", "index": 1, "hex": "#00FF00", "red5": 0, "green5": 31, "blue5": 0, "preservedBit15": False},
+    ],
+}
 GRAPHICS_SETS = {
     "source": "vanilla",
     "rows": [{"token": "4", "id": 4, "path": "Game/field/BGSetTable/bgsettable_4.dat",
@@ -173,8 +207,12 @@ DATA_MAP = {"rows": [
     {"filename": "Game/field/ChipTable/ChipTable_*.dat + ChipTableBg3_*.dat", "controls": "Tile assemblies", "notes": "Fixed 3-byte tile corners.", "coverage": "structured", "status": "integrated", "openable": True, "target": "assemblies"},
     {"filename": "Game/field/BGAnime/bganimeinfo_*.dat", "controls": "Animated map tiles", "notes": "Existing fixed-count current-PC chip animations.", "coverage": "structured", "status": "integrated", "openable": True, "target": "animations"},
     {"filename": "Game/common/bankc6.bin @ 0xFD10", "controls": "World settings", "notes": "Seven fixed 23-byte Steam world headers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worlds"},
+    {"filename": "Game/world/Map/Map_*.dat", "controls": "World map tiles", "notes": "Two fixed 96x64 layers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worldmaps"},
+    {"filename": "Game/world/Id/Id_*.dat", "controls": "World tile properties", "notes": "Fixed property nibbles.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worldprops"},
+    {"filename": "Game/world/SeId/SeId_*.dat", "controls": "World music transitions", "notes": "Fixed music nibbles.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worldmusic"},
+    {"filename": "Game/world/colanim_bin/*_colanim.bin", "controls": "World palette-animation colors", "notes": "Flat RGB555 colors.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worldcolors"},
     {"filename": "Game/world/EventTable/EventTable_*.dat", "controls": "World exits and triggers", "notes": "Existing fixed current-PC world navigation records.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worldnav"},
-    {"filename": "Game/world/Map + Id + esl + colanim_bin", "controls": "World maps and scripts", "notes": "Remaining world formats.", "coverage": "unavailable", "status": "not-integrated", "openable": False, "target": None},
+    {"filename": "Game/world/esl/Event_*.dat + map_bin + Chip + gif", "controls": "World scripts and graphics", "notes": "Remaining variable scripts/raw graphics.", "coverage": "unavailable", "status": "not-integrated", "openable": False, "target": None},
 ]}
 CHANGES = {"rows": []}
 
@@ -192,7 +230,7 @@ def editor_html() -> str:
     )
     fixtures = {
         "dashboard": DASHBOARD, "textFiles": TEXT_FILES, "messages": MESSAGES, "scenes": SCENES,
-        "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "worldNavigation": WORLD_NAVIGATION, "animations": CHIP_ANIMATIONS, "graphicsSets": GRAPHICS_SETS, "assemblies": ASSEMBLIES, "dataMap": DATA_MAP, "changes": CHANGES,
+        "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "worldFiles": WORLD_FILES, "worldMap": WORLD_MAP, "worldProps": WORLD_PROPS, "worldMusic": WORLD_MUSIC, "worldColors": WORLD_COLORS, "worldNavigation": WORLD_NAVIGATION, "animations": CHIP_ANIMATIONS, "graphicsSets": GRAPHICS_SETS, "assemblies": ASSEMBLIES, "dataMap": DATA_MAP, "changes": CHANGES,
     }
     stub = r"""
     window.__posts=[];
@@ -226,6 +264,18 @@ def editor_html() -> str:
             if(row)Object.assign(row,edit.values||{});
           }
           f.worlds.sha256="world-sha-saved";f.worlds.source="project";result=f.worlds;
+        }else if(path==="/api/world-map/save"){
+          for(const edit of body.edits||[]){const row=f.worldMap.rows.find(value=>value.token===edit.token);if(row)Object.assign(row,edit.values||{});}
+          f.worldMap.sha256="world-map-sha-2";f.worldMap.source="project";result=f.worldMap;
+        }else if(path==="/api/world-properties/save"){
+          for(const edit of body.edits||[]){const row=f.worldProps.rows.find(value=>value.token===edit.token);if(row)Object.assign(row,edit.values||{});}
+          f.worldProps.sha256="world-props-sha-2";f.worldProps.source="project";result=f.worldProps;
+        }else if(path==="/api/world-music/save"){
+          for(const edit of body.edits||[]){const row=f.worldMusic.rows.find(value=>value.token===edit.token);if(row)Object.assign(row,edit.values||{});}
+          f.worldMusic.sha256="world-music-sha-2";f.worldMusic.source="project";result=f.worldMusic;
+        }else if(path==="/api/world-colors/save"){
+          for(const edit of body.edits||[]){const row=f.worldColors.rows.find(value=>value.token===edit.token);if(row)row.hex=edit.hex;}
+          f.worldColors.sha256="world-colors-sha-2";f.worldColors.source="project";result=f.worldColors;
         }else if(path==="/api/world-navigation/save"){
           for(const edit of body.edits||[]){
             const row=f.worldNavigation.rows.find(value=>value.token===edit.token);
@@ -271,6 +321,11 @@ def editor_html() -> str:
       else if(path==="/api/palette-files")result=f.paletteFiles;
       else if(path==="/api/palette")result=f.palette;
       else if(path==="/api/worlds")result=f.worlds;
+      else if(path==="/api/world-files")result={rows:f.worldFiles[u.searchParams.get("kind")]||[]};
+      else if(path==="/api/world-map")result=f.worldMap;
+      else if(path==="/api/world-properties")result=f.worldProps;
+      else if(path==="/api/world-music")result=f.worldMusic;
+      else if(path==="/api/world-colors")result=f.worldColors;
       else if(path==="/api/world-navigation")result=f.worldNavigation;
       else if(path==="/api/chip-animations")result=f.animations;
       else if(path==="/api/graphics-sets")result=f.graphicsSets;
@@ -343,6 +398,49 @@ def main():
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/worlds/save')")
                 assert page.get_by_label("MAP",exact=True).input_value()=="42"
                 page.screenshot(path=str(ARTIFACTS/f"worlds-{width}.png"),full_page=True)
+                page.get_by_label("World data",exact=True).wait_for()
+
+                page.get_by_label("World data",exact=True).select_option("map")
+                page.get_by_label("TILE INDEX",exact=True).wait_for()
+                assert page.get_by_label("TRAILING BYTES",exact=True).input_value()=="1"
+                page.get_by_label("TILE INDEX",exact=True).fill("9")
+                page.wait_for_function("!document.querySelector('#global-save')?.disabled")
+                page.locator("#global-save").click()
+                page.get_by_label("World data",exact=True).wait_for()
+                assert page.evaluate("window.__posts.some(value=>value.path==='/api/world-map/save')")
+                assert page.get_by_label("TILE INDEX",exact=True).input_value()=="9"
+                page.screenshot(path=str(ARTIFACTS/f"world-map-{width}.png"),full_page=True)
+
+                page.get_by_label("World data",exact=True).select_option("properties")
+                page.get_by_label("TOP LEFT",exact=True).wait_for()
+                page.get_by_label("TOP LEFT",exact=True).select_option("4")
+                page.wait_for_function("!document.querySelector('#global-save')?.disabled")
+                page.locator("#global-save").click()
+                page.get_by_label("World data",exact=True).wait_for()
+                assert page.evaluate("window.__posts.some(value=>value.path==='/api/world-properties/save')")
+                assert page.get_by_label("TOP RIGHT",exact=True).input_value()=="2"
+                page.screenshot(path=str(ARTIFACTS/f"world-properties-{width}.png"),full_page=True)
+
+                page.get_by_label("World data",exact=True).select_option("music")
+                page.get_by_label("RIGHT MUSIC",exact=True).wait_for()
+                page.get_by_label("RIGHT MUSIC",exact=True).fill("9")
+                page.wait_for_function("!document.querySelector('#global-save')?.disabled")
+                page.locator("#global-save").click()
+                page.get_by_label("World data",exact=True).wait_for()
+                assert page.evaluate("window.__posts.some(value=>value.path==='/api/world-music/save')")
+                assert page.get_by_label("LEFT MUSIC",exact=True).input_value()=="10"
+                page.screenshot(path=str(ARTIFACTS/f"world-music-{width}.png"),full_page=True)
+
+                page.get_by_label("World data",exact=True).select_option("colors")
+                page.get_by_label("COLOR",exact=True).wait_for()
+                assert page.get_by_label("BIT 15",exact=True).input_value()=="Set"
+                page.get_by_label("COLOR",exact=True).fill("#00ff00")
+                page.wait_for_function("!document.querySelector('#global-save')?.disabled")
+                page.locator("#global-save").click()
+                page.get_by_label("World data",exact=True).wait_for()
+                assert page.evaluate("window.__posts.some(value=>value.path==='/api/world-colors/save')")
+                assert page.get_by_label("BIT 15",exact=True).input_value()=="Set"
+                page.screenshot(path=str(ARTIFACTS/f"world-colors-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="World Exits").click()
                 page.locator("#main").get_by_text("Y FLAG BITS", exact=True).wait_for()
