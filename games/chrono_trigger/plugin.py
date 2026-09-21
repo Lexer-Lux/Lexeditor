@@ -160,6 +160,8 @@ def smoke() -> list[str]:
                     or saved_by_token["4:trigger:0"]["scriptAddressIndex"] != 1):
                 raise RuntimeError("World navigation edit did not preserve fixed-record semantics")
             exported = request_json(session.url + "api/export", {})
+            if not exported.get("replacementOnly"):
+                raise RuntimeError("CTP export did not assert replacement-only loader compatibility")
             with zipfile.ZipFile(exported["path"]) as ctp:
                 if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/palette_bin/plt4.bin", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/EventTable/EventTable_0004.dat"}:
                     raise RuntimeError("CTP export did not contain exactly the changed resources")
