@@ -17,8 +17,12 @@ ROWS = [
     ("Game/field/BGAnime/bganimeinfo_*.dat", "Animated map tiles", "Edit existing current-PC chip-animation destination/source chip offsets and documented frame-duration high nibbles without changing animation/frame counts. Unknown duration low nibbles, terminators and trailing bytes are preserved.", "integrated", "animations"),
     ("Game/field/palette_bin/plt*.bin + Game/world/plt_bin/plt*.bin", "Area and world palettes", "Edit the 256 RGB555 colors in current-PC field and world palettes. The two-byte prefix, bit 15 of every color, and trailing bytes are preserved.", "integrated", "palettes"),
     ("Game/common/bankc6.bin @ 0xFD10", "World settings", "Edit the seven active fixed 23-byte Steam world headers. Graphics, palette, map, music, exit and script references are bounded to one byte; the PC-unused palette-animation byte and all bytes outside the selected header are preserved.", "integrated", "worlds"),
+    ("Game/world/Map/Map_*.dat", "World map tiles", "Edit the two stored fixed 96x64 current-PC tile layers. Layer 1 stays in tile range 0-255 and layer 2 in 256-511; file shape and trailing bytes are preserved.", "integrated", "worldmaps"),
+    ("Game/world/Id/Id_*.dat", "World tile properties", "Edit the four documented per-chip property nibbles for each of the 256 layer-2 tiles. Unknown existing nibble values are preserved unless explicitly replaced by a documented 0-4 code.", "integrated", "worldprops"),
+    ("Game/world/SeId/SeId_*.dat", "World music transitions", "Edit the two 4-bit music indexes stored in each fixed transition byte. File shape and trailing bytes are preserved.", "integrated", "worldmusic"),
+    ("Game/world/colanim_bin/*_colanim.bin", "World palette-animation colors", "Edit existing flat RGB555 world animation colors. Bit 15 and any odd trailing byte are preserved.", "integrated", "worldcolors"),
     ("Game/world/EventTable/EventTable_*.dat", "World exits and triggers", "Edit existing current-PC 8-byte exits and live 3-byte triggers without changing counts. Scripted-vs-destination semantics, trigger terminators, the unknown third block, script addresses, unmodelled flag bits and trailing bytes are preserved.", "integrated", "worldnav"),
-    ("Game/world/Map + Id + esl + colanim_bin", "World maps and scripts", "CTViewer documents these current-PC families, but map painting and world-script editing remain outside the bounded editors.", "not-integrated", None),
+    ("Game/world/esl/Event_*.dat + map_bin + Chip + gif", "World scripts and graphics", "Current-PC world scripts and raw graphics are recognized, but this replacement does not rewrite variable script bodies or expose a raster graphics editor.", "not-integrated", None),
     ("Game/chara/*", "Characters and sprites", "Recognized current-PC assets; no format-specific editor is implemented yet.", "not-integrated", None),
     ("Game/common/*DataTable*.dat", "Gameplay tables", "Candidate item/accessory/enemy/tech/shop tables exist in the Steam archive, but no independently verified typed record schema is claimed yet.", "not-integrated", None),
 ]
@@ -51,9 +55,17 @@ def build_data_map(store: OverlayStore) -> dict:
             present = any(path.startswith(("Game/field/palette_bin/", "Game/world/plt_bin/")) for path in available)
         elif filename.startswith("Game/common/bankc6"):
             present = "Game/common/bankc6.bin" in available
+        elif filename.startswith("Game/world/Map/"):
+            present = any(path.startswith("Game/world/Map/") for path in available)
+        elif filename.startswith("Game/world/Id/"):
+            present = any(path.startswith("Game/world/Id/") for path in available)
+        elif filename.startswith("Game/world/SeId/"):
+            present = any(path.startswith("Game/world/SeId/") for path in available)
+        elif filename.startswith("Game/world/colanim_bin"):
+            present = any(path.startswith("Game/world/colanim_bin/") for path in available)
         elif filename.startswith("Game/world/EventTable"):
             present = any(path.startswith("Game/world/EventTable/") for path in available)
-        elif filename.startswith("Game/world/Map +"):
+        elif filename.startswith("Game/world/esl"):
             present = any(path.startswith("Game/world/") for path in available)
         elif filename.startswith("Game/chara"):
             present = any(path.startswith("Game/chara/") for path in available)
