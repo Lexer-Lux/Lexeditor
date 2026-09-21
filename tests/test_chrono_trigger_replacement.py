@@ -97,7 +97,7 @@ class FreshChronoTriggerTests(unittest.TestCase):
             self.assertEqual(saved["unknownWord"], 0xBEEF)
             self.assertEqual(saved["trailingBytes"], 2)
             project_bytes, _ = store.read(row["path"], "mine")
-            self.assertEqual(project_bytes[-2:], b"\\xAA\\xBB")
+            self.assertEqual(project_bytes[-2:], b"\xAA\xBB")
             self.assertEqual(archive.read_bytes(), original)
 
     def test_palette_edit_preserves_prefix_high_bit_trailing_and_vanilla(self):
