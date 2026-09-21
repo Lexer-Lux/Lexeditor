@@ -378,6 +378,7 @@ def main():
                 assert page.get_by_label("DESTINATION CHIP",exact=True).input_value()=="7"
                 assert page.get_by_label("FRAME 0 LOW BITS",exact=True).input_value()=="0xA"
                 page.screenshot(path=str(ARTIFACTS/f"tile-animations-{width}.png"),full_page=True)
+                page.get_by_label("Tile data",exact=True).wait_for()
 
                 page.get_by_label("Tile data",exact=True).select_option("tilesets")
                 page.get_by_label("GRAPHICS SET 0",exact=True).wait_for()
@@ -390,6 +391,7 @@ def main():
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/graphics-sets/save')")
                 assert page.get_by_label("GRAPHICS SET 0",exact=True).input_value()=="9"
                 page.screenshot(path=str(ARTIFACTS/f"tile-graphics-sets-{width}.png"),full_page=True)
+                page.get_by_label("Tile data",exact=True).wait_for()
 
                 page.get_by_label("Tile data",exact=True).select_option("assemblies")
                 page.get_by_label("UNKNOWN PRIORITY BITS",exact=True).wait_for()
