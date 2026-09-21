@@ -19,6 +19,10 @@ from games.chrono_trigger.world_data import (
     BANK_PATH, HEADER_OFFSET, HEADER_SIZE, WORLD_COUNT, load_worlds, save_worlds,
 )
 from games.chrono_trigger.world_navigation import load_world_navigation, save_world_navigation
+from games.chrono_trigger.world_map_data import (
+    load_world_tiles, save_world_tiles, load_world_properties, save_world_properties,
+    load_world_music, save_world_music, load_world_colors, save_world_colors,
+)
 
 
 def build_archive(path: Path, resources: list[tuple[str, bytes]]) -> None:
@@ -66,6 +70,17 @@ class FreshChronoTriggerTests(unittest.TestCase):
             + bytes([1]) + struct.pack("<H", 160) + bytes([0x80]) + struct.pack("<H", 192)
             + b"\xEE"
         )
+        world_map = bytearray(96 * 64 * 2 + 1)
+        world_map[0] = 3
+        world_map[96 * 64] = 4
+        world_map[-1] = 0xFA
+        world_props = bytearray(512 + 1)
+        world_props[0:2] = b"\x12\x34"
+        world_props[-1] = 0xFB
+        world_music = bytearray((96 * 64 // 2) + 1)
+        world_music[0] = 0xA5
+        world_music[-1] = 0xFC
+        world_colors = struct.pack("<HHH", 0x801F, 0x03E0, 0x7C00) + b"\xFD"
         world_event = (
             bytes([2])
             + struct.pack("<BBBHBBB", 0x85, 0xC7, 0, 12, 0xAD, 9, 10)
@@ -80,6 +95,10 @@ class FreshChronoTriggerTests(unittest.TestCase):
             ("Localize/en/msg/cmes0.txt", b"FLD_1,Hello, traveler\r\nFLD_2,World\r\n"),
             ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\r\n"),
             ("Localize/en/msg/w_map.txt", b"0000,Truce Canyon\r\n0001,Medina\r\n"),
+            ("Game/world/Map/Map_0000.dat", bytes(world_map)),
+            ("Game/world/Id/Id_0000.dat", bytes(world_props)),
+            ("Game/world/SeId/SeId_0000.dat", bytes(world_music)),
+            ("Game/world/colanim_bin/0_colanim.bin", world_colors),
             ("Game/world/EventTable/EventTable_0004.dat", world_event),
             ("Game/field/BGSetTable/bgsettable_4.dat", graphics_sets),
             ("Game/field/ChipTable/ChipTable_0004.dat", bytes(assembly_l12)),
@@ -281,6 +300,96 @@ class FreshChronoTriggerTests(unittest.TestCase):
                 save_chip_animations(store, row["path"], saved["sha256"], [{
                     "token": row["token"], "values": {"durationCode0": 0x30},
                 }])
+
+    def test_world_map_tile_edit_changes_only_selected_layer_byte(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            path = "Game/world/Map/Map_0000.dat"
+            data = load_world_tiles(store, path)
+            layer1 = data["rows"][0]
+            layer2 = data["rows"][96 * 64]
+            self.assertEqual((layer1["tileIndex"], layer2["tileIndex"], data["trailingBytes"]), (3, 260, 1))
+            before, _ = store.read(path, "mine")
+            saved = save_world_tiles(store, path, data["sha256"], [
+                {"token": layer1["token"], "values": {"tileIndex": 9}},
+                {"token": layer2["token"], "values": {"tileIndex": 300}},
+            ])
+            self.assertEqual((saved["rows"][0]["tileIndex"], saved["rows"][96 * 64]["tileIndex"]), (9, 300))
+            after, origin = store.read(path, "mine")
+            self.assertEqual(origin, "project")
+            changed = [index for index, (left, right) in enumerate(zip(before, after)) if left != right]
+            self.assertEqual(changed, [0, 96 * 64])
+            self.assertEqual(after[-1:], b"\xFA")
+            self.assertEqual(archive.read_bytes(), original_archive)
+            with self.assertRaises(ValueError):
+                save_world_tiles(store, path, saved["sha256"], [
+                    {"token": layer2["token"], "values": {"tileIndex": 255}},
+                ])
+
+    def test_world_property_edit_preserves_other_nibbles_and_trailing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            path = "Game/world/Id/Id_0000.dat"
+            data = load_world_properties(store, path)
+            row = data["rows"][0]
+            self.assertEqual((row["topLeft"], row["topRight"], row["bottomLeft"], row["bottomRight"],
+                              data["trailingBytes"]), (1, 2, 3, 4, 1))
+            before, _ = store.read(path, "mine")
+            saved = save_world_properties(store, path, data["sha256"], [{
+                "token": row["token"], "values": {"topLeft": 4},
+            }])
+            self.assertEqual((saved["rows"][0]["topLeft"], saved["rows"][0]["topRight"],
+                              saved["rows"][0]["bottomLeft"], saved["rows"][0]["bottomRight"]),
+                             (4, 2, 3, 4))
+            after, _ = store.read(path, "mine")
+            self.assertEqual(after[0], 0x42)
+            self.assertEqual(after[1:], before[1:])
+            self.assertEqual(after[-1:], b"\xFB")
+            self.assertEqual(archive.read_bytes(), original_archive)
+            with self.assertRaises(ValueError):
+                save_world_properties(store, path, saved["sha256"], [{
+                    "token": row["token"], "values": {"topLeft": 7},
+                }])
+
+    def test_world_music_edit_preserves_other_nibble_and_trailing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            path = "Game/world/SeId/SeId_0000.dat"
+            data = load_world_music(store, path)
+            row = data["rows"][0]
+            self.assertEqual((row["xTile"], row["yTile"], row["leftMusic"], row["rightMusic"],
+                              data["trailingBytes"]), (0, 0, 10, 5, 1))
+            before, _ = store.read(path, "mine")
+            saved = save_world_music(store, path, data["sha256"], [{
+                "token": row["token"], "values": {"rightMusic": 9},
+            }])
+            self.assertEqual((saved["rows"][0]["leftMusic"], saved["rows"][0]["rightMusic"]), (10, 9))
+            after, _ = store.read(path, "mine")
+            self.assertEqual(after[0], 0xA9)
+            self.assertEqual(after[1:], before[1:])
+            self.assertEqual(after[-1:], b"\xFC")
+            self.assertEqual(archive.read_bytes(), original_archive)
+
+    def test_world_animation_color_edit_preserves_bit15_and_odd_tail(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            path = "Game/world/colanim_bin/0_colanim.bin"
+            data = load_world_colors(store, path)
+            self.assertEqual((data["rows"][0]["hex"], data["rows"][0]["preservedBit15"],
+                              data["trailingBytes"]), ("#FF0000", True, 1))
+            saved = save_world_colors(store, path, data["sha256"], [{
+                "token": "0", "hex": "#00FF00",
+            }])
+            self.assertEqual((saved["rows"][0]["hex"], saved["rows"][0]["preservedBit15"]),
+                             ("#00FF00", True))
+            raw, _ = store.read(path, "mine")
+            self.assertTrue(struct.unpack_from("<H", raw, 0)[0] & 0x8000)
+            self.assertEqual(raw[-1:], b"\xFD")
+            self.assertEqual(archive.read_bytes(), original_archive)
 
     def test_world_navigation_edit_preserves_semantics_unknown_blocks_and_archive(self):
         with tempfile.TemporaryDirectory() as tmp:
