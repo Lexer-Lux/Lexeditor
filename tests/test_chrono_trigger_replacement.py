@@ -45,11 +45,13 @@ def build_archive(path: Path, resources: list[tuple[str, bytes]]) -> None:
 class FreshChronoTriggerTests(unittest.TestCase):
     def fixture(self, root: Path):
         archive = root / "resources.bin"
+        palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
         build_archive(archive, [
             ("Localize/en/msg/item.txt", b"0000,Sword\r\n0001,Armor\r\n0002,Mail\r\n"),
             ("Localize/en/msg/cmes0.txt", b"FLD_1,Hello, traveler\r\nFLD_2,World\r\n"),
             ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\r\n"),
-            ("Game/field/Mapinfo/mapinfo_1.dat", struct.pack("<10H4B", 10, 1, 2, 3, 4, 5, 6, 7, 8, 0xBEEF, 0, 1, 14, 15) + b"\\xAA\\xBB"),
+            ("Game/field/Mapinfo/mapinfo_1.dat", struct.pack("<10H4B", 10, 1, 2, 3, 4, 5, 6, 7, 8, 0xBEEF, 0, 1, 14, 15) + b"\xAA\xBB"),
+            ("Game/field/palette_bin/plt4.bin", palette),
             ("Game/common/MapJumpOffsetTbl.dat", struct.pack("<IHH", 2, 0, 1)),
             ("Game/common/MapJumpDataTbl.dat", b"HEAD" + struct.pack("<BBBBHBB", 2, 3, 1, 0xA5, 7, 8, 9)),
             ("Game/common/TakaraOffsetTbl.dat", struct.pack("<IHH", 2, 0, 1)),
