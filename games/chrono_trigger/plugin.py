@@ -86,10 +86,21 @@ def smoke() -> list[str]:
         palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
         world_bank = bytearray(b"\xA5" * (HEADER_OFFSET + WORLD_COUNT * HEADER_SIZE + 3))
         world_bank[HEADER_OFFSET:HEADER_OFFSET + HEADER_SIZE] = bytes(range(HEADER_SIZE))
+        world_event = (
+            bytes([2])
+            + struct.pack("<BBBHBBB", 0x85, 0xC7, 0, 12, 0xAD, 9, 10)
+            + struct.pack("<BBBHBBB", 0x82, 3, 1, 0x1FF, 0x52, 0, 0)
+            + bytes([2, 0x84, 5, 0, 0, 0, 0])
+            + bytes([1, 7, 8, 9])
+            + bytes([2]) + struct.pack("<HH", 0x400, 0x410)
+            + b"\xAA\xBB"
+        )
         _fixture_archive(game / "resources.bin", [
             ("Localize/en/msg/item.txt", b"0000,Sword\r\n0001,Armor\r\n0002,Mail\r\n"),
             ("Localize/en/msg/cmes0.txt", b"FLD_001,Hello\r\nFLD_002,World\r\n"),
             ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\r\n"),
+            ("Localize/en/msg/w_map.txt", b"0000,Truce Canyon\r\n0001,Medina\r\n"),
+            ("Game/world/EventTable/EventTable_0004.dat", world_event),
             ("Game/field/Mapinfo/mapinfo_1.dat", scene_header),
             ("Game/field/palette_bin/plt4.bin", palette),
             ("Game/common/MapJumpOffsetTbl.dat", exits_offset),
@@ -133,9 +144,24 @@ def smoke() -> list[str]:
             if (saved_worlds["rows"][0]["mapIndex"] != 42 or saved_worlds["rows"][0]["scriptIndex"] != 43
                     or saved_worlds["rows"][0]["paletteAnimationIndex"] != 11):
                 raise RuntimeError("World header edit did not stay inside the documented Steam record")
+            navigation = request_json(session.url + "api/world-navigation?language=en")
+            world_exit = next(row for row in navigation["rows"] if row["token"] == "4:exit:0")
+            world_trigger = next(row for row in navigation["rows"] if row["token"] == "4:trigger:0")
+            saved_navigation = request_json(session.url + "api/world-navigation/save", {
+                "path": world_exit["path"], "sha256": world_exit["sha256"], "language": "en",
+                "edits": [
+                    {"token": world_exit["token"], "values": {"destinationScene": 33, "facing": 1}},
+                    {"token": world_trigger["token"], "values": {"scriptAddressIndex": 1}},
+                ],
+            })
+            saved_by_token = {row["token"]: row for row in saved_navigation["rows"]}
+            if (saved_by_token["4:exit:0"]["destinationScene"] != 33
+                    or saved_by_token["4:exit:0"]["unknownFacingBits"] != 0xA1
+                    or saved_by_token["4:trigger:0"]["scriptAddressIndex"] != 1):
+                raise RuntimeError("World navigation edit did not preserve fixed-record semantics")
             exported = request_json(session.url + "api/export", {})
             with zipfile.ZipFile(exported["path"]) as ctp:
-                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/palette_bin/plt4.bin", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH}:
+                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/palette_bin/plt4.bin", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/EventTable/EventTable_0004.dat"}:
                     raise RuntimeError("CTP export did not contain exactly the changed resources")
         if (game / "resources.bin").read_bytes() != original_archive:
             raise RuntimeError("Fresh Chrono Trigger plugin modified resources.bin")
@@ -147,6 +173,7 @@ def smoke() -> list[str]:
         "fixed-size area exit edit preserved unknown flag bits",
         "treasure edit preserved the unknown trailing word",
         "fixed 23-byte world header edit preserved the PC-unused palette-animation byte and surrounding bank data",
+        "fixed-size world exit/trigger edits preserved semantics, unknown bits and non-editable blocks",
         "deterministic CTP export contained only changed archive-relative resources",
         "installed resources.bin remained byte-identical",
     ]
