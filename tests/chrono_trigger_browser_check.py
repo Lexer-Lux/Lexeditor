@@ -90,6 +90,28 @@ WORLD_ROW.update({f"layer12Graphics{index}": index for index in range(8)})
 WORLD_ROW.update({f"layer3Graphics{index}": 8 + index for index in range(2)})
 WORLD_ROW.update({f"spriteGraphics{index}": 12 + index for index in range(4)})
 WORLDS = {"path": "Game/common/bankc6.bin", "source": "vanilla", "sha256": "world-sha-1", "rows": [WORLD_ROW]}
+CHIP_ANIMATIONS = {
+    "source": "vanilla",
+    "files": [{"path": "Game/field/BGAnime/bganimeinfo_4.dat", "fileId": 4, "source": "vanilla",
+               "sha256": "anim-sha-1", "declaredCount": 2, "parsedCount": 2,
+               "stoppedByTerminator": False, "terminatorOffset": None, "trailingBytes": 1}],
+    "rows": [
+        {"token": "4:0", "fileId": 4, "animationId": 0, "path": "Game/field/BGAnime/bganimeinfo_4.dat",
+         "sha256": "anim-sha-1", "source": "vanilla", "byteOffset": 1, "frameCount": 2,
+         "destinationChip": 2, "destinationOffsetRemainder": 0, "editable": True,
+         "durationCode0": 0x10, "durationTicks0": 16, "durationLowBits0": 0x0A,
+         "sourceChip0": 3, "sourceOffsetRemainder0": 0,
+         "durationCode1": 0x40, "durationTicks1": 8, "durationLowBits1": 0x0B,
+         "sourceChip1": 4, "sourceOffsetRemainder1": 0,
+         "fileTrailingBytes": 1, "declaredAnimationCount": 2},
+        {"token": "4:1", "fileId": 4, "animationId": 1, "path": "Game/field/BGAnime/bganimeinfo_4.dat",
+         "sha256": "anim-sha-1", "source": "vanilla", "byteOffset": 10, "frameCount": 1,
+         "destinationChip": 5, "destinationOffsetRemainder": 0, "editable": True,
+         "durationCode0": 0x80, "durationTicks0": 4, "durationLowBits0": 0,
+         "sourceChip0": 6, "sourceOffsetRemainder0": 0,
+         "fileTrailingBytes": 1, "declaredAnimationCount": 2},
+    ],
+}
 WORLD_NAVIGATION = {
     "language": "en", "source": "vanilla",
     "files": [{"path": "Game/world/EventTable/EventTable_0004.dat", "tableId": 4, "source": "vanilla",
@@ -121,6 +143,7 @@ DATA_MAP = {"rows": [
     {"filename": "Game/common/TakaraOffsetTbl.dat + TakaraDataTbl.dat", "controls": "Treasure chests", "notes": "Existing fixed-size treasure.", "coverage": "structured", "status": "integrated", "openable": True, "target": "treasure"},
     {"filename": "Game/field/Mapinfo/mapinfo_*.dat", "controls": "Area settings", "notes": "Fixed Steam area headers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "scenes"},
     {"filename": "Game/field/palette_bin/plt*.bin + Game/world/plt_bin/plt*.bin", "controls": "Area and world palettes", "notes": "Fixed 256-color RGB555 palettes.", "coverage": "structured", "status": "integrated", "openable": True, "target": "palettes"},
+    {"filename": "Game/field/BGAnime/bganimeinfo_*.dat", "controls": "Animated map tiles", "notes": "Existing fixed-count current-PC chip animations.", "coverage": "structured", "status": "integrated", "openable": True, "target": "animations"},
     {"filename": "Game/common/bankc6.bin @ 0xFD10", "controls": "World settings", "notes": "Seven fixed 23-byte Steam world headers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worlds"},
     {"filename": "Game/world/EventTable/EventTable_*.dat", "controls": "World exits and triggers", "notes": "Existing fixed current-PC world navigation records.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worldnav"},
     {"filename": "Game/world/Map + Id + esl + colanim_bin", "controls": "World maps and scripts", "notes": "Remaining world formats.", "coverage": "unavailable", "status": "not-integrated", "openable": False, "target": None},
@@ -141,7 +164,7 @@ def editor_html() -> str:
     )
     fixtures = {
         "dashboard": DASHBOARD, "textFiles": TEXT_FILES, "messages": MESSAGES, "scenes": SCENES,
-        "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "worldNavigation": WORLD_NAVIGATION, "dataMap": DATA_MAP, "changes": CHANGES,
+        "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "worldNavigation": WORLD_NAVIGATION, "animations": CHIP_ANIMATIONS, "dataMap": DATA_MAP, "changes": CHANGES,
     }
     stub = r"""
     window.__posts=[];
@@ -184,6 +207,18 @@ def editor_html() -> str:
           result={path:body.path,tableId:4,source:"project",sha256:"world-nav-sha-2",
                   rows:f.worldNavigation.rows,exitCount:2,triggerCount:1,storedTriggerCount:2,
                   unknownCount:1,scriptAddressCount:2,trailingBytes:2};
+        }else if(path==="/api/chip-animations/save"){
+          for(const edit of body.edits||[]){
+            const row=f.animations.rows.find(value=>value.token===edit.token);
+            if(row){
+              Object.assign(row,edit.values||{});
+              if("durationCode0" in (edit.values||{}))row.durationTicks0={16:16,32:12,64:8,128:4}[row.durationCode0]||null;
+            }
+          }
+          for(const row of f.animations.rows){row.sha256="anim-sha-2";row.source="project";}
+          result={path:body.path,fileId:4,source:"project",sha256:"anim-sha-2",
+                  declaredCount:2,parsedCount:2,stoppedByTerminator:false,terminatorOffset:null,
+                  trailingBytes:1,rows:f.animations.rows};
         }else if(path==="/api/exits/save")result=f.exits;
         else if(path==="/api/treasure/save")result=f.treasure;
         else result={};
@@ -197,6 +232,7 @@ def editor_html() -> str:
       else if(path==="/api/palette")result=f.palette;
       else if(path==="/api/worlds")result=f.worlds;
       else if(path==="/api/world-navigation")result=f.worldNavigation;
+      else if(path==="/api/chip-animations")result=f.animations;
       else if(path==="/api/exits")result=f.exits;
       else if(path==="/api/treasure")result=f.treasure;
       else {status=404;result={error:"Unknown fixture request "+path};}
@@ -285,6 +321,21 @@ def main():
                 page.wait_for_function("document.querySelector('#global-save')?.disabled")
                 assert page.get_by_label("SCRIPT ADDRESS",exact=True).input_value()=="1"
                 page.screenshot(path=str(ARTIFACTS/f"world-triggers-{width}.png"),full_page=True)
+
+                page.locator(".lex-tab-label-text",has_text="Tile Anim").click()
+                page.locator("#main").get_by_text("FRAME 0 LOW BITS", exact=True).wait_for()
+                assert page.get_by_label("FRAME 0 LOW BITS",exact=True).input_value()=="0xA"
+                assert page.get_by_label("TRAILING BYTES",exact=True).input_value()=="1"
+                page.get_by_label("DESTINATION CHIP",exact=True).fill("7")
+                page.get_by_label("FRAME 0 DURATION",exact=True).select_option("32")
+                page.get_by_label("FRAME 1 SOURCE CHIP",exact=True).fill("9")
+                page.wait_for_function("!document.querySelector('#global-save')?.disabled")
+                page.locator("#global-save").click()
+                page.wait_for_function("document.querySelector('#global-save')?.disabled")
+                assert page.evaluate("window.__posts.some(value=>value.path==='/api/chip-animations/save')")
+                assert page.get_by_label("DESTINATION CHIP",exact=True).input_value()=="7"
+                assert page.get_by_label("FRAME 0 LOW BITS",exact=True).input_value()=="0xA"
+                page.screenshot(path=str(ARTIFACTS/f"tile-animations-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Area Exits").click()
                 page.locator("#main").get_by_text("PRESERVED BITS", exact=True).wait_for()
