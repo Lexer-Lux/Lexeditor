@@ -15,7 +15,8 @@ ROWS = [
     ("Game/field/BGAnime/bganimeinfo_*.dat", "Animated map tiles", "Descriptor knowledge exists, but runtime phase and safe animation editing are not established for this replacement.", "not-integrated", None),
     ("Game/field/palette_bin/plt*.bin + Game/world/plt_bin/plt*.bin", "Area and world palettes", "Edit the 256 RGB555 colors in current-PC field and world palettes. The two-byte prefix, bit 15 of every color, and trailing bytes are preserved.", "integrated", "palettes"),
     ("Game/common/bankc6.bin @ 0xFD10", "World settings", "Edit the seven active fixed 23-byte Steam world headers. Graphics, palette, map, music, exit and script references are bounded to one byte; the PC-unused palette-animation byte and all bytes outside the selected header are preserved.", "integrated", "worlds"),
-    ("Game/world/Map + Id + EventTable + esl + colanim_bin", "World maps, exits, triggers and scripts", "CTViewer documents these current-PC families, but map painting, exit/trigger editing and world-script editing remain outside this bounded header slice.", "not-integrated", None),
+    ("Game/world/EventTable/EventTable_*.dat", "World exits and triggers", "Edit existing current-PC 8-byte exits and live 3-byte triggers without changing counts. Scripted-vs-destination semantics, trigger terminators, the unknown third block, script addresses, unmodelled flag bits and trailing bytes are preserved.", "integrated", "worldnav"),
+    ("Game/world/Map + Id + esl + colanim_bin", "World maps and scripts", "CTViewer documents these current-PC families, but map painting and world-script editing remain outside the bounded editors.", "not-integrated", None),
     ("Game/chara/*", "Characters and sprites", "Recognized current-PC assets; no format-specific editor is implemented yet.", "not-integrated", None),
     ("Game/common/*DataTable*.dat", "Gameplay tables", "Candidate item/accessory/enemy/tech/shop tables exist in the Steam archive, but no independently verified typed record schema is claimed yet.", "not-integrated", None),
 ]
@@ -44,6 +45,8 @@ def build_data_map(store: OverlayStore) -> dict:
             present = any(path.startswith(("Game/field/palette_bin/", "Game/world/plt_bin/")) for path in available)
         elif filename.startswith("Game/common/bankc6"):
             present = "Game/common/bankc6.bin" in available
+        elif filename.startswith("Game/world/EventTable"):
+            present = any(path.startswith("Game/world/EventTable/") for path in available)
         elif filename.startswith("Game/world/Map +"):
             present = any(path.startswith("Game/world/") for path in available)
         elif filename.startswith("Game/chara"):
