@@ -98,6 +98,17 @@ def smoke() -> list[str]:
             + bytes([1]) + struct.pack("<H", 160) + bytes([0x80]) + struct.pack("<H", 192)
             + b"\xEE"
         )
+        world_map = bytearray(96 * 64 * 2 + 1)
+        world_map[0] = 3
+        world_map[96 * 64] = 4
+        world_map[-1] = 0xFA
+        world_props = bytearray(512 + 1)
+        world_props[0:2] = b"\x12\x34"
+        world_props[-1] = 0xFB
+        world_music = bytearray((96 * 64 // 2) + 1)
+        world_music[0] = 0xA5
+        world_music[-1] = 0xFC
+        world_colors = struct.pack("<HHH", 0x801F, 0x03E0, 0x7C00) + b"\xFD"
         world_event = (
             bytes([2])
             + struct.pack("<BBBHBBB", 0x85, 0xC7, 0, 12, 0xAD, 9, 10)
@@ -112,6 +123,10 @@ def smoke() -> list[str]:
             ("Localize/en/msg/cmes0.txt", b"FLD_001,Hello\r\nFLD_002,World\r\n"),
             ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\r\n"),
             ("Localize/en/msg/w_map.txt", b"0000,Truce Canyon\r\n0001,Medina\r\n"),
+            ("Game/world/Map/Map_0000.dat", bytes(world_map)),
+            ("Game/world/Id/Id_0000.dat", bytes(world_props)),
+            ("Game/world/SeId/SeId_0000.dat", bytes(world_music)),
+            ("Game/world/colanim_bin/0_colanim.bin", world_colors),
             ("Game/world/EventTable/EventTable_0004.dat", world_event),
             ("Game/field/BGSetTable/bgsettable_4.dat", graphics_sets),
             ("Game/field/ChipTable/ChipTable_0004.dat", bytes(assembly_l12)),
@@ -160,6 +175,47 @@ def smoke() -> list[str]:
             if (saved_worlds["rows"][0]["mapIndex"] != 42 or saved_worlds["rows"][0]["scriptIndex"] != 43
                     or saved_worlds["rows"][0]["paletteAnimationIndex"] != 11):
                 raise RuntimeError("World header edit did not stay inside the documented Steam record")
+            map_files = request_json(session.url + "api/world-files?kind=tiles")
+            map_path = map_files["rows"][0]["path"]
+            world_tiles = request_json(session.url + "api/world-map?path=" + map_path.replace("/", "%2F"))
+            saved_tiles = request_json(session.url + "api/world-map/save", {
+                "path": map_path, "sha256": world_tiles["sha256"],
+                "edits": [{"token": "0:1:0", "values": {"tileIndex": 9}},
+                          {"token": "0:2:0", "values": {"tileIndex": 300}}],
+            })
+            if (saved_tiles["rows"][0]["tileIndex"] != 9
+                    or saved_tiles["rows"][96 * 64]["tileIndex"] != 300
+                    or saved_tiles["trailingBytes"] != 1):
+                raise RuntimeError("World map tile edits did not preserve fixed layer shape")
+            prop_files = request_json(session.url + "api/world-files?kind=properties")
+            prop_path = prop_files["rows"][0]["path"]
+            world_props_data = request_json(session.url + "api/world-properties?path=" + prop_path.replace("/", "%2F"))
+            saved_props = request_json(session.url + "api/world-properties/save", {
+                "path": prop_path, "sha256": world_props_data["sha256"],
+                "edits": [{"token": "0:0", "values": {"topLeft": 4}}],
+            })
+            if saved_props["rows"][0]["topLeft"] != 4 or saved_props["rows"][0]["topRight"] != 2:
+                raise RuntimeError("World property edit did not preserve adjacent nibbles")
+            music_files = request_json(session.url + "api/world-files?kind=music")
+            music_path = music_files["rows"][0]["path"]
+            world_music_data = request_json(session.url + "api/world-music?path=" + music_path.replace("/", "%2F"))
+            saved_music = request_json(session.url + "api/world-music/save", {
+                "path": music_path, "sha256": world_music_data["sha256"],
+                "edits": [{"token": "0:0", "values": {"rightMusic": 9}}],
+            })
+            if saved_music["rows"][0]["leftMusic"] != 10 or saved_music["rows"][0]["rightMusic"] != 9:
+                raise RuntimeError("World music edit did not preserve the adjacent nibble")
+            color_files = request_json(session.url + "api/world-files?kind=colors")
+            color_path = color_files["rows"][0]["path"]
+            world_color_data = request_json(session.url + "api/world-colors?path=" + color_path.replace("/", "%2F"))
+            saved_colors = request_json(session.url + "api/world-colors/save", {
+                "path": color_path, "sha256": world_color_data["sha256"],
+                "edits": [{"token": "0", "hex": "#00FF00"}],
+            })
+            if (saved_colors["rows"][0]["hex"] != "#00FF00"
+                    or not saved_colors["rows"][0]["preservedBit15"]
+                    or saved_colors["trailingBytes"] != 1):
+                raise RuntimeError("World palette-animation color edit did not preserve bit 15/tail")
             navigation = request_json(session.url + "api/world-navigation?language=en")
             world_exit = next(row for row in navigation["rows"] if row["token"] == "4:exit:0")
             world_trigger = next(row for row in navigation["rows"] if row["token"] == "4:trigger:0")
@@ -215,7 +271,7 @@ def smoke() -> list[str]:
             if not exported.get("replacementOnly"):
                 raise RuntimeError("CTP export did not assert replacement-only loader compatibility")
             with zipfile.ZipFile(exported["path"]) as ctp:
-                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/palette_bin/plt4.bin", "Game/field/BGAnime/bganimeinfo_4.dat", "Game/field/BGSetTable/bgsettable_4.dat", "Game/field/ChipTable/ChipTable_0004.dat", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/EventTable/EventTable_0004.dat"}:
+                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/palette_bin/plt4.bin", "Game/field/BGAnime/bganimeinfo_4.dat", "Game/field/BGSetTable/bgsettable_4.dat", "Game/field/ChipTable/ChipTable_0004.dat", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/Map/Map_0000.dat", "Game/world/Id/Id_0000.dat", "Game/world/SeId/SeId_0000.dat", "Game/world/colanim_bin/0_colanim.bin", "Game/world/EventTable/EventTable_0004.dat"}:
                     raise RuntimeError("CTP export did not contain exactly the changed resources")
         if (game / "resources.bin").read_bytes() != original_archive:
             raise RuntimeError("Fresh Chrono Trigger plugin modified resources.bin")
@@ -227,6 +283,9 @@ def smoke() -> list[str]:
         "fixed-size area exit edit preserved unknown flag bits",
         "treasure edit preserved the unknown trailing word",
         "fixed 23-byte world header edit preserved the PC-unused palette-animation byte and surrounding bank data",
+        "fixed world map layers preserved layer ranges and trailing bytes",
+        "world property/music nibble edits preserved adjacent values and file shape",
+        "world palette-animation color edit preserved RGB555 bit 15 and trailing bytes",
         "fixed-size world exit/trigger edits preserved semantics, unknown bits and non-editable blocks",
         "fixed-count chip animation edit preserved unknown duration bits and trailing bytes",
         "fixed tileset graphics references preserved sentinels and trailing bytes",
