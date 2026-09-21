@@ -81,6 +81,10 @@ def _parse_file(store: OverlayStore, path: str, source: str) -> dict:
             row[f"sourceOffsetRemainder{frame_index}"] = source_offset % 32
         rows.append(row)
 
+    trailing_bytes = len(payload) - pos
+    for row in rows:
+        row["fileTrailingBytes"] = trailing_bytes
+        row["declaredAnimationCount"] = declared_count
     return {
         "path": path,
         "fileId": file_id,
@@ -90,7 +94,7 @@ def _parse_file(store: OverlayStore, path: str, source: str) -> dict:
         "parsedCount": len(rows),
         "stoppedByTerminator": stopped_by_terminator,
         "terminatorOffset": terminator_offset,
-        "trailingBytes": len(payload) - pos,
+        "trailingBytes": trailing_bytes,
         "rows": rows,
     }
 
