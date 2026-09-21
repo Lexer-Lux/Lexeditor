@@ -90,6 +90,30 @@ WORLD_ROW.update({f"layer12Graphics{index}": index for index in range(8)})
 WORLD_ROW.update({f"layer3Graphics{index}": 8 + index for index in range(2)})
 WORLD_ROW.update({f"spriteGraphics{index}": 12 + index for index in range(4)})
 WORLDS = {"path": "Game/common/bankc6.bin", "source": "vanilla", "sha256": "world-sha-1", "rows": [WORLD_ROW]}
+WORLD_NAVIGATION = {
+    "language": "en", "source": "vanilla",
+    "files": [{"path": "Game/world/EventTable/EventTable_0004.dat", "tableId": 4, "source": "vanilla",
+               "sha256": "world-nav-sha-1", "exitCount": 2, "triggerCount": 1, "storedTriggerCount": 2,
+               "unknownCount": 1, "scriptAddressCount": 2, "trailingBytes": 2}],
+    "rows": [
+        {"token": "4:exit:0", "recordType": "exit", "tableId": 4, "recordId": 0,
+         "path": "Game/world/EventTable/EventTable_0004.dat", "sha256": "world-nav-sha-1", "source": "vanilla",
+         "byteOffset": 1, "xTile": 5, "enabled": True, "yTile": 7, "unknownYBits": 192,
+         "nameIndex": 0, "name": "Truce Canyon", "scripted": False, "destinationScene": 12,
+         "scriptAddressIndex": None, "facing": 2, "halfTileLeft": True, "halfTileUp": False,
+         "unknownFacingBits": 161, "targetX": 9, "targetY": 10, "scriptAddressCount": 2},
+        {"token": "4:exit:1", "recordType": "exit", "tableId": 4, "recordId": 1,
+         "path": "Game/world/EventTable/EventTable_0004.dat", "sha256": "world-nav-sha-1", "source": "vanilla",
+         "byteOffset": 9, "xTile": 2, "enabled": True, "yTile": 3, "unknownYBits": 0,
+         "nameIndex": 1, "name": "Medina", "scripted": True, "destinationScene": None,
+         "scriptAddressIndex": 1, "facing": None, "halfTileLeft": False, "halfTileUp": True,
+         "unknownFacingBits": 64, "targetX": 0, "targetY": 0, "scriptAddressCount": 2},
+        {"token": "4:trigger:0", "recordType": "trigger", "tableId": 4, "recordId": 0,
+         "path": "Game/world/EventTable/EventTable_0004.dat", "sha256": "world-nav-sha-1", "source": "vanilla",
+         "byteOffset": 18, "xTile": 4, "enabled": True, "yTile": 5, "scriptAddressIndex": 0,
+         "scriptAddressCount": 2},
+    ],
+}
 DATA_MAP = {"rows": [
     {"filename": "resources.bin", "controls": "Steam resource archive", "notes": "Read-only ARC1 source.", "coverage": "source", "status": "partial", "openable": False, "target": "info"},
     {"filename": "Localize/<lang>/msg/*.txt", "controls": "Dialogue, menu and item text", "notes": "Keyed text editor.", "coverage": "structured", "status": "integrated", "openable": True, "target": "text"},
@@ -98,7 +122,8 @@ DATA_MAP = {"rows": [
     {"filename": "Game/field/Mapinfo/mapinfo_*.dat", "controls": "Area settings", "notes": "Fixed Steam area headers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "scenes"},
     {"filename": "Game/field/palette_bin/plt*.bin + Game/world/plt_bin/plt*.bin", "controls": "Area and world palettes", "notes": "Fixed 256-color RGB555 palettes.", "coverage": "structured", "status": "integrated", "openable": True, "target": "palettes"},
     {"filename": "Game/common/bankc6.bin @ 0xFD10", "controls": "World settings", "notes": "Seven fixed 23-byte Steam world headers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worlds"},
-    {"filename": "Game/world/Map + Id + EventTable + esl + colanim_bin", "controls": "World maps, exits, triggers and scripts", "notes": "Remaining world formats.", "coverage": "unavailable", "status": "not-integrated", "openable": False, "target": None},
+    {"filename": "Game/world/EventTable/EventTable_*.dat", "controls": "World exits and triggers", "notes": "Existing fixed current-PC world navigation records.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worldnav"},
+    {"filename": "Game/world/Map + Id + esl + colanim_bin", "controls": "World maps and scripts", "notes": "Remaining world formats.", "coverage": "unavailable", "status": "not-integrated", "openable": False, "target": None},
 ]}
 CHANGES = {"rows": []}
 
@@ -116,7 +141,7 @@ def editor_html() -> str:
     )
     fixtures = {
         "dashboard": DASHBOARD, "textFiles": TEXT_FILES, "messages": MESSAGES, "scenes": SCENES,
-        "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "dataMap": DATA_MAP, "changes": CHANGES,
+        "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "worldNavigation": WORLD_NAVIGATION, "dataMap": DATA_MAP, "changes": CHANGES,
     }
     stub = r"""
     window.__posts=[];
@@ -150,6 +175,15 @@ def editor_html() -> str:
             if(row)Object.assign(row,edit.values||{});
           }
           f.worlds.sha256="world-sha-saved";f.worlds.source="project";result=f.worlds;
+        }else if(path==="/api/world-navigation/save"){
+          for(const edit of body.edits||[]){
+            const row=f.worldNavigation.rows.find(value=>value.token===edit.token);
+            if(row)Object.assign(row,edit.values||{});
+          }
+          for(const row of f.worldNavigation.rows){row.sha256="world-nav-sha-2";row.source="project";}
+          result={path:body.path,tableId:4,source:"project",sha256:"world-nav-sha-2",
+                  rows:f.worldNavigation.rows,exitCount:2,triggerCount:1,storedTriggerCount:2,
+                  unknownCount:1,scriptAddressCount:2,trailingBytes:2};
         }else if(path==="/api/exits/save")result=f.exits;
         else if(path==="/api/treasure/save")result=f.treasure;
         else result={};
@@ -162,6 +196,7 @@ def editor_html() -> str:
       else if(path==="/api/palette-files")result=f.paletteFiles;
       else if(path==="/api/palette")result=f.palette;
       else if(path==="/api/worlds")result=f.worlds;
+      else if(path==="/api/world-navigation")result=f.worldNavigation;
       else if(path==="/api/exits")result=f.exits;
       else if(path==="/api/treasure")result=f.treasure;
       else {status=404;result={error:"Unknown fixture request "+path};}
@@ -230,6 +265,26 @@ def main():
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/worlds/save')")
                 assert page.get_by_label("MAP",exact=True).input_value()=="42"
                 page.screenshot(path=str(ARTIFACTS/f"worlds-{width}.png"),full_page=True)
+
+                page.locator(".lex-tab-label-text",has_text="World Exits").click()
+                page.locator("#main").get_by_text("Y FLAG BITS", exact=True).wait_for()
+                assert "Truce Canyon" in page.locator("#main").inner_text()
+                assert page.get_by_label("Y FLAG BITS",exact=True).input_value()=="0xC0"
+                assert page.get_by_label("FACING FLAG BITS",exact=True).input_value()=="0xA1"
+                page.get_by_label("SCENE",exact=True).fill("33")
+                page.wait_for_function("!document.querySelector('#global-save')?.disabled")
+                page.locator("#global-save").click()
+                page.wait_for_function("document.querySelector('#global-save')?.disabled")
+                assert page.evaluate("window.__posts.some(value=>value.path==='/api/world-navigation/save')")
+                assert page.get_by_label("SCENE",exact=True).input_value()=="33"
+                page.screenshot(path=str(ARTIFACTS/f"world-exits-{width}.png"),full_page=True)
+                page.locator(".lex-column-list-row",has_text="trigger").first.click()
+                page.get_by_label("SCRIPT ADDRESS",exact=True).fill("1")
+                page.wait_for_function("!document.querySelector('#global-save')?.disabled")
+                page.locator("#global-save").click()
+                page.wait_for_function("document.querySelector('#global-save')?.disabled")
+                assert page.get_by_label("SCRIPT ADDRESS",exact=True).input_value()=="1"
+                page.screenshot(path=str(ARTIFACTS/f"world-triggers-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Area Exits").click()
                 page.locator("#main").get_by_text("PRESERVED BITS", exact=True).wait_for()
