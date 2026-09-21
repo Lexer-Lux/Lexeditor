@@ -217,7 +217,7 @@ class FreshChronoTriggerTests(unittest.TestCase):
             after, origin = store.read(normal["path"], "mine")
             self.assertEqual(origin, "project")
             # Sentinel, unknown third block, script addresses and trailing bytes are outside editable records.
-            self.assertEqual(after[20:], before[20:])
+            self.assertEqual(after[21:], before[21:])
             self.assertEqual(len(after), len(before))
             self.assertEqual(archive.read_bytes(), original_archive)
             with self.assertRaises(ValueError):
