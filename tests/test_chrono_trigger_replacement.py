@@ -16,6 +16,7 @@ from games.chrono_trigger.text_data import load_messages, save_messages
 from games.chrono_trigger.world_data import (
     BANK_PATH, HEADER_OFFSET, HEADER_SIZE, WORLD_COUNT, load_worlds, save_worlds,
 )
+from games.chrono_trigger.world_navigation import load_world_navigation, save_world_navigation
 
 
 def build_archive(path: Path, resources: list[tuple[str, bytes]]) -> None:
@@ -51,10 +52,21 @@ class FreshChronoTriggerTests(unittest.TestCase):
         palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
         bank = bytearray(b"\xA5" * (HEADER_OFFSET + WORLD_COUNT * HEADER_SIZE + 3))
         bank[HEADER_OFFSET:HEADER_OFFSET + HEADER_SIZE] = bytes(range(HEADER_SIZE))
+        world_event = (
+            bytes([2])
+            + struct.pack("<BBBHBBB", 0x85, 0xC7, 0, 12, 0xAD, 9, 10)
+            + struct.pack("<BBBHBBB", 0x82, 3, 1, 0x1FF, 0x52, 0, 0)
+            + bytes([2, 0x84, 5, 0, 0, 0, 0])
+            + bytes([1, 7, 8, 9])
+            + bytes([2]) + struct.pack("<HH", 0x400, 0x410)
+            + b"\xAA\xBB"
+        )
         build_archive(archive, [
             ("Localize/en/msg/item.txt", b"0000,Sword\r\n0001,Armor\r\n0002,Mail\r\n"),
             ("Localize/en/msg/cmes0.txt", b"FLD_1,Hello, traveler\r\nFLD_2,World\r\n"),
             ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\r\n"),
+            ("Localize/en/msg/w_map.txt", b"0000,Truce Canyon\r\n0001,Medina\r\n"),
+            ("Game/world/EventTable/EventTable_0004.dat", world_event),
             ("Game/field/Mapinfo/mapinfo_1.dat", struct.pack("<10H4B", 10, 1, 2, 3, 4, 5, 6, 7, 8, 0xBEEF, 0, 1, 14, 15) + b"\xAA\xBB"),
             ("Game/field/palette_bin/plt4.bin", palette),
             ("Game/common/MapJumpOffsetTbl.dat", struct.pack("<IHH", 2, 0, 1)),
@@ -170,6 +182,52 @@ class FreshChronoTriggerTests(unittest.TestCase):
             self.assertEqual(archive.read_bytes(), original_archive)
             with self.assertRaises(ValueError):
                 save_worlds(store, saved["sha256"], [{"token": "0", "values": {"paletteAnimationIndex": 3}}])
+
+    def test_world_navigation_edit_preserves_semantics_unknown_blocks_and_archive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            data = load_world_navigation(store, language="en")
+            self.assertEqual(len(data["rows"]), 3)
+            normal = next(row for row in data["rows"] if row["token"] == "4:exit:0")
+            scripted = next(row for row in data["rows"] if row["token"] == "4:exit:1")
+            trigger = next(row for row in data["rows"] if row["token"] == "4:trigger:0")
+            meta = data["files"][0]
+            self.assertEqual((normal["name"], normal["unknownYBits"], normal["unknownFacingBits"]),
+                             ("Truce Canyon", 0xC0, 0xA1))
+            self.assertEqual((scripted["scripted"], scripted["scriptAddressIndex"]), (True, 1))
+            self.assertEqual((meta["storedTriggerCount"], meta["triggerCount"], meta["unknownCount"],
+                              meta["scriptAddressCount"], meta["trailingBytes"]), (2, 1, 1, 2, 2))
+            before, _ = store.read(normal["path"], "mine")
+            saved = save_world_navigation(store, normal["path"], normal["sha256"], [
+                {"token": normal["token"], "values": {
+                    "destinationScene": 33, "facing": 1, "halfTileLeft": False, "yTile": 6,
+                }},
+                {"token": trigger["token"], "values": {
+                    "enabled": False, "scriptAddressIndex": 1,
+                }},
+            ], "en")
+            by_token = {row["token"]: row for row in saved["rows"]}
+            self.assertEqual((by_token[normal["token"]]["destinationScene"], by_token[normal["token"]]["facing"]),
+                             (33, 1))
+            self.assertEqual((by_token[normal["token"]]["unknownYBits"], by_token[normal["token"]]["unknownFacingBits"]),
+                             (0xC0, 0xA1))
+            self.assertFalse(by_token[trigger["token"]]["enabled"])
+            self.assertEqual(by_token[trigger["token"]]["scriptAddressIndex"], 1)
+            after, origin = store.read(normal["path"], "mine")
+            self.assertEqual(origin, "project")
+            # Sentinel, unknown third block, script addresses and trailing bytes are outside editable records.
+            self.assertEqual(after[20:], before[20:])
+            self.assertEqual(len(after), len(before))
+            self.assertEqual(archive.read_bytes(), original_archive)
+            with self.assertRaises(ValueError):
+                save_world_navigation(store, normal["path"], saved["sha256"], [
+                    {"token": normal["token"], "values": {"destinationScene": 0x1FF}},
+                ], "en")
+            with self.assertRaises(ValueError):
+                save_world_navigation(store, normal["path"], saved["sha256"], [
+                    {"token": scripted["token"], "values": {"destinationScene": 3}},
+                ], "en")
 
     def test_ctp_is_deterministic_and_excludes_redundant_files(self):
         with tempfile.TemporaryDirectory() as tmp:
