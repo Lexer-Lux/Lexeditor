@@ -16,6 +16,7 @@ from .project import OverlayStore
 from .scene_data import load_scenes, save_scene
 from .text_data import languages, load_messages, save_messages, text_files
 from .world_data import load_worlds, save_worlds
+from .world_navigation import load_world_navigation, save_world_navigation
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -84,7 +85,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({
                     "apiVersion": 1, "pluginId": "chrono-trigger", "name": "Chrono Trigger",
                     "hosted": True, "windowHost": "webview2",
-                    "capabilities": ["data-map", "localization-text", "area-settings", "field-exits", "treasure", "palettes", "world-settings", "project-overlay", "ctp-export"],
+                    "capabilities": ["data-map", "localization-text", "area-settings", "field-exits", "treasure", "palettes", "world-settings", "world-navigation", "project-overlay", "ctp-export"],
                 })
             if route == "/api/dashboard":
                 langs = languages(STORE)
@@ -109,6 +110,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(load_treasure(STORE, query.get("source", "mine"), query.get("language", "en")))
             if route == "/api/worlds":
                 return self.send_json(load_worlds(STORE, query.get("source", "mine")))
+            if route == "/api/world-navigation":
+                return self.send_json(load_world_navigation(STORE, query.get("source", "mine"), query.get("language", "en")))
             if route == "/api/datamap":
                 return self.send_json(build_data_map(STORE))
             if route == "/api/changes":
@@ -133,6 +136,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = save_treasure(STORE, str(body["dataSha256"]), str(body["offsetSha256"]), list(body.get("edits") or []), str(body.get("language", "en")))
             elif route == "/api/worlds/save":
                 result = save_worlds(STORE, str(body["sha256"]), list(body.get("edits") or []))
+            elif route == "/api/world-navigation/save":
+                result = save_world_navigation(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []), str(body.get("language", "en")))
             elif route == "/api/export":
                 result = STORE.export_ctp()
             elif route == "/api/revert":
