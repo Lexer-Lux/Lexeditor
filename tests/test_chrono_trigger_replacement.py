@@ -13,6 +13,9 @@ from games.chrono_trigger.palette_data import load_palette, save_palette
 from games.chrono_trigger.project import OverlayStore
 from games.chrono_trigger.scene_data import load_scenes, save_scene
 from games.chrono_trigger.text_data import load_messages, save_messages
+from games.chrono_trigger.world_data import (
+    BANK_PATH, HEADER_OFFSET, HEADER_SIZE, WORLD_COUNT, load_worlds, save_worlds,
+)
 
 
 def build_archive(path: Path, resources: list[tuple[str, bytes]]) -> None:
@@ -46,6 +49,8 @@ class FreshChronoTriggerTests(unittest.TestCase):
     def fixture(self, root: Path):
         archive = root / "resources.bin"
         palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
+        bank = bytearray(b"\xA5" * (HEADER_OFFSET + WORLD_COUNT * HEADER_SIZE + 3))
+        bank[HEADER_OFFSET:HEADER_OFFSET + HEADER_SIZE] = bytes(range(HEADER_SIZE))
         build_archive(archive, [
             ("Localize/en/msg/item.txt", b"0000,Sword\r\n0001,Armor\r\n0002,Mail\r\n"),
             ("Localize/en/msg/cmes0.txt", b"FLD_1,Hello, traveler\r\nFLD_2,World\r\n"),
@@ -56,6 +61,7 @@ class FreshChronoTriggerTests(unittest.TestCase):
             ("Game/common/MapJumpDataTbl.dat", b"HEAD" + struct.pack("<BBBBHBB", 2, 3, 1, 0xA5, 7, 8, 9)),
             ("Game/common/TakaraOffsetTbl.dat", struct.pack("<IHH", 2, 0, 1)),
             ("Game/common/TakaraDataTbl.dat", b"HEAD" + struct.pack("<BBHH", 4, 5, 0x1002, 0xCAFE)),
+            (BANK_PATH, bytes(bank)),
         ])
         source = ResourcesBin(archive)
         store = OverlayStore(source, root / "project")
@@ -141,6 +147,29 @@ class FreshChronoTriggerTests(unittest.TestCase):
             self.assertEqual(saved["rows"][0]["trailingWord"], 0xCAFE)
             with self.assertRaises(ValueError):
                 save_treasure(store, saved["dataSha256"], saved["offsetSha256"], [{"token": row["token"], "values": {"xTile": 0, "yTile": 0}}])
+
+    def test_world_header_edit_changes_only_selected_documented_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            data = load_worlds(store)
+            row = data["rows"][0]
+            self.assertEqual((row["paletteIndex"], row["paletteAnimationIndex"], row["mapIndex"], row["scriptIndex"]),
+                             (10, 11, 17, 22))
+            before, _ = store.read(BANK_PATH, "mine")
+            saved = save_worlds(store, data["sha256"], [{
+                "token": "0", "values": {"paletteIndex": 200, "mapIndex": 201, "scriptIndex": 202},
+            }])
+            self.assertEqual((saved["rows"][0]["paletteIndex"], saved["rows"][0]["mapIndex"], saved["rows"][0]["scriptIndex"]),
+                             (200, 201, 202))
+            self.assertEqual(saved["rows"][0]["paletteAnimationIndex"], 11)
+            after, origin = store.read(BANK_PATH, "mine")
+            self.assertEqual(origin, "project")
+            changed = [index for index, (left, right) in enumerate(zip(before, after)) if left != right]
+            self.assertEqual(changed, [HEADER_OFFSET + 10, HEADER_OFFSET + 17, HEADER_OFFSET + 22])
+            self.assertEqual(archive.read_bytes(), original_archive)
+            with self.assertRaises(ValueError):
+                save_worlds(store, saved["sha256"], [{"token": "0", "values": {"paletteAnimationIndex": 3}}])
 
     def test_ctp_is_deterministic_and_excludes_redundant_files(self):
         with tempfile.TemporaryDirectory() as tmp:
