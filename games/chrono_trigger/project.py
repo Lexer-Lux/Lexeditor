@@ -106,7 +106,15 @@ class OverlayStore:
             parent = parent.parent
 
     def export_ctp(self, output: Path | None = None) -> dict:
-        changes = [row for row in self.changes() if row["status"] != "redundant"]
+        inspected = self.changes()
+        added = [row["path"] for row in inspected if row["status"] == "added"]
+        if added:
+            preview = ", ".join(added[:5]) + (" ..." if len(added) > 5 else "")
+            raise ValueError(
+                "CTP loaders replace existing resources.bin entries and ignore unknown paths; "
+                f"remove added project files before export: {preview}"
+            )
+        changes = [row for row in inspected if row["status"] == "modified"]
         if output is None:
             output = self.project_root / "build" / f"{self.project_root.name}.ctp"
         output = Path(output).resolve()
@@ -126,4 +134,4 @@ class OverlayStore:
             os.replace(temporary, output)
         finally:
             temporary.unlink(missing_ok=True)
-        return {"path": str(output), "fileCount": len(changes), "files": [row["path"] for row in changes]}
+        return {"path": str(output), "fileCount": len(changes), "files": [row["path"] for row in changes], "replacementOnly": True}
