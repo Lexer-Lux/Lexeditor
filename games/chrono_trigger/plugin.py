@@ -14,6 +14,7 @@ from service_session import LocalPluginSession, request_json
 from . import paths
 from .archive import _decode
 from .project import PROJECT_MARKER, initialize_project
+from .world_data import BANK_PATH, HEADER_OFFSET, HEADER_SIZE, WORLD_COUNT
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -83,6 +84,8 @@ def smoke() -> list[str]:
         treasure_data = b"HEAD" + struct.pack("<BBHH", 4, 5, 0x1002, 0xCAFE)
         scene_header = struct.pack("<10H4B", 10, 1, 2, 3, 4, 5, 6, 7, 8, 0xBEEF, 0, 1, 14, 15) + b"\xAA\xBB"
         palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
+        world_bank = bytearray(b"\xA5" * (HEADER_OFFSET + WORLD_COUNT * HEADER_SIZE + 3))
+        world_bank[HEADER_OFFSET:HEADER_OFFSET + HEADER_SIZE] = bytes(range(HEADER_SIZE))
         _fixture_archive(game / "resources.bin", [
             ("Localize/en/msg/item.txt", b"0000,Sword\r\n0001,Armor\r\n0002,Mail\r\n"),
             ("Localize/en/msg/cmes0.txt", b"FLD_001,Hello\r\nFLD_002,World\r\n"),
@@ -93,6 +96,7 @@ def smoke() -> list[str]:
             ("Game/common/MapJumpDataTbl.dat", exits_data),
             ("Game/common/TakaraOffsetTbl.dat", treasure_offset),
             ("Game/common/TakaraDataTbl.dat", treasure_data),
+            (BANK_PATH, bytes(world_bank)),
         ])
         original_archive = (game / "resources.bin").read_bytes()
         project = root / "project"
@@ -124,9 +128,14 @@ def smoke() -> list[str]:
             saved_treasure = request_json(session.url + "api/treasure/save", {"dataSha256": treasure["dataSha256"], "offsetSha256": treasure["offsetSha256"], "language": "en", "edits": [{"token": "0:0", "values": {"kind": "gold", "gold": 200}}]})
             if saved_treasure["rows"][0]["gold"] != 200 or saved_treasure["rows"][0]["trailingWord"] != 0xCAFE:
                 raise RuntimeError("Treasure edit failed to preserve the unknown trailing word")
+            worlds = request_json(session.url + "api/worlds")
+            saved_worlds = request_json(session.url + "api/worlds/save", {"sha256": worlds["sha256"], "edits": [{"token": "0", "values": {"mapIndex": 42, "scriptIndex": 43}}]})
+            if (saved_worlds["rows"][0]["mapIndex"] != 42 or saved_worlds["rows"][0]["scriptIndex"] != 43
+                    or saved_worlds["rows"][0]["paletteAnimationIndex"] != 11):
+                raise RuntimeError("World header edit did not stay inside the documented Steam record")
             exported = request_json(session.url + "api/export", {})
             with zipfile.ZipFile(exported["path"]) as ctp:
-                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/palette_bin/plt4.bin", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat"}:
+                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/palette_bin/plt4.bin", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH}:
                     raise RuntimeError("CTP export did not contain exactly the changed resources")
         if (game / "resources.bin").read_bytes() != original_archive:
             raise RuntimeError("Fresh Chrono Trigger plugin modified resources.bin")
@@ -137,6 +146,7 @@ def smoke() -> list[str]:
         "256-color RGB555 palette edit preserved prefix, bit 15 and trailing bytes",
         "fixed-size area exit edit preserved unknown flag bits",
         "treasure edit preserved the unknown trailing word",
+        "fixed 23-byte world header edit preserved the PC-unused palette-animation byte and surrounding bank data",
         "deterministic CTP export contained only changed archive-relative resources",
         "installed resources.bin remained byte-identical",
     ]
