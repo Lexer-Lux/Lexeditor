@@ -86,6 +86,12 @@ def smoke() -> list[str]:
         palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
         world_bank = bytearray(b"\xA5" * (HEADER_OFFSET + WORLD_COUNT * HEADER_SIZE + 3))
         world_bank[HEADER_OFFSET:HEADER_OFFSET + HEADER_SIZE] = bytes(range(HEADER_SIZE))
+        chip_animation = (
+            bytes([2, 2]) + struct.pack("<H", 64) + bytes([0x1A, 0x4B])
+            + struct.pack("<HH", 96, 128)
+            + bytes([1]) + struct.pack("<H", 160) + bytes([0x80]) + struct.pack("<H", 192)
+            + b"\xEE"
+        )
         world_event = (
             bytes([2])
             + struct.pack("<BBBHBBB", 0x85, 0xC7, 0, 12, 0xAD, 9, 10)
@@ -101,6 +107,7 @@ def smoke() -> list[str]:
             ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\r\n"),
             ("Localize/en/msg/w_map.txt", b"0000,Truce Canyon\r\n0001,Medina\r\n"),
             ("Game/world/EventTable/EventTable_0004.dat", world_event),
+            ("Game/field/BGAnime/bganimeinfo_4.dat", chip_animation),
             ("Game/field/Mapinfo/mapinfo_1.dat", scene_header),
             ("Game/field/palette_bin/plt4.bin", palette),
             ("Game/common/MapJumpOffsetTbl.dat", exits_offset),
@@ -159,11 +166,24 @@ def smoke() -> list[str]:
                     or saved_by_token["4:exit:0"]["unknownFacingBits"] != 0xA1
                     or saved_by_token["4:trigger:0"]["scriptAddressIndex"] != 1):
                 raise RuntimeError("World navigation edit did not preserve fixed-record semantics")
+            animations = request_json(session.url + "api/chip-animations")
+            animation = animations["rows"][0]
+            saved_animation = request_json(session.url + "api/chip-animations/save", {
+                "path": animation["path"], "sha256": animation["sha256"],
+                "edits": [{"token": animation["token"], "values": {
+                    "destinationChip": 7, "durationCode0": 0x20, "sourceChip1": 9,
+                }}],
+            })
+            if (saved_animation["rows"][0]["destinationChip"] != 7
+                    or saved_animation["rows"][0]["durationLowBits0"] != 0x0A
+                    or saved_animation["rows"][0]["sourceChip1"] != 9
+                    or saved_animation["trailingBytes"] != 1):
+                raise RuntimeError("Chip animation edit did not preserve fixed frame metadata")
             exported = request_json(session.url + "api/export", {})
             if not exported.get("replacementOnly"):
                 raise RuntimeError("CTP export did not assert replacement-only loader compatibility")
             with zipfile.ZipFile(exported["path"]) as ctp:
-                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/palette_bin/plt4.bin", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/EventTable/EventTable_0004.dat"}:
+                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/palette_bin/plt4.bin", "Game/field/BGAnime/bganimeinfo_4.dat", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/EventTable/EventTable_0004.dat"}:
                     raise RuntimeError("CTP export did not contain exactly the changed resources")
         if (game / "resources.bin").read_bytes() != original_archive:
             raise RuntimeError("Fresh Chrono Trigger plugin modified resources.bin")
@@ -176,6 +196,7 @@ def smoke() -> list[str]:
         "treasure edit preserved the unknown trailing word",
         "fixed 23-byte world header edit preserved the PC-unused palette-animation byte and surrounding bank data",
         "fixed-size world exit/trigger edits preserved semantics, unknown bits and non-editable blocks",
+        "fixed-count chip animation edit preserved unknown duration bits and trailing bytes",
         "deterministic CTP export contained only changed archive-relative resources",
         "installed resources.bin remained byte-identical",
     ]
