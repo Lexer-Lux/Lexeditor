@@ -199,8 +199,11 @@ def main():
             for width,height in [(1200,800),(900,620)]:
                 page=browser.new_page(viewport={"width":width,"height":height})
                 page.on("pageerror",lambda error: errors.append(str(error)))
+                page.route("http://127.0.0.1:9/**",lambda route: route.fulfill(status=200,body="<html></html>",content_type="text/html"))
+                page.goto("http://127.0.0.1:9/")
                 page.set_content(editor_html(),wait_until="domcontentloaded")
-                page.wait_for_selector(".lex-paged-list-detail")
+                page.wait_for_selector(".ct-long-text")
+                assert not errors,errors
                 assert page.locator(".lex-paged-list-detail").count()==1
                 page.locator(".ct-long-text").fill("Changed in rendered acceptance")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
