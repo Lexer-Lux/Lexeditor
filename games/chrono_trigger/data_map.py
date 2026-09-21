@@ -11,7 +11,9 @@ ROWS = [
     ("Game/common/TakaraOffsetTbl.dat + TakaraDataTbl.dat", "Treasure chests", "Edit existing Steam 6-byte treasure records for position and known item/gold contents. Alias sentinels and unknown trailing words are preserved.", "integrated", "treasure"),
     ("Game/field/Mapinfo/mapinfo_*.dat", "Area settings", "Edit the fixed 24-byte current-PC area header: music and map/tileset/palette/script references plus the camera scroll mask. The unmodelled PC word and any trailing bytes are preserved.", "integrated", "scenes"),
     ("Game/field/atel/Atel_*.dat", "Events and cutscenes", "Public tools document substantial script structure, but variable command boundaries and safe resizing make this a later editor rather than part of the low-cost first slice.", "not-integrated", None),
-    ("Game/field/MapTable + BGSetTable + ChipTable + map_bin", "Area maps", "CTViewer can render current-PC maps. The fresh replacement does not yet expose map painting or raster preview.", "not-integrated", None),
+    ("Game/field/BGSetTable/bgsettable_*.dat", "Tileset graphics sets", "Edit the eight fixed current-PC graphics-set references used by layer 1/2 tilesets. 255 remains the game's unused-slot sentinel and trailing bytes are preserved.", "integrated", "tilesets"),
+    ("Game/field/ChipTable/ChipTable_*.dat + ChipTableBg3_*.dat", "Tile assemblies", "Edit fixed current-PC tile corners: chip index, palette, flips and priority. L1/L2 has 512 tiles and L3 has 256; unknown priority-byte bits and trailing bytes are preserved.", "integrated", "assemblies"),
+    ("Game/field/MapTable + PrioMap + map_bin + weather_bin", "Area maps and graphics", "CTViewer documents current-PC map and graphics layouts, but map tile properties use RLE and a useful map-painting/preview workflow is not yet implemented.", "not-integrated", None),
     ("Game/field/BGAnime/bganimeinfo_*.dat", "Animated map tiles", "Edit existing current-PC chip-animation destination/source chip offsets and documented frame-duration high nibbles without changing animation/frame counts. Unknown duration low nibbles, terminators and trailing bytes are preserved.", "integrated", "animations"),
     ("Game/field/palette_bin/plt*.bin + Game/world/plt_bin/plt*.bin", "Area and world palettes", "Edit the 256 RGB555 colors in current-PC field and world palettes. The two-byte prefix, bit 15 of every color, and trailing bytes are preserved.", "integrated", "palettes"),
     ("Game/common/bankc6.bin @ 0xFD10", "World settings", "Edit the seven active fixed 23-byte Steam world headers. Graphics, palette, map, music, exit and script references are bounded to one byte; the PC-unused palette-animation byte and all bytes outside the selected header are preserved.", "integrated", "worlds"),
@@ -37,6 +39,10 @@ def build_data_map(store: OverlayStore) -> dict:
             present = any(path.startswith("Game/field/Mapinfo/") for path in available)
         elif filename.startswith("Game/field/atel"):
             present = any(path.startswith("Game/field/atel/") for path in available)
+        elif filename.startswith("Game/field/BGSetTable"):
+            present = any(path.startswith("Game/field/BGSetTable/") for path in available)
+        elif filename.startswith("Game/field/ChipTable"):
+            present = any(path.startswith("Game/field/ChipTable/") for path in available)
         elif filename.startswith("Game/field/MapTable"):
             present = any(path.startswith("Game/field/MapTable/") for path in available)
         elif filename.startswith("Game/field/BGAnime"):
