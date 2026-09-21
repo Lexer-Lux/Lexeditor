@@ -80,6 +80,16 @@ PALETTE = {
         for index in range(256)
     ],
 }
+WORLD_ROW = {
+    "token": "0", "id": 0, "name": "World 0", "source": "vanilla", "byteOffset": 0xFD10,
+    "paletteIndex": 10, "paletteAnimationIndex": 11,
+    "layer12AssemblyIndex": 16, "mapIndex": 17, "mapPropertiesIndex": 18,
+    "musicPropertiesIndex": 19, "layer3AssemblyIndex": 20, "exitsIndex": 21, "scriptIndex": 22,
+}
+WORLD_ROW.update({f"layer12Graphics{index}": index for index in range(8)})
+WORLD_ROW.update({f"layer3Graphics{index}": 8 + index for index in range(2)})
+WORLD_ROW.update({f"spriteGraphics{index}": 12 + index for index in range(4)})
+WORLDS = {"path": "Game/common/bankc6.bin", "source": "vanilla", "sha256": "world-sha-1", "rows": [WORLD_ROW]}
 DATA_MAP = {"rows": [
     {"filename": "resources.bin", "controls": "Steam resource archive", "notes": "Read-only ARC1 source.", "coverage": "source", "status": "partial", "openable": False, "target": "info"},
     {"filename": "Localize/<lang>/msg/*.txt", "controls": "Dialogue, menu and item text", "notes": "Keyed text editor.", "coverage": "structured", "status": "integrated", "openable": True, "target": "text"},
@@ -87,6 +97,8 @@ DATA_MAP = {"rows": [
     {"filename": "Game/common/TakaraOffsetTbl.dat + TakaraDataTbl.dat", "controls": "Treasure chests", "notes": "Existing fixed-size treasure.", "coverage": "structured", "status": "integrated", "openable": True, "target": "treasure"},
     {"filename": "Game/field/Mapinfo/mapinfo_*.dat", "controls": "Area settings", "notes": "Fixed Steam area headers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "scenes"},
     {"filename": "Game/field/palette_bin/plt*.bin + Game/world/plt_bin/plt*.bin", "controls": "Area and world palettes", "notes": "Fixed 256-color RGB555 palettes.", "coverage": "structured", "status": "integrated", "openable": True, "target": "palettes"},
+    {"filename": "Game/common/bankc6.bin @ 0xFD10", "controls": "World settings", "notes": "Seven fixed 23-byte Steam world headers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worlds"},
+    {"filename": "Game/world/Map + Id + EventTable + esl + colanim_bin", "controls": "World maps, exits, triggers and scripts", "notes": "Remaining world formats.", "coverage": "unavailable", "status": "not-integrated", "openable": False, "target": None},
 ]}
 CHANGES = {"rows": []}
 
@@ -104,7 +116,7 @@ def editor_html() -> str:
     )
     fixtures = {
         "dashboard": DASHBOARD, "textFiles": TEXT_FILES, "messages": MESSAGES, "scenes": SCENES,
-        "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "dataMap": DATA_MAP, "changes": CHANGES,
+        "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "dataMap": DATA_MAP, "changes": CHANGES,
     }
     stub = r"""
     window.__posts=[];
@@ -132,6 +144,12 @@ def editor_html() -> str:
         }else if(path==="/api/palette/save"){
           for(const edit of body.edits||[]){const row=f.palette.rows.find(value=>value.token===edit.token);if(row)row.hex=edit.hex;}
           f.palette.sha256="palette-sha-saved";f.palette.source="project";result=f.palette;
+        }else if(path==="/api/worlds/save"){
+          for(const edit of body.edits||[]){
+            const row=f.worlds.rows.find(value=>value.token===edit.token);
+            if(row)Object.assign(row,edit.values||{});
+          }
+          f.worlds.sha256="world-sha-saved";f.worlds.source="project";result=f.worlds;
         }else if(path==="/api/exits/save")result=f.exits;
         else if(path==="/api/treasure/save")result=f.treasure;
         else result={};
@@ -143,6 +161,7 @@ def editor_html() -> str:
       else if(path==="/api/scenes")result=f.scenes;
       else if(path==="/api/palette-files")result=f.paletteFiles;
       else if(path==="/api/palette")result=f.palette;
+      else if(path==="/api/worlds")result=f.worlds;
       else if(path==="/api/exits")result=f.exits;
       else if(path==="/api/treasure")result=f.treasure;
       else {status=404;result={error:"Unknown fixture request "+path};}
@@ -196,6 +215,18 @@ def main():
                 assert "PC WORD" in page.locator("#main").inner_text()
                 assert "0xBEEF" in page.locator("#main").inner_text()
                 page.screenshot(path=str(ARTIFACTS/f"areas-{width}.png"),full_page=True)
+
+                page.locator(".lex-tab-label-text",has_text="Worlds").click()
+                page.locator("#main").get_by_text("PALETTE ANIMATION BYTE", exact=True).wait_for()
+                assert "World 0" in page.locator("#main").inner_text()
+                assert "0xFD10" in page.locator("#main").inner_text()
+                page.locator('#main input[type="number"]').first.fill("42")
+                page.wait_for_function("!document.querySelector('#global-save')?.disabled")
+                page.locator("#global-save").click()
+                page.wait_for_function("document.querySelector('#global-save')?.disabled")
+                assert page.evaluate("window.__posts.some(value=>value.path==='/api/worlds/save')")
+                assert page.locator('#main input[type="number"]').first.input_value()=="42"
+                page.screenshot(path=str(ARTIFACTS/f"worlds-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Area Exits").click()
                 page.locator("#main").get_by_text("PRESERVED BITS", exact=True).wait_for()
