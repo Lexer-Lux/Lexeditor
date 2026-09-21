@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from .archive import ResourcesBin
+from .animation_data import load_chip_animations, save_chip_animations
 from .data_map import build_data_map
 from .field_data import load_exits, load_treasure, save_exits, save_treasure
 from .palette_data import load_palette, palette_files, save_palette
@@ -85,7 +86,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({
                     "apiVersion": 1, "pluginId": "chrono-trigger", "name": "Chrono Trigger",
                     "hosted": True, "windowHost": "webview2",
-                    "capabilities": ["data-map", "localization-text", "area-settings", "field-exits", "treasure", "palettes", "world-settings", "world-navigation", "project-overlay", "ctp-export"],
+                    "capabilities": ["data-map", "localization-text", "area-settings", "field-exits", "treasure", "palettes", "world-settings", "world-navigation", "chip-animations", "project-overlay", "ctp-export"],
                 })
             if route == "/api/dashboard":
                 langs = languages(STORE)
@@ -112,6 +113,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(load_worlds(STORE, query.get("source", "mine")))
             if route == "/api/world-navigation":
                 return self.send_json(load_world_navigation(STORE, query.get("source", "mine"), query.get("language", "en")))
+            if route == "/api/chip-animations":
+                return self.send_json(load_chip_animations(STORE, query.get("source", "mine")))
             if route == "/api/datamap":
                 return self.send_json(build_data_map(STORE))
             if route == "/api/changes":
@@ -138,6 +141,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = save_worlds(STORE, str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/world-navigation/save":
                 result = save_world_navigation(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []), str(body.get("language", "en")))
+            elif route == "/api/chip-animations/save":
+                result = save_chip_animations(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/export":
                 result = STORE.export_ctp()
             elif route == "/api/revert":
