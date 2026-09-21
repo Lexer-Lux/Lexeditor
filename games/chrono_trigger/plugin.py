@@ -86,6 +86,12 @@ def smoke() -> list[str]:
         palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
         world_bank = bytearray(b"\xA5" * (HEADER_OFFSET + WORLD_COUNT * HEADER_SIZE + 3))
         world_bank[HEADER_OFFSET:HEADER_OFFSET + HEADER_SIZE] = bytes(range(HEADER_SIZE))
+        graphics_sets = bytes([1, 2, 3, 4, 5, 6, 7, 0xFF]) + b"\xDD"
+        assembly_l12 = bytearray(512 * 4 * 3 + 1)
+        struct.pack_into("<HB", assembly_l12, 0, 300 | 0x0400 | (5 << 12), 0xA1)
+        assembly_l12[-1] = 0xCC
+        assembly_l3 = bytearray(256 * 4 * 3)
+        struct.pack_into("<HB", assembly_l3, 0, 77 | 0x0800 | (3 << 12), 0x41)
         chip_animation = (
             bytes([2, 2]) + struct.pack("<H", 64) + bytes([0x1A, 0x4B])
             + struct.pack("<HH", 96, 128)
@@ -107,6 +113,9 @@ def smoke() -> list[str]:
             ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\r\n"),
             ("Localize/en/msg/w_map.txt", b"0000,Truce Canyon\r\n0001,Medina\r\n"),
             ("Game/world/EventTable/EventTable_0004.dat", world_event),
+            ("Game/field/BGSetTable/bgsettable_4.dat", graphics_sets),
+            ("Game/field/ChipTable/ChipTable_0004.dat", bytes(assembly_l12)),
+            ("Game/field/ChipTable/ChipTableBg3_0002.dat", bytes(assembly_l3)),
             ("Game/field/BGAnime/bganimeinfo_4.dat", chip_animation),
             ("Game/field/Mapinfo/mapinfo_1.dat", scene_header),
             ("Game/field/palette_bin/plt4.bin", palette),
@@ -179,11 +188,34 @@ def smoke() -> list[str]:
                     or saved_animation["rows"][0]["sourceChip1"] != 9
                     or saved_animation["trailingBytes"] != 1):
                 raise RuntimeError("Chip animation edit did not preserve fixed frame metadata")
+            graphics = request_json(session.url + "api/graphics-sets")
+            graphics_row = graphics["rows"][0]
+            saved_graphics = request_json(session.url + "api/graphics-sets/save", {
+                "path": graphics_row["path"], "sha256": graphics_row["sha256"],
+                "values": {"graphicsSet0": 9, "graphicsSet7": 8},
+            })
+            if (saved_graphics["graphicsSet0"] != 9 or saved_graphics["graphicsSet7"] != 8
+                    or saved_graphics["trailingBytes"] != 1):
+                raise RuntimeError("Tileset graphics references did not preserve fixed table shape")
+            assemblies = request_json(session.url + "api/tile-assemblies")
+            assembly = next(row for row in assemblies["rows"] if row["token"] == "layer12:4:0:0")
+            saved_assembly = request_json(session.url + "api/tile-assemblies/save", {
+                "path": assembly["path"], "sha256": assembly["sha256"],
+                "edits": [{"token": assembly["token"], "values": {
+                    "chipIndex": 511, "paletteIndex": 6, "flipHorizontal": False,
+                    "flipVertical": True, "priority": False,
+                }}],
+            })
+            updated_corner = saved_assembly["rows"][0]
+            if (updated_corner["chipIndex"] != 511 or updated_corner["paletteIndex"] != 6
+                    or updated_corner["unknownPriorityBits"] != 0xA0
+                    or saved_assembly["trailingBytes"] != 1):
+                raise RuntimeError("Tile assembly edit did not preserve unknown priority bits")
             exported = request_json(session.url + "api/export", {})
             if not exported.get("replacementOnly"):
                 raise RuntimeError("CTP export did not assert replacement-only loader compatibility")
             with zipfile.ZipFile(exported["path"]) as ctp:
-                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/palette_bin/plt4.bin", "Game/field/BGAnime/bganimeinfo_4.dat", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/EventTable/EventTable_0004.dat"}:
+                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/palette_bin/plt4.bin", "Game/field/BGAnime/bganimeinfo_4.dat", "Game/field/BGSetTable/bgsettable_4.dat", "Game/field/ChipTable/ChipTable_0004.dat", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/EventTable/EventTable_0004.dat"}:
                     raise RuntimeError("CTP export did not contain exactly the changed resources")
         if (game / "resources.bin").read_bytes() != original_archive:
             raise RuntimeError("Fresh Chrono Trigger plugin modified resources.bin")
@@ -197,6 +229,8 @@ def smoke() -> list[str]:
         "fixed 23-byte world header edit preserved the PC-unused palette-animation byte and surrounding bank data",
         "fixed-size world exit/trigger edits preserved semantics, unknown bits and non-editable blocks",
         "fixed-count chip animation edit preserved unknown duration bits and trailing bytes",
+        "fixed tileset graphics references preserved sentinels and trailing bytes",
+        "fixed tile assembly edit preserved unknown priority bits and trailing bytes",
         "deterministic CTP export contained only changed archive-relative resources",
         "installed resources.bin remained byte-identical",
     ]
