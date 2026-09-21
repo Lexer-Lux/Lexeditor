@@ -406,8 +406,8 @@ def main():
                 page.get_by_label("TILE INDEX",exact=True).fill("9")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
+                page.wait_for_function("window.__posts.some(value=>value.path==='/api/world-map/save')")
                 page.get_by_label("World data",exact=True).wait_for()
-                assert page.evaluate("window.__posts.some(value=>value.path==='/api/world-map/save')")
                 assert page.get_by_label("TILE INDEX",exact=True).input_value()=="9"
                 page.screenshot(path=str(ARTIFACTS/f"world-map-{width}.png"),full_page=True)
 
@@ -416,8 +416,8 @@ def main():
                 page.get_by_label("TOP LEFT",exact=True).select_option("4")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
+                page.wait_for_function("window.__posts.some(value=>value.path==='/api/world-properties/save')")
                 page.get_by_label("World data",exact=True).wait_for()
-                assert page.evaluate("window.__posts.some(value=>value.path==='/api/world-properties/save')")
                 assert page.get_by_label("TOP RIGHT",exact=True).input_value()=="2"
                 page.screenshot(path=str(ARTIFACTS/f"world-properties-{width}.png"),full_page=True)
 
@@ -426,8 +426,8 @@ def main():
                 page.get_by_label("RIGHT MUSIC",exact=True).fill("9")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
+                page.wait_for_function("window.__posts.some(value=>value.path==='/api/world-music/save')")
                 page.get_by_label("World data",exact=True).wait_for()
-                assert page.evaluate("window.__posts.some(value=>value.path==='/api/world-music/save')")
                 assert page.get_by_label("LEFT MUSIC",exact=True).input_value()=="10"
                 page.screenshot(path=str(ARTIFACTS/f"world-music-{width}.png"),full_page=True)
 
@@ -437,8 +437,8 @@ def main():
                 page.get_by_label("COLOR",exact=True).fill("#00ff00")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
+                page.wait_for_function("window.__posts.some(value=>value.path==='/api/world-colors/save')")
                 page.get_by_label("World data",exact=True).wait_for()
-                assert page.evaluate("window.__posts.some(value=>value.path==='/api/world-colors/save')")
                 assert page.get_by_label("BIT 15",exact=True).input_value()=="Set"
                 page.screenshot(path=str(ARTIFACTS/f"world-colors-{width}.png"),full_page=True)
 
