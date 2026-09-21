@@ -229,6 +229,16 @@ class FreshChronoTriggerTests(unittest.TestCase):
                     {"token": scripted["token"], "values": {"destinationScene": 3}},
                 ], "en")
 
+    def test_ctp_rejects_paths_not_present_in_resources_bin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, store = self.fixture(root)
+            added = root / "project" / "Game" / "common" / "NotARealResource.dat"
+            added.parent.mkdir(parents=True, exist_ok=True)
+            added.write_bytes(b"custom")
+            with self.assertRaisesRegex(ValueError, "ignore unknown paths"):
+                store.export_ctp(root / "project" / "build" / "invalid.ctp")
+
     def test_ctp_is_deterministic_and_excludes_redundant_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -237,6 +247,7 @@ class FreshChronoTriggerTests(unittest.TestCase):
             save_messages(store, message["path"], message["sha256"], [{"line": 1, "key": "FLD_2", "text": "Changed"}])
             first = store.export_ctp(root / "project" / "build" / "one.ctp")
             second = store.export_ctp(root / "project" / "build" / "two.ctp")
+            self.assertTrue(first["replacementOnly"])
             self.assertEqual(Path(first["path"]).read_bytes(), Path(second["path"]).read_bytes())
             with zipfile.ZipFile(first["path"]) as archive:
                 self.assertEqual(archive.namelist(), ["Localize/en/msg/cmes0.txt"])
