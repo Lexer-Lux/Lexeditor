@@ -16,6 +16,7 @@ from .palette_data import load_palette, palette_files, save_palette
 from .project import OverlayStore
 from .scene_data import load_scenes, save_scene
 from .text_data import languages, load_messages, save_messages, text_files
+from .tileset_data import load_graphics_sets, save_graphics_set, load_tile_assemblies, save_tile_assembly
 from .world_data import load_worlds, save_worlds
 from .world_navigation import load_world_navigation, save_world_navigation
 
@@ -86,7 +87,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({
                     "apiVersion": 1, "pluginId": "chrono-trigger", "name": "Chrono Trigger",
                     "hosted": True, "windowHost": "webview2",
-                    "capabilities": ["data-map", "localization-text", "area-settings", "field-exits", "treasure", "palettes", "world-settings", "world-navigation", "chip-animations", "project-overlay", "ctp-export"],
+                    "capabilities": ["data-map", "localization-text", "area-settings", "field-exits", "treasure", "palettes", "world-settings", "world-navigation", "chip-animations", "tilesets", "project-overlay", "ctp-export"],
                 })
             if route == "/api/dashboard":
                 langs = languages(STORE)
@@ -115,6 +116,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(load_world_navigation(STORE, query.get("source", "mine"), query.get("language", "en")))
             if route == "/api/chip-animations":
                 return self.send_json(load_chip_animations(STORE, query.get("source", "mine")))
+            if route == "/api/graphics-sets":
+                return self.send_json(load_graphics_sets(STORE, query.get("source", "mine")))
+            if route == "/api/tile-assemblies":
+                return self.send_json(load_tile_assemblies(STORE, query.get("source", "mine")))
             if route == "/api/datamap":
                 return self.send_json(build_data_map(STORE))
             if route == "/api/changes":
@@ -143,6 +148,10 @@ class Handler(BaseHTTPRequestHandler):
                 result = save_world_navigation(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []), str(body.get("language", "en")))
             elif route == "/api/chip-animations/save":
                 result = save_chip_animations(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
+            elif route == "/api/graphics-sets/save":
+                result = save_graphics_set(STORE, str(body["path"]), str(body["sha256"]), dict(body.get("values") or {}))
+            elif route == "/api/tile-assemblies/save":
+                result = save_tile_assembly(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/export":
                 result = STORE.export_ctp()
             elif route == "/api/revert":
