@@ -432,9 +432,10 @@ def main():
                 page.screenshot(path=str(ARTIFACTS/f"world-music-{width}.png"),full_page=True)
 
                 page.get_by_label("World data",exact=True).select_option("colors")
-                page.get_by_label("COLOR",exact=True).wait_for()
+                world_color=page.locator('#main input[type="color"]').first
+                world_color.wait_for()
                 assert page.get_by_label("BIT 15",exact=True).input_value()=="Set"
-                page.get_by_label("COLOR",exact=True).fill("#00ff00")
+                world_color.fill("#00ff00")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
                 page.wait_for_function("window.__posts.some(value=>value.path==='/api/world-colors/save')")
