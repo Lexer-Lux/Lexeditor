@@ -255,9 +255,14 @@ class Handler(PluginRequestHandler):
                 return
             elif path.startswith("/shared/"):
                 shared = (ROOT / "ui").resolve()
-                target = (shared / path.removeprefix("/shared/")).resolve()
+                name = path.removeprefix("/shared/")
+                target = (shared / name).resolve()
                 if shared in target.parents and target.is_file():
                     self.send_file(target)
+                elif name == "distribution-notices.json":
+                    # Frozen builds may generate this optional shared file.
+                    # Source/candidate builds have no generated package notices.
+                    self.send_json([])
                 else:
                     self.send_json({"error": "Shared UI asset not found"}, 404)
             elif path == "/api/plugin":
