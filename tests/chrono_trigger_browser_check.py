@@ -59,6 +59,27 @@ SCENE_MAP = {
          "storedTile": 4, "upperBank": False, "tileIndex": 4},
     ],
 }
+SCENE_PROPS = {
+    "path": "Game/field/MapTable/MapTable_0006.dat", "mapId": 6, "source": "vanilla",
+    "sha256": "scene-props-sha-1", "width": 16, "height": 16, "expectedTiles": 256,
+    "expandedTiles": 256, "propertyOffset": 518, "propertyBytes": 7, "trailingPropertyBytes": 0,
+    "rows": [
+        {"token": "6:prop:0", "mapId": 6, "runId": 0, "byteOffset": 518, "compressed": False,
+         "repeatCount": 1, "startTile": 0, "endTile": 0, "coveredTiles": 1,
+         "layer1UpperBank": True, "layer2UpperBank": False, "collisionCode": 0, "collisionName": "None",
+         "moveDirection": 0, "moveDirectionName": "North", "moveSpeed": 0, "doorTrigger": False,
+         "unknownSecondBit5": False, "priorityTop": False, "npcCollisionBattle": False,
+         "zPlane": 0, "collisionIgnoreZ": False, "collisionInverted": False, "unknownThirdBit4": False,
+         "zNeutral": False, "priorityBottom": False, "npcCollision": False},
+        {"token": "6:prop:1", "mapId": 6, "runId": 1, "byteOffset": 521, "compressed": True,
+         "repeatCount": 255, "startTile": 1, "endTile": 255, "coveredTiles": 255,
+         "layer1UpperBank": False, "layer2UpperBank": False, "collisionCode": 0, "collisionName": "None",
+         "moveDirection": 0, "moveDirectionName": "North", "moveSpeed": 0, "doorTrigger": False,
+         "unknownSecondBit5": True, "priorityTop": False, "npcCollisionBattle": False,
+         "zPlane": 0, "collisionIgnoreZ": False, "collisionInverted": False, "unknownThirdBit4": True,
+         "zNeutral": False, "priorityBottom": False, "npcCollision": False},
+    ],
+}
 EXITS = {
     "source": "vanilla", "dataSha256": "exit-data-1", "offsetSha256": "exit-offset-1",
     "rows": [
@@ -218,6 +239,7 @@ DATA_MAP = {"rows": [
     {"filename": "Game/common/TakaraOffsetTbl.dat + TakaraDataTbl.dat", "controls": "Treasure chests", "notes": "Existing fixed-size treasure.", "coverage": "structured", "status": "integrated", "openable": True, "target": "treasure"},
     {"filename": "Game/field/Mapinfo/mapinfo_*.dat", "controls": "Area settings", "notes": "Fixed Steam area headers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "scenes"},
     {"filename": "Game/field/MapTable/MapTable_*.dat", "controls": "Area map tiles", "notes": "Fixed layer tile bytes; RLE properties preserved.", "coverage": "structured", "status": "integrated", "openable": True, "target": "scenemaps"},
+    {"filename": "Game/field/MapTable/MapTable_*.dat RLE properties", "controls": "Area collision and movement", "notes": "Existing RLE property runs; repeat counts and unknown bits preserved.", "coverage": "structured", "status": "integrated", "openable": True, "target": "sceneprops"},
     {"filename": "Game/field/palette_bin/plt*.bin + Game/world/plt_bin/plt*.bin", "controls": "Area and world palettes", "notes": "Fixed 256-color RGB555 palettes.", "coverage": "structured", "status": "integrated", "openable": True, "target": "palettes"},
     {"filename": "Game/field/BGSetTable/bgsettable_*.dat", "controls": "Tileset graphics sets", "notes": "Eight fixed graphics-set references.", "coverage": "structured", "status": "integrated", "openable": True, "target": "tilesets"},
     {"filename": "Game/field/ChipTable/ChipTable_*.dat + ChipTableBg3_*.dat", "controls": "Tile assemblies", "notes": "Fixed 3-byte tile corners.", "coverage": "structured", "status": "integrated", "openable": True, "target": "assemblies"},
@@ -246,7 +268,7 @@ def editor_html() -> str:
     )
     fixtures = {
         "dashboard": DASHBOARD, "textFiles": TEXT_FILES, "messages": MESSAGES, "scenes": SCENES,
-        "sceneMapFiles": SCENE_MAP_FILES, "sceneMap": SCENE_MAP, "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "worldFiles": WORLD_FILES, "worldMap": WORLD_MAP, "worldProps": WORLD_PROPS, "worldMusic": WORLD_MUSIC, "worldColors": WORLD_COLORS, "worldNavigation": WORLD_NAVIGATION, "animations": CHIP_ANIMATIONS, "graphicsSets": GRAPHICS_SETS, "assemblies": ASSEMBLIES, "dataMap": DATA_MAP, "changes": CHANGES,
+        "sceneMapFiles": SCENE_MAP_FILES, "sceneMap": SCENE_MAP, "sceneProps": SCENE_PROPS, "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "worldFiles": WORLD_FILES, "worldMap": WORLD_MAP, "worldProps": WORLD_PROPS, "worldMusic": WORLD_MUSIC, "worldColors": WORLD_COLORS, "worldNavigation": WORLD_NAVIGATION, "animations": CHIP_ANIMATIONS, "graphicsSets": GRAPHICS_SETS, "assemblies": ASSEMBLIES, "dataMap": DATA_MAP, "changes": CHANGES,
     }
     stub = r"""
     window.__posts=[];
@@ -274,6 +296,12 @@ def editor_html() -> str:
         }else if(path==="/api/scene-map/save"){
           for(const edit of body.edits||[]){const row=f.sceneMap.rows.find(value=>value.token===edit.token);if(row){Object.assign(row,edit.values||{});row.storedTile=row.tileIndex-(row.upperBank?256:0);}}
           f.sceneMap.sha256="scene-map-sha-2";f.sceneMap.source="project";result=f.sceneMap;
+        }else if(path==="/api/scene-properties/save"){
+          for(const edit of body.edits||[]){
+            const row=f.sceneProps.rows.find(value=>value.token===edit.token);
+            if(row){Object.assign(row,edit.values||{});if("collisionCode" in (edit.values||{}))row.collisionName={30:"Ladder"}[row.collisionCode]||row.collisionName;if("moveDirection" in (edit.values||{}))row.moveDirectionName=["North","South","East","West"][row.moveDirection];}
+          }
+          f.sceneProps.sha256="scene-props-sha-2";f.sceneProps.source="project";result=f.sceneProps;
         }else if(path==="/api/palette/save"){
           for(const edit of body.edits||[]){const row=f.palette.rows.find(value=>value.token===edit.token);if(row)row.hex=edit.hex;}
           f.palette.sha256="palette-sha-saved";f.palette.source="project";result=f.palette;
@@ -339,6 +367,7 @@ def editor_html() -> str:
       else if(path==="/api/scenes")result=f.scenes;
       else if(path==="/api/scene-map-files")result=f.sceneMapFiles;
       else if(path==="/api/scene-map")result=f.sceneMap;
+      else if(path==="/api/scene-properties")result=f.sceneProps;
       else if(path==="/api/palette-files")result=f.paletteFiles;
       else if(path==="/api/palette")result=f.palette;
       else if(path==="/api/worlds")result=f.worlds;
@@ -419,6 +448,25 @@ def main():
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/scene-map/save')")
                 assert page.get_by_label("TILE INDEX",exact=True).input_value()=="300"
                 page.screenshot(path=str(ARTIFACTS/f"area-map-{width}.png"),full_page=True)
+                page.get_by_label("Area data",exact=True).select_option("properties")
+                page.get_by_label("REPEAT COUNT",exact=True).wait_for()
+                page.locator(".lex-column-list-row",has_text="255").first.click()
+                assert page.get_by_label("REPEAT COUNT",exact=True).input_value()=="255"
+                assert page.get_by_label("COMPRESSED",exact=True).input_value()=="Yes"
+                assert page.get_by_label("UNKNOWN BYTE 2 BIT 5",exact=True).input_value()=="Set"
+                assert page.get_by_label("UNKNOWN BYTE 3 BIT 4",exact=True).input_value()=="Set"
+                page.get_by_label("COLLISION",exact=True).select_option("30")
+                page.get_by_label("MOVE DIRECTION",exact=True).select_option("3")
+                page.get_by_label("MOVE SPEED",exact=True).fill("2")
+                page.get_by_label("TOP ABOVE ALL",exact=True).check()
+                page.get_by_label("NPC COLLISION",exact=True).check()
+                page.wait_for_function("!document.querySelector('#global-save')?.disabled")
+                page.locator("#global-save").click()
+                page.wait_for_function("document.querySelector('#global-save')?.disabled")
+                assert page.evaluate("window.__posts.some(value=>value.path==='/api/scene-properties/save')")
+                assert page.get_by_label("REPEAT COUNT",exact=True).input_value()=="255"
+                assert page.get_by_label("UNKNOWN BYTE 2 BIT 5",exact=True).input_value()=="Set"
+                page.screenshot(path=str(ARTIFACTS/f"area-properties-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Worlds").click()
                 page.locator("#main").get_by_text("PALETTE ANIMATION BYTE", exact=True).wait_for()
