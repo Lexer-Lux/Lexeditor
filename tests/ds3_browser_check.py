@@ -113,7 +113,11 @@ def main(argv: list[str] | None = None) -> int:
                 page.screenshot(path=str(output / "weapons-edited.png"), full_page=True)
                 page.locator("#global-save").click()
                 page.wait_for_function(
-                    "() => { const button=document.querySelector('#global-save'); return button && button.disabled; }",
+                    """() => {
+                      const button=document.querySelector('#global-save');
+                      return button && button.disabled &&
+                        !document.body.classList.contains('lex-save-busy');
+                    }""",
                     timeout=10000,
                 )
                 saved = project / "Data0.bdt"
