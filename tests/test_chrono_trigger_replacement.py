@@ -15,6 +15,7 @@ from games.chrono_trigger.project import OverlayStore
 from games.chrono_trigger.scene_data import load_scenes, save_scene
 from games.chrono_trigger.scene_map_data import (load_scene_map, save_scene_map, load_scene_properties, save_scene_properties,
     load_scene_render_settings, save_scene_render_settings)
+from games.chrono_trigger.sprite_data import load_sprite_headers, save_sprite_header
 from games.chrono_trigger.text_data import load_messages, save_messages
 from games.chrono_trigger.tileset_data import load_graphics_sets, save_graphics_set, load_tile_assemblies, save_tile_assembly
 from games.chrono_trigger.world_data import (
@@ -64,6 +65,7 @@ class FreshChronoTriggerTests(unittest.TestCase):
         scene_map[6] = 3
         scene_map[6 + 16 * 16] = 4
         scene_map.extend(bytes([0x01, 0, 0, 0x80, 0x20, 0x10, 255]))
+        sprite_descriptor = bytes([9, 8, 7, 0xAC, 5, 0xD2, 0xFE, 0x03, 0x11, 0x22, 0x33, 0xEE])
         graphics_sets = bytes([1, 2, 3, 4, 5, 6, 7, 0xFF]) + b"\xDD"
         assembly_l12 = bytearray(512 * 4 * 3 + 1)
         struct.pack_into("<HB", assembly_l12, 0, 300 | 0x0400 | (5 << 12), 0xA1)
@@ -106,6 +108,7 @@ class FreshChronoTriggerTests(unittest.TestCase):
             ("Game/world/SeId/SeId_0000.dat", bytes(world_music)),
             ("Game/world/colanim_bin/0_colanim.bin", world_colors),
             ("Game/world/EventTable/EventTable_0004.dat", world_event),
+            ("Game/chara/dat/c005.dat", sprite_descriptor),
             ("Game/field/MapTable/MapTable_0006.dat", bytes(scene_map)),
             ("Game/field/BGSetTable/bgsettable_4.dat", graphics_sets),
             ("Game/field/ChipTable/ChipTable_0004.dat", bytes(assembly_l12)),
@@ -334,6 +337,38 @@ class FreshChronoTriggerTests(unittest.TestCase):
                 save_scene_properties(store, path, saved["sha256"], [{
                     "token": row["token"], "values": {"collisionCode": 31},
                 }])
+
+    def test_sprite_descriptor_edit_preserves_pc_ignored_references_and_unknown_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            data = load_sprite_headers(store)
+            row = next(value for value in data["rows"] if value["id"] == 5)
+            self.assertEqual((row["storedBitmapIndex"], row["storedAssemblyIndex"], row["storedPaletteIndex"]),
+                             (9, 8, 7))
+            self.assertEqual((row["sizeGroupCode"], row["primaryEnemy"], row["unknownSizeFlags"],
+                              row["animationIndex"], row["unknownFlags"]), (0, True, 0xA4, 5, 0xD2))
+            self.assertEqual((row["enemyDescriptor"], row["handX"], row["handY"],
+                              row["enemyUnknown1"], row["enemyUnknown2"], row["enemyUnknown3"],
+                              row["trailingBytes"]), (True, -2, 3, 0x11, 0x22, 0x33, 1))
+            before, _ = store.read(row["path"], "mine")
+            saved = save_sprite_header(store, row["path"], row["sha256"], {
+                "sizeGroupCode": 2, "primaryEnemy": False, "animationIndex": 9,
+                "handX": -8, "handY": 12,
+            })
+            self.assertEqual((saved["sizeGroupCode"], saved["primaryEnemy"], saved["animationIndex"],
+                              saved["handX"], saved["handY"], saved["unknownSizeFlags"]),
+                             (2, False, 9, -8, 12, 0xA4))
+            after, origin = store.read(row["path"], "mine")
+            self.assertEqual(origin, "project")
+            self.assertEqual(after[:3], before[:3])
+            self.assertEqual(after[3], 0xA6)
+            self.assertEqual(after[4], 9)
+            self.assertEqual(after[5], before[5])
+            self.assertEqual(after[8:], before[8:])
+            self.assertEqual(archive.read_bytes(), original_archive)
+            with self.assertRaisesRegex(ValueError, "Unsupported sprite descriptor"):
+                save_sprite_header(store, row["path"], saved["sha256"], {"enemyUnknown1": 0})
 
     def test_graphics_set_edit_preserves_sentinel_shape_trailing_and_archive(self):
         with tempfile.TemporaryDirectory() as tmp:
