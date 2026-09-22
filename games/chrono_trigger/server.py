@@ -19,6 +19,7 @@ from .scene_map_data import (scene_map_files, load_scene_map, save_scene_map,
                              load_scene_properties, save_scene_properties,
                              load_scene_render_settings, save_scene_render_settings)
 from .sprite_data import load_sprite_headers, save_sprite_header
+from .sprite_assembly_data import load_sprite_assemblies, save_sprite_assembly
 from .text_data import languages, load_messages, save_messages, text_files
 from .tileset_data import load_graphics_sets, save_graphics_set, load_tile_assemblies, save_tile_assembly
 from .world_data import load_worlds, save_worlds
@@ -92,7 +93,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({
                     "apiVersion": 1, "pluginId": "chrono-trigger", "name": "Chrono Trigger",
                     "hosted": True, "windowHost": "webview2",
-                    "capabilities": ["data-map", "localization-text", "area-settings", "area-map-tiles", "field-exits", "treasure", "palettes", "world-settings", "world-navigation", "world-maps", "chip-animations", "tilesets", "sprite-descriptors", "project-overlay", "ctp-export"],
+                    "capabilities": ["data-map", "localization-text", "area-settings", "area-map-tiles", "field-exits", "treasure", "palettes", "world-settings", "world-navigation", "world-maps", "chip-animations", "tilesets", "sprite-descriptors", "sprite-assemblies", "project-overlay", "ctp-export"],
                 })
             if route == "/api/dashboard":
                 langs = languages(STORE)
@@ -145,6 +146,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(load_tile_assemblies(STORE, query.get("source", "mine")))
             if route == "/api/sprite-headers":
                 return self.send_json(load_sprite_headers(STORE, query.get("source", "mine")))
+            if route == "/api/sprite-assemblies":
+                return self.send_json(load_sprite_assemblies(STORE, query.get("source", "mine")))
             if route == "/api/datamap":
                 return self.send_json(build_data_map(STORE))
             if route == "/api/changes":
@@ -193,6 +196,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = save_tile_assembly(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/sprite-headers/save":
                 result = save_sprite_header(STORE, str(body["path"]), str(body["sha256"]), dict(body.get("values") or {}))
+            elif route == "/api/sprite-assemblies/save":
+                result = save_sprite_assembly(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/export":
                 result = STORE.export_ctp()
             elif route == "/api/revert":
