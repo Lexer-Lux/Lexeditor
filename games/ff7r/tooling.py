@@ -26,22 +26,25 @@ LATEST_RELEASE_API = "https://api.github.com/repos/trumank/repak/releases/latest
 FF7R_MOUNT_POINT = "../../../"
 # Public FF7R asset archive key, documented by the FF7R Data Editor project.
 FF7R_AES_KEY = "0x23989837645C9D28BA58072B2076E895B853A7C9E1C5591B814C4FD2A2D7B782"
-RELEASE_BASE = f"https://github.com/trumank/repak/releases/download/{REPAK_TAG}"
-DOWNLOADS = {
+
+PLUGIN_ROOT = Path(__file__).resolve().parent
+BUNDLE_ROOT = PLUGIN_ROOT / "runtime" / "repak" / REPAK_TAG
+BUNDLES = {
     "win32": (
-        f"{RELEASE_BASE}/repak_cli-x86_64-pc-windows-msvc.zip",
+        BUNDLE_ROOT / "repak_cli-x86_64-pc-windows-msvc.zip",
         "6720d602144d75df477a99d5bedb6ea780997546afc335901d4937cafeaa73fa",
         "zip",
         "repak.exe",
+        "fcd538e5994b9bb833622d425ae346f4e0692f02d4b0025114a559f9b6286022",
     ),
     "linux": (
-        f"{RELEASE_BASE}/repak_cli-x86_64-unknown-linux-gnu.tar.xz",
+        BUNDLE_ROOT / "repak_cli-x86_64-unknown-linux-gnu.tar.xz",
         "933bdb8e26f34e8fd70ea50201efca39df041de58aa83b1cd6eb83da124a2046",
         "tar.xz",
         "repak",
+        "fce30661c951ce56fd2507a44a1e03637e3ea06a1b7cc8035bd62c0b37dd9457",
     ),
 }
-
 
 def helper_root() -> Path:
     return user_data_dir() / "tools" / "repak" / REPAK_TAG
@@ -55,22 +58,86 @@ def repak_path() -> Path:
     return helper_root() / name
 
 
+def _sha256_file(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with Path(path).open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def _bundle_spec():
+    key = "win32" if os.name == "nt" else sys.platform
+    if key not in BUNDLES:
+        raise RuntimeError(f"No bundled repak binary is configured for {sys.platform}")
+    return BUNDLES[key]
+
+
 def helper_status() -> dict:
     target = repak_path()
-    installed = target.is_file()
+    override = bool(os.environ.get("LEXEDITOR_REPAK"))
+    try:
+        archive, archive_sha, _kind, _member, executable_sha = _bundle_spec()
+        archive_present = archive.is_file()
+        archive_actual = _sha256_file(archive) if archive_present else ""
+        package_integrity = "verified" if archive_present and archive_actual == archive_sha else (
+            "mismatch" if archive_present else "missing"
+        )
+    except RuntimeError as error:
+        archive = Path()
+        archive_sha = executable_sha = archive_actual = ""
+        package_integrity = "unsupported"
+        bundle_error = str(error)
+    else:
+        bundle_error = ""
+
+    target_exists = target.is_file()
+    target_actual = _sha256_file(target) if target_exists and not override else ""
+    if override:
+        installed = target_exists
+        integrity = "external" if target_exists else "missing"
+    else:
+        installed = target_exists and bool(executable_sha) and target_actual == executable_sha
+        integrity = "verified" if installed else ("mismatch" if target_exists else "missing")
+
+    if override and not target_exists:
+        message = f"LEXEDITOR_REPAK points to a missing helper: {target}"
+    elif not override and package_integrity != "verified":
+        message = (
+            f"Bundled repak {REPAK_TAG} package is {package_integrity}. "
+            "Repair or reinstall Lexeditor before installing the helper."
+        )
+        if bundle_error:
+            message = bundle_error
+    elif not installed:
+        message = (
+            f"Install bundled repak {REPAK_TAG} to read and build FF7R PAK archives."
+            if not target_exists else
+            f"Installed repak {REPAK_TAG} failed SHA-256 verification; use Install/Repair."
+        )
+    else:
+        message = (
+            f"Using explicit external repak at {target}."
+            if override else
+            f"Pinned repak {REPAK_TAG} verified from the bundled release."
+        )
+
     return {
         "runtime": "repak",
         "installed": installed,
-        "version": REPAK_TAG if installed else "",
+        "version": REPAK_TAG if installed and not override else ("external" if installed else ""),
         "pinned": REPAK_TAG,
         "packageVersion": REPAK_TAG,
         "path": str(target),
         "source": REPAK_SOURCE,
         "releaseNotes": REPAK_RELEASE,
-        # repak has no self-updater. Lexeditor also never changes the pinned
-        # release unless the user explicitly chooses Install/Repair.
         "autoUpdate": False,
-        "message": "" if installed else f"Install pinned repak {REPAK_TAG} to read and build FF7R PAK archives.",
+        "integrity": integrity,
+        "packageIntegrity": package_integrity,
+        "packagePath": str(archive) if archive else "",
+        "expectedExecutableSha256": executable_sha,
+        "actualExecutableSha256": target_actual,
+        "message": message,
     }
 
 
@@ -115,44 +182,59 @@ def upstream_release(fetch_json=None) -> dict:
     except Exception as error:
         return {**base, "error": str(error), "behind": False}
 
-def _download_spec():
-    key = "win32" if os.name == "nt" else sys.platform
-    if key not in DOWNLOADS:
-        raise RuntimeError(f"No pinned repak binary is configured for {sys.platform}")
-    return DOWNLOADS[key]
-
 
 def helper_install() -> dict:
-    url, expected_sha, archive_kind, member_name = _download_spec()
+    target = repak_path()
+    if os.environ.get("LEXEDITOR_REPAK"):
+        status = helper_status()
+        if status["installed"]:
+            return status
+        raise RuntimeError(
+            "LEXEDITOR_REPAK is an explicit external helper override; "
+            "Install/Repair will not create or overwrite that path."
+        )
+
+    archive, expected_archive_sha, archive_kind, member_name, expected_executable_sha = _bundle_spec()
+    if not archive.is_file():
+        raise RuntimeError(f"Bundled repak archive is missing: {archive}")
+    actual_archive_sha = _sha256_file(archive)
+    if actual_archive_sha != expected_archive_sha:
+        raise RuntimeError(
+            "Bundled repak archive SHA-256 mismatch: "
+            f"expected {expected_archive_sha}, got {actual_archive_sha}"
+        )
+
     root = helper_root()
     root.mkdir(parents=True, exist_ok=True)
-    target = repak_path()
-    if target.is_file():
+    if target.is_file() and _sha256_file(target) == expected_executable_sha:
         return helper_status()
+
     with tempfile.TemporaryDirectory(prefix="lexeditor-repak-") as temp_name:
-        archive = Path(temp_name) / ("repak.zip" if archive_kind == "zip" else "repak.tar.xz")
-        with urllib.request.urlopen(url, timeout=60) as response, archive.open("wb") as output:
-            shutil.copyfileobj(response, output)
-        digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-        if digest != expected_sha:
-            raise RuntimeError(f"repak download SHA-256 mismatch: expected {expected_sha}, got {digest}")
         extracted = Path(temp_name) / Path(member_name).name
         if archive_kind == "zip":
             with zipfile.ZipFile(archive) as package:
-                candidates = [name for name in package.namelist() if Path(name).name == Path(member_name).name]
+                candidates = [name for name in package.namelist()
+                              if Path(name).name == Path(member_name).name]
                 if len(candidates) != 1:
-                    raise RuntimeError("Pinned repak archive does not contain exactly one executable")
+                    raise RuntimeError("Bundled repak archive does not contain exactly one executable")
                 extracted.write_bytes(package.read(candidates[0]))
         else:
             with tarfile.open(archive, "r:xz") as package:
                 members = [member for member in package.getmembers()
                            if member.isfile() and Path(member.name).name == Path(member_name).name]
                 if len(members) != 1:
-                    raise RuntimeError("Pinned repak archive does not contain exactly one executable")
+                    raise RuntimeError("Bundled repak archive does not contain exactly one executable")
                 source = package.extractfile(members[0])
                 if source is None:
-                    raise RuntimeError("Could not read repak executable from archive")
+                    raise RuntimeError("Could not read repak executable from bundled archive")
                 extracted.write_bytes(source.read())
+
+        actual_executable_sha = _sha256_file(extracted)
+        if actual_executable_sha != expected_executable_sha:
+            raise RuntimeError(
+                "Bundled repak executable SHA-256 mismatch: "
+                f"expected {expected_executable_sha}, got {actual_executable_sha}"
+            )
         if os.name != "nt":
             extracted.chmod(0o755)
         temporary = target.with_suffix(target.suffix + ".tmp")
@@ -160,13 +242,17 @@ def helper_install() -> dict:
         if os.name != "nt":
             temporary.chmod(0o755)
         temporary.replace(target)
-    return helper_status()
 
+    status = helper_status()
+    if not status["installed"]:
+        raise RuntimeError(status["message"])
+    return status
 
 def _command(*args: str, binary: bool = False) -> subprocess.CompletedProcess:
+    status = helper_status()
+    if not status["installed"]:
+        raise RuntimeError(status["message"])
     executable = repak_path()
-    if not executable.is_file():
-        raise RuntimeError(helper_status()["message"])
     command = [str(executable), "--aes-key", FF7R_AES_KEY, *map(str, args)]
     return subprocess.run(
         command, check=True, capture_output=True,
@@ -218,6 +304,9 @@ def pack_directory(source: Path, output: Path, *, version: str = "") -> Path:
     if not source.is_dir():
         raise FileNotFoundError(f"FF7R project content directory does not exist: {source}")
     output.parent.mkdir(parents=True, exist_ok=True)
+    status = helper_status()
+    if not status["installed"]:
+        raise RuntimeError(status["message"])
     command = [
         str(repak_path()), "pack", "--quiet",
         "--mount-point", FF7R_MOUNT_POINT,
