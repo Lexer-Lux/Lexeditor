@@ -36,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     output = Path(argv[0] if argv else "out/ds3-browser").resolve()
     output.mkdir(parents=True, exist_ok=True)
     errors: list[str] = []
+    response_failures: list[str] = []
 
     with tempfile.TemporaryDirectory(prefix="lexeditor-ds3-browser-") as temp_name:
         temp = Path(temp_name)
@@ -66,6 +67,12 @@ def main(argv: list[str] | None = None) -> int:
                 browser = play.chromium.launch(headless=True)
                 page = browser.new_page(viewport={"width": 1440, "height": 900})
                 page.on("pageerror", lambda error: errors.append(f"pageerror: {error}"))
+                page.on(
+                    "response",
+                    lambda response: response_failures.append(
+                        f"{response.status} {response.url}"
+                    ) if response.status >= 400 else None,
+                )
                 page.on(
                     "console",
                     lambda message: errors.append(f"console {message.type}: {message.text}")
@@ -166,6 +173,8 @@ def main(argv: list[str] | None = None) -> int:
             if field_value(row, "atkBasePhysics") != 321:
                 raise RuntimeError("Fresh service did not reopen the exported weapon edit")
 
+    if response_failures:
+        errors.extend(f"response: {value}" for value in response_failures)
     if errors:
         print("Browser console/page failures:")
         for error in errors:
