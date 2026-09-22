@@ -461,8 +461,11 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         # without pretending the fixture proves retail-game semantics.
         for tab in ("equipment", "item", "materia", "characters", "abilities",
                     "enemies", "loot", "tweaks", "text"):
-            page.evaluate("tab => navigate(tab)", tab)
-            page.wait_for_function("!state.busy && !state.textBusy && !(state.tweaksPending>0)")
+            page.evaluate("tab => { void navigate(tab); }", tab)
+            page.wait_for_function(
+                "tab => state.tab===tab && !state.busy && !state.textBusy && !(state.tweaksPending>0)",
+                arg=tab,
+            )
             assert page.evaluate("state.tab") == tab
             text = page.locator("#main").inner_text()
             assert text.strip(), tab
@@ -474,10 +477,11 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
             page.screenshot(path=str(output / f"screen-{tab}.png"), full_page=True)
 
         # Return to the explicit misc fixture.
-        page.evaluate("""async asset => {
-          state.asset=asset; await loadAsset(asset); await navigate("misc");
-        }""", MISC)
-        page.wait_for_function("state.data && !state.busy")
+        page.evaluate("asset => { state.asset=asset; void loadAsset(asset); }", MISC)
+        page.wait_for_function(
+            "asset => state.asset===asset && state.data && !state.busy", arg=MISC)
+        page.evaluate("() => { void navigate('misc'); }")
+        page.wait_for_function("() => state.tab==='misc' && state.data && !state.busy")
 
         page.locator("#plugin-data-map").click()
         page.wait_for_selector(".lex-data-map-table")
@@ -514,7 +518,7 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
             (TWEAK, "tweaks"),
             (TEXT, "text"),
         ):
-            page.evaluate("target => openMapRow({target})", target)
+            page.evaluate("target => { void openMapRow({target}); }", target)
             page.wait_for_function(
                 "expected => state.tab===expected && !state.busy && !state.textBusy && !(state.tweaksPending>0)",
                 arg=expected,
