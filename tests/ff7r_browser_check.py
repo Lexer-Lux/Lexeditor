@@ -499,7 +499,10 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
             (TEXT, "text"),
         ):
             page.evaluate("target => openMapRow({target})", target)
-            page.wait_for_function("expected => state.tab===expected && !state.busy && !state.textBusy && !(state.tweaksPending>0)", expected)
+            page.wait_for_function(
+                "expected => state.tab===expected && !state.busy && !state.textBusy && !(state.tweaksPending>0)",
+                arg=expected,
+            )
             assert page.evaluate("state.tab") == expected, (target, expected)
         page.screenshot(path=str(output / "datamap-routing-1200.png"), full_page=True)
 
