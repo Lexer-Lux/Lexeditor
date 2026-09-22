@@ -1,4 +1,4 @@
-"""Isolated launcher for the DS3 PR candidate.
+r"""Isolated launcher for the DS3 PR candidate.
 
 This bypasses global plugin discovery and opens only the Dark Souls III plugin.
 It never runs Lexeditor's normal C:\Lexeditor installer.
