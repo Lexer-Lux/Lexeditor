@@ -233,9 +233,9 @@ window.fetch = async function(input, options={}) {
   if(path === "/api/catalog") data = window.__fixture.catalog;
   else if(path === "/api/datamap") data = window.__fixture.datamap;
   else if(path === "/api/info") data = window.__fixture.info;
-  else if(path === "/shared/mod-loading.json") data = window.__fixture.modLoading;
-  else if(path === "/shared/credits.json") data = window.__fixture.credits;
-  else if(path === "/shared/distribution-notices.json") data = window.__fixture.distributionNotices;
+  else if(path === "/mod-loading.json" || path === "/shared/mod-loading.json") data = window.__fixture.modLoading;
+  else if(path === "/credits.json" || path === "/shared/credits.json") data = window.__fixture.credits;
+  else if(path === "/distribution-notices.json" || path === "/shared/distribution-notices.json") data = window.__fixture.distributionNotices;
   else if(path === "/api/economy") data = window.__fixture.economy;
   else if(path === "/api/loot") data = window.__fixture.loot;
   else if(path === "/api/data") {
@@ -519,6 +519,16 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         page.locator("#plugin-info").click()
         page.wait_for_function("state.tab==='info'")
         expect(page.get_by_role("heading", name="Information", exact=True)).to_be_visible()
+        page.wait_for_function("""() => {
+          const mod=document.querySelector(".lex-plugin-mod-loading");
+          const credits=document.querySelector(".lex-plugin-credits");
+          return mod?.querySelectorAll("li").length>=3
+            && credits?.querySelectorAll(".lex-credit-entry").length>0
+            && !mod.querySelector('[role="alert"]')
+            && !credits.querySelector('[role="alert"]');
+        }""")
+        assert "packaged mod-loading file is missing" not in page.locator("#main").inner_text().lower()
+        assert "packaged credits file is missing" not in page.locator("#main").inner_text().lower()
         remove = page.get_by_role("button", name="Remove deployed PAK", exact=True)
         expect(remove).to_be_enabled()
         remove.click()
@@ -574,6 +584,10 @@ def responsive_checks(browser, output: Path, html: str) -> list[dict]:
         try:
             page.wait_for_timeout(150)
             metrics = assert_layout(page, width, height)
+            if scale > 1:
+                table = page.locator(".ff7r-table")
+                expect(table).to_be_visible()
+                assert table.locator(".lex-column-list-row").count() > 0
             page.screenshot(
                 path=str(output / (
                     f"responsive-{width}x{height}"
@@ -584,6 +598,10 @@ def responsive_checks(browser, output: Path, html: str) -> list[dict]:
             page.wait_for_selector(".lex-data-map-table")
             page.wait_for_timeout(150)
             map_metrics = assert_layout(page, width, height)
+            if scale > 1:
+                map_table = page.locator(".lex-data-map-table")
+                expect(map_table).to_be_visible()
+                assert map_table.locator(".lex-column-list-row").count() > 0
             page.screenshot(
                 path=str(output / (
                     f"datamap-{width}x{height}"
