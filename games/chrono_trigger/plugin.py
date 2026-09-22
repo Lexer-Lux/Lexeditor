@@ -86,7 +86,7 @@ def smoke() -> list[str]:
         palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
         world_bank = bytearray(b"\xA5" * (HEADER_OFFSET + WORLD_COUNT * HEADER_SIZE + 3))
         world_bank[HEADER_OFFSET:HEADER_OFFSET + HEADER_SIZE] = bytes(range(HEADER_SIZE))
-        scene_map = bytearray(bytes([0, 0, 0x21, 0x43, 0x5A, 0xC3]) + bytes(16 * 16 * 2))
+        scene_map = bytearray(bytes([0, 0, 0x21, 0x43, 0x5A, 0xCB]) + bytes(16 * 16 * 2))
         scene_map[6] = 3
         scene_map[6 + 16 * 16] = 4
         scene_map.extend(bytes([0x01, 0, 0, 0x80, 0x20, 0x10, 255]))
@@ -190,6 +190,18 @@ def smoke() -> list[str]:
             if (saved_prop["collisionCode"] != 30 or saved_prop["repeatCount"] != 255
                     or not saved_prop["unknownSecondBit5"] or not saved_prop["unknownThirdBit4"]):
                 raise RuntimeError("Scene property-run edit did not preserve RLE/unknown metadata")
+            scene_render = request_json(session.url + "api/scene-render-settings?path=" + scene_map_path.replace("/", "%2F"))
+            saved_scene_render = request_json(session.url + "api/scene-render-settings/save", {
+                "path": scene_map_path, "sha256": scene_render["sha256"],
+                "values": {"scrollL2XCode": 7, "scrollL2YCode": 15,
+                           "layer1Main": True, "layer2Main": False,
+                           "effectLayer1": False, "effectLayer2": True},
+            })
+            if (saved_scene_render["scrollL2XCode"] != 7
+                    or saved_scene_render["scrollL2YCode"] != 15
+                    or not saved_scene_render["unknownEffectBit3"]
+                    or saved_scene_render["preservedBitsByte"] != 0):
+                raise RuntimeError("Scene render settings edit did not preserve unknown/dimension bits")
             palette_files_result = request_json(session.url + "api/palette-files")
             if palette_files_result["rows"][0]["path"] != "Game/field/palette_bin/plt4.bin":
                 raise RuntimeError("Palette catalogue did not find the Steam field palette")
@@ -316,6 +328,7 @@ def smoke() -> list[str]:
         "fixed 24-byte area settings edit preserved the unmodelled word and trailing bytes",
         "scene map tile edits preserved the header, RLE property stream and existing tile banks",
         "scene RLE property-run edit preserved compression, repeat counts and unknown bits",
+        "scene render settings edit preserved dimensions, scroll-mode bits and the unknown effect bit",
         "256-color RGB555 palette edit preserved prefix, bit 15 and trailing bytes",
         "fixed-size area exit edit preserved unknown flag bits",
         "treasure edit preserved the unknown trailing word",
