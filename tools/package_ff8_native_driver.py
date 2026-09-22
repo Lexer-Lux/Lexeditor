@@ -32,6 +32,7 @@ SUPPORT_FILES = {
     'verify-issue51-build.ps1',
 }
 NEW_DRIVER_MARKERS = (
+    b'enable_ff8_better_hp_colors', b'enable_ff8_interaction_indicators',
     b'enable_ff8_gf_hp_bars', b'enable_ff8_party_switch',
     b'enable_ff8_no_magic_consumption', b'lexeditor_ff8_shared_party_contract_version',
     b'lexeditor_ff8_no_consume_battle_debit',
@@ -179,6 +180,11 @@ suppresses native camera-left/right input and the overhead-view toggle at their
 consumers. Battle camera elevation uses FF8's downward-positive Y axis, so
 the floor blocks underground movement and the upper limit allows elevation.
 In-game Time uses the native TIME label instead of PLAY.
+Better HP Colors adds optional smooth HP-number colour in battle, shared
+character panels and active/reserve main-menu rows. Native KO and status
+palettes take priority. Interaction Indicators observes the native field target
+and adds a CARD cue for Talk scripts that directly contain CARDGAME. Both
+settings default off; neither changes input or starts a field interaction.
 Party Switch explicitly relinquishes and re-registers the replaced
 actor's shared-stock mirror, rather than copying its private record over the
 canonical pool. Shared Magic works with the configured stock cap (1–255);

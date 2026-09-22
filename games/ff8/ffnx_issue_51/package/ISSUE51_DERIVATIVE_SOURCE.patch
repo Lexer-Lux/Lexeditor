@@ -1364,10 +1364,10 @@ index 8eb43c8..97ed5f9 100644
 +
 +endif()
 diff --git a/misc/FFNx.toml b/misc/FFNx.toml
-index d0b1566..9694273 100644
+index d0b1566..1422b55 100644
 --- a/misc/FFNx.toml
 +++ b/misc/FFNx.toml
-@@ -568,6 +568,36 @@ disable_animated_textures_on_field = ""
+@@ -568,6 +568,40 @@ disable_animated_textures_on_field = ""
  #~~~~~~~~~~~~~~~~~~~~~~~~~~~
  enable_devtools = false
  
@@ -1376,6 +1376,8 @@ index d0b1566..9694273 100644
 +
 +# Keep spell stock on successful field/battle casts; items still consume.
 +enable_ff8_no_magic_consumption = false
++# Show non-invasive field interaction and Triple Triad opponent HUD cues.
++enable_ff8_interaction_indicators = false
 +
 +# Manual analog world-map camera. Battle inputs are unchanged.
 +enable_ff8_modern_controls = false
@@ -1394,6 +1396,8 @@ index d0b1566..9694273 100644
 +
 +# Draw current/max HP bars for FF8's three active battle characters.
 +enable_ff8_hp_bars = false
++# Smoothly tint living HP numbers by remaining HP; KO stays native.
++enable_ff8_better_hp_colors = false
 +
 +# Blue junctioned-GF HP bar above each party name.
 +enable_ff8_gf_hp_bars = false
@@ -4814,10 +4818,10 @@ index 0000000..f526b18
 +};
 +}
 diff --git a/src/cfg.cpp b/src/cfg.cpp
-index c313df7..d792dbb 100644
+index c313df7..654a495 100644
 --- a/src/cfg.cpp
 +++ b/src/cfg.cpp
-@@ -1,545 +1,565 @@
+@@ -1,545 +1,569 @@
 -/****************************************************************************/
 -//    Copyright (C) 2009 Aali132                                            //
 -//    Copyright (C) 2018 quantumpencil                                      //
@@ -5486,12 +5490,14 @@ index c313df7..d792dbb 100644
 +bool enable_devtools;
 +bool enable_ff8_party_switch;
 +bool enable_ff8_no_magic_consumption;
++bool enable_ff8_interaction_indicators;
 +bool enable_ff8_modern_controls;
 +double ff8_modern_controls_camera_speed;
 +bool enable_ff8_fast_start;
 +bool enable_ff8_better_targeting;
 +bool enable_ff8_xp_bars;
 +bool enable_ff8_hp_bars;
++bool enable_ff8_better_hp_colors;
 +bool enable_ff8_gf_hp_bars;
 +bool enable_ff8_ingame_time;
 +long devtools_hotkey;
@@ -5667,12 +5673,14 @@ index c313df7..d792dbb 100644
 +	enable_devtools = config["enable_devtools"].value_or(false);
 +	enable_ff8_party_switch = config["enable_ff8_party_switch"].value_or(false);
 +	enable_ff8_no_magic_consumption = config["enable_ff8_no_magic_consumption"].value_or(false);
++	enable_ff8_interaction_indicators = config["enable_ff8_interaction_indicators"].value_or(false);
 +	enable_ff8_modern_controls = config["enable_ff8_modern_controls"].value_or(false);
 +	ff8_modern_controls_camera_speed = config["ff8_modern_controls_camera_speed"].value_or(1.0);
 +	enable_ff8_fast_start = config["enable_ff8_fast_start"].value_or(false);
 +	enable_ff8_better_targeting = config["enable_ff8_better_targeting"].value_or(false);
 +	enable_ff8_xp_bars = config["enable_ff8_xp_bars"].value_or(false);
 +	enable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);
++	enable_ff8_better_hp_colors = config["enable_ff8_better_hp_colors"].value_or(false);
 +	enable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);
 +	enable_ff8_ingame_time = config["enable_ff8_ingame_time"].value_or(false);
 +	devtools_hotkey = config["devtools_hotkey"].value_or(VK_F12);
@@ -5929,10 +5937,10 @@ index c313df7..d792dbb 100644
 +	return std::find(ff8_disable_remastered_hd_textures.begin(), ff8_disable_remastered_hd_textures.end(), module) != ff8_disable_remastered_hd_textures.end();
 +}
 diff --git a/src/cfg.h b/src/cfg.h
-index 056c681..8eb489e 100644
+index 056c681..3fe8a53 100644
 --- a/src/cfg.h
 +++ b/src/cfg.h
-@@ -1,191 +1,201 @@
+@@ -1,191 +1,203 @@
 -/****************************************************************************/
 -//    Copyright (C) 2009 Aali132                                            //
 -//    Copyright (C) 2018 quantumpencil                                      //
@@ -6269,12 +6277,14 @@ index 056c681..8eb489e 100644
 +extern bool enable_devtools;
 +extern bool enable_ff8_party_switch;
 +extern bool enable_ff8_no_magic_consumption;
++extern bool enable_ff8_interaction_indicators;
 +extern bool enable_ff8_modern_controls;
 +extern double ff8_modern_controls_camera_speed;
 +extern bool enable_ff8_fast_start;
 +extern bool enable_ff8_better_targeting;
 +extern bool enable_ff8_xp_bars;
 +extern bool enable_ff8_hp_bars;
++extern bool enable_ff8_better_hp_colors;
 +extern bool enable_ff8_gf_hp_bars;
 +extern bool enable_ff8_ingame_time;
 +extern long devtools_hotkey;
@@ -19384,7 +19394,7 @@ index 9d259e1..05e9abc 100644
 +}
 diff --git a/src/ff8/lexeditor_ff8_shared_party.inc b/src/ff8/lexeditor_ff8_shared_party.inc
 new file mode 100644
-index 0000000..8477fc6
+index 0000000..819d3e7
 --- /dev/null
 +++ b/src/ff8/lexeditor_ff8_shared_party.inc
 @@ -0,0 +1,97 @@
@@ -24903,7 +24913,7 @@ index 2452d5f..f1fe535 100644
 +	text_colors[TEXTCOLOR_WHITE] = 0x0F;
 +}
 diff --git a/src/ff8_opengl.cpp b/src/ff8_opengl.cpp
-index a678015..1c1c73c 100644
+index a678015..e24e47e 100644
 --- a/src/ff8_opengl.cpp
 +++ b/src/ff8_opengl.cpp
 @@ -1,2342 +1,2404 @@
@@ -29635,7 +29645,7 @@ index a678015..1c1c73c 100644
 +	ret->draw_flat2D = common_draw_2D;
 +	ret->draw_smooth2D = common_draw_2D;
 +	ret->draw_textured2D = common_draw_2D;
-+	ret->draw_paletted2D = common_draw_paletted2D;
++	ret->draw_paletted2D = lexeditor_ff8_hp_colors_requested() ? lexeditor_ff8_hp_colors_draw_paletted2D : common_draw_paletted2D;
 +	ret->setrenderstate_flat3D = common_setrenderstate_3D;
 +	ret->setrenderstate_smooth3D = common_setrenderstate_3D;
 +	ret->setrenderstate_textured3D = common_setrenderstate_3D;
@@ -29655,7 +29665,7 @@ index a678015..1c1c73c 100644
 +}
 diff --git a/src/flare_encounter.h b/src/flare_encounter.h
 new file mode 100644
-index 0000000..9775b68
+index 0000000..17afb6a
 --- /dev/null
 +++ b/src/flare_encounter.h
 @@ -0,0 +1,89 @@
@@ -29750,7 +29760,7 @@ index 0000000..9775b68
 +} // namespace lexeditor_flare
 diff --git a/src/flare_item.h b/src/flare_item.h
 new file mode 100644
-index 0000000..42c09a7
+index 0000000..d8cfcaf
 --- /dev/null
 +++ b/src/flare_item.h
 @@ -0,0 +1,52 @@
@@ -29808,7 +29818,7 @@ index 0000000..42c09a7
 +} // namespace lexeditor_flare
 diff --git a/src/flare_request.h b/src/flare_request.h
 new file mode 100644
-index 0000000..ca10b09
+index 0000000..e7f26f6
 --- /dev/null
 +++ b/src/flare_request.h
 @@ -0,0 +1,32 @@
@@ -29846,7 +29856,7 @@ index 0000000..ca10b09
 +}
 diff --git a/src/flare_shop.h b/src/flare_shop.h
 new file mode 100644
-index 0000000..d0bc919
+index 0000000..3c43389
 --- /dev/null
 +++ b/src/flare_shop.h
 @@ -0,0 +1,38 @@
@@ -29956,13 +29966,73 @@ index 528b8f6..c9614eb 100644
  
                  inGlobalOffset = 0;
              }
+diff --git a/src/interaction_indicator.h b/src/interaction_indicator.h
+new file mode 100644
+index 0000000..7336b42
+--- /dev/null
++++ b/src/interaction_indicator.h
+@@ -0,0 +1,53 @@
++#pragma once
++
++#include <cstddef>
++#include <cstdint>
++
++namespace lexeditor_interaction_indicator {
++
++constexpr std::uint32_t kCardgameOpcode = 0x13A;
++constexpr std::uint16_t kFacingLimit = 0x40;
++constexpr std::size_t kMaximumTalkScriptInstructions = 4096;
++
++inline std::uint32_t opcode(std::uint32_t instruction)
++{
++    return (instruction & 0xFF000000U) != 0
++        ? instruction >> 24
++        : instruction;
++}
++
++inline bool talk_script_has_cardgame(
++    const std::uint32_t *instructions, std::size_t count)
++{
++    if (instructions == nullptr || count == 0 ||
++        count > kMaximumTalkScriptInstructions) {
++        return false;
++    }
++    for (std::size_t i = 0; i < count; ++i) {
++        if (opcode(instructions[i]) == kCardgameOpcode) return true;
++    }
++    return false;
++}
++
++inline std::uint16_t facing_error(std::uint8_t facing, std::uint8_t direction)
++{
++    const std::uint8_t wrapped = static_cast<std::uint8_t>(facing - direction);
++    return wrapped > 0x80
++        ? static_cast<std::uint16_t>(0x100 - wrapped)
++        : wrapped;
++}
++
++inline bool vertical_range(int player_z, int target_z)
++{
++    const int delta = player_z - target_z;
++    return delta > -0x100 && delta < 0x100;
++}
++
++inline bool within_talk_radius(
++    int distance, std::uint16_t player_radius, std::uint16_t target_radius)
++{
++    return distance < static_cast<int>(player_radius) +
++        static_cast<int>(target_radius);
++}
++
++} // namespace lexeditor_interaction_indicator
 diff --git a/src/lexeditor_ff8_bars.cpp b/src/lexeditor_ff8_bars.cpp
 new file mode 100644
-index 0000000..48d5c89
+index 0000000..bd96396
 --- /dev/null
 +++ b/src/lexeditor_ff8_bars.cpp
-@@ -0,0 +1,583 @@
+@@ -0,0 +1,792 @@
 +#include "lexeditor_ff8_bars.h"
++#include "lexeditor_ff8_hp_colors.h"
 +
 +#include <algorithm>
 +#include <array>
@@ -29970,6 +30040,7 @@ index 0000000..48d5c89
 +#include <cstdint>
 +#include <cstdio>
 +#include <ctime>
++#include <vector>
 +
 +#include <imgui.h>
 +
@@ -30028,6 +30099,81 @@ index 0000000..48d5c89
 +std::array<HpCapture, 3> g_hp_rows;
 +HpCapture *g_hp_row = nullptr;
 +
++
++struct HpTintState {
++    bool active = false;
++    std::uint16_t current = 0;
++    std::uint16_t maximum = 0;
++};
++HpTintState g_hp_tint;
++HpTintState g_hp_number_previous;
++bool g_hp_number_scope = false;
++struct MenuHpContext {
++    bool active = false;
++    std::uint32_t packed_position = 0;
++    std::uint16_t current = 0;
++    std::uint16_t maximum = 0;
++};
++MenuHpContext g_menu_hp;
++HpTintState g_main_menu_hp;
++const std::uint8_t *g_reserve_menu_state = nullptr;
++bool g_better_hp_runtime_ready = false;
++constexpr std::uint32_t kCharacterWidget = 0x004C0780;
++constexpr std::uint32_t kHpNumberRenderer = 0x004A3530;
++std::uint32_t g_hp_number_renderer = kHpNumberRenderer;
++std::uint32_t g_hp_number_replace_id = 0;
++std::uint32_t g_hp_number_return = 0;
++
++void hp_number_begin(const std::uint32_t *stack)
++{
++    g_hp_number_scope = false;
++    if (stack == nullptr) return;
++    g_hp_number_return = stack[0];
++    if (!g_better_hp_runtime_ready || !enable_ff8_better_hp_colors ||
++        !g_menu_hp.active || stack[3] != g_menu_hp.packed_position) return;
++    g_hp_number_previous = g_hp_tint;
++    g_hp_tint = {lexeditor_ff8_hp_should_tint(g_menu_hp.current, g_menu_hp.maximum),
++        g_menu_hp.current, g_menu_hp.maximum};
++    g_hp_number_scope = true;
++}
++void hp_number_end()
++{
++    if (!g_hp_number_scope) return;
++    g_hp_tint = g_hp_number_previous;
++    g_hp_number_scope = false;
++}
++void __declspec(naked) __cdecl hp_number_hook()
++{
++    __asm {
++        pushad
++        lea eax, [esp + 32]
++        push eax
++        call hp_number_begin
++        add esp, 4
++        popad
++        pushfd
++        pushad
++        push g_hp_number_replace_id
++        call unreplace_function
++        add esp, 4
++        popad
++        popfd
++        mov dword ptr [esp], offset hp_number_after_native
++        jmp dword ptr [g_hp_number_renderer]
++hp_number_after_native:
++        pushfd
++        pushad
++        push g_hp_number_replace_id
++        call rereplace_function
++        add esp, 4
++        call hp_number_end
++        popad
++        popfd
++        push dword ptr [g_hp_number_return]
++        ret
++    }
++}
++
 +// Native 004B77F9 reads the menu sprite table. Each entry encodes a count
 +// and offset; each 8-byte sprite has width, signed x, height, signed y.
 +void capture_glyph(int x, int y, bool hp)
@@ -30061,7 +30207,13 @@ index 0000000..48d5c89
 +std::uint32_t __cdecl hp_glyph_hook(std::uint32_t a, std::uint32_t b, int x, int y)
 +{
 +    capture_glyph(x, y, true);
-+    return g_hp_glyph_renderer(a, b, x, y);
++    const auto previous = g_hp_tint;
++    if (g_better_hp_runtime_ready && enable_ff8_better_hp_colors && g_hp_row != nullptr)
++        g_hp_tint = {lexeditor_ff8_hp_should_tint(g_hp_row->current, g_hp_row->maximum),
++            g_hp_row->current, g_hp_row->maximum};
++    const auto result = g_hp_glyph_renderer(a, b, x, y);
++    g_hp_tint = previous;
++    return result;
 +}
 +std::uint32_t __cdecl atb_glyph_hook(std::uint32_t a, std::uint32_t b, int x, int y)
 +{
@@ -30318,12 +30470,29 @@ index 0000000..48d5c89
 +{
 +    const auto base=reinterpret_cast<std::uintptr_t>(&ff8_externals.savemap->chars[0]);
 +    const auto address=reinterpret_cast<std::uintptr_t>(saved);
++    MenuHpContext previous_hp = g_menu_hp;
++    bool number_detour = false;
 +    if(address>=base && (address-base)%sizeof(savemap_ff8_character)==0) {
 +        const auto id=(address-base)/sizeof(savemap_ff8_character);
-+        if(id<CHAR_NUM) capture_menu_xp(x+79,y+88,70,
-+            xp_fraction(ff8_externals.savemap->chars[id].exp,static_cast<std::uint8_t>(id)));
++        if(id<CHAR_NUM) {
++            if (enable_ff8_xp_bars) capture_menu_xp(x+79,y+88,70,
++                xp_fraction(ff8_externals.savemap->chars[id].exp,static_cast<std::uint8_t>(id)));
++            if (g_better_hp_runtime_ready && enable_ff8_better_hp_colors && stats != nullptr) {
++                const auto *computed = reinterpret_cast<const std::uint16_t *>(stats);
++                g_menu_hp = {true,
++                    (static_cast<std::uint32_t>(static_cast<std::uint16_t>(y + 75)) << 16) |
++                        static_cast<std::uint16_t>(x + 141),
++                    computed[4], computed[5]};
++                rereplace_function(g_hp_number_replace_id);
++                number_detour = true;
++            }
++        }
 +    }
-+    return reinterpret_cast<CharacterWidget>(0x004C0780)(display,cursor,x,y,saved,stats,flags);
++    const auto result = reinterpret_cast<CharacterWidget>(kCharacterWidget)(
++        display,cursor,x,y,saved,stats,flags);
++    if (number_detour) unreplace_function(g_hp_number_replace_id);
++    g_menu_hp = previous_hp;
++    return result;
 +}
 +using MainRowWidget = std::uint32_t(__cdecl *)(const std::uint8_t *,unsigned,unsigned,int);
 +template<unsigned Address, int Spacing>
@@ -30347,14 +30516,60 @@ index 0000000..48d5c89
 +    return reinterpret_cast<MainRowWidget>(Address)(state,display,cursor,slot);
 +}
 +using ReserveWidget = std::uint32_t(__cdecl *)(const std::uint8_t *,unsigned,unsigned);
++using MainHpWidget = std::uint32_t(__cdecl *)(int,int,unsigned,unsigned,int,int,unsigned);
++using MenuText = std::uint32_t(__cdecl *)(unsigned,unsigned,int,int,const void *,unsigned);
++
++// These three calls draw only the current HP digits. The HP label, slash,
++// maximum and other numbers retain their native palette.
++std::uint32_t __cdecl main_hp_widget_hook(int current,int maximum,unsigned display,
++    unsigned cursor,int x,int y,unsigned palette)
++{
++    const auto previous=g_main_menu_hp;
++    g_main_menu_hp={current>0 && maximum>current,
++        static_cast<std::uint16_t>(std::max(0,current)),
++        static_cast<std::uint16_t>(std::max(0,maximum))};
++    const auto result=reinterpret_cast<MainHpWidget>(0x004BF380)(
++        current,maximum,display,cursor,x,y,palette);
++    g_main_menu_hp=previous;
++    return result;
++}
++
++HpTintState reserve_hp_at(int x,int y)
++{
++    // 004C2090: x=32+120*column+59+16, y=112+24*row+12.
++    if(!g_reserve_menu_state || x<107 || y<124 || (x-107)%120 || (y-124)%24)
++        return {};
++    const int column=(x-107)/120,row=(y-124)/24;
++    if(column>1 || row>3)return {};
++    const auto id=g_reserve_menu_state[0x38+row*2+column];
++    if(id>=CHAR_NUM)return {};
++    const auto *stats=reinterpret_cast<const std::uint16_t *>(0x01D771B0+32*id);
++    return {lexeditor_ff8_hp_should_tint(stats[4],stats[5]),stats[4],stats[5]};
++}
++
++template<bool Reserve> std::uint32_t __cdecl main_hp_text_hook(unsigned display,
++    unsigned cursor,int x,int y,const void *text,unsigned palette)
++{
++    const auto previous=g_hp_tint;
++    if(g_better_hp_runtime_ready && enable_ff8_better_hp_colors)
++        g_hp_tint=Reserve?reserve_hp_at(x,y):g_main_menu_hp;
++    const auto result=reinterpret_cast<MenuText>(0x0049F850)(display,cursor,x,y,text,palette);
++    g_hp_tint=previous;
++    return result;
++}
++
 +std::uint32_t __cdecl reserve_widget_hook(const std::uint8_t *state,unsigned display,unsigned cursor)
 +{
 +    for(unsigned slot=0;slot<8;++slot) {
 +        const auto id=state[0x38+slot];
-+        if(id<CHAR_NUM) capture_menu_xp(44+120*(slot%2),138+24*(slot/2),48,
++        if(enable_ff8_xp_bars && id<CHAR_NUM) capture_menu_xp(44+120*(slot%2),138+24*(slot/2),48,
 +            xp_fraction(ff8_externals.savemap->chars[id].exp,id));
 +    }
-+    return reinterpret_cast<ReserveWidget>(0x004C2090)(state,display,cursor);
++    const auto *previous=g_reserve_menu_state;
++    g_reserve_menu_state=state;
++    const auto result=reinterpret_cast<ReserveWidget>(0x004C2090)(state,display,cursor);
++    g_reserve_menu_state=previous;
++    return result;
 +}
 +using GfListWidget = std::uint32_t(__cdecl *)(unsigned,unsigned,int,int,unsigned,unsigned);
 +std::uint32_t __cdecl gf_list_hook(unsigned display,unsigned cursor,int x,int y,unsigned gf,unsigned level)
@@ -30453,6 +30668,50 @@ index 0000000..48d5c89
 +
 +} // namespace
 +
++bool lexeditor_ff8_hp_colors_requested()
++{
++    return ff8 && enable_ff8_better_hp_colors;
++}
++
++void lexeditor_ff8_hp_colors_draw_paletted2D(
++    struct polygon_set *polygon_set, struct indexed_vertices *iv, struct game_obj *game_object)
++{
++    if (!g_better_hp_runtime_ready || !enable_ff8_better_hp_colors ||
++        !g_hp_tint.active || iv == nullptr) {
++        common_draw_paletted2D(polygon_set, iv, game_object);
++        return;
++    }
++    auto *ff8_iv = reinterpret_cast<ff8_indexed_vertices *>(iv);
++    if (ff8_iv->vertices == nullptr || ff8_iv->palettes == nullptr ||
++        ff8_iv->count == 0 || ff8_iv->vertexcount == 0) {
++        common_draw_paletted2D(polygon_set, iv, game_object);
++        return;
++    }
++    const auto white = static_cast<unsigned char>(text_colors[TEXTCOLOR_WHITE]);
++    const auto yellow = static_cast<unsigned char>(text_colors[TEXTCOLOR_YELLOW]);
++    for (std::uint32_t i=0;i<ff8_iv->count;++i)
++        if (ff8_iv->palettes[i] != white && ff8_iv->palettes[i] != yellow) {
++            common_draw_paletted2D(polygon_set, iv, game_object); return;
++        }
++    for (std::uint32_t i=0;i<ff8_iv->vertexcount;++i) {
++        const auto &v=ff8_iv->vertices[i].color;
++        if (v.r != 255 || v.g != 255 || v.b != 255) {
++            common_draw_paletted2D(polygon_set, iv, game_object); return;
++        }
++    }
++    std::vector<unsigned char> palettes(ff8_iv->palettes,ff8_iv->palettes+ff8_iv->count);
++    std::vector<std::uint32_t> colors; colors.reserve(ff8_iv->vertexcount);
++    for(std::uint32_t i=0;i<ff8_iv->vertexcount;++i) colors.push_back(ff8_iv->vertices[i].color.color);
++    const auto rgb=lexeditor_ff8_hp_rgb(g_hp_tint.current,g_hp_tint.maximum);
++    std::fill_n(ff8_iv->palettes,ff8_iv->count,white);
++    for(std::uint32_t i=0;i<ff8_iv->vertexcount;++i) {
++        ff8_iv->vertices[i].color.r=rgb.r;ff8_iv->vertices[i].color.g=rgb.g;ff8_iv->vertices[i].color.b=rgb.b;
++    }
++    common_draw_paletted2D(polygon_set, iv, game_object);
++    std::copy(palettes.begin(),palettes.end(),ff8_iv->palettes);
++    for(std::uint32_t i=0;i<ff8_iv->vertexcount;++i) ff8_iv->vertices[i].color.color=colors[i];
++}
++
 +bool lexeditor_ff8_bars_enabled()
 +{
 +    return ff8 && (enable_ff8_xp_bars || enable_ff8_hp_bars || enable_ff8_gf_hp_bars || enable_ff8_ingame_time);
@@ -30460,68 +30719,87 @@ index 0000000..48d5c89
 +
 +void lexeditor_ff8_bars_install()
 +{
-+    if (!ff8 || (!enable_ff8_xp_bars && !enable_ff8_hp_bars && !enable_ff8_gf_hp_bars && !enable_ff8_ingame_time)) {
-+        return;
-+    }
-+
-+    g_active_viewport = reinterpret_cast<sprite_viewport **>(get_absolute_value(
-+        ff8_externals.engine_reset_viewport_sub_4972D0, 0x12));
-+    const auto original_call = [](std::uintptr_t address, std::uintptr_t target) {
-+        return *reinterpret_cast<const std::uint8_t *>(address) == 0xE8 &&
-+            get_relative_call(address, 0) == target;
++    if (!ff8 || (!enable_ff8_xp_bars && !enable_ff8_hp_bars && !enable_ff8_gf_hp_bars &&
++        !enable_ff8_ingame_time && !enable_ff8_better_hp_colors)) return;
++    g_better_hp_runtime_ready=false;
++    g_active_viewport=reinterpret_cast<sprite_viewport **>(get_absolute_value(
++        ff8_externals.engine_reset_viewport_sub_4972D0,0x12));
++    const auto original_call=[](std::uintptr_t address,std::uintptr_t target) {
++        return *reinterpret_cast<const std::uint8_t *>(address)==0xE8 && get_relative_call(address,0)==target;
 +    };
-+    if ((enable_ff8_hp_bars || enable_ff8_gf_hp_bars) && FF8_US_VERSION &&
-+        original_call(0x004B17D5, 0x004B0F10) &&
-+        original_call(0x004B1100, 0x004A7210) &&
-+        original_call(0x004B127B, 0x004A7210)) {
-+        // Row call runs only after native HUD visibility and participant gates.
-+        g_battle_row_renderer = reinterpret_cast<BattleRowRenderer>(get_relative_call(0x004B17D5, 0));
-+        g_hp_glyph_renderer = reinterpret_cast<GlyphRenderer>(get_relative_call(0x004B1100, 0));
-+        g_atb_glyph_renderer = reinterpret_cast<GlyphRenderer>(get_relative_call(0x004B127B, 0));
-+        replace_call(0x004B17D5, reinterpret_cast<void *>(&battle_row_hook));
-+        replace_call(0x004B1100, reinterpret_cast<void *>(&hp_glyph_hook));
-+        replace_call(0x004B127B, reinterpret_cast<void *>(&atb_glyph_hook));
++    const std::array<std::uint32_t,7> character_widget_calls={
++        0x4C08F4U,0x4CB66CU,0x4CC846U,0x4F6E8EU,0x4F6F17U,0x4F7361U,0x4F73EEU};
++    const bool battle_hp_supported=FF8_US_VERSION &&
++        original_call(0x004B17D5,0x004B0F10) &&
++        original_call(0x004B1100,0x004A7210) &&
++        original_call(0x004B127B,0x004A7210);
++    bool menu_hp_supported=FF8_US_VERSION;
++    for(const auto call:character_widget_calls)
++        menu_hp_supported=menu_hp_supported && original_call(call,kCharacterWidget);
++    const bool main_hp_supported=original_call(0x004C1DF6,0x004BF380) &&
++        original_call(0x004C1F78,0x004BF380) && original_call(0x004BF407,0x0049F850) &&
++        original_call(0x004C22CD,0x0049F850) && original_call(0x004C1AED,0x004C2090);
++    const bool better_hp_supported=battle_hp_supported && menu_hp_supported && main_hp_supported;
++    if ((enable_ff8_hp_bars || enable_ff8_gf_hp_bars ||
++        (enable_ff8_better_hp_colors && better_hp_supported)) && battle_hp_supported) {
++        g_battle_row_renderer=reinterpret_cast<BattleRowRenderer>(get_relative_call(0x004B17D5,0));
++        g_hp_glyph_renderer=reinterpret_cast<GlyphRenderer>(get_relative_call(0x004B1100,0));
++        g_atb_glyph_renderer=reinterpret_cast<GlyphRenderer>(get_relative_call(0x004B127B,0));
++        replace_call(0x004B17D5,reinterpret_cast<void *>(&battle_row_hook));
++        replace_call(0x004B1100,reinterpret_cast<void *>(&hp_glyph_hook));
++        replace_call(0x004B127B,reinterpret_cast<void *>(&atb_glyph_hook));
++    }
++    if(enable_ff8_better_hp_colors) {
++        if(!better_hp_supported) ffnx_error("Better HP Colors: unsupported FF8 executable layout; leaving vanilla HP colors.\n");
++        else {
++            g_hp_number_replace_id=replace_function(kHpNumberRenderer,reinterpret_cast<void *>(&hp_number_hook));
++            unreplace_function(g_hp_number_replace_id);g_better_hp_runtime_ready=true;
++            replace_call(0x004C1DF6,reinterpret_cast<void *>(&main_hp_widget_hook));
++            replace_call(0x004C1F78,reinterpret_cast<void *>(&main_hp_widget_hook));
++            replace_call(0x004BF407,reinterpret_cast<void *>(&main_hp_text_hook<false>));
++            replace_call(0x004C22CD,reinterpret_cast<void *>(&main_hp_text_hook<true>));
++        }
 +    }
 +    if (enable_ff8_ingame_time && FF8_US_VERSION &&
-+        original_call(0x004C1C6E, 0x004BF020) &&
-+        original_call(0x004BF099, 0x004B77C0)) {
-+        g_clock_renderer = reinterpret_cast<ClockRenderer>(get_relative_call(0x004C1C6E, 0));
-+        g_clock_label_renderer = reinterpret_cast<ClockLabelRenderer>(get_relative_call(0x004BF099, 0));
-+        replace_call(0x004BF099, reinterpret_cast<void *>(&clock_label_hook));
-+        replace_call(0x004C1C6E, reinterpret_cast<void *>(&main_menu_clock_hook));
++        original_call(0x004C1C6E,0x004BF020) && original_call(0x004BF099,0x004B77C0)) {
++        g_clock_renderer=reinterpret_cast<ClockRenderer>(get_relative_call(0x004C1C6E,0));
++        g_clock_label_renderer=reinterpret_cast<ClockLabelRenderer>(get_relative_call(0x004BF099,0));
++        replace_call(0x004BF099,reinterpret_cast<void *>(&clock_label_hook));
++        replace_call(0x004C1C6E,reinterpret_cast<void *>(&main_menu_clock_hook));
 +    }
-+    // Main-menu HP also needs the active-party row hooks when XP is off.
-+    if (FF8_US_VERSION && (enable_ff8_xp_bars || enable_ff8_hp_bars)) {
-+        if(original_call(0x4C1ADA,0x4C1D50))
-+            replace_call(0x4C1ADA,reinterpret_cast<void *>(&main_row_hook<0x4C1D50,26>));
-+        if(original_call(0x4C1AC2,0x4C1ED0))
-+            replace_call(0x4C1AC2,reinterpret_cast<void *>(&main_row_hook<0x4C1ED0,52>));
++    if(FF8_US_VERSION && (enable_ff8_xp_bars || enable_ff8_hp_bars)) {
++        if(original_call(0x4C1ADA,0x4C1D50)) replace_call(0x4C1ADA,reinterpret_cast<void *>(&main_row_hook<0x4C1D50,26>));
++        if(original_call(0x4C1AC2,0x4C1ED0)) replace_call(0x4C1AC2,reinterpret_cast<void *>(&main_row_hook<0x4C1ED0,52>));
 +    }
++    if(FF8_US_VERSION && (enable_ff8_xp_bars || g_better_hp_runtime_ready)) {
++        const auto hook=[&](unsigned address,unsigned target,void *replacement) {
++            if(original_call(address,target)) replace_call(address,replacement);
++            else if(enable_ff8_xp_bars) ffnx_error("XP Bars: unsupported widget call at %08X\n",address);
++        };
++        for(const unsigned call:character_widget_calls) hook(call,kCharacterWidget,reinterpret_cast<void *>(&character_widget_hook));
++    }
++    if(FF8_US_VERSION && (enable_ff8_xp_bars || g_better_hp_runtime_ready) &&
++        original_call(0x4C1AED,0x4C2090))
++        replace_call(0x4C1AED,reinterpret_cast<void *>(&reserve_widget_hook));
 +    if (!enable_ff8_xp_bars) return;
-+
-+    if (FF8_US_VERSION) {
-+        const auto hook = [&](unsigned address,unsigned target,void *replacement) {
++    if(FF8_US_VERSION) {
++        const auto hook=[&](unsigned address,unsigned target,void *replacement) {
 +            if(original_call(address,target)) replace_call(address,replacement);
 +            else ffnx_error("XP Bars: unsupported widget call at %08X\n",address);
 +        };
-+        for(const unsigned call : {0x4C08F4U,0x4CB66CU,0x4CC846U,0x4F6E8EU,0x4F6F17U,0x4F7361U,0x4F73EEU})
-+            hook(call,0x4C0780,reinterpret_cast<void *>(&character_widget_hook));
-+        hook(0x4C1AED,0x4C2090,reinterpret_cast<void *>(&reserve_widget_hook));
 +        hook(0x4D3DB5,0x4D3E40,reinterpret_cast<void *>(&gf_list_hook));
-+        for(const unsigned call : {0x4D3D34U,0x4D3D4AU})
-+            hook(call,0x4D41B0,reinterpret_cast<void *>(&gf_detail_hook));
++        for(const unsigned call:{0x4D3D34U,0x4D3D4AU}) hook(call,0x4D41B0,reinterpret_cast<void *>(&gf_detail_hook));
 +    }
-+    g_after_battle_renderer = reinterpret_cast<AfterBattleRenderer>(
-+        get_relative_call(ff8_externals.battle_menu_sub_4A3D20, 0x139));
-+    g_result_state = reinterpret_cast<ResultState>(get_relative_call(
-+        reinterpret_cast<std::uintptr_t>(g_after_battle_renderer), 0x9));
-+    g_active_viewport = reinterpret_cast<sprite_viewport **>(get_absolute_value(
-+        ff8_externals.engine_reset_viewport_sub_4972D0, 0x12));
-+    const auto row_call = reinterpret_cast<std::uintptr_t>(g_after_battle_renderer) + 0x2BD;
-+    g_result_row_renderer = reinterpret_cast<ResultRowRenderer>(get_relative_call(row_call, 0));
-+    replace_call(row_call, reinterpret_cast<void *>(&result_row_renderer_hook));
-+    replace_call(ff8_externals.battle_menu_sub_4A3D20 + 0x139,
-+        reinterpret_cast<void *>(&after_battle_renderer_hook));
++    g_after_battle_renderer=reinterpret_cast<AfterBattleRenderer>(
++        get_relative_call(ff8_externals.battle_menu_sub_4A3D20,0x139));
++    g_result_state=reinterpret_cast<ResultState>(get_relative_call(
++        reinterpret_cast<std::uintptr_t>(g_after_battle_renderer),0x9));
++    g_active_viewport=reinterpret_cast<sprite_viewport **>(get_absolute_value(
++        ff8_externals.engine_reset_viewport_sub_4972D0,0x12));
++    const auto row_call=reinterpret_cast<std::uintptr_t>(g_after_battle_renderer)+0x2BD;
++    g_result_row_renderer=reinterpret_cast<ResultRowRenderer>(get_relative_call(row_call,0));
++    replace_call(row_call,reinterpret_cast<void *>(&result_row_renderer_hook));
++    replace_call(ff8_externals.battle_menu_sub_4A3D20+0x139,reinterpret_cast<void *>(&after_battle_renderer_hook));
 +}
 +
 +void lexeditor_ff8_bars_draw()
@@ -30547,10 +30825,10 @@ index 0000000..48d5c89
 +}
 diff --git a/src/lexeditor_ff8_bars.h b/src/lexeditor_ff8_bars.h
 new file mode 100644
-index 0000000..8af1bd3
+index 0000000..64286d8
 --- /dev/null
 +++ b/src/lexeditor_ff8_bars.h
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,19 @@
 +#pragma once
 +
 +// Install FF8 renderer observations. This function is safe when all options
@@ -30562,9 +30840,17 @@ index 0000000..8af1bd3
 +
 +// Tell Renderer whether FFNx must create an ImGui frame for the bars.
 +bool lexeditor_ff8_bars_enabled();
++
++struct polygon_set;
++struct indexed_vertices;
++struct game_obj;
++
++bool lexeditor_ff8_hp_colors_requested();
++void lexeditor_ff8_hp_colors_draw_paletted2D(
++    struct polygon_set *, struct indexed_vertices *, struct game_obj *);
 diff --git a/src/lexeditor_ff8_flare.cpp b/src/lexeditor_ff8_flare.cpp
 new file mode 100644
-index 0000000..042c9f0
+index 0000000..4447822
 --- /dev/null
 +++ b/src/lexeditor_ff8_flare.cpp
 @@ -0,0 +1,101 @@
@@ -30671,7 +30957,7 @@ index 0000000..042c9f0
 +}
 diff --git a/src/lexeditor_ff8_flare_item.cpp b/src/lexeditor_ff8_flare_item.cpp
 new file mode 100644
-index 0000000..fe2fae6
+index 0000000..fe78d8a
 --- /dev/null
 +++ b/src/lexeditor_ff8_flare_item.cpp
 @@ -0,0 +1,241 @@
@@ -30918,7 +31204,7 @@ index 0000000..fe2fae6
 +extern "C" __declspec(dllexport) void __cdecl lexeditor_ff8_flare_transactions_enable(int enabled) {transactions_enabled=enabled!=0;}
 diff --git a/src/lexeditor_ff8_flare_menu.cpp b/src/lexeditor_ff8_flare_menu.cpp
 new file mode 100644
-index 0000000..ef942e3
+index 0000000..6da7ad7
 --- /dev/null
 +++ b/src/lexeditor_ff8_flare_menu.cpp
 @@ -0,0 +1,64 @@
@@ -30988,7 +31274,7 @@ index 0000000..ef942e3
 +extern "C" __declspec(dllexport) int __cdecl lexeditor_ff8_flare_menu_exit_install() {return prepare_menu_exit(true);}
 diff --git a/src/lexeditor_ff8_flare_owner.cpp b/src/lexeditor_ff8_flare_owner.cpp
 new file mode 100644
-index 0000000..5a06d21
+index 0000000..84437bd
 --- /dev/null
 +++ b/src/lexeditor_ff8_flare_owner.cpp
 @@ -0,0 +1,135 @@
@@ -31129,7 +31415,7 @@ index 0000000..5a06d21
 +}
 diff --git a/src/lexeditor_ff8_flare_owner.h b/src/lexeditor_ff8_flare_owner.h
 new file mode 100644
-index 0000000..98025c7
+index 0000000..33ee1ba
 --- /dev/null
 +++ b/src/lexeditor_ff8_flare_owner.h
 @@ -0,0 +1,7 @@
@@ -31142,7 +31428,7 @@ index 0000000..98025c7
 +int lexeditor_ff8_flare_owner_install();
 diff --git a/src/lexeditor_ff8_flare_shop.cpp b/src/lexeditor_ff8_flare_shop.cpp
 new file mode 100644
-index 0000000..60134c3
+index 0000000..196b2ef
 --- /dev/null
 +++ b/src/lexeditor_ff8_flare_shop.cpp
 @@ -0,0 +1,130 @@
@@ -31278,7 +31564,7 @@ index 0000000..60134c3
 +extern "C" __declspec(dllexport) int __cdecl lexeditor_ff8_flare_shop_install() {return prepare_shop(true);}
 diff --git a/src/lexeditor_ff8_gf_spellbooks.cpp b/src/lexeditor_ff8_gf_spellbooks.cpp
 new file mode 100644
-index 0000000..16c4468
+index 0000000..4d90efd
 --- /dev/null
 +++ b/src/lexeditor_ff8_gf_spellbooks.cpp
 @@ -0,0 +1,389 @@
@@ -31673,7 +31959,7 @@ index 0000000..16c4468
 +}
 diff --git a/src/lexeditor_ff8_gf_spellbooks.h b/src/lexeditor_ff8_gf_spellbooks.h
 new file mode 100644
-index 0000000..52399f0
+index 0000000..cd7bdc9
 --- /dev/null
 +++ b/src/lexeditor_ff8_gf_spellbooks.h
 @@ -0,0 +1,6 @@
@@ -31683,6 +31969,280 @@ index 0000000..52399f0
 +// Installation is guarded against the supported FF8_EN hook bytes and a
 +// validated direct/lexeditor/gf-spellbooks.bin runtime snapshot.
 +void lexeditor_ff8_gf_spellbooks_install();
+diff --git a/src/lexeditor_ff8_hp_colors.h b/src/lexeditor_ff8_hp_colors.h
+new file mode 100644
+index 0000000..f4f1305
+--- /dev/null
++++ b/src/lexeditor_ff8_hp_colors.h
+@@ -0,0 +1,30 @@
++#pragma once
++
++#include <algorithm>
++#include <cmath>
++#include <cstdint>
++
++struct LexeditorFf8HpRgb { std::uint8_t r; std::uint8_t g; std::uint8_t b; };
++
++inline std::uint8_t lexeditor_ff8_hp_lerp(std::uint8_t a, std::uint8_t b, double t)
++{
++    t = std::clamp(t, 0.0, 1.0);
++    return static_cast<std::uint8_t>(std::lround(
++        static_cast<double>(a) + (static_cast<double>(b) - a) * t));
++}
++
++inline LexeditorFf8HpRgb lexeditor_ff8_hp_rgb(std::uint32_t current, std::uint32_t maximum)
++{
++    if (maximum == 0) return {255, 255, 255};
++    const double ratio = std::min(1.0, static_cast<double>(current) / maximum);
++    if (ratio >= 0.5)
++        return {255, 255, lexeditor_ff8_hp_lerp(0, 255, (ratio - 0.5) / 0.5)};
++    if (ratio >= 0.25)
++        return {255, lexeditor_ff8_hp_lerp(128, 255, (ratio - 0.25) / 0.25), 0};
++    return {255, lexeditor_ff8_hp_lerp(0, 128, ratio / 0.25), 0};
++}
++
++inline bool lexeditor_ff8_hp_should_tint(std::uint32_t current, std::uint32_t maximum)
++{
++    return maximum != 0 && current != 0 && current < maximum;
++}
+diff --git a/src/lexeditor_ff8_interaction_indicators.cpp b/src/lexeditor_ff8_interaction_indicators.cpp
+new file mode 100644
+index 0000000..5125405
+--- /dev/null
++++ b/src/lexeditor_ff8_interaction_indicators.cpp
+@@ -0,0 +1,220 @@
++#include "lexeditor_ff8_interaction_indicators.h"
++#include "interaction_indicator.h"
++
++#include <algorithm>
++#include <cstdint>
++
++#include <imgui.h>
++
++#include "cfg.h"
++#include "common.h"
++#include "ff8.h"
++#include "globals.h"
++
++namespace {
++
++constexpr std::uintptr_t kFieldEntities = 0x01D9CF88;
++constexpr std::uintptr_t kFieldEntityCount = 0x01D9D019;
++constexpr std::uintptr_t kFieldPlayerEntity = 0x01CD8FD0;
++constexpr std::uintptr_t kFieldControlLock = 0x01CE4775;
++constexpr std::uintptr_t kFieldInstructions = 0x01D9CF50;
++constexpr std::uintptr_t kFieldEntrypoints = 0x01D9D0E4;
++constexpr std::uintptr_t kFieldOpcodeTable = 0x00B8DE94;
++constexpr std::uintptr_t kCardgameHandler = 0x005225A0;
++constexpr std::uintptr_t kDirectionAndDistance = 0x00477380;
++constexpr std::size_t kEntitySize = 0x264;
++
++constexpr std::size_t kPositionX = 0x190;
++constexpr std::size_t kPositionY = 0x194;
++constexpr std::size_t kPositionZ = 0x198;
++constexpr std::size_t kPlayerRadius = 0x1F6;
++constexpr std::size_t kTargetRadius = 0x1F8;
++constexpr std::size_t kTalkState = 0x218;
++constexpr std::size_t kFacing = 0x241;
++constexpr std::size_t kInteractionDisabled = 0x24B;
++constexpr std::size_t kScriptBase = 0x178;
++
++struct Target {
++    const std::uint8_t *entity = nullptr;
++    bool card = false;
++};
++
++using DirectionAndDistance = std::uint32_t(__cdecl *)(
++    const int *, const int *, int *);
++
++int fixed_position(const std::uint8_t *entity, std::size_t offset)
++{
++    return *reinterpret_cast<const std::int32_t *>(entity + offset) >> 12;
++}
++
++bool layout_supported()
++{
++    if (!ff8 || !FF8_US_VERSION) return false;
++    const auto *handlers =
++        reinterpret_cast<const std::uintptr_t *>(kFieldOpcodeTable);
++    return handlers[lexeditor_interaction_indicator::kCardgameOpcode] ==
++        kCardgameHandler;
++}
++
++bool talk_script_has_cardgame(const std::uint8_t *entity)
++{
++    const auto *entrypoints =
++        *reinterpret_cast<const std::uint16_t *const *>(kFieldEntrypoints);
++    const auto *instructions =
++        *reinterpret_cast<const std::uint32_t *const *>(kFieldInstructions);
++    if (entrypoints == nullptr || instructions == nullptr) return false;
++
++    const std::uint16_t base =
++        *reinterpret_cast<const std::uint16_t *>(entity + kScriptBase);
++    const std::uint32_t talk = static_cast<std::uint32_t>(base) + 2U;
++    if (talk >= 0x3FFE) return false;
++
++    // FF8 stores the runtime PC in dwords. Bit 15 on an entrypoint is metadata;
++    // the native loader masks it before using the instruction offset.
++    const std::uint16_t start = entrypoints[talk] & 0x7FFF;
++    const std::uint16_t end = entrypoints[talk + 1] & 0x7FFF;
++    if (end <= start) return false;
++    const std::size_t count = static_cast<std::size_t>(end - start);
++    return lexeditor_interaction_indicator::talk_script_has_cardgame(
++        instructions + start, count);
++}
++
++Target current_target()
++{
++    if (!layout_supported() ||
++        *reinterpret_cast<const std::uint8_t *>(kFieldControlLock) != 0) {
++        return {};
++    }
++
++    const auto *entities =
++        *reinterpret_cast<const std::uint8_t *const *>(kFieldEntities);
++    const unsigned count =
++        *reinterpret_cast<const std::uint8_t *>(kFieldEntityCount);
++    const int player_index =
++        *reinterpret_cast<const std::int16_t *>(kFieldPlayerEntity);
++    if (entities == nullptr || count == 0 ||
++        player_index < 0 || player_index >= static_cast<int>(count)) {
++        return {};
++    }
++
++    const auto *player = entities +
++        static_cast<std::size_t>(player_index) * kEntitySize;
++    const int player_position[3] = {
++        fixed_position(player, kPositionX),
++        fixed_position(player, kPositionY),
++        fixed_position(player, kPositionZ),
++    };
++    const std::uint8_t facing = player[kFacing];
++    const std::uint16_t player_radius =
++        *reinterpret_cast<const std::uint16_t *>(player + kPlayerRadius);
++    const auto direction_and_distance =
++        reinterpret_cast<DirectionAndDistance>(kDirectionAndDistance);
++
++    std::uint16_t best_error =
++        lexeditor_interaction_indicator::kFacingLimit;
++    const std::uint8_t *best = nullptr;
++
++    for (unsigned index = 0; index < count; ++index) {
++        if (index == static_cast<unsigned>(player_index)) continue;
++        const auto *target = entities +
++            static_cast<std::size_t>(index) * kEntitySize;
++        if (target[kInteractionDisabled] != 0 ||
++            *reinterpret_cast<const std::uint16_t *>(target + kTalkState) ==
++                0xFFFF) {
++            continue;
++        }
++
++        const int target_position[3] = {
++            fixed_position(target, kPositionX),
++            fixed_position(target, kPositionY),
++            fixed_position(target, kPositionZ),
++        };
++        if (target_position[0] == player_position[0] &&
++            target_position[1] == player_position[1]) {
++            continue;
++        }
++        if (!lexeditor_interaction_indicator::vertical_range(
++                player_position[2], target_position[2])) {
++            continue;
++        }
++
++        int distance = 0;
++        const std::uint8_t direction = static_cast<std::uint8_t>(
++            direction_and_distance(
++                player_position, target_position, &distance));
++        const std::uint16_t error =
++            lexeditor_interaction_indicator::facing_error(facing, direction);
++        const std::uint16_t target_radius =
++            *reinterpret_cast<const std::uint16_t *>(target + kTargetRadius);
++        if (!lexeditor_interaction_indicator::within_talk_radius(
++                distance, player_radius, target_radius)) {
++            continue;
++        }
++
++        // Native field_check_talk_interaction chooses the smallest facing
++        // error, not the shortest distance, and requires error < 0x40.
++        if (error < best_error) {
++            best_error = error;
++            best = target;
++        }
++    }
++
++    return best == nullptr
++        ? Target{}
++        : Target{best, talk_script_has_cardgame(best)};
++}
++
++float badge_width(const char *text)
++{
++    return ImGui::CalcTextSize(text).x + 22.0f;
++}
++
++void draw_badge(ImDrawList *draw, float x, float y,
++    const char *text, ImU32 edge, ImU32 fill)
++{
++    const ImVec2 size = ImGui::CalcTextSize(text);
++    const float width = size.x + 22.0f;
++    const float height = size.y + 12.0f;
++    const ImVec2 minimum(x, y);
++    const ImVec2 maximum(x + width, y + height);
++    draw->AddRectFilled(minimum, maximum, fill, 4.0f);
++    draw->AddRect(minimum, maximum, edge, 4.0f, 0, 1.5f);
++    draw->AddText(ImVec2(x + 11.0f, y + 6.0f),
++        IM_COL32(255, 255, 255, 255), text);
++}
++
++} // namespace
++
++bool lexeditor_ff8_interaction_indicators_enabled()
++{
++    if (!enable_ff8_interaction_indicators || !layout_supported()) return false;
++    const auto *mode = getmode_cached();
++    return mode != nullptr && mode->driver_mode == MODE_FIELD;
++}
++
++void lexeditor_ff8_interaction_indicators_draw()
++{
++    if (!lexeditor_ff8_interaction_indicators_enabled()) return;
++    const Target target = current_target();
++    if (target.entity == nullptr) return;
++
++    // The issue explicitly accepts a fixed-HUD fallback. Keeping this overlay
++    // screen-space avoids guessing field-model projection state and does not
++    // touch native interaction or field-script state.
++    ImDrawList *draw = ImGui::GetForegroundDrawList();
++    const ImVec2 display = ImGui::GetIO().DisplaySize;
++    constexpr float gap = 8.0f;
++    const float interact = badge_width("INTERACT");
++    const float card = target.card ? badge_width("CARD") : 0.0f;
++    const float total = interact + (target.card ? gap + card : 0.0f);
++    float x = std::max(8.0f, (display.x - total) * 0.5f);
++    const float y = std::max(8.0f, display.y * 0.80f);
++
++    draw_badge(draw, x, y, "INTERACT",
++        IM_COL32(216, 224, 255, 255), IM_COL32(12, 24, 72, 220));
++    if (target.card) {
++        x += interact + gap;
++        draw_badge(draw, x, y, "CARD",
++            IM_COL32(255, 220, 96, 255), IM_COL32(80, 48, 8, 228));
++    }
++}
+diff --git a/src/lexeditor_ff8_interaction_indicators.h b/src/lexeditor_ff8_interaction_indicators.h
+new file mode 100644
+index 0000000..4be5c84
+--- /dev/null
++++ b/src/lexeditor_ff8_interaction_indicators.h
+@@ -0,0 +1,6 @@
++#pragma once
++
++// Default-off field HUD cues for the same entity FF8 would choose for
++// Cross/Square interaction. The implementation never writes interaction state.
++bool lexeditor_ff8_interaction_indicators_enabled();
++void lexeditor_ff8_interaction_indicators_draw();
 diff --git a/src/lexeditor_ff8_modern_controls.cpp b/src/lexeditor_ff8_modern_controls.cpp
 new file mode 100644
 index 0000000..c9e1fa5
@@ -32039,7 +32599,7 @@ index 0000000..c9e1fa5
 +}
 diff --git a/src/lexeditor_ff8_modern_controls.h b/src/lexeditor_ff8_modern_controls.h
 new file mode 100644
-index 0000000..01ba598
+index 0000000..d95d98b
 --- /dev/null
 +++ b/src/lexeditor_ff8_modern_controls.h
 @@ -0,0 +1,8 @@
@@ -32053,7 +32613,7 @@ index 0000000..01ba598
 +int lexeditor_ff8_modern_world_axis(std::int8_t port, int type, std::int8_t offset);
 diff --git a/src/lexeditor_ff8_party_switch.cpp b/src/lexeditor_ff8_party_switch.cpp
 new file mode 100644
-index 0000000..3baa6e1
+index 0000000..2d8c290
 --- /dev/null
 +++ b/src/lexeditor_ff8_party_switch.cpp
 @@ -0,0 +1,317 @@
@@ -32385,7 +32945,7 @@ index 0000000..24bd147
 +void lexeditor_ff8_party_switch_tick();
 diff --git a/src/lexeditor_ff8_reptile_atb.cpp b/src/lexeditor_ff8_reptile_atb.cpp
 new file mode 100644
-index 0000000..89965ce
+index 0000000..34784c7
 --- /dev/null
 +++ b/src/lexeditor_ff8_reptile_atb.cpp
 @@ -0,0 +1,241 @@
@@ -32632,7 +33192,7 @@ index 0000000..89965ce
 +}
 diff --git a/src/lexeditor_ff8_reptile_atb.h b/src/lexeditor_ff8_reptile_atb.h
 new file mode 100644
-index 0000000..3cf7aa4
+index 0000000..3665b05
 --- /dev/null
 +++ b/src/lexeditor_ff8_reptile_atb.h
 @@ -0,0 +1,6 @@
@@ -32644,7 +33204,7 @@ index 0000000..3cf7aa4
 +void lexeditor_ff8_reptile_atb_install();
 diff --git a/src/lexeditor_ff8_shared_party.h b/src/lexeditor_ff8_shared_party.h
 new file mode 100644
-index 0000000..e7777a6
+index 0000000..3aee2be
 --- /dev/null
 +++ b/src/lexeditor_ff8_shared_party.h
 @@ -0,0 +1,14 @@
@@ -32664,7 +33224,7 @@ index 0000000..e7777a6
 +void lexeditor_ff8_shared_party_reset();
 diff --git a/src/lexeditor_ff8_stock_tweaks.cpp b/src/lexeditor_ff8_stock_tweaks.cpp
 new file mode 100644
-index 0000000..8c23b93
+index 0000000..8f90059
 --- /dev/null
 +++ b/src/lexeditor_ff8_stock_tweaks.cpp
 @@ -0,0 +1,68 @@
@@ -32738,7 +33298,7 @@ index 0000000..8c23b93
 +}
 diff --git a/src/lexeditor_ff8_stock_tweaks.h b/src/lexeditor_ff8_stock_tweaks.h
 new file mode 100644
-index 0000000..2a60cd8
+index 0000000..a12ef0a
 --- /dev/null
 +++ b/src/lexeditor_ff8_stock_tweaks.h
 @@ -0,0 +1,2 @@
@@ -32746,7 +33306,7 @@ index 0000000..2a60cd8
 +void lexeditor_ff8_stock_tweaks_install();
 diff --git a/src/lexeditor_ff8_toast.cpp b/src/lexeditor_ff8_toast.cpp
 new file mode 100644
-index 0000000..4012002
+index 0000000..dc2a235
 --- /dev/null
 +++ b/src/lexeditor_ff8_toast.cpp
 @@ -0,0 +1,168 @@
@@ -32954,10 +33514,10 @@ index 0000000..81ad8b9
 +// asserted against the Python that greys the command.
 +extern const char *const LEXEDITOR_SUMMON_UNAVAILABLE_REASON;
 diff --git a/src/overlay.cpp b/src/overlay.cpp
-index b2cc508..ecba856 100644
+index b2cc508..353e1a2 100644
 --- a/src/overlay.cpp
 +++ b/src/overlay.cpp
-@@ -1,396 +1,403 @@
+@@ -1,396 +1,405 @@
 -/****************************************************************************/
 -//    Copyright (C) 2009 Aali132                                            //
 -//    Copyright (C) 2018 quantumpencil                                      //
@@ -33385,6 +33945,7 @@ index b2cc508..ecba856 100644
 +#include "world.h"
 +#include "lighting_debug.h"
 +#include "lexeditor_ff8_bars.h"
++#include "lexeditor_ff8_interaction_indicators.h"
 +#include "lexeditor_ff8_toast.h"
 +
 +#define IMGUI_VIEW_ID 255
@@ -33689,6 +34250,7 @@ index b2cc508..ecba856 100644
 +    Update();
 +    ImGui::NewFrame();
 +    lexeditor_ff8_bars_draw();
++    lexeditor_ff8_interaction_indicators_draw();
 +    lexeditor_ff8_toast_draw();
 +
 +    // This is a placeholder UI
@@ -33758,20 +34320,21 @@ index b2cc508..ecba856 100644
 +        ImGui::GetIO().AddInputCharacterUTF16((unsigned short)e.keyChar);
 +}
 diff --git a/src/renderer.cpp b/src/renderer.cpp
-index ce629d7..672ec37 100644
+index ce629d7..10a1458 100644
 --- a/src/renderer.cpp
 +++ b/src/renderer.cpp
-@@ -38,6 +38,9 @@
+@@ -38,6 +38,10 @@
  #include "log.h"
  #include "cfg.h"
  #include "utils.h"
 +bool lexeditor_ff8_hide_startup_frame();
 +#include "lexeditor_ff8_bars.h"
++#include "lexeditor_ff8_interaction_indicators.h"
 +#include "lexeditor_ff8_toast.h"
  #include "renderer.h"
  
  CMRC_DECLARE(FFNx);
-@@ -404,7 +407,7 @@ void Renderer::destroyAll()
+@@ -404,7 +408,7 @@ void Renderer::destroyAll()
              bgfx::destroy(handle);
      }
  
@@ -33780,7 +34343,7 @@ index ce629d7..672ec37 100644
          overlay.destroy();
  };
  
-@@ -442,8 +445,35 @@ void Renderer::resetState()
+@@ -442,8 +446,35 @@ void Renderer::resetState()
      resetViewMatrixFlag();
  };
  
@@ -33816,7 +34379,7 @@ index ce629d7..672ec37 100644
      /*  y0    y2
       x0 +-----+ x2
          |    /|
-@@ -1029,7 +1059,7 @@ void Renderer::init()
+@@ -1029,7 +1060,7 @@ void Renderer::init()
  
      bgfx::frame();
  
@@ -33825,7 +34388,7 @@ index ce629d7..672ec37 100644
      {
          backendProgramHandles[RendererProgram::OVERLAY] = bgfx::createProgram(
              getShader(vertexOverlayPath.c_str()),
-@@ -1454,7 +1484,7 @@ void Renderer::discardAllBindings()
+@@ -1454,7 +1485,7 @@ void Renderer::discardAllBindings()
  
  void Renderer::drawOverlay()
  {
@@ -33850,7 +34413,7 @@ index d2d01dd..920ca0a 100644
      uint16_t getInternalCoordY(uint16_t inY);
 diff --git a/src/reptile_atb_runtime.h b/src/reptile_atb_runtime.h
 new file mode 100644
-index 0000000..656efe1
+index 0000000..c3c89a0
 --- /dev/null
 +++ b/src/reptile_atb_runtime.h
 @@ -0,0 +1,72 @@
@@ -34004,7 +34567,7 @@ index 0000000..db3b403
 +}  // namespace lexeditor_toast
 diff --git a/src/vehicle_drive.h b/src/vehicle_drive.h
 new file mode 100644
-index 0000000..b5a6342
+index 0000000..c79e739
 --- /dev/null
 +++ b/src/vehicle_drive.h
 @@ -0,0 +1,36 @@
