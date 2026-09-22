@@ -13,6 +13,22 @@ from .acceptance import acceptance_status, begin_acceptance
 from .content_pack import ContentPackStore, deploy, deployment_status, loader_status, revert
 from .source_data import load_base_objects
 
+try:
+    from plugin_http import PluginRequestHandler
+except ImportError:
+    class PluginRequestHandler(BaseHTTPRequestHandler):
+        """Branch fallback until the shared plugin_http helper lands here."""
+
+        def send_page_module(self, root: Path, path: str) -> bool:
+            name = path.strip("/")
+            if "/" in name or not name.endswith((".js", ".css")):
+                return False
+            module = (Path(root) / name).resolve()
+            if module.parent != Path(root).resolve() or not module.is_file():
+                return False
+            self.file_response(module)
+            return True
+
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
@@ -25,23 +41,6 @@ POST_ROUTES = {
     "/api/deployment/revert",
     "/api/acceptance/begin",
 }
-PAGE_MODULES = {"editor.css", "editor.js"}
-
-
-def send_page_module(handler, name: str) -> None:
-    """Serve one plugin-owned editor module without exposing arbitrary paths."""
-    if name not in PAGE_MODULES:
-        handler.json_response({"error": "Editor module not found"}, 404)
-        return
-    root = PLUGIN_ROOT.resolve()
-    target = (root / name).resolve()
-    if root not in target.parents or not target.is_file():
-        handler.json_response({"error": "Editor module not found"}, 404)
-        return
-    handler.file_response(target)
-
-
-
 def objects_dataset() -> dict:
     """Combine read-only vanilla values, when available, with project-owned overrides."""
     payload = ContentPackStore(paths.PROJECT_ROOT).objects()
@@ -117,7 +116,7 @@ def dashboard() -> dict:
     }
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(PluginRequestHandler):
     server_version = "LexeditorStardew/1"
 
     def log_message(self, _format, *_args): return
@@ -142,8 +141,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             if path == "/": self.file_response(PLUGIN_ROOT / "editor.html")
-            elif path in {"/editor.css", "/editor.js"}:
-                send_page_module(self, path.removeprefix("/"))
+            elif self.send_page_module(PLUGIN_ROOT, path):
+                return
             elif path.startswith("/shared/"):
                 shared = (LEXEDITOR_ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()

@@ -50,11 +50,13 @@ jobs:
           html = Path('games/stardew_valley/editor.html').read_text(encoding='utf-8')
           css = Path('games/stardew_valley/editor.css').read_text(encoding='utf-8')
           js = Path('games/stardew_valley/editor.js').read_text(encoding='utf-8')
-          script_tags = re.findall(r'<script[^>]*>', html, flags=re.I)
-          if '<style' in html.casefold() or not script_tags or any(
-              'src=' not in tag.casefold() for tag in script_tags
-          ):
-              raise SystemExit('Stardew editor.html must stay markup-only')
+          script_blocks = re.findall(r'<script([^>]*)>(.*?)</script>', html, flags=re.I | re.S)
+          inline_scripts = [body for attrs, body in script_blocks if 'src=' not in attrs.casefold()]
+          if ('<style' in html.casefold() or len(inline_scripts) != 1
+                  or 'lexTransition' not in inline_scripts[0]
+                  or any('src=' not in attrs.casefold() and 'lexTransition' not in body
+                         for attrs, body in script_blocks)):
+              raise SystemExit('Stardew editor.html must stay markup-only except for the transition boot')
           if 'href="editor.css"' not in html or 'src="editor.js"' not in html:
               raise SystemExit('Stardew editor modules are not linked relatively')
           if css.count(';') > 30 or '.lex-' in css:

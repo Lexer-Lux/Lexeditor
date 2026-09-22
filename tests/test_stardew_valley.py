@@ -68,11 +68,14 @@ class StardewContentPackTests(unittest.TestCase):
         css = (paths.PLUGIN_ROOT / "editor.css").read_text(encoding="utf-8")
         javascript = (paths.PLUGIN_ROOT / "editor.js").read_text(encoding="utf-8")
         server_source = (paths.PLUGIN_ROOT / "server.py").read_text(encoding="utf-8")
-        script_tags = re.findall(r"<script[^>]*>", html, flags=re.IGNORECASE)
+        script_blocks = re.findall(r"<script([^>]*)>(.*?)</script>", html, flags=re.IGNORECASE | re.DOTALL)
+        inline_scripts = [body for attrs, body in script_blocks if "src=" not in attrs.casefold()]
 
         self.assertNotIn("<style", html.casefold())
-        self.assertTrue(script_tags)
-        self.assertTrue(all("src=" in tag.casefold() for tag in script_tags))
+        self.assertEqual(len(inline_scripts), 1)
+        self.assertIn("lexTransition", inline_scripts[0])
+        self.assertTrue(all("src=" in attrs.casefold() or "lexTransition" in body
+                            for attrs, body in script_blocks))
         self.assertIn('href="editor.css"', html)
         self.assertIn('src="editor.js"', html)
         self.assertLessEqual(css.count(";"), 30)
@@ -83,9 +86,8 @@ class StardewContentPackTests(unittest.TestCase):
             'label: "Sell price"', 'label: "Edibility"', 'label: "Drink"',
         ):
             self.assertIn(token, javascript)
-        self.assertIn("send_page_module", server_source)
-        self.assertIn('"/editor.css"', server_source)
-        self.assertIn('"/editor.js"', server_source)
+        self.assertIn("from plugin_http import PluginRequestHandler", server_source)
+        self.assertIn("self.send_page_module(PLUGIN_ROOT, path)", server_source)
 
     def test_project_identity_is_stable_and_distinguishes_same_named_projects(self):
         first = self.root / "one" / "Same Name"

@@ -1,17 +1,5 @@
 "use strict";
 
-(() => {
-  const parameters = new URLSearchParams(location.search);
-  const transition = parameters.get("lexTransition");
-  if (!["load", "resume"].includes(transition)) return;
-  const root = document.documentElement;
-  root.classList.add("lex-transition-entry");
-  if (transition === "load") {
-    root.dataset.lexQuote = parameters.get("lexQuote") || "Loading editor…";
-    root.classList.add("lex-transition-loading");
-  }
-})();
-
 const {
   el, columnList, columnPreferences, detailPanel, detailSection, detailField,
   readonlyField, recordId, infoHelp, infoIcon, pagedListDetail, clone, booleanMark,

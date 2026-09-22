@@ -48,7 +48,32 @@ Result: first-time bundled helper installation and two-row Updates-drawer report
 
 ## Shared API dependency
 
-The live remote branch still passes `subtitle` and `description` to `GamePlugin` because the remote shared API currently defines those fields. Lexer has a local shared-API change removing that metadata. This Stardew PR must not independently modify the shared `GamePlugin` API or add new subtitle/description metadata; once the shared change lands, the Stardew constructor should simply follow the updated API during normal branch reconciliation.
+Current master `72ee978a2ff36686a6349696b19860057356468a` has removed `subtitle` and `description` from `GamePlugin`. This older Stardew branch still requires those constructor arguments until it reconciles the shared API. This Stardew PR does not independently edit `plugin_api.py` or add new subtitle/description metadata; remove the now-obsolete arguments only as part of normal reconciliation with the landed shared API.
+
+## Current-guide UI audit (2026-09-22)
+
+Re-baselined against current master `72ee978a2ff36686a6349696b19860057356468a` before the rendered merge-target run:
+
+- `docs/ADDING_A_GAME.md` `7fe6d35dd82fa3fe4e6378ca558ecbb0a316c4c0`
+- `docs/UI-MANUAL.md` `14a3269992031d7e7893fcb127728a48b944e71f`
+- `AGENTS.md` `41355ce0b783c55a03ad250ed279666f785c6e67`
+- `ui/component-catalog.js` `a11e52e31ee92bce495c6cbf54a66d4597d52139`
+- Blank gallery: `editor.html` `b0b235d010952bf0c7524dcce172ef72f7cf63e4`, `editor.js` `bec94d0c192225472282c5c591d568a104073fc8`, `editor.css` `4e01602ce0f339781cae766d4b6d7541bb7bae89`
+- RDR2 page `editor.html` `899bfdb45cbf25da55aed43a590db6ee476b523b`; Table + Detail examples reviewed in `crafting.js` `a92cd8c91c982bf1d3e896e660b4b27c474c6287`, `effects.js` `ae814a15453ffe3b6b39eb9889721cc31ac2ce45`, `loot.js` `5483171206dccd0ecf4644f1ab5a42d90b06accc`, with shared state/edit patterns in `core.js` `19930136412504bb471edfb9021901c839292b8e`.
+
+Stardew-side conformance/evidence:
+
+- `editor.html` is markup-only except for the guide-sanctioned one-line transition boot in `<head>`; plugin JS/CSS load by relative path.
+- The service uses `self.send_page_module(PLUGIN_ROOT, path)` when the current shared `plugin_http.py` is available, with a branch-local equivalent only so this older branch stays runnable before shared reconciliation.
+- Plugin CSS styles only Stardew-owned classes/tokens and stays below its local budget; no `.lex-*` selector clone is added.
+- The shared shell owns Information, Data Map, save/discard, and page navigation. Data Map uses the shared integration-status UI on the current-master rendered pass.
+- Objects is a shared paged Table + Detail view with 96+ synthetic records during browser acceptance, searchable/sortable identity columns, shared cell editors, semantic BOOL/INT controls, grouped detail sections, and gameplay-facing help for sell price, edibility/energy/health, and drink behavior.
+- Loading, empty-search, stale-save error, dirty/save/discard/reopen, keyboard help, keyboard divider resize, pagination, sorting, selection, table editing, Data Map routing, and the final controls of the tall Information panel are exercised by `tests/stardew_valley_browser_check.py`.
+- The rendered workflow tests both this branch's shared UI and an exact current-master `framework.js/framework.css` overlay at 1440x900, 900x620, and 1100x760 at 135% scale. Passing source/API/smoke checks are not substituted for this rendered evidence.
+- No Tweaks page is added: this vertical slice has no separate supported settings dataset to expose, so inventing one would violate the scope/semantics rule.
+- Credits and Mod Loading already contain the Stardew sources, loader structure, and cross-mod conflict model.
+
+Remaining shared/setup limits are the helper-model/distribution constraints above and the landed `GamePlugin` metadata API reconciliation. Neither justifies a Stardew-local fork of shared infrastructure. Real Windows/Steam in-game acceptance remains separate from agent-side rendered acceptance.
 
 ## Installed acceptance contract
 
