@@ -13,7 +13,7 @@ from games.chrono_trigger.field_data import load_exits, load_treasure, save_exit
 from games.chrono_trigger.palette_data import load_palette, save_palette
 from games.chrono_trigger.project import OverlayStore
 from games.chrono_trigger.scene_data import load_scenes, save_scene
-from games.chrono_trigger.scene_map_data import load_scene_map, save_scene_map
+from games.chrono_trigger.scene_map_data import load_scene_map, save_scene_map, load_scene_properties, save_scene_properties
 from games.chrono_trigger.text_data import load_messages, save_messages
 from games.chrono_trigger.tileset_data import load_graphics_sets, save_graphics_set, load_tile_assemblies, save_tile_assembly
 from games.chrono_trigger.world_data import (
@@ -62,7 +62,7 @@ class FreshChronoTriggerTests(unittest.TestCase):
         scene_map = bytearray(bytes([0, 0, 0x21, 0x43, 0x5A, 0xC3]) + bytes(16 * 16 * 2))
         scene_map[6] = 3
         scene_map[6 + 16 * 16] = 4
-        scene_map.extend(bytes([0x01, 0, 0, 0x80, 0, 0, 255]))
+        scene_map.extend(bytes([0x01, 0, 0, 0x80, 0x20, 0x10, 255]))
         graphics_sets = bytes([1, 2, 3, 4, 5, 6, 7, 0xFF]) + b"\xDD"
         assembly_l12 = bytearray(512 * 4 * 3 + 1)
         struct.pack_into("<HB", assembly_l12, 0, 300 | 0x0400 | (5 << 12), 0xA1)
@@ -257,6 +257,45 @@ class FreshChronoTriggerTests(unittest.TestCase):
                 save_scene_map(store, path, saved["sha256"], [
                     {"token": layer1["token"], "values": {"tileIndex": 9}},
                 ])
+
+    def test_scene_property_run_edit_preserves_rle_repeat_and_unknown_bits(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            path = "Game/field/MapTable/MapTable_0006.dat"
+            data = load_scene_properties(store, path)
+            self.assertEqual((data["expectedTiles"], data["expandedTiles"], data["trailingPropertyBytes"]),
+                             (256, 256, 0))
+            row = next(value for value in data["rows"] if value["token"] == "6:prop:1")
+            self.assertEqual((row["compressed"], row["repeatCount"], row["startTile"], row["endTile"],
+                              row["unknownSecondBit5"], row["unknownThirdBit4"]),
+                             (True, 255, 1, 255, True, True))
+            before, _ = store.read(path, "mine")
+            saved = save_scene_properties(store, path, data["sha256"], [{
+                "token": row["token"], "values": {
+                    "collisionCode": 30, "moveDirection": 3, "moveSpeed": 2,
+                    "doorTrigger": True, "priorityTop": True, "npcCollisionBattle": True,
+                    "zPlane": 2, "collisionIgnoreZ": True, "collisionInverted": True,
+                    "zNeutral": True, "priorityBottom": True, "npcCollision": True,
+                },
+            }])
+            updated = next(value for value in saved["rows"] if value["token"] == row["token"])
+            self.assertEqual((updated["collisionCode"], updated["collisionName"], updated["moveDirectionName"],
+                              updated["moveSpeed"], updated["zPlane"]),
+                             (30, "Ladder", "West", 2, 2))
+            after, origin = store.read(path, "mine")
+            self.assertEqual(origin, "project")
+            self.assertEqual(after[:row["byteOffset"]], before[:row["byteOffset"]])
+            self.assertEqual(after[row["byteOffset"] + 3:], before[row["byteOffset"] + 3:])
+            self.assertTrue(after[row["byteOffset"]] & 0x80)
+            self.assertTrue(after[row["byteOffset"] + 1] & 0x20)
+            self.assertTrue(after[row["byteOffset"] + 2] & 0x10)
+            self.assertEqual(after[row["byteOffset"] + 3], 255)
+            self.assertEqual(archive.read_bytes(), original_archive)
+            with self.assertRaisesRegex(ValueError, "documented code 0 through 30"):
+                save_scene_properties(store, path, saved["sha256"], [{
+                    "token": row["token"], "values": {"collisionCode": 31},
+                }])
 
     def test_graphics_set_edit_preserves_sentinel_shape_trailing_and_archive(self):
         with tempfile.TemporaryDirectory() as tmp:
