@@ -197,6 +197,18 @@ ASSEMBLIES = {
          "fileTrailingBytes": 1},
     ],
 }
+SPRITES = {
+    "source": "vanilla",
+    "rows": [{
+        "token": "5", "id": 5, "path": "Game/chara/dat/c005.dat",
+        "source": "vanilla", "sha256": "sprite-sha-1",
+        "storedBitmapIndex": 9, "storedAssemblyIndex": 8, "storedPaletteIndex": 7,
+        "sizeGroupCode": 0, "primaryEnemy": True, "unknownSizeFlags": 0xA4,
+        "animationIndex": 5, "unknownFlags": 0xD2, "enemyDescriptor": True,
+        "handX": -2, "handY": 3, "enemyUnknown1": 0x11, "enemyUnknown2": 0x22,
+        "enemyUnknown3": 0x33, "trailingBytes": 1,
+    }],
+}
 CHIP_ANIMATIONS = {
     "source": "vanilla",
     "files": [{"path": "Game/field/BGAnime/bganimeinfo_4.dat", "fileId": 4, "source": "vanilla",
@@ -256,6 +268,7 @@ DATA_MAP = {"rows": [
     {"filename": "Game/field/BGSetTable/bgsettable_*.dat", "controls": "Tileset graphics sets", "notes": "Eight fixed graphics-set references.", "coverage": "structured", "status": "integrated", "openable": True, "target": "tilesets"},
     {"filename": "Game/field/ChipTable/ChipTable_*.dat + ChipTableBg3_*.dat", "controls": "Tile assemblies", "notes": "Fixed 3-byte tile corners.", "coverage": "structured", "status": "integrated", "openable": True, "target": "assemblies"},
     {"filename": "Game/field/BGAnime/bganimeinfo_*.dat", "controls": "Animated map tiles", "notes": "Existing fixed-count current-PC chip animations.", "coverage": "structured", "status": "integrated", "openable": True, "target": "animations"},
+    {"filename": "Game/chara/dat/c*.dat", "controls": "Sprite descriptors", "notes": "Bounded current-PC sprite header fields.", "coverage": "structured", "status": "integrated", "openable": True, "target": "sprites"},
     {"filename": "Game/common/bankc6.bin @ 0xFD10", "controls": "World settings", "notes": "Seven fixed 23-byte Steam world headers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worlds"},
     {"filename": "Game/world/Map/Map_*.dat", "controls": "World map tiles", "notes": "Two fixed 96x64 layers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worldmaps"},
     {"filename": "Game/world/Id/Id_*.dat", "controls": "World tile properties", "notes": "Fixed property nibbles.", "coverage": "structured", "status": "integrated", "openable": True, "target": "worldprops"},
@@ -280,7 +293,7 @@ def editor_html() -> str:
     )
     fixtures = {
         "dashboard": DASHBOARD, "textFiles": TEXT_FILES, "messages": MESSAGES, "scenes": SCENES,
-        "sceneMapFiles": SCENE_MAP_FILES, "sceneMap": SCENE_MAP, "sceneProps": SCENE_PROPS, "sceneRender": SCENE_RENDER, "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "worldFiles": WORLD_FILES, "worldMap": WORLD_MAP, "worldProps": WORLD_PROPS, "worldMusic": WORLD_MUSIC, "worldColors": WORLD_COLORS, "worldNavigation": WORLD_NAVIGATION, "animations": CHIP_ANIMATIONS, "graphicsSets": GRAPHICS_SETS, "assemblies": ASSEMBLIES, "dataMap": DATA_MAP, "changes": CHANGES,
+        "sceneMapFiles": SCENE_MAP_FILES, "sceneMap": SCENE_MAP, "sceneProps": SCENE_PROPS, "sceneRender": SCENE_RENDER, "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "worldFiles": WORLD_FILES, "worldMap": WORLD_MAP, "worldProps": WORLD_PROPS, "worldMusic": WORLD_MUSIC, "worldColors": WORLD_COLORS, "worldNavigation": WORLD_NAVIGATION, "animations": CHIP_ANIMATIONS, "graphicsSets": GRAPHICS_SETS, "assemblies": ASSEMBLIES, "sprites": SPRITES, "dataMap": DATA_MAP, "changes": CHANGES,
     }
     stub = r"""
     window.__posts=[];
@@ -370,6 +383,10 @@ def editor_html() -> str:
           for(const row of f.assemblies.rows){row.sha256="assembly-sha-2";row.source="project";}
           result={path:body.path,kind:"layer12",fileId:4,tileCount:512,source:"project",
                   sha256:"assembly-sha-2",trailingBytes:1,rows:f.assemblies.rows};
+        }else if(path==="/api/sprite-headers/save"){
+          const row=f.sprites.rows.find(value=>value.path===body.path);
+          if(row){Object.assign(row,body.values||{});row.sha256="sprite-sha-2";row.source="project";}
+          result=row;
         }else if(path==="/api/exits/save")result=f.exits;
         else if(path==="/api/treasure/save")result=f.treasure;
         else result={};
@@ -395,6 +412,7 @@ def editor_html() -> str:
       else if(path==="/api/chip-animations")result=f.animations;
       else if(path==="/api/graphics-sets")result=f.graphicsSets;
       else if(path==="/api/tile-assemblies")result=f.assemblies;
+      else if(path==="/api/sprite-headers")result=f.sprites;
       else if(path==="/api/exits")result=f.exits;
       else if(path==="/api/treasure")result=f.treasure;
       else {status=404;result={error:"Unknown fixture request "+path};}
@@ -619,6 +637,24 @@ def main():
                 assert page.get_by_label("CHIP INDEX",exact=True).input_value()=="511"
                 assert page.get_by_label("UNKNOWN PRIORITY BITS",exact=True).input_value()=="0xA0"
                 page.screenshot(path=str(ARTIFACTS/f"tile-assemblies-{width}.png"),full_page=True)
+                page.get_by_label("Tile data",exact=True).select_option("sprites")
+                page.get_by_label("UNKNOWN SIZE FLAGS",exact=True).wait_for()
+                assert page.get_by_label("STORED BITMAP",exact=True).input_value()=="9"
+                assert page.get_by_label("UNKNOWN SIZE FLAGS",exact=True).input_value()=="0xA4"
+                assert page.get_by_label("UNKNOWN FLAGS",exact=True).input_value()=="0xD2"
+                assert page.get_by_label("ENEMY UNKNOWN 1",exact=True).input_value()=="0x11"
+                page.get_by_label("SIZE GROUP CODE",exact=True).fill("2")
+                page.get_by_label("PRIMARY ENEMY",exact=True).uncheck()
+                page.get_by_label("ANIMATION SET",exact=True).fill("9")
+                page.get_by_label("HAND X",exact=True).fill("-8")
+                page.get_by_label("HAND Y",exact=True).fill("12")
+                page.wait_for_function("!document.querySelector('#global-save')?.disabled")
+                page.locator("#global-save").click()
+                page.wait_for_function("document.querySelector('#global-save')?.disabled")
+                assert page.evaluate("window.__posts.some(value=>value.path==='/api/sprite-headers/save')")
+                assert page.get_by_label("UNKNOWN SIZE FLAGS",exact=True).input_value()=="0xA4"
+                assert page.get_by_label("ANIMATION SET",exact=True).input_value()=="9"
+                page.screenshot(path=str(ARTIFACTS/f"sprite-descriptors-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Area Exits").click()
                 page.locator("#main").get_by_text("PRESERVED BITS", exact=True).wait_for()
