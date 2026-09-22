@@ -10,7 +10,7 @@
 
 ## Current implementation and evidence
 
-Draft PR: #501 on `codex/ff8-interaction-indicators-302`.
+PR #501 is integrated with local work and PRs #499/#500/#502.
 
 The supported Steam English `FF8_EN.exe` was supplied privately and verified as
 SHA-256 `064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570`.
@@ -35,7 +35,7 @@ round-trip tests and a Windows FFNx build gate.
 
 ## Remaining acceptance boundary
 
-- Download and inspect a successful exact-head Windows FFNx candidate; source success alone is not delivery.
+- Build 35798579648 passed at f12a03d5. The downloaded DLL (`cf8aa19d233aa6cc69965ac8961759f5aadb7a1670926547e2ca07d052ad9621`) passed linked checks and compilation-input comparison before being added to the managed package. Native/UI workflow 35799144379 also passed. The user's game installation was not changed.
 - Retail classifier check passed: all 37 Talk scripts from the installed `bghall_1.jsm` and matching `.sym` were passed through the compiled production classifier. Only `seito6`, `seito7`, `seito8` and `seito10` matched. Private script bytes remained in a temporary harness and were removed after the test.
 - In a live game, verify ordinary targets show INTERACT, the four known Garden card players add
   CARD, out-of-range/facing-away/locked states show nothing, and Cross/Square behavior remains
