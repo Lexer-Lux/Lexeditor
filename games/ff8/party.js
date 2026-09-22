@@ -15,7 +15,7 @@
     const table=columnList({rows:sorted,key:field=>field.field,editable:true,fill:true,
       sortState:{key:sortKey,dir:sortDir},sort:key=>{state.gfSorts.compatibility=[key,sortKey===key?-sortDir:1];if(view==="magic")renderKernel("magic","Magic");else renderGFs()},
       template:"minmax(135px,1fr) minmax(75px,100px)",
-      columns:[{key:"label",label:"GF",help:view==="magic"?"Casting this spell changes compatibility with each listed GF by this amount.":"Summoning this GF changes the summoner’s compatibility with each listed GF by this amount.",sortable:true,render:gfCompatibilityLabel},
+      columns:[{key:"label",label:"GF",align:"start",help:view==="magic"?"Casting this spell changes compatibility with each listed GF by this amount.":"Summoning this GF changes the summoner’s compatibility with each listed GF by this amount.",sortable:true,render:gfCompatibilityLabel},
         {key:"value",label:"Change",sortable:true,render:field=>fieldSourceControl(field,view,rowId)}]});
     table.dataset.gfPanel="compatibility";
     return table;

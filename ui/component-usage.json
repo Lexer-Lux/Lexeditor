@@ -434,6 +434,10 @@
       "rdr2",
       "warband"
     ],
+    "iconValue": [
+      "blank",
+      "ff8"
+    ],
     "imageMap": [
       "blank",
       "ff8"
@@ -761,6 +765,10 @@
       "rdr",
       "rdr2"
     ],
+    "quantityChoice": [
+      "blank",
+      "ff8"
+    ],
     "readonlyField": [
       "blank",
       "ff7",
@@ -835,6 +843,11 @@
       "warband"
     ],
     "sectionParts": [
+      "ff8",
+      "rdr2"
+    ],
+    "selectionIcon": [
+      "blank",
       "ff8",
       "rdr2"
     ],

@@ -237,7 +237,7 @@ function dispatchSection() {
     const ek=r.group+"|"+r.field;
     const cur=isRO()?r.value:(state.dispatchEdits[ek]??r.value);
     const vRow=vd&&vd.rows.find(x=>x.group===r.group&&x.field===r.field);
-    const inp=el("input",{type:"number",step:"any",value:cur,style:"width:100px",
+    const inp=el("input",{type:"number",step:"any",value:cur,
       "aria-label":`${dispatchLabel(r.group)} ${r.field}`,
       class:ek in state.dispatchEdits?"edited":"",
       onchange:ev=>{
@@ -331,7 +331,7 @@ async function renderCrime() {
     const isMoney = kind === "money";
     const inp = el("input", { type: "number", step: isMoney ? "0.01" : "any",
       value: isMoney ? fmtMoney(+raw) : (+raw % 1 ? (+raw).toFixed(2) : String(+raw)),
-      style: "width:70px", class: ek in state.crimeEdits ? "edited" : "",
+      class: ek in state.crimeEdits ? "edited" : "",
       "aria-label": `${c.key} ${label}`,
       onchange: ev => {
         const v = isMoney ? String(Math.round(parseFloat(ev.target.value || "0") * 100))
@@ -348,7 +348,7 @@ async function renderCrime() {
     const sevEk = c.key + "|severity";
     const severityValue = isRO() ? c.severity : (state.crimeEdits[sevEk] ?? c.severity);
     const vRow = vanillaRow(c), ctRow = tweakRow(c);
-    const sev = el("select", { class: "key", style: "width:90px", disabled: isRO(),
+    const sev = el("select", { class: "key", disabled: isRO(),
       "aria-label": `${c.key} severity`,
       onchange: ev => {
         if (ev.target.value === c.severity) delete state.crimeEdits[sevEk];

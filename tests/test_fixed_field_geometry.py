@@ -10,24 +10,33 @@ from test_shared_ui_feedback import ROOT, page, framework
 
 @pytest.mark.parametrize('theme', ['ff8', 'ff7r2', 'rdr2'])
 @pytest.mark.parametrize('platform',[False,True])
-def test_name_lane_stays_fixed_when_panel_resizes(page, theme, platform):
+def test_name_lane_keeps_names_readable_when_panel_resizes(page, theme, platform):
+    # The lane is a tenth-ish of the field (7.5%) and grows only when a name
+    # cannot be read in it. Names used to shrink to fit a fixed lane, which in
+    # a narrow panel meant text a few pixels high.
     framework(page)
     page.add_style_tag(path=str(ROOT / f'games/{theme}/editor.css'))
     page.evaluate('''()=>{const U=LexeditorUI;document.querySelector('main').append(
-      U.detailField({label:'A very long property name',control:U.el('input',{value:4})}));
-      document.documentElement.style.setProperty('--lex-detail-label-width','50%');}''')
+      U.detailField({label:'A very long property name',control:U.el('input',{value:4})}),
+      U.detailField({label:'HP',control:U.el('input',{value:4})}));}''')
     if platform:
-        page.locator('.lex-detail-field').evaluate("n=>n.classList.add('lex-platform-config-field')")
+        page.locator('.lex-detail-field').first.evaluate("n=>n.classList.add('lex-platform-config-field')")
     for width in [1000, 500, 800]:
         page.locator('main').evaluate('(n,w)=>n.style.width=w+"px"', width)
-        page.wait_for_timeout(180)
-        result=page.locator('.lex-detail-field').evaluate('''n=>{
+        page.wait_for_timeout(250)
+        result=page.locator('.lex-detail-field').first.evaluate('''n=>{
           const css=getComputedStyle(n),label=n.querySelector('.lex-detail-field-label');
           const available=n.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight);
-          return {ratio:parseFloat(css.gridTemplateColumns)/available,
+          return {ratio:parseFloat(css.gridTemplateColumns)/available,size:parseFloat(getComputedStyle(label).fontSize),
             fits:label.scrollWidth<=label.clientWidth+1&&label.scrollHeight<=label.clientHeight+1};}''')
-        assert abs(result['ratio']-.075)<.001, result
+        assert result['ratio'] >= .075 - .001, result
+        assert result['ratio'] <= .5 + .001, result
+        assert result['size'] >= 9, result
         assert result['fits'], result
+        # Every name in the panel shares the one lane.
+        lanes = page.locator('.lex-detail-field').evaluate_all(
+            "ns=>ns.map(n=>Math.round(n.querySelector('.lex-detail-field-label').getBoundingClientRect().width))")
+        assert len(set(lanes)) == 1, lanes
 
 
 def test_selected_row_does_not_move_text_and_keeps_pointer_gap(page):

@@ -88,7 +88,19 @@
       detailField({label:"J-STATUS (DEFENSE)",control:magicComposite(take("j_status_defense_value"),take("j_status_defend"),row.id)}),
     ];
     const compat=row.fields.filter(field=>field.group==="GF Compatibility");compat.forEach(field=>used.add(field.field));
-    const body=[detailSection({title:"ATTACK DATA",help:infoHelp("Change what this spell does when cast."),body:generalRows}),detailSection({title:"JUNCTION",help:infoHelp("Change the bonuses granted when this spell is junctioned."),body:junctionRows})];
+    // What the spell does when cast and what it gives when junctioned are two
+    // halves of one record, read one at a time: a tab each, as the GF panel
+    // splits its properties from its defaults.
+    const sections={
+      attack:()=>detailSection({title:"ATTACK DATA",help:infoHelp("Change what this spell does when cast."),body:generalRows}),
+      junction:()=>detailSection({title:"JUNCTION",help:infoHelp("Change the bonuses granted when this spell is junctioned."),body:junctionRows}),
+    };
+    const active=sections[state.magicDetailTab]?state.magicDetailTab:"attack";
+    const body=[LexeditorUI.tabbedPanel({label:"Magic details",active,
+      tabs:[{id:"attack",label:"Attack data",help:"What this spell does when it is cast: animation, power, targeting, element and status."},
+        {id:"junction",label:"Junction",help:"What this spell gives the character it is junctioned to: stat bonuses, elemental and status attack and defence."}],
+      change:id=>{state.magicDetailTab=id;renderKernel("magic","Magic")},
+      content:sections[active]()})];
     const detail=sharedDetail({...row,titleContent:magicLabel(row)},prefs,body,"magic-detail");
     return detail;
   }

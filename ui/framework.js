@@ -981,7 +981,10 @@
       // tiny, so pagination measured a shorter card than the one later shown.
       if (!control.getClientRects().length || control.clientWidth <= 0) return "";
       const style = getComputedStyle(control);
-      const maximum = control instanceof HTMLTextAreaElement
+      // A table cell's value is the table's text: it may shrink to fit a
+      // narrow column but never grows past the rows around it, which a box
+      // the height of the row otherwise invited.
+      const maximum = control instanceof HTMLTextAreaElement || control.closest(".lex-column-list")
         ? Number.parseFloat(style.fontSize) || 16
         : Math.max(minimum,Math.min(28,control.clientHeight*.78));
       const horizontal = (Number.parseFloat(style.paddingLeft) || 0) +
@@ -3093,10 +3096,79 @@
     const columnCount = length => {
       const width=content.clientWidth||scroll.clientWidth;
       const gap=parseFloat(getComputedStyle(content).columnGap)||12;
-      const target=parseFloat(getComputedStyle(content).getPropertyValue("--lex-tweak-card-width"))||320;
-      return Number.isInteger(options.columns)&&options.columns>0?options.columns:Math.max(1,Math.min(length,Math.floor((width+gap)/(target+gap))||1));
+      const asked=parseFloat(getComputedStyle(content).getPropertyValue("--lex-tweak-card-width"));
+      const target=asked||320;
+      const fit=Math.max(1,Math.min(length,Math.floor((width+gap)/(target+gap))||1));
+      // `columns` is a ceiling, not a count: six fixed columns made three
+      // cards a sixth of the window each, truncating every value in them,
+      // beside three empty columns. A page never has more columns than
+      // cards, and a game that asks for a card width gets no narrower ones.
+      if(Number.isInteger(options.columns)&&options.columns>0)return Math.max(1,Math.min(options.columns,length,asked?fit:options.columns));
+      return fit;
     };
-    const paginate = visible => {
+    // A section taller than a page goes on in the next column, its title
+    // repeated. Each fit starts from the whole sections again, so a larger
+    // window joins them back up.
+    let pieces = [];
+    const joinSections = () => {
+      // Newest first, each back into the section it was cut from, so a
+      // section cut twice gets its rows back in order.
+      for (const {source, piece} of pieces.reverse()) {
+        const body = source.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body)");
+        const rest = piece.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body)");
+        if (body && rest) body.append(...rest.children);
+        piece.remove();
+        const at = cards.indexOf(piece);
+        if (at >= 0) cards.splice(at, 1);
+      }
+      pieces = [];
+    };
+    // A section splits between its rows; a panel between its sections.
+    const splitSection = (card, available) => {
+      const panel = card.matches(".lex-detail-panel");
+      if (!panel && !card.matches(".lex-detail-section")) return false;
+      const title = panel ? card.querySelector(":scope > .lex-detail-panel-heading") : card.querySelector(":scope > .lex-detail-section-title");
+      const body = card.querySelector(panel ? ":scope > .lex-detail-panel-body" : ":scope > .lex-detail-section-content");
+      const rows = body ? [...body.children] : [];
+      if (rows.length < 2) return false;
+      const outer = card.getBoundingClientRect(), inner = body.getBoundingClientRect();
+      const scale = outer.height / Math.max(1, card.offsetHeight) || 1;
+      const above = (inner.top - outer.top) / scale, below = (outer.bottom - inner.bottom) / scale;
+      let keep = 0;
+      for (let index = 0; index < rows.length; index++) {
+        const through = (rows[index].getBoundingClientRect().bottom - inner.top) / scale;
+        if (above + through + below > available - 1) break;
+        keep = index + 1;
+      }
+      // One row taller than the page cannot be helped by splitting.
+      if (keep < 1 || keep >= rows.length) return false;
+      const named = panel ? title?.querySelector(".lex-detail-panel-title") : title;
+      const name = (panel ? named?.textContent || "" : [...(title?.childNodes || [])].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join(""))
+        .trim().replace(/ \(continued\)$/, "");
+      const piece = card.cloneNode(false);
+      piece.classList.add("lex-detail-section-continued");
+      const rest = body.cloneNode(false);
+      rest.append(...rows.slice(keep));
+      let head = null;
+      if (panel && title) {
+        head = title.cloneNode(true);
+        const copy = head.querySelector(".lex-detail-panel-title");
+        if (copy) copy.textContent = `${name} (continued)`;
+        head.querySelectorAll(".lex-detail-panel-icon,.lex-detail-panel-actions,.lex-detail-panel-id,.lex-detail-panel-meta").forEach(node => node.remove());
+      } else if (title) {
+        head = element("h3", {class: title.className}, `${name} (continued)`);
+      }
+      piece.append(...(head ? [head] : []), rest);
+      card.after(piece);
+      cards.splice(cards.indexOf(card) + 1, 0, piece);
+      pieces.push({source: card, piece});
+      return true;
+    };
+    const paginate = (visible, keepPieces = false) => {
+      if (pieces.length && !keepPieces) {
+        joinSections();
+        visible = cards.filter(card => !card.hidden);
+      }
       pagedCount = visible.length;
       if (size || !scroll.isConnected || scroll.clientHeight <= 0) {
         const per = size || visible.length || 1;
@@ -3114,8 +3186,18 @@
         const box=card.getBoundingClientRect();
         const scale=box.width/Math.max(1,card.offsetWidth);
         cardHeights.set(card,Math.ceil(box.height/scale)+1);
-        if(options.strictColumns && (card.scrollWidth>card.clientWidth+1 || card.offsetWidth>card.parentElement.clientWidth+1 || card.offsetHeight>scroll.clientHeight+1))
-          throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title')?.textContent||card.textContent.slice(0,80)}`);
+        if(options.strictColumns){
+          // Say which way it does not fit: a section too tall for the page
+          // is split by its game; one too wide has a control that will not
+          // shrink.
+          const why=card.scrollWidth>card.clientWidth+1?`its content is ${card.scrollWidth}px wide in ${card.clientWidth}px`
+            :card.offsetWidth>card.parentElement.clientWidth+1?`it is ${card.offsetWidth}px wide in a ${card.parentElement.clientWidth}px column`
+            :card.offsetHeight>scroll.clientHeight+1?`it is ${card.offsetHeight}px tall on a ${scroll.clientHeight}px page`:"";
+          // Too tall is fixed here: the section goes on in the next column.
+          if(why&&card.offsetHeight>scroll.clientHeight+1&&card.scrollWidth<=card.clientWidth+1&&splitSection(card,scroll.clientHeight))
+            return paginate(cards.filter(entry=>!entry.hidden),true);
+          if(why)throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title')?.textContent||card.textContent.slice(0,80)} - ${why}`);
+        }
       }
       const count=columnCount(visible.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
       const available=scroll.clientHeight,loads=Array(count).fill(0),next=[0];
@@ -3137,10 +3219,30 @@
       const count=columnCount(onPage.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
       const columns=Array.from({length:count},()=>element("div",{class:"lex-tweak-column"})),loads=Array(count).fill(0);
       let orderedLane=0;
+      // Column-major order used to fill the first column to the foot of the
+      // page before starting the next, so a page of three cards was one
+      // column beside empty ones. The cards are spread instead: each column
+      // holds about its share of the page's total height, in reading order,
+      // unless that share would run past the foot.
+      const heights=onPage.map(card=>cardHeights.get(card));
+      let lanesFor=null;
+      if(options.columnMajor&&heights.every(height=>height!==undefined)&&count>1){
+        const total=heights.reduce((sum,height)=>sum+height,0)+gap*Math.max(0,onPage.length-count);
+        const share=Math.max(Math.max(...heights),total/count);
+        const lanes=[],sums=Array(count).fill(0);
+        let at=0;
+        heights.forEach((height,index)=>{
+          const left=onPage.length-index;
+          if(sums[at]>0&&at<count-1&&(sums[at]+gap+height>share+1||left<=count-1-at))at++;
+          lanes.push(at);sums[at]+=(sums[at]?gap:0)+height;
+        });
+        if(sums.every(sum=>sum<=scroll.clientHeight+1))lanesFor=lanes;
+      }
       onPage.forEach((card,index)=>{
         const measured=cardHeights.get(card);
         let lane=measured===undefined?index%count:loads.indexOf(Math.min(...loads));
-        if(options.columnMajor&&measured!==undefined){
+        if(lanesFor)lane=lanesFor[index];
+        else if(options.columnMajor&&measured!==undefined){
           if(loads[orderedLane]>0&&loads[orderedLane]+gap+measured>scroll.clientHeight+1)orderedLane=Math.min(count-1,orderedLane+1);
           lane=orderedLane;
         }
@@ -3152,8 +3254,10 @@
     };
 
     const render = () => {
-      const visible = cards.filter(card => !card.hidden);
-      if (visible.length !== pagedCount) paginate(visible);
+      let visible = cards.filter(card => !card.hidden);
+      // Paginating can split a tall section into pieces, so read the cards
+      // again afterwards.
+      if (visible.length !== pagedCount) { paginate(visible); visible = cards.filter(card => !card.hidden); }
       const pages = starts.length;
       page = Math.max(0, Math.min(page, pages - 1));
       const from = starts[page], to = starts[page + 1] ?? visible.length;
@@ -3174,10 +3278,11 @@
     // Re-break the pages for the box as it is now, keeping the first card on
     // screen on screen.
     const refit = () => {
-      const visible = cards.filter(card => !card.hidden);
+      let visible = cards.filter(card => !card.hidden);
       const anchor = visible[starts[page]] || null;
       paginate(visible);
-      const at = anchor ? visible.indexOf(anchor) : 0;
+      visible = cards.filter(card => !card.hidden);
+      const at = anchor ? Math.max(0, visible.indexOf(anchor)) : 0;
       page = Math.max(0, starts.findLastIndex(start => start <= at));
       render();
     };
@@ -3186,6 +3291,9 @@
       if (target >= 0 && target < starts.length) turn(target);
     }, overflows);
     root.refreshPages = () => {page=0;pagedCount=-1;refit();};
+    // What the pager decided, for checks and for debugging a page break.
+    root.lexPaging = () => ({starts:[...starts],page,
+      cards:cards.filter(card=>!card.hidden).map(card=>({title:(card.querySelector(".lex-detail-panel-title,.lex-detail-section-title")?.textContent||"").trim(),height:cardHeights.get(card)??null}))});
     root.lexFitPage = refit;
     render();
     if (options.notice) root.prepend(options.notice);
@@ -7722,6 +7830,28 @@ ${contents.path}`});
     const root = element("div", {
       class: ["lex-source-control", internal ? "lex-source-control-internal" : "", stacked ? "lex-source-control-stacked" : ""].filter(Boolean).join(" "),
     }, options.control);
+    // A number sharing its box with a reference gets its own up and down at
+    // the box's right edge. The browser's arrows sit at the end of the text,
+    // so the space kept for the reference showed as an empty band to the
+    // right of them, and the arrows jumped left whenever a reference appeared.
+    const numberBox = internal && options.control instanceof Element
+      ? (options.control.matches("input[type=number]") ? options.control : options.control.querySelector(":scope > input[type=number]"))
+      : null;
+    if (numberBox) {
+      root.classList.add("lex-has-stepper");
+      const step = direction => event => {
+        event.preventDefault();
+        if (numberBox.disabled || numberBox.readOnly) return;
+        try { direction > 0 ? numberBox.stepUp() : numberBox.stepDown(); }
+        catch (_error) { numberBox.value = String((Number(numberBox.value) || 0) + direction); }
+        numberBox.dispatchEvent(new Event("input", {bubbles: true}));
+        numberBox.dispatchEvent(new Event("change", {bubbles: true}));
+      };
+      const arrow = (direction, label) => element("button", {type: "button", tabindex: "-1", "aria-hidden": "true",
+        class: direction > 0 ? "lex-stepper-up" : "lex-stepper-down", title: label,
+        onpointerdown: event => event.preventDefault(), onclick: step(direction)});
+      root.append(element("span", {class: "lex-stepper"}, arrow(1, "Increase"), arrow(-1, "Decrease")));
+    }
     // What the rail must hold is decided by the sources, which do not change
     // while a value is edited - not by which of them happen to differ from the
     // value right now. Measuring the visible entries instead made the rail
@@ -8277,15 +8407,55 @@ ${contents.path}`});
     }));
   }, true);
 
-  // Every tab stays in one row. Equal lanes give the label fitter a bound.
-  const tabLabelObserver=new ResizeObserver(()=>scheduleFit());
+  // Tabs share one row of equal lanes while every name fits in its lane at
+  // full size. When one does not, the bar takes another row rather than
+  // shrinking the names: one row at any cost put PROPERTIES at seven pixels
+  // beside LOOT at fifteen. The names are measured at their own size, so a
+  // bar that has room again goes back to one row.
+  const tabLabelObserver=new ResizeObserver(()=>scheduleBalance());
   const balanceTabRows = () => {
     for (const bar of document.querySelectorAll('.lex-shell-header nav, .lex-subtab-bar')) {
       const tabs=[...bar.children].filter(node=>node instanceof HTMLElement && !node.hidden);
       bar.dataset.lexTabRows='1';
       bar.dataset.lexTabTight='';
-      bar.style.setProperty('--lex-tab-columns',String(Math.max(1,tabs.length)));
       tabs.forEach(tab=>tab.style.removeProperty('--lex-tab-span'));
+      const width=bar.clientWidth;
+      let columns=Math.max(1,tabs.length);
+      // A bar of pictures (GF portraits) scales its pictures to the lanes and
+      // stays one row; only names are measured.
+      if(width>0&&tabs.length>1&&!bar.matches('.lex-subtab-bar-images')){
+        const needs=tabs.map(tab=>{
+          const label=tab.querySelector('.lex-tab-label-text');
+          if(!label)return 0;
+          label.style.fontSize='';
+          // The whole name, the tab's padding and border, and whatever else
+          // sits beside the name in the flow (a help mark). Read from those
+          // parts, not from the tab: a tab is as wide as its lane, so the
+          // lane would feed back into what it is measured to need.
+          const px=(style,...names)=>names.reduce((sum,name)=>sum+(parseFloat(style[name])||0),0);
+          const own=getComputedStyle(tab);
+          // The text's own width: a Range, since the label box is as wide as its lane.
+          const text=document.createRange();text.selectNodeContents(label);
+          let need=text.getBoundingClientRect().width+px(own,'paddingLeft','paddingRight','borderLeftWidth','borderRightWidth');
+          for(let wrap=label.parentElement;wrap&&wrap!==tab;wrap=wrap.parentElement)need+=px(getComputedStyle(wrap),'paddingLeft','paddingRight');
+          for(const child of tab.children){
+            if(child.contains(label))continue;
+            const style=getComputedStyle(child);
+            if(style.position==='absolute'||style.position==='fixed'||style.display==='none')continue;
+            need+=child.offsetWidth+px(style,'marginLeft','marginRight');
+          }
+          // Letter spacing trails the last glyph and is not in the text box.
+          return Math.ceil(need+(parseFloat(getComputedStyle(label).letterSpacing)||0)*2)+6;
+        });
+        const widest=Math.max(...needs);
+        if(widest*tabs.length>width){
+          const perRow=Math.max(1,Math.floor(width/Math.max(1,widest)));
+          const rows=Math.ceil(tabs.length/perRow);
+          columns=Math.ceil(tabs.length/rows);
+        }
+      }
+      bar.style.setProperty('--lex-tab-columns',String(columns));
+      bar.dataset.lexTabRows=String(Math.ceil(Math.max(1,tabs.length)/columns));
       bar.querySelectorAll('.lex-tab-label-text').forEach(label=>tabLabelObserver.observe(label));
     }
   };
@@ -8329,6 +8499,14 @@ ${contents.path}`});
   // reads without writing, so nothing is invalidated and the browser answers
   // the whole sweep from one layout.
   const fitted = new WeakMap();
+  const LABEL_MIN_PX = 9;
+  const widenLabelLane = label => {
+    const lane = label.closest('.lex-tweak-card-grid,.lex-detail-panel,.lex-detail,.lex-detail-section') || label.parentElement?.parentElement || label.parentElement;
+    if (!lane) return;
+    const needed = Math.ceil(label.scrollWidth + 2);
+    const current = parseFloat(lane.style.getPropertyValue('--lex-detail-label-min')) || 0;
+    if (needed > current) lane.style.setProperty('--lex-detail-label-min', `${needed}px`);
+  };
   const fitKey = label => `${label.clientWidth}x${label.clientHeight}|${label.textContent}`;
   const fitLabel = label => {
     if (!(label instanceof HTMLElement)) return;
@@ -8338,19 +8516,33 @@ ${contents.path}`});
     label.style.fontSize = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
     if(label.classList.contains('lex-tab-label-text')) {
+      // A subtab keeps its name at full size and its bar wraps onto another
+      // row when the names no longer fit. Shrinking came first and made
+      // wrapping unreachable: a seven-tab panel read PROPERTIES at seven
+      // pixels beside LOOT at fifteen.
+      if(label.closest('.lex-subtab-button')){fitted.set(label,fitKey(label));return;}
       const range=document.createRange();range.selectNodeContents(label);
       const fits=()=>{const css=getComputedStyle(label);return range.getBoundingClientRect().width <= label.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight)-3;};
-      while(size>1&&!fits()){size-=.5;label.style.fontSize=`${size}px`;}
+      while(size>LABEL_MIN_PX&&!fits()){size-=.5;label.style.fontSize=`${size}px`;}
       fitted.set(label,fitKey(label));
       return;
     }
     // Width gets no slack: a word may no longer wrap mid-way, so a name one
     // pixel too wide pokes past the label edge every other name ends on.
-    const minimum=1;
-    while (size > minimum && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth)) {
+    // A name is never shrunk past what can be read. The floor was one pixel,
+    // and a long property name in a narrow lane came out as a smear. A name
+    // that still does not fit at the floor widens the lane instead - for its
+    // whole panel, so the names in it keep one edge.
+    const overflows = () => label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth;
+    // A word wider than the lane widens the lane before anything shrinks, so
+    // one long name does not come out smaller than the names around it. The
+    // lane settles on the next pass, when the observer sees it resize.
+    if (label.classList.contains('lex-detail-field-label') && label.scrollWidth > label.clientWidth) widenLabelLane(label);
+    while (size > LABEL_MIN_PX && overflows()) {
       size -= .5;
       label.style.fontSize = `${size}px`;
     }
+
     // `contain:size` keeps the font size out of the box's own measurements, so
     // the key is the same one computed above and the label settles in one pass.
     fitted.set(label, key);

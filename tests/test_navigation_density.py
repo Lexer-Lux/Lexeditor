@@ -4,7 +4,11 @@ from PIL import Image
 from test_shared_ui_feedback import ROOT, page, framework
 
 @pytest.mark.parametrize('width',[700,1000,1600])
-def test_tabs_share_one_row_and_tweaks_stays_attached(page,width):
+def test_tabs_keep_full_size_names_and_tweaks_stays_attached(page,width):
+    # Tabs share equal lanes, as many to a row as fit with their names at
+    # full size. Forcing one row shrank sixteen FF8 names to a few pixels in a
+    # 700px window; a second row is the readable answer. Tweaks stays the last
+    # lane of the grid rather than floating off on its own.
     page.set_viewport_size({'width':width,'height':900})
     framework(page)
     page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
@@ -20,13 +24,17 @@ def test_tabs_share_one_row_and_tweaks_stays_attached(page,width):
     for selector in ['.lex-shell-header nav','.lex-subtab-bar']:
         result=page.locator(selector).first.evaluate('''n=>{
           const buttons=[...n.children],r=n.getBoundingClientRect();
+          const labels=[...n.querySelectorAll('.lex-tab-label-text')];
           return {rows:new Set(buttons.map(b=>b.offsetTop)).size,
-            inside:buttons.every(b=>b.getBoundingClientRect().right<=r.right+1)};
+            inside:buttons.every(b=>b.getBoundingClientRect().right<=r.right+1),
+            shrunk:labels.filter(l=>l.style.fontSize).map(l=>l.textContent),
+            clipped:labels.filter(l=>l.scrollWidth>l.clientWidth+1).map(l=>l.textContent)};
         }''')
-        assert result=={'rows':1,'inside':True},result
+        assert result['inside'] and not result['shrunk'] and not result['clipped'],result
+        # A wide window keeps the one row it has room for.
+        if width>=1600 and selector=='.lex-subtab-bar':
+            assert result['rows']==1,result
     nav=page.locator('.lex-shell-header nav')
-    for label in nav.locator('.lex-tab-label-text').all():
-        assert label.evaluate('n=>n.scrollWidth<=n.clientWidth+1'),label.text_content()
     assert nav.locator('button').last.get_attribute('data-tab')=='settings'
     assert nav.locator('button').last.evaluate('n=>getComputedStyle(n).marginLeft')=='0px'
     # The pointer must fit in the existing page gutter, not indent the row.

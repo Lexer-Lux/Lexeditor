@@ -2208,37 +2208,77 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 .lex-column-list .lex-column-cell-content { width:100%; }
 .lex-column-cell-content:not(:has(input,select,textarea)) { padding-block:.15em; box-sizing:border-box; }
 .lex-column-list-cell:has(.lex-source-control) .lex-column-cell-content { width:100%; }
+/* An editable cell is the control, as in a spreadsheet: the box is the whole
+   cell and its value sits where a read-only cell's text sits. The control
+   used to be a short box floating in the middle of a tall row. */
+.lex-column-list-cell:has(> .lex-column-cell-content > :is(.lex-source-control, input:not([type="checkbox"]), select, textarea)) {
+  padding:0;
+  align-items:stretch;
+  overflow:visible;
+}
+.lex-column-list-cell:has(> .lex-column-cell-content > :is(.lex-source-control, input:not([type="checkbox"]), select, textarea)) > .lex-column-cell-content {
+  align-self:stretch;
+  height:auto;
+  overflow:visible;
+}
+.lex-column-list .lex-column-cell-content > :is(input:not([type="checkbox"]), select, textarea),
+.lex-column-list .lex-column-cell-content > .lex-source-control > :is(input:not([type="checkbox"]), select, textarea) {
+  height:100%;
+  padding:var(--lex-cell-padding, 4px 10px);
+}
 
-/* Editable table controls occupy the complete cell. Their compact provenance
-   lane overlays the right edge instead of shortening the input or select. */
+/* Editable table controls occupy the complete cell. A cell has no room for
+   the provenance rail beside its value: reserving it left a value of three
+   characters about thirty pixels, which the text fitter then shrank to a
+   smear, and moved the box whenever a value started or stopped matching. In a
+   table the rail therefore takes no room. It opens above the cell while the
+   cell is pointed at or being edited, and a corner mark says the value is not
+   the vanilla one. */
 .lex-column-list .lex-source-control {
   position:relative;
   display:block;
   width:100%;
-  /* The rail overlays the right edge of the control, and the control reserves
-     that much padding for it. A clamp whose MINIMUM is 1.8em reserved more
-     than a narrow cell has, so the value itself was pushed out of its own box:
-     a 44px cell kept 37px of padding and showed no digits. min() lets the
-     reservation shrink with the cell and still caps it in a wide one. */
-  --lex-reference-rail-width:min(var(--lex-reference-requested-width,3.2em), 3.2em, 34%);
+  height:100%;
+  --lex-reference-rail-width:0px;
 }
 .lex-column-list .lex-source-control > :is(input:not([type="checkbox"]),select,textarea,.lex-unit-field,.lex-readonly-field) {
   box-sizing:border-box;
   width:100%;
-  padding-right:calc(var(--lex-reference-rail-width) + .4em);
 }
 .lex-column-list .lex-source-control:is(.no-reference,:has(> .lex-reference-placeholder)) > :is(input:not([type="checkbox"]),textarea,.lex-readonly-field) {
-  padding-right:.4em;
+  padding-right:var(--lex-cell-padding-inline, 10px);
 }
-.lex-column-list .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
+.lex-column-list .lex-source-control > .lex-reference-placeholder { display:none; }
+.lex-column-list .lex-source-control > .lex-reference-values {
   position:absolute;
-  z-index:2;
-  top:1px;
-  right:2px;
-  bottom:1px;
-  width:var(--lex-reference-rail-width);
+  z-index:30;
+  top:auto;
+  right:0;
+  bottom:calc(100% + 2px);
+  display:flex;
+  gap:6px;
+  width:max-content;
   min-width:0;
-  justify-content:center;
+  max-width:none;
+  padding:3px 6px;
+  border:1px solid var(--lex-border);
+  border-radius:var(--lex-radius);
+  background:var(--lex-panel);
+  box-shadow:0 4px 12px #0006;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .12s ease;
+}
+.lex-column-list-cell:is(:hover, :focus-within) .lex-source-control > .lex-reference-values { opacity:1; pointer-events:auto; }
+.lex-column-list .lex-source-control.lex-value-modified::after {
+  content:"";
+  position:absolute;
+  top:0;
+  right:0;
+  border:4px solid transparent;
+  border-top-color:var(--lex-highlight);
+  border-right-color:var(--lex-highlight);
+  pointer-events:none;
 }
 
 .lex-column-list input[type="checkbox"] {
@@ -2267,6 +2307,9 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 .lex-detail-field:hover > .lex-detail-field-control > .lex-column-pin,
 .lex-detail-field:hover > .lex-detail-field-control > .lex-source-control > .lex-column-pin,
 .lex-source-control:hover > .lex-column-pin,
+/* A part of a control group keeps its pin one level down, in its control box.
+   Without this an unpinned part's pin could never be seen again. */
+.lex-detail-part:hover > .lex-detail-part-control > .lex-column-pin,
 .lex-column-pin:focus-visible { color:var(--lex-muted);opacity:.75; }
 .lex-column-pin.pinned { color:var(--lex-accent);opacity:1; }
 
@@ -2289,12 +2332,13 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 .lex-column-list-row.lex-row-disabled > .lex-column-list-cell { color:var(--lex-muted); }
 .lex-column-list-row.lex-row-disabled > .lex-column-list-cell > * { opacity:.45; }
 
-.lex-column-align-start {
+/* Two classes, so the cell's own centring - defined later - does not win. */
+.lex-column-list-cell.lex-column-align-start {
   justify-content: flex-start;
   text-align: left;
 }
 
-.lex-column-align-end {
+.lex-column-list-cell.lex-column-align-end {
   justify-content: flex-end;
   text-align: right;
 }
@@ -2693,8 +2737,50 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
 .lex-source-control-internal > :first-child { width:100%;box-sizing:border-box; }
 .lex-source-control-internal > .lex-column-pin { top:3px;right:3px; }
 .lex-source-control-internal > :is(input,select,textarea) {
-  padding-right:calc(var(--lex-internal-reference-width) + .95em);
+  padding-right:calc(var(--lex-internal-reference-width) + var(--lex-stepper-width, 0px) + .95em);
 }
+/* The stepper replaces the browser's arrows in a box that holds a reference;
+   see provenanceControl. It sits on the box's edge and shows while the box is
+   pointed at or being edited. */
+.lex-source-control-internal.lex-has-stepper { --lex-stepper-width:1.15em; }
+.lex-has-stepper input[type="number"] { appearance:textfield; -moz-appearance:textfield; }
+.lex-has-stepper input[type="number"]::-webkit-inner-spin-button,
+.lex-has-stepper input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+.lex-stepper {
+  position:absolute;
+  z-index:3;
+  top:1px;
+  right:1px;
+  bottom:1px;
+  display:grid;
+  grid-template-rows:1fr 1fr;
+  width:var(--lex-stepper-width);
+  opacity:0;
+  transition:opacity .12s ease;
+}
+.lex-source-control:is(:hover, :focus-within) > .lex-stepper { opacity:1; }
+.lex-stepper > button {
+  position:relative;
+  min-width:0;
+  min-height:0;
+  padding:0;
+  color:var(--lex-muted);
+  border:0;
+  background:transparent;
+  cursor:pointer;
+}
+.lex-stepper > button:hover { color:var(--lex-accent); }
+.lex-stepper > button::before {
+  content:"";
+  position:absolute;
+  left:50%;
+  top:50%;
+  translate:-50% -50%;
+  border:.28em solid transparent;
+}
+.lex-stepper-up::before { border-bottom-color:currentColor; margin-top:-.14em; }
+.lex-stepper-down::before { border-top-color:currentColor; margin-top:.14em; }
+.lex-column-list .lex-source-control-internal { --lex-internal-reference-width:0px; }
 .lex-source-control-internal.no-reference {
   --lex-internal-reference-width:0px;
 }
@@ -2717,14 +2803,14 @@ select optgroup {
   --lex-internal-reference-width:0px;
 }
 .lex-source-control-internal > .lex-unit-field > :is(input,select,textarea) {
-  padding-right:calc(var(--lex-unit-reserve,2.4em) + var(--lex-internal-reference-width) + .7em);
+  padding-right:calc(var(--lex-unit-reserve,2.4em) + var(--lex-internal-reference-width) + var(--lex-stepper-width, 0px) + .7em);
 }
 .lex-source-control-internal > .lex-unit-field > .lex-unit {
   /* Resolve the reference rail in the same font size as its container.
      Shrink the painted unit only; a smaller em moved it into the reference. */
   font-size:inherit;
   padding-block:0;
-  right:calc(var(--lex-internal-reference-width) + .55em);
+  right:calc(var(--lex-internal-reference-width) + var(--lex-stepper-width, 0px) + .55em);
   transform:translateY(-50%) scale(.78);
   transform-origin:right center;
 }
@@ -2733,8 +2819,8 @@ select optgroup {
   z-index:2;
   top:50%;
   /* right:0 pinned the reference hard against the box edge with no breathing
-     room, which read as sitting too far right. */
-  right:6px;
+     room, which read as sitting too far right. A stepper takes the edge. */
+  right:calc(var(--lex-stepper-width, 0px) + 6px);
   bottom:auto;
   transform:translateY(-50%);
   width:var(--lex-internal-reference-width);
@@ -2773,14 +2859,6 @@ select optgroup {
 /* Centred on the control but free to use the taller row around it, so a
    three-deep stack stays legible without changing any row's height. */
 
-.lex-column-list .lex-source-control > .lex-reference-values {
-  position:absolute;
-  top:1px;
-  right:2px;
-  bottom:1px;
-  align-self:auto;
-  justify-content:center;
-}
 .lex-reference-placeholder {
   display:block;
   width:var(--lex-reference-rail-width);
@@ -3391,7 +3469,7 @@ body:has(.lex-data-map-table) #main {
 .lex-platform-config-section > summary { padding:10px 6px; cursor:pointer; font-weight:700; }
 .lex-platform-config-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:var(--lex-panel-gap); padding:0 0 var(--lex-panel-gap); }
 .lex-platform-config-field { min-width:0; }
-.lex-platform-config-field.lex-boolean-field { grid-template-columns:7.5% minmax(0,1fr) auto; }
+.lex-platform-config-field.lex-boolean-field { grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr) auto; }
 .lex-platform-config-field :is(input[type=text],input[type=number],select) { width:100%; min-width:0; }
 @media (max-width:700px) {
   .lex-platform-config-head { align-items:stretch; flex-direction:column; }
@@ -5093,7 +5171,11 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control > .lex-copy-value {
   grid-column:1;
 }
-.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control > *:not(.lex-copy-value) {
+/* Not the pin: it is placed by its own offsets, and a positioned grid item
+   takes those offsets from its grid area. Put in column two it measured from
+   the column's edge instead of the control's and hung 24px outside the panel,
+   where the panel cut it off - which is where every FF9 pin went. */
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control > *:not(.lex-copy-value, .lex-column-pin) {
   grid-column:2;
 }
 
@@ -5445,7 +5527,8 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 }
 
-/* All tabs share one row. Labels fit inside equal-width lanes. */
+/* Tabs sit in equal lanes, as many to a row as fit at full size; see
+   balanceTabRows. */
 .lex-shell-header nav[data-lex-tab-rows],
 .lex-subtab-bar[data-lex-tab-rows] {
   display:grid;
@@ -6064,7 +6147,8 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 /* Dealt columns, not a grid: a grid row takes the height of its tallest
    card and opens a band of empty panel across the rest of that row. Each
    column here packs on its own. */
-.lex-tweak-card-grid { display:flex; align-items:flex-start; gap:var(--lex-panel-gap,12px); min-width:0; }
+/* A settings card is narrow: its names take a real share of it. */
+.lex-tweak-card-grid { --lex-detail-label-width:clamp(6.5em, 38%, 12em); display:flex; align-items:flex-start; gap:var(--lex-panel-gap,12px); min-width:0; }
 .lex-tweak-column { display:flex; flex:1 1 0; flex-direction:column; gap:var(--lex-panel-gap,12px); min-width:0; }
 .lex-tweak-column > .lex-detail-panel {
   --lex-detail-title-size:1em;
@@ -6092,11 +6176,11 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
    The leader and checkbox share one row. References occupy the space below
    that checkbox; the reserved space stays fixed when a reference changes. */
 .lex-boolean-field {
-  grid-template-columns:7.5% minmax(0,1fr) auto;
+  grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr) auto;
   min-height:0;
 }
 .lex-boolean-field:where(:has(> .lex-detail-field-control > .lex-source-control)) {
-  grid-template-columns:7.5% minmax(0,1fr);
+  grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr);
 }
 .lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control:not(.no-reference)) { padding-bottom:12px; }
 .lex-boolean-field > .lex-detail-field-label {
@@ -6216,7 +6300,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
  .lex-platform-config-field.lex-detail-field:not(.lex-boolean-field) {
   align-items:center;
   display:grid;
-  grid-template-columns:7.5% minmax(0,1fr);
+  grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr);
 }
 .lex-platform-config-field.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control {
   justify-self:stretch;
@@ -6579,7 +6663,13 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   padding-inline-start:var(--lex-field-type-gutter);
   padding-inline-end:0;
 
- grid-template-columns:7.5% minmax(0,1fr);
+ /* The name lane. A detail panel is wide, so a tenth of it holds a name; a
+    settings card is a few hundred pixels, where the same tenth was nineteen
+    and the fitter shrank every name in it to an unreadable few pixels. The
+    card says how much it gives its names instead. */
+ /* --lex-detail-label-min is set by the label fitter when a name cannot be
+    read at the smallest size it allows; the lane never takes over half. */
+ grid-template-columns:max(var(--lex-detail-label-width, 7.5%), min(var(--lex-detail-label-min, 0px), 50%)) minmax(0,1fr);
  border-bottom: var(--lex-field-border, 0);
 }
 .lex-detail-field-label {
