@@ -8179,7 +8179,10 @@ ${contents.path}`});
       return fields;
     });
     let paged;
+    const searchOptions={key:`platform-${config.runtime || "settings"}`,value:options.query || "",label:`Search ${config.runtime} settings`};
     const applySearch = value => {
+      // Page rebuilding must keep the current input, including its caret.
+      searchOptions.value=value;
       options.search(value);
       const normalized = String(value).toLocaleLowerCase();
       const root = document.querySelector(".lex-platform-config");
@@ -8195,7 +8198,7 @@ ${contents.path}`});
       // rather than drawing a second one above this view.
       tabs: options.tabs, activeTab: options.activeTab,
       tabsLabel: options.tabsLabel, changeTab: options.changeTab,
-      search:{key:`platform-${config.runtime || "settings"}`,value:options.query || "",label:`Search ${config.runtime} settings`,change:applySearch},
+      search:Object.assign(searchOptions,{change:applySearch}),
     });
     return element("section", {class: "lex-platform-config"},
       options.showHeader === false ? null : element("header", {class: "lex-platform-config-head"},

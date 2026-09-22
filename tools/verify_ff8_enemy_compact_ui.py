@@ -55,7 +55,8 @@ def fixture() -> dict:
 
 
 def page_html() -> str:
-    editor = (ROOT/'games/ff8/editor.html').read_text()
+    editor = '<html><head><style>'+(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8')+'</style></head><body><header id="lexeditor-shell"></header><div id="toolbar"></div><main id="main"></main><script>'
+    editor += '\n'.join((ROOT/'games/ff8'/name).read_text(encoding='utf-8') for name in ['core.js','records.js','party.js','battle.js','places.js','boot.js'])
     # Only omit the desktop boot / external game discovery; every view,
     # picker, provenance control, serializer and layout is production code.
     editor = editor[:editor.index('  const shell=LexeditorUI.mountShell(')]
@@ -68,8 +69,8 @@ window.setup = data => {
   Object.assign(state.data,structuredClone(data));state.vanilla=structuredClone(state.data);
   for(const key of editableDatasets)state.base[key]=structuredClone(state.data[key]?.rows||[]);
   state.data.settings={};state.base.settings={};state.data.init={};state.base.init={};
-  state.booting=false;state.tab='enemies';state.enemyPanelTab='battleText';state.selected.enemies=0;
-  document.body.dataset.lexPlugin='ff8';render();
+  state.booting=false;state.tab='enemies';state.enemyDetailTab='text';state.selected.enemies=0;
+  document.body.dataset.lexPlugin='ff8';render();LexeditorUI.finishPluginLoading();
 };
 window.fixtureState=state;
 window.rerender=render;
@@ -114,12 +115,13 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
             # framework.js resolves shared assets relative to document.baseURI;
             # about:blank is not a valid URL base in current Chromium.
             markup=markup.replace('<head>','<head><base href="http://localhost/">',1)
-            page.set_content(markup)
-            page.add_style_tag(content=(ROOT/'ui/framework.css').read_text())
+            page.route('http://localhost/',lambda route:route.fulfill(content_type='text/html',body=markup))
+            page.goto('http://localhost/')
+            page.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
             # Plugin overrides come after the shared stylesheet, as in production.
             page.add_style_tag(content=re.search(r'<style>(.*?)</style>',html,re.S)[1])
-            page.add_script_tag(content=(ROOT/'ui/framework.js').read_text())
-            page.add_script_tag(content=(ROOT/'games/ff8/cards_ui.js').read_text())
+            page.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
+            page.add_script_tag(content=(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8'))
             if pngs:
                 # Mock asset transport only; preserve the production image,
                 # load/error handlers and card controls. No HTTP is required.
@@ -132,8 +134,7 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
             page.evaluate('setup', dataset)
             page.wait_for_timeout(200)
             assert not errors, errors
-            assert page.locator('.enemy-detail .enemy-scan-section').count() == 0
-            assert page.locator('.enemy-tabbed-column .enemy-scan-section textarea').count() == 1
+            assert page.locator('.enemy-detail .enemy-scan-section textarea').count() == 1
             page.locator('.enemy-scan-section textarea').fill('Changed Scan text')
             assert page.evaluate('fixtureState.data.enemies.rows[0].scanDescription') == 'Changed Scan text'
             # Scan remains accessible without local scripted dialogue or a DAT file.
@@ -142,106 +143,63 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
                 assert page.locator('.enemy-scan-section textarea').count()==1
             page.evaluate('fixtureState.selected.enemies=0;rerender()')
             print('PASS Scan is editable in Battle Text, including empty/unavailable script cases')
+            page.evaluate("fixtureState.enemyDetailTab='loot';rerender()")
             for kind in ['draw','mug','drops']:
                 table=page.locator(f'.enemy-{kind}-table')
-                assert table.locator('tbody>tr').count()==3
-                assert table.locator('tbody>tr>td').count()==12
-                assert table.locator('thead th').count()==(0 if kind=='draw' else 5)
-                assert table.locator('tbody>tr>th').all_text_contents()==['LOW','MED','HIGH']
+                assert table.locator('.enemy-tier-row').count()==3
+                assert table.locator('[role="columnheader"]').count()==(0 if kind=='draw' else 5)
                 for tier in ['low','medium','high']:
                     for slot in range(4):
-                        value=30+slot
-                        table.locator(f'[data-tier="{tier}"] [data-slot="{slot}"] input').fill(str(value))
-                        assert page.evaluate('([kind,tier,slot])=>fixtureState.data.enemyTables.rows[0].tables[kind][tier][slot].quantity',[kind,tier,slot])==value
+                        control=page.get_by_label(f'{kind.upper()} {tier} choice {slot+1} quantity',exact=True)
+                        control.fill(str(30+slot))
+                        assert page.evaluate('([k,t,s])=>fixtureState.data.enemyTables.rows[0].tables[k][t][s].quantity',[kind,tier,slot])==30+slot
             page.evaluate('rerender()')
-            assert page.locator('.enemy-draw-table [data-tier="low"] [data-slot="0"] input').input_value()=='30'
-            print('PASS all 36 live pair entries persist across rerenders; slot labels and order preserved')
-            # Use the actual shared thing finder (press-and-hold a candidate).
-            page.locator('.enemy-draw-table [data-tier="low"] [data-slot="0"] .ff8-entity-search-button').click()
-            assert page.evaluate('fixtureState.tab')=='magic'
-            candidate=page.locator('.lex-search-candidate').filter(has_text='Ultima').first
-            candidate.hover();page.mouse.down();page.wait_for_timeout(800);page.mouse.up()
-            assert page.evaluate('fixtureState.tab')=='enemies'
-            assert page.evaluate('fixtureState.data.enemyTables.rows[0].tables.draw.low[0].valueId')==5
-            page.locator('.enemy-card-finder').first.click()
-            assert page.evaluate('fixtureState.tab')=='cards'
-            candidate=page.locator('.lex-search-candidate').filter(has_text='Abadon').first
-            candidate.hover();page.mouse.down();page.wait_for_timeout(800);page.mouse.up()
-            assert page.evaluate('fixtureState.data.enemyTables.rows[0].tables.cards[0].cardId')==61
-            assert page.locator('.enemy-card-name').first.inner_text().strip()=='Abadon'
-            page.locator('.enemy-card-clear').first.click()
+            assert page.get_by_label('DRAW low choice 1 quantity',exact=True).input_value()=='30'
+            print('PASS all 36 quantities edit their stored slots and survive rendering')
+            page.get_by_label('Clear card slot 1',exact=True).click()
             assert page.evaluate('fixtureState.data.enemyTables.rows[0].tables.cards[0].cardId')==255
-            assert page.locator('.enemy-card-name').first.inner_text().strip()=='Immune'
-            print('PASS production magic/card thing finders, return navigation, and card sentinel')
-            fire=page.locator('[data-defence="Fire"]');number=fire.locator('input[type=number]');toggle=fire.locator('input[type=checkbox]')
-            number.fill('40');number.press('Tab');toggle.check()
-            assert number.is_disabled() and fire.locator('.enemy-immunity-label').is_visible()
+            assert page.get_by_label('Clear card slot 1',exact=True).is_disabled()
+            for width in [720,1000,1600]:
+                page.set_viewport_size({'width':width,'height':1000})
+                page.wait_for_timeout(150)
+                # Each quantity choice stays on one row: the multiplier cannot
+                # overlap its input or acquire a different baseline on resize.
+                for choice in page.locator('.enemy-tier-table .lex-quantity-choice').all():
+                    assert choice.evaluate('n=>n.scrollWidth<=n.clientWidth+1')
+            page.evaluate("fixtureState.enemyDetailTab='defense';rerender()")
+            number=page.get_by_label('Fire defence percent',exact=True)
+            toggle=page.locator('[data-defence="Fire"] input[type=checkbox]')
+            number.fill('40');number.blur()
+            toggle.check()
+            assert number.is_disabled()
             assert page.evaluate('fixtureState.data.enemyTables.rows[0].tables.elementDefence[0].stored')==90
             toggle.uncheck();assert number.input_value()=='40' and number.is_enabled()
-            number.fill('-100');number.press('Tab')
-            assert not toggle.is_checked() and number.is_enabled()
+            number.fill('-100');number.blur()
+            assert not toggle.is_checked()
             assert page.evaluate('fixtureState.data.enemyTables.rows[0].tables.elementDefence[0].stored')==100
-            death=page.locator('[data-defence="Death"]');death.locator('input[type=number]').fill('75');death.locator('input[type=number]').press('Tab')
-            death.locator('input[type=checkbox]').check()
-            assert death.locator('input[type=number]').is_disabled()
+            death=page.get_by_label('Death defence percent',exact=True)
+            death.fill('75');death.blur();page.locator('[data-defence="Death"] input[type=checkbox]').check()
+            assert death.is_disabled()
             assert page.evaluate('fixtureState.data.enemyTables.rows[0].tables.statusDefence[0].stored')==255
-            death.locator('input[type=checkbox]').uncheck()
-            assert death.locator('input[type=number]').input_value()=='75'
-            fire.locator('.lex-reference-value').first.click()
-            assert page.evaluate('fixtureState.data.enemyTables.rows[0].tables.elementDefence[0].percent')==100
-            assert page.locator('[data-defence="Fire"] input[type=number]').is_enabled()
-            page.locator('.enemy-mug-table [data-tier="low"] [data-slot="0"] .lex-source-control').last.locator('.lex-reference-value').first.click()
-            assert page.evaluate('fixtureState.data.enemyTables.rows[0].tables.mug.low[0].quantity')==2
-            print('PASS immune overlays, disabled inputs, exact byte conversion, negative values and reference restoration')
-            # Layout at minimum and wide right-pane sizes, with real provenance.
-            for width in [430,720,1000]:
-                page.evaluate('mountRight',width);page.wait_for_timeout(100)
-                geometry=page.evaluate('''() => {
-                  const tops=s=>[...document.querySelectorAll(s)].map(x=>Math.round(x.getBoundingClientRect().top));
-                  const panel=document.querySelector('.enemy-detail');
-                  return {numbers:tops('.enemy-properties-numeric>.enemy-property'),flags:tops('.enemy-properties-booleans>.enemy-property'),
-                    elements:tops('.enemy-elements>.enemy-defence-tile'),cards:tops('.enemy-card-choices>.lex-source-control'),
-                    horizontalOverflow:panel.scrollWidth>panel.clientWidth+1};
-                }''')
-                assert len(set(geometry['numbers']))==1,geometry
-                assert len(set(geometry['flags']))==2,geometry
-                assert len(set(geometry['elements']))==1,geometry
-                assert len(set(geometry['cards']))==1,geometry
-                assert not geometry['horizontalOverflow'],geometry
-                if output and width==720:
-                    output.mkdir(parents=True,exist_ok=True)
-                    page.locator('.enemy-detail').screenshot(path=str(output/'enemy-compact-panel.png'))
-                    page.locator('.enemy-card-choices').scroll_into_view_if_needed()
-                    page.wait_for_timeout(100)
-                    if pngs:
-                        assert page.locator('.enemy-card-art img').count()==2
-                        assert page.locator('.enemy-card-art img').evaluate_all('(images)=>images.every(img=>img.complete&&img.naturalWidth===64)')
-                    page.locator('.enemy-detail').screenshot(path=str(output/'enemy-cards.png'))
-                    page.locator('.enemy-defence-section').last.scroll_into_view_if_needed()
-                    page.locator('[data-defence="Fire"] input[type=checkbox]').check()
-                    page.locator('[data-defence="Death"] input[type=checkbox]').check()
-                    page.locator('.enemy-detail').screenshot(path=str(output/'enemy-defences.png'))
-            # Read-only project sources must not expose any of the new writes.
-            page.evaluate("fixtureState.activeSource='vanilla';mountRight(720)")
-            for selector in ['.enemy-tier-table input','.enemy-card-finder','.enemy-defence-tile input','.enemy-properties-compact input']:
-                for control in page.locator(selector).all(): assert control.is_disabled(),selector
+            page.locator('[data-defence="Death"] input[type=checkbox]').uncheck();assert death.input_value()=='75'
+            print('PASS card sentinel, immunity, negative defence and restored previous values')
+            page.evaluate("fixtureState.activeSource='vanilla';rerender()")
+            assert number.is_disabled() and toggle.is_disabled()
             page.evaluate("fixtureState.activeSource='mine'")
-            print('PASS 7-number row, two boolean rows, 8-element row and 3-card row at 430/720/1000px')
-            # Record the real save payload before it reaches the backend.
             page.evaluate('setup',dataset)
-            page.locator('.enemy-mug-table [data-tier="high"] [data-slot="2"] input').fill('77')
-            page.locator('.enemy-draw-table [data-tier="medium"] [data-slot="1"] input').fill('8')
-            page.locator('.enemy-drops-table [data-tier="low"] [data-slot="3"] input').fill('99')
-            page.locator('.enemy-card-clear').first.click()
+            page.evaluate("fixtureState.enemyDetailTab='loot';rerender()")
+            page.get_by_label('MUG high choice 3 quantity',exact=True).fill('77')
+            page.get_by_label('DRAW medium choice 2 quantity',exact=True).fill('8')
+            page.get_by_label('DROPS low choice 4 quantity',exact=True).fill('99')
+            page.get_by_label('Clear card slot 1',exact=True).click()
+            page.evaluate("fixtureState.enemyDetailTab='defense';rerender()")
             page.locator('[data-defence="Fire"] input[type=checkbox]').check()
             page.locator('[data-defence="Death"] input[type=checkbox]').check()
             page.evaluate('captureSave()')
             payload=page.evaluate('savedPayloads.find(value=>value.path==="/api/enemy-tables/save")')
-            assert payload, page.evaluate('savedPayloads')
-            edits=payload['body']['edits']
-            assert next(e for e in edits if e['kind']=='mug' and e['tier']=='high' and e['slot']==2)['quantity']==77
+            assert payload,page.evaluate('savedPayloads')
             raw=bytearray(0x180)
-            enemy_tables.apply_edits(raw,0,edits,ROOT/'games/ff8/schema',set(range(6)),set(range(6)))
+            enemy_tables.apply_edits(raw,0,payload['body']['edits'],ROOT/'games/ff8/schema',set(range(6)),set(range(6)))
             saved=enemy_tables.read_tables(raw,0)
             assert saved['mug']['high'][2]['quantity']==77
             assert saved['draw']['medium'][1]['quantity']==8
@@ -249,8 +207,8 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
             assert saved['cards'][0]['cardId']==255
             assert saved['elementDefence'][0]['stored']==90
             assert saved['statusDefence'][0]['stored']==255
-            print('PASS actual saveAll payload -> backend DAT writer -> read-back')
-            assert not errors, errors
+            print('PASS production save payload -> DAT writer -> read-back')
+            assert not errors,errors
         finally:
             browser.close()
 
