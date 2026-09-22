@@ -391,6 +391,24 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
     context, page, errors = new_page(
         browser, html, 1200, 800, diagnostic=output / "boot-failure.png")
     try:
+        initial = page.evaluate("""() => ({
+          tab: state.tab,
+          asset: state.asset,
+          busy: state.busy,
+          records: state.data?.records?.length ?? null,
+          properties: (state.data?.properties || []).map(prop => [prop.name, prop.type, prop.editable]),
+          mainText: document.querySelector("#main")?.innerText?.slice(0, 2000) || "",
+          detailCount: document.querySelectorAll(".ff7r-detail").length,
+          numberInputs: [...document.querySelectorAll('input[type="number"]')].map(input => ({
+            value: input.value,
+            aria: input.getAttribute("aria-label"),
+            disabled: input.disabled
+          }))
+        })""")
+        (output / "initial-render.json").write_text(
+            json.dumps(initial, indent=2), encoding="utf-8")
+        page.screenshot(path=str(output / "initial-render-1200.png"), full_page=True)
+
         expect(page.locator(".ff7r-table .lex-column-list-row")).not_to_have_count(0)
         power = page.locator('.ff7r-detail input[type="number"]').first
         expect(power).to_have_value("10")
