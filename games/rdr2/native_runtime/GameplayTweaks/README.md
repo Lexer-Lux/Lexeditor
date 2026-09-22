@@ -22,7 +22,7 @@ local SDK directory containing `inc/main.h`, `inc/natives.h`, and
 `lib/ScriptHookRDR2.lib`. The SDK is not redistributed here.
 
 MinHook source is vendored under `third_party/minhook` with its upstream
-license when that portion of the migration lands.
+license.
 
 ## Build
 

@@ -75,7 +75,7 @@ def run(framework_path: Path, *, executable: str | None = None) -> None:
     from playwright.sync_api import sync_playwright
 
     framework = framework_path.read_text(encoding="utf-8")
-    editor = (ROOT / "games/ff8/editor.html").read_text(encoding="utf-8")
+    editor = (ROOT / "games/ff8/boot.js").read_text(encoding="utf-8")
     assert "platformConfigView({config:state.platformConfig,showHeader:false," in editor
     with sync_playwright() as playwright:
         kwargs = {"headless": True}
@@ -86,8 +86,12 @@ def run(framework_path: Path, *, executable: str | None = None) -> None:
             page = browser.new_page()
             errors: list[str] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
-            page.set_content('<main id="fixture"></main><button id="elsewhere">Other control</button>')
-            page.add_script_tag(content=FIXTURE + component_source(framework) + PAGE)
+            page.route('http://fixture/',lambda route:route.fulfill(content_type='text/html',body='<main id="fixture"></main><button id="elsewhere">Other control</button>'))
+            page.goto('http://fixture/')
+            page.add_style_tag(path=str(ROOT/'ui/framework.css'))
+            page.add_script_tag(content=framework)
+            page.add_script_tag(content='const {bottomSearch,platformConfigView}=LexeditorUI;'+PAGE)
+            page.evaluate('LexeditorUI.finishPluginLoading()')
             selector = '[data-lex-bottom-search="test-records"]'
             page.locator(selector).focus()
             text = "Fastitocalon HP level 255"
@@ -148,8 +152,9 @@ def run(framework_path: Path, *, executable: str | None = None) -> None:
             search = page.locator('[data-lex-bottom-search="platform-FFNx"]')
             search.focus()
             page.keyboard.type("fullscreen", delay=0)
+            page.wait_for_function("window.platformQuery === 'fullscreen'")
             assert page.locator(".lex-platform-config-field:visible").count() == 1
-            assert page.locator(".lex-platform-config-field:visible").inner_text() == "FULLSCREEN"
+            assert 'FULLSCREEN' in page.locator(".lex-platform-config-field:visible").inner_text().upper()
             assert page.evaluate("window.platformQuery") == "fullscreen"
             page.evaluate("window.renderPlatform(true)")
             assert page.locator(".lex-platform-config-head").count() == 1

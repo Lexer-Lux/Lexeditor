@@ -118,7 +118,9 @@ jobs:
           python editor/tools/verify_ff8_modern_controls_binary.py --driver candidate/AF3DN.P
           python editor/tools/verify_ff8_reptile_atb_binary.py --driver candidate/AF3DN.P
           python editor/tools/verify_ff8_interaction_indicators_302.py --compile --compiler cl
-          python -m unittest editor/tests/test_ff8_interaction_indicators_issue_302.py -v
+          Push-Location editor
+          try { python -m unittest tests.test_ff8_interaction_indicators_issue_302 tests.test_ff8_hp_colors_issue_481 -v }
+          finally { Pop-Location }
       - uses: actions/upload-artifact@v4
         if: success()
         with:

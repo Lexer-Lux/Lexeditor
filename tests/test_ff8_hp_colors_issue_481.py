@@ -23,6 +23,16 @@ class BetterHpColorsTests(unittest.TestCase):
         self.assertIn('"aria-label":"Better HP Colors"',editor)
         self.assertIn('row("BETTER HP COLORS"',editor)
         for phrase in ("white at full HP","yellow at 50%","orange at 25%","KO"):self.assertIn(phrase,editor)
+    def test_merged_toggles_are_independent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config=Path(directory)/'FFNx.toml'
+            config.write_text('',encoding='utf-8')
+            for hp,indicator in ((True,True),(False,True),(True,False),(False,False)):
+                gameplay_settings._set_ffnx_runtime_tweaks(config,xp_bars=False,hp_bars=False,
+                    better_targeting=False,better_hp_colors=hp,interaction_indicators=indicator)
+                data=config.read_text()
+                self.assertEqual(data.count(f'enable_ff8_better_hp_colors = {str(hp).lower()}'),1)
+                self.assertEqual(data.count(f'enable_ff8_interaction_indicators = {str(indicator).lower()}'),1)
     def test_candidate_default_and_disable_dispatch(self):
         prepare=(ROOT/"tools/prepare_ff8_native_build.py").read_text()
         self.assertIn("enable_ff8_better_hp_colors = false",prepare)
