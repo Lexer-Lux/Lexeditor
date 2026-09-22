@@ -468,8 +468,14 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         coverage = page.get_by_role("combobox", name="Filter files by coverage", exact=True)
         coverage.select_option("view")
         page.wait_for_timeout(200)
-        assert "Read-only view" in page.locator(".lex-data-map-table").inner_text()
-        assert "Structured editable" not in page.locator(".lex-data-map-table").inner_text()
+        expect(coverage).to_have_value("view")
+        view_rows = page.locator(".lex-data-map-table .lex-column-list-row")
+        expect(view_rows).to_have_count(12)
+        view_text = page.locator(".lex-data-map-table").inner_text()
+        assert "fixture/resource-01.uasset" in view_text
+        assert "fixture/resource-05.uasset" in view_text
+        assert "fixture/resource-00.uasset" not in view_text
+        expect(page.locator('.lex-data-map-table .lex-integration-status[aria-label="Partial"]')).to_have_count(12)
         page.screenshot(path=str(output / "datamap-view-1200.png"), full_page=True)
 
         coverage.select_option("structured")
