@@ -13,7 +13,7 @@ import re
 from .project import OverlayStore, digest, validate_resource_path
 
 
-SPRITE_RE = re.compile(r"^Game/chara/dat/c(d+).dat$", re.IGNORECASE)
+SPRITE_RE = re.compile(r"^Game/chara/dat/c(\d+)\.dat$", re.IGNORECASE)
 
 
 def _signed(value: int) -> int:
