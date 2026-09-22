@@ -24,7 +24,7 @@ on:
       - '.github/workflows/ff7r-checks.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ff7r-${{ github.ref }}
@@ -84,43 +84,85 @@ jobs:
           retention-days: 7
 
 
+
   repak-vendor-candidate:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'codex/ff7r-1-plugin-completion'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
-      - name: Fetch exact repak v0.2.3 release archives
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/ff7r-1-plugin-completion
+      - name: Vendor exact repak v0.2.3 release archives
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p out/repak-vendor
-          cd out/repak-vendor
-          curl -L --fail --retry 3 -o repak_cli-x86_64-pc-windows-msvc.zip \
+          target=games/ff7r/runtime/repak/v0.2.3
+          mkdir -p "$target"
+          curl -L --fail --retry 3 -o "$target/repak_cli-x86_64-pc-windows-msvc.zip" \
             https://github.com/trumank/repak/releases/download/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip
-          echo "6720d602144d75df477a99d5bedb6ea780997546afc335901d4937cafeaa73fa  repak_cli-x86_64-pc-windows-msvc.zip" | sha256sum -c -
-          curl -L --fail --retry 3 -o repak_cli-x86_64-unknown-linux-gnu.tar.xz \
+          echo "6720d602144d75df477a99d5bedb6ea780997546afc335901d4937cafeaa73fa  $target/repak_cli-x86_64-pc-windows-msvc.zip" | sha256sum -c -
+          curl -L --fail --retry 3 -o "$target/repak_cli-x86_64-unknown-linux-gnu.tar.xz" \
             https://github.com/trumank/repak/releases/download/v0.2.3/repak_cli-x86_64-unknown-linux-gnu.tar.xz
-          echo "933bdb8e26f34e8fd70ea50201efca39df041de58aa83b1cd6eb83da124a2046  repak_cli-x86_64-unknown-linux-gnu.tar.xz" | sha256sum -c -
-          curl -L --fail --retry 3 -o LICENSE-MIT \
+          echo "933bdb8e26f34e8fd70ea50201efca39df041de58aa83b1cd6eb83da124a2046  $target/repak_cli-x86_64-unknown-linux-gnu.tar.xz" | sha256sum -c -
+          curl -L --fail --retry 3 -o "$target/LICENSE-MIT" \
             https://raw.githubusercontent.com/trumank/repak/e215472c51db69328b1ce77be2db24d24c1d646b/LICENSE-MIT
-          curl -L --fail --retry 3 -o LICENSE-APACHE \
+          curl -L --fail --retry 3 -o "$target/LICENSE-APACHE" \
             https://raw.githubusercontent.com/trumank/repak/e215472c51db69328b1ce77be2db24d24c1d646b/LICENSE-APACHE
           python - <<'PY'
-          import hashlib, json
+          import hashlib, json, tarfile, tempfile, zipfile
           from pathlib import Path
-          root=Path("out/repak-vendor") if Path("out/repak-vendor").is_dir() else Path(".")
-          rows={}
-          for path in sorted(root.iterdir()):
-              if path.is_file():
-                  rows[path.name]={"size":path.stat().st_size,"sha256":hashlib.sha256(path.read_bytes()).hexdigest()}
-          (root/"manifest.json").write_text(json.dumps({
+          root=Path("games/ff7r/runtime/repak/v0.2.3")
+          win=root/"repak_cli-x86_64-pc-windows-msvc.zip"
+          linux=root/"repak_cli-x86_64-unknown-linux-gnu.tar.xz"
+          with zipfile.ZipFile(win) as package:
+              executable=package.read("repak.exe")
+          with tarfile.open(linux,"r:xz") as package:
+              member=next(m for m in package.getmembers() if m.isfile() and Path(m.name).name=="repak")
+              source=package.extractfile(member)
+              assert source is not None
+              linux_executable=source.read()
+          manifest={
               "source":"https://github.com/trumank/repak/releases/tag/v0.2.3",
               "tag":"v0.2.3",
               "commit":"e215472c51db69328b1ce77be2db24d24c1d646b",
-              "files":rows,
-          },indent=2)+"\n",encoding="utf-8")
+              "platforms":{
+                  "win32":{
+                      "archive":win.name,
+                      "archiveSha256":hashlib.sha256(win.read_bytes()).hexdigest(),
+                      "kind":"zip","member":"repak.exe",
+                      "executableSha256":hashlib.sha256(executable).hexdigest(),
+                  },
+                  "linux":{
+                      "archive":linux.name,
+                      "archiveSha256":hashlib.sha256(linux.read_bytes()).hexdigest(),
+                      "kind":"tar.xz","member":"repak",
+                      "executableSha256":hashlib.sha256(linux_executable).hexdigest(),
+                  },
+              },
+              "licenses":["LICENSE-MIT","LICENSE-APACHE"],
+          }
+          expected={
+              "win32":("6720d602144d75df477a99d5bedb6ea780997546afc335901d4937cafeaa73fa",
+                       "fcd538e5994b9bb833622d425ae346f4e0692f02d4b0025114a559f9b6286022"),
+              "linux":("933bdb8e26f34e8fd70ea50201efca39df041de58aa83b1cd6eb83da124a2046",
+                       "fce30661c951ce56fd2507a44a1e03637e3ea06a1b7cc8035bd62c0b37dd9457"),
+          }
+          for key,(archive_sha,exe_sha) in expected.items():
+              row=manifest["platforms"][key]
+              assert row["archiveSha256"]==archive_sha,(key,row["archiveSha256"])
+              assert row["executableSha256"]==exe_sha,(key,row["executableSha256"])
+          (root/"manifest.json").write_text(json.dumps(manifest,indent=2)+"\n",encoding="utf-8")
           PY
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: ff7r-repak-v0.2.3-vendor
-          path: out/repak-vendor/
-          retention-days: 1
+          git add "$target"
+          if git diff --cached --quiet; then
+            echo "repak v0.2.3 is already vendored exactly"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Bundle pinned repak v0.2.3 for FF7R"
+          git push origin HEAD:codex/ff7r-1-plugin-completion
