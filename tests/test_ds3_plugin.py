@@ -160,6 +160,7 @@ class DS3FormatTests(unittest.TestCase):
             saved_globals = (
                 ds3_server.PROJECT, ds3_server.GAME_ROOT, ds3_server.SOURCE_OVERRIDE,
                 ds3_server._DOCUMENT, ds3_server._SOURCE_PATH,
+                ds3_server._SOURCE_HASH, ds3_server._OUTPUT_HASH_AT_LOAD,
             )
             try:
                 ds3_server.PROJECT = project
@@ -170,6 +171,11 @@ class DS3FormatTests(unittest.TestCase):
                 document = ds3_server._document()
                 row_id, _ = _row_ids("EquipParamWeapon")
                 document.edit("EquipParamWeapon", row_id, "atkBasePhysics", 321)
+                external_output = project / "Data0.bdt"
+                external_output.write_bytes(encrypt_regulation(_bnd4(), iv=b"\x45" * 16))
+                with self.assertRaisesRegex(ValueError, "created externally"):
+                    ds3_server._save()
+                external_output.unlink()
                 result = ds3_server._save()
                 self.assertTrue(result["saved"])
                 exported = project / "Data0.bdt"
@@ -180,10 +186,16 @@ class DS3FormatTests(unittest.TestCase):
                 self.assertEqual(
                     _field_value(reopened, "EquipParamWeapon", row_id, "atkBasePhysics"), 321
                 )
+                live = ds3_server._document()
+                live.edit("EquipParamWeapon", row_id, "atkBaseMagic", 123)
+                exported.write_bytes(exported.read_bytes() + b"external")
+                with self.assertRaisesRegex(ValueError, "source Data0.bdt changed"):
+                    ds3_server._save()
             finally:
                 (
                     ds3_server.PROJECT, ds3_server.GAME_ROOT, ds3_server.SOURCE_OVERRIDE,
                     ds3_server._DOCUMENT, ds3_server._SOURCE_PATH,
+                    ds3_server._SOURCE_HASH, ds3_server._OUTPUT_HASH_AT_LOAD,
                 ) = saved_globals
 
     def test_project_boundary_rejects_game_install_subfolders(self):

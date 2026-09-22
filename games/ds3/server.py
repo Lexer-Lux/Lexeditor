@@ -1,6 +1,7 @@
 """Loopback service for the Dark Souls III parameter editor."""
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import threading
@@ -42,6 +43,8 @@ TABLE_LABELS = {
 _LOCK = threading.RLock()
 _DOCUMENT: RegulationDocument | None = None
 _SOURCE_PATH: Path | None = None
+_SOURCE_HASH: str | None = None
+_OUTPUT_HASH_AT_LOAD: str | None = None
 
 
 def _path_within(path: Path, root: Path) -> bool:
@@ -52,6 +55,14 @@ def _path_within(path: Path, root: Path) -> bool:
 
 def _project_output() -> Path:
     return PROJECT / "Data0.bdt"
+
+
+def _sha256_path(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def _source_candidates() -> list[Path]:
@@ -71,10 +82,14 @@ def _find_source() -> Path:
 
 
 def _reload() -> RegulationDocument:
-    global _DOCUMENT, _SOURCE_PATH
+    global _DOCUMENT, _SOURCE_PATH, _SOURCE_HASH, _OUTPUT_HASH_AT_LOAD
     source = _find_source()
-    _DOCUMENT = RegulationDocument(source.read_bytes(), METADATA_ROOT)
+    raw = source.read_bytes()
+    _DOCUMENT = RegulationDocument(raw, METADATA_ROOT)
     _SOURCE_PATH = source
+    _SOURCE_HASH = hashlib.sha256(raw).hexdigest()
+    output = _project_output()
+    _OUTPUT_HASH_AT_LOAD = _sha256_path(output) if output.is_file() else None
     return _DOCUMENT
 
 
@@ -187,6 +202,24 @@ def _save() -> dict:
                 f"Selected DS3 project is missing {PROJECT_MARKER}: {PROJECT}"
             )
         destination = _project_output()
+        if _SOURCE_PATH is None or _SOURCE_HASH is None:
+            raise RuntimeError("DS3 source state is unavailable; reopen the editor before saving")
+        if not _SOURCE_PATH.is_file() or _sha256_path(_SOURCE_PATH) != _SOURCE_HASH:
+            raise ValueError(
+                "DS3 source Data0.bdt changed after it was opened; discard/reopen before exporting."
+            )
+        current_output_hash = _sha256_path(destination) if destination.is_file() else None
+        if _OUTPUT_HASH_AT_LOAD is None:
+            if current_output_hash is not None:
+                raise ValueError(
+                    "DS3 project Data0.bdt was created externally after this editor opened; "
+                    "discard/reopen before exporting."
+                )
+        elif current_output_hash != _OUTPUT_HASH_AT_LOAD:
+            raise ValueError(
+                "DS3 project Data0.bdt changed externally after this editor opened; "
+                "discard/reopen before exporting."
+            )
         atomic_write(destination, document.export())
         _DOCUMENT = None
         reloaded = _reload()
