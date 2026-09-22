@@ -97,3 +97,4 @@ jobs:
           name: ds3-candidate-pr493
           path: out/Lexeditor-DS3-PR493
           if-no-files-found: error
+          include-hidden-files: true
