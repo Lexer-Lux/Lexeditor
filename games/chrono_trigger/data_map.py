@@ -51,8 +51,6 @@ def build_data_map(store: OverlayStore) -> dict:
             present = any(path.startswith("Game/field/ChipTable/") for path in available)
         elif filename.startswith("Game/field/MapTable/"):
             present = any(path.startswith("Game/field/MapTable/") for path in available)
-        elif filename.startswith("Game/field/MapTable/MapTable_") && "RLE properties" in filename:
-            present = any(path.startswith("Game/field/MapTable/") for path in available)
         elif filename.startswith("Game/field/PrioMap"):
             present = any(path.startswith(("Game/field/PrioMap/", "Game/field/MapTable/", "Game/field/map_bin/", "Game/field/weather_bin/")) for path in available)
         elif filename.startswith("Game/field/BGAnime"):
