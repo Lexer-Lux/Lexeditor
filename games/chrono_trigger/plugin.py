@@ -86,6 +86,10 @@ def smoke() -> list[str]:
         palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
         world_bank = bytearray(b"\xA5" * (HEADER_OFFSET + WORLD_COUNT * HEADER_SIZE + 3))
         world_bank[HEADER_OFFSET:HEADER_OFFSET + HEADER_SIZE] = bytes(range(HEADER_SIZE))
+        scene_map = bytearray(bytes([0, 0, 0x21, 0x43, 0x5A, 0xC3]) + bytes(16 * 16 * 2))
+        scene_map[6] = 3
+        scene_map[6 + 16 * 16] = 4
+        scene_map.extend(bytes([0x01, 0, 0, 0x80, 0, 0, 255]))
         graphics_sets = bytes([1, 2, 3, 4, 5, 6, 7, 0xFF]) + b"\xDD"
         assembly_l12 = bytearray(512 * 4 * 3 + 1)
         struct.pack_into("<HB", assembly_l12, 0, 300 | 0x0400 | (5 << 12), 0xA1)
@@ -128,6 +132,7 @@ def smoke() -> list[str]:
             ("Game/world/SeId/SeId_0000.dat", bytes(world_music)),
             ("Game/world/colanim_bin/0_colanim.bin", world_colors),
             ("Game/world/EventTable/EventTable_0004.dat", world_event),
+            ("Game/field/MapTable/MapTable_0006.dat", bytes(scene_map)),
             ("Game/field/BGSetTable/bgsettable_4.dat", graphics_sets),
             ("Game/field/ChipTable/ChipTable_0004.dat", bytes(assembly_l12)),
             ("Game/field/ChipTable/ChipTableBg3_0002.dat", bytes(assembly_l3)),
@@ -155,6 +160,23 @@ def smoke() -> list[str]:
             saved_scene = request_json(session.url + "api/scenes/save", {"id": scene["id"], "sha256": scene["sha256"], "language": "en", "values": {"musicIndex": 42, "cameraUnbounded": True}})
             if saved_scene["musicIndex"] != 42 or saved_scene["unknownWord"] != 0xBEEF or saved_scene["trailingBytes"] != 2:
                 raise RuntimeError("Area settings edit did not preserve the unmodelled PC header data")
+            scene_map_files_result = request_json(session.url + "api/scene-map-files")
+            scene_map_path = scene_map_files_result["rows"][0]["path"]
+            scene_map_data = request_json(session.url + "api/scene-map?path=" + scene_map_path.replace("/", "%2F"))
+            layer1_tile = next(row for row in scene_map_data["rows"] if row["token"] == "6:1:0")
+            layer2_tile = next(row for row in scene_map_data["rows"] if row["token"] == "6:2:0")
+            saved_scene_map = request_json(session.url + "api/scene-map/save", {
+                "path": scene_map_path, "sha256": scene_map_data["sha256"],
+                "edits": [
+                    {"token": layer1_tile["token"], "values": {"tileIndex": 300}},
+                    {"token": layer2_tile["token"], "values": {"tileIndex": 9}},
+                ],
+            })
+            saved_scene_by_token = {row["token"]: row for row in saved_scene_map["rows"]}
+            if (saved_scene_by_token["6:1:0"]["tileIndex"] != 300
+                    or saved_scene_by_token["6:2:0"]["tileIndex"] != 9
+                    or saved_scene_map["propertyBytes"] != 7):
+                raise RuntimeError("Scene map tile edits did not preserve header/property boundaries")
             palette_files_result = request_json(session.url + "api/palette-files")
             if palette_files_result["rows"][0]["path"] != "Game/field/palette_bin/plt4.bin":
                 raise RuntimeError("Palette catalogue did not find the Steam field palette")
@@ -271,7 +293,7 @@ def smoke() -> list[str]:
             if not exported.get("replacementOnly"):
                 raise RuntimeError("CTP export did not assert replacement-only loader compatibility")
             with zipfile.ZipFile(exported["path"]) as ctp:
-                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/palette_bin/plt4.bin", "Game/field/BGAnime/bganimeinfo_4.dat", "Game/field/BGSetTable/bgsettable_4.dat", "Game/field/ChipTable/ChipTable_0004.dat", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/Map/Map_0000.dat", "Game/world/Id/Id_0000.dat", "Game/world/SeId/SeId_0000.dat", "Game/world/colanim_bin/0_colanim.bin", "Game/world/EventTable/EventTable_0004.dat"}:
+                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/MapTable/MapTable_0006.dat", "Game/field/palette_bin/plt4.bin", "Game/field/BGAnime/bganimeinfo_4.dat", "Game/field/BGSetTable/bgsettable_4.dat", "Game/field/ChipTable/ChipTable_0004.dat", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/Map/Map_0000.dat", "Game/world/Id/Id_0000.dat", "Game/world/SeId/SeId_0000.dat", "Game/world/colanim_bin/0_colanim.bin", "Game/world/EventTable/EventTable_0004.dat"}:
                     raise RuntimeError("CTP export did not contain exactly the changed resources")
         if (game / "resources.bin").read_bytes() != original_archive:
             raise RuntimeError("Fresh Chrono Trigger plugin modified resources.bin")
@@ -279,6 +301,7 @@ def smoke() -> list[str]:
         "read-only ARC1 source archive validated",
         "keyed Steam text edit survived project-overlay readback",
         "fixed 24-byte area settings edit preserved the unmodelled word and trailing bytes",
+        "scene map tile edits preserved the header, RLE property stream and existing tile banks",
         "256-color RGB555 palette edit preserved prefix, bit 15 and trailing bytes",
         "fixed-size area exit edit preserved unknown flag bits",
         "treasure edit preserved the unknown trailing word",
