@@ -13,8 +13,9 @@ ROWS = [
     ("Game/field/atel/Atel_*.dat", "Events and cutscenes", "Public tools document substantial script structure, but variable command boundaries and safe resizing make this a later editor rather than part of the low-cost first slice.", "not-integrated", None),
     ("Game/field/BGSetTable/bgsettable_*.dat", "Tileset graphics sets", "Edit the eight fixed current-PC graphics-set references used by layer 1/2 tilesets. 255 remains the game's unused-slot sentinel and trailing bytes are preserved.", "integrated", "tilesets"),
     ("Game/field/ChipTable/ChipTable_*.dat + ChipTableBg3_*.dat", "Tile assemblies", "Edit fixed current-PC tile corners: chip index, palette, flips and priority. L1/L2 has 512 tiles and L3 has 256; unknown priority-byte bits and trailing bytes are preserved.", "integrated", "assemblies"),
-    ("Game/field/MapTable/MapTable_*.dat", "Area map tiles", "Edit the existing fixed current-PC layer tile bytes using map coordinates and layer identity. Layer 1/2 edits stay within each tile's existing 0-255 or 256-511 bank; the six-byte map header and entire RLE property stream are preserved unchanged.", "integrated", "scenemaps"),
-    ("Game/field/PrioMap + MapTable RLE properties + map_bin + weather_bin", "Area collision, priority and graphics", "CTViewer documents these current-PC structures, but Lexeditor does not yet rewrite the RLE scene-property stream, unknown PC priority bytes or raster chip graphics.", "not-integrated", None),
+    ("Game/field/MapTable/MapTable_*.dat", "Area map tiles", "Edit the existing fixed current-PC layer tile bytes using map coordinates and layer identity. Layer 1/2 edits stay within each tile's existing 0-255 or 256-511 bank; the six-byte map header and RLE property layout are preserved.", "integrated", "scenemaps"),
+    ("Game/field/MapTable/MapTable_*.dat RLE properties", "Area collision and movement", "Edit existing RLE property runs in place: tile-bank flags, documented collision shape, movement direction/speed, door/NPC collision, Z behavior and sprite priority. Compression state, repeat counts and the two unknown property bits are preserved.", "integrated", "sceneprops"),
+    ("Game/field/PrioMap + map_bin + weather_bin", "Area priority bytes and graphics", "The PC priority bytes remain unmodelled and raster chip graphics do not yet have a safe format-specific image editor.", "not-integrated", None),
     ("Game/field/BGAnime/bganimeinfo_*.dat", "Animated map tiles", "Edit existing current-PC chip-animation destination/source chip offsets and documented frame-duration high nibbles without changing animation/frame counts. Unknown duration low nibbles, terminators and trailing bytes are preserved.", "integrated", "animations"),
     ("Game/field/palette_bin/plt*.bin + Game/world/plt_bin/plt*.bin", "Area and world palettes", "Edit the 256 RGB555 colors in current-PC field and world palettes. The two-byte prefix, bit 15 of every color, and trailing bytes are preserved.", "integrated", "palettes"),
     ("Game/common/bankc6.bin @ 0xFD10", "World settings", "Edit the seven active fixed 23-byte Steam world headers. Graphics, palette, map, music, exit and script references are bounded to one byte; the PC-unused palette-animation byte and all bytes outside the selected header are preserved.", "integrated", "worlds"),
@@ -49,6 +50,8 @@ def build_data_map(store: OverlayStore) -> dict:
         elif filename.startswith("Game/field/ChipTable"):
             present = any(path.startswith("Game/field/ChipTable/") for path in available)
         elif filename.startswith("Game/field/MapTable/"):
+            present = any(path.startswith("Game/field/MapTable/") for path in available)
+        elif filename.startswith("Game/field/MapTable/MapTable_") && "RLE properties" in filename:
             present = any(path.startswith("Game/field/MapTable/") for path in available)
         elif filename.startswith("Game/field/PrioMap"):
             present = any(path.startswith(("Game/field/PrioMap/", "Game/field/MapTable/", "Game/field/map_bin/", "Game/field/weather_bin/")) for path in available)
