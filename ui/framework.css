@@ -6148,7 +6148,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
    card and opens a band of empty panel across the rest of that row. Each
    column here packs on its own. */
 /* A settings card is narrow: its names take a real share of it. */
-.lex-tweak-card-grid { --lex-detail-label-width:clamp(6.5em, 38%, 12em); display:flex; align-items:flex-start; gap:var(--lex-panel-gap,12px); min-width:0; }
+.lex-tweak-card-grid { --lex-detail-label-width:clamp(min(6.5em, 40%), 38%, 12em); display:flex; align-items:flex-start; gap:var(--lex-panel-gap,12px); min-width:0; }
 .lex-tweak-column { display:flex; flex:1 1 0; flex-direction:column; gap:var(--lex-panel-gap,12px); min-width:0; }
 .lex-tweak-column > .lex-detail-panel {
   --lex-detail-title-size:1em;

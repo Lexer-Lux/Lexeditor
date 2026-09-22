@@ -268,6 +268,14 @@
       return true;
     } catch (_error) { return false; }
   };
+  // The loading quote is remembered for the next page in this window. A page
+  // whose storage is refused (a sandboxed or embedded document, a browser
+  // set to block it) threw on the first read, and the throw stopped the whole
+  // framework from loading: every game came up blank.
+  const sessionQuote = {
+    get: () => { try { return sessionStorage.getItem("lex-loading-quote"); } catch (_error) { return null; } },
+    set: value => { try { sessionStorage.setItem("lex-loading-quote", value); } catch (_error) {} },
+  };
   const loadingParameters = new URLSearchParams(location.search);
   const loadingStartedAt = (() => {
     const supplied = Number(loadingParameters.get("lexLoadStarted"));
@@ -280,12 +288,12 @@
       role: "status", "aria-live": "polite",
       "aria-label": "Loading game editor",
     }, element("blockquote", {class: "lex-plugin-loading-quote"},
-      loadingParameters.get("lexQuote") || sessionStorage.getItem("lex-loading-quote") || "Loading editor…"),
+      loadingParameters.get("lexQuote") || sessionQuote.get() || "Loading editor…"),
     element("span", {class: "lex-plugin-loading-pulse", "aria-hidden": "true"}));
     document.body.append(pluginLoadingScreen);
     // The root already painted an identical screen; hand over without a blink.
     document.documentElement.classList.add("lex-loading-live");
-    if(loadingParameters.get("lexQuote"))sessionStorage.setItem("lex-loading-quote",loadingParameters.get("lexQuote"));
+    if(loadingParameters.get("lexQuote"))sessionQuote.set(loadingParameters.get("lexQuote"));
     for(const type of ["keydown","pointerdown","click"])document.addEventListener(type,event=>{
       if(document.documentElement.classList.contains("lex-loading-live")){event.preventDefault();event.stopImmediatePropagation();}
     },true);
@@ -3096,14 +3104,16 @@
     const columnCount = length => {
       const width=content.clientWidth||scroll.clientWidth;
       const gap=parseFloat(getComputedStyle(content).columnGap)||12;
+      // A card is never narrower than it can be used at: the width a game
+      // asks for, or 180px - six columns in a wide window, four in a narrow
+      // one, where six made every card 140px and nothing in it fit.
       const asked=parseFloat(getComputedStyle(content).getPropertyValue("--lex-tweak-card-width"));
-      const target=asked||320;
+      const target=asked||(Number.isInteger(options.columns)&&options.columns>0?180:320);
       const fit=Math.max(1,Math.min(length,Math.floor((width+gap)/(target+gap))||1));
       // `columns` is a ceiling, not a count: six fixed columns made three
       // cards a sixth of the window each, truncating every value in them,
-      // beside three empty columns. A page never has more columns than
-      // cards, and a game that asks for a card width gets no narrower ones.
-      if(Number.isInteger(options.columns)&&options.columns>0)return Math.max(1,Math.min(options.columns,length,asked?fit:options.columns));
+      // beside three empty columns. A page never has more columns than cards.
+      if(Number.isInteger(options.columns)&&options.columns>0)return Math.max(1,Math.min(options.columns,fit));
       return fit;
     };
     // A section taller than a page goes on in the next column, its title
@@ -5242,7 +5252,7 @@ ${contents.path}`});
     applyTheme(options.plugin.theme);
     if (pluginLoadingScreen) callWindow("loading_quote", options.plugin.id).then(result => {
       if (!result?.quote) return;
-      sessionStorage.setItem("lex-loading-quote", result.quote);
+      sessionQuote.set(result.quote);
       const quote = document.querySelector(".lex-plugin-loading-quote");
       if (quote) quote.textContent = result.quote;
     }).catch(() => {});
