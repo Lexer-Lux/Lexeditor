@@ -366,20 +366,25 @@ def load_schema(root: Path, table: str) -> ParamSchema:
         for key in group.get("Fields", []):
             groups[str(key)] = name
     ann_path = root / "annotations" / f"{param_type}.json"
-    annotations = json.loads(ann_path.read_text("utf-8-sig")) if ann_path.is_file() else {}
+    if not ann_path.is_file():
+        raise DS3FormatError(f"Missing pinned annotation metadata for {table}: {ann_path.name}")
+    annotations = json.loads(ann_path.read_text("utf-8-sig"))
     ann_fields = {str(item.get("Field")): item for item in annotations.get("Fields", [])}
     description = str(annotations.get("Description") or table)
     enum_cache: dict[str, dict[str, str]] = {}
     row_names_path = root / "row_names" / f"{table}.json"
+    if not row_names_path.is_file():
+        raise DS3FormatError(f"Missing pinned row-name metadata for {table}: {row_names_path.name}")
     row_names: dict[int, str] = {}
-    if row_names_path.is_file():
-        raw_names = json.loads(row_names_path.read_text("utf-8-sig"))
-        for entry in raw_names.get("Entries", []):
-            if not isinstance(entry, dict) or "ID" not in entry:
-                continue
-            names = [str(value).strip() for value in entry.get("Entries", []) if str(value).strip()]
-            if names:
-                row_names[int(entry["ID"])] = names[0]
+    raw_names = json.loads(row_names_path.read_text("utf-8-sig"))
+    for entry in raw_names.get("Entries", []):
+        if not isinstance(entry, dict) or "ID" not in entry:
+            continue
+        names = [str(value).strip() for value in entry.get("Entries", []) if str(value).strip()]
+        if names:
+            row_names[int(entry["ID"])] = names[0]
+    if not row_names:
+        raise DS3FormatError(f"Pinned row-name metadata for {table} has no usable entries")
 
     fields=[]; offset=0; bit_limit=None; bit_offset=0; bit_storage_offset=0
     for node in def_root.findall(".//Fields/Field"):
@@ -412,22 +417,25 @@ def load_schema(root: Path, table: str) -> ParamSchema:
         enum_name=attrs.get("Enum")
         if enum_name and enum_name not in enum_cache:
             enum_path=root / "enums" / f"{enum_name}.json"
-            if enum_path.is_file():
-                raw=json.loads(enum_path.read_text("utf-8-sig"))
-                if isinstance(raw, dict):
-                    values=raw.get("Values", raw.get("values"))
-                    if isinstance(values, dict):
-                        enum_cache[enum_name]={str(k):str(v) for k,v in values.items()}
-                    elif isinstance(values, list):
-                        enum_cache[enum_name]={str(i.get("Value")):str(i.get("Name")) for i in values if isinstance(i,dict)}
-                    elif isinstance(raw.get("Options"), list):
-                        options={}
-                        for item in raw["Options"]:
-                            if not isinstance(item,dict) or "Key" not in item:
-                                continue
-                            english=next((n.get("Text") for n in item.get("Names",[]) if isinstance(n,dict) and n.get("Language")=="English"),None)
-                            options[str(item["Key"])]=str(english or item["Key"])
-                        enum_cache[enum_name]=options
+            if not enum_path.is_file():
+                raise DS3FormatError(f"Missing pinned enum metadata for {table}.{key}: {enum_name}")
+            raw=json.loads(enum_path.read_text("utf-8-sig"))
+            if isinstance(raw, dict):
+                values=raw.get("Values", raw.get("values"))
+                if isinstance(values, dict):
+                    enum_cache[enum_name]={str(k):str(v) for k,v in values.items()}
+                elif isinstance(values, list):
+                    enum_cache[enum_name]={str(i.get("Value")):str(i.get("Name")) for i in values if isinstance(i,dict)}
+                elif isinstance(raw.get("Options"), list):
+                    options={}
+                    for item in raw["Options"]:
+                        if not isinstance(item,dict) or "Key" not in item:
+                            continue
+                        english=next((n.get("Text") for n in item.get("Names",[]) if isinstance(n,dict) and n.get("Language")=="English"),None)
+                        options[str(item["Key"])]=str(english or item["Key"])
+                    enum_cache[enum_name]=options
+            if not enum_cache.get(enum_name):
+                raise DS3FormatError(f"Pinned enum metadata {enum_name} has no usable options")
         fields.append(FieldSpec(
             key=key,dtype=dtype,offset=field_offset,array_length=array_len,
             bit_offset=(bit_offset if bit_size is not None else None),bit_size=bit_size,
