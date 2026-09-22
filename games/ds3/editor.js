@@ -75,15 +75,22 @@
         ...entries.map(([value,label])=>el("option",{value},value+" — "+label)));
       select.value=String(field.value);return select;
     }
-    let submitted=String(field.value);
-    const commit=event=>{
-      const value=String(event.target.value??"").replace(/,/g,"").trim();
+    let submitted=String(field.value),commitTimer=0;
+    const submit=control=>{
+      const value=String(control?.value??"").replace(/,/g,"").trim();
       if(!value||value===submitted)return;
       submitted=value;
       void editField(table,row,field,value);
     };
+    const schedule=event=>{
+      clearTimeout(commitTimer);
+      const control=event.currentTarget;
+      commitTimer=setTimeout(()=>submit(control),120);
+    };
+    const commit=event=>{clearTimeout(commitTimer);submit(event.currentTarget)};
     const attrs={type:"number",value:field.value,step:/^f/.test(field.dtype)?"any":1,
-      "aria-label":field.label,"data-ds3-field":field.key,onchange:commit,onblur:commit};
+      "aria-label":field.label,"data-ds3-field":field.key,
+      oninput:schedule,onchange:commit,onblur:commit};
     if(field.minimum!==null&&field.minimum!==undefined)attrs.min=field.minimum;
     if(field.maximum!==null&&field.maximum!==undefined)attrs.max=field.maximum;
     return el("input",attrs);
