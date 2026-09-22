@@ -410,7 +410,7 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         page.screenshot(path=str(output / "initial-render-1200.png"), full_page=True)
 
         expect(page.locator(".ff7r-table .lex-column-list-row")).not_to_have_count(0)
-        power = page.locator('.ff7r-detail input[type="number"]').first
+        power = page.get_by_role("textbox", name="Power", exact=True)
         expect(power).to_have_value("10")
 
         power.fill("77")
@@ -431,7 +431,7 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
 
         page.evaluate("loadAsset(state.asset)")
         page.wait_for_function("state.data && !state.busy")
-        power = page.locator('.ff7r-detail input[type="number"]').first
+        power = page.get_by_role("textbox", name="Power", exact=True)
         expect(power).to_have_value("77")
         assert page.evaluate("state.data.usingProject") is True
 
@@ -441,7 +441,7 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         expect(page.get_by_role("button", name="Discard Changes", exact=True)).to_be_visible()
         page.get_by_role("button", name="Discard Changes", exact=True).click()
         page.wait_for_function("dirtyCount()===0")
-        power = page.locator('.ff7r-detail input[type="number"]').first
+        power = page.get_by_role("textbox", name="Power", exact=True)
         expect(power).to_have_value("77")
         page.screenshot(path=str(output / "edit-save-discard-1200.png"), full_page=True)
 
