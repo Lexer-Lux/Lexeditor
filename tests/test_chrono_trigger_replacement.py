@@ -13,6 +13,7 @@ from games.chrono_trigger.field_data import load_exits, load_treasure, save_exit
 from games.chrono_trigger.palette_data import load_palette, save_palette
 from games.chrono_trigger.project import OverlayStore
 from games.chrono_trigger.scene_data import load_scenes, save_scene
+from games.chrono_trigger.scene_map_data import load_scene_map, save_scene_map
 from games.chrono_trigger.text_data import load_messages, save_messages
 from games.chrono_trigger.tileset_data import load_graphics_sets, save_graphics_set, load_tile_assemblies, save_tile_assembly
 from games.chrono_trigger.world_data import (
@@ -58,6 +59,10 @@ class FreshChronoTriggerTests(unittest.TestCase):
         palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
         bank = bytearray(b"\xA5" * (HEADER_OFFSET + WORLD_COUNT * HEADER_SIZE + 3))
         bank[HEADER_OFFSET:HEADER_OFFSET + HEADER_SIZE] = bytes(range(HEADER_SIZE))
+        scene_map = bytearray(bytes([0, 0, 0x21, 0x43, 0x5A, 0xC3]) + bytes(16 * 16 * 2))
+        scene_map[6] = 3
+        scene_map[6 + 16 * 16] = 4
+        scene_map.extend(bytes([0x01, 0, 0, 0x80, 0, 0, 255]))
         graphics_sets = bytes([1, 2, 3, 4, 5, 6, 7, 0xFF]) + b"\xDD"
         assembly_l12 = bytearray(512 * 4 * 3 + 1)
         struct.pack_into("<HB", assembly_l12, 0, 300 | 0x0400 | (5 << 12), 0xA1)
@@ -100,6 +105,7 @@ class FreshChronoTriggerTests(unittest.TestCase):
             ("Game/world/SeId/SeId_0000.dat", bytes(world_music)),
             ("Game/world/colanim_bin/0_colanim.bin", world_colors),
             ("Game/world/EventTable/EventTable_0004.dat", world_event),
+            ("Game/field/MapTable/MapTable_0006.dat", bytes(scene_map)),
             ("Game/field/BGSetTable/bgsettable_4.dat", graphics_sets),
             ("Game/field/ChipTable/ChipTable_0004.dat", bytes(assembly_l12)),
             ("Game/field/ChipTable/ChipTableBg3_0002.dat", bytes(assembly_l3)),
@@ -219,6 +225,38 @@ class FreshChronoTriggerTests(unittest.TestCase):
             self.assertEqual(archive.read_bytes(), original_archive)
             with self.assertRaises(ValueError):
                 save_worlds(store, saved["sha256"], [{"token": "0", "values": {"paletteAnimationIndex": 3}}])
+
+    def test_scene_map_tile_edit_preserves_header_rle_properties_and_tile_bank(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            path = "Game/field/MapTable/MapTable_0006.dat"
+            data = load_scene_map(store, path)
+            self.assertEqual((data["layer1Width"], data["layer1Height"], data["layer2Width"],
+                              data["layer2Height"], data["layer3Enabled"], data["propertyBytes"]),
+                             (16, 16, 16, 16, False, 7))
+            layer1 = next(row for row in data["rows"] if row["token"] == "6:1:0")
+            layer2 = next(row for row in data["rows"] if row["token"] == "6:2:0")
+            self.assertEqual((layer1["storedTile"], layer1["upperBank"], layer1["tileIndex"]), (3, True, 259))
+            self.assertEqual((layer2["storedTile"], layer2["upperBank"], layer2["tileIndex"]), (4, False, 4))
+            before, _ = store.read(path, "mine")
+            saved = save_scene_map(store, path, data["sha256"], [
+                {"token": layer1["token"], "values": {"tileIndex": 300}},
+                {"token": layer2["token"], "values": {"tileIndex": 9}},
+            ])
+            by_token = {row["token"]: row for row in saved["rows"]}
+            self.assertEqual((by_token[layer1["token"]]["tileIndex"], by_token[layer2["token"]]["tileIndex"]), (300, 9))
+            after, origin = store.read(path, "mine")
+            self.assertEqual(origin, "project")
+            self.assertEqual(after[:6], before[:6])
+            self.assertEqual(after[data["propertyOffset"]:], before[data["propertyOffset"]:])
+            changed = [index for index, (left, right) in enumerate(zip(before, after)) if left != right]
+            self.assertEqual(changed, [6, 6 + 16 * 16])
+            self.assertEqual(archive.read_bytes(), original_archive)
+            with self.assertRaisesRegex(ValueError, "existing 256-511 bank"):
+                save_scene_map(store, path, saved["sha256"], [
+                    {"token": layer1["token"], "values": {"tileIndex": 9}},
+                ])
 
     def test_graphics_set_edit_preserves_sentinel_shape_trailing_and_archive(self):
         with tempfile.TemporaryDirectory() as tmp:
