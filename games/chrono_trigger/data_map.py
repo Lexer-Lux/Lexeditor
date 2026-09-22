@@ -27,7 +27,8 @@ ROWS = [
     ("Game/world/EventTable/EventTable_*.dat", "World exits and triggers", "Edit existing current-PC 8-byte exits and live 3-byte triggers without changing counts. Scripted-vs-destination semantics, trigger terminators, the unknown third block, script addresses, unmodelled flag bits and trailing bytes are preserved.", "integrated", "worldnav"),
     ("Game/world/esl/Event_*.dat + map_bin + Chip + gif", "World scripts and graphics", "Current-PC world scripts and raw graphics are recognized, but this replacement does not rewrite variable script bodies or expose a raster graphics editor.", "not-integrated", None),
     ("Game/chara/dat/c*.dat", "Sprite descriptors", "Edit documented current-PC sprite size-group bits, primary-enemy flag, animation-set index and enemy hand coordinates. Stored bitmap/assembly/palette references ignored by the PC runtime, unknown flags/enemy bytes and trailing data are preserved.", "integrated", "sprites"),
-    ("Game/chara/bmp + cell + common Slot/Interval", "Sprite graphics, assemblies and animations", "Current-PC sprite assets are recognized, but bitmap/cell editing and variable animation bodies remain outside this bounded descriptor slice.", "not-integrated", None),
+    ("Game/chara/cell/c*.cel", "Sprite assemblies", "Edit existing current-PC sprite-cell chip index, signed X/Y and flip-X without changing frame/tile counts. The odd stored source bit, other flag bits, header word, prefix and trailing bytes are preserved.", "integrated", "spriteassemblies"),
+    ("Game/chara/bmp + common Slot/Interval", "Sprite graphics and animations", "Current-PC sprite bitmaps and variable animation bodies are recognized but remain outside the bounded descriptor/assembly editors.", "not-integrated", None),
     ("Game/common/*DataTable*.dat", "Gameplay tables", "Candidate item/accessory/enemy/tech/shop tables exist in the Steam archive, but no independently verified typed record schema is claimed yet.", "not-integrated", None),
 ]
 
@@ -75,8 +76,10 @@ def build_data_map(store: OverlayStore) -> dict:
             present = any(path.startswith("Game/world/") for path in available)
         elif filename.startswith("Game/chara/dat"):
             present = any(path.startswith("Game/chara/dat/") for path in available)
+        elif filename.startswith("Game/chara/cell"):
+            present = any(path.startswith("Game/chara/cell/") for path in available)
         elif filename.startswith("Game/chara/bmp"):
-            present = any(path.startswith(("Game/chara/bmp/", "Game/chara/cell/", "Game/common/Slot", "Game/common/Interval")) for path in available)
+            present = any(path.startswith(("Game/chara/bmp/", "Game/common/Slot", "Game/common/Interval")) for path in available)
         elif filename.startswith("Game/common/*DataTable"):
             present = any(path.startswith("Game/common/") and "DataTable" in path for path in available)
         actual = status if present else "not-integrated"
