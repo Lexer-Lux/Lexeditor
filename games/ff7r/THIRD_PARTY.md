@@ -47,17 +47,30 @@ font assets.
 
 ## repak
 
-Lexeditor downloads a pinned release of **repak** only when the user chooses to
-install the FF7R archive helper:
+Lexeditor bundles the exact upstream **repak v0.2.3** release archives used by
+the FF7R plugin. Install/Repair extracts the platform executable locally; it
+does not download repak at setup time.
 
 - https://github.com/trumank/repak
 - License: dual Apache-2.0 / MIT
 - Pinned release: v0.2.3
+- Upstream release commit: `e215472c51db69328b1ce77be2db24d24c1d646b`
+- Windows release archive SHA-256:
+  `6720d602144d75df477a99d5bedb6ea780997546afc335901d4937cafeaa73fa`
+- Linux release archive SHA-256:
+  `933bdb8e26f34e8fd70ea50201efca39df041de58aa83b1cd6eb83da124a2046`
 
-repak reads the installed Unreal Engine PAK indexes/files on demand and packs the
-separate Lexeditor project tree into a mod PAK. FF7R's `../../../` mount point is
-passed explicitly when listing, extracting and packing. repak is not committed
-into this repository.
+The unchanged release archives, manifest and required MIT/Apache-2.0 license
+texts live under `games/ff7r/runtime/repak/v0.2.3/`. The installer verifies
+both the archive and extracted executable hashes before an atomic install. The
+shared Updates view may report a newer upstream release, but neither Lexeditor
+nor repak automatically updates the pinned helper.
+
+repak reads installed Unreal Engine PAK indexes/files on demand and packs the
+separate Lexeditor project tree into a mod PAK. FF7R's `../../../` mount point
+is passed explicitly when listing, extracting and packing. For Oodle-compressed
+game data, Lexeditor uses an already-present explicit/game-owned Oodle library;
+the repak fallback is never allowed to fetch Oodle silently.
 
 ## Improved Keyboard and Mouse Controls / Native Mod Loader research
 
