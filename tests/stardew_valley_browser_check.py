@@ -148,6 +148,16 @@ def open_editor(browser, url: str, width: int, height: int, zoom: float = 1.0):
     page.goto(url, wait_until="domcontentloaded")
     try:
         page.wait_for_selector(".lex-paged-list-detail .lex-column-list-row", timeout=20000)
+        # Current shared UI may render the editor before its minimum loading
+        # transition releases pointer/keyboard interaction. Rows existing is
+        # necessary but not sufficient for an interactable rendered screen.
+        page.wait_for_function(
+            "() => !document.documentElement.classList.contains('lex-loading-live')",
+            timeout=10000,
+        )
+        loading_screen = page.locator(".lex-plugin-loading-screen")
+        if loading_screen.count():
+            loading_screen.wait_for(state="detached", timeout=10000)
     except Exception:
         label = f"{width}x{height}-z{zoom}"
         diagnostics = {
