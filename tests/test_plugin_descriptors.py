@@ -60,6 +60,22 @@ class Startup(unittest.TestCase):
 
 
 class PluginDescriptors(unittest.TestCase):
+    def test_windows_project_defaults_are_valid_metadata_on_posix(self):
+        from dataclasses import replace
+        from pathlib import PurePosixPath
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from games.ff7r.plugin import PLUGIN
+
+        with patch('plugin_api.os', SimpleNamespace(name='posix')):
+            for path in ('C:/FF7RMod', '/home/player/FF7RMod'):
+                validate_plugin(replace(PLUGIN, projects=replace(
+                    PLUGIN.projects, default_root=PurePosixPath(path))))
+            for path in ('relative/mod', 'C:relative'):
+                with self.assertRaisesRegex(ValueError, 'invalid project descriptor'):
+                    validate_plugin(replace(PLUGIN, projects=replace(
+                        PLUGIN.projects, default_root=PurePosixPath(path))))
+
     def test_every_plugin_exports_one_and_validates(self):
         found = list(plugins())
         self.assertTrue(found, "no plugins were discovered")

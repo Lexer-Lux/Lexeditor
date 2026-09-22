@@ -66,39 +66,8 @@ jobs:
       - name: Build native application and installer
         run: python -c "from tools.build_distribution import build_app, build_installer; print('Application:', build_app()); print('Installer:', build_installer())"
 
-      - name: Run full frozen service smoke where current plugin descriptors validate
-        if: runner.os == 'Windows'
-        run: python -c "from pathlib import Path; from tools.build_distribution import smoke; smoke(Path('dist/Lexeditor/Lexeditor.exe'))"
-
-      - name: Record current POSIX plugin-discovery dependency
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          from app import discover_plugins
-
-          expected = "ff7r has an invalid project descriptor"
-          try:
-              discover_plugins()
-          except ValueError as error:
-              if str(error) != expected:
-                  raise
-          else:
-              raise SystemExit("Known POSIX descriptor blocker is gone; restore the full frozen service smoke on this platform.")
-
-          report = Path("build/distribution/posix-plugin-discovery-blocker.txt")
-          report.parent.mkdir(parents=True, exist_ok=True)
-          report.write_text(
-              "Full plugin discovery is not accepted on this exact remote revision.\n"
-              "Current blocker: games/ff7r/plugin.py uses a Windows-shaped default project path, "
-              "while plugin_api validates ModProjectSpec.default_root with POSIX Path.is_absolute().\n"
-              "PR #499 does not patch plugin_api or GamePlugin metadata; it builds/tests packaging only "
-              "until the shared API/plugin contract change lands.\n",
-              encoding="utf-8",
-          )
-          print(report.read_text("utf-8"))
-          PY
+      - name: Run frozen service smoke on every platform
+        run: python -c "from pathlib import Path; import sys; from tools.build_distribution import smoke; smoke(Path('dist/Lexeditor.app/Contents/MacOS/Lexeditor') if sys.platform == 'darwin' else Path('dist/Lexeditor/Lexeditor.exe') if sys.platform == 'win32' else Path('dist/Lexeditor/Lexeditor'))"
 
       - name: Record exact packaged revision
         run: python -c "from pathlib import Path; import subprocess; p=Path('build/distribution/source-sha.txt'); p.parent.mkdir(parents=True,exist_ok=True); p.write_text(subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()+chr(10),encoding='utf-8')"
@@ -115,6 +84,7 @@ jobs:
           test -f /usr/share/applications/lexeditor.desktop
           grep -Fx 'Exec=/opt/lexeditor/Lexeditor' /usr/share/applications/lexeditor.desktop
           grep -Fx 'Terminal=false' /usr/share/applications/lexeditor.desktop
+          python -c "from pathlib import Path; from tools.build_distribution import smoke; smoke(Path('/opt/lexeditor/Lexeditor'))"
           sudo dpkg -r lexeditor
           test ! -e /opt/lexeditor/Lexeditor
           test ! -e /usr/share/applications/lexeditor.desktop
@@ -127,6 +97,7 @@ jobs:
           test -n "$PKG"
           sudo installer -pkg "$PKG" -target /
           test -x /Applications/Lexeditor.app/Contents/MacOS/Lexeditor
+          python -c "from pathlib import Path; from tools.build_distribution import smoke; smoke(Path('/Applications/Lexeditor.app/Contents/MacOS/Lexeditor'))"
           sudo rm -rf /Applications/Lexeditor.app
           sudo pkgutil --forget io.github.lexer-lux.lexeditor >/dev/null || true
           test ! -e /Applications/Lexeditor.app
@@ -137,7 +108,7 @@ jobs:
         run: |
           $installer = Get-ChildItem dist\installers\*.exe | Select-Object -First 1
           if (-not $installer) { throw 'Windows installer was not produced' }
-          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
+          $process = Start-Process -WindowStyle Hidden -FilePath $installer.FullName -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
           if ($process.ExitCode -ne 0) { throw "Installer failed with exit code $($process.ExitCode)" }
           $app = Join-Path $env:LOCALAPPDATA 'Programs\Lexeditor\Lexeditor.exe'
           $uninstaller = Join-Path $env:LOCALAPPDATA 'Programs\Lexeditor\unins000.exe'
@@ -145,10 +116,10 @@ jobs:
           if (-not (Test-Path $app)) { throw "Installed executable missing: $app" }
           if (-not (Test-Path $startShortcut)) { throw "Start Menu shortcut missing: $startShortcut" }
           $smokePath = Join-Path $env:GITHUB_WORKSPACE 'build\distribution\installed-smoke.json'
-          $smoke = Start-Process -FilePath $app -ArgumentList '--smoke-service',$smokePath -PassThru -Wait
+          $smoke = Start-Process -WindowStyle Hidden -FilePath $app -ArgumentList '--smoke-service',$smokePath -PassThru -Wait
           if ($smoke.ExitCode -ne 0) { throw "Installed smoke failed with exit code $($smoke.ExitCode)" }
           if (-not (Test-Path $smokePath)) { throw "Installed smoke report missing: $smokePath" }
-          $process = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
+          $process = Start-Process -WindowStyle Hidden -FilePath $uninstaller -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
           if ($process.ExitCode -ne 0) { throw "Uninstaller failed with exit code $($process.ExitCode)" }
           if (Test-Path $app) { throw "Installed executable remained after uninstall: $app" }
 
@@ -163,7 +134,6 @@ jobs:
             dist/installers/
             build/distribution/smoke.json
             build/distribution/installed-smoke.json
-            build/distribution/posix-plugin-discovery-blocker.txt
             build/distribution/source-sha.txt
             build/Lexeditor/warn-Lexeditor.txt
           if-no-files-found: error

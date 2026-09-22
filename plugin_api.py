@@ -235,7 +235,11 @@ def validate_plugin(plugin: GamePlugin) -> None:
                     f"{plugin.plugin_id} has an unsafe ReShade folder: {declared}")
     if plugin.projects is not None:
         projects = plugin.projects
-        if not projects.root_env or not projects.default_root.is_absolute():
+        # Windows defaults remain valid metadata when discovered on POSIX.
+        # The installation resolver chooses the current platform's actual path.
+        absolute_default = projects.default_root.is_absolute() or (
+            os.name != "nt" and PureWindowsPath(str(projects.default_root)).is_absolute())
+        if not projects.root_env or not absolute_default:
             raise ValueError(f"{plugin.plugin_id} has an invalid project descriptor")
         if projects.template_root and not projects.template_root.is_absolute():
             raise ValueError(f"{plugin.plugin_id} has a relative project template")
