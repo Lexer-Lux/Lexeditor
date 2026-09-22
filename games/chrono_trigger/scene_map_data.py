@@ -341,3 +341,77 @@ def save_scene_properties(store: OverlayStore, path: str, expected_sha256: str, 
         # The optional fourth RLE repeat byte is deliberately never touched.
     store.write(path, expected_sha256, bytes(output))
     return load_scene_properties(store, path, "mine")
+
+
+SCROLL_SPEEDS = (0.0, 3.75, 7.5, 15.0, 30.0, 60.0, 120.0, 240.0,
+                 -0.0, -3.75, -7.5, -15.0, -30.0, -60.0, -120.0, -240.0)
+
+SCREEN_FIELDS = {
+    "layer1Main": 0x01, "layer2Main": 0x02, "layer3Main": 0x04, "spritesMain": 0x08,
+    "layer1Sub": 0x10, "layer2Sub": 0x20, "layer3Sub": 0x40, "spritesSub": 0x80,
+}
+EFFECT_FIELDS = {
+    "effectLayer1": 0x01, "effectLayer2": 0x02, "effectLayer3": 0x04,
+    "effectSprites": 0x10, "effectDefaultColor": 0x20,
+    "effectHalfIntensity": 0x40, "effectSubtract": 0x80,
+}
+
+
+def load_scene_render_settings(store: OverlayStore, path: str, source: str = "mine") -> dict:
+    source = _source(source)
+    path = validate_resource_path(path)
+    match = MAP_RE.match(path)
+    if not match:
+        raise ValueError("Only Steam Game/field/MapTable/MapTable_*.dat files use this editor")
+    payload, origin = store.read(path, source)
+    dims = _dimensions(payload)
+    result = {
+        "token": str(int(match.group(1))), "mapId": int(match.group(1)),
+        "path": path, "source": origin, "sha256": digest(payload),
+        "scrollL2XCode": payload[2] & 0x0F, "scrollL2YCode": (payload[2] >> 4) & 0x0F,
+        "scrollL3XCode": payload[3] & 0x0F, "scrollL3YCode": (payload[3] >> 4) & 0x0F,
+        "unknownEffectBit3": bool(payload[5] & 0x08),
+        "preservedBitsByte": payload[1],
+        "layer3Enabled": dims["layer3Enabled"],
+        "scrollModeBits": dims["scrollBits"],
+    }
+    for prefix in ("scrollL2X", "scrollL2Y", "scrollL3X", "scrollL3Y"):
+        result[prefix + "Speed"] = SCROLL_SPEEDS[result[prefix + "Code"]]
+    for key, mask in SCREEN_FIELDS.items():
+        result[key] = bool(payload[4] & mask)
+    for key, mask in EFFECT_FIELDS.items():
+        result[key] = bool(payload[5] & mask)
+    return result
+
+
+def save_scene_render_settings(
+    store: OverlayStore, path: str, expected_sha256: str, values: dict
+) -> dict:
+    current = load_scene_render_settings(store, path, "mine")
+    payload, _ = store.read(path, "mine")
+    if digest(payload) != expected_sha256 or current["sha256"] != expected_sha256:
+        raise RuntimeError(f"{path} changed since it was opened; reload before saving")
+    allowed = {"scrollL2XCode", "scrollL2YCode", "scrollL3XCode", "scrollL3YCode",
+               *SCREEN_FIELDS.keys(), *EFFECT_FIELDS.keys()}
+    unknown = set(values) - allowed
+    if unknown:
+        raise ValueError(f"Unsupported scene render-setting fields: {', '.join(sorted(unknown))}")
+    codes = {}
+    for key in ("scrollL2XCode", "scrollL2YCode", "scrollL3XCode", "scrollL3YCode"):
+        codes[key] = _bounded(key, values.get(key, current[key]), 0, 15)
+    output = bytearray(payload)
+    output[2] = codes["scrollL2XCode"] | (codes["scrollL2YCode"] << 4)
+    output[3] = codes["scrollL3XCode"] | (codes["scrollL3YCode"] << 4)
+    screen = 0
+    for key, mask in SCREEN_FIELDS.items():
+        if bool(values.get(key, current[key])):
+            screen |= mask
+    output[4] = screen
+    effects = 0x08 if current["unknownEffectBit3"] else 0
+    for key, mask in EFFECT_FIELDS.items():
+        if bool(values.get(key, current[key])):
+            effects |= mask
+    output[5] = effects
+    # Bytes 0-1 carry map dimensions, L3 enable and scroll-mode bits. Never rewrite them here.
+    store.write(path, expected_sha256, bytes(output))
+    return load_scene_render_settings(store, path, "mine")
