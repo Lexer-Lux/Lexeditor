@@ -57,12 +57,12 @@ function scenesView(){return records("scenes",[
 const SCROLL_SPEED_CHOICES=[[0,"0 px/s"],[1,"+3.75 px/s"],[2,"+7.5 px/s"],[3,"+15 px/s"],[4,"+30 px/s"],[5,"+60 px/s"],[6,"+120 px/s"],[7,"+240 px/s"],[8,"0 px/s (code 8)"],[9,"-3.75 px/s"],[10,"-7.5 px/s"],[11,"-15 px/s"],[12,"-30 px/s"],[13,"-60 px/s"],[14,"-120 px/s"],[15,"-240 px/s"]];
 function sceneRenderDetail(row){return detailPanel({className:"ct-detail",title:`Area map ${row.mapId}`,identity:recordId(row.mapId),meta:row.path,body:[
   detailSection({title:"LAYER 2 SCROLL",body:[
-    detailField({label:"X SPEED",...selectField("scenerender",row,"scrollL2XCode",SCROLL_SPEED_CHOICES,"Stored four-bit horizontal scroll-speed code.")}),
-    detailField({label:"Y SPEED",...selectField("scenerender",row,"scrollL2YCode",SCROLL_SPEED_CHOICES,"Stored four-bit vertical scroll-speed code.")}),
+    detailField({label:"L2 X SPEED",...selectField("scenerender",row,"scrollL2XCode",SCROLL_SPEED_CHOICES,"Stored four-bit horizontal scroll-speed code.")}),
+    detailField({label:"L2 Y SPEED",...selectField("scenerender",row,"scrollL2YCode",SCROLL_SPEED_CHOICES,"Stored four-bit vertical scroll-speed code.")}),
   ]}),
   detailSection({title:"LAYER 3 SCROLL",body:[
-    detailField({label:"X SPEED",...selectField("scenerender",row,"scrollL3XCode",SCROLL_SPEED_CHOICES,"Stored four-bit horizontal scroll-speed code.")}),
-    detailField({label:"Y SPEED",...selectField("scenerender",row,"scrollL3YCode",SCROLL_SPEED_CHOICES,"Stored four-bit vertical scroll-speed code.")}),
+    detailField({label:"L3 X SPEED",...selectField("scenerender",row,"scrollL3XCode",SCROLL_SPEED_CHOICES,"Stored four-bit horizontal scroll-speed code.")}),
+    detailField({label:"L3 Y SPEED",...selectField("scenerender",row,"scrollL3YCode",SCROLL_SPEED_CHOICES,"Stored four-bit vertical scroll-speed code.")}),
   ]}),
   detailSection({title:"MAIN SCREEN",body:[
     detailField({label:"LAYER 1 MAIN",...boolField("scenerender",row,"layer1Main")}),
