@@ -83,6 +83,7 @@ jobs:
           Copy-Item games/ds3/candidate/ds3_candidate.py -Destination "$dest/ds3_candidate.py"
           Copy-Item games/ds3/candidate/Run-DS3-Candidate.ps1 -Destination "$dest/Run-DS3-Candidate.ps1"
           Copy-Item games/ds3/candidate/README-CANDIDATE.md -Destination "$dest/README-CANDIDATE.md"
+          python -m pip install --disable-pip-version-check -r "$dest/requirements.txt"
           python "$dest/ds3_candidate.py" --check
           Get-ChildItem -Path $dest -Recurse -File |
             Sort-Object FullName |
