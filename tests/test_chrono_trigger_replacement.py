@@ -16,6 +16,7 @@ from games.chrono_trigger.scene_data import load_scenes, save_scene
 from games.chrono_trigger.scene_map_data import (load_scene_map, save_scene_map, load_scene_properties, save_scene_properties,
     load_scene_render_settings, save_scene_render_settings)
 from games.chrono_trigger.sprite_data import load_sprite_headers, save_sprite_header
+from games.chrono_trigger.sprite_assembly_data import load_sprite_assemblies, save_sprite_assembly
 from games.chrono_trigger.text_data import load_messages, save_messages
 from games.chrono_trigger.tileset_data import load_graphics_sets, save_graphics_set, load_tile_assemblies, save_tile_assembly
 from games.chrono_trigger.world_data import (
@@ -66,6 +67,13 @@ class FreshChronoTriggerTests(unittest.TestCase):
         scene_map[6 + 16 * 16] = 4
         scene_map.extend(bytes([0x01, 0, 0, 0x80, 0x20, 0x10, 255]))
         sprite_descriptor = bytes([9, 8, 7, 0xAC, 5, 0xD2, 0xFE, 0x03, 0x11, 0x22, 0x33, 0xEE])
+        sprite_cell = bytearray(b"\xAA\xBB\xCC" + struct.pack("<HH", 2, 0xBEEF))
+        sprite_cell.extend(bytes([2]))
+        sprite_cell.extend(struct.pack("<HbbB", 0x025C, -5, -25, 0xA1))
+        sprite_cell.extend(struct.pack("<HbbB", 0x0000, 1, 2, 0x02))
+        sprite_cell.extend(bytes([1]))
+        sprite_cell.extend(struct.pack("<HbbB", 0x0020, 3, 4, 0x80))
+        sprite_cell.extend(b"\xEE")
         graphics_sets = bytes([1, 2, 3, 4, 5, 6, 7, 0xFF]) + b"\xDD"
         assembly_l12 = bytearray(512 * 4 * 3 + 1)
         struct.pack_into("<HB", assembly_l12, 0, 300 | 0x0400 | (5 << 12), 0xA1)
@@ -109,6 +117,7 @@ class FreshChronoTriggerTests(unittest.TestCase):
             ("Game/world/colanim_bin/0_colanim.bin", world_colors),
             ("Game/world/EventTable/EventTable_0004.dat", world_event),
             ("Game/chara/dat/c005.dat", sprite_descriptor),
+            ("Game/chara/cell/c005.cel", bytes(sprite_cell)),
             ("Game/field/MapTable/MapTable_0006.dat", bytes(scene_map)),
             ("Game/field/BGSetTable/bgsettable_4.dat", graphics_sets),
             ("Game/field/ChipTable/ChipTable_0004.dat", bytes(assembly_l12)),
@@ -336,6 +345,39 @@ class FreshChronoTriggerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "documented code 0 through 30"):
                 save_scene_properties(store, path, saved["sha256"], [{
                     "token": row["token"], "values": {"collisionCode": 31},
+                }])
+
+    def test_sprite_assembly_edit_preserves_counts_weird_bit_unknown_flags_and_other_records(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            data = load_sprite_assemblies(store)
+            row = next(value for value in data["rows"] if value["token"] == "5:0:0")
+            meta = data["files"][0]
+            self.assertEqual((meta["frameCount"], meta["headerWord"], meta["prefixHex"], meta["trailingBytes"]),
+                             (2, 0xBEEF, "AABBCC", 1))
+            self.assertEqual((row["frameTileCount"], row["chipIndex"], row["weirdSourceBit"],
+                              row["x"], row["y"], row["isTop"], row["flipHorizontal"], row["unknownFlags"]),
+                             (2, 300, True, -5, -25, True, True, 0xA0))
+            before, _ = store.read(row["path"], "mine")
+            saved = save_sprite_assembly(store, row["path"], row["sha256"], [{
+                "token": row["token"],
+                "values": {"chipIndex": 511, "x": 7, "y": -10, "flipHorizontal": False},
+            }])
+            updated = next(value for value in saved["rows"] if value["token"] == row["token"])
+            self.assertEqual((updated["chipIndex"], updated["weirdSourceBit"], updated["x"], updated["y"],
+                              updated["flipHorizontal"], updated["unknownFlags"]),
+                             (511, True, 7, -10, False, 0xA0))
+            after, origin = store.read(row["path"], "mine")
+            self.assertEqual(origin, "project")
+            self.assertEqual(after[:8], before[:8])
+            self.assertEqual(after[13:], before[13:])
+            self.assertTrue(struct.unpack_from("<H", after, 8)[0] & 0x0008)
+            self.assertEqual(after[12], 0xA0)
+            self.assertEqual(archive.read_bytes(), original_archive)
+            with self.assertRaisesRegex(ValueError, "Unsupported sprite assembly"):
+                save_sprite_assembly(store, row["path"], saved["sha256"], [{
+                    "token": row["token"], "values": {"weirdSourceBit": False},
                 }])
 
     def test_sprite_descriptor_edit_preserves_pc_ignored_references_and_unknown_bytes(self):
