@@ -6,7 +6,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import games.ds3.server as ds3_server
+from games.ds3.plugin import PLUGIN, check as plugin_check
 from games.ds3.server import _data_map, _path_within
+from plugin_api import validate_plugin
 from games.ds3.formats import (
     BND4View,
     DS3FormatError,
@@ -131,6 +134,58 @@ def _field_value(document: RegulationDocument, table: str, row_id: int, key: str
 
 
 class DS3FormatTests(unittest.TestCase):
+    def test_pinned_metadata_source_record_and_plugin_descriptor(self):
+        source = json.loads((METADATA / "SOURCE.json").read_text("utf-8"))
+        self.assertEqual(source["revision"], "43f9b49a022260b6a76b1adcbe20cc0989ccff95")
+        self.assertEqual(source["license"], "MIT")
+        self.assertEqual(set(source["tables"]), set(TARGET_TABLES))
+        self.assertEqual(plugin_check(), [])
+        validate_plugin(PLUGIN)
+        self.assertFalse(PLUGIN.mods_load)
+        self.assertFalse(PLUGIN.can_launch)
+
+    def test_project_save_is_isolated_and_reopens_export(self):
+        with tempfile.TemporaryDirectory(prefix="lexeditor-ds3-save-") as name:
+            root = Path(name).resolve()
+            project = root / "project"
+            game = root / "game"
+            source = root / "installed-Data0.bdt"
+            project.mkdir()
+            game.mkdir()
+            (project / ".lexeditor-ds3-project").write_text(
+                '{"schema":1,"game":"Dark Souls III"}\n', encoding="utf-8"
+            )
+            source.write_bytes(encrypt_regulation(_bnd4(), iv=b"\x44" * 16))
+            source_before = source.read_bytes()
+            saved_globals = (
+                ds3_server.PROJECT, ds3_server.GAME_ROOT, ds3_server.SOURCE_OVERRIDE,
+                ds3_server._DOCUMENT, ds3_server._SOURCE_PATH,
+            )
+            try:
+                ds3_server.PROJECT = project
+                ds3_server.GAME_ROOT = game
+                ds3_server.SOURCE_OVERRIDE = str(source)
+                ds3_server._DOCUMENT = None
+                ds3_server._SOURCE_PATH = None
+                document = ds3_server._document()
+                row_id, _ = _row_ids("EquipParamWeapon")
+                document.edit("EquipParamWeapon", row_id, "atkBasePhysics", 321)
+                result = ds3_server._save()
+                self.assertTrue(result["saved"])
+                exported = project / "Data0.bdt"
+                self.assertTrue(exported.is_file())
+                self.assertEqual(source.read_bytes(), source_before)
+                self.assertEqual(Path(result["source"]).resolve(), exported.resolve())
+                reopened = RegulationDocument(exported.read_bytes(), METADATA)
+                self.assertEqual(
+                    _field_value(reopened, "EquipParamWeapon", row_id, "atkBasePhysics"), 321
+                )
+            finally:
+                (
+                    ds3_server.PROJECT, ds3_server.GAME_ROOT, ds3_server.SOURCE_OVERRIDE,
+                    ds3_server._DOCUMENT, ds3_server._SOURCE_PATH,
+                ) = saved_globals
+
     def test_project_boundary_rejects_game_install_subfolders(self):
         with tempfile.TemporaryDirectory(prefix="lexeditor-ds3-boundary-") as name:
             root = Path(name).resolve()
