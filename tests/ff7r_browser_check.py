@@ -348,8 +348,19 @@ def new_page(browser, html: str, physical_width: int, physical_height: int,
     page = context.new_page()
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    page.route("**/*", lambda route: route.abort())
-    page.set_content(html, wait_until="domcontentloaded")
+
+    def route_request(route):
+        request = route.request
+        if request.resource_type == "document" and request.url.rstrip("/") == "https://lexeditor.test":
+            route.fulfill(status=200, content_type="text/html", body=html)
+        else:
+            route.abort()
+
+    page.route("**/*", route_request)
+    # set_content() creates an opaque document whose sessionStorage access is
+    # denied in Chromium. The production shared shell legitimately uses web
+    # storage, so render the same synthetic page from a routed HTTPS origin.
+    page.goto("https://lexeditor.test/", wait_until="domcontentloaded")
     page.wait_for_timeout(100)
     try:
         booted = page.evaluate(
