@@ -279,8 +279,11 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
           else setPercent(enemyDefencePrevious.get(entry)??neutral);
           input.value=entry.percent;sync();input.dispatchEvent(new Event('change',{bubbles:true}));
         }});
-        const icon=conceptIcon(element?'element':'status',aliases[name]||name);
-        if(icon)icon.addEventListener('error',()=>icon.remove(),{once:true});
+        // A status the game has no icon for - or whose icon will not load -
+        // shows a plain mark in the icon's place, so every tile reads alike.
+        const fallback=()=>el('span',{class:'enemy-status-fallback','aria-hidden':'true'},'▧');
+        const icon=conceptIcon(element?'element':'status',aliases[name]||name)||fallback();
+        icon.querySelector?.('img')?.addEventListener('error',()=>icon.replaceWith(fallback()),{once:true});
         const tile=LexeditorUI.iconValue({icon,label:name,toggle:checkbox,control:enemyTableSource(unitField(input,'%'),row,read,setPercent,value=>`${value}%`)});tile.dataset.defence=name;
         const sync=()=>{const checked=isImmune();checkbox.checked=checked;checkbox.disabled=state.activeSource!=='mine';
           input.disabled=checked||state.activeSource!=='mine';tile.classList.toggle('immune',checked)};

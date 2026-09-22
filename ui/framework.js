@@ -1350,7 +1350,8 @@
       const box=stage.getBoundingClientRect();
       options.place({x:Math.max(0,Math.min(1,(event.clientX-box.left)/box.width)),y:Math.max(0,Math.min(1,(event.clientY-box.top)/box.height))});
     });
-    const root=element("div",{class:options.fill===false?"lex-image-map lex-image-map-natural":"lex-image-map","aria-label":options.label||"Map"},stage);
+    // A region, so its label is announced; a bare div's aria-label is not.
+    const root=element("div",{class:options.fill===false?"lex-image-map lex-image-map-natural":"lex-image-map",role:"region","aria-label":options.label||"Map"},stage);
     root.style.setProperty("--lex-map-ratio", String(Number(options.ratio)||4/3));
     root.lexStage=stage;
     return root;
@@ -1694,7 +1695,10 @@
       booleanField ? null : arrow),
     booleanField ? arrow : null,
     element("div", {class: "lex-detail-field-control"}, control,
-      pin && pin.parentElement !== control ? pin : null), options.showType === false ? null : typeRail);
+      pin && pin.parentElement !== control ? pin : null),
+    // Hiding the type hides the type, not the help that shares its rail: a
+    // field that asked for no type lost its only explanation with it.
+    options.showType === false ? (helpMarker ? element("div", {class: "lex-field-type-rail"}, helpMarker) : null) : typeRail);
     // The leader arrow shares the checkbox's grid row, so it points at the
     // middle of the box whatever else the row is carrying and however tall the
     // row turns out to be. Anchored to the row instead, it tracked the row's

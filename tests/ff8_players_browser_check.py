@@ -36,9 +36,9 @@ def main():
   assert page.get_by_role('table').count()==1
   assert page.get_by_label('Search card players',exact=True).count()==1
   assert page.locator('#toolbar').is_hidden()
-  assert page.locator('.lex-column-list-row').filter(has_text='Opponent Student').count()==1
+  assert page.locator('.lex-column-list-row').filter(has_text='Student').count()==1
   assert page.locator('.lex-column-list-row').filter(has_text='Garden').count()==0
-  control=page.get_by_label('Opponent Student Deck level',exact=True)
+  control=page.get_by_label('Student Deck level',exact=True)
   control.fill('5')
   assert page.evaluate('model.data.fields.rows[1].players[0].params[0].value')==5
   assert page.evaluate('calls[0][0]')=='fields'

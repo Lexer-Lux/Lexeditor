@@ -25,7 +25,8 @@ PLUGIN_IMPORTANT = {
     "palworld": 0, "rdr": 0, "rdr2": 0, "warband": 0,
 }
 FRAMEWORK_DUPLICATES = 0
-FRAMEWORK_IMPORTANT = 0
+# One, and only for `[hidden]`: see the comment on it in ui/framework.css.
+FRAMEWORK_IMPORTANT = 1
 
 
 class CssBudgetTests(unittest.TestCase):

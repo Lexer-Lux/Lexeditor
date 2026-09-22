@@ -34,8 +34,11 @@ state.data.enemyTables.choices={statuses:[{id:0,name:'Haste'},{id:1,name:'Reflec
   page.evaluate("""()=>{document.querySelector('main').style.cssText='display:block;width:360px';document.querySelector('main').replaceChildren(enemyDefenceSection({tables:{statusDefence:[{slot:0,percent:0},{slot:1,percent:0}]}},'statusDefence','STATUS DEFENCE'));}""")
   page.wait_for_timeout(200)
   assert page.locator('.enemy-status-fallback').all_text_contents()==['\u25a7','\u25a7']
-  assert page.locator('.enemy-defence-toggle').first.evaluate('e=>e.getBoundingClientRect().height')==26
-  assert page.locator('.enemy-defence-section').evaluate('e=>e.scrollWidth<=e.clientWidth+2')
+  # Defence tiles are the shared iconValue: its toggle sits inside its tile,
+  # and the section does not overflow a narrow panel.
+  assert page.locator('.lex-icon-value-toggle').first.evaluate('''e=>{const t=e.closest('.lex-icon-value').getBoundingClientRect(),r=e.getBoundingClientRect();
+    return r.height>0&&r.top>=t.top-1&&r.bottom<=t.bottom+1}''')
+  assert page.locator('.lex-detail-section').first.evaluate('e=>e.scrollWidth<=e.clientWidth+2')
   import tempfile
   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-defence-layout.png'))
   browser.close()
