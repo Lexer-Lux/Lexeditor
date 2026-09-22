@@ -206,6 +206,9 @@ def fixtures() -> dict:
         "catalog": {"assets": assets, "textAssets": [{"asset": TEXT, "name": "Resident Text", "group": "Text", "language": "US"}]},
         "data": data, "text": {TEXT: text}, "economy": economy, "loot": loot,
         "datamap": {"rows": map_rows}, "info": info,
+        "modLoading": json.loads((ROOT / "ui" / "mod-loading.json").read_text(encoding="utf-8")),
+        "credits": json.loads((ROOT / "ui" / "credits.json").read_text(encoding="utf-8")),
+        "distributionNotices": [],
     }
 
 
@@ -230,6 +233,9 @@ window.fetch = async function(input, options={}) {
   if(path === "/api/catalog") data = window.__fixture.catalog;
   else if(path === "/api/datamap") data = window.__fixture.datamap;
   else if(path === "/api/info") data = window.__fixture.info;
+  else if(path === "/shared/mod-loading.json") data = window.__fixture.modLoading;
+  else if(path === "/shared/credits.json") data = window.__fixture.credits;
+  else if(path === "/shared/distribution-notices.json") data = window.__fixture.distributionNotices;
   else if(path === "/api/economy") data = window.__fixture.economy;
   else if(path === "/api/loot") data = window.__fixture.loot;
   else if(path === "/api/data") {
@@ -383,6 +389,10 @@ def new_page(browser, html: str, physical_width: int, physical_height: int,
                 json.dumps(details, indent=2), encoding="utf-8")
         raise AssertionError(details)
     page.wait_for_function("() => state.catalog && state.data && !state.busy")
+    page.wait_for_function(
+        "() => !document.querySelector('.lex-plugin-loading-screen')",
+        timeout=5000,
+    )
     return context, page, errors
 
 
