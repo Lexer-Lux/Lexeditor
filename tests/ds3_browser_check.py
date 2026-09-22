@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
 from games.ds3.formats import encrypt_regulation
 from service_session import LocalPluginSession, request_json
@@ -85,10 +85,24 @@ def main(argv: list[str] | None = None) -> int:
                 damage = page.locator('[data-ds3-field="atkBasePhysics"]')
                 damage.fill("321")
                 damage.press("Tab")
-                page.wait_for_function(
-                    "() => { const button=document.querySelector('#global-save'); return button && !button.disabled; }",
-                    timeout=10000,
-                )
+                try:
+                    page.wait_for_function(
+                        "() => { const button=document.querySelector('#global-save'); return button && !button.disabled; }",
+                        timeout=10000,
+                    )
+                except PlaywrightTimeoutError as error:
+                    diagnostics = page.evaluate(
+                        """() => ({
+                          dirty: typeof state === 'object' ? state.dirty : null,
+                          saveDisabled: document.querySelector('#global-save')?.disabled ?? null,
+                          saveTitle: document.querySelector('#global-save')?.title ?? null,
+                          fieldValue: document.querySelector('[data-ds3-field="atkBasePhysics"]')?.value ?? null,
+                          ready: document.body.dataset.ds3Ready || null
+                        })"""
+                    )
+                    diagnostics["apiDirty"] = request_json(session.url + "api/state").get("dirtyCount")
+                    diagnostics["browserErrors"] = list(errors)
+                    raise RuntimeError(f"DS3 edit did not enable Save: {diagnostics}") from error
                 page.screenshot(path=str(output / "weapons-edited.png"), full_page=True)
                 page.locator("#global-save").click()
                 page.wait_for_function(
