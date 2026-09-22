@@ -140,7 +140,7 @@ def smoke() -> list[str]:
             ("Game/world/SeId/SeId_0000.dat", bytes(world_music)),
             ("Game/world/colanim_bin/0_colanim.bin", world_colors),
             ("Game/world/EventTable/EventTable_0004.dat", world_event),
-            ("Game/chara/dat/c005.dat", "Game/chara/cell/c005.cel", sprite_descriptor),
+            ("Game/chara/dat/c005.dat", sprite_descriptor),
             ("Game/chara/cell/c005.cel", bytes(sprite_cell)),
             ("Game/field/MapTable/MapTable_0006.dat", bytes(scene_map)),
             ("Game/field/BGSetTable/bgsettable_4.dat", graphics_sets),
