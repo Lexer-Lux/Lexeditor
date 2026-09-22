@@ -89,7 +89,7 @@ def smoke() -> list[str]:
         scene_map = bytearray(bytes([0, 0, 0x21, 0x43, 0x5A, 0xC3]) + bytes(16 * 16 * 2))
         scene_map[6] = 3
         scene_map[6 + 16 * 16] = 4
-        scene_map.extend(bytes([0x01, 0, 0, 0x80, 0, 0, 255]))
+        scene_map.extend(bytes([0x01, 0, 0, 0x80, 0x20, 0x10, 255]))
         graphics_sets = bytes([1, 2, 3, 4, 5, 6, 7, 0xFF]) + b"\xDD"
         assembly_l12 = bytearray(512 * 4 * 3 + 1)
         struct.pack_into("<HB", assembly_l12, 0, 300 | 0x0400 | (5 << 12), 0xA1)
@@ -177,6 +177,19 @@ def smoke() -> list[str]:
                     or saved_scene_by_token["6:2:0"]["tileIndex"] != 9
                     or saved_scene_map["propertyBytes"] != 7):
                 raise RuntimeError("Scene map tile edits did not preserve header/property boundaries")
+            scene_props = request_json(session.url + "api/scene-properties?path=" + scene_map_path.replace("/", "%2F"))
+            prop_run = next(row for row in scene_props["rows"] if row["token"] == "6:prop:1")
+            saved_scene_props = request_json(session.url + "api/scene-properties/save", {
+                "path": scene_map_path, "sha256": scene_props["sha256"],
+                "edits": [{"token": prop_run["token"], "values": {
+                    "collisionCode": 30, "moveDirection": 3, "moveSpeed": 2,
+                    "priorityTop": True, "npcCollision": True,
+                }}],
+            })
+            saved_prop = next(row for row in saved_scene_props["rows"] if row["token"] == "6:prop:1")
+            if (saved_prop["collisionCode"] != 30 or saved_prop["repeatCount"] != 255
+                    or not saved_prop["unknownSecondBit5"] or not saved_prop["unknownThirdBit4"]):
+                raise RuntimeError("Scene property-run edit did not preserve RLE/unknown metadata")
             palette_files_result = request_json(session.url + "api/palette-files")
             if palette_files_result["rows"][0]["path"] != "Game/field/palette_bin/plt4.bin":
                 raise RuntimeError("Palette catalogue did not find the Steam field palette")
@@ -302,6 +315,7 @@ def smoke() -> list[str]:
         "keyed Steam text edit survived project-overlay readback",
         "fixed 24-byte area settings edit preserved the unmodelled word and trailing bytes",
         "scene map tile edits preserved the header, RLE property stream and existing tile banks",
+        "scene RLE property-run edit preserved compression, repeat counts and unknown bits",
         "256-color RGB555 palette edit preserved prefix, bit 15 and trailing bytes",
         "fixed-size area exit edit preserved unknown flag bits",
         "treasure edit preserved the unknown trailing word",
