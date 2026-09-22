@@ -153,6 +153,7 @@ def fixtures() -> dict:
         {"asset": TWEAK, "name": "Runtime Tweaks", "group": "Lexeditor Runtime", "synthetic": "runtime-settings"},
     ]
     economy = {
+        "available": True,
         "tables": [
             {"available": True, "asset": EQUIPMENT, "name": "Equipment",
              "rows": [{"id": "EQ_001", "name": "Fixture Blade", "textId": "TXT_EQ", "descriptionId": "DESC_EQ"}]},
@@ -463,8 +464,13 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
             page.evaluate("tab => navigate(tab)", tab)
             page.wait_for_function("!state.busy && !state.textBusy && !(state.tweaksPending>0)")
             assert page.evaluate("state.tab") == tab
-            assert page.locator("#main").inner_text().strip(), tab
-            assert "Resource unavailable" not in page.locator("#main").inner_text(), tab
+            text = page.locator("#main").inner_text()
+            assert text.strip(), tab
+            assert "Resource unavailable" not in text, tab
+            if tab in {"equipment", "item", "materia"}:
+                assert "Item settings unavailable" not in text, tab
+                expect(page.locator(".ff7r-table")).to_be_visible()
+                assert page.locator(".ff7r-table .lex-column-list-row").count() > 0, tab
             page.screenshot(path=str(output / f"screen-{tab}.png"), full_page=True)
 
         # Return to the explicit misc fixture.
@@ -529,6 +535,12 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
         }""")
         assert "packaged mod-loading file is missing" not in page.locator("#main").inner_text().lower()
         assert "packaged credits file is missing" not in page.locator("#main").inner_text().lower()
+        assert page.locator(".lex-information-panel .lex-detail-panel-body > .lex-plugin-mod-loading").count() == 1
+        assert page.locator(".lex-information-panel .lex-detail-panel-body > .lex-plugin-credits").count() == 1
+        shared = page.locator(".lex-information-panel .lex-detail-panel-body")
+        shared.evaluate("node => { node.scrollTop = node.scrollHeight; }")
+        page.wait_for_timeout(100)
+        page.screenshot(path=str(output / "info-shared-sections-1200.png"), full_page=True)
         remove = page.get_by_role("button", name="Remove deployed PAK", exact=True)
         expect(remove).to_be_enabled()
         remove.click()
