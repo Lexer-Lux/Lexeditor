@@ -15,6 +15,7 @@ from .field_data import load_exits, load_treasure, save_exits, save_treasure
 from .palette_data import load_palette, palette_files, save_palette
 from .project import OverlayStore
 from .scene_data import load_scenes, save_scene
+from .scene_map_data import scene_map_files, load_scene_map, save_scene_map
 from .text_data import languages, load_messages, save_messages, text_files
 from .tileset_data import load_graphics_sets, save_graphics_set, load_tile_assemblies, save_tile_assembly
 from .world_data import load_worlds, save_worlds
@@ -88,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({
                     "apiVersion": 1, "pluginId": "chrono-trigger", "name": "Chrono Trigger",
                     "hosted": True, "windowHost": "webview2",
-                    "capabilities": ["data-map", "localization-text", "area-settings", "field-exits", "treasure", "palettes", "world-settings", "world-navigation", "world-maps", "chip-animations", "tilesets", "project-overlay", "ctp-export"],
+                    "capabilities": ["data-map", "localization-text", "area-settings", "area-map-tiles", "field-exits", "treasure", "palettes", "world-settings", "world-navigation", "world-maps", "chip-animations", "tilesets", "project-overlay", "ctp-export"],
                 })
             if route == "/api/dashboard":
                 langs = languages(STORE)
@@ -103,6 +104,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(load_messages(STORE, query["path"], query.get("source", "mine")))
             if route == "/api/scenes":
                 return self.send_json(load_scenes(STORE, query.get("source", "mine"), query.get("language", "en")))
+            if route == "/api/scene-map-files":
+                return self.send_json({"rows": scene_map_files(STORE)})
+            if route == "/api/scene-map":
+                return self.send_json(load_scene_map(STORE, query["path"], query.get("source", "mine")))
             if route == "/api/palette-files":
                 return self.send_json({"rows": palette_files(STORE)})
             if route == "/api/palette":
@@ -147,6 +152,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = save_messages(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/scenes/save":
                 result = save_scene(STORE, int(body["id"]), str(body["sha256"]), dict(body.get("values") or {}), str(body.get("language", "en")))
+            elif route == "/api/scene-map/save":
+                result = save_scene_map(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/palette/save":
                 result = save_palette(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
             elif route == "/api/exits/save":
