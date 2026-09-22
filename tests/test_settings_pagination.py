@@ -49,7 +49,8 @@ def test_settings_pages_fit_and_wheel_preserves_edits(zoom):
             browser.close()
 
 
-def test_six_columns_order_and_reject_oversize_cards():
+@pytest.mark.parametrize('minimum, count', [(400, 3), (180, 6)])
+def test_columns_order_and_reject_oversize_cards(minimum, count):
     with sync_playwright() as play:
         browser = play.chromium.launch(headless=True)
         try:
@@ -60,27 +61,27 @@ def test_six_columns_order_and_reject_oversize_cards():
             page.goto('http://fixture/')
             page.add_style_tag(path=str(ROOT / 'ui/framework.css'))
             page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
-            page.evaluate('''() => {
+            page.evaluate('''minimum => {
               const U=LexeditorUI;
               const cards=Array.from({length:36},(_,i)=>{
                 const card=U.detailPanel({title:`Setting ${String(35-i).padStart(2,'0')}`});
                 card.style.height='100px'; return card;
               });
               window.fixture=U.settingsColumns(cards);
-              fixture.style.cssText='height:500px;width:1500px';
+              fixture.style.cssText=`height:500px;width:1500px;--lex-tweak-card-width:${minimum}px`;
               document.body.append(fixture);
-            }''')
+            }''', minimum)
             page.wait_for_timeout(150)
             assert not errors
             columns = page.locator('.lex-tweak-column')
-            assert columns.count() == 6
+            assert columns.count() == count
             widths = columns.evaluate_all('nodes=>nodes.map(n=>n.getBoundingClientRect().width)')
             assert max(widths) - min(widths) < 1
             titles = page.locator('.lex-tweak-column .lex-detail-panel-title').all_text_contents()
             assert titles == sorted(titles)
             assert columns.first.locator('section').count() > 1
             assert page.locator('.lex-tweaks-scroll').evaluate('n=>n.scrollHeight<=n.clientHeight+1')
-            for css in ('width:400px', 'height:900px'):
+            for css in ('width:600px', 'height:900px'):
                 failure = page.evaluate('''css => {
                   const card=fixture.querySelector('.lex-tweak-column > section');
                   const previous=card.style.cssText;

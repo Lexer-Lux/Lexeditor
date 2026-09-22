@@ -8,6 +8,7 @@ def main():
  try:
   with sync_playwright() as pw:
    browser=pw.chromium.launch(headless=True);page=browser.new_page();page.add_init_script(STUB)
+   errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
    page.goto(f'http://127.0.0.1:{server.server_port}/games/blank/editor.html')
    # Blank's tabs are the component catalogue now; its demonstration views
    # still render and are opened by name.
@@ -48,6 +49,7 @@ def main():
     fit=page.evaluate("(s=>[s.scrollHeight,s.clientHeight])(document.querySelector('.lex-tweaks-scroll'))")
     assert fit[0]<=fit[1]+1,(number,fit)
    print('Every tweaks page fits, and the wheel turns them.')
+   assert not errors,errors
    browser.close()
  finally:server.shutdown();server.server_close();thread.join(timeout=2)
 if __name__=='__main__':main()

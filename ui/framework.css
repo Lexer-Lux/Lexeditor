@@ -892,6 +892,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
    the panel's foot. Sized to its content, the body ended wherever the
    content did and the tabs floated partway down a tall window. */
 .lex-detail-panel-body:has(> .lex-tabbed-panel:only-child) { flex:1 1 auto; }
+.lex-detail-panel-body > .lex-tabbed-panel:only-child { flex:1 1 auto; }
 
 .lex-detail-section {
   position:relative;
@@ -5193,7 +5194,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    character count times a guessed em, and the stack draws at about two thirds
    of the control's type, so every value box on the panel ended early to make
    room for space nothing was ever going to fill. */
-.lex-source-control:not(.lex-source-control-internal):not(.lex-source-control-stacked) > .lex-reference-values {
+.lex-source-control:not(.lex-source-control-internal):not(.lex-source-control-stacked):not(:has(> input[type="checkbox"])) > .lex-reference-values {
 
   position:absolute;
   z-index:2;

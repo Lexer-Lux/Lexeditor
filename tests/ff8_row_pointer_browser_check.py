@@ -40,14 +40,14 @@ def main():
               const texts=[...range.getClientRects()].filter(r=>r.width>0);
               const before=getComputedStyle(content,'::before');
               const text=Math.min(...texts.map(r=>r.left));
-              const handRight=text-parseFloat(before.marginRight);
+              const handRight=content.getBoundingClientRect().left+parseFloat(before.left)+parseFloat(before.width);
               const handLeft=handRight-parseFloat(before.width);
               return {content:content.getBoundingClientRect().left,text,handLeft,handRight,position:before.position};
             }""")
         page.screenshot(path=str(SHOT))
         browser.close()
     for align, row in results.items():
-        assert row["position"] == "relative", row
+        assert row["position"] == "absolute", row
         # The hand's right edge sits a few pixels left of the text, wherever the text is.
         assert 0 < row["text"] - row["handRight"] <= 10, (align, row)
     print("FF8 hand cursor sits beside the selected text:", results)

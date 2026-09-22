@@ -3108,11 +3108,11 @@
     const columnCount = length => {
       const width=content.clientWidth||scroll.clientWidth;
       const gap=parseFloat(getComputedStyle(content).columnGap)||12;
-      // A card is never narrower than it can be used at: the width a game
-      // asks for, or 180px - six columns in a wide window, four in a narrow
-      // one, where six made every card 140px and nothing in it fit.
+      // Allow room for the shared name, copy button, value and help lanes.
+      // Narrower cards clipped flag names and could abort strict pagination.
+      // A caller can supply a measured minimum for a simpler card.
       const asked=parseFloat(getComputedStyle(content).getPropertyValue("--lex-tweak-card-width"));
-      const target=asked||(Number.isInteger(options.columns)&&options.columns>0?180:320);
+      const target=asked||400;
       const fit=Math.max(1,Math.min(length,Math.floor((width+gap)/(target+gap))||1));
       // `columns` is a ceiling, not a count: six fixed columns made three
       // cards a sixth of the window each, truncating every value in them,
@@ -6595,7 +6595,9 @@ ${contents.path}`});
         widths[donor]-=taken;remaining-=taken;applied+=taken;
         if(remaining<.25)break;
       }
-      if(applied<.25)return false;
+      // A drag is measured from its starting widths. Returning to the start
+      // must restore those widths, even though this move transfers nothing.
+      if(applied<.25){if(initialWidths)setSizes(widths,persist);return false;}
       widths[delta>0?index:index+1]+=applied;
       setSizes(widths, persist);
       return true;

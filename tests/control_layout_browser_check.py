@@ -48,8 +48,16 @@ def main():
                 for tab in tabs.all():
                     if not tab.is_visible():continue
                     tab.hover()
-                    data=tab.evaluate('''e=>{const r=e.getBoundingClientRect(),b=e.querySelector('.lex-tab-shortcut').getBoundingClientRect(),t=e.querySelector('.lex-tab-label').getBoundingClientRect();return {size:b.height,top:b.top-r.top,bottom:r.bottom-b.bottom,right:r.right-b.right,gap:b.left-t.right}}''')
-                    assert data['size']>=20 and min(data['top'],data['bottom'],data['right'])>=3 and data['gap']>=4,data
+                    page.wait_for_timeout(200)
+                    hint=tab.locator('.lex-tab-shortcut')
+                    assert hint.evaluate('e=>getComputedStyle(e).opacity')=='0'
+                    before=tab.locator('.lex-tab-label').bounding_box()
+                    page.keyboard.down('Control')
+                    page.wait_for_timeout(200)
+                    assert hint.evaluate('e=>getComputedStyle(e).opacity')=='1'
+                    after=tab.locator('.lex-tab-label').bounding_box()
+                    assert all(abs(after[key]-before[key])<.5 for key in before),(before,after)
+                    page.keyboard.up('Control')
                 for field in page.locator('.lex-detail-field:has(.lex-copy-value)').all():
                     if not field.is_visible():continue
                     # A multi-number property gives each value its own copy
@@ -143,7 +151,7 @@ def main():
                                        p.top>=bb.bottom-1||p.bottom<=bb.top+1;})():true};}''')
                     if row is not None:
                         assert abs(row['onCentre'])<=1,row
-                        assert 0<=row['tip']<=4,row
+                        assert abs(row['tip']-10)<=1,row
                         assert row['markUnder'],row
                         assert abs(row['markLeft'])<=1 and abs(row['markRight'])<=1,row
                         assert row['pinIn'],row
@@ -425,15 +433,28 @@ def main():
                 return e ? Math.round(e.getBoundingClientRect().left) : null; };
               return [at('.lex-project-source-mode'), at('.lex-project-menu-name'),
                       at('.lex-project-menu-path'), at('.lex-project-source-status')];})''')
-            assert len(columns)>1 and all(row==columns[0] for row in columns),columns
+            # Vanilla is not toggleable and has no enable/disable status box.
+            assert len(columns)>1 and all(row[:3]==columns[0][:3] for row in columns),columns
+            statuses=[row[3] for row in columns if row[3] is not None]
+            assert statuses and len(set(statuses))==1,columns
             assert page.locator('.lex-project-menu-item .lex-project-about').count()>0
             assert page.locator('.lex-project-remove').count()==0
             page.keyboard.press('Escape')
             page.evaluate("navigate('subtabs')")
             for tab in page.locator('.lex-subtab-button').all():
                 tab.hover()
-                data=tab.evaluate("""e=>{const r=e.getBoundingClientRect(),b=e.querySelector('.lex-tab-shortcut').getBoundingClientRect(),l=e.querySelector('.lex-tab-label').getBoundingClientRect();return {height:b.height,top:b.top-r.top,gap:b.left-l.right}}""")
-                assert data['height']>=20 and data['top']>=3 and data['gap']>=4,data
+                page.wait_for_timeout(150)
+                hint=tab.locator('.lex-tab-shortcut')
+                if hint.count()==0:
+                    assert tab.evaluate("e=>!!e.closest('.lex-tabbed-panel-tabs')")
+                    continue
+                assert hint.evaluate('e=>getComputedStyle(e).opacity')=='0'
+                before=tab.locator('.lex-tab-label').bounding_box()
+                page.keyboard.down('Control');page.wait_for_timeout(150)
+                assert hint.evaluate('e=>getComputedStyle(e).opacity')=='1'
+                after=tab.locator('.lex-tab-label').bounding_box()
+                assert all(abs(after[key]-before[key])<.5 for key in before),(before,after)
+                page.keyboard.up('Control')
             page.locator('.lex-detail-field:has(.lex-copy-value)').last.hover()
             page.screenshot(path=str(OUT/'tabbed-copy.png'))
             assert page.locator('.lex-field-boolean-arrow').evaluate('(e)=>getComputedStyle(e).position')=='relative'
