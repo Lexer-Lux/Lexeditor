@@ -108,6 +108,7 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
     for folder,name in (
         ('ffnx_status_bars','lexeditor_ff8_bars.cpp'),
         ('ffnx_status_bars','lexeditor_ff8_bars.h'),
+        ('ffnx_status_bars','lexeditor_ff8_hp_colors.h'),
         ('ffnx_party_switch','lexeditor_ff8_party_switch.cpp'),
         ('ffnx_party_switch','lexeditor_ff8_party_switch.h'),
     ):
@@ -150,9 +151,9 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
             ('bool enable_ff8_party_switch;', 'bool enable_ff8_party_switch;\nbool enable_ff8_no_magic_consumption;'),
             ('\tenable_ff8_party_switch = config["enable_ff8_party_switch"].value_or(false);',
              '\tenable_ff8_party_switch = config["enable_ff8_party_switch"].value_or(false);\n\tenable_ff8_no_magic_consumption = config["enable_ff8_no_magic_consumption"].value_or(false);'),
-            ('bool enable_ff8_hp_bars;','bool enable_ff8_hp_bars;\nbool enable_ff8_gf_hp_bars;'),
+            ('bool enable_ff8_hp_bars;','bool enable_ff8_hp_bars;\nbool enable_ff8_better_hp_colors;\nbool enable_ff8_gf_hp_bars;'),
             ('\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);',
-             '\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);\n\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);'),
+             '\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);\n\tenable_ff8_better_hp_colors = config["enable_ff8_better_hp_colors"].value_or(false);\n\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);'),
             ('bool enable_ff8_gf_hp_bars;','bool enable_ff8_gf_hp_bars;\nbool enable_ff8_ingame_time;'),
             ('\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);',
              '\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);\n\tenable_ff8_ingame_time = config["enable_ff8_ingame_time"].value_or(false);'),
@@ -164,13 +165,13 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
         ],
         'src/cfg.h':[
             ('extern bool enable_ff8_party_switch;', 'extern bool enable_ff8_party_switch;\nextern bool enable_ff8_no_magic_consumption;'),
-            ('extern bool enable_ff8_hp_bars;','extern bool enable_ff8_hp_bars;\nextern bool enable_ff8_gf_hp_bars;'),
+            ('extern bool enable_ff8_hp_bars;','extern bool enable_ff8_hp_bars;\nextern bool enable_ff8_better_hp_colors;\nextern bool enable_ff8_gf_hp_bars;'),
             ('extern bool enable_ff8_gf_hp_bars;','extern bool enable_ff8_gf_hp_bars;\nextern bool enable_ff8_ingame_time;'),
             ('extern bool enable_ff8_modern_controls;', 'extern bool enable_ff8_modern_controls;\nextern double ff8_modern_controls_camera_speed;'),
         ],
         'misc/FFNx.toml':[
             ('enable_ff8_party_switch = false', 'enable_ff8_party_switch = false\n\n# Keep spell stock on successful field/battle casts; items still consume.\nenable_ff8_no_magic_consumption = false'),
-            ('enable_ff8_hp_bars = false','enable_ff8_hp_bars = false\n\n# Blue junctioned-GF HP bar above each party name.\nenable_ff8_gf_hp_bars = false'),
+            ('enable_ff8_hp_bars = false','enable_ff8_hp_bars = false\n\n# Smoothly tint living HP numbers by remaining HP; KO stays native.\nenable_ff8_better_hp_colors = false\n\n# Blue junctioned-GF HP bar above each party name.\nenable_ff8_gf_hp_bars = false'),
             ('enable_ff8_gf_hp_bars = false','enable_ff8_gf_hp_bars = false\n\n# Show the computer local clock on FF8 main menu without changing PLAY time.\nenable_ff8_ingame_time = false'),
             ('enable_ff8_modern_controls = false', 'enable_ff8_modern_controls = false\n\n# Battle camera turn rate as a multiple of the shipped speed, 0.2 to 4.\nff8_modern_controls_camera_speed = 1.0'),
         ],
@@ -189,6 +190,8 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
          '#include "lexeditor_ff8_bars.h"\n#include "lexeditor_ff8_toast.h"'),
     ]
     changes['src/ff8_opengl.cpp'] = [
+        ('\tret->draw_paletted2D = common_draw_paletted2D;',
+         '\tret->draw_paletted2D = lexeditor_ff8_hp_colors_requested() ? lexeditor_ff8_hp_colors_draw_paletted2D : common_draw_paletted2D;'),
         ('#include "lexeditor_ff8_party_switch.h"', '#include "lexeditor_ff8_party_switch.h"\n#include "lexeditor_ff8_stock_tweaks.h"\n#include "lexeditor_ff8_gf_spellbooks.h"\n#include "lexeditor_ff8_reptile_atb.h"'),
         ('\tlexeditor_ff8_party_switch_install();', '\tlexeditor_ff8_party_switch_install();\n\tlexeditor_ff8_stock_tweaks_install();\n\tlexeditor_ff8_gf_spellbooks_install();\n\tlexeditor_ff8_reptile_atb_install();'),
     ]
@@ -239,7 +242,7 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
                    if line.startswith("+++ b/")]
     patch_paths.extend('src/' + ('ff8/' if name.endswith('.inc') else '') + name for name in extension_files)
     patch_paths.extend(('src/toast_layout.h', 'src/lexeditor_ff8_toast.h',
-                        'src/lexeditor_ff8_toast.cpp'))
+                        'src/lexeditor_ff8_toast.cpp', 'src/lexeditor_ff8_hp_colors.h'))
     for relative in ('src/battle_camera.h', 'src/vehicle_drive.h'):
         if relative not in patch_paths:
             patch_paths.append(relative)

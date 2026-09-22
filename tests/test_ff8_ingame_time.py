@@ -54,7 +54,8 @@ class InGameTimeTests(unittest.TestCase):
         # rather than by one exact spelling that keeps moving.
         gate = "if (!ff8 || (!enable_ff8_xp_bars && !enable_ff8_hp_bars"
         self.assertIn(gate, source)
-        self.assertIn("!enable_ff8_gf_hp_bars && !enable_ff8_ingame_time))", source)
+        self.assertIn("!enable_ff8_gf_hp_bars", source)
+        self.assertIn("!enable_ff8_ingame_time && !enable_ff8_better_hp_colors", source)
         self.assertIn("if (!enable_ff8_xp_bars) return;", source)
         # The clock is not an overlay surface any more; it hooks the native
         # PLAY-time renderer. What still has to hold is the ordering: the
