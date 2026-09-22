@@ -12,6 +12,10 @@ on:
       - 'tools/verify_ff8_hp_colors_issue_481.py'
       - 'tools/verify_ff8_modern_controls_binary.py'
       - 'tools/verify_ff8_reptile_atb_binary.py'
+      - 'tools/verify_ff8_interaction_indicators_302.py'
+      - 'tests/test_ff8_interaction_indicators_issue_302.py'
+      - 'games/ff8/gameplay_settings.py'
+      - 'games/ff8/editor.html'
       - '.github/workflows/ff8-stock-build.yml'
   workflow_dispatch:
 permissions:
@@ -113,6 +117,8 @@ jobs:
           python editor/tools/verify_ff8_no_magic_consumption.py --driver candidate/AF3DN.P
           python editor/tools/verify_ff8_modern_controls_binary.py --driver candidate/AF3DN.P
           python editor/tools/verify_ff8_reptile_atb_binary.py --driver candidate/AF3DN.P
+          python editor/tools/verify_ff8_interaction_indicators_302.py --compile --compiler cl
+          python -m unittest editor/tests/test_ff8_interaction_indicators_issue_302.py -v
       - uses: actions/upload-artifact@v4
         if: success()
         with:
