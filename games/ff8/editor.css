@@ -67,8 +67,8 @@
       --lex-sort-marker-clip-ascending:none;--lex-sort-marker-opacity:.75;
       --lex-sort-marker-sorted-opacity:.75;--lex-sort-marker-width:22px;--lex-sort-marker-height:15px;
       --lex-sort-marker-filter:drop-shadow(1px 1px #111);
-      --lex-sort-marker-ascending:translateY(-50%) rotate(-30deg);--lex-sort-marker-descending:translateY(-50%) rotate(30deg);
-      --lex-sort-marker-position:static;--lex-sort-marker-top:auto;--lex-sort-marker-right:auto;--lex-sort-marker-margin:4px;--lex-head-cell-overflow:visible;
+      --lex-sort-marker-ascending:rotate(-30deg);--lex-sort-marker-descending:rotate(30deg);
+      --lex-head-cell-overflow:visible;
       --lex-pager-fg:#fff;--lex-pager-bg:#4f4f4f;--lex-pager-border:3px solid;
       --lex-pager-border-color:#aaa #282828 #282828 #aaa;--lex-pager-button-fg:#fff;
       --lex-pager-button-bg:#606060;--lex-pager-button-border:2px solid;
@@ -78,7 +78,7 @@
       --lex-input-fg:#fff;--lex-input-border:2px solid;
       --lex-input-border-color:#292929 #a5a5a5 #a5a5a5 #292929;--lex-input-radius:0;
       --lex-input-bg:#3b3b3b;--lex-input-shadow:none;--lex-input-text-shadow:inherit;
-      --lex-field-padding:6px 8px;--lex-detail-label-width:max(min(125px,35%),15%);
+      --lex-field-padding:6px 8px;
 
       /* Section titles keep the game lettering and separate content with a line. */
       --lex-section-title-fg:#d0d0d0;--lex-section-title-font:20px/1 var(--lex-heading-font);
@@ -86,9 +86,9 @@
         2px 0 0 #151515,-2px 2px 0 #151515,0 2px 0 #151515,2px 2px 0 #151515;
       --lex-section-title-border:1px solid #929292;--lex-section-title-stroke:.65px #d0d0d0;
       --lex-section-title-position:static;--lex-section-title-top:auto;--lex-section-title-left:auto;
-      --lex-section-title-shift:none;--lex-section-title-padding:6px 4px;
+      --lex-section-title-shift:none;--lex-section-title-padding:1px 4px 4px;
       --lex-section-title-letter-spacing:.01em;--lex-section-title-transform:uppercase;
-      --lex-subsection-border:0;--lex-subsection-gap:8px;
+      --lex-subsection-border:0;--lex-subsection-gap:0;
       /* Subtabs are the window's tabs, smaller: the same bevel everywhere. */
       --lex-subtab-fg:#eee;--lex-subtab-border:3px solid;
       --lex-subtab-border-color:#a7a7a7 #292929 #292929 #a7a7a7;
@@ -103,7 +103,7 @@
       --lex-detail-heading-padding:2px 6px 4px;
       --lex-section-border:0;--lex-section-bg:transparent;
       /* Sections take the height of their content. */
-      --lex-section-flex:0 0 auto;--lex-panel-body-gap:16px;
+      --lex-section-flex:0 0 auto;--lex-panel-body-gap:4px;
       --lex-section-content-padding:4px 0 0;
       --lex-detail-title-size:clamp(28px,3.5vw,46px);--lex-detail-title-fg:#fff;--lex-detail-id-fg:#c0c0c0;
 

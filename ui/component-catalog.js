@@ -101,7 +101,7 @@
     {id: "textArea", level:"atom", summary:"An editable text block.", sample:()=>UI.textArea({value:"Example description",rows:2})},
     {id: "tileGrid",level:"template",summary:"A responsive grid of shared fields, sections, or cards.",sample:()=>UI.tileGrid([UI.detailSection({title:"First",body:"First value"}),UI.detailSection({title:"Second",body:"Second value"})])},
     {id: "inlineLabel",level:"molecule",summary:"A name with inline icons at one shared size.",sample:()=>UI.inlineLabel(UI.infoIcon(),"Example item")},
-    {id: "choiceField",level:"molecule",summary:"A value with a separate selection action.",sample:()=>UI.choiceField("Potion",el("button",{},UI.searchIcon()))},
+    {id: "choiceField",level:"molecule",summary:"A value with a separate selection action.",sample:()=>UI.choiceField("Potion",el("button",{},UI.selectionIcon()))},
     {id: "statCard",level:"molecule",summary:"An image card with directional ranks and corner controls.",sample:()=>UI.statCard({ranks:["8","5","3","6"].map(value=>el("button",{},value)),corner:el("button",{},"+"),footer:"70"})},
     {id: "choicePopover",level:"molecule",summary:"An accessible menu of named choices.",sample:()=>{const menu=UI.choicePopover({choices:[{value:1,label:"First"},{value:2,label:"Second"}]});const button=el("button",{onclick:()=>menu.openFor(button)},"Choose");return button;}},
     {id: "mathFormula", level:"atom", summary:"A mathematical expression with fractions and powers.", sample:()=>UI.mathFormula("HP(L)=C+L*A+floor(10*L^2/B)")},

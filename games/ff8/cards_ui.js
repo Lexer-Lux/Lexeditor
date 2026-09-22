@@ -57,8 +57,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       onclick:()=>picker.openFor(element),
     }, none ? "+" : elementIcon(row.element));
     card=LexeditorUI.statCard({image:`/assets/cards/${row.id}.png`,
-      ranks:sides.map(rankButton),corner:element,
-      footer:el("span",{title:labels.power},String(row.power))});
+      ranks:sides.map(rankButton),corner:element});
     return card;
   };
 
@@ -84,6 +83,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         ? options.find(entry => entry.value === Number(value))?.name || value
         : Number(value) === 10 && field !== "power" ? "A" : value;
       return detailField({label: labels[field].toUpperCase(),
+        pin:prefs?.pinButton(field,labels[field]),
         help: infoHelp(field === "power"
           ? "When you lose, the opponent prefers a card with a higher selection power."
           : field === "element" ? "The card's element under the Elemental rule."
@@ -153,7 +153,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     const known=new Map((state.data.characters?.rows||[]).map(row=>[row.name.toLowerCase(),row.name]));
     const query=playerView.query.toLowerCase();
     const rows=[...groups.values()].map(entry=>({...entry,
-      name:known.get(entry.entity.toLowerCase())||`Opponent ${entry.entity}`}))
+      name:known.get(entry.entity.toLowerCase())||entry.entity}))
       .filter(row=>`${row.name} ${row.map}`.toLowerCase().includes(query));
     const help=[
       "Selects the opponent's deck. It does not select a single card. The deck catalogue is not decoded here yet.",
@@ -170,8 +170,6 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         queueMicrotask(async()=>{await ensureFieldDetail(map);if(state.tab==='cards'&&mode==='players')render()});
       const body=[detailField({label:'Location',control:LexeditorUI.readonlyField(map.name)}),
         detailField({label:'Map file',control:LexeditorUI.readonlyField(map.key)})];
-      if(!known.has(entry.entity.toLowerCase()))body.push(LexeditorUI.detailNote(
-        `The game identifies this opponent as “${entry.entity}”. A display name has not been established.`));
       if(map._error)body.push(LexeditorUI.detailNote(`Could not load opponent: ${map._error}`));
       else if(!map._loaded)body.push(LexeditorUI.detailNote('Loading opponent settings…'));
       else {
@@ -199,7 +197,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       search:{key:'ff8-card-players',value:playerView.query,label:'Search card players',change:value=>{playerView.query=value;playerView.page=0;render()}},
       sync:next=>Object.assign(playerView,next),change:next=>{Object.assign(playerView,next);render()},
       master:({rows,selected,select})=>columnList({rows,key:row=>row.key,selected,select,
-        columns:[{key:'name',label:'Player'}]}),detail,
+        columns:[{key:'name',label:'Player',help:'Shows the character name when known. Otherwise this is the player identifier stored by the game, such as queen_est.'}]}),detail,
       emptyDetail:()=>detailPanel({title:'Card players',body:[LexeditorUI.detailNote('No players match this search.')]})});
   };
   render = () => {

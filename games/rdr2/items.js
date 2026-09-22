@@ -268,7 +268,7 @@ function pickNewIngredient(output,recipeIndex,rerender){
 
 function validatedKeyEditor(kind,value,values,onSet){
   const input=el("input",{value,readonly:true,title:`Selected existing ${kind.toLowerCase()} identifier. Use the search button to change it.`});
-  return LexeditorUI.choiceField(input,el("button",{title:`Choose an existing ${kind.toLowerCase()}`,onclick:()=>pickIdentifier(kind,values,input.value,v=>{input.value=v;onSet(v)})},"⌕"));
+  return LexeditorUI.choiceField(input,el("button",{title:`Choose an existing ${kind.toLowerCase()}`,onclick:()=>pickIdentifier(kind,values,input.value,v=>{input.value=v;onSet(v)})},LexeditorUI.selectionIcon()));
 }
 
 function linkedCatalogKeyEditor(value,onSet){

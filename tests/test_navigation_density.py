@@ -1,4 +1,6 @@
 import pytest
+from io import BytesIO
+from PIL import Image
 from test_shared_ui_feedback import ROOT, page, framework
 
 @pytest.mark.parametrize('width',[700,1000,1600])
@@ -27,6 +29,20 @@ def test_tabs_share_one_row_and_tweaks_stays_attached(page,width):
         assert label.evaluate('n=>n.scrollWidth<=n.clientWidth+1'),label.text_content()
     assert nav.locator('button').last.get_attribute('data-tab')=='settings'
     assert nav.locator('button').last.evaluate('n=>getComputedStyle(n).marginLeft')=='0px'
+    # The pointer must fit in the existing page gutter, not indent the row.
+    frame=page.locator('.lex-nav-frame')
+    assert frame.evaluate('n=>getComputedStyle(n).paddingLeft===getComputedStyle(n).paddingRight')
+    boxes=[b.bounding_box() for b in nav.locator('button').all()]
+    page.evaluate('''()=>document.querySelectorAll('nav button[data-tab]').forEach(
+      (n,i)=>n.classList.toggle('active',i===0))''')
+    page.wait_for_timeout(60)
+    assert [b.bounding_box() for b in nav.locator('button').all()]==boxes
+    assert nav.locator('button').first.evaluate('''n=>{
+      const p=getComputedStyle(n,'::before'),r=n.getBoundingClientRect();
+      const left=r.left+parseFloat(getComputedStyle(n).borderLeftWidth)+parseFloat(p.left);
+      const label=n.querySelector('.lex-tab-label-text'),range=document.createRange();range.selectNodeContents(label);
+      return Math.abs(range.getBoundingClientRect().left-left-parseFloat(p.width)-6)<2;
+    }''')
     brand=page.locator('.lex-brand-button')
     assert brand.evaluate('n=>!n.dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true}))')
 
@@ -36,3 +52,56 @@ def test_help_scales_with_its_heading(page):
     help=page.locator('.lex-info-help')
     assert help.bounding_box()['width']>=30
     assert help.evaluate('n=>getComputedStyle(n).backgroundColor')=='rgb(255, 255, 255)'
+
+
+def test_tab_pointer_is_painted_above_neighbouring_tabs(page):
+    framework(page)
+    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.evaluate('''()=>{const U=LexeditorUI;document.body.prepend(U.el('div',{id:'shell'}));
+      U.mountShell({host:'#shell',plugin:{id:'fixture',name:'Fixture'},
+        tabs:['Abilities','Cards','Items'].map(id=>({id,label:id})),activeTab:()=> 'Cards',navigate(){}});
+      U.finishPluginLoading();
+      document.documentElement.style.setProperty('--lex-tab-marker-image','linear-gradient(#ff00ff,#ff00ff)');
+    }''')
+    page.wait_for_timeout(200)
+    for selected in [0,1,2]:
+        page.evaluate('''selected=>document.querySelectorAll('nav button[data-tab]').forEach((n,i)=>n.classList.toggle('active',i===selected))''',selected)
+        page.wait_for_timeout(60)
+        point=page.evaluate('''selected=>{
+          const tabs=[...document.querySelectorAll('nav button[data-tab]')];
+          tabs.forEach((n,i)=>n.classList.toggle('active',i===selected));
+          const n=tabs[selected],r=n.getBoundingClientRect(),p=getComputedStyle(n,'::before');
+          const width=parseFloat(p.width),border=parseFloat(getComputedStyle(n).borderLeftWidth);
+          return {x:r.left+border+(parseFloat(p.left)+width/2),y:r.top+r.height/2};
+        }''',selected)
+        pixels=Image.open(BytesIO(page.screenshot())).convert('RGB')
+        assert pixels.getpixel((round(point['x']),round(point['y'])))==(255,0,255)
+
+
+@pytest.mark.parametrize('surface',['plugin','home'])
+def test_brand_pointer_gestures_never_select_text(page,surface):
+    framework(page)
+    page.evaluate('''surface=>{
+      const U=LexeditorUI;window.brandClicks=0;
+      if(surface==='plugin') {
+        document.body.prepend(U.el('div',{id:'shell'}));
+        U.mountShell({host:'#shell',plugin:{id:'fixture',name:'Fixture'},tabs:[],
+          activeTab:()=>'',navigate(){}});U.finishPluginLoading();
+      } else document.querySelector('main').append(
+        U.el('div',{class:'chooser-title'},U.el('h1',{},'LEXEDITOR')));
+      const brand=document.querySelector('.lex-brand-button,.chooser-title');
+      brand.onclick=()=>brandClicks++;
+      // Test the event protection even when host CSS enables selection.
+      brand.style.userSelect='text';brand.querySelector('h1').style.userSelect='text';
+      document.querySelector('main').append(U.el('input',{id:'editable',value:'Keep this selectable'}));
+    }''',surface)
+    brand=page.locator('.lex-brand-button,.chooser-title')
+    brand.click();brand.dblclick()
+    assert page.evaluate('brandClicks')==3
+    assert page.evaluate('getSelection().toString()')==''
+    box=brand.locator('h1').bounding_box()
+    page.mouse.move(box['x']+2,box['y']+box['height']/2);page.mouse.down()
+    page.mouse.move(box['x']+box['width']-2,box['y']+box['height']/2,steps=12);page.mouse.up()
+    assert page.evaluate('getSelection().toString()')==''
+    page.locator('#editable').click();page.locator('#editable').press('Control+A')
+    assert page.locator('#editable').evaluate('n=>n.selectionEnd-n.selectionStart')==20

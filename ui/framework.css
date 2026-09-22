@@ -823,6 +823,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 
 .lex-record-id-prefix {
   flex:0 0 auto;
+  padding-block:.15em;
 }
 
 .lex-detail-panel {
@@ -2205,6 +2206,7 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 }
 
 .lex-column-list .lex-column-cell-content { width:100%; }
+.lex-column-cell-content:not(:has(input,select,textarea)) { padding-block:.15em; box-sizing:border-box; }
 .lex-column-list-cell:has(.lex-source-control) .lex-column-cell-content { width:100%; }
 
 /* Editable table controls occupy the complete cell. Their compact provenance
@@ -2551,7 +2553,7 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
 
 .lex-page-sized-table .lex-column-list-row {
   min-height:0;
-  font-size:clamp(11px,calc((100vh - 245px) / var(--lex-page-font-row-count,var(--lex-page-row-count)) * .42),18px);
+  font-size:clamp(11px,calc((100vh - 245px) / var(--lex-page-font-row-count,var(--lex-page-row-count)) * .65),24px);
 }
 
 .lex-pager-controls {
@@ -3100,6 +3102,46 @@ body:has(.lex-data-map-table) #main {
   grid-column: 1 / -1;
 }
 
+  .settings-section { width:100%;
+                      margin:0; min-width:0; border:1px solid var(--lex-border); background:var(--lex-panel); }
+  .settings-section h2 { margin:0; padding:10px 14px; border-bottom:2px solid var(--lex-accent); background:#18140f;
+                         font:400 20px/1 var(--lex-heading-font); color:var(--lex-highlight); letter-spacing:.04em; }
+  .settings-subs { display:grid; grid-template-columns:repeat(auto-fit,minmax(232px,1fr)); }
+  .settings-sub { min-width:0; border-right:1px solid var(--lex-border); border-bottom:1px solid var(--lex-border); }
+  .settings-sub h3 { margin:0; padding:6px 12px; background:var(--lex-panel-2); border-bottom:1px solid var(--lex-border);
+                     font:600 11px Consolas,monospace; letter-spacing:.09em; text-transform:uppercase; color:var(--lex-highlight);
+                     display:flex; align-items:center; gap:4px; }
+  /* One subcategory is one column. Do not create a second nested column grid
+     inside it (that made Recon Tagging look like two columns within a column). */
+  .settings-fields { display:grid; grid-template-columns:minmax(0,1fr); }
+  /* One compact horizontal row: name/help/source stay left; value/unit stay
+     right. Do not stack controls under labels, including boolean controls. */
+  .settings-field { min-width:0; display:grid;
+                    grid-template-columns:minmax(0,1fr) minmax(92px,42%); gap:8px;
+                    align-items:center; padding:5px 10px; border-bottom:1px solid var(--lex-border); }
+  .settings-field.dev { background:#172b46; box-shadow:inset 4px 0 0 #4f9ee8; }
+  .settings-field.const { background:#36191b; box-shadow:inset 4px 0 0 #d75a62; }
+  .settings-field.dev.const { background:#2b203e;
+                              box-shadow:inset 4px 0 0 #4f9ee8,inset -4px 0 0 #d75a62; }
+  .settings-field-label { min-width:0; }
+  .settings-field-name { display:flex; align-items:center; gap:4px; flex-wrap:wrap; color:var(--lex-text); }
+  .setting-dev-chip { flex:0 0 auto; padding:0 4px; border:1px solid #78b9f5; color:#d9efff; background:#173b5d;
+                      font:600 9px Consolas,monospace; letter-spacing:.08em; }
+  .setting-const-chip { flex:0 0 auto; padding:0 4px; border:1px solid #e26464; color:#ffd7d7; background:#5b1f25;
+                        font:600 9px Consolas,monospace; letter-spacing:.08em; }
+  .settings-field-control { min-width:0; display:flex; justify-content:flex-end; align-items:center; }
+  .settings-field-control input[type=number],.settings-field-control input[type=text],
+  .settings-field-control select { width:100%; min-width:0; box-sizing:border-box; }
+  .setting-value { display:flex; align-items:center; justify-content:flex-end; gap:6px; width:100%; min-width:0; }
+  .setting-value input,.setting-value select { flex:1 1 auto; min-width:0; }
+  /* Native number spinners consume the right edge only on hover and clipped
+     the final digit. Numeric bounds still apply; remove only the tiny arrows. */
+  .setting-value input[type=number] { appearance:textfield; -moz-appearance:textfield; }
+  .setting-value input[type=number]::-webkit-inner-spin-button,
+  .setting-value input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+  .setting-unit { flex:0 0 auto; color:var(--lex-muted); font-size:11px; white-space:nowrap; }
+  .setting-source { display:block; margin-top:2px; color:#665f53; font:9px Consolas,monospace; overflow-wrap:anywhere; }
+
 .lex-settings-columns {
   position:relative;
   display:grid;
@@ -3349,13 +3391,7 @@ body:has(.lex-data-map-table) #main {
 .lex-platform-config-section > summary { padding:10px 6px; cursor:pointer; font-weight:700; }
 .lex-platform-config-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:var(--lex-panel-gap); padding:0 0 var(--lex-panel-gap); }
 .lex-platform-config-field { min-width:0; }
-.lex-platform-config-field.lex-boolean-field { grid-template-columns:minmax(0,1fr) minmax(32px,.35fr) auto; }
-.lex-platform-config-field.lex-boolean-field > .lex-detail-field-label {
-  contain:none; height:auto; min-height:32px; white-space:normal; overflow-wrap:anywhere;
-}
-.lex-platform-config-field.lex-boolean-field > .lex-detail-field-label > .lex-detail-field-label-text {
-  flex:1 1 auto; white-space:normal; min-width:0;
-}
+.lex-platform-config-field.lex-boolean-field { grid-template-columns:7.5% minmax(0,1fr) auto; }
 .lex-platform-config-field :is(input[type=text],input[type=number],select) { width:100%; min-width:0; }
 @media (max-width:700px) {
   .lex-platform-config-head { align-items:stretch; flex-direction:column; }
@@ -3543,16 +3579,16 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-bar-mode :is(.lex-curve-line,.lex-curve-fill,.lex-curve-path-formula) { display:none; }
 
 /* Image tabs use the same selection and keyboard controls as text tabs. */
-.lex-subtab-bar-images { display:flex; justify-content:center; flex-wrap:wrap; gap:2px; flex:1; margin:0; }
-.lex-subtab-bar-images > .lex-subtab-button { flex:0 0 auto; width:clamp(42px,4.5vw,68px); min-width:0; padding:0; height:auto; aspect-ratio:2/3; border:0; }
+.lex-subtab-bar-images { display:flex; justify-content:center; flex-wrap:nowrap; align-items:stretch; gap:2px; flex:1; margin:0; }
+.lex-subtab-bar-images > .lex-subtab-button { flex:1 1 0; width:auto; min-width:0; padding:0; height:100%; aspect-ratio:auto; border:0; }
 .lex-subtab-bar-images .lex-tab-label { display:contents; }
 .lex-subtab-bar-images .lex-tab-label-text { display:contents; }
 .lex-subtab-bar-images img { display:block; width:100%; height:100%; object-fit:cover; image-rendering:pixelated; }
-.lex-subtab-bar-images > .active { outline:2px solid var(--lex-highlight); outline-offset:-2px; }
+.lex-subtab-bar-images > .active { outline:0; }
 /* A card with four directional ranks, a corner control and a score. */
 .lex-stat-card { position:relative; width:clamp(150px,17vw,208px); aspect-ratio:3/4; flex:none; overflow:hidden; color:var(--lex-card-fg,var(--lex-text)); background:var(--lex-card-bg,var(--lex-panel-2)); }
 .lex-stat-card > img { position:absolute; inset:calc(-1 * var(--lex-card-image-crop,0%)); width:calc(100% + 2 * var(--lex-card-image-crop,0%)); height:calc(100% + 2 * var(--lex-card-image-crop,0%)); object-fit:fill; image-rendering:pixelated; }
-.lex-stat-card-ranks { position:absolute; top:5px; left:6px; display:grid; grid-template-columns:1em 1em; justify-items:center; font:700 20px/1 var(--lex-font); }
+.lex-stat-card-ranks { position:absolute; top:5px; left:6px; display:grid; grid-template-columns:1em 1em; justify-items:center; font:700 32px/1 var(--lex-font); filter:drop-shadow(2px 2px 1px #000) drop-shadow(-1px -1px 1px #000); }
 .lex-stat-card-ranks > button { min-width:1ch; min-height:1em; padding:0; border:0; color:inherit; background:transparent; font:inherit; }
 .lex-stat-card-ranks > :is(:first-child,:last-child) { grid-column:span 2; }
 .lex-stat-card-corner { position:absolute; top:0; right:0; width:30%; height:28%; display:grid; place-items:center; }
@@ -3568,10 +3604,35 @@ body:has(.lex-data-map-table) #main {
 .lex-choice-popover img { width:22px; height:22px; object-fit:contain; }
 .lex-inline-label { display:inline-flex; align-items:center; gap:.3em; min-width:0; max-width:100%; vertical-align:middle; }
 .lex-inline-label > img { width:1.35em; height:1.35em; object-fit:contain; image-rendering:pixelated; flex:none; }
-.lex-inline-label > span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.lex-inline-label:has(> select) { display:block; position:relative; width:100%; text-align:left; }
+.lex-inline-label:has(> select) > :first-child { position:absolute; left:.4em; top:50%; transform:translateY(-50%); width:1.35em; z-index:1; pointer-events:none; }
+.lex-inline-label > select { width:100%; min-width:0; text-align:left; padding-inline-start:2.1em; }
+.lex-column-list-cell:has(.lex-inline-label > select) { padding:0; }
+.lex-column-list-cell:has(.lex-inline-label > select) :is(.lex-column-cell-content,.lex-source-control,.lex-inline-label,select) { height:100%; }
+.lex-inline-label > span { min-width:0; padding:.2em .12em; overflow:hidden; text-overflow:ellipsis; }
 .lex-detail-panel-title .lex-inline-label > span { padding-inline:.12em; }
 .lex-table-fill .lex-column-list-cell:has(.lex-inline-label > img) { container-type:size; }
 .lex-table-fill .lex-inline-label > img { height:100cqh; width:auto; max-width:4em; }
+.lex-quantity-choice { display:grid; grid-template-columns:minmax(0,1fr) auto calc(3ch + 8px); align-items:center; gap:3px; min-width:0; width:100%; }
+.lex-quantity-choice > * { min-width:0; }
+.lex-quantity-choice .lex-choice-field { gap:2px; }
+.lex-quantity-choice .lex-choice-field > button:last-child { width:1.2em; min-width:1.2em; }
+.lex-quantity-choice > .lex-source-control:last-child input { text-align:left; padding-inline:3px; }
+.lex-quantity-mark { font-family:var(--lex-symbol-font); line-height:1; }
+.lex-source-control.lex-source-control-stacked { grid-template-columns:minmax(0,1fr); gap:2px; }
+.lex-source-control-stacked > .lex-reference-values { grid-column:1; justify-self:end; max-width:100%; }
+.lex-icon-value { display:flex; flex-direction:column; align-items:stretch; gap:4px; min-width:0; }
+.lex-icon-value-toggle { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; cursor:pointer; min-width:0; padding:4px; }
+.lex-icon-value-toggle > input { position:absolute; opacity:0; width:100%; height:100%; inset:0; margin:0; }
+.lex-icon-value-art { display:grid; place-items:center; width:32px; height:32px; }
+.lex-icon-value-art img { width:32px; height:32px; object-fit:contain; image-rendering:pixelated; }
+.lex-icon-value-toggle:has(:focus-visible) { outline:2px solid var(--lex-highlight); }
+.lex-icon-value-state { font-size:.7em; visibility:hidden; }
+.lex-icon-value-toggle:has(:checked) .lex-icon-value-state { visibility:visible; }
+.lex-paged-pane:has(> .lex-paged-pane-content > .lex-curve-editor) { flex:1; height:100%; }
+.lex-paged-pane-content > .lex-curve-editor { height:100%; display:flex; flex-direction:column; }
+.lex-paged-pane-content > .lex-curve-editor > .lex-curve-plot { flex:1; min-height:0; }
+.lex-paged-pane-content > .lex-curve-editor .lex-curve-svg { height:100%; aspect-ratio:auto; }
 .lex-choice-field { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px; width:100%; min-width:0; }
 .lex-choice-field > button:last-child { display:grid; place-items:center; width:1.8em; min-width:1.8em; min-height:1.6em; padding:2px; font:inherit; color:var(--lex-text); background:var(--lex-input-bg,var(--lex-panel-2)); border:var(--lex-input-border,1px solid var(--lex-border)); border-color:var(--lex-input-border-color,var(--lex-border)); }
 .lex-choice-field > button svg { width:1em; height:1em; }
@@ -3579,17 +3640,17 @@ body:has(.lex-data-map-table) #main {
 .lex-paged-pane { display:grid; grid-template-rows:minmax(0,1fr) auto; min-height:0; overflow:hidden; gap:var(--lex-panel-gap); }
 .lex-paged-pane-content { min-width:0; min-height:0; overflow:auto; }
 .lex-instruction-pane { height:100%; flex:1 1 0; gap:0; }
-.lex-tabbed-panel-content:has(> .lex-paged-pane) { display:flex; overflow:hidden; padding:0; }
+.lex-tabbed-panel-content:has(> .lex-paged-pane, > .lex-detail-panel, > .lex-source-control > .lex-code-field) { display:flex; overflow:hidden; padding:0; }
+.lex-tabbed-panel-content > :is(.lex-detail-panel,.lex-source-control:has(> .lex-code-field)) { flex:1 1 0; min-width:0; min-height:0; align-items:stretch; }
+.lex-tabbed-panel-content > .lex-source-control > .lex-code-field { height:100%; resize:none; }
 .lex-paged-pane:has(> .lex-paged-pane-content > .lex-source-control > .lex-code-field) { height:100%; flex:1 1 0; }
 .lex-paged-pane-content:has(> .lex-source-control > .lex-code-field) { display:flex; overflow:hidden; }
 .lex-paged-pane-content > .lex-source-control:has(> .lex-code-field) { flex:1 1 auto; align-items:stretch; }
 .lex-paged-pane-content > .lex-source-control > .lex-code-field { height:100%; resize:none; }
-.lex-instruction-list { min-width:680px; width:100%; }
-.lex-instruction-row { display:flex; align-items:center; gap:6px; height:96px; padding:6px; border-bottom:1px solid var(--lex-border); box-sizing:border-box; }
-.lex-instruction-handle { opacity:0; cursor:grab; flex:0 0 24px; padding:2px; }
+.lex-instruction-list { min-width:0; width:100%; min-height:100%; display:flex; flex-direction:column; }
+.lex-instruction-row { display:flex; align-items:center; gap:6px; min-height:96px; flex:1 0 96px; padding:6px; border-bottom:1px solid var(--lex-border); box-sizing:border-box; }
+.lex-instruction-row[draggable="true"], .lex-project-reference[draggable="true"] { cursor:grab; }
 .lex-instruction-index { flex:0 0 22px; font-size:.8em; color:var(--lex-muted); }
-.lex-instruction-row:hover > .lex-instruction-handle,
-.lex-instruction-handle:focus-visible { opacity:1; }
 .lex-instruction-controls { display:flex; align-items:center; gap:6px; flex:1 1 60%; min-width:0; }
 .lex-instruction-controls > select { width:130px; min-width:90px; flex:0 1 130px; }
 .lex-instruction-operand { display:flex; flex-direction:column; gap:2px; width:90px; min-width:52px; flex:0 1 90px; font-size:.8em; }
@@ -3734,8 +3795,10 @@ body:has(.lex-data-map-table) #main {
 
 /* ---- Figure grids ------------------------------------------------------ */
 /* Pictures side by side, each over its caption. */
-.lex-figure-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; padding:8px; }
-.lex-figure-grid > figure { display:grid; gap:5px; margin:0; }
+.lex-figure-grid { display:grid; min-width:0; grid-template-columns:repeat(auto-fit, minmax(min(100%,150px), 1fr)); gap:10px; padding:8px; }
+.lex-figure-grid > figure { display:grid; min-width:0; gap:5px; margin:0; }
+.lex-figure-grid .lex-icon-slot { aspect-ratio:4/5; height:auto; min-height:0; }
+.lex-figure-grid .lex-icon-slot img { position:absolute; inset:0; }
 .lex-figure-grid > figure > :is(img, canvas) { display:block; width:100%; height:auto; min-width:0; object-fit:contain; }
 .lex-figure-grid .lex-model-stage { --lex-model-stage-min-height:150px; }
 .lex-figure-grid figcaption { color:var(--lex-muted); font-size:12px; text-align:center; }
@@ -4016,9 +4079,7 @@ body:has(.lex-data-map-table) #main {
    find the rest. Read-only projects get no hint, because there editing is
    refused. */
 .lex-column-list-cell.lex-cell-editable { cursor:cell; }
-.lex-column-list-cell.lex-cell-editable:hover > .lex-column-cell-content {
-  border-bottom:1px dashed color-mix(in srgb,var(--lex-accent) 70%,transparent);
-}
+.lex-column-list-cell.lex-cell-editable:hover > .lex-column-cell-content { border-bottom:0; }
 .lex-column-list-cell.lex-cell-editable:hover {
   background:color-mix(in srgb,var(--lex-accent) 8%,transparent);
 }
@@ -4228,7 +4289,11 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
 /* ---- Sort caret ------------------------------------------------------ */
 .lex-sort-indicator {
 
-  position:static;
+  position:absolute;
+  right:100%;
+  top:50%;
+  translate:0 -50%;
+  pointer-events:none;
   display:inline-flex;
   align-items:center;
   justify-content:center;
@@ -4355,10 +4420,8 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
   pointer-events:none;
   transition:opacity .1s ease;
 }
-nav button:hover .lex-tab-shortcut,
-nav button:focus-visible .lex-tab-shortcut,
-.lex-subtab-button:hover .lex-tab-shortcut,
-.lex-subtab-button:focus-visible .lex-tab-shortcut {
+.lex-control-held nav button .lex-tab-shortcut,
+.lex-control-held .lex-subtab-button .lex-tab-shortcut {
   visibility:visible;
   opacity:1;
 }
@@ -5046,7 +5109,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    character count times a guessed em, and the stack draws at about two thirds
    of the control's type, so every value box on the panel ended early to make
    room for space nothing was ever going to fill. */
-.lex-source-control:not(.lex-source-control-internal) > .lex-reference-values {
+.lex-source-control:not(.lex-source-control-internal):not(.lex-source-control-stacked) > .lex-reference-values {
 
   position:absolute;
   z-index:2;
@@ -5151,7 +5214,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   min-width:0;
   margin-right:6px;
 }
-.lex-detail-parts > .lex-toggle { min-width:0; }
+.lex-detail-parts > .lex-toggle { min-width:0; align-self:stretch; }
 .lex-detail-part-label {
   justify-self:end;
   overflow:hidden;
@@ -5161,9 +5224,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   text-overflow:ellipsis;
   white-space:nowrap;
 }
-.lex-detail-part-control { display:flex; align-items:center; gap:6px; min-width:0; }
+.lex-detail-part-control { position:relative; display:flex; align-items:center; gap:6px; min-width:0; }
 .lex-detail-part-control > * { flex:1 1 auto; min-width:0; width:100%; }
 .lex-detail-part-control > input[type="checkbox"] { flex:0 0 auto; }
+.lex-detail-part-control > .lex-column-pin { position:absolute; z-index:3; flex:none; width:18px; }
 .lex-detail-part-spare { width:0; }
 .lex-detail-parts-bare { grid-template-columns:repeat(var(--lex-part-columns),minmax(0,1fr)); }
 .lex-detail-parts-bare > .lex-detail-part { grid-template-columns:minmax(0,1fr); }
@@ -5276,7 +5340,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   line-height: 1;
 }
 .lex-column-heading > .lex-info-help {
-  flex:0 0 18px;
+  flex:0 0 auto;
   margin-left:0;
   font-family: var(--lex-symbol-font);
   font-size: 11px;
@@ -5832,7 +5896,7 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 
  max-width:100%;
 }
-.lex-hoverable-label { display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.lex-hoverable-label { display:block;box-sizing:border-box;padding:.2em .15em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .lex-hoverable > :is(img,svg) { flex-shrink:0; }
 
 .lex-value-modified > :is(input,select,textarea,output), .lex-value-modified > .lex-unit-field > :is(input,select,output), .lex-value-modified > :not(.lex-reference-values):not(.lex-reference-placeholder) .lex-hoverable {
@@ -6028,11 +6092,11 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
    The leader and checkbox share one row. References occupy the space below
    that checkbox; the reserved space stays fixed when a reference changes. */
 .lex-boolean-field {
-  grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr) auto;
+  grid-template-columns:7.5% minmax(0,1fr) auto;
   min-height:0;
 }
 .lex-boolean-field:where(:has(> .lex-detail-field-control > .lex-source-control)) {
-  grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr);
+  grid-template-columns:7.5% minmax(0,1fr);
 }
 .lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control:not(.no-reference)) { padding-bottom:12px; }
 .lex-boolean-field > .lex-detail-field-label {
@@ -6058,13 +6122,13 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   grid-template-columns:minmax(0,1fr) var(--lex-boolean-box);
   grid-template-rows:minmax(19px,1fr);
   align-items:center;
-  column-gap:4px;
+  column-gap:10px;
   row-gap:0;
   position:relative;
   box-sizing:border-box;
   width:100%;
   min-height:19px;
-  padding:0 0 0 12px;
+  padding:0 0 0 24px;
   overflow:visible;
 }
 .lex-boolean-field .lex-field-boolean-arrow {
@@ -6080,6 +6144,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   clip-path:polygon(0 43.75%,calc(100% - 6px) 43.75%,calc(100% - 6px) 0,100% 50%,calc(100% - 6px) 100%,calc(100% - 6px) 56.25%,0 56.25%);
 }
 .lex-boolean-field .lex-field-boolean-arrow::after { content:none; }
+.lex-boolean-field > .lex-field-boolean-arrow { margin-left:24px; margin-right:10px; }
 .lex-boolean-field .lex-source-control > .lex-field-boolean-arrow { grid-area:1/1; }
 .lex-boolean-field .lex-source-control > input[type="checkbox"] {
   grid-area:1/2;
@@ -6148,36 +6213,16 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 }
 .lex-boolean-field > .lex-column-pin { top:2px; }
 
-.lex-platform-config-field.lex-detail-field:not(.lex-boolean-field) {
-  gap:3px;
-  align-items:start;
+ .lex-platform-config-field.lex-detail-field:not(.lex-boolean-field) {
+  align-items:center;
   display:grid;
-  grid-template-columns:minmax(0,1fr);
+  grid-template-columns:7.5% minmax(0,1fr);
 }
 .lex-platform-config-field.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control {
   justify-self:stretch;
-  grid-column:1;
+  grid-column:2;
   justify-content:flex-start;
   text-align:left;
-}
-.lex-platform-config-field.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-label {
-  justify-self:stretch;
-  min-height:0;
-  overflow:visible;
-  grid-column:1;
-  justify-content:flex-start;
-  text-align:left;
-  contain:none;
-  height:auto;
-  padding-right:0;
-}
-.lex-platform-config-field.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-label > .lex-detail-field-label-text {
-  overflow-wrap:break-word;
-  white-space:normal;
-  /* The label fitter scales a name down to fit a fixed lane. There is no fixed
-     lane here, so the name keeps its own size. */
-  transform:none;
-  font-size:inherit;
 }
 
 /* ReShade is the one helper row that installs itself, so its control sits
@@ -6318,6 +6363,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 
 /* Help inside a tab sits beside the label rather than floating over it. */
 [role="tab"] .lex-info-help { position: relative; inset: auto; margin-left: 8px; }
+.lex-tabbed-panel-tabs [role="tab"] > .lex-info-help { font-size:.85em; margin-left:3px; }
 
 /* Colours a game restyles through tokens rather than by naming shared classes:
    the window bar, its buttons, a list's header and cell rules, a panel's
@@ -6533,7 +6579,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   padding-inline-start:var(--lex-field-type-gutter);
   padding-inline-end:0;
 
- grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr);
+ grid-template-columns:7.5% minmax(0,1fr);
  border-bottom: var(--lex-field-border, 0);
 }
 .lex-detail-field-label {
@@ -6571,7 +6617,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 
  text-decoration-color:currentColor;
 
-  outline: var(--lex-hoverable-hover-border, 1px solid var(--lex-highlight));
+  outline: none;
   outline-offset:-1px;
   box-shadow: var(--lex-hoverable-hover-shadow, none);
 
@@ -6657,8 +6703,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   /* Just enough to hold a short property name. Six and a half ems was more
      than the tenth it was meant to rescue, so it took over lanes that were
      perfectly usable and the shared ten-percent rule stopped being the rule. */
-  --lex-detail-label-floor:min(4.2em, 26%);
-  --lex-detail-label-width:minmax(var(--lex-detail-label-floor), 10%);
+  --lex-detail-label-width:7.5%;
 
   --lex-font-size-adjust: none;
   --lex-text-nudge: 0px;
@@ -6774,7 +6819,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   max-width: 100%;
 
  background: var(--lex-nav-bg, var(--lex-panel-2));
- padding-inline: max(var(--lex-nav-padding-inline, 0px), var(--lex-tab-marker-width, 0px)) var(--lex-nav-padding-inline, 0px);
+ padding-inline: var(--lex-nav-padding-inline, 0px);
 }
 .lex-shell-header nav button {
 
@@ -6816,6 +6861,9 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 }
 .lex-shell-header nav button.active {
 
+  z-index:2;
+  overflow:visible;
+
   border-radius:var(--lex-tab-hover-radius,8px 8px 0 0);
 
   transform:translateY(var(--lex-tab-lift, -3px));
@@ -6844,7 +6892,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   position: absolute;
   z-index: 5;
   top: 50%;
-  right: 100%;
+  left: var(--lex-marker-left, 0px);
   width: var(--lex-tab-marker-width, 24px);
   height: var(--lex-tab-marker-height, 16px);
   background: var(--lex-tab-marker-image, none) center / contain no-repeat;
@@ -6852,6 +6900,8 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   transform: translateY(-50%);
   pointer-events: none;
 }
+
+
 
 .lex-shell-actions button {
   color: var(--lex-shell-button-fg, inherit);
@@ -6998,6 +7048,13 @@ body { text-shadow: var(--lex-text-shadow, none); }
   text-shadow: var(--lex-input-text-shadow, none);
 }
 
+:where(.lex-detail-field-control,.lex-source-control,.lex-column-list-cell)
+  :where(input[type="number"],input[type="text"],input:not([type]),select) {
+  padding-block:2px;
+  padding-inline-start:6px;
+  line-height:1.1;
+}
+
 /* A section's title: where it sits relative to the section's top border, and
    what it is drawn with. */
 
@@ -7005,12 +7062,14 @@ body { text-shadow: var(--lex-text-shadow, none); }
    active tab already has. Default: nothing drawn, as before. */
 .lex-column-list-row.selected .lex-column-pointer-cell > .lex-column-cell-content::before {
   content: var(--lex-row-marker-content, none);
-  position: relative;
-  z-index: 5;
-  flex: 0 0 var(--lex-row-marker-width, 24px);
+  position:absolute;
+  left:var(--lex-marker-left,0px);
+  top:50%;
+  transform:translateY(-50%);
+  z-index:5;
   width: var(--lex-row-marker-width, 24px);
   height: var(--lex-row-marker-height, 16px);
-  margin: 0 var(--lex-row-marker-gap, 4px) 0 0;
+  margin:0;
   background: var(--lex-row-marker-image, none) center / contain no-repeat;
   filter: var(--lex-row-marker-filter, none);
   image-rendering: pixelated;
@@ -7072,6 +7131,10 @@ body { text-shadow: var(--lex-text-shadow, none); }
   box-shadow: var(--lex-subtab-active-shadow, none);
 }
 
+.lex-subtab-bar-images > .lex-subtab-button { background:transparent; border:0; box-shadow:none; padding:0; }
+.lex-subtab-bar-images > .lex-subtab-button.active { background:transparent; box-shadow:inset 0 -2px var(--lex-highlight); }
+.lex-subtab-bar-images .lex-tab-label, .lex-subtab-bar-images .lex-tab-label-text { display:block; height:100%; padding:0; translate:none; line-height:1; }
+.lex-subtab-bar-images img { width:100%; height:100%; object-fit:contain; }
 /* A section title can sit on its section's top edge, as a menu label does. */
 .lex-detail-section-title {
 
@@ -7106,10 +7169,7 @@ body { text-shadow: var(--lex-text-shadow, none); }
   filter: var(--lex-sort-marker-filter, none);
   image-rendering: pixelated;
 
-  position: var(--lex-sort-marker-position, static);
-  top: var(--lex-sort-marker-top, auto);
-  right: var(--lex-sort-marker-right, auto);
-  margin-right: var(--lex-sort-marker-margin, .3em);
+  margin-right: 2px;
 
 }
 }

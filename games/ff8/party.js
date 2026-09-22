@@ -80,7 +80,7 @@
   function gfCompatibilityFormat(value){const modifier=(Number(value)-100)/10;return modifier>0?`+${formatNumber(modifier,{maximumFractionDigits:1})}`:formatNumber(modifier,{maximumFractionDigits:1})}
   function gfCompatibilityControl(field){
     const control=el("input",{type:"text",inputmode:"decimal",value:gfCompatibilityFormat(field.value),class:"gf-compat-input","aria-label":`${field.label} compatibility modifier`,oninput:event=>{const next=Number(String(event.target.value).replaceAll(",",""));if(!Number.isFinite(next))return;const bounded=Math.max(-10,Math.min(15.5,Math.round(next*10)/10));field.value=Math.round(bounded*10+100);shell.refresh()},onblur:event=>{event.target.value=gfCompatibilityFormat(field.value)}});
-    return el("span",{class:"gf-compat-control"},control)
+    return control
   }
   const booleanGlyph=value=>value?"\u2713":"\u00d7";
   const booleanMark=value=>el("span",{class:"lex-boolean-mark lex-ui-symbol"},booleanGlyph(value));
@@ -148,14 +148,15 @@
       const statFields=enemyCurveFields(fields,stat),variables=statFields.map((field,index)=>({label:"ABCD"[index],control:fieldSourceControl(field,"enemies",rowId,{internal:true})}));
       return curveEditor({title:stat,overlayExtrema:true,variables,domain:{min:1,max:100},range:()=>enemyCurveRange(stat,statFields),graphLabel:`${stat} from enemy level 1 to 100`,evaluate:level=>enemyCurveValue(stat,statFields,level),formula:coloredCurveFormula(enemyCurveFormula(stat))});
     });
-    return LexeditorUI.curveGrid(...cards);
+    const index=Math.max(0,Math.min(cards.length-1,state.enemyStatPage||0));
+    return LexeditorUI.pagedPane(cards[index],pager({inline:true,page:index,pages:cards.length,pageSize:1,total:cards.length,noun:"stats",change:value=>{state.enemyStatPage=value;renderEnemies()}}));
   }
   function magicSearchControl(value,prompt,accept,origin){
     const magic=state.data.magic.rows.find(row=>Number(row.id)===Number(value))||{id:value,name:`Magic ${value}`};
     // The name is an ordinary hoverable and the magnifier is its own control,
     // so following the link and picking a different record stay separate.
     const link=hoverable({content:magicLabel(magic),targetType:"magic",targetId:magic.id,targetLabel:magic.name,activate:()=>{state.selected.magic=Number(magic.id);navigate("magic")}});
-    const finder=el("button",{type:"button",title:"Choose magic","aria-label":"Choose magic",onclick:event=>{event.preventDefault();event.stopPropagation();beginSearcher({type:"magic",prompt,target:()=>navigate("magic"),origin,accept})}},searchIcon());
+    const finder=el("button",{type:"button",title:"Choose magic","aria-label":"Choose magic",onclick:event=>{event.preventDefault();event.stopPropagation();beginSearcher({type:"magic",prompt,target:()=>navigate("magic"),origin,accept})}},LexeditorUI.selectionIcon());
     return LexeditorUI.choiceField(link,finder);
   }
   function enemyTableRow(dataset,id){return rowOf(dataset,"enemyTables",id)}
@@ -170,7 +171,7 @@
    rows. */
 template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minmax(120px,.8fr) minmax(180px,1.4fr) 90px",table=columnList({rows,key:entry=>entry.key,class:"ff8-record-list enemy-ability-table",editable:true,template,columns});return detailSection({className:"enemy-table-section",title:tier?`${tier.toLocaleUpperCase()} LEVEL`:"ABILITIES",body:table})}
   function enemyPairSection(row,kind,title,valueLabel){
-    const tiers=[['low','LOW'],['medium','MED'],['high','HIGH']], draw=kind==='draw';
+    const tiers=[['low','LOW'],['medium','MID'],['high','HI']], draw=kind==='draw';
     const origin=()=>{state.selected.enemies=row.id;navigate('enemies')};
     // Keep the actual stored entry, not a spread copy: saveAll reads this
     // array. Display labels never sort, compact, or renumber DAT slots.
@@ -187,7 +188,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       const quantity=numberControl(entry.quantity,0,255,1,value=>entry.quantity=Math.round(value),
         {'aria-label':`${title} ${tier} choice ${entry.slot+1} quantity`});
       quantity.addEventListener('blur',()=>quantity.value=String(entry.quantity));
-      return LexeditorUI.controlGroup([value,enemyTableSource(unitField(quantity,'×'),row,value=>read(value)?.quantity,value=>entry.quantity=Number(value))],{columns:1});
+      return LexeditorUI.quantityChoice(value,enemyTableSource(quantity,row,value=>read(value)?.quantity,value=>entry.quantity=Number(value)));
     };
     const table=columnList({
       rows:tiers.map(([tier,label])=>({key:tier,tier,label})),
@@ -197,7 +198,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       editable:true, localSort:false, showHeader:!draw,
       template:'42px repeat(4,minmax(0,1fr))',
       rowClass:entry=>`enemy-tier-row enemy-tier-${entry.tier}`,
-      columns:[{key:'label',label:'LEVEL',render:entry=>entry.label},
+      columns:[{key:'label',label:'',render:entry=>entry.label},
         ...[0,1,2,3].map(index=>({key:`slot${index}`,label:`SLOT ${index+1}`,
           render:entry=>slotCell(entry.tier,entry.label,index)}))],
     });
@@ -220,7 +221,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
         'aria-label':`Choose card for slot ${entry.slot+1}: ${name}`,
         title:`Choose card for slot ${entry.slot+1}: ${name}`,onclick:()=>beginSearcher({type:'cards',
           prompt:`Select card ${entry.slot+1} for ${row.name}.`,target:()=>navigate('cards'),origin,accept:set})},
-        LexeditorUI.figureGrid([{media:art,caption:LexeditorUI.inlineLabel(name,searchIcon())}]));
+        LexeditorUI.figureGrid([{media:art,caption:name}]));
       // 255 is a real sentinel in the existing schema, not card zero. Keep it
       // selectable even though the Cards tab only contains the 110 real cards.
       const clear=el('button',{type:'button',disabled:state.activeSource!=='mine'||id===255,
@@ -229,7 +230,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       const control=LexeditorUI.stack({fill:false},choose,LexeditorUI.actionRow(clear));control.dataset.slot=entry.slot;
       return enemyTableSource(control,row,value=>value?.tables.cards.find(value=>value.slot===entry.slot)?.cardId,
         set,value=>rowOf(state.data,'cards',Number(value))?.name||choiceName(choices,value));
-    }),{minWidth:120});
+    }),{columns:3,minWidth:80});
   }
   function enemySimpleTables(row){
     const cards=enemyCardChoices(row),devourChoices=state.data.enemyTables.choices.devour||[];
@@ -242,12 +243,10 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       return enemyTableSource(selectControl(id,choices,value=>{entry.devourId=Number(value);shell.refresh()}),row,
         value=>value?.tables.devour[entry.slot]?.devourId,value=>entry.devourId=Number(value),value=>choiceName(choices,value));
     };
-    const devour=detailField({label:"DEVOUR",
-      help:infoHelp("Devouring the enemy gives one of these three outcomes. Which tier you get depends on the enemy's level at the time; the cut-offs differ for a few vanilla enemies, so Lexeditor does not state a universal range."),
-      control:multiNumberRow((row.tables.devour||[]).map(entry=>({
+    const devour=multiNumberRow((row.tables.devour||[]).map(entry=>({
         label:tierNames[entry.slot]||`Tier ${entry.slot+1}`,
         title:`${tierNames[entry.slot]||`Tier ${entry.slot+1}`}-tier Devour outcome`,
-        control:devourControl(entry)})),{columns:3})});
+        control:devourControl(entry)})),{columns:3,stacked:true});
     const renzokuken=columnList({rows:row.tables.renzokuken,key:entry=>entry.slot,class:"ff8-record-list",editable:true,template:"70px minmax(120px,1fr)",columns:[
       {key:"slot",label:"Hit",help:"Which hit of the Renzokuken sequence this row sets. Squall's limit strikes several times, and each hit reads its own entry in this table.",render:entry=>entry.slot+1},
       {key:"value",label:"Damage",help:"The damage multiplier this hit contributes, out of 65,535. It is not a damage figure: the engine scales it by Squall's attack and the enemy's defence.",render:entry=>enemyTableSource(numberControl(entry.value,0,65535,1,value=>entry.value=value),row,value=>value?.tables.renzokuken[entry.slot]?.value,value=>entry.value=Number(value))}]});
@@ -282,13 +281,11 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
         }});
         const icon=conceptIcon(element?'element':'status',aliases[name]||name);
         if(icon)icon.addEventListener('error',()=>icon.remove(),{once:true});
-        const tile=detailSection({title:LexeditorUI.inlineLabel(icon,name),attrs:{'data-defence':name},body:[
-          LexeditorUI.toggleRow({toggles:[{label:'Immune',control:checkbox}]}),
-          detailField({label:'Defence',control:enemyTableSource(unitField(input,'%'),row,read,setPercent,value=>`${value}%`)})]});
+        const tile=LexeditorUI.iconValue({icon,label:name,toggle:checkbox,control:enemyTableSource(unitField(input,'%'),row,read,setPercent,value=>`${value}%`)});tile.dataset.defence=name;
         const sync=()=>{const checked=isImmune();checkbox.checked=checked;checkbox.disabled=state.activeSource!=='mine';
           input.disabled=checked||state.activeSource!=='mine';tile.classList.toggle('immune',checked)};
         sync();return tile;
-      }),{minWidth:190});
+      }),{minWidth:95});
     return detailSection({title,help,body:grid});
   }
   const enemyScanElementNames=['Fire','Ice','Thunder','Earth','Poison','Wind','Water','Holy'];
@@ -326,8 +323,8 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
   function enemyProperties(fields,rowId,prefs){
     const numeric=fields.filter(field=>field.control!=='boolean'),flags=fields.filter(field=>field.control==='boolean');
     const result=detailSection({title:'PROPERTIES',body:[
-      LexeditorUI.tileGrid(numeric.map(field=>detailField({label:enemyPropertyLabel(field),help:field.help?infoHelp(field.help):null,
-        pin:prefs?.pinButton(`field:${field.field}`,field.label),control:fieldSourceControl(field,'enemies',rowId,{internal:true})})),{minWidth:280}),
+      ...numeric.map(field=>detailField({label:enemyPropertyLabel(field),help:field.help?infoHelp(field.help):null,
+        pin:prefs?.pinButton(`field:${field.field}`,field.label),control:fieldSourceControl(field,'enemies',rowId,{internal:true})})),
       flags.length?enemyFlagsField(flags,rowId,prefs):null]});
     if(state.activeSource!=='mine')result.querySelectorAll('input,select,button').forEach(control=>control.disabled=true);
     return result;
@@ -404,8 +401,34 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       insert:index=>enemyAiInsert(script,index),remove:index=>enemyAiDelete(script,index)});
   }
   function enemyAiSourceReference(dataset,row,scriptId){return enemyAiRow(dataset,row.id)?.scripts?.find(value=>value.id===scriptId)?.source}
-  function enemyAiSourceScript(row,script){const input=LexeditorUI.codeField({rows:12,wrap:"off","aria-label":`${script.name} enemy AI source`,oninput:event=>{script.source=event.target.value;shell.refresh()}});input.value=script.source??"";input.readOnly=state.activeSource!=="mine";const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:enemyAiSourceReference(state.referenceData[reference.id],row,script.id)})).filter(value=>value.value!==undefined),summary=value=>`${String(value??"").split(/\r?\n/).filter(Boolean).length} lines`;return sourceControl(input,()=>script.source,enemyAiSourceReference(state.vanilla,row,script.id),references,value=>{script.source=String(value??"");shell.refresh()},summary)}
-  async function enemyAiApplySource(row){const document=enemyAiRow(state.data,row.id);try{const result=await api("/api/enemy-ai/source/compile",post({sources:document.scripts.map(script=>({id:script.id,source:script.source}))}));document.scripts=result.scripts;for(const [index,script] of document.scripts.entries()){script.source=result.sources[index];enemyAiNormalizeScript(script)}setStatus(`Compiled ${row.name} AI source`);renderEnemies();shell.refresh();return true}catch(error){setStatus("AI source has an error");showAlert({title:"AI source has an error",message:error.message||String(error)});return false}}
+  function enemyAiSourceScript(row,script){const input=LexeditorUI.codeField({rows:12,wrap:"off","aria-label":`${script.name} enemy AI source`,oninput:event=>{script.source=event.target.value;state.enemyAiDirtyRow=row;shell.refresh()}});input.value=script.source??"";input.readOnly=state.activeSource!=="mine";const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:enemyAiSourceReference(state.referenceData[reference.id],row,script.id)})).filter(value=>value.value!==undefined),summary=value=>`${String(value??"").split(/\r?\n/).filter(Boolean).length} lines`;return sourceControl(input,()=>script.source,enemyAiSourceReference(state.vanilla,row,script.id),references,value=>{script.source=String(value??"");state.enemyAiDirtyRow=row;shell.refresh()},summary,{internal:true})}
+  async function enemyAiApplySource(row){
+    const document=enemyAiRow(state.data,row.id);
+    const sources=()=>document.scripts.map(script=>({id:script.id,source:script.source}));
+    const submitted=sources();
+    try{
+      const result=await api("/api/enemy-ai/source/compile",post({sources:submitted}));
+      // Do not replace edits made while the compiler was running.
+      if(JSON.stringify(sources())!==JSON.stringify(submitted))return enemyAiApplySource(row);
+      document.scripts=result.scripts;
+      for(const [index,script] of document.scripts.entries()){
+        script.source=result.sources[index];enemyAiNormalizeScript(script);
+      }
+      state.enemyAiDirtyRow=null;
+      setStatus(`Compiled ${row.name} AI source`);shell.refresh();return true;
+    }catch(error){
+      setStatus("AI source has an error");
+      showAlert({title:"AI source has an error",message:error.message||String(error)});
+      return false;
+    }
+  }
+  async function enemyAiBeforeLeave(){
+    if(!state.enemyAiDirtyRow)return true;
+    if(state.enemyAiCompilePending)return false;
+    state.enemyAiCompilePending=true;
+    try{return await enemyAiApplySource(state.enemyAiDirtyRow);}
+    finally{state.enemyAiCompilePending=false;}
+  }
   function enemyAiPanel(row){
     const ai=enemyAiRow(state.data,row.id);
     if(!ai?.available)return LexeditorUI.detailNote('This enemy has no battle-script section.');
@@ -413,32 +436,30 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     const script=ai.scripts.find(value=>value.id===state.enemyAiScriptTab)||ai.scripts[0];
     const raw=state.enemyAiView==='source';
     const switchMode=async id=>{
-      if(raw && state.activeSource==='mine' && !(await enemyAiApplySource(row)))return;
+      if(!(await enemyAiBeforeLeave()))return;
       state.enemyAiScriptTab=id;state.enemyAiView=raw?'structure':'source';renderEnemies();
     };
-    const help='Right-click a script tab to switch between friendly rows and raw code. Drag a row by its left handle to reorder it; Alt+Up or Alt+Down also moves a focused handle. Branches follow their target instruction. Unknown bytes remain read-only. Raw edits are checked before returning to rows or saving.';
+    const help='Right-click a script tab to switch between friendly rows and raw code. Drag a row to reorder it; Alt+Up or Alt+Down also moves a focused row. Branches follow their target instruction. Unknown bytes remain read-only. Raw edits compile when you leave a tab. An error keeps the current tab open.';
     const tabs=ai.scripts.map(value=>({id:value.id,label:value.name,help,
       attrs:{'aria-label':value.name,'aria-description':raw?'Raw code view':'Friendly view',oncontextmenu:event=>{event.preventDefault();switchMode(value.id)}}}));
-    const content=raw?LexeditorUI.pagedPane(enemyAiSourceScript(row,script),
-      LexeditorUI.actionRow(el('button',{type:'button',disabled:state.activeSource!=='mine',onclick:()=>enemyAiApplySource(row)},'Apply code'))):enemyAiScript(row,script);
-    return tabbedPanel({tabs,active:script.id,label:'Enemy AI scripts',change:id=>{state.enemyAiScriptTab=id;renderEnemies()},content});
+    const content=raw?enemyAiSourceScript(row,script):enemyAiScript(row,script);
+    return tabbedPanel({tabs,active:script.id,label:'Enemy AI scripts',change:async id=>{if(!(await enemyAiBeforeLeave()))return;state.enemyAiScriptTab=id;renderEnemies()},content});
   }
   function enemyBattleTextPanel(row,prefs){const scan=enemyScanSection(row,prefs);const document=enemyBattleTextRow(state.data,row.id),help=message=>LexeditorUI.detailNote(message);if(!document?.available)return LexeditorUI.stack({fill:false},scan,help("This enemy has no battle-script section."));if(!document.lines.length)return LexeditorUI.stack({fill:false},scan,help("This enemy has no local battle dialogue."));const vanilla=enemyBattleTextRow(state.vanilla,row.id),referenceLine=(dataset,id)=>enemyBattleTextRow(dataset,row.id)?.lines?.find(value=>value.id===id)?.text;return LexeditorUI.stack({fill:false},scan,help("These lines are used by this enemy during battle. Each line number matches a Show Text instruction in the AI view."),...document.lines.map(line=>{const input=LexeditorUI.textArea({rows:4,maxlength:400,"aria-label":`Battle text line ${line.id} for ${row.name}`,oninput:event=>{line.text=event.target.value;shell.refresh()}});input.value=line.text;const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:referenceLine(state.referenceData[reference.id],line.id)})).filter(value=>value.value!==undefined);return detailSection({className:"enemy-battle-text-line",title:`LINE ${line.id}`,body:sourceControl(input,()=>line.text,vanilla?.lines?.find(value=>value.id===line.id)?.text,references,value=>line.text=String(value??""))})}))}
   function enemyDetail(row,prefs){
     const table=enemyTableRow(state.data,row.id),tab=state.enemyDetailTab||'properties';
-    const tabs=[{id:'properties',label:'Properties'},{id:'loot',label:'Loot'},
+    const tabs=[{id:'properties',label:'Properties'},{id:'actions',label:'Actions',help:'The AI uses these action slots. Each level tier can use a different ability in the same slot.'},{id:'loot',label:'Loot'},
       {id:'renzokuken',label:'Renzokuken'},{id:'defense',label:'Defense'},
       {id:'text',label:'Text'},{id:'stats',label:'Stats',help:'Edit the coefficients to change how this enemy grows with its level.'}];
     let body=[];
     if(tab==='properties'){
       body=[enemyProperties(row.fields.filter(field=>field.group!=='Stat curves'),row.id,prefs)];
-      if(table)body.push(detailSection({title:'Actions',help:infoHelp('The AI uses these action slots. Each level tier can use a different ability in the same slot.'),body:['low','medium','high'].map(tier=>enemyAbilitiesSection(table,tier))}));
-    }else if(tab==='loot'&&table)body=[enemyPairSection(table,'mug','MUG','Item'),enemyPairSection(table,'draw','DRAW','Magic'),enemyPairSection(table,'drops','DROPS','Item'),...enemySimpleTables(table).slice(0,2)];
+    }else if(tab==='actions'&&table)body=['low','medium','high'].map(tier=>enemyAbilitiesSection(table,tier));
+    else if(tab==='loot'&&table)body=[enemyPairSection(table,'mug','MUG','Item'),enemyPairSection(table,'draw','DRAW','Magic'),enemyPairSection(table,'drops','DROPS','Item'),...enemySimpleTables(table).slice(0,2)];
     else if(tab==='renzokuken'&&table)body=enemySimpleTables(table).slice(2);
     else if(tab==='defense'&&table)body=[enemyDefenceSection(table,'elementDefence','ELEMENT'),enemyDefenceSection(table,'statusDefence','STATUS')];
     else if(tab==='text')body=[enemyBattleTextPanel(row,prefs)];
     else if(tab==='stats')body=[enemyStatGrowth(row.fields.filter(field=>field.group==='Stat curves'),row.id)];
-    const panel=tabbedPanel({tabs,active:tab,label:'Enemy details',change:value=>{state.enemyDetailTab=value;renderEnemies()},content:body});
-    return sharedDetail({...row,name:enemyDisplayName(row.name)},prefs,[panel],'enemy-detail');
+    return tabbedPanel({tabs,active:tab,label:'Enemy details',change:async value=>{if(!(await enemyAiBeforeLeave()))return;state.enemyDetailTab=value;renderEnemies()},content:tab==='stats'?body:sharedDetail({...row,name:enemyDisplayName(row.name)},prefs,body,'enemy-detail')});
   }
   function enemyLeadingPanel(row){return enemyAiPanel(row)}

@@ -43,7 +43,10 @@ def test_tab_hover_does_not_move_or_resize_label(page):
     assert label.bounding_box()==before
     assert label.evaluate('n=>getComputedStyle(n).fontSize')==font
     assert page.locator('nav button.active').evaluate('''n=>{
-      const p=getComputedStyle(n,'::before');return parseFloat(p.right)>=n.clientWidth-1
+      const p=getComputedStyle(n,'::before'),range=document.createRange();
+      range.selectNodeContents(n.querySelector('.lex-tab-label-text'));
+      const tip=n.getBoundingClientRect().left+parseFloat(getComputedStyle(n).borderLeftWidth)+parseFloat(p.left)+parseFloat(p.width);
+      return Math.abs(range.getBoundingClientRect().left-tip-6)<2
     }''')
 
 
@@ -100,7 +103,8 @@ def test_mod_menu_has_live_toggles_and_drag_order(page):
     assert actions.count()==2
     assert abs(actions.nth(0).bounding_box()['width']-actions.nth(1).bounding_box()['width'])<1
     assert actions.first.inner_text()=='➕ Add a Mod'
-    page.get_by_role('button',name='Reorder First mod').drag_to(rows.nth(2))
+    assert page.locator('.lex-mod-drag-handle').count()==0
+    rows.nth(1).locator('.lex-project-menu-name').drag_to(rows.nth(2))
     assert page.evaluate('modChanges')==[['a',{'move':1}]]
     page.get_by_role('checkbox',name='Enable First mod').click()
     assert page.evaluate('modChanges.at(-1)')==['a',{'enabled':True}]

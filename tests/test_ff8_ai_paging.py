@@ -27,12 +27,22 @@ def test_later_page_actions_use_full_script_indices(page):
     page.get_by_role('button',name='Next page',exact=True).click()
     assert page.locator('[data-offset]').first.get_attribute('data-offset')==str(count)
     assert page.locator('.lex-instruction-footer').bounding_box()==footer
-    page.locator('.lex-instruction-handle').first.focus()
+    assert page.locator('.lex-instruction-handle').count()==0
+    page.locator('.lex-instruction-row').first.focus()
     page.keyboard.press('Alt+ArrowUp')
     assert page.evaluate('window.moved')==[count,-1]
     page.locator('.lex-instruction-actions button').first.click()
     assert page.evaluate('window.inserted')==count
-    page.locator('.lex-instruction-handle').first.drag_to(page.locator('.lex-instruction-row').nth(2))
+    page.locator('.lex-instruction-description').first.drag_to(page.locator('.lex-instruction-row').nth(2))
+    assert page.evaluate('window.moved')==[count,2]
+    # Editing an operand must not start a row drag or reorder from Alt+arrows.
+    page.evaluate('''()=>{
+      const row=document.querySelector('.lex-instruction-row'),control=row.querySelector('select');
+      control.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
+      window.inputDragAllowed=row.dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:new DataTransfer()}));
+    }''')
+    assert page.evaluate('window.inputDragAllowed') is False
+    page.locator('.lex-instruction-controls select').first.press('Alt+ArrowUp')
     assert page.evaluate('window.moved')==[count,2]
     page.get_by_role('button',name='Last page',exact=True).click()
     page.locator('.lex-instruction-actions button').nth(1).click()

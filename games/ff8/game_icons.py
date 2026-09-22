@@ -196,7 +196,8 @@ def _render_icon(icon_id: int, sp1: bytes, tex: bytes) -> Image.Image | None:
         if quad["semi"]:
             crop.putalpha(crop.getchannel("A").point(lambda alpha: min(alpha, 128)))
         canvas.alpha_composite(crop, (quad["dx"] - min_x, quad["dy"] - min_y))
-    return canvas
+    bounds = canvas.getchannel("A").getbbox()
+    return canvas.crop(bounds) if bounds else canvas
 
 
 def ensure_icons(data_root: Path | None = None) -> dict:
@@ -208,6 +209,7 @@ def ensure_icons(data_root: Path | None = None) -> dict:
     if not source_sp1.is_file() or not source_tex.is_file():
         return {"icons": {}, "available": False}
     fingerprint = {
+        "rendererVersion": 2,
         "sp1Size": source_sp1.stat().st_size,
         "sp1MtimeNs": source_sp1.stat().st_mtime_ns,
         "texSize": source_tex.stat().st_size,

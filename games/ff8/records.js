@@ -1,9 +1,8 @@
   function renderItems(){const rows=filtered("items",["name","id"]),columns=[{key:"id",label:"ID"},{key:"name",label:"Item",render:row=>itemLabel(row)},{key:"buyPrice",label:"Buy",render:row=>gilValue(row.buyPrice)},{key:"sellPrice",label:"Sell",render:row=>gilValue(row.sellPrice)},{key:"sellMultiplier",label:"Sell %",pinned:false,render:row=>unitField(numberValue(row.sellMultiplier*5),"%")},{key:"iconId",label:"Menu icon",pinned:false,render:row=>itemIcon(row)}];showPaged("items",rows,columns,itemDetail,"70px minmax(210px,2fr) 90px 90px")}
   function itemDetail(row,prefs){const vanilla=rowOf(state.vanilla,"items",row.id),sell=readonlyField(row.sellPrice);const updateSell=()=>{row.sellPrice=Math.round((row.buyPrice/20)*row.sellMultiplier);sell.value=formatNumber(row.sellPrice);shell.refresh()},setSellMultiplier=value=>{row.sellMultiplier=Math.max(0,Math.min(255,Math.round(Number(value)||0)));updateSell()},buy=sourceControl(unitField(numberControl(row.buyPrice,0,655350,10,value=>{row.buyPrice=value;updateSell()}),"G",{unitClass:"ff8-gil-unit"}),()=>row.buyPrice,vanilla.buyPrice,referenceValues("items",row.id,value=>value?.buyPrice),value=>{row.buyPrice=value;updateSell()},value=>`${formatNumber(value)} G`,{internal:true}),sellRate=sourceControl(unitField(numberControl(row.sellMultiplier*5,0,1275,5,value=>setSellMultiplier(value/5)),"%"),()=>row.sellMultiplier,vanilla.sellMultiplier,referenceValues("items",row.id,value=>value?.sellMultiplier),setSellMultiplier,value=>`${formatNumber(Number(value)*5)}%`,{internal:true});return sharedDetail(row,prefs,[detailSection({className:"item-price-section",title:"PRICES",body:[
-    LexeditorUI.tileGrid([
-      detailField({label:"Buy price",control:buy,pin:prefs?.pinButton("buyPrice","Buy price")}),
-      detailField({label:"Sell percentage",control:sellRate,pin:prefs?.pinButton("sellMultiplier","Sell percentage"),help:infoHelp("The shop pays this percentage of the buy price when you sell this item.")}),
-      detailField({label:"Sell price",control:unitField(sell,"G"),pin:prefs?.pinButton("sellPrice","Sell price")})])]}),
+      detailField({label:"Buy",control:buy,pin:prefs?.pinButton("buyPrice","Buy price")}),
+      detailField({label:"Sell %",control:sellRate,pin:prefs?.pinButton("sellMultiplier","Sell percentage"),help:infoHelp("The shop pays this percentage of the buy price when you sell this item.")}),
+      detailField({label:"Sell",control:unitField(sell,"G"),pin:prefs?.pinButton("sellPrice","Sell price")})]}),
     menuItemSection(row.id),
     row.id<33?LexeditorUI.detailNote("This item also has battle behavior in kernel.bin. Those fields are not editable here until cross-file saving is validated."):null],"","",itemIcon(row))}
 
@@ -19,7 +18,7 @@
       return [slot.slot,{item,rare,slotControl:LexeditorUI.inlineLabel(String(slot.slot+1),el("button",{type:"button",class:"lex-row-remove",title:`Set slot ${slot.slot+1} to Nothing`,"aria-label":`Clear slot ${slot.slot+1}`,onclick:()=>removeShopSlot(row,slot)},"×"))}];
     }));
     state.shopSlotSort||=["slot",1];const [sortKey,sortDir]=state.shopSlotSort,sorted=[...row.slots].sort((a,b)=>sortDir*String(sortKey==="item"?a.itemName:a[sortKey]??"").localeCompare(String(sortKey==="item"?b.itemName:b[sortKey]??""),undefined,{numeric:true}));
-    const table=columnList({rows:sorted,key:slot=>slot.slot,class:"ff8-shop-table ff8-record-list",template:"80px minmax(150px,1fr) 110px",sortState:{key:sortKey,dir:sortDir},sort:key=>{state.shopSlotSort=[key,sortKey===key?-sortDir:1];renderShops()},columns:[{key:"slot",label:"Slot",sortable:true,render:slot=>controls.get(slot.slot).slotControl},{key:"item",label:"Item",sortable:true,render:slot=>controls.get(slot.slot).item},{key:"rare",label:el("span",{},"Rare",infoHelp("Rare stock is hidden until the player has Tonberry's Familiar menu ability.")),sortable:true,cellClass:"rare",render:slot=>controls.get(slot.slot).rare}]});
+    const table=columnList({fill:true,rows:sorted,key:slot=>slot.slot,class:"ff8-shop-table ff8-record-list",template:"80px minmax(150px,1fr) 110px",sortState:{key:sortKey,dir:sortDir},sort:key=>{state.shopSlotSort=[key,sortKey===key?-sortDir:1];renderShops()},columns:[{key:"slot",label:"Slot",sortable:true,render:slot=>controls.get(slot.slot).slotControl},{key:"item",label:"Item",sortable:true,render:slot=>controls.get(slot.slot).item},{key:"rare",label:el("span",{},"Rare",infoHelp("Rare stock is hidden until the player has Tonberry's Familiar menu ability.")),sortable:true,cellClass:"rare",render:slot=>controls.get(slot.slot).rare}]});
     return sharedDetail(row,prefs,table);
   }
 
@@ -132,8 +131,8 @@
     };
     const boundary=boundaries[row.source]||"This text source is not writable.";
     return detailPanel({heading:false,body:[
-      LexeditorUI.controlGroup([["Source","sourceLabel"],["Section","sectionId"],["Record","recordId"],["Field","role"]].map(([label,key])=>({label,control:readonlyField(row[key])})),{columns:4,stacked:true}),
-      detailField({className:"lex-detail-field-stacked lex-text-editor",label:"",help:infoHelp(`FF8 text supports game tokens such as {Squall} and {L2}. Unsupported characters are rejected when you save. ${boundary}`),control,pin:prefs?.pinButton("value","Text")})]});
+      LexeditorUI.controlGroup([["Source","sourceLabel"],["Section","sectionId"],["Record","recordId"],["Field","role"]].map(([label,key])=>({label,control:readonlyField(row[key]),pin:prefs?.pinButton(key,label)})),{columns:4,stacked:true}),
+      detailField({className:"lex-detail-field-stacked lex-text-editor",showType:false,label:"",help:infoHelp(`FF8 text supports game tokens such as {Squall} and {L2}. Unsupported characters are rejected when you save. ${boundary}`),control,pin:prefs?.pinButton("value","Text")})]});
   }
   function renderText(){const rows=filtered("text",["sourceLabel","section","recordId","role","value"]),columns=[{key:"sourceLabel",label:"Source",width:"95px"},{key:"sectionId",label:"Section",numeric:true,width:"70px"},{key:"recordId",label:"Record",numeric:true,width:"70px"},{key:"role",label:"Field",width:"minmax(106px,.55fr)"},{key:"value",label:"Text",grow:1}];showPaged("text",rows,columns,textDetail,"95px 70px 70px minmax(106px,.55fr) minmax(160px,1fr)")}
   const characterCurveOrder=["HP","STR","VIT","MAG","SPR","SPD","LUCK"];

@@ -133,7 +133,7 @@ def test_mod_actions_use_one_dropdown(page):
     }''')
     page.get_by_role('button',name='Active mod project',exact=True).click()
     page.get_by_role('checkbox',name='Enable Second mod').uncheck()
-    page.get_by_role('button',name='Reorder Second mod').press('Alt+ArrowUp')
+    page.locator('.lex-project-reference').nth(1).press('Alt+ArrowUp')
     page.get_by_role('button',name='Remove Second mod',exact=True).click()
     page.get_by_role('button',name='Remove',exact=True).click()
     page.wait_for_timeout(100)

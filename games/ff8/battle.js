@@ -9,7 +9,7 @@
     const mode=el("select",{"aria-label":"Enemy level rule",onchange:event=>{apply(event.target.value);renderEncounters()}},el("option",{value:"fixed"},"Fixed level"),el("option",{value:"maximum"},"Maximum level"),el("option",{value:"ultimecia"},"Ultimecia Castle: random 1–100"));
     if(rule.mode==="special")mode.append(el("option",{value:"special"},`Special (${slot.level})`));
     mode.value=rule.mode;
-    return LexeditorUI.controlGroup([mode,...(["fixed","maximum"].includes(rule.mode)?[numberControl(rule.value,1,100,1,value=>apply(rule.mode,value),{"aria-label":"Enemy level rule value"})]:[])]);
+    return LexeditorUI.stack({fill:false},mode,...(["fixed","maximum"].includes(rule.mode)?[numberControl(rule.value,1,100,1,value=>apply(rule.mode,value),{"aria-label":"Enemy level rule value"})]:[]));
   }
   function encounterDetail(row,prefs){
     const formation=LexeditorUI.controlGroup(['stageId','flags','cameraMain','cameraSecondary'].map((key,index)=>({
