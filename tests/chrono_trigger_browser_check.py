@@ -51,13 +51,24 @@ SCENE_MAP = {
     "sha256": "scene-map-sha-1", "layer1Width": 16, "layer1Height": 16,
     "layer2Width": 16, "layer2Height": 16, "layer3Width": 16, "layer3Height": 16,
     "layer3Enabled": False, "scrollBits": 0, "scrollL2": 0x21, "scrollL3": 0x43,
-    "screenFlags": 0x5A, "effectFlags": 0xC3, "propertyBytes": 7, "propertyOffset": 518,
+    "screenFlags": 0x5A, "effectFlags": 0xCB, "propertyBytes": 7, "propertyOffset": 518,
     "rows": [
         {"token": "6:1:0", "mapId": 6, "layer": 1, "index": 0, "xTile": 0, "yTile": 0,
          "storedTile": 3, "upperBank": True, "tileIndex": 259},
         {"token": "6:2:0", "mapId": 6, "layer": 2, "index": 0, "xTile": 0, "yTile": 0,
          "storedTile": 4, "upperBank": False, "tileIndex": 4},
     ],
+}
+SCENE_RENDER = {
+    "token": "6", "mapId": 6, "path": "Game/field/MapTable/MapTable_0006.dat",
+    "source": "vanilla", "sha256": "scene-render-sha-1",
+    "scrollL2XCode": 1, "scrollL2YCode": 2, "scrollL2XSpeed": 3.75, "scrollL2YSpeed": 7.5,
+    "scrollL3XCode": 3, "scrollL3YCode": 4, "scrollL3XSpeed": 15.0, "scrollL3YSpeed": 30.0,
+    "unknownEffectBit3": True, "preservedBitsByte": 0, "layer3Enabled": False, "scrollModeBits": 0,
+    "layer1Main": False, "layer2Main": True, "layer3Main": False, "spritesMain": True,
+    "layer1Sub": True, "layer2Sub": False, "layer3Sub": True, "spritesSub": False,
+    "effectLayer1": True, "effectLayer2": True, "effectLayer3": False, "effectSprites": False,
+    "effectDefaultColor": False, "effectHalfIntensity": True, "effectSubtract": True,
 }
 SCENE_PROPS = {
     "path": "Game/field/MapTable/MapTable_0006.dat", "mapId": 6, "source": "vanilla",
@@ -239,6 +250,7 @@ DATA_MAP = {"rows": [
     {"filename": "Game/common/TakaraOffsetTbl.dat + TakaraDataTbl.dat", "controls": "Treasure chests", "notes": "Existing fixed-size treasure.", "coverage": "structured", "status": "integrated", "openable": True, "target": "treasure"},
     {"filename": "Game/field/Mapinfo/mapinfo_*.dat", "controls": "Area settings", "notes": "Fixed Steam area headers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "scenes"},
     {"filename": "Game/field/MapTable/MapTable_*.dat", "controls": "Area map tiles", "notes": "Fixed layer tile bytes; RLE properties preserved.", "coverage": "structured", "status": "integrated", "openable": True, "target": "scenemaps"},
+    {"filename": "Game/field/MapTable/MapTable_*.dat header", "controls": "Area render settings", "notes": "Fixed scroll, screen and effect masks.", "coverage": "structured", "status": "integrated", "openable": True, "target": "scenerender"},
     {"filename": "Game/field/MapTable/MapTable_*.dat RLE properties", "controls": "Area collision and movement", "notes": "Existing RLE property runs; repeat counts and unknown bits preserved.", "coverage": "structured", "status": "integrated", "openable": True, "target": "sceneprops"},
     {"filename": "Game/field/palette_bin/plt*.bin + Game/world/plt_bin/plt*.bin", "controls": "Area and world palettes", "notes": "Fixed 256-color RGB555 palettes.", "coverage": "structured", "status": "integrated", "openable": True, "target": "palettes"},
     {"filename": "Game/field/BGSetTable/bgsettable_*.dat", "controls": "Tileset graphics sets", "notes": "Eight fixed graphics-set references.", "coverage": "structured", "status": "integrated", "openable": True, "target": "tilesets"},
@@ -268,7 +280,7 @@ def editor_html() -> str:
     )
     fixtures = {
         "dashboard": DASHBOARD, "textFiles": TEXT_FILES, "messages": MESSAGES, "scenes": SCENES,
-        "sceneMapFiles": SCENE_MAP_FILES, "sceneMap": SCENE_MAP, "sceneProps": SCENE_PROPS, "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "worldFiles": WORLD_FILES, "worldMap": WORLD_MAP, "worldProps": WORLD_PROPS, "worldMusic": WORLD_MUSIC, "worldColors": WORLD_COLORS, "worldNavigation": WORLD_NAVIGATION, "animations": CHIP_ANIMATIONS, "graphicsSets": GRAPHICS_SETS, "assemblies": ASSEMBLIES, "dataMap": DATA_MAP, "changes": CHANGES,
+        "sceneMapFiles": SCENE_MAP_FILES, "sceneMap": SCENE_MAP, "sceneProps": SCENE_PROPS, "sceneRender": SCENE_RENDER, "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "worldFiles": WORLD_FILES, "worldMap": WORLD_MAP, "worldProps": WORLD_PROPS, "worldMusic": WORLD_MUSIC, "worldColors": WORLD_COLORS, "worldNavigation": WORLD_NAVIGATION, "animations": CHIP_ANIMATIONS, "graphicsSets": GRAPHICS_SETS, "assemblies": ASSEMBLIES, "dataMap": DATA_MAP, "changes": CHANGES,
     }
     stub = r"""
     window.__posts=[];
@@ -296,6 +308,8 @@ def editor_html() -> str:
         }else if(path==="/api/scene-map/save"){
           for(const edit of body.edits||[]){const row=f.sceneMap.rows.find(value=>value.token===edit.token);if(row){Object.assign(row,edit.values||{});row.storedTile=row.tileIndex-(row.upperBank?256:0);}}
           f.sceneMap.sha256="scene-map-sha-2";f.sceneMap.source="project";result=f.sceneMap;
+        }else if(path==="/api/scene-render-settings/save"){
+          Object.assign(f.sceneRender,body.values||{});f.sceneRender.sha256="scene-render-sha-2";f.sceneRender.source="project";result=f.sceneRender;
         }else if(path==="/api/scene-properties/save"){
           for(const edit of body.edits||[]){
             const row=f.sceneProps.rows.find(value=>value.token===edit.token);
@@ -368,6 +382,7 @@ def editor_html() -> str:
       else if(path==="/api/scene-map-files")result=f.sceneMapFiles;
       else if(path==="/api/scene-map")result=f.sceneMap;
       else if(path==="/api/scene-properties")result=f.sceneProps;
+      else if(path==="/api/scene-render-settings")result=f.sceneRender;
       else if(path==="/api/palette-files")result=f.paletteFiles;
       else if(path==="/api/palette")result=f.palette;
       else if(path==="/api/worlds")result=f.worlds;
@@ -436,6 +451,21 @@ def main():
                 assert "PC WORD" in page.locator("#main").inner_text()
                 assert page.get_by_label("PC WORD",exact=True).input_value()=="0xBEEF"
                 page.screenshot(path=str(ARTIFACTS/f"areas-{width}.png"),full_page=True)
+                page.get_by_label("Area data",exact=True).select_option("render")
+                page.get_by_label("UNKNOWN EFFECT BIT",exact=True).wait_for()
+                assert page.get_by_label("UNKNOWN EFFECT BIT",exact=True).input_value()=="Set"
+                assert page.get_by_label("DIMENSION / MODE BYTE",exact=True).input_value()=="0x00"
+                page.get_by_label("L2 X SPEED",exact=True).select_option("7")
+                page.get_by_label("L2 Y SPEED",exact=True).select_option("15")
+                page.get_by_label("LAYER 1 MAIN",exact=True).check()
+                page.get_by_label("LAYER 2 MAIN",exact=True).uncheck()
+                page.get_by_label("LAYER 1 EFFECT",exact=True).uncheck()
+                page.wait_for_function("!document.querySelector('#global-save')?.disabled")
+                page.locator("#global-save").click()
+                page.wait_for_function("document.querySelector('#global-save')?.disabled")
+                assert page.evaluate("window.__posts.some(value=>value.path==='/api/scene-render-settings/save')")
+                assert page.get_by_label("UNKNOWN EFFECT BIT",exact=True).input_value()=="Set"
+                page.screenshot(path=str(ARTIFACTS/f"area-render-{width}.png"),full_page=True)
                 page.get_by_label("Area data",exact=True).select_option("map")
                 page.get_by_label("TILE INDEX",exact=True).wait_for()
                 assert page.get_by_label("BANK",exact=True).input_value()=="Upper · 256-511"
