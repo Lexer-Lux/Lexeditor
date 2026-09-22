@@ -44,6 +44,21 @@ SCENES = {
          "scrollLeft": 128, "scrollTop": 0, "scrollRight": 0, "scrollBottom": 0, "trailingBytes": 0},
     ],
 }
+SCENE_MAP_FILES = {"rows": [{"path": "Game/field/MapTable/MapTable_0006.dat", "id": 6, "label": "Area map 6",
+                              "layer1": "16×16", "layer2": "16×16", "layer3": "disabled"}]}
+SCENE_MAP = {
+    "path": "Game/field/MapTable/MapTable_0006.dat", "mapId": 6, "source": "vanilla",
+    "sha256": "scene-map-sha-1", "layer1Width": 16, "layer1Height": 16,
+    "layer2Width": 16, "layer2Height": 16, "layer3Width": 16, "layer3Height": 16,
+    "layer3Enabled": False, "scrollBits": 0, "scrollL2": 0x21, "scrollL3": 0x43,
+    "screenFlags": 0x5A, "effectFlags": 0xC3, "propertyBytes": 7, "propertyOffset": 518,
+    "rows": [
+        {"token": "6:1:0", "mapId": 6, "layer": 1, "index": 0, "xTile": 0, "yTile": 0,
+         "storedTile": 3, "upperBank": True, "tileIndex": 259},
+        {"token": "6:2:0", "mapId": 6, "layer": 2, "index": 0, "xTile": 0, "yTile": 0,
+         "storedTile": 4, "upperBank": False, "tileIndex": 4},
+    ],
+}
 EXITS = {
     "source": "vanilla", "dataSha256": "exit-data-1", "offsetSha256": "exit-offset-1",
     "rows": [
@@ -202,6 +217,7 @@ DATA_MAP = {"rows": [
     {"filename": "Game/common/MapJumpOffsetTbl.dat + MapJumpDataTbl.dat", "controls": "Area exits", "notes": "Existing fixed-size exits.", "coverage": "structured", "status": "integrated", "openable": True, "target": "exits"},
     {"filename": "Game/common/TakaraOffsetTbl.dat + TakaraDataTbl.dat", "controls": "Treasure chests", "notes": "Existing fixed-size treasure.", "coverage": "structured", "status": "integrated", "openable": True, "target": "treasure"},
     {"filename": "Game/field/Mapinfo/mapinfo_*.dat", "controls": "Area settings", "notes": "Fixed Steam area headers.", "coverage": "structured", "status": "integrated", "openable": True, "target": "scenes"},
+    {"filename": "Game/field/MapTable/MapTable_*.dat", "controls": "Area map tiles", "notes": "Fixed layer tile bytes; RLE properties preserved.", "coverage": "structured", "status": "integrated", "openable": True, "target": "scenemaps"},
     {"filename": "Game/field/palette_bin/plt*.bin + Game/world/plt_bin/plt*.bin", "controls": "Area and world palettes", "notes": "Fixed 256-color RGB555 palettes.", "coverage": "structured", "status": "integrated", "openable": True, "target": "palettes"},
     {"filename": "Game/field/BGSetTable/bgsettable_*.dat", "controls": "Tileset graphics sets", "notes": "Eight fixed graphics-set references.", "coverage": "structured", "status": "integrated", "openable": True, "target": "tilesets"},
     {"filename": "Game/field/ChipTable/ChipTable_*.dat + ChipTableBg3_*.dat", "controls": "Tile assemblies", "notes": "Fixed 3-byte tile corners.", "coverage": "structured", "status": "integrated", "openable": True, "target": "assemblies"},
@@ -230,7 +246,7 @@ def editor_html() -> str:
     )
     fixtures = {
         "dashboard": DASHBOARD, "textFiles": TEXT_FILES, "messages": MESSAGES, "scenes": SCENES,
-        "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "worldFiles": WORLD_FILES, "worldMap": WORLD_MAP, "worldProps": WORLD_PROPS, "worldMusic": WORLD_MUSIC, "worldColors": WORLD_COLORS, "worldNavigation": WORLD_NAVIGATION, "animations": CHIP_ANIMATIONS, "graphicsSets": GRAPHICS_SETS, "assemblies": ASSEMBLIES, "dataMap": DATA_MAP, "changes": CHANGES,
+        "sceneMapFiles": SCENE_MAP_FILES, "sceneMap": SCENE_MAP, "exits": EXITS, "treasure": TREASURE, "paletteFiles": PALETTE_FILES, "palette": PALETTE, "worlds": WORLDS, "worldFiles": WORLD_FILES, "worldMap": WORLD_MAP, "worldProps": WORLD_PROPS, "worldMusic": WORLD_MUSIC, "worldColors": WORLD_COLORS, "worldNavigation": WORLD_NAVIGATION, "animations": CHIP_ANIMATIONS, "graphicsSets": GRAPHICS_SETS, "assemblies": ASSEMBLIES, "dataMap": DATA_MAP, "changes": CHANGES,
     }
     stub = r"""
     window.__posts=[];
@@ -255,6 +271,9 @@ def editor_html() -> str:
           const row=f.scenes.rows.find(value=>value.id===body.id);
           if(row){Object.assign(row,body.values||{});row.sha256="scene-sha-saved";row.source="project";}
           result=row;
+        }else if(path==="/api/scene-map/save"){
+          for(const edit of body.edits||[]){const row=f.sceneMap.rows.find(value=>value.token===edit.token);if(row){Object.assign(row,edit.values||{});row.storedTile=row.tileIndex-(row.upperBank?256:0);}}
+          f.sceneMap.sha256="scene-map-sha-2";f.sceneMap.source="project";result=f.sceneMap;
         }else if(path==="/api/palette/save"){
           for(const edit of body.edits||[]){const row=f.palette.rows.find(value=>value.token===edit.token);if(row)row.hex=edit.hex;}
           f.palette.sha256="palette-sha-saved";f.palette.source="project";result=f.palette;
@@ -318,6 +337,8 @@ def editor_html() -> str:
       else if(path==="/api/text-files")result=f.textFiles;
       else if(path==="/api/messages")result=f.messages;
       else if(path==="/api/scenes")result=f.scenes;
+      else if(path==="/api/scene-map-files")result=f.sceneMapFiles;
+      else if(path==="/api/scene-map")result=f.sceneMap;
       else if(path==="/api/palette-files")result=f.paletteFiles;
       else if(path==="/api/palette")result=f.palette;
       else if(path==="/api/worlds")result=f.worlds;
@@ -386,6 +407,18 @@ def main():
                 assert "PC WORD" in page.locator("#main").inner_text()
                 assert page.get_by_label("PC WORD",exact=True).input_value()=="0xBEEF"
                 page.screenshot(path=str(ARTIFACTS/f"areas-{width}.png"),full_page=True)
+                page.get_by_label("Area data",exact=True).select_option("map")
+                page.get_by_label("TILE INDEX",exact=True).wait_for()
+                assert page.get_by_label("BANK",exact=True).input_value()=="Upper · 256-511"
+                assert page.get_by_label("PROPERTY BYTES",exact=True).input_value()=="7"
+                assert page.get_by_label("SCREEN FLAGS",exact=True).input_value()=="0x5A"
+                page.get_by_label("TILE INDEX",exact=True).fill("300")
+                page.wait_for_function("!document.querySelector('#global-save')?.disabled")
+                page.locator("#global-save").click()
+                page.wait_for_function("document.querySelector('#global-save')?.disabled")
+                assert page.evaluate("window.__posts.some(value=>value.path==='/api/scene-map/save')")
+                assert page.get_by_label("TILE INDEX",exact=True).input_value()=="300"
+                page.screenshot(path=str(ARTIFACTS/f"area-map-{width}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Worlds").click()
                 page.locator("#main").get_by_text("PALETTE ANIMATION BYTE", exact=True).wait_for()
