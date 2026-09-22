@@ -266,8 +266,11 @@ class FreshChronoTriggerTests(unittest.TestCase):
             path = "Game/field/MapTable/MapTable_0006.dat"
             data = load_scene_render_settings(store, path)
             self.assertEqual((data["scrollL2XCode"], data["scrollL2YCode"], data["scrollL2XSpeed"],
-                              data["scrollL3XCode"], data["scrollL3YCode"], data["screenFlags"] if "screenFlags" in data else None),
-                             (1, 2, 3.75, 3, 4, None))
+                              data["scrollL3XCode"], data["scrollL3YCode"]),
+                             (1, 2, 3.75, 3, 4))
+            self.assertEqual((data["layer1Main"], data["layer2Main"], data["spritesMain"],
+                              data["layer1Sub"], data["layer3Sub"]),
+                             (False, True, True, True, True))
             self.assertTrue(data["unknownEffectBit3"])
             self.assertEqual((data["preservedBitsByte"], data["scrollModeBits"], data["layer3Enabled"]), (0, 0, False))
             before, _ = store.read(path, "mine")
