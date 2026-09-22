@@ -82,3 +82,45 @@ jobs:
           name: ff7r-browser-${{ github.sha }}
           path: out/ff7r-browser/
           retention-days: 7
+
+
+  repak-vendor-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch exact repak v0.2.3 release archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p out/repak-vendor
+          cd out/repak-vendor
+          curl -L --fail --retry 3 -o repak_cli-x86_64-pc-windows-msvc.zip \
+            https://github.com/trumank/repak/releases/download/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip
+          echo "6720d602144d75df477a99d5bedb6ea780997546afc335901d4937cafeaa73fa  repak_cli-x86_64-pc-windows-msvc.zip" | sha256sum -c -
+          curl -L --fail --retry 3 -o repak_cli-x86_64-unknown-linux-gnu.tar.xz \
+            https://github.com/trumank/repak/releases/download/v0.2.3/repak_cli-x86_64-unknown-linux-gnu.tar.xz
+          echo "933bdb8e26f34e8fd70ea50201efca39df041de58aa83b1cd6eb83da124a2046  repak_cli-x86_64-unknown-linux-gnu.tar.xz" | sha256sum -c -
+          curl -L --fail --retry 3 -o LICENSE-MIT \
+            https://raw.githubusercontent.com/trumank/repak/e215472c51db69328b1ce77be2db24d24c1d646b/LICENSE-MIT
+          curl -L --fail --retry 3 -o LICENSE-APACHE \
+            https://raw.githubusercontent.com/trumank/repak/e215472c51db69328b1ce77be2db24d24c1d646b/LICENSE-APACHE
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          root=Path("out/repak-vendor") if Path("out/repak-vendor").is_dir() else Path(".")
+          rows={}
+          for path in sorted(root.iterdir()):
+              if path.is_file():
+                  rows[path.name]={"size":path.stat().st_size,"sha256":hashlib.sha256(path.read_bytes()).hexdigest()}
+          (root/"manifest.json").write_text(json.dumps({
+              "source":"https://github.com/trumank/repak/releases/tag/v0.2.3",
+              "tag":"v0.2.3",
+              "commit":"e215472c51db69328b1ce77be2db24d24c1d646b",
+              "files":rows,
+          },indent=2)+"\n",encoding="utf-8")
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ff7r-repak-v0.2.3-vendor
+          path: out/repak-vendor/
+          retention-days: 1
