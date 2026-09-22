@@ -91,6 +91,13 @@ def smoke() -> list[str]:
         scene_map[6 + 16 * 16] = 4
         scene_map.extend(bytes([0x01, 0, 0, 0x80, 0x20, 0x10, 255]))
         sprite_descriptor = bytes([9, 8, 7, 0xAC, 5, 0xD2, 0xFE, 0x03, 0x11, 0x22, 0x33, 0xEE])
+        sprite_cell = bytearray(b"\xAA\xBB\xCC" + struct.pack("<HH", 2, 0xBEEF))
+        sprite_cell.extend(bytes([2]))
+        sprite_cell.extend(struct.pack("<HbbB", 0x025C, -5, -25, 0xA1))
+        sprite_cell.extend(struct.pack("<HbbB", 0x0000, 1, 2, 0x02))
+        sprite_cell.extend(bytes([1]))
+        sprite_cell.extend(struct.pack("<HbbB", 0x0020, 3, 4, 0x80))
+        sprite_cell.extend(b"\xEE")
         graphics_sets = bytes([1, 2, 3, 4, 5, 6, 7, 0xFF]) + b"\xDD"
         assembly_l12 = bytearray(512 * 4 * 3 + 1)
         struct.pack_into("<HB", assembly_l12, 0, 300 | 0x0400 | (5 << 12), 0xA1)
@@ -133,7 +140,8 @@ def smoke() -> list[str]:
             ("Game/world/SeId/SeId_0000.dat", bytes(world_music)),
             ("Game/world/colanim_bin/0_colanim.bin", world_colors),
             ("Game/world/EventTable/EventTable_0004.dat", world_event),
-            ("Game/chara/dat/c005.dat", sprite_descriptor),
+            ("Game/chara/dat/c005.dat", "Game/chara/cell/c005.cel", sprite_descriptor),
+            ("Game/chara/cell/c005.cel", bytes(sprite_cell)),
             ("Game/field/MapTable/MapTable_0006.dat", bytes(scene_map)),
             ("Game/field/BGSetTable/bgsettable_4.dat", graphics_sets),
             ("Game/field/ChipTable/ChipTable_0004.dat", bytes(assembly_l12)),
@@ -305,6 +313,20 @@ def smoke() -> list[str]:
                     or saved_sprite["handY"] != 12 or saved_sprite["unknownSizeFlags"] != 0xA4
                     or saved_sprite["unknownFlags"] != 0xD2):
                 raise RuntimeError("Sprite descriptor edit did not preserve PC-ignored/unknown fields")
+            sprite_assemblies = request_json(session.url + "api/sprite-assemblies")
+            sprite_tile = next(row for row in sprite_assemblies["rows"] if row["token"] == "5:0:0")
+            saved_sprite_assembly = request_json(session.url + "api/sprite-assemblies/save", {
+                "path": sprite_tile["path"], "sha256": sprite_tile["sha256"],
+                "edits": [{"token": sprite_tile["token"], "values": {
+                    "chipIndex": 511, "x": 7, "y": -10, "flipHorizontal": False,
+                }}],
+            })
+            saved_sprite_tile = next(row for row in saved_sprite_assembly["rows"] if row["token"] == "5:0:0")
+            if (saved_sprite_tile["chipIndex"] != 511 or not saved_sprite_tile["weirdSourceBit"]
+                    or saved_sprite_tile["unknownFlags"] != 0xA0
+                    or saved_sprite_assembly["headerWord"] != 0xBEEF
+                    or saved_sprite_assembly["trailingBytes"] != 1):
+                raise RuntimeError("Sprite assembly edit did not preserve counts/unknown metadata")
             graphics = request_json(session.url + "api/graphics-sets")
             graphics_row = graphics["rows"][0]
             saved_graphics = request_json(session.url + "api/graphics-sets/save", {
@@ -353,6 +375,7 @@ def smoke() -> list[str]:
         "fixed-size world exit/trigger edits preserved semantics, unknown bits and non-editable blocks",
         "fixed-count chip animation edit preserved unknown duration bits and trailing bytes",
         "sprite descriptor edit preserved PC-ignored references and unknown bytes",
+        "sprite assembly edit preserved frame/tile counts, weird source bit and unknown flags",
         "fixed tileset graphics references preserved sentinels and trailing bytes",
         "fixed tile assembly edit preserved unknown priority bits and trailing bytes",
         "deterministic CTP export contained only changed archive-relative resources",
