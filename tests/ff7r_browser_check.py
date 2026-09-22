@@ -337,7 +337,8 @@ def assert_layout(page, width: int, height: int) -> dict:
     return metrics
 
 
-def new_page(browser, html: str, physical_width: int, physical_height: int, scale: float = 1.0):
+def new_page(browser, html: str, physical_width: int, physical_height: int,
+             scale: float = 1.0, diagnostic: Path | None = None):
     css_width = round(physical_width / scale)
     css_height = round(physical_height / scale)
     context = browser.new_context(
@@ -350,20 +351,34 @@ def new_page(browser, html: str, physical_width: int, physical_height: int, scal
     page.route("**/*", lambda route: route.abort())
     page.set_content(html, wait_until="domcontentloaded")
     page.wait_for_timeout(100)
-    if not page.evaluate('typeof state !== "undefined"'):
-        raise AssertionError({
+    try:
+        booted = page.evaluate(
+            "() => { try { return typeof state !== 'undefined'; } catch (_error) { return false; } }"
+        )
+    except Exception as error:
+        errors.append(f"boot probe failed: {error}")
+        booted = False
+    if not booted:
+        details = {
             "reason": "FF7R editor state missing after modular boot",
             "pageErrors": errors,
             "scripts": page.locator("script").count(),
             "body": page.locator("body").inner_text()[:1200],
-        })
-    page.wait_for_function("state.catalog && state.data && !state.busy")
+        }
+        if diagnostic is not None:
+            diagnostic.parent.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(diagnostic), full_page=True)
+            diagnostic.with_suffix(".json").write_text(
+                json.dumps(details, indent=2), encoding="utf-8")
+        raise AssertionError(details)
+    page.wait_for_function("() => state.catalog && state.data && !state.busy")
     return context, page, errors
 
 
 def exercise_editor(browser, output: Path, html: str) -> list[dict]:
     results = []
-    context, page, errors = new_page(browser, html, 1200, 800)
+    context, page, errors = new_page(
+        browser, html, 1200, 800, diagnostic=output / "boot-failure.png")
     try:
         expect(page.locator(".ff7r-table .lex-column-list-row")).not_to_have_count(0)
         power = page.locator('.ff7r-detail input[type="number"]').first
@@ -503,7 +518,11 @@ def responsive_checks(browser, output: Path, html: str) -> list[dict]:
         (1600, 1000, 1.0),
         (1200, 800, 1.5),
     ):
-        context, page, errors = new_page(browser, html, width, height, scale)
+        context, page, errors = new_page(
+            browser, html, width, height, scale,
+            diagnostic=output / (
+                f"boot-failure-{width}x{height}"
+                + ("-scale150.png" if scale == 1.5 else ".png")))
         try:
             page.wait_for_timeout(150)
             metrics = assert_layout(page, width, height)
