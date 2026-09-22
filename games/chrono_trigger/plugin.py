@@ -90,6 +90,7 @@ def smoke() -> list[str]:
         scene_map[6] = 3
         scene_map[6 + 16 * 16] = 4
         scene_map.extend(bytes([0x01, 0, 0, 0x80, 0x20, 0x10, 255]))
+        sprite_descriptor = bytes([9, 8, 7, 0xAC, 5, 0xD2, 0xFE, 0x03, 0x11, 0x22, 0x33, 0xEE])
         graphics_sets = bytes([1, 2, 3, 4, 5, 6, 7, 0xFF]) + b"\xDD"
         assembly_l12 = bytearray(512 * 4 * 3 + 1)
         struct.pack_into("<HB", assembly_l12, 0, 300 | 0x0400 | (5 << 12), 0xA1)
@@ -132,6 +133,7 @@ def smoke() -> list[str]:
             ("Game/world/SeId/SeId_0000.dat", bytes(world_music)),
             ("Game/world/colanim_bin/0_colanim.bin", world_colors),
             ("Game/world/EventTable/EventTable_0004.dat", world_event),
+            ("Game/chara/dat/c005.dat", sprite_descriptor),
             ("Game/field/MapTable/MapTable_0006.dat", bytes(scene_map)),
             ("Game/field/BGSetTable/bgsettable_4.dat", graphics_sets),
             ("Game/field/ChipTable/ChipTable_0004.dat", bytes(assembly_l12)),
@@ -291,6 +293,18 @@ def smoke() -> list[str]:
                     or saved_animation["rows"][0]["sourceChip1"] != 9
                     or saved_animation["trailingBytes"] != 1):
                 raise RuntimeError("Chip animation edit did not preserve fixed frame metadata")
+            sprites = request_json(session.url + "api/sprite-headers")
+            sprite = next(row for row in sprites["rows"] if row["id"] == 5)
+            saved_sprite = request_json(session.url + "api/sprite-headers/save", {
+                "path": sprite["path"], "sha256": sprite["sha256"],
+                "values": {"sizeGroupCode": 2, "primaryEnemy": False, "animationIndex": 9,
+                           "handX": -8, "handY": 12},
+            })
+            if (saved_sprite["sizeGroupCode"] != 2 or saved_sprite["primaryEnemy"]
+                    or saved_sprite["animationIndex"] != 9 or saved_sprite["handX"] != -8
+                    or saved_sprite["handY"] != 12 or saved_sprite["unknownSizeFlags"] != 0xA4
+                    or saved_sprite["unknownFlags"] != 0xD2):
+                raise RuntimeError("Sprite descriptor edit did not preserve PC-ignored/unknown fields")
             graphics = request_json(session.url + "api/graphics-sets")
             graphics_row = graphics["rows"][0]
             saved_graphics = request_json(session.url + "api/graphics-sets/save", {
@@ -318,7 +332,7 @@ def smoke() -> list[str]:
             if not exported.get("replacementOnly"):
                 raise RuntimeError("CTP export did not assert replacement-only loader compatibility")
             with zipfile.ZipFile(exported["path"]) as ctp:
-                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/MapTable/MapTable_0006.dat", "Game/field/palette_bin/plt4.bin", "Game/field/BGAnime/bganimeinfo_4.dat", "Game/field/BGSetTable/bgsettable_4.dat", "Game/field/ChipTable/ChipTable_0004.dat", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/Map/Map_0000.dat", "Game/world/Id/Id_0000.dat", "Game/world/SeId/SeId_0000.dat", "Game/world/colanim_bin/0_colanim.bin", "Game/world/EventTable/EventTable_0004.dat"}:
+                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/chara/dat/c005.dat", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/MapTable/MapTable_0006.dat", "Game/field/palette_bin/plt4.bin", "Game/field/BGAnime/bganimeinfo_4.dat", "Game/field/BGSetTable/bgsettable_4.dat", "Game/field/ChipTable/ChipTable_0004.dat", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/Map/Map_0000.dat", "Game/world/Id/Id_0000.dat", "Game/world/SeId/SeId_0000.dat", "Game/world/colanim_bin/0_colanim.bin", "Game/world/EventTable/EventTable_0004.dat"}:
                     raise RuntimeError("CTP export did not contain exactly the changed resources")
         if (game / "resources.bin").read_bytes() != original_archive:
             raise RuntimeError("Fresh Chrono Trigger plugin modified resources.bin")
@@ -338,6 +352,7 @@ def smoke() -> list[str]:
         "world palette-animation color edit preserved RGB555 bit 15 and trailing bytes",
         "fixed-size world exit/trigger edits preserved semantics, unknown bits and non-editable blocks",
         "fixed-count chip animation edit preserved unknown duration bits and trailing bytes",
+        "sprite descriptor edit preserved PC-ignored references and unknown bytes",
         "fixed tileset graphics references preserved sentinels and trailing bytes",
         "fixed tile assembly edit preserved unknown priority bits and trailing bytes",
         "deterministic CTP export contained only changed archive-relative resources",
