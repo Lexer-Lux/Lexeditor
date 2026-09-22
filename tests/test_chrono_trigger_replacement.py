@@ -13,7 +13,8 @@ from games.chrono_trigger.field_data import load_exits, load_treasure, save_exit
 from games.chrono_trigger.palette_data import load_palette, save_palette
 from games.chrono_trigger.project import OverlayStore
 from games.chrono_trigger.scene_data import load_scenes, save_scene
-from games.chrono_trigger.scene_map_data import load_scene_map, save_scene_map, load_scene_properties, save_scene_properties
+from games.chrono_trigger.scene_map_data import (load_scene_map, save_scene_map, load_scene_properties, save_scene_properties,
+    load_scene_render_settings, save_scene_render_settings)
 from games.chrono_trigger.text_data import load_messages, save_messages
 from games.chrono_trigger.tileset_data import load_graphics_sets, save_graphics_set, load_tile_assemblies, save_tile_assembly
 from games.chrono_trigger.world_data import (
@@ -59,7 +60,7 @@ class FreshChronoTriggerTests(unittest.TestCase):
         palette = b"\x12\x34" + struct.pack("<H", 0x801F) + (b"\x00\x00" * 255) + b"\xCC"
         bank = bytearray(b"\xA5" * (HEADER_OFFSET + WORLD_COUNT * HEADER_SIZE + 3))
         bank[HEADER_OFFSET:HEADER_OFFSET + HEADER_SIZE] = bytes(range(HEADER_SIZE))
-        scene_map = bytearray(bytes([0, 0, 0x21, 0x43, 0x5A, 0xC3]) + bytes(16 * 16 * 2))
+        scene_map = bytearray(bytes([0, 0, 0x21, 0x43, 0x5A, 0xCB]) + bytes(16 * 16 * 2))
         scene_map[6] = 3
         scene_map[6 + 16 * 16] = 4
         scene_map.extend(bytes([0x01, 0, 0, 0x80, 0x20, 0x10, 255]))
@@ -257,6 +258,40 @@ class FreshChronoTriggerTests(unittest.TestCase):
                 save_scene_map(store, path, saved["sha256"], [
                     {"token": layer1["token"], "values": {"tileIndex": 9}},
                 ])
+
+    def test_scene_render_settings_preserve_dimension_byte_and_unknown_effect_bit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, store = self.fixture(Path(tmp))
+            original_archive = archive.read_bytes()
+            path = "Game/field/MapTable/MapTable_0006.dat"
+            data = load_scene_render_settings(store, path)
+            self.assertEqual((data["scrollL2XCode"], data["scrollL2YCode"], data["scrollL2XSpeed"],
+                              data["scrollL3XCode"], data["scrollL3YCode"], data["screenFlags"] if "screenFlags" in data else None),
+                             (1, 2, 3.75, 3, 4, None))
+            self.assertTrue(data["unknownEffectBit3"])
+            self.assertEqual((data["preservedBitsByte"], data["scrollModeBits"], data["layer3Enabled"]), (0, 0, False))
+            before, _ = store.read(path, "mine")
+            saved = save_scene_render_settings(store, path, data["sha256"], {
+                "scrollL2XCode": 7, "scrollL2YCode": 15,
+                "scrollL3XCode": 8, "scrollL3YCode": 1,
+                "layer1Main": True, "layer2Main": False, "layer3Main": True, "spritesMain": False,
+                "layer1Sub": True, "layer2Sub": False, "layer3Sub": True, "spritesSub": False,
+                "effectLayer1": False, "effectLayer2": True, "effectLayer3": True,
+                "effectSprites": True, "effectDefaultColor": False,
+                "effectHalfIntensity": True, "effectSubtract": False,
+            })
+            self.assertEqual((saved["scrollL2XSpeed"], saved["scrollL2YSpeed"],
+                              saved["scrollL3XSpeed"], saved["scrollL3YSpeed"]),
+                             (240.0, -240.0, -0.0, 3.75))
+            self.assertTrue(saved["unknownEffectBit3"])
+            after, origin = store.read(path, "mine")
+            self.assertEqual(origin, "project")
+            self.assertEqual(after[:2], before[:2])
+            self.assertEqual(after[6:], before[6:])
+            self.assertTrue(after[5] & 0x08)
+            self.assertEqual(after[4], 0x55)
+            self.assertEqual(after[5], 0x5E)
+            self.assertEqual(archive.read_bytes(), original_archive)
 
     def test_scene_property_run_edit_preserves_rle_repeat_and_unknown_bits(self):
         with tempfile.TemporaryDirectory() as tmp:
