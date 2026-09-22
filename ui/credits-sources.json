@@ -55,19 +55,19 @@
     ],
     "licenses": [
       {
-        "name": "Lexend \u2014 SIL Open Font License 1.1",
+        "name": "Lexend — SIL Open Font License 1.1",
         "sourcePath": "ui/assets/fonts/OFL.txt"
       },
       {
-        "name": "Lexend \u2014 source notice",
+        "name": "Lexend — source notice",
         "sourcePath": "ui/assets/fonts/SOURCE.md"
       },
       {
-        "name": "ReShade \u2014 BSD 3-Clause License",
+        "name": "ReShade — BSD 3-Clause License",
         "sourcePath": "tools/reshade/6.8.0/LICENSE.md"
       },
       {
-        "name": "ReshadeEffectShaderToggler \u2014 MIT License",
+        "name": "ReshadeEffectShaderToggler — MIT License",
         "sourcePath": "tools/reshade/addons/REST-1.3.23.633/LICENSE.txt"
       }
     ]
@@ -100,7 +100,7 @@
       "thanks": [],
       "licenses": [
         {
-          "name": "Elena and ff7tools \u2014 original notices",
+          "name": "Elena and ff7tools — original notices",
           "sourcePath": "games/ff7/THIRD_PARTY.md"
         }
       ]
@@ -127,7 +127,7 @@
         },
         {
           "name": "trumank / repak",
-          "role": "Pinned external helper for reading and building Unreal Engine PAK files.",
+          "role": "Bundled pinned v0.2.3 helper for reading and building Unreal Engine PAK files.",
           "url": "https://github.com/trumank/repak"
         },
         {
@@ -149,8 +149,16 @@
       "thanks": [],
       "licenses": [
         {
-          "name": "FF7R references and tools \u2014 source/license notices",
+          "name": "FF7R references and tools — source/license notices",
           "sourcePath": "games/ff7r/THIRD_PARTY.md"
+        },
+        {
+          "name": "repak — MIT License",
+          "sourcePath": "games/ff7r/runtime/repak/v0.2.3/LICENSE-MIT"
+        },
+        {
+          "name": "repak — Apache License 2.0",
+          "sourcePath": "games/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE"
         }
       ]
     },
@@ -170,7 +178,7 @@
       "thanks": [],
       "licenses": [
         {
-          "name": "Shader Injector \u2014 MIT License",
+          "name": "Shader Injector — MIT License",
           "sourcePath": "games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt"
         }
       ]
@@ -206,7 +214,7 @@
       "thanks": [],
       "licenses": [
         {
-          "name": "Palworld / PalSchema references \u2014 source and license notes",
+          "name": "Palworld / PalSchema references — source and license notes",
           "sourcePath": "games/palworld/THIRD_PARTY.md"
         }
       ]
@@ -222,11 +230,11 @@
       "thanks": [],
       "licenses": [
         {
-          "name": "BRF Sync \u2014 source and distribution notice",
+          "name": "BRF Sync — source and distribution notice",
           "sourcePath": "tools/brf-sync/SOURCE.md"
         },
         {
-          "name": "BRF Sync \u2014 GNU GPL v2",
+          "name": "BRF Sync — GNU GPL v2",
           "sourcePath": "tools/brf-sync/LICENSE"
         }
       ]
@@ -242,7 +250,7 @@
       "thanks": [],
       "licenses": [
         {
-          "name": "MagicRDR \u2014 usage and redistribution limits",
+          "name": "MagicRDR — usage and redistribution limits",
           "sourcePath": "tools/magic-rdr/README.md"
         }
       ]
@@ -268,23 +276,23 @@
       "thanks": [],
       "licenses": [
         {
-          "name": "PyLibDrawable \u2014 source notice",
+          "name": "PyLibDrawable — source notice",
           "sourcePath": "games/rdr2/vendor/reddead2blend/NOTICE.md"
         },
         {
-          "name": "PyLibDrawable \u2014 MIT",
+          "name": "PyLibDrawable — MIT",
           "sourcePath": "games/rdr2/vendor/reddead2blend/LICENSE"
         },
         {
-          "name": "RPF tool \u2014 source notice",
+          "name": "RPF tool — source notice",
           "sourcePath": "tools/rpf-cli/NOTICE.md"
         },
         {
-          "name": "RPF tool \u2014 AGPL v3",
+          "name": "RPF tool — AGPL v3",
           "sourcePath": "tools/rpf-cli/LICENSE.txt"
         },
         {
-          "name": "RageLib \u2014 MIT",
+          "name": "RageLib — MIT",
           "sourcePath": "tools/rpf-cli/RAGELIB-LICENSE.txt"
         }
       ]
