@@ -228,10 +228,19 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
         for old,new in pairs:
             # Check the added declaration/parser line, not just the substring
             # (cfg.cpp contains both the declaration and the parser).
-            addition=new.split('\n')[-1]
-            if addition in text:continue
+            # Earlier derivatives may contain only part of this addition.
+            # Checking only the last line skipped Better HP Colors whenever
+            # GF HP bars were already present.
+            if new.startswith(old+'\n'):
+                additions=new[len(old)+1:].split('\n')
+                missing=[line for line in additions if line not in text.splitlines()]
+                if not missing:continue
+                replacement=old+'\n'+'\n'.join(missing)
+            else:
+                if new in text:continue
+                replacement=new
             if text.count(old)!=1:raise RuntimeError(f'Integration anchor changed: {relative}: {old}')
-            text=text.replace(old,new,1)
+            text=text.replace(old,replacement,1)
         path.write_bytes(text.replace('\n',newline).encode('utf-8'))
     for relative in ('src/renderer.cpp', 'src/overlay.cpp'):
         path = source / relative

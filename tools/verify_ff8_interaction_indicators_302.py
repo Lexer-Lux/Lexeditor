@@ -59,7 +59,7 @@ def static_contract() -> None:
             "indicator must not write/request an interaction or poll button edges")
 
 
-def compile_contract(compiler: str) -> None:
+def compile_contract(compiler: str, jsm: Path | None = None) -> None:
     harness = r"""
 #include <cassert>
 #include <cstdint>
@@ -94,6 +94,26 @@ int main()
     assert(!within_talk_radius(96, 48, 48));
 }
 """
+    if jsm is not None:
+        import struct
+        import sys
+        sys.path.insert(0, str(ROOT))
+        from games.ff8.field_scripts import read
+        parsed = read(jsm.read_bytes(), jsm.with_suffix('.sym').read_bytes())
+        talks = [method for method in parsed['methods'] if method['localId'] == 2]
+        positives = [method['name'] for method in talks if 'CARDGAME' in method['source']]
+        require(set(positives) == {'seito6::talk', 'seito7::talk', 'seito8::talk', 'seito10::talk'},
+                'Expected the four retail bghall_1 card players')
+        checks = []
+        for index, method in enumerate(talks):
+            raw = bytes.fromhex(method['raw'])
+            words = struct.unpack(f'<{len(raw)//4}I', raw)
+            literal = ','.join(f'0x{word:08X}U' for word in words)
+            expected = 'true' if method['name'] in positives else 'false'
+            checks.append(f'const std::uint32_t retail{index}[]={{ {literal} }};'
+                          f'assert(talk_script_has_cardgame(retail{index},{len(words)})=={expected});')
+        harness = harness.replace('int main()\n{', 'int main()\n{\n'+'\n'.join(checks))
+        print(f'Retail bghall_1: {len(talks)} Talk scripts, four card targets; private bytes stay temporary')
     with tempfile.TemporaryDirectory(prefix="ff8-interaction-302-") as directory:
         temp = Path(directory)
         (temp / "interaction_indicator.h").write_bytes(CORE.read_bytes())
@@ -119,11 +139,12 @@ def main() -> int:
     parser.add_argument("--compile", action="store_true")
     parser.add_argument("--compiler", default="c++")
     parser.add_argument("--exe", type=Path)
+    parser.add_argument("--jsm", type=Path, help="Private retail bghall_1.jsm, with adjacent .sym")
     args = parser.parse_args()
 
     static_contract()
     if args.compile:
-        compile_contract(args.compiler)
+        compile_contract(args.compiler, args.jsm)
     if args.exe is not None:
         require(sha256(args.exe) == EXPECTED_EXE,
                 "unsupported FF8_EN.exe SHA-256")

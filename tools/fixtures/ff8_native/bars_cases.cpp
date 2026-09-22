@@ -6,6 +6,20 @@ static std::uint32_t native_row(std::uint8_t *,std::uint32_t,std::uint32_t,int) 
 static void word(void *p,unsigned offset,std::uint16_t n) {std::memcpy(static_cast<std::uint8_t *>(p)+offset,&n,2);}
 int main() {
     assert(mmap(reinterpret_cast<void *>(0x1CFF000),0x2000,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED,-1,0)!=MAP_FAILED);
+    assert(mmap(reinterpret_cast<void *>(0x1D77000),0x2000,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED,-1,0)!=MAP_FAILED);
+    std::uint8_t reserve_state[0x40]{};
+    g_reserve_menu_state=reserve_state;
+    for(int slot=0;slot<8;++slot){
+        reserve_state[0x38+slot]=slot;
+        auto *computed=reinterpret_cast<std::uint16_t *>(0x01D771B0+32*slot);
+        computed[4]=25+slot;computed[5]=100;
+        const auto tint=reserve_hp_at(107+120*(slot%2),124+24*(slot/2));
+        assert(tint.active && tint.current==25+slot && tint.maximum==100);
+    }
+    assert(!reserve_hp_at(108,124).active && !reserve_hp_at(107,125).active);
+    assert(!reserve_hp_at(347,124).active && !reserve_hp_at(107,220).active);
+    reserve_state[0x38]=255;assert(!reserve_hp_at(107,124).active);
+    g_reserve_menu_state=nullptr;assert(!reserve_hp_at(107,124).active);
     g_battle_row_renderer=&native_row;
     for(int i=0;i<3;++i) {
         const int gf=15-i;save_map.chars[i].gfs=1U<<gf;save_map.gfs[gf].exists=1;save_map.gfs[gf].HPs=4000;

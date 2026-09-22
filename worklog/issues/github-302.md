@@ -36,8 +36,7 @@ round-trip tests and a Windows FFNx build gate.
 ## Remaining acceptance boundary
 
 - Download and inspect a successful exact-head Windows FFNx candidate; source success alone is not delivery.
-- Validate the runtime CARDGAME classifier against retail field data. Smallest useful fixture:
-  `bghall_1.jsm` plus `bghall_1.sym` from the same Steam English install.
+- Retail classifier check passed: all 37 Talk scripts from the installed `bghall_1.jsm` and matching `.sym` were passed through the compiled production classifier. Only `seito6`, `seito7`, `seito8` and `seito10` matched. Private script bytes remained in a temporary harness and were removed after the test.
 - In a live game, verify ordinary targets show INTERACT, the four known Garden card players add
   CARD, out-of-range/facing-away/locked states show nothing, and Cross/Square behavior remains
   byte-for-byte native with the tweak disabled. Screenshots/logs are required for visual/runtime acceptance.

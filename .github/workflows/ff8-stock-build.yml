@@ -104,7 +104,7 @@ jobs:
           1. Use this AF3DN.P only in an isolated copy; enable enable_ff8_better_hp_colors.
           2. Battle: full, ~75%, 50%, ~37.5%, 25%, low nonzero, KO. 50%=yellow, 25%=orange, living HP blends smoothly; KO stays vanilla.
           3. Check Status/Magic/Junction-style shared-character panels for the same smooth behavior.
-          4. Inspect active/reserve main-menu HP separately. Its number-call seam is not guessed here; if vanilla threshold-recolours it, report an uncovered #481 surface.
+          4. Inspect active and reserve main-menu current HP at several HP ratios. Only the current digits should receive the smooth colour; the label, slash and maximum must retain their native colour. Check KO and status palettes too.
           5. Native status/presentation colours must win.
           6. Disable the switch, relaunch, and compare to unmodified FFNx: HP display must be vanilla exactly.
           7. Record executable hash, FFNx.log, screens/values, and screenshots.

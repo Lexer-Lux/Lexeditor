@@ -12,7 +12,7 @@ State: actionable. Draft PR #500; FF8 only.
 - [x] Unsupported native layout fails closed.
 - [x] Default-off setting/UI/config and disabled driver dispatch to original `common_draw_paletted2D`.
 - [x] Reconciled current master's newer gauge harness without changing production gauge behavior.
-- [ ] Active/reserve main-menu HP-number seam is separate and has not been safely identified; do not guess it. Establish whether vanilla threshold-recolours it and, if so, its exact call seam.
+- [x] Active/reserve main-menu current-HP calls identified in the supported executable and hooked. Native status palettes still take priority; label, slash and maximum are unchanged. Reserve coordinate and character lookup cases added to the compiled harness.
 - [ ] Current-head Windows derivative build + isolated candidate evidence.
 - [ ] Live battle/shared-menu visual and disable comparison.
 

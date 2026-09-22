@@ -118,7 +118,10 @@ coll=COLLECT(exe,a.binaries,a.datas,strip=False,upx=False,name="Lexeditor")
 
 def smoke(executable: Path) -> None:
     # Packaging must preserve child-service dispatch; launching a second GUI is a failure.
+    executable=executable.resolve(strict=True)
     result=ROOT/'build/distribution/smoke.json'
+    result.parent.mkdir(parents=True,exist_ok=True)
+    result.unlink(missing_ok=True)
     env=os.environ.copy()
     env['LEXEDITOR_NO_AUTO_SCAN']='1'
     p=subprocess.run([str(executable),'--smoke-service',str(result)],cwd=Path.home(),env=env,timeout=90)

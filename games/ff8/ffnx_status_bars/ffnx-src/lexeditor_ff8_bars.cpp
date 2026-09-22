@@ -82,6 +82,8 @@ struct MenuHpContext {
     std::uint16_t maximum = 0;
 };
 MenuHpContext g_menu_hp;
+HpTintState g_main_menu_hp;
+const std::uint8_t *g_reserve_menu_state = nullptr;
 bool g_better_hp_runtime_ready = false;
 constexpr std::uint32_t kCharacterWidget = 0x004C0780;
 constexpr std::uint32_t kHpNumberRenderer = 0x004A3530;
@@ -481,14 +483,60 @@ std::uint32_t __cdecl main_row_hook(const std::uint8_t *state,unsigned display,u
     return reinterpret_cast<MainRowWidget>(Address)(state,display,cursor,slot);
 }
 using ReserveWidget = std::uint32_t(__cdecl *)(const std::uint8_t *,unsigned,unsigned);
+using MainHpWidget = std::uint32_t(__cdecl *)(int,int,unsigned,unsigned,int,int,unsigned);
+using MenuText = std::uint32_t(__cdecl *)(unsigned,unsigned,int,int,const void *,unsigned);
+
+// These three calls draw only the current HP digits. The HP label, slash,
+// maximum and other numbers retain their native palette.
+std::uint32_t __cdecl main_hp_widget_hook(int current,int maximum,unsigned display,
+    unsigned cursor,int x,int y,unsigned palette)
+{
+    const auto previous=g_main_menu_hp;
+    g_main_menu_hp={current>0 && maximum>current,
+        static_cast<std::uint16_t>(std::max(0,current)),
+        static_cast<std::uint16_t>(std::max(0,maximum))};
+    const auto result=reinterpret_cast<MainHpWidget>(0x004BF380)(
+        current,maximum,display,cursor,x,y,palette);
+    g_main_menu_hp=previous;
+    return result;
+}
+
+HpTintState reserve_hp_at(int x,int y)
+{
+    // 004C2090: x=32+120*column+59+16, y=112+24*row+12.
+    if(!g_reserve_menu_state || x<107 || y<124 || (x-107)%120 || (y-124)%24)
+        return {};
+    const int column=(x-107)/120,row=(y-124)/24;
+    if(column>1 || row>3)return {};
+    const auto id=g_reserve_menu_state[0x38+row*2+column];
+    if(id>=CHAR_NUM)return {};
+    const auto *stats=reinterpret_cast<const std::uint16_t *>(0x01D771B0+32*id);
+    return {lexeditor_ff8_hp_should_tint(stats[4],stats[5]),stats[4],stats[5]};
+}
+
+template<bool Reserve> std::uint32_t __cdecl main_hp_text_hook(unsigned display,
+    unsigned cursor,int x,int y,const void *text,unsigned palette)
+{
+    const auto previous=g_hp_tint;
+    if(g_better_hp_runtime_ready && enable_ff8_better_hp_colors)
+        g_hp_tint=Reserve?reserve_hp_at(x,y):g_main_menu_hp;
+    const auto result=reinterpret_cast<MenuText>(0x0049F850)(display,cursor,x,y,text,palette);
+    g_hp_tint=previous;
+    return result;
+}
+
 std::uint32_t __cdecl reserve_widget_hook(const std::uint8_t *state,unsigned display,unsigned cursor)
 {
     for(unsigned slot=0;slot<8;++slot) {
         const auto id=state[0x38+slot];
-        if(id<CHAR_NUM) capture_menu_xp(44+120*(slot%2),138+24*(slot/2),48,
+        if(enable_ff8_xp_bars && id<CHAR_NUM) capture_menu_xp(44+120*(slot%2),138+24*(slot/2),48,
             xp_fraction(ff8_externals.savemap->chars[id].exp,id));
     }
-    return reinterpret_cast<ReserveWidget>(0x004C2090)(state,display,cursor);
+    const auto *previous=g_reserve_menu_state;
+    g_reserve_menu_state=state;
+    const auto result=reinterpret_cast<ReserveWidget>(0x004C2090)(state,display,cursor);
+    g_reserve_menu_state=previous;
+    return result;
 }
 using GfListWidget = std::uint32_t(__cdecl *)(unsigned,unsigned,int,int,unsigned,unsigned);
 std::uint32_t __cdecl gf_list_hook(unsigned display,unsigned cursor,int x,int y,unsigned gf,unsigned level)
@@ -655,7 +703,10 @@ void lexeditor_ff8_bars_install()
     bool menu_hp_supported=FF8_US_VERSION;
     for(const auto call:character_widget_calls)
         menu_hp_supported=menu_hp_supported && original_call(call,kCharacterWidget);
-    const bool better_hp_supported=battle_hp_supported && menu_hp_supported;
+    const bool main_hp_supported=original_call(0x004C1DF6,0x004BF380) &&
+        original_call(0x004C1F78,0x004BF380) && original_call(0x004BF407,0x0049F850) &&
+        original_call(0x004C22CD,0x0049F850) && original_call(0x004C1AED,0x004C2090);
+    const bool better_hp_supported=battle_hp_supported && menu_hp_supported && main_hp_supported;
     if ((enable_ff8_hp_bars || enable_ff8_gf_hp_bars ||
         (enable_ff8_better_hp_colors && better_hp_supported)) && battle_hp_supported) {
         g_battle_row_renderer=reinterpret_cast<BattleRowRenderer>(get_relative_call(0x004B17D5,0));
@@ -670,6 +721,10 @@ void lexeditor_ff8_bars_install()
         else {
             g_hp_number_replace_id=replace_function(kHpNumberRenderer,reinterpret_cast<void *>(&hp_number_hook));
             unreplace_function(g_hp_number_replace_id);g_better_hp_runtime_ready=true;
+            replace_call(0x004C1DF6,reinterpret_cast<void *>(&main_hp_widget_hook));
+            replace_call(0x004C1F78,reinterpret_cast<void *>(&main_hp_widget_hook));
+            replace_call(0x004BF407,reinterpret_cast<void *>(&main_hp_text_hook<false>));
+            replace_call(0x004C22CD,reinterpret_cast<void *>(&main_hp_text_hook<true>));
         }
     }
     if (enable_ff8_ingame_time && FF8_US_VERSION &&
@@ -690,13 +745,15 @@ void lexeditor_ff8_bars_install()
         };
         for(const unsigned call:character_widget_calls) hook(call,kCharacterWidget,reinterpret_cast<void *>(&character_widget_hook));
     }
+    if(FF8_US_VERSION && (enable_ff8_xp_bars || g_better_hp_runtime_ready) &&
+        original_call(0x4C1AED,0x4C2090))
+        replace_call(0x4C1AED,reinterpret_cast<void *>(&reserve_widget_hook));
     if (!enable_ff8_xp_bars) return;
     if(FF8_US_VERSION) {
         const auto hook=[&](unsigned address,unsigned target,void *replacement) {
             if(original_call(address,target)) replace_call(address,replacement);
             else ffnx_error("XP Bars: unsupported widget call at %08X\n",address);
         };
-        hook(0x4C1AED,0x4C2090,reinterpret_cast<void *>(&reserve_widget_hook));
         hook(0x4D3DB5,0x4D3E40,reinterpret_cast<void *>(&gf_list_hook));
         for(const unsigned call:{0x4D3D34U,0x4D3D4AU}) hook(call,0x4D41B0,reinterpret_cast<void *>(&gf_detail_hook));
     }

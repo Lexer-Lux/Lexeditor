@@ -5,7 +5,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const html=fs.readFileSync(path.join(__dirname,'../games/rdr2/editor.html'),'utf8');
-for(const match of html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/g))new vm.Script(match[1]);
+for(const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(match[1]);
 assert(html.includes('<script src="core.js"></script>'),'RDR2 page must load its core module');
 assert(html.includes('<script src="boot.js"></script>'),'RDR2 page must load its boot module');
 const core=fs.readFileSync(path.join(__dirname,'../games/rdr2/core.js'),'utf8');
@@ -21,7 +21,7 @@ function fixture(){
  const state={booting:true,ds:'mine',store:{},config:null,catalog:null};
  const ctx=vm.createContext({
   state,console,Promise,JSON,Object,LOOT_TAB_LABELS:{},
-  LexeditorUI:{finishPluginLoading:()=>finishes.push({booting:state.booting,catalog:state.catalog})},
+  LexeditorUI:{stack:()=>({}),finishPluginLoading:()=>finishes.push({booting:state.booting,catalog:state.catalog})},
   document:{body:{classList:{toggle(){}}}},
   $:id=>{if(!nodes.has(id))nodes.set(id,{innerHTML:'',append(){},replaceChildren(){},addEventListener(){}});return nodes.get(id);},
   el:()=>({}),rebuildTagMaps(){},

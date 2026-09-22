@@ -1,5 +1,6 @@
 name: FF8 native shipping and UI regressions
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'games/ff8/**'
