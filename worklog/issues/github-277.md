@@ -27,3 +27,9 @@ The current heartbeat is sampled every five seconds. Absence of a suppression re
 ## 2026-09-22 misc-fixes evidence
 Re-ran tools/verify_rdr2_recon_cutscenes.py today: PASS production with six mutations rejected (cinematic-only guard, no-story-scene guard, progress survival, plant progress, completed-tag deletion, early-return loss). Suppression, state reset, tag preservation, and resumption hold in source.
 Real cutscene check, needs built ASI on a game machine: play a story cutscene with tags active, confirm Recon displays and acquisition hide, then confirm existing tags restore afterward. Cinematic camera alone does not count. Report hide and restore behavior. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

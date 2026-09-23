@@ -16,3 +16,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes finding
 No saddle or horse-lantern code exists anywhere in the runtime tree (only belt_lantern.cpp matches lantern). The reported-installed implementation is not in this tree, and no shop or item route names it. The test needs the exact purchase and equip path plus light-control fixes first. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (purchase/equip path plus
+light-control fixes still owed), so flipping to waiting would be a fake
+checklist. Left actionable until a real session can be written.
