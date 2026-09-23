@@ -50,8 +50,10 @@ def document() -> str:
     }
     strings = {
         "tables": [{**string_table["table"],
-                    "languages": [{"id": "0", "index": 0, "label": "English"}]}],
-        "languages": [{"id": "0", "index": 0, "label": "English"}],
+                    "languages": [{"id": "0", "index": 0, "label": "English"},
+                                  {"id": "2", "index": 2, "label": "French"}]}],
+        "languages": [{"id": "0", "index": 0, "label": "English"},
+                      {"id": "2", "index": 2, "label": "French"}],
         "counts": {"tables": 1, "available": 1, "records": 1, "project": 0},
     }
     strings_payload = {
