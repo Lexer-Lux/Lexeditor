@@ -437,7 +437,7 @@ def data_map_rows() -> dict:
             elif dataset and source_available:
                 schema = MODULE_RECORD_SCHEMAS[dataset]
                 coverage, status, view = "structured", schema["status"], "misc"
-                notes = schema["notes"]
+                notes = schema["notes"] + " Structured controls apply to literal top-level records; helper/wrapper-generated records stay source-only."
             elif source_available:
                 coverage, status = "source", "not-integrated"
                 notes = SOURCE_ONLY_NOTES.get(filename, "Source-only editing with backup is available, but no format-specific record screen is implemented.")
