@@ -29,12 +29,20 @@ class SeventhHeavenCompatibilityTests(unittest.TestCase):
         )
 
     def profile(self, rows):
-        body = "".join(
-            f"<ProfileItem><ModID>{mod_id}</ModID><Name>{name}</Name><IsModActive>{str(active).lower()}</IsModActive></ProfileItem>"
-            for mod_id, name, active in rows
-        )
+        body = []
+        for row in rows:
+            mod_id, name, active = row[:3]
+            settings = row[3] if len(row) > 3 else {}
+            values = "".join(
+                f"<ProfileSetting><ID>{key}</ID><Value>{value}</Value></ProfileSetting>"
+                for key, value in settings.items()
+            )
+            body.append(
+                f"<ProfileItem><ModID>{mod_id}</ModID><Name>{name}</Name>"
+                f"<IsModActive>{str(active).lower()}</IsModActive><Settings>{values}</Settings></ProfileItem>"
+            )
         (self.workshop / "profiles" / "Default.xml").write_text(
-            f"<Profile><Items>{body}</Items></Profile>", encoding="utf-8")
+            f"<Profile><Items>{''.join(body)}</Items></Profile>", encoding="utf-8")
 
     def library_xml(self, rows):
         body = "".join(
@@ -66,15 +74,61 @@ class SeventhHeavenCompatibilityTests(unittest.TestCase):
         self.assertTrue(report["complete"])
         self.assertFalse(report["clear"])
 
+    def test_public_60fps_modfolder_activewhen_shape_uses_profile_settings(self):
+        """Covers the public tangtang95/ff7-60fps-mod v1.15 ModFolder pattern."""
+        fps = self.library / "fps"
+        for folder, relative in (
+            ("FieldAnimation", "kernel/kernel.bin.chunk.1"),
+            ("BattleAnimation", "battle/scene.bin.chunk.0"),
+            ("KOTRAnimation30FPS", "kernel/kernel.bin.chunk.2"),
+        ):
+            target = fps / folder / "direct" / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(folder.encode("ascii"))
+        (fps / "mod.xml").write_text("""<ModInfo>
+          <ModFolder Folder="FieldAnimation"><ActiveWhen><Option>FPSMode = 3</Option></ActiveWhen></ModFolder>
+          <ModFolder Folder="BattleAnimation"><ActiveWhen><Or><Option>FPSMode = 2</Option><Option>FPSMode = 3</Option></Or></ActiveWhen></ModFolder>
+          <ModFolder Folder="KOTRAnimation30FPS"><ActiveWhen><Option>FPSMode = 2</Option></ActiveWhen></ModFolder>
+        </ModInfo>""", encoding="utf-8")
+        self.profile([("fps", "60/30 FPS Gameplay", True, {"FPSMode": 3})])
+        self.library_xml([("fps", "1.15", "fps")])
+
+        report = mod_stack.scan_7h_stack(self.workshop, [
+            "kernel/kernel.bin.chunk.1", "battle/scene.bin.chunk.0", "kernel/kernel.bin.chunk.2"])
+        self.assertEqual([row["path"] for row in report["overlaps"]], [
+            "direct/kernel/kernel.bin.chunk.1", "direct/battle/scene.bin.chunk.0"])
+        self.assertEqual(report["conditionalOverlaps"], [])
+        self.assertTrue(report["complete"])
+
+    def test_ffnx_prefixed_activewhen_uses_current_runtime_value(self):
+        folder = self.library / "ffnx-condition"
+        target = folder / "Active/direct/kernel/kernel.bin.chunk.4"
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b"ffnx")
+        (folder / "mod.xml").write_text(
+            '<ModInfo><ModFolder Folder="Active" ActiveWhen="ffnx_ff7_fps_limiter = 3"/></ModInfo>',
+            encoding="utf-8")
+        self.profile([("a", "FFNx conditional", True)])
+        self.library_xml([("a", "1.0", "ffnx-condition")])
+
+        off = mod_stack.scan_7h_stack(
+            self.workshop, ["kernel/kernel.bin.chunk.4"], ffnx_values={"ff7_fps_limiter": 2})
+        on = mod_stack.scan_7h_stack(
+            self.workshop, ["kernel/kernel.bin.chunk.4"], ffnx_values={"ff7_fps_limiter": 3})
+        self.assertEqual(off["overlaps"], [])
+        self.assertTrue(off["complete"])
+        self.assertEqual(len(on["overlaps"]), 1)
+
     def test_iro_and_conditional_content_are_explicitly_incomplete_not_guessed(self):
         conditional = self.library / "conditional"
         (conditional / "Maybe/direct/kernel").mkdir(parents=True)
         (conditional / "Maybe/direct/kernel/kernel.bin.chunk.2").write_bytes(b"conditional")
         (conditional / "mod.xml").write_text(
-            '<ModInfo><Conditional Folder="Maybe"><ActiveWhen><Option>1</Option></ActiveWhen></Conditional></ModInfo>',
+            '<ModInfo><Conditional Folder="Maybe"><ActiveWhen><Option>Flag = 1</Option></ActiveWhen>'
+            '<RuntimeVar ApplyTo="">0</RuntimeVar></Conditional></ModInfo>',
             encoding="utf-8")
         (self.library / "opaque.iro").write_bytes(b"not parsed")
-        self.profile([("a", "Conditional", True), ("b", "IRO", True)])
+        self.profile([("a", "Conditional", True, {"Flag": 1}), ("b", "IRO", True)])
         self.library_xml([("a", "1.0", "conditional"), ("b", "1.0", "opaque.iro")])
 
         report = mod_stack.scan_7h_stack(self.workshop, ["kernel/kernel.bin.chunk.2"])
