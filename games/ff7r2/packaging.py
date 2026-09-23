@@ -24,7 +24,8 @@ ENGINE_VERSION = "GAME_UE4_26"
 MOUNT_POINT = "../../../End/Content/"
 PACKAGE_NAME = "Lexeditor-FF7R2_P"
 CUE4PARSE_VERSION = "1.1.1"
-STAGED_PLAYER = Path("content/End/Content/DataObject/Resident/PlayerParameter.uasset")
+CONTENT_ROOT = Path("content/End/Content")
+STAGED_PLAYER = CONTENT_ROOT / "DataObject/Resident/PlayerParameter.uasset"
 
 
 class PackagingError(ValueError):
@@ -73,14 +74,68 @@ def _candidate_manifests(project: Path | None) -> list[Path]:
     return sorted(build.glob("ff7r2-candidate-*/manifest.json"), key=lambda path: path.stat().st_mtime_ns)
 
 
+def _staged_inputs(project: Path | None) -> list[Path]:
+    """Return every staged regular file while refusing path indirection."""
+    if project is None:
+        return []
+    root = project / CONTENT_ROOT
+    if not root.exists():
+        return []
+    project_resolved = project.resolve()
+    root_resolved = root.resolve()
+    if root.is_symlink() or project_resolved not in root_resolved.parents:
+        raise PackagingError("Staged content root must stay inside the selected project")
+    if not root.is_dir():
+        raise PackagingError(f"{CONTENT_ROOT.as_posix()} must be a directory")
+
+    files: list[Path] = []
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise PackagingError(
+                "Staged content may not contain symbolic links: "
+                + path.relative_to(project).as_posix()
+            )
+        if path.is_dir():
+            continue
+        if not path.is_file():
+            raise PackagingError(
+                "Staged content may contain regular files only: "
+                + path.relative_to(project).as_posix()
+            )
+        resolved = path.resolve()
+        if root_resolved not in resolved.parents:
+            raise PackagingError(
+                "Staged file escapes content root: "
+                + path.relative_to(project).as_posix()
+            )
+        files.append(path)
+    return files
+
+
+def _staged_snapshot(project: Path, paths: list[Path]) -> list[dict]:
+    return [
+        {
+            "path": path.relative_to(project).as_posix(),
+            "sha256": _sha256(path),
+            "bytes": path.stat().st_size,
+        }
+        for path in paths
+    ]
+
+
 def status(project: Path | None, game: Path | None,
            environment: Mapping[str, str] | None = None) -> dict:
     """Return candidate-builder readiness without executing external software."""
     env = os.environ if environment is None else environment
     packer = _explicit_path(env, UNREALREZEN_ENV)
     oodle = _explicit_path(env, OODLE_ENV)
-    staged = project / STAGED_PLAYER if project is not None else None
     paks = game / "End/Content/Paks" if game is not None else None
+    staged_error = ""
+    try:
+        staged_files = _staged_inputs(project)
+    except PackagingError as error:
+        staged_files = []
+        staged_error = str(error)
 
     packer_present = bool(packer and packer.is_file())
     packer_dependency_ok = _packer_dependency_ok(packer)
@@ -92,7 +147,7 @@ def status(project: Path | None, game: Path | None,
         and expected_oodle.is_file()
         and oodle.resolve() == expected_oodle.resolve()
     )
-    staged_present = bool(staged and staged.is_file())
+    staged_present = bool(staged_files)
     paks_present = bool(paks and paks.is_dir())
     archives_present = bool(
         paks_present
@@ -103,8 +158,10 @@ def status(project: Path | None, game: Path | None,
     missing: list[str] = []
     if project is None:
         missing.append("selected Rebirth project")
+    elif staged_error:
+        missing.append(staged_error)
     elif not staged_present:
-        missing.append(STAGED_PLAYER.as_posix())
+        missing.append(f"at least one staged regular file under {CONTENT_ROOT.as_posix()}")
     if game is None:
         missing.append("located Rebirth installation")
     elif not archives_present:
@@ -136,6 +193,10 @@ def status(project: Path | None, game: Path | None,
         "oodleInToolDirectory": oodle_in_tool_directory,
         "oodlePath": str(oodle) if oodle else "",
         "stagedPresent": staged_present,
+        "stagedFileCount": len(staged_files),
+        "stagedFiles": [
+            path.relative_to(project).as_posix() for path in staged_files
+        ] if project is not None else [],
         "gameArchivesPresent": archives_present,
         "candidateCount": len(manifests),
         "latestManifest": str(manifests[-1]) if manifests else "",
@@ -147,7 +208,7 @@ def status(project: Path | None, game: Path | None,
 
 
 def _plan(project: Path | None, game: Path | None,
-          environment: Mapping[str, str]) -> tuple[Path, Path, Path, Path, Path]:
+          environment: Mapping[str, str]) -> tuple[Path, Path, Path, Path, Path, list[Path]]:
     state = status(project, game, environment)
     if not state["ready"]:
         raise PackagingError(
@@ -157,15 +218,23 @@ def _plan(project: Path | None, game: Path | None,
     packer = Path(state["packerPath"]).resolve()
     oodle = Path(state["oodlePath"]).resolve()
     deps = _expected_deps_path(packer).resolve()
-    content_root = (project / "content/End/Content").resolve()
+    content_root = (project / CONTENT_ROOT).resolve()
     paks = (game / "End/Content/Paks").resolve()
-    return packer, oodle, deps, content_root, paks
+    staged_files = _staged_inputs(project)
+    if not staged_files:
+        raise PackagingError("Package candidate has no staged files")
+    return packer, oodle, deps, content_root, paks, staged_files
 
 
 def build_candidate(project: Path | None, game: Path | None,
                     environment: Mapping[str, str] | None = None,
                     runner=subprocess.run) -> dict:
     """Build an isolated, never-installed IoStore candidate.
+
+    Every regular file under content/End/Content is treated as an explicit
+    candidate input. Symlinks are refused, and the complete staged file set,
+    hashes and sizes are checked again after UnrealReZen exits so untracked or
+    concurrently changed content cannot silently enter the candidate.
 
     UnrealReZen's FF7R2 release loads CUE4Parse Oodle at startup even when
     package compression is Zlib.  Its CUE4Parse/1.1.1 helper returns immediately
@@ -177,15 +246,15 @@ def build_candidate(project: Path | None, game: Path | None,
     local-DLL lookup interpretations resolve to the supplied file.
     """
     env = dict(os.environ if environment is None else environment)
-    packer, oodle, deps, content_root, game_paks = _plan(project, game, env)
+    packer, oodle, deps, content_root, game_paks, staged_files = _plan(project, game, env)
     assert project is not None
 
     build_root = project / "build"
     build_root.mkdir(parents=True, exist_ok=True)
     candidate = Path(tempfile.mkdtemp(prefix="ff7r2-candidate-", dir=build_root))
     output_utoc = candidate / f"{PACKAGE_NAME}.utoc"
-    staged = project / STAGED_PLAYER
-    staged_sha256 = _sha256(staged)
+    staged_snapshot = _staged_snapshot(project, staged_files)
+    staged_paths = [item["path"] for item in staged_snapshot]
     packer_sha256 = _sha256(packer)
     deps_sha256 = _sha256(deps)
     oodle_sha256 = _sha256(oodle)
@@ -222,8 +291,15 @@ def build_candidate(project: Path | None, game: Path | None,
                 + (f": {detail}" if detail else "")
             )
 
-        if _sha256(staged) != staged_sha256:
-            raise PackagingError("Staged PlayerParameter changed while the package was being built")
+        current_files = _staged_inputs(project)
+        current_paths = [path.relative_to(project).as_posix() for path in current_files]
+        if current_paths != staged_paths:
+            raise PackagingError("Staged content set changed while the package was being built")
+        for path, before in zip(current_files, staged_snapshot):
+            if path.stat().st_size != before["bytes"] or _sha256(path) != before["sha256"]:
+                raise PackagingError(
+                    "Staged input changed while the package was being built: " + before["path"]
+                )
         if _sha256(packer) != packer_sha256:
             raise PackagingError("UnrealReZen executable changed while the package was being built")
         if _sha256(deps) != deps_sha256:
@@ -244,15 +320,12 @@ def build_candidate(project: Path | None, game: Path | None,
             )
 
         manifest = {
-            "schema": 1,
+            "schema": 2,
             "game": "ff7r2",
             "kind": "isolated-package-candidate",
             "acceptedInGame": False,
             "installed": False,
-            "input": {
-                "path": STAGED_PLAYER.as_posix(),
-                "sha256": staged_sha256,
-            },
+            "inputs": staged_snapshot,
             "tooling": {
                 "unrealReZen": {
                     "sha256": packer_sha256,
