@@ -65,6 +65,34 @@ def battle_item_source_path() -> Path | None:
     return root / "source" / BATTLE_ITEM_POSSESSION if root else None
 
 
+_BATTLE_ITEM_SCHEMA = {
+    "NormalItemName_Array": ("array", "NameProperty"),
+    "NormalItemPercent_Array": ("array", "ByteProperty"),
+    "RareItemName_Array": ("array", "NameProperty"),
+    "RareItemPercent_Array": ("array", "ByteProperty"),
+    "StealItemName_Array": ("array", "NameProperty"),
+    "StealItemQuantity_Array": ("array", "ByteProperty"),
+    "StealFaildCountArrayIndex": ("int32", "IntProperty"),
+}
+
+
+def _validate_battle_item_schema(package: DataObjectPackage) -> None:
+    if not package.records:
+        raise DataObjectError("BattleItemPossession contains no rows to validate")
+    fields = {field.name: field for field in package.records[0].fields}
+    for name, (kind, type_name) in _BATTLE_ITEM_SCHEMA.items():
+        field = fields.get(name)
+        if field is None:
+            raise DataObjectError(
+                f"BattleItemPossession schema is missing proved field {name}"
+            )
+        if field.kind != kind or field.type_name != type_name:
+            raise DataObjectError(
+                f"BattleItemPossession field {name} has {field.kind}/{field.type_name}; "
+                f"expected {kind}/{type_name}"
+            )
+
+
 def battle_item_payload() -> dict:
     root = project_root()
     path = battle_item_source_path()
@@ -76,6 +104,7 @@ def battle_item_payload() -> dict:
             f"asset at source/{BATTLE_ITEM_POSSESSION.as_posix()} inside this project."
         )
     package = DataObjectPackage.from_bytes(path.read_bytes())
+    _validate_battle_item_schema(package)
     payload = package.payload()
     payload.update({
         "source": "source",
