@@ -7763,7 +7763,12 @@ ${contents.path}`});
         rowSelector: fit.rowSelector,
         headerSelector: fit.headerSelector,
         resize: (height, measurement) => {
-          const fittedHeight = measurement?.full ? `${height}px` : "";
+          // A stacked (single-column) page must not pin both panes to the
+          // fitted table height: the grid rows already bound master and
+          // detail, and equal inline heights overlap them.
+          const tracks = getComputedStyle(root).gridTemplateColumns.split(" ");
+          const stacked = tracks.length < 2 && tracks[0] !== "none";
+          const fittedHeight = measurement?.full && !stacked ? `${height}px` : "";
           masterNode.style.height = fittedHeight;
           root.classList.toggle("lex-full-table-page", !!measurement?.full);
           detailNode.style.height = fittedHeight;

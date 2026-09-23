@@ -11,6 +11,7 @@ Currently supports:
 * Red Dead Redemption
 * Red Dead Redemption 2
 * Stardew Valley
+* Project Zomboid
 
 Coming soon:
 * Final Fantasy IV

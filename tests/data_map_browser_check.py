@@ -85,13 +85,21 @@ with sync_playwright() as p:
                 # seeded through those rather than being called broken for not
                 # having a variable of that name.
                 booted = page.evaluate(
-                    'typeof state !== "undefined" || typeof mapRows !== "undefined"')
+                    'typeof state !== "undefined" || typeof mapRows !== "undefined" '
++ '|| typeof datamap !== "undefined"')
                 if not booted and game != 'blank':
                     raise AssertionError((game,width,height,'plugin state missing',errors,page.locator('body').inner_text()[:1200]))
                 target=OPEN_TARGETS.get(game,'items')
                 fixture_rows=[{**row,'target':target} for row in ROWS]
                 if game=='blank':
                     page.evaluate('navigate("datamap")')
+                elif game=='project_zomboid':
+                    # Zomboid keeps its map rows in a module-level datamap object
+                    # keyed by editor label; seed and render through its own path.
+                    page.evaluate('''rows=>{
+                      datamap.rows=rows.map((row,index)=>({filename:row.filename,notes:row.notes,editor:index%3===0?'Metadata':index%3===1?'Items':'Unmapped'}));
+                      renderDatamap();navigate("datamap");
+                    }''',fixture_rows)
                 elif game=='palworld':
                     page.evaluate('''rows=>{
                       mapRows=rows;

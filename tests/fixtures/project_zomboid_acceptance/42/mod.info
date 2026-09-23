@@ -1,0 +1,5 @@
+name=Lexeditor Project Zomboid Acceptance
+id=LexeditorPZAcceptance
+author=Lexeditor
+description=PR 463 installed-game acceptance fixture
+versionMin=42.20

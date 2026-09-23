@@ -13,7 +13,7 @@ import tempfile
 ROOT=Path(__file__).resolve().parents[1]
 DIST=ROOT/'dist'
 VERSION='0.1.0'
-RESOURCE_EXTENSIONS={'.html','.css','.js','.json','.csv','.txt','.md','.xml','.svg','.png','.jpg','.jpeg','.webp','.ico','.icns','.ttf','.otf','.woff','.woff2','.toml','.ini','.py','.ps1','.cmd','.bat'}
+RESOURCE_EXTENSIONS={'.html','.css','.js','.json','.csv','.txt','.md','.xml','.svg','.png','.jpg','.jpeg','.webp','.ico','.icns','.ttf','.otf','.woff','.woff2','.toml','.ini','.info','.py','.ps1','.cmd','.bat'}
 # Helpers with no proven redistribution grant are never copied into an installer.
 FORBIDDEN_PARTS={'__pycache__','.git','worklog','codex','baseline','game-data','out',
                  '_scratch','.venv','.build','build','vcpkg','.vcpkg','buildtrees',
