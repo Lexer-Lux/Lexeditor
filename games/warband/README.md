@@ -22,7 +22,24 @@ source-only.
 
 Structured Module System saves patch only changed field spans, keep record IDs
 fixed, reject stale source, create a backup and preserve unmodeled fields. The
+structured path deliberately accepts literal top-level records only. Real Module
+Systems that generate entries through helpers or wrappers remain visible but
+source-only for those records rather than being rewritten speculatively. The
 normal shell Save then runs the selected project's Module System build.
+
+## Theme and installed assets
+
+The parchment/burgundy chrome is original CSS inspired by Warband's visual
+language; it does not embed game artwork. When an installed copy supplies
+`Data/font_data.xml` and `Textures/font.dds`, Lexeditor reads those files
+locally and derives an alpha-only font atlas into the user's private
+`LOCALAPPDATA/Lexeditor/game-data/warband` cache. No TaleWorlds font texture,
+font data, or other game asset is committed or redistributed, and the UI falls
+back to system fonts when the installed atlas is unavailable.
+
+The plugin does not bundle Warband sound effects. Game-derived audio should only
+be added through a rights-safe source or the same local installed-asset model;
+the current theme makes no claim of proprietary sound coverage.
 
 ## WSE2 setup
 
