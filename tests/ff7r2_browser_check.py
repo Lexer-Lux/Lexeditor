@@ -146,11 +146,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                     "els=>els.some(el=>el.value.includes('0: Potion')&&el.value.includes('1: Ether'))"
                 )
                 expect(page.get_by_text(
-                    "RATE MODIFIER — Generated runtime types include StealSuccessRateAdd; its arithmetic/order is not exposed.",
+                    "Generated runtime types include StealSuccessRateAdd, but its arithmetic/order is not exposed.",
                     exact=True,
                 )).to_be_visible()
                 expect(page.get_by_text(
-                    "RESULT STATES — Generated runtime types distinguish StealFailed, AlreadyStolen and NothingToSteal; their branch conditions are not exposed.",
+                    "Generated runtime types distinguish StealFailed, AlreadyStolen and NothingToSteal; their branch conditions are not exposed.",
                     exact=True,
                 )).to_be_visible()
                 assert page.locator(".ff7r2-formulae-detail input:not([readonly])").count() == 0
