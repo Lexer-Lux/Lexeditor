@@ -283,7 +283,7 @@
         detailField({label:"ENABLED",control:value(summary(externalMods.map(mod=>mod.name))),
           help:infoHelp("Read-only snapshot of Memoria FolderNames and enabled mods' ModDescription.xml metadata. Lexeditor does not install, edit, enable, disable, or remove these mods.")}),
         detailField({label:"RUNTIME ORDER",control:value(summary(compatibility.folderNames||[],"No active mod folders")),
-          help:infoHelp("Memoria FolderNames is highest-priority first: the leftmost enabled folder wins an exact loose-file collision.")}),
+          help:infoHelp("Memoria FolderNames is highest-priority first. Ordinary replacement assets use the first matching folder; format-specific patch files may deliberately compose in a different order.")}),
         detailField({label:"METADATA WARNINGS",control:value(summary([
             ...(compatibility.error?[compatibility.error]:[]),
             ...externalMods.filter(mod=>!mod.metadata||mod.error).map(mod=>`${mod.name}: ${mod.error||"ModDescription.xml unavailable"}`)
@@ -294,12 +294,12 @@
         detailField({label:"DECLARED CONFLICTS",control:value(summary((compatibility.declaredConflicts||[]).map(row=>row.mods.join(" ↔ ")),"None declared"),
           help:infoHelp("These are author-declared incompatibilities among enabled mods. Missing metadata is not proof that a combination is safe in game.")}),
         detailField({label:"EXACT PATH OVERLAPS",control:value(summary((compatibility.overlaps||[]).map(row=>`${row.mod}: ${row.path}`),"None detected"),
-          help:infoHelp("For identical loose override paths, Lexeditor is first in Memoria's FolderNames and wins the whole file. Separate mods are not semantically merged by Lexeditor."+(compatibility.projectScanTruncated?" The project scan hit its 10,000-file safety cap, so additional overlaps may exist.":""))}),
+          help:infoHelp("For Lexeditor-generated CSV and battle raw16 replacements, first/highest priority wins the whole file. Other Memoria patch-file families can compose, and event scripts have separate append/MergeScripts behavior; this overlap list therefore reports shared paths without inventing a universal semantic winner."+(compatibility.projectScanTruncated?" The project scan hit its 10,000-file safety cap, so additional overlaps may exist.":""))}),
       ]}),
       LexeditorUI.modLoaderSection({
         loader:"Memoria's Mod Manager installs, enables and removes external FF9 mods. Lexeditor owns only its separate Lexeditor mod folder and opens Memoria's launcher for the external-mod UI. Mods that require a Memoria version newer than Lexeditor's pinned v2025.07.04 are outside the current supported loader boundary.",
         output:"Save writes the selected Lexeditor project. Deploy copies only that project's StreamingAssets overrides plus the Lexeditor runtime into <FF9>/Lexeditor; installed game archives and other mod folders stay untouched.",
-        order:"Memoria's FolderNames list is highest-priority first. Lexeditor deploy keeps Lexeditor first there and, when Priorities already exists, first in that launcher list too; it does not invent a missing Priorities setting. An exact-path collision is whole-file Lexeditor-wins. Lexeditor does not semantically merge files from separate mods. Memoria's optional MergeScripts mode is left unchanged and remains Memoria's experimental script behavior.",
+        order:"Memoria's FolderNames list is highest-priority first. Lexeditor deploy keeps Lexeditor first there and, when Priorities already exists, first in that launcher list too; it does not invent a missing Priorities setting. Lexeditor-generated CSV and battle raw16 replacements are first-hit whole-file overrides. Memoria patch files may compose low-to-high, while event scripts have separate append/MergeScripts behavior; Lexeditor does not claim a universal cross-mod semantic merge.",
         safety:"Installed game data and external mod folders are read only to Lexeditor. Memoria installation keeps a recovery copy, and deploy/revert preserve unrelated Memoria.ini settings and mod-order entries.",
         removal:"Revert removes only the marker-owned <FF9>/Lexeditor folder and its FolderNames/Priorities entries. External mods remain installed and are managed through Memoria's launcher.",
       }),
@@ -401,7 +401,7 @@
   async function deploymentAction(action){
     if(state.busy||state.activeSource!=="mine")return;
     if(dirtyCount()){state.runtimeError="Save your project changes before deployment.";await render();return}
-    if(action==="revert"&&!await LexeditorUI.confirmAction({title:"Remove the Lexeditor mod?",message:"Only the Lexeditor-owned FF9 Memoria mod folder and its FolderNames entry are removed. Nothing else is touched.",confirmLabel:"Remove",cancelLabel:"Cancel"}))return;
+    if(action==="revert"&&!await LexeditorUI.confirmAction({title:"Remove the Lexeditor mod?",message:"Only the Lexeditor-owned FF9 Memoria mod folder, its FolderNames entry, and its Priorities entry when that setting exists are removed. Nothing else is touched.",confirmLabel:"Remove",cancelLabel:"Cancel"}))return;
     state.busy=true;shell.refresh();
     try{state.deployment=await api(`/api/deployment/${action}`,{});state.dataMap=await api("/api/datamap");state.runtimeError=""}
     catch(error){state.runtimeError=error.message;throw error}
