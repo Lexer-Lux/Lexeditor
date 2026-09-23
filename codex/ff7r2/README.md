@@ -168,9 +168,11 @@ meaning by themselves.
   decodes those array elements read-only and exposes supplied BattleItemPossession rows
   in a shared paged Formulae Table+Detail. Gantz79's public mod evidence says the
   25% rate data is shared between steal/drop, so a Steal-only percentage control
-  would still be misleading. Array writes, the complete Steal formula/terms,
-  roll-vs-no-item failure branch and failure-message hook remain unproved. #471 is
-  Partial, not complete.
+  would still be misleading. Generated runtime enums independently distinguish
+  StealFailed, AlreadyStolen and NothingToSteal and expose a StealSuccessRateAdd
+  skill-effect type. That proves the requested miss/nothing states and a rate
+  modifier exist, but not their branch conditions or arithmetic. Array writes and
+  the complete Steal formula/terms remain unproved. #471 is Partial, not complete.
 - #472 blue benches / cushion: public DataObject names identify the bench
   rest trigger/action rows and UI7033_00_ConsumedItem_Cushion. The generated SDK
   narrows the runtime/asset seam further: AEndFieldActionActorBenchBreak has both
