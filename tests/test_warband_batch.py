@@ -90,6 +90,16 @@ class CoverageTests(unittest.TestCase):
             self.assertFalse(rows[filename]['sourceOpenable'],filename)
         self.assertEqual(result['counts'],{'integrated':4,'partial':21,'not-integrated':8})
 
+    def test_module_discovery_uses_module_ini_not_optional_manual(self):
+        modules=self.root/'Modules';modules.mkdir()
+        for name in ('Native','No Manual'):
+            folder=modules/name;folder.mkdir();(folder/'module.ini').write_text('module_name = '+name)
+        (modules/'Native'/'info_pages.txt').write_text('manual')
+        (modules/'Not A Module').mkdir()
+        with patch.object(server,'MODULES',modules):
+            self.assertEqual(server.modules(),['Native','No Manual'])
+            self.assertEqual(server.modules_with_manual(),['Native'])
+
     def test_installed_module_ini_resolves_without_source(self):
         (self.root/'module.ini').write_text('module_name = Installed')
         self.assertEqual(server.resolve_catalog_file('module.ini'),self.root/'module.ini')
