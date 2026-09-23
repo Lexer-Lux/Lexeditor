@@ -49,7 +49,7 @@ def _candidate_manifests(project: Path | None) -> list[Path]:
     build = project / "build"
     if not build.is_dir():
         return []
-    return sorted(build.glob("ff7r2-candidate-*/manifest.json"))
+    return sorted(build.glob("ff7r2-candidate-*/manifest.json"), key=lambda path: path.stat().st_mtime_ns)
 
 
 def status(project: Path | None, game: Path | None,
@@ -140,6 +140,7 @@ def build_candidate(project: Path | None, game: Path | None,
     candidate = Path(tempfile.mkdtemp(prefix="ff7r2-candidate-", dir=build_root))
     output_utoc = candidate / f"{PACKAGE_NAME}.utoc"
     staged = project / STAGED_PLAYER
+    staged_sha256 = _sha256(staged)
 
     try:
         with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packer-") as runtime_name:
@@ -186,6 +187,9 @@ def build_candidate(project: Path | None, game: Path | None,
             if not runtime_oodle.is_file() or _sha256(runtime_oodle) != expected_oodle:
                 raise PackagingError("UnrealReZen modified the supplied Oodle runtime copy")
 
+        if _sha256(staged) != staged_sha256:
+            raise PackagingError("Staged PlayerParameter changed while the package was being built")
+
         outputs = [
             output_utoc,
             output_utoc.with_suffix(".ucas"),
@@ -206,7 +210,7 @@ def build_candidate(project: Path | None, game: Path | None,
             "installed": False,
             "input": {
                 "path": STAGED_PLAYER.as_posix(),
-                "sha256": _sha256(staged),
+                "sha256": staged_sha256,
             },
             "tooling": {
                 "unrealReZen": {"sha256": _sha256(packer)},
