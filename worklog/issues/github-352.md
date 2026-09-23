@@ -1,10 +1,10 @@
-# #352: Install and launch normally on Windows, macOS and Linux
+# #352: Install and launch on Windows, macOS and Linux (parent)
 
 [Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/352)
 
 ## Requirements and decisions
 
-Read the live GitHub issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
+Read the live issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
 
 ## Current implementation and evidence
 
@@ -13,3 +13,7 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-23 misc-fixes triage
+
+Stays actionable as the parent traceability record. Agent-verifiable slice is green: tests/test_distribution_hygiene.py passes (bundled helpers pinned, private helpers/builds/profiles excluded). Remaining agent work is release-time (re-run build against the release commit, attach installers). Children #494/#495/#496 moved to waiting (need a release cut plus their OS/hardware). Human install/launch acceptance stays with Lexer at release time.
