@@ -400,9 +400,12 @@ function datasetFieldControl(row, field) {
       type: "number", min: field.min, max: field.max, step: field.kind === "int" ? 1 : (field.step || 0.01),
       value: shown, disabled: !enabled || state.busy, "aria-label": field.label,
       oninput: event => {
-        const value = Number(event.target.value);
-        if (!Number.isFinite(value)) return;
-        row.fields[key] = field.kind === "int" ? Math.round(value) : value;
+        const raw = Number(event.target.value);
+        if (!Number.isFinite(raw)) return;
+        const normalized = field.kind === "int" ? Math.round(raw) : raw;
+        const value = Math.max(field.min, Math.min(field.max, normalized));
+        event.target.value = String(value);
+        row.fields[key] = value;
         shell.refresh();
       },
     });
