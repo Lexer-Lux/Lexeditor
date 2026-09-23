@@ -229,3 +229,15 @@ test('semantic CSV controls and source identity stay truthful', async () => {
   const detailNode=e.run('detail(state.datasets.leveling,state.datasets.leveling.rows[0])');
   assert.ok(!JSON.stringify(detailNode).includes('recordId'));
 });
+
+
+test('Mod Loading explains real Memoria priority and whole-file overlap', async () => {
+  const e = await editor();
+  e.run('info()');
+  const info = JSON.stringify(e.targets['#main']);
+  assert.match(info, /highest-priority first/);
+  assert.match(info, /whole-file Lexeditor-wins/);
+  assert.match(info, /does not semantically merge files from separate mods/);
+  assert.match(info, /MergeScripts/);
+  assert.doesNotMatch(info, /later one wins/);
+});
