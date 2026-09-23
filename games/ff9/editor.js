@@ -287,13 +287,13 @@
         detailField({label:"METADATA WARNINGS",control:value(summary([
             ...(compatibility.error?[compatibility.error]:[]),
             ...externalMods.filter(mod=>!mod.metadata||mod.error).map(mod=>`${mod.name}: ${mod.error||"ModDescription.xml unavailable"}`)
-          ],"None detected"),
+          ],"None detected")),
           help:infoHelp("Missing or malformed metadata is reported as unknown, never treated as proof that the mod is compatible.")}),
-        detailField({label:"UNSUPPORTED RUNTIME",control:value(summary((compatibility.unsupportedByPinnedMemoria||[]).map(mod=>`${mod.name} (needs ${mod.minimumMemoriaVersion})`),"None detected"),
+        detailField({label:"UNSUPPORTED RUNTIME",control:value(summary((compatibility.unsupportedByPinnedMemoria||[]).map(mod=>`${mod.name} (needs ${mod.minimumMemoriaVersion})`),"None detected")),
           help:infoHelp("Mods declaring a MinimumMemoriaVersion newer than Lexeditor's pinned helper are outside this candidate's supported runtime boundary.")}),
-        detailField({label:"DECLARED CONFLICTS",control:value(summary((compatibility.declaredConflicts||[]).map(row=>row.mods.join(" ↔ ")),"None declared"),
+        detailField({label:"DECLARED CONFLICTS",control:value(summary((compatibility.declaredConflicts||[]).map(row=>row.mods.join(" ↔ ")),"None declared")),
           help:infoHelp("These are author-declared incompatibilities among enabled mods. Missing metadata is not proof that a combination is safe in game.")}),
-        detailField({label:"EXACT PATH OVERLAPS",control:value(summary((compatibility.overlaps||[]).map(row=>`${row.mod}: ${row.path}`),"None detected"),
+        detailField({label:"EXACT PATH OVERLAPS",control:value(summary((compatibility.overlaps||[]).map(row=>`${row.mod}: ${row.path}`),"None detected")),
           help:infoHelp("For Lexeditor-generated CSV and battle raw16 replacements, first/highest priority wins the whole file. Other Memoria patch-file families can compose, and event scripts have separate append/MergeScripts behavior; this overlap list therefore reports shared paths without inventing a universal semantic winner."+(compatibility.projectScanTruncated?" The project scan hit its 10,000-file safety cap, so additional overlaps may exist.":""))}),
       ]}),
       LexeditorUI.modLoaderSection({
