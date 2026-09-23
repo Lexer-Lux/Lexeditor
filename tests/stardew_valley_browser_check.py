@@ -65,6 +65,52 @@ def make_fixture(root: Path) -> tuple[Path, Path]:
     source.parent.mkdir(parents=True)
     source.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
 
+    typed_sources = {
+        "BigCraftables": {
+            "FixtureLamp": {
+                "Name": "Fixture Lamp", "Price": 150, "Fragility": 0,
+                "CanBePlacedIndoors": True, "CanBePlacedOutdoors": True,
+                "IsLamp": True, "SpriteIndex": 4,
+                "CustomFields": {"fixture/nested": "preserve"},
+            },
+        },
+        "Crops": {
+            "FixtureCrop": {
+                "Name": "Fixture Crop", "RegrowDays": 3, "IsRaised": False,
+                "IsPaddyCrop": False, "NeedsWatering": True, "HarvestMethod": "Grab",
+                "HarvestMinStack": 1, "HarvestMaxStack": 2, "ExtraHarvestChance": 0.2,
+                "SpriteIndex": 7, "CountForMonoculture": True, "CountForPolyculture": False,
+                "Seasons": ["Spring"], "DaysInPhase": [1, 2, 3],
+            },
+        },
+        "Fences": {
+            "FixtureFence": {"Name": "Fixture Fence", "Health": 100.0, "RemovalDebrisType": 12},
+        },
+        "FloorsAndPaths": {
+            "FixturePath": {
+                "Name": "Fixture Path", "RemovalDebrisType": 12, "ShadowType": "None",
+                "ConnectType": "Path", "CornerSize": 0,
+            },
+        },
+        "Machines": {
+            "FixtureMachine": {
+                "Name": "Fixture Machine", "OnlyCompleteOvernight": False,
+                "AllowLoadWhenFull": True, "WorkingEffectChance": 0.33,
+                "OutputRules": [{"Id": "nested-fixture", "MinutesUntilReady": 30}],
+            },
+        },
+        "Weapons": {
+            "FixtureSword": {
+                "Name": "Fixture Sword", "Type": 3, "SpriteIndex": 2,
+                "MinDamage": 8, "MaxDamage": 14, "CritChance": 0.05,
+                "CanBeLostOnDeath": True, "MineBaseLevel": -1, "MineMinLevel": -1,
+            },
+        },
+    }
+    for asset, payload in typed_sources.items():
+        target = source.parent / f"{asset}.json"
+        target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
     shutil.copytree(ROOT / "games" / "stardew_valley" / "project_template", project)
     initialize_project(project)
     return game, project
