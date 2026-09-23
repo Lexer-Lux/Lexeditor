@@ -12,6 +12,8 @@ on:
     paths:
       - 'games/rdr/**'
       - 'tools/*rdr*.py'
+      - 'tests/test_rdr_*.py'
+      - 'tests/rdr_browser_check.py'
       - '.github/workflows/rdr1-checks.yml'
 permissions:
   contents: read
@@ -43,7 +45,9 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Browser interactions and complete-row checks
         shell: bash
-        run: python tools/verify_rdr_editing_browser.py --screenshots artifacts/screenshots 2>&1 | tee artifacts/rdr1-browser.log
+        run: |
+          python tools/verify_rdr_editing_browser.py --screenshots artifacts/screenshots 2>&1 | tee artifacts/rdr1-browser.log
+          python tests/rdr_browser_check.py --screenshots artifacts/rdr-browser 2>&1 | tee artifacts/rdr1-shared-detail.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
