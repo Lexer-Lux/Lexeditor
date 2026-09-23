@@ -14,6 +14,7 @@ from urllib.parse import parse_qs, urlparse
 from . import paths
 from .memoria_csv import MemoriaDataStore, catalog
 from .battle_scene import BattleSceneStore
+from .field_walkmesh import FieldWalkmeshStore
 from .memoria_baseline import ensure as ensure_baseline
 from . import memoria_manager, features, mod_compat
 from plugin_http import PluginRequestHandler
@@ -25,6 +26,9 @@ PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
+FIELD_WALKMESH = FieldWalkmeshStore()
+
+
 POST_ROUTES = {"/api/save", "/api/runtime/install", "/api/runtime/recover",
                "/api/runtime/settings", "/api/features/save",
                "/api/deployment/deploy", "/api/deployment/revert"}
@@ -36,8 +40,8 @@ POST_ROUTES = {"/api/save", "/api/runtime/install", "/api/runtime/recover",
 # agent-side work. None is promoted to Partial until Lexeditor has an actual
 # player-facing viewer/editor for that family.
 UNRESOLVED_AREAS = (
-    ("StreamingAssets/p0data1*.bin", "Field scenes: backgrounds, cameras and walkmeshes",
-     "Public FF9 tooling can extract and rebuild field scene/background/camera/walkmesh data from the numbered p0data1 field bundles. Lexeditor has not adapted those codecs into a preservation-tested field editor yet."),
+    ("StreamingAssets/p0data1*.bin (outside integrated BGI floor activity)", "Field backgrounds, cameras, walkmesh geometry/topology and animations",
+     "Lexeditor now has a preservation-safe editor for the documented BGI_FLOOR_ACTIVE bit only. Background art, cameras, walkmesh geometry/topology, edge semantics, transforms and moving-platform animation data remain protected and unintegrated rather than being routed through a lossy generic editor."),
     ("StreamingAssets/p0data2.bin (outside BattleScene raw16)", "Battle geometry, scene assets and effects",
      "Enemy and encounter BattleScene raw16 records are integrated separately. Public tooling also reads battle meshes/background assets, SPS/effect data and related scene resources from p0data2; Lexeditor has no safe structured editor for those assets yet."),
     ("StreamingAssets/p0data3.bin", "World-map geometry, materials and effects",
@@ -89,6 +93,15 @@ def data_map() -> dict:
             "notes": (row["notes"] + (" Source data is available now." if row["available"] else
                       " The installed p0data2 source is not available yet; opening the view shows that dependency without changing integration status.")),
             "status": "integrated", "coverage": "structured",
+            "openable": True, "sourceAvailable": bool(row["available"]),
+            "target": row["tab"], "datasetKey": row["key"],
+        })
+    for row in FIELD_WALKMESH.status_rows():
+        integrated.append({
+            "filename": row["relativePath"], "controls": row["controls"],
+            "notes": (row["notes"] + (" Source data is available now." if row["available"] else
+                      " No installed p0data1 field bundle or project BGI override is available yet; opening the view shows that dependency without changing integration status.")),
+            "status": "partial", "coverage": "structured",
             "openable": True, "sourceAvailable": bool(row["available"]),
             "target": row["tab"], "datasetKey": row["key"],
         })
@@ -159,13 +172,13 @@ class Handler(PluginRequestHandler):
                 self.json_response({"apiVersion": 1, "pluginId": "ff9", "name": "Final Fantasy IX",
                     "edition": "Steam Unity / Memoria CSV", "hosted": HOSTED, "windowHost": WINDOW_HOST,
                     "projectRoot": str(paths.PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
-                    "capabilities": ["data-map", "memoria-csv", "battle-scenes", "ff9-features", "deploy", "read", "save"]})
+                    "capabilities": ["data-map", "memoria-csv", "battle-scenes", "field-walkmesh", "ff9-features", "deploy", "read", "save"]})
             elif path == "/api/dashboard": self.json_response(dashboard())
             elif path == "/api/datamap": self.json_response(data_map())
-            elif path == "/api/catalog": self.json_response({"datasets": catalog() + BattleSceneStore().status_rows()})
+            elif path == "/api/catalog": self.json_response({"datasets": catalog() + BattleSceneStore().status_rows() + FIELD_WALKMESH.status_rows()})
             elif path == "/api/dataset":
                 key = parse_qs(parsed.query).get("key", [""])[0]
-                self.json_response(BattleSceneStore().load(key) if key in {"enemies", "encounters"} else MemoriaDataStore().load(key))
+                self.json_response(BattleSceneStore().load(key) if key in {"enemies", "encounters"} else FIELD_WALKMESH.load(key) if key == FIELD_WALKMESH.KEY else MemoriaDataStore().load(key))
             elif path == "/api/runtime": self.json_response(memoria_manager.status(paths.GAME_ROOT))
             elif path == "/api/runtime/available": self.json_response(memoria_manager.available())
             elif path == "/api/mod-compat": self.json_response(mod_compat.audit())
@@ -204,6 +217,8 @@ class Handler(PluginRequestHandler):
                 key = str(payload.get("key", ""))
                 result = (BattleSceneStore().save(key, payload.get("sceneHashes", {}), payload.get("changes", []))
                           if key in {"enemies", "encounters"} else
+                          FIELD_WALKMESH.save(key, payload.get("sceneHashes", {}), payload.get("changes", []))
+                          if key == FIELD_WALKMESH.KEY else
                           MemoriaDataStore().save(key, str(payload.get("sha256", "")), payload.get("changes", [])))
             self.json_response(result)
         except FileNotFoundError as error: self.json_response({"error": str(error)}, 409)

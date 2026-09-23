@@ -20,6 +20,7 @@ from games.ff9.plugin import FF9Session
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "ff9-browser"
 OUT.mkdir(parents=True, exist_ok=True)
 archive = runpy.run_path(str(ROOT / "tests" / "test_ff9_battle_scene.py"))["archive"]
+walkmesh_archive = runpy.run_path(str(ROOT / "tests" / "test_ff9_field_walkmesh.py"))["archive"]
 
 
 def csv_bytes(relative: str) -> bytes:
@@ -123,6 +124,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
     target = game / "StreamingAssets/p0data2.bin"
     target.parent.mkdir(parents=True)
     target.write_bytes(archive())
+    (game / "StreamingAssets/p0data11.bin").write_bytes(walkmesh_archive())
     (project / "StreamingAssets/Data").mkdir(parents=True)
 
     hashes = {}
@@ -238,6 +240,22 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             assert "ID" not in page.locator(".lex-column-list-header").inner_text().split()
             assert page.locator(".lex-detail-panel-heading .lex-record-id").count() == 0
 
+            page.evaluate("state.datasetChoice.world='field-walkmesh';loadDataset('field-walkmesh').then(render)")
+            page.wait_for_function("state.datasets['field-walkmesh']?.rows?.length===2")
+            active = field(page, "FLOOR ACTIVE").locator('input[type="checkbox"]')
+            expect(active).to_be_checked()
+            expect(field(page, "OTHER FLAG BITS").locator("input")).to_have_value("64")
+            active.uncheck()
+            expect(page.locator("#global-save")).to_be_enabled()
+            page.locator("#global-save").click()
+            page.wait_for_function("state.datasets['field-walkmesh']?.rows?.[0]?.source==='project'")
+            expect(field(page, "FLOOR ACTIVE").locator('input[type="checkbox"]')).not_to_be_checked()
+            expect(page.get_by_text("Field walkmesh floors · project BGI", exact=True)).to_be_visible()
+            page.evaluate("loadDataset('field-walkmesh',true).then(render)")
+            page.wait_for_function("state.datasets['field-walkmesh']?.rows?.[0]?.source==='project'")
+            expect(field(page, "FLOOR ACTIVE").locator('input[type="checkbox"]')).not_to_be_checked()
+            page.screenshot(path=str(OUT / "ff9-walkmesh-save-reopen.png"), full_page=True)
+
             page.evaluate("navigate('encounters')")
             page.wait_for_function("state.datasets.encounters?.rows?.length===1")
             expect(numeric_field(page, "MONSTER COUNT")).to_have_attribute("max", "4")
@@ -250,6 +268,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             map_search.fill("BattleScene")
             page.wait_for_function("state.mapQuery==='BattleScene'")
             assert "BattleScene" in page.locator(".lex-data-map-view").inner_text()
+            map_search.fill("p0data1")
+            page.wait_for_function("state.mapQuery==='p0data1'")
+            partial_row = page.locator(".lex-column-list-row").filter(has_text="BGI_FLOOR_ACTIVE").first
+            expect(partial_row).to_be_visible()
+            expect(partial_row).to_contain_text("Partial")
             map_search.fill("p0data4.bin")
             page.wait_for_function("state.mapQuery==='p0data4.bin'")
             map_text = page.locator(".lex-data-map-view").inner_text()

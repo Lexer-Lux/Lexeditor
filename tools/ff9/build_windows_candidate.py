@@ -110,7 +110,7 @@ def main() -> None:
         "and hash or copy one representative file. Deploy Lexeditor: Lexeditor must become first while the other "
         "mod's folder and bytes remain unchanged. Revert: only Lexeditor must disappear and the prior external "
         "order/bytes must remain.\n"
-        "- If a safe test profile intentionally contains the same Lexeditor-generated CSV or battle raw16 path "
+        "- If a safe test profile intentionally contains the same Lexeditor-generated CSV, battle raw16, or field-walkmesh BGI path "
         "in Lexeditor and an external mod, the deployed Lexeditor file must win because FolderNames is "
         "highest-priority first. Revert must expose the external file again. Do not generalize this result to "
         "Memoria patch-file families that compose low-to-high or to event scripts, which have separate append/"

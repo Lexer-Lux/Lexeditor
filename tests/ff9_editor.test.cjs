@@ -240,12 +240,26 @@ test('Mod Loading explains real Memoria priority and format-specific overlap', a
   e.run('info()');
   const info = JSON.stringify(e.targets['#main']);
   assert.match(info, /highest-priority first/);
-  assert.match(info, /CSV and battle raw16 replacements are first-hit whole-file overrides/);
+  assert.match(info, /CSV, battle raw16, and field-walkmesh BGI replacements are first-hit whole-file overrides/);
   assert.match(info, /patch files may compose low-to-high/);
   assert.match(info, /MergeScripts/);
   assert.doesNotMatch(info, /later one wins/);
 });
 
+
+test('field walkmesh detail labels BGI and exposes only the active bit as editable', async () => {
+  const e = await editor();
+  e.run(`state.datasets['field-walkmesh']={key:'field-walkmesh',label:'Field walkmesh floors',source:'vanilla/project',fields:[
+    {key:'Field',label:'Field',kind:'stored',editable:false,declaredType:'Path'},
+    {key:'Active',label:'Floor active',kind:'boolean',editable:true,declaredType:'Boolean'},
+    {key:'OtherFlags',label:'Other flag bits',kind:'stored',editable:false,declaredType:'UInt16'}
+  ],rows:[{line:0,name:'FBG_TEST · Floor 0',source:'project',values:{Field:'FBG_TEST',Active:true,OtherFlags:64}}]};`);
+  const node=e.run(`detail(state.datasets['field-walkmesh'],state.datasets['field-walkmesh'].rows[0])`);
+  const text=JSON.stringify(node);
+  assert.match(text,/Field walkmesh floors · project BGI/);
+  assert.match(text,/BGI_FLOOR_ACTIVE/);
+  assert.match(text,/STORED DATA/);
+});
 
 test('battle scene detail labels raw16 instead of CSV', async () => {
   const e = await editor();

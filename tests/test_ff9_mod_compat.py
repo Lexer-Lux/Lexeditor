@@ -60,6 +60,10 @@ def test_real_catalog_metadata_and_overlap_boundary(tmp_path):
     item.parent.mkdir(parents=True); item.write_bytes(b"lexeditor item fixture")
     other_item = alternate / "StreamingAssets/Data/Items/Items.csv"
     other_item.parent.mkdir(parents=True); other_item.write_bytes(b"external item fixture")
+    walkmesh = project / "StreamingAssets/Assets/Resources/FieldMaps/FBG_N21_TEST/FBG_N21_TEST.bgi.bytes"
+    walkmesh.parent.mkdir(parents=True); walkmesh.write_bytes(b"lexeditor walkmesh fixture")
+    other_walkmesh = alternate / "StreamingAssets/Assets/Resources/FieldMaps/FBG_N21_TEST/FBG_N21_TEST.bgi.bytes"
+    other_walkmesh.parent.mkdir(parents=True); other_walkmesh.write_bytes(b"external walkmesh fixture")
 
     # Real Ukrainian package family: StreamingAssets/Assets/Resources/FieldMaps.
     title = project / "StreamingAssets/Assets/Resources/FieldMaps/FIELD/Title_11.png"
@@ -86,11 +90,13 @@ def test_real_catalog_metadata_and_overlap_boundary(tmp_path):
 
     overlaps = {(row["mod"], row["path"]) for row in report["overlaps"]}
     assert ("Alternate Fantasy", "StreamingAssets/Data/Items/Items.csv") in overlaps
+    assert ("Alternate Fantasy", "StreamingAssets/Assets/Resources/FieldMaps/FBG_N21_TEST/FBG_N21_TEST.bgi.bytes") in overlaps
     assert ("Ukrainian Translation", "StreamingAssets/Assets/Resources/FieldMaps/FIELD/Title_11.png") in overlaps
     assert not any(name == "Dualsense Buttons" for name, _ in overlaps)
 
     # Audit is read-only: external mod bytes are unchanged.
     assert other_item.read_bytes() == b"external item fixture"
+    assert other_walkmesh.read_bytes() == b"external walkmesh fixture"
     assert other_title.read_bytes() == b"translation art fixture"
     assert ui.read_bytes() == b"controller atlas fixture"
     assert trance.joinpath("ModDescription.xml").is_file()
@@ -145,6 +151,7 @@ def test_shared_mod_loading_metadata_uses_canonical_ff9_entry():
     assert "ff9" not in data, "FF9 metadata belongs under plugins, not as a second top-level entry"
     ff9 = data["plugins"]["ff9"]
     assert "highest priority first" in ff9["overriding"]
+    assert "walkmesh" in ff9["overriding"].lower()
     assert "Priorities" in ff9["overriding"]
     assert "MergeScripts" in ff9["overriding"]
     assert "newer than Lexeditor's pinned" in ff9["loader"]
