@@ -31,7 +31,9 @@ def main():
   assert widths[0]>100 and widths[1]<80 and widths[2]>widths[0],widths
   assert p.locator('#detail h3').count()==0
   boxes=p.locator('#detail .lex-detail-field-control').evaluate_all('(es)=>es.map(e=>e.getBoundingClientRect().left)')
-  assert len(boxes)==6 and max(boxes)-min(boxes)<2,boxes
+  assert len(boxes)==5,boxes
+  assert p.locator('#detail .lex-recipe-row .lex-detail-field').count()==4
+  assert p.locator('#detail .lex-detail-field-label').all_text_contents()==['']*5
   p.locator('textarea').fill('Changed recipe text')
   assert p.evaluate('row.text')=='Changed recipe text'
   p.evaluate("""() => {
@@ -42,18 +44,19 @@ def main():
     };
     window.renderPins();
   }""")
-  for key in ['inputName','inputQuantity','outputName','outputQuantity','text','unknown']:
+  for key in ['inputName','inputQuantity','outputName','outputQuantity','text']:
    pin=p.locator(f'[data-lex-pin-column="{key}"]')
    pin.focus()
-   pin.click()
+   pin.click();p.wait_for_timeout(300)
    assert p.locator(f'.lex-column-list-head-cell[data-column-key="{key}"]').count()==1,key
    assert pin.get_attribute('aria-pressed')=='true'
   p.evaluate('window.renderPins()')
-  for key in ['inputName','inputQuantity','outputName','outputQuantity','text','unknown']:
+  for key in ['inputName','inputQuantity','outputName','outputQuantity','text']:
    assert p.locator(f'.lex-column-list-head-cell[data-column-key="{key}"]').count()==1,key
-   pin=p.locator(f'[data-lex-pin-column="{key}"]');pin.focus();pin.click()
+   pin=p.locator(f'[data-lex-pin-column="{key}"]');pin.focus();pin.click();p.wait_for_timeout(300)
    assert p.locator(f'.lex-column-list-head-cell[data-column-key="{key}"]').count()==0,key
   b.close()
- print('Refine reordered column widths, six aligned properties, recipe text editing, and all six property pins with saved preferences passed.')
+ print('Refine reordered column widths, one recipe row, recipe text editing, and all five property pins with saved preferences passed.')
 if __name__=='__main__':main()
+
 

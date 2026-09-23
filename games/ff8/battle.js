@@ -150,11 +150,13 @@
     const label=`${state.data.refine.tables.find(table=>table.id===row.table)?.name||row.table} ${row.id+1}`;
     const recipeFields=["input","output"].flatMap(side=>{
       const field=`${side}Id`,quantity=`${side}Quantity`,apply=value=>setRefineEntity(row,side,value);
-      return [detailField({label:side==="input"?"INPUT":"OUTPUT",pin:prefs?.pinButton(`${side}Name`,side==="input"?"Input":"Output"),control:refineSource(refineEntityControl(row,side),row,field,apply,value=>refineChoice(row[`${side}Type`],value))}),detailField({label:side==="input"?"NEEDED":"RECEIVED",pin:prefs?.pinButton(quantity,side==="input"?"Needed":"Received"),dataType:"INT",min:0,max:255,control:refineSource(numberControl(row[quantity],0,255,1,value=>{row[quantity]=value;shell.refresh()},{"aria-label":`${side} quantity for refine recipe`}),row,quantity,value=>{row[quantity]=Number(value);shell.refresh()})})];
+      return [detailField({label:"",showType:false,pin:prefs?.pinButton(`${side}Name`,side==="input"?"Input":"Output"),control:refineSource(refineEntityControl(row,side),row,field,apply,value=>refineChoice(row[`${side}Type`],value))}),detailField({label:"",showType:false,pin:prefs?.pinButton(quantity,side==="input"?"Needed":"Received"),dataType:"INT",min:0,max:255,control:refineSource(numberControl(row[quantity],0,255,1,value=>{row[quantity]=value;shell.refresh()},{"aria-label":`${side} quantity for refine recipe`}),row,quantity,value=>{row[quantity]=Number(value);shell.refresh()})})];
     });
     return sharedDetail({...row,id:row.id+1,name:label},prefs,[
-      ...recipeFields,
-      detailField({label:"RECIPE TEXT",pin:prefs?.pinButton("text","Recipe text"),help:infoHelp("Message shown in the game for this recipe. Update it when you change the ingredients or quantities; it does not set the conversion itself."),control:refineSource(text,row,"text",value=>row.text=String(value??""))}),
-      detailField({label:"UNKNOWN",pin:prefs?.pinButton("unknown","Unknown"),help:infoHelp("This preserved 16-bit value has no proved gameplay meaning, so it is read-only."),control:readonlyField(row.unknown)})
+      el("div",{class:"lex-recipe-row"},
+        LexeditorUI.quantityChoice(recipeFields[0],recipeFields[1]),
+        el("span",{"aria-label":"produces"},"→"),
+        LexeditorUI.quantityChoice(recipeFields[2],recipeFields[3])),
+      detailField({label:"",showType:false,pin:prefs?.pinButton("text","Recipe text"),help:infoHelp("Message shown in the game for this recipe. Update it when you change the ingredients or quantities; it does not set the conversion itself."),control:refineSource(text,row,"text",value=>row.text=String(value??""))})
     ],"refine-detail");
   }
