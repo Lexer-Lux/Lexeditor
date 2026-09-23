@@ -984,6 +984,7 @@
     : null;
   const autoFitControlText = (control, options = {}) => {
     if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement)) return control;
+    if (control.dataset.lexAutofit === "false") return control;
     if (control.__lexAutoFitUpdate) {
       control.__lexAutoFitUpdate();
       return control;
@@ -7125,6 +7126,9 @@ ${contents.path}`});
       const commitRows = input => options.rowControl.change?.(input.value);
       const rowInput = element("input", {
         type: "number", min: "5", max: "80", step: "1", value: options.rowControl.value,
+        // This box is sized for two digits. Fitting its font to its own ch
+        // width creates a feedback loop that keeps shrinking both.
+        "data-lex-autofit": "false",
         "aria-label": "Rows on this page",
         onblur: event => commitRows(event.target),
         onkeydown: event => {
