@@ -3777,8 +3777,6 @@ body:has(.lex-data-map-table) #main {
 .lex-column-list-cell:has(.lex-inline-label > select) :is(.lex-column-cell-content,.lex-source-control,.lex-inline-label,select) { height:100%; }
 .lex-inline-label > span { min-width:0; padding:.2em .12em; overflow:hidden; text-overflow:ellipsis; }
 .lex-detail-panel-title .lex-inline-label > span { padding-inline:.12em; }
-.lex-table-fill .lex-column-list-cell:has(.lex-inline-label > img) { container-type:size; }
-.lex-table-fill .lex-inline-label > img { height:100cqh; width:auto; max-width:4em; }
 .lex-quantity-choice { display:grid; grid-template-columns:minmax(0,1fr) auto calc(3ch + 8px); align-items:center; gap:3px; min-width:0; width:100%; }
 .lex-quantity-choice > * { min-width:0; }
 .lex-recipe-row { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:8px; min-width:0; }

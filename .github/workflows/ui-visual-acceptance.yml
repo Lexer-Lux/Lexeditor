@@ -32,6 +32,7 @@ on:
       - 'tests/app_update_browser_check.py'
       - 'tests/rdr_browser_check.py'
       - 'tests/ff8_graph_design_a_browser_check.py'
+      - 'tests/ff8_spellbook_tabs_browser_check.py'
       - '.github/workflows/ui-visual-acceptance.yml'
   pull_request:
     paths:
@@ -62,6 +63,7 @@ on:
       - 'tests/app_update_browser_check.py'
       - 'tests/rdr_browser_check.py'
       - 'tests/ff8_graph_design_a_browser_check.py'
+      - 'tests/ff8_spellbook_tabs_browser_check.py'
       - '.github/workflows/ui-visual-acceptance.yml'
 
 permissions:
@@ -104,6 +106,8 @@ jobs:
         run: python tests/rdr_browser_check.py --screenshots out/rdr-browser
       - name: FF8 graph design A acceptance
         run: python tests/ff8_graph_design_a_browser_check.py out/ff8-graph-design-a
+      - name: GF ability icons and spellbook tabs
+        run: python tests/ff8_spellbook_tabs_browser_check.py
       - name: Developer helper browser regression
         run: python tests/wse2_helper_browser_check.py out/wse2-helper-browser
       - uses: actions/upload-artifact@v4

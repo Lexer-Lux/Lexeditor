@@ -22,7 +22,10 @@ def main():
     const content=document.querySelector('.lex-detail-section-content');
     const input=content.querySelector('input');
     content.replaceChildren(LexeditorUI.columnList({rows:Array.from({length:22},(_,id)=>({id})),
-      columns:[{key:'id',label:'Slot',render:r=>r.id},{key:'ability',label:'Ability',render:r=>r.id===0?input:'Ability '+r.id}]}));
+      columns:[{key:'id',label:'Slot',render:r=>r.id},{key:'ability',label:'Ability',render:r=>r.id===0?input:
+        LexeditorUI.inlineLabel(LexeditorUI.inlineLabel(LexeditorUI.el('img',{
+          src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path fill="%23998ab6" d="M2 2h12v12H2z"/></svg>',alt:''})),
+          LexeditorUI.el('span',{},'Ability '+r.id))}]}));
   }''')
   page.add_style_tag(content='#gf-detail {display:flex} #gf-detail > .lex-tabbed-panel {flex:1;min-height:0}')
   page.add_script_tag(content=(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8'))
@@ -35,6 +38,18 @@ def main():
   content_box=page.locator('.lex-tabbed-panel-content').bounding_box()
   for key in ('x','y','width','height'):
     assert abs(table_box[key]-content_box[key])<2,(table_box,content_box)
+  icons=table.locator('.lex-inline-label > img')
+  page.locator('#gf-detail').evaluate('n=>n.style.height="1100px"')
+  table.evaluate('n=>n.style.gridTemplateRows="40px repeat(22,48px)"')
+  page.wait_for_timeout(150)
+  assert icons.count()==21
+  for icon in icons.all():
+    assert icon.evaluate('''n=>{
+      const r=n.getBoundingClientRect(),p=n.parentElement.getBoundingClientRect();
+      const font=parseFloat(getComputedStyle(n).fontSize);
+      return r.height>5 && r.width>5 && r.height<=font*1.36 && r.width<=font*1.36 &&
+        r.left>=p.left-1 && r.right<=p.right+1 && r.top>=p.top-1 && r.bottom<=p.bottom+1;
+    }'''),icon.bounding_box()
   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-gf-abilities-table.png'))
   page.get_by_role('tab',name='SPELLBOOK').click()
   page.get_by_role('button',name='ADD PAGE').wait_for(state='visible')
