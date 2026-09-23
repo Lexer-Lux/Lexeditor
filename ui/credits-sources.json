@@ -205,6 +205,11 @@
           "name": "DaniRBT / FF7 Rebirth Accessibility - Visibility Overhaul",
           "role": "Public Rebirth evidence for #473 separating pak-based minimap position/size changes from the optional UE4SS HUD mover. Used to avoid conflating HUD layout with world-minimap zoom; no mod assets are copied or redistributed.",
           "url": "https://www.nexusmods.com/finalfantasy7rebirth/mods/2357"
+        },
+        {
+          "name": "narknon / FF7R2UProj",
+          "role": "Public generated Rebirth type declarations used only as reverse-engineering/schema evidence for #470/#472/#473/#477: chocobo ride-legality/location seams, bench mesh/cushion actor members, navimap scale option categories, and Queen's Blood field/pass/turn types. No root repository license file was found in the audited snapshot, so no source is copied, adapted, vendored or redistributed.",
+          "url": "https://github.com/narknon/FF7R2UProj"
         }
       ],
       "thanks": [],
