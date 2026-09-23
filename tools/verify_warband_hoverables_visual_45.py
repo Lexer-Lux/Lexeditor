@@ -82,7 +82,7 @@ def main() -> int:
             assert link.get_attribute("data-hover-target-id") == "recruit"
             link.hover()
             assert "underline" in link.evaluate("node => getComputedStyle(node).textDecorationLine")
-            link.click()
+            link.click(modifiers=["Alt"])
             page.wait_for_function("state.tab==='troops'&&state.selectedTroop==='recruit'")
             selected = page.locator(".lex-column-list-row.selected")
             selected.wait_for(state="visible")
