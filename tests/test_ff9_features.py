@@ -110,3 +110,32 @@ def test_missing_priorities_setting_is_not_invented(env):
     reverted = (game / "Memoria.ini").read_bytes()
     assert b"Priorities" not in reverted
     assert b'FolderNames = "OtherMod", "SecondMod"' in reverted
+
+
+def test_single_unquoted_memoria_mod_entry_is_preserved(env):
+    game, project, runtime = env
+    (game / "Memoria.ini").write_bytes(
+        b"[Mod]\r\nFolderNames = OtherMod\r\nPriorities = OtherMod\r\n"
+    )
+    features.deploy(game, project, runtime)
+    deployed = (game / "Memoria.ini").read_bytes()
+    assert b'FolderNames = "Lexeditor", "OtherMod"' in deployed
+    assert b'Priorities = "Lexeditor", "OtherMod"' in deployed
+    features.revert(game, project, runtime)
+    reverted = (game / "Memoria.ini").read_bytes()
+    assert b'FolderNames = "OtherMod"' in reverted
+    assert b'Priorities = "OtherMod"' in reverted
+
+
+@pytest.mark.parametrize("setting", ["FolderNames", "Priorities"])
+def test_duplicate_memoria_order_settings_fail_closed(env, setting):
+    game, project, runtime = env
+    data = (game / "Memoria.ini").read_bytes()
+    needle = (setting + ' = "OtherMod", "SecondMod"\r\n').encode()
+    data = data.replace(needle, needle + needle)
+    (game / "Memoria.ini").write_bytes(data)
+    before = (game / "Memoria.ini").read_bytes()
+    with pytest.raises(RuntimeError, match="duplicate"):
+        features.deploy(game, project, runtime)
+    assert (game / "Memoria.ini").read_bytes() == before
+    assert not (game / "Lexeditor").exists()
