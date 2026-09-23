@@ -246,17 +246,11 @@ for plugin in sorted((ROOT / "games").iterdir()):
 # Pin the single definition, not the number. Three separate declarations of
 # this width existed at once and only the last one was live, so edits to the
 # others silently did nothing.
-# The lane is still ten percent wherever ten percent is wide enough to hold a
-# property name. It now carries a font-relative floor as well, because ten
-# percent of a narrow detail panel is a twenty-pixel column that cuts every
-# label off. Both halves are required: the floor without the percentage would
-# let the lane grow without limit.
+# The user changed the shared lane to 7.5%. Do not restore the old 10% rule
+# while bringing back an archived UI patch.
 flat = css.replace(" ", "")
-require("--lex-detail-label-width:minmax(var(--lex-detail-label-floor),10%)" in flat,
-        "Detail property-name lane is not standardized to the shared 10% lane "
-        "with its font-relative floor")
-require("--lex-detail-label-floor:" in flat,
-        "Detail property-name lane has no font-relative minimum width")
+require("--lex-detail-label-width:7.5%" in flat,
+        "Detail property-name lane does not use the shared 7.5% default")
 require("lex-info-help" in css and "place-items:center" in css.replace(" ", ""),
         "info bubble glyph centering is not defined")
 require("lex-toggle-name" in css and "writing-mode:horizontal-tb" in css,

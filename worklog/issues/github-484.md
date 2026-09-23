@@ -25,3 +25,7 @@ Measured on the misc-fixes tree with tools/css_audit.py and tools/css_dead_code.
 - Style-snapshot baseline: ff7r-only --styles retry in progress (artifacts/snap-ff7r); earlier full baseline stalled at 456 files on an ff7r inner_text timeout.
 
 Remaining, needs Lexer: accept the `[hidden]` ceiling of 1 (or authorize layering every component display rule so it can drop to 0), and confirm the snapshot baseline / style-diff-empty gate. Issue stays actionable.
+
+## 2026-09-23 misc-fixes: lane-pin alignment
+
+The branch's contract tool pinned the pre-decision 10%-with-floor lane while the CSS (and master, via bda769f0 "Recover missing ... from archived branches") carries Lexer's decided 7.5% lane — `verify_shared_ui_contract.py` failed on this branch. Aligned the tool pin to master's decided 7.5% text; contract audit passes again. No design change: the 7.5% decision stands.
