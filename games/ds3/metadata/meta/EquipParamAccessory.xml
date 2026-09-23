@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self FieldLayout="EquipParamAccessory" />
+  <Field>
+    <refId Refs="SpEffectParam(refCategory=2),Bullet(refCategory=1),BehaviorParam_Pc(refCategory=0)" />
+    <sfxVariationId />
+    <weight />
+    <behaviorId />
+    <basicPrice />
+    <sellValue />
+    <sortId />
+    <qwcId />
+    <equipModelId />
+    <iconId IconConfig="Item" />
+    <shopLv />
+    <trophySGradeId />
+    <trophySeqId />
+    <equipModelCategory Enum="EQUIP_MODEL_CATEGORY" />
+    <equipModelGender Enum="EQUIP_MODEL_GENDER" />
+    <accessoryCategory Enum="ACCESSORY_TYPE" />
+    <refCategory Enum="BEHAVIOR_REF_TYPE" />
+    <spEffectCategory Enum="SP_EFFECT_CATEGORY" />
+    <pad1 Padding="" />
+    <vagrantItemLotId />
+    <vagrantBonusEneDropItemLotId />
+    <vagrantItemEneDropItemLotId />
+    <IsDeposit IsBool="" />
+    <IsEquipOutBrake IsBool="" />
+    <disableMultiDropShare IsBool="" />
+    <IsDiscard IsBool="" />
+    <isDrop IsBool="" />
+    <showLogCondType IsBool="" />
+    <showDialogCondType />
+    <pad2 Padding="" />
+    <saleValue />
+    <accessoryGroup VRef="accessoryGroup" />
+    <vowId />
+    <compTrophySedId />
+    <residentSpEffectId1 Refs="SpEffectParam(refCategory=2),Bullet(refCategory=1),BehaviorParam_Pc(refCategory=0)" />
+    <residentSpEffectId2 Refs="SpEffectParam(refCategory=2),Bullet(refCategory=1),BehaviorParam_Pc(refCategory=0)" />
+    <residentSpEffectId3 Refs="SpEffectParam(refCategory=2),Bullet(refCategory=1),BehaviorParam_Pc(refCategory=0)" />
+    <residentSpEffectId4 Refs="SpEffectParam(refCategory=2),Bullet(refCategory=1),BehaviorParam_Pc(refCategory=0)" />
+    <pad3 Padding="" />
+  </Field>
+</PARAMMETA>

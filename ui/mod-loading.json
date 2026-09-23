@@ -85,6 +85,11 @@
       "loader": "Fahrenheit's External File Loader. Lexeditor creates one file-only Fahrenheit mod and does not patch or rebuild the installed FFX_Data.vbf or FFX2_Data.vbf archives.",
       "structure": "The selected project mirrors Fahrenheit EFL roots under <project>/efl/x/ for FFX and <project>/efl/x2/ for FFX-2. Deploy Project copies those replacements into <game>/fahrenheit/mods/lexeditor-ffx-x2/ with a Fahrenheit manifest and one managed loadorder entry.",
       "overriding": "Fahrenheit indexes enabled mods in loadorder order and later replacements supersede earlier same-path files. Lexeditor owns only its lexeditor-ffx-x2 mod folder and exact loadorder line; it preserves other mods and refuses to overwrite its deployment if those files changed externally."
+    },
+    "ds3": {
+      "loader": "Lexeditor does not claim a managed Dark Souls III loader yet. It exports a project-local Data0.bdt for manual offline use with a compatible external loader; Lexeditor neither installs nor configures that loader.",
+      "structure": "One selected Lexeditor project contains a marker file and, after Save, one encrypted Data0.bdt. The installed <Dark Souls III>/Game/Data0.bdt is always treated as read-only source data.",
+      "overriding": "Lexeditor authors one complete regulation archive and does not define a multi-mod priority stack. Separate external mods that replace Data0.bdt are not semantically merged by Lexeditor; combine intended parameter edits in one selected project before export."
     }
   }
 }

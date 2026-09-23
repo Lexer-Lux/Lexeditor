@@ -8,7 +8,7 @@ import sys
 
 SERVICE_MODULES = frozenset({
     'games.bannerlord.server', 'games.blank.server', 'games.ff7.server', 'games.ff7r.server', 'games.ff7r.themed_server',
-    'games.ff8.server', 'games.ff9.server', 'games.ffx_x2.server', 'games.palworld.full_server', 'games.project_zomboid.server',
+    'games.ds3.server', 'games.ff8.server', 'games.ff9.server', 'games.ffx_x2.server', 'games.palworld.full_server', 'games.project_zomboid.server',
     'games.rdr.server', 'games.rdr2.server', 'games.terraria.server',
     'games.stardew_valley.server', 'games.warband.server', 'games.ff7r2.server', 'games.factorio.server',
 })

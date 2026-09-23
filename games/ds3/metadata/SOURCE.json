@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "source": "https://github.com/vawser/Smithbox",
+  "revision": "43f9b49a022260b6a76b1adcbe20cc0989ccff95",
+  "license": "MIT",
+  "scope": "Dark Souls III parameter metadata used by Lexeditor; no Smithbox or SoulsFormats executable code is bundled.",
+  "upstreamTrees": {
+    "Defs": "5a898b227baa29c0ad9be374df034ec29b6225c2",
+    "Field Layouts": "415ea1123e5ba4da8c1eb237c99d86780d5895e4",
+    "Param Meta": "de81eab695931be9f50c185002fe4a6fa0f029fa",
+    "Param Annotations": "fc280944fea667555335262bdad3ab33303068dd",
+    "Param Enums": "6be97cc703f0523034ed8a9c56bb1d918ea3a72c",
+    "Param Row Names": "020143c168e562587ac0c1fa6f480fd5a5e03309"
+  },
+  "tables": [
+    "EquipParamWeapon",
+    "EquipParamProtector",
+    "EquipParamAccessory",
+    "Magic",
+    "SpEffectParam",
+    "NpcParam"
+  ],
+  "rowNameBlobs": {
+    "EquipParamWeapon.json": "a477f935ce21d6fef9f2593cd9525f6f07f43a59",
+    "EquipParamProtector.json": "b0066513c6f69a4726743e5b392685eee82dbd3e",
+    "EquipParamAccessory.json": "ef6be387cc170e551a2c8e6ff7d2a264941469f6",
+    "Magic.json": "f8fb6d1337e70044e4908b7d981cbe59ec73373d",
+    "SpEffectParam.json": "4973f9931f60fae6b5116ad8596efb2ec075b0e6",
+    "NpcParam.json": "3c48080c4b8215775197e351be1a457bc82dbb4d"
+  },
+  "transformations": [
+    "XML encoding declarations were normalized to UTF-8 to match the vendored text bytes."
+  ]
+}

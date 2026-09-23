@@ -568,6 +568,10 @@
       ],
       "thanks": [],
       "licenses": []
+    },
+    "ds3": {
+      "source": "games/ds3/credits.json",
+      "licenseRoot": "games/ds3"
     }
   }
 }

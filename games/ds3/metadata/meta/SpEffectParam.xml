@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self Row0Dummy="" FieldLayout="SpEffectParam" />
+  <Field>
+    <iconId />
+    <conditionHp />
+    <effectEndurance />
+    <motionInterval />
+    <maxHpRate />
+    <maxMpRate />
+    <maxStaminaRate />
+    <slashDamageCutRate />
+    <blowDamageCutRate />
+    <thrustDamageCutRate />
+    <neutralDamageCutRate />
+    <magicDamageCutRate />
+    <fireDamageCutRate />
+    <thunderDamageCutRate />
+    <physicsAttackRate />
+    <magicAttackRate />
+    <fireAttackRate />
+    <thunderAttackRate />
+    <physicsAttackPowerRate />
+    <magicAttackPowerRate />
+    <fireAttackPowerRate />
+    <thunderAttackPowerRate />
+    <physicsAttackPower />
+    <magicAttackPower />
+    <fireAttackPower />
+    <thunderAttackPower />
+    <physicsDiffenceRate />
+    <magicDiffenceRate />
+    <fireDiffenceRate />
+    <thunderDiffenceRate />
+    <physicsDiffence />
+    <magicDiffence />
+    <fireDiffence />
+    <thunderDiffence />
+    <NoGuardDamageRate />
+    <vitalSpotChangeRate />
+    <normalSpotChangeRate />
+    <lookAtTargetPosOffset />
+    <behaviorId Refs="BehaviorParam_PC,BehaviorParam" />
+    <changeHpRate />
+    <changeHpPoint />
+    <changeMpRate />
+    <changeMpPoint />
+    <mpRecoverChangeSpeed />
+    <changeStaminaRate />
+    <changeStaminaPoint />
+    <staminaRecoverChangeSpeed />
+    <magicEffectTimeChange />
+    <insideDurability />
+    <maxDurability />
+    <staminaAttackRate />
+    <poizonAttackPower />
+    <diseaseAttackPower />
+    <bloodAttackPower />
+    <curseAttackPower />
+    <fallDamageRate />
+    <soulRate />
+    <equipWeightChangeRate />
+    <allItemWeightChangeRate />
+    <soul />
+    <animIdOffset />
+    <haveSoulRate />
+    <targetPriority />
+    <sightSearchEnemyRate />
+    <hearingSearchEnemyRate />
+    <grabityRate />
+    <registPoizonChangeRate />
+    <registDiseaseChangeRate />
+    <registBloodChangeRate />
+    <registCurseChangeRate />
+    <soulStealRate />
+    <lifeReductionRate />
+    <hpRecoverRate />
+    <replaceSpEffectId Refs="SpEffectParam" />
+    <cycleOccurrenceSpEffectId Refs="SpEffectParam" />
+    <atkOccurrenceSpEffectId Refs="SpEffectParam" />
+    <guardDefFlickPowerRate />
+    <guardStaminaCutRate />
+    <rayCastPassedTime />
+    <changeSuperArmorPoint />
+    <bowDistRate />
+    <spCategory Enum="SP_EFFECT_SPCATEGORY" />
+    <categoryPriority />
+    <saveCategory Enum="SP_EFFECT_SAVE_CATEGORY" />
+    <changeMagicSlot />
+    <changeMiracleSlot />
+    <heroPointDamage />
+    <defFlickPower />
+    <flickDamageCutRate />
+    <bloodDamageRate />
+    <dmgLv_None Enum="ATKPARAM_REP_DMGTYPE" />
+    <dmgLv_S Enum="ATKPARAM_REP_DMGTYPE" />
+    <dmgLv_M Enum="ATKPARAM_REP_DMGTYPE" />
+    <dmgLv_L Enum="ATKPARAM_REP_DMGTYPE" />
+    <dmgLv_BlowM Enum="ATKPARAM_REP_DMGTYPE" />
+    <dmgLv_Push Enum="ATKPARAM_REP_DMGTYPE" />
+    <dmgLv_Strike Enum="ATKPARAM_REP_DMGTYPE" />
+    <dmgLv_BlowS Enum="ATKPARAM_REP_DMGTYPE" />
+    <dmgLv_Min Enum="ATKPARAM_REP_DMGTYPE" />
+    <dmgLv_Uppercut Enum="ATKPARAM_REP_DMGTYPE" />
+    <dmgLv_BlowLL Enum="ATKPARAM_REP_DMGTYPE" />
+    <dmgLv_Breath Enum="ATKPARAM_REP_DMGTYPE" />
+    <atkAttribute Enum="ATKPARAM_ATKATTR_TYPE" />
+    <spAttribute Enum="ATKPARAM_SPATTR_TYPE" />
+    <stateInfo Enum="SP_EFFECT_TYPE" />
+    <wepParamChange Enum="SP_EFE_WEP_CHANGE_PARAM" />
+    <moveType Enum="SP_EFFECT_MOVE_TYPE" />
+    <lifeReductionType Enum="SP_EFFECT_TYPE" />
+    <throwCondition Enum="SP_EFFECT_THROW_CONDITION_TYPE" />
+    <addBehaviorJudgeId_condition />
+    <freezeDamageRate />
+    <effectTargetSelf IsBool="" />
+    <effectTargetFriend IsBool="" />
+    <effectTargetEnemy IsBool="" />
+    <effectTargetPlayer IsBool="" />
+    <effectTargetAI IsBool="" />
+    <effectTargetLive IsBool="" />
+    <effectTargetGhost IsBool="" />
+    <effectTargetWhiteGhost />
+    <effectTargetBlackGhost />
+    <effectTargetAttacker IsBool="" />
+    <dispIconNonactive IsBool="" />
+    <useSpEffectEffect />
+    <bAdjustMagicAbility IsBool="" />
+    <bAdjustFaithAbility IsBool="" />
+    <bGameClearBonus IsBool="" />
+    <magParamChange IsBool="" />
+    <miracleParamChange IsBool="" />
+    <clearSoul IsBool="" />
+    <requestSOS IsBool="" />
+    <requestBlackSOS IsBool="" />
+    <requestForceJoinBlackSOS IsBool="" />
+    <requestKickSession IsBool="" />
+    <requestLeaveSession IsBool="" />
+    <requestNpcInveda IsBool="" />
+    <noDead IsBool="" />
+    <bCurrHPIndependeMaxHP IsBool="" />
+    <corrosionIgnore IsBool="" />
+    <sightSearchCutIgnore IsBool="" />
+    <hearingSearchCutIgnore IsBool="" />
+    <antiMagicIgnore IsBool="" />
+    <fakeTargetIgnore IsBool="" />
+    <fakeTargetIgnoreUndead IsBool="" />
+    <fakeTargetIgnoreAnimal IsBool="" />
+    <grabityIgnore IsBool="" />
+    <disablePoison IsBool="" />
+    <disableDisease IsBool="" />
+    <disableBlood IsBool="" />
+    <disableCurse IsBool="" />
+    <enableCharm IsBool="" />
+    <enableLifeTime IsBool="" />
+    <hasTarget IsBool="" />
+    <replanningOnFire IsBool="" />
+    <eraseOnBonfireRecover IsBool="" />
+    <requestLeaveColiseumSession IsBool="" />
+    <bAdjustStrengthAblity IsBool="" />
+    <bAdjustAgilityAblity IsBool="" />
+    <chargeAttackParamChange IsBool="" />
+    <throwAttackParamChange IsBool="" />
+    <vowType0 IsBool="" />
+    <vowType1 IsBool="" />
+    <vowType2 IsBool="" />
+    <vowType3 IsBool="" />
+    <vowType4 IsBool="" />
+    <vowType5 IsBool="" />
+    <vowType6 IsBool="" />
+    <vowType7 IsBool="" />
+    <vowType8 IsBool="" />
+    <vowType9 IsBool="" />
+    <vowType10 IsBool="" />
+    <vowType11 IsBool="" />
+    <vowType12 IsBool="" />
+    <vowType13 IsBool="" />
+    <vowType14 IsBool="" />
+    <vowType15 IsBool="" />
+    <repAtkDmgLv Enum="ATKPARAM_REP_DMGTYPE" />
+    <sightSearchRate />
+    <effectTargetOpposeTarget IsBool="" />
+    <effectTargetFriendlyTarget IsBool="" />
+    <effectTargetSelfTarget IsBool="" />
+    <effectTargetPcHorse IsBool="" />
+    <effectTargetPcDeceased IsBool="" />
+    <isContractSpEffectLife IsBool="" />
+    <isWaitModeDelete IsBool="" />
+    <isIgnoreNoDamage IsBool="" />
+    <changeTeamType Enum="SP_EFFECT_CHANGE_TEAM_TYPE" />
+    <dmypolyId />
+    <vfxId Refs="SpEffectVfxParam" />
+    <accumuOverFireId Refs="SpEffectParam" />
+    <accumuOverVal />
+    <accumuUnderFireId Refs="SpEffectParam" />
+    <accumuUnderVal />
+    <accumuVal />
+    <eye_angX />
+    <eye_angY />
+    <addDeceasedLv />
+    <unknown />
+    <vfxId1 Refs="SpEffectVfxParam" />
+    <vfxId2 Refs="SpEffectVfxParam" />
+    <vfxId3 Refs="SpEffectVfxParam" />
+    <vfxId4 Refs="SpEffectVfxParam" />
+    <vfxId5 Refs="SpEffectVfxParam" />
+    <vfxId6 Refs="SpEffectVfxParam" />
+    <vfxId7 Refs="SpEffectVfxParam" />
+    <freezeAttackPower />
+    <AppearAiSoundId Refs="AiSoundParam" />
+    <addFootEffectSfxId Refs="FootSfxParam" />
+    <unknown2 />
+    <teamOffenseEffectivity />
+    <toughnessDamageCutRate />
+    <weakDmgRateA />
+    <weakDmgRateB />
+    <weakDmgRateC />
+    <weakDmgRateD />
+    <weakDmgRateE />
+    <weakDmgRateF />
+    <darkDamageCutRate />
+    <darkDiffenceRate />
+    <darkDiffence />
+    <darkAttackRate />
+    <darkAttackPowerRate />
+    <darkAttackPower />
+    <antiDarkSightRadius />
+    <antiDarkSightDmypolyId />
+    <conditionHpRate />
+    <consumeStaminaRate />
+    <itemDropRate />
+    <unknown3 />
+    <changePoisonResistPoint />
+    <changeDiseaseResistPoint />
+    <changeBloodResistPoint />
+    <changeCurseResistPoint />
+    <changeFreezeResistPoint />
+    <slashAttackRate />
+    <blowAttackRate />
+    <thrustAttackRate />
+    <neutralAttackRate />
+    <slashAttackPowerRate />
+    <blowAttackPowerRate />
+    <thrustAttackPowerRate />
+    <neutralAttackPowerRate />
+    <slashAttackPower />
+    <blowAttackPower />
+    <thrustAttackPower />
+    <neutralAttackPower />
+    <changeStrengthPoint />
+    <changeAgilityPoint />
+    <changeMagicPoint />
+    <changeFaithPoint />
+    <changeLuckPoint />
+    <recoverArtsPoint_Str />
+    <recoverArtsPoint_Dex />
+    <recoverArtsPoint_Magic />
+    <recoverArtsPoint_Miracle />
+    <wetConditionDepth Enum="SP_EFFECT_WET_CONDITION_DEPTH" />
+    <disableFreeze IsBool="" />
+    <isUseStatusAilmentAtkPowerCorrect IsBool="" />
+    <isUseAtkParamAtkPowerCorrect IsBool="" />
+    <isHollowingCorrection IsBool="" />
+    <affectedByDurationContraction />
+    <waitForTriggerStateInfo IsBool="" />
+    <ignoreNoDamage IsBool="" />
+    <isDisableNetSync IsBool="" />
+    <eyeAngleUpper_around />
+    <eyeAngleUpper_bottom />
+    <saReceiveDamageRate />
+    <defPlayerDmgCorrectRate_Physics />
+    <defPlayerDmgCorrectRate_Magic />
+    <defPlayerDmgCorrectRate_Fire />
+    <defPlayerDmgCorrectRate_Thunder />
+    <defPlayerDmgCorrectRate_Dark />
+    <defEnemyDmgCorrectRate_Physics />
+    <defEnemyDmgCorrectRate_Magic />
+    <defEnemyDmgCorrectRate_Fire />
+    <defEnemyDmgCorrectRate_Thunder />
+    <defEnemyDmgCorrectRate_Dark />
+    <defObjDmgCorrectRate />
+    <atkPlayerDmgCorrectRate_Physics />
+    <atkPlayerDmgCorrectRate_Magic />
+    <atkPlayerDmgCorrectRate_Fire />
+    <atkPlayerDmgCorrectRate_Thunder />
+    <atkPlayerDmgCorrectRate_Dark />
+    <atkEnemyDmgCorrectRate_Physics />
+    <atkEnemyDmgCorrectRate_Magic />
+    <atkEnemyDmgCorrectRate_Fire />
+    <atkEnemyDmgCorrectRate_Thunder />
+    <atkEnemyDmgCorrectRate_Dark />
+    <registFreezeChangeRate />
+    <invocationConditionsStateChange1 Enum="SP_EFFECT_TYPE" />
+    <invocationConditionsStateChange2 Enum="SP_EFFECT_TYPE" />
+    <invocationConditionsStateChange3 Enum="SP_EFFECT_TYPE" />
+    <affectPyromancy />
+    <fakeDexterity_castSpeed />
+    <value_Magnification />
+    <artsConsumptionRate />
+    <magicConsumptionRate />
+    <shamanConsumptionRate />
+    <miracleConsumptionRate />
+    <changeHpEstusFlaskRate />
+    <changeHpEstusFlaskPoint />
+    <changeMpEstusFlaskRate />
+    <changeMpEstusFlaskPoint />
+    <changeHpEstusFlaskCorrectRate />
+    <changeMpEstusFlaskCorrectRate />
+    <applyIdOnGetSoul Refs="SpEffectParam" />
+    <extendLifeRate />
+    <contractLifeRate />
+    <behaviorJudgeId_add0 />
+    <behaviorJudgeId_add1 />
+    <effectEndDeleteDecalGroupId />
+    <defObjectAttackPowerRate />
+    <addLifeForceStatus />
+    <addWillpowerStatus />
+    <addEndureStatus />
+    <addVitalityStatus />
+    <addStrengthStatus />
+    <addDexterityStatus />
+    <addMagicStatus />
+    <addFaithStatus />
+    <addLuckStatus />
+    <deleteCriteriaDamage Enum="SP_EFFECT_PARAM_DELETE_DAMAGE_TYPE" />
+    <pad10 Padding="" />
+  </Field>
+</PARAMMETA>
