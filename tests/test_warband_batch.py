@@ -62,9 +62,22 @@ class CoverageTests(unittest.TestCase):
         path=self.root/'ModuleSystem'/'module_skills.py'
         path.write_text('old = 1\n')
         with patch.object(server,'resolve_catalog_file',return_value=path):
-            result=server.save_catalog_file('module_skills.py','old = 2\n','utf-8')
+            loaded=server.read_catalog_file('module_skills.py')
+            result=server.save_catalog_file('module_skills.py','old = 2\n','utf-8',loaded['sha256'])
         self.assertEqual(path.read_text(),'old = 2\n')
         self.assertEqual(Path(result['backup']).read_text(),'old = 1\n')
+        self.assertEqual(server.read_catalog_file('module_skills.py')['sha256'],result['sha256'])
+
+    def test_source_edit_rejects_stale_external_change(self):
+        path=self.root/'ModuleSystem'/'module_skills.py'
+        path.write_text('old = 1\n')
+        with patch.object(server,'resolve_catalog_file',return_value=path):
+            loaded=server.read_catalog_file('module_skills.py')
+            path.write_text('external = 9\n')
+            with self.assertRaisesRegex(ValueError,'changed; reload'):
+                server.save_catalog_file('module_skills.py','old = 2\n','utf-8',loaded['sha256'])
+        self.assertEqual(path.read_text(),'external = 9\n')
+        self.assertFalse(path.with_name(path.name+'.lexeditor.bak').exists())
 
 
 class FontTests(unittest.TestCase):
