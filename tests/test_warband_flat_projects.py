@@ -83,7 +83,7 @@ class WarbandFlatProjectTests(unittest.TestCase):
         self.assertIn('export_dir = "../Module/"', managed_info)
 
         wrapper = (imported / "build.bat").read_text(encoding="utf-8")
-        self.assertIn("call %LEX_WARBAND_PY% -tt build_module.py", wrapper)
+        self.assertIn('call "%LEX_WARBAND_PY%" %LEX_WARBAND_PY_ARGS% -tt build_module.py', wrapper)
         self.assertIn("Build verified: imported Warband Module System", wrapper)
         self.assertNotIn("pause", wrapper.casefold())
         self.assertNotIn("goto", wrapper.casefold())
