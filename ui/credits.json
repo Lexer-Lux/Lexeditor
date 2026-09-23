@@ -99,6 +99,16 @@
           "name": "Christian Bauer / ff7tools",
           "role": "Reference for FF7 archive and kernel formats.",
           "url": "https://github.com/cebix/ff7tools"
+        },
+        {
+          "name": "petfriendamy / Scarlet",
+          "role": "Reference for FF7 formation layouts, battle restrictions, and initial-condition flags.",
+          "url": "https://github.com/petfriendamy/ff7-scarlet"
+        },
+        {
+          "name": "FF7 modding community / ff7-flat-wiki",
+          "role": "Reference for battle arena names and formation layout.",
+          "url": "https://ff7-mods.github.io/ff7-flat-wiki/FF7/Battle/Battle_Scenes.html"
         }
       ],
       "thanks": [],
@@ -121,6 +131,16 @@
           "name": "Christian Bauer / ff7tools",
           "role": "Reference for FF7 archive and kernel formats.",
           "url": "https://github.com/cebix/ff7tools"
+        },
+        {
+          "name": "petfriendamy / Scarlet",
+          "role": "Reference for FF7 formation layouts, battle restrictions, and initial-condition flags.",
+          "url": "https://github.com/petfriendamy/ff7-scarlet"
+        },
+        {
+          "name": "FF7 modding community / ff7-flat-wiki",
+          "role": "Reference for battle arena names and formation layout.",
+          "url": "https://ff7-mods.github.io/ff7-flat-wiki/FF7/Battle/Battle_Scenes.html"
         }
       ],
       "thanks": [],
