@@ -170,3 +170,19 @@ def test_real_catalog_examples_in_isolation(tmp_path, folder, name, minimum, sup
     assert report["mods"][0]["supportedByPinnedMemoria"] is supported
     assert report["declaredConflicts"] == []
     assert report["overlaps"] == []
+
+
+def test_unparseable_minimum_memoria_version_fails_closed(tmp_path):
+    game, project = tmp_path / "game", tmp_path / "project"
+    game.mkdir(); project.mkdir()
+    write_mod(game, "UnknownRuntimeMod", description(
+        "Unknown Runtime Mod", minimum="latest"))
+    (game / "Memoria.ini").write_text(
+        '[Mod]\nFolderNames = "UnknownRuntimeMod"\n',
+        encoding="utf-8",
+    )
+    report = mod_compat.audit(game, project)
+    mod = report["mods"][0]
+    assert mod["minimumMemoriaVersionValid"] is False
+    assert mod["supportedByPinnedMemoria"] is False
+    assert report["unsupportedByPinnedMemoria"][0]["reason"] == "invalid MinimumMemoriaVersion metadata"
