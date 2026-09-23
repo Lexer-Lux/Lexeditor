@@ -59,3 +59,9 @@ a real mantle, reliable entry, or an acceptable sideways climbing animation.
 ## 2026-09-22 misc-fixes disposition
 Sequenced behind #193 entry. The timeout only bounds stuck state; the fall/snap on angled top-outs still needs the traversal path proven in game. Transition harness passes in source (see github-251.md).
 Human test, needs built ASI on a game machine after #193: climb onto an angled roof and confirm a real mantle or a retained safe grip. A fall plus teleport back up fails. Report motion and final footing. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

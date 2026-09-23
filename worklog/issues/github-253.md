@@ -18,3 +18,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes disposition
 Sideways movement is a static grip pose; the ladder cycle is removed and no animated traverse is proven. Sequenced behind reliable grabbing (#193, then #251): restore entry first, then present the actual pose and animation choice with A and D traverse, reversal, and release tests. Static sliding is not the finished animation. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

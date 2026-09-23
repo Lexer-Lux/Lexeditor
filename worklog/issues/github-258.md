@@ -19,3 +19,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 ## 2026-09-22 misc-fixes disposition
 Same sequencing: reliable entry comes from #193 first; the mantle transition then gets its own test. Transition source tests pass per the climb verifier re-run today (see github-251.md).
 Human test, needs built ASI on a game machine after #193: mantle a wall top and watch for slide-down, snap-up, then animate. Report the exact motion sequence. Better probes alone are not acceptance. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

@@ -19,3 +19,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 ## 2026-09-22 misc-fixes disposition
 Sequenced behind #193 plus combined entry/contact handling on the corrected build; the older installed correction cannot be assumed accepted. Transition harness passes in source (see github-251.md).
 Human test, needs built ASI on a game machine after #193: walk and sneak off a climbable ledge and confirm reverse-mantle into a safe grip; sprint keeps its separate behavior. Report per-gait result. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.
