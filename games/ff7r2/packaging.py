@@ -75,7 +75,7 @@ def _candidate_manifests(project: Path | None) -> list[Path]:
     return sorted(build.glob("ff7r2-candidate-*/manifest.json"), key=lambda path: path.stat().st_mtime_ns)
 
 
-_PATCH_LEVEL = re.compile(r"(?:_(\\d+))?_P$", re.IGNORECASE)
+_PATCH_LEVEL = re.compile(r"(?:_(\d+))?_P$", re.IGNORECASE)
 
 
 def _native_mod_load_order(game: Path | None) -> dict:
