@@ -30,7 +30,7 @@
       {key:"field",label:"Field",width:"minmax(0,1.35fr)",render:row=>cell(row.path)},
       {key:"type",label:"Type",width:"minmax(0,.55fr)",render:row=>cell(row.kind)},
       {key:"value",label:"Value",width:"minmax(0,.65fr)",render:row=>cell(String(value(row)))},
-      {key:"resource",label:"Resource",width:"minmax(0,1.1fr)",render:row=>cell(row.resourcePath)},
+      {key:"resource",label:"File",width:"minmax(0,1.1fr)",render:row=>cell(row.resourcePath)},
     ];
     function control(row){
       const vanilla=state.vanilla.rbf?.rows?.find(item=>item.id===row.id)?.value;
@@ -47,7 +47,7 @@
       if(!row)return UI.detailPanel({className:"record-detail rbf-detail",title:"Select an RBF0 scalar",
         body:[UI.detailNote("Only fixed-width boolean, uint32 and float leaves are exposed. Strings, vectors, byte blocks and unknown records stay byte-for-byte opaque.")]});
       return UI.detailPanel({className:"record-detail rbf-detail",title:row.name,meta:row.path,body:[
-        detailField("Resource",shown(row.resourcePath),"","The prepared RBF0 tuning resource which owns this scalar."),
+        detailField("File",shown(row.resourcePath),"","The prepared RBF0 tuning resource which owns this scalar."),
         detailField("Field",shown(row.path),"","Descriptor path reconstructed from the RBF0 structure and attribute count."),
         detailField("Role",shown(row.role)),
         detailField("Type",shown(row.kind),"","Lexeditor exposes only fixed-width RBF0 primitives whose byte span is public and bounded."),
@@ -61,7 +61,8 @@
     function discard(){state.rbfEdits={};shell().history.clear();setStatus("Discarded unsaved RBF0 scalar edits");render();shell().refresh();}
     function render(){
       discardButton=el("button",{type:"button",disabled:!Object.keys(state.rbfEdits).length,onclick:discard},"Discard RBF edits");
-      const count=`${state.rbf?.counts?.scalars||0} safe scalars · ${state.rbf?.counts?.resources||0} RBF0 resources`;
+      const scalarCount=state.rbf?.counts?.scalars||0,resourceCount=state.rbf?.counts?.resources||0;
+      const count=`${scalarCount} safe scalar${scalarCount===1?"":"s"} · ${resourceCount} RBF0 resource${resourceCount===1?"":"s"}`;
       document.querySelector("#toolbar").replaceChildren(discardButton,el("span",{class:"count"},count));
       const rows=matchingRows();
       document.querySelector("#main").replaceChildren(pagedListDetail({

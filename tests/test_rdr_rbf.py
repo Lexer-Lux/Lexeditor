@@ -86,6 +86,15 @@ class RbfTests(unittest.TestCase):
                 "kind": row["kind"], "rawHex": "00000000", "value": 9,
             }])
 
+    def test_structure_must_consume_advertised_attributes(self):
+        malformed = (
+            rbf.MAGIC
+            + record(0, rbf.TYPE_STRUCTURE, "Root", struct.pack("<hhh", 0, 0, 1))
+            + b"\xff\xff"
+        )
+        with self.assertRaisesRegex(ValueError, "advertised attributes"):
+            rbf.parse(malformed)
+
     def test_strings_vectors_and_unknown_types_are_not_promoted(self):
         source = fixture()
         paths = {row["path"] for row in rbf.parse(source)["scalars"]}

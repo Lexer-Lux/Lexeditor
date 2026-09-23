@@ -215,6 +215,8 @@ def run(output: Path, executable: str | None) -> None:
                 page.screenshot(path=str(output / f"rdr-strings-{width}-zoom{zoom}.png"), full_page=True)
 
                 page.evaluate("state.tab='rbf'; state.rbfSelected='tune/ai/protected.tune:24'; rbfUI.render()")
+                expect(page.locator('nav button[data-tab="rbf"] .lex-tab-label-text')).to_have_text("Tuning")
+                expect(page.locator(".rbf-detail .lex-detail-field-label").filter(has_text="File")).to_have_count(1)
                 expect(page.locator(".rdr-record-list .lex-column-list-row:not(.lex-filler-row)")).to_have_count(1)
                 expect(page.locator(".rbf-detail .lex-detail-field")).to_have_count(7)
                 expect(page.get_by_label("Tuning/Scale", exact=True)).to_have_value("1")

@@ -109,6 +109,10 @@ def parse(data: bytes | bytearray | memoryview) -> dict[str, Any]:
                 raise ValueError("Malformed RBF0 close marker")
             if current is None:
                 raise ValueError("RBF0 close marker has no open structure")
+            if current.pending_attributes:
+                raise ValueError(
+                    "RBF0 structure closed before all advertised attributes were read"
+                )
             if stack:
                 current = stack.pop()
             else:

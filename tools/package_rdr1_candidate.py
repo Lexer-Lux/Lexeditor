@@ -187,7 +187,7 @@ def build(root: Path, output: Path, commit: str) -> dict:
                 "  4. Edit one string, Save, switch to Vanilla and back, then reload: Vanilla stays unchanged and the project text reopens.\n"
                 "  5. Make another unsaved string edit and Discard string edits: the last saved text returns.\n"
                 "  6. Data Map: supported PC STRTBL and actual parsed RBF0 scalar rows are Partial/openable; _ps3 STRTBL, unsafe RBF0 content and unknown formats remain visible as Not integrated.\n"
-                "  7. RBF Scalars: edit one bool/uint32/float leaf, Save, switch Vanilla/back, then verify only the project override changes; strings, vectors, byte blocks and unknown records stay opaque.\n"
+                "  7. Tuning (RBF0): edit one bool/uint32/float leaf, Save, switch Vanilla/back, then verify only the project override changes; strings, vectors, byte blocks and unknown records stay opaque.\n"
                 "  8. Items/Shops/Missions/Tweaks: change one safe field, Save, reopen, and confirm the project override without changing prepared source bytes.\n"
                 "  9. Info: if RedHook is absent, Keep editing works and Open official download only opens the official page. RedHook is never bundled or silently installed.\n"
                 "  10. Do not click Deploy Project for source/rendered acceptance. Deployment and in-game behavior are separate acceptance levels.\n"
