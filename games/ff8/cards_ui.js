@@ -293,16 +293,19 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       const gf = payload.rows?.find(row => Number(row.id) === gfId);
       if (!gf) throw new Error(`GF ${gfId} is unavailable`);
       const meta = payload.spellbook || {};
+      if (!meta.enabled) {
+        marker.replaceChildren(LexeditorUI.detailNote("Enable GF Spellbooks on the Tweaks page."));
+        return;
+      }
+      if (meta.runtimeActive === false) {
+        marker.replaceChildren(LexeditorUI.detailNote("GF Spellbooks needs Monogamy on and Shared Party Magic Inventory off. Set these on Tweaks."));
+        return;
+      }
       const magic = meta.magicOptions || [];
       const abilities = meta.abilityOptions || [];
       let pages = clone(gf.spellbook?.pages || []);
       let dirty = false;
       marker.replaceChildren();
-      const title = document.createElement("h3");
-      title.textContent = "SPELLBOOK";
-      const note = document.createElement("p");
-      note.className = "ff8-spell-note";
-      note.textContent = "Ordered Magic pages for this GF. Zero-stock spells remain visible but disabled in battle. Optional requirements use abilities learned by this GF. Runtime requires Single GF and Shared Magic off.";
       const toolbar = LexeditorUI.actionRow();
       const body = LexeditorUI.stack({fill:false});
       const status = LexeditorUI.detailNote("");
@@ -312,22 +315,16 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         toolbar.replaceChildren();
         body.replaceChildren();
         if (!pages.length) {
-          toolbar.append(button("ENABLE SPELLBOOK", () => {pages=[[]];setDirty();draw();}));
-          const empty = document.createElement("div");
-          empty.className = "ff8-spell-note";
-          empty.textContent = "No custom book: FF8 uses its native Magic stock list.";
-          body.append(empty);
+          toolbar.append(button("ADD PAGE", () => {pages=[[]];setDirty();draw();}));
         } else {
           toolbar.append(
             button("ADD PAGE", () => {if(pages.length < (meta.maxPages||8)){pages.push([]);setDirty();draw();}}, "Maximum eight pages"),
-            button("DISABLE", () => {pages=[];setDirty();draw();})
+            button("CLEAR PAGES", () => {pages=[];setDirty();draw();})
           );
           pages.forEach((page, pageIndex) => {
             const card = LexeditorUI.detailSection({title:`PAGE ${pageIndex+1}`});
             const cardBody=LexeditorUI.sectionParts(card).content;
             const head = LexeditorUI.actionRow();
-            const name = document.createElement("span");
-            name.textContent = `PAGE ${pageIndex+1}`;
             const pageActions = LexeditorUI.actionRow();
             pageActions.append(
               button("↑",()=>{if(pageIndex){[pages[pageIndex-1],pages[pageIndex]]=[pages[pageIndex],pages[pageIndex-1]];setDirty();draw();}},"Move page earlier"),
@@ -336,11 +333,8 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
             );
             head.append(pageActions);
             cardBody.append(head);
+            const spellRows=[];
             page.forEach((slot, slotIndex) => {
-              const row = document.createElement("div");
-              row.className = "ff8-spell-row";
-              const index = document.createElement("span");
-              index.textContent = String(slotIndex+1);
               const spellChoices = magic.map(entry => ({...entry}));
               const magicSelect = select(spellChoices,slot.magicId,value=>{
                 if(value===null)return;
@@ -354,10 +348,16 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
                 button("↓",()=>{if(slotIndex<page.length-1){[page[slotIndex+1],page[slotIndex]]=[page[slotIndex],page[slotIndex+1]];setDirty();draw();}},"Move spell later"),
                 button("×",()=>{page.splice(slotIndex,1);setDirty();draw();},"Remove spell")
               );
-              cardBody.append(LexeditorUI.detailSection({title:`SPELL ${slotIndex+1}`,body:[
-                LexeditorUI.detailField({label:"Magic",control:magicSelect}),
-                LexeditorUI.detailField({label:"Required ability",control:abilitySelect}),actions]}));
+              magicSelect.setAttribute("aria-label",`Spell ${slotIndex+1}`);
+              abilitySelect.setAttribute("aria-label",`Required ability for spell ${slotIndex+1}`);
+              spellRows.push({id:slotIndex,magicSelect,abilitySelect,actions});
             });
+            cardBody.append(LexeditorUI.columnList({rows:spellRows,key:row=>row.id,editable:true,
+              template:"minmax(0,1fr) minmax(0,1fr) auto",columns:[
+                {key:"magic",label:"Magic",render:row=>row.magicSelect},
+                {key:"ability",label:"Required ability",render:row=>row.abilitySelect},
+                {key:"actions",label:"",render:row=>row.actions}
+              ]}));
             if (page.length < (meta.slotsPerPage||4)) {
               cardBody.append(button("ADD SPELL",()=>{
                 const used=usedMagic();const first=magic.find(entry=>!used.has(Number(entry.id)));
@@ -376,7 +376,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
               method:"POST", headers:{"Content-Type":"application/json"},
               body:JSON.stringify({section:3,edits:[{id:gfId,field:"__spellbook",value:pages.length?pages:null}]})
             });
-            dirty=false;status.textContent="Spellbook saved. Save Gameplay settings too if you changed Single GF / Shared Magic.";
+            dirty=false;status.textContent="Spellbook saved.";
           } catch(error) {status.textContent=error.message;}
           finally {save.disabled=false;}
         });

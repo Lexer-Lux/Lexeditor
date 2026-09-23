@@ -1,5 +1,5 @@
 """Spellbook stays inside the abilities panel and preserves tab content."""
-import json,re
+import json,re,tempfile
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
@@ -10,7 +10,7 @@ def main():
  with sync_playwright() as pw:
   browser=pw.chromium.launch(headless=True);page=browser.new_page()
   page.route('http://fixture/',lambda r:r.fulfill(body='<div id="gf-detail" data-gf="10" style="width:650px;height:600px"><section class="gf-panel abilities" data-gf-panel="abilities"><h3 class="lex-detail-section-title">ABILITIES</h3><div class="lex-detail-section-content"><input aria-label="Native ability" value="21"></div></section></div>',content_type='text/html'))
-  page.route('**/api/kernel?*',lambda r:r.fulfill(body=json.dumps({'rows':[{'id':10,'spellbook':None}],'spellbook':{'magicOptions':[],'abilityOptions':[]}}),content_type='application/json'))
+  page.route('**/api/kernel?*',lambda r:r.fulfill(body=json.dumps({'rows':[{'id':10,'spellbook':None}],'spellbook':{'enabled':True,'magicOptions':[{'id':1,'name':'Fire'}],'abilityOptions':[]}}),content_type='application/json'))
   page.goto('http://fixture/')
   page.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
   page.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
@@ -24,15 +24,18 @@ def main():
   assert page.locator('.lex-tabbed-panel .lexeditor-gf-spellbook').count()==1
   assert page.get_by_label('Native ability').is_visible()
   page.get_by_role('tab',name='SPELLBOOK').click()
-  page.get_by_role('button',name='ENABLE SPELLBOOK').wait_for(state='visible')
+  page.get_by_role('button',name='ADD PAGE').wait_for(state='visible')
   assert not page.get_by_label('Native ability').is_visible()
-  page.get_by_role('button',name='ENABLE SPELLBOOK').click()
+  page.get_by_role('button',name='ADD PAGE').click()
   page.get_by_role('tab',name='ABILITIES',exact=True).click()
   assert page.get_by_label('Native ability').input_value()=='21'
   assert not page.locator('.lexeditor-gf-spellbook').is_visible()
   page.get_by_role('tab',name='SPELLBOOK').click()
-  assert page.get_by_role('button',name='ENABLE SPELLBOOK').count()==0
+  assert page.get_by_role('button',name='ADD PAGE').count()==1
+  page.get_by_role('button',name='ADD SPELL',exact=True).click()
+  assert page.locator('.lexeditor-gf-spellbook .lex-column-list-row').count()==1
   assert page.locator('[role="tab"] .lex-info-help').count()==1
+  page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-spellbook-list.png'))
   browser.close()
  print('Spellbook tab containment, tab switching and independent ability value passed.')
 if __name__=='__main__':main()

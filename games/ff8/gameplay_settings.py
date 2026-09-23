@@ -402,6 +402,7 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "autoSortMagic": auto_sort_magic,
         "enhancedAbilityMenu": enhanced_ability_menu,
         "singleGf": single_gf,
+        "gfSpellbooksEnabled": data.get("gfSpellbooksEnabled", False) is True,
         "universalItem": universal_item,
         "scannedTargetScan": scanned_target_scan,
         "enhancedScanAvailable": battle_shortcuts.ENHANCED_SCAN_AVAILABLE,
@@ -911,6 +912,7 @@ def save(data: dict, game_root: Path | None = None,
     )
 
     single_gf = _boolean(data.get("singleGf", DEFAULT_SINGLE_GF), "Monogamy")
+    spellbooks_enabled = _boolean(data.get("gfSpellbooksEnabled", False), "GF Spellbooks")
     universal_item = _boolean(
         data.get("universalItem", DEFAULT_UNIVERSAL_ITEM), "Universal Item",
     )
@@ -1063,6 +1065,7 @@ def save(data: dict, game_root: Path | None = None,
         "flyingEvaBonus": bonus,
         "flyingEvaEnabled": flying_enabled,
         "singleGf": single_gf,
+        "gfSpellbooksEnabled": spellbooks_enabled,
         "universalItem": universal_item,
         "scannedTargetScan": scanned_target_scan,
         "partySwitch": party_switch,
