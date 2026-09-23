@@ -20,14 +20,14 @@ from verify_ff7_installed import EXPECTED_DATASETS, EXPECTED_FAMILY_DATASETS, ch
 
 
 class InstalledAcceptanceContractTests(unittest.TestCase):
-    def test_backend_surface_matches_independent_38_dataset_contract(self):
+    def test_backend_surface_matches_independent_40_dataset_contract(self):
         declared = declared_family_datasets()
         self.assertEqual(set(declared), set(EXPECTED_FAMILY_DATASETS))
         for family, expected in EXPECTED_FAMILY_DATASETS.items():
             self.assertEqual(set(declared[family]), set(expected), family)
         flattened = [key for rows in declared.values() for key in rows]
-        self.assertEqual(len(flattened), 38)
-        self.assertEqual(len(set(flattened)), 38)
+        self.assertEqual(len(flattened), 40)
+        self.assertEqual(len(set(flattened)), 40)
         self.assertEqual(set(flattened), set(EXPECTED_DATASETS))
 
     def test_kernel_true_noop_preserves_noncanonical_gzip_header_bytes(self):
@@ -61,7 +61,7 @@ class InstalledAcceptanceContractTests(unittest.TestCase):
             with patch.dict(extended.EXE_PROFILES, {identity: 0x400}):
                 report = check_installation(game)
             self.assertTrue(report["passed"], report["errors"])
-            self.assertEqual(report["datasetCoverage"]["exercised"], 38)
+            self.assertEqual(report["datasetCoverage"]["exercised"], 40)
             self.assertEqual(set(report["datasets"]), set(EXPECTED_DATASETS))
             self.assertEqual({entry["family"] for entry in report["rewrittenFiles"]}, set(EXPECTED_FAMILY_DATASETS))
             self.assertEqual(len(report["rewrittenFiles"]), 6)

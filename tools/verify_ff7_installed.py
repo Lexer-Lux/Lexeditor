@@ -30,17 +30,17 @@ EXPECTED_FAMILY_DATASETS = {
         "magicOrder", "initialState", "initialInventory", "initialMateria", "stolenMateria",
     ),
     "scene": ("enemies", "enemyAI", "formationAI", "encounters", "enemyAttacks"),
-    "text": ("texts",),
+    "text": ("texts", "keyItems"),
     "shop": (
         "shops", "prices", "recruits", "defaultNames", "limitBreaks", "materiaEquipEffects",
-        "exeText", "itemSortOrder", "materiaPriority", "audioMixing", "apMultiplier",
+        "exeText", "itemSortOrder", "materiaPriority", "audioMixing", "apMultiplier", "worldMovement",
     ),
     "field": ("fieldEncounters",),
     "world": ("worldEncounters", "yuffieEncounters", "chocoboRatings"),
 }
 EXPECTED_DATASETS = tuple(key for keys in EXPECTED_FAMILY_DATASETS.values() for key in keys)
-if len(EXPECTED_DATASETS) != 38 or len(set(EXPECTED_DATASETS)) != 38:
-    raise RuntimeError("FF7 installed acceptance contract must contain exactly 38 unique datasets")
+if len(EXPECTED_DATASETS) != 40 or len(set(EXPECTED_DATASETS)) != 40:
+    raise RuntimeError("FF7 installed acceptance contract must contain exactly 40 unique datasets")
 
 
 def sha256(path: Path) -> str:
@@ -79,9 +79,9 @@ def _record_contract(report: dict) -> None:
     flattened = [key for keys in declared.values() for key in keys]
     counts = Counter(flattened)
     duplicates = sorted(key for key, count in counts.items() if count > 1)
-    passed = passed and len(flattened) == 38 and len(counts) == 38 and not duplicates
+    passed = passed and len(flattened) == 40 and len(counts) == 40 and not duplicates
     report["datasetContract"] = {
-        "expectedCount": 38,
+        "expectedCount": 40,
         "declaredCount": len(flattened),
         "uniqueDeclaredCount": len(counts),
         "missingFamilies": sorted(expected_families - declared_families),
@@ -91,7 +91,7 @@ def _record_contract(report: dict) -> None:
         "passed": passed,
     }
     if not passed:
-        report["errors"]["datasetContract"] = "Backend dataset declarations differ from the reviewed 38-dataset installed acceptance contract."
+        report["errors"]["datasetContract"] = "Backend dataset declarations differ from the reviewed 40-dataset installed acceptance contract."
 
 
 def _source_entry(path: Path) -> dict:
@@ -223,19 +223,19 @@ def check_installation(game: Path) -> dict:
     expected = set(EXPECTED_DATASETS)
     exercised = set(report["datasets"])
     report["datasetCoverage"] = {
-        "expected": 38,
+        "expected": 40,
         "exercised": len(exercised),
         "missing": sorted(expected - exercised),
         "unexpected": sorted(exercised - expected),
     }
     report["datasetCoverage"]["passed"] = (
-        report["datasetCoverage"]["exercised"] == 38
+        report["datasetCoverage"]["exercised"] == 40
         and not report["datasetCoverage"]["missing"]
         and not report["datasetCoverage"]["unexpected"]
     )
     if not report["datasetCoverage"]["passed"]:
         report["errors"]["datasetCoverage"] = (
-            f"Expected 38/38 datasets; exercised {len(exercised)}. "
+            f"Expected 40/40 datasets; exercised {len(exercised)}. "
             f"Missing: {', '.join(report['datasetCoverage']['missing']) or 'none'}; "
             f"unexpected: {', '.join(report['datasetCoverage']['unexpected']) or 'none'}."
         )
@@ -318,7 +318,7 @@ def main() -> int:
         coverage = report["datasetCoverage"]
         rewrites = report["rewriteCoverage"]
         print(
-            f"{report['game']}: {coverage['exercised']}/38 datasets; "
+            f"{report['game']}: {coverage['exercised']}/40 datasets; "
             f"{rewrites['rewritten']}/6 no-op project copies; "
             f"byte-exact: {rewrites['allByteExactNoOps']}; "
             f"sources unchanged: {report['installedFilesUnchanged']}; "
