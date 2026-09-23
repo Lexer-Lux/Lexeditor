@@ -5,6 +5,28 @@ from io import BytesIO
 from PIL import Image
 from test_shared_ui_feedback import ROOT, page, framework
 
+
+def test_row_pointer_follows_clickable_label(page):
+    import os
+    marker=Path(os.environ['LOCALAPPDATA'])/'Lexeditor/game-data/ff8/generated/icons/0.png'
+    if marker.exists():
+        page.route('**/assets/icons/0.png',lambda r:r.fulfill(path=str(marker)))
+    framework(page)
+    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.evaluate('''()=>{
+      document.querySelector('main').innerHTML='<div class="lex-column-list-row selected"><div class="lex-column-pointer-cell"><span class="lex-column-cell-content" style="position:relative;display:flex;justify-content:center;width:900px;height:60px"><button><span id="ability-name">HP-J</span></button></span></div></div>';
+    }''')
+    page.wait_for_timeout(100)
+    for width in (900,600):
+        page.locator('.lex-column-cell-content').evaluate('(n,w)=>n.style.width=w+"px"',width)
+        page.wait_for_timeout(100)
+        assert page.locator('.lex-column-cell-content').evaluate('''n=>{
+          const p=getComputedStyle(n,'::before'),box=n.getBoundingClientRect();
+          const range=document.createRange();range.selectNodeContents(document.querySelector('#ability-name'));
+          return Math.abs(range.getBoundingClientRect().left-(box.left+parseFloat(p.left)+parseFloat(p.width))-6)<2;
+        }''')
+    page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-clickable-row-pointer.png'))
+
 @pytest.mark.parametrize('width',[700,1000,1600])
 def test_tabs_stay_one_row_and_tweaks_stays_attached(page,width):
     # Main tabs and subtabs always share one row of equal lanes.

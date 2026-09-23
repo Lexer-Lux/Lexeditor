@@ -8600,7 +8600,7 @@ ${contents.path}`});
       const label=tab?host.querySelector('.lex-tab-label-text'):host;
       if(!label)continue;
       sizes.observe(label);
-      const walker=document.createTreeWalker(label,NodeFilter.SHOW_TEXT,{acceptNode:node=>node.textContent.trim()&&!node.parentElement.closest('.lex-reference-values,.lex-tab-shortcut,button,select')?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP});
+      const walker=document.createTreeWalker(label,NodeFilter.SHOW_TEXT,{acceptNode:node=>node.textContent.trim()&&!node.parentElement.closest('.lex-reference-values,.lex-tab-shortcut,.lex-info-help,[aria-hidden="true"],select')?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP});
       let node=tab?label.firstChild:walker.nextNode();
       while(node&&node.nodeType!==Node.TEXT_NODE)node=node.firstChild;
       if(!node||!node.textContent.trim())continue;
