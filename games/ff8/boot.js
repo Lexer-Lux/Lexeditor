@@ -75,6 +75,11 @@
     const dropChance=el("input",{type:"checkbox",checked:settings.dropChance,"aria-label":"Drop Chance Rework",onchange:event=>{settings.dropChance=event.target.checked;shell.refresh()}});
     const sharedMagic=el("input",{type:"checkbox",checked:settings.sharedMagicInventory,disabled:!settings.sharedMagicInventoryAvailable&&!settings.sharedMagicInventory,"aria-label":"Shared Party Magic Inventory",onchange:event=>{settings.sharedMagicInventory=event.target.checked;shell.refresh()}});
     const flatStatAbilities=el("input",{type:"checkbox",checked:settings.flatStatAbilities,"aria-label":"Flat +Stat Abilities",onchange:event=>{settings.flatStatAbilities=event.target.checked;shell.refresh()}});
+    // The Formulae page lives under Tweaks now, so its owning toggle lives
+    // here with the other tweaks. It stays unavailable until every row in the
+    // central Formulae Rework contract has a real runtime patch, and the
+    // Formulae subtab unlocks only while this tweak is enabled.
+    const formulaeRework=el("input",{type:"checkbox",checked:settings.formulaeRework,disabled:state.activeSource!=="mine"||!settings.formulaeReworkAvailable,"aria-label":"Formulae Rework",onchange:event=>{settings.formulaeRework=event.target.checked;shell.refresh();renderSettings()}});
     const maxSpellEnabled=el("input",{type:"checkbox",checked:settings.maxSpellEnabled,"aria-label":"Enable Max Spell",onchange:event=>{settings.maxSpellEnabled=event.target.checked;shell.refresh()}});
     const maxSpellValue=numberControl(settings.maxSpell,settings.maxSpellMinimum,settings.maxSpellMaximum,1,value=>settings.maxSpell=value,{"aria-label":"Maximum spell stock"});
     const row=(title,description,control)=>{
@@ -102,6 +107,7 @@
       row("FAST START","Skips the Square Enix logo movie and the opening credits, then uses the game's normal transition into the main menu.",fastStart,"boolean"),
       row("FF10-STYLE PARTY SWITCH","Look Left opens the reserve-party selector during an active turn. Confirming a replacement spends that turn.",partySwitch,"boolean"),
       row("FLAT +STAT ABILITIES","Changes +Stat% abilities into fixed-point +Stat abilities and updates their in-game names and descriptions.",flatStatAbilities,"boolean"),
+      row("FORMULAE REWORK","Uses Lexer's reworked battle formulae and unlocks the Formulae subtab. Only healing and physical accuracy have runtime patches today; melee damage, magic damage, status infliction and Mug remain preview-only, so the toggle stays unavailable until every listed formula has a guarded game patch.",formulaeRework,"boolean"),
       row("FLYING EVA BONUS","Adds the selected effective EVA to intrinsic flying targets against grounded melee attacks. A hit rate of 255 does not bypass it.",flyingControl,"value-toggle"),
       row("GF HP CASTING","Battle Magic spends the spell’s GF HP cost instead of spell stock. Set costs in Magic → Attack Data. Requires Monogamy and No Magic Consumption. A character without a GF or enough GF HP cannot cast.",gfHpCasting,"boolean"),
       row('GF "MP" BARS',"Shows a blue bar above each party name for the junctioned GF's HP, which is spent like MP, including damage it takes while being summoned. Requires Monogamy. With more than one GF junctioned the bar is hidden and the FFNx log says why.",gfHpBars,"boolean"),
@@ -147,13 +153,15 @@
           {key:"normal",label:"Normal",render:entry=>change(vanilla.normal[entry.slot-1],rework.normal[entry.slot-1])},
           {key:"rare",label:"Rare Item",render:entry=>change(vanilla.rare[entry.slot-1],rework.rare[entry.slot-1])}]}));
   }
-  const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"platform",label:"FFNx"}];
-  const tweakTabProps=()=>({tabs:TWEAK_TABS,activeTab:state.settingsTab,
+  const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"formulae",label:"Formulae"},{id:"platform",label:"FFNx"}];
+  const tweakTabProps=()=>({tabs:TWEAK_TABS.map(tab=>tab.id==="formulae"?{...tab,disabled:!state.data.settings.formulaeRework}:tab),activeTab:state.settingsTab,
     tabsLabel:"Tweak settings",
     changeTab:value=>{state.settingsTab=value;renderSettings()}});
   function renderSettings(){
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
-    if(state.settingsTab==="platform")renderPlatformSettings();else renderGameplaySettings();
+    // The Formulae subtab unlocks only while its owning tweak is enabled; without it, fall back to the Gameplay list that owns the toggle.
+    if(state.settingsTab==="formulae"&&!state.data.settings.formulaeRework)state.settingsTab="gameplay";
+    if(state.settingsTab==="platform")renderPlatformSettings();else if(state.settingsTab==="formulae")renderFormulae();else renderGameplaySettings();
   }
 
   const DEFAULT_FLYING_EVA_BONUS=25;
@@ -163,7 +171,8 @@
     const f=state.formula,weapons=state.data.weapons?.rows||[],settings=state.data.settings;
     if(!weapons.some(row=>Number(row.id)===Number(f.weaponId)))f.weaponId=weapons[0]?.id??0;
     const weapon=weapons.find(row=>Number(row.id)===Number(f.weaponId)),weaponField=name=>weapon?.fields?.find(field=>field.field===name),fieldValue=name=>Number(weaponField(name)?.value??0);
-    const formulaeRework=el("input",{type:"checkbox",checked:settings.formulaeRework,disabled:state.activeSource!=="mine"||!settings.formulaeReworkAvailable,"aria-label":"Formulae Rework",onchange:event=>{settings.formulaeRework=event.target.checked;shell.refresh();renderFormulae()}});
+    // The owning toggle lives in the Tweaks Gameplay list; this subtab unlocks
+    // only while it is enabled, so no second toggle lives here.
     const preset=()=>detailField({label:"Weapon preset",control:selectControl(f.weaponId,weapons.map(row=>({id:row.id,name:row.name})),value=>{f.weaponId=value;renderFormulae()})});
     const formulaTerm=(name,label,help)=>{const field=weaponField(name);return field?detailField({label,help:infoHelp(help),control:fieldSourceControl(field,"weapons",weapon.id)}):null};
     const boost=()=>state.data.settings.flyingEvaEnabled?state.data.settings.flyingEvaBonus:0;
@@ -204,16 +213,17 @@
         formula.blocker?LexeditorUI.detailNote(`INCOMPLETE: ${formula.blocker}`):null].filter(Boolean)});
     const implementedCount=formulaRows.filter(formula=>formula.status==="implemented").length;
     const master=section("FORMULAE REWORK",[
-      detailField({label:"Use Lexer's reworked battle formulae",control:formulaeRework}),
-      LexeditorUI.detailNote(`${implementedCount}/${formulaRows.length} requested runtime formulae are implemented. The owning toggle remains unavailable until every listed formula has a guarded game patch.`)]);
+      LexeditorUI.detailNote("The Formulae Rework tweak in the Gameplay list owns this page. It stays unavailable until every listed formula has a guarded game patch."),
+      LexeditorUI.detailNote(`${implementedCount}/${formulaRows.length} requested runtime formulae are implemented.`)])
     const view=LexeditorUI.stack({fill:false},master,LexeditorUI.tileGrid([damage,accuracy,...formulaRows.map(reworkCard)],{minWidth:450}));
     view.addEventListener("input",()=>requestAnimationFrame(updateOutputs));updateOutputs();
     // The stacked damage, accuracy and per-formula cards run taller than the
     // main region, and this plugin clips #main, so the page needs the shared
     // tweaks scroll container; without it the lowest cards render below the
     // window with no way to reach them.
-    const scroller=el("div",{class:"lex-tweaks-scroll",tabindex:"-1"},detailPanel({heading:false,body:view}));
-    $("#main").replaceChildren(scroller);
+    // The Tweaks subtab bar sits above the scroll container, matching the Gameplay and FFNx lists, so the viewer can leave this subtab again.
+    const tweaks=tweakTabProps(),scroller=el("div",{class:"lex-tweaks-scroll",tabindex:"-1"},detailPanel({heading:false,body:view}));
+    $("#main").replaceChildren(subtabBar({tabs:tweaks.tabs,active:"formulae",label:tweaks.tabsLabel,change:tweaks.changeTab}),scroller);
   }
 
   function startingDataEdits(){const edits=[],current=state.data.init,before=state.base.init;if(!current||!before)return edits;for(const kind of ["general","config"])current[kind].fields.forEach((field,index)=>{if(field.value!==before[kind].fields[index].value)edits.push({kind,id:0,field:field.field,value:field.value})});for(const [key,kind] of [["gfs","gf"],["characters","character"]])for(const row of current[key].rows){const base=before[key].rows.find(value=>value.id===row.id);row.fields.forEach((field,index)=>{if(field.value!==base.fields[index].value)edits.push({kind,id:row.id,field:field.field,value:field.value})});if(kind==="character")row.magics.forEach((slot,index)=>{const old=base.magics[index];if(slot.magicId!==old.magicId||slot.quantity!==old.quantity)edits.push({kind:"magic",id:row.id,slot:slot.slot,magicId:slot.magicId,quantity:slot.quantity})})}current.inventory.rows.forEach((slot,index)=>{const old=before.inventory.rows[index];if(slot.itemId!==old.itemId||slot.quantity!==old.quantity)edits.push({kind:"inventory",id:0,slot:slot.slot,itemId:slot.itemId,quantity:slot.quantity})});return edits}
@@ -358,14 +368,14 @@
   function discardAll(){window.ff8SpellbookDrafts?.clear();for(const name of editableDatasets)if(state.data[name])state.data[name].rows=clone(state.base[name]||[]);state.data.init=clone(state.base.init||{});state.data.settings=clone(state.base.settings||{});state.platformConfig=clone(state.savedPlatformConfig);shell.history?.clear();setStatus("Restored the last saved state");render();shell.refresh()}
   let cardsUI;
   function renderCards(){cardsUI??=FF8CardsUI({el,state,rowOf,filtered,showPaged,sharedDetail,detailSection,detailField,numberControl,selectControl,sourceControl,referenceValues,infoHelp,shell,noteFieldEdit,subtabBar,detailPanel,recordId,columnList,conceptIcon,ensureFieldDetail});return cardsUI.render()}
-  const views={cards:renderCards,abilities:renderAbilities,starting:renderStartingData,items:renderItems,refine:renderRefine,shops:renderShops,weapons:renderWeapons,magic:()=>renderKernel("magic","Magic"),gfs:renderGFs,characters:renderCharacters,text:renderText,enemies:renderEnemies,encounters:renderEncounters,maps:renderMaps,world:renderWorldMap,fields:renderFields,formulae:renderFormulae,settings:renderSettings,datamap:renderDataMap,dashboard:renderDashboard};
+  const views={cards:renderCards,abilities:renderAbilities,starting:renderStartingData,items:renderItems,refine:renderRefine,shops:renderShops,weapons:renderWeapons,magic:()=>renderKernel("magic","Magic"),gfs:renderGFs,characters:renderCharacters,text:renderText,enemies:renderEnemies,encounters:renderEncounters,maps:renderMaps,world:renderWorldMap,fields:renderFields,settings:renderSettings,datamap:renderDataMap,dashboard:renderDashboard};
   // An ability record lives in a category subtab of Abilities, so a link to one
   // names its dataset (abilityJunction) and lands on that subtab.
-  async function navigate(tab){if(!(await enemyAiBeforeLeave()))return false;if(tab==="fields"||tab==="world"){state.mapsTab=tab==="fields"?"field":"world";tab="maps"}if(/^ability[A-Z]/.test(tab)){state.abilityTab=tab;tab="abilities"}state.tab=tab;render()}
+  async function navigate(tab){if(!(await enemyAiBeforeLeave()))return false;if(tab==="formulae"){state.settingsTab="formulae";tab="settings"}if(tab==="fields"||tab==="world"){state.mapsTab=tab==="fields"?"field":"world";tab="maps"}if(/^ability[A-Z]/.test(tab)){state.abilityTab=tab;tab="abilities"}state.tab=tab;render()}
   function render(){document.querySelectorAll("nav button[data-tab]").forEach(button=>button.classList.toggle("active",button.dataset.tab===state.tab));if(state.booting||state.bootFailed)return;const toolbar=$("#toolbar");toolbar.hidden=false;toolbar.classList.toggle("portrait-toolbar",state.tab==="gfs"||state.tab==="characters");views[state.tab]();shell.refresh()}
   async function prepareGameplayLaunch(){if(dirtyCount())await saveAll();const result=await api("/api/settings/activate",post({}));if(!result.ready)throw new Error("The FFNx gameplay patch did not pass its launch check.");setStatus("Gameplay patch ready")}
   async function confirmGameplayPatch(){for(let attempt=0;attempt<40;attempt++){await new Promise(resolve=>setTimeout(resolve,500));const status=await api("/api/settings/runtime");if(status.loaded){setStatus("FFNx loaded the gameplay patch");return}if(status.logReady&&attempt>5){showAlert({title:"FFNx did not load the gameplay patch",message:status.message});return}}showAlert({title:"FFNx patch check timed out",message:"FFNx did not write a current patch result within 20 seconds. The game can remain open, but these gameplay settings are not confirmed active."})}
-  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff8",name:"Final Fantasy 8",themeName:"ff8",theme:{bg:"#000",panel:"#626262","panel-2":"#4f4f4f",border:"#929292",text:"#fff",muted:"#d0d0d0",accent:"#aa2432","accent-text":"#fff",highlight:"#fff",success:"#d8d8d8",font:'"FF8 Menu","Arial Narrow",sans-serif',"heading-font":'"FF8 Menu","Arial Narrow",sans-serif'}},tabs:[["characters","Characters"],["cards","Cards"],["encounters","Encounters"],["maps","Maps"],["enemies","Enemies"],["formulae","Formulae"],["gfs","GFs"],["items","Items"],["refine","Refine"],["abilities","Abilities"],["magic","Magic"],["text","Text"],["shops","Shops"],["starting","New Game"],["weapons","Weapons"],["settings","Tweaks"]].map(([id,label])=>({id,label})),activeTab:()=>state.tab,navigate,resetView:tab=>{state.columnPrefs[tab]?.reset?.()},help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the FF8 Data Map",info:()=>navigate("dashboard"),infoActive:()=>state.tab==="dashboard",infoTitle:"Open FF8 setup and runtime information",projectSnapshot:async()=>({canCreate:false,projects:[]}),projectSources:projectSources,projectActiveSource:()=>state.activeSource,selectProjectSource:switchProjectSource,sourcesReplaceProjects:true,changeProjectSource,addProjectSource,pendingChanges:()=>LexeditorUI.pendingChangeList({...state.base,platformConfig:state.savedPlatformConfig},{...historyCapture(),platformConfig:state.platformConfig}),dirtyCount,readonly:()=>state.activeSource!=="mine",save:saveAll,discard:discardAll,beforeLaunch:prepareGameplayLaunch,afterLaunch:confirmGameplayPatch,history:{capture:historyCapture,restore:historyRestore,render,enabled:()=>!state.booting&&state.activeSource==="mine",limit:50}});
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff8",name:"Final Fantasy 8",themeName:"ff8",theme:{bg:"#000",panel:"#626262","panel-2":"#4f4f4f",border:"#929292",text:"#fff",muted:"#d0d0d0",accent:"#aa2432","accent-text":"#fff",highlight:"#fff",success:"#d8d8d8",font:'"FF8 Menu","Arial Narrow",sans-serif',"heading-font":'"FF8 Menu","Arial Narrow",sans-serif'}},tabs:[["characters","Characters"],["cards","Cards"],["encounters","Encounters"],["maps","Maps"],["enemies","Enemies"],["gfs","GFs"],["items","Items"],["refine","Refine"],["abilities","Abilities"],["magic","Magic"],["text","Text"],["shops","Shops"],["starting","New Game"],["weapons","Weapons"],["settings","Tweaks"]].map(([id,label])=>({id,label})),activeTab:()=>state.tab,navigate,resetView:tab=>{state.columnPrefs[tab]?.reset?.()},help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the FF8 Data Map",info:()=>navigate("dashboard"),infoActive:()=>state.tab==="dashboard",infoTitle:"Open FF8 setup and runtime information",projectSnapshot:async()=>({canCreate:false,projects:[]}),projectSources:projectSources,projectActiveSource:()=>state.activeSource,selectProjectSource:switchProjectSource,sourcesReplaceProjects:true,changeProjectSource,addProjectSource,pendingChanges:()=>LexeditorUI.pendingChangeList({...state.base,platformConfig:state.savedPlatformConfig},{...historyCapture(),platformConfig:state.platformConfig}),dirtyCount,readonly:()=>state.activeSource!=="mine",save:saveAll,discard:discardAll,beforeLaunch:prepareGameplayLaunch,afterLaunch:confirmGameplayPatch,history:{capture:historyCapture,restore:historyRestore,render,enabled:()=>!state.booting&&state.activeSource==="mine",limit:50}});
   async function boot(){try{[state.dashboard,state.datamap]=await Promise.all([api("/api/dashboard"),api("/api/datamap")]);LexeditorUI.configureThemeSounds(state.dashboard.themeSounds);await reloadEditable();state.booting=false;setStatus(state.dashboard.runtime.installed?"FFNx ready":"FFNx needed for in-game loading");render();LexeditorUI.finishPluginLoading()}catch(error){state.booting=false;state.bootFailed=true;LexeditorUI.finishPluginLoading();$("#main").replaceChildren(el("div",{class:"empty"},`Failed to load FF8 plugin: ${error.message}`));setStatus("Load failed")}}
   window.addEventListener("lexeditor-settings-ready",()=>{if(!state.booting&&state.tab==="dashboard")renderDashboard()});
   window.addEventListener("ff8-spellbook-changed",()=>shell.refresh());

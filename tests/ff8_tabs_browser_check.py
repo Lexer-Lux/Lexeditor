@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from plugin_ui import plugin_ui
-LABELS = 'ABILITIES CARDS CHARACTERS ENCOUNTERS ENEMIES FORMULAE GFS ITEMS MAGIC MAPS REFINE SHOPS START TEXT WEAPONS TWEAKS'.split()
+LABELS = 'ABILITIES CARDS CHARACTERS ENCOUNTERS ENEMIES GFS ITEMS MAGIC MAPS REFINE SHOPS START TEXT WEAPONS TWEAKS'.split()
 
 def main():
     font = Path(os.environ['LOCALAPPDATA']) / 'Lexeditor/game-data/ff8/generated/ff8-menu.ttf'

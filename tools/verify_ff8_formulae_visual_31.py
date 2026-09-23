@@ -1,4 +1,4 @@
-"""Hidden rendered check for the FF8 Formulae page (GitHub #31)."""
+"""Hidden rendered check for the FF8 Formulae tweaks subtab (GitHub #31)."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # n
 
 
 def main() -> int:
-    # Formulae renders real weapons/settings data. Without the extracted FF8
+    # The Tweaks list renders real settings data. Without the extracted FF8
     # baseline the editor can boot, but those payloads are null and a browser
     # TypeError would misreport "no game data" as a UI regression.
     required = (
@@ -63,89 +63,50 @@ def main() -> int:
             """})
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
-            cdp.eval("navigate('formulae')")
-            # Wait for the page, not for a fixed number of cards. FF8 has gained
-            # formulae since this was written, and pinning the count made every
-            # new one break a check that is about layout and editing.
-            wait_eval(cdp, "state.tab==='formulae'&&document.querySelectorAll('.formula-card').length>=document.querySelectorAll('.formula-rework').length+2&&document.querySelectorAll('.formula-rework').length>0", 30)
+            cdp.eval("navigate('settings')")
+            wait_eval(cdp, "state.tab==='settings'&&document.querySelectorAll('.lex-subtab-button').length===3", 30)
             result = cdp.eval("""(() => ({
-              cards:[...document.querySelectorAll('.formula-card>h2')].map(node=>node.textContent.trim()),
-              groups:[...document.querySelectorAll('.formula-subheading')].map(node=>node.textContent.trim()),
-              expressions:[...document.querySelectorAll('.formula-expression')].map(node=>node.textContent.trim()),
-              editableTerms:document.querySelectorAll('.formula-terms input').length,
-              termsPerCard:[...document.querySelectorAll('.formula-card:not(.formula-rework)')].map(card=>card.querySelectorAll('.formula-terms input').length),
-              termValues:[...document.querySelectorAll('.formula-terms input')].map(input=>({label:input.getAttribute('aria-label'),value:input.value,checked:input.checked,type:input.type})),
-              previewInputs:document.querySelectorAll('.formula-preview-inputs input').length,
-              reworkControl:(()=>{const input=document.querySelector('[aria-label="Formulae Rework"]');return input?{checked:input.checked,inside:!!input.closest('.formula-rework-master')}:null})(),
+              subtabs:[...document.querySelectorAll('.lex-subtab-button')].map(button=>({
+                label:button.querySelector('.lex-tab-label-text').textContent.trim(),
+                disabled:button.disabled,active:button.classList.contains('active')})),
+              tweak:(()=>{const input=document.querySelector('[aria-label="Formulae Rework"]');
+                return input?{checked:input.checked,disabled:input.disabled,
+                  row:!!input.closest('.lex-detail-panel')}:null})(),
+              formulaCards:document.querySelectorAll('[data-formula-id]').length,
+              settingsTab:state.settingsTab,
+              available:state.data.settings.formulaeReworkAvailable,
+              rework:state.data.settings.formulaeRework,
               errors:window.__testErrors,
             }))()""")
-            geometry_script = """(() => {
-              const view=document.querySelector('.formulae-view');
-              const cards=[...document.querySelectorAll('.formula-card')];
-              const box=view.getBoundingClientRect();
-              const right=Math.max(...cards.map(card=>card.getBoundingClientRect().right));
-              return {viewport:innerWidth,left:box.left,right:box.right,
-                contentRight:box.left+view.clientWidth,cardRight:right,
-                overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth};
-            })()"""
-            geometry_1600 = cdp.eval(geometry_script)
-            # The transcribed formulae must still be here and still lead; the
-            # reworks that follow them are a growing list.
-            leading = ["PHYSICAL DAMAGE", "PHYSICAL ACCURACY"]
-            assert result["cards"][:len(leading)] == leading, result
-            for title in ("MELEE DAMAGE", "MAGIC DAMAGE", "STATUS INFLICTION", "SPELL HEALING"):
-                assert any(title in card for card in result["cards"]), (title, result["cards"])
-            assert result["reworkControl"] == {"checked": False, "inside": True}, result
-            assert cdp.eval("document.querySelector('[aria-label=\"Formulae Rework\"]').disabled") is True
-            assert result["groups"].count("FORMULA") == 2, result
-            assert "EDITABLE FORMULA TERMS" in result["groups"], result
-            assert any("DAMAGE" in value for value in result["expressions"]), result
-            assert any("HIT CHANCE" in value for value in result["expressions"]), result
-            joined_expressions = "\n".join(result["expressions"])
-            for text in ("0x491AD0", "0x48F9F0", "0x493280"):
-                assert text in joined_expressions, (text, result)
-            assert "Not yet transcribed" not in joined_expressions, result
-            assert result["termsPerCard"] and all(count >= 2 for count in result["termsPerCard"]), result
-            assert result["previewInputs"] > 1, result
+            # The live backend still lists incomplete rows, so the owning
+            # toggle stays unavailable and its subtab stays locked. The page
+            # content itself is covered stubbed (no game) by the scroll check.
+            labels = [tab["label"] for tab in result["subtabs"]]
+            assert labels == ["Gameplay", "Formulae", "FFNx"], result
+            formulae_tab = next(tab for tab in result["subtabs"] if tab["label"] == "Formulae")
+            assert formulae_tab["disabled"] is True, result
+            assert result["tweak"] == {"checked": False, "disabled": True, "row": True}, result
+            assert result["formulaCards"] == 0, result
+            assert result["available"] is False and result["rework"] is False, result
             assert not result["errors"], result
-            assert abs(geometry_1600["contentRight"] - geometry_1600["cardRight"]) <= 2, geometry_1600
-            assert geometry_1600["overflow"] <= 0, geometry_1600
-            assert cdp.eval("state.data.settings.formulaeRework") is False
-            edit = cdp.eval("""(() => {
-              const weapon=state.data.weapons.rows.find(row=>Number(row.id)===Number(state.formula.weaponId));
-              const field=weapon.fields.find(value=>value.field==='attack_power');
-              const input=document.querySelector('.formula-card:not(.formula-rework) .formula-terms input');
-              const output=document.querySelector('.formula-card:not(.formula-rework) .formula-output');
-              const before={value:Number(field.value),output:output.textContent};
-              const next=before.value<255?before.value+1:before.value-1;
-              input.value=String(next);
-              input.dispatchEvent(new Event('input',{bubbles:true}));
-              return {before,next};
-            })()""")
-            wait_eval(cdp, f"dirtyCount()>0&&Number(state.data.weapons.rows.find(row=>Number(row.id)===Number(state.formula.weaponId)).fields.find(value=>value.field==='attack_power').value)==={edit['next']}", 10)
-            wait_eval(cdp, f"document.querySelector('.formula-card:not(.formula-rework) .formula-output').textContent!=={json.dumps(edit['before']['output'])}", 10)
-            cdp.eval("saveAll()", True)
-            wait_eval(cdp, "dirtyCount()===0", 20)
-            cdp.eval("reloadEditable().then(()=>navigate('formulae'))", True)
-            wait_eval(cdp, "state.data.settings.formulaeRework===false&&state.tab==='formulae'&&document.querySelectorAll('.formula-card').length>=document.querySelectorAll('.formula-rework').length+2&&document.querySelectorAll('.formula-rework').length>0", 20)
-            saved_value = cdp.eval("state.data.weapons.rows.find(row=>Number(row.id)===Number(state.formula.weaponId)).fields.find(value=>value.field==='attack_power').value")
-            assert int(saved_value) == int(edit["next"]), (saved_value, edit)
-            cdp.call("Emulation.setDeviceMetricsOverride", {
-                "width": 1280, "height": 900, "deviceScaleFactor": 1, "mobile": False,
-            })
-            wait_eval(cdp, "innerWidth===1280", 10)
-            geometry_1280 = cdp.eval(geometry_script)
-            assert abs(geometry_1280["contentRight"] - geometry_1280["cardRight"]) <= 2, geometry_1280
-            assert geometry_1280["overflow"] <= 0, geometry_1280
-            cdp.call("Emulation.setDeviceMetricsOverride", {
-                "width": 1600, "height": 900, "deviceScaleFactor": 1, "mobile": False,
-            })
+            # An old formulae link must land on the Gameplay list that owns
+            # the toggle, never on a locked subtab.
+            cdp.eval("navigate('formulae')")
+            wait_eval(cdp, "state.tab==='settings'&&state.settingsTab==='gameplay'", 30)
+            fallback = cdp.eval("""(() => ({
+              formulaCards:document.querySelectorAll('[data-formula-id]').length,
+              tweak:!!document.querySelector('[aria-label="Formulae Rework"]'),
+            }))()""")
+            assert fallback == {"formulaCards": 0, "tweak": True}, fallback
+            geometry = cdp.eval("""(() => ({
+              overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth}))()""")
+            assert geometry["overflow"] <= 0, geometry
             screenshot = cdp.call("Page.captureScreenshot", {
                 "format": "png", "captureBeyondViewport": False, "fromSurface": True,
             })
             output.write_bytes(base64.b64decode(screenshot["data"]))
-            print(json.dumps({"content": result, "geometry1600": geometry_1600,
-                              "geometry1280": geometry_1280}, ensure_ascii=True))
+            print(json.dumps({"tweaks": result, "fallback": fallback,
+                              "geometry": geometry}, ensure_ascii=True))
         return 0
     finally:
         if cdp:
