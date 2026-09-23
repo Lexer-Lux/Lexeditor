@@ -140,7 +140,7 @@ def audit(game_root: Path | None = None, project_root: Path | None = None) -> di
         return {
             "pinnedMemoria": memoria_manager.PINNED_RELEASE,
             "folderNames": [], "priorities": [], "mods": [], "declaredConflicts": [],
-            "overlaps": [], "unsupportedByPinnedMemoria": [], "mergeScripts": None,
+            "overlaps": [], "unsupportedByPinnedMemoria": [], "unknownRuntimeCompatibility": [], "mergeScripts": None,
             "projectScanTruncated": False,
         }
 
@@ -149,7 +149,7 @@ def audit(game_root: Path | None = None, project_root: Path | None = None) -> di
     except (OSError, UnicodeError) as error:
         return {"pinnedMemoria": memoria_manager.PINNED_RELEASE, "error": str(error),
                 "folderNames": [], "priorities": [], "mods": [], "declaredConflicts": [],
-                "overlaps": [], "unsupportedByPinnedMemoria": [], "mergeScripts": None,
+                "overlaps": [], "unsupportedByPinnedMemoria": [], "unknownRuntimeCompatibility": [], "mergeScripts": None,
                 "projectScanTruncated": False}
 
     folders = _quoted_list(_ini_setting(text, "Mod", "FolderNames"))
@@ -192,12 +192,21 @@ def audit(game_root: Path | None = None, project_root: Path | None = None) -> di
                         overlap_paths.append(value)
         minimum = str(meta.get("minimumMemoriaVersion", ""))
         minimum_valid = not minimum or bool(_version(minimum))
-        supported = not minimum or (minimum_valid and not _newer_than(minimum, pinned))
+        runtime_compatibility = (
+            "unknown" if not minimum
+            else "unsupported" if not minimum_valid or _newer_than(minimum, pinned)
+            else "declared-compatible"
+        )
         row = {
             **meta,
             "activePaths": list(active_paths[key]),
             "minimumMemoriaVersionValid": minimum_valid,
-            "supportedByPinnedMemoria": supported,
+            "runtimeCompatibility": runtime_compatibility,
+            "supportedByPinnedMemoria": (
+                True if runtime_compatibility == "declared-compatible"
+                else False if runtime_compatibility == "unsupported"
+                else None
+            ),
             "overlapPaths": overlap_paths,
         }
         mods.append(row)
@@ -224,7 +233,11 @@ def audit(game_root: Path | None = None, project_root: Path | None = None) -> di
          "reason": ("invalid MinimumMemoriaVersion metadata"
                     if not mod.get("minimumMemoriaVersionValid", True)
                     else "requires newer Memoria")}
-        for mod in mods if not mod["supportedByPinnedMemoria"]
+        for mod in mods if mod["runtimeCompatibility"] == "unsupported"
+    ]
+    unknown_runtime = [
+        {"name": mod["name"], "folder": mod["folder"]}
+        for mod in mods if mod["runtimeCompatibility"] == "unknown"
     ]
 
     return {
@@ -240,5 +253,6 @@ def audit(game_root: Path | None = None, project_root: Path | None = None) -> di
         "declaredConflicts": declared,
         "overlaps": overlaps,
         "unsupportedByPinnedMemoria": unsupported,
+        "unknownRuntimeCompatibility": unknown_runtime,
         "projectScanTruncated": truncated,
     }
