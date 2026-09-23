@@ -13,6 +13,7 @@ from pathlib import Path
 from plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProjectSpec, PluginFont
 from service_session import LocalPluginSession, request_json
 from .extractor import ensure_rdr_data
+from . import magic_rdr_manager
 from .paths import LEXEDITOR_ROOT, MOD_ROOT, PLUGIN_ROOT, PROJECT_ROOT, RDR2_FONT_ROOT, check as check_paths
 
 
@@ -324,6 +325,10 @@ PLUGIN = GamePlugin(
     launch=launch,
     smoke=smoke,
     session_factory=RdrSession,
+    helper_name="MagicRDR bridge",
+    helper_status=magic_rdr_manager.status,
+    helper_pinned=magic_rdr_manager.PINNED_RELEASE,
+    helper_upstream=magic_rdr_manager.upstream_release,
     github=GitHubRepository(
         full_name="Lexer-Lux/Lexers-Mod-For-RDR",
         authorized_logins=("Lexer-Lux",),
