@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from games.ff7r2.dataobject import DataObjectError, DataObjectPackage
-from ff7r2_fixture import fixture
+from ff7r2_fixture import battle_item_possession_fixture, fixture
 
 
 def test_fixture_parses_real_record_identity_and_scalar_types():
@@ -75,3 +75,57 @@ def test_truncated_assets_are_rejected(cut):
     source = fixture()[:cut]
     with pytest.raises(DataObjectError):
         DataObjectPackage.from_bytes(source)
+
+def test_array_elements_decode_read_only_and_preserve_source_bytes():
+    source = battle_item_possession_fixture()
+    package = DataObjectPackage.from_bytes(source)
+    assert package.to_bytes() == source
+    row = package.records[0]
+    values = {field.name: field.value for field in row.fields}
+    assert values["NormalItemName_Array"] == ["Potion", "HiPotion"]
+    assert values["NormalItemPercent_Array"] == [25, 75]
+    assert values["RareItemName_Array"] == ["Ether"]
+    assert values["RareItemPercent_Array"] == [10]
+    assert values["StealItemName_Array"] == ["Potion", "Ether"]
+    assert values["StealItemQuantity_Array"] == [1, 2]
+    assert values["StealFaildCountArrayIndex"] == 3
+    arrays = [field for field in row.fields if field.kind == "array"]
+    assert arrays
+    assert all(field.editable is False for field in arrays)
+    assert all("array writes remain disabled" in field.note for field in arrays)
+    payload = package.payload()
+    payload_arrays = {
+        field["name"]: field for field in payload["records"][0]["fields"]
+        if field["kind"] == "array"
+    }
+    assert payload_arrays["StealItemName_Array"]["arrayCount"] == 2
+    assert payload_arrays["RareItemName_Array"]["arrayCount"] == 1
+
+
+def test_array_edit_is_rejected_without_mutation():
+    source = battle_item_possession_fixture()
+    package = DataObjectPackage.from_bytes(source)
+    with pytest.raises(DataObjectError, match="read-only"):
+        package.apply_edits([{
+            "nameIndex": package.records[0].key.index,
+            "property": "NormalItemPercent_Array",
+            "value": [100, 100],
+        }])
+    assert package.to_bytes() == source
+
+
+def test_array_data_pointer_outside_asset_is_rejected():
+    source = battle_item_possession_fixture()
+    parsed = DataObjectPackage.from_bytes(source)
+    field = next(
+        item for item in parsed.records[0].fields
+        if item.name == "NormalItemPercent_Array"
+    )
+    damaged = bytearray(source)
+    bad_target = len(damaged) + 64
+    offset = bad_target - field.offset
+    import struct
+    struct.pack_into("<Q", damaged, field.offset, (offset << 1) | 1)
+    with pytest.raises(DataObjectError):
+        DataObjectPackage.from_bytes(bytes(damaged))
+
