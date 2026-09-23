@@ -117,7 +117,8 @@ def main() -> None:
         "MergeScripts behavior.\n"
         "- Do not count mods whose ModDescription.xml requires a Memoria version newer than the candidate's pinned "
         "v2025.07.04 as supported. The 2026-09-22 catalog audit found Ferny Fantasy IX, MistwakeUI - English "
-        "Version, CostumePack 2.1, and Extra Equipment Menu 1.2 beyond that pin.\n\n"
+        "Version, CostumePack 2.1, and Extra Equipment Menu 1.2 beyond that pin. Mods with no "
+        "MinimumMemoriaVersion declaration remain runtime-compatibility UNKNOWN until native testing.\n\n"
         "Report separately: helper install/repair, save/reopen, baseline deployment, native battle behavior, "
         "revert, compatible-mod coexistence, exact-path overlap (if tested), and any error text shown.\n",
         encoding="utf-8",
