@@ -120,13 +120,13 @@ jobs:
             ".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -r requirements.txt
             if errorlevel 1 exit /b 1
           )
-          if /i "%~1"=="--checks-only" (
-            set "LEXEDITOR_CHECK_PYTHON=%CD%\.venv\Scripts\python.exe"
-            call tools\Warband-checks.cmd --checks-only
-            if errorlevel 1 exit /b 1
-            exit /b 0
-          )
+          if /i "%~1"=="--checks-only" goto checks_only
           start "" ".venv\Scripts\pythonw.exe" app.py --game warband
+          exit /b 0
+          :checks_only
+          set "LEXEDITOR_CHECK_PYTHON=%CD%\.venv\Scripts\python.exe"
+          call tools\Warband-checks.cmd --checks-only
+          exit /b %ERRORLEVEL%
           '@ | Set-Content -LiteralPath (Join-Path $candidate 'Run-Warband-Candidate.cmd') -Encoding ascii
           @"
           Lexeditor Warband candidate
