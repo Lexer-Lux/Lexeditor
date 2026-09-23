@@ -1019,13 +1019,7 @@ details.lex-detail-section[open] > summary::before { content:"▾"; }
 }
 .lex-detail-field:not(:focus-within) .lex-field-type-range { display:block;opacity:0; }
 .lex-field-type-rail:hover { z-index:6; }
-/* Pointing at the rail enlarges the TYPE CODE, which is text. The help pip is
-   a fixed circle, and growing its glyph to the type code's hover size left the
-   question mark crowding the ring around it. */
-/* The type code does not grow when it is pointed at. Growing it moved the
-   text inside its own rail, which is what kept shaving a glyph against an edge
-   that had nothing on the other side of it. */
-.lex-field-type-rail:hover > span:not(.lex-info-help) { font-size:inherit; }
+
 .lex-detail-field:focus-within:has(.lex-field-type-range) .lex-field-type-name { left:25%; }
 .lex-detail-field:focus-within .lex-field-type-range { left:75%;opacity:1; }
 
@@ -4296,11 +4290,7 @@ body:has(.lex-data-map-table) #main {
 /* Pointing at the type rail turns it into the same help popup every other
    marker uses, instead of being a separate silent affordance. */
 .lex-detail-field:hover > .lex-field-type-rail > .lex-field-type-name { opacity:1; }
-/* The help badge occupies the same slot as the type name. Dimming the name
-   left the two drawn on top of each other; the rail swaps instead, exactly
-   as the toggle rail already does. */
-.lex-field-type-rail:hover:has(> .lex-info-help) > .lex-field-type-name,
-.lex-field-type-rail:hover:has(> .lex-info-help) > .lex-field-type-range { opacity:0; }
+
 /* Hovering only hints at the range. Once the field has focus the range is
    the thing being read, so it must not stay dimmed under the cursor. */
 /* The help marker is a round badge, so it must stay square. Stretching it to
@@ -4409,24 +4399,9 @@ body:has(.lex-data-map-table) #main {
 /* The rail and its help marker cross-fade instead of swapping instantly. */
 .lex-field-type-rail > .lex-field-type-name,
 .lex-field-type-rail > .lex-field-type-range { transition: left .16s ease, opacity .16s ease, font-size .12s ease; }
-/* The transition belongs on the HOVER state, not the base rule. On the base
-   rule it also governed the way OUT, so the badge was still fading while the
-   type name - hidden with display:none, which is instant - had already come
-   back, and both were briefly readable at once. Fading in only means they
-   can never coexist in either direction. */
 
-.lex-detail-field:hover > .lex-field-type-rail > .lex-info-help {
-  transition: opacity .16s ease .04s;
-}
-/* Pointing at the type text replaces that text with its help mark. Keep this
-   final rule after the focus/range rules so a focused input cannot draw the
-   range through the question mark. */
-.lex-field-type-rail:hover:has(> .lex-info-help) > :is(.lex-field-type-name,.lex-field-type-range) {
-  opacity:0;
-}
-.lex-field-type-rail:hover > .lex-info-help {
-  opacity:1;
-}
+
+
 
 /* ---- Loading screen handover ---------------------------------------- */
 /* The root paints the screen from the first frame; framework.js then appends
@@ -4506,17 +4481,7 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
   opacity:1;
 }
 
-/* Only a rail that HAS a help mark may blank its type: on a property without
-   one this hid the type code and put nothing in its place, so pointing at the
-   rail of a plain property emptied it. Tabbing to the mark reveals it the same
-   way pointing at the rail does; clicking it does not, because a click that
-   leaves focus behind would hold the swap open after the pointer had left. */
-.lex-field-type-rail:is(:hover,:has(:focus-visible)):has(> .lex-info-help) > .lex-field-type-name, .lex-field-type-rail:is(:hover,:has(:focus-visible)):has(> .lex-info-help) > .lex-field-type-range {
-  opacity:0;
-}
-.lex-field-type-rail:is(:hover,:has(:focus-visible)) > .lex-info-help {
-  opacity:1;
-}
+
 /* A sorted field uses the same centre point as its type/help marker. */
 
 .lex-detail-field[data-lex-sort="desc"] .lex-field-type-rail::after { content:"\25BC"; }
@@ -4710,12 +4675,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   line-height:1;
   transform:none;
 }
-.lex-field-type-rail .lex-info-help {
-  position:absolute;
-  left:50%;
-  top:50%;
-  transform:translate(-50%,-50%);
-}
+
 
 .lex-reference-tag.lex-reference-ll {
   color:#72ff1e;
@@ -5479,29 +5439,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   font-weight: 700;
   line-height: 1;
 }
-.lex-field-type-rail > .lex-info-help {
-  position: absolute;
-  display: grid;
-  box-sizing: border-box;
-  place-items: center;
-  opacity: 0;
-  transition: none;
-  top:50%;
-  left:50%;
-  width:18px;
-  min-width:18px;
-  height:18px;
-  min-height:18px;
-  margin:0;
-  padding:0;
-  transform:translate(-50%,-50%);
-  pointer-events:auto;
-  cursor:pointer;
-  font-family: var(--lex-symbol-font);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-}
+
 .lex-column-heading > .lex-info-help {
   flex:0 0 auto;
   margin-left:0;
@@ -7382,4 +7320,24 @@ body { text-shadow: var(--lex-text-shadow, none); }
    showed while hidden. An important declaration in a layer beats all
    unlayered rules, which is exactly the guarantee this needs. */
 [hidden] { display:none !important; }
+}
+
+/* Property help has its own right gutter; the left rail stays metadata. */
+.lex-detail-field:has(> .lex-field-help) { padding-inline-end:30px; }
+.lex-field-help {
+  position:absolute;
+  inset-inline-end:4px;
+  top:50%;
+  transform:translateY(-50%);
+  display:grid;
+  place-items:center;
+  width:22px;
+  z-index:5;
+}
+.lex-field-help > .lex-info-help {
+  position:static;
+  margin:0;
+  transform:none;
+  opacity:1;
+  visibility:visible;
 }

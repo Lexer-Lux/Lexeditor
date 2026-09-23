@@ -24,6 +24,34 @@ def framework(page):
     page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
 
 
+def test_property_help_is_always_on_right(page):
+    import tempfile
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI, main=document.querySelector('main');
+      const box=U.el('div',{style:'width:600px'});main.append(box);
+      for(const [label,type,showType,help] of [['Number','number',true,true],['Flag','checkbox',true,true],['Text','text',false,true],['No help','text',true,false]]){
+        box.append(U.detailField({label,showType,control:U.el('input',{type,value:20}),
+          help:help?U.infoHelp('Help for '+label):null}));
+      }
+    }''')
+    page.wait_for_timeout(100)
+    assert page.locator('.lex-field-type-rail .lex-info-help').count()==0
+    assert page.locator('.lex-field-help').count()==3
+    for field in page.locator('.lex-detail-field').all()[:3]:
+        help=field.locator('.lex-field-help .lex-info-help')
+        assert help.is_visible()
+        assert help.evaluate('n=>getComputedStyle(n).opacity')=='1'
+        control=field.locator('.lex-detail-field-control').bounding_box()
+        assert help.bounding_box()['x']>=control['x']+control['width']
+    rail=page.locator('.lex-field-type-rail').first
+    rail.hover()
+    assert rail.locator('.lex-field-type-name').evaluate('n=>getComputedStyle(n).opacity')=='1'
+    page.locator('.lex-field-help .lex-info-help').first.hover()
+    page.get_by_role('tooltip').wait_for()
+    page.locator('main > div').screenshot(path=str(Path(tempfile.gettempdir())/'lex-property-help-right.png'))
+
+
 def test_readonly_fields_keep_numeric_types(page):
     framework(page)
     page.evaluate('''()=>{

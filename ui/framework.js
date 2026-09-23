@@ -1670,7 +1670,7 @@
         input.setAttribute("aria-description", suppliedHelp);
     }
     const typeRail = element("div", {class: "lex-field-type-rail"},
-      typeName, typeRange, helpMarker);
+      typeName, typeRange);
     const directCheckboxes = control instanceof Element
       ? (control.matches('input[type="checkbox"]') ? 1 : control.querySelectorAll('input[type="checkbox"]').length)
       : 0;
@@ -1700,9 +1700,8 @@
     booleanField ? arrow : null,
     element("div", {class: "lex-detail-field-control"}, control,
       pin && pin.parentElement !== control ? pin : null),
-    // Hiding the type hides the type, not the help that shares its rail: a
-    // field that asked for no type lost its only explanation with it.
-    options.showType === false ? (helpMarker ? element("div", {class: "lex-field-type-rail"}, helpMarker) : null) : typeRail);
+    options.showType === false ? null : typeRail,
+    helpMarker ? element("div", {class:"lex-field-help"}, helpMarker) : null);
     // The leader arrow shares the checkbox's grid row, so it points at the
     // middle of the box whatever else the row is carrying and however tall the
     // row turns out to be. Anchored to the row instead, it tracked the row's
