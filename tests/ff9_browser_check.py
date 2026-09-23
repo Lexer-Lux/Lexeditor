@@ -217,6 +217,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             expect(page.get_by_label("RUNTIME UNKNOWN", exact=True)).to_have_value("None detected")
             expect(page.get_by_label("DECLARED CONFLICTS", exact=True)).to_have_value("None declared")
             expect(page.get_by_label("EXACT PATH OVERLAPS", exact=True)).to_have_value("None detected")
+            page.get_by_text("EXTERNAL MOD COMPATIBILITY", exact=True).scroll_into_view_if_needed()
             page.screenshot(path=str(OUT / "ff9-info-mod-compat.png"), full_page=True)
 
             page.evaluate("navigate('magic')")
@@ -245,7 +246,6 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
 
             page.locator("#plugin-data-map").click()
             page.wait_for_selector(".lex-data-map-view")
-            page.screenshot(path=str(OUT / "ff9-datamap.png"), full_page=True)
             map_search = page.get_by_role("searchbox", name="Search the data map")
             map_search.fill("BattleScene")
             page.wait_for_function("state.mapQuery==='BattleScene'")
@@ -254,6 +254,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.wait_for_function("state.mapQuery==='p0data4.bin'")
             map_text = page.locator(".lex-data-map-view").inner_text()
             assert "p0data4.bin" in map_text and "Field and character 3D models" in map_text
+            gap_row = page.locator(".lex-column-list-row").filter(has_text="p0data4.bin").first
+            expect(gap_row).to_be_visible()
+            gap_row.click()
+            expect(page.locator(".lex-data-map-detail")).to_contain_text("mesh/rig")
+            page.screenshot(path=str(OUT / "ff9-datamap.png"), full_page=True)
             map_search.fill("")
 
             page.set_viewport_size({"width": 820, "height": 700})
