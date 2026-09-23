@@ -2104,6 +2104,10 @@
     svg.setAttribute("class", "lex-curve-svg");
     svg.setAttribute("viewBox", "0 0 320 160");
     let graphHeight = 160;
+    // The viewBox is only matched while the layout drives the box. Under a
+    // content-driven ancestor the box height falls back to the intrinsic
+    // ratio, so adopting our own box back would grow every pass (#527).
+    let lastBoxWidth = 0, lastBoxHeight = 0, wroteViewBox = false, heldSize = false;
     // Match the viewBox to the available rectangle, keeping text uniformly
     // scaled without adding letterbox space above and below the graph.
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
@@ -2531,7 +2535,22 @@
 
     const draw = () => {
       const bounds=svg.getBoundingClientRect();
-      if(bounds.width>0&&bounds.height>0)graphHeight=320*bounds.height/bounds.width;
+      if(bounds.width>0&&bounds.height>0){
+        // A box that moves right after our own viewBox write, with width
+        // unchanged, is following us rather than the layout (#527): hold the
+        // sizing so the loop settles instead of growing. The hold lasts until
+        // the box moves on its own or the width changes; both adopt again.
+        const adopt=()=>{
+          const aspect=320*bounds.height/bounds.width;
+          wroteViewBox=Math.abs(aspect-graphHeight)>1e-6;
+          if(wroteViewBox){graphHeight=aspect;heldSize=false;}
+        };
+        if(bounds.width!==lastBoxWidth)adopt();
+        else if(bounds.height===lastBoxHeight){if(!heldSize)adopt();}
+        else if(!wroteViewBox)adopt();
+        else{heldSize=true;wroteViewBox=false;}
+        lastBoxWidth=bounds.width;lastBoxHeight=bounds.height;
+      }
       svg.setAttribute('viewBox',`0 0 320 ${graphHeight}`);
       grid.setAttribute('d',Array.from({length:5},(_,i)=>`M0 ${graphHeight*i/4}H320 M${80*i} 0V${graphHeight}`).join(' '));
       const range = getRange();
