@@ -123,7 +123,10 @@ def main():
                     page.reload()
                     page.wait_for_function('typeof state !== "undefined" && !state.booting')
                     page.evaluate('navigate("loot")')
-                    assert page.get_by_text('Not supplied', exact=True).count() == 2
+                    evidence = page.locator('.lex-detail-section').filter(has_text='Which script this is reading').first
+                    for label in ('Archive', 'Script'):
+                        field = evidence.locator('.lex-detail-field').filter(has_text=label).first
+                        assert field.locator('input.lex-readonly-field').input_value() == 'Not supplied'
                     paths['LOOT_FILE'].write_text('{broken')
                     page.reload()
                     page.wait_for_function('typeof state !== "undefined" && !state.booting')
