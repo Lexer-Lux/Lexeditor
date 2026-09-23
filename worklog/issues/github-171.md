@@ -31,3 +31,13 @@ proposals stay rejected. Exact needs: build that prototype with recovery
 checks, then a Lexer drowning session. Death at zero stamina stays
 inevitable with no rescue window or HUD warning. No code written here.
 
+## 2026-09-23 agent slice (per-game-rdr2): prototype shape contract
+
+games/rdr2/drowning_prototype.py records the agreed shape as data plus
+validate_drowning_plan(), which requires the irreversible zero-stamina
+latch, presentation with no rescue window or HUD warning, immediate-death
+fall-throughs (shallow, ragdoll, unsafe first person, mission, refused
+control), recovery checks, and rejects zero-second and trough proposals.
+Covered by tests/test_rdr2_drowning_prototype.py (9 hermetic tests).
+No gameplay claim: building the prototype still needs the game.
+

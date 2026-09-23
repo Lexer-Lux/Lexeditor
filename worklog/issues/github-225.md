@@ -31,3 +31,13 @@ RDR2 session preparing a concrete alternative interface and progression
 proposal, then Lexer design approval. No code written; recording the needs
 here instead of inventing a menu page.
 
+## 2026-09-23 agent slice (per-game-rdr2): interface proposal
+
+docs/rdr2-skills-interface-proposal.md prepares the requested concrete
+alternative: a key-bound standalone runtime panel (never a pause-menu
+page), event-counted progression with fixed rank thresholds,
+scalar-only effects, and mod-owned per-profile persistence, with the
+editor planning page as the approval artifact. Not installed; no menu
+or save changed. Next: Lexer design approval of the interface and
+progression model before any prototype.
+

@@ -35,3 +35,12 @@ their shape. (4 hermetic tests.) No gameplay claim: intercepting one
 event before its identity is lost still needs native research with the
 game.
 
+## 2026-09-23 agent slice (per-game-rdr2): verified, no new code
+
+Re-read the live issue plus comments. The editor side is complete and
+honest: the Crime page exposes the 21 event toggles plus the 19-tier
+table with the shared-tier scope note, and per-action amounts stay
+absent as required. Re-ran tests/test_rdr2_honor_action_amounts.py:
+4 green. Stays actionable: native interception research plus the game
+session are still owed.
+

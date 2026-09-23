@@ -34,3 +34,12 @@ animation work (draw/holster/idle/aim/fire/reload sets, reticle-driven
 aim poses, recoil/reload events, binocular handling, upper-body masks,
 contacts, zero root motion), then Lexer visual QA. No code written here.
 
+## 2026-09-23 agent slice (per-game-rdr2): honest settings help
+
+settings_schema.json gains the missing Prone|GroundedAimMode help: test
+mode runs the authored grounded aim loop so the wheel opens prone, while
+reload stays blocked, longarms/binoculars are unsupported, and shots
+need in-game reticle validation. Guarded by
+tests/test_rdr2_settings_help.py. No gameplay claim: the authored
+animation pipeline and visual QA are still owed.
+

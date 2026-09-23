@@ -125,3 +125,13 @@ present on this branch. Exact remaining needs: the tag198 decryption path
 for short_update, the guarded cap-policy design, then game-side proof.
 No new code written.
 
+## 2026-09-23 agent slice (per-game-rdr2): cap-policy contract
+
+games/rdr2/bounty_cap_policy.py records the vanilla caps (30000/50000/
+150000, network -1) plus validate_cap_policy(), which requires a script
+fingerprint with fail-closed builds, bounded whole-dollar regional
+maxima with explicit conversion, one amount driving both engine and
+regional clamp, and preservation of existing bounties on disable.
+Covered by tests/test_rdr2_bounty_cap_policy.py (9 hermetic tests). No
+gameplay claim: the tag198 path, patch design, and proof are still owed.
+

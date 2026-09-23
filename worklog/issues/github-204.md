@@ -36,3 +36,13 @@ per-shop Honor price hook with the game, then a purchase-comparison
 session. No code written; recording the needs here instead of inventing
 a hook.
 
+## 2026-09-23 agent slice (per-game-rdr2): comparison contract
+
+games/rdr2/fence_price_check.py pins the valid purchase comparison as
+code plus validate_price_check(), which requires low-Honor and
+high-Honor legs at one fence for one item with readable prices, rejects
+cross-shop/cross-item comparisons and normal-store substitutions, and
+requires ownership of the unbuilt shop-modifier correction. Covered by
+tests/test_rdr2_fence_price_check.py (8 hermetic tests). No gameplay
+claim: the correction and the comparison session are still owed.
+
