@@ -183,6 +183,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 page.get_by_role("button", name="Items", exact=True).click()
                 item_search = page.get_by_label("Search Factorio Items", exact=True)
                 item_search.fill("iron-plate")
+                page.locator('.lex-column-list-row[data-key="iron-plate"]').click()
                 page.wait_for_timeout(120)
                 stack = page.get_by_label("Stack size", exact=True)
                 stack.fill("250")
@@ -192,6 +193,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 page.get_by_role("button", name="Machines", exact=True).click()
                 machine_search = page.get_by_label("Search Factorio Machines", exact=True)
                 machine_search.fill("assembling-machine-1")
+                page.locator('.lex-column-list-row[data-key="assembling-machine-1"]').click()
                 page.wait_for_timeout(120)
                 speed = page.get_by_label("Crafting speed", exact=True)
                 speed.fill("1.25")
@@ -201,6 +203,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 page.get_by_role("button", name="Technologies", exact=True).click()
                 tech_search = page.get_by_label("Search Factorio Technologies", exact=True)
                 tech_search.fill("automation")
+                page.locator('.lex-column-list-row[data-key="automation"]').click()
                 page.wait_for_timeout(120)
                 count = page.get_by_label("Research unit count", exact=True)
                 count.fill("25")
@@ -211,6 +214,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 page.wait_for_function("dirtyCount() === 3")
 
                 tech_search.fill("automation-2")
+                page.locator('.lex-column-list-row[data-key="automation-2"]').click()
                 page.wait_for_timeout(120)
                 prerequisites = page.get_by_label("Technology prerequisites", exact=True)
                 prerequisites.select_option([])
@@ -224,22 +228,26 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 page.get_by_role("button", name="Items", exact=True).click()
                 item_search = page.get_by_label("Search Factorio Items", exact=True)
                 item_search.fill("iron-plate")
+                page.locator('.lex-column-list-row[data-key="iron-plate"]').click()
                 page.wait_for_timeout(100)
                 assert page.get_by_label("Stack size", exact=True).input_value() == "250"
 
                 page.get_by_role("button", name="Machines", exact=True).click()
                 machine_search = page.get_by_label("Search Factorio Machines", exact=True)
                 machine_search.fill("assembling-machine-1")
+                page.locator('.lex-column-list-row[data-key="assembling-machine-1"]').click()
                 page.wait_for_timeout(100)
                 assert page.get_by_label("Crafting speed", exact=True).input_value() == "1.25"
 
                 page.get_by_role("button", name="Technologies", exact=True).click()
                 tech_search = page.get_by_label("Search Factorio Technologies", exact=True)
                 tech_search.fill("automation")
+                page.locator('.lex-column-list-row[data-key="automation"]').click()
                 page.wait_for_timeout(100)
                 assert page.get_by_label("Research unit count", exact=True).input_value() == "25"
                 assert page.get_by_label("Research unit time", exact=True).input_value() == "10"
                 tech_search.fill("automation-2")
+                page.locator('.lex-column-list-row[data-key="automation-2"]').click()
                 page.wait_for_timeout(100)
                 assert page.get_by_label(
                     "Technology prerequisites", exact=True
