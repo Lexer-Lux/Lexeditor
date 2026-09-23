@@ -2862,8 +2862,10 @@ select optgroup {
 .lex-source-control-internal:has(> select) > :is(.lex-reference-values,.lex-reference-placeholder) {
   right:1.65em;
 }
-.lex-source-control-internal:has(> select):not(.no-reference) > select {
-  padding-right:calc(var(--lex-internal-reference-width) + 2.1em);
+.lex-source-control-internal > select {
+  /* Native selects already reserve space for their arrow. Adding another
+     arrow-width here clips text before the visible arrow is reached. */
+  padding-right:calc(var(--lex-internal-reference-width) + 6px);
 }
 .lex-source-control-internal > .lex-source-strip.lex-reference-values { align-items:flex-end; }
 

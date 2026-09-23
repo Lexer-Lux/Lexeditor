@@ -986,7 +986,7 @@
       control.__lexAutoFitUpdate();
       return control;
     }
-    const minimum = Math.max(8, Number(options.minimum) || 11);
+    const minimum = Math.max(8, Number(options.minimum) || (control instanceof HTMLSelectElement ? 8 : 11));
     // The size the text needs, read with the control at its natural size.
     const measure = () => {
       // Off-page controls have no width. Fitting them to zero made their font
