@@ -95,7 +95,7 @@ def main():
                     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding="utf-8")+'</style>')
                     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding="utf-8")+'</script>')
                     html=inline_modules('warband',html)
-                    page.set_content(html,wait_until='domcontentloaded');page.wait_for_function('typeof state!=="undefined"&&!state.booting')
+                    page.set_content(html,wait_until='domcontentloaded');page.wait_for_function('!!document.querySelector(".warband-item-detail")')
                     page.wait_for_function('document.querySelector(".warband-item-thumbnail img")?.naturalWidth>0')
                     assert page.locator('.warband-item-detail [data-lex-property="id"] input').count()==1
                     assert page.locator('.warband-item-detail [data-lex-property="id"] input').is_disabled()
@@ -143,14 +143,14 @@ def main():
                     page.screenshot(path=str(ARTIFACTS/f'datamap-{width}.png'),full_page=True)
                     coverage_filter=page.get_by_role('combobox',name='Filter files by coverage',exact=True)
                     coverage_filter.select_option('')
-                    page.wait_for_function("state.filters.mapStatus===''")
+                    page.wait_for_function("document.querySelector('[aria-label=\"Filter files by coverage\"]')?.value===''")
                     # Resetting coverage causes the fitted Data Map to rebuild.
                     # Let that render settle before typing into the replacement
                     # search input, or a late fit callback can discard the query.
                     page.wait_for_timeout(300)
                     search_box=page.get_by_role('searchbox',name='Search the data map',exact=True)
                     search_box.fill('module_skills.py')
-                    page.wait_for_function("state.filters.datamap==='module_skills.py'")
+                    page.wait_for_function("document.querySelector('[aria-label=\"Search the data map\"]')?.value==='module_skills.py'")
                     skill_row=page.locator('.lex-column-list-row').filter(has_text='module_skills.py')
                     skill_row.wait_for(state='visible')
                     skill_row.click()
@@ -176,7 +176,7 @@ def main():
                     max_level=page.locator('.warband-module-detail [data-lex-property="maxLevel"] input');max_level.fill('11')
                     assert page.evaluate('moduleRecords.dirtyCount()')==1
                     page.locator('.lex-save-icon').click()
-                    page.wait_for_function('moduleRecords.dirtyCount()===0 && !state.build.running')
+                    page.wait_for_function('document.querySelector("#plugin-status")?.textContent==="Saved and build verified"')
                     page.get_by_role('button',name='Items',exact=True).click()
                     page.get_by_role('button',name='Misc.',exact=True).click()
                     page.locator('.warband-module-detail').wait_for(state='visible')
