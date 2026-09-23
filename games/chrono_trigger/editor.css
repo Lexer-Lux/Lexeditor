@@ -6,7 +6,7 @@ body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;co
 #toolbar label{display:flex;gap:6px;align-items:center;min-width:0}
 #toolbar select{min-width:min(52vw,520px);max-width:100%}
 main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
-.ct-layout,.lex-paged-list-detail{height:100%}
+.ct-layout{height:100%}
 .ct-table,.ct-detail{height:100%;min-height:0}
 .ct-detail .lex-detail-panel-body{padding:10px;gap:10px}
 .ct-color-input{width:100%;min-height:44px;padding:2px;border:1px solid var(--lex-border);background:var(--lex-panel)}
@@ -15,4 +15,4 @@ main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
 .ct-loading,.ct-empty,.ct-error{display:grid;place-items:center;height:100%;padding:24px;text-align:center;border:1px solid var(--lex-border);background:var(--lex-panel)}
 .ct-error{color:var(--lex-danger,#b42318)}
 .ct-info-note{margin:0;padding:8px 10px;border-left:3px solid var(--lex-accent);background:color-mix(in srgb,var(--lex-accent) 10%,transparent)}
-@media(max-width:760px){#toolbar{flex-wrap:wrap;padding-top:6px}#toolbar label,#toolbar select{width:100%;min-width:0}}
+@media(max-width:850px){.ct-layout:has(.ct-table){grid-template-rows:minmax(112px,34%) minmax(0,66%)}}\n@media(max-width:760px){#toolbar{flex-wrap:wrap;padding-top:6px}#toolbar label,#toolbar select{width:100%;min-width:0}}
