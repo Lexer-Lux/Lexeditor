@@ -13,9 +13,11 @@ async function editor() {
     append(...values) { this.children.push(...values); },
     replaceChildren(...values) { this.children = values; }});
   const data = {
-    '/api/dashboard': {game: {ready: true}, baseline: {}, project: {root: 'fixture'}, runtime: {installed: false}},
+    '/api/dashboard': {game: {ready: true}, baseline: {}, project: {root: 'fixture'}, runtime: {installed: false},
+      modCompatibility: {mods:[], unsupportedByPinnedMemoria:[], declaredConflicts:[], overlaps:[], projectScanTruncated:false}},
     '/api/catalog': {datasets: []}, '/api/datamap': {rows: []},
     '/api/runtime': {installed: false},
+    '/api/mod-compat': {mods:[], unsupportedByPinnedMemoria:[], declaredConflicts:[], overlaps:[], projectScanTruncated:false},
     '/api/features': {features: {ImprovedInterface:false, BetterEat:false, XPBars:false, HPMPBars:false, RowRework:false}, sha256:'feature-fixture'},
     '/api/deployment': {deployed:false, runtimeReady:true, runtimeCurrent:false},
   };
@@ -170,10 +172,12 @@ test('runtime refresh never replaces unsaved CSV data', async () => {
   assert.equal(e.run('dirtyCount()'), 1);
 });
 
-test('information help describes launcher-first Play', async () => {
+test('information help describes launcher-first Play and read-only external mod audit', async () => {
   const e = await editor(); e.run('info()');
   const description = JSON.stringify(e.targets['#main']);
   assert.match(description, /Play opens Memoria's launcher/);
+  assert.match(description, /EXTERNAL MOD COMPATIBILITY/);
+  assert.match(description, /exact path/i);
   assert.doesNotMatch(description, /Play starts FF9 directly/);
 });
 
