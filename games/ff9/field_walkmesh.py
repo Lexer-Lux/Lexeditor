@@ -1,11 +1,15 @@
-"""Edit the proven FF9 field-walkmesh floor-active bit without rewriting topology.
+"""Edit proven FF9 field-walkmesh activity bits without rewriting topology.
 
 FF9 field ``.bgi.bytes`` TextAssets live in the numbered ``p0data1*.bin``
-archives.  Memoria's pinned BGI reader/writer documents the floor table layout,
-and the runtime names bit 0 ``BGI_FLOOR_ACTIVE``.  Lexeditor deliberately edits
-only that one semantic bit.  Every other BGI byte -- geometry, neighbors, edge
-flags, floor transforms, animation data, unknown flag bits, and padding -- is
-copied verbatim into a normal Memoria loose override.
+archives. Memoria's pinned BGI reader/writer documents both the floor and
+triangle tables, and its runtime names bit 0 ``BGI_FLOOR_ACTIVE`` / ``BGI_TRI_ACTIVE``.
+Lexeditor deliberately edits only those semantic bits. Every other BGI byte --
+geometry, neighbors, edge semantics, transforms, animation data, unknown flag
+bits, and padding -- is copied verbatim into a normal Memoria loose override.
+
+Floor rows are small enough to browse game-wide. Triangle rows are loaded one
+field at a time so the UI never materializes the game's six-figure triangle
+population into one client-side table.
 """
 from __future__ import annotations
 
@@ -23,8 +27,11 @@ from .battle_scene import UnityArchive
 
 BGI_MAGIC = 0xACDCDEAD
 BGI_HEADER_SIZE = 64
+BGI_TRI_SIZE = 40
 BGI_FLOOR_SIZE = 32
+BGI_TRI_ACTIVE = 0x0001
 BGI_FLOOR_ACTIVE = 0x0001
+MAX_TRIANGLES = 65_535
 MAX_FLOORS = 4096
 FIELD_BGI_PATH = re.compile(
     r"(?:^|/)fieldmaps/([^/]+)/([^/]+\.bgi\.bytes)$",
@@ -42,10 +49,47 @@ def _u16(data: bytes, offset: int) -> int:
     return struct.unpack_from("<H", data, offset)[0]
 
 
-def _floor_table(data: bytes) -> list[dict[str, int | bool]]:
-    """Return floor descriptors while retaining every non-edited byte in ``data``."""
+def _i16(data: bytes, offset: int) -> int:
+    if offset < 0 or offset + 2 > len(data):
+        raise ValueError("FF9 BGI data is truncated")
+    return struct.unpack_from("<h", data, offset)[0]
+
+
+def _validate_header(data: bytes) -> None:
     if len(data) < BGI_HEADER_SIZE or struct.unpack_from("<I", data, 0)[0] != BGI_MAGIC:
         raise ValueError("FF9 walkmesh has an invalid BGI header")
+
+
+def _triangle_table(data: bytes) -> list[dict[str, int | bool]]:
+    """Return triangle descriptors while retaining every non-edited byte in ``data``."""
+    _validate_header(data)
+    count = _u16(data, 40)
+    relative_offset = _u16(data, 42)
+    if count > MAX_TRIANGLES:
+        raise ValueError("FF9 walkmesh has too many triangles")
+    start = 4 + relative_offset
+    end = start + count * BGI_TRI_SIZE
+    if start < BGI_HEADER_SIZE or end > len(data):
+        raise ValueError("FF9 walkmesh triangle table is outside the BGI data")
+    result = []
+    for index in range(count):
+        offset = start + index * BGI_TRI_SIZE
+        flags = _u16(data, offset)
+        result.append({
+            "index": index,
+            "offset": offset,
+            "floorNdx": _i16(data, offset + 4),
+            "flags": flags,
+            "active": bool(flags & BGI_TRI_ACTIVE),
+            "otherFlags": flags & ~BGI_TRI_ACTIVE,
+        })
+    return result
+
+
+def _floor_table(data: bytes) -> list[dict[str, int | bool]]:
+    """Return floor descriptors while retaining every non-edited byte in ``data``."""
+    _validate_header(data)
+    triangle_count = _u16(data, 40)
     floor_count = _u16(data, 52)
     floor_offset = _u16(data, 54)
     if floor_count > MAX_FLOORS:
@@ -61,9 +105,14 @@ def _floor_table(data: bytes) -> list[dict[str, int | bool]]:
         floor_ndx = _u16(data, offset + 2)
         tri_count = _u16(data, offset + 28)
         tri_offset = _u16(data, offset + 30)
-        tri_end = 4 + tri_offset + tri_count * 4
-        if tri_end > len(data):
+        tri_start = 4 + tri_offset
+        tri_end = tri_start + tri_count * 4
+        if tri_start < 0 or tri_end > len(data):
             raise ValueError("FF9 walkmesh floor triangle list is outside the BGI data")
+        for item in range(tri_count):
+            tri_index = struct.unpack_from("<i", data, tri_start + item * 4)[0]
+            if not 0 <= tri_index < triangle_count:
+                raise ValueError("FF9 walkmesh floor references an invalid triangle")
         floors.append({
             "index": index,
             "offset": offset,
@@ -76,20 +125,33 @@ def _floor_table(data: bytes) -> list[dict[str, int | bool]]:
     return floors
 
 
-def _set_floor_active(data: bytes, record: int, active: bool) -> bytes:
-    floors = _floor_table(data)
-    if type(record) is not int or not 0 <= record < len(floors):
-        raise ValueError("Changed FF9 walkmesh floor does not exist")
+def _set_active(data: bytes, record: int, active: bool, *, triangle: bool) -> bytes:
+    rows = _triangle_table(data) if triangle else _floor_table(data)
+    noun = "triangle" if triangle else "floor"
+    mask = BGI_TRI_ACTIVE if triangle else BGI_FLOOR_ACTIVE
+    if type(record) is not int or not 0 <= record < len(rows):
+        raise ValueError(f"Changed FF9 walkmesh {noun} does not exist")
     out = bytearray(data)
-    floor = floors[record]
-    flags = int(floor["flags"])
-    flags = (flags | BGI_FLOOR_ACTIVE) if active else (flags & ~BGI_FLOOR_ACTIVE)
-    struct.pack_into("<H", out, int(floor["offset"]), flags)
+    row = rows[record]
+    flags = int(row["flags"])
+    flags = (flags | mask) if active else (flags & ~mask)
+    struct.pack_into("<H", out, int(row["offset"]), flags)
     return bytes(out)
 
 
+def _set_floor_active(data: bytes, record: int, active: bool) -> bytes:
+    return _set_active(data, record, active, triangle=False)
+
+
+def _set_triangle_active(data: bytes, record: int, active: bool) -> bytes:
+    return _set_active(data, record, active, triangle=True)
+
+
 class FieldWalkmeshStore:
-    KEY = "field-walkmesh"
+    FLOOR_KEY = "field-walkmesh"
+    TRIANGLE_KEY = "field-walkmesh-triangles"
+    KEY = FLOOR_KEY  # compatibility with the original floor-only integration
+    KEYS = frozenset({FLOOR_KEY, TRIANGLE_KEY})
 
     def __init__(self, game_root: Path | None = None, project_root: Path | None = None):
         self.game_root = Path(game_root or paths.GAME_ROOT)
@@ -120,6 +182,11 @@ class FieldWalkmeshStore:
         return (Path("StreamingAssets") / "Assets" / "Resources" / "FieldMaps" /
                 folder / filename).as_posix()
 
+    @staticmethod
+    def _validate_asset(raw: bytes) -> None:
+        _triangle_table(raw)
+        _floor_table(raw)
+
     def _vanilla_assets(self) -> dict[str, bytes]:
         signature = self._signature()
         if signature == self._archive_signature:
@@ -136,7 +203,7 @@ class FieldWalkmeshStore:
                     continue
                 payload = archive._object_payload(obj)
                 # Parse now so corrupt/unexpected objects never enter the editable set.
-                _floor_table(payload)
+                self._validate_asset(payload)
                 if relative in result and result[relative] != payload:
                     raise ValueError(f"Duplicate FF9 walkmesh asset: {relative}")
                 result[relative] = payload
@@ -166,7 +233,7 @@ class FieldWalkmeshStore:
             file = project.get(relative)
             if file is not None:
                 raw = file.read_bytes()
-                _floor_table(raw)
+                self._validate_asset(raw)
                 result[relative] = (raw, "project", file)
             elif relative in vanilla:
                 result[relative] = (vanilla[relative], "vanilla", None)
@@ -174,26 +241,41 @@ class FieldWalkmeshStore:
 
     def status_rows(self) -> list[dict[str, Any]]:
         available = bool(self._archives()) or bool(self._project_assets())
-        return [{
-            "key": self.KEY,
+        common = {
             "tab": "world",
-            "label": "Field walkmesh floors",
             "relativePath": "StreamingAssets/p0data1*.bin → StreamingAssets/Assets/Resources/FieldMaps/*/*.bgi.bytes",
-            "controls": "Field walkmesh floor active/inactive state (BGI_FLOOR_ACTIVE)",
             "available": available,
             "source": "vanilla/project" if available else None,
             "sourcePath": str(self.game_root / "StreamingAssets" / "p0data1*.bin") if available else None,
             "projectPath": str(self.project_root / "StreamingAssets/Assets/Resources/FieldMaps"),
-            "notes": (
-                "Partial p0data1 integration. Lexeditor edits only Memoria's documented floor-active bit and "
-                "preserves geometry, triangle/edge topology, floor transforms, animations, every other flag bit, "
-                "and all unknown bytes verbatim in a canonical loose .bgi.bytes override. Backgrounds and cameras "
-                "remain separate unintegrated field-scene areas."
-            ),
-        }]
+        }
+        return [
+            {**common, "key": self.FLOOR_KEY, "label": "Field walkmesh floors",
+             "controls": "Field walkmesh floor active/inactive state (BGI_FLOOR_ACTIVE)",
+             "notes": (
+                 "Partial p0data1 integration. Lexeditor edits only Memoria's documented floor-active bit and "
+                 "preserves geometry, triangle/edge topology, floor transforms, animations, every other flag bit, "
+                 "and all unknown bytes verbatim in a canonical loose .bgi.bytes override."
+             )},
+            {**common, "key": self.TRIANGLE_KEY, "label": "Field walkmesh triangles",
+             "controls": "Per-field triangle active/inactive state (BGI_TRI_ACTIVE)",
+             "notes": (
+                 "Partial p0data1 integration. Triangle rows are field-scoped to keep the shared Table+Detail "
+                 "responsive. Lexeditor changes only Memoria's documented triangle-active bit and preserves all "
+                 "geometry, neighbors, edge semantics, other flag bits and unknown bytes verbatim."
+             )},
+        ]
 
     @staticmethod
-    def _fields() -> list[dict[str, Any]]:
+    def _fields(key: str) -> list[dict[str, Any]]:
+        if key == FieldWalkmeshStore.TRIANGLE_KEY:
+            return [
+                {"key": "Field", "label": "Field", "declaredType": "Path", "editable": False, "kind": "stored"},
+                {"key": "Triangle", "label": "Triangle", "declaredType": "UInt16", "editable": False, "kind": "stored"},
+                {"key": "Floor", "label": "Floor", "declaredType": "Int16", "editable": False, "kind": "stored"},
+                {"key": "Active", "label": "Triangle active", "declaredType": "Boolean", "editable": True, "kind": "boolean"},
+                {"key": "OtherFlags", "label": "Other flag bits", "declaredType": "UInt16", "editable": False, "kind": "stored"},
+            ]
         return [
             {"key": "Field", "label": "Field", "declaredType": "Path", "editable": False, "kind": "stored"},
             {"key": "Floor", "label": "Floor", "declaredType": "UInt16", "editable": False, "kind": "stored"},
@@ -202,49 +284,85 @@ class FieldWalkmeshStore:
             {"key": "OtherFlags", "label": "Other flag bits", "declaredType": "UInt16", "editable": False, "kind": "stored"},
         ]
 
-    def load(self, key: str) -> dict[str, Any]:
-        if key != self.KEY:
+    def _scene_rows(self, sources: dict[str, tuple[bytes, str, Path | None]]) -> list[dict[str, str]]:
+        return [{"value": relative, "label": Path(relative).parent.name, "source": source_kind}
+                for relative, (_raw, source_kind, _file) in sources.items()]
+
+    def load(self, key: str, scene: str | None = None) -> dict[str, Any]:
+        if key not in self.KEYS:
             raise KeyError("Unknown FF9 field-walkmesh dataset")
         rows = []
         hashes = {}
         sources = self._sources()
-        for relative, (raw, source_kind, _file) in sources.items():
+        active_scene = None
+        selected_sources = sources.items()
+        if key == self.TRIANGLE_KEY and sources:
+            if scene is not None and scene not in sources:
+                raise ValueError("Unknown FF9 field-walkmesh scene")
+            active_scene = scene or next(iter(sources))
+            selected_sources = [(active_scene, sources[active_scene])]
+
+        for relative, (raw, source_kind, _file) in selected_sources:
             hashes[relative] = _sha256(raw)
             folder = Path(relative).parent.name
-            for floor in _floor_table(raw):
-                index = int(floor["index"])
-                floor_ndx = int(floor["floorNdx"])
-                rows.append({
-                    "line": len(rows),
-                    "id": f"{folder}:{floor_ndx}",
-                    "name": f"{folder} · Floor {floor_ndx}",
-                    "scene": relative,
-                    "record": index,
-                    "source": source_kind,
-                    "values": {
-                        "Field": folder,
-                        "Floor": floor_ndx,
-                        "Active": bool(floor["active"]),
-                        "Triangles": int(floor["triangleCount"]),
-                        "OtherFlags": int(floor["otherFlags"]),
-                    },
-                })
-        status = self.status_rows()[0]
-        return {**status, "sha256": "", "sceneHashes": hashes,
-                "fields": self._fields(), "rows": rows}
+            if key == self.TRIANGLE_KEY:
+                for triangle in _triangle_table(raw):
+                    index = int(triangle["index"])
+                    floor_ndx = int(triangle["floorNdx"])
+                    rows.append({
+                        "line": index,
+                        "id": index,
+                        "name": f"Triangle {index}",
+                        "scene": relative,
+                        "record": index,
+                        "source": source_kind,
+                        "values": {
+                            "Field": folder,
+                            "Triangle": index,
+                            "Floor": floor_ndx,
+                            "Active": bool(triangle["active"]),
+                            "OtherFlags": int(triangle["otherFlags"]),
+                        },
+                    })
+            else:
+                for floor in _floor_table(raw):
+                    index = int(floor["index"])
+                    floor_ndx = int(floor["floorNdx"])
+                    rows.append({
+                        "line": len(rows),
+                        "id": f"{folder}:{floor_ndx}",
+                        "name": f"{folder} · Floor {floor_ndx}",
+                        "scene": relative,
+                        "record": index,
+                        "source": source_kind,
+                        "values": {
+                            "Field": folder,
+                            "Floor": floor_ndx,
+                            "Active": bool(floor["active"]),
+                            "Triangles": int(floor["triangleCount"]),
+                            "OtherFlags": int(floor["otherFlags"]),
+                        },
+                    })
+        status = next(row for row in self.status_rows() if row["key"] == key)
+        result = {**status, "sha256": "", "sceneHashes": hashes,
+                  "fields": self._fields(key), "rows": rows}
+        if key == self.TRIANGLE_KEY:
+            result.update({"activeScene": active_scene, "scenes": self._scene_rows(sources)})
+        return result
 
     def save(self, key: str, expected_hashes: dict[str, str], changes: list[dict[str, Any]]) -> dict[str, Any]:
-        if key != self.KEY or not isinstance(expected_hashes, dict) or not isinstance(changes, list):
+        if key not in self.KEYS or not isinstance(expected_hashes, dict) or not isinstance(changes, list):
             raise ValueError("Invalid FF9 field-walkmesh save")
+        noun = "triangle" if key == self.TRIANGLE_KEY else "floor"
         grouped: dict[str, list[dict[str, Any]]] = {}
         for change in changes:
             if not isinstance(change, dict) or not isinstance(change.get("scene"), str):
-                raise ValueError("Changed FF9 walkmesh floor is invalid")
+                raise ValueError(f"Changed FF9 walkmesh {noun} is invalid")
             values = change.get("values")
             if not isinstance(values, dict) or set(values) - {"Active"}:
-                raise ValueError("Only FF9 walkmesh floor activity is editable")
+                raise ValueError(f"Only FF9 walkmesh {noun} activity is editable")
             if "Active" in values and type(values["Active"]) is not bool:
-                raise ValueError("FF9 walkmesh floor activity must be true or false")
+                raise ValueError(f"FF9 walkmesh {noun} activity must be true or false")
             grouped.setdefault(change["scene"], []).append(change)
 
         for relative, asset_changes in grouped.items():
@@ -259,7 +377,10 @@ class FieldWalkmeshStore:
             for change in asset_changes:
                 record = change.get("record")
                 if "Active" in change["values"]:
-                    edited = _set_floor_active(edited, record, change["values"]["Active"])
+                    if key == self.TRIANGLE_KEY:
+                        edited = _set_triangle_active(edited, record, change["values"]["Active"])
+                    else:
+                        edited = _set_floor_active(edited, record, change["values"]["Active"])
             if edited == raw:
                 continue
             target = self.project_root / Path(relative)
@@ -279,4 +400,5 @@ class FieldWalkmeshStore:
                 os.replace(temporary, target)
             finally:
                 temporary.unlink(missing_ok=True)
-        return self.load(key)
+        scene = next(iter(grouped), next(iter(expected_hashes), None)) if key == self.TRIANGLE_KEY else None
+        return self.load(key, scene)
