@@ -2098,9 +2098,9 @@
     const svg = document.createElementNS(svgNamespace, "svg");
     svg.setAttribute("class", "lex-curve-svg");
     svg.setAttribute("viewBox", "0 0 320 160");
-    // Formula glyphs and labels must never be non-uniformly stretched. The
-    // graph owns a 2:1 user-space viewport; letterbox if a caller gives the
-    // drawing a differently shaped box instead of distorting that viewport.
+    let graphHeight = 160;
+    // Match the viewBox to the available rectangle, keeping text uniformly
+    // scaled without adding letterbox space above and below the graph.
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     svg.setAttribute("role", "img");
     svg.setAttribute("aria-label", options.graphLabel || `${options.title || "Value"} curve`);
@@ -2320,8 +2320,8 @@
         ? ((x - domain.min) + .5) / slots * 320
         : (x - domain.min) / spanX * 320;
       const bounded = Math.max(range.min, Math.min(range.max, y));
-      const graphY = 160 - (bounded - range.min) / spanY * 160;
-      const cursorY = Math.max(0, Math.min(160, (event.clientY - bounds.top) / bounds.height * 160));
+      const graphY = graphHeight - (bounded - range.min) / spanY * graphHeight;
+      const cursorY = Math.max(0, Math.min(graphHeight, (event.clientY - bounds.top) / bounds.height * graphHeight));
       guide.setAttribute("x1", graphX.toFixed(2));
       guide.setAttribute("x2", graphX.toFixed(2));
       guide.setAttribute("y1", cursorY.toFixed(2));
@@ -2338,7 +2338,7 @@
       const viewportCenter = Math.max(inset + halfWidth,
         Math.min(innerWidth - inset - halfWidth, event.clientX));
       tooltip.style.left = `${viewportCenter - plotBounds.left}px`;
-      tooltip.style.top = `${Math.max(8, bounds.top - plotBounds.top + graphY / 160 * bounds.height)}px`;
+      tooltip.style.top = `${Math.max(8, bounds.top - plotBounds.top + graphY / graphHeight * bounds.height)}px`;
     });
     plot.addEventListener("pointerleave", () => { clearProbe(); highlightVariable(""); });
 
@@ -2386,14 +2386,11 @@
     // Real hitboxes, not an estimate: every rendered glyph is asked for its
     // own start point, rotation and extent, turned into the quad it actually
     // occupies, and tested against its neighbours with a separating axis.
-    // The plot is 320x160 of user space fitted uniformly into whatever box the
-    // card gives it. Angles and overlaps are still measured in SCREEN space so
-    // letterboxing, browser zoom and responsive sizing cannot invalidate the
-    // collision test. preserveAspectRatio keeps glyph geometry uniform, and
-    // measuring after that transform keeps the placement faithful to display.
+    // The viewport height follows the card. Measure angles and overlaps in
+    // screen space so resizing and browser zoom keep glyph geometry uniform.
     const plotScale = () => {
       const box = svg.getBoundingClientRect();
-      return {x: (box.width || 320) / 320, y: (box.height || 160) / 160};
+      return {x: (box.width || 320) / 320, y: (box.height || graphHeight) / graphHeight};
     };
     const glyphQuads = () => {
       const count = formulaText.getNumberOfChars?.() ?? 0;
@@ -2525,6 +2522,10 @@
     }
 
     const draw = () => {
+      const bounds=svg.getBoundingClientRect();
+      if(bounds.width>0&&bounds.height>0)graphHeight=320*bounds.height/bounds.width;
+      svg.setAttribute('viewBox',`0 0 320 ${graphHeight}`);
+      grid.setAttribute('d',Array.from({length:5},(_,i)=>`M0 ${graphHeight*i/4}H320 M${80*i} 0V${graphHeight}`).join(' '));
       const range = getRange();
       axisTop.textContent = formatNumber(range.max);
       axisBottom.textContent = formatNumber(range.min);
@@ -2555,7 +2556,7 @@
       maximum.textContent = formatNumber(Math.max(...values), options.valueFormat || {});
       hoverExtrema.firstElementChild.textContent = minimum.textContent;
       hoverExtrema.lastElementChild.textContent = maximum.textContent;
-      const width = 320, height = 160, spanX = Math.max(1, domain.max - domain.min), spanY = Math.max(1, range.max - range.min);
+      const width = 320, height = graphHeight, spanX = Math.max(1, domain.max - domain.min), spanY = Math.max(1, range.max - range.min);
       const points = samples.map(sample => {
         const x = (sample.x - domain.min) / spanX * width;
         const bounded = Math.max(range.min, Math.min(range.max, sample.value));
@@ -2692,6 +2693,7 @@
     // the newly written model value before focus leaves the input.
     root.addEventListener("input", scheduleDraw, true);
     root.addEventListener("change", scheduleDraw, true);
+    if(typeof ResizeObserver!=="undefined")new ResizeObserver(scheduleDraw).observe(svg);
     draw();
     root.refreshCurve = draw;
     return root;

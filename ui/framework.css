@@ -3646,6 +3646,11 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-axis-name-y { top:50%; left:2px; writing-mode:vertical-rl; transform:translateY(-50%) rotate(180deg); }
 .lex-curve-variables { position:absolute; z-index:6; left:0; right:0; bottom:0; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:4px 8px; padding:6px; color:var(--lex-text); background:var(--lex-input-bg,var(--lex-panel)); border:1px solid var(--lex-border); opacity:0; pointer-events:none; transform:translateY(100%); transition:opacity .15s,transform .15s; }
 .lex-curve-editor:is(:hover,:focus-within) > .lex-curve-variables { opacity:1; pointer-events:auto; transform:none; }
+.lex-curve-variables {
+  background:color-mix(in srgb,var(--lex-panel) 90%,var(--lex-text) 10%);
+  border-color:color-mix(in srgb,var(--lex-border) 65%,var(--lex-text) 35%);
+  box-shadow:0 -4px 12px rgb(0 0 0 / 28%),inset 0 1px rgb(255 255 255 / 18%);
+}
 .lex-curve-variable { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:4px; min-width:0; }
 .lex-curve-variable :is(input,select) { width:100%; min-width:0; }
 .lex-curve-variable-a { color:#f05b5b; fill:#f05b5b; }
