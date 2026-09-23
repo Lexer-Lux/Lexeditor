@@ -16,7 +16,7 @@ from games.warband.plugin import WarbandSession  # noqa: E402
 
 TROOPS = [
     {
-        "id": "recruit", "name": "Recruit", "plural": "Recruits",
+        "recordIndex": 0, "id": "recruit", "name": "Recruit", "plural": "Recruits",
         "faction": "fac_test", "level": 1, "line": 1, "status": "active",
         "fields": {
             "name": "Recruit", "plural": "Recruits", "faction": "fac_test",
@@ -25,7 +25,7 @@ TROOPS = [
         "stats": {}, "flagValue": None, "items": [],
     },
     {
-        "id": "veteran", "name": "Veteran", "plural": "Veterans",
+        "recordIndex": 1, "id": "veteran", "name": "Veteran", "plural": "Veterans",
         "faction": "fac_test", "level": 10, "line": 2, "status": "active",
         "fields": {
             "name": "Veteran", "plural": "Veterans", "faction": "fac_test",
@@ -83,7 +83,7 @@ def main() -> int:
             link.hover()
             assert "underline" in link.evaluate("node => getComputedStyle(node).textDecorationLine")
             link.click(modifiers=["Alt"])
-            page.wait_for_function("state.tab==='troops'&&state.selectedTroop==='recruit'")
+            page.wait_for_function("state.tab==='troops'&&state.troops.rows.find(row=>troopRowKey(row)===state.selectedTroop)?.id==='recruit'")
             selected = page.locator(".lex-column-list-row.selected")
             selected.wait_for(state="visible")
             assert "recruit" in selected.inner_text().lower()
@@ -94,7 +94,7 @@ def main() -> int:
             print({
                 "treeTarget": "veteran",
                 "linkedTarget": "recruit",
-                "destination": page.evaluate("() => ({tab:state.tab, selected:state.selectedTroop})"),
+                "destination": page.evaluate("() => ({tab:state.tab, selectedRecord:state.selectedTroop, selectedId:state.troops.rows.find(row=>troopRowKey(row)===state.selectedTroop)?.id})"),
                 "screenshot": str(output),
             })
         finally:
