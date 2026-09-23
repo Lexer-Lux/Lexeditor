@@ -181,6 +181,27 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             wait_loaded(page)
             expect(numeric_field(page, "PRICE")).to_have_value("333")
 
+            page.evaluate("navigate('enemies')")
+            page.wait_for_function("state.datasets.enemies?.rows?.length===1")
+            enemy_hp = numeric_field(page, "MAX HP")
+            expect(enemy_hp).to_have_value("1234")
+            enemy_hp.fill("2345")
+            expect(save).to_be_enabled()
+            save.click()
+            page.wait_for_function("dirtyCount()===0")
+            raw16_overlay = (
+                project / "StreamingAssets/Assets/Resources/BattleMap/BattleScene"
+                / "EVT_BATTLE_B3_001/dbfile0000.raw16.bytes"
+            )
+            assert raw16_overlay.is_file(), raw16_overlay
+            page.reload(wait_until="domcontentloaded")
+            page.wait_for_selector(".lex-paged-list-detail")
+            wait_loaded(page)
+            page.evaluate("navigate('enemies')")
+            page.wait_for_function("state.datasets.enemies?.rows?.length===1")
+            expect(numeric_field(page, "MAX HP")).to_have_value("2345")
+            page.screenshot(path=str(OUT / "ff9-enemy-save-reopen.png"), full_page=True)
+
             page.evaluate("navigate('info')")
             expect(page.get_by_text("EXTERNAL MOD COMPATIBILITY", exact=True)).to_be_visible()
             assert page.get_by_text("None detected", exact=True).count() >= 1
