@@ -137,9 +137,19 @@ def main():
                     assert metrics['listScroll']<=metrics['listHeight']+2,metrics
                     assert metrics['last']<=metrics['boxBottom']+1,metrics
                     page.screenshot(path=str(ARTIFACTS/f'datamap-{width}.png'),full_page=True)
-                    page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('')
-                    page.get_by_role('searchbox',name='Search the data map',exact=True).fill('module_skills.py')
-                    page.locator('.lex-column-list-row').filter(has_text='module_skills.py').click()
+                    coverage_filter=page.get_by_role('combobox',name='Filter files by coverage',exact=True)
+                    coverage_filter.select_option('')
+                    page.wait_for_function("state.filters.mapStatus===''")
+                    # Resetting coverage causes the fitted Data Map to rebuild.
+                    # Let that render settle before typing into the replacement
+                    # search input, or a late fit callback can discard the query.
+                    page.wait_for_timeout(300)
+                    search_box=page.get_by_role('searchbox',name='Search the data map',exact=True)
+                    search_box.fill('module_skills.py')
+                    page.wait_for_function("state.filters.datamap==='module_skills.py'")
+                    skill_row=page.locator('.lex-column-list-row').filter(has_text='module_skills.py')
+                    skill_row.wait_for(state='visible')
+                    skill_row.click()
                     page.get_by_role('button',name='Open misc',exact=True).click()
                     page.locator('.warband-module-state').wait_for(state='visible')
                     assert 'Loading structured Module System records' in page.locator('.warband-module-state').inner_text()
