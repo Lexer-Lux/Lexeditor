@@ -289,8 +289,10 @@
             ...externalMods.filter(mod=>!mod.metadata||mod.error).map(mod=>`${mod.name}: ${mod.error||"ModDescription.xml unavailable"}`)
           ],"None detected")),
           help:infoHelp("Missing or malformed metadata is reported as unknown, never treated as proof that the mod is compatible.")}),
-        detailField({label:"UNSUPPORTED RUNTIME",control:value(summary((compatibility.unsupportedByPinnedMemoria||[]).map(mod=>`${mod.name} (needs ${mod.minimumMemoriaVersion})`),"None detected")),
-          help:infoHelp("Mods declaring a MinimumMemoriaVersion newer than Lexeditor's pinned helper are outside this candidate's supported runtime boundary.")}),
+        detailField({label:"UNSUPPORTED RUNTIME",control:value(summary((compatibility.unsupportedByPinnedMemoria||[]).map(mod=>`${mod.name} (needs ${mod.minimumMemoriaVersion||"valid version metadata"})`),"None detected")),
+          help:infoHelp("Mods declaring a MinimumMemoriaVersion newer than Lexeditor's pinned helper, or an invalid minimum version, are outside this candidate's supported runtime boundary.")}),
+        detailField({label:"RUNTIME UNKNOWN",control:value(summary((compatibility.unknownRuntimeCompatibility||[]).map(mod=>mod.name),"None detected")),
+          help:infoHelp("These enabled mods do not declare MinimumMemoriaVersion. Their metadata does not prove compatibility with Lexeditor's pinned helper; only native testing can establish it.")}),
         detailField({label:"DECLARED CONFLICTS",control:value(summary((compatibility.declaredConflicts||[]).map(row=>row.mods.join(" ↔ ")),"None declared")),
           help:infoHelp("These are author-declared incompatibilities among enabled mods. Missing metadata is not proof that a combination is safe in game.")}),
         detailField({label:"EXACT PATH OVERLAPS",control:value(summary((compatibility.overlaps||[]).map(row=>`${row.mod}: ${row.path}`),"None detected")),
