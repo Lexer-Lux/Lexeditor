@@ -729,7 +729,6 @@ async function save() {
   if (!sourceReady()) return;
   const result = await jsonPost("/api/save", {});
   state.config.dirty = result.dirty;
-  LexeditorUI.showToast?.("Saved Factorio overrides");
   refreshShell();
 }
 
