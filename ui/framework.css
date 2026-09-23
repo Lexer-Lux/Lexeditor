@@ -3566,10 +3566,10 @@ body:has(.lex-data-map-table) #main {
   margin:var(--lex-toolbar-margin, var(--lex-panel-gap) var(--lex-panel-gap) 0);
 }
 .lex-toolbar { position:relative; flex-wrap:wrap; margin:0; padding:var(--lex-toolbar-padding, 0); border:var(--lex-toolbar-border, 0); background:var(--lex-toolbar-bg, transparent); box-shadow:var(--lex-toolbar-shadow, none); }
-.lex-toolbar:has(> .lex-subtab-bar-images) { display:grid; grid-template-columns:auto minmax(0,1fr) auto; width:100%; height:64px; }
+.lex-toolbar:has(> .lex-subtab-bar-images) { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,3fr) minmax(0,1fr); width:100%; height:64px; }
 .lex-toolbar > .lex-subtab-bar-images { height:100%; min-height:0; }
 .lex-toolbar > .lex-subtab-bar-images > button { height:100%; min-height:0; }
-.lex-toolbar > .lex-subtab-bar-images img { height:100%; max-height:58px; object-fit:contain; }
+.lex-toolbar > .lex-subtab-bar-images img { height:100%; max-height:none; object-fit:contain; }
 .lex-toolbar > label { font-weight:700; }
 .lex-toolbar > select { min-width:0; max-width:min(720px,100%); }
 /* Important, so a game's own toolbar class cannot show an empty bar. */
@@ -3666,7 +3666,7 @@ body:has(.lex-data-map-table) #main {
 
 /* Image tabs use the same selection and keyboard controls as text tabs. */
 .lex-subtab-bar-images { display:flex; justify-content:center; flex-wrap:nowrap; align-items:stretch; gap:2px; flex:1; margin:0; }
-.lex-subtab-bar-images > .lex-subtab-button { flex:1 1 0; width:auto; min-width:0; padding:0; height:100%; aspect-ratio:auto; border:0; }
+.lex-subtab-bar-images > .lex-subtab-button { position:relative;flex:0 1 calc(64px * 2 / 3); width:auto; min-width:0; padding:0; height:100%; aspect-ratio:2/3; border:0; }
 .lex-subtab-bar-images .lex-tab-label { display:contents; }
 .lex-subtab-bar-images .lex-tab-label-text { display:contents; }
 .lex-subtab-bar-images img { display:block; width:100%; height:100%; object-fit:cover; image-rendering:pixelated; }
@@ -7206,8 +7206,15 @@ body { text-shadow: var(--lex-text-shadow, none); }
   box-shadow: var(--lex-subtab-active-shadow, none);
 }
 
+.lex-subtab-bar.lex-subtab-bar-images { gap:2px; }
 .lex-subtab-bar-images > .lex-subtab-button { background:transparent; border:0; box-shadow:none; padding:0; }
-.lex-subtab-bar-images > .lex-subtab-button.active { background:transparent; box-shadow:inset 0 -2px var(--lex-highlight); }
+.lex-subtab-bar-images > .lex-subtab-button.active { background:transparent; box-shadow:none; }
+.lex-subtab-bar-images > .lex-subtab-button.active::before {
+  content:var(--lex-tab-marker-content,none);position:absolute;z-index:3;
+  right:calc(100% + 6px);top:50%;transform:translateY(-50%);
+  width:var(--lex-tab-marker-width,24px);height:var(--lex-tab-marker-height,18px);
+  background:var(--lex-tab-marker-image,none) center/contain no-repeat;pointer-events:none;
+}
 .lex-subtab-bar-images .lex-tab-label, .lex-subtab-bar-images .lex-tab-label-text { display:block; height:100%; padding:0; translate:none; line-height:1; }
 .lex-subtab-bar-images img { width:100%; height:100%; object-fit:contain; }
 /* A section title can sit on its section's top edge, as a menu label does. */
