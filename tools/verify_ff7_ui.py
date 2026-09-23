@@ -281,7 +281,7 @@ class PageTests(unittest.TestCase):
         self.save_wait()
         self.assertEqual(SceneArchive((self.backend.project/"data/battle/scene.bin").read_bytes()).records("enemies")[0]["values"]["hp"],12345)
         self.click("Encounters")
-        self.page.get_by_label("X for Battle 0",exact=True).first.fill("-123")
+        self.page.get_by_label("Enemy slot 1 Position X for Battle 0",exact=True).first.fill("-123")
         self.save_wait()
         self.open();self.click("Enemies")
         self.assertEqual(self.page.get_by_label("HP for Enemy0",exact=True).input_value(),"12345")
