@@ -145,8 +145,8 @@ class SeventhHeavenCompatibilityTests(unittest.TestCase):
         self.profile([("a", "Versioned", True), ("missing", "Missing", True)])
         (self.workshop / "library.xml").write_text("""<Library><Items>
           <InstalledItem><ModID>a</ModID><Versions>
-            <InstalledVersion><VersionDetails><Version>1.0</Version></VersionDetails><InstalledLocation>old</InstalledLocation></InstalledVersion>
-            <InstalledVersion><VersionDetails><Version>2.0</Version></VersionDetails><InstalledLocation>new</InstalledLocation></InstalledVersion>
+            <InstalledVersion><VersionDetails><Version>1.10</Version></VersionDetails><InstalledLocation>old</InstalledLocation></InstalledVersion>
+            <InstalledVersion><VersionDetails><Version>1.9</Version></VersionDetails><InstalledLocation>new</InstalledLocation></InstalledVersion>
           </Versions></InstalledItem>
         </Items></Library>""", encoding="utf-8")
         report = mod_stack.scan_7h_stack(self.workshop, ["kernel/kernel.bin.chunk.3"])
