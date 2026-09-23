@@ -521,7 +521,7 @@ class HttpTests(unittest.TestCase):
                 self.assertFalse(row["openable"])
         character = next(row for row in rows if row["category"] == "characters")
         self.assertTrue(character["openable"])
-        self.assertEqual(character["status"], "partial")
+        self.assertEqual(character["status"], "integrated")
 
     def test_config_appears_without_kernel_and_filters_other_game(self):
         config = self.config()

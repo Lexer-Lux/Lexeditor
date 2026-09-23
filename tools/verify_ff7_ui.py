@@ -143,7 +143,7 @@ class PageTests(unittest.TestCase):
         bridge = "window.fetch=async(path,options={})=>{const r=await window.testRequest(path,options);return new Response(r.body,{status:r.status})};"
         identity = {"id": server.PLUGIN_ID, "name": server.PLUGIN_NAME, "edition": server.PLUGIN_EDITION}
         html = html.replace('<script src="/shared/framework.js"></script>', '<script>' + FRAMEWORK + bridge + 'window.__lexeditorPlugin=' + json.dumps(identity) + ';</script>')
-        html = html.replace('<script src="/editor.js"></script>', '<script>' + (server.PLUGIN_ROOT / "editor.js").read_text(encoding="utf-8") + '</script>')
+        html = html.replace('<script src="editor.js"></script>', '<script>' + (server.PLUGIN_ROOT / "editor.js").read_text(encoding="utf-8") + '</script>')
         html = html.replace('<link rel="stylesheet" href="/shared/framework.css">', '')
         self.page.set_content(html)
         self.page.wait_for_function("window.testLoaded === true")
