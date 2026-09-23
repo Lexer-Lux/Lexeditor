@@ -51,11 +51,10 @@ class WarbandFlatProjectTests(unittest.TestCase):
         root.mkdir(parents=True)
         (root / "module_items.py").write_text(ITEMS, encoding="utf-8")
         (root / "module_troops.py").write_text(TROOPS, encoding="utf-8")
-        (root / "module_info.py").write_text(
-            'export_dir = "../PW/"\n\n'
-            'def export_path(file_name):\n'
-            '    return export_dir + file_name\n',
-            encoding="utf-8",
+        (root / "module_info.py").write_bytes(
+            b'export_dir = "../PW/"\r\n\r\n'
+            b'def export_path(file_name):\r\n'
+            b'    return export_dir + file_name\r\n'
         )
         (root / "build_module.bat").write_text(PERSISTENT_WORLD_BUILD, encoding="utf-8")
         (root / "build_module.py").write_text("print('fixture build')\n", encoding="utf-8")
