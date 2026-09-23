@@ -16,3 +16,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes disposition
 Artwork states and HUD extraction done (16 stages). The remaining measurement needs a synchronized core-value trace plus video to separate artwork stepping from update timing; the recording tool and the exact restoration and drain sequence come first. No smoothing change exists to test. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (recording tool and exact
+restoration/drain sequence still owed), so flipping to waiting would be a
+fake checklist. Left actionable until a real session can be written.

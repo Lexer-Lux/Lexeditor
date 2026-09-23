@@ -18,3 +18,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes disposition
 Ten categories installed; treasure caches correctly unmarked. Location auditing continues in #274 with named problem cards. The gate tests need representative before and after quest saves with expected markers, and POIs must vanish after the journal sketch rather than on approach. Save preparation needs the game. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.
