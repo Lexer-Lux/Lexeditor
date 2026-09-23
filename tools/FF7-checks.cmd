@@ -8,7 +8,7 @@ set "CHECK_PYTHON=%CD%\.venv\Scripts\python.exe"
 if exist "%CHECK_PYTHON%" goto python_ready
 set "CHECK_PYTHON=python"
 :python_ready
-echo FF7 installed-data checks: 38/38 dataset coverage and byte-exact disposable no-op project copies.
+echo FF7 installed-data checks: 40/40 dataset coverage and byte-exact disposable no-op project copies.
 "%CHECK_PYTHON%" tools\verify_ff7_installed.py %*
 set "CHECK_RESULT=%ERRORLEVEL%"
 echo This does not deploy a mod or validate gameplay or sound selection.
