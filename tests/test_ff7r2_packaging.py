@@ -116,6 +116,12 @@ def test_candidate_builder_is_isolated_and_never_installs():
         assert observed["env"][packaging.UNREALREZEN_ENV] == str(packer)
 
         manifest = json.loads(Path(result["manifest"]).read_text(encoding="utf-8"))
+        assert manifest["schema"] == 2
+        assert manifest["inputs"] == [{
+            "path": packaging.STAGED_PLAYER.as_posix(),
+            "sha256": packaging._sha256(project / packaging.STAGED_PLAYER),
+            "bytes": len(b"synthetic-playerparameter"),
+        }]
         assert manifest["acceptedInGame"] is False
         assert manifest["installed"] is False
         assert manifest["tooling"]["dependencyDownloadInvokedByLexeditor"] is False
@@ -215,3 +221,73 @@ def test_candidate_builder_refuses_missing_staged_output_before_execution():
         with pytest.raises(packaging.PackagingError, match="not ready"):
             packaging.build_candidate(project, game, env, runner=should_not_run)
         assert called is False
+
+def test_candidate_builder_tracks_all_staged_inputs():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packaging-inputs-") as temp_name:
+        project, game, _packer, _oodle, env = _fixture(Path(temp_name))
+        extra = project / packaging.CONTENT_ROOT / "DataObject/Resident/CardGameCommonParameter.uasset"
+        extra.parent.mkdir(parents=True, exist_ok=True)
+        extra.write_bytes(b"synthetic-card-game")
+
+        state = packaging.status(project, game, env)
+        assert state["ready"] is True
+        assert state["stagedFileCount"] == 2
+        assert state["stagedFiles"] == [
+            packaging.STAGED_PLAYER.as_posix(),
+            (packaging.CONTENT_ROOT / "DataObject/Resident/CardGameCommonParameter.uasset").as_posix(),
+        ]
+
+        def fake_runner(command, **_kwargs):
+            output = Path(command[command.index("--output-path") + 1])
+            output.write_bytes(b"candidate-utoc")
+            output.with_suffix(".ucas").write_bytes(b"candidate-ucas")
+            output.with_suffix(".pak").write_bytes(b"candidate-pak")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        result = packaging.build_candidate(project, game, env, runner=fake_runner)
+        manifest = json.loads(Path(result["manifest"]).read_text(encoding="utf-8"))
+        assert [item["path"] for item in manifest["inputs"]] == state["stagedFiles"]
+        assert {item["bytes"] for item in manifest["inputs"]} == {
+            len(b"synthetic-playerparameter"),
+            len(b"synthetic-card-game"),
+        }
+
+
+def test_candidate_builder_rejects_staged_input_mutation():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packaging-input-mutation-") as temp_name:
+        project, game, _packer, _oodle, env = _fixture(Path(temp_name))
+        extra = project / packaging.CONTENT_ROOT / "DataObject/Resident/CardGameCommonParameter.uasset"
+        extra.parent.mkdir(parents=True, exist_ok=True)
+        extra.write_bytes(b"before")
+
+        def mutating_runner(command, **_kwargs):
+            extra.write_bytes(b"after")
+            output = Path(command[command.index("--output-path") + 1])
+            output.write_bytes(b"candidate-utoc")
+            output.with_suffix(".ucas").write_bytes(b"candidate-ucas")
+            output.with_suffix(".pak").write_bytes(b"candidate-pak")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with pytest.raises(packaging.PackagingError, match="Staged input changed"):
+            packaging.build_candidate(project, game, env, runner=mutating_runner)
+        assert not list((project / "build").glob("ff7r2-candidate-*"))
+
+
+def test_candidate_builder_rejects_staged_set_mutation():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packaging-set-mutation-") as temp_name:
+        project, game, _packer, _oodle, env = _fixture(Path(temp_name))
+        added = project / packaging.CONTENT_ROOT / "DataObject/Resident/ResidentParameter.uasset"
+
+        def mutating_runner(command, **_kwargs):
+            added.parent.mkdir(parents=True, exist_ok=True)
+            added.write_bytes(b"appeared-during-build")
+            output = Path(command[command.index("--output-path") + 1])
+            output.write_bytes(b"candidate-utoc")
+            output.with_suffix(".ucas").write_bytes(b"candidate-ucas")
+            output.with_suffix(".pak").write_bytes(b"candidate-pak")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with pytest.raises(packaging.PackagingError, match="Staged content set changed"):
+            packaging.build_candidate(project, game, env, runner=mutating_runner)
+        assert not list((project / "build").glob("ff7r2-candidate-*"))
+
