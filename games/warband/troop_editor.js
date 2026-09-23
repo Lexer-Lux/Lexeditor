@@ -1,6 +1,6 @@
 "use strict";
 function troopEditKey(row){return troopRowKey(row);}
-function newTroopDraft(row){return {recordIndex:row.recordIndex,originalId:row.id,fields:{},stats:{...row.stats},flagValue:row.flagValue};}
+function newTroopDraft(row){return {recordIndex:row.recordIndex,originalId:row.id,id:row.id,fields:{},stats:{...row.stats},flagValue:row.flagValue};}
 function troopDraft(row){return state.troopEdits[troopEditKey(row)]||newTroopDraft(row);}
 function troopValue(row,key){return troopDraft(row).fields[key]??row.fields[key];}
 function setTroopField(row,key,value){
