@@ -11,7 +11,7 @@ def main():
   b=pw.chromium.launch(headless=True);p=b.new_page()
   p.route('http://fixture/',lambda r:r.fulfill(content_type='text/html',body='<body data-lex-plugin="ff8"><main style="width:900px"></main></body>'));p.goto('http://fixture/')
   p.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  p.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
+  p.add_style_tag(content=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8'))
   p.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
   for scale in [.96,1,1.5]:
    p.evaluate("""scale=>{

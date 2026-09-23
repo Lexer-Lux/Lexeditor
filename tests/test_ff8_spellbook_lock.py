@@ -17,7 +17,7 @@ def test_spellbook_lock_keeps_help_usable(page,enabled,active,pending):
       host.append(U.detailSection({title:'Abilities',attrs:{'data-gf-panel':'abilities'},body:U.el('div',{},'Ability list')}));
       host.lexReplacePanel=(old,next)=>old.replaceWith(next);document.querySelector('main').append(host);
     }''')
-    page.add_script_tag(path=str(ROOT/'games/ff8/cards_ui.js'))
+    page.add_script_tag(path=str(ROOT/'plugins/ff8/cards_ui.js'))
     tab=page.get_by_role('tab',name='SPELLBOOK')
     tab.wait_for()
     page.wait_for_timeout(150)

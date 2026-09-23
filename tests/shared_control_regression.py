@@ -11,7 +11,7 @@ from playwright.sync_api import sync_playwright
 from global_browser_check import Handler, ThreadingHTTPServer, STUB
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from games.warband.troop_editor import troop_data, save_troops
+from plugins.warband.troop_editor import troop_data, save_troops
 from test_warband_troop_editor import SOURCE
 OUT=Path(os.environ.get('LEXEDITOR_TEST_OUTPUT',str(Path(tempfile.gettempdir())/'lex-shared-review')))
 OUT.mkdir(exist_ok=True,parents=True)
@@ -30,7 +30,7 @@ def main():
    page.on('pageerror',lambda e:errors.append(str(e)))
    page.add_init_script(STUB+"window.pywebview.api.github_repository=async()=>({repository:'Lexer-Lux/Lexeditor',login:'Lexer-Lux'});window.pywebview.api.open_plugin_repository=async id=>{window.__calls.push({openRepository:id});return{opened:true};};")
    # Blank's tabs are the component catalogue; its demonstration views are opened by name.
-   page.goto(f'http://127.0.0.1:{server.server_port}/games/blank/editor.html')
+   page.goto(f'http://127.0.0.1:{server.server_port}/plugins/blank/editor.html')
    page.wait_for_selector('nav button[data-tab]');page.wait_for_timeout(400)
    page.locator('#plugin-data-map').click();page.wait_for_timeout(300)
    divider=page.locator('.lex-data-map-view .lex-panel-layout-divider')
@@ -186,7 +186,7 @@ def main():
      elif path=='/api/build/status':payload={'cursor':1,'lines':['Build verified: fixture only'],'running':False,'returnCode':0}
      route.fulfill(content_type='application/json',body=json.dumps(payload))
     page.route('**/api/**',route_api)
-    page.goto(f'http://127.0.0.1:{server.server_port}/games/warband/editor.html')
+    page.goto(f'http://127.0.0.1:{server.server_port}/plugins/warband/editor.html')
     page.wait_for_function('!state.booting')
     page.evaluate('state.selectedTroop="soldier";navigate("troops")')
     page.get_by_role('textbox',name='name',exact=True).fill('Edited soldier')

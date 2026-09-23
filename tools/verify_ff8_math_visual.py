@@ -5,8 +5,8 @@ import tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from games.ff8.plugin import FF8Session
-from games.blank.plugin import BlankSession
+from plugins.ff8.plugin import FF8Session
+from plugins.blank.plugin import BlankSession
 from tools.verify_panel_layout_visual_46 import browser_session,close_browser,screenshot,wait_eval
 
 def check_math(cdp):

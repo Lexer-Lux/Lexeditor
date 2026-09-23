@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from games.ff7r.project_deployment import (
+from plugins.ff7r.project_deployment import (
     deploy_built_pak,
     deployed_pak_path,
     deployment_status,

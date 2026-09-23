@@ -21,7 +21,7 @@ def run(browser_path: str | None = None) -> None:
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.set_content("<base href='http://localhost/'><main id='main'></main>")
             page.add_style_tag(content=(ROOT / "ui/framework.css").read_text(encoding="utf-8"))
-            blank = (ROOT / "games/blank/editor.html").read_text(encoding="utf-8")
+            blank = (ROOT / "plugins/blank/editor.html").read_text(encoding="utf-8")
             blank_css = re.search(r"<style>(.*?)</style>", blank, re.S).group(1)
             page.add_style_tag(content=blank_css)
             page.add_script_tag(content=(ROOT / "ui/framework.js").read_text(encoding="utf-8"))
@@ -144,7 +144,7 @@ def run(browser_path: str | None = None) -> None:
         finally:
             browser.close()
 
-    ff8 = (ROOT / "games/ff8/editor.html").read_text(encoding="utf-8")
+    ff8 = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
     assert 'label:"STATUS 1",help:status1?.help?infoHelp(status1.help):null' in ff8
     assert 'label:"STATUS 2",help:status2?.help?infoHelp(status2.help):null' in ff8
     assert '.encounter-slot-table .lex-column-list-head-cell .header-label{white-space:normal' in ff8

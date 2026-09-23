@@ -10,8 +10,8 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from desktop_host import HostApi
-from games.ff7r.mod_support import PakModAdapter
-from games.ff7r.tooling import pack_directory, get_file
+from plugins.ff7r.mod_support import PakModAdapter
+from plugins.ff7r.tooling import pack_directory, get_file
 from mod_library import metadata
 from settings_manager import SettingsStore
 from playwright.sync_api import sync_playwright
@@ -54,7 +54,7 @@ def main():
                     body="<html><body></body></html>", content_type="text/html"))
                 page.goto("http://fixture.test/")
                 page.add_style_tag(path=str(ROOT / "ui/framework.css"))
-                page.add_style_tag(path=str(ROOT / "games/ff7r/game-appearance.css"))
+                page.add_style_tag(path=str(ROOT / "plugins/ff7r/game-appearance.css"))
                 page.expose_binding("hostCall", bridge)
                 page.evaluate("""() => { window.pywebview = {api:new Proxy({}, {
                     get:(_,name)=>(...args)=>window.hostCall(name,args)})}; }""")

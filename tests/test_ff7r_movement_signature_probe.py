@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import struct
 
-from games.ff7r.movement_signature_probe import (
+from plugins.ff7r.movement_signature_probe import (
     JOYSTICK_MOVEMENT_SIGNATURE,
     probe_public_joystick_movement_signature,
 )
-from games.ff7r.sprint_probe import assess_sprint_evidence
+from plugins.ff7r.sprint_probe import assess_sprint_evidence
 
 
 def _fixture_pe(*, include_signature: bool = True) -> bytes:

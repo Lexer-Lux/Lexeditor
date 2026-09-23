@@ -31,13 +31,13 @@ def _write_smoke_report(path: str | None, payload: dict) -> None:
 
 def discover_plugins() -> dict[str, GamePlugin]:
     plugins: dict[str, GamePlugin] = {}
-    for directory in sorted((ROOT / "games").iterdir()):
+    for directory in sorted((ROOT / "plugins").iterdir()):
         if not directory.is_dir() or not (directory / "plugin.py").is_file():
             continue
-        module = importlib.import_module(f"games.{directory.name}.plugin")
+        module = importlib.import_module(f"plugins.{directory.name}.plugin")
         plugin = getattr(module, "PLUGIN", None)
         if not isinstance(plugin, GamePlugin):
-            raise TypeError(f"games/{directory.name}/plugin.py does not export GamePlugin PLUGIN")
+            raise TypeError(f"plugins/{directory.name}/plugin.py does not export GamePlugin PLUGIN")
         validate_plugin(plugin)
         if plugin.plugin_id in plugins:
             raise ValueError(f"duplicate plugin id: {plugin.plugin_id}")

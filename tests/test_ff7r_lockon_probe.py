@@ -1,4 +1,4 @@
-from games.ff7r.lockon_probe import (
+from plugins.ff7r.lockon_probe import (
     assess_lock_state_evidence,
     assess_marker_slot_evidence,
     assess_serialized_marker_slots,

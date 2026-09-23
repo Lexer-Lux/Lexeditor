@@ -12,7 +12,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.rdr import extractor  # noqa: E402
+from plugins.rdr import extractor  # noqa: E402
 
 
 def make_cache(root: Path) -> tuple[dict, dict, dict]:

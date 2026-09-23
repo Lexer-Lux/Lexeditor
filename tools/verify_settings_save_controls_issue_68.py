@@ -58,7 +58,7 @@ def main() -> int:
     if 'payload["helpers"]' in host:
         raise AssertionError("The global settings payload must not collect game helper status")
 
-    ff8_path = ROOT / "games" / "ff8" / "editor.html"
+    ff8_path = ROOT / "plugins" / "ff8" / "editor.html"
     ff8 = ff8_path.read_text(encoding="utf-8")
     for token in ('lex-information-panel ff8-information', "runtime.version"):
         require(ff8, token, ff8_path)
@@ -67,13 +67,13 @@ def main() -> int:
     # RDR2 and Warband deliberately do not: their shell Save owns settings along
     # with every other editable surface, so a second button would present two
     # different Save controls for the same pending changes.
-    rdr_path = ROOT / "games" / "rdr" / "editor.html"
+    rdr_path = ROOT / "plugins" / "rdr" / "editor.html"
     rdr = rdr_path.read_text(encoding="utf-8")
     require(rdr, "LexeditorUI.settingsSaveControl({", rdr_path)
     for token in ("Object.keys(state.settingEdits).length", "save:saveSettings", "discard:discardSettings"):
         require(rdr, token, rdr_path)
 
-    warband_path = ROOT / "games" / "warband" / "editor.html"
+    warband_path = ROOT / "plugins" / "warband" / "editor.html"
     warband = warband_path.read_text(encoding="utf-8")
     if "LexeditorUI.settingsSaveControl({" in warband:
         raise AssertionError("Warband Tweaks must use the plugin-wide Save control, not a second settings save control")

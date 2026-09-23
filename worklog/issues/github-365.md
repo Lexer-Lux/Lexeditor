@@ -12,7 +12,7 @@ truthful compatibility validation.
 
 ## Implementation
 
-`games/warband/wse2_manager.py`, root-aware plugin hooks and a physically shipped
+`plugins/warband/wse2_manager.py`, root-aware plugin hooks and a physically shipped
 58-file `1.1.5.1-lex1` package. The engine/Steam bytes are publisher-original; custom
 packaging excludes the updater, dedicated servers and debug symbols. No engine
 source rebuild is claimed. Full archive/member digests are in the runtime manifest.

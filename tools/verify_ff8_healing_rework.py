@@ -15,7 +15,7 @@ EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")
 EXPECTED_SHA256 = "064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570"
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import healing_rework  # noqa: E402
+from plugins.ff8 import healing_rework  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:

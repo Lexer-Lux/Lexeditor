@@ -1,6 +1,6 @@
 # FF7 data editors and verification
 
-Updated 2026-09-08 for the completion pass on PR #434. This is the current scope reference; the earlier `ff7-recovery-20260906.md` is a historical session record, not the current list of missing editors. Both `ff7` and `ff7-2013` use `games.ff7.server` and the same page. No other game's implementation is changed by this pass.
+Updated 2026-09-08 for the completion pass on PR #434. This is the current scope reference; the earlier `ff7-recovery-20260906.md` is a historical session record, not the current list of missing editors. Both `ff7` and `ff7-2013` use `plugins.ff7.server` and the same page. No other game's implementation is changed by this pass.
 
 ## Connected editors
 

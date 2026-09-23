@@ -1,0 +1,57 @@
+RDR2 catalog artwork coverage status
+Updated 2026-09-07
+
+This file used to be a pre-import extraction to-do list. Those counts are
+obsolete. Do not use the old report to request another OpenIV extraction pass.
+
+[ITEM_TEXTURES]
+  347 / 347 historical referenced static PNGs are bundled under
+  assets/dictionary_icons/item_textures.
+  Unresolved static atlas references: 0
+
+[UI_ITEMVIEWER]
+  Historical raw reference values: 283
+  Bundled static PNG values:         235
+  Installed-game DLC fallbacks:        7
+  Source-proven non-static values:     41
+  Unresolved static atlas references:   0
+
+The seven installed-game fallbacks are the C5/C6 treasure maps. They live in
+x64/dlcpacks/dlc_content_extra/dlc.rpf -> x64/textures/ui/ui_itemviewer.ytd.
+Lexeditor resolves them on demand with plugins/rdr2/inventory_icons.py and stores
+only generated PNGs in its private cache. No Rockstar texture is added here.
+
+The 41 non-static raw values expand to 42 unique texture IDs because two book
+records contain ordered alternatives. They are:
+  UI_BOOK_FRANKHECK1
+  UI_BOOK_GERMAN1
+  UI_BOOK_JIMBOY1 UI_BOOK_JIMBOY2
+  UI_BOOK_MADSCI
+  UI_BOOK_OTISARB1
+  UI_BOOK_OTISBLK1
+  UI_BOOK_OTISBLK1 UI_BOOK_OTISBLK2
+  UI_LETTER_MAYOR_PERM
+  UI_MAP_SERIAL_KILLER
+  UI_NOTE_DINO_01 through UI_NOTE_DINO_30
+  UI_PHOTO_NORWEGIAN
+  UI_PHOTO_SC_DAGUERROTYPE
+
+These names are absent from all three shipped static UI_ITEMVIEWER atlas layers
+(base textures_1, update_4 patch, and dlc_content_extra), and their JOAATs are
+absent from the base atlas unresolved-hash list. Decompiled Story code confirms
+that item UI data is a texture-hash / texture-dictionary / texture-type tuple;
+doc_book also tries document texture handles as streamed TXDs for the physical
+held prop. Therefore these are real document/item-database handles with no
+static UI_ITEMVIEWER atlas PNG, not failed extractions. The editor's explicit
+unavailable-artwork state is correct for them unless a future source proves a
+specific renderable asset. Do not manufacture similarity-based aliases.
+
+[INVENTORY_ITEMS and other dictionaries]
+  They are not part of the local ITEM_TEXTURES/UI_ITEMVIEWER import accounting
+  above. Their resolver paths remain independent; this report makes no claim of
+  universal coverage for every RDR2 texture dictionary.
+
+The executable classification used by tests lives in
+  plugins/rdr2/inventory_icons.py
+and the accounting regression lives in
+  tests/test_rdr2_inventory_icons.py

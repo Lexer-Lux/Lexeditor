@@ -11,7 +11,7 @@ from playwright.sync_api import sync_playwright
 from global_browser_check import STUB,ROOT
 sys.path.insert(0,str(ROOT))
 from desktop_host import HostApi
-from games.blank.plugin import PLUGIN, BlankSession
+from plugins.blank.plugin import PLUGIN, BlankSession
 
 class Bridge(BaseHTTPRequestHandler):
     host=None

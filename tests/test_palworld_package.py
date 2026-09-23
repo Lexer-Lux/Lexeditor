@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.palworld.package import (
+from plugins.palworld.package import (
     InfoDocument,
     PackageValidationError,
     StaleInfoError,

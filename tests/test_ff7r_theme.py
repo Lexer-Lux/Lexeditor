@@ -1,6 +1,6 @@
-from games.ff7r import theme
-from games.ff7r.plugin import FF7RSession
-from games.ff7r.themed_server import themed_editor_html
+from plugins.ff7r import theme
+from plugins.ff7r.plugin import FF7RSession
+from plugins.ff7r.themed_server import themed_editor_html
 from service_session import request_json
 
 

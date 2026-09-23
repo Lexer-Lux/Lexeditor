@@ -4,8 +4,8 @@ import struct
 
 import pytest
 
-from games.ff7r.dataobject import FormatError
-from games.ff7r.package_probe import parse_object_table
+from plugins.ff7r.dataobject import FormatError
+from plugins.ff7r.package_probe import parse_object_table
 
 
 def _fstring(value: str) -> bytes:

@@ -20,7 +20,7 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 High-priority RDR2 slice (253, 245, 185, 184, 139, 130, 123, 119, 111, 104)
 triaged: only safe repo-only edit is this stale-comment rewrite in
-`games/rdr2/native_runtime/GameplayTweaks/modules/collectibles_map.cpp`
+`plugins/rdr2/native_runtime/GameplayTweaks/modules/collectibles_map.cpp`
 (`categoryIcon` prescribed separate `lex_blips.ytd`, but `ensureLexBlipTextures`
 ships art in resident `INVENTORY_ITEMS_MP`). Comment now points at the current
 approach; no code changed. `tests/test_rdr2_native_source.py`: 5 passed.

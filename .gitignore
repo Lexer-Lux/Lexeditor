@@ -23,8 +23,8 @@ tools/magic-rdr/MagicRDR_*.zip
 
 # Downloaded or private RDR2 fonts. Source and release bundles do not include
 # these binaries.
-games/rdr2/assets/fonts/*.ttf
-games/rdr2/assets/fonts/*.otf
-games/rdr2/assets/fonts/*.woff
-games/rdr2/assets/fonts/*.woff2
-!games/rdr2/assets/fonts/README.md
+plugins/rdr2/assets/fonts/*.ttf
+plugins/rdr2/assets/fonts/*.otf
+plugins/rdr2/assets/fonts/*.woff
+plugins/rdr2/assets/fonts/*.woff2
+!plugins/rdr2/assets/fonts/README.md

@@ -22,7 +22,7 @@ sys.path.append(str(ROOT / "_scratch/gf-spellbooks-test-deps"))
 import unicorn  # noqa: E402
 from unicorn.x86_const import UC_X86_REG_EAX, UC_X86_REG_ESP  # noqa: E402
 
-from games.ff8 import flying_eva, gameplay_settings  # noqa: E402
+from plugins.ff8 import flying_eva, gameplay_settings  # noqa: E402
 
 EXE = Path(r"D:/SteamLibrary/steamapps/common/FINAL FANTASY VIII/FF8_EN.exe")
 SHA256 = "064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570"

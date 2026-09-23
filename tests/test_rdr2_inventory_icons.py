@@ -9,11 +9,11 @@ from unittest.mock import patch
 import zlib
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.rdr2 import inventory_icons as icons
+from plugins.rdr2 import inventory_icons as icons
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "games" / "rdr2" / "assets"
+ASSETS = ROOT / "plugins" / "rdr2" / "assets"
 
 
 class InstalledItemviewerTests(unittest.TestCase):
@@ -106,7 +106,7 @@ class InstalledItemviewerTests(unittest.TestCase):
         )
 
     def test_server_falls_back_only_after_a_local_ui_itemviewer_miss(self):
-        source = (ROOT / "games/rdr2/server.py").read_text(encoding="utf-8")
+        source = (ROOT / "plugins/rdr2/server.py").read_text(encoding="utf-8")
         self.assertIn("_resolve_inventory_icon(relative.stem)", source)
         self.assertIn('relative.parts[:2] == ("dictionary_icons", "ui_itemviewer")', source)
         self.assertIn("if not asset.is_file():", source)

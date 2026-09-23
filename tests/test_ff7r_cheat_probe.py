@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from games.ff7r.cheat_probe import scan_installed_menu_candidates
+from plugins.ff7r.cheat_probe import scan_installed_menu_candidates
 
 
 def _text_entry(key, text, subentries=()):

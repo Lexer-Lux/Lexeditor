@@ -8,8 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.rdr import input_remaps as remaps
-from games.rdr import script_features as scripts
+from plugins.rdr import input_remaps as remaps
+from plugins.rdr import script_features as scripts
 
 
 def push_string(value: bytes) -> bytes:

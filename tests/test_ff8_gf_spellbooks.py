@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.ff8 import gf_spellbooks
+from plugins.ff8 import gf_spellbooks
 
 
 class GfSpellbookRuntimeTests(unittest.TestCase):

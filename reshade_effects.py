@@ -1,6 +1,6 @@
 """Lexeditor's ReShade effects, switched on and tuned per game.
 
-Every effect is one of Lexeditor's own (tools/reshade/shaders/Lexerian). Its
+Every effect is one of Lexeditor's own (shaders). Its
 controls are read straight out of the .fx file - the same uniforms and
 annotations ReShade's own overlay reads - so a slider added to a shader shows
 up on the Tweaks page without a second list to keep in step.

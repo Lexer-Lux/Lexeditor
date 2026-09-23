@@ -9,8 +9,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import field_data, field_walkmesh  # noqa: E402
-from games.ff8.fs_archive import FsArchive  # noqa: E402
+from plugins.ff8 import field_data, field_walkmesh  # noqa: E402
+from plugins.ff8.fs_archive import FsArchive  # noqa: E402
 
 
 def main() -> int:

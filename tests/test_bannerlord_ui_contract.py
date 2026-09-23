@@ -6,7 +6,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BANNERLORD_ROOT = ROOT / "games" / "bannerlord"
+BANNERLORD_ROOT = ROOT / "plugins" / "bannerlord"
 _STALE_DATA_MAP_MOUNT = re.compile(r"main\.replaceChildren\(\s*view\s*\)")
 
 

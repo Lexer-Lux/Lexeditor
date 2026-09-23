@@ -36,7 +36,7 @@ public sealed class Settings {
 
 class SettingsTests(unittest.TestCase):
     def test_reads_bounds_groups_and_defaults_and_saves_field_only(self):
-        from games.bannerlord.settings_data import read_mcm_defaults, save_mcm_defaults
+        from plugins.bannerlord.settings_data import read_mcm_defaults, save_mcm_defaults
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);(root/'src').mkdir();path=root/'src/LexerSkillTweaksSettings.cs';path.write_text(TEXT,encoding='utf-8')
             model=read_mcm_defaults(root);rows={r['property']:r for r in model['settings']}
@@ -52,7 +52,7 @@ class SettingsTests(unittest.TestCase):
             with self.assertRaises(ValueError):save_mcm_defaults(root,[{'property':'Native','value':1}])
 
     def test_settings_writer_preserves_bom_and_crlf(self):
-        from games.bannerlord.settings_data import save_mcm_defaults
+        from plugins.bannerlord.settings_data import save_mcm_defaults
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);(root/"src").mkdir();path=root/"src/LexerSkillTweaksSettings.cs"
             path.write_bytes(b"\xef\xbb\xbf"+TEXT.replace("\n","\r\n").encode())
@@ -60,7 +60,7 @@ class SettingsTests(unittest.TestCase):
             raw=path.read_bytes();self.assertTrue(raw.startswith(b"\xef\xbb\xbf"));self.assertNotIn(b"\n",raw[3:].replace(b"\r\n",b""));self.assertIn(b"private bool _native = true;",raw)
 
     def test_settings_write_helpers_do_not_follow_existing_hardlinks(self):
-        from games.bannerlord.settings_data import save_mcm_defaults
+        from plugins.bannerlord.settings_data import save_mcm_defaults
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
             (root/'src').mkdir()
@@ -84,7 +84,7 @@ class SettingsTests(unittest.TestCase):
             self.assertIn('private bool _native = true;', path.read_text(encoding='utf-8'))
 
     def test_settings_source_redirection_outside_project_is_rejected(self):
-        from games.bannerlord.settings_data import save_mcm_defaults
+        from plugins.bannerlord.settings_data import save_mcm_defaults
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
             (root / 'src').mkdir()

@@ -3,7 +3,7 @@ import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EDITOR = ROOT / "games" / "rdr2" / "editor.html"
+EDITOR = ROOT / "plugins" / "rdr2" / "editor.html"
 
 html = EDITOR.read_text(encoding="utf-8")
 

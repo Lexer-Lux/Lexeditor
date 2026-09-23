@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from games.ff7r.archive import _with_virtual_assets
-from games.ff7r.research_dataobject import (
+from plugins.ff7r.archive import _with_virtual_assets
+from plugins.ff7r.research_dataobject import (
     ATB_RUNTIME_PROBE_ASSET,
     BETTER_LOCKON_PROBE_ASSET,
     BETTER_SPRINT_PROBE_ASSET,
@@ -18,8 +18,8 @@ from games.ff7r.research_dataobject import (
     dog_whistle_result_package,
     unscanned_name_result_package,
 )
-from games.ff7r.sprint_probe import assess_sprint_evidence
-from games.ff7r.storage import save_edits
+from plugins.ff7r.sprint_probe import assess_sprint_evidence
+from plugins.ff7r.storage import save_edits
 
 
 def _payload(package_result):

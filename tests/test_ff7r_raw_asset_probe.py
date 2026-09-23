@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from games.ff7r.raw_asset_probe import (
+from plugins.ff7r.raw_asset_probe import (
     extract_interesting_strings,
     extract_object_evidence,
     select_shadowed_assets,
@@ -60,7 +60,7 @@ def test_binary_string_probe_can_be_limited():
 
 
 def test_object_evidence_prefers_specific_resolved_owner_when_bounded(monkeypatch):
-    import games.ff7r.raw_asset_probe as module
+    import plugins.ff7r.raw_asset_probe as module
 
     class FakeTable:
         imports = (

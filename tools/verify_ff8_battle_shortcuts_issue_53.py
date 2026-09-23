@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import battle_shortcuts  # noqa: E402
+from plugins.ff8 import battle_shortcuts  # noqa: E402
 
 
 EXPECTED_EXE_SHA256 = (
@@ -129,7 +129,7 @@ def main() -> None:
     for fragment in forbidden_patch_fragments:
         assert fragment not in item_patch
 
-    module_text = (ROOT / "games" / "ff8" / "battle_shortcuts.py").read_text(
+    module_text = (ROOT / "plugins" / "ff8" / "battle_shortcuts.py").read_text(
         encoding="utf-8"
     )
     for forbidden_source in (

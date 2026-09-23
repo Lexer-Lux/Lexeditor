@@ -10,7 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff7.kernel import CATEGORIES, Kernel, resolve_kernel  # noqa: E402
+from plugins.ff7.kernel import CATEGORIES, Kernel, resolve_kernel  # noqa: E402
 
 
 ROOTS = (

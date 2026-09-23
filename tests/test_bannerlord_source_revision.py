@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.bannerlord.source_revision import (
+from plugins.bannerlord.source_revision import (
     attach_source_revision, replace_source_bytes, require_source_revision, source_revision
 )
 
@@ -29,7 +29,7 @@ class BannerlordSourceRevisionTests(unittest.TestCase):
                 result=real_copy2(src,dst,*args,**kwargs)
                 source.write_bytes(b"external\r\n")
                 return result
-            with patch("games.bannerlord.source_revision.shutil.copy2",side_effect=race):
+            with patch("plugins.bannerlord.source_revision.shutil.copy2",side_effect=race):
                 with self.assertRaisesRegex(ValueError,"changed on disk"):
                     replace_source_bytes(source,b"ours\r\n",token)
             self.assertEqual(source.read_bytes(),b"external\r\n")
@@ -48,7 +48,7 @@ class BannerlordSourceRevisionTests(unittest.TestCase):
             self.assertEqual(payload["sourceHash"],source_revision(source))
 
     def test_frontend_sends_saved_revision_for_every_structured_source(self):
-        root=Path(__file__).resolve().parents[1]/"games"/"bannerlord"
+        root=Path(__file__).resolve().parents[1]/"plugins"/"bannerlord"
         core=(root/"editor_core.js").read_text(encoding="utf-8")
         boot=(root/"editor_boot.js").read_text(encoding="utf-8")
         self.assertIn('sourceHash:baseline?.sourceHash||""',core)

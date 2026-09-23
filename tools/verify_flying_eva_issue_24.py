@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from games.ff8 import gameplay_settings  # noqa: E402
+from plugins.ff8 import gameplay_settings  # noqa: E402
 
 
 def expect_invalid(value) -> None:
@@ -96,8 +96,8 @@ def main() -> int:
 
     from plugin_source import plugin_source
     editor = plugin_source("ff8")
-    server = (ROOT / "games" / "ff8" / "server.py").read_text(encoding="utf-8")
-    extractor = (ROOT / "games" / "ff8" / "extractor.py").read_text(encoding="utf-8")
+    server = (ROOT / "plugins" / "ff8" / "server.py").read_text(encoding="utf-8")
+    extractor = (ROOT / "plugins" / "ff8" / "extractor.py").read_text(encoding="utf-8")
     assert '["settings","Tweaks"]' in editor
     assert 'type:"text",inputmode:"decimal",value:display(value),"data-min":min,"data-max":max,"data-step":step' in editor
     assert 'Math.max(min,Math.min(max,next))' in editor

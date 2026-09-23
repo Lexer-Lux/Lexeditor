@@ -19,7 +19,7 @@ Read the live issue and comments and preserve the latest explicit human correcti
 Lexer asked why the design draws a map from scratch when the game and the
 editor already have one (the blue and brown world map). Revised: the base
 layer is the existing 20 fixed world-map TIMs in `texl.obj` (256x256 indexed,
-16 palettes each; `games/ff8/world_textures.py`), already parsed and
+16 palettes each; `plugins/ff8/world_textures.py`), already parsed and
 previewed in the editor. Terrain/coastline stays always visible because it is
 baked into the game's own art; no fog-of-war drawing, no separate map
 database. Discovery policy covers labels and markers only. Posted as a

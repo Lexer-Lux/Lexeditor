@@ -18,7 +18,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.ff8 import card_art, server
+from plugins.ff8 import card_art, server
 
 
 def atlas() -> bytes:

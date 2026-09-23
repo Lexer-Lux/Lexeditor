@@ -3,8 +3,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.ff8 import gameplay_settings
-from games.ff8 import gf_acquisition_rework
+from plugins.ff8 import gameplay_settings
+from plugins.ff8 import gf_acquisition_rework
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -41,7 +41,7 @@ class GfAcquisitionReworkTests(unittest.TestCase):
             gf_acquisition_rework.build_hext(True)
 
     def test_editor_exposes_approved_rule(self):
-        editor = (ROOT / "games/ff8/boot.js").read_text(encoding="utf-8")
+        editor = (ROOT / "plugins/ff8/boot.js").read_text(encoding="utf-8")
         self.assertIn('"aria-label":"GF Acquisition Rework"', editor)
         self.assertIn('row("GF ACQUISITION REWORK"', editor)
         self.assertIn("gfAcquisitionRework:state.data.settings.gfAcquisitionRework", editor)

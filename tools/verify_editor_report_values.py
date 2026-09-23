@@ -30,7 +30,7 @@ with tempfile.TemporaryDirectory() as td:
  (prepared/'content').mkdir();(prepared/'content'/'inventory.xml').write_bytes(b'original')
  assert find_original_location('game/content.rpf:/content/inventory.xml',[prepared],game)==(prepared/'content'/'inventory.xml').resolve()
 
-source=ast.parse(Path('games/rdr2/server.py').read_text(encoding='utf-8'));node=next(n for n in source.body if isinstance(n,ast.FunctionDef) and n.name=='_validate_mob_value');ns={'re':re};exec(compile(ast.Module(body=[node],type_ignores=[]),'mob scalar validation','exec'),ns);validate=ns['_validate_mob_value']
+source=ast.parse(Path('plugins/rdr2/server.py').read_text(encoding='utf-8'));node=next(n for n in source.body if isinstance(n,ast.FunctionDef) and n.name=='_validate_mob_value');ns={'re':re};exec(compile(ast.Module(body=[node],type_ignores=[]),'mob scalar validation','exec'),ns);validate=ns['_validate_mob_value']
 for value in ('nan','inf','nope',''):
  try:validate('1.0',value,set())
  except ValueError:pass
@@ -40,6 +40,6 @@ assert validate('CA_POOR','CA_AVERAGE',{'CA_POOR','CA_AVERAGE'})=='CA_AVERAGE'
 try:validate('CA_POOR','MADE_UP',{'CA_POOR','CA_AVERAGE'})
 except ValueError:pass
 else:raise AssertionError('unknown enum')
-from games.rdr2.data_map import build_data_map
+from plugins.rdr2.data_map import build_data_map
 rows=build_data_map(Path(r'C:\RDR2Mod\DATA_MAP.md'))['rows'];assert len(rows)>100
 print('Original file resolution, typed Mobs values and full RDR2 Data Map parsing passed:',len(rows),'rows')

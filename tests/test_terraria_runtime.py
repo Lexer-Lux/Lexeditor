@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.terraria.runtime import SUPPORTED_TML_DISPLAY, inspect_runtime, parse_build_identifier
+from plugins.terraria.runtime import SUPPORTED_TML_DISPLAY, inspect_runtime, parse_build_identifier
 
 
 class TerrariaRuntimeTests(unittest.TestCase):

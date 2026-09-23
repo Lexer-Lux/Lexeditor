@@ -83,12 +83,12 @@ int main(){
 '''
     run_variants({'production':writer,
         'binocular-save-changes-gun':writer.replace('previous, g_iniPath.c_str())) return;', 'normalized.c_str(), g_iniPath.c_str())) return;')},writer_prelude,writer_tests)
-    module=ast.parse((root/'games/rdr2/server.py').read_text('utf-8'))
+    module=ast.parse((root/'plugins/rdr2/server.py').read_text('utf-8'))
     names={'_parse_gameplay_settings','_gameplay_settings_schema','_clamp_displayed_settings',
         '_recon_radius_compatibility','_insert_recon_radius_setting','get_gameplay_settings','save_gameplay_settings'}
     selected=ast.Module(body=[n for n in module.body if isinstance(n,ast.FunctionDef) and n.name in names],type_ignores=[])
     assert len(selected.body)==len(names)
-    schema=json.loads((root/'games/rdr2/settings_schema.json').read_text('utf-8'))
+    schema=json.loads((root/'plugins/rdr2/settings_schema.json').read_text('utf-8'))
     for key in ('ScreenCenterTolerancePercent','WeaponScreenCenterTolerancePercent'):
         compound='ReconTagging|'+key
         assert schema['ranges'][compound]=={'min':.1,'max':35.,'step':.5}
@@ -98,7 +98,7 @@ int main(){
         original='; keep this\n[ReconTagging]\nScreenCenterTolerancePercent=12\nEnabled=1\n[Other]\nKeep=9\n'
         ini.write_text(original,'utf-8')
         env={'json':json,'os':os,'shutil':shutil,'GAMEPLAY_INI_FILE':ini,'GAME_ROOT':folder/'no-game',
-            'SETTINGS_SCHEMA_FILE':root/'games/rdr2/settings_schema.json'}
+            'SETTINGS_SCHEMA_FILE':root/'plugins/rdr2/settings_schema.json'}
         exec(compile(selected,'server-settings','exec'),env)
         read=env['get_gameplay_settings'];save=env['save_gameplay_settings']
         def values():return {r['key']:r['value'] for s in read()['sections'] if s['name']=='ReconTagging' for r in s['settings']}

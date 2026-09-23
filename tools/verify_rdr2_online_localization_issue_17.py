@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.rdr2 import extractor, server  # noqa: E402
+from plugins.rdr2 import extractor, server  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:

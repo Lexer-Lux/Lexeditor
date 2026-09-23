@@ -3,8 +3,8 @@ name: FF7 data regressions
 on:
   pull_request:
     paths:
-      - 'games/ff7/**'
-      - 'games/ff7_2013/**'
+      - 'plugins/ff7/**'
+      - 'plugins/ff7_2013/**'
       - 'platform_config.py'
       - 'process_probe.py'
       - 'ui/framework.js'
@@ -48,11 +48,11 @@ jobs:
           retention-days: 3
           path: |
             *.py
-            games/__init__.py
-            games/ff7/*.py
-            games/ff7/*.html
-            games/ff7/*.js
-            games/ff7_2013/*.py
+            plugins/__init__.py
+            plugins/ff7/*.py
+            plugins/ff7/*.html
+            plugins/ff7/*.js
+            plugins/ff7_2013/*.py
             ui/**/*.js
             ui/**/*.css
             ui/**/*.json

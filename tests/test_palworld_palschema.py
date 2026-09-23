@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.palworld.palschema import (
+from plugins.palworld.palschema import (
     PatchValidationError,
     RawPatchDocument,
     ReadOnlyPatchError,

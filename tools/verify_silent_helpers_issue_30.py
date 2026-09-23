@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PRODUCTION_ROOTS = (
     ROOT / "service_session.py",
     ROOT / "github_integration.py",
-    ROOT / "games",
+    ROOT / "plugins",
 )
 
 

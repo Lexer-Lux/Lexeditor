@@ -11,13 +11,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from games.stardew_valley.acceptance import acceptance_status, begin_acceptance
-from games.stardew_valley.content_pack import (
+from plugins.stardew_valley.acceptance import acceptance_status, begin_acceptance
+from plugins.stardew_valley.content_pack import (
     ACCEPTANCE_MARKER, OBJECT_PATCH_LOG_NAME, ContentPackStore, deploy, deployment_status,
     initialize_project, loader_status, revert,
 )
-from games.stardew_valley import paths, server
-from games.stardew_valley.source_data import load_base_objects, objects_source_path
+from plugins.stardew_valley import paths, server
+from plugins.stardew_valley.source_data import load_base_objects, objects_source_path
 
 
 class StardewContentPackTests(unittest.TestCase):
@@ -49,8 +49,8 @@ class StardewContentPackTests(unittest.TestCase):
                 sys.executable,
                 "-c",
                 (
-                    "from games.stardew_valley import paths; "
-                    "from games.stardew_valley.plugin import PLUGIN; "
+                    "from plugins.stardew_valley import paths; "
+                    "from plugins.stardew_valley.plugin import PLUGIN; "
                     "print(paths.DEFAULT_PROJECT_ROOT); "
                     "print(paths.PROJECT_ROOT); "
                     "print(PLUGIN.projects.default_root)"
@@ -346,7 +346,7 @@ class StardewContentPackTests(unittest.TestCase):
             }
         }, indent=2) + "\n", encoding="utf-8")
         before = source.read_bytes()
-        from games.stardew_valley.source_data import load_base_dataset
+        from plugins.stardew_valley.source_data import load_base_dataset
         rows, status = load_base_dataset(game, "crops")
         self.assertTrue(status["available"])
         self.assertEqual(rows["472"]["baseFields"]["ExtraHarvestChance"], 0.2)

@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from games.ff7r.dataobject import BOOLEAN_BYTE, INT32, Property
-from games.ff7r import minimap_semantics as subject
+from plugins.ff7r.dataobject import BOOLEAN_BYTE, INT32, Property
+from plugins.ff7r import minimap_semantics as subject
 
 
 ASSET = "End/Content/GameContents/DataObject/Resident/EnemyTerritory"

@@ -4,7 +4,7 @@ on:
   push:
     branches: [codex/factorio-plugin]
     paths:
-      - 'games/factorio/**'
+      - 'plugins/factorio/**'
       - 'tests/test_factorio.py'
       - 'tests/factorio_browser_check.py'
       - 'tests/fixtures/factorio/**'
@@ -15,7 +15,7 @@ on:
       - '.github/workflows/factorio-checks.yml'
   pull_request:
     paths:
-      - 'games/factorio/**'
+      - 'plugins/factorio/**'
       - 'tests/test_factorio.py'
       - 'tests/factorio_browser_check.py'
       - 'tests/fixtures/factorio/**'
@@ -49,16 +49,16 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install -r requirements.txt
       - name: Python syntax
-        run: python -m compileall -q games/factorio tests/test_factorio.py tests/factorio_browser_check.py
+        run: python -m compileall -q plugins/factorio tests/test_factorio.py tests/factorio_browser_check.py
       - name: Editor JavaScript syntax
-        run: node --check games/factorio/editor.js
+        run: node --check plugins/factorio/editor.js
       - name: Structured model tests
         run: python -m unittest -v tests.test_factorio
       - name: Plugin descriptor
         run: >-
-          python -c "from games.factorio.plugin import PLUGIN; from plugin_api import validate_plugin;
+          python -c "from plugins.factorio.plugin import PLUGIN; from plugin_api import validate_plugin;
           from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN);
-          assert 'games.factorio.server' in SERVICE_MODULES; print(PLUGIN.name)"
+          assert 'plugins.factorio.server' in SERVICE_MODULES; print(PLUGIN.name)"
       - name: Repository metadata
         run: |
           python plugin_metadata.py
@@ -70,7 +70,7 @@ jobs:
           python app.py --game factorio --check
       - name: Managed service smoke
         run: >-
-          python -c "from games.factorio.plugin import smoke;
+          python -c "from plugins.factorio.plugin import smoke;
           [print('PASS:', line) for line in smoke()]"
 
   shared-baseline:

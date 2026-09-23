@@ -12,7 +12,7 @@ def main():
   b=pw.chromium.launch(headless=True);p=b.new_page(viewport={'width':2560,'height':1352})
   p.route('http://fixture/',lambda r:r.fulfill(content_type='text/html',body='<body data-lex-plugin="ff8"><main class="lex-detail-panel"></main></body>'));p.goto('http://fixture/')
   p.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  p.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
+  p.add_style_tag(content=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8'))
   p.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
   p.evaluate("""()=>{const U=LexeditorUI;const grid=U.el('div',{class:'starting-field-grid lex-property-grid'});
    for(let i=0;i<15;i++){const input=i%2?U.el('input',{value:'17336449'}):U.el('select',{},U.el('option',{},'Squall'));

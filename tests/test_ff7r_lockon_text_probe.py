@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from games.ff7r import lockon_text_probe as probe
+from plugins.ff7r import lockon_text_probe as probe
 
 
 def _package(entries):

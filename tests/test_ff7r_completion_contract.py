@@ -1,5 +1,5 @@
-from games.ff7r import server
-from games.ff7r.plugin import DEFAULT_PROJECT
+from plugins.ff7r import server
+from plugins.ff7r.plugin import DEFAULT_PROJECT
 
 
 def test_default_project_is_cross_platform_absolute():

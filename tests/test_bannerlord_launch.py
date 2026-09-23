@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.bannerlord.game_launch import launch_command, module_load_order, selected_module
+from plugins.bannerlord.game_launch import launch_command, module_load_order, selected_module
 
 
 def write_module(

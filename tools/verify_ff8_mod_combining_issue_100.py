@@ -10,7 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import runtime_layout
+from plugins.ff8 import runtime_layout
 from tools.prepare_ff8_mod_combining_fixture import (
     EXPECTED_HIGH_LOW, EXPECTED_LOW_HIGH, HIGH_ID, LOW_ID, PRICE_EDITS,
     prepare,

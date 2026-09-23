@@ -53,7 +53,7 @@ window.fetch=async function(url,options={}) {
  return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
 };
 """.replace('RESPONSES',json.dumps(responses))
-    html=(ROOT/'games/rdr2/editor.html').read_text(encoding='utf-8')
+    html=(ROOT/'plugins/rdr2/editor.html').read_text(encoding='utf-8')
     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">',
                       '<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
     html=html.replace('<script src="/shared/framework.js"></script>',
@@ -62,10 +62,10 @@ window.fetch=async function(url,options={}) {
     # is no server here, so they are inlined in the order the page lists them.
     for module in re.findall(r'<script src="/?([A-Za-z0-9_.-]+\.js)"></script>', html):
         html=html.replace(f'<script src="{module}"></script>',
-                          '<script>'+(ROOT/'games/rdr2'/module).read_text(encoding='utf-8')+'</script>')
+                          '<script>'+(ROOT/'plugins/rdr2'/module).read_text(encoding='utf-8')+'</script>')
     for sheet in re.findall(r'<link rel="stylesheet" href="/?([A-Za-z0-9_.-]+\.css)">', html):
         html=html.replace(f'<link rel="stylesheet" href="{sheet}">',
-                          '<style>'+(ROOT/'games/rdr2'/sheet).read_text(encoding='utf-8')+'</style>')
+                          '<style>'+(ROOT/'plugins/rdr2'/sheet).read_text(encoding='utf-8')+'</style>')
     return html
 
 

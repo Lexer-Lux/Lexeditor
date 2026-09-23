@@ -1,6 +1,6 @@
 import unittest
 
-from games.bannerlord.plugin import PLUGIN, smoke
+from plugins.bannerlord.plugin import PLUGIN, smoke
 
 
 class BannerlordSmokeTests(unittest.TestCase):

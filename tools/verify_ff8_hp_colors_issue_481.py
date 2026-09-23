@@ -3,11 +3,11 @@ from __future__ import annotations
 import argparse, subprocess, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-HEADER=ROOT/"games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_hp_colors.h"
-SOURCE=ROOT/"games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp"
+HEADER=ROOT/"plugins/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_hp_colors.h"
+SOURCE=ROOT/"plugins/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp"
 PREPARE=ROOT/"tools/prepare_ff8_native_build.py"
-SETTINGS=ROOT/"games/ff8/gameplay_settings.py"
-EDITOR=ROOT/"games/ff8/boot.js"
+SETTINGS=ROOT/"plugins/ff8/gameplay_settings.py"
+EDITOR=ROOT/"plugins/ff8/boot.js"
 def require(v,m):
     if not v: raise AssertionError(m)
 def static_contract():

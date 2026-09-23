@@ -71,7 +71,7 @@ def propagate_usage(found: dict[str, set[str]], graph: dict[str, set[str]]) -> N
 def usage() -> dict[str, list[str]]:
     names = exports()
     found: dict[str, set[str]] = {name: set() for name in names}
-    sources = [(plugin.name, plugin) for plugin in sorted((ROOT / "games").iterdir()) if plugin.is_dir()]
+    sources = [(plugin.name, plugin) for plugin in sorted((ROOT / "plugins").iterdir()) if plugin.is_dir()]
     # The component catalogue is rendered by Blank, so a component with a sample
     # there is one Blank shows, whoever wrote the file.
     sources.append(("blank", ROOT / "ui" / "component-catalog.js"))

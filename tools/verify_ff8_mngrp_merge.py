@@ -10,7 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import formats, mngrp_merge, mngrp_text, paths, refine_tables, runtime_layout  # noqa: E402
+from plugins.ff8 import formats, mngrp_merge, mngrp_text, paths, refine_tables, runtime_layout  # noqa: E402
 
 
 def main() -> int:

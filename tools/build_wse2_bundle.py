@@ -45,5 +45,5 @@ def build(source: Path, destination: Path) -> Path:
 if __name__=='__main__':
     if len(sys.argv) not in (2,3):
         raise SystemExit(__doc__)
-    dest=Path(sys.argv[2]) if len(sys.argv)>2 else Path(__file__).resolve().parents[1]/'games/warband/runtime'
+    dest=Path(sys.argv[2]) if len(sys.argv)>2 else Path(__file__).resolve().parents[1]/'plugins/warband/runtime'
     print(build(Path(sys.argv[1]),dest))

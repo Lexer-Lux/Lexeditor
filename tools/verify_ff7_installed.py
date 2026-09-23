@@ -16,8 +16,8 @@ import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.ff7 import datasets, extended
-from games.ff7.kernel import resolve_kernel
+from plugins.ff7 import datasets, extended
+from plugins.ff7.kernel import resolve_kernel
 
 
 # Deliberately independent of the backend declarations below. If the editor's
@@ -276,8 +276,8 @@ def check_installation(game: Path) -> dict:
 
 
 def discover() -> list[Path]:
-    from games.ff7.plugin import PLUGIN as current
-    from games.ff7_2013.plugin import PLUGIN as legacy
+    from plugins.ff7.plugin import PLUGIN as current
+    from plugins.ff7_2013.plugin import PLUGIN as legacy
 
     roots = []
     saved = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Lexeditor/game-installations.json"

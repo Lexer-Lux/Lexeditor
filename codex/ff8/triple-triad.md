@@ -1,6 +1,6 @@
 # Triple Triad field opponents
 
-`games/ff8/field_data.py` reads CARDGAME calls from field scripts. A call belongs
+`plugins/ff8/field_data.py` reads CARDGAME calls from field scripts. A call belongs
 to a script entity. One entity can contain multiple calls, so call count is not
 opponent count. The editor groups calls by map and entity. Identical entity
 names in different maps do not establish that they are the same person.

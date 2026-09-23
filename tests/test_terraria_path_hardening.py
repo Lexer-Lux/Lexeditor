@@ -5,8 +5,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.terraria import server
-from games.terraria.source_text import source_file_state
+from plugins.terraria import server
+from plugins.terraria.source_text import source_file_state
 
 
 class TerrariaPathHardeningTests(unittest.TestCase):

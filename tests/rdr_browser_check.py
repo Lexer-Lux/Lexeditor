@@ -130,7 +130,7 @@ window.fetch=async function(url,options={}) {
   return new Response(JSON.stringify(data),{status:200,headers:{'Content-Type':'application/json'}});
 };
 """.replace("RESPONSES", json.dumps(responses))
-    html = (ROOT / "games/rdr/editor.html").read_text(encoding="utf-8")
+    html = (ROOT / "plugins/rdr/editor.html").read_text(encoding="utf-8")
     html = html.replace(
         '<link rel="stylesheet" href="/shared/framework.css">',
         "<style>" + (ROOT / "ui/framework.css").read_text(encoding="utf-8") + "</style>",
@@ -142,19 +142,19 @@ window.fetch=async function(url,options={}) {
     )
     html = html.replace(
         '<link rel="stylesheet" href="editor.css">',
-        "<style>" + (ROOT / "games/rdr/editor.css").read_text(encoding="utf-8") + "</style>",
+        "<style>" + (ROOT / "plugins/rdr/editor.css").read_text(encoding="utf-8") + "</style>",
     )
     html = html.replace(
         '<script src="strings.js"></script>',
-        "<script>" + (ROOT / "games/rdr/strings.js").read_text(encoding="utf-8") + "</script>",
+        "<script>" + (ROOT / "plugins/rdr/strings.js").read_text(encoding="utf-8") + "</script>",
     )
     html = html.replace(
         '<script src="rbf.js"></script>',
-        "<script>" + (ROOT / "games/rdr/rbf.js").read_text(encoding="utf-8") + "</script>",
+        "<script>" + (ROOT / "plugins/rdr/rbf.js").read_text(encoding="utf-8") + "</script>",
     )
     html = html.replace(
         '<script src="editor.js"></script>',
-        "<script>" + (ROOT / "games/rdr/editor.js").read_text(encoding="utf-8") + "</script>",
+        "<script>" + (ROOT / "plugins/rdr/editor.js").read_text(encoding="utf-8") + "</script>",
     )
     return html.replace("<head>", '<head><base href="https://lexeditor.test/">', 1)
 

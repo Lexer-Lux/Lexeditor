@@ -14,7 +14,7 @@ from capstone import CS_ARCH_X86, CS_MODE_32, Cs
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import flat_stat_abilities, formats, kernel_text, max_spell  # noqa: E402
+from plugins.ff8 import flat_stat_abilities, formats, kernel_text, max_spell  # noqa: E402
 
 
 EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")

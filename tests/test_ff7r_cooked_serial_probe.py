@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import struct
 
-from games.ff7r.cooked_serial_probe import extract_serialized_name_refs
+from plugins.ff7r.cooked_serial_probe import extract_serialized_name_refs
 
 
 def _fstring(value: str) -> bytes:

@@ -35,7 +35,7 @@ def _read_json(path: Path) -> dict:
 def static_plugin_ids(root: Path = ROOT) -> set[str]:
     """Read declared plugin IDs without importing game code."""
     ids: set[str] = set()
-    for plugin_path in sorted((Path(root) / "games").glob("*/plugin.py")):
+    for plugin_path in sorted((Path(root) / "plugins").glob("*/plugin.py")):
         source = plugin_path.read_text(encoding="utf-8")
         matches = set(PLUGIN_ID_PATTERN.findall(source))
         if len(matches) != 1:

@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from tools.verify_panel_layout_visual_46 import browser_session,close_browser,screenshot,wait_eval,Rdr2Session
-from games.rdr.plugin import RdrSession
+from plugins.rdr.plugin import RdrSession
 SOURCE_INI=Path(r'C:\RDR2Mod\GameplayTweaks\GameplayTweaks.ini')
 if not SOURCE_INI.is_file():
  raise FileNotFoundError(f'Missing RDR2 project fixture: {SOURCE_INI}')

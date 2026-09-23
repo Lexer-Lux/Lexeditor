@@ -9,16 +9,16 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import formats, game_icons, paths  # noqa: E402
+from plugins.ff8 import formats, game_icons, paths  # noqa: E402
 
 
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
-editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
-rdr2_editor = (ROOT / "games" / "rdr2" / "editor.html").read_text(encoding="utf-8")
-rdr_editor = (ROOT / "games" / "rdr" / "editor.html").read_text(encoding="utf-8")
-ff7_editor = (ROOT / "games" / "ff7" / "editor.html").read_text(encoding="utf-8")
-blank_editor = (ROOT / "games" / "blank" / "editor.html").read_text(encoding="utf-8")
-extractor = (ROOT / "games" / "ff8" / "extractor.py").read_text(encoding="utf-8")
+editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+rdr2_editor = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
+rdr_editor = (ROOT / "plugins" / "rdr" / "editor.html").read_text(encoding="utf-8")
+ff7_editor = (ROOT / "plugins" / "ff7" / "editor.html").read_text(encoding="utf-8")
+blank_editor = (ROOT / "plugins" / "blank" / "editor.html").read_text(encoding="utf-8")
+extractor = (ROOT / "plugins" / "ff8" / "extractor.py").read_text(encoding="utf-8")
 
 assert "provenanceControl" in framework
 assert "referenceDisplay" in framework

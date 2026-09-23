@@ -4,9 +4,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.terraria.localization import parse_localization_text
-from games.terraria.source_text import source_file_state
-from games.terraria.structured_content import create_structured_content, default_values, render_structured_source, update_structured_content, validate_values
+from plugins.terraria.localization import parse_localization_text
+from plugins.terraria.source_text import source_file_state
+from plugins.terraria.structured_content import create_structured_content, default_values, render_structured_source, update_structured_content, validate_values
 
 
 class TerrariaStructuredSystemsTests(unittest.TestCase):

@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const html = ['core.js','crafting.js','tweaks.js'].map(name=>fs.readFileSync(path.join(__dirname, '../games/rdr2', name), 'utf8')).join('\n');
+const html = ['core.js','crafting.js','tweaks.js'].map(name=>fs.readFileSync(path.join(__dirname, '../plugins/rdr2', name), 'utf8')).join('\n');
 const stateSource = html.slice(html.indexOf('const state = {'), html.indexOf('\n};', html.indexOf('const state = {')) + 3);
 const globalSave = html.slice(html.indexOf('async function saveAllChanges()'), html.indexOf('\nfunction savebar('));
 const catalogSave = html.slice(html.indexOf('async function saveCatalog()'), html.indexOf('// ----- GameplayTweaks settings -----'));

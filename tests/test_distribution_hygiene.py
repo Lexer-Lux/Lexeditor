@@ -10,12 +10,12 @@ class DistributionHygieneTests(unittest.TestCase):
     def test_resources_exclude_builds_profiles_and_dependency_trees(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
-            expected = ['ui/framework.js', 'games/blank/editor.html', 'assets/icon.png']
+            expected = ['ui/framework.js', 'plugins/blank/editor.html', 'assets/icon.png']
             discarded = ['_scratch/huge-build/source.cpp', '.venv/module.py',
-                         'games/blank/_scratch/profile.json', 'games/blank/vcpkg/source.py',
-                         'games/blank/.build/generated.json', 'games/blank/build/generated.py',
-                         'games/blank/__pycache__/module.py', 'ui/node_modules/library.js',
-                         'games/ff8/ffnx_driver/source.py', 'games/blank/game-data/private.json']
+                         'plugins/blank/_scratch/profile.json', 'plugins/blank/vcpkg/source.py',
+                         'plugins/blank/.build/generated.json', 'plugins/blank/build/generated.py',
+                         'plugins/blank/__pycache__/module.py', 'ui/node_modules/library.js',
+                         'plugins/ff8/ffnx_driver/source.py', 'plugins/blank/game-data/private.json']
             for relative in expected + discarded:
                 path = root / relative; path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text('fixture', encoding='utf-8')
@@ -25,7 +25,7 @@ class DistributionHygieneTests(unittest.TestCase):
         """A vendored helper that is not in the installer is not vendored."""
         import hashlib
         import reshade_projects
-        from games.ff7r2 import shader_injector
+        from plugins.ff7r2 import shader_injector
         from tools.build_distribution import VENDORED_HELPERS
 
         root = Path(__file__).resolve().parents[1]

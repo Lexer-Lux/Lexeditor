@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.module_data import read_submodule, save_module
+from plugins.bannerlord.module_data import read_submodule, save_module
 
 
 BASE = '''<?xml version="1.0" encoding="utf-8"?>

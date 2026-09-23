@@ -4,14 +4,14 @@ on:
   push:
     branches: [master, fix/rdr1-editor-runtime-handoff]
     paths:
-      - 'games/rdr/**'
+      - 'plugins/rdr/**'
       - 'tools/*rdr*.py'
       - 'tests/test_rdr_*.py'
       - 'tests/rdr_browser_check.py'
       - '.github/workflows/rdr1-checks.yml'
   pull_request:
     paths:
-      - 'games/rdr/**'
+      - 'plugins/rdr/**'
       - 'tools/*rdr*.py'
       - 'tests/test_rdr_*.py'
       - 'tests/rdr_browser_check.py'
@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts
-          python -m compileall -q games/rdr
+          python -m compileall -q plugins/rdr
           python -m unittest discover -s tests -p 'test_rdr_string_tables.py' 2>&1 | tee artifacts/rdr1-strtbl.log
           python -m unittest discover -s tests -p 'test_rdr_rbf.py' 2>&1 | tee artifacts/rdr1-rbf.log
           python tools/verify_rdr_editing.py 2>&1 | tee artifacts/rdr1-unit.log

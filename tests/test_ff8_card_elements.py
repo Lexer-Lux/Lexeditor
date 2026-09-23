@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from PIL import Image
 
-from games.ff8 import card_art
+from plugins.ff8 import card_art
 
 
 def texture():

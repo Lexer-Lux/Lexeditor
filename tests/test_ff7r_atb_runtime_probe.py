@@ -1,4 +1,4 @@
-from games.ff7r.atb_runtime_probe import assess_atb_runtime_evidence
+from plugins.ff7r.atb_runtime_probe import assess_atb_runtime_evidence
 
 
 def _native(**counts):

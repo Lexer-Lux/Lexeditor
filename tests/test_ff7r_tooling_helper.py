@@ -6,7 +6,7 @@ import zipfile
 
 import pytest
 
-from games.ff7r import pak_reader, tooling
+from plugins.ff7r import pak_reader, tooling
 
 
 def test_upstream_release_is_information_only_and_keeps_the_pin():
@@ -168,11 +168,11 @@ def test_distribution_bundles_repak_archives_manifest_and_licenses():
     from tools import build_distribution
 
     required = {
-        "games/ff7r/runtime/repak/v0.2.3/manifest.json",
-        "games/ff7r/runtime/repak/v0.2.3/LICENSE-MIT",
-        "games/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE",
-        "games/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip",
-        "games/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-unknown-linux-gnu.tar.xz",
+        "plugins/ff7r/runtime/repak/v0.2.3/manifest.json",
+        "plugins/ff7r/runtime/repak/v0.2.3/LICENSE-MIT",
+        "plugins/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE",
+        "plugins/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip",
+        "plugins/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-unknown-linux-gnu.tar.xz",
     }
     assert required <= set(build_distribution.VENDORED_HELPERS)
 

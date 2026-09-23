@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.game_launch import module_load_order
+from plugins.bannerlord.game_launch import module_load_order
 
 
 class BannerlordAmbiguousCategoryTests(unittest.TestCase):

@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.bannerlord.project_data import primary_project_file, resolve_project_file, run_build
-from games.bannerlord import server
+from plugins.bannerlord.project_data import primary_project_file, resolve_project_file, run_build
+from plugins.bannerlord import server
 
 
 PROJECT_XML = '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net472</TargetFramework></PropertyGroup></Project>'
@@ -48,7 +48,7 @@ class BannerlordMultiProjectTests(unittest.TestCase):
     def test_build_without_selection_refuses_multiple_projects_before_dotnet(self):
         with tempfile.TemporaryDirectory() as name:
             workspace = self.make_workspace(Path(name))
-            with patch("games.bannerlord.project_data.subprocess.run") as runner:
+            with patch("plugins.bannerlord.project_data.subprocess.run") as runner:
                 with self.assertRaisesRegex(ValueError, "Several .csproj files"):
                     run_build(workspace)
             runner.assert_not_called()

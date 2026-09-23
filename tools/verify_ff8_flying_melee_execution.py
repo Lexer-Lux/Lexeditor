@@ -13,7 +13,7 @@ except ImportError:
     sys.path.insert(0, str(ROOT/'_scratch/gf-spellbooks-test-deps'))
     import unicorn
 from unicorn.x86_const import *
-from games.ff8 import flying_eva
+from plugins.ff8 import flying_eva
 
 data = Path(r'D:/SteamLibrary/steamapps/common/FINAL FANTASY VIII/FF8_EN.exe').read_bytes()
 assert hashlib.sha256(data).hexdigest() == '064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570'

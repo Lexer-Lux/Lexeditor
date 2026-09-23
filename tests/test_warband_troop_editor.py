@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.warband.troop_editor import troop_data, save_troops
+from plugins.warband.troop_editor import troop_data, save_troops
 
 
 SOURCE = '''# encoding: utf-8

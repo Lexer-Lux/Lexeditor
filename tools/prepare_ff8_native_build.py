@@ -101,7 +101,7 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
             raise RuntimeError(f'Expected FFNx {BASE}; found {revision}')
     if subprocess.check_output(['git','status','--porcelain','--untracked-files=no'],cwd=source,text=True).strip():
         raise RuntimeError('Refusing to modify a dirty FFNx source checkout')
-    patch=ROOT/'games/ff8/ffnx_issue_51/package/ISSUE51_DERIVATIVE_SOURCE.patch'
+    patch=ROOT/'plugins/ff8/ffnx_issue_51/package/ISSUE51_DERIVATIVE_SOURCE.patch'
     subprocess.run(['git','apply','--check','--ignore-space-change',str(patch)],cwd=source,check=True)
     subprocess.run(['git','apply','--ignore-space-change',str(patch)],cwd=source,check=True)
     integrate_shared_magic_notifications(source)
@@ -112,7 +112,7 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
         ('ffnx_party_switch','lexeditor_ff8_party_switch.cpp'),
         ('ffnx_party_switch','lexeditor_ff8_party_switch.h'),
     ):
-        shutil.copyfile(ROOT/f'games/ff8/{folder}/ffnx-src/{name}',source/'src'/name)
+        shutil.copyfile(ROOT/f'plugins/ff8/{folder}/ffnx-src/{name}',source/'src'/name)
     # Modern Controls is also present in the provenance patch, but its maintained
     # sources move faster than that immutable build snapshot. Always overlay the
     # current audited implementation after applying the pinned derivative patch.
@@ -123,14 +123,14 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
         'lexeditor_ff8_modern_controls.cpp',
         'lexeditor_ff8_modern_controls.h',
     ):
-        shutil.copyfile(ROOT/'games/ff8/ffnx_modern_controls'/name, source/'src'/name)
+        shutil.copyfile(ROOT/'plugins/ff8/ffnx_modern_controls'/name, source/'src'/name)
     # Lexeditor's own in-game messages. The queue decides what is shown and
     # for how long, the layout decides where the box sits and how it fades,
     # and the third file is the only part that touches a device.
     for name in ('toast_queue.h', 'toast_layout.h'):
-        shutil.copyfile(ROOT/'games/ff8/ffnx_toasts'/name, source/'src'/name)
+        shutil.copyfile(ROOT/'plugins/ff8/ffnx_toasts'/name, source/'src'/name)
     for name in ('lexeditor_ff8_toast.h', 'lexeditor_ff8_toast.cpp'):
-        shutil.copyfile(ROOT/'games/ff8/ffnx_toasts/ffnx-src'/name, source/'src'/name)
+        shutil.copyfile(ROOT/'plugins/ff8/ffnx_toasts/ffnx-src'/name, source/'src'/name)
     extension_files = [
         'flare_encounter.h', 'lexeditor_ff8_flare.cpp',
         'flare_request.h', 'lexeditor_ff8_flare_owner.h', 'lexeditor_ff8_flare_owner.cpp',
@@ -145,7 +145,7 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
     ]
     for name in extension_files:
         destination = source / 'src' / ('ff8' if name.endswith('.inc') else '') / name
-        shutil.copyfile(ROOT / 'games/ff8/ffnx_gameplay_extensions/ffnx-src' / name, destination)
+        shutil.copyfile(ROOT / 'plugins/ff8/ffnx_gameplay_extensions/ffnx-src' / name, destination)
     # The packaged provenance patch may already include the new switch after
     # this candidate has been validated and promoted; support repeat builds.
     changes={

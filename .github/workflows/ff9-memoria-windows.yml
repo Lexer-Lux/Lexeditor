@@ -3,7 +3,7 @@ on:
   push:
     branches: [master]
     paths:
-      - 'games/ff9/**'
+      - 'plugins/ff9/**'
       - 'tests/test_ff9_runtime.py'
       - 'tests/ff9_browser_check.py'
       - '.github/workflows/ff9-memoria-windows.yml'
@@ -12,7 +12,7 @@ on:
       - 'requirements.txt'
   pull_request:
     paths:
-      - 'games/ff9/**'
+      - 'plugins/ff9/**'
       - 'tests/test_ff9_runtime.py'
       - 'tests/ff9_browser_check.py'
       - '.github/workflows/ff9-memoria-windows.yml'
@@ -40,7 +40,7 @@ jobs:
           @'
           from pathlib import Path
           import json, tempfile
-          from games.ff9 import memoria_manager as manager
+          from plugins.ff9 import memoria_manager as manager
 
           with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-real-patcher-") as name:
               root = Path(name) / "FINAL FANTASY IX"

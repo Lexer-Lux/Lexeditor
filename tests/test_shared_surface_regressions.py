@@ -6,7 +6,7 @@ from test_shared_ui_feedback import ROOT, page, framework
 @pytest.mark.parametrize('platform', [False, True])
 def test_boolean_label_arrow_and_mark_share_a_row(page, platform):
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''platform=>{
       const U=LexeditorUI,input=U.el('input',{type:'checkbox',checked:true});
       input.style.fontSize='60px';

@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'tools'))
 from prepare_ff8_native_build import integrate_shared_magic_notifications
 
-patch = (ROOT/'games/ff8/ffnx_issue_51/package/ISSUE51_DERIVATIVE_SOURCE.patch').read_text(encoding='utf-8')
+patch = (ROOT/'plugins/ff8/ffnx_issue_51/package/ISSUE51_DERIVATIVE_SOURCE.patch').read_text(encoding='utf-8')
 section = patch.split('+++ b/src/ff8/shared_magic_runtime.cpp\n', 1)[1].split('diff --git ', 1)[0]
 source = '\n'.join(line[1:] for line in section.splitlines() if line.startswith('+'))+'\n'
 with tempfile.TemporaryDirectory(prefix='lex-shared-toast-') as folder:
@@ -56,9 +56,9 @@ with tempfile.TemporaryDirectory(prefix='lex-shared-toast-fresh-') as folder:
 
 # The box itself: the parts that need no device are checked here, because the
 # drawing cannot be exercised without one.
-layout = (ROOT/'games/ff8/ffnx_toasts/toast_layout.h').read_text(encoding='utf-8')
-toast = (ROOT/'games/ff8/ffnx_toasts/ffnx-src/lexeditor_ff8_toast.cpp').read_text(encoding='utf-8')
-header = (ROOT/'games/ff8/ffnx_toasts/ffnx-src/lexeditor_ff8_toast.h').read_text(encoding='utf-8')
+layout = (ROOT/'plugins/ff8/ffnx_toasts/toast_layout.h').read_text(encoding='utf-8')
+toast = (ROOT/'plugins/ff8/ffnx_toasts/ffnx-src/lexeditor_ff8_toast.cpp').read_text(encoding='utf-8')
+header = (ROOT/'plugins/ff8/ffnx_toasts/ffnx-src/lexeditor_ff8_toast.h').read_text(encoding='utf-8')
 assert 'lexeditor_toast::layout(' in toast and 'lexeditor_toast::fade(' in toast
 assert 'ImGui::GetForegroundDrawList()' in toast
 assert 'show_popup_msg' not in toast, 'the box draws itself; it does not wrap the popup'
@@ -70,7 +70,7 @@ for name in ('lexeditor_ff8_toast_push', 'lexeditor_ff8_toast_draw',
 # The refusal sentence is written twice - once where Summon is greyed, once
 # where the reason is shown - so they are checked against each other.
 sys.path.insert(0, str(ROOT))
-from games.ff8 import battle_issue_54 as battle
+from plugins.ff8 import battle_issue_54 as battle
 quoted = toast.split('LEXEDITOR_SUMMON_UNAVAILABLE_REASON =', 1)[1].split(';', 1)[0]
 spoken = ''.join(part.split('"')[1] for part in quoted.split('\n') if '"' in part)
 assert spoken == battle.SUMMON_UNAVAILABLE_REASON, (spoken, battle.SUMMON_UNAVAILABLE_REASON)

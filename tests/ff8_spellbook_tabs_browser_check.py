@@ -13,7 +13,7 @@ def main():
   page.route('**/api/kernel?*',lambda r:r.fulfill(body=json.dumps({'rows':[{'id':10,'spellbook':None}],'spellbook':{'enabled':True,'magicOptions':[{'id':1,'name':'Fire'}],'abilityOptions':[]}}),content_type='application/json'))
   page.goto('http://fixture/')
   page.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  page.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
+  page.add_style_tag(content=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8'))
   page.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
   # The GF page gives its detail host a way to swap one of its panels; the
   # spellbook uses it to put the abilities panel inside its tabs.
@@ -28,7 +28,7 @@ def main():
           LexeditorUI.el('span',{},'Ability '+r.id))}]}));
   }''')
   page.add_style_tag(content='#gf-detail {display:flex} #gf-detail > .lex-tabbed-panel {flex:1;min-height:0}')
-  page.add_script_tag(content=(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8'))
+  page.add_script_tag(content=(ROOT/'plugins/ff8/cards_ui.js').read_text(encoding='utf-8'))
   page.get_by_role('tab',name='SPELLBOOK').wait_for()
   # The abilities panel is replaced by one tabbed panel holding both views.
   assert page.locator('.lex-tabbed-panel .lexeditor-gf-spellbook').count()==1

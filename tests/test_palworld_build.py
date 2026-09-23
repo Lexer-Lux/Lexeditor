@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.palworld.build import (
+from plugins.palworld.build import (
     BuildChangedError,
     BuildOwnershipError,
     build,

@@ -22,7 +22,7 @@ drawn — they are awarded automatically on winning the fight.
 
 Answer to Lexer's question (tweak or data-file edit): a tweak. The existing
 tweak layer already patches the same battle paths natively — see
-`games/ff8/streamlined_draw.py` (Draw hooks/caves, no data-file edits) and
+`plugins/ff8/streamlined_draw.py` (Draw hooks/caves, no data-file edits) and
 the shared Draw/Card command hooks in `battle_issue_54`. GF Acquisition
 Rework follows the same pattern: a battle-victory award hook plus a Draw-list
 filter for GF entries. No data-file edit is needed.
@@ -41,7 +41,7 @@ actionable.
 
 ## 2026-09-23 per-game-ff8: separable logic landed, native proof still needs the game
 
-Landed on branch per-game-ff8: new `games/ff8/gf_acquisition_rework.py` owns
+Landed on branch per-game-ff8: new `plugins/ff8/gf_acquisition_rework.py` owns
 the approved acquisition map (6 drawable GFs with primary + Disc 4 recovery
 bosses), award-on-victory with no-duplicate, Draw-list GF suppression with
 spells untouched, and disable-keeps-GF (awards only append). Activation fails
@@ -49,7 +49,7 @@ closed (`GF_ACQUISITION_AVAILABLE = False`) until battle-victory/Draw-list
 hooks and GF-owned save offsets are proved; no guessed bytes. Wired as a
 visible-but-blocked tweak (`gfAcquisitionRework` in gameplay_settings +
 boot.js row) mirroring the issue-90 pattern. Covered by
-`games/ff8/gf_acquisition_rework_test.py` and
+`plugins/ff8/gf_acquisition_rework_test.py` and
 `tests/test_ff8_gf_acquisition_rework.py`; full ff8 unit set green (223
 passed, 3 skipped).
 

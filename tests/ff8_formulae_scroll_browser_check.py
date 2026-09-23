@@ -16,8 +16,8 @@ import threading
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.ff8 import formulae_rework
-from games.ff8.server import create_server
+from plugins.ff8 import formulae_rework
+from plugins.ff8.server import create_server
 from playwright.sync_api import sync_playwright
 
 FORMULA_ROWS = json.dumps(formulae_rework.rows(), ensure_ascii=True)
@@ -35,7 +35,7 @@ try:
         # discovery and shell startup, so CI needs no private installation.
         # The rework rows come from the real backend contract, so the stub
         # renders the same inventory the game session would list.
-        boot = (Path(__file__).resolve().parents[1] / "games/ff8/boot.js").read_text(encoding="utf-8")
+        boot = (Path(__file__).resolve().parents[1] / "plugins/ff8/boot.js").read_text(encoding="utf-8")
         boot = boot[:boot.index("  const shell=LexeditorUI.mountShell(")] + """
 const shell={refresh(){}};
 state.formula={weaponId:0,strength:100,vitality:50,luck:20,eva:10,targetLuck:5,flying:false,float:false};

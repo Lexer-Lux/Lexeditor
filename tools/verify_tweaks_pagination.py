@@ -9,7 +9,7 @@ with sync_playwright() as p:
  page.route("http://fixture/**",lambda route:route.fulfill(body="<html></html>",content_type="text/html"))
  page.goto("http://fixture/")
  css=(root/"ui/framework.css").read_text(encoding="utf-8")
- rdr=(root/"games/rdr2/editor.html").read_text(encoding="utf-8")
+ rdr=(root/"plugins/rdr2/editor.html").read_text(encoding="utf-8")
  page.set_content('<style>'+re.search(r'<style>(.*?)</style>',rdr,re.S)[1]+css+'</style><header class="lex-shell-header" style="height:130px;flex-shrink:0">Tweaks</header><main></main>')
  page.add_script_tag(path=str(root/"ui/framework.js"))
  page.evaluate("""() => {const u=LexeditorUI;document.querySelector('main').append(u.settingsColumns(Array.from({length:19},(_,i)=>u.el('section',{'data-card':i},u.el('h2',{},'Group '+i),u.el('div',{style:'height:900px'},'Tall group'),u.el('input',{'aria-label':'Setting '+i,value:i})))))}""")

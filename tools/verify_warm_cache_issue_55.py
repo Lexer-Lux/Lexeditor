@@ -10,10 +10,10 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import extractor as ff8
-from games.ff8 import game_icons as ff8_icons
-from games.ff8 import paths as ff8_paths
-from games.rdr import extractor as rdr
+from plugins.ff8 import extractor as ff8
+from plugins.ff8 import game_icons as ff8_icons
+from plugins.ff8 import paths as ff8_paths
+from plugins.rdr import extractor as rdr
 
 
 def write(path: Path, data: bytes) -> None:

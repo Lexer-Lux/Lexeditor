@@ -1,9 +1,9 @@
-from games.ff7r.save_bit_signature_probe import (
+from plugins.ff7r.save_bit_signature_probe import (
     analyze_controlled_bit_signatures,
     assess_indexed_bitset_layout,
     validate_controlled_bit_signatures,
 )
-from games.ff7r.save_diff_probe import SavePair
+from plugins.ff7r.save_diff_probe import SavePair
 
 
 def _pair(*changes: tuple[int, int], label: str = "") -> SavePair:

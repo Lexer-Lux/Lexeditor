@@ -3,8 +3,8 @@ import shutil
 
 import pytest
 
-import games.ff7r.lockon_tweaks as lockon_tweaks
-from games.ff7r.lockon_tweaks import (
+import plugins.ff7r.lockon_tweaks as lockon_tweaks
+from plugins.ff7r.lockon_tweaks import (
     BETTER_LOCKON_ASSET,
     BETTER_LOCKON_SCHEMA_VERSION,
     load_config,
@@ -14,8 +14,8 @@ from games.ff7r.lockon_tweaks import (
     save_config,
     save_virtual_edits,
 )
-from games.ff7r.plugin import _test_text_package
-from games.ff7r.textresource import TextResourcePackage
+from plugins.ff7r.plugin import _test_text_package
+from plugins.ff7r.textresource import TextResourcePackage
 
 
 def _text_pair(language: str, prompt: str, *, ambiguous: bool = False):

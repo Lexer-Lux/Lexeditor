@@ -6,8 +6,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-ff8 = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
-rdr2 = (ROOT / "games" / "rdr2" / "editor.html").read_text(encoding="utf-8")
+ff8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+rdr2 = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
 
 
 def require(condition: bool, message: str) -> None:

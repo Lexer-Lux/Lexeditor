@@ -9,25 +9,25 @@ import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
-from games.chrono_trigger.archive import ArchiveError, ResourcesBin, _decode
-from games.chrono_trigger.animation_data import load_chip_animations, save_chip_animations
-from games.chrono_trigger.field_data import load_exits, load_treasure, save_exits, save_treasure
-from games.chrono_trigger.mod_support import ChronoCtpAdapter, OWNED_NAMESPACE
+from plugins.chrono_trigger.archive import ArchiveError, ResourcesBin, _decode
+from plugins.chrono_trigger.animation_data import load_chip_animations, save_chip_animations
+from plugins.chrono_trigger.field_data import load_exits, load_treasure, save_exits, save_treasure
+from plugins.chrono_trigger.mod_support import ChronoCtpAdapter, OWNED_NAMESPACE
 from mod_library import ModLibrary, file_tree
-from games.chrono_trigger.palette_data import load_palette, save_palette
-from games.chrono_trigger.project import OverlayStore
-from games.chrono_trigger.scene_data import load_scenes, save_scene
-from games.chrono_trigger.scene_map_data import (load_scene_map, save_scene_map, load_scene_properties, save_scene_properties,
+from plugins.chrono_trigger.palette_data import load_palette, save_palette
+from plugins.chrono_trigger.project import OverlayStore
+from plugins.chrono_trigger.scene_data import load_scenes, save_scene
+from plugins.chrono_trigger.scene_map_data import (load_scene_map, save_scene_map, load_scene_properties, save_scene_properties,
     load_scene_render_settings, save_scene_render_settings)
-from games.chrono_trigger.sprite_data import load_sprite_headers, save_sprite_header
-from games.chrono_trigger.sprite_assembly_data import load_sprite_assemblies, save_sprite_assembly
-from games.chrono_trigger.text_data import load_messages, save_messages
-from games.chrono_trigger.tileset_data import load_graphics_sets, save_graphics_set, load_tile_assemblies, save_tile_assembly
-from games.chrono_trigger.world_data import (
+from plugins.chrono_trigger.sprite_data import load_sprite_headers, save_sprite_header
+from plugins.chrono_trigger.sprite_assembly_data import load_sprite_assemblies, save_sprite_assembly
+from plugins.chrono_trigger.text_data import load_messages, save_messages
+from plugins.chrono_trigger.tileset_data import load_graphics_sets, save_graphics_set, load_tile_assemblies, save_tile_assembly
+from plugins.chrono_trigger.world_data import (
     BANK_PATH, HEADER_OFFSET, HEADER_SIZE, WORLD_COUNT, load_worlds, save_worlds,
 )
-from games.chrono_trigger.world_navigation import load_world_navigation, save_world_navigation
-from games.chrono_trigger.world_map_data import (
+from plugins.chrono_trigger.world_navigation import load_world_navigation, save_world_navigation
+from plugins.chrono_trigger.world_map_data import (
     load_world_tiles, save_world_tiles, load_world_properties, save_world_properties,
     load_world_music, save_world_music, load_world_colors, save_world_colors,
 )

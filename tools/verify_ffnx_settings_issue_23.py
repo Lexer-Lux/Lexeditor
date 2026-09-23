@@ -14,7 +14,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8.ffnx_manager import ensure_ffnx, status  # noqa: E402
+from plugins.ff8.ffnx_manager import ensure_ffnx, status  # noqa: E402
 from settings_manager import SettingsStore  # noqa: E402
 
 

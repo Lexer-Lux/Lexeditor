@@ -4,9 +4,9 @@ import hashlib
 from pathlib import Path
 import struct
 
-from games.ffx_x2 import treasures
-from games.ffx_x2.plugin import _write_fixture_vbf
-from games.ffx_x2.verify_install import (
+from plugins.ffx_x2 import treasures
+from plugins.ffx_x2.plugin import _write_fixture_vbf
+from plugins.ffx_x2.verify_install import (
     EXPECTED_STRUCTURED_KEYS, acceptance_checks, finalize_report, inspect_install,
 )
 

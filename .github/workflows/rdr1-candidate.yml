@@ -2,7 +2,7 @@ name: RDR1 candidate
 on:
   pull_request:
     paths:
-      - 'games/rdr/**'
+      - 'plugins/rdr/**'
       - 'tools/*rdr*.py'
       - 'tests/test_rdr_*.py'
       - '.github/workflows/rdr1-candidate.yml'
@@ -46,7 +46,7 @@ jobs:
           assert not (target / "tools/magic-rdr/cli").exists()
           assert (target / "tools/magic-rdr/README.md").is_file()
           other_games = [
-              path for path in (target / "games").iterdir()
+              path for path in (target / "plugins").iterdir()
               if path.is_dir() and path.name != "rdr"
           ]
           assert not other_games, other_games
@@ -62,7 +62,7 @@ jobs:
           validate_repository_metadata()
           print("candidate plugin metadata narrowed to RDR1")
           PY
-          python -m compileall -q *.py games/rdr
+          python -m compileall -q *.py plugins/rdr
           python -m unittest discover -s tests -p 'test_rdr_string_tables.py'
           python -m unittest discover -s tests -p 'test_rdr_rbf.py'
           python tools/verify_rdr_editing.py

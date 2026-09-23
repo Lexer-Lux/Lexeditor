@@ -3,7 +3,7 @@ from test_shared_ui_feedback import ROOT, page, framework
 
 def test_github_owns_search_pager_detail_and_workflow(page):
     page.set_viewport_size({'width':1600,'height':900})
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''()=>{
       window.issue={number:484,title:'Fix shared editor layout',state:'OPEN',body:'Example issue body',labels:[{name:'actionable'},{name:'ff8'}],comments:[]};
       window.writes=[];

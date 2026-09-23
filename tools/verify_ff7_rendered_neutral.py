@@ -5,12 +5,12 @@ import json
 from pathlib import Path
 import unittest
 import verify_ff7_rendered as target
-from games.ff7 import deployment
+from plugins.ff7 import deployment
 
 
 def open_with_neutral(self, edition="ff7"):
     self.page.goto("about:blank")
-    html = (target.ROOT / "games/ff7/editor.html").read_text(encoding="utf-8")
+    html = (target.ROOT / "plugins/ff7/editor.html").read_text(encoding="utf-8")
     # framework.js resolves optional shared assets relative to document.baseURI.
     # Synthetic set_content() pages otherwise use the non-hierarchical about:blank URL.
     html = html.replace("<head>", '<head><base href="http://127.0.0.1:9/">', 1)
@@ -19,7 +19,7 @@ def open_with_neutral(self, edition="ff7"):
     html = html.replace('<link rel="stylesheet" href="/shared/neutral.css">', "")
     code = target.HOST + "\nwindow.__lexeditorPlugin=" + json.dumps({"id":edition,"name":"FF7 fixture","edition":edition}) + ";\n" + (target.ROOT / "ui/framework.js").read_text(encoding="utf-8")
     html = html.replace('<script src="/shared/framework.js"></script>', "<script>" + code + "</script>")
-    html = html.replace('<script src="editor.js"></script>', "<script>" + (target.ROOT / "games/ff7/editor.js").read_text(encoding="utf-8") + "</script>")
+    html = html.replace('<script src="editor.js"></script>', "<script>" + (target.ROOT / "plugins/ff7/editor.js").read_text(encoding="utf-8") + "</script>")
     self.page.set_content(html, wait_until="domcontentloaded")
     self.page.wait_for_function("state.loaded === true")
     self.assertEqual(self.errors, [])

@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from games.ff7r.atb_tweaks import DEFAULT_ATB_CONFIG, save_atb_config
-from games.ff7r.runtime_config import DEFAULT_RUNTIME_CONFIG, LEGACY_MINIMAP_CONFIG, save_runtime_config
-from games.ff7r import runtime_state
+from plugins.ff7r.atb_tweaks import DEFAULT_ATB_CONFIG, save_atb_config
+from plugins.ff7r.runtime_config import DEFAULT_RUNTIME_CONFIG, LEGACY_MINIMAP_CONFIG, save_runtime_config
+from plugins.ff7r import runtime_state
 
 
 def _base_status():

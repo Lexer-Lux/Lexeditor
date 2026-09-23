@@ -5,7 +5,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from plugin_ui import plugin_ui
 import unittest
 
-from games.ff8 import formulae_rework, healing_rework, luck_accuracy
+from plugins.ff8 import formulae_rework, healing_rework, luck_accuracy
 
 
 class FormulaeReworkTests(unittest.TestCase):
@@ -94,7 +94,7 @@ class FormulaeReworkTests(unittest.TestCase):
         self.assertNotIn("formula cards below define the complete requested rework", editor)
 
     def test_settings_module_alias_cannot_be_shadowed_by_boolean(self):
-        settings = (Path(__file__).resolve().parents[1] / "games/ff8/gameplay_settings.py").read_text(
+        settings = (Path(__file__).resolve().parents[1] / "plugins/ff8/gameplay_settings.py").read_text(
             encoding="utf-8"
         )
         self.assertIn(

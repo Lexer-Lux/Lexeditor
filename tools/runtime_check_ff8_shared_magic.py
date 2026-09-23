@@ -15,7 +15,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from games.ff8 import fast_start, ffnx_manager, paths
+from plugins.ff8 import fast_start, ffnx_manager, paths
 
 
 def _new_text(path: Path, offset: int, *, rewritten_after_ns: int | None = None) -> str:

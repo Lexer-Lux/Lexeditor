@@ -10,8 +10,8 @@ from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from games.ff7 import ai, archives, extended as ex, datasets as ds, kernel_extra as extra
-from games.ff7.format_codec import lzs_encode,lzs_decode,encode_text
+from plugins.ff7 import ai, archives, extended as ex, datasets as ds, kernel_extra as extra
+from plugins.ff7.format_codec import lzs_encode,lzs_decode,encode_text
 from verify_ff7_datasets import write_kernel, PATHS
 from verify_ff7_extended import scene_fixture,exe_fixture,text_fixture
 
@@ -241,7 +241,7 @@ class IntegrationTests(unittest.TestCase):
         with self.assertRaises(ValueError):obj.apply('chocoboRatings',rows)
 
     def test_kernel_case_insensitive_discovery_and_snapshot_payload(self):
-        from games.ff7.plugin import kernel_save_payload
+        from plugins.ff7.plugin import kernel_save_payload
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);game=root/'game';project=root/'project'
             source=game/'ff7/workingdir/Data/Lang-EN/Kernel/KERNEL.BIN';write_kernel(source)
@@ -276,8 +276,8 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual([p for p in game.rglob('*') if p.is_file()],[source])
 
     def test_template_and_process_identity_guards(self):
-        from games.ff7 import plugin
-        from games.ff7_2013 import plugin as legacy
+        from plugins.ff7 import plugin
+        from plugins.ff7_2013 import plugin as legacy
         self.assertIn('FFVII.exe',plugin.PLUGIN.process_names)
         self.assertIn('ff7_en.exe',legacy.PLUGIN.process_names)
         with tempfile.TemporaryDirectory() as name:

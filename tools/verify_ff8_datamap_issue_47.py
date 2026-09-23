@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 
-from games.ff8.formats import data_map_rows  # noqa: E402
-from games.ff8.plugin import FF8Session  # noqa: E402
+from plugins.ff8.formats import data_map_rows  # noqa: E402
+from plugins.ff8.plugin import FF8Session  # noqa: E402
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 
 
@@ -27,7 +27,7 @@ def main() -> int:
     for required in ("kernel.bin", "menu/price.bin", "battle/c0m*.dat", "field.fs"):
         assert required in filenames, required
 
-    source = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    source = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
     assert ".lex-data-map-table code,.lex-data-map-link{font-family:var(--lex-font)" in source
 
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")

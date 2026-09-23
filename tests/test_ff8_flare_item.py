@@ -23,8 +23,8 @@ def write_stubs(folder):
 class FlareItemTests(unittest.TestCase):
     def test_item_display_name_is_signal_flare(self):
         sys.path.insert(0, str(ROOT))
-        from games.ff8.kernel_text import decode
-        source=(ROOT/"games/ff8/ffnx_gameplay_extensions/ffnx-src/flare_item.h").read_text()
+        from plugins.ff8.kernel_text import decode
+        source=(ROOT/"plugins/ff8/ffnx_gameplay_extensions/ffnx-src/flare_item.h").read_text()
         body=re.search(r"item_name\[\]\s*=\s*\{([^}]+)\}",source).group(1)
         data=bytes(int(value.strip(),0) for value in body.split(","))
         self.assertEqual(data[-1],0)
@@ -32,7 +32,7 @@ class FlareItemTests(unittest.TestCase):
 
     @unittest.skipUnless(os.name == "nt" and VCVARS.exists(), "Windows C++ Build Tools required")
     def test_menu_exit_owner_waits_for_item_cleanup_and_native_root_close(self):
-        source=ROOT/"games/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_flare_menu.cpp"
+        source=ROOT/"plugins/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_flare_menu.cpp"
         code='#include <windows.h>\n#include "'+source.as_posix()+'"\n'+r''' 
 bool ff8=true,enable_ff8_modern_controls=true;
 unsigned calls=0;bool finish=false;
@@ -84,7 +84,7 @@ int main() {
 
     @unittest.skipUnless(os.name == "nt" and VCVARS.exists(), "Windows C++ Build Tools required")
     def test_production_overlay_and_stock_text_lookup(self):
-        source = ROOT / "games/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_flare_item.cpp"
+        source = ROOT / "plugins/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_flare_item.cpp"
         code = '#include <windows.h>\n#include "' + source.as_posix() + '"\n#include "' + (source.parent/'flare_shop.h').as_posix() + '"\n' + r'''
 #include <cstdio>
 bool ff8=true, enable_ff8_modern_controls=true;
@@ -204,7 +204,7 @@ int main() {
 
     @unittest.skipUnless(os.name == "nt" and VCVARS.exists(), "Windows C++ Build Tools required")
     def test_compiled_shop_guards_preserve_stock_and_refuse_new_ids(self):
-        source = ROOT / "games/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_flare_item.cpp"
+        source = ROOT / "plugins/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_flare_item.cpp"
         with tempfile.TemporaryDirectory(prefix="lexeditor-flare-shop-") as temporary:
             folder = Path(temporary)
             write_stubs(folder)
@@ -338,7 +338,7 @@ assert bytes(u.mem_read(rows+32,2))==bytes(2)
 print(json.dumps({'cases':count}))
 '''
             (folder/"emulate.py").write_text(worker)
-            from games.ff8 import paths
+            from plugins.ff8 import paths
             private_exe=paths.GAME_ROOT/"FF8_EN.exe"
             command=[str(ROOT/".venv/Scripts/python.exe"),str(folder/"emulate.py"),str(folder/"check.dll"),str(ROOT/"_scratch/gf-spellbooks-test-deps")]
             if private_exe.is_file():command.append(str(private_exe))

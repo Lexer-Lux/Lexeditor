@@ -2,7 +2,7 @@
 import io
 import unittest
 
-from games.ff8 import drop_chance
+from plugins.ff8 import drop_chance
 
 
 class DropChanceTests(unittest.TestCase):

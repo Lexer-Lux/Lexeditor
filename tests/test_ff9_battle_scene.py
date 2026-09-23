@@ -6,7 +6,7 @@ from pathlib import Path
 import struct
 import pytest
 
-from games.ff9 import battle_scene as battle, paths
+from plugins.ff9 import battle_scene as battle, paths
 
 
 def align4(value): return (value + 3) & ~3

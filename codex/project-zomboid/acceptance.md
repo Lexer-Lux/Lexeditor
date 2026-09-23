@@ -5,7 +5,7 @@ Project Zomboid's synthetic service smoke is necessary but not sufficient for fi
 Run the passive preflight from the repository root:
 
 ```text
-python -m games.project_zomboid.acceptance --game-root "C:\\Program Files (x86)\\Steam\\steamapps\\common\\ProjectZomboid" --project-root "C:\\path\\to\\mod-project"
+python -m plugins.project_zomboid.acceptance --game-root "C:\\Program Files (x86)\\Steam\\steamapps\\common\\ProjectZomboid" --project-root "C:\\path\\to\\mod-project"
 ```
 
 `--user-root` is optional and defaults to `LEXEDITOR_PROJECT_ZOMBOID_USER_ROOT` or `~/Zomboid`. The game and project arguments can likewise come from `LEXEDITOR_PROJECT_ZOMBOID_ROOT` and `LEXEDITOR_PROJECT_ZOMBOID_PROJECT`.

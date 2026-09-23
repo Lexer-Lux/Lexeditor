@@ -15,7 +15,7 @@ def test_name_lane_keeps_names_readable_when_panel_resizes(page, theme, platform
     # cannot be read in it. Names used to shrink to fit a fixed lane, which in
     # a narrow panel meant text a few pixels high.
     framework(page)
-    page.add_style_tag(path=str(ROOT / f'games/{theme}/editor.css'))
+    page.add_style_tag(path=str(ROOT / f'plugins/{theme}/editor.css'))
     page.evaluate('''()=>{const U=LexeditorUI;document.querySelector('main').append(
       U.detailField({label:'A very long property name',control:U.el('input',{value:4})}),
       U.detailField({label:'HP',control:U.el('input',{value:4})}));}''')
@@ -41,7 +41,7 @@ def test_name_lane_keeps_names_readable_when_panel_resizes(page, theme, platform
 
 def test_selected_row_does_not_move_text_and_keeps_pointer_gap(page):
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''()=>{const U=LexeditorUI;document.querySelector('main').append(U.columnList({
       rows:[{id:1,name:'Flame Saber'},{id:2,name:'Gauntlet'}],key:r=>r.id,selected:1,
       columns:[{key:'name',label:'Name'}]}));}''')
@@ -59,13 +59,13 @@ def test_selected_row_does_not_move_text_and_keeps_pointer_gap(page):
 
 
 def test_native_font_first_glyph_is_not_clipped(page):
-    from games.ff8.game_font import ensure_font
+    from plugins.ff8.game_font import ensure_font
     try:
         font=ensure_font()
     except (FileNotFoundError, RuntimeError):
         pytest.skip('Native FF8 font is not installed')
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     encoded=base64.b64encode(font.read_bytes()).decode()
     page.add_style_tag(content=f'@font-face{{font-family:PixelCheck;src:url(data:font/ttf;base64,{encoded})}} :root{{--lex-font:PixelCheck;--lex-number-font:PixelCheck}}')
     page.evaluate('''()=>{const U=LexeditorUI;document.querySelector('main').append(U.columnList({
@@ -81,7 +81,7 @@ def test_native_font_first_glyph_is_not_clipped(page):
 
 
 def test_icon_export_trims_transparent_cell_padding(monkeypatch):
-    from games.ff8 import game_icons
+    from plugins.ff8 import game_icons
     atlas=Image.new('RGBA',(16,16))
     atlas.paste((255,0,0,255),(2,1,12,13))
     monkeypatch.setattr(game_icons,'_tex',lambda _: (16,16,[[0]],b''))

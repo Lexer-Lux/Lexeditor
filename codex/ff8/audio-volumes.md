@@ -5,7 +5,7 @@
 - The in-game Config menu has one Sound slider. It drives SFX-ish gain;
   players report it does not turn down the music.
 - Lexeditor reads that single value as the `Volume` config field
-  (`games/ff8/init_data.py`).
+  (`plugins/ff8/init_data.py`).
 
 ## FFNx backend (pinned release 1.24.3, `misc/FFNx.toml`)
 
@@ -22,5 +22,5 @@
 Separate in-game SFX/Music sliders need two halves: a Config-menu
 replacement (game-side mod, needs in-game proof) and backend consistency
 (Lexeditor writes the two gains into `FFNx.toml` on deploy —
-`set_audio_volumes` in `games/ff8/ffnx_manager.py`, `None` preserves the
+`set_audio_volumes` in `plugins/ff8/ffnx_manager.py`, `None` preserves the
 existing key so `-1` auto-detect survives when a side is unmanaged).

@@ -16,15 +16,15 @@ import urllib.error
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mod_library import ModLibrary, documents_folder, package_root, relative_path
-from games.ff7r.mod_support import PakModAdapter
+from plugins.ff7r.mod_support import PakModAdapter
 from managed_mods import ManagedModSpec, update_mod, recover_update, refresh_active_mod, check_release
 
 
 class ImportTests(unittest.TestCase):
     def test_editable_copy_service_save_reaches_deployed_pak(self):
-        from games.ff7r.plugin import FF7RSession, _test_package
-        from games.ff7r.tooling import pack_directory, get_file
-        from games.ff7r.dataobject import DataObjectPackage
+        from plugins.ff7r.plugin import FF7RSession, _test_package
+        from plugins.ff7r.tooling import pack_directory, get_file
+        from plugins.ff7r.dataobject import DataObjectPackage
         from urllib.parse import quote
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -105,7 +105,7 @@ class ImportTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "No stable managed mod release"):
                 check_release(ManagedModSpec("owner/mod", "mod.zip"))
 
-    @patch("games.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
+    @patch("plugins.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
     def test_managed_update_refreshes_enabled_deployment(self, listing):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -127,7 +127,7 @@ class ImportTests(unittest.TestCase):
             deployed = game / "End/Content/Paks/~mods/LexeditorLibrary/test_P.pak"
             self.assertEqual(deployed.read_bytes(), b"version two")
             package.write_bytes(b"version three")
-            with patch("games.ff7r.mod_support.shutil.copyfile", side_effect=OSError("copy failed")):
+            with patch("plugins.ff7r.mod_support.shutil.copyfile", side_effect=OSError("copy failed")):
                 with self.assertRaises(OSError):
                     refresh_active_mod(library, "ff7r", adapter, spec, game)
             self.assertEqual(deployed.read_bytes(), b"version two")
@@ -137,7 +137,7 @@ class ImportTests(unittest.TestCase):
             self.assertFalse(refresh_active_mod(library, "ff7r", adapter, spec, game))
 
     def test_service_rejects_managed_save(self):
-        from games.ff7r.plugin import FF7RSession
+        from plugins.ff7r.plugin import FF7RSession
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             fixture = root / "fixture"
@@ -179,7 +179,7 @@ class ImportTests(unittest.TestCase):
             self.assertFalse(result["updated"])
             check.assert_not_called()
 
-    @patch("games.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
+    @patch("plugins.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
     def test_managed_updates_and_failed_download(self, reader):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -212,7 +212,7 @@ class ImportTests(unittest.TestCase):
                 install("4")
             self.assertEqual((target / "test.pak").read_text(), "User edit")
 
-    @patch("games.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
+    @patch("plugins.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
     def test_editable_copy_failure_leaves_no_target(self, reader):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -220,7 +220,7 @@ class ImportTests(unittest.TestCase):
             source.mkdir()
             (source / "test.pak").write_bytes(b"fixture")
             library = ModLibrary(root / "library")
-            with patch("games.ff7r.mod_support.get_file", side_effect=OSError("bad package")):
+            with patch("plugins.ff7r.mod_support.get_file", side_effect=OSError("bad package")):
                 with self.assertRaises(OSError):
                     library.import_mod("ff7r", source, PakModAdapter(), "Copy", prepare_editable=True)
             self.assertFalse((root / "library/ff7r/Copy").exists())
@@ -242,7 +242,7 @@ class ImportTests(unittest.TestCase):
                     pass
             self.assertFalse((Path(temp).parent / "escape").exists())
 
-    @patch("games.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
+    @patch("plugins.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
     def test_import_manual_root_and_metadata(self, reader):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -261,7 +261,7 @@ class ImportTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 library.import_mod("ff7r", archive, adapter, "Copy", "Wrapper/Mods")
 
-    @patch("games.ff7r.mod_support.list_pak", return_value=["OtherGame/Content/Test.uasset"])
+    @patch("plugins.ff7r.mod_support.list_pak", return_value=["OtherGame/Content/Test.uasset"])
     def test_invalid_content_and_runtime_package(self, reader):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -276,7 +276,7 @@ class ImportTests(unittest.TestCase):
             self.assertTrue(documents_folder().is_absolute())
 
     def test_real_pak(self):
-        from games.ff7r.tooling import repak_path, pack_directory
+        from plugins.ff7r.tooling import repak_path, pack_directory
         if not repak_path().is_file():
             self.skipTest("Pinned repak helper is unavailable")
         with tempfile.TemporaryDirectory() as temp:
@@ -291,7 +291,7 @@ class ImportTests(unittest.TestCase):
             self.assertTrue(report["valid"], report)
 
     def test_real_editable_copy_activation(self):
-        from games.ff7r.tooling import repak_path, pack_directory, get_file
+        from plugins.ff7r.tooling import repak_path, pack_directory, get_file
         if not repak_path().is_file():
             self.skipTest("Pinned repak helper is unavailable")
         with tempfile.TemporaryDirectory() as temp:
@@ -354,7 +354,7 @@ class ImportTests(unittest.TestCase):
             self.assertFalse(source.exists())
             self.assertEqual((root / "new/keep.txt").read_text(), "original")
 
-    @patch("games.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
+    @patch("plugins.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
     def test_activation_disable_and_external_edit(self, reader):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -377,7 +377,7 @@ class ImportTests(unittest.TestCase):
             adapter.activate([], game)
             self.assertFalse(deployed.exists())
 
-    @patch("games.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
+    @patch("plugins.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
     def test_activation_recovers_interrupted_swap(self, reader):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -397,7 +397,7 @@ class ImportTests(unittest.TestCase):
             self.assertEqual((destination / "test.pak").read_bytes(), b"before")
             self.assertFalse(backup.exists())
 
-    @patch("games.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
+    @patch("plugins.ff7r.mod_support.list_pak", return_value=["End/Content/Test.uasset"])
     def test_conflict_refuses_deployment(self, reader):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

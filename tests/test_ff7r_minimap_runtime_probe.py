@@ -1,5 +1,5 @@
-from games.ff7r import minimap_runtime_probe as probe_module
-from games.ff7r.minimap_runtime_probe import (
+from plugins.ff7r import minimap_runtime_probe as probe_module
+from plugins.ff7r.minimap_runtime_probe import (
     assess_minimap_runtime_evidence,
     probe_minimap_runtime,
 )

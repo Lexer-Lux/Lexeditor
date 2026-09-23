@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.prepare_ff8_native_build import BASE, prepare
 from tools.verify_ff8_linked_runtime import verify as verify_linked
-from games.ff8.ffnx_issue_51 import runtime_package
+from plugins.ff8.ffnx_issue_51 import runtime_package
 
 SUPPORT_FILES = {
     'tests/lexeditor_live_conditions_test.cpp',
@@ -97,12 +97,12 @@ def package(candidate: Path, ffnx_source: Path, *, driver_sha256: str,
     require(f'Editor source: {build_revision}' in build and f'FFNx source: {BASE}' in build,
             'Build receipt does not match requested source revisions')
     require(sha256(candidate / 'FFNx.pdb') != hashlib.sha256(b'').hexdigest(), 'Empty build symbols')
-    old_root = ROOT / 'games/ff8/ffnx_issue_51/package'
+    old_root = ROOT / 'plugins/ff8/ffnx_issue_51/package'
     licence = old_root / 'COPYING.TXT'
     require(licence.read_bytes().replace(b'\r\n', b'\n') ==
             (candidate / 'LICENSE').read_bytes().replace(b'\r\n', b'\n'),
             'Candidate licence changed beyond line endings')
-    require('games/ff8/ffnx_issue_51/package/** -text' in
+    require('plugins/ff8/ffnx_issue_51/package/** -text' in
             (ROOT / '.gitattributes').read_text(), 'Pinned package lacks byte-preserving Git attributes')
 
     with tempfile.TemporaryDirectory(prefix='ff8-package-') as folder:
@@ -229,7 +229,7 @@ this packaging command. This report does not claim in-game acceptance.
         for key in ('license', 'sourcePatch', 'buildReport'):
             manifest['provenance'][key + 'Sha256'] = hashes[key]
         (stage / 'runtime-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
-        verifier = ROOT / 'games/ff8/ffnx_issue_51/runtime_package.py'
+        verifier = ROOT / 'plugins/ff8/ffnx_issue_51/runtime_package.py'
         code = verifier.read_text(encoding='utf-8')
         for key, digest in hashes.items():
             code, count = re.subn(r'("' + key + r'": ")[0-9a-f]{64}("[ ,\n])',

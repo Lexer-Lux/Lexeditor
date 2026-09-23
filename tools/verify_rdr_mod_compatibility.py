@@ -14,7 +14,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.rdr.archive_deployment import ArchiveSpec, deploy_archives, revert_archives, sha256_file
+from plugins.rdr.archive_deployment import ArchiveSpec, deploy_archives, revert_archives, sha256_file
 
 
 def build_fixture(_tool: Path, source: Path, output: Path, manifest: Path) -> None:

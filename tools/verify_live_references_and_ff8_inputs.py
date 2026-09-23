@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> int:
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
-    ff8 = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    ff8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
 
     # A shell refresh must update every mounted provenance control. Input and
     # change events must refresh synchronously; a tab rebuild is not allowed.

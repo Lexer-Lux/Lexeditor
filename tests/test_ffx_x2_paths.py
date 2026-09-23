@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from games.ffx_x2 import paths, server, treasures
-from games.ffx_x2.plugin import _write_fixture_vbf
-from games.ffx_x2.vbf import read_index
+from plugins.ffx_x2 import paths, server, treasures
+from plugins.ffx_x2.plugin import _write_fixture_vbf
+from plugins.ffx_x2.vbf import read_index
 
 
 def test_virtual_ffx_path_maps_to_raw_vbf_candidate_and_back():

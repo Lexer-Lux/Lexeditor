@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.rdr import magic_rdr_manager, mission_rewards, server, string_tables
+from plugins.rdr import magic_rdr_manager, mission_rewards, server, string_tables
 from tools.rdr_test_support import workspace, loot_document, fake_resource_tool
 
 

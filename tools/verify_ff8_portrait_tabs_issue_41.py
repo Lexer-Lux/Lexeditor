@@ -12,7 +12,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8.game_icons import ensure_portraits, portrait_root  # noqa: E402
+from plugins.ff8.game_icons import ensure_portraits, portrait_root  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:
@@ -21,7 +21,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
     manifest = ensure_portraits()
     require(manifest.get("available"), "installed mngrp.bin portrait sheets must decode")
     require(set(manifest["portraits"]) == {"characters", "gfs"},

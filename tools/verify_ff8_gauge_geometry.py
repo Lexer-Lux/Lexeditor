@@ -3,7 +3,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 ROOT=Path(__file__).resolve().parents[1]
-source=(ROOT/'games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp').read_text()
+source=(ROOT/'plugins/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp').read_text()
 gauge=source[source.index('void draw_gauge('):source.index('int level_for_exp(')]
 harness=r'''
 #include <algorithm>

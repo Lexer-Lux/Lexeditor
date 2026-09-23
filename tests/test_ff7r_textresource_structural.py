@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from games.ff7r.plugin import _test_text_package
-from games.ff7r.textresource import TextFormatError, TextResourcePackage
-from games.ff7r.textresource_structural import append_text_entry
+from plugins.ff7r.plugin import _test_text_package
+from plugins.ff7r.textresource import TextFormatError, TextResourcePackage
+from plugins.ff7r.textresource_structural import append_text_entry
 
 
 def fixture_package():

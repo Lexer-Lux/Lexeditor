@@ -2,7 +2,7 @@
 from pathlib import Path
 import unittest
 
-from games.ff8 import fixed_command_menu, kernel_text
+from plugins.ff8 import fixed_command_menu, kernel_text
 
 
 class RinoaAngeloFixedCommandTests(unittest.TestCase):
@@ -64,7 +64,7 @@ class RinoaAngeloFixedCommandTests(unittest.TestCase):
         )
 
     def test_no_stale_rinoa_blocker_remains(self):
-        source = (Path(__file__).resolve().parents[1] / "games/ff8/fixed_command_menu.py").read_text(
+        source = (Path(__file__).resolve().parents[1] / "plugins/ff8/fixed_command_menu.py").read_text(
             encoding="utf-8"
         )
         self.assertNotIn("Angelo is explicitly TBD", source)

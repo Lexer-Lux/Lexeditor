@@ -16,8 +16,8 @@ import zlib
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from games.ff7r import pak_reader
-from games.ff7r.pak_reader import PakError, read_file, read_index
+from plugins.ff7r import pak_reader
+from plugins.ff7r.pak_reader import PakError, read_file, read_index
 
 MOUNT = "../../../End/Content/GameContents/"
 BLOCK_SIZE = 0x10000
@@ -152,7 +152,7 @@ class InstalledGameTests(unittest.TestCase):
     """Read the real archives when FF7R is present."""
 
     def setUp(self):
-        from games.ff7r.archive import installed_paks
+        from plugins.ff7r.archive import installed_paks
 
         root = os.environ.get("FF7R_ROOT")
         candidates = [Path(root)] if root else [
@@ -169,7 +169,7 @@ class InstalledGameTests(unittest.TestCase):
     def test_oodle_entry_decodes_to_a_cooked_package(self):
         if pak_reader.oodle_library(self.paks[0]) is None:
             self.skipTest("no explicit or game-owned Oodle library available")
-        from games.ff7r.tooling import get_file
+        from plugins.ff7r.tooling import get_file
 
         target = "Menu/Resident/Battle/Status.uasset"
         for pak in self.paks:

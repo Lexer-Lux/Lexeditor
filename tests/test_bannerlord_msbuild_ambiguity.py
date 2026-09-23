@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.project_data import read_project_file, save_project_properties
+from plugins.bannerlord.project_data import read_project_file, save_project_properties
 
 
 class BannerlordMsbuildAmbiguityTests(unittest.TestCase):

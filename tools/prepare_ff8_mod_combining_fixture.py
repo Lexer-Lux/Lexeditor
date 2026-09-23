@@ -17,12 +17,12 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import paths
+from plugins.ff8 import paths
 
 LOW_ID = "issue100-low-priority"
 HIGH_ID = "issue100-high-priority"
 # price.bin records are four bytes: uint16 buy-price/10, multiplier, unknown.
-# Item IDs come from games/ff8/schema/item.json.
+# Item IDs come from plugins/ff8/schema/item.json.
 PRICE_EDITS = {
     LOW_ID: {1: 1230, 3: 5670},       # Potion, Hi-Potion
     HIGH_ID: {1: 4560, 7: 8910},     # Potion collision, Phoenix Down independent

@@ -4,7 +4,7 @@ import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "games" / "rdr2" / "native_runtime" / "GameplayTweaks"
+SOURCE = ROOT / "plugins" / "rdr2" / "native_runtime" / "GameplayTweaks"
 
 
 class Rdr2NativeSourceTests(unittest.TestCase):

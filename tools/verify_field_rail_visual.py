@@ -7,7 +7,7 @@ import time
 ROOT = r"C:\Lexeditor"
 sys.path.insert(0, ROOT)
 
-from games.blank.plugin import BlankSession  # noqa: E402
+from plugins.blank.plugin import BlankSession  # noqa: E402
 from tools.verify_panel_layout_visual_46 import browser_session, close_browser, wait_eval  # noqa: E402
 
 

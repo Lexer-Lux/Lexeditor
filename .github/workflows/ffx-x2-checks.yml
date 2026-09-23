@@ -4,7 +4,7 @@ on:
   push:
     branches: [master, feature/ffx-x2-plugin, 'work/ffx-x2-*']
     paths:
-      - 'games/ffx_x2/**'
+      - 'plugins/ffx_x2/**'
       - 'tests/test_ffx_x2_*.py'
       - 'worklog/acceptance/ffx-x2/**'
       - 'runtime_bootstrap.py'
@@ -18,7 +18,7 @@ on:
       - '.github/workflows/ffx-x2-checks.yml'
   pull_request:
     paths:
-      - 'games/ffx_x2/**'
+      - 'plugins/ffx_x2/**'
       - 'tests/test_ffx_x2_*.py'
       - 'worklog/acceptance/ffx-x2/**'
       - 'runtime_bootstrap.py'
@@ -54,7 +54,7 @@ jobs:
       - name: Install tests
         run: python -m pip install pytest
       - name: Python syntax
-        run: python -m compileall -q games/ffx_x2
+        run: python -m compileall -q plugins/ffx_x2
       - name: Acceptance PowerShell syntax
         if: runner.os == 'Windows'
         shell: pwsh
@@ -70,16 +70,16 @@ jobs:
       - name: Editor module and markup contract
         shell: bash
         run: >-
-          node --check games/ffx_x2/editor.js
-          && python -c "from pathlib import Path; h=Path('games/ffx_x2/editor.html').read_text(encoding='utf-8'); c=Path('games/ffx_x2/editor.css').read_text(encoding='utf-8'); assert '<style' not in h and '<script>' not in h; assert './editor.js' in h and './editor.css' in h; assert len(c) <= 6000; print('markup-only editor + CSS budget OK')"
+          node --check plugins/ffx_x2/editor.js
+          && python -c "from pathlib import Path; h=Path('plugins/ffx_x2/editor.html').read_text(encoding='utf-8'); c=Path('plugins/ffx_x2/editor.css').read_text(encoding='utf-8'); assert '<style' not in h and '<script>' not in h; assert './editor.js' in h and './editor.css' in h; assert len(c) <= 6000; print('markup-only editor + CSS budget OK')"
       - name: Plugin and metadata contracts
         run: >-
-          python -c "from games.ffx_x2.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ffx_x2.server' in SERVICE_MODULES; print(PLUGIN.name)"
+          python -c "from plugins.ffx_x2.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'plugins.ffx_x2.server' in SERVICE_MODULES; print(PLUGIN.name)"
           && python tools/generate_credits.py --check
           && python plugin_metadata.py
       - name: FFX-X2 shared UI budget
         run: >-
-          python -c "import runpy; c=runpy.run_path('tools/verify_shared_ui_budget.py')['counts'](); f={k:v for k,v in c.items() if k.startswith('games/ffx_x2/')}; assert not f, f; print('FFX-X2 shared UI budget: zero local shared selectors/hand-built rows')"
+          python -c "import runpy; c=runpy.run_path('tools/verify_shared_ui_budget.py')['counts'](); f={k:v for k,v in c.items() if k.startswith('plugins/ffx_x2/')}; assert not f, f; print('FFX-X2 shared UI budget: zero local shared selectors/hand-built rows')"
       - name: FFX-X2 regressions
         run: >-
           python -m pytest -q
@@ -105,7 +105,7 @@ jobs:
           tests/test_ffx_x2_ffx2_jobs.py
           tests/test_ffx_x2_ui_focus.py
       - name: Managed service smoke
-        run: python -c "from games.ffx_x2.plugin import smoke; [print('PASS:', line) for line in smoke()]"
+        run: python -c "from plugins.ffx_x2.plugin import smoke; [print('PASS:', line) for line in smoke()]"
 
   browser:
     runs-on: ubuntu-latest
@@ -162,7 +162,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path build\distribution | Out-Null
           @'
-          from games.ffx_x2.verify_install import main
+          from plugins.ffx_x2.verify_install import main
 
           if __name__ == "__main__":
               raise SystemExit(main())

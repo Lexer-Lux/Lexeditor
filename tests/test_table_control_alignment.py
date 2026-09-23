@@ -4,7 +4,7 @@ from test_shared_ui_feedback import ROOT, page, framework
 
 def test_table_controls_share_row_height(page):
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''()=>{
       const U=LexeditorUI;
       const source=control=>U.provenanceControl({control,current:()=>1,vanilla:1});

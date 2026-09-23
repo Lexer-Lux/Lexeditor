@@ -300,7 +300,7 @@ CHANGES = {"rows": []}
 
 
 def editor_html() -> str:
-    html = (ROOT / "games/chrono_trigger/editor.html").read_text(encoding="utf-8")
+    html = (ROOT / "plugins/chrono_trigger/editor.html").read_text(encoding="utf-8")
     html = html.replace("<head>", '<head><base href="http://127.0.0.1:9/">', 1)
     html = html.replace(
         '<link rel="stylesheet" href="/shared/framework.css">',
@@ -308,7 +308,7 @@ def editor_html() -> str:
     )
     html = html.replace(
         '<link rel="stylesheet" href="/editor.css">',
-        "<style>" + (ROOT / "games/chrono_trigger/editor.css").read_text(encoding="utf-8") + "</style>",
+        "<style>" + (ROOT / "plugins/chrono_trigger/editor.css").read_text(encoding="utf-8") + "</style>",
     )
     fixtures = {
         "dashboard": DASHBOARD, "textFiles": TEXT_FILES, "messages": MESSAGES, "scenes": SCENES,
@@ -451,7 +451,7 @@ def editor_html() -> str:
     )
     html = html.replace(
         '<script src="/editor.js"></script>',
-        "<script>" + (ROOT / "games/chrono_trigger/editor.js").read_text(encoding="utf-8") + "</script>",
+        "<script>" + (ROOT / "plugins/chrono_trigger/editor.js").read_text(encoding="utf-8") + "</script>",
     )
     return html
 

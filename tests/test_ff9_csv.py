@@ -2,7 +2,7 @@
 from pathlib import Path
 import hashlib
 import pytest
-from games.ff9 import memoria_baseline as baseline, memoria_csv as csv, paths
+from plugins.ff9 import memoria_baseline as baseline, memoria_csv as csv, paths
 
 
 @pytest.fixture

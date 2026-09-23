@@ -1,4 +1,4 @@
-from games.ff7r.save_diff_probe import (
+from plugins.ff7r.save_diff_probe import (
     SavePair,
     analyze_experiment_groups,
     analyze_save_pairs,

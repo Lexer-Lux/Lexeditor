@@ -3,10 +3,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.bannerlord import paths
-from games.bannerlord.gauntlet_data import list_prefabs
-from games.bannerlord.module_data import data_map
-from games.bannerlord.module_xml_data import list_documents
+from plugins.bannerlord import paths
+from plugins.bannerlord.gauntlet_data import list_prefabs
+from plugins.bannerlord.module_data import data_map
+from plugins.bannerlord.module_xml_data import list_documents
 
 
 class BannerlordDiscoveryContainmentTests(unittest.TestCase):

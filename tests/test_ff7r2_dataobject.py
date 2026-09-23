@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from games.ff7r2.dataobject import DataObjectError, DataObjectPackage
+from plugins.ff7r2.dataobject import DataObjectError, DataObjectPackage
 from ff7r2_fixture import battle_item_possession_fixture, battle_player_parameter_fixture, fixture
 
 

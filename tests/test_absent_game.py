@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 
 from desktop_host import HostApi
 from game_installation import GameInstallationManager
-from games.palworld.plugin import PLUGIN
+from plugins.palworld.plugin import PLUGIN
 
 
 class AbsentGameTests(unittest.TestCase):

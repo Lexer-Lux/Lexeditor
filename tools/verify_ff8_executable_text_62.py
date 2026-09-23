@@ -19,8 +19,8 @@ FF8UE_SCHEMA = ROOT / "_scratch/ff8ue-upstream/FF8GameData/Resources/json/exe.js
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 
-from games.ff8 import executable_text  # noqa: E402
-from games.ff8.plugin import FF8Session  # noqa: E402
+from plugins.ff8 import executable_text  # noqa: E402
+from plugins.ff8.plugin import FF8Session  # noqa: E402
 from render_crime_editors_55_62 import wait_eval  # noqa: E402
 from tools.verify_panel_layout_visual_46 import (  # noqa: E402
     browser_session, close_browser, screenshot,
@@ -170,7 +170,7 @@ def verify_api_and_render() -> dict:
 
 
 def main() -> int:
-    formats = (ROOT / "games/ff8/formats.py").read_text(encoding="utf-8")
+    formats = (ROOT / "plugins/ff8/formats.py").read_text(encoding="utf-8")
     sys.path.insert(0, str(ROOT / "tests"))
     from plugin_ui import plugin_ui
     editor = plugin_ui("ff8")

@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 import unittest
 
-from games.rdr import loot_script
+from plugins.rdr import loot_script
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOL = ROOT / "tools" / "magic-rdr" / "app" / "Rpf6ReadCli.exe"

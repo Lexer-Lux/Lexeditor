@@ -31,7 +31,7 @@ def test_three_pane_divider_can_use_room_beyond_narrow_middle(page):
 
 def test_tab_hover_does_not_move_or_resize_label(page):
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''()=>{const U=LexeditorUI;document.body.prepend(U.el('div',{id:'shell'}));
       U.mountShell({host:'#shell',plugin:{id:'fixture',name:'Fixture'},
       tabs:['Items','Characters','Enemies'].map(id=>({id,label:id})),activeTab:()=> 'Items',navigate(){}});
@@ -64,7 +64,7 @@ def test_instruction_wheel_turns_page_without_scrolling_footer(page):
 
 def test_subtab_selection_and_hover_preserve_all_boxes(page):
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''()=>{const U=LexeditorUI;
       document.querySelector('main').append(U.subtabBar({
         tabs:[{id:'gameplay',label:'Gameplay'},{id:'ffnx',label:'FFNx'}],

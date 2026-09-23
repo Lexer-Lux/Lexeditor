@@ -6,11 +6,11 @@ import struct
 
 import pytest
 
-from games.ffx_x2.ffx_auto_abilities import (
+from plugins.ffx_x2.ffx_auto_abilities import (
     ARCHIVE_PATH, ELEMENT_MASK, FFXAutoAbilityError, RECORD_SIZE,
     apply_edits, parse_auto_abilities, payload,
 )
-from games.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
+from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
 from service_session import request_json
 
 

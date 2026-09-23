@@ -15,7 +15,7 @@ from unicorn.x86_const import UC_X86_REG_EAX, UC_X86_REG_EBP, UC_X86_REG_ECX, UC
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.ff8 import max_spell
+from plugins.ff8 import max_spell
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--exe", type=Path, required=True)

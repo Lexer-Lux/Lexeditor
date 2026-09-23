@@ -10,7 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import runtime_layout
+from plugins.ff8 import runtime_layout
 
 
 def write_mod(root: Path, mod_id: str, name: str, order: int, enabled: bool) -> None:
@@ -67,9 +67,9 @@ def main() -> int:
         manifest = json.loads((empty / runtime_layout.COMPOSITION_FILE).read_text())
         assert manifest["mods"] == [] and manifest["conflicts"] == []
 
-    editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
-    server = (ROOT / "games" / "ff8" / "server.py").read_text(encoding="utf-8")
+    server = (ROOT / "plugins" / "ff8" / "server.py").read_text(encoding="utf-8")
     assert "FF8 MOD LOAD ORDER" in editor
     assert "Claimants, low to high:" in editor
     assert "sourcesReplaceProjects:true" in editor

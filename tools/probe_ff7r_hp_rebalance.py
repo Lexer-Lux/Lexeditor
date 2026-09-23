@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from games.ff7r.archive import build_index
-from games.ff7r.hp_rebalance_probe import probe_hp_rebalance_sources
+from plugins.ff7r.archive import build_index
+from plugins.ff7r.hp_rebalance_probe import probe_hp_rebalance_sources
 
 
 def main() -> int:

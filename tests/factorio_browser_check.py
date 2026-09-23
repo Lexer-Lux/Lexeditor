@@ -102,7 +102,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
         "FACTORIO_GAME_ROOT": str(game),
     })
     process = subprocess.Popen(
-        [sys.executable, "-m", "games.factorio.server"],
+        [sys.executable, "-m", "plugins.factorio.server"],
         cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, encoding="utf-8", errors="replace",
     )

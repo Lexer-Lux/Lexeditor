@@ -18,7 +18,7 @@ Read the live issue and comments and preserve the latest explicit human correcti
 Healing and accuracy runtimes stand (tests green). Melee, magic-damage, and status-infliction patches are still missing: each needs hand-written x86 against its routine, which cannot be validated without the game, so no blind machine code was written. Mug prerequisite done on this branch (explicit Difficulty contract plus tests, see github-408.md); the Mug comparison patch itself remains. Formulae page scroll report still needs a rendered check. Issue stays actionable.
 
 ## 2026-09-23 misc-fixes status
-Scroll report resolved and fixed: the Formulae tab mounted a bare detailPanel while the FF8 plugin clips #main (`--lex-main-overflow:hidden`), so stacked cards below the fold were unreachable (reproduced headless: last card bottom 819px at 800px viewport, no scroll path). Fix wraps the panel in the shared `.lex-tweaks-scroll` container in `renderFormulae` (games/ff8/boot.js). Verified by new `tests/ff8_formulae_scroll_browser_check.py` (stubbed data, no game, no writes; wired into native-regressions.yml): scroller scrolls and last card lands inside the window. Melee, magic-damage, status-infliction and Mug-comparison runtime patches still need the game; issue stays actionable.
+Scroll report resolved and fixed: the Formulae tab mounted a bare detailPanel while the FF8 plugin clips #main (`--lex-main-overflow:hidden`), so stacked cards below the fold were unreachable (reproduced headless: last card bottom 819px at 800px viewport, no scroll path). Fix wraps the panel in the shared `.lex-tweaks-scroll` container in `renderFormulae` (plugins/ff8/boot.js). Verified by new `tests/ff8_formulae_scroll_browser_check.py` (stubbed data, no game, no writes; wired into native-regressions.yml): scroller scrolls and last card lands inside the window. Melee, magic-damage, status-infliction and Mug-comparison runtime patches still need the game; issue stays actionable.
 
 ## 2026-09-23 misc-fixes: flipped to waiting with concrete checklist
 
@@ -30,7 +30,7 @@ passed session closes it subject to the merge workflow.
 ## 2026-09-23 formulae-subtab status
 
 Per Lexer's latest comment, Formulae is now a subtab under Tweaks that
-unlocks only while the Formulae Rework tweak is enabled (games/ff8/boot.js):
+unlocks only while the Formulae Rework tweak is enabled (plugins/ff8/boot.js):
 the owning toggle moved into the Tweaks Gameplay list (still unavailable
 until every contract row has a runtime patch), `navigate('formulae')` lands
 on Tweaks, and a locked subtab falls back to the Gameplay list. Page content

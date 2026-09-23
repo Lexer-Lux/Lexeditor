@@ -4,11 +4,11 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-FF7 = ROOT / "games" / "ff7" / "editor.html"
-FF7_JS = ROOT / "games" / "ff7" / "editor.js"
-BLANK = ROOT / "games" / "blank" / "editor.html"
-BLANK_CSS = ROOT / "games" / "blank" / "editor.css"
-BLANK_JS = ROOT / "games" / "blank" / "editor.js"
+FF7 = ROOT / "plugins" / "ff7" / "editor.html"
+FF7_JS = ROOT / "plugins" / "ff7" / "editor.js"
+BLANK = ROOT / "plugins" / "blank" / "editor.html"
+BLANK_CSS = ROOT / "plugins" / "blank" / "editor.css"
+BLANK_JS = ROOT / "plugins" / "blank" / "editor.js"
 NEUTRAL = ROOT / "ui" / "neutral.css"
 
 

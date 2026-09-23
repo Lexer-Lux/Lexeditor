@@ -8,11 +8,11 @@ descriptions used. Acceptance: single reward, several rewards, long and
 modded descriptions render; confirm awards exactly once.
 
 ## Findings (2026-09-22)
-- No results-screen layout code exists in games/ff8: the screen is drawn by
+- No results-screen layout code exists in plugins/ff8: the screen is drawn by
   the game exe natively. Reward-adjacent code (`formats.py` XP/drop fields,
   `mug_drops.py`) covers data, not layout.
 - Only Lexeditor's own FFNx patch files are vendored
-  (`games/ff8/ffnx_status_bars/`); the pinned FFNx source with the battle
+  (`plugins/ff8/ffnx_status_bars/`); the pinned FFNx source with the battle
   draw code is an external checkout, so hook locations cannot be confirmed
   from this repo.
 - Precedent for renderer changes exists (`fast_start_ffnx.py` patches pinned

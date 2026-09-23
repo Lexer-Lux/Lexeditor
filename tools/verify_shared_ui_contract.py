@@ -37,13 +37,13 @@ framework = text("ui/framework.js")
 css = text("ui/framework.css")
 host = text("desktop_host.py")
 github = text("github_integration.py")
-blank = page_source("games/blank")
-warband = page_source("games/warband")
+blank = page_source("plugins/blank")
+warband = page_source("plugins/warband")
 
 # Shared chrome is global by construction. Every real editor shell must load the
 # shared framework, and a game theme may not swap the info-bubble glyph back to
 # its own game font. This is what keeps Blank fixes from becoming Blank-only.
-plugin_editors = sorted((ROOT / "games").glob("*/editor.html"))
+plugin_editors = sorted((ROOT / "plugins").glob("*/editor.html"))
 require(plugin_editors, "no game editor shells were found")
 for editor_path in plugin_editors:
     source = editor_path.read_text(encoding="utf-8")
@@ -66,7 +66,7 @@ for editor_path in plugin_editors:
 mod_loading = json.loads(text("ui/mod-loading.json"))
 mod_loading_plugins = mod_loading.get("plugins", {})
 plugin_ids = set()
-for plugin_path in sorted((ROOT / "games").glob("*/plugin.py")):
+for plugin_path in sorted((ROOT / "plugins").glob("*/plugin.py")):
     source = plugin_path.read_text(encoding="utf-8")
     match = re.search(r"\bplugin_id\s*=\s*['\"]([^'\"]+)['\"]", source)
     require(match is not None, f"{plugin_path.relative_to(ROOT)} does not declare plugin_id")
@@ -130,7 +130,7 @@ require("warband-item-preview-action" not in warband,
 # Every plugin explains its mod loader, in the same five fields, in the same
 # words. Five of the eight editors previously said nothing about how their
 # output is loaded, which is the first thing anyone installing a mod needs.
-for plugin in sorted((ROOT / "games").iterdir()):
+for plugin in sorted((ROOT / "plugins").iterdir()):
     if not (plugin / "editor.html").is_file():
         continue
     editor = page_source(plugin)
@@ -150,7 +150,7 @@ require("MOD LOADER" in framework and "MOD_LOADER_FIELDS" in framework,
 # more than one line, and are the reason "I get this browser message" was a bug
 # report. Every question and every message is Lexeditor's own.
 for source_path in [ROOT / "ui" / "framework.js", ROOT / "ui" / "chooser.html"] + [
-        plugin / "editor.html" for plugin in sorted((ROOT / "games").iterdir())
+        plugin / "editor.html" for plugin in sorted((ROOT / "plugins").iterdir())
         if (plugin / "editor.html").is_file()]:
     text = source_path.read_text(encoding="utf-8")
     for banned in ("window.confirm(", "window.alert(", "window.prompt("):
@@ -162,9 +162,9 @@ require("const confirmAction = options =>" in framework,
 
 require("reshadeSection" in framework,
         "the shared ReShade section is not defined in the framework")
-require("reshadeSection(" in page_source("games/blank"),
-        "games/blank does not demonstrate the shared ReShade section")
-for plugin in sorted((ROOT / "games").iterdir()):
+require("reshadeSection(" in page_source("plugins/blank"),
+        "plugins/blank does not demonstrate the shared ReShade section")
+for plugin in sorted((ROOT / "plugins").iterdir()):
     if not (plugin / "editor.html").is_file():
         continue
     editor = page_source(plugin)

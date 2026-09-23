@@ -4,7 +4,7 @@ const {test} = require('node:test');
 const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
 const vm = require('node:vm');
-const source = readFileSync(join(__dirname, '../games/ff9/editor.js'), 'utf8');
+const source = readFileSync(join(__dirname, '../plugins/ff9/editor.js'), 'utf8');
 const message = "can't be bothered to make this when the memoria guys already did this themselves. just hit play and you can edit the settings in the launcher that comes up";
 
 async function editor() {

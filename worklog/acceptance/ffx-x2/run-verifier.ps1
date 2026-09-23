@@ -73,7 +73,7 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedVerifier)) {
 else {
     Push-Location $repoRoot
     try {
-        $jsonLines = & python -m games.ffx_x2.verify_install `
+        $jsonLines = & python -m plugins.ffx_x2.verify_install `
             --game-root $resolvedGameRoot `
             --require-fahrenheit `
             --hash-archives `

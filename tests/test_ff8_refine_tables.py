@@ -2,7 +2,7 @@
 import unittest
 from unittest.mock import patch
 
-from games.ff8 import refine_tables as refine
+from plugins.ff8 import refine_tables as refine
 
 
 class RefineSaveTests(unittest.TestCase):

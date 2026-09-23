@@ -4,8 +4,8 @@ import struct
 
 import pytest
 
-from games.ff7r.archive import _with_virtual_assets
-from games.ff7r.runtime_config import (
+from plugins.ff7r.archive import _with_virtual_assets
+from plugins.ff7r.runtime_config import (
     DEFAULT_RUNTIME_CONFIG,
     LEGACY_MINIMAP_CONFIG,
     RUNTIME_CONFIG_NAME,
@@ -18,14 +18,14 @@ from games.ff7r.runtime_config import (
     validate_runtime_config,
     validate_runtime_manifest,
 )
-from games.ff7r.runtime_dataobject import (
+from plugins.ff7r.runtime_dataobject import (
     NO_MORE_CHEATS_PROBE_ASSET,
     RUNTIME_PROBE_ASSET,
     RUNTIME_TWEAKS_ASSET,
     runtime_settings_package,
     save_runtime_edits,
 )
-from games.ff7r.storage import save_edits
+from plugins.ff7r.storage import save_edits
 
 
 FIXTURE_TIMESTAMP = 0x12345678

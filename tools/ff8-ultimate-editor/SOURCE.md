@@ -8,6 +8,6 @@ Lexeditor uses the FF8 archive LZS decoder and data-schema files from
 - Copied LZS source SHA-256:
   `EB0FA352685F9EF6B7CE3C2D9F8F70CFC289D23551449175D9AA1ED2EAF3E8F6`
 
-The complete copied decoder source is `games/ff8/vendor/ff8ue/lzs.py`. The
-complete copied JSON data sources are under `games/ff8/schema/`. The repository
+The complete copied decoder source is `plugins/ff8/vendor/ff8ue/lzs.py`. The
+complete copied JSON data sources are under `plugins/ff8/schema/`. The repository
 and exact revision above provide the corresponding upstream project source.

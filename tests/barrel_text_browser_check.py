@@ -11,7 +11,7 @@ def main():
   browser=pw.chromium.launch(headless=True);page=browser.new_page(viewport={'width':1440,'height':1000})
   page.route('http://fixture/',lambda r:r.fulfill(body='<main style="height:850px;width:900px"></main>',content_type='text/html'));page.goto('http://fixture/')
   page.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  page.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
+  page.add_style_tag(content=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8'))
   page.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
   page.evaluate("""()=>{
    const U=LexeditorUI;window.draw=reverse=>{const rows=Array.from({length:64},(_,id)=>({id,name:id===42?"Gunblade (Seifer's Hyperion battle prop) with a very long name":'G-Soldier'}));if(reverse)rows.reverse();

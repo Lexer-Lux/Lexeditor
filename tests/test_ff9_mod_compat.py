@@ -7,7 +7,7 @@ from pathlib import Path
 import json
 import pytest
 
-from games.ff9 import mod_compat
+from plugins.ff9 import mod_compat
 
 
 def description(name, *, version="", minimum="", incompatible=""):

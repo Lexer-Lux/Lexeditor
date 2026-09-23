@@ -16,7 +16,7 @@ internal static class PsoConverter
         "PsoCollisions.txt",
     };
 
-    // These names are the exact element contract read by games/rdr2/server.py.
+    // These names are the exact element contract read by plugins/rdr2/server.py.
     // They are case-sensitive because RDR2 PSO schema hashes are case-sensitive.
     private static readonly string[] ContractNames =
     {

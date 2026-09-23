@@ -5,8 +5,8 @@ import struct
 
 import pytest
 
-from games.ffx_x2.item_prices import ARCHIVE_PATH, ItemPriceError, apply_edits, parse_item_prices, payload
-from games.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
+from plugins.ffx_x2.item_prices import ARCHIVE_PATH, ItemPriceError, apply_edits, parse_item_prices, payload
+from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
 from service_session import request_json
 
 

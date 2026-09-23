@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).parents[1]
-RUNTIME = ROOT / "games/ff9/runtime"
+RUNTIME = ROOT / "plugins/ff9/runtime"
 
 
 def source(name):
@@ -100,7 +100,7 @@ def test_row_rework_uses_memoria_row_and_melee_contracts():
     assert "TryKillFrozen" in script
 
 def test_runtime_uses_mod_specific_scriptsloader_filename():
-    from games.ff9 import features
+    from plugins.ff9 import features
     assert features.RUNTIME_NAME == "Memoria.Scripts.Lexeditor.dll"
     assert not (RUNTIME / "Memoria.Scripts.dll").exists()
 

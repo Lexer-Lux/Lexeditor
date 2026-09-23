@@ -7,7 +7,7 @@ from test_shared_ui_feedback import ROOT, page, framework
 def test_ai_dropdown_labels_fit(page):
     font=Path(os.environ['LOCALAPPDATA'])/'Lexeditor/game-data/ff8/generated/ff8-menu.ttf'
     page.route('**/assets/ff8-menu.ttf*',lambda route:route.fulfill(path=str(font)))
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     framework(page)
     page.evaluate('''async()=>{
       await document.fonts.load('17px "FF8 Menu"');

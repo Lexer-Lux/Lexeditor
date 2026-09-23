@@ -10,7 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import formats, paths, runtime_layout
+from plugins.ff8 import formats, paths, runtime_layout
 
 
 def main() -> int:
@@ -107,7 +107,7 @@ def main() -> int:
         else:
             raise AssertionError("editable mod and active runtime were allowed to share one root")
 
-    source = (Path(__file__).resolve().parents[1] / "games" / "ff8" / "extractor.py").read_text()
+    source = (Path(__file__).resolve().parents[1] / "plugins" / "ff8" / "extractor.py").read_text()
     assert "ensure_ffnx(game_root, paths.RUNTIME_DIRECT_ROOT" in source
     assert "ensure_ffnx(game_root, paths.DIRECT_ROOT" not in source
     print("FF8 editable-mod and active-runtime separation passed")

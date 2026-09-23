@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.project_zomboid import zedscript
+from plugins.project_zomboid import zedscript
 
 
 class ProjectZomboidZedScriptTests(unittest.TestCase):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from games.terraria.plugin import smoke
+from plugins.terraria.plugin import smoke
 
 
 class TerrariaSmokeTests(unittest.TestCase):

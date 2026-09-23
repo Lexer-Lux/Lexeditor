@@ -4,7 +4,7 @@ from test_shared_ui_feedback import ROOT, page, framework
 
 def test_tabs_and_help_keep_centering_and_contrast(page):
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''() => {
       const U=LexeditorUI;
       document.querySelector('main').append(U.subtabBar({active:'a',
@@ -58,7 +58,7 @@ def test_filled_detail_table_uses_remaining_height(page):
 def test_player_index_upgrades_area_only_cache(tmp_path):
     import json
     from unittest.mock import patch
-    from games.ff8 import field_data as field
+    from plugins.ff8 import field_data as field
     (tmp_path/'field').mkdir()
     cache=tmp_path/'field/card-players.json'
     cache.write_text(json.dumps({'source':'fixture','keys':['garden']}))

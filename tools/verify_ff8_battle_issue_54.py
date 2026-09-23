@@ -14,8 +14,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.ff8 import battle_issue_54 as battle
-from games.ff8 import gameplay_settings
+from plugins.ff8 import battle_issue_54 as battle
+from plugins.ff8 import gameplay_settings
 EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")
 FFNX = ROOT / "_scratch" / "ffnx-upstream"
 EXPECTED_EXE = "064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570"
@@ -80,7 +80,7 @@ def main() -> int:
     assert "uint8_t magic_drawn_once[8];" in save_header
     assert '"Squall"' in (FFNX / "src" / "ff8" / "engine.h").read_text(encoding="utf-8")
 
-    schema = json.loads((ROOT / "games" / "ff8" / "schema" / "kernel_section_fields.json").read_text(encoding="utf-8"))
+    schema = json.loads((ROOT / "plugins" / "ff8" / "schema" / "kernel_section_fields.json").read_text(encoding="utf-8"))
     shots = next(field for field in schema["5"]["fields"] if field["offset"] == 3)
     assert shots["name"] == "shots_per_atb"
     assert shots["minimum"] == 1 and shots["maximum"] == 10
@@ -212,8 +212,8 @@ def main() -> int:
     assert battle.summon_unavailable_reason(junctioned_gf_count=0)
     assert battle.summon_unavailable_reason(junctioned_gf_count=2) == ""
 
-    gameplay = (ROOT / "games" / "ff8" / "gameplay_settings.py").read_text(encoding="utf-8")
-    editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    gameplay = (ROOT / "plugins" / "ff8" / "gameplay_settings.py").read_text(encoding="utf-8")
+    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
     assert "battle_issue_54.build_command_eligibility_patch(" in gameplay
     assert "draw_once=draw_once_per_enemy, better_card=better_card_enabled" in gameplay
     assert "battle_issue_54.build_draw_patch(draw_once_per_enemy)" not in gameplay

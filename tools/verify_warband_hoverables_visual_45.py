@@ -11,8 +11,8 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.warband import paths  # noqa: E402
-from games.warband.plugin import WarbandSession  # noqa: E402
+from plugins.warband import paths  # noqa: E402
+from plugins.warband.plugin import WarbandSession  # noqa: E402
 
 
 TROOPS = [

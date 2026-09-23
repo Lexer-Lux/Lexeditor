@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
-from games.ff7r.bench_mutation_probe import analyze_object_layout_mutation_surface
-from games.ff7r.dataobject import BOOLEAN, INT32, NAME, STRING, Property
+from plugins.ff7r.bench_mutation_probe import analyze_object_layout_mutation_surface
+from plugins.ff7r.dataobject import BOOLEAN, INT32, NAME, STRING, Property
 
 
 def _entry(index, tag, **values):

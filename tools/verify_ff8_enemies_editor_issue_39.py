@@ -19,8 +19,8 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> None:
-    editor = (ROOT / "games/ff8/editor.html").read_text(encoding="utf-8")
-    server = (ROOT / "games/ff8/server.py").read_text(encoding="utf-8")
+    editor = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
+    server = (ROOT / "plugins/ff8/server.py").read_text(encoding="utf-8")
     require("Read-only inventory" not in editor, "The old read-only enemy placeholder remains")
     require('/api/enemies/save' in server, "The enemy save route is missing")
     require('function enemyDisplayName(name)' in editor,
@@ -39,7 +39,7 @@ def main() -> None:
     require("enemy-properties-section" in editor and "enemy-properties-row" in editor,
             "enemy properties must use one compact shared row")
 
-    from games.ff8 import formats, paths, scan_text
+    from plugins.ff8 import formats, paths, scan_text
 
     vanilla = formats.enemy_rows("vanilla")
     require(vanilla["rows"], "No extracted enemies were loaded")

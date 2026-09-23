@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from games.ff7r import unscanned_names_probe as probe
+from plugins.ff7r import unscanned_names_probe as probe
 
 
 def test_unscanned_probe_targets_both_enemy_name_surfaces_and_enemybook_identity():

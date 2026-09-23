@@ -93,13 +93,13 @@ def main() -> int:
     # Per-game loading lines moved into the plugin that owns them, so a new
     # game brings its own quotes instead of editing a shared file. The shared
     # file keeps only the global lines and the sharing map.
-    _ff8_quotes = ROOT / "games" / "ff8" / "loading_quotes.json"
+    _ff8_quotes = ROOT / "plugins" / "ff8" / "loading_quotes.json"
     require(_ff8_quotes.is_file()
             and len(json.loads(_ff8_quotes.read_text(encoding="utf-8"))) >= 7,
             "the supplied FF8 loading lines must remain editable in its plugin")
     require("global" in QUOTES and "shares" in QUOTES,
             "the shared quote file must keep the global lines and the sharing map")
-    _warband_quotes = ROOT / "games" / "warband" / "loading_quotes.json"
+    _warband_quotes = ROOT / "plugins" / "warband" / "loading_quotes.json"
     require(_warband_quotes.is_file()
             and len(json.loads(_warband_quotes.read_text(encoding="utf-8"))) >= 2,
             "the supplied Warband loading lines must remain editable in its plugin")
@@ -108,7 +108,7 @@ def main() -> int:
             and "--lex-resident-save-size" in CHOOSER,
             "the resident icon and title need one height-relative safe area and scaler")
     def _plugin_quotes(plugin_id: str) -> list:
-        path = ROOT / "games" / plugin_id / "loading_quotes.json"
+        path = ROOT / "plugins" / plugin_id / "loading_quotes.json"
         if not path.is_file():
             return []
         loaded = json.loads(path.read_text(encoding="utf-8"))

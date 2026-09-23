@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_numeric_input_handlers_preserve_focus_during_typing():
     """Record-detail inputs update local state without rebuilding the page per keystroke."""
-    source = (ROOT / "games/ffx_x2/editor.js").read_text(encoding="utf-8")
+    source = (ROOT / "plugins/ffx_x2/editor.js").read_text(encoding="utf-8")
     handlers = re.findall(r"oninput:event=>\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}", source)
     assert len(handlers) >= 7
     assert any("row[f.key]" in handler for handler in handlers)

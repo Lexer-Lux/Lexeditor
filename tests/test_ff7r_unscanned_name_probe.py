@@ -1,4 +1,4 @@
-from games.ff7r.unscanned_name_probe import (
+from plugins.ff7r.unscanned_name_probe import (
     assess_unscanned_name_evidence,
     rank_unscanned_name_assets,
 )

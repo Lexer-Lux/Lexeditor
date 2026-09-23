@@ -7,7 +7,7 @@ import argparse
 import json
 from pathlib import Path
 
-from games.ff7r.minimap_runtime_probe import probe_minimap_runtime
+from plugins.ff7r.minimap_runtime_probe import probe_minimap_runtime
 
 
 def main() -> int:

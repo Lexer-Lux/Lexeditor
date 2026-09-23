@@ -51,7 +51,7 @@ When local access is available:
 
 1. Inventory the installed menu/UI PAK assets and record the exact texture/audio source paths plus formats used by the current build.
 2. Implement the narrow local-only decoders/converters needed for those verified assets; never bundle or redistribute Square Enix source assets.
-3. Wire the decoded textures/SFX into `games/ff7r/theme.py` / `theme.js` and keep the authored palette as a fallback; derive color tokens from real assets only where the local evidence supports it.
+3. Wire the decoded textures/SFX into `plugins/ff7r/theme.py` / `theme.js` and keep the authored palette as a fallback; derive color tokens from real assets only where the local evidence supports it.
 4. Add proprietary-data-free decoder fixtures plus installed-game smoke/visual/audio acceptance.
 5. Mark this frontier complete only after the actual installed build proves texture rendering, UI SFX playback, cache confinement, and fallback behavior.
 

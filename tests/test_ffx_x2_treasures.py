@@ -4,8 +4,8 @@ import struct
 
 import pytest
 
-from games.ffx_x2.ffx_table import FFXTableError, parse_table
-from games.ffx_x2.treasures import TreasureError, apply_edits, parse_treasures, payload
+from plugins.ffx_x2.ffx_table import FFXTableError, parse_table
+from plugins.ffx_x2.treasures import TreasureError, apply_edits, parse_treasures, payload
 
 
 def _table(records: list[bytes], min_index: int = 0x10, trailing: bytes = b"TRAIL") -> bytes:

@@ -2,7 +2,7 @@
 import sys,threading
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from games.ff8.server import create_server
+from plugins.ff8.server import create_server
 from playwright.sync_api import sync_playwright
 server=create_server(0);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
 try:
@@ -14,7 +14,7 @@ try:
             else:route.continue_()
         # Keep the shipped views and shared controls. Replace only game discovery
         # and shell startup, so CI needs no private game installation.
-        boot=(Path(__file__).resolve().parents[1]/'games/ff8/boot.js').read_text(encoding='utf-8')
+        boot=(Path(__file__).resolve().parents[1]/'plugins/ff8/boot.js').read_text(encoding='utf-8')
         boot=boot[:boot.index('  const shell=LexeditorUI.mountShell(')]+'''
 const shell={refresh(){}};
 state.data.settings={betterHpColors:false,interactionIndicators:false,

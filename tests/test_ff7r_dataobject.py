@@ -4,8 +4,8 @@ import struct
 
 import pytest
 
-from games.ff7r.dataobject import DataObjectPackage, FormatError, parse_uasset
-from games.ff7r.plugin import _test_package
+from plugins.ff7r.dataobject import DataObjectPackage, FormatError, parse_uasset
+from plugins.ff7r.plugin import _test_package
 
 
 def fixture_package():

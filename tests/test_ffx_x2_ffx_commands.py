@@ -9,11 +9,11 @@ import urllib.request
 
 import pytest
 
-from games.ffx_x2.ffx_commands import (
+from plugins.ffx_x2.ffx_commands import (
     ARCHIVE_PATH, TABLES, FFXCommandError, apply_edits, apply_table_edits,
     parse_commands, payload, payload_for, table_spec,
 )
-from games.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
+from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
 from service_session import request_json
 
 

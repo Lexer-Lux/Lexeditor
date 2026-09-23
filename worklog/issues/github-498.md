@@ -14,7 +14,7 @@ consistent with the active audio backend. Research menu + FFNx audio paths first
   - Both layers are disabled here; neither follows the vanilla menu slider.
 - The vanilla menu Sound slider drives the game's internal audio path. No
   SFX/Music split point is known in the exe or codex (codex/ff8 has no audio
-  knowledge). The `volume` byte in `games/ff8/init_data.py` is save config,
+  knowledge). The `volume` byte in `plugins/ff8/init_data.py` is save config,
   not the menu slider.
 - No implementation exists; nothing to remove or wire.
 

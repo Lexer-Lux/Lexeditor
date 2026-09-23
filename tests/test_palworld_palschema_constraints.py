@@ -5,9 +5,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.palworld.palschema import field_schema
-from games.palworld.palschema_fields import schema_scalar_writable
-from games.palworld.server import validate_schema_edits
+from plugins.palworld.palschema import field_schema
+from plugins.palworld.palschema_fields import schema_scalar_writable
+from plugins.palworld.server import validate_schema_edits
 
 
 class PalSchemaConstraintTests(unittest.TestCase):
