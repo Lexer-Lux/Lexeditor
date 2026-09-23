@@ -17,16 +17,14 @@ Draft PR: #491, FF7R-2 Plugin
   original dark/blue/white CSS tokens derived from publicly visible Rebirth UI.
   Current-master shared detail sizing was adopted by removing the stale local
   label-width override.
-- Rendered evidence: the ff7r2-rendered artifact at e82aa8e was downloaded and
-  visually inspected. Desktop, narrow, Data Map, Information and Tweaks were
-  usable; unsupported Data Map rows remained visible. The 150% browser check now
-  captures the viewport rather than a CSS-zoomed full page, which previously
-  created an artificial blank tail. The exact live head `5a7149ae9cdd5351f998800c47835f1bc21d681e`
-  reran the FF7R2 workflow successfully on Linux, Windows and Chromium. Its
-  `ff7r2-rendered` artifact was downloaded and visually inspected: desktop,
-  narrow, simulated 150%, Data Map, Information and Tweaks all remained usable;
-  unsupported Data Map rows stayed visible and Information still states that the
-  staged output is not packaged or installed.
+- Rendered evidence: exact source head
+  `e45da924d64d3d57c8e6293e2f942f2ac91067c7`, FF7R2 run 35806543930, passed
+  browser + Linux + Windows. Artifact `ff7r2-rendered` digest
+  `dc94da7164c4bc972fecda51d382be4358a3abff8ab73a05c0200991cd304bd1`
+  was downloaded and visually inspected: desktop, narrow, simulated 150%,
+  Data Map, Information and Tweaks were usable and evidence boundaries stayed
+  visible. This remains the last completed rendered handoff before the newer
+  Formulae/BattleItemPossession view; that view needs its own exact-head rerun.
 - Extraction: retoc v0.1.5 remains researched/pinned but is not invoked because
   its absent-Oodle path can acquire a DLL. GamePlugin still exposes one shared
   managed-helper slot, already owned by Shader Injector. Do not compete for a
@@ -54,44 +52,49 @@ Draft PR: #491, FF7R-2 Plugin
   real IoStore archives or user-supplied Oodle DLL exist here, so producing a
   real candidate would require inventing/obtaining inputs and is intentionally
   not attempted.
-- #470 Chocobo whistle pursuit: public Rebirth constants now narrow this to
-  ResidentParameter rows CallChocoboAtFieldActionDistanceParamRatio0/1 plus
-  key_ChocoboWhistle, FA0407_00_ChocoboWhistle_Standard and ChocoboRide identity
-  leads. Missing: a proved instant teleport/mount hook, safe-placement rule,
-  ride-legality predicate, vanilla fallback, and semantics/ranges for the two
-  distance ratios. No speculative control was added.
-- #471 Formulae / Steal pursuit: BattleItemPossession publicly exposes
-  NormalItemPercent_Array, RareItemPercent_Array, StealItemName_Array,
-  StealItemQuantity_Array and StealFaildCountArrayIndex. The 100% Steal/Drop mod
-  author reports Rebirth shares the 25% data between stolen and dropped items.
-  Missing: writable array-element support, the complete Steal formula/terms,
-  roll-vs-no-item failure branch and message hook. A Steal-only percentage
-  control would therefore be misleading and was not added.
-- #472 bench/cushion pursuit: public constants identify
-  scgCmn_Tmp_Bench_Init/Rest, trgCmn_Bench_Rest,
-  acgCmn_RecoverAll_ForBench and UI7033_00_ConsumedItem_Cushion. Public mesh
-  evidence confirms the blue bench is separate from Chocobo-rest benches and
-  multiple bench models exist. Missing: the complete restable-placement-to-model
-  mapping and the universal cushion-consumption gate.
-- #473 minimap pursuit: MapIconInfo exposes navimap visibility/layer, offsets and
-  view-distance fields but no zoom field. Public 2026 accessibility work proves
-  minimap position/size can be changed in packaged HUD data and distinguishes
-  that from its UE4SS HUD mover. Missing: a world-minimap zoom scalar, valid
-  range and persistence path; size/position/FOV are not mislabeled as zoom.
-- #477 Queen's Blood pursuit: public CardGameCommonParameter/CardGameAIParam
-  constants expose EffectWaitTime, NeedCanPutCount and player/enemy prediction
-  fields, but do not prove the legal-move predicate, automatic pass transition,
-  both-sides-no-moves end condition or intro skippable-input state. Score/card
-  cheat evidence is not used as proof of those hooks.
-- These five areas remain visible as not integrated, but their Data Map rows now
-  name the concrete public data families and exact blockers rather than treating
-  them as generic unsupported requests.
-- Shared-suite status at that head: `Shared UI contract` fails because merged
-  `ui/framework.css` defines `--lex-detail-label-width:7.5%` while the current
-  verifier expects `minmax(var(--lex-detail-label-floor),10%)`; PR #491 does not
-  modify that shared file. `Shared UI visual acceptance` times out in the shared
-  Blank acceptance before any Rebirth-specific check. These are tracked as
-  shared-baseline failures, not Rebirth regressions.
+- #470 Chocobo whistle pursuit: generated SDK declarations now prove concrete
+  ride-legality/location/action seams beyond the original DataObject row names:
+  `AEndLocationVolume.bDisableChocoboRide`,
+  `UEndEnvQueryTest_IsDisabledChocoboRide`,
+  `UEndEnvQueryContext_LastEnableChocoboRideLocation`,
+  `FEndBehaviorChocoboRideOnExtraAction` and `UEndAnimNotifyCallChocobo`.
+  Missing: the callable safe teleport + immediate mount sequence, distance-ratio
+  semantics/ranges and vanilla fallback. #470 remains Not integrated.
+- #471 Formulae / Steal pursuit: public format evidence proves _Array headers
+  point to repeated values of the property's underlying type. Lexeditor now
+  independently decodes fixed-width/name/string array elements read-only,
+  exposes a source-only BattleItemPossession Formulae Table+Detail, and has
+  synthetic preservation/bounds/edit-refusal tests. No BattleItemPossession file
+  is staged or written. Public behavior evidence still says steal/drop share the
+  25% rate data. Missing: safe accepted array writes, the complete Steal
+  formula/terms, roll-vs-no-item failure branch and message hook. #471 is Partial
+  and remains actionable.
+- #472 bench/cushion pursuit: generated SDK declarations narrow the actor seam to
+  `AEndFieldActionActorBenchBreak.BenchMeshComponent` and
+  `ZabutonActorClass`; CampBreak derives from that bench actor. Missing: the
+  complete restable-placement -> blue-mesh mapping and the inventory/state
+  transition that consumes a cushion for every valid rest without changing
+  unusable benches. #472 remains Not integrated.
+- #473 minimap pursuit: generated SDK declarations now explicitly name
+  `AreaNaviMapScale`, `LocationNaviMapScale` and `ZackNaviMapScale` option
+  categories; `UEndNaviMap` exposes `PixelPerCm` and location prototype data
+  has Min/Mid/MaxPixelPerCm. Missing: concrete requested-category range/default
+  mapping and persistent save/config storage. No invented slider. #473 remains
+  Not integrated.
+- #477 Queen's Blood pursuit: generated types confirm `NeedCanPutCount`,
+  player/enemy prediction fields, a `UEndCardGameMenu._PassClass` and yes/no
+  handlers, plus turn/board-state seams. Missing: the legal-move predicate,
+  automatic pass transition, both-sides-no-moves termination and intro
+  first-skippable-input hook. Timing fields are not substituted for requested
+  logic. #477 remains Not integrated.
+- Deterministic service/browser assertions now lock the requested evidence states:
+  #471 must be Partial/view/Formulae while #470/#472/#473/#477 must stay
+  Not-integrated until real implementation advances them.
+- Shared-suite status at exact rendered head `e45da924...`: Shared UI contract
+  passed. Shared UI visual acceptance failed in Blank acceptance before
+  Rebirth-specific checks; repository-wide verifier failures sampled there were
+  other-game/shared failures. They are not counted as Rebirth source/rendered or
+  in-game evidence.
 - Real-game acceptance remains required: parse a real extracted PlayerParameter,
   make one harmless fixed-width edit, build the isolated package candidate, copy
   the three candidate files manually to End/Content/Paks/~mods, start Rebirth,
