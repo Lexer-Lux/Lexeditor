@@ -47,7 +47,7 @@ class WarbandItemEditorTests(unittest.TestCase):
         original = self.path.read_bytes();data=server.item_data()
         result = server.save_item_edits([{
             "recordIndex": 0, "originalId": "sword", "fields": {
-                "name": "New Sword", "value": "250",
+                "name": "New café Sword", "value": "250",
                 "flags": "itp_type_two_handed_wpn|itp_merchandise",
                 "stats": "weight(2.25)|spd_rtng(91)|weapon_length(115)",
             }
@@ -56,7 +56,7 @@ class WarbandItemEditorTests(unittest.TestCase):
         self.assertTrue(result["sha256"])
         self.assertEqual(Path(result["backup"]).read_bytes(), original)
         rows = server.item_rows(); sword, boots = rows
-        self.assertEqual(sword["name"], "New Sword")
+        self.assertEqual(sword["name"], "New café Sword")\n        self.assertTrue(self.path.read_text(encoding="utf-8").startswith("# coding: utf-8\\n"))
         self.assertEqual(sword["value"], "250")
         self.assertEqual(sword["type"], "two_handed_wpn")
         self.assertEqual(sword["weight"], "2.25")
