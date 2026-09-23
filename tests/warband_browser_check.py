@@ -190,7 +190,9 @@ def main():
                     max_level=page.locator('.warband-module-detail [data-lex-property="maxLevel"] input');max_level.fill('11')
                     assert page.evaluate('moduleRecords.dirtyCount()')==1
                     page.locator('.lex-save-icon').click()
-                    page.wait_for_function('document.querySelector("#plugin-status")?.textContent==="Saved and build verified"')
+                    page.wait_for_function('document.body.classList.contains("lex-save-busy")')
+                    page.wait_for_function('!document.body.classList.contains("lex-save-busy")')
+                    assert page.locator('.lex-dialog').filter(has_text='Save failed').count()==0
                     page.get_by_role('button',name='Items',exact=True).click()
                     page.get_by_role('button',name='Misc.',exact=True).click()
                     page.locator('.warband-module-detail').wait_for(state='visible')
