@@ -163,3 +163,16 @@ def test_modified_managed_repak_is_rejected(monkeypatch, tmp_path):
     assert status["installed"] is False
     assert status["integrity"] == "mismatch"
     assert "Install/Repair" in status["message"]
+
+def test_distribution_bundles_repak_archives_manifest_and_licenses():
+    from tools import build_distribution
+
+    required = {
+        "games/ff7r/runtime/repak/v0.2.3/manifest.json",
+        "games/ff7r/runtime/repak/v0.2.3/LICENSE-MIT",
+        "games/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE",
+        "games/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip",
+        "games/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-unknown-linux-gnu.tar.xz",
+    }
+    assert required <= set(build_distribution.VENDORED_HELPERS)
+
