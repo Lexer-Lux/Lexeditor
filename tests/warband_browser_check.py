@@ -109,6 +109,8 @@ def main():
                     icon.click();page.wait_for_timeout(250)
                     assert page.locator('.warband-item-detail.lex-model-preview-open').count()==1
                     assert page.locator('.lex-model-preview-drawer .warband-preview-stage').count()==1
+                    page.locator('.lex-model-preview-drawer .warband-preview-stage canvas').wait_for(state='visible')
+                    assert page.evaluate('window.__warbandPreview?.length===1')
                     page.locator('.warband-item-detail .lex-model-preview-close').click()
                     page.wait_for_timeout(250)
                     assert page.locator('.warband-item-detail.lex-model-preview-open').count()==0
@@ -120,6 +122,7 @@ def main():
                     assert page.evaluate('itemDirtyCount()')==0
                     page.screenshot(path=str(ARTIFACTS/f'items-{width}.png'),full_page=True)
                     page.evaluate('navigate("datamap")');page.wait_for_timeout(600)
+                    assert page.evaluate('window.__warbandPreview===undefined')
                     assert page.locator('.lex-paged-list-detail').count()==1
                     page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('source')
                     page.wait_for_timeout(400)
