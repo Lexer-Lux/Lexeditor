@@ -181,6 +181,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             wait_loaded(page)
             expect(numeric_field(page, "PRICE")).to_have_value("333")
 
+            page.evaluate("navigate('info')")
+            expect(page.get_by_text("EXTERNAL MOD COMPATIBILITY", exact=True)).to_be_visible()
+            assert page.get_by_text("None detected", exact=True).count() >= 1
+            page.screenshot(path=str(OUT / "ff9-info-mod-compat.png"), full_page=True)
+
             page.evaluate("navigate('magic')")
             page.wait_for_function("state.datasets.actions?.rows?.length===2")
             targets = field(page, "TARGETS").locator("select")
