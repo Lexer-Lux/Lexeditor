@@ -59,7 +59,7 @@ def smoke() -> list[str]:
         session = Ff7r2Session({"LEXEDITOR_FF7R2_PROJECT": str(project)})
         with session:
             identity = request_json(session.url + "api/plugin")
-            required = {"data-map", "player-parameter", "fixed-width-edit", "project-staging"}
+            required = {"data-map", "player-parameter", "fixed-width-edit", "project-staging", "package-candidate"}
             if identity.get("pluginId") != "ff7r2" or not required.issubset(identity.get("capabilities", [])):
                 raise RuntimeError("FF7R2 service returned the wrong managed identity/capabilities")
             mapped = request_json(session.url + "api/datamap")
