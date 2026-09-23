@@ -266,13 +266,20 @@ def revert(game_root: Path | None = None, project_root: Path | None = None,
     ini = game / "Memoria.ini"
     with memoria_manager.configuration_write(game):
         original_ini = ini.read_bytes() if ini.is_file() else b""
+        backup = None
         try:
             if target.exists():
-                shutil.rmtree(target)
+                backup = Path(tempfile.mkdtemp(prefix="Lexeditor.ff9-revert-", dir=game))
+                backup.rmdir()
+                os.replace(target, backup)
             if original_ini:
                 atomic_write(ini, _edit_mod_order(original_ini, add=False))
+            if backup and backup.exists():
+                shutil.rmtree(backup)
         except Exception:
-            if original_ini and ini.exists():
+            if backup and backup.exists() and not target.exists():
+                os.replace(backup, target)
+            if original_ini:
                 atomic_write(ini, original_ini)
             raise
     return status(game, project, runtime)
