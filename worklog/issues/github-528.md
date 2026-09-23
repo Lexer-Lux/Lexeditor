@@ -67,6 +67,13 @@ relabels, `hasattr(send_page_module)` guard (master's shared
 - Master itself is red in the same lanes (Shared UI contract, FF9
   verification failed on the #540 merge push), so these are not PR 541
   regressions. Left for the owning lane work, not chased here.
+- `package-candidate` fails at `discover-plugins` with
+  `ValueError: ff9/default declares two helper installers`. This branch's
+  `games/ff9/plugin.py` declares only `helper_install_for_root`; the
+  duplicate comes from master's FF9 (PR #540) via merge-commit testing.
+  PR 542 carries the fix; this branch needs a master merge after 542
+  lands, not a local FF9 edit. Same likely applies to Shard 8 if it runs
+  descriptor tests (still in flight at time of writing).
 
 ## Remaining (needs Lexer / game)
 
