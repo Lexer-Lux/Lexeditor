@@ -193,7 +193,11 @@ function sanitizeItemDescription(value){
 }
 function localizationInput(key,placeholder="No localized name"){
   if(!key)return el("input",{class:"human-name",value:"N/A",readonly:"readonly",title:"This record has no localization key."});
-  const attrs={class:"human-name localized-name",type:"text",value:localizedValue(key),placeholder,title:`In-game localization: ${key}`,onchange:ev=>{const value=ev.target.value,base=state.localization?.values?.[key]??"";if(value===base)delete state.localizationEdits[key];else state.localizationEdits[key]=value;renderToolbarOnly();}};
+  // Some catalogue headings resolve to a non-breaking space. Treat blank
+  // names as empty on screen so the placeholder remains visible. Keep the
+  // source untouched unless the user supplies a name.
+  const visible=value=>String(value??"").trim()?String(value):"";
+  const attrs={class:"human-name localized-name",type:"text",value:visible(localizedValue(key)),placeholder,title:`In-game localization: ${key}`,onchange:ev=>{const value=ev.target.value,base=visible(state.localization?.values?.[key]);if(value===base)delete state.localizationEdits[key];else state.localizationEdits[key]=value;renderToolbarOnly();}};
   if(isRO())attrs.readonly="readonly";return el("input",attrs);
 }
 function localizationTextarea(key,placeholder="No localized description",onEdit){

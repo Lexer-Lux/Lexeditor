@@ -11,6 +11,9 @@ on:
       - 'tools/verify_text_clipping.py'
       - 'tests/test_text_clipping.py'
       - 'tests/test_shared_ui_feedback.py'
+      - 'tests/test_rdr2_item_name.py'
+      - 'tests/rdr2_browser_check.py'
+      - 'games/rdr2/*.js'
       - 'games/blank/**'
       - 'games/warband/editor.html'
       - 'games/rdr/editor.html'
@@ -36,6 +39,9 @@ on:
       - 'tools/verify_text_clipping.py'
       - 'tests/test_text_clipping.py'
       - 'tests/test_shared_ui_feedback.py'
+      - 'tests/test_rdr2_item_name.py'
+      - 'tests/rdr2_browser_check.py'
+      - 'games/rdr2/*.js'
       - 'games/blank/**'
       - 'games/warband/editor.html'
       - 'games/rdr/editor.html'
@@ -72,6 +78,8 @@ jobs:
         env:
           LEXEDITOR_TEST_OUTPUT: out/text-clipping
         run: python tools/verify_text_clipping.py
+      - name: Item name display and editing
+        run: python -m pytest -q tests/test_rdr2_item_name.py
       - name: Global rendered browser regression
         env:
           LEXEDITOR_TEST_OUTPUT: out/global-browser
