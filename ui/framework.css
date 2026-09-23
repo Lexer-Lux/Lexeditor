@@ -2322,9 +2322,8 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 .lex-column-pin:focus-visible { color:var(--lex-muted);opacity:.75; }
 .lex-column-pin.pinned { color:var(--lex-accent);opacity:1; }
 
-.lex-column-pin.pinned:active { color:var(--lex-muted); }
-.lex-column-pin.pinned:active .lex-column-pin-on { display:none; }
-.lex-column-pin.pinned:active .lex-column-pin-off { display:block; }
+.lex-column-pin[data-pin-moving] { color:var(--lex-accent);opacity:1; }
+.lex-column-pin[data-pin-moving] > svg { animation:none;transition:none; }
 
 .lex-column-list-head-cell:last-child,
 .lex-column-list-cell:last-child {
@@ -4216,7 +4215,7 @@ body:has(.lex-data-map-table) #main {
 
 /* A pin slides down-left into the page when stuck, and back out when pulled. */
 
-.lex-column-pin:not(.pinned) > svg { translate: 3px -3px; }
+.lex-column-pin:not(.pinned) > svg { translate: 6px -6px; }
 .lex-column-pin.pinned > svg { translate: 0 0; }
 
 /* Pointing at the type rail turns it into the same help popup every other
@@ -5676,7 +5675,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 /* A pin is a small marker, not a metronome. Half the swing, twice as slow, and
    it settles instead of running forever. */
-.lex-column-pin:hover > svg {
+.lex-column-pin:not([data-pin-moving]):hover > svg {
    animation:lex-pin-wiggle .5s ease-in-out infinite;
  transform-origin:14% 86%;
  animation-duration:1.1s;

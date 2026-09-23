@@ -5982,11 +5982,31 @@ ${contents.path}`});
           "aria-pressed": String(pinned),
           onpointerenter: () => setColumnLit(value, true),
           onpointerleave: () => setColumnLit(value, false),
-          onclick: event => {
+          onclick: async event => {
             event.preventDefault();
             event.stopPropagation();
-            api.toggle(value);
-            markArrivingColumn(document, value);
+            const button=event.currentTarget;
+            if(button.dataset.pinMoving)return;
+            button.dataset.pinMoving="true";
+            const inserting=!api.isPinned(value);
+            try {
+              if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+                const animation=icon.animate([
+                  {translate:inserting?'6px -6px':'0px 0px'},
+                  {translate:inserting?'0px 0px':'6px -6px'},
+                ],{duration:220,easing:inserting?'cubic-bezier(.4,0,.7,1)':'cubic-bezier(.2,.7,.3,1)',fill:'forwards'});
+                await animation.finished.catch(()=>{});
+                animation.cancel();
+              }
+              // Commit only after the movement: callers can replace the whole
+              // detail panel when the visible columns change.
+              button.classList.toggle('pinned',inserting);
+              button.setAttribute('aria-pressed',String(inserting));
+              button.setAttribute('aria-label',inserting?`Unpin ${label} column`:`Pin ${label} column`);
+              button.title=inserting?`Hide ${label} in the table`:`Show ${label} in the table`;
+              api.toggle(value);
+              markArrivingColumn(document, value);
+            } finally { delete button.dataset.pinMoving; }
           },
         }, icon);
       },
