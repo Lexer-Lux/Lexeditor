@@ -12,7 +12,7 @@ import sys
 import tempfile
 
 from PIL import Image
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
@@ -84,18 +84,32 @@ def main():
             try:
                 for width,height in [(1200,800),(900,620),(1600,1000)]:
                     page=browser.new_page(viewport={'width':width,'height':height});page.on('pageerror',lambda e:errors.append(str(e)))
-                    # In-memory fixtures avoid browser policies that disallow loopback HTTP.
+                    # Route one synthetic HTTP origin entirely in memory. set_content() leaves
+                    # Chromium on an opaque/storage-refused document, while the shared shell
+                    # legitimately uses sessionStorage during boot; that made the fixture die
+                    # before Warband's scripts could render anything.
                     fixtures={'/api/items':{'rows':ITEMS,'sha256':'fixture-items'},'/api/troops':{'rows':TROOPS,'items':[],'factions':[],'sha256':'fixture-troops','types':{},'flags':{}},'/api/upgrades':{'rows':UPGRADES},'/api/modules':{'modules':[]},'/api/warband-font':{'available':False},'/api/dashboard':{'paths':{},'problems':[]},'/api/settings':{'rows':server.settings_rows()},'/api/datamap':server.data_map_rows()}
                     record_fixtures={key:server.dataset_data(module,key) for key in server.MODULE_RECORD_SCHEMAS}
                     model={**MODEL,'texture':'data:image/png;base64,'+base64.b64encode(TEXTURE).decode()}
                     stub='const replaceState=history.replaceState.bind(history);history.replaceState=(state,unused)=>replaceState(state,unused);const recordFixtures='+json.dumps(record_fixtures)+';let failSound=true;window.fetch=async function(input,options={}){const path=String(input);const fixtures='+json.dumps(fixtures)+';if(path.startsWith("/api/module-records?")){const key=new URL(path,"http://fixture").searchParams.get("dataset");if(key==="sounds"&&failSound){failSound=false;return new Response(JSON.stringify({error:"Synthetic sound parse failure"}),{status:400});}await new Promise(r=>setTimeout(r,80));return new Response(JSON.stringify(recordFixtures[key]||{error:"Unknown fixture dataset"}));}if(path==="/api/module-records/save"){const body=JSON.parse(options.body||"{}"),data=recordFixtures[body.dataset];for(const edit of body.edits||[]){const row=data.rows.find(r=>r.recordIndex===edit.recordIndex);Object.assign(row.fields,edit.fields||{});if(Object.hasOwn(edit.fields||{},"name"))row.name=edit.fields.name;}data.sha256="saved-"+Date.now();return new Response(JSON.stringify({saved:(body.edits||[]).length,sha256:data.sha256}));}if(path==="/api/build/start")return new Response(JSON.stringify({started:true}));if(path.startsWith("/api/build/status"))return new Response(JSON.stringify({cursor:1,lines:["Build verified: fixture\\n"],running:false,returnCode:0}));if(path.startsWith("/api/item-preview?")){return new Response(JSON.stringify(path.includes("broken")?{error:"Missing diffuse texture fixture"}:'+json.dumps(model)+'),{status:path.includes("broken")?422:200});}if(path.startsWith("/api/item-icon?")){if(path.includes("broken"))return new Response(JSON.stringify({error:"Missing diffuse texture fixture"}),{status:422});const bytes=Uint8Array.from(atob("'+base64.b64encode(ICON).decode()+'"),c=>c.charCodeAt(0));return new Response(bytes,{headers:{"Content-Type":"image/png"}});}return new Response(JSON.stringify(fixtures[path]||{}));};'
                     html=(ROOT/'games/warband/editor.html').read_text(encoding="utf-8")
                     # Synthetic set_content pages need a hierarchical base for shared optional asset URLs.
-                    html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
+                    html=html.replace('<head>','<head><base href="http://warband-fixture.test/">',1)
                     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding="utf-8")+'</style>')
                     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding="utf-8")+'</script>')
                     html=inline_modules('warband',html)
-                    page.set_content(html,wait_until='domcontentloaded');page.wait_for_function('!!document.querySelector(".warband-item-detail")')
+                    def route_fixture(route):
+                        if route.request.resource_type=='document':
+                            route.fulfill(status=200,body=html,content_type='text/html')
+                        else:
+                            route.abort()
+                    page.route('http://warband-fixture.test/**',route_fixture)
+                    page.goto('http://warband-fixture.test/',wait_until='domcontentloaded')
+                    assert page.evaluate('sessionStorage.setItem("warband-fixture","1");sessionStorage.getItem("warband-fixture")')=='1'
+                    try:
+                        page.locator('.warband-item-detail').wait_for(state='visible',timeout=10000)
+                    except PlaywrightTimeoutError as error:
+                        raise AssertionError({'pageErrors':errors,'main':page.locator('#main').inner_text(),'url':page.url}) from error
                     page.wait_for_function('document.querySelector(".warband-item-thumbnail img")?.naturalWidth>0')
                     assert page.locator('.warband-item-detail [data-lex-property="id"] input').count()==1
                     assert page.locator('.warband-item-detail [data-lex-property="id"] input').is_disabled()
