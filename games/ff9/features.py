@@ -98,7 +98,12 @@ def _decode_ini(raw: bytes) -> tuple[str, str, bytes]:
 
 
 def _split_folder_names(raw_value: str) -> list[str]:
-    return re.findall(r'"([^"]*)"', raw_value)
+    quoted = re.findall(r'"([^"]*)"', raw_value)
+    if quoted:
+        return [value for value in quoted if value]
+    # Memoria's launcher also accepts one unquoted path because its parser
+    # trims outer quotes and then splits only on the quoted comma separator.
+    return [value.strip() for value in raw_value.split(",") if value.strip()]
 
 
 def _folder_line(names: Iterable[str], prefix: str = "FolderNames = ") -> str:
@@ -120,6 +125,7 @@ def _edit_mod_order(raw: bytes, *, add: bool) -> bytes:
     lines = text.splitlines()
     in_mod = False
     found_folder_names = False
+    seen_settings: set[str] = set()
     for index, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith("[") and stripped.endswith("]"):
@@ -131,6 +137,9 @@ def _edit_mod_order(raw: bytes, *, add: bool) -> bytes:
         if not match:
             continue
         setting = match.group(2).casefold()
+        if setting in seen_settings:
+            raise RuntimeError(f"Memoria.ini has duplicate [Mod] {match.group(2)} settings")
+        seen_settings.add(setting)
         if setting == "foldernames":
             found_folder_names = True
         names = _split_folder_names(match.group(3))
