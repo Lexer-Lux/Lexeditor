@@ -2,8 +2,10 @@
 
 FF9 field ``.bgi.bytes`` TextAssets live in the numbered ``p0data1*.bin``
 archives. Memoria's pinned BGI reader/writer documents both the floor and
-triangle tables, and its runtime names bit 0 ``BGI_FLOOR_ACTIVE`` / ``BGI_TRI_ACTIVE``.
-Lexeditor deliberately edits only those semantic bits. Every other BGI byte --
+triangle tables. Its runtime names bit 0 ``BGI_FLOOR_ACTIVE`` / ``BGI_TRI_ACTIVE``, and
+Memoria's Field Creator exposes triangle bits ``0x1000`` as Alternate footstep,
+``0x4000`` as Prevent NPC pathing, and ``0x8000`` as Prevent PC pathing.
+Lexeditor deliberately edits only those documented semantic bits. Every other BGI byte --
 geometry, neighbors, edge semantics, transforms, animation data, unknown flag
 bits, and padding -- is copied verbatim into a normal Memoria loose override.
 
@@ -30,6 +32,12 @@ BGI_HEADER_SIZE = 64
 BGI_TRI_SIZE = 40
 BGI_FLOOR_SIZE = 32
 BGI_TRI_ACTIVE = 0x0001
+BGI_TRI_ALTERNATE_FOOTSTEP = 0x1000
+BGI_TRI_NO_NPC = 0x4000
+BGI_TRI_NO_PC = 0x8000
+BGI_TRI_EDITABLE_MASK = (
+    BGI_TRI_ACTIVE | BGI_TRI_ALTERNATE_FOOTSTEP | BGI_TRI_NO_NPC | BGI_TRI_NO_PC
+)
 BGI_FLOOR_ACTIVE = 0x0001
 MAX_TRIANGLES = 65_535
 MAX_FLOORS = 4096
@@ -81,7 +89,10 @@ def _triangle_table(data: bytes) -> list[dict[str, int | bool]]:
             "floorNdx": _i16(data, offset + 4),
             "flags": flags,
             "active": bool(flags & BGI_TRI_ACTIVE),
-            "otherFlags": flags & ~BGI_TRI_ACTIVE,
+            "alternateFootstep": bool(flags & BGI_TRI_ALTERNATE_FOOTSTEP),
+            "preventNPC": bool(flags & BGI_TRI_NO_NPC),
+            "preventPC": bool(flags & BGI_TRI_NO_PC),
+            "otherFlags": flags & ~BGI_TRI_EDITABLE_MASK,
         })
     return result
 
@@ -143,8 +154,27 @@ def _set_floor_active(data: bytes, record: int, active: bool) -> bytes:
     return _set_active(data, record, active, triangle=False)
 
 
+def _set_triangle_values(data: bytes, record: int, values: dict[str, bool]) -> bytes:
+    rows = _triangle_table(data)
+    if type(record) is not int or not 0 <= record < len(rows):
+        raise ValueError("Changed FF9 walkmesh triangle does not exist")
+    flags = int(rows[record]["flags"])
+    masks = {
+        "Active": BGI_TRI_ACTIVE,
+        "AlternateFootstep": BGI_TRI_ALTERNATE_FOOTSTEP,
+        "PreventNPC": BGI_TRI_NO_NPC,
+        "PreventPC": BGI_TRI_NO_PC,
+    }
+    for key, value in values.items():
+        mask = masks[key]
+        flags = (flags | mask) if value else (flags & ~mask)
+    out = bytearray(data)
+    struct.pack_into("<H", out, int(rows[record]["offset"]), flags)
+    return bytes(out)
+
+
 def _set_triangle_active(data: bytes, record: int, active: bool) -> bytes:
-    return _set_active(data, record, active, triangle=True)
+    return _set_triangle_values(data, record, {"Active": active})
 
 
 class FieldWalkmeshStore:
@@ -258,11 +288,12 @@ class FieldWalkmeshStore:
                  "and all unknown bytes verbatim in a canonical loose .bgi.bytes override."
              )},
             {**common, "key": self.TRIANGLE_KEY, "label": "Field walkmesh triangles",
-             "controls": "Per-field triangle active/inactive state (BGI_TRI_ACTIVE)",
+             "controls": "Per-field triangle activity, alternate footstep, NPC-pathing and PC-pathing flags",
              "notes": (
                  "Partial p0data1 integration. Triangle rows are field-scoped to keep the shared Table+Detail "
-                 "responsive. Lexeditor changes only Memoria's documented triangle-active bit and preserves all "
-                 "geometry, neighbors, edge semantics, other flag bits and unknown bytes verbatim."
+                 "responsive. Lexeditor edits only Memoria's documented Active, Alternate footstep, Prevent NPC "
+                 "pathing and Prevent PC pathing flags; geometry, neighbors, edge semantics, all other flag bits "
+                 "and unknown bytes remain verbatim."
              )},
         ]
 
@@ -274,6 +305,9 @@ class FieldWalkmeshStore:
                 {"key": "Triangle", "label": "Triangle", "declaredType": "UInt16", "editable": False, "kind": "stored"},
                 {"key": "Floor", "label": "Floor", "declaredType": "Int16", "editable": False, "kind": "stored"},
                 {"key": "Active", "label": "Triangle active", "declaredType": "Boolean", "editable": True, "kind": "boolean"},
+                {"key": "AlternateFootstep", "label": "Alternate footstep", "declaredType": "Boolean", "editable": True, "kind": "boolean"},
+                {"key": "PreventNPC", "label": "Prevent NPC pathing", "declaredType": "Boolean", "editable": True, "kind": "boolean"},
+                {"key": "PreventPC", "label": "Prevent PC pathing", "declaredType": "Boolean", "editable": True, "kind": "boolean"},
                 {"key": "OtherFlags", "label": "Other flag bits", "declaredType": "UInt16", "editable": False, "kind": "stored"},
             ]
         return [
@@ -321,6 +355,9 @@ class FieldWalkmeshStore:
                             "Triangle": index,
                             "Floor": floor_ndx,
                             "Active": bool(triangle["active"]),
+                            "AlternateFootstep": bool(triangle["alternateFootstep"]),
+                            "PreventNPC": bool(triangle["preventNPC"]),
+                            "PreventPC": bool(triangle["preventPC"]),
                             "OtherFlags": int(triangle["otherFlags"]),
                         },
                     })
@@ -359,10 +396,12 @@ class FieldWalkmeshStore:
             if not isinstance(change, dict) or not isinstance(change.get("scene"), str):
                 raise ValueError(f"Changed FF9 walkmesh {noun} is invalid")
             values = change.get("values")
-            if not isinstance(values, dict) or set(values) - {"Active"}:
-                raise ValueError(f"Only FF9 walkmesh {noun} activity is editable")
-            if "Active" in values and type(values["Active"]) is not bool:
-                raise ValueError(f"FF9 walkmesh {noun} activity must be true or false")
+            allowed = ({"Active", "AlternateFootstep", "PreventNPC", "PreventPC"}
+                       if key == self.TRIANGLE_KEY else {"Active"})
+            if not isinstance(values, dict) or set(values) - allowed:
+                raise ValueError(f"Only documented FF9 walkmesh {noun} flags are editable")
+            if any(type(value) is not bool for value in values.values()):
+                raise ValueError(f"FF9 walkmesh {noun} flags must be true or false")
             grouped.setdefault(change["scene"], []).append(change)
 
         for relative, asset_changes in grouped.items():
@@ -376,11 +415,11 @@ class FieldWalkmeshStore:
             edited = raw
             for change in asset_changes:
                 record = change.get("record")
-                if "Active" in change["values"]:
-                    if key == self.TRIANGLE_KEY:
-                        edited = _set_triangle_active(edited, record, change["values"]["Active"])
-                    else:
-                        edited = _set_floor_active(edited, record, change["values"]["Active"])
+                if key == self.TRIANGLE_KEY:
+                    if change["values"]:
+                        edited = _set_triangle_values(edited, record, change["values"])
+                elif "Active" in change["values"]:
+                    edited = _set_floor_active(edited, record, change["values"]["Active"])
             if edited == raw:
                 continue
             target = self.project_root / Path(relative)
