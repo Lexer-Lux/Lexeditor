@@ -113,3 +113,32 @@ def test_brand_pointer_gestures_never_select_text(page,surface):
     assert page.evaluate('getSelection().toString()')==''
     page.locator('#editable').click();page.locator('#editable').press('Control+A')
     assert page.locator('#editable').evaluate('n=>n.selectionEnd-n.selectionStart')==20
+
+
+def test_brand_real_return_action_and_scriptless_snapshot(page):
+    page.evaluate('''()=>{
+      window.homeCalls=0;
+      window.pywebview={api:{transition_snapshot:async()=>null,
+        return_to_main_menu:async()=>{homeCalls++;return {hostNavigates:true}},
+        set_dirty_count:async()=>true,lexeditor_settings:async()=>({})}};
+    }''')
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;document.body.prepend(U.el('div',{id:'shell'}));
+      U.mountShell({host:'#shell',plugin:{id:'fixture',name:'Fixture'},tabs:[],
+        activeTab:()=>'',navigate(){},dirtyCount:()=>0});U.finishPluginLoading();
+    }''')
+    brand=page.locator('.lex-brand-button')
+    assert brand.locator('h1').evaluate("n=>getComputedStyle(n,'::before').content")=='"LEXEDITOR"'
+    assert brand.locator('h1').bounding_box()['width']>50
+    brand.click()
+    page.wait_for_function('homeCalls===1')
+    assert page.evaluate('getSelection().toString()')==''
+    # A snapshot has CSS but no JavaScript selection guards. Exercise that too.
+    markup=brand.evaluate('n=>n.outerHTML')
+    page.set_content('<style>'+ (ROOT/'ui/framework.css').read_text(encoding='utf-8')+
+                     '</style>'+markup)
+    brand=page.locator('.lex-brand-button')
+    brand.dblclick()
+    assert page.evaluate('getSelection().toString()')==''
+    assert brand.evaluate("n=>{const r=document.createRange();r.selectNodeContents(n);return r.toString()}")==''

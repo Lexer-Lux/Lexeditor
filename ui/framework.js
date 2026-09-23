@@ -5270,7 +5270,8 @@ ${contents.path}`});
       title: "Return to main menu",
       "aria-label": "Return to main menu",
       "data-lex-history-control": true,
-    }, element("h1", {text: options.brand || "LEXEDITOR"}));
+    }, element("h1", {"data-lex-brand-label":options.brand || "LEXEDITOR",
+      "aria-label":options.brand || "LEXEDITOR"}));
     const nav = element("nav", {"aria-label": `${options.plugin.name || options.plugin.id} sections`});
     const navFrame = element("div", {class: "lex-nav-frame"}, nav);
     let githubWorkspace = null;

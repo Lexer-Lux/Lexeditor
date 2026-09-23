@@ -539,6 +539,12 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 
 }
 
+/* Navigation artwork has no selectable text node, including in transition
+   snapshots where the document's selection event guards do not run. */
+.lex-brand-button h1[data-lex-brand-label]:empty::before {
+  content:attr(data-lex-brand-label);
+}
+
 .lex-brand-slot {
   box-sizing: border-box;
   min-width: 0;
