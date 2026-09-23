@@ -485,20 +485,20 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
 
         page.locator("#plugin-data-map").click()
         page.wait_for_selector(".lex-data-map-table")
-        coverage = page.get_by_role("combobox", name="Filter files by coverage", exact=True)
-        coverage.select_option("view")
+        integration = page.get_by_role("combobox", name="Filter files by integration", exact=True)
+        integration.select_option("not-integrated")
         page.wait_for_timeout(200)
-        expect(coverage).to_have_value("view")
+        expect(integration).to_have_value("not-integrated")
         view_rows = page.locator(".lex-data-map-table .lex-column-list-row")
         expect(view_rows).to_have_count(12)
         view_text = page.locator(".lex-data-map-table").inner_text()
-        assert "fixture/resource-01.uasset" in view_text
-        assert "fixture/resource-05.uasset" in view_text
+        assert "fixture/resource-03.uasset" in view_text
+        assert "fixture/resource-07.uasset" in view_text
         assert "fixture/resource-00.uasset" not in view_text
-        expect(page.locator('.lex-data-map-table .lex-integration-status[aria-label="Partial"]')).to_have_count(12)
+        expect(page.locator('.lex-data-map-table .lex-integration-status[aria-label="Not integrated"]')).to_have_count(12)
         page.screenshot(path=str(output / "datamap-view-1200.png"), full_page=True)
 
-        coverage.select_option("structured")
+        integration.select_option("partial")
         page.wait_for_timeout(150)
         open_button = page.locator(".lex-data-map-open").first
         expect(open_button).to_be_visible()

@@ -335,7 +335,6 @@
       state.catalogFile.editable?el("textarea",{value:state.catalogDraft,oninput:event=>{state.catalogDraft=event.target.value;shell.refresh();}},state.catalogDraft):"");
     backdrop.append(panel);backdrop.addEventListener("click",event=>{if(event.target===backdrop)closeCatalog();});return backdrop;
   }
-  const coverageNames={structured:"Structured editable",view:"Read-only view",source:"Source only",unavailable:"Unavailable"};
   function renderDataMap(){
     window.LexeditorUI?.dismissDialogs?.();
     const view=LexeditorUI.dataMap({rows:state.datamap.rows,query:state.filters.datamap,

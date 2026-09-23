@@ -14,13 +14,9 @@
   if(!state.pages)state.pages={};
   // DataObject entry.index is only the writer's row position, not a game ID.
   // The FName row tag is the record identity the game actually stores.
-  const dataColumns=[{key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"}];
-  const economyColumns=[{key:"tag",label:"ID",sortable:true,width:"minmax(10em,.8fr)"},{key:"name",label:"Item",sortable:true,width:"minmax(14em,1.2fr)"},{key:"buy",label:"Buy",numeric:true,sortable:true},{key:"sale",label:"Sell",numeric:true,sortable:true},{key:"maxCount",label:"Carry Cap",numeric:true,sortable:true}];
   // Four columns at fourteen ems each did not fit the list panel, so the Steal
   // column was cut in half by the panel edge. The minimums are sized so all
   // four fit the default split; the cells ellipsise if a value is longer.
-  const lootColumns=[{key:"tag",label:"Enemy / Battle ID",sortable:true,width:"minmax(9em,.9fr)"},{key:"normal",label:"Normal",sortable:true,width:"minmax(8em,1fr)"},{key:"rare",label:"Rare",sortable:true,width:"minmax(8em,1fr)"},{key:"steal",label:"Steal",sortable:true,width:"minmax(8em,1fr)"}];
-  const textColumns=[{key:"resource",label:"Resource",sortable:true,width:"minmax(10em,.7fr)"},{key:"key",label:"Text ID",sortable:true,width:"minmax(12em,.8fr)"},{key:"text",label:"Text",sortable:true,width:"minmax(16em,1.2fr)"}];
   // Any property of the loaded DataObject can be pinned into the table. The pin
   // is the same control every other table uses; what differs here is that the
   // column set is the record's own schema rather than a fixed list, so the
@@ -50,35 +46,11 @@
     dataPrefsCache.set(asset,{signature,prefs});
     return prefs;
   }
-  const economyPrefs=columnPreferences("ff7r-economy",economyColumns,()=>render());
-  const lootPrefs=columnPreferences("ff7r-loot",lootColumns,()=>render());
-  const textPrefs=columnPreferences("ff7r-text-records",textColumns,()=>render());
-  const assets=()=>state.catalog?.assets||[];
   if(!state.pages)state.pages={};
-  const isTweak=item=>String(item.group||"").startsWith("Lexeditor ");
-  const tweakAssets=()=>assets().filter(isTweak);
-  const gameAssets=()=>assets().filter(item=>!isTweak(item));
-  const textAssets=()=>state.catalog?.textAssets||[];
-  const currentAsset=()=>assets().find(row=>row.asset===state.asset)||assets()[0]||null;
-  const currentTextAsset=()=>textAssets().find(row=>row.asset===state.textAsset)||null;
-  const records=()=>state.data?.records||[];
   // Every resource for the chosen language is loaded together, so the Text tab
   // is one list of all the game's text with the resource as an ordinary column.
   // Picking a resource before being allowed to look at anything was the old
   // shape, and it meant a search could only ever find what was already open.
-  const textPacks=()=>Object.values(state.textPacks||{});
-  const textRecords=()=>textPacks().flatMap(pack=>pack.data.records.map(row=>({
-    row, asset:pack.item.asset, resource:pack.item.name,
-    id:`${pack.item.asset}#${row.id}`,
-    key:row.key, text:row.text, subentries:row.subentries})));
-  const selectedRecord=()=>records().find(row=>row.id===state.selected)||records()[0]||null;
-  const selectedTextRecord=()=>textRecords().find(row=>row.id===state.textSelected)||textRecords()[0]||null;
-  const textPackOf=view=>state.textPacks?.[view?.asset]||null;
-  const comparable=value=>JSON.stringify(value);
-  const refreshShell=()=>shell?.refresh?.();
-  const sourceSuffix=()=>state.activeSource==="vanilla"?"&source=vanilla":"";
-  const semanticKey=()=>`${state.activeSource}:${state.textLanguage||"US"}`;
-  const property=name=>state.data?.properties?.find(prop=>prop.name===name)||null;
 
   function dataEdits(){return diffRecords(state.data,state.dataBaseline)}
   // Both the Misc tab and every tweak group on the Tweaks page compare a loaded

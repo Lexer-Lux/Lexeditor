@@ -1,5 +1,6 @@
 "use strict";
   async function selectCatalog(row){
+    if(moduleRecords?.fileHasEdits(row.filename)){showAlert({title:"Structured edits are open",items:[{item:row.filename,issue:"Discard or save the Misc. changes before opening this file as raw source."}],closeLabel:"Close"});return;}
     if(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text&&!confirm("Discard the unsaved source-file edit?"))return;
     state.selectedFile=row.filename;state.catalogFile=await api(`/api/catalog/file?name=${encodeURIComponent(row.filename)}`);state.catalogDraft=state.catalogFile.text||"";shell.history.clear();renderDataMap();
   }
@@ -21,7 +22,7 @@
     window.LexeditorUI?.dismissDialogs?.();
     const view=LexeditorUI.dataMap({rows:state.datamap.rows,query:state.filters.datamap,
       status:state.filters.mapStatus,page:state.pages.datamap,sort:state.sorts.datamap,
-      tableClass:"warband-record-list",open:row=>navigate(row.view),openSource:selectCatalog,
+      tableClass:"warband-record-list",open:row=>row.dataset?moduleRecords.open(row.dataset):navigate(row.view),openSource:selectCatalog,
       changeQuery:value=>{state.filters.datamap=value;state.pages.datamap=0;renderDataMap()},
       changeStatus:value=>{state.filters.mapStatus=value;state.pages.datamap=0;renderDataMap()},
       changePage:value=>{state.pages.datamap=value;renderDataMap()},

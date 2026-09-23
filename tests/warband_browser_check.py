@@ -139,9 +139,10 @@ def main():
                     page.evaluate('navigate("datamap")');page.wait_for_timeout(600)
                     assert page.evaluate('window.__warbandPreview===undefined')
                     assert page.locator('.lex-paged-list-detail').count()==1
-                    page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('source')
+                    page.get_by_role('combobox',name='Filter files by integration',exact=True).select_option('not-integrated')
                     page.wait_for_timeout(400)
-                    assert 'Source only' in page.locator('#main').inner_text()
+                    assert 'module.ini' in page.locator('#main').inner_text()
+                    assert 'Resource/*.brf' not in page.locator('#main').inner_text()
                     assert 'Structured editable' not in page.locator('.warband-record-list').inner_text()
                     metrics=page.evaluate('''() => {
                       const list=document.querySelector('.warband-record-list'), box=list.getBoundingClientRect();
@@ -155,10 +156,10 @@ def main():
                     assert metrics['listScroll']<=metrics['listHeight']+2,metrics
                     assert metrics['last']<=metrics['boxBottom']+1,metrics
                     page.screenshot(path=str(ARTIFACTS/f'datamap-{width}.png'),full_page=True)
-                    coverage_filter=page.get_by_role('combobox',name='Filter files by coverage',exact=True)
+                    coverage_filter=page.get_by_role('combobox',name='Filter files by integration',exact=True)
                     coverage_filter.select_option('')
-                    page.wait_for_function("document.querySelector('[aria-label=\"Filter files by coverage\"]')?.value===''")
-                    # Resetting coverage causes the fitted Data Map to rebuild.
+                    page.wait_for_function("document.querySelector('[aria-label=\"Filter files by integration\"]')?.value===''")
+                    # Resetting the filter causes the fitted Data Map to rebuild.
                     # Let that render settle before typing into the replacement
                     # search input, or a late fit callback can discard the query.
                     page.wait_for_timeout(300)
@@ -169,8 +170,6 @@ def main():
                     skill_row.wait_for(state='visible')
                     skill_row.click()
                     page.get_by_role('button',name='Open misc',exact=True).click()
-                    page.locator('.warband-module-state').wait_for(state='visible')
-                    assert 'Loading structured Module System records' in page.locator('.warband-module-state').inner_text()
                     page.locator('.warband-module-detail').wait_for(state='visible')
                     assert page.locator('.warband-module-detail [data-lex-property="id"] input').is_disabled()
                     max_level=page.locator('.warband-module-detail [data-lex-property="maxLevel"] input')

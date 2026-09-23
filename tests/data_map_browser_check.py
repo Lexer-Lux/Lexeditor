@@ -112,22 +112,18 @@ with sync_playwright() as p:
                 page.wait_for_function('!document.documentElement.classList.contains("lex-loading-live")',timeout=15000)
                 page.wait_for_timeout(600)
                 # A preview/source/parser does not produce an editable badge.
-                page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('unavailable' if game=='blank' else 'view')
+                page.get_by_role('combobox',name='Filter files by integration',exact=True).select_option('not-integrated')
                 page.wait_for_timeout(250)
                 assert page.locator('.lex-paged-list-detail').count()==1,game
                 assert page.locator('.lex-pager').count()==1,game
                 assert 'Structured editable' not in page.locator('.lex-data-map-table').inner_text(),game
                 metrics=page.evaluate('''()=>{const list=document.querySelector('.lex-data-map-table'),box=list.getBoundingClientRect(),rows=[...list.querySelectorAll('.lex-column-list-row')];return{body:document.body.scrollHeight,viewport:innerHeight,scroll:list.scrollHeight,height:list.clientHeight,bottom:box.bottom,last:rows.at(-1)?.getBoundingClientRect().bottom,count:rows.length}}''')
                 page.screenshot(path=str(OUT/f'{game}-{width}.png'),full_page=True)
-                location=page.locator('.lex-data-map-actions .lex-data-map-location')
-                assert location.evaluate('''button=>{
-                  const box=button.getBoundingClientRect();
-                  const text=[...button.childNodes].find(node=>node.nodeType===Node.TEXT_NODE&&node.textContent.trim());
-                  if(!text)return false;
-                  const range=document.createRange();range.selectNodeContents(text);
-                  const bounds=range.getBoundingClientRect();
-                  return range.getClientRects().length===1&&bounds.left>=box.left&&bounds.right<=box.right+1&&bounds.bottom<=box.bottom+1;
-                }'''),(game,width,'File location text must fit inside its button')
+                location=page.locator('.lex-data-map-file .lex-data-map-location')
+                assert location.count()==1,(game,width,'header file-location control missing')
+                location.wait_for(state='visible')
+                box=location.bounding_box()
+                assert box and box['width']>0 and box['height']>0,(game,width,'header file-location control has no box')
                 assert metrics['body']<=height+2,(game,metrics)
                 assert metrics['scroll']<=metrics['height']+2,(game,metrics)
                 if metrics['count']:assert metrics['last']<=metrics['bottom']+1,(game,metrics)
@@ -159,13 +155,13 @@ with sync_playwright() as p:
                             assert page.evaluate('state.tab')=='misc',game
                             assert page.evaluate('moduleRecords.active()')=='fixture-data',game
                             page.evaluate('navigate("datamap")')
-                            page.get_by_role('combobox',name='Filter files by coverage',exact=True).wait_for()
+                            page.get_by_role('combobox',name='Filter files by integration',exact=True).wait_for()
                         else:
                             page.evaluate('navigate=(target,filters)=>{window.mapOpened={target,filters}}')
                             page.locator('.lex-data-map-open').first.click()
                             assert page.evaluate('mapOpened.target')=='items',game
                             if game=='ff9':assert page.evaluate('state.datasetChoice.items')=='fixture-data'
-                    page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('source')
+                    page.get_by_role('combobox',name='Filter files by integration',exact=True).select_option('not-integrated')
                     page.wait_for_timeout(200)
                     assert page.locator('.lex-data-map-open').count()==0,game
                 if game in ('ff7','ff7_2013'):

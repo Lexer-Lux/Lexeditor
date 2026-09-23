@@ -112,14 +112,14 @@
       const discard=LexeditorUI.el("button",{type:"button",disabled:!dirty,"data-warband-module-discard":"1",onclick:()=>{edits[active]={};setStatus("Discarded unsaved "+labelFor(active)+" changes");refreshShell();renderApp();}},"Discard changes");
       toolbar().replaceChildren(selector,discard,LexeditorUI.el("span",{class:"count","data-warband-module-dirty":"1"},dirty+" unsaved field"+(dirty===1?"":"s")));
       const entry=cache.get(active);
-      if(!entry){main().replaceChildren(LexeditorUI.notice({message:"Loading structured Module System records…"}));load(active);return;}
-      if(entry.loading&&!entry.data){main().replaceChildren(LexeditorUI.notice({message:"Loading structured Module System records…"}));return;}
-      if(entry.error){main().replaceChildren(LexeditorUI.notice({title:labelFor(active)+" could not be loaded",message:entry.error,action:LexeditorUI.el("button",{type:"button",onclick:()=>load(active,true)},"Retry")}));return;}
+      if(!entry){main().replaceChildren(LexeditorUI.notice({className:"warband-module-state",message:"Loading structured Module System records…"}));load(active);return;}
+      if(entry.loading&&!entry.data){main().replaceChildren(LexeditorUI.notice({className:"warband-module-state",message:"Loading structured Module System records…"}));return;}
+      if(entry.error){main().replaceChildren(LexeditorUI.notice({className:"warband-module-state",title:labelFor(active)+" could not be loaded",message:entry.error,action:LexeditorUI.el("button",{type:"button",onclick:()=>load(active,true)},"Retry")}));return;}
       const data=entry.data;
-      if(!data?.available){main().replaceChildren(LexeditorUI.notice({title:labelFor(active)+" source is unavailable",message:"The selected project does not contain this Module System source file."}));return;}
+      if(!data?.available){main().replaceChildren(LexeditorUI.notice({className:"warband-module-state",title:labelFor(active)+" source is unavailable",message:"The selected project does not contain this Module System source file."}));return;}
       const local=viewState(active),query=local.query.trim().toLocaleLowerCase();
       const filtered=(data.rows||[]).filter(row=>!query||[row.id,row.name,...Object.values(row.fields||{}).map(value=>Array.isArray(value)?value.join(" "):value)].some(value=>String(value??"").toLocaleLowerCase().includes(query)));
-      if(!filtered.length&&!query){main().replaceChildren(LexeditorUI.notice({title:"No "+data.schema.label.toLowerCase()+" records",message:data.filename+" contains an empty "+data.schema.label.toLowerCase()+" list."}));return;}
+      if(!filtered.length&&!query){main().replaceChildren(LexeditorUI.notice({className:"warband-module-state",title:"No "+data.schema.label.toLowerCase()+" records",message:data.filename+" contains an empty "+data.schema.label.toLowerCase()+" list."}));return;}
       const columns=data.schema.columns.map(key=>{
         const spec=data.schema.fields.find(field=>field.key===key)||{label:key};
         const column={key,label:spec.label,sortable:false,
