@@ -1,11 +1,11 @@
 import struct
 
-from games.ff7r.dog_whistle_commit_probe import (
+from plugins.ff7r.dog_whistle_commit_probe import (
     _caller_anchor_map,
     _function_string_refs,
     analyze_item_commit_caller_strings,
 )
-from games.ff7r.native_probe import PEImage, RuntimeFunction, Section
+from plugins.ff7r.native_probe import PEImage, RuntimeFunction, Section
 
 
 def _image_with_string_refs(*, callers=(0x1010,)):

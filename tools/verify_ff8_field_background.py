@@ -11,8 +11,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import field_background, field_data  # noqa: E402
-from games.ff8.fs_archive import FsArchive  # noqa: E402
+from plugins.ff8 import field_background, field_data  # noqa: E402
+from plugins.ff8.fs_archive import FsArchive  # noqa: E402
 
 
 def _pair(archive: FsArchive, group: dict) -> tuple[bytes, bytes] | None:

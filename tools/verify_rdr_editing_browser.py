@@ -9,7 +9,7 @@ import threading
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.rdr import server
+from plugins.rdr import server
 from tools.rdr_test_support import workspace, loot_document
 
 

@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.rdr2 import viking_comb_criteria as vcc
+from plugins.rdr2 import viking_comb_criteria as vcc
 
 
 def valid_plan():

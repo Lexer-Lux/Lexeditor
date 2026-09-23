@@ -2,7 +2,7 @@ import struct
 
 import pytest
 
-from games.ff7r.native_probe import PEFormatError, probe_bytes
+from plugins.ff7r.native_probe import PEFormatError, probe_bytes
 
 
 def fixture_pe(*, with_pdata=True, with_inbound_caller=False):

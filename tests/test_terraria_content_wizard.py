@@ -4,14 +4,14 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.terraria.content_wizard import (
+from plugins.terraria.content_wizard import (
     create_mod_item,
     default_display_name,
     placeholder_png,
     render_mod_item_source,
     validate_content_name,
 )
-from games.terraria.localization import parse_localization_text
+from plugins.terraria.localization import parse_localization_text
 
 
 class TerrariaContentWizardTests(unittest.TestCase):

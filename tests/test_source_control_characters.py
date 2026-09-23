@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-FOLDERS = ("games", "ui", "tools", "tests")
+FOLDERS = ("plugins", "ui", "tools", "tests")
 SUFFIXES = {".js", ".py", ".css", ".html", ".json"}
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 

@@ -11,7 +11,7 @@ Current reconciled master: `95a15cae8f0e53f2884222f573f8222600aaae58`
 
 - Starting revisions: `AGENTS.md` `ec8d363d…`, `docs/ADDING_A_GAME.md` `78a987c5…`, Blank `cd3c79ba…`, RDR2 `9d11f8a0…`.
 - Current revisions after reconciliation: `AGENTS.md` `41355ce0b783c55a03ad250ed279666f785c6e67`; `docs/ADDING_A_GAME.md` `7fe6d35dd82fa3fe4e6378ca558ecbb0a316c4c0`; `docs/UI-MANUAL.md` `14a3269992031d7e7893fcb127728a48b944e71f`.
-- Current shared UI references: Blank `games/blank/editor.html` `b0b235d010952bf0c7524dcce172ef72f7cf63e4`; RDR2 `games/rdr2/editor.html` `899bfdb45cbf25da55aed43a590db6ee476b523b`.
+- Current shared UI references: Blank `plugins/blank/editor.html` `b0b235d010952bf0c7524dcce172ef72f7cf63e4`; RDR2 `plugins/rdr2/editor.html` `899bfdb45cbf25da55aed43a590db6ee476b523b`.
 - `ui/component-catalog.js` now exists on current master at `a11e52e31ee92bce495c6cbf54a66d4597d52139`. The starting-master 404 is historical only.
 - Current plugin UI contract uses markup-only `editor.html`, relative game-local JS/CSS modules, shared `plugin_http.PluginRequestHandler.send_page_module`, and no new game CSS selectors targeting shared `.lex-*` classes.
 - No pre-existing Factorio codex/worklog path was found on the starting master.

@@ -10,7 +10,7 @@ def verify(driver,exe):
     import capstone,pefile
     from unicorn import Uc,UC_ARCH_X86,UC_MODE_32
     from unicorn.x86_const import UC_X86_REG_ESP,UC_X86_REG_EAX,UC_X86_REG_EIP
-    from games.ff8.ffnx_issue_51 import runtime_package
+    from plugins.ff8.ffnx_issue_51 import runtime_package
     runtime_package.verify_game_installation(exe.parent)
     pe=pefile.PE(str(driver));base=pe.OPTIONAL_HEADER.ImageBase;image=pe.get_memory_mapped_image()
     assert pe.FILE_HEADER.Machine==0x14c

@@ -12,11 +12,11 @@ import sys
 
 import pytest
 
-from games.ff9 import memoria_manager as manager
-from games.ff9 import memoria_update as update
-from games.ff9.plugin import PLUGIN
-from games.ff9.memoria_patcher import MAGIC, inspect_payload, installation_files
-from games.ff9.memoria_recovery import Recovery, digest, root_key, install_lock
+from plugins.ff9 import memoria_manager as manager
+from plugins.ff9 import memoria_update as update
+from plugins.ff9.plugin import PLUGIN
+from plugins.ff9.memoria_patcher import MAGIC, inspect_payload, installation_files
+from plugins.ff9.memoria_recovery import Recovery, digest, root_key, install_lock
 
 
 def pack(files, *, signed=False):
@@ -256,7 +256,7 @@ def test_recovery_can_acquire_lock_after_owner_crashes(setup):
     control = manager._control_root(kwargs["state_path"])
     script = """import os,sys
 from pathlib import Path
-from games.ff9.memoria_recovery import install_lock
+from plugins.ff9.memoria_recovery import install_lock
 with install_lock(Path(sys.argv[1]), Path(sys.argv[2])):
     os._exit(17)
 """
@@ -272,7 +272,7 @@ def test_recovery_does_not_clear_live_process_lock(setup):
     control = manager._control_root(kwargs["state_path"])
     script = """import sys
 from pathlib import Path
-from games.ff9.memoria_recovery import install_lock
+from plugins.ff9.memoria_recovery import install_lock
 with install_lock(Path(sys.argv[1]), Path(sys.argv[2])):
     print('locked', flush=True)
     sys.stdin.readline()

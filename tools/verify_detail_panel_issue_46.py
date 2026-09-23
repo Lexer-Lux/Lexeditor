@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-warband = (ROOT / "games" / "warband" / "editor.html").read_text(encoding="utf-8")
+warband = (ROOT / "plugins" / "warband" / "editor.html").read_text(encoding="utf-8")
 
 for token in (
     "const detailPanel = (options = {}) =>", "lex-detail-panel-heading",

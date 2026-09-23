@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE = (ROOT / "games" / "rdr2" / "native_runtime" / "GameplayTweaks"
+MODULE = (ROOT / "plugins" / "rdr2" / "native_runtime" / "GameplayTweaks"
           / "modules" / "gameplay_camera.cpp")
 
 

@@ -7,7 +7,7 @@ import sys
 import tempfile
 import time
 import unittest
-from games.warband.game_launch import WindowsGameJob, _OwnedProcess
+from plugins.warband.game_launch import WindowsGameJob, _OwnedProcess
 
 
 class ProcessAPI:

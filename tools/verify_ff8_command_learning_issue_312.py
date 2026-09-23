@@ -4,7 +4,7 @@ from pathlib import Path
 import struct
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.ff8 import fixed_command_menu as menu
+from plugins.ff8 import fixed_command_menu as menu
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32
 from unicorn.x86_const import *
 

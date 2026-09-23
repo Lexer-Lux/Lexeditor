@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.rdr2 import bounty_cap_policy as bc
+from plugins.rdr2 import bounty_cap_policy as bc
 
 
 def valid_config():

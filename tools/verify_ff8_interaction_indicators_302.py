@@ -12,8 +12,8 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-CORE = ROOT / "games/ff8/ffnx_gameplay_extensions/ffnx-src/interaction_indicator.h"
-RUNTIME = ROOT / "games/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_interaction_indicators.cpp"
+CORE = ROOT / "plugins/ff8/ffnx_gameplay_extensions/ffnx-src/interaction_indicator.h"
+RUNTIME = ROOT / "plugins/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_interaction_indicators.cpp"
 PREPARE = ROOT / "tools/prepare_ff8_native_build.py"
 EXPECTED_EXE = "064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570"
 
@@ -98,7 +98,7 @@ int main()
         import struct
         import sys
         sys.path.insert(0, str(ROOT))
-        from games.ff8.field_scripts import read
+        from plugins.ff8.field_scripts import read
         parsed = read(jsm.read_bytes(), jsm.with_suffix('.sym').read_bytes())
         talks = [method for method in parsed['methods'] if method['localId'] == 2]
         positives = [method['name'] for method in talks if 'CARDGAME' in method['source']]

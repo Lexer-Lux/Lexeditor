@@ -7,7 +7,7 @@ except ImportError: sys.path.insert(0,str(ROOT/'_scratch/gf-spellbooks-test-deps
 from unicorn import Uc,UC_ARCH_X86,UC_MODE_32
 from unicorn.x86_const import *
 import pefile
-from games.ff8 import character_growth as growth, flying_eva
+from plugins.ff8 import character_growth as growth, flying_eva
 exe=Path(r'D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe').read_bytes()
 assert hashlib.sha256(exe).hexdigest()=='064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570'
 image=pefile.PE(data=exe).get_memory_mapped_image();STACK=0x2908000;STOP=0x2800000
@@ -45,7 +45,7 @@ for stat in range(1,5):
  vanilla.mem_write(address,bytes([12,5,100,100]))
  for level in range(1,101): assert call(u,level,0,stat)==call(vanilla,level,0,stat)
 # Apply both patches in their actual load order. Max Spell must not erase the guard.
-from games.ff8 import max_spell
+from plugins.ff8 import max_spell
 for enabled in (False, True):
  v=machine()
  for patch in (growth.build_hext(),max_spell.build_hext(enabled,10)):
@@ -115,7 +115,7 @@ print('Native SPR/SPD zero across 11 characters x100 levels; bonus preservation;
 
 # Run the actual browser curve function, not a Python copy.
 import subprocess, shutil
-editor=(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8')
+editor=(ROOT/'plugins/ff8/editor.html').read_text(encoding='utf-8')
 curve=editor[editor.index('  const characterCurveOrder='):editor.index('  function characterCurveFormula(')]
 js=curve+"""
 const fields=(stat,values)=>values.map((value,i)=>({field:stat.toLowerCase()+'_'+(i+1),value}));

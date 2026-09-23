@@ -2,7 +2,7 @@
 
 ## Scope and audited baseline
 
-This note is Rebirth-only. Remake remains a separate plugin/worker under games/ff7r.
+This note is Rebirth-only. Remake remains a separate plugin/worker under plugins/ff7r.
 Shared Unreal/helper framework changes are blockers here rather than changes this PR competes for.
 
 The work began from master a47f0a57f8b44113b0ca1d42e5795f59f707372a and was last reconciled wholesale against 72ee978a2ff36686a6349696b19860057356468a. Live master was re-audited at 76ec7c3b9b289f1d52bcf684c691d5020619c3f6; it has advanced substantially, so this worker adopted only Rebirth-local compatible changes instead of overwriting concurrent shared work.
@@ -12,8 +12,8 @@ Current-master references read for this audit:
 - docs/ADDING_A_GAME.md — 7fe6d35dd82fa3fe4e6378ca558ecbb0a316c4c0
 - docs/UI-MANUAL.md — 14a3269992031d7e7893fcb127728a48b944e71f
 - ui/component-catalog.js — a11e52e31ee92bce495c6cbf54a66d4597d52139
-- games/blank/editor.html — b0b235d010952bf0c7524dcce172ef72f7cf63e4
-- games/rdr2/editor.html — 899bfdb45cbf25da55aed43a590db6ee476b523b, including shared paged Table + Detail and Data Map patterns
+- plugins/blank/editor.html — b0b235d010952bf0c7524dcce172ef72f7cf63e4
+- plugins/rdr2/editor.html — 899bfdb45cbf25da55aed43a590db6ee476b523b, including shared paged Table + Detail and Data Map patterns
 - codex/ff7r/README.md — 5a25913ede861eb84ba30419ab21a47a0fbee8c6, used only where Remake/Rebirth Unreal context is explicitly shared
 
 Still unavailable on that master:

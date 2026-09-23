@@ -12,8 +12,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import paths  # noqa: E402
-from games.ff8.plugin import FF8Session  # noqa: E402
+from plugins.ff8 import paths  # noqa: E402
+from plugins.ff8.plugin import FF8Session  # noqa: E402
 from service_session import request_json  # noqa: E402
 
 
@@ -29,12 +29,12 @@ def digest(path: Path) -> str:
 def main() -> int:
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
     framework_css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-    editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
-    schema = json.loads((ROOT / "games" / "ff8" / "schema" / "kernel_section_fields.json").read_text(encoding="utf-8"))
+    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    schema = json.loads((ROOT / "plugins" / "ff8" / "schema" / "kernel_section_fields.json").read_text(encoding="utf-8"))
     # Per-game loading lines live in the plugin that owns them now; the shared
     # file keeps only the global lines and the sharing map.
     def plugin_quotes(plugin_id: str) -> list:
-        path = ROOT / "games" / plugin_id / "loading_quotes.json"
+        path = ROOT / "plugins" / plugin_id / "loading_quotes.json"
         if not path.is_file():
             return []
         loaded = json.loads(path.read_text(encoding="utf-8"))
@@ -42,7 +42,7 @@ def main() -> int:
 
     shared = json.loads((ROOT / "ui" / "loading_quotes.json").read_text(encoding="utf-8"))
     quotes = {plugin.name: plugin_quotes(plugin.name)
-              for plugin in (ROOT / "games").iterdir() if plugin.is_dir()}
+              for plugin in (ROOT / "plugins").iterdir() if plugin.is_dir()}
     quotes["global"] = shared.get("global", [])
 
     require("const curveEditor = (options = {})" in framework and

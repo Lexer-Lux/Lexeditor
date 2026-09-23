@@ -17,11 +17,11 @@ def main():
         page.route("http://fixture/", lambda r: r.fulfill(content_type="text/html",
                    body='<body data-lex-plugin="ff8"><main style="width:700px"></main></body>'))
         page.route("http://fixture/assets/icons/0.png", lambda r: r.fulfill(
-            path=str(ROOT / "games/ff8/assets/icons/0.png")) if (ROOT / "games/ff8/assets/icons/0.png").is_file()
+            path=str(ROOT / "plugins/ff8/assets/icons/0.png")) if (ROOT / "plugins/ff8/assets/icons/0.png").is_file()
             else r.fulfill(status=404))
         page.goto("http://fixture/")
         page.add_style_tag(content=(ROOT / "ui/framework.css").read_text(encoding="utf-8"))
-        page.add_style_tag(content=(ROOT / "games/ff8/editor.css").read_text(encoding="utf-8"))
+        page.add_style_tag(content=(ROOT / "plugins/ff8/editor.css").read_text(encoding="utf-8"))
         page.add_script_tag(content=(ROOT / "ui/framework.js").read_text(encoding="utf-8"))
         # The icon comes from the player's game data; mark where it would draw.
         page.add_style_tag(content=".lex-column-cell-content::before{outline:2px solid red}")

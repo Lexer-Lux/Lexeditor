@@ -8,7 +8,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import formats, kernel_merge, kernel_text, paths
+from plugins.ff8 import formats, kernel_merge, kernel_text, paths
 
 
 def main() -> None:

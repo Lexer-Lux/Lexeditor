@@ -2,7 +2,7 @@
 from pathlib import Path
 import unittest
 
-from games.ff8 import menu_qol_issue_61
+from plugins.ff8 import menu_qol_issue_61
 
 ROOT = Path(__file__).resolve().parents[1]
 import sys
@@ -16,7 +16,7 @@ class InGameTimeTests(unittest.TestCase):
         self.assertEqual(menu_qol_issue_61.INGAME_TIME_BLOCKER, "")
 
     def test_runtime_uses_wall_clock_not_saved_play_time(self):
-        source = (ROOT / "games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp").read_text(
+        source = (ROOT / "plugins/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp").read_text(
             encoding="utf-8"
         )
         self.assertIn("enable_ff8_ingame_time", source)
@@ -33,7 +33,7 @@ class InGameTimeTests(unittest.TestCase):
     def test_clock_has_independent_runtime_config(self):
         prepare = (ROOT / "tools/prepare_ff8_native_build.py").read_text(encoding="utf-8")
         self.assertIn("enable_ff8_ingame_time", prepare)
-        settings = (ROOT / "games/ff8/gameplay_settings.py").read_text(encoding="utf-8")
+        settings = (ROOT / "plugins/ff8/gameplay_settings.py").read_text(encoding="utf-8")
         self.assertIn('"inGameTime"', settings)
         self.assertIn('("enable_ff8_ingame_time", in_game_time)', settings)
         self.assertIn("in_game_time=in_game_time", settings)
@@ -46,7 +46,7 @@ class InGameTimeTests(unittest.TestCase):
         self.assertIn("does not replace FF8's saved play-time counter", editor)
 
     def test_main_menu_hook_can_be_installed_without_xp_bars(self):
-        source = (ROOT / "games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp").read_text(
+        source = (ROOT / "plugins/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp").read_text(
             encoding="utf-8"
         )
         # The clock installs without XP bars. The gate has since grown to

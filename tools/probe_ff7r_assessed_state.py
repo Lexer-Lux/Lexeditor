@@ -7,7 +7,7 @@ import argparse
 import json
 from pathlib import Path
 
-from games.ff7r.save_diff_probe import analyze_save_paths
+from plugins.ff7r.save_diff_probe import analyze_save_paths
 
 
 def main() -> int:

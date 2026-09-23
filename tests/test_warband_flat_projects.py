@@ -6,8 +6,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.warband import project_import, server
-from games.warband.plugin import PLUGIN
+from plugins.warband import project_import, server
+from plugins.warband.plugin import PLUGIN
 from project_manager import ProjectManager
 
 

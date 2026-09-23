@@ -5,10 +5,10 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.palworld.full_server import _validate_schema_edits_with_utility
-from games.palworld.palschema import field_schema
-from games.palworld.palschema_fields import schema_scalar_writable
-from games.palworld.palschema_utility import (
+from plugins.palworld.full_server import _validate_schema_edits_with_utility
+from plugins.palworld.palschema import field_schema
+from plugins.palworld.palschema_fields import schema_scalar_writable
+from plugins.palworld.palschema_utility import (
     apply_existing_utility_policy,
     resolve_utility_constraint,
     validate_utility_value,

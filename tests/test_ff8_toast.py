@@ -8,7 +8,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TOASTS = ROOT / "games/ff8/ffnx_toasts"
+TOASTS = ROOT / "plugins/ff8/ffnx_toasts"
 VCVARS = Path(r"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat")
 
 

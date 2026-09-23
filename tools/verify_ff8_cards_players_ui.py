@@ -15,7 +15,7 @@ def run(browser_path=None):
             page.goto('http://fixture/')
             page.add_style_tag(path=str(ROOT/'ui/framework.css'))
             page.add_script_tag(path=str(ROOT/'ui/framework.js'))
-            page.add_script_tag(path=str(ROOT/'games/ff8/cards_ui.js'))
+            page.add_script_tag(path=str(ROOT/'plugins/ff8/cards_ui.js'))
             page.evaluate('''() => {
               const U=LexeditorUI,card={id:0,name:'Geezard',top:1,bottom:2,left:3,right:10,element:0,power:5};
               const map={key:'balamb',name:'Balamb',_loaded:true,players:[{id:0,entity:'queen_est',script:'talk',params:[

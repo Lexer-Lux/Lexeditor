@@ -17,3 +17,12 @@ Read the live issue and comments and preserve the latest explicit human correcti
 ## 2026-09-23 misc-fixes triage
 
 Stays actionable as the parent traceability record. Agent-verifiable slice is green: tests/test_distribution_hygiene.py passes (bundled helpers pinned, private helpers/builds/profiles excluded). Remaining agent work is release-time (re-run build against the release commit, attach installers). Children #494/#495/#496 moved to waiting (need a release cut plus their OS/hardware). Human install/launch acceptance stays with Lexer at release time.
+
+## 2026-09-23 per-game-global pass
+
+Re-verified post-rename: tests/test_distribution_hygiene.py passes, along
+with the reshade, plugin-descriptor and mod-library suites; the distribution
+file list in tools/build_distribution.py was updated to the new
+shaders/*.fx paths. No code beyond the 505 rename. Everything remaining is
+the release-time build plus Lexer's install/launch acceptance on all three
+platforms. Stays actionable.

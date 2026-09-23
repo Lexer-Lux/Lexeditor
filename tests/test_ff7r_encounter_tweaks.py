@@ -4,8 +4,8 @@ import struct
 
 import pytest
 
-import games.ff7r.encounter_tweaks as encounters
-from games.ff7r.dataobject import BYTE, INT32, NAME, DataObjectPackage, PACKAGE_TAG
+import plugins.ff7r.encounter_tweaks as encounters
+from plugins.ff7r.dataobject import BYTE, INT32, NAME, DataObjectPackage, PACKAGE_TAG
 
 
 def _fstring(value: str) -> bytes:

@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.module_data import read_submodule, save_module
+from plugins.bannerlord.module_data import read_submodule, save_module
 
 
 LEGACY = '''<Module>
@@ -215,7 +215,7 @@ class BannerlordLegacyRelationEditorTests(unittest.TestCase):
             temporary.cleanup()
 
     def test_dependency_ui_includes_legacy_read_write_surface(self):
-        editor = Path(__file__).resolve().parents[1] / "games" / "bannerlord" / "editor_core.js"
+        editor = Path(__file__).resolve().parents[1] / "plugins" / "bannerlord" / "editor_core.js"
         text = editor.read_text(encoding="utf-8")
         self.assertIn("legacyDependencies:m.legacyDependencies||[]", text)
         self.assertIn("legacyDependenciesBaseline", text)

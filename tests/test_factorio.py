@@ -10,9 +10,9 @@ import unittest
 from unittest import mock
 import zipfile
 
-from games.factorio.data_map import build_data_map
-from games.factorio import server as factorio_server
-from games.factorio.model import (
+from plugins.factorio.data_map import build_data_map
+from plugins.factorio import server as factorio_server
+from plugins.factorio.model import (
     FactorioDataError, PrototypeStore, build_mod_bytes, detect_install,
     export_dependencies, export_mod, project_manifest,
 )
@@ -241,7 +241,7 @@ class FactorioModelTests(unittest.TestCase):
             target.write_bytes(original)
             store = PrototypeStore.from_project(project)
             store.set_edit("items", "iron-plate", {"stack_size": 250})
-            with mock.patch("games.factorio.model.os.replace",
+            with mock.patch("plugins.factorio.model.os.replace",
                             side_effect=OSError("synthetic replace failure")):
                 with self.assertRaisesRegex(OSError, "synthetic replace failure"):
                     store.save(project)

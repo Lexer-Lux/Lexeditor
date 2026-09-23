@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from desktop_host import HostApi  # noqa: E402
-from games.ff8 import extractor, paths, server  # noqa: E402
+from plugins.ff8 import extractor, paths, server  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:
@@ -68,7 +68,7 @@ def verify_host_folder_action() -> None:
 
 
 def verify_source() -> None:
-    editor = (ROOT / "games/ff8/editor.html").read_text(encoding="utf-8")
+    editor = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
     framework = (ROOT / "ui/framework.js").read_text(encoding="utf-8")
     # The page now uses the shared information panel rather than bespoke cards.
     require('lex-information-panel ff8-information' in editor,

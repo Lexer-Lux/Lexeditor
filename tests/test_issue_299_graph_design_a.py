@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class GraphDesignATests(unittest.TestCase):
     def test_ff8_loads_the_approved_graph_renderer(self):
-        bootstrap = (ROOT / "games/ff8/cards_ui.js").read_text(encoding="utf-8")
+        bootstrap = (ROOT / "plugins/ff8/cards_ui.js").read_text(encoding="utf-8")
         self.assertNotIn("/shared/ff8-graph-design-a.js", bootstrap)
         self.assertFalse((ROOT / "ui/ff8-graph-design-a.js").is_file())
         self.assertFalse((ROOT / "ui/ff8-graph-design-a.css").is_file())

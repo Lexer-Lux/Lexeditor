@@ -11,8 +11,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import inventory_auto_sort  # noqa: E402
-from games.ff8 import menu_qol_issue_61 as source  # noqa: E402
+from plugins.ff8 import inventory_auto_sort  # noqa: E402
+from plugins.ff8 import menu_qol_issue_61 as source  # noqa: E402
 
 
 INSTALLED = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")

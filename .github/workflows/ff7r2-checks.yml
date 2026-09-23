@@ -4,7 +4,7 @@ on:
   push:
     branches: [master, codex/ff7r-2-plugin-completion]
     paths:
-      - 'games/ff7r2/**'
+      - 'plugins/ff7r2/**'
       - 'tests/ff7r2_fixture.py'
       - 'tests/test_ff7r2_*.py'
       - 'tests/ff7r2_browser_check.py'
@@ -14,7 +14,7 @@ on:
       - '.github/workflows/ff7r2-checks.yml'
   pull_request:
     paths:
-      - 'games/ff7r2/**'
+      - 'plugins/ff7r2/**'
       - 'tests/ff7r2_fixture.py'
       - 'tests/test_ff7r2_*.py'
       - 'tests/ff7r2_browser_check.py'
@@ -46,15 +46,15 @@ jobs:
       - name: Install test dependency
         run: python -m pip install pytest
       - name: Python syntax
-        run: python -m compileall -q games/ff7r2
+        run: python -m compileall -q plugins/ff7r2
       - name: Editor JavaScript syntax
-        run: node --check games/ff7r2/editor.js
+        run: node --check plugins/ff7r2/editor.js
       - name: Plugin descriptor
-        run: python -c "from games.ff7r2.plugin import PLUGIN; from plugin_api import validate_plugin; validate_plugin(PLUGIN); assert PLUGIN.projects is not None; print(PLUGIN.name)"
+        run: python -c "from plugins.ff7r2.plugin import PLUGIN; from plugin_api import validate_plugin; validate_plugin(PLUGIN); assert PLUGIN.projects is not None; print(PLUGIN.name)"
       - name: Rebirth DataObject and service regressions
         run: python -m pytest -q tests/test_ff7r2_dataobject.py tests/test_ff7r2_server.py tests/test_ff7r2_packaging.py
       - name: Managed service smoke
-        run: python -c "from games.ff7r2.plugin import smoke; [print('PASS:', line) for line in smoke()]"
+        run: python -c "from plugins.ff7r2.plugin import smoke; [print('PASS:', line) for line in smoke()]"
 
   browser:
     runs-on: ubuntu-latest

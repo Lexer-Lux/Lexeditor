@@ -1,7 +1,7 @@
 import struct
 
-from games.ff7r.atb_movement_probe import correlate_atb_movement_evidence
-from games.ff7r.native_probe import PEImage, RuntimeFunction, Section
+from plugins.ff7r.atb_movement_probe import correlate_atb_movement_evidence
+from plugins.ff7r.native_probe import PEImage, RuntimeFunction, Section
 
 
 def _atb():

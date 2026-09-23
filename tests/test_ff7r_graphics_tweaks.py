@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from games.ff7r.graphics_dataobject import (
+from plugins.ff7r.graphics_dataobject import (
     load_graphics_virtual_package,
     save_graphics_virtual_package,
 )
-from games.ff7r.graphics_tweaks import (
+from plugins.ff7r.graphics_tweaks import (
     EYE_ADAPTATION_CVAR,
     GRAPHICS_SCHEMA_VERSION,
     MANAGED_BEGIN,

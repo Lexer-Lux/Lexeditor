@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-HEADER = ROOT / 'games/ff8/ffnx_toasts/toast_queue.h'
+HEADER = ROOT / 'plugins/ff8/ffnx_toasts/toast_queue.h'
 
 CASES = r'''
 #include <cassert>

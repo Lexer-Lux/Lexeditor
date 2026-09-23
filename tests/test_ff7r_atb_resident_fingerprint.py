@@ -1,4 +1,4 @@
-from games.ff7r.atb_resident_fingerprint import classify_resident_atb_fingerprints
+from plugins.ff7r.atb_resident_fingerprint import classify_resident_atb_fingerprints
 
 
 def _row(tag, vanilla, *, prop="ParamFloat", key=None):

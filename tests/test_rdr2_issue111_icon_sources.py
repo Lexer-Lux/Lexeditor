@@ -2,7 +2,7 @@
 
 Issue 111 is now an artwork-quality task: the icons appear in game but look
 poor, and replacement previews must come before any approval ask. The art
-toolchain inputs live in games/rdr2/assets/item-icons. These tests lock that
+toolchain inputs live in plugins/rdr2/assets/item-icons. These tests lock that
 the source PNGs and review previews for the named groups still exist, so a
 future cleanup cannot silently drop an input. They judge presence only:
 artwork quality and Lexer's approval still need the art toolchain and a
@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ICONS = ROOT / "games" / "rdr2" / "assets" / "item-icons"
+ICONS = ROOT / "plugins" / "rdr2" / "assets" / "item-icons"
 
 # (group, source PNGs that must exist for that group)
 REQUIRED_SOURCES = (

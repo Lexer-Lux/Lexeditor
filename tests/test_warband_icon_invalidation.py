@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from PIL import Image
-from games.warband import model_preview as models, item_icons as icons
+from plugins.warband import model_preview as models, item_icons as icons
 
 
 class IconMutationTests(unittest.TestCase):

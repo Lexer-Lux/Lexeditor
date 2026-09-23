@@ -2,10 +2,10 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.module_data import read_submodule
-from games.bannerlord.plugin import PLUGIN
-from games.bannerlord.project_data import primary_project_file, read_project_file
-from games.bannerlord.project_template import module_id_from_name
+from plugins.bannerlord.module_data import read_submodule
+from plugins.bannerlord.plugin import PLUGIN
+from plugins.bannerlord.project_data import primary_project_file, read_project_file
+from plugins.bannerlord.project_template import module_id_from_name
 from project_manager import ProjectManager
 
 

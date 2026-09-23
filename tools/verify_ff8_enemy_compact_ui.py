@@ -15,8 +15,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.ff8 import enemy_tables
-from games.ff8.formats import ENEMY_FIELDS
+from plugins.ff8 import enemy_tables
+from plugins.ff8.formats import ENEMY_FIELDS
 
 
 def fixture() -> dict:
@@ -40,8 +40,8 @@ def fixture() -> dict:
                 for entry in tier:
                     entry.update(valueId=entry['slot'] + 1, quantity=entry['slot'] + 2)
         tables.append({'id': row['id'], 'name': row['name'], 'tables': table})
-    cards = json.loads((ROOT/'games/ff8/schema/card.json').read_text())['card_info']
-    statuses = json.loads((ROOT/'games/ff8/schema/status.json').read_text())['status']
+    cards = json.loads((ROOT/'plugins/ff8/schema/card.json').read_text())['card_info']
+    statuses = json.loads((ROOT/'plugins/ff8/schema/status.json').read_text())['status']
     return {'enemies': {'rows': enemies}, 'enemyTables': {'rows': tables, 'choices': {'cards': cards,
         'statuses': statuses, 'enemyAbilities': [{'id': 0, 'name': 'None'}], 'abilityTypes': [{'id': 0, 'name': 'None'}]}},
         'enemyBattleText': {'rows': [{'id': 0, 'available': True, 'lines': [{'id': 0, 'text': 'Local dialogue.'}]},
@@ -55,8 +55,8 @@ def fixture() -> dict:
 
 
 def page_html() -> str:
-    editor = '<html><head><style>'+(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8')+'</style></head><body><header id="lexeditor-shell"></header><div id="toolbar"></div><main id="main"></main><script>'
-    editor += '\n'.join((ROOT/'games/ff8'/name).read_text(encoding='utf-8') for name in ['core.js','records.js','party.js','battle.js','places.js','boot.js'])
+    editor = '<html><head><style>'+(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8')+'</style></head><body><header id="lexeditor-shell"></header><div id="toolbar"></div><main id="main"></main><script>'
+    editor += '\n'.join((ROOT/'plugins/ff8'/name).read_text(encoding='utf-8') for name in ['core.js','records.js','party.js','battle.js','places.js','boot.js'])
     # Only omit the desktop boot / external game discovery; every view,
     # picker, provenance control, serializer and layout is production code.
     editor = editor[:editor.index('  const shell=LexeditorUI.mountShell(')]
@@ -96,7 +96,7 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
     dataset = fixture()
     pngs = {}
     if exe:
-        from games.ff8.card_art import _read_atlas, _render_card
+        from plugins.ff8.card_art import _read_atlas, _render_card
         palette, pixels = _read_atlas(exe.read_bytes())
         for i in range(110):
             pngs[f'/assets/cards/{i}.png'] = _render_card(i, palette, pixels)
@@ -121,7 +121,7 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
             # Plugin overrides come after the shared stylesheet, as in production.
             page.add_style_tag(content=re.search(r'<style>(.*?)</style>',html,re.S)[1])
             page.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
-            page.add_script_tag(content=(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8'))
+            page.add_script_tag(content=(ROOT/'plugins/ff8/cards_ui.js').read_text(encoding='utf-8'))
             if pngs:
                 # Mock asset transport only; preserve the production image,
                 # load/error handlers and card controls. No HTTP is required.
@@ -199,7 +199,7 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
             payload=page.evaluate('savedPayloads.find(value=>value.path==="/api/enemy-tables/save")')
             assert payload,page.evaluate('savedPayloads')
             raw=bytearray(0x180)
-            enemy_tables.apply_edits(raw,0,payload['body']['edits'],ROOT/'games/ff8/schema',set(range(6)),set(range(6)))
+            enemy_tables.apply_edits(raw,0,payload['body']['edits'],ROOT/'plugins/ff8/schema',set(range(6)),set(range(6)))
             saved=enemy_tables.read_tables(raw,0)
             assert saved['mug']['high'][2]['quantity']==77
             assert saved['draw']['medium'][1]['quantity']==8

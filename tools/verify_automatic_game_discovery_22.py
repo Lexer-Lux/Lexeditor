@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from game_installation import GameInstallationManager  # noqa: E402
 from desktop_host import HostApi  # noqa: E402
-from games.ff7.plugin import PLUGIN as FF7_PLUGIN  # noqa: E402
+from plugins.ff7.plugin import PLUGIN as FF7_PLUGIN  # noqa: E402
 from plugin_api import GameInstallSpec, GamePlugin  # noqa: E402
 
 

@@ -16,7 +16,7 @@ except ImportError:
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_CODE
 from unicorn.x86_const import *
 import pefile
-from games.ff8 import battle_shortcuts as scan, battle_issue_54 as draw, streamlined_draw as stock
+from plugins.ff8 import battle_shortcuts as scan, battle_issue_54 as draw, streamlined_draw as stock
 EXE = Path(r'D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe')
 data = EXE.read_bytes()
 assert hashlib.sha256(data).hexdigest() == '064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570'

@@ -9,8 +9,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.project_zomboid import acceptance, core
-from games.project_zomboid.plugin import PLUGIN
+from plugins.project_zomboid import acceptance, core
+from plugins.project_zomboid.plugin import PLUGIN
 
 
 class ProjectZomboidAcceptanceTests(unittest.TestCase):

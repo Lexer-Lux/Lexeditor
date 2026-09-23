@@ -32,10 +32,10 @@ def test_dense_table_text_fits_real_rows(page, height, theme, zoom):
     page.evaluate('zoom=>document.body.style.zoom=zoom', zoom)
     if theme == 'rdr2':
         page.route('**/assets/fonts/*', lambda route: route.fulfill(
-            path=str(ROOT/'games/rdr2/assets/fonts'/route.request.url.rsplit('/',1)[-1]))
-            if (ROOT/'games/rdr2/assets/fonts'/route.request.url.rsplit('/',1)[-1]).exists()
+            path=str(ROOT/'plugins/rdr2/assets/fonts'/route.request.url.rsplit('/',1)[-1]))
+            if (ROOT/'plugins/rdr2/assets/fonts'/route.request.url.rsplit('/',1)[-1]).exists()
             else route.fulfill(status=404,body=''))
-        page.add_style_tag(path=str(ROOT/'games/rdr2/editor.css'))
+        page.add_style_tag(path=str(ROOT/'plugins/rdr2/editor.css'))
         page.add_style_tag(content=':root{--lex-font: "Lex RDR Lino", Arial; --lex-text:#e8e1d4;--lex-panel:#191714;--lex-panel-2:#24211c;--lex-border:#4a4439}')
     framework(page)
     page.evaluate('''()=>{
@@ -61,5 +61,5 @@ def test_dense_table_text_fits_real_rows(page, height, theme, zoom):
     assert not table_hits, table_hits
     assert page.locator('.lex-column-list-row').first.evaluate('n=>n.getBoundingClientRect().height') >= 31
     assert page.locator('.lex-column-list-row').first.evaluate('n=>parseFloat(getComputedStyle(n).fontSize)') >= 11
-    if theme == 'rdr2' and (ROOT/'games/rdr2/assets/fonts/RDRLino-Regular.woff2').exists():
+    if theme == 'rdr2' and (ROOT/'plugins/rdr2/assets/fonts/RDRLino-Regular.woff2').exists():
         assert page.evaluate('document.fonts.check(\'14px "Lex RDR Lino"\')')

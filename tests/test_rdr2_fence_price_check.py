@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.rdr2 import fence_price_check as fp
+from plugins.rdr2 import fence_price_check as fp
 
 
 def valid_plan():

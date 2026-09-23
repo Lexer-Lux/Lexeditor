@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.rdr2 import locker_recovery as lr
+from plugins.rdr2 import locker_recovery as lr
 
 
 def valid_plan():

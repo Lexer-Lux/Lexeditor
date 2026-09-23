@@ -18,8 +18,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def plugins():
-    for path in sorted((ROOT / "games").glob("*/plugin.py")):
-        module = importlib.import_module("games." + path.parent.name + ".plugin")
+    for path in sorted((ROOT / "plugins").glob("*/plugin.py")):
+        module = importlib.import_module("plugins." + path.parent.name + ".plugin")
         yield path.parent.name, getattr(module, "PLUGIN", None)
 
 
@@ -36,7 +36,7 @@ class Startup(unittest.TestCase):
 
         plugins = app.discover_plugins()
         self.assertTrue(plugins)
-        folders = {path.parent.name for path in (ROOT / "games").glob("*/plugin.py")}
+        folders = {path.parent.name for path in (ROOT / "plugins").glob("*/plugin.py")}
         self.assertEqual(len(plugins), len(folders))
 
 
@@ -65,7 +65,7 @@ class PluginDescriptors(unittest.TestCase):
         from pathlib import PurePosixPath
         from types import SimpleNamespace
         from unittest.mock import patch
-        from games.ff7r.plugin import PLUGIN
+        from plugins.ff7r.plugin import PLUGIN
 
         with patch('plugin_api.os', SimpleNamespace(name='posix')):
             for path in ('C:/FF7RMod', '/home/player/FF7RMod'):
@@ -81,7 +81,7 @@ class PluginDescriptors(unittest.TestCase):
         self.assertTrue(found, "no plugins were discovered")
         for directory, plugin in found:
             with self.subTest(plugin=directory):
-                self.assertIsNotNone(plugin, f"games/{directory}/plugin.py exports no PLUGIN")
+                self.assertIsNotNone(plugin, f"plugins/{directory}/plugin.py exports no PLUGIN")
                 validate_plugin(plugin)
 
     def test_a_created_project_starts_from_a_real_template(self):

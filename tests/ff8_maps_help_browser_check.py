@@ -17,7 +17,7 @@ def main():
         page.route('http://fixture/', lambda r: r.fulfill(body='<body data-lex-plugin="ff8"><main></main></body>', content_type='text/html'))
         page.goto('http://fixture/')
         page.add_style_tag(content=(ROOT / 'ui/framework.css').read_text(encoding='utf-8'))
-        page.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
+        page.add_style_tag(content=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8'))
         page.add_script_tag(content=(ROOT / 'ui/framework.js').read_text(encoding='utf-8'))
         page.evaluate("""groups => {
             window.changes = 0;

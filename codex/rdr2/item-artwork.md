@@ -36,9 +36,9 @@ The historical Lexeditor audit contains 283 raw UI_ITEMVIEWER reference values.
 Current accounting is:
 
 - 235 raw values have bundled PNGs under
-  `games/rdr2/assets/dictionary_icons/ui_itemviewer`.
+  `plugins/rdr2/assets/dictionary_icons/ui_itemviewer`.
 - 7 C5/C6 treasure-map values live in the DLC layer and are decoded from the
-  installed game on demand by `games/rdr2/inventory_icons.py`.
+  installed game on demand by `plugins/rdr2/inventory_icons.py`.
 - 41 raw values (42 unique attempted IDs because two book values contain ordered
   alternatives) have no static atlas entry in any of the three layers.
 - Consequently the unresolved **static atlas** count is zero.
@@ -84,5 +84,5 @@ identity.
   non-static raw values = 283 historical raw values.
 - Unknown values remain `missing`; the classifier is not a blanket exemption.
 
-`games/rdr2/assets/MISSING_ICONS.txt` is now a status report, not an extraction
+`plugins/rdr2/assets/MISSING_ICONS.txt` is now a status report, not an extraction
 to-do list.

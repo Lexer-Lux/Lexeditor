@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 RDR2_ROOT = Path(r"C:\RDR2Mod")
 sys.path.insert(0, str(ROOT))
 
-from games.ff8.plugin import FF8Session  # noqa: E402
-from games.rdr2.plugin import Rdr2Session  # noqa: E402
+from plugins.ff8.plugin import FF8Session  # noqa: E402
+from plugins.rdr2.plugin import Rdr2Session  # noqa: E402
 from tools.verify_panel_layout_visual_46 import (  # noqa: E402
     browser_session, close_browser, screenshot,
 )

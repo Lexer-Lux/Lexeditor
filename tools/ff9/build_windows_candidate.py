@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from games.ff9 import memoria_manager
+from plugins.ff9 import memoria_manager
 from tools import build_distribution
 
 OUT = ROOT / "out" / "ff9-windows-candidate"
@@ -51,10 +51,10 @@ def main() -> None:
     if not internal.is_dir():
         raise RuntimeError("Unexpected PyInstaller onedir layout: _internal is missing")
 
-    runtime_source = ROOT / "games" / "ff9" / "runtime" / RUNTIME_NAME
+    runtime_source = ROOT / "plugins" / "ff9" / "runtime" / RUNTIME_NAME
     if not runtime_source.is_file():
         raise FileNotFoundError(f"FF9 runtime is missing: {runtime_source}")
-    runtime_target = internal / "games" / "ff9" / "runtime" / RUNTIME_NAME
+    runtime_target = internal / "plugins" / "ff9" / "runtime" / RUNTIME_NAME
     runtime_target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(runtime_source, runtime_target)
     if digest(runtime_target) != digest(runtime_source):

@@ -9,7 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(ROOT))
 from plugin_ui import plugin_ui
-from games.ff8 import kernel_text
+from plugins.ff8 import kernel_text
 def main():
  s=plugin_ui('ff8')
  fn=s[s.index('  function textTokenToolbar'):s.index('  function renderText')]
@@ -17,7 +17,7 @@ def main():
   b=pw.chromium.launch(headless=True);p=b.new_page()
   p.route('http://fixture/',lambda r:r.fulfill(content_type='text/html',body='<body data-lex-plugin="ff8"><main></main></body>'));p.goto('http://fixture/')
   p.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  p.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
+  p.add_style_tag(content=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8'))
   p.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
   p.add_style_tag(content='main{display:block!important;padding:0!important}.lex-detail-panel{width:100%}')
   p.add_script_tag(content="""const {el,detailField,detailSection,infoHelp,detailPanel,readonlyField}=LexeditorUI;

@@ -2,7 +2,7 @@
 
 ## Evidence and recurring failure classes
 
-Read the preserved #131 request/archive and the existing sparse-save implementation. The recurring failure was a correct handler not wired into the user-facing path, followed by a misleading success message. Primary code: games/rdr2/editor.html saveAllChanges, saveCatalog, itemTagsCell. Execution proof must be a save request plus cleared pending state after success, not a button click or toast alone.
+Read the preserved #131 request/archive and the existing sparse-save implementation. The recurring failure was a correct handler not wired into the user-facing path, followed by a misleading success message. Primary code: plugins/rdr2/editor.html saveAllChanges, saveCatalog, itemTagsCell. Execution proof must be a save request plus cleared pending state after success, not a button click or toast alone.
 
 ## Reproduced and repaired
 

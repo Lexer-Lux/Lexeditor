@@ -1,4 +1,4 @@
-"""Source of games/ff8/flying_eva.PHYSICAL_TEMPLATE, assembled at PHYSICAL_CAVE.
+"""Source of plugins/ff8/flying_eva.PHYSICAL_TEMPLATE, assembled at PHYSICAL_CAVE.
 
 verify_ff8_flying_physical.py re-assembles this and compares it with the
 embedded bytes. Keystone is a development dependency only.

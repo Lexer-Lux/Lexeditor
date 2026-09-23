@@ -25,7 +25,7 @@ actionable until a real session can be written.
 
 ## 2026-09-23 agent slice: checkable Schofield conversion plan
 
-games/rdr2/unique_gun_parts.py records the first proof candidate (unique
+plugins/rdr2/unique_gun_parts.py records the first proof candidate (unique
 Schofield features as grip/barrel/frame components on the base Schofield,
 with catalog and gunsmith entries and pickup-unlocks-parts) plus
 validate_prototype(), which rejects stat-toggle-only parts, missing

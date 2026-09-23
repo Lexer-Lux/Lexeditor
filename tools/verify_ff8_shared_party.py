@@ -11,8 +11,8 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-CORE = ROOT / 'games/ff8/ffnx_issue_51'
-EXT = ROOT / 'games/ff8/ffnx_gameplay_extensions/ffnx-src'
+CORE = ROOT / 'plugins/ff8/ffnx_issue_51'
+EXT = ROOT / 'plugins/ff8/ffnx_gameplay_extensions/ffnx-src'
 
 
 def runtime_source() -> str:

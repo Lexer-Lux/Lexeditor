@@ -6,8 +6,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.terraria import server
-from games.terraria.assets import (
+from plugins.terraria import server
+from plugins.terraria.assets import (
     asset_index,
     asset_state,
     create_asset,

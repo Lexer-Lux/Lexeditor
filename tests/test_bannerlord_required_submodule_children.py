@@ -3,7 +3,7 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
-from games.bannerlord.module_data import save_module
+from plugins.bannerlord.module_data import save_module
 
 
 class BannerlordRequiredSubModuleChildrenTests(unittest.TestCase):
@@ -46,7 +46,7 @@ class BannerlordRequiredSubModuleChildrenTests(unittest.TestCase):
             self.assertIsNone(sub.find("Tags"))
 
     def test_packaged_template_contains_required_assemblies_before_tags(self):
-        template = Path("games/bannerlord/template/SubModule.xml")
+        template = Path("plugins/bannerlord/template/SubModule.xml")
         sub = ET.parse(template).getroot().find("./SubModules/SubModule")
         self.assertIsNotNone(sub.find("Assemblies"))
         self.assertIsNotNone(sub.find("Tags"))

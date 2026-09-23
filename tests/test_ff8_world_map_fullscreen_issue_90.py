@@ -3,8 +3,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.ff8 import gameplay_settings
-from games.ff8 import world_map_fullscreen_issue_90 as world_map_fullscreen
+from plugins.ff8 import gameplay_settings
+from plugins.ff8 import world_map_fullscreen_issue_90 as world_map_fullscreen
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -42,7 +42,7 @@ class WorldMapFullscreenTests(unittest.TestCase):
             world_map_fullscreen.build_hext(True, modern_controls=True)
 
     def test_editor_exposes_approved_policy(self):
-        editor = (ROOT / "games/ff8/boot.js").read_text(encoding="utf-8")
+        editor = (ROOT / "plugins/ff8/boot.js").read_text(encoding="utf-8")
         self.assertIn('"aria-label":"Full-screen World Map"', editor)
         self.assertIn('row("FULL-SCREEN WORLD MAP"', editor)
         self.assertIn("worldMapFullscreen:state.data.settings.worldMapFullscreen", editor)

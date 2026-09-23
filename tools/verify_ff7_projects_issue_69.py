@@ -14,13 +14,13 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff7.plugin import (  # noqa: E402
+from plugins.ff7.plugin import (  # noqa: E402
     FF7Session, PLUGIN as CURRENT_PLUGIN, seed_project_layout,
 )
-from games.ff7_2013.plugin import (  # noqa: E402
+from plugins.ff7_2013.plugin import (  # noqa: E402
     FF7LegacySession, PLUGIN as LEGACY_PLUGIN,
 )
-from games.ff7.kernel import Kernel, resolve_kernel  # noqa: E402
+from plugins.ff7.kernel import Kernel, resolve_kernel  # noqa: E402
 from project_manager import ProjectManager  # noqa: E402
 
 
@@ -42,7 +42,7 @@ PRODUCTS = (
 )
 
 
-editor = (ROOT / "games" / "ff7" / "editor.html").read_text(encoding="utf-8")
+editor = (ROOT / "plugins" / "ff7" / "editor.html").read_text(encoding="utf-8")
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 assert "projectSnapshot:" not in editor, "FF7 bypasses the shared project manager"
 # The menu offers one action to create a mod and one to point at an existing

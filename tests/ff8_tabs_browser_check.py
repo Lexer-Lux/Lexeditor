@@ -14,7 +14,7 @@ LABELS = 'ABILITIES CARDS CHARACTERS ENCOUNTERS ENEMIES GFS ITEMS MAGIC MAPS REF
 def main():
     font = Path(os.environ['LOCALAPPDATA']) / 'Lexeditor/game-data/ff8/generated/ff8-menu.ttf'
     assert font.is_file(), 'Install/extract the FF8 menu font before this check.'
-    css = (ROOT/'games/ff8/editor.css').read_text(encoding='utf-8')
+    css = (ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8')
     css = re.sub(r'url\("/assets/ff8-menu.ttf\?v=4"\)', 'url(data:font/ttf;base64,' + base64.b64encode(font.read_bytes()).decode() + ')', css)
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)

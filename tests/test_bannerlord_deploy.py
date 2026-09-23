@@ -5,8 +5,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.bannerlord.deploy_data import deploy_target, sync_project_assets
-from games.bannerlord.runtime_data import deployment_status
+from plugins.bannerlord.deploy_data import deploy_target, sync_project_assets
+from plugins.bannerlord.runtime_data import deployment_status
 
 
 PROJECT_SUBMODULE = '''<Module>
@@ -196,7 +196,7 @@ class BannerlordDeployTests(unittest.TestCase):
             outside = project.parent / "outside-module"
             outside.mkdir()
             with patch(
-                "games.bannerlord.deploy_data.installed_modules",
+                "plugins.bannerlord.deploy_data.installed_modules",
                 return_value={"LexerSkillTweaks": outside},
             ):
                 with self.assertRaisesRegex(ValueError, "escaped the Modules folder"):

@@ -23,7 +23,7 @@ def main() -> int:
     css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
     desktop = (ROOT / "desktop_host.py").read_text(encoding="utf-8")
     settings_source = (ROOT / "settings_manager.py").read_text(encoding="utf-8")
-    ff8 = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    ff8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
     require("const hoverable = options =>" in framework and "hoverable," in framework,
             "the shared framework must own and export hoverables")
     require('class: ["lex-hoverable"' in framework,

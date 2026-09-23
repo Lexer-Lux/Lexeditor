@@ -6,10 +6,10 @@ import struct
 
 import pytest
 
-from games.ffx_x2.ffx_player_stats import (
+from plugins.ffx_x2.ffx_player_stats import (
     ARCHIVE_PATH, FFXPlayerStatsError, RECORD_SIZE, apply_edits, parse_player_stats, payload,
 )
-from games.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
+from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
 from service_session import request_json
 
 

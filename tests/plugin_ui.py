@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def plugin_ui(name: str) -> str:
     """The page and its modules, as one string, in load order."""
-    plugin = ROOT / "games" / name
+    plugin = ROOT / "plugins" / name
     page = (plugin / "editor.html").read_text(encoding="utf-8")
     loaded = [plugin / module for module in re.findall(r'<script src="/?([A-Za-z0-9_.-]+\.js)">', page)]
     rest = [path for path in sorted(plugin.glob("*.js")) + sorted(plugin.glob("*.css"))
@@ -29,7 +29,7 @@ def inline_modules(name: str, html: str) -> str:
     local module is put where its tag stood, keeping the page's load order.
     Shared framework tags are left for the check to replace as it chooses.
     """
-    plugin = ROOT / "games" / name
+    plugin = ROOT / "plugins" / name
 
     def script(match):
         body = (plugin / Path(match[1]).name).read_text(encoding="utf-8")
@@ -43,4 +43,4 @@ def inline_modules(name: str, html: str) -> str:
 
 
 def plugins_with_ui() -> list[str]:
-    return sorted(path.parent.name for path in (ROOT / "games").glob("*/editor.html"))
+    return sorted(path.parent.name for path in (ROOT / "plugins").glob("*/editor.html"))

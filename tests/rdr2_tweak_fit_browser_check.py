@@ -5,7 +5,7 @@ import sys
 import tempfile
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from games.rdr2.plugin import Rdr2Session
+from plugins.rdr2.plugin import Rdr2Session
 from playwright.sync_api import sync_playwright
 
 with tempfile.TemporaryDirectory(prefix='lex-tweak-fit-') as folder:

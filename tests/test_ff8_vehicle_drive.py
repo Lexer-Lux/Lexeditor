@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import unittest
 
-from games.ff8.ffnx_modern_controls import apply_to_ffnx
+from plugins.ff8.ffnx_modern_controls import apply_to_ffnx
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,7 +15,7 @@ VCVARS = Path(r"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\V
 class VehicleDriveTests(unittest.TestCase):
     @unittest.skipUnless(os.name == "nt" and VCVARS.exists(), "Windows C++ Build Tools required")
     def test_production_axis_preserves_partial_analog_with_digital_alias(self):
-        header = ROOT / "games/ff8/ffnx_modern_controls/vehicle_drive.h"
+        header = ROOT / "plugins/ff8/ffnx_modern_controls/vehicle_drive.h"
         code = '#include "' + header.as_posix() + '"\n' + r'''
 #include <limits>
 int main() {

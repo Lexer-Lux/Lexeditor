@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-SCHEMA = REPO / "games" / "rdr2" / "settings_schema.json"
+SCHEMA = REPO / "plugins" / "rdr2" / "settings_schema.json"
 
 
 def load_schema():

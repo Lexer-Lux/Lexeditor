@@ -16,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from games.palworld.plugin import PalworldSession
-from games.palworld.package import default_info
+from plugins.palworld.plugin import PalworldSession
+from plugins.palworld.package import default_info
 
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "palworld-browser"
 OUT.mkdir(parents=True, exist_ok=True)

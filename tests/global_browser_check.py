@@ -83,7 +83,7 @@ def main():
             for width,height in [(900,620),(1600,900)]:
                 page=browser.new_page(viewport={'width':width,'height':height});errors=[]
                 page.set_default_timeout(5000);page.on('pageerror',lambda e:(errors.append(str(e)),print('PAGE ERROR',e,flush=True)));page.add_init_script(STUB)
-                print('Loading Blank',width,flush=True);load_page(page,base,'/games/blank/editor.html');page.wait_for_function('!!window.LexeditorUI?.creditsPanel')
+                print('Loading Blank',width,flush=True);load_page(page,base,'/plugins/blank/editor.html');page.wait_for_function('!!window.LexeditorUI?.creditsPanel')
                 page.wait_for_timeout(300)
                 # Actual Blank Info action mounts one shared credits panel, even after refresh.
                 print('Clicking info',flush=True);page.get_by_role('button',name='Open Blank setup and runtime information',exact=True).click()

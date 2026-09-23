@@ -10,7 +10,7 @@ duplicated edits fail instead of corrupting the archive.
 import struct
 import unittest
 
-from games.ff8 import world_map
+from plugins.ff8 import world_map
 
 
 def _synthetic_wmset(padding=0xA5):

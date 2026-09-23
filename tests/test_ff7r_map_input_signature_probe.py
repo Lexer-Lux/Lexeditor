@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import struct
 
-from games.ff7r.map_input_signature_probe import (
+from plugins.ff7r.map_input_signature_probe import (
     MAP_CONTROL_SIGNATURE,
     RAW_INPUT_REGISTRATION_SIGNATURE,
     probe_public_map_input_signatures,

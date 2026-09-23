@@ -1,7 +1,7 @@
 """Regression coverage for the FF8 Streamlined Draw tweak."""
 import unittest
 
-from games.ff8 import streamlined_draw as draw
+from plugins.ff8 import streamlined_draw as draw
 
 
 class StreamlinedDrawTests(unittest.TestCase):

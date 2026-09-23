@@ -1,7 +1,7 @@
 import struct
 
-from games.ff7r.native_probe import PEImage, RuntimeFunction, Section
-from games.ff7r.sprint_authority_probe import (
+from plugins.ff7r.native_probe import PEImage, RuntimeFunction, Section
+from plugins.ff7r.sprint_authority_probe import (
     _candidate_functions,
     analyze_sprint_authority_strings,
 )

@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.project_zomboid import core, mannequin
+from plugins.project_zomboid import core, mannequin
 
 
 SCRIPT = """module LexTest

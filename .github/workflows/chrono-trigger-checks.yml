@@ -3,7 +3,7 @@ name: Chrono Trigger fresh checks
 on:
   pull_request:
     paths:
-      - 'games/chrono_trigger/**'
+      - 'plugins/chrono_trigger/**'
       - 'codex/chrono_trigger/**'
       - 'worklog/requests/chrono-trigger-plugin.md'
       - 'tests/test_chrono_trigger_replacement.py'
@@ -40,13 +40,13 @@ jobs:
       - name: Install host dependency used by mod-library integration test
         run: python -m pip install Pillow==12.3.0
       - name: Compile fresh Chrono Trigger modules
-        run: python -m compileall -q games/chrono_trigger
+        run: python -m compileall -q plugins/chrono_trigger
       - name: Run fresh Chrono Trigger roundtrip tests
         run: python -m unittest discover -s tests -p 'test_chrono_trigger_replacement.py' -v
       - name: Run synthetic managed-service smoke
-        run: python -c "from games.chrono_trigger.plugin import smoke; print(smoke())"
+        run: python -c "from plugins.chrono_trigger.plugin import smoke; print(smoke())"
       - name: Check editor JavaScript syntax
-        run: node --check games/chrono_trigger/editor.js
+        run: node --check plugins/chrono_trigger/editor.js
 
   integration:
     runs-on: ubuntu-latest
@@ -62,7 +62,7 @@ jobs:
       - name: Validate the Chrono plugin descriptor directly
         run: |
           python - <<'PY'
-          from games.chrono_trigger.plugin import PLUGIN
+          from plugins.chrono_trigger.plugin import PLUGIN
           from plugin_api import validate_plugin
           validate_plugin(PLUGIN)
           assert PLUGIN.plugin_id == "chrono-trigger"
@@ -94,7 +94,7 @@ jobs:
           python - <<'PY'
           import runtime_bootstrap
           registered = getattr(runtime_bootstrap, "SERVICE_MODULES", ())
-          assert "games.chrono_trigger.server" in registered, registered
+          assert "plugins.chrono_trigger.server" in registered, registered
           print("Chrono Trigger service registration passed")
           PY
 
@@ -138,10 +138,10 @@ jobs:
       - name: Recheck Chrono source candidate
         shell: pwsh
         run: |
-          python -m compileall -q games/chrono_trigger
+          python -m compileall -q plugins/chrono_trigger
           python -m unittest discover -s tests -p 'test_chrono_trigger_replacement.py' -v
-          python -c "from games.chrono_trigger.plugin import PLUGIN, smoke; from plugin_api import validate_plugin; validate_plugin(PLUGIN); print(smoke())"
-          node --check games/chrono_trigger/editor.js
+          python -c "from plugins.chrono_trigger.plugin import PLUGIN, smoke; from plugin_api import validate_plugin; validate_plugin(PLUGIN); print(smoke())"
+          node --check plugins/chrono_trigger/editor.js
       - name: Build exact-head tracked-source candidate
         shell: pwsh
         run: |

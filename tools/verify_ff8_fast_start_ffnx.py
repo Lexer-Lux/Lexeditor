@@ -6,7 +6,7 @@ import sys
 import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.ff8.fast_start_ffnx import apply, STARTUP_FRAME_GATE
+from plugins.ff8.fast_start_ffnx import apply, STARTUP_FRAME_GATE
 
 with TemporaryDirectory(prefix='ff8-fast-start-') as tmp:
     root = Path(tmp)

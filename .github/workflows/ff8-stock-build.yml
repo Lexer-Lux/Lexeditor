@@ -5,17 +5,17 @@ on:
     paths: [.github/workflows/ff8-stock-build.yml]
   pull_request:
     paths:
-      - 'games/ff8/ffnx_modern_controls/**'
-      - 'games/ff8/ffnx_gameplay_extensions/**'
-      - 'games/ff8/ffnx_status_bars/**'
+      - 'plugins/ff8/ffnx_modern_controls/**'
+      - 'plugins/ff8/ffnx_gameplay_extensions/**'
+      - 'plugins/ff8/ffnx_status_bars/**'
       - 'tools/prepare_ff8_native_build.py'
       - 'tools/verify_ff8_hp_colors_issue_481.py'
       - 'tools/verify_ff8_modern_controls_binary.py'
       - 'tools/verify_ff8_reptile_atb_binary.py'
       - 'tools/verify_ff8_interaction_indicators_302.py'
       - 'tests/test_ff8_interaction_indicators_issue_302.py'
-      - 'games/ff8/gameplay_settings.py'
-      - 'games/ff8/editor.html'
+      - 'plugins/ff8/gameplay_settings.py'
+      - 'plugins/ff8/editor.html'
       - '.github/workflows/ff8-stock-build.yml'
   workflow_dispatch:
 permissions:

@@ -6,7 +6,7 @@ import struct
 
 import pytest
 
-from games.ff7r.atb_tweaks import (
+from plugins.ff7r.atb_tweaks import (
     ATB_ABILITY_ASSET,
     ATB_GUARD_ASSET,
     ATB_RESIDENT_ASSET,
@@ -21,7 +21,7 @@ from games.ff7r.atb_tweaks import (
     unvalidated_runtime_requests,
     validate_atb_config,
 )
-from games.ff7r.dataobject import FLOAT, INT32, DataObjectPackage
+from plugins.ff7r.dataobject import FLOAT, INT32, DataObjectPackage
 
 
 def _fstring(value: str) -> bytes:

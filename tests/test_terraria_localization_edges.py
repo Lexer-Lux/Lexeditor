@@ -5,8 +5,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.terraria.localization import parse_localization_text
-from games.terraria import server
+from plugins.terraria.localization import parse_localization_text
+from plugins.terraria import server
 
 
 class TerrariaLocalizationEdgeTests(unittest.TestCase):

@@ -3,7 +3,7 @@
 The user confirmed proportional right-stick world-camera rotation works on
 2026-09-05. Vertical camera and battle controls remain separate issues329/330.
 
-Canonical implementation: games/ff8/ffnx_modern_controls. The DLL wraps both
+Canonical implementation: plugins/ff8/ffnx_modern_controls. The DLL wraps both
 complete native camera calls0053FBB4 and0054101C after checking original bytes.
 Native right-stick movement/zoom aliases are centered in world mode only.
 Raw input is reset on every poll to avoid stale movement after disconnect.

@@ -5,7 +5,7 @@ import tempfile
 import os
 
 ROOT = Path(__file__).resolve().parents[1]
-HEADER = ROOT / 'games/ff8/ffnx_modern_controls/battle_camera.h'
+HEADER = ROOT / 'plugins/ff8/ffnx_modern_controls/battle_camera.h'
 
 CASES = r'''
 #include <cassert>

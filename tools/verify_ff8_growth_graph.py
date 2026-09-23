@@ -2,7 +2,7 @@
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
-editor=(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8')
+editor=(ROOT/'plugins/ff8/editor.html').read_text(encoding='utf-8')
 curve=editor[editor.index('  const characterCurveOrder='):editor.index('  function characterCurveFormula(')]
 with sync_playwright() as p:
  browser=p.chromium.launch(headless=True)

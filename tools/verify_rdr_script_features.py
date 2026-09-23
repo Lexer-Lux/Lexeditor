@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.rdr import script_features as scripts
+from plugins.rdr import script_features as scripts
 
 
 def fixture(native_hash=scripts.WAS_CONTEXT_EVER_PRESSED_HASH, *, opcode=scripts.OP_JUMP_FALSE):

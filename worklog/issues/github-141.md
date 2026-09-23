@@ -27,7 +27,7 @@ actionable until a real session can be written.
 
 ## 2026-09-23 master: stock+merchant documented headlessly, flipped to waiting
 
-Queried the live editable dataset via games/rdr2 get_catalog('mine'):
+Queried the live editable dataset via plugins/rdr2 get_catalog('mine'):
 24,706 items; ST_GUNSMITH carries 95 listings, 56 non-advert stock rows
 with buy prices (Schofield at 2190 catalog units). Merchant record
 (merchant_buyers.json vanillaBuyers ST_GUNSMITH) covers 8 ammo types. Buyer

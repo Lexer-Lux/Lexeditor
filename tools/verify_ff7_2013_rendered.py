@@ -18,7 +18,7 @@ OUT = ROOT / "out" / "ff7-2013-acceptance"
 def open_current_modules(self, edition: str = "ff7") -> None:
     """Load the same FF7 page code as production, including the split editor.js module."""
     self.page.goto("about:blank")
-    html = (ROOT / "games" / "ff7" / "editor.html").read_text(encoding="utf-8")
+    html = (ROOT / "plugins" / "ff7" / "editor.html").read_text(encoding="utf-8")
     html = html.replace("<head>", '<head><base href="http://127.0.0.1:9/">', 1)
     shared_css = (
         (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
@@ -44,7 +44,7 @@ def open_current_modules(self, edition: str = "ff7") -> None:
     html = html.replace('<script src="editor.js"></script>', "")
     self.page.set_content(html, wait_until="domcontentloaded")
     self.page.add_script_tag(
-        content=(ROOT / "games" / "ff7" / "editor.js").read_text(encoding="utf-8")
+        content=(ROOT / "plugins" / "ff7" / "editor.js").read_text(encoding="utf-8")
     )
     self.page.wait_for_function("typeof state !== 'undefined' && state.loaded === true")
     self.assertEqual(self.errors, [])

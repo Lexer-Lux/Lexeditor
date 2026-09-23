@@ -11,8 +11,8 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff7.plugin import DISPLAY_NAME, FF7Session, kernel_save_payload
-from games.ff7_2013.plugin import FF7LegacySession, PLUGIN as LEGACY_PLUGIN
+from plugins.ff7.plugin import DISPLAY_NAME, FF7Session, kernel_save_payload
+from plugins.ff7_2013.plugin import FF7LegacySession, PLUGIN as LEGACY_PLUGIN
 from service_session import request_json
 
 import verify_ff7_completion as complete
@@ -20,7 +20,7 @@ import verify_ff7_datasets as fixtures
 import verify_ff7_extended as extended
 
 
-LEGACY_ROOT = ROOT / "games" / "ff7_2013"
+LEGACY_ROOT = ROOT / "plugins" / "ff7_2013"
 EXPECTED_CURRENT = "Final Fantasy 7 (Completely Pointless 2026 Re-Release That Really Should Have Just Been A Patch)"
 EXPECTED_LEGACY = "Final Fantasy 7 (Original)"
 
@@ -99,10 +99,10 @@ def verify_structure() -> None:
         )
     source = (LEGACY_ROOT / "plugin.py").read_text(encoding="utf-8")
     required = (
-        'SHARED_PLUGIN_ROOT = LEXEDITOR_ROOT / "games" / "ff7"',
-        'module="games.ff7.server"',
-        "from games.ff7.plugin import prepare_product, kernel_save_payload",
-        "from games.ff7.kernel import Kernel, resolve_kernel",
+        'SHARED_PLUGIN_ROOT = LEXEDITOR_ROOT / "plugins" / "ff7"',
+        'module="plugins.ff7.server"',
+        "from plugins.ff7.plugin import prepare_product, kernel_save_payload",
+        "from plugins.ff7.kernel import Kernel, resolve_kernel",
     )
     missing = [text for text in required if text not in source]
     if missing:

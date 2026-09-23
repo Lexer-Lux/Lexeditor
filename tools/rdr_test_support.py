@@ -119,7 +119,7 @@ def fake_resource_tool(args, **_kwargs):
 
 @contextmanager
 def workspace(root: Path, count=1):
-    from games.rdr import server, mission_rewards
+    from plugins.rdr import server, mission_rewards
     project, mod, data, game = root / "project", root / "project/mod", root / "data", root / "game"
     mapping = {
         "PROJECT": project, "MOD_ROOT": mod, "GAME_ROOT": game, "EXTRACT_ROOT": data,

@@ -17,7 +17,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.ff7 import battle, extended as ex, format_codec as codec
+from plugins.ff7 import battle, extended as ex, format_codec as codec
 
 
 def scene_fixture():

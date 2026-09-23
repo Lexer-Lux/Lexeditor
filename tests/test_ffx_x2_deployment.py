@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from games.ffx_x2 import deployment
+from plugins.ffx_x2 import deployment
 
 
 def setup_fahrenheit(root: Path):

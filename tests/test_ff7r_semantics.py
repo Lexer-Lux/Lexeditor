@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from games.ff7r.dataobject import (
+from plugins.ff7r.dataobject import (
     BOOLEAN_BYTE, BYTE, INT32, NAME, STRING,
 )
-from games.ff7r.semantics import (
+from plugins.ff7r.semantics import (
     economy_payload,
     loot_payload,
     save_economy_edits,

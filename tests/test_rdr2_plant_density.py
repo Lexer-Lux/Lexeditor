@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.rdr2 import plant_density as pd
+from plugins.rdr2 import plant_density as pd
 
 
 def valid_candidate():

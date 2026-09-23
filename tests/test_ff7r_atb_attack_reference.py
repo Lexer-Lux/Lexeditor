@@ -1,4 +1,4 @@
-from games.ff7r.atb_attack_reference import analyze_attack_atb_reference
+from plugins.ff7r.atb_attack_reference import analyze_attack_atb_reference
 
 
 def test_attack_reference_rejects_single_global_per_hit_constant():

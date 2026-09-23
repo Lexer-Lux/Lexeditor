@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import Mock, call, patch
 
 from desktop_host import HostApi, LEXEDITOR_REPOSITORY
-from games.blank.plugin import PLUGIN as BLANK_PLUGIN
+from plugins.blank.plugin import PLUGIN as BLANK_PLUGIN
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -145,11 +145,11 @@ class DeveloperModeUiContractTests(unittest.TestCase):
     def test_loading_quote_counts_cover_every_plugin_and_the_shared_pool(self):
         from desktop_host import HostApi
         counts = HostApi.loading_quote_counts(object.__new__(HostApi))
-        games = sorted(path.name for path in (ROOT / "games").iterdir()
+        games = sorted(path.name for path in (ROOT / "plugins").iterdir()
                        if path.is_dir() and not path.name.startswith(("_", ".")))
         self.assertEqual(sorted(counts["plugins"]), games)
         for name, count in counts["plugins"].items():
-            own = ROOT / "games" / name / "loading_quotes.json"
+            own = ROOT / "plugins" / name / "loading_quotes.json"
             if own.is_file():
                 import json
                 self.assertEqual(count, len(json.loads(own.read_text(encoding="utf-8"))))

@@ -1,7 +1,7 @@
 import struct
 
-from games.ff7r.atb_dodge_transition_probe import analyze_dodge_atb_call_sequences
-from games.ff7r.native_probe import PEImage, RuntimeFunction, Section
+from plugins.ff7r.atb_dodge_transition_probe import analyze_dodge_atb_call_sequences
+from plugins.ff7r.native_probe import PEImage, RuntimeFunction, Section
 
 
 def _assessment(*, common=True):

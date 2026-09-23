@@ -39,7 +39,7 @@ def main():
             page.wait_for_selector('.lex-global-setting input')
             font=Path(os.environ['LOCALAPPDATA'])/'Lexeditor/game-data/ff8/generated/ff8-menu.ttf'
             page.route('**/assets/ff8-menu.ttf*',lambda r:r.fulfill(path=str(font)))
-            page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+            page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
             page.evaluate('document.fonts.ready')
             assert page.get_by_role('checkbox',name='Wrap around at the ends',exact=True).count()==2
             for width,height in [(2048,1080),(900,620),(600,500)]:

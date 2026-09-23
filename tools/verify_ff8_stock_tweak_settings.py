@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from games.ff8 import gameplay_settings as settings
+from plugins.ff8 import gameplay_settings as settings
 
 
 def run(exe:Path|None=None) -> None:
@@ -68,7 +68,7 @@ def run(exe:Path|None=None) -> None:
         settings.initialize_project(project)
         assert not settings.load(project,game)['noMagicConsumption']
         assert not settings.load(project,game)['dropsAfterMug']
-    ui=(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8')
+    ui=(ROOT/'plugins/ff8/editor.html').read_text(encoding='utf-8')
     for key,label in [('noMagicConsumption','No Magic Consumption'),('dropsAfterMug','Drops After Mug')]:
         assert f'{key}:state.data.settings.{key}' in ui
         assert f'"aria-label":"{label}"' in ui

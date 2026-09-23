@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.ff8 import reptile_atb
+from plugins.ff8 import reptile_atb
 
 
 class ReptileAtbTests(unittest.TestCase):

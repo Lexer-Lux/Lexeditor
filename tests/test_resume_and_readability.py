@@ -36,7 +36,7 @@ def test_resident_handle_blocks_repeat_clicks_and_clears_cover(page):
 @pytest.mark.parametrize('zoom',[.75,1,1.25])
 def test_pointer_tip_tracks_text_at_each_ui_scale(page,zoom):
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''zoom=>{const U=LexeditorUI;document.body.style.zoom=zoom;
       document.querySelector('main').append(U.columnList({rows:[{id:1,name:'Fuel'}],key:r=>r.id,selected:1,
         columns:[{key:'name',label:'Item',render:r=>U.inlineLabel(U.el('img',{style:'width:20px;height:20px'}),U.el('span',{},r.name))}]}));}''',zoom)

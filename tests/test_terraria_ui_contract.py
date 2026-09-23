@@ -4,10 +4,10 @@ from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-HTML = ROOT / "games" / "terraria" / "editor.html"
-JS = ROOT / "games" / "terraria" / "editor.js"
-CSS = ROOT / "games" / "terraria" / "editor.css"
-SERVER = ROOT / "games" / "terraria" / "server.py"
+HTML = ROOT / "plugins" / "terraria" / "editor.html"
+JS = ROOT / "plugins" / "terraria" / "editor.js"
+CSS = ROOT / "plugins" / "terraria" / "editor.css"
+SERVER = ROOT / "plugins" / "terraria" / "server.py"
 
 
 class TerrariaUiContractTests(unittest.TestCase):

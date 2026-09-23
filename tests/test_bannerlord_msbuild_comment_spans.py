@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.project_data import save_project_properties
+from plugins.bannerlord.project_data import save_project_properties
 
 
 class BannerlordMsbuildCommentSpanTests(unittest.TestCase):

@@ -8,12 +8,12 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import formulae_rework  # noqa: E402
+from plugins.ff8 import formulae_rework  # noqa: E402
 
 
 def main() -> int:
-    boot = (ROOT / "games" / "ff8" / "boot.js").read_text(encoding="utf-8")
-    gameplay = (ROOT / "games" / "ff8" / "gameplay_settings.py").read_text(encoding="utf-8")
+    boot = (ROOT / "plugins" / "ff8" / "boot.js").read_text(encoding="utf-8")
+    gameplay = (ROOT / "plugins" / "ff8" / "gameplay_settings.py").read_text(encoding="utf-8")
 
     # Formulae is a subtab under Tweaks now, not a top-level tab.
     assert '["formulae","Formulae"]' not in boot

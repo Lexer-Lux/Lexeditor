@@ -33,7 +33,7 @@ def _shape(node: ast.AST) -> str:
 def duplicates() -> dict[str, list[dict]]:
     """Function shapes that appear in more than one plugin."""
     bodies: dict[str, list[dict]] = defaultdict(list)
-    for path in sorted((ROOT / "games").rglob("*.py")):
+    for path in sorted((ROOT / "plugins").rglob("*.py")):
         if SKIP & set(path.parts):
             continue
         try:

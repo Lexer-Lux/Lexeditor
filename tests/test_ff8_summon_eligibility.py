@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import unittest
 
-from games.ff8 import battle_issue_54 as battle
+from plugins.ff8 import battle_issue_54 as battle
 
 
 class SummonEligibility(unittest.TestCase):

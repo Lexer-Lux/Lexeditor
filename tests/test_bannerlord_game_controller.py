@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.bannerlord.game_launch import BannerlordGameController, module_load_order
+from plugins.bannerlord.game_launch import BannerlordGameController, module_load_order
 
 
 def write_module(root: Path, module_id: str) -> Path:
@@ -68,7 +68,7 @@ class BannerlordGameControllerTests(unittest.TestCase):
                 return process
 
             controller = BannerlordGameController(process_factory=factory)
-            with patch("games.bannerlord.game_launch.module_load_order", wraps=module_load_order) as resolver:
+            with patch("plugins.bannerlord.game_launch.module_load_order", wraps=module_load_order) as resolver:
                 launched = controller.launch(game, workspace)
             self.assertEqual(resolver.call_count, 1)
             self.assertTrue(launched["running"])

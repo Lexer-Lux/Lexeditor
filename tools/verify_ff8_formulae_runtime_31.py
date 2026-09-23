@@ -15,7 +15,7 @@ EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")
 EXPECTED_SHA256 = "064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570"
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import gameplay_settings, healing_rework, luck_accuracy  # noqa: E402
+from plugins.ff8 import gameplay_settings, healing_rework, luck_accuracy  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:
@@ -92,7 +92,7 @@ def main() -> int:
     require(rejected == (len(luck_native) + len(healing_native) + len(healing_payload)),
             "Formulae runtime mutation coverage is incomplete")
 
-    source = (ROOT / "games" / "ff8" / "gameplay_settings.py").read_text(
+    source = (ROOT / "plugins" / "ff8" / "gameplay_settings.py").read_text(
         encoding="utf-8",
     )
     require('"formulaeReworkAvailable": formulae_rework_contract.available()' in source and

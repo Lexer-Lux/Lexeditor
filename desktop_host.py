@@ -405,7 +405,7 @@ class HostApi:
             shared = {}
         shared_lines = shared.get("global", []) if isinstance(shared, dict) else []
         counts = {}
-        games_dir = root / "games"
+        games_dir = root / "plugins"
         try:
             names = sorted(path.name for path in games_dir.iterdir()
                            if path.is_dir() and not path.name.startswith(("_", ".")))
@@ -433,7 +433,7 @@ class HostApi:
             payload = {}
         if plugin_id != "__home__":
             try:
-                own = json.loads((ROOT / "games" / plugin_id / "loading_quotes.json")
+                own = json.loads((ROOT / "plugins" / plugin_id / "loading_quotes.json")
                                  .read_text(encoding="utf-8"))
             except (OSError, ValueError, TypeError):
                 own = None

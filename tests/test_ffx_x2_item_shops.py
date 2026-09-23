@@ -4,7 +4,7 @@ import struct
 
 import pytest
 
-from games.ffx_x2.item_shops import ItemShopError, apply_edits, parse_item_shops, payload
+from plugins.ffx_x2.item_shops import ItemShopError, apply_edits, parse_item_shops, payload
 
 
 def _record(rate: int, items: list[int]) -> bytes:

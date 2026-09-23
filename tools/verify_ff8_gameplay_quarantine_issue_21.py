@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import gameplay_settings
+from plugins.ff8 import gameplay_settings
 
 
 VISIBLE = frozenset({
@@ -24,7 +24,7 @@ VISIBLE = frozenset({
 })
 
 
-EDITOR = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+EDITOR = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
 
 
 def main() -> None:
@@ -78,7 +78,7 @@ def main() -> None:
             assert loaded[key] is True, key
         assert loaded["formulaeRework"] is False
 
-    editor = (ROOT / "games" / "ff8" / "editor.html").read_text(
+    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(
         encoding="utf-8",
     )
     rendered = editor[editor.index('const view=el("section",{class:"settings-view"}'):

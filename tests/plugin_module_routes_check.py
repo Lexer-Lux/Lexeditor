@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 # The service each plugin's page is served by, where it is not the plugin's own
 # server module.
-SERVERS = {"palworld": "games.palworld.build_server"}
+SERVERS = {"palworld": "plugins.palworld.build_server"}
 
 
 def modules(page: str) -> list[str]:
@@ -27,7 +27,7 @@ def modules(page: str) -> list[str]:
 
 def check(name: str) -> list[str]:
     import importlib
-    module = importlib.import_module(SERVERS.get(name, f"games.{name}.server"))
+    module = importlib.import_module(SERVERS.get(name, f"plugins.{name}.server"))
     handler = getattr(module, "Handler", None)
     if handler is None:
         return [f"{name}: no request handler"]
@@ -43,7 +43,7 @@ def check(name: str) -> list[str]:
     problems = []
     base = f"http://127.0.0.1:{server.server_port}"
     try:
-        page = (ROOT / "games" / name / "editor.html").read_text(encoding="utf-8")
+        page = (ROOT / "plugins" / name / "editor.html").read_text(encoding="utf-8")
         for asset in modules(page):
             # Browsers resolve a leading ./ before sending; request the same path.
             request = asset.lstrip('/')
@@ -90,7 +90,7 @@ def boot(base: str, name: str) -> list[str]:
 
 def main() -> int:
     problems = []
-    for page in sorted((ROOT / "games").glob("*/editor.html")):
+    for page in sorted((ROOT / "plugins").glob("*/editor.html")):
         problems += check(page.parent.name)
     if problems:
         print("FAIL:", *problems, sep="\n  ")

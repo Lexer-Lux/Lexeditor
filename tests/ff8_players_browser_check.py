@@ -21,11 +21,11 @@ def main():
   page.goto('http://fixture/')
   page.set_content('<div id="toolbar">Old character tabs</div><main id="main" style="height:800px"></main>')
   page.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  css=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8')
+  css=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8')
   page.add_style_tag(content=css)
   page.add_style_tag(content=':root{--lex-text:#fff;--lex-panel:#626262;--lex-panel-2:#4f4f4f;--lex-border:#929292;--lex-highlight:#fff;--lex-accent:#aa2432;--lex-panel-gap:8px}')
   page.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
-  source=(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8').replace('    render,\n    edits:', '    render, renderPlayers:()=>{mode="players";return render()},\n    edits:',1)
+  source=(ROOT/'plugins/ff8/cards_ui.js').read_text(encoding='utf-8').replace('    render,\n    edits:', '    render, renderPlayers:()=>{mode="players";return render()},\n    edits:',1)
   page.add_script_tag(content=source)
   page.evaluate('''()=>{
    const U=LexeditorUI;window.model={tab:'cards',activeSource:'mine',data:{fields:{rows:[{key:'test',name:'Test area',_loaded:true,players:[]},{key:'garden',name:'Garden',_loaded:true,players:[{id:0,entity:'Student',params:[{id:0,name:'Deck level',mode:'literal',editable:true,value:3}]}]}]}},vanilla:{fields:{rows:[]}}};

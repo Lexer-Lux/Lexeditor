@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from games.ff9 import memoria_baseline
-from games.ff9.plugin import FF9Session
+from plugins.ff9 import memoria_baseline
+from plugins.ff9.plugin import FF9Session
 
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "ff9-browser"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -139,7 +139,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
     shim = temp / "shim"
     shim.mkdir()
     (shim / "sitecustomize.py").write_text(
-        "from games.ff9 import memoria_baseline as b\n" + f"b.FILES={hashes!r}\nb._last=None\n",
+        "from plugins.ff9 import memoria_baseline as b\n" + f"b.FILES={hashes!r}\nb._last=None\n",
         encoding="utf-8",
     )
     separator = ";" if sys.platform == "win32" else ":"

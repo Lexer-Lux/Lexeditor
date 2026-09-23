@@ -60,7 +60,7 @@ STUB = """
 
 def session_for(plugin_id: str, project: str | None):
     """Return the plugin's own session class, not the shared base class."""
-    module = __import__(f"games.{plugin_id}.plugin", fromlist=["PLUGIN"])
+    module = __import__(f"plugins.{plugin_id}.plugin", fromlist=["PLUGIN"])
     from service_session import LocalPluginSession
     candidates = [getattr(module, name) for name in dir(module)]
     session_class = next(
@@ -69,7 +69,7 @@ def session_for(plugin_id: str, project: str | None):
          and value is not LocalPluginSession),
         None)
     if session_class is None:
-        raise SystemExit(f"no session class in games/{plugin_id}/plugin.py")
+        raise SystemExit(f"no session class in plugins/{plugin_id}/plugin.py")
     variable = {
         "bannerlord": "LEXEDITOR_BANNERLORD_PROJECT",
         "ff8": "LEXEDITOR_FF8_PROJECT", "ff7": "LEXEDITOR_FF7_PROJECT",

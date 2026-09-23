@@ -5,9 +5,9 @@ on:
     branches: [master]
     paths:
       - 'ui/**'
-      - 'games/**/plugin.py'
-      - 'games/**/credits.json'
-      - 'games/**/editor.html'
+      - 'plugins/**/plugin.py'
+      - 'plugins/**/credits.json'
+      - 'plugins/**/editor.html'
       - 'app.py'
       - 'desktop_host.py'
       - 'github_integration.py'
@@ -31,9 +31,9 @@ on:
   pull_request:
     paths:
       - 'ui/**'
-      - 'games/**/plugin.py'
-      - 'games/**/credits.json'
-      - 'games/**/editor.html'
+      - 'plugins/**/plugin.py'
+      - 'plugins/**/credits.json'
+      - 'plugins/**/editor.html'
       - 'app.py'
       - 'desktop_host.py'
       - 'github_integration.py'

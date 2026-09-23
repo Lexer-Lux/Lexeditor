@@ -4,8 +4,8 @@ import sys,tempfile
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from games.ff8.cards import ELEMENTS
-from games.ff8.card_art import png_bytes, element_png_bytes
+from plugins.ff8.cards import ELEMENTS
+from plugins.ff8.card_art import png_bytes, element_png_bytes
 
 def main():
  with sync_playwright() as pw:
@@ -19,7 +19,7 @@ def main():
   page.add_style_tag(path=str(ROOT/'ui/framework.css'))
   page.add_style_tag(content=':root{--lex-card-image-crop:3%;--lex-card-bg:#22357e}')
   page.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
-  source=(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8').replace('    render,\n    edits:', '    render, preview,\n    edits:',1)
+  source=(ROOT/'plugins/ff8/cards_ui.js').read_text(encoding='utf-8').replace('    render,\n    edits:', '    render, preview,\n    edits:',1)
   page.add_script_tag(content=source)
   page.evaluate('''elements=>{const el=LexeditorUI.el;window.row={id:9,top:4,left:3,right:2,bottom:4,element:0,power:22};window.edits=[];
    const ui=FF8CardsUI({el,state:{activeSource:'mine',data:{cards:{elements}}},noteFieldEdit:(...args)=>edits.push(args),conceptIcon:(kind,name)=>name==='None'?null:el('img',{src:'/assets/icons/'+({Fire:288,Ice:289,Thunder:290,Earth:291,Poison:292,Wind:293,Water:294,Holy:295}[name])+'.png',alt:'',title:name+' game icon'})});

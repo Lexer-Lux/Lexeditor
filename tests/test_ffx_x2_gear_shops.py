@@ -5,10 +5,10 @@ import struct
 
 import pytest
 
-from games.ffx_x2.gear_shops import (
+from plugins.ffx_x2.gear_shops import (
     ARCHIVE_PATH, GearShopError, apply_edits, parse_gear_shops, payload,
 )
-from games.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
+from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
 from service_session import request_json
 
 

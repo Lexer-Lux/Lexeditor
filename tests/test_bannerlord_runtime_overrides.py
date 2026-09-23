@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.bannerlord.runtime_overrides import read_runtime_overrides, save_runtime_overrides
+from plugins.bannerlord.runtime_overrides import read_runtime_overrides, save_runtime_overrides
 
 
 EFFECTS = r'''private static readonly List<EffectDefinition> Definitions = new List<EffectDefinition>{Effect("Tailoring","Light armor encumbrance",150f,50f,"%"),Effect("Medicine","Ally heal rate",2.5f,5f,"%")};'''
@@ -189,7 +189,7 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
             temporary.cleanup()
 
     def test_runtime_editor_sends_loaded_revisions(self):
-        boot = Path(__file__).resolve().parents[1] / "games" / "bannerlord" / "editor_boot.js"
+        boot = Path(__file__).resolve().parents[1] / "plugins" / "bannerlord" / "editor_boot.js"
         text = boot.read_text(encoding="utf-8")
         self.assertIn('effectsHash:state.savedRuntimeOverrides.effectsHash||""', text)
         self.assertIn('xpSourcesHash:state.savedRuntimeOverrides.xpSourcesHash||""', text)
@@ -300,7 +300,7 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
             temporary.cleanup()
 
     def test_runtime_editor_exposes_safe_reload(self):
-        editor = Path(__file__).resolve().parents[1] / "games" / "bannerlord" / "editor_runtime.js"
+        editor = Path(__file__).resolve().parents[1] / "plugins" / "bannerlord" / "editor_runtime.js"
         text = editor.read_text(encoding="utf-8")
         self.assertIn("async function reloadRuntimeOverrides", text)
         self.assertIn("Discard unsaved Runtime Override changes", text)
@@ -336,7 +336,7 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
                 return real_resolve(path, *args, **kwargs)
 
             with patch(
-                "games.bannerlord.runtime_overrides._deployed_module",
+                "plugins.bannerlord.runtime_overrides._deployed_module",
                 return_value=("LexerSkillTweaks", deployed_resolved),
             ), patch.object(Path, "resolve", new=fake_resolve):
                 with self.assertRaisesRegex(ValueError, "ModuleData path escaped"):

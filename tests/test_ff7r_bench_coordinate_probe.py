@@ -1,12 +1,12 @@
 import struct
 
-from games.ff7r.bench_coordinate_probe import (
+from plugins.ff7r.bench_coordinate_probe import (
     analyze_actor_root_coordinate_space,
     compare_actor_root_coordinate_spaces,
     correlate_layout_with_coordinate_evidence,
     decode_object_property_ref,
 )
-from games.ff7r.package_probe import NameRef, PackageExport, PackageObjectTable
+from plugins.ff7r.package_probe import NameRef, PackageExport, PackageObjectTable
 
 
 def _export(index: int, name: str, *, outer: int = 0) -> PackageExport:

@@ -10,8 +10,8 @@
 
 ## Current implementation and evidence
 
-- `games/ff8/streamlined_draw.py` is integrated through `games/ff8/gameplay_settings.py` and owns Streamlined Draw filtering/selection behavior.
-- `games/ff8/shoot_issue_54.py` owns the guarded Shoot queue, per-shot ATB cost, return/cancel handling, and next-ready lock.
+- `plugins/ff8/streamlined_draw.py` is integrated through `plugins/ff8/gameplay_settings.py` and owns Streamlined Draw filtering/selection behavior.
+- `plugins/ff8/shoot_issue_54.py` owns the guarded Shoot queue, per-shot ATB cost, return/cancel handling, and next-ready lock.
 - The live issue is now `untested` / `test build` with a reproducible player checklist. No gameplay acceptance has been claimed.
 
 ## Next agent work

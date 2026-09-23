@@ -63,7 +63,7 @@ def service(tmp_path, monkeypatch):
     def revert(): deployed["value"] = False; return deployment_status()
     dependency("features", load=feature_load, save=feature_save, status=deployment_status,
                deploy=deploy, revert=revert)
-    file = Path(__file__).parents[1] / "games/ff9/server.py"
+    file = Path(__file__).parents[1] / "plugins/ff9/server.py"
     spec = importlib.util.spec_from_file_location(f"{package_name}.server", file)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -145,7 +145,7 @@ def test_dashboard_and_plugin_choose_launcher_for_play(service):
     _, dashboard = request(service, "/api/dashboard", method="GET")
     expected = service[0].paths.GAME_ROOT / "FF9_Launcher.exe"
     assert Path(dashboard["game"]["executable"]) == expected
-    source = (Path(__file__).parents[1] / "games/ff9/plugin.py").read_text(encoding="utf-8")
+    source = (Path(__file__).parents[1] / "plugins/ff9/plugin.py").read_text(encoding="utf-8")
     specs = [node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Call)
              and isinstance(node.func, ast.Name) and node.func.id == "GameInstallSpec"]
     assert len(specs) == 1

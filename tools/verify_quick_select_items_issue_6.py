@@ -13,9 +13,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = Path(r"C:\RDR2Mod")
-EDITOR = ROOT / "games" / "rdr2" / "editor.html"
-SERVER = ROOT / "games" / "rdr2" / "server.py"
-DATA_MAP = ROOT / "games" / "rdr2" / "data_map.py"
+EDITOR = ROOT / "plugins" / "rdr2" / "editor.html"
+SERVER = ROOT / "plugins" / "rdr2" / "server.py"
+DATA_MAP = ROOT / "plugins" / "rdr2" / "data_map.py"
 
 
 def require(condition: bool, message: str) -> None:
@@ -78,7 +78,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-issue-6-", ignore_cleanup_err
     os.environ["LEXEDITOR_RDR2_PROJECT"] = str(PROJECT)
     os.environ["LEXEDITOR_MOD_ROOT"] = str(mod)
     sys.path.insert(0, str(ROOT))
-    from games.rdr2 import server  # noqa: E402
+    from plugins.rdr2 import server  # noqa: E402
 
     before = server.get_quick_select()
     require(before["available"], "temporary quick-select file was not loaded")

@@ -284,9 +284,9 @@ def _archive_entries(game: str) -> list[dict]:
 
 def _serve(page, store: dict[str, object]):
     assets = {
-        "/": ("text/html", ROOT / "games/ffx_x2/editor.html"),
-        "/editor.js": ("application/javascript", ROOT / "games/ffx_x2/editor.js"),
-        "/editor.css": ("text/css", ROOT / "games/ffx_x2/editor.css"),
+        "/": ("text/html", ROOT / "plugins/ffx_x2/editor.html"),
+        "/editor.js": ("application/javascript", ROOT / "plugins/ffx_x2/editor.js"),
+        "/editor.css": ("text/css", ROOT / "plugins/ffx_x2/editor.css"),
         "/shared/framework.js": ("application/javascript", ROOT / "ui/framework.js"),
         "/shared/framework.css": ("text/css", ROOT / "ui/framework.css"),
         "/shared/mod-loading.json": ("application/json", ROOT / "ui/mod-loading.json"),

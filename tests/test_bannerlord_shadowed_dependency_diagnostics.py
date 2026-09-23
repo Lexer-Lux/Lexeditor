@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.runtime_data import deployment_status
+from plugins.bannerlord.runtime_data import deployment_status
 
 
 def write_selected(game: Path) -> Path:

@@ -1,4 +1,4 @@
-from games.ff7r.cutscene_runtime_probe import assess_cutscene_runtime_evidence
+from plugins.ff7r.cutscene_runtime_probe import assess_cutscene_runtime_evidence
 
 
 def _inbound(*callers):

@@ -1,8 +1,8 @@
-from games.ff7r.save_control_probe import (
+from plugins.ff7r.save_control_probe import (
     analyze_controlled_experiment_groups,
     analyze_controlled_save_pairs,
 )
-from games.ff7r.save_diff_probe import SavePair
+from plugins.ff7r.save_diff_probe import SavePair
 
 
 def _pair(*changes: tuple[int, int], label: str = "") -> SavePair:

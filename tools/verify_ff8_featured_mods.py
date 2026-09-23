@@ -16,7 +16,7 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import featured_mods, iroj_archive, paths, runtime_layout, server  # noqa: E402
+from plugins.ff8 import featured_mods, iroj_archive, paths, runtime_layout, server  # noqa: E402
 
 
 def archive_bytes(mod_id: str, name: str, payload: bytes) -> bytes:

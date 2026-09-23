@@ -8,10 +8,10 @@ from fontTools.ttLib import TTFont
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8.game_font import ensure_font  # noqa: E402
+from plugins.ff8.game_font import ensure_font  # noqa: E402
 
-EDITOR = ROOT / "games" / "ff8" / "editor.html"
-ICONS = ROOT / "games" / "ff8" / "game_icons.py"
+EDITOR = ROOT / "plugins" / "ff8" / "editor.html"
+ICONS = ROOT / "plugins" / "ff8" / "game_icons.py"
 
 
 def main() -> int:

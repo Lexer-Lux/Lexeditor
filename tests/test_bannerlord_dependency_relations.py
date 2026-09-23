@@ -1,6 +1,6 @@
 import unittest
 
-from games.bannerlord.dependency_relations import (
+from plugins.bannerlord.dependency_relations import (
     effective_incompatible_relations,
     effective_load_relations,
     incompatible_relation_rows,

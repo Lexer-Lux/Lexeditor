@@ -2,8 +2,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.game_launch import module_load_order
-from games.bannerlord.module_data import is_singleplayer_module, read_submodule, save_module
+from plugins.bannerlord.game_launch import module_load_order
+from plugins.bannerlord.module_data import is_singleplayer_module, read_submodule, save_module
 
 
 class BannerlordModuleCategoryTests(unittest.TestCase):

@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.module_data import is_singleplayer_module, read_submodule, save_module_metadata
+from plugins.bannerlord.module_data import is_singleplayer_module, read_submodule, save_module_metadata
 
 
 MODERN = '''<Module>

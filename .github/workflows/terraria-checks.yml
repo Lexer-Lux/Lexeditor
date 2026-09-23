@@ -4,7 +4,7 @@ on:
   push:
     branches: [master, feature/terraria-plugin]
     paths:
-      - 'games/terraria/**'
+      - 'plugins/terraria/**'
       - 'codex/terraria/**'
       - 'plugin_api.py'
       - 'project_manager.py'
@@ -13,7 +13,7 @@ on:
       - '.github/workflows/terraria-checks.yml'
   pull_request:
     paths:
-      - 'games/terraria/**'
+      - 'plugins/terraria/**'
       - 'codex/terraria/**'
       - 'plugin_api.py'
       - 'project_manager.py'
@@ -39,10 +39,10 @@ jobs:
           python-version: '3.12'
       - name: Python parser and service tests
         run: |
-          python -m compileall -q games/terraria plugin_api.py project_manager.py
+          python -m compileall -q plugins/terraria plugin_api.py project_manager.py
           python -m unittest discover -s tests -p 'test_terraria_*.py'
       - name: Editor JavaScript syntax
-        run: node --check games/terraria/editor.js
+        run: node --check plugins/terraria/editor.js
       - name: Install browser acceptance
         run: |
           python -m pip install --disable-pip-version-check 'playwright>=1.50,<2'
@@ -74,7 +74,7 @@ jobs:
           python-version: '3.12'
       - name: Prove Windows file-version metadata reader
         shell: pwsh
-        run: python -c "from pathlib import Path; import sys; from games.terraria.runtime import windows_product_version; value=windows_product_version(Path(sys.executable)); print(value); assert value.strip()"
+        run: python -c "from pathlib import Path; import sys; from plugins.terraria.runtime import windows_product_version; value=windows_product_version(Path(sys.executable)); print(value); assert value.strip()"
       - name: Build packaged acceptance runner
         shell: pwsh
         run: |
@@ -82,12 +82,12 @@ jobs:
           python -m pip install --disable-pip-version-check -r requirements.txt 'pyinstaller>=6,<7'
           python -m PyInstaller --noconfirm --clean --onefile --name TerrariaAcceptance `
             --paths . `
-            --collect-submodules games.terraria `
+            --collect-submodules plugins.terraria `
             --hidden-import plugin_api `
             --hidden-import project_manager `
             --hidden-import runtime_bootstrap `
             --hidden-import service_session `
-            --add-data "games/terraria/template;games/terraria/template" `
+            --add-data "plugins/terraria/template;plugins/terraria/template" `
             tools/terraria_acceptance.py
 
           New-Item -ItemType Directory -Force candidate | Out-Null
@@ -175,8 +175,8 @@ jobs:
           mkdir -p candidate/runtime candidate/runner/tools candidate/runner/games
           cp tools/terraria_acceptance.py candidate/runner/tools/
           cp plugin_api.py service_session.py runtime_bootstrap.py candidate/runner/
-          cp -R games/terraria candidate/runner/games/terraria
-          test -f games/__init__.py && cp games/__init__.py candidate/runner/games/__init__.py || touch candidate/runner/games/__init__.py
+          cp -R plugins/terraria candidate/runner/plugins/terraria
+          test -f plugins/__init__.py && cp plugins/__init__.py candidate/runner/plugins/__init__.py || touch candidate/runner/plugins/__init__.py
           find candidate/runner -type d -name __pycache__ -prune -exec rm -rf {} +
 
           python_url='https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip'

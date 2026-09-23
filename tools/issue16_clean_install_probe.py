@@ -44,8 +44,8 @@ def main() -> int:
     copied_root = Path(sys.argv[1]).resolve()
     sys.path.insert(0, str(copied_root))
 
-    from games.rdr2 import extractor  # pylint: disable=import-outside-toplevel
-    from games.rdr2 import plugin as rdr2_plugin  # pylint: disable=import-outside-toplevel
+    from plugins.rdr2 import extractor  # pylint: disable=import-outside-toplevel
+    from plugins.rdr2 import plugin as rdr2_plugin  # pylint: disable=import-outside-toplevel
     from game_installation import GameInstallationManager  # pylint: disable=import-outside-toplevel
 
     PLUGIN = rdr2_plugin.PLUGIN

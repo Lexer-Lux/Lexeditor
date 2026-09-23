@@ -12,7 +12,7 @@ from settings_manager import SettingsStore  # noqa: E402
 
 FRAMEWORK = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-FF8 = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+FF8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
 
 
 def main() -> int:

@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from games.ff8 import formats
+from plugins.ff8 import formats
 from test_shared_ui_feedback import ROOT, page, framework
 
 
@@ -41,10 +41,10 @@ def test_items_render_and_save_battle_and_ammo(page,game_files):
     with patch.object(formats,'source_path',side_effect=lambda name,*a:game_files[name]):
         battle=formats.kernel_rows(8)
         ammo=formats.kernel_rows(22)
-    core=(ROOT/'games/ff8/core.js').read_text()
+    core=(ROOT/'plugins/ff8/core.js').read_text()
     names=json.loads(re.search(r'const editableDatasets=(\[.*?\]);',core).group(1))
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''({names,battle,ammo})=>{
       window.state={data:Object.fromEntries(names.map(n=>[n,{rows:[]}])),base:{},tab:'items',selected:{items:1}};
       state.data.battleItems=battle;state.data.ammoEffects=ammo;
@@ -60,9 +60,9 @@ def test_items_render_and_save_battle_and_ammo(page,game_files):
       const showAlert=()=>{};
       function fieldSourceControl(field){return LexeditorUI.el('input',{type:'number',value:field.value,'aria-label':field.label,oninput:e=>field.value=Number(e.target.value)})}
     ''')
-    records=(ROOT/'games/ff8/records.js').read_text()
+    records=(ROOT/'plugins/ff8/records.js').read_text()
     page.add_script_tag(content=records[:records.index('  function renderItems(')])
-    boot=(ROOT/'games/ff8/boot.js').read_text()
+    boot=(ROOT/'plugins/ff8/boot.js').read_text()
     page.add_script_tag(content=boot[boot.index('  async function saveAll()'):boot.index('  function post(')])
     assert page.evaluate('itemBattleSections(0).length')==0
     assert page.evaluate('itemBattleSections(33).length')==0
@@ -87,11 +87,11 @@ def test_actual_battle_controls(page,game_files):
     with patch.object(formats,'source_path',side_effect=lambda name,*a:game_files[name]):
         data={'battleItems':formats.kernel_rows(8),'ammoEffects':formats.kernel_rows(22)}
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
-    page.add_script_tag(path=str(ROOT/'games/ff8/core.js'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
+    page.add_script_tag(path=str(ROOT/'plugins/ff8/core.js'))
     page.add_script_tag(content='const shell={refresh(){}};function render(){}')
-    page.add_script_tag(path=str(ROOT/'games/ff8/party.js'))
-    records=(ROOT/'games/ff8/records.js').read_text()
+    page.add_script_tag(path=str(ROOT/'plugins/ff8/party.js'))
+    records=(ROOT/'plugins/ff8/records.js').read_text()
     page.add_script_tag(content=records[:records.index('  function renderItems(')])
     page.evaluate('''data=>{Object.assign(state.data,data);state.vanilla=structuredClone(data);
       document.querySelector('main').replaceChildren(...itemBattleSections(1));}''',data)

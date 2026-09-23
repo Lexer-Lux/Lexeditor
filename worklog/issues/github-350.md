@@ -15,7 +15,7 @@ Preserve Fast Start behavior.
   shows no warning.
 - No acceptance persistence exists: no QSettings, no registry keys, no
   agreed/accepted/don't-show strings. The notice shows on every launcher run.
-- No existing warning-suppression code in the plugin (searched games/ff8).
+- No existing warning-suppression code in the plugin (searched plugins/ff8).
 - Lexeditor launches `FF8_EN.exe` directly and never runs the launcher, so
   its path already avoids the warning — but nothing disables the warning
   itself, exactly as the issue states.

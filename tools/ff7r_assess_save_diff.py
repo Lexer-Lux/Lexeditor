@@ -44,16 +44,16 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from games.ff7r.save_bit_signature_probe import (  # noqa: E402
+from plugins.ff7r.save_bit_signature_probe import (  # noqa: E402
     analyze_controlled_bit_signatures,
     assess_indexed_bitset_layout,
     validate_controlled_bit_signatures,
 )
-from games.ff7r.save_control_probe import (  # noqa: E402
+from plugins.ff7r.save_control_probe import (  # noqa: E402
     analyze_controlled_experiment_groups,
     analyze_controlled_save_pairs,
 )
-from games.ff7r.save_diff_probe import (  # noqa: E402
+from plugins.ff7r.save_diff_probe import (  # noqa: E402
     SavePair,
     analyze_experiment_groups,
     analyze_save_pairs,

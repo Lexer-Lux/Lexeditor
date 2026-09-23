@@ -5,8 +5,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.palworld import build as package_build
-from games.palworld.workshop import (
+from plugins.palworld import build as package_build
+from plugins.palworld.workshop import (
     PackageNameCollisionError,
     WorkshopChangedError,
     WorkshopOwnershipError,

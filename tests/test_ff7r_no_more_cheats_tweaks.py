@@ -4,9 +4,9 @@ import struct
 
 import pytest
 
-from games.ff7r.dataobject import DataObjectPackage, parse_uasset
-from games.ff7r.dataobject_structural import append_array_element
-from games.ff7r.no_more_cheats_tweaks import (
+from plugins.ff7r.dataobject import DataObjectPackage, parse_uasset
+from plugins.ff7r.dataobject_structural import append_array_element
+from plugins.ff7r.no_more_cheats_tweaks import (
     EXPECTED_TARGET_KEYS,
     NO_MORE_CHEATS_ASSET,
     has_enabled_no_more_cheats,
@@ -18,7 +18,7 @@ from games.ff7r.no_more_cheats_tweaks import (
     save_virtual_edits,
     validate_config,
 )
-from games.ff7r.plugin import _test_package
+from plugins.ff7r.plugin import _test_package
 
 
 def _assessment(*, blocked: str | None = None):
@@ -106,7 +106,7 @@ def test_removal_plan_rejects_duplicate_structural_selector():
 
 
 def test_virtual_surface_exposes_enable_and_fail_closed_status(tmp_path, monkeypatch):
-    import games.ff7r.no_more_cheats_tweaks as module
+    import plugins.ff7r.no_more_cheats_tweaks as module
 
     assessment = _assessment(blocked="easyMode")
     monkeypatch.setattr(module, "collect_report", lambda *args, **kwargs: _report())
@@ -124,7 +124,7 @@ def test_virtual_surface_exposes_enable_and_fail_closed_status(tmp_path, monkeyp
 
 
 def test_virtual_save_round_trip_is_config_only(tmp_path, monkeypatch):
-    import games.ff7r.no_more_cheats_tweaks as module
+    import plugins.ff7r.no_more_cheats_tweaks as module
 
     assessment = _assessment()
     monkeypatch.setattr(module, "collect_report", lambda *args, **kwargs: _report())
@@ -144,8 +144,8 @@ def test_virtual_save_round_trip_is_config_only(tmp_path, monkeypatch):
 
 
 def test_materializer_deletes_all_four_proved_entries_in_staging_only(tmp_path, monkeypatch):
-    import games.ff7r.archive as archive
-    import games.ff7r.no_more_cheats_tweaks as module
+    import plugins.ff7r.archive as archive
+    import plugins.ff7r.no_more_cheats_tweaks as module
 
     source_uasset, source_uexp = _source_pair(tmp_path)
     assessment = _assessment()
@@ -167,7 +167,7 @@ def test_materializer_deletes_all_four_proved_entries_in_staging_only(tmp_path, 
 
 
 def test_materializer_refuses_any_blocked_target(tmp_path, monkeypatch):
-    import games.ff7r.no_more_cheats_tweaks as module
+    import plugins.ff7r.no_more_cheats_tweaks as module
 
     save_config(tmp_path / "project", {"enabled": True})
     monkeypatch.setattr(module, "collect_report", lambda *args, **kwargs: _report())

@@ -11,7 +11,7 @@ VCVARS=Path(r"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\
 class FlareOwnerTests(unittest.TestCase):
     @unittest.skipUnless(os.name=="nt" and VCVARS.exists(),"Windows C++ Build Tools required")
     def test_production_request_admission_gates_count_and_reset(self):
-        source=ROOT/"games/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_flare_owner.cpp"
+        source=ROOT/"plugins/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_flare_owner.cpp"
         code='#include "'+source.as_posix()+'"\n'+r'''
 #include <cstdarg>
 #include <cstdio>

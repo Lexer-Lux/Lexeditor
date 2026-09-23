@@ -7,7 +7,7 @@ during movement. Main lantern behavior is #105; leg clipping is #295.
 The issue states deferral must not become waiting-on-Lexer.
 
 ## Findings (2026-09-22)
-- Code: `games/rdr2/native_runtime/GameplayTweaks/modules/belt_lantern.cpp`
+- Code: `plugins/rdr2/native_runtime/GameplayTweaks/modules/belt_lantern.cpp`
   (482 lines). Attachment is bone-resolved (PH_Belt_Thrower / bone 2656,
   WEAPON_ATTACH_POINT_LANTERN) with runtime pose calibration
   (`attachBeltLanternCalibrationPose`, best-pose selection with rotation

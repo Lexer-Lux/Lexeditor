@@ -273,7 +273,7 @@ class PageTests(unittest.TestCase):
 
     def install_extra(self, family):
         from verify_ff7_extended import scene_fixture, text_fixture, exe_fixture
-        from games.ff7 import extended as ex
+        from plugins.ff7 import extended as ex
         import hashlib
         paths = {"scene":"data/battle/scene.bin", "text":"data/lang-en/kernel/kernel2.bin", "shop":"ff7_en.exe"}
         value = {"scene":scene_fixture,"text":text_fixture,"shop":exe_fixture}[family]()
@@ -290,7 +290,7 @@ class PageTests(unittest.TestCase):
         self.assertEqual(self.page.locator("#test-error").inner_text(),"")
 
     def test_scene_fields_save_without_kernel_and_keep_ai(self):
-        from games.ff7.battle import SceneArchive
+        from plugins.ff7.battle import SceneArchive
         source=self.install_extra("scene");before=source.read_bytes()
         self.open();self.click("Enemies")
         self.page.get_by_label("HP for Enemy0",exact=True).fill("12345")
@@ -304,7 +304,7 @@ class PageTests(unittest.TestCase):
         self.assertEqual(source.read_bytes(),before);self.assertEqual(self.errors,[])
 
     def test_text_and_shop_ui_persistence(self):
-        from games.ff7 import extended as ex
+        from plugins.ff7 import extended as ex
         write_kernel(self.backend.game/PATHS[0])
         text=self.install_extra("text");shop=self.install_extra("shop")
         text_before,shop_before=text.read_bytes(),shop.read_bytes()

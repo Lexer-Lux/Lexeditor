@@ -17,9 +17,9 @@ RDR2_ROOT = Path(r"C:\RDR2Mod")
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(RDR2_ROOT / "tools" / "reverse-engineering"))
 
-from games.ff8.plugin import FF8Session  # noqa: E402
-from games.rdr2.plugin import Rdr2Session  # noqa: E402
-from games.blank.plugin import BlankSession  # noqa: E402
+from plugins.ff8.plugin import FF8Session  # noqa: E402
+from plugins.rdr2.plugin import Rdr2Session  # noqa: E402
+from plugins.blank.plugin import BlankSession  # noqa: E402
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 
 

@@ -98,7 +98,7 @@ and the textures `U_CharaStatus_Base_02` and `U_CharaStatus_ATB_03`.
 
 ### Fixed by reading PAK entries directly
 
-`games/ff7r/pak_reader.py` now parses the version 4 index and entry payloads
+`plugins/ff7r/pak_reader.py` now parses the version 4 index and entry payloads
 itself, so the plugin no longer depends on the repak defect being fixed
 upstream. repak remains responsible for listing, packing and archive info,
 which it performs correctly, and stays the fallback if the reader rejects an

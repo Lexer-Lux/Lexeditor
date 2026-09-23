@@ -48,7 +48,7 @@ def main() -> int:
 
     # Guard the architecture decision. Junction is evidence for condition
     # syntax only. Lexeditor remains the loader and composition owner.
-    layout = (ROOT / "games" / "ff8" / "runtime_layout.py").read_text(encoding="utf-8")
+    layout = (ROOT / "plugins" / "ff8" / "runtime_layout.py").read_text(encoding="utf-8")
     require('"liveConditionalRoutes": live_routes' in layout and
             "LIVE_CONDITIONAL_MANIFEST" in layout,
             "composition no longer emits its bounded runtime manifest")

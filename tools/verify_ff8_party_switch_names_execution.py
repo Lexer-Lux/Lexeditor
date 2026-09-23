@@ -26,7 +26,7 @@ from pathlib import Path
 u=machine()
 assert bytes(u.mem_read(0x4AF589,5)) == bytes.fromhex("E8 C2 7C FF FF")
 assert bytes(u.mem_read(0x4AF597,5)) == bytes.fromhex("E8 74 7F FF FF")
-source=(Path(__file__).resolve().parents[1]/"games/ff8/ffnx_party_switch/ffnx-src/lexeditor_ff8_party_switch.cpp").read_text()
+source=(Path(__file__).resolve().parents[1]/"plugins/ff8/ffnx_party_switch/ffnx-src/lexeditor_ff8_party_switch.cpp").read_text()
 draw=source.split("std::uint32_t __cdecl draw(",1)[1].split("void abort_swap()",1)[0]
 assert draw.rindex("0x4A7250") < draw.index("0x4A7510")
 print("PASS: selector submits names and cursor before the background, matching native battle menus")

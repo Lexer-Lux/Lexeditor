@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.terraria.structured_content import (
+from plugins.terraria.structured_content import (
     BEGIN_MARKER,
     END_MARKER,
     create_structured_content,
@@ -16,8 +16,8 @@ from games.terraria.structured_content import (
     update_structured_content,
     validate_values,
 )
-from games.terraria.source_text import save_source, source_file_state
-from games.terraria.localization import parse_localization_text
+from plugins.terraria.source_text import save_source, source_file_state
+from plugins.terraria.localization import parse_localization_text
 
 
 class TerrariaStructuredContentTests(unittest.TestCase):

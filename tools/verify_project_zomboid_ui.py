@@ -305,7 +305,7 @@ def main() -> int:
     parser.add_argument("--screenshots", type=Path)
     args = parser.parse_args()
     from playwright.sync_api import sync_playwright
-    from games.project_zomboid import server
+    from plugins.project_zomboid import server
 
     with tempfile.TemporaryDirectory(prefix="lexeditor-pz-rendered-") as temp:
         base = Path(temp)

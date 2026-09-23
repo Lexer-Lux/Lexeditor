@@ -1,7 +1,7 @@
 """Regression coverage for FF8 kernel text overrides (encode/decode/rows/edits)."""
 import unittest
 
-from games.ff8 import kernel_text as kt
+from plugins.ff8 import kernel_text as kt
 
 
 def fixture():

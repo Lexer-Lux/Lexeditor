@@ -2,7 +2,7 @@
 import sys,threading
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from games.ff8.server import create_server
+from plugins.ff8.server import create_server
 from playwright.sync_api import sync_playwright
 server=create_server(0);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
 try:

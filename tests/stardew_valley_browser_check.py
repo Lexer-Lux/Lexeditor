@@ -20,10 +20,10 @@ SHARED_LAYOUT_WARNINGS: list[dict] = []
 (OUT / "started.txt").write_text("Stardew rendered acceptance started.\n", encoding="utf-8")
 sys.path.insert(0, str(ROOT))
 
-from games.stardew_valley.content_pack import initialize_project  # noqa: E402
-from games.stardew_valley.plugin import StardewValleySession  # noqa: E402
+from plugins.stardew_valley.content_pack import initialize_project  # noqa: E402
+from plugins.stardew_valley.plugin import StardewValleySession  # noqa: E402
 from service_session import request_json  # noqa: E402
-from games.stardew_valley.source_data import objects_source_path  # noqa: E402
+from plugins.stardew_valley.source_data import objects_source_path  # noqa: E402
 
 
 def make_fixture(root: Path) -> tuple[Path, Path]:
@@ -157,7 +157,7 @@ def make_fixture(root: Path) -> tuple[Path, Path]:
         target = source.parent / f"{asset}.json"
         target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
-    shutil.copytree(ROOT / "games" / "stardew_valley" / "project_template", project)
+    shutil.copytree(ROOT / "plugins" / "stardew_valley" / "project_template", project)
     initialize_project(project)
     return game, project
 

@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def session():
-    return LocalPluginSession(module='games.blank.server', plugin_id='blank',
+    return LocalPluginSession(module='plugins.blank.server', plugin_id='blank',
                               app_root=ROOT, check=lambda: [])
 
 
@@ -55,7 +55,7 @@ class ServiceLifetimeTests(unittest.TestCase):
 import json,os,time
 from pathlib import Path
 from service_session import LocalPluginSession
-s=LocalPluginSession(module='games.blank.server',plugin_id='blank',app_root=Path.cwd(),check=lambda:[])
+s=LocalPluginSession(module='plugins.blank.server',plugin_id='blank',app_root=Path.cwd(),check=lambda:[])
 s.start()
 print(json.dumps({'pid':os.getpid(),'port':s.port}),flush=True)
 time.sleep(120)

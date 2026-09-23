@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import unittest
 
-from games.project_zomboid import core, zedscript
+from plugins.project_zomboid import core, zedscript
 
 
 ROOT = Path(__file__).resolve().parents[1]

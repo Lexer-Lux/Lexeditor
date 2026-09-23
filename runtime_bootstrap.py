@@ -8,10 +8,10 @@ import sys
 
 SERVICE_MODULES = frozenset({
 
-    'games.bannerlord.server', 'games.blank.server', 'games.ff7.server', 'games.ff7r.server', 'games.ff7r.themed_server',
-    'games.ds3.server', 'games.ff8.server', 'games.ff9.server', 'games.ffx_x2.server', 'games.palworld.full_server', 'games.project_zomboid.server',
-    'games.rdr.server', 'games.rdr2.server', 'games.terraria.server',
-    'games.stardew_valley.server', 'games.warband.server', 'games.ff7r2.server', 'games.factorio.server', 'games.chrono_trigger.server',
+    'plugins.bannerlord.server', 'plugins.blank.server', 'plugins.ff7.server', 'plugins.ff7r.server', 'plugins.ff7r.themed_server',
+    'plugins.ds3.server', 'plugins.ff8.server', 'plugins.ff9.server', 'plugins.ffx_x2.server', 'plugins.palworld.full_server', 'plugins.project_zomboid.server',
+    'plugins.rdr.server', 'plugins.rdr2.server', 'plugins.terraria.server',
+    'plugins.stardew_valley.server', 'plugins.warband.server', 'plugins.ff7r2.server', 'plugins.factorio.server', 'plugins.chrono_trigger.server',
 
 
 

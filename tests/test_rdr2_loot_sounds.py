@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import patch
-from games.rdr2 import loot_sounds
+from plugins.rdr2 import loot_sounds
 
 XML='''<?xml version="1.0"?><CLootSoundsMapCollection><!--keep--><SoundMaps><Item><SoundSets><Item key="PICKUP_CONTEXT">PICKUP_SOUNDSET</Item></SoundSets><Sounds><Item key="AMMO">AMMO</Item><Item key="WATCH">WATCH</Item><Item key="AMMO">WATCH</Item></Sounds></Item></SoundMaps><Unknown value="keep" /></CLootSoundsMapCollection>'''
 
@@ -24,7 +24,7 @@ class Sounds(unittest.TestCase):
             with self.assertRaises(ValueError):loot_sounds.apply(XML,edits)
 
     def test_server_saves_routed_mod_file_and_preserves_reference(self):
-        from games.rdr2 import server
+        from plugins.rdr2 import server
         with tempfile.TemporaryDirectory(prefix='lex-loot-sounds-') as temp:
             root=Path(temp);mod=root/'mod';ref=root/'ref';mod.mkdir();ref.mkdir()
             (mod/'install.xml').write_text('<LennyModLoader><Resources /></LennyModLoader>')
@@ -38,7 +38,7 @@ class Sounds(unittest.TestCase):
                 self.assertEqual(len(list(mod.glob('tmp*'))),0)
 
     def test_change_between_read_and_staging_is_not_overwritten(self):
-        from games.rdr2 import server
+        from plugins.rdr2 import server
         with tempfile.TemporaryDirectory() as temp:
             mod=Path(temp);target=mod/'loot_sounds.meta';manifest=mod/'install.xml'
             target.write_text(XML)
@@ -57,7 +57,7 @@ class Sounds(unittest.TestCase):
             self.assertFalse(list(mod.glob('.loot-sounds-*')))
 
     def test_failed_transaction_preserves_manifest_and_data(self):
-        from games.rdr2 import server
+        from plugins.rdr2 import server
         import os
         for existing in (False, True):
             for failure in ('write', 'routing', 'data-replace', 'manifest-replace', 'rollback'):

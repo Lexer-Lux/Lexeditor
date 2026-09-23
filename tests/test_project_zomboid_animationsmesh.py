@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.project_zomboid import animationsmesh, core
+from plugins.project_zomboid import animationsmesh, core
 
 
 class ProjectZomboidAnimationsMeshTests(unittest.TestCase):

@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 
-from games.ff8 import world_data_merge, world_map  # noqa: E402
-from games.ff8.plugin import FF8Session  # noqa: E402
+from plugins.ff8 import world_data_merge, world_map  # noqa: E402
+from plugins.ff8.plugin import FF8Session  # noqa: E402
 from render_crime_editors_55_62 import wait_eval  # noqa: E402
 from tools.verify_panel_layout_visual_46 import (  # noqa: E402
     browser_session, close_browser, screenshot,

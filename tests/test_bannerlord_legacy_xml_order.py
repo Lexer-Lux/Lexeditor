@@ -3,7 +3,7 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
-from games.bannerlord.module_data import save_module
+from plugins.bannerlord.module_data import save_module
 
 
 class BannerlordLegacyXmlOrderingTests(unittest.TestCase):

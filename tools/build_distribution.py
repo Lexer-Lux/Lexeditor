@@ -26,30 +26,30 @@ VENDORED_HELPERS=(
     'tools/reshade/6.8.0/ReShade_Setup_6.8.0_Addon.exe',
     'tools/reshade/6.8.0/ReShade_Setup_6.8.0.exe',
     'tools/reshade/6.8.0/LICENSE.md',
-    'tools/reshade/shaders/Lexerian/LexerianDepth.fxh',
-    'tools/reshade/shaders/Lexerian/Colors.fx',
-    'tools/reshade/shaders/Lexerian/Bloom.fx',
-    'tools/reshade/shaders/Lexerian/Sharpen.fx',
-    'tools/reshade/shaders/Lexerian/AmbientOcclusion.fx',
-    'tools/reshade/shaders/Lexerian/DepthOfField.fx',
-    'tools/reshade/shaders/Lexerian/Vignette.fx',
-    'tools/reshade/shaders/Lexerian/Compare.fx',
+    'shaders/LexerianDepth.fxh',
+    'shaders/Colors.fx',
+    'shaders/Bloom.fx',
+    'shaders/Sharpen.fx',
+    'shaders/AmbientOcclusion.fx',
+    'shaders/DepthOfField.fx',
+    'shaders/Vignette.fx',
+    'shaders/Compare.fx',
     'tools/reshade/addons/REST-1.3.23.633/ReshadeEffectShaderToggler-1.3.23.633.zip',
     'tools/reshade/addons/REST-1.3.23.633/LICENSE.txt',
-    'games/ff7r/runtime/repak/v0.2.3/manifest.json',
-    'games/ff7r/runtime/repak/v0.2.3/LICENSE-MIT',
-    'games/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE',
-    'games/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip',
-    'games/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-unknown-linux-gnu.tar.xz',
-    'games/ff7r2/runtime/shader-injector-2-2-1-maximum-dood.zip',
-    'games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt',
+    'plugins/ff7r/runtime/repak/v0.2.3/manifest.json',
+    'plugins/ff7r/runtime/repak/v0.2.3/LICENSE-MIT',
+    'plugins/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE',
+    'plugins/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip',
+    'plugins/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-unknown-linux-gnu.tar.xz',
+    'plugins/ff7r2/runtime/shader-injector-2-2-1-maximum-dood.zip',
+    'plugins/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt',
 )
 
 
 def resource_files(root: Path) -> list[Path]:
     """Select app resources without traversing disposable development trees."""
     files = []
-    for folder in ('ui', 'assets', 'games'):
+    for folder in ('ui', 'assets', 'plugins'):
         for directory, names, leaves in os.walk(root / folder, followlinks=False):
             names[:] = [name for name in names if name not in FORBIDDEN_PARTS
                         and not name.startswith('ffnx_')
@@ -87,7 +87,7 @@ def build_app() -> Path:
     for path in resource_files(ROOT):
         datas.append((str(path), str(path.relative_to(ROOT).parent)))
     datas.append((str(notices),'ui'))
-    modules=['games.'+p.parent.name+'.plugin' for p in (ROOT/'games').glob('*/plugin.py')]
+    modules=['plugins.'+p.parent.name+'.plugin' for p in (ROOT/'plugins').glob('*/plugin.py')]
     sys.path.insert(0,str(ROOT))
     from runtime_bootstrap import SERVICE_MODULES
     modules+=sorted(SERVICE_MODULES)
@@ -107,7 +107,7 @@ def build_app() -> Path:
     text=f'''# Generated from reviewed application resources; private helpers excluded.
 from PyInstaller.utils.hooks import collect_submodules
 hiddenimports={modules!r}
-hiddenimports += collect_submodules("games")
+hiddenimports += collect_submodules("plugins")
 a=Analysis([{str(ROOT/'app.py')!r}], pathex=[{str(ROOT)!r}], binaries=[], datas={datas!r},
  hiddenimports=hiddenimports, hookspath=[], runtime_hooks=[], excludes=["pytest","playwright","tkinter"], noarchive=False)
 pyz=PYZ(a.pure)

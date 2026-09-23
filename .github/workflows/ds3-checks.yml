@@ -5,13 +5,13 @@ on:
     branches:
       - codex/ds3-plugin
     paths:
-      - 'games/ds3/**'
+      - 'plugins/ds3/**'
       - 'tests/test_ds3_plugin.py'
       - 'tests/ds3_browser_check.py'
       - '.github/workflows/ds3-checks.yml'
   pull_request:
     paths:
-      - 'games/ds3/**'
+      - 'plugins/ds3/**'
       - 'tests/test_ds3_plugin.py'
       - 'tests/ds3_browser_check.py'
       - '.github/workflows/ds3-checks.yml'
@@ -30,11 +30,11 @@ jobs:
       - name: Install DS3 format dependency
         run: python -m pip install 'cryptography>=42'
       - name: Compile DS3 plugin
-        run: python -m compileall -q games/ds3 tests/test_ds3_plugin.py tests/ds3_browser_check.py
+        run: python -m compileall -q plugins/ds3 tests/test_ds3_plugin.py tests/ds3_browser_check.py
       - name: JavaScript syntax
         run: |
-          node --check games/ds3/editor.js
-          node --check games/ds3/boot.js
+          node --check plugins/ds3/editor.js
+          node --check plugins/ds3/boot.js
       - name: DS3 regulation regressions
         run: python -m unittest discover -s tests -p 'test_ds3_plugin.py' -v
 
@@ -78,11 +78,11 @@ jobs:
           Copy-Item assets -Destination $dest -Recurse
           Copy-Item ui -Destination $dest -Recurse
           New-Item -ItemType Directory -Force -Path "$dest/games" | Out-Null
-          Copy-Item games/__init__.py -Destination "$dest/games/__init__.py"
-          Copy-Item games/ds3 -Destination "$dest/games/ds3" -Recurse
-          Copy-Item games/ds3/candidate/ds3_candidate.py -Destination "$dest/ds3_candidate.py"
-          Copy-Item games/ds3/candidate/Run-DS3-Candidate.ps1 -Destination "$dest/Run-DS3-Candidate.ps1"
-          Copy-Item games/ds3/candidate/README-CANDIDATE.md -Destination "$dest/README-CANDIDATE.md"
+          Copy-Item plugins/__init__.py -Destination "$dest/plugins/__init__.py"
+          Copy-Item plugins/ds3 -Destination "$dest/plugins/ds3" -Recurse
+          Copy-Item plugins/ds3/candidate/ds3_candidate.py -Destination "$dest/ds3_candidate.py"
+          Copy-Item plugins/ds3/candidate/Run-DS3-Candidate.ps1 -Destination "$dest/Run-DS3-Candidate.ps1"
+          Copy-Item plugins/ds3/candidate/README-CANDIDATE.md -Destination "$dest/README-CANDIDATE.md"
           python -m pip install --disable-pip-version-check -r "$dest/requirements.txt"
           python "$dest/ds3_candidate.py" --check
           Get-ChildItem -Path $dest -Recurse -File |

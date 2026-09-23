@@ -1,7 +1,7 @@
 """Pin the original FF7 core KERNEL record layout used by Lexeditor.
 
 This is intentionally independent of the generic byte-preservation regression:
-that test derives offsets from games.ff7.kernel.CATEGORIES, while this test
+that test derives offsets from plugins.ff7.kernel.CATEGORIES, while this test
 hard-codes the documented offsets so a mistaken table entry cannot validate
 itself.
 
@@ -18,7 +18,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff7 import kernel
+from plugins.ff7 import kernel
 
 
 EXPECTED = {

@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 
-from games.ff7 import datasets, extended
+from plugins.ff7 import datasets, extended
 from verify_ff7_completion import field_fixture, lgp_fixture, world_fixture
 from verify_ff7_datasets import PATHS, write_kernel
 from verify_ff7_extended import exe_fixture, scene_fixture, text_fixture

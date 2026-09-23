@@ -36,8 +36,8 @@ def main():
     node = shutil.which("node")
     if not node:
         raise RuntimeError("Node.js is required for JavaScript syntax checks.")
-    files = sorted((ROOT / "ui").glob("*.js")) + sorted((ROOT / "games").glob("*/*.js"))
-    html = sorted((ROOT / "ui").glob("*.html")) + sorted((ROOT / "games").glob("*/editor.html"))
+    files = sorted((ROOT / "ui").glob("*.js")) + sorted((ROOT / "plugins").glob("*/*.js"))
+    html = sorted((ROOT / "ui").glob("*.html")) + sorted((ROOT / "plugins").glob("*/editor.html"))
     blocks = [(str(p.relative_to(ROOT)), False, p.read_text(encoding="utf-8-sig")) for p in files]
     for path in html:
         parser = Scripts()

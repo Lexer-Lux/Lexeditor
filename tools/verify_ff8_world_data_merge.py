@@ -10,7 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import (formats, paths, runtime_layout, world_data_merge,
+from plugins.ff8 import (formats, paths, runtime_layout, world_data_merge,
                        world_map, world_textures)  # noqa: E402
 
 

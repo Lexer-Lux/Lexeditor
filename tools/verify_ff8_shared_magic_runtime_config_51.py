@@ -10,7 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8.ffnx_issue_51 import runtime_config  # noqa: E402
+from plugins.ff8.ffnx_issue_51 import runtime_config  # noqa: E402
 
 
 def rejected(text: str) -> None:

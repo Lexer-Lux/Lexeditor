@@ -19,7 +19,7 @@ def main():
             page.add_init_script(STUB)
             errors=[]
             page.on('pageerror',lambda e:errors.append(str(e)))
-            load_page(page,f'http://127.0.0.1:{server.server_port}','/games/blank/editor.html')
+            load_page(page,f'http://127.0.0.1:{server.server_port}','/plugins/blank/editor.html')
             page.locator('.lex-detail-field').first.wait_for()
             # Both project actions work in Blank without game folders or native windows.
             page.get_by_role('button',name='Active mod project',exact=True).click()

@@ -5,10 +5,10 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EDITOR = ROOT / "games" / "project_zomboid" / "editor.html"
-EDITOR_JS = ROOT / "games" / "project_zomboid" / "editor.js"
-EDITOR_CSS = ROOT / "games" / "project_zomboid" / "editor.css"
-SERVER = ROOT / "games" / "project_zomboid" / "server.py"
+EDITOR = ROOT / "plugins" / "project_zomboid" / "editor.html"
+EDITOR_JS = ROOT / "plugins" / "project_zomboid" / "editor.js"
+EDITOR_CSS = ROOT / "plugins" / "project_zomboid" / "editor.css"
+SERVER = ROOT / "plugins" / "project_zomboid" / "server.py"
 
 def editor_script() -> str:
     return EDITOR_JS.read_text(encoding="utf-8")

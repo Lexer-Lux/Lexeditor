@@ -238,7 +238,7 @@ to redistribute.
 
 ## 5. Register and serve the plugin
 
-Create `games/<game>/__init__.py` and `plugin.py`. Export one `GamePlugin` named
+Create `plugins/<game>/__init__.py` and `plugin.py`. Export one `GamePlugin` named
 `PLUGIN`; discovery is automatic. Give it a unique letters/numbers/hyphens ID,
 name, accent, `check`, `launch`, `session_factory`, and a
 safe `smoke()` before shipping.
@@ -254,7 +254,7 @@ def check():
     return []  # Replace with real checks; never invent readiness.
 
 def session(extra_env=None):
-    return LocalPluginSession(module="games.example.server", plugin_id="example",
+    return LocalPluginSession(module="plugins.example.server", plugin_id="example",
                               app_root=ROOT, check=check, extra_env=extra_env)
 
 def launch():
@@ -282,7 +282,7 @@ stop it cleanly.
 
 ## 6. Use the shared UI instead of rebuilding it
 
-Start with `games/blank` as the shared-control gallery, not as markup to copy.
+Start with `plugins/blank` as the shared-control gallery, not as markup to copy.
 Load `/shared/framework.css` and `/shared/framework.js` and use the common controls
 listed in `ui/component-catalog.js` and demonstrated by the gallery.
 
@@ -355,7 +355,7 @@ Every list of records is a shared paged Table + Detail. Its search and paging li
 in the shared bottom bar, so a plugin never builds its own search box above a bare
 table: doing that silently caps the view at one page.
 
-Tweaks is a settings page, not a record table. `games/blank`'s Tweaks tab is the
+Tweaks is a settings page, not a record table. `plugins/blank`'s Tweaks tab is the
 reference: a master switch that owns the page, dependent controls disabled until it
 is on, bounded values with units, selects for fixed choices, and related switches
 grouped into one property.

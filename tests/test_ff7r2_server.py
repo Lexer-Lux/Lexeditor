@@ -11,8 +11,8 @@ from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-from games.ff7r2.dataobject import DataObjectPackage
-from games.ff7r2.plugin import Ff7r2Session
+from plugins.ff7r2.dataobject import DataObjectPackage
+from plugins.ff7r2.plugin import Ff7r2Session
 from ff7r2_fixture import battle_item_possession_fixture, battle_player_parameter_fixture, fixture
 
 

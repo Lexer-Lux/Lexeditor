@@ -4,7 +4,7 @@ from test_shared_ui_feedback import ROOT, page, framework
 
 def test_later_page_actions_use_full_script_indices(page):
     framework(page)
-    source=(ROOT/'games/ff8/party.js').read_text(encoding='utf-8')
+    source=(ROOT/'plugins/ff8/party.js').read_text(encoding='utf-8')
     renderer=source[source.index('  function enemyAiScript('):source.index('  function enemyAiSourceReference(')]
     page.add_script_tag(content='''
       const state={activeSource:'mine'},el=LexeditorUI.element;

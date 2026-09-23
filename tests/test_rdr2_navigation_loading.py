@@ -7,9 +7,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_skinning_does_not_wait_for_an_unconfigured_reference():
-    core=(ROOT/'games/rdr2/core.js').read_text(encoding='utf-8')
+    core=(ROOT/'plugins/rdr2/core.js').read_text(encoding='utf-8')
     helper=core[core.index('async function ensureRefMatrix('):core.index('\nfunction cashOf(')]
-    loot=(ROOT/'games/rdr2/loot.js').read_text(encoding='utf-8')
+    loot=(ROOT/'plugins/rdr2/loot.js').read_text(encoding='utf-8')
     start=loot.index('async function renderMatrix()')
     renderer=loot[start:loot.index('  const tb =',start)]+'return state.matrix;}'
     with sync_playwright() as play:
@@ -29,9 +29,9 @@ def test_skinning_does_not_wait_for_an_unconfigured_reference():
 
 
 def test_delayed_settings_read_keeps_new_page():
-    core = (ROOT / 'games/rdr2/core.js').read_text(encoding='utf-8')
+    core = (ROOT / 'plugins/rdr2/core.js').read_text(encoding='utf-8')
     scope = core[core.index('let renderRevision='):core.index('function render() {')]
-    tweaks = (ROOT / 'games/rdr2/tweaks.js').read_text(encoding='utf-8')
+    tweaks = (ROOT / 'plugins/rdr2/tweaks.js').read_text(encoding='utf-8')
     renderer = tweaks[tweaks.index('async function renderSettings(){'):]
     with sync_playwright() as play:
         browser = play.chromium.launch(headless=True)
@@ -60,7 +60,7 @@ def test_delayed_settings_read_keeps_new_page():
 
 
 def test_new_render_and_return_navigation_invalidate_old_scope():
-    core = (ROOT / 'games/rdr2/core.js').read_text(encoding='utf-8')
+    core = (ROOT / 'plugins/rdr2/core.js').read_text(encoding='utf-8')
     scope = core[core.index('let renderRevision='):core.index('function render() {')]
     with sync_playwright() as play:
         browser = play.chromium.launch(headless=True)

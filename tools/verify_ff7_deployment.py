@@ -13,10 +13,10 @@ sys.path.insert(0, str(ROOT))
 import tempfile
 import unittest
 
-from games.ff7 import datasets, deployment, extended
-from games.ff7.archives import FieldArchive, WorldArchive
-from games.ff7.battle import SceneArchive
-from games.ff7.storage import target_path
+from plugins.ff7 import datasets, deployment, extended
+from plugins.ff7.archives import FieldArchive, WorldArchive
+from plugins.ff7.battle import SceneArchive
+from plugins.ff7.storage import target_path
 
 import verify_ff7_completion as complete
 import verify_ff7_datasets as kernel_fixture

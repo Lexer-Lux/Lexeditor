@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from games.ff7r.runtime_heartbeat import (
+from plugins.ff7r.runtime_heartbeat import (
     KNOWN_FEATURES,
     RUNTIME_STATUS_NAME,
     load_runtime_status,

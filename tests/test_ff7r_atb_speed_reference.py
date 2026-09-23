@@ -1,4 +1,4 @@
-from games.ff7r.atb_speed_reference import analyze_speed_measurement_reference
+from plugins.ff7r.atb_speed_reference import analyze_speed_measurement_reference
 
 
 def test_speed_reference_preserves_measured_points_without_claiming_exact_formula():

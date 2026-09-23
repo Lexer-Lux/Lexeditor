@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-HEADER = ROOT / 'games/ff8/ffnx_gameplay_extensions/ffnx-src/reptile_atb_runtime.h'
+HEADER = ROOT / 'plugins/ff8/ffnx_gameplay_extensions/ffnx-src/reptile_atb_runtime.h'
 
 CASES = r'''
 #include <cassert>

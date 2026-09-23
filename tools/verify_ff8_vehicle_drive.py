@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-HEADER = ROOT / 'games/ff8/ffnx_modern_controls/vehicle_drive.h'
+HEADER = ROOT / 'plugins/ff8/ffnx_modern_controls/vehicle_drive.h'
 
 CASES = r'''
 #include <cassert>

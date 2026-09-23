@@ -5,7 +5,7 @@ import struct
 import pytest
 from PIL import Image
 
-from games.ff7r import bitmap_font
+from plugins.ff7r import bitmap_font
 
 
 def _glyph_payload(*, head=bitmap_font.GLYPH_HEAD2):

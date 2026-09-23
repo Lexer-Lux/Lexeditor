@@ -13,7 +13,7 @@ def test_row_pointer_follows_clickable_label(page,with_icon):
     if marker.exists():
         page.route('**/assets/icons/0.png',lambda r:r.fulfill(path=str(marker)))
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''()=>{
       document.querySelector('main').innerHTML='<div class="lex-column-list-row selected"><div class="lex-column-pointer-cell"><span class="lex-column-cell-content" style="position:relative;display:flex;justify-content:center;width:900px;height:60px"><button><span id="ability-name">HP-J</span></button></span></div></div>';
     }''')
@@ -41,7 +41,7 @@ def test_tabs_stay_one_row_and_tweaks_stays_attached(page,width):
     # Main tabs and subtabs always share one row of equal lanes.
     page.set_viewport_size({'width':width,'height':900})
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''()=>{
       const U=LexeditorUI;
       document.body.prepend(U.el('div',{id:'shell'}));
@@ -91,7 +91,7 @@ def test_help_scales_with_its_heading(page):
 
 def test_tab_pointer_is_painted_above_neighbouring_tabs(page):
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''()=>{const U=LexeditorUI;document.body.prepend(U.el('div',{id:'shell'}));
       U.mountShell({host:'#shell',plugin:{id:'fixture',name:'Fixture'},
         tabs:['Abilities','Cards','Items'].map(id=>({id,label:id})),activeTab:()=> 'Cards',navigate(){}});

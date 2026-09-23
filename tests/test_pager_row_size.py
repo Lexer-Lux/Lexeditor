@@ -8,7 +8,7 @@ from test_shared_ui_feedback import page, framework, ROOT
 @pytest.mark.parametrize('theme',['blank','ff8'])
 def test_rows_text_stays_readable_through_focus_and_refits(page,theme):
     if theme=='ff8':
-        page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+        page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     framework(page)
     page.evaluate('''()=>document.querySelector('main').append(LexeditorUI.pager({
       page:0,pages:3,total:78,pageSize:26,rowControl:{value:26,defaultValue:40,change(){}}

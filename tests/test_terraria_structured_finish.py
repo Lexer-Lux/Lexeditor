@@ -5,8 +5,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.terraria import server
-from games.terraria.structured_content import (
+from plugins.terraria import server
+from plugins.terraria.structured_content import (
     create_structured_content,
     default_values,
     render_structured_source,
@@ -117,7 +117,7 @@ class TerrariaStructuredFinishTests(unittest.TestCase):
             else: os.environ["LEXEDITOR_TERRARIA_PROJECT"]=previous_project
 
     def test_absent_build_booleans_are_addable_in_editor(self):
-        editor=Path("games/terraria/editor.js").read_text(encoding="utf-8")
+        editor=Path("plugins/terraria/editor.js").read_text(encoding="utf-8")
         self.assertIn("Not declared — check to add",editor)
         self.assertIn('boolControl("noCompile")',editor)
         self.assertIn('boolControl("playableOnPreview")',editor)

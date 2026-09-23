@@ -3,7 +3,7 @@ from test_shared_ui_feedback import ROOT, page, framework
 
 def test_slot_header_sorts_numerically_both_directions(page):
     framework(page)
-    source=(ROOT/'games/ff8/party.js').read_text(encoding='utf-8')
+    source=(ROOT/'plugins/ff8/party.js').read_text(encoding='utf-8')
     abilities=source[source.index('  function gfAbilities('):source.index('  function renderGFs(')]
     sort=source[source.index('  function sortGfTable('):source.index('  // GF compatibility')]
     page.add_script_tag(content='''

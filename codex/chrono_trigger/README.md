@@ -15,7 +15,7 @@ Lexeditor's active Chrono Trigger target is the Steam release. SNES and DS edito
 | ChronoMod | `4566e9dea7a3510cbb442991cd9efa223b95fdc7` | no clear top-level repo license found | Historical ARC1 corroboration only |
 | CTExt | `892c47166c56f6d20a2c805c303586096e8d466a` | no clear top-level repo license found | Runtime CTP/loose-file behavior only; not bundled |
 
-`ui/component-catalog.js` was requested as a reference but is unavailable on current master. `games/blank/editor.html`, `docs/UI-MANUAL.md`, and the RDR2/FF9 Table+Detail implementations are the current UI references.
+`ui/component-catalog.js` was requested as a reference but is unavailable on current master. `plugins/blank/editor.html`, `docs/UI-MANUAL.md`, and the RDR2/FF9 Table+Detail implementations are the current UI references.
 
 ## Proven Steam layouts used by the fresh replacement
 

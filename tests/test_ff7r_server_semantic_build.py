@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from games.ff7r import server
+from plugins.ff7r import server
 
 
 def test_build_composes_better_lockon_over_ordinary_project_content(monkeypatch, tmp_path):

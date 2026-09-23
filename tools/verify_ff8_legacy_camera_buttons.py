@@ -21,7 +21,7 @@ for keys, expected in ((0,0),(4,127),(8,129),(12,0)):
     m.emu_start(0x557515,0x557530,count=30)
     assert m.mem_read(0x203ED5E,1)[0] == expected
 
-source=(ROOT/'games/ff8/ffnx_modern_controls/lexeditor_ff8_modern_controls.cpp').read_text()
+source=(ROOT/'plugins/ff8/ffnx_modern_controls/lexeditor_ff8_modern_controls.cpp').read_text()
 wrapper=source[source.index('std::uint32_t __cdecl world_actions()'):source.index('void __cdecl update_battle_camera()')]
 old='reinterpret_cast<std::uint32_t(__cdecl *)()>(0x0054A7F0)'
 assert wrapper.count(old)==1
