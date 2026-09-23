@@ -124,6 +124,15 @@ def patch_value(project: Path, object_id: str, field: str):
     return None
 
 
+def typed_patch_value(project: Path, target: str, record_id: str, field: str):
+    data = json.loads((project / "content.json").read_text(encoding="utf-8"))
+    log_name = f"Lexeditor {target} overrides"
+    for change in data.get("Changes", []):
+        if change.get("LogName") == log_name:
+            return change.get("Fields", {}).get(record_id, {}).get(field)
+    return None
+
+
 def geometry(page, label: str) -> dict:
     metrics = page.evaluate("""() => {
       const main=document.querySelector('#main');
