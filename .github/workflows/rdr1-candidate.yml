@@ -67,6 +67,7 @@ jobs:
           python tools/verify_rdr_editing.py
           python tools/verify_rdr_cache_reuse_71.py
           python tools/verify_rdr_items_split_issue_19.py
+          python tools/verify_rdr_data_map_audit.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
