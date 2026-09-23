@@ -198,7 +198,7 @@
         },
         {
           "name": "Synthlight / FF7R2-DataObject-Parser",
-          "role": "CC BY-NC 4.0 Rebirth format documentation used to independently verify DataObject layout and published PlayerParameter property names. Lexeditor does not vendor or adapt this implementation.",
+          "role": "CC BY-NC 4.0 Rebirth format documentation used to independently verify IoStore-state DataObject layout and public table/row/property names across PlayerParameter and the unresolved Rebirth gameplay areas. Lexeditor does not vendor or adapt this implementation.",
           "url": "https://github.com/Synthlight/FF7R2-DataObject-Parser"
         },
         {
@@ -215,6 +215,21 @@
           "name": "nikolaybutnik / FFVII-Rebirth-Mesh-Patcher",
           "role": "MIT-licensed public Rebirth tooling used to cross-check that native IoStore mod triples are discovered under End/Content/Paks/~mods. No code is vendored or adapted.",
           "url": "https://github.com/nikolaybutnik/FFVII-Rebirth-Mesh-Patcher"
+        },
+        {
+          "name": "Gantz79 / 100 Percent Steal and Drop Rate",
+          "role": "Public Rebirth behavior evidence for #471: a packaged rate edit works and the author reports the 25% rate data is shared between steals and enemy drops. Used for semantic boundary research only; no mod assets are copied or redistributed.",
+          "url": "https://www.nexusmods.com/finalfantasy7rebirth/mods/157"
+        },
+        {
+          "name": "TheWolfster / Refreshed Chocobo Rest Stops (Static Mesh)",
+          "role": "Public Rebirth evidence for #472 that Chocobo rest-stop meshes can be replaced and that the blue bench is a separate asset among multiple bench models. Used for research only; no mod assets are copied or redistributed.",
+          "url": "https://www.nexusmods.com/finalfantasy7rebirth/mods/2048"
+        },
+        {
+          "name": "DaniRBT / FF7 Rebirth Accessibility - Visibility Overhaul",
+          "role": "Public Rebirth evidence for #473 separating pak-based minimap position/size changes from the optional UE4SS HUD mover. Used to avoid conflating HUD layout with world-minimap zoom; no mod assets are copied or redistributed.",
+          "url": "https://www.nexusmods.com/finalfantasy7rebirth/mods/2357"
         }
       ],
       "thanks": [],
