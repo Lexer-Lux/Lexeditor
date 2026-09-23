@@ -79,12 +79,13 @@ Shader Injector. The candidate route is instead dependency-explicit: the user
 must supply both LEXEDITOR_FF7R2_UNREALREZEN and LEXEDITOR_FF7R2_OODLE local
 paths. The reviewed FF7R2 release references CUE4Parse 1.1.1, whose Oodle
 helper checks for oo2core_9_win64.dll before entering its downloader. The builder
-therefore requires a matching CUE4Parse/1.1.1 dependency manifest and copies only
-the explicitly supplied Oodle DLL into a temporary process working directory
-before UnrealReZen starts. It uses Zlib package compression and never implements
-or calls a dependency downloader itself. The release's downloader explicitly
-disables HTTP proxy use, so proxy environment variables are not treated as a
-safety boundary.
+therefore requires a matching CUE4Parse/1.1.1 dependency manifest and requires
+LEXEDITOR_FF7R2_OODLE to point to an existing oo2core_9_win64.dll already beside
+the explicit UnrealReZen executable. Lexeditor runs UnrealReZen from that tool
+directory and does not download, copy or relocate Oodle. It uses Zlib package
+compression and never implements or calls a dependency downloader itself. The
+release's downloader explicitly disables HTTP proxy use, so proxy environment
+variables are not treated as a safety boundary.
 
 The exact FF7R2 command contract is GAME_UE4_26,
 --mount-point ../../../End/Content/, --game-dir-top-only, game archives from
@@ -99,8 +100,9 @@ acceptance step until Lexeditor has proved collision/removal behavior in-game.
 A real package candidate cannot be produced in the agent environment because it
 has no Rebirth installation/archive set and no user-supplied Oodle DLL. The
 candidate builder and refusal/isolation tests are nevertheless complete and
-exercise the exact command, no-install boundary, runtime Oodle copy integrity,
-missing-dependency refusal, and cleanup on failure.
+exercise the exact command, no-install boundary, adjacent explicit Oodle
+requirement, tool/dependency hash stability, missing-dependency refusal, and
+cleanup on failure.
 
 ## Theme and rendered browser evidence
 
