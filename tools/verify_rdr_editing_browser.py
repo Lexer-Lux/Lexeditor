@@ -88,7 +88,10 @@ def main():
                     page.evaluate('switchProjectSource("mine")')
                     assert page.locator('.string-detail textarea').input_value() == 'Hello from New Austin'
                     page.locator('.string-detail textarea').fill('Discard me')
-                    page.get_by_role('button', name='Discard string edits').click()
+                    assert page.evaluate('stringsUI.dirtyCount()') == 1
+                    discard_button = page.get_by_role('button', name='Discard string edits')
+                    assert discard_button.is_enabled()
+                    discard_button.click()
                     assert page.locator('.string-detail textarea').input_value() == 'Hello from New Austin'
                     page.reload()
                     page.wait_for_function('typeof state !== "undefined" && !state.booting')

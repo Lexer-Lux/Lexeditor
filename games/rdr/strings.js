@@ -16,6 +16,12 @@
     const value = row => state.stringEdits[row.id]?.value ?? row.text;
     const languageId = language => String(language?.index ?? language?.id ?? "");
 
+    let discardButton = null;
+    const refreshDiscardButton = () => {
+      if (discardButton?.isConnected)
+        discardButton.disabled = !Object.keys(state.stringEdits).length;
+    };
+
     function edit(row, next) {
       if (next === row.text) delete state.stringEdits[row.id];
       else state.stringEdits[row.id] = {
@@ -23,6 +29,7 @@
         languageIndex: row.languageIndex, entryIndex: row.entryIndex,
         expectedHash: row.hash, expectedText: row.text,
       };
+      refreshDiscardButton();
       shell().refresh();
     }
 
@@ -154,7 +161,7 @@
     }
 
     function render() {
-      const discardButton = el("button", {
+      discardButton = el("button", {
         type:"button", disabled:!Object.keys(state.stringEdits).length,
         onclick:discard,
       }, "Discard string edits");
@@ -231,7 +238,7 @@
       }
     }
 
-    const clearEdits = () => { state.stringEdits = {}; };
+    const clearEdits = () => { state.stringEdits = {}; refreshDiscardButton(); };
 
     return {render,load,validate,savePending,clearEdits,
       dirtyCount:()=>Object.keys(state.stringEdits).length,firstLanguageId};
