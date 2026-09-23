@@ -259,7 +259,7 @@ def test_save_refuses_unknown_fields_and_stale_project_source(store):
     database, _archive, project = store
     loaded = database.load("field-walkmesh")
     row = loaded["rows"][0]
-    with pytest.raises(ValueError, match="Only FF9 walkmesh"):
+    with pytest.raises(ValueError, match="Only documented FF9 walkmesh"):
         database.save("field-walkmesh", loaded["sceneHashes"], [{
             "scene": row["scene"], "record": 0, "values": {"Triangles": 9},
         }])
