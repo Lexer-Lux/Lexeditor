@@ -1930,7 +1930,7 @@ def _provisional_data_map_rows() -> list[dict]:
     loot_cache_dir = EXTRACT_ROOT / "loot-script"
     loot_cached = (loot_cache_dir / "script.wsc").is_file() and (loot_cache_dir / "script.c").is_file()
     loot_extractable = (GAME_ROOT / "game" / "content.rpf").is_file() and Path(paths.RPF6_TOOL).is_file()
-    loot_available = loot_cached or loot_extractable
+    loot_available = LOOT_FILE.is_file() or loot_cached or loot_extractable
     rows.append({
         "filename": f"game/content.rpf:/{loot_script.ARCHIVE_PATH}",
         "controls": "Corpse loot script item-enum switch",
@@ -1938,7 +1938,8 @@ def _provisional_data_map_rows() -> list[dict]:
             "Loot Tables exposes only the verified item-enum call sites and writes "
             "a length-preserving WSC override; the rest of the script stays read-only."
             if loot_available else
-            "The corpse loot script is missing: no cached extraction and no content.rpf plus RPF6 bridge to extract it."
+            "The corpse loot script is missing: no LexerRDR.loot.json override, "
+            "no cached extraction, and no content.rpf plus RPF6 bridge to extract it."
         ),
         "status": "partial" if loot_available else "not-integrated",
         "coverage": "structured" if loot_available else "unavailable",
