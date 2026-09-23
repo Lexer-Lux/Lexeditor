@@ -171,6 +171,32 @@ class FactorioModelTests(unittest.TestCase):
                 8.0,
             )
 
+    def test_dirty_count_tracks_changes_since_saved_overrides(self):
+        with tempfile.TemporaryDirectory() as name:
+            project = self.project(Path(name))
+            store = PrototypeStore.from_project(project)
+            store.set_edit("recipes", "iron-gear-wheel", {
+                "enabled": True,
+                "energy_required": 0.75,
+                "maximum_productivity": 3.0,
+            })
+            store.save(project)
+
+            reopened = PrototypeStore.from_project(project)
+            with mock.patch.object(
+                    factorio_server, "_saved_edits",
+                    factorio_server._snapshot_edits(reopened)):
+                self.assertEqual(factorio_server._dirty_records(reopened), 0)
+                reopened.set_edit("items", "iron-plate", {"stack_size": 250})
+                self.assertEqual(factorio_server._dirty_records(reopened), 1)
+                reopened.set_edit(
+                    "machines", "assembling-machine-1",
+                    {"crafting_speed": 1.25},
+                )
+                self.assertEqual(factorio_server._dirty_records(reopened), 2)
+                reopened.set_edit("items", "iron-plate", {"stack_size": 100})
+                self.assertEqual(factorio_server._dirty_records(reopened), 1)
+
     def test_ranges_and_references_fail_closed(self):
         with tempfile.TemporaryDirectory() as name:
             store = PrototypeStore.from_project(self.project(Path(name)))

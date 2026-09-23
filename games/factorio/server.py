@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 from http.server import ThreadingHTTPServer
 import json
@@ -39,6 +40,7 @@ _lock = threading.RLock()
 _store: PrototypeStore | None = None
 _dirty = 0
 _source_fingerprint = ""
+_saved_edits: dict = {}
 
 
 def _fingerprint(path: Path) -> str:
@@ -55,12 +57,28 @@ def _source_path() -> Path:
     return PROJECT_ROOT / SOURCE_DIR / SOURCE_DUMP
 
 
+def _snapshot_edits(store: PrototypeStore) -> dict:
+    return copy.deepcopy(store.overrides.get("edits", {}))
+
+
+def _dirty_records(store: PrototypeStore) -> int:
+    current = store.overrides.get("edits", {})
+    kinds = set(_saved_edits) | set(current)
+    return sum(
+        _saved_edits.get(kind, {}).get(name) != current.get(kind, {}).get(name)
+        for kind in kinds
+        for name in set(_saved_edits.get(kind, {})) | set(current.get(kind, {}))
+    )
+
+
 def _load_store(*, refresh: bool = False) -> PrototypeStore:
-    global _store, _source_fingerprint
+    global _store, _source_fingerprint, _saved_edits, _dirty
     with _lock:
         if _store is None or refresh:
             _store = PrototypeStore.from_project(PROJECT_ROOT)
             _source_fingerprint = _fingerprint(_source_path())
+            _saved_edits = _snapshot_edits(_store)
+            _dirty = 0
         return _store
 
 
@@ -278,7 +296,7 @@ class Handler(PluginRequestHandler):
             self.send_json({"error": str(error)}, 500)
 
     def do_POST(self):
-        global _dirty, _store, _source_fingerprint
+        global _dirty, _store, _source_fingerprint, _saved_edits
         path = urlparse(self.path).path
         if not self._same_origin():
             self.send_json({"error": "Cross-origin writes are not permitted"}, 403)
@@ -299,9 +317,7 @@ class Handler(PluginRequestHandler):
                     raise FactorioDataError("Edit must identify one supported prototype")
                 store = _load_store()
                 changes = store.set_edit(kind, name, body.get("changes", {}))
-                _dirty = sum(
-                    len(records) for records in store.overrides["edits"].values()
-                )
+                _dirty = _dirty_records(store)
                 self.send_json({
                     "changed": bool(changes),
                     "dirty": _dirty,
@@ -312,11 +328,13 @@ class Handler(PluginRequestHandler):
                 store = _load_store()
                 _require_source_unchanged()
                 store.save(PROJECT_ROOT)
+                _saved_edits = _snapshot_edits(store)
                 _dirty = 0
                 self.send_json({"saved": True, "dirty": 0, "path": str(PROJECT_ROOT / OVERRIDES_FILE)})
             elif path == "/api/discard":
                 _store = PrototypeStore.from_project(PROJECT_ROOT)
                 _source_fingerprint = _fingerprint(_source_path())
+                _saved_edits = _snapshot_edits(_store)
                 _dirty = 0
                 self.send_json({"discarded": True, "dirty": 0})
             elif path == "/api/export":
@@ -337,6 +355,7 @@ class Handler(PluginRequestHandler):
             elif path == "/api/reopen":
                 _store = PrototypeStore.from_project(PROJECT_ROOT)
                 _source_fingerprint = _fingerprint(_source_path())
+                _saved_edits = _snapshot_edits(_store)
                 _dirty = 0
                 self.send_json({"reopened": True, "dirty": 0, "config": _config()})
             else:
