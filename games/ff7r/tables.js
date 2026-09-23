@@ -1,14 +1,14 @@
 "use strict";
-  // An ID is four or five digits wide, so it takes four or five digits of the
-  // table. Left to share the grid it took a fifth of the width and pushed the
-  // record name into a column too narrow to read.
-  const dataColumns=[{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true,width:"74px"},{key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"}];
+  // Records are identified by their game key, not the parser row index, so
+  // the tag column leads the table.
+  // Text entries likewise lead with their resource and text ID.
+  const dataColumns=[{key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"}];
   const economyColumns=[{key:"tag",label:"ID",sortable:true,width:"minmax(10em,.8fr)"},{key:"name",label:"Item",sortable:true,width:"minmax(14em,1.2fr)"},{key:"buy",label:"Buy",numeric:true,sortable:true},{key:"sale",label:"Sell",numeric:true,sortable:true},{key:"maxCount",label:"Carry Cap",numeric:true,sortable:true}];
   // Four columns at fourteen ems each did not fit the list panel, so the Steal
   // column was cut in half by the panel edge. The minimums are sized so all
   // four fit the default split; the cells ellipsise if a value is longer.
   const lootColumns=[{key:"tag",label:"Enemy / Battle ID",sortable:true,width:"minmax(9em,.9fr)"},{key:"normal",label:"Normal",sortable:true,width:"minmax(8em,1fr)"},{key:"rare",label:"Rare",sortable:true,width:"minmax(8em,1fr)"},{key:"steal",label:"Steal",sortable:true,width:"minmax(8em,1fr)"}];
-  const textColumns=[{key:"number",label:"ID",numeric:true,numberedId:true,sortable:true,width:"minmax(4em,max-content)"},{key:"resource",label:"Resource",sortable:true,width:"minmax(10em,.7fr)"},{key:"key",label:"Text ID",sortable:true,width:"minmax(12em,.8fr)"},{key:"text",label:"Text",sortable:true,width:"minmax(16em,1.2fr)"}];
+  const textColumns=[{key:"resource",label:"Resource",sortable:true,width:"minmax(10em,.7fr)"},{key:"key",label:"Text ID",sortable:true,width:"minmax(12em,.8fr)"},{key:"text",label:"Text",sortable:true,width:"minmax(16em,1.2fr)"}];
   function propertyCellValue(row,prop){
     const value=row.values?.[prop.name];
     if(Array.isArray(value))return value.length?value.map(item=>resolvedText(item)||item).join(", "):"—";

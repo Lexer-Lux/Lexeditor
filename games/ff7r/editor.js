@@ -1,5 +1,5 @@
   "use strict";
-  const {el,columnList,columnPreferences,detailPanel,detailSection,detailNote,detailField,readonlyField,recordId,infoHelp,infoIcon,panelLayout,clone,EditHistory}=LexeditorUI;
+  const {el,columnList,columnPreferences,detailPanel,detailSection,detailNote,detailField,readonlyField,infoHelp,infoIcon,panelLayout,clone,EditHistory}=LexeditorUI;
   const $=selector=>document.querySelector(selector);
   async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let payload={};try{payload=await response.json()}catch(_error){}if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
 
