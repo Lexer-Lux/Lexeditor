@@ -242,7 +242,7 @@ function fieldControl(row, key, kind, min, max, help) {
   return detailField({
     label: key === "Price" ? "SELL PRICE" : key === "IsDrink" ? "DRINK" : "EDIBILITY",
     help: infoHelp(help),
-    control: el("div", {class: "sv-override"}, el("label", {}, override, "Override"), input),
+    control: el("div", {class: "lex-action-row"}, el("label", {}, override, "Override"), input),
     dataType: kind === "boolean" ? "BOOL" : "INT", min, max,
     pin: prefs.pinButton(key, valueLabel),
     attrs: {"data-lex-property": key},
@@ -252,7 +252,7 @@ function tablePanel(rows = sortedRows(), picked = state.selected, select = row =
   return columnList({
     rows, key: row => row.id, selected: picked, select, sortState: state.sort,
     sort: key => { state.sort = state.sort.key === key ? {key, dir: -state.sort.dir} : {key, dir: 1}; state.page = 0; render(); },
-    columnPreferences: prefs, columns: objectColumns(), class: "sv-table", "aria-label": "Stardew objects",
+    columnPreferences: prefs, columns: objectColumns(), "aria-label": "Stardew objects",
     refresh: () => { render(); shell.refresh(); },
   });
 }
@@ -284,7 +284,7 @@ function detail(row) {
     const message = source?.available
       ? "No Data/Objects records match the current search."
       : "No object records are available yet. Add a patch by object key, or provide an existing StardewXnbHack Data/Objects export to browse vanilla objects.";
-    return detailPanel({className: "sv-detail", title: "Data/Objects", meta: "No records", body: [el("p", {class: "sv-state"}, message)]});
+    return detailPanel({title: "Data/Objects", meta: "No records", body: [el("p", {class: "lex-notice"}, message)]});
   }
   const remove = el("button", {
     type: "button", disabled: state.busy || !FIELD_KEYS.some(key => has(row, key)), onclick: () => clearOverrides(row),
@@ -295,7 +295,7 @@ function detail(row) {
     : readonlyField(row.internalName || row.id, {format: false});
   const longKey = String(row.id).length > 8;
   return detailPanel({
-    className: "sv-detail", title: row.name || "Object", identity: longKey ? null : recordId(row.id),
+    title: row.name || "Object", identity: longKey ? null : recordId(row.id),
     meta: longKey ? `${row.id} · ${sourceMeta}` : sourceMeta,
     body: [
       detailSection({title: "SOURCE", body: [
@@ -314,8 +314,8 @@ function detail(row) {
           "When the item is edible, this makes Stardew use drinking behavior instead of eating behavior."),
       ]}),
       detailSection({title: "PATCH", body: [
-        detailField({label: "ACTIONS", control: el("div", {class: "sv-actions"}, remove)}),
-        ...(row.unsupportedFieldCount ? [el("p", {class: "sv-state"}, `${row.unsupportedFieldCount} unsupported field(s) in this record are preserved unchanged.`)] : []),
+        detailField({label: "ACTIONS", control: el("div", {class: "lex-action-row"}, remove)}),
+        ...(row.unsupportedFieldCount ? [el("p", {class: "lex-notice"}, `${row.unsupportedFieldCount} unsupported field(s) in this record are preserved unchanged.`)] : []),
       ]}),
     ],
   });
@@ -334,7 +334,7 @@ function objectsPanel() {
   return pagedListDetail({
     rows: records, key: row => row.id, slots: false, add: addRecord, addTitle: "Add Data/Objects patch",
     addDisabled: state.busy, selected: state.selected, page: state.page, pageSize: state.pageSize, noun: "objects",
-    className: "sv-layout", splitKey: "stardew-objects", rowsKey: "stardew-objects", defaultSplit: 48,
+    splitKey: "stardew-objects", rowsKey: "stardew-objects", defaultSplit: 48,
     minLeft: 360, minRight: 400,
     search: {key: "stardew-objects-search", value: state.query, label: "Search object keys or names", change: value => { state.query = value; state.page = 0; render(); }},
     emptyDetail: () => detail(null), master: view => tablePanel(view.rows, view.selected, view.select), detail,
@@ -418,7 +418,7 @@ function datasetFieldControl(row, field) {
   return detailField({
     label: field.label.toUpperCase(),
     help: field.help ? infoHelp(field.help) : null,
-    control: el("div", {class: "sv-override"}, el("label", {}, override, "Override"), control),
+    control: el("div", {class: "lex-action-row"}, el("label", {}, override, "Override"), control),
     dataType: field.kind === "bool" ? "BOOL" : field.kind === "enum" ? "ENUM" : field.kind.toUpperCase(),
     min: field.min, max: field.max, attrs: {"data-lex-property": key},
   });
@@ -432,8 +432,8 @@ function datasetDetail(row) {
     const message = source?.available
       ? "No records match the current search."
       : "No records are available. Provide the read-only StardewXnbHack "+schema.target+" JSON export, or open a project that already contains Lexeditor field overrides for this family.";
-    return detailPanel({className: "sv-detail", title: schema?.target || "Data", meta: "No records",
-      body: [el("p", {class: "sv-state"}, message)]});
+    return detailPanel({title: schema?.target || "Data", meta: "No records",
+      body: [el("p", {class: "lex-notice"}, message)]});
   }
   const remove = el("button", {
     type: "button", disabled: state.busy || !(schema.fields || []).some(field => has(row, field.key)),
@@ -444,7 +444,7 @@ function datasetDetail(row) {
   }, "Clear supported overrides");
   const sourceMeta = row.sourcePresent ? "Vanilla source + project patch" : "Project/external record only";
   return detailPanel({
-    className: "sv-detail", title: row.name || row.id,
+    title: row.name || row.id,
     identity: String(row.id).length <= 12 ? recordId(row.id) : null,
     meta: String(row.id).length <= 12 ? sourceMeta : row.id+" · "+sourceMeta,
     body: [
@@ -454,9 +454,9 @@ function datasetDetail(row) {
       ]}),
       detailSection({title: "EDITABLE FIELDS", body: (schema.fields || []).map(field => datasetFieldControl(row, field))}),
       detailSection({title: "PATCH", body: [
-        detailField({label: "ACTIONS", control: el("div", {class: "sv-actions"}, remove)}),
-        ...(row.unsupportedFieldCount ? [el("p", {class: "sv-state"}, row.unsupportedFieldCount+" unsupported project field(s) are preserved unchanged.")] : []),
-        ...(row.invalidFieldCount ? [el("p", {class: "sv-state"}, row.invalidFieldCount+" source field(s) could not be represented by this typed view and remain read-only.")] : []),
+        detailField({label: "ACTIONS", control: el("div", {class: "lex-action-row"}, remove)}),
+        ...(row.unsupportedFieldCount ? [el("p", {class: "lex-notice"}, row.unsupportedFieldCount+" unsupported project field(s) are preserved unchanged.")] : []),
+        ...(row.invalidFieldCount ? [el("p", {class: "lex-notice"}, row.invalidFieldCount+" source field(s) could not be represented by this typed view and remain read-only.")] : []),
       ]}),
     ],
   });
@@ -469,7 +469,7 @@ function datasetPanel() {
     rows: records, key: row => row.id, slots: false,
     selected: state.datasetSelected, page: state.datasetPage, pageSize: state.pageSize,
     noun: state.dataset?.schema?.noun || "records",
-    className: "sv-layout", splitKey: "stardew-"+state.datasetKey, rowsKey: "stardew-"+state.datasetKey,
+    splitKey: "stardew-"+state.datasetKey, rowsKey: "stardew-"+state.datasetKey,
     defaultSplit: 48, minLeft: 360, minRight: 400,
     search: {key: "stardew-"+state.datasetKey+"-search", value: state.datasetQuery,
       label: "Search "+(state.dataset?.schema?.label || "data")+" keys or names",
@@ -480,7 +480,7 @@ function datasetPanel() {
       sortState: state.datasetSort,
       sort: key => { state.datasetSort = state.datasetSort.key === key
         ? {key, dir: -state.datasetSort.dir} : {key, dir: 1}; state.datasetPage = 0; render(); },
-      columnPreferences: prefs, columns, class: "sv-table",
+      columnPreferences: prefs, columns,
       "aria-label": "Stardew "+(state.dataset?.schema?.label || "data"), refresh: () => { render(); shell.refresh(); },
     }),
     detail: datasetDetail,
@@ -540,10 +540,10 @@ function infoPanel() {
   const contentPatcherState = !loader.contentPatcher ? "Not found"
     : loader.contentPatcherCompatible ? `Installed · ${loader.contentPatcherVersion || "version unknown"}`
       : `Update required · ${loader.contentPatcherVersion || "unknown"} (need ${loader.requiredContentPatcherVersion || "2.9.0"}+)`;
-  const actions = el("div", {class: "sv-actions"},
+  const actions = el("div", {class: "lex-action-row"},
     el("button", {type: "button", disabled: state.busy || dirtyCount() > 0 || !loader.ready, onclick: () => deploymentAction("deploy")}, deployment.deployed ? "Redeploy Project" : "Deploy Project"),
     el("button", {type: "button", disabled: state.busy || !deployment.managed || deployment.externallyChanged, onclick: () => deploymentAction("revert")}, "Revert Lexeditor Mod"));
-  const acceptanceActions = el("div", {class: "sv-actions"},
+  const acceptanceActions = el("div", {class: "lex-action-row"},
     el("button", {type: "button", disabled: state.busy || dirtyCount() > 0 || !loader.ready || !deployment.managed || deployment.externallyChanged, onclick: acceptanceBegin}, acceptance.started ? "Reset Acceptance Baseline" : "Begin Acceptance"),
     el("button", {type: "button", disabled: state.busy || !acceptance.started, onclick: acceptanceVerify}, "Verify Acceptance Evidence"));
   const acceptanceState = acceptance.accepted ? "Accepted"
@@ -552,7 +552,7 @@ function infoPanel() {
   const runtime = acceptance.smapiVersion
     ? `SMAPI ${acceptance.smapiVersion} · Stardew ${acceptance.gameVersion || "?"}${acceptance.gameBuild ? ` build ${acceptance.gameBuild}` : ""}`
     : "No post-baseline runtime detected";
-  return detailPanel({className: "lex-information-panel sv-detail", icon: infoIcon(), title: "Information",
+  return detailPanel({className: "lex-information-panel", icon: infoIcon(), title: "Information",
     meta: "Stardew Valley installation, source data, loader, project deployment, and installed acceptance", body: [
       detailSection({title: "GAME", body: [
         detailField({label: "STATE", control: read(dashboard.game.ready ? "Ready" : "Incomplete")}),
@@ -587,7 +587,7 @@ function infoPanel() {
         ...(acceptance.blockers?.length ? [detailField({label: "BLOCKERS", control: read(acceptance.blockers.join(" · "))})] : []),
         detailField({label: "ACTIONS", control: acceptanceActions}),
       ]}),
-      ...(state.error ? [detailSection({title: "ERROR", body: [el("p", {class: "sv-state", role: "alert"}, state.error)]})] : []),
+      ...(state.error ? [detailSection({title: "ERROR", body: [el("p", {class: "lex-notice lex-tone-warning", role: "alert"}, state.error)]})] : []),
     ]});
 }
 
@@ -658,7 +658,7 @@ async function refresh() {
   if (values[3]) installDataset(values[3]);
 }
 function mainState(message, error = false) {
-  $("#main").replaceChildren(el("p", {class: "sv-state", role: error ? "alert" : "status"}, message));
+  $("#main").replaceChildren(el("p", {class: "lex-notice", role: error ? "alert" : "status"}, message));
 }
 function render() {
   if (!state.dashboard) return;
