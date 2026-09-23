@@ -61,6 +61,12 @@ DEFAULT_GF_ACQUISITION_REWORK = gf_acquisition_rework.DEFAULT_GF_ACQUISITION_REW
 DEFAULT_CAMERA_SPEED = modern_controls_issue_65.DEFAULT_CAMERA_SPEED
 MINIMUM_CAMERA_SPEED = modern_controls_issue_65.MINIMUM_CAMERA_SPEED
 MAXIMUM_CAMERA_SPEED = modern_controls_issue_65.MAXIMUM_CAMERA_SPEED
+# Issue #498 gains. None leaves the FFNx layer unmanaged, so the -1
+# auto-detect default in FFNx.toml survives for that category.
+DEFAULT_SFX_VOLUME = None
+DEFAULT_MUSIC_VOLUME = None
+MIN_AUDIO_VOLUME = 0
+MAX_AUDIO_VOLUME = 100
 DEFAULT_VIBRATION_CONSOLIDATION = vibration_consolidation_issue_66.DEFAULT_VIBRATION_CONSOLIDATION
 DEFAULT_BETTER_TARGETING = better_targeting_issue_64.DEFAULT_BETTER_TARGETING
 DEFAULT_DAMAGE_LIMIT_REMOVAL = damage_limit.DEFAULT_DAMAGE_LIMIT_REMOVAL
@@ -126,6 +132,23 @@ def _bounded_bonus(value) -> int:
         raise ValueError("Flying EVA Bonus must be a whole number from 0 to 100")
     if not MIN_FLYING_EVA_BONUS <= result <= MAX_FLYING_EVA_BONUS:
         raise ValueError("Flying EVA Bonus must be from 0 to 100")
+    return result
+
+
+def _bounded_audio_volume(value, label: str):
+    """Validate one issue-498 gain: None (unmanaged) or an int 0..100."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be a whole number from 0 to 100 or left unset")
+    try:
+        result = int(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{label} must be a whole number from 0 to 100 or left unset") from error
+    if str(value).strip() not in {str(result), f"{result}.0"}:
+        raise ValueError(f"{label} must be a whole number from 0 to 100 or left unset")
+    if not MIN_AUDIO_VOLUME <= result <= MAX_AUDIO_VOLUME:
+        raise ValueError(f"{label} must be from 0 to 100")
     return result
 
 
@@ -352,6 +375,14 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         camera_speed = DEFAULT_CAMERA_SPEED
     camera_speed = round(
         min(MAXIMUM_CAMERA_SPEED, max(MINIMUM_CAMERA_SPEED, camera_speed)), 2)
+    try:
+        sfx_volume = _bounded_audio_volume(data.get("sfxVolume", DEFAULT_SFX_VOLUME), "SFX volume")
+    except ValueError:
+        sfx_volume = DEFAULT_SFX_VOLUME
+    try:
+        music_volume = _bounded_audio_volume(data.get("musicVolume", DEFAULT_MUSIC_VOLUME), "Music volume")
+    except ValueError:
+        music_volume = DEFAULT_MUSIC_VOLUME
     vibration_consolidation = data.get(
         "vibrationConsolidation", DEFAULT_VIBRATION_CONSOLIDATION,
     )
@@ -438,6 +469,10 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "cameraSpeed": camera_speed,
         "cameraSpeedMinimum": MINIMUM_CAMERA_SPEED,
         "cameraSpeedMaximum": MAXIMUM_CAMERA_SPEED,
+        "sfxVolume": sfx_volume,
+        "musicVolume": music_volume,
+        "audioVolumeMinimum": MIN_AUDIO_VOLUME,
+        "audioVolumeMaximum": MAX_AUDIO_VOLUME,
         "modernControlsAvailable": modern_controls_issue_65.MODERN_CONTROLS_AVAILABLE,
         "modernControlsBlocker": modern_controls_issue_65.MODERN_CONTROLS_BLOCKER,
         "worldMapFullscreen": world_map_fullscreen,
@@ -914,6 +949,8 @@ def initialize_project(project_root: Path) -> None:
         "maxSpellEnabled": False,
         "maxSpell": DEFAULT_MAX_SPELL,
         "cameraSpeed": DEFAULT_CAMERA_SPEED,
+        "sfxVolume": DEFAULT_SFX_VOLUME,
+        "musicVolume": DEFAULT_MUSIC_VOLUME,
     }
     _atomic_text(settings_path(project), json.dumps(
         settings_data, indent=2, sort_keys=True,
@@ -1010,6 +1047,12 @@ def save(data: dict, game_root: Path | None = None,
     if not camera_speed > 0:
         camera_speed = DEFAULT_CAMERA_SPEED
     camera_speed = min(MAXIMUM_CAMERA_SPEED, max(MINIMUM_CAMERA_SPEED, camera_speed))
+    sfx_volume = _bounded_audio_volume(
+        data.get("sfxVolume", DEFAULT_SFX_VOLUME), "SFX volume",
+    )
+    music_volume = _bounded_audio_volume(
+        data.get("musicVolume", DEFAULT_MUSIC_VOLUME), "Music volume",
+    )
     vibration_consolidation = _boolean(
         data.get("vibrationConsolidation", DEFAULT_VIBRATION_CONSOLIDATION),
         "Vibration Rationalization",
@@ -1142,6 +1185,8 @@ def save(data: dict, game_root: Path | None = None,
         # Stored with the switch it belongs to. Written only to FFNx.toml, it
         # read back as the default and the next save overwrote the reader's.
         "cameraSpeed": round(camera_speed, 2),
+        "sfxVolume": sfx_volume,
+        "musicVolume": music_volume,
         "vibrationConsolidation": vibration_consolidation,
         "betterTargeting": better_targeting,
         "damageLimitRemoval": damage_limit_removal,
@@ -1243,6 +1288,12 @@ def save(data: dict, game_root: Path | None = None,
                 modern_controls=modern_controls, party_switch=party_switch,
                 no_magic_consumption=no_magic_consumption,
                 camera_speed=camera_speed,
+            )
+            # Issue #498: each slider drives only its named FFNx audio
+            # layer. An unset side keeps its existing key, so -1
+            # auto-detect survives for the unmanaged category.
+            ffnx_manager.set_audio_volumes(
+                config, sfx=sfx_volume, music=music_volume,
             )
     except Exception:
         _restore_files(snapshots)

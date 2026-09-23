@@ -55,3 +55,13 @@ is still open (Drive-only .gdoc, unreadable from disk).
 Needs Lexer/game: in-game verification of the four runtime patches,
 Formulae scroll confirmation at an 800px viewport, and the review/mod doc
 formulae section (paste the text or grant access).
+
+## 2026-09-23 impl/ff8-actionables: verified, no new code
+
+Re-verified on this branch: Formulae subtab gating, scroll fix, and
+`tests/test_ff8_formulae_rework.py` stand as merged (green in the ff8
+unit run). No new agent-side slice exists: melee, magic-damage,
+status-infliction and Mug-comparison runtime patches need hand-written
+x86 against the game and were not written blind; the review/mod-doc
+formulae audit is still open (Drive-only .gdoc, unreadable from disk).
+Stays actionable; needs the game-session checklist already on the issue.

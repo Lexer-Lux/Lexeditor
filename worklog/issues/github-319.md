@@ -62,3 +62,14 @@ extracting deltas from your own Japanese + Steam installs; (2) game-install
 access for the kernel nunchaku-string check; (3) the Scan rotation lock
 location (exe address or menu script), or confirmation of what the lock
 refers to in game.
+
+## 2026-09-23 impl/ff8-actionables: nunchaku check done, codex noted
+
+New agent-side slice landed: the Steam-English nunchaku-string check.
+Decoded `mngrp.bin` uses `nunchaku` (Weapon Monthly 38:14, 38:38,
+38:48; test seed 45:2 `Selphie's weapon is the nunchaku`) and no
+`shinobou` spelling exists in `mngrp.bin` or `FF8_EN.exe`, so no rename
+is exposed. Recorded in new `codex/ff8/altered-content.md` (indexed in
+codex/ff8/README.md). Still blocked: uncensor-mod archives plus
+per-target redistribution rights (or delta-extraction approval), and
+the Scan rotation-lock location. Stays actionable.

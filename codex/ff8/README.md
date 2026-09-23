@@ -7,3 +7,5 @@ Canonical game-specific knowledge. No standalone source has been imported for th
 - [Smooth HP-number colours](hp-colours.md): FFNx RGB seam, verified native HP scopes, and acceptance boundary.
 
 - [Audio volumes](audio-volumes.md): vanilla Sound slider scope, FFNx SFX/Music layer gains, and the #498 split.
+
+- [Altered content](altered-content.md): #319 restoration targets, the nunchaku verdict, and the safe rule.

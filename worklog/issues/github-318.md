@@ -57,3 +57,11 @@ Still needs Lexer/game: prove the battle-victory award and Draw suppression
 in game (source tests alone are not acceptance); native hook research
 (battle-victory point, Draw-list filter point, GF-owned save path) to flip
 the availability gate.
+
+## 2026-09-23 impl/ff8-actionables: verified, no new code
+
+Re-verified on this branch: `games/ff8` logic stands as merged
+(`plugins/ff8/gf_acquisition_rework.py`, gated, tests green in the ff8
+unit run). No new agent-side slice exists: flipping the availability
+gate needs proved battle-victory/Draw-list hooks and GF-owned save
+offsets from the game. Stays actionable.
