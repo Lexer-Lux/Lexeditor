@@ -153,6 +153,21 @@ class ModuleRecordTests(unittest.TestCase):
         self.assertEqual(icon["rows"][0]["fields"]["mesh"], "player")
         self.assertNotIn("offsetX", icon["rows"][0]["fields"])
 
+    def test_helper_generated_records_are_source_only(self):
+        # Real Module Systems such as Persistent World use helpers like psys(...).
+        # Never treat the helper call argument list as a literal Module System record.
+        path = self.root / "module_particle_systems.py"
+        path.write_text("""particle_systems=[psys("rain",flags,"mesh",number=500.0,life=0.5,damping=0.3,gravity=1,turbulence_size=10,turbulence_strength=0,alpha=[(1,1),(1,1)],red=[(1,1),(1,1)],green=[(1,1),(1,1)],blue=[(1,1),(1,1)],scale=[(1,1),(1,1)],emit_box=(1,1,1),emit_velocity=(0,0,-10),emit_direction_randomness=0,rotation_speed=0,rotation_damping=.5)]\n""")
+        data = dataset_data(self.root, "particle-systems")
+        self.assertEqual(len(data["rows"]), 1)
+        self.assertIn("helper/wrapper", data["rows"][0]["problem"])
+        self.assertTrue(data["rows"][0]["id"].startswith("record@"))
+        with self.assertRaisesRegex(ValueError, "source repair"):
+            save_dataset(self.root, "particle-systems", data["sha256"], [{
+                "recordIndex": 0, "originalId": data["rows"][0]["id"], "fields": {"particleLife": 2},
+            }])
+        self.assertIn("number=500.0", path.read_text())
+
     def test_noop_save_does_not_create_backup(self):
         data = dataset_data(self.root, "strings")
         result = save_dataset(self.root, "strings", data["sha256"], [])
