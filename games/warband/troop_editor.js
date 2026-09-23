@@ -1,9 +1,12 @@
 "use strict";
-function troopDraft(row){return state.troopEdits[row.id]||{id:row.id,fields:{},stats:{...row.stats},flagValue:row.flagValue};}
+function troopEditKey(row){return troopRowKey(row);}
+function newTroopDraft(row){return {recordIndex:row.recordIndex,originalId:row.id,fields:{},stats:{...row.stats},flagValue:row.flagValue};}
+function troopDraft(row){return state.troopEdits[troopEditKey(row)]||newTroopDraft(row);}
 function troopValue(row,key){return troopDraft(row).fields[key]??row.fields[key];}
 function setTroopField(row,key,value){
- const draft=state.troopEdits[row.id] ||= {id:row.id,fields:{},stats:{...row.stats},flagValue:row.flagValue};
+ const key=troopEditKey(row),draft=state.troopEdits[key] ||= newTroopDraft(row);
  if(value===row.fields[key])delete draft.fields[key];else draft.fields[key]=value;
+ if(!Object.keys(draft.fields).length)delete state.troopEdits[key];
  shell.refresh();
 }
 function troopFields(row){
@@ -20,17 +23,17 @@ function troopFields(row){
    const n=Number(e.target.value);if(!Number.isInteger(n)||n<0||n>255)return;
    const mask=255n<<BigInt(shift),v=BigInt(n)<<BigInt(shift);
    setTroopField(row,"attributes",`((${troopValue(row,"attributes")}) & ~0x${mask.toString(16)}) | 0x${v.toString(16)}`);
-   state.troopEdits[row.id].stats[key]=n;
+   state.troopEdits[troopEditKey(row)].stats[key]=n;
   }})));
  }
  if(row.flagValue!==null){
   const setFlag=(mask,on)=>{
    const current=troopValue(row,"flags");setTroopField(row,"flags",on?`(${current}) | ${mask}`:`(${current}) & ~${mask}`);
-   state.troopEdits[row.id].flagValue=on?troopDraft(row).flagValue|mask:troopDraft(row).flagValue&~mask;
+   state.troopEdits[troopEditKey(row)].flagValue=on?troopDraft(row).flagValue|mask:troopDraft(row).flagValue&~mask;
   };
   const type=el("select",{disabled,onchange:e=>{
    const value=Number(e.target.value);setTroopField(row,"flags",`((${troopValue(row,"flags")}) & ~15) | ${value}`);
-   state.troopEdits[row.id].flagValue=(troopDraft(row).flagValue&~15)|value;
+   state.troopEdits[troopEditKey(row)].flagValue=(troopDraft(row).flagValue&~15)|value;
   }},...Object.entries(state.troops.types||{}).map(([name,value])=>el("option",{value},name.replace("tf_",""))));
   type.value=String(troopDraft(row).flagValue&15);body.push(field("Type",type));
   body.push(LexeditorUI.detailSection({title:"Flags",body:Object.entries(state.troops.flags||{}).map(([name,mask])=>field(name.replace("tf_","").replaceAll("_"," "),el("input",{type:"checkbox",disabled,checked:!!(troopDraft(row).flagValue&mask),onchange:e=>setFlag(mask,e.target.checked)})))}));
