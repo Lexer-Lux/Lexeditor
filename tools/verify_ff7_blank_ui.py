@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import re
 
 ROOT = Path(__file__).resolve().parents[1]
 FF7 = ROOT / "games" / "ff7" / "editor.html"
@@ -58,8 +57,12 @@ def main() -> None:
     # Blank also owns gallery-only command/nav tokens. Compare only the
     # presentation tokens neutral.css deliberately shares with FF7.
     def token(css: str, name: str) -> str | None:
-        match = re.search(rf"{re.escape(name)}\\s*:\\s*([^;}}]+)", css)
-        return match.group(1).strip() if match else None
+        value = compact(css)
+        marker = name + ":"
+        if marker not in value:
+            return None
+        tail = value.split(marker, 1)[1]
+        return tail.split(";", 1)[0].split("}", 1)[0]
 
     for name in ("--lex-accent", "--lex-accent-text", "--lex-highlight"):
         blank_value = token(blank_css, name)
