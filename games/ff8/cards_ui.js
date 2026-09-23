@@ -279,13 +279,18 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     const abilitiesContent=parts.content.querySelector(':scope > .lex-column-list') || parts.content;
     if(abilitiesContent.classList.contains('lex-column-list')) abilitiesContent.classList.add('lex-table-fill');
     parts.title?.remove();
-    const tabbed=LexeditorUI.tabbedPanel({label:'GF abilities and spellbook',active:'abilities',tabs:[{id:'abilities',label:'ABILITIES'},{id:'spellbook',label:'SPELLBOOK'}],content:[abilitiesContent,marker],change:id=>{
+    let spellbookReady=false;
+    const tabbed=LexeditorUI.tabbedPanel({label:'GF abilities and spellbook',active:'abilities',tabs:[{id:'abilities',label:'ABILITIES'},{id:'spellbook',label:'SPELLBOOK',attrs:{'aria-disabled':'true'}}],content:[abilitiesContent,marker],change:id=>{
+      if(id==='spellbook'&&!spellbookReady)return;
       abilitiesContent.hidden=id!=='abilities';marker.hidden=id!=='spellbook';
       tabs.querySelectorAll('[role="tab"]').forEach((tab,index)=>{const active=index===(id==='abilities'?0:1);tab.tabIndex=active?0:-1;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));});
     }});
     const tabs=tabbed.querySelector('[role="tablist"]');
     const spellTab=tabs.querySelectorAll('button')[1];
-    spellTab?.append(LexeditorUI.infoHelp("Choose and order this GF's Magic pages. This needs Lexer's spellbook tweak, with Single GF on and Shared Magic off. It does not change this GF's learnable abilities. Without the tweak, these pages have no effect in battle."));
+    const spellHelp=LexeditorUI.infoHelp("Choose and order this GF's Magic pages. To unlock this tab, open Tweaks → Gameplay and enable GF Spellbooks and Monogamy, with Shared Party Magic Inventory off. This does not change the GF's learnable abilities.");
+    spellHelp.addEventListener('click',event=>event.stopPropagation());
+    spellHelp.addEventListener('keydown',event=>event.stopPropagation());
+    spellTab?.append(spellHelp);
     marker.hidden=true;
     host.lexReplacePanel(abilitiesPanel,tabbed);
     try {
@@ -294,14 +299,20 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       const gf = payload.rows?.find(row => Number(row.id) === gfId);
       if (!gf) throw new Error(`GF ${gfId} is unavailable`);
       const meta = payload.spellbook || {};
-      if (!meta.enabled) {
+      // Respect edits made on Tweaks before Save as well as saved settings.
+      const currentSettings=typeof state!=='undefined'?state.data?.settings:null;
+      const enabled=currentSettings?.gfSpellbooksEnabled??meta.enabled;
+      const runtimeActive=currentSettings?currentSettings.singleGf&&!currentSettings.sharedMagicInventory:meta.runtimeActive!==false;
+      if (!enabled) {
         marker.replaceChildren(LexeditorUI.detailNote("Enable GF Spellbooks on the Tweaks page."));
         return;
       }
-      if (meta.runtimeActive === false) {
+      if (!runtimeActive) {
         marker.replaceChildren(LexeditorUI.detailNote("GF Spellbooks needs Monogamy on and Shared Party Magic Inventory off. Set these on Tweaks."));
         return;
       }
+      spellbookReady=true;
+      spellTab?.setAttribute('aria-disabled','false');
       const magic = meta.magicOptions || [];
       const abilities = meta.abilityOptions || [];
       const drafts = window.ff8SpellbookDrafts ||= new Map();

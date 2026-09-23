@@ -22,6 +22,7 @@ on:
       - 'games/ff8/cards_ui.js'
       - 'games/ff8/party.js'
       - 'tests/test_ff8_gf_attack_tab.py'
+      - 'tests/test_ff8_spellbook_lock.py'
       - 'desktop_host.py'
       - 'github_integration.py'
       - 'plugin_api.py'
@@ -55,6 +56,7 @@ on:
       - 'games/ff8/cards_ui.js'
       - 'games/ff8/party.js'
       - 'tests/test_ff8_gf_attack_tab.py'
+      - 'tests/test_ff8_spellbook_lock.py'
       - 'desktop_host.py'
       - 'github_integration.py'
       - 'plugin_api.py'
@@ -113,7 +115,7 @@ jobs:
       - name: GF ability icons and spellbook tabs
         run: python tests/ff8_spellbook_tabs_browser_check.py
       - name: GF attack tab routing
-        run: python -m pytest -q tests/test_ff8_gf_attack_tab.py
+        run: python -m pytest -q tests/test_ff8_gf_attack_tab.py tests/test_ff8_spellbook_lock.py
       - name: Developer helper browser regression
         run: python tests/wse2_helper_browser_check.py out/wse2-helper-browser
       - uses: actions/upload-artifact@v4

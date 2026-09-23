@@ -1178,6 +1178,9 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
  color:var(--lex-accent-text);background:var(--lex-accent);
 }
 .lex-subtab-button:focus-visible { position:relative;z-index:1;outline:2px solid var(--lex-highlight);outline-offset:-2px; }
+/* Keep authored help usable on a locked tab. Only the label is dimmed. */
+.lex-subtab-button[aria-disabled="true"] { cursor:not-allowed; }
+.lex-subtab-button[aria-disabled="true"] > .lex-tab-label { opacity:.4; }
 
 /* The drawing space now stretches to fill the plot, so every stroke inside
    it must opt out of that scaling or the lines would thin and thicken with
