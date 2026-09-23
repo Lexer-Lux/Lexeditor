@@ -4,9 +4,9 @@ function newTroopDraft(row){return {recordIndex:row.recordIndex,originalId:row.i
 function troopDraft(row){return state.troopEdits[troopEditKey(row)]||newTroopDraft(row);}
 function troopValue(row,key){return troopDraft(row).fields[key]??row.fields[key];}
 function setTroopField(row,key,value){
- const key=troopEditKey(row),draft=state.troopEdits[key] ||= newTroopDraft(row);
+ const recordKey=troopEditKey(row),draft=state.troopEdits[recordKey] ||= newTroopDraft(row);
  if(value===row.fields[key])delete draft.fields[key];else draft.fields[key]=value;
- if(!Object.keys(draft.fields).length)delete state.troopEdits[key];
+ if(!Object.keys(draft.fields).length)delete state.troopEdits[recordKey];
  shell.refresh();
 }
 function troopFields(row){
