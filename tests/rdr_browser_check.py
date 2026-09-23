@@ -134,7 +134,7 @@ def run(output: Path, executable: str | None) -> None:
             options["executable_path"] = executable
         browser = playwright.chromium.launch(**options)
         try:
-            for width, height, zoom in ((1200, 800, 100), (760, 700, 100), (1200, 800, 150)):
+            for width, height, zoom in ((1200, 800, 100), (900, 620, 100), (1200, 800, 150)):
                 page = browser.new_page(viewport={"width": width, "height": height})
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))
