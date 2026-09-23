@@ -205,6 +205,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.evaluate("navigate('enemies')")
             page.wait_for_function("state.datasets.enemies?.rows?.length===1")
             expect(numeric_field(page, "MAX HP")).to_have_value("2,345")
+            expect(page.get_by_text("Enemies · project BattleScene raw16", exact=True)).to_be_visible()
             page.screenshot(path=str(OUT / "ff9-enemy-save-reopen.png"), full_page=True)
 
             page.evaluate("navigate('info')")
