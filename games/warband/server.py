@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import mimetypes
 import os
@@ -36,6 +37,7 @@ MODULES = Path(paths.MODULES_DIR)
 PORT = int(os.environ.get("LEXEDITOR_PORT", "8766"))
 HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED", "0") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "")
+CATALOG_LOCK = threading.Lock()
 
 
 def settings_rows() -> list[dict]:
@@ -489,34 +491,49 @@ def read_catalog_file(filename: str) -> dict:
             break
         except UnicodeDecodeError:
             pass
-    return {"filename": filename, "editable": True, "path": str(path), "encoding": encoding, "text": text}
+    return {"filename": filename, "editable": True, "path": str(path), "encoding": encoding, "text": text,
+            "sha256": hashlib.sha256(raw).hexdigest()}
 
 
-def save_catalog_file(filename: str, text: str, encoding: str) -> dict:
+def save_catalog_file(filename: str, text: str, encoding: str, expected_sha256: str) -> dict:
     path = resolve_catalog_file(filename)
     if path is None:
         raise ValueError("This catalog row is not an editable text file")
-    encoded = text.encode(encoding)
-    if path.suffix.casefold() == ".py":
-        python27 = Path(r"C:\Python27\python.exe")
-        if python27.is_file():
-            with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temporary:
-                temporary.write(encoded)
-                temporary_path = Path(temporary.name)
-            try:
-                check = subprocess.run(
-                    [str(python27), "-c", "import sys; compile(open(sys.argv[1],'rb').read(),sys.argv[1],'exec')", str(temporary_path)],
-                    capture_output=True, text=True,
-                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                )
-                if check.returncode:
-                    raise ValueError((check.stderr or check.stdout).strip())
-            finally:
-                temporary_path.unlink(missing_ok=True)
-    backup = path.with_name(path.name + ".lexeditor.bak")
-    backup.write_bytes(path.read_bytes())
-    path.write_bytes(encoded)
-    return {"saved": 1, "backup": str(backup)}
+    with CATALOG_LOCK:
+        raw = path.read_bytes()
+        current_sha256 = hashlib.sha256(raw).hexdigest()
+        if not expected_sha256 or current_sha256 != expected_sha256:
+            raise ValueError(f"{filename} changed; reload before saving")
+        encoded = text.encode(encoding)
+        if path.suffix.casefold() == ".py":
+            python27 = Path(r"C:\Python27\python.exe")
+            if python27.is_file():
+                with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temporary:
+                    temporary.write(encoded)
+                    temporary_path = Path(temporary.name)
+                try:
+                    check = subprocess.run(
+                        [str(python27), "-c", "import sys; compile(open(sys.argv[1],'rb').read(),sys.argv[1],'exec')", str(temporary_path)],
+                        capture_output=True, text=True,
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                    )
+                    if check.returncode:
+                        raise ValueError((check.stderr or check.stdout).strip())
+                finally:
+                    temporary_path.unlink(missing_ok=True)
+        if path.read_bytes() != raw:
+            raise ValueError(f"{filename} changed while validating; reload before saving")
+        backup = path.with_name(path.name + ".lexeditor.bak")
+        backup.write_bytes(raw)
+        fd, temporary_name = tempfile.mkstemp(prefix=f".{path.stem}-", dir=path.parent)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(encoded)
+            os.replace(temporary_name, path)
+        finally:
+            if os.path.exists(temporary_name):
+                os.unlink(temporary_name)
+        return {"saved": 1, "backup": str(backup), "sha256": hashlib.sha256(encoded).hexdigest()}
 
 
 class BuildState:
@@ -681,7 +698,7 @@ class Handler(PluginRequestHandler):
             elif path == "/api/module-records/save":
                 self.json_response(save_dataset(MODULE_SYSTEM, body.get("dataset", ""), body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/catalog/file/save":
-                self.json_response(save_catalog_file(body.get("filename", ""), body.get("text", ""), body.get("encoding", "utf-8")))
+                self.json_response(save_catalog_file(body.get("filename", ""), body.get("text", ""), body.get("encoding", "utf-8"), body.get("sha256", "")))
             elif path == "/api/build/start":
                 self.json_response(BUILD_STATE.start())
             else:
