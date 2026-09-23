@@ -22,3 +22,14 @@ Schofield prototype proposed; component and engraved-mesh compatibility unproven
 No concrete Lexer-side session exists yet (prototype/research still owed on
 the agent side), so flipping to waiting would be a fake checklist. Left
 actionable until a real session can be written.
+
+## 2026-09-23 agent slice: checkable Schofield conversion plan
+
+games/rdr2/unique_gun_parts.py records the first proof candidate (unique
+Schofield features as grip/barrel/frame components on the base Schofield,
+with catalog and gunsmith entries and pickup-unlocks-parts) plus
+validate_prototype(), which rejects stat-toggle-only parts, missing
+entries, uncovered in-game checks, and unowned engraved-mesh assumptions.
+Covered by tests/test_rdr2_unique_gun_parts.py (11 hermetic tests).
+No gameplay claim: gunsmith visibility, installation, persistence, dual
+wield, mission rewards, and compendium credit still need a real session.
