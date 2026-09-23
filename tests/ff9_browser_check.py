@@ -91,6 +91,28 @@ def assert_table_headers_fit(page):
     assert not overflow, overflow
 
 
+def assert_table_rows_do_not_overlap(page):
+    overlaps = page.evaluate("""()=> {
+      const rows=[...document.querySelectorAll('.lex-column-list-row')]
+        .filter(row=>row.offsetParent!==null && !row.classList.contains('lex-filler-row'));
+      const bad=[];
+      for(let i=0;i<rows.length;i++){
+        const box=rows[i].getBoundingClientRect();
+        const content=[...rows[i].querySelectorAll('.lex-column-cell-content')]
+          .map(node=>node.getBoundingClientRect())
+          .filter(rect=>rect.width>0&&rect.height>0);
+        if(content.some(rect=>rect.top < box.top-1 || rect.bottom > box.bottom+1))
+          bad.push({index:i,row:{top:box.top,bottom:box.bottom},content:content.map(rect=>({top:rect.top,bottom:rect.bottom}))});
+        if(i+1<rows.length){
+          const next=rows[i+1].getBoundingClientRect();
+          if(box.bottom > next.top+1) bad.push({index:i,overlapsNext:true,bottom:box.bottom,nextTop:next.top});
+        }
+      }
+      return bad;
+    }""")
+    assert not overlaps, overlaps
+
+
 with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
     temp = Path(name)
     game, project, data_root = temp / "game", temp / "project", temp / "data"
@@ -210,6 +232,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.evaluate("document.documentElement.style.zoom='1.25';navigate('items')")
             page.wait_for_selector(".lex-paged-list-detail")
             expect(page.locator("#global-save")).to_be_visible()
+            assert_table_rows_do_not_overlap(page)
             page.screenshot(path=str(OUT / "ff9-scale-125.png"), full_page=True)
             page.evaluate("document.documentElement.style.zoom='1'")
 
