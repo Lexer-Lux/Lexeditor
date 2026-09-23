@@ -420,6 +420,15 @@ def build_candidate(project: Path | None, game: Path | None,
                 "gameDirTopOnly": True,
                 "dependencyDownloadInvokedByLexeditor": False,
             },
+            "loadOrder": {
+                "candidate": {
+                    "package": output_utoc.with_suffix(".pak").name,
+                    "patchLevel": 0,
+                    "effectiveOrder": 100,
+                },
+                "observedNativeMods": _native_mod_load_order(game),
+                "contentsCompared": False,
+            },
             "outputs": [
                 {"file": path.name, "sha256": _sha256(path), "bytes": path.stat().st_size}
                 for path in outputs
