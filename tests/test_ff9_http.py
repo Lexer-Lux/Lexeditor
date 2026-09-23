@@ -30,6 +30,11 @@ def service(tmp_path, monkeypatch):
         def status_rows(self): return []
     dependency("battle_scene", BattleSceneStore=FakeBattleSceneStore)
     dependency("memoria_baseline", ensure=lambda: {"release": "fixture", "source": "fixture", "problems": []})
+    dependency("mod_compat", audit=lambda: {
+        "pinnedMemoria": "v2025.07.04", "mods": [], "declaredConflicts": [],
+        "overlaps": [], "unsupportedByPinnedMemoria": [], "folderNames": [],
+        "priorities": [], "mergeScripts": False, "projectScanTruncated": False,
+    })
     runtime = dependency("memoria_manager", status=lambda root: {"installed": False},
                          available=lambda: {"available": False})
     called = []
@@ -202,3 +207,11 @@ def test_data_map_keeps_each_known_p0data_gap_visible(service):
                for name in expected)
     assert "mesh/rig" in gaps["StreamingAssets/p0data4.bin"]["notes"]
     assert "event-script" in gaps["StreamingAssets/p0data7.bin"]["notes"]
+
+
+def test_dashboard_exposes_read_only_mod_compatibility_snapshot(service):
+    status, dashboard = request(service, "/api/dashboard", method="GET")
+    assert status == 200
+    report = dashboard["modCompatibility"]
+    assert report["pinnedMemoria"] == "v2025.07.04"
+    assert report["mods"] == [] and report["overlaps"] == []
