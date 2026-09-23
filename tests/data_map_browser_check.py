@@ -58,7 +58,22 @@ with sync_playwright() as p:
                 errors=[]
                 page=browser.new_page(viewport={'width':width,'height':height})
                 page.on('pageerror',lambda e:errors.append(str(e)))
-                page.set_content(html_for(game),wait_until='domcontentloaded')
+                html=html_for(game)
+                if game=='warband':
+                    # Warband's shared shell reads sessionStorage during boot.
+                    # set_content() uses an opaque/storage-refused document in
+                    # Chromium, so give this synthetic fixture a normal in-memory
+                    # HTTP origin without opening a loopback server.
+                    html=html.replace('http://127.0.0.1:9/','http://warband-data-map.test/')
+                    def route_warband_fixture(route):
+                        if route.request.resource_type=='document':
+                            route.fulfill(status=200,body=html,content_type='text/html')
+                        else:
+                            route.abort()
+                    page.route('http://warband-data-map.test/**',route_warband_fixture)
+                    page.goto('http://warband-data-map.test/',wait_until='domcontentloaded')
+                else:
+                    page.set_content(html,wait_until='domcontentloaded')
                 # Most plugins keep one `state` object the map can be seeded
                 # into. Palworld keeps its own named globals instead, so it is
                 # seeded through those rather than being called broken for not
