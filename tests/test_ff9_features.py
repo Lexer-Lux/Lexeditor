@@ -139,3 +139,26 @@ def test_duplicate_memoria_order_settings_fail_closed(env, setting):
         features.deploy(game, project, runtime)
     assert (game / "Memoria.ini").read_bytes() == before
     assert not (game / "Lexeditor").exists()
+
+
+def test_revert_restores_owned_mod_when_ini_update_fails(env):
+    game, project, runtime = env
+    features.deploy(game, project, runtime)
+    target = game / "Lexeditor"
+    deployed_runtime = target / "StreamingAssets/Scripts/Memoria.Scripts.Lexeditor.dll"
+    before_runtime = deployed_runtime.read_bytes()
+    ini = game / "Memoria.ini"
+    before = ini.read_bytes()
+    duplicate = before.replace(
+        b'Priorities = "Lexeditor", "OtherMod", "SecondMod"\r\n',
+        b'Priorities = "Lexeditor", "OtherMod", "SecondMod"\r\n'
+        b'Priorities = "Lexeditor", "OtherMod", "SecondMod"\r\n',
+    )
+    ini.write_bytes(duplicate)
+
+    with pytest.raises(RuntimeError, match="duplicate"):
+        features.revert(game, project, runtime)
+
+    assert target.is_dir()
+    assert deployed_runtime.read_bytes() == before_runtime
+    assert ini.read_bytes() == duplicate
