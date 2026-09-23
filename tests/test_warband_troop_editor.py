@@ -33,6 +33,29 @@ class TroopEditorTests(unittest.TestCase):
             self.assertEqual(source.with_suffix('.py.lexeditor.bak').read_bytes(),before)
             with self.assertRaises(ValueError):save_troops(root,data['sha256'],[])
 
+    def test_nested_literals_are_ignored_and_duplicate_ids_need_record_identity(self):
+        source_text = '''troops = [
+ ["dup", "First", "Firsts", 0, 0, 0, 0, [], 0, 0, 0, 0],
+ helper([
+   ["nested", "Nested", "Nesteds", 0, 0, 0, 0, [], 0, 0, 0, 0],
+ ]),
+ ["dup", "Second", "Seconds", 0, 0, 0, 0, [], 0, 0, 0, 0],
+]
+'''
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);source=root/'module_troops.py';source.write_text(source_text)
+            data=troop_data(root)
+            self.assertEqual([row['name'] for row in data['rows']], ['First', 'Second'])
+            self.assertEqual([row['recordIndex'] for row in data['rows']], [0, 1])
+            with self.assertRaisesRegex(ValueError, 'missing or ambiguous'):
+                save_troops(root,data['sha256'],[{'id':'dup','fields':{'name':'Wrong'}}])
+            self.assertEqual(source.read_text(),source_text)
+            save_troops(root,data['sha256'],[
+                {'recordIndex':1,'originalId':'dup','fields':{'name':'Updated Second'}}])
+            result=troop_data(root)
+            self.assertEqual([row['name'] for row in result['rows']], ['First', 'Updated Second'])
+            self.assertIn('"nested", "Nested"',source.read_text())
+
     def test_invalid_edits_do_not_write(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);source=root/'module_troops.py';source.write_text(SOURCE)
