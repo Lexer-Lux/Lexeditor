@@ -198,16 +198,18 @@ def _build_wrapper(steps: list[str]) -> str:
         "setlocal",
         'cd /d "%~dp0ModuleSystem"',
         'set "LEX_WARBAND_PY="',
-        'if exist "C:\\Python27\\python.exe" set "LEX_WARBAND_PY=\"C:\\Python27\\python.exe\""',
+        'set "LEX_WARBAND_PY_ARGS="',
+        'if exist "C:\\Python27\\python.exe" set "LEX_WARBAND_PY=C:\\Python27\\python.exe"',
         'if not defined LEX_WARBAND_PY (',
         '  py -2 -c "import sys" >nul 2>nul',
-        '  if not errorlevel 1 set "LEX_WARBAND_PY=py -2"',
+        '  if not errorlevel 1 set "LEX_WARBAND_PY=py"',
+        '  if not errorlevel 1 set "LEX_WARBAND_PY_ARGS=-2"',
         ')',
         'if not defined LEX_WARBAND_PY set "LEX_WARBAND_PY=python"',
     ]
     for arguments in steps:
         lines.extend([
-            f"call %LEX_WARBAND_PY% {arguments}",
+            f'call "%LEX_WARBAND_PY%" %LEX_WARBAND_PY_ARGS% {arguments}',
             "if errorlevel 1 exit /b %errorlevel%",
         ])
     lines.extend([
