@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import paths, deployment
+from . import paths, deployment, tooling
 from .extended import FAMILIES, ERRORS as EXTENDED_ERRORS, load_extended, save_extended, resolve_source, model
 from .datasets import CATEGORIES, UNRESOLVED, READ_ERRORS, load_datasets, save_datasets
 from .storage import target_path
@@ -272,7 +272,7 @@ class Handler(PluginRequestHandler):
     def do_POST(self):
         try:
             path = urlparse(self.path).path
-            if path not in {"/api/save", "/api/platform-config/save", "/api/extended/save", "/api/deployment/export", "/api/deployment/deploy", "/api/deployment/remove"}:
+            if path not in {"/api/save", "/api/platform-config/save", "/api/extended/save", "/api/deployment/setup", "/api/deployment/export", "/api/deployment/deploy", "/api/deployment/remove"}:
                 self.json_response({"error": "Not found"}, 404)
                 return
             length = int(self.headers.get("Content-Length", "0"))
@@ -283,7 +283,16 @@ class Handler(PluginRequestHandler):
                     payload = json.loads(self.rfile.read(length).decode("utf-8"))
                     if payload not in ({}, None):
                         raise ValueError("FF7 deployment actions do not accept data changes")
-                if path == "/api/deployment/export":
+                if path == "/api/deployment/setup":
+                    if PLUGIN_ID != "ff7":
+                        raise ValueError("Pinned FFNx 2026 setup is available only for the classic FF7 rerelease plugin")
+                    import process_probe
+                    if os.name == "nt" and process_probe.live_processes(deployment.PROCESS_NAMES):
+                        raise RuntimeError("Close Final Fantasy VII before installing FFNx")
+                    tooling.install_pinned(GAME_ROOT)
+                    plan = deployment.build_plan(GAME_ROOT, PROJECT_ROOT)
+                    self.json_response({key:value for key,value in plan.items() if key != "_payload"})
+                elif path == "/api/deployment/export":
                     self.json_response(deployment.export_project(GAME_ROOT, PROJECT_ROOT))
                 elif path == "/api/deployment/deploy":
                     import process_probe
