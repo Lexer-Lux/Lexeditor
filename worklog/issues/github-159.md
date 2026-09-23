@@ -13,3 +13,6 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes disposition
+Audit complete; no fixes delivered. First targets stand: wickiup map artwork plus completed-Dreamcatcher cleanup, as separate independently verified permission-compatible fixes. Clothing and carry physics need their own comparisons; run and walk toggling is preference, not a confirmed bug. Issue stays actionable.
