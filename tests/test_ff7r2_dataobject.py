@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from games.ff7r2.dataobject import DataObjectError, DataObjectPackage
-from ff7r2_fixture import battle_item_possession_fixture, fixture
+from ff7r2_fixture import battle_item_possession_fixture, battle_player_parameter_fixture, fixture
 
 
 def test_fixture_parses_real_record_identity_and_scalar_types():
@@ -142,3 +142,23 @@ def test_name_array_element_without_minimal_name_is_rejected():
     with pytest.raises(DataObjectError, match="has no minimal-name identity"):
         DataObjectPackage.from_bytes(source)
 
+
+
+def test_battle_player_parameter_public_storage_signature_decodes_without_writes():
+    source = battle_player_parameter_fixture()
+    package = DataObjectPackage.from_bytes(source)
+    assert package.to_bytes() == source
+    row = package.records[0]
+    values = {field.name: field.value for field in row.fields}
+    assert row.key.text == "BattleCharacterTest"
+    assert values["CommandAbilityID_Array"] == ["AbilityTest"]
+    assert values["EnableAerialShortCut"] == 1
+    assert values["UniqueAbilityType0"] == 2
+    assert values["UniqueAbilityParameterValue_Array"] == pytest.approx([1.25, 2.5])
+    assert values["KeyDownTime"] == pytest.approx(0.4)
+    assert values["KeyDownEffectCreateTime"] == pytest.approx(0.2)
+    assert values["GuardParameterValue_Array"] == pytest.approx([0.5])
+    assert values["DodgeType_Array"] == [1, 2]
+    assert values["LimitAbilityID_Array"] == ["LimitTest"]
+    arrays = [field for field in row.fields if field.kind == "array"]
+    assert arrays and all(field.editable is False for field in arrays)
