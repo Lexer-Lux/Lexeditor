@@ -200,7 +200,7 @@
     }
     return FIELD_HELP[`${dataKey}:${field.key}`]||"";
   }
-  function setValue(data,row,field,value){row.values[field.key]=value;shell.refresh()}
+  function setValue(data,row,field,value){row.values[field.key]=value;shell.refresh();toolbar()}
   function fieldPin(data,field){
     const key=["accessories","armor","weapons"].includes(state.tab)?`equipment-${state.tab}`:activeKey();
     if(!key)return null;

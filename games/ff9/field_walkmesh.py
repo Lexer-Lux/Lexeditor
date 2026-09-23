@@ -288,7 +288,7 @@ class FieldWalkmeshStore:
                  "and all unknown bytes verbatim in a canonical loose .bgi.bytes override."
              )},
             {**common, "key": self.TRIANGLE_KEY, "label": "Field walkmesh triangles",
-             "controls": "Per-field triangle activity, alternate footstep, NPC-pathing and PC-pathing flags",
+             "controls": "Per-field triangle activity (BGI_TRI_ACTIVE), alternate footstep, NPC-pathing and PC-pathing flags",
              "notes": (
                  "Partial p0data1 integration. Triangle rows are field-scoped to keep the shared Table+Detail "
                  "responsive. Lexeditor edits only Memoria's documented Active, Alternate footstep, Prevent NPC "

@@ -280,10 +280,10 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             first_scene = page.evaluate("state.datasets['field-walkmesh-triangles'].activeScene")
             second_scene = page.evaluate("state.datasets['field-walkmesh-triangles'].scenes.find(row=>row.value!==state.datasets['field-walkmesh-triangles'].activeScene).value")
             chooser.select_option(second_scene)
-            page.wait_for_function("scene=>state.datasets['field-walkmesh-triangles']?.activeScene===scene", second_scene)
+            page.wait_for_function("scene=>state.datasets['field-walkmesh-triangles']?.activeScene===scene", arg=second_scene)
             chooser = page.get_by_label("Field walkmesh", exact=True)
             chooser.select_option(first_scene)
-            page.wait_for_function("scene=>state.datasets['field-walkmesh-triangles']?.activeScene===scene", first_scene)
+            page.wait_for_function("scene=>state.datasets['field-walkmesh-triangles']?.activeScene===scene", arg=first_scene)
             expect(field(page, "TRIANGLE ACTIVE").locator('input[type="checkbox"]')).not_to_be_checked()
             page.screenshot(path=str(OUT / "ff9-walkmesh-triangle-save-reopen.png"), full_page=True)
 
