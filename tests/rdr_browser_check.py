@@ -165,7 +165,7 @@ def run(output: Path, executable: str | None) -> None:
                   if (!field.isConnected || b.width<=0 || l.width<=0) return false;
                   return {field:b.width,label:l.width,ratio:l.width/b.width};
                 }""").json_value()
-                assert 0.075 <= geometry["ratio"] <= 0.125, (width, "RDR1 bypassed shared ~10% label lane", geometry)
+                assert 0.075 <= geometry["ratio"] <= 0.16, (width, "RDR1 bypassed shared adaptive label lane", geometry)
                 page.screenshot(path=str(output / f"rdr-items-{width}-zoom{zoom}.png"), full_page=True)
 
                 page.evaluate("state.tab='strings'; stringsUI.render()")
