@@ -844,6 +844,13 @@
     const packaging=delivery.packaging||{};
     const retoc=ws.tooling?.retoc||{};
     const rezen=ws.tooling?.unrealReZen||{};
+    const loadOrder=packaging.loadOrder||{};
+    const rankedMods=Array.isArray(loadOrder.ranked)?loadOrder.ranked:[];
+    const unrankedMods=Array.isArray(loadOrder.unranked)?loadOrder.unranked:[];
+    const incompleteMods=Array.isArray(loadOrder.incomplete)?loadOrder.incomplete:[];
+    const precedenceSummary=rankedMods.length
+      ?rankedMods.slice(0,6).map(item=>item.winnerRank+". "+item.package+" (patch "+item.patchLevel+")").join("  ·  ")
+      :(loadOrder.present?"No complete ASCII *_P triples found.":"~mods is not available in the located game.");
     const stagedCount=Number(packaging.stagedFileCount||0);
     const packageState=packaging.ready
       ?(stagedCount+" audited staged file"+(stagedCount===1?"":"s")+"; explicit dependencies and game archives are ready.")
@@ -882,10 +889,20 @@
         detailField({label:"BUILD CANDIDATE",control:packageActions,
           help:infoHelp("Builds .pak/.utoc/.ucas only under this project's build folder. Nothing is copied to End/Content/Paks/~mods.")}),
       ]}),
+      detailSection({title:"NATIVE MOD LOAD ORDER",body:[
+        detailField({label:"ROOT",control:readonlyField(loadOrder.root||"End/Content/Paks/~mods")}),
+        detailField({label:"PRECEDENCE",control:readonlyField(precedenceSummary),
+          help:infoHelp(loadOrder.rule||"Higher numeric patch level wins; otherwise the case-insensitively smaller complete path wins.")}),
+        detailField({label:"UNCLASSIFIED",control:readonlyField(
+          unrankedMods.length+" unranked complete package"+(unrankedMods.length===1?"":"s")+"; "+
+          incompleteMods.length+" incomplete triple"+(incompleteMods.length===1?"":"s"))}),
+        detailField({label:"SCOPE",control:readonlyField(loadOrder.scope||"Filename/path precedence only; package contents are not inspected."),
+          help:infoHelp("This is a read-only audit of native package names and paths. It does not unpack mods, detect which assets overlap, change priority, or activate Lexeditor's unaccepted candidate.")}),
+      ]}),
       LexeditorUI.modLoaderSection({
         loader:"Rebirth gameplay assets are loaded from IoStore. A candidate can be packed with explicitly supplied UnrealReZen + Oodle; ReShade uses dxgi.dll and Shader Injector uses dsound.dll.",
         output:"Gameplay Save currently stages PlayerParameter under content/End/Content. Build Candidate audits every staged regular file under that content root and writes a three-file IoStore package only under <project>/build/.",
-        order:"The game natively loads accepted .pak/.utoc/.ucas triples from End/Content/Paks/~mods, but Lexeditor does not install this unaccepted candidate or claim a collision winner yet.",
+        order:"For complete native *_P triples, higher numeric _<n>_P patch level wins; at the same level the case-insensitively smaller complete path wins. Lexeditor reports that filename/path precedence read-only, but does not inspect asset overlap or install its unaccepted candidate.",
         safety:"The candidate process rejects staged symlinks, hashes every staged input before packing, rechecks the complete file set and hashes after packing, and requires explicit local dependencies plus CUE4Parse/1.1.1 metadata. The user-supplied oo2core_9_win64.dll must already sit beside UnrealReZen; Lexeditor does not download, copy or relocate it and never writes the installed game. Presentation helpers retain their DLL ownership checks.",
         removal:"Revert/delete the staged project file or delete an isolated project build candidate. No gameplay package is installed by this integration yet."
       }),
