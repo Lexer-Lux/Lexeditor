@@ -55,3 +55,20 @@ launch via the previously orphaned `set_audio_volumes` (now wired in
 non-browser ff8 unit set (212 passed, 3 skipped). Codex updated.
 Still game-side: in-game Config-menu replacement plus audible
 isolation/persistence proof. Stays actionable.
+
+## 2026-09-23 impl/ff8-wave2: native split mapped, anchors pinned+tested
+
+New `plugins/ff8/audio_split_issue_498.py` +
+`tests/test_ff8_audio_split_issue_498.py` (12 passed, hermetic). Proved
+against the installed FF8_EN.exe (all 6 byte anchors match live):
+sfx_set_master_volume 0x46A390 (rejects >100, writes master global
+0x01CD1794 default 100, re-applies to live channels), getter 0x46A470 read
+by the Config-menu Sound slider at 0x4EE284 (0-100 clamp logic),
+per-channel 0x46A480 (ch 0-31, vol 0-127, master/100 scaling replicated
+and tested over the full domain), set-all 0x46A8E0, music per-play volume
+entries (sd_music_play log push 0x46B596; no music master global found).
+Settled the open backend question: with use_external_sfx/music off, FFNx
+gains scale external files only and do not move vanilla audio; the exe
+master does. No bytes installed. Still needs the game: music-volume hook
+point, the second-slider menu patch, audible isolation plus restart
+persistence proof. Stays actionable.

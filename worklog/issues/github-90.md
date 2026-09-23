@@ -47,3 +47,11 @@ discovered/revealed-only labels, waypoint-only, L1-Journal/R1-map
 under Modern Controls) and `tests/test_ff8_world_map_fullscreen_issue_90.py`
 is green. No new agent-side slice exists: native overlay injection
 points need the game. Stays actionable.
+
+## 2026-09-23 impl/ff8-wave2: verify-only, exe string sweep noted
+
+Re-ran `tests/test_ff8_world_map_fullscreen_issue_90.py`: green. No code
+change. Static sweep of the installed FF8_EN.exe found no world-map, Draw
+Point, Chocobo Forest, vehicle, or location strings in the exe: game text
+lives in data files, so the Back-action/native overlay injection points
+cannot be string-anchored and still need the game. Stays actionable.

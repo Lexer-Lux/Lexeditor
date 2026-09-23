@@ -67,15 +67,20 @@ def test_ff7r_markers_match_legacy_graphics_module():
     assert unreal_config.FF7R_MANAGED_END == graphics_tweaks.MANAGED_END
 
 
-def test_ff7r2_config_starts_undiscovered(project, monkeypatch):
+def test_ff7r2_config_location_verified(project, monkeypatch):
     root, ini = project
-    assert game_definition("ff7r2")["config_verified"] is False
+    definition = game_definition("ff7r2")
+    assert definition["config_verified"] is True
+    assert definition["config_candidates"] == (
+        "Documents/My Games/FINAL FANTASY VII REBIRTH/Saved/Config/WindowsNoEditor/Engine.ini",
+    )
     monkeypatch.delenv("LEXEDITOR_FF7R2_ENGINE_INI")
     monkeypatch.setattr("unreal_config._documents", lambda: Path("/nonexistent-lexeditor"))
     assert discover_config_file("ff7r2") is None
     report = status("ff7r2", root)
     assert report["configDiscovered"] is False
-    assert "undiscovered" in report["notes"]
+    assert "undiscovered" not in report["notes"]
+    assert "advanced view" in report["notes"]
 
 
 def test_discovery_prefers_env_override(project):
@@ -239,3 +244,26 @@ def test_observed_never_claims_effective_value(project):
     observed = observed_values(read_document(ini), "ff7r2")
     assert observed == {"r.BloomQuality": "5"}
     assert setting("r.BloomQuality")["key"] == "r.BloomQuality"
+
+
+def test_documents_follows_redirected_shell_folder(project, monkeypatch, tmp_path):
+    docs = tmp_path / "Docs"
+    target = (docs / "My Games" / "FINAL FANTASY VII REBIRTH" / "Saved" /
+              "Config" / "WindowsNoEditor")
+    target.mkdir(parents=True)
+    engine_ini = target / "Engine.ini"
+    engine_ini.write_text("[Core.System]\n", encoding="utf-8")
+    monkeypatch.delenv("LEXEDITOR_FF7R2_ENGINE_INI")
+    monkeypatch.setattr("unreal_config._shell_personal", lambda: docs)
+    assert unreal_config._documents() == docs
+    assert discover_config_file("ff7r2") == engine_ini
+
+
+def test_documents_falls_back_without_shell_folder(monkeypatch):
+    monkeypatch.setattr("unreal_config._shell_personal", lambda: None)
+    assert unreal_config._documents() == Path.home() / "Documents"
+
+
+def test_shell_personal_ignores_non_windows(monkeypatch):
+    monkeypatch.setattr(os, "name", "posix")
+    assert unreal_config._shell_personal() is None

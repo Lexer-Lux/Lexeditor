@@ -50,7 +50,10 @@ class CatalogueTests(unittest.TestCase):
             self.assertTrue(definition["config_candidates"])
             self.assertTrue(definition["env_override"])
             self.assertTrue(definition["supported"])
-        self.assertFalse(game_definition("ff7r2")["config_verified"])
+        self.assertTrue(game_definition("ff7r2")["config_verified"])
+        self.assertEqual(game_definition("ff7r2")["config_candidates"], (
+            "Documents/My Games/FINAL FANTASY VII REBIRTH/Saved/Config/WindowsNoEditor/Engine.ini",
+        ))
 
     def test_ff7r_markers_match_legacy_module(self):
         from plugins.ff7r import graphics_tweaks

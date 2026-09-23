@@ -32,6 +32,16 @@ DEFAULT_GF_ACQUISITION_REWORK = False
 # save offsets exist, so enabling must fail closed rather than install
 # guessed bytes. Flip to True only with verified injection points and the
 # matching build_hext() fragment.
+#
+# Native anchors found 2026-09-23 narrow the remaining search:
+# - GF-owned state is ff8_externals.savemap->gfs[gf_idx].exists bit 0
+#   (vendored plugins/ff8/ffnx_issue_51 derivative sources), with the
+#   native GF table at 0x01CFDCA8 + gf * 68. An FFNx-side award writes
+#   the exists bit plus HPs init, never touching learned abilities.
+# - Draw-list points are already proved in streamlined_draw.py
+#   (SHARED_DRAW_HOOKS, ENEMY_DRAW_BASE); GF suppression reuses them.
+# - Still missing: the battle-victory trigger routine to hang the
+#   award on, plus the in-game proof run. See the issue worklog.
 GF_ACQUISITION_AVAILABLE = False
 GF_ACQUISITION_BLOCKER = (
     "GF Acquisition Rework has no proved battle-victory or Draw-list hooks "
