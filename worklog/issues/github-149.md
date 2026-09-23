@@ -18,3 +18,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes disposition
 Diagnostic crash repaired; the overhaul itself remains research: duration/state experiment plus a concrete persistent-zone prototype with re-entry consequences, all needing the game. Drawn circles alone do not prove law behavior. No repo change available. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side prototype/experiment
+still owed), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.
