@@ -48,3 +48,14 @@ Standing, crouched, aiming, horseback, vehicle, and prone profiles exist; contin
 No concrete Lexer-side session exists yet (prototype/research still owed on
 the agent side), so flipping to waiting would be a fake checklist. Left
 actionable until a real session can be written.
+
+## 2026-09-23 agent slice (per-game-rdr2): camera-boundary source guards
+
+tests/test_rdr2_issue108_camera_boundary.py locks the module boundary in
+gameplay_camera.cpp: the standing/crouched/aiming/horseback/vehicle/prone
+profiles exist, framing stays binary LOW/NORMAL, and authoring input plus
+persistence are dev-mode gated while saved presets keep their separate
+apply path. (4 hermetic tests.) No gameplay claim: vehicle-height
+research and the open shoulder/transition defect sessions still need the
+game.
+
