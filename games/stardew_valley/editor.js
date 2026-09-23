@@ -424,6 +424,91 @@ function datasetFieldControl(row, field) {
   });
 }
 
+
+function datasetDetail(row) {
+  const schema = state.dataset?.schema;
+  if (!row) {
+    const source = state.dataset?.baseSource;
+    const message = source?.available
+      ? "No records match the current search."
+      : "No records are available. Provide the read-only StardewXnbHack "+schema.target+" JSON export, or open a project that already contains Lexeditor field overrides for this family.";
+    return detailPanel({className: "sv-detail", title: schema?.target || "Data", meta: "No records",
+      body: [el("p", {class: "sv-state"}, message)]});
+  }
+  const remove = el("button", {
+    type: "button", disabled: state.busy || !(schema.fields || []).some(field => has(row, field.key)),
+    onclick: () => {
+      for (const field of schema.fields || []) delete row.fields[field.key];
+      state.error = ""; render(); shell.refresh();
+    },
+  }, "Clear supported overrides");
+  const sourceMeta = row.sourcePresent ? "Vanilla source + project patch" : "Project/external record only";
+  return detailPanel({
+    className: "sv-detail", title: row.name || row.id,
+    identity: String(row.id).length <= 12 ? recordId(row.id) : null,
+    meta: String(row.id).length <= 12 ? sourceMeta : row.id+" · "+sourceMeta,
+    body: [
+      detailSection({title: "SOURCE", body: [
+        detailField({label: "RECORD KEY", control: readonlyField(row.id, {format: false})}),
+        ...(row.description ? [detailField({label: "DESCRIPTION", control: readonlyField(row.description, {format: false})})] : []),
+      ]}),
+      detailSection({title: "EDITABLE FIELDS", body: (schema.fields || []).map(field => datasetFieldControl(row, field))}),
+      detailSection({title: "PATCH", body: [
+        detailField({label: "ACTIONS", control: el("div", {class: "sv-actions"}, remove)}),
+        ...(row.unsupportedFieldCount ? [el("p", {class: "sv-state"}, row.unsupportedFieldCount+" unsupported project field(s) are preserved unchanged.")] : []),
+        ...(row.invalidFieldCount ? [el("p", {class: "sv-state"}, row.invalidFieldCount+" source field(s) could not be represented by this typed view and remain read-only.")] : []),
+      ]}),
+    ],
+  });
+}
+function datasetPanel() {
+  const records = sortedDatasetRows();
+  const columns = datasetColumns();
+  const prefs = currentDatasetPrefs();
+  return pagedListDetail({
+    rows: records, key: row => row.id, slots: false,
+    selected: state.datasetSelected, page: state.datasetPage, pageSize: state.pageSize,
+    noun: state.dataset?.schema?.noun || "records",
+    className: "sv-layout", splitKey: "stardew-"+state.datasetKey, rowsKey: "stardew-"+state.datasetKey,
+    defaultSplit: 48, minLeft: 360, minRight: 400,
+    search: {key: "stardew-"+state.datasetKey+"-search", value: state.datasetQuery,
+      label: "Search "+(state.dataset?.schema?.label || "data")+" keys or names",
+      change: value => { state.datasetQuery = value; state.datasetPage = 0; render(); }},
+    emptyDetail: () => datasetDetail(null),
+    master: view => columnList({
+      rows: view.rows, key: row => row.id, selected: view.selected, select: view.select,
+      sortState: state.datasetSort,
+      sort: key => { state.datasetSort = state.datasetSort.key === key
+        ? {key, dir: -state.datasetSort.dir} : {key, dir: 1}; state.datasetPage = 0; render(); },
+      columnPreferences: prefs, columns, class: "sv-table",
+      "aria-label": "Stardew "+(state.dataset?.schema?.label || "data"), refresh: () => { render(); shell.refresh(); },
+    }),
+    detail: datasetDetail,
+    sync: next => { state.datasetPage = next.page; state.pageSize = next.pageSize; if (next.selected !== null) state.datasetSelected = next.selected; },
+    change: next => { state.datasetPage = next.page; state.pageSize = next.pageSize; if (next.selected !== null) state.datasetSelected = next.selected; render(); },
+  });
+}
+async function openDataset(key) {
+  if (key === "objects") {
+    state.datasetKey = "objects"; state.dataset = null; navigate("objects"); return;
+  }
+  if (dirtyCount()) {
+    LexeditorUI.showAlert({title: "Save or discard changes first", message: "Switching data families is blocked while this project has unsaved edits."});
+    return;
+  }
+  state.busy = true; state.error = ""; shell.refresh();
+  try {
+    installDataset(await api("/api/datasets/"+encodeURIComponent(key)));
+    state.datasetPage = 0; state.datasetQuery = ""; state.datasetSort = {key: "id", dir: 1};
+    navigate("objects");
+  } catch (error) {
+    state.error = error.message;
+    LexeditorUI.showAlert({title: "Could not open Stardew data", message: state.error});
+  } finally {
+    state.busy = false; render();
+  }
+}
+
 function dataMapPanel() {
   const view = LexeditorUI.dataMap({
     rows: state.dataMap.rows, query: state.mapQuery, status: state.mapStatus, page: state.mapPage,
