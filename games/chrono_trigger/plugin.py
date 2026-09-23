@@ -14,6 +14,7 @@ from service_session import LocalPluginSession, request_json
 from . import paths
 from .archive import _decode
 from .project import PROJECT_MARKER, initialize_project
+from .mod_support import ChronoCtpAdapter
 from .world_data import BANK_PATH, HEADER_OFFSET, HEADER_SIZE, WORLD_COUNT
 
 
@@ -392,6 +393,7 @@ PLUGIN = GamePlugin(
     smoke=smoke,
     session_factory=ChronoTriggerSession,
     process_names=("Chrono Trigger.exe",),
+    mod_adapter=ChronoCtpAdapter(),
     mods_load=False,
     projects=ModProjectSpec(
         root_env="LEXEDITOR_CHRONO_TRIGGER_PROJECT",
