@@ -237,6 +237,12 @@
   let selectedRecord=null, recordPage=0, recordPageSize=12, recordQuery="";
   let recordSort={key:"key",dir:1};
 
+  // #471 is deliberately source-only until array writes and the actual Steal
+  // formula have native acceptance. The view exposes proved serialized data.
+  let battleItem=null, battleItemError="", battleItemBusy=false;
+  let selectedBattleRecord=null, battlePage=0, battlePageSize=12, battleQuery="";
+  let battleSort={key:"key",dir:1};
+
   const playerValueColumn=(key,label,pinned=true)=>({
     key,label,numeric:true,sortable:true,pinned,
     editValue:row=>row[key],
@@ -255,6 +261,15 @@
     playerValueColumn("Luck","Luck",false),
   ];
   const playerPrefs=columnPreferences("ff7r2-player-parameter",PLAYER_COLUMNS,()=>render());
+  const BATTLE_COLUMNS=[
+    {key:"key",label:"Record",sortable:true},
+    {key:"StealItemName_Array",label:"Steal items",numeric:true,sortable:true},
+    {key:"StealItemQuantity_Array",label:"Quantities",numeric:true,sortable:true},
+    {key:"NormalItemPercent_Array",label:"Normal rates",numeric:true,sortable:true},
+    {key:"RareItemPercent_Array",label:"Rare rates",numeric:true,sortable:true},
+    {key:"StealFaildCountArrayIndex",label:"Fail index",numeric:true,sortable:true},
+  ];
+  const battlePrefs=columnPreferences("ff7r2-battle-item-possession",BATTLE_COLUMNS,()=>render());
 
   const FIELD_HELP={
     HPMax:"Base maximum HP stored by this PlayerParameter record.",
@@ -311,6 +326,31 @@
       player=null;savedPlayer=null;playerError=error.message;
       if(error.payload?.workspace)workspace=error.payload.workspace;
     }finally{playerBusy=false}
+  }
+
+  function installBattleItem(value){
+    battleItem=value;
+    battleItemError="";
+    if(battleItem?.records){
+      for(const row of battleItem.records){
+        row.id=String(row.nameIndex)+":"+String(row.nameNumber);
+        for(const field of row.fields||[]){
+          row[field.name]=field.kind==="array"?Number(field.arrayCount||0):field.value;
+        }
+      }
+      if(battleItem.records.length&&!battleItem.records.some(row=>row.id===selectedBattleRecord)){
+        selectedBattleRecord=battleItem.records[0].id;
+      }
+    }
+  }
+
+  async function loadBattleItem(){
+    battleItemBusy=true;
+    try{installBattleItem(await api("/api/battle-item-possession"))}
+    catch(error){
+      battleItem=null;battleItemError=error.message;
+      if(error.payload?.workspace)workspace=error.payload.workspace;
+    }finally{battleItemBusy=false}
   }
 
   function fieldOf(row,name){return (row?.fields||[]).find(field=>field.name===name)}
@@ -568,6 +608,101 @@
     });
   }
 
+  function battleRows(){
+    const rows=[...(battleItem?.records||[])];
+    const needle=battleQuery.trim().toLocaleLowerCase();
+    const filtered=needle?rows.filter(row=>{
+      const values=[row.key,row.name,...(row.fields||[]).flatMap(field=>
+        Array.isArray(field.value)?field.value:[field.value])];
+      return values.join(" ").toLocaleLowerCase().includes(needle);
+    }):rows;
+    const key=battleSort.key,dir=battleSort.dir;
+    return filtered.sort((left,right)=>{
+      const a=left[key],b=right[key];
+      if(typeof a==="number"||typeof b==="number")return (Number(a||0)-Number(b||0))*dir;
+      return String(a??"").localeCompare(String(b??""))*dir;
+    });
+  }
+
+  function battleTable(rows,picked,select){
+    return columnList({
+      rows,key:row=>row.id,selected:picked,select,
+      sortState:battleSort,
+      sort:key=>{battleSort=battleSort.key===key?{key,dir:-battleSort.dir}:{key,dir:1};render()},
+      columnPreferences:battlePrefs,columns:BATTLE_COLUMNS,
+      refresh:()=>{render();shell.refresh?.()},
+      class:"ff7r2-table ff7r2-formulae-table",
+      "aria-label":"Final Fantasy VII Rebirth BattleItemPossession records"
+    });
+  }
+
+  function arrayDisplay(field){
+    const values=Array.isArray(field?.value)?field.value:[];
+    return values.length?values.map((value,index)=>index+": "+String(value)).join("  ·  "):"(empty)";
+  }
+
+  function battleRecordPanel(row){
+    if(!row)return detailPanel({className:"ff7r2-detail",title:"NO RECORD",icon:infoIcon(),identity:null,
+      meta:"BattleItemPossession",body:[detailSection({title:"STATUS",body:[
+        detailField({label:"DETAIL",control:readonlyField("No BattleItemPossession record is selected.")})
+      ]})]});
+    const fields=(row.fields||[]).map(field=>detailField({
+      label:field.name.toUpperCase(),
+      dataType:field.kind==="array"?("ARRAY<"+String(field.type||"VALUE").toUpperCase()+">"):String(field.kind||field.type).toUpperCase(),
+      control:readonlyField(field.kind==="array"?arrayDisplay(field):String(field.value??"")),
+      help:infoHelp(field.note||"Serialized source value; read-only in this integration.")
+    }));
+    return detailPanel({className:"ff7r2-detail ff7r2-formulae-detail",title:row.key,
+      icon:el("span",{class:"ff7r2-record-icon"},"VII"),identity:recordId(row.key),
+      meta:"BattleItemPossession — read-only source data",body:[
+        detailSection({title:"FORMULA STATUS",body:[
+          detailField({label:"STATUS",control:readonlyField("Source data only; the complete Steal formula has not been reconstructed.")}),
+          detailField({label:"RATE EVIDENCE",control:readonlyField("Public mod evidence reports the 25% rate data is shared between steals and drops.")}),
+        ]}),
+        detailSection({title:"IDENTITY",body:[
+          detailField({label:"ROW FNAME",control:readonlyField(row.key)}),
+          detailField({label:"NAME INDEX",control:readonlyField(String(row.nameIndex))}),
+          detailField({label:"NAME NUMBER",control:readonlyField(String(row.nameNumber))}),
+        ]}),
+        detailSection({title:"SERIALIZED FIELDS",body:fields.length?fields:[
+          detailField({label:"STATUS",control:readonlyField("This row has no decoded fields.")})
+        ]}),
+        detailSection({title:"SOURCE FILE",body:[
+          detailField({label:"PATH",control:readonlyField(battleItem?.projectRelativePath||workspace?.battleItemPossession?.sourceRelative||"")}),
+          detailField({label:"MODE",control:readonlyField("Read-only; no BattleItemPossession staging or array writes.")}),
+        ]}),
+      ]});
+  }
+
+  function formulaePanel(){
+    if(battleItemBusy&&!battleItem)return detailPanel({className:"ff7r2-detail",title:"LOADING",icon:infoIcon(),identity:null,
+      meta:"Formulae",body:[detailSection({title:"STATUS",body:[
+        detailField({label:"DETAIL",control:readonlyField("Reading the extracted BattleItemPossession DataObject.")})
+      ]})]});
+    if(!battleItem)return detailPanel({className:"ff7r2-detail",title:"BATTLEITEMPOSSESSION NOT LOADED",icon:infoIcon(),identity:null,
+      meta:"Formulae",body:[detailSection({title:"STATUS",body:[
+        detailField({label:"DETAIL",control:readonlyField(battleItemError||"The project has no extracted BattleItemPossession source asset yet.")}),
+        detailField({label:"SOURCE PATH",control:readonlyField(workspace?.battleItemPossession?.sourceRelative||"source/End/Content/DataObject/Resident/BattleItemPossession.uasset")}),
+        detailField({label:"ACTION",control:el("div",{class:"lex-reshade-actions"},
+          el("button",{type:"button",class:"lex-dialog-action",disabled:battleItemBusy,onclick:async()=>{await loadBattleItem();render()}}, "Reopen from disk"))}),
+      ]})]});
+    if(!battleItem.records?.length)return detailPanel({className:"ff7r2-detail",title:"EMPTY BATTLEITEMPOSSESSION",icon:infoIcon(),identity:null,
+      meta:"Formulae",body:[detailSection({title:"STATUS",body:[
+        detailField({label:"DETAIL",control:readonlyField("The DataObject parsed successfully but contains no rows.")})
+      ]})]});
+    const rows=battleRows();
+    return pagedListDetail({
+      rows,key:row=>row.id,slots:false,selected:selectedBattleRecord,page:battlePage,pageSize:battlePageSize,noun:"records",
+      className:"ff7r2-layout",splitKey:"ff7r2-battle-items",rowsKey:"ff7r2-battle-items",defaultSplit:48,minLeft:330,minRight:390,
+      search:{key:"ff7r2-battle-search",value:battleQuery,label:"Search BattleItemPossession records",
+        change:value=>{battleQuery=value;battlePage=0;render()}},
+      sync:next=>{battlePage=next.page;battlePageSize=next.pageSize;if(next.selected!==null)selectedBattleRecord=next.selected},
+      change:next=>{battlePage=next.page;battlePageSize=next.pageSize;if(next.selected!==null)selectedBattleRecord=next.selected;render()},
+      master:state=>battleTable(state.rows,state.selected,state.select),
+      detail:row=>battleRecordPanel(row)
+    });
+  }
+
   function informationPanel(){
     const ws=workspace||{};
     const pp=ws.playerParameter||{};
@@ -643,6 +778,7 @@
     if(tab==="datamap")content=dataMapView();
     else if(tab==="info")content=panelLayout([informationPanel()],"ff7r2-layout",{layoutKey:"ff7r2-info",defaultSizes:[100]});
     else if(tab==="tweaks")content=tweaks();
+    else if(tab==="formulae")content=formulaePanel();
     else content=charactersPanel();
     main.replaceChildren(content);
     shell.refresh?.();
@@ -652,7 +788,7 @@
   const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",
     plugin:{id:PLUGIN,name:"Final Fantasy VII Rebirth",themeName:"ff7r2",
       theme:{accent:"#3f7fd0","accent-text":"#f2f7ff"}},
-    tabs:[{id:"characters",label:"Characters"},{id:"tweaks",label:"Tweaks"}],
+    tabs:[{id:"characters",label:"Characters"},{id:"formulae",label:"Formulae"},{id:"tweaks",label:"Tweaks"}],
     activeTab:()=>tab,navigate,
     help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open the FF7 Rebirth Data Map",
     info:()=>navigate("info"),infoActive:()=>tab==="info",infoTitle:"Open Rebirth plugin information",
@@ -662,7 +798,7 @@
   });
 
   (async()=>{
-    await Promise.all([loadGame(),loadReshade(),loadInjector(),loadDataMap(),loadWorkspace(),loadPlayer()]);
+    await Promise.all([loadGame(),loadReshade(),loadInjector(),loadDataMap(),loadWorkspace(),loadPlayer(),loadBattleItem()]);
     render();
     LexeditorUI.finishPluginLoading();
   })();
