@@ -357,16 +357,18 @@ def _string_table_metadata(
             "languages": [],
         }
     language_rows = []
-    seen_languages = set()
-    for row in string_tables.rows(table):
-        identity = (row["languageIndex"], row["language"])
-        if identity in seen_languages:
+    for index, offset in enumerate(table.positions):
+        if offset not in table.blocks:
             continue
-        seen_languages.add(identity)
+        label = (
+            string_tables.LANGUAGE_NAMES[index]
+            if index < len(string_tables.LANGUAGE_NAMES)
+            else f"Language {index + 1}"
+        )
         language_rows.append({
-            "id": str(row["languageIndex"]),
-            "index": row["languageIndex"],
-            "label": row["language"],
+            "id": str(index),
+            "index": index,
+            "label": label,
         })
     return {
         "id": f"{source_id}:{relative.as_posix()}",
@@ -380,7 +382,7 @@ def _string_table_metadata(
         "projectPath": str(project),
         "project": project.is_file() and not vanilla_only,
         "rowCount": sum(len(block.entries) for block in table.blocks.values()),
-        "languageCount": len(table.blocks),
+        "languageCount": len(language_rows),
         "languages": language_rows,
         "version": table.version,
         "identifierCount": len(table.identifiers),
@@ -448,7 +450,7 @@ def string_table_payload(
         "rows": rows,
         "counts": {
             "records": len(rows),
-            "languages": len(table.blocks),
+            "languages": len(_string_table_metadata(source_id, relative, vanilla_only)["languages"]),
             "identifiers": len(table.identifiers),
         },
     }
@@ -482,10 +484,13 @@ def strings_payload(language_index: int | None = None, vanilla_only: bool = Fals
             payload = string_table_payload(
                 metadata["source"], metadata["path"], vanilla_only)
             for row in payload["rows"]:
-                if row["languageIndex"] != language_index:
+                if language_index not in row.get("languageIndexes", [row["languageIndex"]]):
                     continue
-                rows.append(row)
-                table_ids.add(row["tableId"])
+                current = dict(row)
+                current["languageIndex"] = language_index
+                current["language"] = selected["label"]
+                rows.append(current)
+                table_ids.add(current["tableId"])
     return {
         "language": selected,
         "languages": languages,
