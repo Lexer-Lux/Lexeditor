@@ -57,7 +57,7 @@ def main():
                     page.locator('.item-detail input[type=number]').first.fill('9')
                     page.evaluate('navigate("missions")')
                     page.evaluate('state.missionSelected=state.missions.missions[0].id;renderMissions()')
-                    page.locator('.mission-detail input[type=number]').first.fill('')
+                    page.locator('.mission-detail input[inputmode="decimal"][aria-label="Cash"]').fill('')
                     requests = []
                     page.on('request', lambda request: requests.append(request.url) if request.method == 'POST' else None)
                     page.evaluate('saveAll()')

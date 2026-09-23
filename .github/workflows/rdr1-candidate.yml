@@ -72,5 +72,7 @@ jobs:
         if: always()
         with:
           name: rdr1-plugin-candidate
-          path: artifacts/
+          path: |
+            artifacts/Lexeditor-RDR1-*.zip
+            artifacts/rdr1-candidate.json
           retention-days: 7
