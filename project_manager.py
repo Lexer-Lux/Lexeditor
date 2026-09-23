@@ -147,6 +147,10 @@ class ProjectManager:
         _plugin, spec = self._spec(plugin_id)
         root = Path(root_value).expanduser().resolve()
         problems = self._problems(root, spec.required_paths, spec.required_any)
+        if problems and spec.prepare_existing is not None:
+            prepared = Path(spec.prepare_existing(root)).expanduser().resolve()
+            root = prepared
+            problems = self._problems(root, spec.required_paths, spec.required_any)
         if problems:
             raise ValueError("\n".join(problems))
         with self._lock:
