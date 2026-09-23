@@ -57,6 +57,9 @@ def test_deploy_preserves_ini_and_activates_first(env):
     assert (game / "Lexeditor/StreamingAssets/Assets/Resources/BattleMap/BattleScene/EVT_BATTLE_B3_001/dbfile0000.raw16.bytes").read_bytes() == b"canonical raw16 fixture"
     config = (game / "Lexeditor/lexeditor-ff9.ini").read_text()
     assert "XPBars = 1" in config and "HPMPBars = 1" in config and "RowRework = 1" in config
+    description = (game / "Lexeditor/ModDescription.xml").read_text(encoding="utf-8")
+    assert "<Name>Lexeditor</Name>" in description
+    assert "<InstallationPath>Lexeditor</InstallationPath>" in description
     state = features.revert(game, project, runtime)
     assert not state["deployed"]
     reverted = (game / "Memoria.ini").read_bytes()
