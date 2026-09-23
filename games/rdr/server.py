@@ -25,7 +25,7 @@ except ImportError:  # Old PR base; current master supplies the shared handler.
 from urllib.parse import parse_qs, urlparse
 
 from . import (camera_features, input_remaps, loot_script, map_icon_features,
-               mission_rewards, paths, script_features, string_tables)
+               mission_rewards, paths, rbf, script_features, string_tables)
 from .archive_deployment import (
     ArchiveSpec, deploy_archives, deployment_status, revert_archives,
 )
@@ -199,7 +199,15 @@ def override_file(relative: PurePosixPath) -> Path:
 
 
 def is_editable(path: Path) -> bool:
-    return path.suffix.casefold() in TEXT_EXTENSIONS and path.stat().st_size <= MAX_TEXT_BYTES
+    if path.suffix.casefold() not in TEXT_EXTENSIONS or path.stat().st_size > MAX_TEXT_BYTES:
+        return False
+    try:
+        with path.open("rb") as stream:
+            if stream.read(4) == rbf.MAGIC:
+                return False
+    except OSError:
+        return False
+    return True
 
 
 def decode_text(path: Path) -> tuple[str, str]:
@@ -303,6 +311,94 @@ def save_file(value: str, text: str, encoding: str) -> dict:
         "projectPath": str(target),
         "backup": str(backup) if backup else "",
         "bytes": len(encoded),
+    }
+
+
+def _rbf_paths(relative_value: str, vanilla_only: bool = False) -> tuple[PurePosixPath, Path, Path, Path]:
+    relative = safe_relative(relative_value)
+    vanilla = under(PREPARED_ROOT, relative)
+    project = under(OVERRIDE_ROOT, relative)
+    if not vanilla.is_file():
+        raise FileNotFoundError(f"Prepared RDR RBF0 file not found: {relative.as_posix()}")
+    if vanilla.read_bytes()[:4] != rbf.MAGIC:
+        raise ValueError("Prepared file is not an RBF0 resource")
+    active = vanilla if vanilla_only or not project.is_file() else project
+    return relative, vanilla, project, active
+
+
+def _rbf_resource_rows(relative: PurePosixPath, vanilla: Path, project: Path, active: Path) -> tuple[list[dict], dict]:
+    document = rbf.parse(active.read_bytes())
+    result = []
+    for row in document["scalars"]:
+        current = dict(row)
+        current.update({
+            "id": f"{relative.as_posix()}:{row['recordOffset']}",
+            "resourcePath": relative.as_posix(),
+            "sourcePath": str(vanilla),
+            "projectPath": str(project),
+            "project": project.is_file() and active == project,
+        })
+        result.append(current)
+    return result, document
+
+
+def rbf_scalars_payload(vanilla_only: bool = False) -> dict:
+    rows = []
+    resources = []
+    if PREPARED_ROOT.is_dir():
+        for vanilla in sorted(path for path in PREPARED_ROOT.rglob("*") if path.is_file()):
+            try:
+                with vanilla.open("rb") as stream:
+                    if stream.read(4) != rbf.MAGIC:
+                        continue
+                relative = PurePosixPath(vanilla.relative_to(PREPARED_ROOT).as_posix())
+                relative, vanilla, project, active = _rbf_paths(relative.as_posix(), vanilla_only)
+                resource_rows, document = _rbf_resource_rows(relative, vanilla, project, active)
+            except (OSError, ValueError, struct.error):
+                continue
+            if not resource_rows:
+                continue
+            rows.extend(resource_rows)
+            resources.append({
+                "path": relative.as_posix(),
+                "scalarCount": len(resource_rows),
+                "descriptorCount": document["descriptorCount"],
+                "trailingBytes": document["trailingBytes"],
+                "skipped": document["skipped"],
+                "project": project.is_file() and not vanilla_only,
+            })
+    rows.sort(key=lambda row: (row["resourcePath"].casefold(), row["recordOffset"]))
+    return {
+        "rows": rows,
+        "resources": resources,
+        "counts": {
+            "resources": len(resources),
+            "scalars": len(rows),
+            "project": sum(bool(row["project"]) for row in resources),
+        },
+    }
+
+
+def save_rbf_scalars(relative_value: str, edits: list[dict]) -> dict:
+    relative, vanilla, project, active = _rbf_paths(relative_value)
+    source_hash = sha256_file(vanilla)
+    candidate, changed = rbf.apply_scalar_edits(active.read_bytes(), edits)
+    if not changed:
+        return {
+            "saved": 0, "path": relative.as_posix(), "projectPath": str(project),
+            "backup": "", "sourceUnchanged": source_hash,
+        }
+    backup = backup_file(project)
+    atomic_bytes(project, candidate)
+    reread = project.read_bytes()
+    rbf.parse(reread)
+    if reread != candidate:
+        raise RuntimeError("RBF0 project override did not read back byte-identically")
+    if sha256_file(vanilla) != source_hash:
+        raise RuntimeError("Prepared RBF0 source changed during save")
+    return {
+        "saved": changed, "path": relative.as_posix(), "projectPath": str(project),
+        "backup": str(backup) if backup else "", "sourceUnchanged": source_hash,
     }
 
 
@@ -1779,12 +1875,36 @@ def _provisional_data_map_rows() -> list[dict]:
                     "openable": supported,
                 })
             else:
-                rows.append({
-                    "filename": f"game/tune_d11generic.rpf:/{relative.as_posix()}",
-                    "controls": "Prepared tuning data",
-                    "notes": "Prepared from tune_d11generic.rpf; a format-specific editor is not mapped yet.",
-                    "status": "not-integrated", "coverage": "unavailable",
-                })
+                try:
+                    with source.open("rb") as stream:
+                        rbf_magic = stream.read(4) == rbf.MAGIC
+                    rbf_supported = rbf_magic and rbf.supports(source.read_bytes())
+                except (OSError, ValueError, struct.error):
+                    rbf_magic = False
+                    rbf_supported = False
+                if rbf_supported:
+                    rows.append({
+                        "filename": f"game/tune_d11generic.rpf:/{relative.as_posix()}",
+                        "controls": "RBF0 fixed-width scalar fields",
+                        "notes": (
+                            "RBF Scalars exposes only bool, uint32 and float leaves proved by the "
+                            "RBF0 parser. Writes patch the original byte span in place; strings, "
+                            "vectors, byte blocks and unknown records remain opaque."
+                        ),
+                        "status": "partial", "coverage": "structured",
+                        "target": "rbf", "openable": True,
+                    })
+                else:
+                    rows.append({
+                        "filename": f"game/tune_d11generic.rpf:/{relative.as_posix()}",
+                        "controls": "RBF0 tuning data" if rbf_magic else "Prepared tuning data",
+                        "notes": (
+                            "This file has an RBF0 header but no safely editable fixed-width scalar "
+                            "set passed the protected parser." if rbf_magic else
+                            "Prepared from tune_d11generic.rpf; a format-specific editor is not mapped yet."
+                        ),
+                        "status": "not-integrated", "coverage": "unavailable",
+                    })
     if CONTENT_PREPARED_ROOT.is_dir():
         for source in CONTENT_PREPARED_ROOT.rglob("*.strtbl"):
             relative = PurePosixPath(source.relative_to(CONTENT_PREPARED_ROOT).as_posix())
@@ -1998,7 +2118,7 @@ class Handler(PluginRequestHandler):
                 self.file_response(PLUGIN_ROOT / "editor.html")
             elif hasattr(self, "send_page_module") and self.send_page_module(PLUGIN_ROOT, path):
                 return
-            elif path in {"/editor.js", "/editor.css", "/strings.js"}:
+            elif path in {"/editor.js", "/editor.css", "/strings.js", "/rbf.js"}:
                 self.file_response(PLUGIN_ROOT / path.removeprefix("/"))
             elif path.startswith("/shared/"):
                 shared_root = (LEXEDITOR_ROOT / "ui").resolve()
@@ -2029,7 +2149,7 @@ class Handler(PluginRequestHandler):
                     "editorRoot": str(PLUGIN_ROOT),
                     "capabilities": [
                         "prepared-files", "project-overrides", "source-editor",
-                        "items", "shops", "string-tables", "missions", "loot-asi-override", "settings",
+                        "items", "shops", "string-tables", "rbf0-scalars", "missions", "loot-asi-override", "settings",
                         "data-map", "redhook-prerequisite", "github-workspace",
                         "archive-copy-deployment",
                     ],
@@ -2062,6 +2182,9 @@ class Handler(PluginRequestHandler):
                     language_index,
                     query.get("dataset", ["current"])[0] == "vanilla",
                 ))
+            elif path == "/api/rbf-scalars":
+                self.json_response(rbf_scalars_payload(
+                    query.get("dataset", ["current"])[0] == "vanilla"))
             elif path == "/api/loot":
                 self.json_response(loot_payload())
             elif path == "/api/loot/script":
@@ -2108,6 +2231,9 @@ class Handler(PluginRequestHandler):
                     str(body.get("path", "")),
                     body.get("edits", []),
                 ))
+            elif path == "/api/rbf/save":
+                self.json_response(save_rbf_scalars(
+                    str(body.get("path", "")), body.get("edits", [])))
             elif path == "/api/loot/save":
                 self.json_response(save_loot(body.get("document")))
             elif path == "/api/loot/script/save":
