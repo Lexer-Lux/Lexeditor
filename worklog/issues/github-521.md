@@ -36,3 +36,8 @@ completion.
   Lexer per-family decisions) or #523/#524/#525 (`untested`, human checklists
   stand). FFX-X2-adjacent files are untouched by this branch.
 - Parent stays `actionable`; merging the misc-games PR must not close it.
+
+## 2026-09-23 --- agents/actionables-ff9: audit, tracker unchanged
+
+- Exact-head audit at origin/master 89f7f532 (branch agents/actionables-ff9): FF9 pytest 158 passed, node 18 passed, ff9 smoke/check/credits/features-determinism/rendered browser all pass; see github-74.md for the full list.
+- No code change: #522 still waits on Lexer per-family pursue-or-exclude decisions, and #523/#524/#525 remain pending their human checklists. Parent stays actionable and must not be merge-closed.
