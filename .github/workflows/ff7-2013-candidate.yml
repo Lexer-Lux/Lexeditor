@@ -5,6 +5,7 @@ on:
     paths:
       - 'games/ff7_2013/**'
       - 'tools/verify_ff7_2013_rendered.py'
+      - 'tools/verify_ff7_2013_adapter.py'
       - '.github/workflows/ff7-2013-candidate.yml'
 
 permissions:
@@ -126,6 +127,9 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check -r requirements-test.txt
           python -m playwright install --with-deps chromium
+
+      - name: Verify FF7 2013 adapter source isolation
+        run: python tools/verify_ff7_2013_adapter.py
 
       - name: Exercise FF7 2013 Discard in the real shared UI
         run: python tools/verify_ff7_2013_rendered.py
