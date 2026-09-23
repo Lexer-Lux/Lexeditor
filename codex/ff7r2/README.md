@@ -182,8 +182,12 @@ meaning by themselves.
   FName fields with concrete storage types. Synthlight independently publishes
   the matching property names. This is enough to validate and display a supplied
   BattlePlayerParameter structurally; searches for these names did not expose
-  documented gameplay domains/ranges. The new Battle Params view is therefore
-  Partial/read-only rather than speculative editing.
+  documented gameplay domains/ranges. Two current public gameplay mods independently
+  demonstrate that real BattlePlayerParameter packages are used to alter Prime Mode,
+  Overcharge, Ward Shift, Vengeance and charge-state behavior, but their public pages
+  still do not publish a field/value/range mapping that Lexeditor can safely turn into
+  semantic controls. The new Battle Params view is therefore Partial/read-only rather
+  than speculative editing.
 - #470 Chocobo whistle: ResidentParameter publicly names
   CallChocoboAtFieldActionDistanceParamRatio0/1. The public generated Rebirth SDK
   also exposes AEndLocationVolume.bDisableChocoboRide,
@@ -216,18 +220,25 @@ meaning by themselves.
   a UStaticMeshComponent* BenchMeshComponent and a
   TSubclassOf<AEndSkeletalMeshActor> ZabutonActorClass, and CampBreak derives from
   that bench actor. Public mesh evidence also confirms multiple bench models.
-  Missing evidence remains the complete restable-placement -> desired blue-mesh
-  mapping and the inventory/state transition that consumes a cushion for every
-  valid rest without changing unusable benches. #472 remains Not integrated.
+  Public gameplay documentation independently confirms the important vanilla split:
+  ordinary blue benches do not expend a cushion, while Chocobo-stop benches do; a
+  May 2026 mesh-mod discussion also identifies the blue bench as a separate asset
+  family from Chocobo-stop benches. Missing evidence remains the complete
+  restable-placement -> desired blue-mesh mapping and the inventory/state transition
+  that consumes a cushion for every valid rest without changing unusable benches.
+  #472 remains Not integrated.
 - #473 minimap zoom: the generated SDK explicitly contains option categories
   AreaNaviMapScale, LocationNaviMapScale and ZackNaviMapScale, while UEndNaviMap
   exposes PixelPerCm and the location prototype data contains Min/Mid/MaxPixelPerCm.
-  The option model can represent integer MinValue/MaxValue ranges. This is direct
-  evidence that Rebirth has navimap scaling concepts, substantially stronger than
-  the earlier HUD-size evidence. Public sources still do not map the requested
-  world-minimap category to its concrete option range/default and persistent
-  storage, so Lexeditor cannot yet present a truthful bounded control. #473
-  remains Not integrated.
+  The option model can represent integer MinValue/MaxValue ranges. Independent
+  player-facing documentation confirms two related controls already exist: a
+  specific-location "Minimap Display Area" whose larger numeric choices show more
+  area, and a world-travel navigation-map display-scale control with the same
+  larger-number/wider-area behavior. This is substantially stronger than the
+  earlier HUD-size evidence, but the generated enum names do not prove which
+  category binds to which persisted setting, the complete stored range/default, or
+  the save/config location. Lexeditor therefore cannot yet present a truthful
+  bounded editor. #473 remains Not integrated.
 - #477 Faster Queen's Blood: public CardGame data exposes EffectWaitTime and AI
   tuning fields; generated declarations confirm NeedCanPutCount,
   PlayerPredictionTurn and EnemyPredictionTurn are int8 members.
@@ -238,6 +249,49 @@ meaning by themselves.
   both-sides-no-moves termination or intro first-skippable-input hook. Animation
   timing such as FlagPlayTurnAnimDuration is not treated as a substitute for the
   requested logic. #477 remains Not integrated.
+
+### Focused public-source recheck (2026-09-22)
+
+The final agent-side feasibility pass explicitly rechecked these public sources,
+without downloading or redistributing their game assets:
+
+- meditationxp, **BattlePlayerParameter - Unique Ability Enhanced**:
+  https://www.nexusmods.com/finalfantasy7rebirth/mods/1793
+  - proves current real mods modify BattlePlayerParameter gameplay, but the public
+    page does not publish a dependable serialized field/value/range mapping.
+- OnionKnight49, **Various Gameplay Upgrades**:
+  https://www.nexusmods.com/finalfantasy7rebirth/mods/1848
+  - independently lists BattlePlayerParameter changes and a separate optional
+    uasset-editing help download. The public description gives effects/vanilla
+    comparisons, not enough field-address/range detail to expose safe controls here.
+- peacefulz2, **Easier Fast Travel**:
+  https://www.nexusmods.com/finalfantasy7rebirth/mods/2261
+  - August 2026 real-mod packaging example: an ordinary .pak/.ucas/.utoc triple is
+    copied to End/Content/Paks/~mods. It changes fast-travel availability, not the
+    #470 safe call/teleport/mount orchestration.
+- TheWolfster / Lobyrockstar, **Refreshed Chocobo Rest Stops** discussion:
+  https://www.nexusmods.com/finalfantasy7rebirth/mods/2048?tab=posts
+  - identifies the blue bench as separate from Chocobo-rest bench assets; it does
+    not provide the complete restable-placement or cushion-state mapping for #472.
+- Gamer Guides, **Chocobo Stops: Resting & Fast Travel**:
+  https://www.gamerguides.com/final-fantasy-vii-rebirth/guide/gameplay/basics/chocobo-stops-resting-fast-travel
+  - independently documents that Chocobo-stop rests consume cushions while ordinary
+    blue benches do not.
+- Seeking Tech, **How to make the Final Fantasy VII: Rebirth minimap show more area**:
+  https://seekingtech.com/how-to-make-the-final-fantasy-vii-rebirth-minimap-show-more-area/
+  and GameWith's Rebirth minimap guide:
+  https://gamewith.jp/ff7rebirth/437417
+  - confirm the shipped location/world navigation scale UI behavior for #473, but
+    not the persistent storage binding required for a Lexeditor writer.
+- f80h, **FF7 Rebirth Load ordering**:
+  https://www.nexusmods.com/finalfantasy7rebirth/articles/46
+  - current UE4.26/Rebirth filename/path and numeric _P precedence evidence used by
+    Lexeditor's read-only ~mods load-order audit.
+
+No searched public source established the complete callable/runtime behavior
+required for #470, #472 or #477, or the persistence binding required for #473.
+Those areas therefore stay protected as Not integrated instead of being represented
+by guessed controls.
 
 narknon/FF7R2UProj at public commit
 ae73efa89db7e48fc7f425dec0847a0208c15b80 is used only as generated
