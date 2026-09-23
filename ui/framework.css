@@ -3481,12 +3481,37 @@ body:has(.lex-data-map-table) #main {
 
 @media (max-width: 850px) {
   .lex-panel-layout {
-  gap: 14px;
-  grid-template-columns: 1fr;
-}
+    gap: 14px;
+    grid-template-columns: 1fr;
+  }
 
   .lex-panel-layout-divider {
     display: none;
+  }
+
+  /* A paged master/detail page has a fixed-height viewport plus a pager. If
+     only the columns stack, the detail's intrinsic auto row consumes the page
+     and collapses the master's 1fr row to zero. Give master and detail bounded
+     rows instead, and let the master scroll its complete readable records. */
+  .lex-panel-layout.lex-paged-list-detail {
+    grid-template-rows:minmax(120px,.8fr) minmax(160px,1.2fr);
+    align-items:stretch;
+  }
+  .lex-panel-layout.lex-paged-list-detail.has-pager {
+    grid-template-rows:minmax(120px,.8fr) minmax(140px,1.2fr) auto;
+  }
+  .lex-paged-list-detail > .lex-barrelled-master {
+    align-self:stretch;
+    max-height:none;
+    overflow:auto;
+  }
+  .lex-paged-list-detail > .lex-barrelled-master > .lex-barrel-grid {
+    height:auto;
+    overflow:visible;
+  }
+  .lex-paged-list-detail > .lex-barrelled-master .lex-column-list {
+    max-height:none;
+    overflow:visible;
   }
 }
 
