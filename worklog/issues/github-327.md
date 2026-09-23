@@ -160,3 +160,13 @@ All four translation units compiled with the existing MSVC x86 build cache.
 These menu/field changes remain source/object only, not in the installed DLL.
 The full request owner must still bind menu admission, exit readiness, both
 native battle gates and count feedback; startup and purchase remain guarded.
+
+## 2026-09-22 misc-fixes disposition
+Source and object stage stands; the remaining owner work is unchanged (menu admission, exit readiness, both native battle gates, count feedback). Analog-trigger vehicle movement plus the Modern-Controls-gated Flare trigger still need implementation and game proof. Issue stays actionable.
+
+## 2026-09-23 misc-fixes: flipped to waiting with concrete checklist
+
+Per Lexer's rule (needs concrete Lexer-side work means waiting), posted the
+exact game-session/decision checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

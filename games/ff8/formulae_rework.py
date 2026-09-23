@@ -112,9 +112,9 @@ FORMULAE = (
             "when random[0..255] ≤ target Mug rate + floor(mugger SPD / 2)."
         ),
         "blocker": (
-            "Native replacement is not installed yet. FF8 stores a target Mug rate byte, not a "
-            "named Mug Difficulty value; the Difficulty↔stored-rate contract must be made explicit "
-            "before changing the native Mug comparison."
+            "Native replacement is not installed yet. The Difficulty-stored-rate contract is "
+            "explicit in mug_difficulty_from_rate (stored rate 0 stays immune); only the native "
+            "Mug comparison patch remains."
         ),
     },
 )
@@ -192,3 +192,24 @@ def mug_chance_percent(target_mug_difficulty: float, target_spd: int,
     target = bounded_stat(target_spd, "Target SPD")
     mugger = bounded_stat(mugger_spd, "Mugger SPD")
     return max(0.0, min(100.0, 100.0 - difficulty - target + mugger))
+
+
+def mug_difficulty_from_rate(mug_rate: float) -> float:
+    """Map the stored Mug rate byte (0-100, higher is easier) to Mug Difficulty.
+
+    Difficulty runs the other way (higher is harder), so Difficulty = 100 - rate.
+    """
+    rate = bounded_percent(mug_rate, "Mug rate")
+    return 100.0 - rate
+
+def mug_stored_success_chance(mug_rate: float, target_spd: int,
+                              mugger_spd: int) -> float:
+    """Apply the requested Mug formula to a stored rate byte.
+
+    A stored rate of 0 keeps vanilla immunity (never succeeds) instead of
+    following the raw formula into positive chances.
+    """
+    rate = bounded_percent(mug_rate, "Mug rate")
+    if rate <= 0:
+        return 0.0
+    return mug_chance_percent(100.0 - rate, target_spd, mugger_spd)

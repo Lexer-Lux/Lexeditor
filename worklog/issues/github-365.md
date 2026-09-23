@@ -77,4 +77,9 @@ unverified. A pin or passing CI must never be treated as evidence of an achievem
 award. Keep the issue open for the prepared installed acceptance; a failure returns
 to implementation with its runtime/module/log evidence.
 
+## 2026-09-23 misc-fixes: flipped to waiting with concrete checklist
 
+Per Lexer's rule (needs concrete Lexer-side work means waiting), posted the
+exact game-session/decision checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

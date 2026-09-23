@@ -39,7 +39,9 @@ const render=renderEncounters;
   for width in [850,600]:
    page.locator('main').evaluate('(e,w)=>e.style.width=w+"px"',width)
    page.wait_for_timeout(150)
-   assert page.locator('.lex-detail-panel').evaluate('e=>e.scrollWidth<=e.clientWidth+2')
+   assert page.locator('.lex-detail-panel').evaluate_all('nodes=>nodes.length===2 && nodes.every(e=>e.scrollWidth<=e.clientWidth+2)')
+   surfaces=page.locator('.lex-detail-panel').evaluate_all('nodes=>nodes.map(e=>e.getBoundingClientRect().toJSON())')
+   assert surfaces[1]['top']>surfaces[0]['bottom']
   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-encounter-slots.png'))
   browser.close()
  print('Encounter slots: selection, disabled state, numeric edits, level rules and width bounds passed.')

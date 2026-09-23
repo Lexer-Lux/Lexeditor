@@ -29,3 +29,6 @@ After the experiment is restored and this candidate is delivered, enable the exi
 Focus review follow-up: the caller's blocked flag excluded foreground ownership. The capture now uses the existing `EditorNumpadInput::editorWindowFocused()` predicate. F10 in another application cannot start a capture; focus loss cancels publication while the pending handle is still polled. Held F10 on return does not create an edge. The executable verifier now rejects six regressions, including off-app capture. The added block uses the module's tab indentation. Legacy compendium checks still pass.
 
 Root built and hash-verified the reviewed diagnostic, SHA-256 `5028C5B91751FF7B941CCEC9664F481679811A4EFF42297825AC266B1A335B8E`. Candidate and matching release manifest are held in `out/rdr2-after-duration`. No installation occurred while #151 is active; full suppression remains unimplemented and actionable.
+
+## 2026-09-22 misc-fixes disposition
+Weapon implementation stays removed after crash isolation; hat path unfinished. The compendium glint probe is read-only evidence gathering, not suppression. A safe rebuild needs probe captures identifying owned gear first. No code written. Issue stays actionable.

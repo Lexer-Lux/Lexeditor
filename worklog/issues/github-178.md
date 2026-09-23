@@ -15,3 +15,6 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
 
 - [Original Lexer-Lux/Lexers-Mod-For-RDR2 #80 worklog](github-178/imports/Lexer-Lux--Lexers-Mod-For-RDR2/4fe6c76d17cc9c526cbb208e7d28f26e6395ca60/github-80.md) — verified transferred issue identity; historical evidence, not a replacement for newer central progress.
+
+## 2026-09-22 misc-fixes disposition
+Ten categories installed; treasure caches correctly unmarked. Location auditing continues in #274 with named problem cards. The gate tests need representative before and after quest saves with expected markers, and POIs must vanish after the journal sketch rather than on approach. Save preparation needs the game. Issue stays actionable.

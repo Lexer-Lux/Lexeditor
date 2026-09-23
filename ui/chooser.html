@@ -200,6 +200,12 @@
       <section class="lexer-dev-games">
         <h3>GAMES</h3>
         <div class="lexer-dev-table-wrap"><table id="lexer-dev-games" class="lexer-dev-table"></table></div>
+        <h3>SHARED UI BUDGET</h3>
+        <div class="lexer-dev-table-wrap"><table id="lexer-dev-budget" class="lexer-dev-table"></table></div>
+        <h3>COPIED CODE</h3>
+        <div class="lexer-dev-table-wrap"><table id="lexer-dev-code" class="lexer-dev-table"></table></div>
+        <h3>LOADING QUOTES</h3>
+        <div class="lexer-dev-table-wrap"><table id="lexer-dev-quotes" class="lexer-dev-table"></table></div>
       </section>
       <section class="lexer-dev-helpers">
         <h3>HELPERS</h3>
@@ -338,6 +344,9 @@
       const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
       try{
         const overview=await window.pywebview.api.developer_overview();
+        renderBudget(overview?.sharedUi||[]);
+        renderCodeBudget(overview?.sharedCode||[]);
+        renderQuotes(overview?.quotes);
         const rows=overview?.games||[];
         const head=document.createElement("tr");
         for(const name of ["GAME","MOD LOADING","HOW","TASKS"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
@@ -355,6 +364,64 @@
       }catch(error){
         const tr=document.createElement("tr");tr.append(cell(String(error?.message||error)));table.replaceChildren(tr);
       }
+    }
+    // What each plugin still writes for itself instead of asking the shared UI.
+    // Recorded counts may fall, never rise; a file over its recorded count is
+    // what fails the tests, and it is marked here.
+    function renderBudget(rows){
+      const table=document.querySelector("#lexer-dev-budget");
+      const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
+      const head=document.createElement("tr");
+      for(const name of ["FILE","SHARED SELECTORS","HAND-BUILT ROWS"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
+      const count=(now,was)=>now===was?String(now):`${now} (was ${was})`;
+      const body=(rows||[]).map(row=>{
+        const tr=document.createElement("tr");
+        tr.append(cell(row.file),cell(count(row.sharedSelectors,row.recordedSelectors),"num"),
+          cell(count(row.handBuiltRows,row.recordedRows),"num"));
+        if(row.over)tr.classList.add("over");
+        return tr;
+      });
+      const totals=document.createElement("tr");totals.className="total";
+      totals.append(cell(`${(rows||[]).length} files`),
+        cell(String((rows||[]).reduce((sum,row)=>sum+row.sharedSelectors,0)),"num"),
+        cell(String((rows||[]).reduce((sum,row)=>sum+row.handBuiltRows,0)),"num"));
+      table.replaceChildren(head,...body,totals);
+    }
+    // Plugin Python that is a second copy of another plugin's function. Same
+    // ratchet as the UI budget: it may fall, never rise.
+    function renderCodeBudget(rows){
+      const table=document.querySelector("#lexer-dev-code");
+      const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
+      const head=document.createElement("tr");
+      for(const name of ["PLUGIN","COPIED LINES"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
+      const body=(rows||[]).filter(row=>row.copiedLines||row.recorded).map(row=>{
+        const tr=document.createElement("tr");
+        tr.append(cell(row.plugin),cell(row.copiedLines===row.recorded?String(row.copiedLines)
+          :`${row.copiedLines} (was ${row.recorded})`,"num"));
+        if(row.over)tr.classList.add("over");
+        return tr;
+      });
+      const total=document.createElement("tr");total.className="total";
+      total.append(cell(`${body.length} plugins`),
+        cell(String((rows||[]).reduce((sum,row)=>sum+row.copiedLines,0)),"num"));
+      table.replaceChildren(head,...body,total);
+    }
+    // Loading lines per plugin plus the shared pool they fall back to.
+    function renderQuotes(quotes){
+      const table=document.querySelector("#lexer-dev-quotes");
+      const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
+      const head=document.createElement("tr");
+      for(const name of ["PLUGIN","QUOTES"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
+      const plugins=(quotes&&quotes.plugins)||{};
+      const names=Object.keys(plugins).sort();
+      const globalRow=document.createElement("tr");
+      globalRow.append(cell("Global (shared)"),cell(String((quotes&&quotes.global)||0),"num"));
+      const body=names.map(name=>{const tr=document.createElement("tr");
+        tr.append(cell(name),cell(String(plugins[name]),"num"));return tr;});
+      const total=document.createElement("tr");total.className="total";
+      total.append(cell(`${names.length} plugins + shared`),
+        cell(String(names.reduce((sum,name)=>sum+plugins[name],0)+((quotes&&quotes.global)||0)),"num"));
+      table.replaceChildren(head,globalRow,...body,total);
     }
     function setLexerPanel(open){
       if(open){lexerPanel.hidden=false;requestAnimationFrame(()=>lexerPanel.classList.add("open"));loadHelperVersions(false);loadDeveloperOverview();}

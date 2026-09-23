@@ -506,6 +506,7 @@
   };
 
   const infoHelp = (text, attrs = {}) => {
+    if (text instanceof Element && text.matches('.lex-info-help') && !Object.keys(attrs).length) return text;
     const {
       class: className = "", title = text, "aria-label": ariaLabel = text,
       onclick = null, ...rest
@@ -721,6 +722,10 @@
     };
     control.addEventListener("input", place);
     control.addEventListener("change", place);
+    if(typeof ResizeObserver!=="undefined"){
+      const observer=new ResizeObserver(place);observer.observe(control);observer.observe(unitNode);
+    }
+    new MutationObserver(place).observe(control,{attributes:true,attributeFilter:['style','class']});
     field.lexPlaceUnit = place;
     requestAnimationFrame(place);
     document.fonts?.ready?.then(place);
@@ -796,6 +801,7 @@
       : (format ? formatNumber(value) : String(value ?? ""));
     return element("input", {
       type: "text", value: display, disabled: true, readonly: true,
+      "data-lex-value-type": typeof value === "number" && Number.isFinite(value) ? (Number.isInteger(value) ? "INT" : "FLOAT") : "STRING",
       tabindex: "-1", "aria-readonly": "true", ...rest,
       class: ["lex-readonly-field", className].filter(Boolean).join(" "),
     });
@@ -978,11 +984,12 @@
     : null;
   const autoFitControlText = (control, options = {}) => {
     if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement)) return control;
+    if (control.dataset.lexAutofit === "false") return control;
     if (control.__lexAutoFitUpdate) {
       control.__lexAutoFitUpdate();
       return control;
     }
-    const minimum = Math.max(8, Number(options.minimum) || 11);
+    const minimum = Math.max(8, Number(options.minimum) || (control instanceof HTMLSelectElement ? 8 : 11));
     // The size the text needs, read with the control at its natural size.
     const measure = () => {
       // Off-page controls have no width. Fitting them to zero made their font
@@ -1485,9 +1492,7 @@
       // The Boxicons pin tip is at 3.71,21.71 in its 24-by-24 view box.
       const tipX = icon.width * 3.71 / 24;
       const tipY = icon.height * 21.71 / 24;
-      const lock=control.closest(".lex-detail-field")?.querySelector(".lex-field-readonly-lock");
-      const lockInset=lock ? lock.getBoundingClientRect().width + 12 * (owner.width/control.offsetWidth || 1) : 0;
-      const targetX = target.right - lockInset + (outward ? inset : -inset);
+      const targetX = target.right + (outward ? inset : -inset);
       const targetY = target.top + (outward ? -inset : inset);
       const scale = owner.width / control.offsetWidth || 1;
       pin.style.setProperty("left", `${(targetX - owner.left - tipX) / scale}px`, "important");
@@ -1580,14 +1585,14 @@
     const checkboxCount = control instanceof Element
       ? (control.matches("input[type=checkbox]") ? 1 : control.querySelectorAll("input[type=checkbox]").length)
       : 0;
-    const inferredType = inputType === "checkbox" ? (checkboxCount > 1 ? "FLAGS" : "BOOL")
+    const inferredType = input?.dataset?.lexValueType || (inputType === "checkbox" ? (checkboxCount > 1 ? "FLAGS" : "BOOL")
       : numericLike && (step === null || step === "" || (step !== "any" && Number.isInteger(Number(step)))) ? "INT"
       : numericLike ? "FLOAT"
       : input?.tagName === "SELECT" ? "ENUM"
       : input?.tagName === "TEXTAREA" ? "TEXT"
       // No control to read a type from. "VALUE" said nothing except that the
       // guess failed, so the rail carries no type name instead.
-      : input ? "STRING" : "";
+      : input ? "STRING" : "");
     const declaredType = String(options.dataType || "").toLocaleUpperCase();
     const dataType = declaredType && declaredType !== "READ ONLY" ? declaredType : inferredType;
     const min = options.min ?? input?.getAttribute?.("min") ?? input?.dataset?.min;
@@ -1595,7 +1600,7 @@
     const rangeText = options.range || ((min !== null && min !== undefined && min !== "") ||
       (max !== null && max !== undefined && max !== "")
       ? `(${min ?? "…"}-${max ?? "…"})` : "");
-    if (input && dataType === "INT") {
+    if (input && !readOnly && dataType === "INT") {
       if (!input.hasAttribute("step")) input.step = "1";
       input.inputMode = "numeric";
       let lastValid = /^-?\d+$/.test(String(input.value)) ? String(input.value) : "0";
@@ -1666,7 +1671,7 @@
         input.setAttribute("aria-description", suppliedHelp);
     }
     const typeRail = element("div", {class: "lex-field-type-rail"},
-      typeName, typeRange, helpMarker);
+      typeName, typeRange);
     const directCheckboxes = control instanceof Element
       ? (control.matches('input[type="checkbox"]') ? 1 : control.querySelectorAll('input[type="checkbox"]').length)
       : 0;
@@ -1686,6 +1691,7 @@
       // label fitter down to its six-pixel floor.
     }, element("div", {class: "lex-detail-field-label"},
       element("span", {class: "lex-detail-field-label-text"}, options.label),
+      helpMarker ? element("span", {class:"lex-field-help"}, helpMarker) : null,
       // The arrow used to live inside the label, which forced a boolean's
       // label column to span the whole row so the arrow had somewhere to run -
       // and that is why a boolean's name started at the far left while every
@@ -1696,9 +1702,7 @@
     booleanField ? arrow : null,
     element("div", {class: "lex-detail-field-control"}, control,
       pin && pin.parentElement !== control ? pin : null),
-    // Hiding the type hides the type, not the help that shares its rail: a
-    // field that asked for no type lost its only explanation with it.
-    options.showType === false ? (helpMarker ? element("div", {class: "lex-field-type-rail"}, helpMarker) : null) : typeRail);
+    options.showType === false ? null : typeRail);
     // The leader arrow shares the checkbox's grid row, so it points at the
     // middle of the box whatever else the row is carrying and however tall the
     // row turns out to be. Anchored to the row instead, it tracked the row's
@@ -1995,6 +1999,7 @@
       options.images ? "lex-subtab-bar-images" : "",
       options.className || ""].filter(Boolean).join(" "),
     role: "tablist",
+    "data-lex-subtab-shortcuts": String(options.shortcuts !== false),
     "aria-label": options.label || "Subsections",
   }, ...(options.tabs || []).map((tab, index) => element("button", {
     type: "button",
@@ -2018,7 +2023,7 @@
   })() : null,
   (key => key && options.shortcuts !== false ? element("span", {
     class: "lex-tab-shortcut", "aria-hidden": "true",
-  }, key) : "")(shortcutKeyFor(index + 1)))));
+  }, `⇧${key}`) : "")(shortcutKeyFor(index + 1)))));
 
   // The key that selects the Nth tab, matching the shortcut sequence:
   // 1-9, then 0 for the tenth, then - and = for the eleventh and twelfth.
@@ -2098,9 +2103,9 @@
     const svg = document.createElementNS(svgNamespace, "svg");
     svg.setAttribute("class", "lex-curve-svg");
     svg.setAttribute("viewBox", "0 0 320 160");
-    // Formula glyphs and labels must never be non-uniformly stretched. The
-    // graph owns a 2:1 user-space viewport; letterbox if a caller gives the
-    // drawing a differently shaped box instead of distorting that viewport.
+    let graphHeight = 160;
+    // Match the viewBox to the available rectangle, keeping text uniformly
+    // scaled without adding letterbox space above and below the graph.
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     svg.setAttribute("role", "img");
     svg.setAttribute("aria-label", options.graphLabel || `${options.title || "Value"} curve`);
@@ -2320,8 +2325,8 @@
         ? ((x - domain.min) + .5) / slots * 320
         : (x - domain.min) / spanX * 320;
       const bounded = Math.max(range.min, Math.min(range.max, y));
-      const graphY = 160 - (bounded - range.min) / spanY * 160;
-      const cursorY = Math.max(0, Math.min(160, (event.clientY - bounds.top) / bounds.height * 160));
+      const graphY = graphHeight - (bounded - range.min) / spanY * graphHeight;
+      const cursorY = Math.max(0, Math.min(graphHeight, (event.clientY - bounds.top) / bounds.height * graphHeight));
       guide.setAttribute("x1", graphX.toFixed(2));
       guide.setAttribute("x2", graphX.toFixed(2));
       guide.setAttribute("y1", cursorY.toFixed(2));
@@ -2338,7 +2343,7 @@
       const viewportCenter = Math.max(inset + halfWidth,
         Math.min(innerWidth - inset - halfWidth, event.clientX));
       tooltip.style.left = `${viewportCenter - plotBounds.left}px`;
-      tooltip.style.top = `${Math.max(8, bounds.top - plotBounds.top + graphY / 160 * bounds.height)}px`;
+      tooltip.style.top = `${Math.max(8, bounds.top - plotBounds.top + graphY / graphHeight * bounds.height)}px`;
     });
     plot.addEventListener("pointerleave", () => { clearProbe(); highlightVariable(""); });
 
@@ -2386,14 +2391,11 @@
     // Real hitboxes, not an estimate: every rendered glyph is asked for its
     // own start point, rotation and extent, turned into the quad it actually
     // occupies, and tested against its neighbours with a separating axis.
-    // The plot is 320x160 of user space fitted uniformly into whatever box the
-    // card gives it. Angles and overlaps are still measured in SCREEN space so
-    // letterboxing, browser zoom and responsive sizing cannot invalidate the
-    // collision test. preserveAspectRatio keeps glyph geometry uniform, and
-    // measuring after that transform keeps the placement faithful to display.
+    // The viewport height follows the card. Measure angles and overlaps in
+    // screen space so resizing and browser zoom keep glyph geometry uniform.
     const plotScale = () => {
       const box = svg.getBoundingClientRect();
-      return {x: (box.width || 320) / 320, y: (box.height || 160) / 160};
+      return {x: (box.width || 320) / 320, y: (box.height || graphHeight) / graphHeight};
     };
     const glyphQuads = () => {
       const count = formulaText.getNumberOfChars?.() ?? 0;
@@ -2525,6 +2527,10 @@
     }
 
     const draw = () => {
+      const bounds=svg.getBoundingClientRect();
+      if(bounds.width>0&&bounds.height>0)graphHeight=320*bounds.height/bounds.width;
+      svg.setAttribute('viewBox',`0 0 320 ${graphHeight}`);
+      grid.setAttribute('d',Array.from({length:5},(_,i)=>`M0 ${graphHeight*i/4}H320 M${80*i} 0V${graphHeight}`).join(' '));
       const range = getRange();
       axisTop.textContent = formatNumber(range.max);
       axisBottom.textContent = formatNumber(range.min);
@@ -2555,7 +2561,7 @@
       maximum.textContent = formatNumber(Math.max(...values), options.valueFormat || {});
       hoverExtrema.firstElementChild.textContent = minimum.textContent;
       hoverExtrema.lastElementChild.textContent = maximum.textContent;
-      const width = 320, height = 160, spanX = Math.max(1, domain.max - domain.min), spanY = Math.max(1, range.max - range.min);
+      const width = 320, height = graphHeight, spanX = Math.max(1, domain.max - domain.min), spanY = Math.max(1, range.max - range.min);
       const points = samples.map(sample => {
         const x = (sample.x - domain.min) / spanX * width;
         const bounded = Math.max(range.min, Math.min(range.max, sample.value));
@@ -2692,6 +2698,7 @@
     // the newly written model value before focus leaves the input.
     root.addEventListener("input", scheduleDraw, true);
     root.addEventListener("change", scheduleDraw, true);
+    if(typeof ResizeObserver!=="undefined")new ResizeObserver(scheduleDraw).observe(svg);
     draw();
     root.refreshCurve = draw;
     return root;
@@ -3210,9 +3217,9 @@
             :card.offsetWidth>card.parentElement.clientWidth+1?`it is ${card.offsetWidth}px wide in a ${card.parentElement.clientWidth}px column`
             :card.offsetHeight>scroll.clientHeight+1?`it is ${card.offsetHeight}px tall on a ${scroll.clientHeight}px page`:"";
           // Too tall is fixed here: the section goes on in the next column.
-          if(why&&card.offsetHeight>scroll.clientHeight+1&&card.scrollWidth<=card.clientWidth+1&&splitSection(card,scroll.clientHeight))
+          if(why&&options.splitOversized!==false&&card.offsetHeight>scroll.clientHeight+1&&card.scrollWidth<=card.clientWidth+1&&splitSection(card,scroll.clientHeight))
             return paginate(cards.filter(entry=>!entry.hidden),true);
-          if(why)throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title')?.textContent||card.textContent.slice(0,80)} - ${why}`);
+          if(why)throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title,h2')?.textContent||card.textContent.slice(0,80)} - ${why}`);
         }
       }
       const count=columnCount(visible.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
@@ -3331,7 +3338,8 @@
   };
   const settingsColumns = (sections, options = {}) => {
     const content = element("div", {class:"lex-tweak-card-grid"}, ...(sections || []).filter(Boolean));
-    const root = paginateSettings(content, {columns:6,columnMajor:true,strictColumns:true,...options});
+    const root = paginateSettings(content, {columnMajor:true,strictColumns:true,...options,
+      columns:sharedSettings()?.tweakColumnsPerPage||options.columns||6});
     root.classList.add("lex-settings-columns");
     if(options.className) root.classList.add(...options.className.split(/\s+/));
     if(options.columnWidth) content.style.setProperty("--lex-tweak-card-width",options.columnWidth);
@@ -3894,7 +3902,10 @@
       document.body.append(popup);button.setAttribute('aria-describedby',popup.id);
       const r=button.getBoundingClientRect(),box=popup.getBoundingClientRect();
       popup.style.left=`${Math.max(8,Math.min(r.left+r.width/2-box.width/2,innerWidth-box.width-8))}px`;
-      popup.style.top=`${Math.max(8,Math.min(r.bottom+8,innerHeight-box.height-8))}px`;
+      const below=innerHeight-r.bottom-16,above=r.top-16;
+      const useBelow=box.height<=below || below>=above;
+      popup.style.maxHeight=`${Math.max(0,useBelow?below:above)}px`;
+      popup.style.top=`${useBelow?r.bottom+8:Math.max(8,r.top-popup.getBoundingClientRect().height-8)}px`;
       popup.addEventListener('mouseenter',()=>clearTimeout(timer));popup.addEventListener('mouseleave',leave);
     };
     button.addEventListener('mouseenter',show);button.addEventListener('mouseleave',leave);
@@ -4547,6 +4558,8 @@ ${contents.path}`});
     let restoreSettings = () => {};
     const fitDialog = () => {
       dialog.classList.remove("lex-settings-must-scroll");
+      dialog.classList.remove("lex-settings-wide");
+      if (dialog.scrollHeight > window.innerHeight - 24) dialog.classList.add("lex-settings-wide");
       dialog.classList.toggle("lex-settings-must-scroll",
         dialog.scrollHeight > Math.max(320, window.innerHeight - 24));
     };
@@ -4592,6 +4605,7 @@ ${contents.path}`});
         {key:"absentGameDesaturationPercent", scope:"packaged", title:"Absent game desaturation", description:"Amount of color removed from Absent game cover art on the Home screen.", type:"number", min:0, max:100, step:5, unit:"%"},
         {key:"globalMessageRarity", scope:"packaged", title:"Global message rarity", description:"Makes each global loading message this many times less likely than each game-specific message.", type:"number", min:1, max:100, step:1, unit:"× rarer"},
         {key:"loadingTransitionMinimumSeconds", scope:"packaged", title:"Loading screen minimum", description:"Keeps the loading screen visible for at least this long. Actual loading can take longer.", type:"number", min:0, max:10, step:.25, unit:"s", fallback:1.5},
+        {key:"tweakColumnsPerPage", scope:"packaged", title:"Tweak columns per page", description:"Maximum columns on one Tweaks page. Each tweak stays in one column.", type:"number", min:1, max:12, step:1, fallback:6},
       ];
       const ordinaryDefinitions = definitions.filter(definition => definition.scope !== "packaged");
       const supportsCurrent = definition => Object.prototype.hasOwnProperty.call(settings, definition.key);
@@ -4694,7 +4708,8 @@ ${contents.path}`});
             class:"lex-global-setting lex-developer-setting lex-packaged-setting", hidden:true,
           }, element("div", {class:"lex-setting-copy"},
             element("label", {for:`lex-default-${definition.key}`}, definition.title),
-            element("p", {}, `${definition.description}${supported ? "" : " Restart LEXEDITOR to enable this newly added setting."}`)), wrapped);
+            element("p", {}, definition.description)), wrapped);
+          if(!supported)controlNode(wrapped).title="Restart Lexeditor to make this setting available.";
           card.dataset.lexSettingSupported = String(supported);
           developerLane.append(card);
           defaultCards.push(card);
@@ -4704,10 +4719,11 @@ ${contents.path}`});
         const defaultSupported = supportsDefault(definition);
         const wrapped = makeControl(definition, initialValue(definition), `lex-${definition.key}`);
         controlNode(wrapped).disabled = !currentSupported;
+        if(!currentSupported)controlNode(wrapped).title="Restart Lexeditor to make this setting available.";
         currentControls.set(definition.key, wrapped);
         const copy = element("div", {class:"lex-setting-copy"},
           element("label", {for:`lex-${definition.key}`}, definition.title),
-          element("p", {}, `${definition.description}${currentSupported ? "" : " Restart LEXEDITOR to enable this newly added setting."}`));
+          element("p", {}, definition.description));
         const defaultWrapped = makeControl(definition, initialValue(definition, true), `lex-default-${definition.key}`);
         defaultControls.set(definition.key, defaultWrapped);
         const defaultControl = element("label", {
@@ -4775,7 +4791,7 @@ ${contents.path}`});
         heading,
         element("div", {class:"lex-settings-columns"}, userLane, developerLane),
       ];
-      const libraryPath = element("span", {}, "Loading library location…");
+      const libraryPath = element("output", {class:"lex-readonly-field","aria-label":"Mod library location"}, "Loading library location…");
       let libraryStatus = null;
       const libraryRecover = element("button", {type:"button", hidden:true, onclick:async () => {
         try {
@@ -4819,8 +4835,9 @@ ${contents.path}`});
         } catch (error) { libraryPath.textContent = String(error?.message || error); }
         finally { libraryMoveActive = false; if (progressTimer) clearInterval(progressTimer); libraryMove.disabled = false; }
       }}, "Move…");
-      dialogChildren.push(element("section", {class:"lex-dialog-status"},
-        element("strong", {}, "Mod library "), libraryPath, libraryMove, libraryRecover, libraryCleanup));
+      userLane.append(element("section", {class:"lex-global-setting lex-library-setting"},
+        element("div", {class:"lex-setting-copy"},element("strong", {}, "Mod library")),
+        libraryPath,actionRow(libraryMove,libraryRecover,libraryCleanup)));
       const refreshLibraryLocation = async () => {
         const value = await callWindow("mod_library_location");
         libraryStatus = value;
@@ -4839,9 +4856,7 @@ ${contents.path}`});
       // setting cannot be saved at all.
       dialog.addEventListener("input", () => save.refresh?.());
       dialog.addEventListener("change", () => save.refresh?.());
-      message.textContent = unsupportedDefinitions.length
-        ? "Restart LEXEDITOR to enable newly added settings. Other settings can still be saved."
-        : "";
+      message.textContent = "";
       fitDialog();
       controlNode(currentControls.get("updateCheckFrequency")).focus();
     } catch (error) {
@@ -5256,11 +5271,14 @@ ${contents.path}`});
     document.body.dataset.lexPlugin = options.plugin.id;
     document.body.dataset.lexTheme = options.plugin.themeName || options.plugin.id;
     applyTheme(options.plugin.theme);
-    if (pluginLoadingScreen) callWindow("loading_quote", options.plugin.id).then(result => {
+    const quoteScreen = pluginLoadingScreen;
+    if (quoteScreen && !loadingParameters.get("lexQuote")) callWindow("loading_quote", options.plugin.id).then(result => {
       if (!result?.quote) return;
       sessionQuote.set(result.quote);
-      const quote = document.querySelector(".lex-plugin-loading-quote");
-      if (quote) quote.textContent = result.quote;
+      const quote = quoteScreen.querySelector(".lex-plugin-loading-quote");
+      // Keep one quote for the entire transition. A late response may seed
+      // the next load, but must not replace text already being read or fading.
+      if (pluginLoadingScreen === quoteScreen && quote?.textContent === "Loading editor…") quote.textContent = result.quote;
     }).catch(() => {});
 
     const brand = element("button", {
@@ -5270,7 +5288,8 @@ ${contents.path}`});
       title: "Return to main menu",
       "aria-label": "Return to main menu",
       "data-lex-history-control": true,
-    }, element("h1", {text: options.brand || "LEXEDITOR"}));
+    }, element("h1", {"data-lex-brand-label":options.brand || "LEXEDITOR",
+      "aria-label":options.brand || "LEXEDITOR"}));
     const nav = element("nav", {"aria-label": `${options.plugin.name || options.plugin.id} sections`});
     const navFrame = element("div", {class: "lex-nav-frame"}, nav);
     let githubWorkspace = null;
@@ -5745,8 +5764,11 @@ ${contents.path}`});
         },
         tab: () => document.querySelectorAll("nav button[data-tab]")[
           Number(shortcutDigit(event)) - 1]?.click(),
-        subtab: () => document.querySelectorAll(".lex-subtab-bar:not(.lex-tabbed-panel-tabs) > .lex-subtab-button")[
-          Number(shortcutDigit(event)) - 1]?.click(),
+        subtab: () => {
+          const bar = [...document.querySelectorAll('.lex-subtab-bar[data-lex-subtab-shortcuts="true"]:not(.lex-tabbed-panel-tabs)')]
+            .find(node => node.checkVisibility() && !node.closest('[hidden]'));
+          bar?.querySelectorAll(':scope > .lex-subtab-button')[Number(shortcutDigit(event)) - 1]?.click();
+        },
       }[action];
       if (!run) return;
       event.preventDefault();
@@ -5981,11 +6003,31 @@ ${contents.path}`});
           "aria-pressed": String(pinned),
           onpointerenter: () => setColumnLit(value, true),
           onpointerleave: () => setColumnLit(value, false),
-          onclick: event => {
+          onclick: async event => {
             event.preventDefault();
             event.stopPropagation();
-            api.toggle(value);
-            markArrivingColumn(document, value);
+            const button=event.currentTarget;
+            if(button.dataset.pinMoving)return;
+            button.dataset.pinMoving="true";
+            const inserting=!api.isPinned(value);
+            try {
+              if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+                const animation=icon.animate([
+                  {translate:inserting?'6px -6px':'0px 0px'},
+                  {translate:inserting?'0px 0px':'6px -6px'},
+                ],{duration:220,easing:inserting?'cubic-bezier(.4,0,.7,1)':'cubic-bezier(.2,.7,.3,1)',fill:'forwards'});
+                await animation.finished.catch(()=>{});
+                animation.cancel();
+              }
+              // Commit only after the movement: callers can replace the whole
+              // detail panel when the visible columns change.
+              button.classList.toggle('pinned',inserting);
+              button.setAttribute('aria-pressed',String(inserting));
+              button.setAttribute('aria-label',inserting?`Unpin ${label} column`:`Pin ${label} column`);
+              button.title=inserting?`Hide ${label} in the table`:`Show ${label} in the table`;
+              api.toggle(value);
+              markArrivingColumn(document, value);
+            } finally { delete button.dataset.pinMoving; }
           },
         }, icon);
       },
@@ -7074,13 +7116,19 @@ ${contents.path}`});
         element("span", {class: "lex-page-total", text: pages})),
       button(">", page + 1, page + 1 >= pages, "Next page"),
       button(">>", pages - 1, page + 1 >= pages, "Last page"));
+    const filters=options.filters || [];
+    const createControls=filters.filter(control=>control?.matches?.('.lex-new-button'));
     const left = element("div", {class: "lex-pager-left"},
+      ...createControls,
       options.search ? bottomSearch(options.search) : null);
     let rowControl = null;
     if (options.rowControl) {
       const commitRows = input => options.rowControl.change?.(input.value);
       const rowInput = element("input", {
         type: "number", min: "5", max: "80", step: "1", value: options.rowControl.value,
+        // This box is sized for two digits. Fitting its font to its own ch
+        // width creates a feedback loop that keeps shrinking both.
+        "data-lex-autofit": "false",
         "aria-label": "Rows on this page",
         onblur: event => commitRows(event.target),
         onkeydown: event => {
@@ -7105,7 +7153,7 @@ ${contents.path}`});
     }
     const right = element("div", {class: "lex-pager-right"},
       rowControl,
-      ...(options.filters || []),
+      ...filters.filter(control=>!createControls.includes(control)),
       element("span", {class: "lex-page-summary", text: `${formatNumber(first)}-${formatNumber(last)}/${formatNumber(total)}`}));
     return element("div", {
       class: `lex-pager${pages === 1 ? " single-page" : ""}${inline ? " lex-pager-inline" : ""}`,
@@ -7313,7 +7361,9 @@ ${contents.path}`});
     // A Table page uses one global row target. Plugin-local page sizes are only
     // compatibility state until the shared settings snapshot arrives.
     const rowPreferenceKey = tableRowPreferenceKey(options);
-    const fitMinimum = Math.max(0, Number(options.fit?.minRowHeight) || 0);
+    // Pagination must leave enough height for readable text and controls.
+    // The requested row count is a ceiling, not permission to crush rows.
+    const fitMinimum = options.fit === false ? 0 : Math.max(32, Number(options.fit?.minRowHeight) || 0);
     const fitCapacity = fitMinimum ? tableFitCapacityCache.get(rowPreferenceKey) : null;
     const globalPageSize = boundedTableRows(sharedSettingsSnapshot?.tableRowsPerPage || fitCapacity?.requested || options.pageSize || 15);
     const hasRowOverride = hasTableRowsOverride(rowPreferenceKey);
@@ -8041,15 +8091,6 @@ ${contents.path}`});
   });
 
   const dataMapState = new Map();
-  // How much of a file Lexeditor can reach. Structured editing is the whole
-  // record set; a view is readable but not writable; source is the bytes and
-  // nothing above them; unavailable is a file that is named and not read.
-  const COVERAGE_LABELS = {
-    structured: "Structured editable",
-    view: "Read-only view",
-    source: "Source only",
-    unavailable: "Unavailable",
-  };
   const dataMap = options => {
     const plugin = document.body.dataset.lexPlugin || "plugin";
     const stateKey = options.searchKey || `${plugin}-data-map`;
@@ -8059,17 +8100,12 @@ ${contents.path}`});
     const status = row => Object.hasOwn(labels,row.status) ? row.status : "not-integrated";
     const label = row => labels[status(row)];
     const coverage = row => row.coverage;
-    // Coverage is answered by the shared map itself. A plugin may still take
-    // the change if it wants to persist it, but it does not have to, and the
-    // filter works the same either way.
-    const wantedCoverage = options.coverage ?? saved.coverage ?? "";
     const keyOf = row => row.id || `${row.filename}\u001f${row.controls || ""}`;
     const query = String(options.query || "").trim().toLocaleLowerCase();
     const wanted = options.status || "";
     const [sortKey, direction] = options.sort || ["filename", 1];
     const filtered = (options.rows || []).filter(row => (!wanted ||
       status(row)===wanted) &&
-      (!wantedCoverage || coverage(row)===wantedCoverage) &&
       (!query || [row.filename,row.controls,row.notes,label(row)].some(value=>String(value||"").toLocaleLowerCase().includes(query))))
       .sort((a,b)=>direction*String(sortKey==="status"?label(a):a[sortKey]||"").localeCompare(
         String(sortKey==="status"?label(b):b[sortKey]||""),undefined,{numeric:true}));
@@ -8077,23 +8113,6 @@ ${contents.path}`});
       onchange:event=>options.changeStatus?.(event.target.value)},
       ...[["","All integration states"],...Object.entries(labels)].map(([value,text])=>{
         const option=element("option",{value},text);option.selected=value===wanted;return option;
-      }));
-    // Integration state and coverage are two different questions about a file:
-    // whether Lexeditor has wired it up at all, and how much of it can be
-    // reached once it has. A reader looking for "what can I actually edit here"
-    // is asking the second, so it has a filter of its own.
-    const coverageFilter = element("select", {"aria-label":"Filter files by coverage",
-      onchange:event=>{
-        saved.coverage=event.target.value;
-        if(options.changeCoverage){options.changeCoverage(event.target.value);return}
-        // A plugin that does not take the change still gets a working filter:
-        // the map rebuilds itself in place from the selection it just stored.
-        const replacement=dataMap(options);
-        content.replaceWith(replacement.content);
-      }},
-      ...[["","All coverage"],...Object.entries(COVERAGE_LABELS)].map(([value,text])=>{
-        const option=element("option",{value},text);
-        option.selected=value===wantedCoverage;return option;
       }));
     const detail = row => {
       const body = [element("p",{class:"lex-data-map-scope"},row.controls || "No mapped interface"),
@@ -8109,12 +8128,16 @@ ${contents.path}`});
       }
       if (options.openSource && (row.sourceOpenable || (coverage(row)==="source" && row.openable)))
         actions.push(element("button",{type:"button",class:"lex-data-map-source",onclick:()=>options.openSource(row)},"Edit source only"));
-      actions.push(element("button",{type:"button",class:"lex-data-map-location",title:"Reveal original file location",
+      const path=element("span",{class:"lex-data-map-path"},row.path || row.sourcePath || row.filename);
+      const folder=element("button",{type:"button",class:"lex-data-map-location","aria-label":"Open file location",
         onclick:async()=>{try{const opened=await callWindow("open_game_data_location",plugin,row.filename);
           if(opened===false)throw new Error("Open this page in the desktop editor to reveal original files.");
-        }catch(error){showToast(error.message || String(error),true)}}},folderIcon()," File location"));
+        }catch(error){showToast(error.message || String(error),true)}}},folderIcon());
+      callWindow("game_data_location",plugin,row.filename).then(result=>{
+        if(result?.path){path.textContent=result.path;path.title=result.path;}
+      }).catch(()=>{});
       body.push(element("div",{class:"lex-data-map-actions"},...actions));
-      return detailPanel({className:"lex-data-map-detail",title:row.filename,meta:label(row),body});
+      return detailPanel({className:"lex-data-map-detail",title:row.filename,meta:element('div',{class:'lex-data-map-file'},folder,path),identity:integrationStatus(status(row)),body});
     };
     let page = Number(options.page)||0;
     const content = pagedListDetail({
@@ -8123,7 +8146,7 @@ ${contents.path}`});
       className:"lex-data-map lex-data-map-view",splitKey:`${stateKey}-split`,rowsKey:`${stateKey}-rows`,
       defaultSplit:54,minLeft:280,minRight:240,
       search:{key:stateKey,value:options.query || "",label:"Search the data map",
-        placeholder:"Search filenames, systems, or notes…",change:options.changeQuery},filters:[statusFilter,coverageFilter],
+        placeholder:"Search filenames, systems, or notes…",change:options.changeQuery},filters:[statusFilter],
       sync:next=>{Object.assign(saved,next);page=next.page},
       change:next=>{Object.assign(saved,next);options.changePage?.(next.page)},
       emptyDetail:()=>detailPanel({className:"lex-data-map-detail",title:"Data Map",body:[element("p",{},"No files match this filter.")]}),
@@ -8170,7 +8193,7 @@ ${contents.path}`});
         const control = controlFor(field);
         const node = detailPanel({
           className: "lex-platform-config-field lex-platform-config-section", title: field.label,
-          help: field.description ? infoHelp(field.description) : null,
+          help: field.description || null,
           actions: field.kind === "boolean" ? control : null,
           body: field.kind === "boolean" ? [] : control,
         });
@@ -8428,79 +8451,6 @@ ${contents.path}`});
     }));
   }, true);
 
-  // Tabs share one row of equal lanes while every name fits in its lane at
-  // full size. When one does not, the bar takes another row rather than
-  // shrinking the names: one row at any cost put PROPERTIES at seven pixels
-  // beside LOOT at fifteen. The names are measured at their own size, so a
-  // bar that has room again goes back to one row.
-  const tabLabelObserver=new ResizeObserver(()=>scheduleBalance());
-  const balanceTabRows = () => {
-    for (const bar of document.querySelectorAll('.lex-shell-header nav, .lex-subtab-bar')) {
-      const tabs=[...bar.children].filter(node=>node instanceof HTMLElement && !node.hidden);
-      bar.dataset.lexTabRows='1';
-      bar.dataset.lexTabTight='';
-      tabs.forEach(tab=>tab.style.removeProperty('--lex-tab-span'));
-      const width=bar.clientWidth;
-      let columns=Math.max(1,tabs.length);
-      // A bar of pictures (GF portraits) scales its pictures to the lanes and
-      // stays one row; only names are measured.
-      if(width>0&&tabs.length>1&&!bar.matches('.lex-subtab-bar-images')){
-        const needs=tabs.map(tab=>{
-          const label=tab.querySelector('.lex-tab-label-text');
-          if(!label)return 0;
-          label.style.fontSize='';
-          // The whole name, the tab's padding and border, and whatever else
-          // sits beside the name in the flow (a help mark). Read from those
-          // parts, not from the tab: a tab is as wide as its lane, so the
-          // lane would feed back into what it is measured to need.
-          const px=(style,...names)=>names.reduce((sum,name)=>sum+(parseFloat(style[name])||0),0);
-          const own=getComputedStyle(tab);
-          // The text's own width: a Range, since the label box is as wide as its lane.
-          const text=document.createRange();text.selectNodeContents(label);
-          let need=text.getBoundingClientRect().width+px(own,'paddingLeft','paddingRight','borderLeftWidth','borderRightWidth');
-          for(let wrap=label.parentElement;wrap&&wrap!==tab;wrap=wrap.parentElement)need+=px(getComputedStyle(wrap),'paddingLeft','paddingRight');
-          for(const child of tab.children){
-            if(child.contains(label))continue;
-            const style=getComputedStyle(child);
-            if(style.position==='absolute'||style.position==='fixed'||style.display==='none')continue;
-            need+=child.offsetWidth+px(style,'marginLeft','marginRight');
-          }
-          // Letter spacing trails the last glyph and is not in the text box.
-          return Math.ceil(need+(parseFloat(getComputedStyle(label).letterSpacing)||0)*2)+6;
-        });
-        const widest=Math.max(...needs);
-        if(widest*tabs.length>width){
-          const perRow=Math.max(1,Math.floor(width/Math.max(1,widest)));
-          const rows=Math.ceil(tabs.length/perRow);
-          columns=Math.ceil(tabs.length/rows);
-        }
-      }
-      bar.style.setProperty('--lex-tab-columns',String(columns));
-      bar.dataset.lexTabRows=String(Math.ceil(Math.max(1,tabs.length)/columns));
-      bar.querySelectorAll('.lex-tab-label-text').forEach(label=>tabLabelObserver.observe(label));
-    }
-  };
-  let balancePending = false;
-  const scheduleBalance = () => {
-    if (balancePending) return;
-    balancePending = true;
-    requestAnimationFrame(() => { balancePending = false; balanceTabRows(); scheduleFit(); });
-  };
-  window.addEventListener('resize', scheduleBalance);
-  document.fonts?.ready?.then(scheduleBalance).catch(() => {});
-  new MutationObserver(records => {
-    for (const record of records) {
-      for (const node of record.addedNodes) {
-        if (node instanceof Element &&
-            (node.matches?.('nav,.lex-subtab-bar') || node.querySelector?.('nav,.lex-subtab-bar'))) {
-          scheduleBalance();
-          return;
-        }
-      }
-    }
-  }).observe(document.documentElement, {childList: true, subtree: true});
-  scheduleBalance();
-
   const dedupeShortcuts = root => root.querySelectorAll?.('nav button[data-tab]').forEach(button => {
     if (button.querySelector('.lex-tab-shortcut')) {
       button.querySelectorAll('.lex-tab-ordinal').forEach(node => node.remove());
@@ -8521,10 +8471,14 @@ ${contents.path}`});
   // the whole sweep from one layout.
   const fitted = new WeakMap();
   const LABEL_MIN_PX = 9;
+  const labelLeftOverflow = label => {
+    const left=label.getBoundingClientRect().left;
+    return Math.max(0,...[...label.children].map(child=>left-child.getBoundingClientRect().left));
+  };
   const widenLabelLane = label => {
     const lane = label.closest('.lex-tweak-card-grid,.lex-detail-panel,.lex-detail,.lex-detail-section') || label.parentElement?.parentElement || label.parentElement;
     if (!lane) return;
-    const needed = Math.ceil(label.scrollWidth + 2);
+    const needed = Math.ceil(label.scrollWidth + labelLeftOverflow(label) + 2);
     const current = parseFloat(lane.style.getPropertyValue('--lex-detail-label-min')) || 0;
     if (needed > current) lane.style.setProperty('--lex-detail-label-min', `${needed}px`);
   };
@@ -8533,15 +8487,11 @@ ${contents.path}`});
     if (!(label instanceof HTMLElement)) return;
     // The name lane has a fixed width. Fit the font inside it.
     const key = fitKey(label);
-    if (fitted.get(label) === key && label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight + 1) return;
+    if (fitted.get(label) === key && label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight + 1 && labelLeftOverflow(label)<1) return;
     label.style.fontSize = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
     if(label.classList.contains('lex-tab-label-text')) {
-      // A subtab keeps its name at full size and its bar wraps onto another
-      // row when the names no longer fit. Shrinking came first and made
-      // wrapping unreachable: a seven-tab panel read PROPERTIES at seven
-      // pixels beside LOOT at fifteen.
-      if(label.closest('.lex-subtab-button')){fitted.set(label,fitKey(label));return;}
+      // Main tabs and subtabs fit their labels inside a single row.
       const range=document.createRange();range.selectNodeContents(label);
       const fits=()=>{const css=getComputedStyle(label);return range.getBoundingClientRect().width <= label.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight)-3;};
       while(size>LABEL_MIN_PX&&!fits()){size-=.5;label.style.fontSize=`${size}px`;}
@@ -8554,11 +8504,11 @@ ${contents.path}`});
     // and a long property name in a narrow lane came out as a smear. A name
     // that still does not fit at the floor widens the lane instead - for its
     // whole panel, so the names in it keep one edge.
-    const overflows = () => label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth;
+    const overflows = () => label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1;
     // A word wider than the lane widens the lane before anything shrinks, so
     // one long name does not come out smaller than the names around it. The
     // lane settles on the next pass, when the observer sees it resize.
-    if (label.classList.contains('lex-detail-field-label') && label.scrollWidth > label.clientWidth) widenLabelLane(label);
+    if (label.classList.contains('lex-detail-field-label') && (label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1)) widenLabelLane(label);
     while (size > LABEL_MIN_PX && overflows()) {
       size -= .5;
       label.style.fontSize = `${size}px`;
@@ -8620,12 +8570,12 @@ ${contents.path}`});
   document.fonts?.ready?.then(() => scheduleFit());
   document.fonts?.addEventListener?.('loadingdone', () => {
     document.querySelectorAll(LABEL_SELECTOR).forEach(label => fitted.delete(label));
-    scheduleBalance();
+    scheduleFit();
   });
   scheduleFit();
 })();
 
-// Selection marks follow the first visible glyph, without joining its layout.
+// Selection marks precede the label, including its leading icon.
 (() => {
   let pending=false;
   const sizes=new ResizeObserver(()=>schedule());
@@ -8636,17 +8586,25 @@ ${contents.path}`});
       const label=tab?host.querySelector('.lex-tab-label-text'):host;
       if(!label)continue;
       sizes.observe(label);
-      const walker=document.createTreeWalker(label,NodeFilter.SHOW_TEXT,{acceptNode:node=>node.textContent.trim()&&!node.parentElement.closest('.lex-reference-values,.lex-tab-shortcut,button,select')?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP});
+      const walker=document.createTreeWalker(label,NodeFilter.SHOW_TEXT,{acceptNode:node=>node.textContent.trim()&&!node.parentElement.closest('.lex-reference-values,.lex-tab-shortcut,.lex-info-help,[aria-hidden="true"],select')?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP});
       let node=tab?label.firstChild:walker.nextNode();
       while(node&&node.nodeType!==Node.TEXT_NODE)node=node.firstChild;
       if(!node||!node.textContent.trim())continue;
       const range=document.createRange();range.selectNodeContents(node);
       const text=range.getBoundingClientRect(),box=host.getBoundingClientRect(),css=getComputedStyle(host);
       if(!text.width)continue;
+      let labelLeft=text.left;
+      for(const icon of label.querySelectorAll('img,svg,canvas')){
+        if(icon.closest('.lex-reference-values,.lex-info-help,.lex-tab-shortcut'))continue;
+        const iconStyle=getComputedStyle(icon),bounds=icon.getBoundingClientRect();
+        if(iconStyle.visibility==='hidden'||!bounds.width||!bounds.height)continue;
+        sizes.observe(icon);
+        if(bounds.right<=text.left+1)labelLeft=Math.min(labelLeft,bounds.left);
+      }
       const width=parseFloat(css.getPropertyValue(tab?'--lex-tab-marker-width':'--lex-row-marker-width'))||24;
       const gap=6;
       const scale=box.width/host.offsetWidth||1;
-      const left=(text.left-box.left)/scale-width-gap-(parseFloat(css.borderLeftWidth)||0);
+      const left=(labelLeft-box.left)/scale-width-gap-(parseFloat(css.borderLeftWidth)||0);
       host.style.setProperty('--lex-marker-left',`${left}px`);
     }
   };
@@ -8715,13 +8673,12 @@ ${contents.path}`});
   // reference readings - but a plugin's own input[type=number] cannot hold a
   // comma at all: assigning "50,000" to one leaves it empty. So the box is
   // rebuilt as a text box that carries the number, groups it while the reader
-  // is looking at it, and shows the bare digits the moment they start typing.
+  // is looking at it and while they edit it.
   //
   // Two things keep this safe for plugins that never asked for it. Only boxes
   // that can actually hold a big number are touched - a 0-100 percentage gains
-  // nothing from a separator - and the grouped form only ever exists while the
-  // box is NOT focused, so every input and change event a plugin listens for
-  // still reports plain digits.
+  // nothing from a separator. Input and change handlers receive plain digits;
+  // grouping returns after dispatch, with the caret in the same digit position.
   const GROUPING_FLOOR = 10000;
   const groupedBoxes = new WeakSet();
   const wantsGrouping = input => {
@@ -8751,7 +8708,7 @@ ${contents.path}`});
         return bounded;
       };
       const show = () => {
-        if (input === document.activeElement) return;
+        if (input === document.activeElement) { groupEditing(); return; }
         const value = Number(plain());
         if (plain() === "" || !Number.isFinite(value)) return;
         const bounded = clamp(value);
@@ -8765,14 +8722,35 @@ ${contents.path}`});
       input.type = "text";
       input.inputMode = "decimal";
       input.autocomplete = "off";
+      const groupEditing = () => {
+        const value=input.value;
+        const start=value.slice(0,input.selectionStart??value.length).replace(/,/g,'').length;
+        const end=value.slice(0,input.selectionEnd??value.length).replace(/,/g,'').length;
+        const raw=plain();
+        if(!/^-?\d+(\.\d*)?$/.test(raw))return;
+        const [integer,fraction]=raw.split('.');
+        const formatted=integer.replace(/\B(?=(\d{3})+(?!\d))/g,',')+(fraction===undefined?'':'.'+fraction);
+        const position=count=>{let i=0,seen=0;while(i<formatted.length&&seen<count){if(formatted[i]!==',')seen++;i++}return i};
+        input.value=formatted;
+        if(input===document.activeElement)input.setSelectionRange(position(start),position(end));
+      };
+      // Handlers receive plain numbers; restore grouping after event dispatch.
+      const editEvent = () => {
+        const start=input.value.slice(0,input.selectionStart??input.value.length).replace(/,/g,'').length;
+        const end=input.value.slice(0,input.selectionEnd??input.value.length).replace(/,/g,'').length;
+        input.value=plain();input.setSelectionRange(start,end);
+        setTimeout(groupEditing,0);
+      };
+      input.addEventListener('input',editEvent,true);
+      input.addEventListener('change',editEvent,true);
       input.addEventListener("focus", () => {
-        input.value = plain();
+        groupEditing();
         input.select();
       });
       input.addEventListener("blur", show);
       // A plugin that writes a fresh value into the box while it sits unfocused
       // re-groups it; while it is focused the reader's own digits stand.
-      input.addEventListener("change", show);
+      input.addEventListener("change", () => setTimeout(show,0));
       show();
     }
   };

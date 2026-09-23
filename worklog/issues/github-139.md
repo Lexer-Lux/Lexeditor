@@ -37,3 +37,6 @@ No game files changed and no game was launched. Remaining acceptance: open Story
 Pause, confirm all ten retained entries appear and navigate; Online and Social Club
 are absent; Back resumes play; reopen Pause and check again. Duration #151 remains
 active; do not change its setup for this check.
+
+## 2026-09-22 misc-fixes disposition
+The corrected RBF0 replacement lives in the game LML directory outside this repo, targeting update screens 0xA900038B. Test, needs the game: open Story Pause, confirm all ten retained entries appear and navigate, Online and Social Club absent, Back resumes play, reopen and check again. No new install was needed. Issue stays actionable.

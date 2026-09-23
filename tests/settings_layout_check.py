@@ -2,6 +2,7 @@
 import functools
 import threading
 import tempfile
+import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 from global_browser_check import Handler, ThreadingHTTPServer, STUB, ROOT
@@ -36,17 +37,33 @@ def main():
             assert not page.locator('#modal').is_visible()
             page.evaluate('LexeditorUI.openSettings()')
             page.wait_for_selector('.lex-global-setting input')
+            font=Path(os.environ['LOCALAPPDATA'])/'Lexeditor/game-data/ff8/generated/ff8-menu.ttf'
+            page.route('**/assets/ff8-menu.ttf*',lambda r:r.fulfill(path=str(font)))
+            page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+            page.evaluate('document.fonts.ready')
             assert page.get_by_role('checkbox',name='Wrap around at the ends',exact=True).count()==2
             for width,height in [(2048,1080),(900,620),(600,500)]:
                 page.set_viewport_size({'width':width,'height':height});page.wait_for_timeout(250)
                 metrics=page.locator('.lex-global-settings').evaluate("""dialog=>({width:dialog.getBoundingClientRect().width,scroll:dialog.scrollWidth,client:dialog.clientWidth,cards:[...dialog.querySelectorAll('.lex-global-setting:not([hidden])')].map(e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height}})})""")
                 assert metrics['scroll']<=metrics['client']+2,metrics
+                if width == 2048:
+                    assert page.locator('.lex-global-settings').evaluate('n=>n.scrollHeight<=n.clientHeight+1')
+                checks=page.locator('.lex-global-setting input[type="checkbox"]').evaluate_all('ns=>ns.map(n=>({w:n.getBoundingClientRect().width,h:n.getBoundingClientRect().height,p:getComputedStyle(n).padding}))')
+                assert all(abs(n['w']-n['h'])<1 for n in checks),checks
+                assert page.locator('.lex-global-setting input:not([type="checkbox"]),.lex-global-setting select').evaluate_all('ns=>new Set(ns.filter(n=>n.getBoundingClientRect().height).map(n=>Math.round(n.getBoundingClientRect().height))).size===1')
+                assert page.locator('.lex-library-setting .lex-readonly-field').count()==1
+                assert page.locator('.lex-global-settings > .lex-dialog-status').inner_text()==''
                 assert all(c['w']>=190 for c in metrics['cards']),metrics
                 cards=metrics['cards']
                 for i,a in enumerate(cards):
                     for b in cards[i+1:]:
                         assert min(a['x']+a['w'],b['x']+b['w'])-max(a['x'],b['x'])<=1 or min(a['y']+a['h'],b['y']+b['h'])-max(a['y'],b['y'])<=1,metrics
                 page.screenshot(path=str(Path(tempfile.gettempdir())/f'lex-settings-{width}.png'))
+                if width == 2048:
+                    page.locator('.lex-settings-save-control').hover()
+                    page.wait_for_timeout(150)
+                    page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-settings-save-preview.png'))
+                    page.mouse.move(0,0)
             page.evaluate("""()=>{
                 document.querySelector('.lex-global-settings-backdrop').remove();
                 const cards=Array.from({length:7},(_,i)=>LexeditorUI.detailSection({title:`Group ${i}`,body:Array.from({length:30},(_,j)=>LexeditorUI.detailField({label:`Property ${j}`,control:LexeditorUI.readonlyField(`Value ${j}`)}))}));

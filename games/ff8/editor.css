@@ -38,9 +38,9 @@
       /* The hand is the marker, so the shared lift and underline go away. */
       --lex-tab-lift:0px;--lex-tab-underline-content:none;
       --lex-unit-align:baseline;
-      --lex-settings-tab-bg:linear-gradient(135deg,#555,#3f3f3f);
-      --lex-settings-tab-hover-bg:linear-gradient(135deg,#666,#494949);
-      --lex-settings-tab-active-bg:linear-gradient(135deg,#777,#555);
+      --lex-settings-tab-bg:linear-gradient(135deg,#595959,#404040);
+      --lex-settings-tab-hover-bg:linear-gradient(135deg,#696969,#505050);
+      --lex-settings-tab-active-bg:linear-gradient(135deg,#777,#575757);
 
       /* Window buttons: the same bevel, round where the game draws it round. */
       --lex-shell-button-fg:#fff;--lex-shell-button-border-width:2px;
@@ -147,3 +147,7 @@
 
 /* A record's icon before its name in the panel heading. */
 .ff8-heading-label, .ff8-ability-label {--ff8-item-icon-size:1.15em;}
+
+/* Token picker rows reuse the shared toolbars; only gaps differ here. */
+.ff8-text-token-toolbar { --lex-toolbar-gap:6px; --lex-toolbar-margin:0; }
+.ff8-text-token-group { --lex-toolbar-gap:3px; }

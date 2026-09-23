@@ -61,7 +61,7 @@
   function bitmapize(node) {
     if (!bitmapState || !(node instanceof Element)) return false;
     const stored = node.dataset.lexFf7rBitmapLabel;
-    const label = String(stored || node.textContent || "").replace(/\s+/g, " ").trim();
+    const label = String(stored || node.dataset.lexBrandLabel || node.textContent || "").replace(/\s+/g, " ").trim();
     if (!label) return false;
     if (stored && node.lexBitmapCanvas?.isConnected) return true;
     const measured = measureLabel(label, bitmapState.glyphs);

@@ -154,8 +154,8 @@ def verify_api_and_render() -> dict:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
             cdp.eval("navigate('text');state.selected.text='exe_card_names:1';renderText()")
-            wait_eval(cdp, "document.querySelector('.kernel-text-editor textarea')!==null", 30)
-            rendered = cdp.eval("""(()=>{const row=state.data.text.rows.find(row=>row.id==='exe_card_names:1'),area=document.querySelector('.kernel-text-editor textarea'),panel=area.closest('.kernel-text-editor'),help=panel.querySelector('.lex-info-help');return{source:row?.source,label:row?.sourceLabel,value:area.value,help:help?.getAttribute('aria-label')||'',editable:!area.readOnly,rows:state.data.text.rows.length}})()""")
+            wait_eval(cdp, "document.querySelector('.lex-text-editor textarea')!==null", 30)
+            rendered = cdp.eval("""(()=>{const row=state.data.text.rows.find(row=>row.id==='exe_card_names:1'),area=document.querySelector('.lex-text-editor textarea'),panel=area.closest('.lex-text-editor'),help=panel.querySelector('.lex-info-help');return{source:row?.source,label:row?.sourceLabel,value:area.value,help:help?.getAttribute('aria-label')||'',editable:!area.readOnly,rows:state.data.text.rows.length}})()""")
             assert rendered["source"] == "exe_card_names" and rendered["label"] == "Card names"
             assert rendered["editable"] and rendered["rows"] == 2225
             assert "card_names.msd" in rendered["help"] and "never changes FF8_EN.exe" in rendered["help"]
@@ -170,7 +170,9 @@ def verify_api_and_render() -> dict:
 
 def main() -> int:
     formats = (ROOT / "games/ff8/formats.py").read_text(encoding="utf-8")
-    editor = (ROOT / "games/ff8/editor.html").read_text(encoding="utf-8")
+    sys.path.insert(0, str(ROOT / "tests"))
+    from plugin_ui import plugin_ui
+    editor = plugin_ui("ff8")
     assert 'paths.DIRECT_ROOT / "ff8" / "en" / "exe" / source.filename' in formats
     assert "exe_card_names" in editor and "exe_draw_point" in editor and "exe_card_texts" in editor
     print(json.dumps({"primary": verify_primary_contracts(), "binary": verify_binary(),

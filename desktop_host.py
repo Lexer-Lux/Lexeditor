@@ -396,6 +396,29 @@ class HostApi:
                 "resident": True,
             }
 
+    def loading_quote_counts(self) -> dict:
+        """How many loading lines each plugin owns, plus the shared pool."""
+        root = Path(__file__).resolve().parent
+        try:
+            shared = json.loads((root / "ui" / "loading_quotes.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            shared = {}
+        shared_lines = shared.get("global", []) if isinstance(shared, dict) else []
+        counts = {}
+        games_dir = root / "games"
+        try:
+            names = sorted(path.name for path in games_dir.iterdir()
+                           if path.is_dir() and not path.name.startswith(("_", ".")))
+        except OSError:
+            names = []
+        for name in names:
+            try:
+                own = json.loads((games_dir / name / "loading_quotes.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                own = None
+            counts[name] = len(own) if isinstance(own, list) else 0
+        return {"global": len(shared_lines) if isinstance(shared_lines, list) else 0,
+                "plugins": counts}
     def loading_quote(self, plugin_id: str) -> dict:
         """Choose one editable game or down-weighted global line."""
         if plugin_id != "__home__" and plugin_id not in self._plugins:
@@ -738,7 +761,7 @@ class HostApi:
             "installation": self._installations.configure_directory(plugin_id, selected),
         }
 
-    def open_game_data_location(self, plugin_id: str, filename: str) -> dict:
+    def game_data_location(self, plugin_id: str, filename: str) -> dict:
         from game_data_location import find_original_location
         if plugin_id not in self._plugins:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
@@ -747,6 +770,10 @@ class HostApi:
         roots = []
         roots.append(Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Lexeditor" / "game-data" / plugin_id)
         target = find_original_location(filename, roots, Path(configured) if configured else None)
+        return {"path": str(target)}
+
+    def open_game_data_location(self, plugin_id: str, filename: str) -> dict:
+        target = Path(self.game_data_location(plugin_id, filename)["path"])
         subprocess.Popen(["explorer.exe", str(target)] if target.is_dir() else
                          ["explorer.exe", "/select,", str(target)])
         return {"path": str(target)}
@@ -827,7 +854,8 @@ class HostApi:
                           "tasks": tasks})
         return {"games": sorted(games, key=lambda row: row["name"].lower()),
                 "sharedUi": self._shared_ui_budget(),
-                "sharedCode": self._shared_code_budget()}
+                "sharedCode": self._shared_code_budget(),
+                "quotes": self.loading_quote_counts()}
 
     def _shared_code_budget(self) -> list[dict]:
         """Plugin Python that is a second copy of another plugin's function."""

@@ -177,3 +177,8 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
   <scratchpad>/patch.py`. Same for one-off checks longer than a single line.
 - A patch script asserts what it expects to find before replacing it, so a
   changed file fails loudly instead of silently matching nothing.
+
+## Actionable-to-waiting handoff on plugin PRs
+
+- Work every open actionable issue you can on the PR: verify the code, re-run executable checks, and record evidence plus human test plans (or blocked findings with proof) in the per-issue handoff. Close nothing without a delivered candidate; merge auto-flips closed issues to untested.
+- When agent work is done and only a specific Lexer action blocks the next step, flip the issue to waiting: append an unchecked checklist of the exact actions or answers needed from Lexer and swap the actionable label for waiting. Everything else keeps actionable.

@@ -98,7 +98,8 @@ def _gf_fields(base: int) -> list[dict]:
     return [
         _field("exp", "Experience", base + 12, 4),
         _field("available", "Available", base + 17, control="boolean"),
-        _field("current_hp", "Current HP", base + 18, 2),
+        _field("current_hp", "Initial HP value", base + 18, 2,
+               help_text="HP requested by the new-game data. The game caps this at the GF's maximum HP, calculated from its level and HP abilities. The original value of 9,999 fills its health; it does not give every GF 9,999 maximum HP. Set a lower value to start it with less health."),
         _field("kills", "Kills", base + 60, 2),
         _field("kos", "KOs", base + 62, 2),
         _field("learning_ability", "Learning ability", base + 64, maximum=127,

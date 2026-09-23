@@ -539,7 +539,15 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 
 }
 
+/* Navigation artwork has no selectable text node, including in transition
+   snapshots where the document's selection event guards do not run. */
+.lex-brand-button h1[data-lex-brand-label]:empty::before {
+  content:attr(data-lex-brand-label);
+}
+
 .lex-brand-slot {
+  display:flex;
+  align-items:center;
   box-sizing: border-box;
   min-width: 0;
   width: 100%;
@@ -936,8 +944,8 @@ details.lex-detail-section[open] > summary::before { content:"▾"; }
 .lex-detail-field-control.lex-has-readonly-lock { --lex-readonly-lock-inset:10px; }
 /* A nameless field gives its name lane to the control - unless the lane holds
    the field's help, which would otherwise vanish with it. */
-.lex-detail-field:has(> .lex-detail-field-label > .lex-detail-field-label-text:empty):not(:has(> .lex-detail-field-label > .lex-info-help)) { grid-template-columns:minmax(0,1fr); }
-.lex-detail-field-label:has(> .lex-detail-field-label-text:empty):not(:has(> .lex-info-help)) { display:none; }
+.lex-detail-field:has(> .lex-detail-field-label > .lex-detail-field-label-text:empty):not(:has(> .lex-detail-field-label .lex-info-help)) { grid-template-columns:minmax(0,1fr); }
+.lex-detail-field-label:has(> .lex-detail-field-label-text:empty):not(:has(.lex-info-help)) { display:none; }
 .lex-tile-grid > .lex-detail-field:has(.lex-toggle-row) { grid-column:1/-1; }
 .lex-detail-field-control > .lex-source-control:has(> .lex-toggle-row) { grid-template-columns:minmax(0,1fr); }
 .lex-detail-field-control > .lex-source-control:has(> .lex-toggle-row) > .lex-reference-values { grid-column:1; justify-self:end; }
@@ -1011,13 +1019,7 @@ details.lex-detail-section[open] > summary::before { content:"▾"; }
 }
 .lex-detail-field:not(:focus-within) .lex-field-type-range { display:block;opacity:0; }
 .lex-field-type-rail:hover { z-index:6; }
-/* Pointing at the rail enlarges the TYPE CODE, which is text. The help pip is
-   a fixed circle, and growing its glyph to the type code's hover size left the
-   question mark crowding the ring around it. */
-/* The type code does not grow when it is pointed at. Growing it moved the
-   text inside its own rail, which is what kept shaving a glyph against an edge
-   that had nothing on the other side of it. */
-.lex-field-type-rail:hover > span:not(.lex-info-help) { font-size:inherit; }
+
 .lex-detail-field:focus-within:has(.lex-field-type-range) .lex-field-type-name { left:25%; }
 .lex-detail-field:focus-within .lex-field-type-range { left:75%;opacity:1; }
 
@@ -1127,12 +1129,12 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
   width:100%;
   align-self:stretch;
   justify-content:center;
-  display:flex;
+  display:grid;
+  grid-auto-flow:column;
+  grid-auto-columns:minmax(0,1fr);
   flex:0 0 auto;
   min-width:0;
-  /* Buttons keep their content width. Where they no longer fit on one line the
-     bar wraps onto a second, the way the main nav does - scrolling hid whole
-     tabs behind an edge and cut the label of the one straddling it. */
+  /* Navigation always uses one row, regardless of label length. */
   flex-wrap:nowrap;
   overflow-x:visible;
   border-bottom:1px solid var(--lex-border);
@@ -1144,9 +1146,9 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
   user-select: none;
   -webkit-user-select: none;
 
-  /* Equal widths while they fit, never narrower than the label needs. */
+  /* Equal lanes can shrink without adding another row. */
   flex:1 1 0;
-  min-width:max-content;
+  min-width:0;
   box-sizing:border-box;
   height:min(31px, calc(var(--lex-command-row-height) * .6667));
   min-height:min(31px, calc(var(--lex-command-row-height) * .6667));
@@ -1176,6 +1178,9 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
  color:var(--lex-accent-text);background:var(--lex-accent);
 }
 .lex-subtab-button:focus-visible { position:relative;z-index:1;outline:2px solid var(--lex-highlight);outline-offset:-2px; }
+/* Keep authored help usable on a locked tab. Only the label is dimmed. */
+.lex-subtab-button[aria-disabled="true"] { cursor:not-allowed; }
+.lex-subtab-button[aria-disabled="true"] > .lex-tab-label { opacity:.4; }
 
 /* The drawing space now stretches to fill the plot, so every stroke inside
    it must opt out of that scaling or the lines would thin and thicken with
@@ -2209,7 +2214,7 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 }
 
 .lex-column-list .lex-column-cell-content { width:100%; }
-.lex-column-cell-content:not(:has(input,select,textarea)) { padding-block:.15em; box-sizing:border-box; }
+.lex-column-cell-content:not(:has(input,select,textarea,.lex-choice-field)) { padding-block:.15em; box-sizing:border-box; }
 .lex-column-list-cell:has(.lex-source-control) .lex-column-cell-content { width:100%; }
 /* An editable cell is the control, as in a spreadsheet: the box is the whole
    cell and its value sits where a read-only cell's text sits. The control
@@ -2239,11 +2244,33 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
    the vanilla one. */
 .lex-column-list .lex-source-control {
   position:relative;
-  display:block;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  align-items:stretch;
   width:100%;
   height:100%;
   --lex-reference-rail-width:0px;
 }
+.lex-column-list .lex-source-control > input[type="checkbox"] {
+  place-self:center;
+}
+/* Composite editors must fill the cell just like a direct input. */
+.lex-column-list .lex-source-control > :is(.lex-stack,.lex-choice-field) {
+  height:100%;
+  min-height:0;
+}
+.lex-column-list .lex-source-control > .lex-stack {
+  display:grid;
+  grid-auto-rows:minmax(0,1fr);
+  gap:0;
+}
+.lex-column-list .lex-source-control > .lex-stack > :is(input,select) {
+  height:100%;
+  min-height:0;
+  box-sizing:border-box;
+}
+.lex-column-list .lex-choice-field > :first-child { align-self:stretch; display:flex; align-items:center; }
+.lex-column-list .lex-choice-field > button:last-child { height:100%; }
 .lex-column-list .lex-source-control > :is(input:not([type="checkbox"]),select,textarea,.lex-unit-field,.lex-readonly-field) {
   box-sizing:border-box;
   width:100%;
@@ -2296,6 +2323,7 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 /* A pin on a pinnable label is a small mark in that label's top-right corner,
    the same size beside a heading's id as beside a property name. */
 .lex-pinnable-property:not(.lex-detail-field) { position:relative; padding-inline-end:20px; }
+.lex-detail-panel-id > .lex-pinnable-property { padding-inline-end:10px; }
 .lex-pinnable-property:not(.lex-detail-field) > .lex-column-pin {
   position:absolute;
   z-index:5;
@@ -2316,9 +2344,8 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 .lex-column-pin:focus-visible { color:var(--lex-muted);opacity:.75; }
 .lex-column-pin.pinned { color:var(--lex-accent);opacity:1; }
 
-.lex-column-pin.pinned:active { color:var(--lex-muted); }
-.lex-column-pin.pinned:active .lex-column-pin-on { display:none; }
-.lex-column-pin.pinned:active .lex-column-pin-off { display:block; }
+.lex-column-pin[data-pin-moving] { color:var(--lex-accent);opacity:1; }
+.lex-column-pin[data-pin-moving] > svg { animation:none;transition:none; }
 
 .lex-column-list-head-cell:last-child,
 .lex-column-list-cell:last-child {
@@ -2600,7 +2627,13 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
 
 .lex-page-sized-table .lex-column-list-row {
   min-height:0;
-  font-size:clamp(11px,calc((100vh - 245px) / var(--lex-page-font-row-count,var(--lex-page-row-count)) * .65),24px);
+  font-size:clamp(11px,calc((var(--lex-fitted-row-height, 32px) - 5px) / 1.75),24px);
+}
+
+/* The fitted row includes cell padding. Reserve it before sizing the text;
+   window height alone says nothing about the space this table receives. */
+.lex-page-sized-table .lex-column-list-cell {
+  padding-block:2px;
 }
 
 .lex-pager-controls {
@@ -2630,7 +2663,7 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
 
 .lex-page-row-override input {
   box-sizing:border-box;
-  width:4.5em;
+  width:calc(2ch + 14px);
   min-height:32px;
   padding:4px 6px;
   color:var(--lex-text);
@@ -2640,8 +2673,29 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
   background:var(--lex-panel-2);
   box-shadow:none;
   font:inherit;
+  font-size:24px;
+  line-height:1.2;
   text-align:center;
   text-shadow:none;
+  appearance:textfield;
+  transition:width 160ms ease;
+}
+
+.lex-page-row-override input:focus {
+  width:calc(2ch + 32px);
+  appearance:auto;
+}
+
+.lex-page-row-override input:not(:focus)::-webkit-inner-spin-button,
+.lex-page-row-override input:not(:focus)::-webkit-outer-spin-button {
+  -webkit-appearance:none;
+  margin:0;
+}
+
+.lex-page-row-override input:focus::-webkit-inner-spin-button { opacity:1; }
+
+@media (prefers-reduced-motion:reduce) {
+  .lex-page-row-override input { transition:none; }
 }
 
 .lex-page-row-override.inherited,
@@ -2674,7 +2728,8 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
   accent-color:var(--lex-accent);
 }
 
-.lex-pager-right .lex-new-button.lex-pager-add {
+.lex-pager-left .lex-new-button {
+  flex:0 0 auto;
   min-height:32px;
 }
 
@@ -2701,6 +2756,7 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
   max-width: 100%;
   color: var(--lex-text);
   font-weight: 700;
+  font-size:1.35em;
   white-space: nowrap;
   padding-inline:2px;
 }
@@ -2835,8 +2891,10 @@ select optgroup {
 .lex-source-control-internal:has(> select) > :is(.lex-reference-values,.lex-reference-placeholder) {
   right:1.65em;
 }
-.lex-source-control-internal:has(> select):not(.no-reference) > select {
-  padding-right:calc(var(--lex-internal-reference-width) + 2.1em);
+.lex-source-control-internal > select {
+  /* Native selects already reserve space for their arrow. Adding another
+     arrow-width here clips text before the visible arrow is reached. */
+  padding-right:calc(var(--lex-internal-reference-width) + 6px);
 }
 .lex-source-control-internal > .lex-source-strip.lex-reference-values { align-items:flex-end; }
 
@@ -3187,7 +3245,8 @@ body:has(.lex-data-map-table) #main {
                       margin:0; min-width:0; border:1px solid var(--lex-border); background:var(--lex-panel); }
   .settings-section h2 { margin:0; padding:10px 14px; border-bottom:2px solid var(--lex-accent); background:#18140f;
                          font:400 20px/1 var(--lex-heading-font); color:var(--lex-highlight); letter-spacing:.04em; }
-  .settings-subs { display:grid; grid-template-columns:repeat(auto-fit,minmax(232px,1fr)); }
+  .settings-subs { display:flex; flex-direction:column; gap:0; }
+  .settings-subs > .settings-sub { margin:0; }
   .settings-sub { min-width:0; border-right:1px solid var(--lex-border); border-bottom:1px solid var(--lex-border); }
   .settings-sub h3 { margin:0; padding:6px 12px; background:var(--lex-panel-2); border-bottom:1px solid var(--lex-border);
                      font:600 11px Consolas,monospace; letter-spacing:.09em; text-transform:uppercase; color:var(--lex-highlight);
@@ -3270,6 +3329,9 @@ body:has(.lex-data-map-table) #main {
 }
 
 .lex-global-setting {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
   min-width:0;
   margin-top: 0;
   padding: 10px;
@@ -3288,6 +3350,7 @@ body:has(.lex-data-map-table) #main {
 }
 
 .lex-setting-control-pair {
+  margin-top:auto;
   display:grid;
   grid-template-columns:minmax(0,1fr) minmax(0,1fr);
   gap:6px;
@@ -3341,7 +3404,7 @@ body:has(.lex-data-map-table) #main {
   text-shadow:none;
 }
 
-.lex-global-setting .lex-setting-control-pair > :is(select,input,.lex-unit-field),
+.lex-global-setting .lex-setting-control-pair > :is(select,input:not([type="checkbox"]),.lex-unit-field),
 .lex-global-setting .lex-setting-control-pair .lex-unit-field > :is(input,select),
 .lex-global-setting .lex-setting-control-pair :is(select,input[type="number"]) {
   box-sizing:border-box;
@@ -3349,6 +3412,26 @@ body:has(.lex-data-map-table) #main {
   min-width:0;
 }
 
+.lex-global-setting .lex-setting-default-control { display:grid; }
+.lex-global-setting :is(input:not([type="checkbox"]),select) {
+  width:100%;min-width:0;height:36px;min-height:36px;box-sizing:border-box;font-size:1em;font-weight:400;
+}
+
+.lex-global-settings.lex-settings-wide { width:calc(100vw - 24px); }
+.lex-global-settings.lex-settings-wide .lex-settings-lane {
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));
+}
+.lex-global-settings.lex-settings-must-scroll > .lex-dialog-actions {
+  position:sticky;
+  bottom:0;
+  z-index:2;
+  background:var(--lex-panel);
+}
+.lex-global-setting input[type="checkbox"] {
+  width:1.2em;min-width:1.2em;height:1.2em;min-height:1.2em;justify-self:start;align-self:end;
+}
+.lex-library-setting { grid-column:1 / -1; }
+.lex-library-setting > output { width:100%;min-height:36px;padding:6px 8px;overflow-wrap:anywhere; }
 .lex-setting-dependency-arrows {
   position:absolute;
   inset:0;
@@ -3561,12 +3644,19 @@ body:has(.lex-data-map-table) #main {
   margin:var(--lex-toolbar-margin, var(--lex-panel-gap) var(--lex-panel-gap) 0);
 }
 .lex-toolbar { position:relative; flex-wrap:wrap; margin:0; padding:var(--lex-toolbar-padding, 0); border:var(--lex-toolbar-border, 0); background:var(--lex-toolbar-bg, transparent); box-shadow:var(--lex-toolbar-shadow, none); }
-.lex-toolbar:has(> .lex-subtab-bar-images) { display:grid; grid-template-columns:auto minmax(0,1fr) auto; width:100%; height:64px; }
+.lex-toolbar:has(> .lex-subtab-bar-images) { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,3fr) minmax(0,1fr); width:100%; height:80px; box-sizing:border-box; padding:5px 12px; border:var(--lex-surface-border, 1px solid var(--lex-border)); border-color:var(--lex-surface-border-color, var(--lex-border)); background:var(--lex-surface-bg, var(--lex-panel)); background-position:var(--lex-surface-background-position, 0 0); background-size:var(--lex-surface-background-size, auto); box-shadow:var(--lex-surface-shadow, none); }
 .lex-toolbar > .lex-subtab-bar-images { height:100%; min-height:0; }
 .lex-toolbar > .lex-subtab-bar-images > button { height:100%; min-height:0; }
-.lex-toolbar > .lex-subtab-bar-images img { height:100%; max-height:58px; object-fit:contain; }
+.lex-toolbar > .lex-subtab-bar-images img { height:100%; max-height:none; object-fit:contain; }
 .lex-toolbar > label { font-weight:700; }
 .lex-toolbar > select { min-width:0; max-width:min(720px,100%); }
+/* Icon-button toolbars (token pickers and the like): fixed-geometry image
+   buttons and colour chips, sized by tokens so games set values, not rules. */
+.lex-toolbar-icons button { display:inline-flex; align-items:center; justify-content:center; min-width:var(--lex-toolbar-icon-min-width,26px); min-height:var(--lex-toolbar-icon-min-height,28px); padding:3px; }
+.lex-toolbar-icons img { width:var(--lex-toolbar-icon-width,22px); height:var(--lex-toolbar-icon-height,28px); object-fit:contain; }
+.lex-toolbar-icons select { width:auto; max-width:100%; min-width:0; }
+.lex-toolbar-chip { display:block; width:var(--lex-toolbar-chip-size,18px); height:var(--lex-toolbar-chip-size,18px); border:1px solid #222; background:var(--lex-toolbar-chip-bg,transparent); }
+.lex-toolbar-chip-blink { background:linear-gradient(90deg,var(--lex-toolbar-chip-bg,transparent) 50%,#555 50%); }
 /* Important, so a game's own toolbar class cannot show an empty bar. */
 #toolbar:empty {
   display:none;
@@ -3639,8 +3729,9 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-axis-name { position:absolute; color:var(--lex-muted); font:10px/1 var(--lex-font); pointer-events:none; }
 .lex-curve-axis-name-x { bottom:3px; left:50%; transform:translateX(-50%); }
 .lex-curve-axis-name-y { top:50%; left:2px; writing-mode:vertical-rl; transform:translateY(-50%) rotate(180deg); }
-.lex-curve-variables { position:absolute; z-index:6; left:0; right:0; bottom:0; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:4px 8px; padding:6px; color:var(--lex-text); background:var(--lex-input-bg,var(--lex-panel)); border:1px solid var(--lex-border); opacity:0; pointer-events:none; transform:translateY(100%); transition:opacity .15s,transform .15s; }
+.lex-curve-variables { position:absolute; z-index:6; left:0; right:0; bottom:0; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:4px 8px; padding:6px; color:var(--lex-text); background:color-mix(in srgb,var(--lex-panel) 90%,var(--lex-text) 10%); border:1px solid var(--lex-border); border-color:color-mix(in srgb,var(--lex-border) 65%,var(--lex-text) 35%); box-shadow:0 -4px 12px rgb(0 0 0 / 28%),inset 0 1px rgb(255 255 255 / 18%); opacity:0; pointer-events:none; transform:translateY(100%); transition:opacity .15s,transform .15s; }
 .lex-curve-editor:is(:hover,:focus-within) > .lex-curve-variables { opacity:1; pointer-events:auto; transform:none; }
+
 .lex-curve-variable { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:4px; min-width:0; }
 .lex-curve-variable :is(input,select) { width:100%; min-width:0; }
 .lex-curve-variable-a { color:#f05b5b; fill:#f05b5b; }
@@ -3661,7 +3752,7 @@ body:has(.lex-data-map-table) #main {
 
 /* Image tabs use the same selection and keyboard controls as text tabs. */
 .lex-subtab-bar-images { display:flex; justify-content:center; flex-wrap:nowrap; align-items:stretch; gap:2px; flex:1; margin:0; }
-.lex-subtab-bar-images > .lex-subtab-button { flex:1 1 0; width:auto; min-width:0; padding:0; height:100%; aspect-ratio:auto; border:0; }
+.lex-subtab-bar-images > .lex-subtab-button { position:relative;flex:0 1 calc(64px * 2 / 3); width:auto; min-width:0; padding:0; height:100%; aspect-ratio:2/3; border:0; }
 .lex-subtab-bar-images .lex-tab-label { display:contents; }
 .lex-subtab-bar-images .lex-tab-label-text { display:contents; }
 .lex-subtab-bar-images img { display:block; width:100%; height:100%; object-fit:cover; image-rendering:pixelated; }
@@ -3692,10 +3783,9 @@ body:has(.lex-data-map-table) #main {
 .lex-column-list-cell:has(.lex-inline-label > select) :is(.lex-column-cell-content,.lex-source-control,.lex-inline-label,select) { height:100%; }
 .lex-inline-label > span { min-width:0; padding:.2em .12em; overflow:hidden; text-overflow:ellipsis; }
 .lex-detail-panel-title .lex-inline-label > span { padding-inline:.12em; }
-.lex-table-fill .lex-column-list-cell:has(.lex-inline-label > img) { container-type:size; }
-.lex-table-fill .lex-inline-label > img { height:100cqh; width:auto; max-width:4em; }
 .lex-quantity-choice { display:grid; grid-template-columns:minmax(0,1fr) auto calc(3ch + 8px); align-items:center; gap:3px; min-width:0; width:100%; }
 .lex-quantity-choice > * { min-width:0; }
+.lex-recipe-row { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:8px; min-width:0; }
 .lex-quantity-choice .lex-choice-field { gap:2px; }
 .lex-quantity-choice .lex-choice-field > button:last-child { width:1.2em; min-width:1.2em; }
 .lex-quantity-choice > .lex-source-control:last-child input { text-align:left; padding-inline:3px; }
@@ -4078,7 +4168,7 @@ body:has(.lex-data-map-table) #main {
 .lex-unit-field:has(> .lex-value-fill) { position:relative; }
 .lex-value-fill {
   position:absolute;
-  z-index:0;
+  z-index:auto;
   left:1px;
   right:1px;
   bottom:1px;
@@ -4090,11 +4180,8 @@ body:has(.lex-data-map-table) #main {
   transition:height .12s ease,bottom .12s ease;
 }
 
-/* The input is a later sibling, so it paints over the handle and swallowed
-   every press: the slider could be clicked but never dragged. While the
-   slider is actually offered, the fill rises above the input. It stays
-   pointer-events:none and translucent, so only the handle becomes grabbable
-   and the value underneath stays readable. */
+/* Keep the fill below the value. It must not create a stacking context:
+   only its handle rises above the input to receive drag events. */
 /* The fill is prepended to the source control, which is a grid whose second
    column is the reference rail. Spanning the whole grid let the slider run
    well past the right edge of the number box it belongs to - the handle
@@ -4210,17 +4297,13 @@ body:has(.lex-data-map-table) #main {
 
 /* A pin slides down-left into the page when stuck, and back out when pulled. */
 
-.lex-column-pin:not(.pinned) > svg { translate: 3px -3px; }
+.lex-column-pin:not(.pinned) > svg { translate: 6px -6px; }
 .lex-column-pin.pinned > svg { translate: 0 0; }
 
 /* Pointing at the type rail turns it into the same help popup every other
    marker uses, instead of being a separate silent affordance. */
 .lex-detail-field:hover > .lex-field-type-rail > .lex-field-type-name { opacity:1; }
-/* The help badge occupies the same slot as the type name. Dimming the name
-   left the two drawn on top of each other; the rail swaps instead, exactly
-   as the toggle rail already does. */
-.lex-field-type-rail:hover:has(> .lex-info-help) > .lex-field-type-name,
-.lex-field-type-rail:hover:has(> .lex-info-help) > .lex-field-type-range { opacity:0; }
+
 /* Hovering only hints at the range. Once the field has focus the range is
    the thing being read, so it must not stay dimmed under the cursor. */
 /* The help marker is a round badge, so it must stay square. Stretching it to
@@ -4259,15 +4342,12 @@ body:has(.lex-data-map-table) #main {
    only grabbable strip was the part sticking out, and the input painted over
    the handle everywhere else. */
 .lex-detail-field:hover .lex-value-fill {
-  z-index:3;
  height: calc(100% - 2px); bottom: 1px;
 }
 .lex-detail-field:focus-within .lex-value-fill {
-  z-index:3;
  height: calc(100% - 2px); bottom: 1px;
 }
 .lex-value-dragging .lex-value-fill {
-  z-index:3;
  height: calc(100% - 2px); bottom: 1px;
 }
 .lex-value-handle {
@@ -4332,24 +4412,9 @@ body:has(.lex-data-map-table) #main {
 /* The rail and its help marker cross-fade instead of swapping instantly. */
 .lex-field-type-rail > .lex-field-type-name,
 .lex-field-type-rail > .lex-field-type-range { transition: left .16s ease, opacity .16s ease, font-size .12s ease; }
-/* The transition belongs on the HOVER state, not the base rule. On the base
-   rule it also governed the way OUT, so the badge was still fading while the
-   type name - hidden with display:none, which is instant - had already come
-   back, and both were briefly readable at once. Fading in only means they
-   can never coexist in either direction. */
 
-.lex-detail-field:hover > .lex-field-type-rail > .lex-info-help {
-  transition: opacity .16s ease .04s;
-}
-/* Pointing at the type text replaces that text with its help mark. Keep this
-   final rule after the focus/range rules so a focused input cannot draw the
-   range through the question mark. */
-.lex-field-type-rail:hover:has(> .lex-info-help) > :is(.lex-field-type-name,.lex-field-type-range) {
-  opacity:0;
-}
-.lex-field-type-rail:hover > .lex-info-help {
-  opacity:1;
-}
+
+
 
 /* ---- Loading screen handover ---------------------------------------- */
 /* The root paints the screen from the first frame; framework.js then appends
@@ -4429,17 +4494,7 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
   opacity:1;
 }
 
-/* Only a rail that HAS a help mark may blank its type: on a property without
-   one this hid the type code and put nothing in its place, so pointing at the
-   rail of a plain property emptied it. Tabbing to the mark reveals it the same
-   way pointing at the rail does; clicking it does not, because a click that
-   leaves focus behind would hold the swap open after the pointer had left. */
-.lex-field-type-rail:is(:hover,:has(:focus-visible)):has(> .lex-info-help) > .lex-field-type-name, .lex-field-type-rail:is(:hover,:has(:focus-visible)):has(> .lex-info-help) > .lex-field-type-range {
-  opacity:0;
-}
-.lex-field-type-rail:is(:hover,:has(:focus-visible)) > .lex-info-help {
-  opacity:1;
-}
+
 /* A sorted field uses the same centre point as its type/help marker. */
 
 .lex-detail-field[data-lex-sort="desc"] .lex-field-type-rail::after { content:"\25BC"; }
@@ -4510,6 +4565,10 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
   visibility:visible;
   opacity:1;
 }
+.lex-subtab-button > .lex-tab-shortcut {
+  width:calc(var(--lex-tab-badge-size,24px) * 1.6);
+  border-radius:6px;
+}
 nav button.active:hover .lex-tab-shortcut,
 nav button.active:focus-visible .lex-tab-shortcut,
 .lex-subtab-button.active:hover .lex-tab-shortcut,
@@ -4531,15 +4590,8 @@ nav button.active:focus-visible .lex-tab-shortcut,
      inside a short command row. */
   --lex-tab-badge-size:min(1.6em,calc(min(46px,var(--lex-command-row-height)) - 12px));
   --lex-tab-badge-gap:.4em;
-  /* Reserved on BOTH sides. Two things have to be true at once: the label is
-     centred in its button, and the badge never covers it. Reserving only the
-     badge's own side satisfies the second and breaks the first, because the
-     label then centres inside an off-centre content box. The symmetric
-     reservation is the only arrangement that holds both.
-     It is because this is what keeps the badge off the label, and a
-     plugin's blanket nav-button padding must not quietly remove it - FF8 set
-     six pixels on both sides and the badge sat on top of "Abilities". */
-  padding-inline:var(--lex-tab-label-padding,calc(var(--lex-tab-badge-size) + var(--lex-tab-badge-gap) * 2));
+  /* Ctrl prompts overlay the tabs without reserving label space. */
+  padding-inline:4px;
 }
 .lex-shell-header nav button[data-tab] > .lex-tab-label,
 .lex-subtab-button > .lex-tab-label {
@@ -4556,7 +4608,7 @@ nav button.active:focus-visible .lex-tab-shortcut,
   /* Bold game fonts can paint outside their advance box. Keep that ink and
      its shadow inside the clip area; retain ellipsis for narrow tabs. */
   box-sizing:border-box;
-  padding:.12em .2em;
+  padding:.12em max(3px,.2em);
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
@@ -4609,13 +4661,9 @@ nav button.active:focus-visible .lex-tab-shortcut,
 .lex-data-map-view .lex-data-map-table .lex-column-list-cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-items:center}
 .lex-data-map-detail{min-width:0;overflow:auto;overflow-wrap:anywhere}
 .lex-data-map-detail .lex-data-map-notes{white-space:pre-wrap}
+.lex-data-map-path { min-width:0; overflow-wrap:anywhere; white-space:normal; }
+.lex-data-map-detail .lex-detail-panel-id .lex-integration-status { width:36px; height:36px; }
 .lex-data-map-actions{display:flex;flex-wrap:wrap;gap:8px}
-.lex-data-map-actions > .lex-data-map-location {
-  display:inline-flex;align-items:center;justify-content:center;gap:.4em;
-  flex:0 0 auto;width:auto;height:auto;min-height:1.6em;
-  white-space:nowrap;padding:.2em .5em;
-}
-.lex-data-map-actions > .lex-data-map-location svg { width:1em;height:1em;flex:0 0 1em; }
 
 body:has(.lex-data-map-view){display:flex;flex-direction:column;height:100vh;min-height:0;overflow:hidden}
 body:has(.lex-data-map-view)>#lexeditor-shell,body:has(.lex-data-map-view)>#toolbar{flex:0 0 auto}
@@ -4636,12 +4684,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   line-height:1;
   transform:none;
 }
-.lex-field-type-rail .lex-info-help {
-  position:absolute;
-  left:50%;
-  top:50%;
-  transform:translate(-50%,-50%);
-}
+
 
 .lex-reference-tag.lex-reference-ll {
   color:#72ff1e;
@@ -5405,29 +5448,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   font-weight: 700;
   line-height: 1;
 }
-.lex-field-type-rail > .lex-info-help {
-  position: absolute;
-  display: grid;
-  box-sizing: border-box;
-  place-items: center;
-  opacity: 0;
-  transition: none;
-  top:50%;
-  left:50%;
-  width:18px;
-  min-width:18px;
-  height:18px;
-  min-height:18px;
-  margin:0;
-  padding:0;
-  transform:translate(-50%,-50%);
-  pointer-events:auto;
-  cursor:pointer;
-  font-family: var(--lex-symbol-font);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-}
+
 .lex-column-heading > .lex-info-help {
   flex:0 0 auto;
   margin-left:0;
@@ -5534,30 +5555,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 }
 
-/* Tabs sit in equal lanes, as many to a row as fit at full size; see
-   balanceTabRows. */
-.lex-shell-header nav[data-lex-tab-rows],
-.lex-subtab-bar[data-lex-tab-rows] {
-  display:grid;
-  grid-template-columns:repeat(var(--lex-tab-columns, 1), minmax(0, 1fr));
-}
-.lex-shell-header nav[data-lex-tab-rows] > *,
-.lex-subtab-bar[data-lex-tab-rows] > * {
-  width:auto;
-  grid-column:span var(--lex-tab-span, 1);
-  min-width:0;
-  max-width:none;
-}
-
-/* A bar that wrapped is a bar asking for less padding before it asks for a
-   second row. The measuring pass runs again after this lands, so a bar that
-   now fits on one line drops the attribute and its tabs go back to full size. */
-.lex-shell-header nav[data-lex-tab-tight] > button,
-.lex-subtab-bar[data-lex-tab-tight] > .lex-subtab-button {
-  --lex-tab-label-padding:4px;
-  padding-inline:6px;
-  letter-spacing:0;
-}
 /* Shortcut badges are overlays. Hover never changes the label lane. */
 
 /* A boolean reads across the row like every other property: its name in the
@@ -5701,7 +5698,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 /* A pin is a small marker, not a metronome. Half the swing, twice as slow, and
    it settles instead of running forever. */
-.lex-column-pin:hover > svg {
+.lex-column-pin:not([data-pin-moving]):hover > svg {
    animation:lex-pin-wiggle .5s ease-in-out infinite;
  transform-origin:14% 86%;
  animation-duration:1.1s;
@@ -5911,7 +5908,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    display:inline-grid; place-items:center; margin:0; line-height:1;
  overflow:visible;
 }
-.lex-shell-header button:is(:active,.lex-command-pressed) {
+.lex-shell-header button:not(.lex-brand-button):is(:active,.lex-command-pressed) {
   background:var(--lex-accent);
   color:var(--lex-accent-text);
 }
@@ -6149,6 +6146,8 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   align-items:stretch;
   display:flex;
 }
+/* Pagination avoids scrolling when cards fit. A failed fit must still leave
+   every setting reachable; clipping is not a substitute for fitting. */
 .lex-tweaks-scroll { flex:1 1 0; min-height:0; overflow:auto; overscroll-behavior:contain; }
 .lex-tweaks-pages { flex:0 0 auto; min-width:0; }
 /* Dealt columns, not a grid: a grid row takes the height of its tallest
@@ -6420,6 +6419,20 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
    min-width:0;min-height:0;flex:1 1 auto;overflow:auto;
  padding: 12px;
 }
+.lex-tabbed-panel-content:has(> .lex-column-list:not([hidden])) {
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  padding:0;
+}
+.lex-tabbed-panel-content > .lex-column-list:not([hidden]) {
+  flex:1 1 0;
+  min-height:0;
+  width:100%;
+  margin:0;
+  border:0;
+  box-shadow:none;
+}
 .lex-boolean-mark {
    font:800 1.08em/1 "Lexend", "Segoe UI Symbol", sans-serif;
  display: block; font-size: 1.45em; text-align: center;
@@ -6571,7 +6584,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   border-bottom: var(--lex-detail-heading-border, 1px solid var(--lex-border));
   background: var(--lex-detail-heading-bg, color-mix(in srgb, var(--lex-panel-2) 55%, var(--lex-panel)));
 
- padding: var(--lex-detail-heading-padding, 4px 18px 4px 4px);
+ padding: var(--lex-detail-heading-padding, 4px);
 }
 .lex-detail-panel-icon {
 
@@ -6649,8 +6662,33 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   font: inherit;
   text-align: left;
   max-width: 100%;
+  box-sizing:border-box;
+  position:relative;
+  isolation:isolate;
 
  color: var(--lex-brand-fg, inherit);
+}
+.lex-brand-button::before {
+  content:"";
+  position:absolute;
+  inset:-4px -8px;
+  z-index:-1;
+  pointer-events:none;
+  border:1px solid transparent;
+  border-radius:var(--lex-radius);
+}
+.lex-brand-button:hover::before {
+  background:color-mix(in srgb,var(--lex-text) 8%,transparent);
+  border-color:var(--lex-border);
+}
+.lex-brand-button:is(:active,.lex-command-pressed)::before {
+  background:color-mix(in srgb,var(--lex-text) 16%,transparent);
+  border-color:var(--lex-border);
+  box-shadow:inset 0 2px 3px rgb(0 0 0 / 25%);
+}
+.lex-brand-button:focus-visible {
+  outline:2px solid var(--lex-highlight);
+  outline-offset:2px;
 }
 .lex-detail-field {
 
@@ -6873,7 +6911,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   position: relative;
   display: grid;
   box-sizing: border-box;
-  grid-template-columns: clamp(190px, 10vw, 210px) minmax(0, 1fr) auto auto auto;
+  grid-template-columns: max-content minmax(0, 1fr) auto auto auto;
   height: var(--lex-command-row-height);
   min-height: var(--lex-command-row-height);
   /* The row has to honour the height the setting asks for, so its contents
@@ -6893,7 +6931,9 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 }
 .lex-shell-header nav {
 
-  display: flex;
+  display: grid;
+  grid-auto-flow:column;
+  grid-auto-columns:minmax(0,1fr);
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -6927,6 +6967,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   letter-spacing:.03em;
   text-transform:uppercase;
   flex: 1 1 0;
+  min-width:0;
   margin: 0;
   padding: 8px 14px;
   white-space: nowrap;
@@ -6939,7 +6980,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
     border-radius .14s ease;
 
   min-height: var(--lex-tab-min-height, 0);
-  padding-inline: var(--lex-tab-padding-inline, 10px);
+  padding-inline: var(--lex-tab-padding-inline, 6px);
   font-size: var(--lex-tab-font-size, inherit);
   color: var(--lex-tab-fg, inherit);
   text-shadow: var(--lex-tab-text-shadow, none);
@@ -7229,8 +7270,15 @@ body { text-shadow: var(--lex-text-shadow, none); }
   box-shadow: var(--lex-subtab-active-shadow, none);
 }
 
+.lex-subtab-bar.lex-subtab-bar-images { gap:2px; }
 .lex-subtab-bar-images > .lex-subtab-button { background:transparent; border:0; box-shadow:none; padding:0; }
-.lex-subtab-bar-images > .lex-subtab-button.active { background:transparent; box-shadow:inset 0 -2px var(--lex-highlight); }
+.lex-subtab-bar-images > .lex-subtab-button.active { background:transparent; box-shadow:none; }
+.lex-subtab-bar-images > .lex-subtab-button.active::before {
+  content:var(--lex-tab-marker-content,none);position:absolute;z-index:3;
+  right:calc(100% + 6px);top:50%;transform:translateY(-50%);
+  width:var(--lex-tab-marker-width,24px);height:var(--lex-tab-marker-height,18px);
+  background:var(--lex-tab-marker-image,none) center/contain no-repeat;pointer-events:none;
+}
 .lex-subtab-bar-images .lex-tab-label, .lex-subtab-bar-images .lex-tab-label-text { display:block; height:100%; padding:0; translate:none; line-height:1; }
 .lex-subtab-bar-images img { width:100%; height:100%; object-fit:contain; }
 /* A section title can sit on its section's top edge, as a menu label does. */
@@ -7282,4 +7330,22 @@ body { text-shadow: var(--lex-text-shadow, none); }
    showed while hidden. An important declaration in a layer beats all
    unlayered rules, which is exactly the guarantee this needs. */
 [hidden] { display:none !important; }
+}
+
+/* Help follows the property name; the left type rail stays metadata. */
+.lex-detail-field-label:has(> .lex-field-help) > .lex-detail-field-label-text { min-width:min-content; }
+.lex-field-help {
+  position:relative;
+  flex:0 0 22px;
+  display:grid;
+  place-items:center;
+  width:22px;
+  z-index:5;
+}
+.lex-field-help > .lex-info-help {
+  position:static;
+  margin:0;
+  transform:none;
+  opacity:1;
+  visibility:visible;
 }

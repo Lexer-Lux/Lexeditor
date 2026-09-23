@@ -37,6 +37,11 @@ def main():
                     page.evaluate('''i=>document.querySelectorAll('nav button').forEach((b,n)=>b.classList.toggle('active',n===i))''', i)
                     errors = page.evaluate('''() => {
                       const errors=[],c=document.createElement('canvas').getContext('2d');
+                      for(const bar of document.querySelectorAll('nav,.lex-subtab-bar')) {
+                        if(new Set([...bar.children].map(b=>b.offsetTop)).size!==1) errors.push('tabs wrapped');
+                        const edge=bar.getBoundingClientRect().right;
+                        if([...bar.children].some(b=>b.getBoundingClientRect().right>edge+1)) errors.push('tab outside bar');
+                      }
                       for(const e of document.querySelectorAll('.lex-tab-label-text')) {
                         const s=getComputedStyle(e);c.font=`${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
                         const m=c.measureText(e.textContent);

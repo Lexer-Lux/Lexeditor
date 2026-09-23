@@ -29,3 +29,18 @@ The executable test now covers original-prop cleanup, replacement with the same 
 Correction to the earlier readback wording: INVENTORY_ITEM_COUNT wraps native 0xE787F05DFC977BDE, documented as returning int but with no documented negative-on-failure contract. Negative-value scenarios test defensive handling only; they do not prove the native signals read failure that way. Actual success still requires observed count growth. No game or experiment files were changed.
 
 Root integrated and built this source with the independent Recon radii. Development build passed, ASI SHA-256 `8AE9385498F96437AFB504381F6B8E34491E3A740D8993C539D89C21B3D7BB2E`. The small candidate is held under `out/rdr2-after-duration`; it is not installed because #151 remains active. No game acceptance is claimed.
+
+## 2026-09-22 misc-fixes evidence
+
+Re-ran `tools/verify_rdr2_casing_acquisition.py` on current tree: PASS
+production; four mutations rejected (trust-native-flag, forget-owner,
+false-success, lost-cleanup). Hold E prompt (`INPUT_LOOT` hold,
+`SHORT_TIMED_EVENT`, label "Collect Casing") confirmed in
+`items_casings.cpp` `ensureCasingPrompt`. No code change.
+
+Human test, needs built ASI on a game machine after #151 restores its runtime:
+1. Hold E on fired brass: ground-pickup animation plays, acquisition card
+   shows, brass count grows by exactly the pickup, never live rounds.
+2. Failed grant (full satchel): prop stays, no success card or sound.
+Report animation, card text, and before/after counts. Longarm-held reach
+animation proof stays open. Issue stays `actionable`.

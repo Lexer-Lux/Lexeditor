@@ -15,3 +15,14 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
 
 - [Original Lexer-Lux/Lexers-Mod-For-RDR2 #153 worklog](github-245/imports/Lexer-Lux--Lexers-Mod-For-RDR2/4fe6c76d17cc9c526cbb208e7d28f26e6395ca60/github-153.md) — verified transferred issue identity; historical evidence, not a replacement for newer central progress.
+
+## 2026-09-22 misc-fixes triage
+
+High-priority RDR2 slice (253, 245, 185, 184, 139, 130, 123, 119, 111, 104)
+triaged: only safe repo-only edit is this stale-comment rewrite in
+`games/rdr2/native_runtime/GameplayTweaks/modules/collectibles_map.cpp`
+(`categoryIcon` prescribed separate `lex_blips.ytd`, but `ensureLexBlipTextures`
+ships art in resident `INVENTORY_ITEMS_MP`). Comment now points at the current
+approach; no code changed. `tests/test_rdr2_native_source.py`: 5 passed.
+Runtime corpse-X visibility still needs a game machine and human in-game check;
+issue stays `actionable`.

@@ -92,7 +92,7 @@ function renderItems() {
     (!q || it.key.toUpperCase().includes(q) || localizedValue(it.nameKey).toUpperCase().includes(q) || localizedValue(it.descriptionKey||state.descriptionKeyEdits[it.key]||"").toUpperCase().includes(q)) &&
     (!f.category || it.category === f.category) &&
     (!f.group || it.group === f.group) &&
-    (f.itemSource==="all" || f.itemSource==="model"&&!!it.model || f.itemSource==="no-name"&&!localizedValue(it.nameKey) || it.sourceSummary?.status===f.itemSource));
+    (f.itemSource==="all" || f.itemSource==="model"&&!!it.model || f.itemSource==="no-name"&&!localizedValue(it.nameKey).trim() || it.sourceSummary?.status===f.itemSource));
   rows=sortedRows("items",rows,{name:it=>localizedValue(it.nameKey)||it.key,description:it=>localizedValue(it.descriptionKey||state.descriptionKeyEdits[it.key]||""),buy:it=>cashOf(it,"buy")??Infinity,buyqty:effectivePurchaseYieldOf,sell:it=>cashOf(it,"sell")??Infinity,carry:defaultCarryCap,recipe:it=>craftView(it).length,recipes:it=>recipesUsing(it.key).length,effects:it=>(state.itemEffectEdits[it.key]??it.effects).length,tags:it=>itemTagsOf(it).length});
   // The shared preset owns the page slice, selected-row fallback, master,
   // detail, fitted capacity, and fixed bottom pager.
@@ -627,7 +627,7 @@ function itemDetailPane(it, cells){
     value=>{input.value=value;input.dispatchEvent(new Event("change"));},String);
   const body=LexeditorUI.stack({fill:false});
   input.setAttribute("aria-label","Item name");
-  input.placeholder=it.key;
+  input.placeholder="No localized name";
   const pane=LexeditorUI.detailPanel({titleControl:name,
     meta:it.key,icon:identityIcon||null,body});
   body.append(LexeditorUI.controlGroup([

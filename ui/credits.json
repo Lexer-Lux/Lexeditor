@@ -264,6 +264,11 @@
           "url": "https://github.com/HobbitDur/FF8UltimateEditor"
         },
         {
+          "name": "HobbitDur and the FF8 modding wiki contributors",
+          "role": "wmset Section 34 reference: the sub-ID location discriminator, the five record-range blocks, and how the game resolves a standing position to a draw-point record.",
+          "url": "https://github.com/hobbitdur/ff8moddingwiki/blob/HEAD/FF8/TechnicalReference/WorldMap/WorldMap_wmsetxx.md"
+        },
+        {
           "name": "Julian Xhokaxhiu (TrueOdin), Tang-Tang Zhou (vertex2995), Jérôme Arzel (myst6re), CosmosXIII and FFNx contributors",
           "role": "FFNx runtime, game hooks and reverse-engineering references, including the embedded Triple Triad card and icon TIM locations.",
           "url": "https://github.com/julianxhokaxhiu/FFNx"

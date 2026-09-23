@@ -51,7 +51,10 @@ def install() -> None:
         books = {book["gfId"]: book for book in document["books"]}
         for row in result.get("rows", []):
             row["spellbook"] = books.get(int(row["id"]))
+        settings = gameplay_settings.load()
         result["spellbook"] = {
+            "enabled": settings.get("gfSpellbooksEnabled", False),
+            "runtimeActive": bool(settings.get("gfSpellbooksEnabled")) and bool(settings.get("singleGf")) and not bool(settings.get("sharedMagicInventory")),
             "magicIds": sorted(gf_spellbooks.MAGIC_IDS),
             "abilityIds": sorted(gf_spellbooks.ABILITY_IDS),
             "magicOptions": [
@@ -104,6 +107,9 @@ def install() -> None:
             "books": [by_gf[key] for key in sorted(by_gf)],
         })
         gf_spellbooks.save(paths.PROJECT_ROOT, document)
+        settings = gameplay_settings.load()
+        _sync_runtime(paths.PROJECT_ROOT, enabled=bool(settings.get("gfSpellbooksEnabled"))
+                      and bool(settings.get("singleGf")) and not bool(settings.get("sharedMagicInventory")))
         result = dict(result)
         result["saved"] = int(result.get("saved", 0)) + len(spellbook_edits)
         files = list(result.get("files", []))
@@ -123,7 +129,7 @@ def install() -> None:
             install_runtime=install_runtime, runtime_root=runtime_root,
         )
         project = (project_root or paths.PROJECT_ROOT).resolve()
-        active = bool(data.get("singleGf", False)) and not bool(data.get("sharedMagicInventory", False))
+        active = bool(data.get("gfSpellbooksEnabled", False)) and bool(data.get("singleGf", False)) and not bool(data.get("sharedMagicInventory", False))
         _sync_runtime(project, enabled=active)
         return result
 

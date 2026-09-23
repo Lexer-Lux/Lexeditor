@@ -257,8 +257,17 @@ def shoot_plugin(browser, api, plugin_id: str, out: Path) -> list[str]:
     except Exception as error:  # noqa: BLE001
         notes.append(f"{plugin_id}: {error}".replace("\n", " ")[:300])
         if not page.is_closed():
-            notes.append(f"{plugin_id}: visible status: " + page.locator('body').inner_text()[-1600:])
-            page.screenshot(path=str(out / f"{plugin_id}-failure.png"))
+            # A sick page can stall text reads past the default timeout,
+            # which used to raise out of this handler and lose the original
+            # error with it. Bound the read so the notes always survive.
+            try:
+                notes.append(f"{plugin_id}: visible status: " + page.locator('body').inner_text(timeout=15000)[-1600:])
+            except Exception:  # noqa: BLE001 - the page can be too sick to read
+                notes.append(f"{plugin_id}: body text unreadable within 15s (page unresponsive)")
+            try:
+                page.screenshot(path=str(out / f"{plugin_id}-failure.png"))
+            except Exception:  # noqa: BLE001
+                notes.append(f"{plugin_id}: failure screenshot failed")
     finally:
         if errors:
             notes.append(f"{plugin_id}: page errors: " + " | ".join(errors[:3])[:6000])

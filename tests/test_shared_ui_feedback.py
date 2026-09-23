@@ -24,6 +24,135 @@ def framework(page):
     page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
 
 
+def test_create_button_precedes_pager_search(page):
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;window.created=0;
+      document.querySelector('main').append(U.pager({page:0,pages:2,pageSize:10,total:20,
+        search:{key:'create-position',change(){}},filters:[U.newButton({onclick:()=>created++})]}));
+    }''')
+    button=page.locator('.lex-pager-left .lex-new-button')
+    search=page.locator('.lex-pager-left input')
+    assert button.bounding_box()['x']+button.bounding_box()['width']<=search.bounding_box()['x']
+    assert page.locator('.lex-pager-right .lex-new-button').count()==0
+    button.click()
+    assert page.evaluate('created')==1
+
+
+def test_data_map_header_location_and_state(page):
+    import tempfile
+    framework(page)
+    page.evaluate('''()=>{
+      document.body.dataset.lexPlugin='ff8';
+      window.revealed=[];
+      window.pywebview={api:{game_data_location:async()=>({path:'C:/Game/data/kernel.bin'}),
+        open_game_data_location:async(...args)=>{revealed=args;return {path:'C:/Game/data/kernel.bin'}}}};
+      const map=LexeditorUI.dataMap({coverage:'unavailable',rows:[{filename:'kernel.bin',status:'partial',coverage:'structured',controls:'Battle data'}]});
+      document.querySelector('main').append(map.content);
+    }''')
+    page.wait_for_function("document.querySelector('.lex-data-map-path')?.textContent==='C:/Game/data/kernel.bin'")
+    assert page.get_by_label('Filter files by coverage').count()==0
+    assert page.get_by_label('Filter files by integration').count()==1
+    assert page.locator('.lex-detail-panel-id .lex-integration-status.partial').count()==1
+    assert page.locator('.lex-detail-panel-body .lex-data-map-location').count()==0
+    page.get_by_role('button',name='Open file location',exact=True).click()
+    assert page.evaluate('revealed')==['ff8','kernel.bin']
+    page.locator('.lex-data-map-detail').screenshot(path=str(Path(tempfile.gettempdir())/'lex-data-map-header.png'))
+
+
+@pytest.mark.parametrize('theme',['blank','ff8'])
+def test_property_help_is_always_beside_name(page,theme):
+    import tempfile
+    if theme=='ff8':
+        page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI, main=document.querySelector('main');
+      const box=U.el('div',{style:'width:600px'});main.append(box);
+      for(const [label,type,showType,help] of [['Number','number',true,true],['Flag','checkbox',true,true],['Text','text',false,true],['No help','text',true,false]]){
+        box.append(U.detailField({label,showType,control:U.el('input',{type,value:20}),
+          help:help?U.infoHelp('Help for '+label):null}));
+      }
+    }''')
+    page.wait_for_timeout(100)
+    assert page.locator('.lex-field-type-rail .lex-info-help').count()==0
+    assert page.locator('.lex-field-help').count()==3
+    for field in page.locator('.lex-detail-field').all()[:3]:
+        help=field.locator('.lex-field-help .lex-info-help')
+        assert help.is_visible()
+        assert help.evaluate('n=>getComputedStyle(n).opacity')=='1'
+        control=field.locator('.lex-detail-field-control').bounding_box()
+        label=field.locator('.lex-detail-field-label-text').bounding_box()
+        assert help.bounding_box()['x']>=label['x']+label['width']-1
+        assert help.bounding_box()['x']+help.bounding_box()['width']<=control['x']+1
+        assert field.locator('.lex-detail-field-label .lex-field-help').count()==1
+        text_right=field.locator('.lex-detail-field-label-text').evaluate('n=>{const r=document.createRange();r.selectNodeContents(n);return r.getBoundingClientRect().right}')
+        assert help.bounding_box()['x']>=text_right+2
+    rail=page.locator('.lex-field-type-rail').first
+    rail.hover()
+    assert rail.locator('.lex-field-type-name').evaluate('n=>getComputedStyle(n).opacity')=='1'
+    page.locator('.lex-field-help .lex-info-help').first.hover()
+    page.get_by_role('tooltip').wait_for()
+    page.locator('main > div').screenshot(path=str(Path(tempfile.gettempdir())/'lex-property-help-right.png'))
+
+
+def test_readonly_fields_keep_numeric_types(page):
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      document.querySelector('main').append(...[12500,2.5,'0123'].map(value=>
+        U.detailField({label:'Value',control:U.unitField(U.readonlyField(value),'G')})));
+    }''')
+    assert page.locator('.lex-field-type-name').all_text_contents()==['INT','FLT','STR']
+    assert page.locator('input').first.input_value()=='12,500'
+
+
+def test_grouped_number_keeps_commas_during_editing(page):
+    framework(page)
+    page.evaluate('''()=>{
+      const input=LexeditorUI.el('input',{type:'number',min:0,max:655350,value:421400});
+      input.addEventListener('input',()=>window.received=Number(input.value));
+      document.querySelector('main').append(input);
+    }''')
+    control=page.locator('input')
+    page.wait_for_function('document.querySelector("input").value==="421,400"')
+    control.focus()
+    assert control.input_value()=='421,400'
+    control.fill('123456')
+    page.wait_for_function('document.querySelector("input").value==="123,456"')
+    assert page.evaluate('received')==123456
+    control.evaluate('n=>n.setSelectionRange(2,2)')
+    control.press('Backspace')
+    page.wait_for_function('document.querySelector("input").value==="13,456"')
+    assert control.evaluate('n=>n.selectionStart')==1
+    assert page.evaluate('received')==13456
+
+
+def test_value_fill_stays_behind_text_while_handle_can_drag(page):
+    import tempfile
+    framework(page)
+    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      const input=U.el('input',{type:'number',value:75,min:0,max:100,step:1});
+      document.querySelector('main').append(U.detailField({label:'Hit rate',min:0,max:100,control:U.unitField(input,'%')}));
+    }''')
+    field=page.locator('.lex-detail-field')
+    field.hover()
+    page.wait_for_timeout(150)
+    assert page.locator('.lex-value-fill').evaluate('n=>getComputedStyle(n).zIndex')=='auto'
+    field.screenshot(path=str(Path(tempfile.gettempdir())/'lex-hit-rate-fill.png'))
+    handle=page.locator('.lex-value-handle')
+    box=handle.bounding_box()
+    x,y=box['x']+box['width']/2,box['y']+box['height']/2
+    assert page.evaluate('([x,y])=>document.elementFromPoint(x,y).classList.contains("lex-value-handle")',[x,y])
+    page.mouse.move(x,y)
+    page.mouse.down()
+    page.mouse.move(x-80,y,steps=5)
+    page.mouse.up()
+    assert float(page.locator('input').input_value())<75
+
+
 def test_refresh_loading_blocks_input_and_uses_shared_quote(page):
     page.evaluate('''() => {
       document.body.insertAdjacentHTML('afterbegin','<div id="lexeditor-shell"></div>');
@@ -44,6 +173,25 @@ def test_refresh_loading_blocks_input_and_uses_shared_quote(page):
     page.wait_for_selector('.lex-plugin-loading-screen',state='detached')
     page.get_by_role('button',name='Test action').click()
     assert page.evaluate('touched') == 1
+
+
+def test_late_quote_cannot_replace_closing_screen(page):
+    page.evaluate('''()=>{
+      sessionStorage.setItem('lex-loading-quote','Keep this quote');
+      document.body.prepend(Object.assign(document.createElement('div'),{id:'lexeditor-shell'}));
+      window.pywebview={api:{loading_quote:()=>new Promise(resolve=>window.resolveQuote=resolve),
+        lexeditor_settings:async()=>({loadingTransitionMinimumSeconds:0})}};
+    }''')
+    framework(page)
+    page.evaluate('''()=>LexeditorUI.mountShell({host:'#lexeditor-shell',plugin:{id:'fixture',name:'Fixture'},tabs:[],activeTab:()=>'',navigate(){}})''')
+    page.wait_for_function('typeof resolveQuote === "function"')
+    page.evaluate('''()=>{
+      window.quoteNode=document.querySelector('.lex-plugin-loading-quote');
+      LexeditorUI.finishPluginLoading();
+      resolveQuote({quote:'Late replacement'});
+    }''')
+    page.wait_for_function('sessionStorage.getItem("lex-loading-quote")==="Late replacement"')
+    assert page.evaluate('quoteNode.textContent')=='Keep this quote'
 
 
 @pytest.mark.parametrize('zoom', [1, 1.25])
@@ -101,6 +249,27 @@ def test_save_preview_and_native_tooltips(page):
     page.wait_for_timeout(150)
     assert card.evaluate("n=>getComputedStyle(n).opacity") == '1'
     assert card.evaluate("n=>getComputedStyle(n).backgroundColor") != 'rgba(0, 0, 0, 0)'
+
+
+def test_save_preview_does_not_cover_bottom_save_button(page):
+    framework(page)
+    page.evaluate('''() => {
+      window.saved=0;
+      const button=LexeditorUI.settingsSaveControl({dirtyCount:()=>1,
+        pendingChanges:()=>[{label:'Panel spacing',before:.25,after:.85}],
+        save:async()=>{window.saved++}});
+      Object.assign(button.style,{position:'fixed',right:'20px',bottom:'10px'});
+      document.body.append(button);
+    }''')
+    button=page.locator('.lex-settings-save-control')
+    button.hover()
+    page.wait_for_timeout(120)
+    popup=page.locator('.lex-save-preview')
+    box=popup.bounding_box()
+    target=button.bounding_box()
+    assert box['y']+box['height'] <= target['y']-7
+    button.click(timeout=1500)
+    assert page.evaluate('window.saved')==1
 
 
 def test_readonly_pin_does_not_cover_lock(page):

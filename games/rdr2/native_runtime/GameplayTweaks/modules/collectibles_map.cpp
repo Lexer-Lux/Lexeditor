@@ -707,11 +707,11 @@ static Hash categoryIcon(const std::string& category) {
 	// its texture did not, and the map drew an empty square. Trying to override
 	// the resident `blips` dictionary wholesale was the wrong fix and displaced
 	// ordinary icons.
-	// The right fix is what vanilla already does: ship a SEPARATE dictionary and
-	// name it per blip. `blips_mp` (320 entries) and `blips_tu` (1 entry) prove
-	// the game resolves several dictionaries side by side. The six LEX entries
-	// now point at `lex_blips`, shipped as MyOverhaul/stream/lex_blips.ytd, and
-	// Lexer's own artwork is back.
+	// Superseded by #153 below: the separate `lex_blips` dictionary rendered as
+	// black quads, so custom art now lives in the resident INVENTORY_ITEMS_MP
+	// replacement (see ensureLexBlipTextures). History kept: the earlier black
+	// squares were a registration bug (entries pointed at resident `blips`,
+	// which lacks our textures), not an art bug.
 	if (category == "card") return joaat("LEX_BLIP_CARD");
 	if (category == "bone") return joaat("LEX_BLIP_BONE");
 	if (category == "carving") return joaat("LEX_BLIP_CARVING");
