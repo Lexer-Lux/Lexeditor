@@ -26,3 +26,19 @@ Per Lexer's rule (needs concrete Lexer-side work means waiting), posted the
 exact game-session/decision checklist as a comment and swapped actionable
 for waiting. A failed session returns it to actionable with evidence; a
 passed session closes it subject to the merge workflow.
+
+## 2026-09-23 formulae-subtab status
+
+Per Lexer's latest comment, Formulae is now a subtab under Tweaks that
+unlocks only while the Formulae Rework tweak is enabled (games/ff8/boot.js):
+the owning toggle moved into the Tweaks Gameplay list (still unavailable
+until every contract row has a runtime patch), `navigate('formulae')` lands
+on Tweaks, and a locked subtab falls back to the Gameplay list. Page content
+and the scroll-container fix are unchanged. Verified: rewritten static
+contract (`tools/verify_ff8_formulae_issue_31.py`), extended stubbed scroll
+check (content + lock fallback), rendered Tweaks check against the installed
+game (`tools/verify_ff8_formulae_visual_31.py`), tabs font check. Still needs
+the game: melee, magic-damage, status-infliction and Mug-comparison runtime
+patches (no blind x86 written). The FF8 review/mod Google Doc is a Drive-only
+`.gdoc` link and could not be read from disk, so the "did you miss any
+formulae" audit against Lexer's doc is still open.

@@ -95,9 +95,11 @@ def main() -> int:
     source = (ROOT / "games" / "ff8" / "gameplay_settings.py").read_text(
         encoding="utf-8",
     )
-    require('"formulaeReworkAvailable": False' in source and
-            'raise ValueError("Formulae Rework is not available")' in source,
-            "the incomplete three-slice rework was exposed as a complete feature")
+    require('"formulaeReworkAvailable": formulae_rework_contract.available()' in source and
+            "if not formulae_rework_contract.available():" in source and
+            "formulae_rework = False" in source and
+            'raise ValueError(f"Formulae Rework is not available; incomplete:' in source,
+            "the incomplete rework was exposed as a complete feature")
 
     print(
         "FF8 Formulae runtime audit passed: healing and full LUCK proved; "
