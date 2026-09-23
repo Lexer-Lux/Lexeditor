@@ -180,6 +180,9 @@ class Handler(PluginRequestHandler):
             elif path == "/api/dashboard": self.json_response(dashboard())
             elif path == "/api/datamap": self.json_response(data_map())
             elif path == "/api/objects": self.json_response(objects_dataset())
+            elif path.startswith("/api/datasets/"):
+                key = path.removeprefix("/api/datasets/").strip("/")
+                self.json_response(dataset_payload(key))
             elif path == "/api/deployment": self.json_response(deployment_status(paths.GAME_ROOT, paths.PROJECT_ROOT))
             elif path == "/api/acceptance": self.json_response(acceptance_status(paths.GAME_ROOT, paths.PROJECT_ROOT))
             else: self.json_response({"error": "Not found"}, 404)
@@ -190,7 +193,8 @@ class Handler(PluginRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         try:
-            if path not in POST_ROUTES:
+            is_dataset_save = path.startswith("/api/datasets/") and path.endswith("/save")
+            if path not in POST_ROUTES and not is_dataset_save:
                 self.json_response({"error": "Not found"}, 404); return
             port = self.server.server_address[1]
             allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
@@ -210,6 +214,11 @@ class Handler(PluginRequestHandler):
                 ContentPackStore(paths.PROJECT_ROOT).save_objects(
                     str(payload.get("sha256", "")), payload.get("edits", []))
                 result = objects_dataset()
+            elif is_dataset_save:
+                key = path.removeprefix("/api/datasets/").removesuffix("/save").strip("/")
+                ContentPackStore(paths.PROJECT_ROOT).save_dataset(
+                    key, str(payload.get("sha256", "")), payload.get("edits", []))
+                result = dataset_payload(key)
             elif path == "/api/deployment/deploy": result = deploy(paths.GAME_ROOT, paths.PROJECT_ROOT)
             elif path == "/api/deployment/revert": result = revert(paths.GAME_ROOT, paths.PROJECT_ROOT)
             else: result = begin_acceptance(paths.GAME_ROOT, paths.PROJECT_ROOT)
