@@ -38,3 +38,22 @@ Next agent work:
 
 Needs the game for step 3, so no implementation was written here. Issue stays
 actionable.
+
+## 2026-09-23 per-game-ff8: separable logic landed, native proof still needs the game
+
+Landed on branch per-game-ff8: new `games/ff8/gf_acquisition_rework.py` owns
+the approved acquisition map (6 drawable GFs with primary + Disc 4 recovery
+bosses), award-on-victory with no-duplicate, Draw-list GF suppression with
+spells untouched, and disable-keeps-GF (awards only append). Activation fails
+closed (`GF_ACQUISITION_AVAILABLE = False`) until battle-victory/Draw-list
+hooks and GF-owned save offsets are proved; no guessed bytes. Wired as a
+visible-but-blocked tweak (`gfAcquisitionRework` in gameplay_settings +
+boot.js row) mirroring the issue-90 pattern. Covered by
+`games/ff8/gf_acquisition_rework_test.py` and
+`tests/test_ff8_gf_acquisition_rework.py`; full ff8 unit set green (223
+passed, 3 skipped).
+
+Still needs Lexer/game: prove the battle-victory award and Draw suppression
+in game (source tests alone are not acceptance); native hook research
+(battle-victory point, Draw-list filter point, GF-owned save path) to flip
+the availability gate.
