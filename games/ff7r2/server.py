@@ -147,8 +147,9 @@ def workspace_payload() -> dict:
                 "reason": (
                     "The FF7R2 fork documents UE4.26 packaging. Lexeditor's candidate "
                     "builder refuses to run without explicit local UnrealReZen and Oodle "
-                    "paths, blocks downloader fallback, writes only under the project build "
-                    "folder, and still requires real-game acceptance plus shared-helper ownership."
+                    "paths plus the known CUE4Parse/1.1.1 dependency manifest; the supplied Oodle "
+                    "exists before process start so that release short-circuits its downloader. "
+                    "Output stays under the project and still needs real-game acceptance/shared ownership."
                 ),
             },
         },
