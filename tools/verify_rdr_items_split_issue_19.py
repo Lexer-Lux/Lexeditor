@@ -5,6 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STYLE = (ROOT / "games" / "rdr" / "editor.css").read_text(encoding="utf-8")
 SOURCE = (ROOT / "games" / "rdr" / "editor.js").read_text(encoding="utf-8")
 STRINGS = (ROOT / "games" / "rdr" / "strings.js").read_text(encoding="utf-8")
+RBF = (ROOT / "games" / "rdr" / "rbf.js").read_text(encoding="utf-8")
 
 
 def require(condition: bool, message: str) -> None:
@@ -23,6 +24,8 @@ for key in ("rdr-items", "rdr-shops", "rdr-missions"):
             f"RDR {key} must keep its own shared two-panel split setting")
 require('splitKey:"rdr-strings"' in STRINGS,
         "RDR Strings must keep its own shared two-panel split setting")
+require("pagedListDetail({" in RBF and "columnList({" in RBF and 'splitKey:"rdr-rbf"' in RBF,
+        "RDR RBF0 Scalars must keep the shared paged Table + Detail view")
 require("columnList({" in SOURCE,
         "RDR record tables must use the shared column list")
 
