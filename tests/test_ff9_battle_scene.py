@@ -106,6 +106,10 @@ def test_enemy_save_writes_raw16_overlay_only(store):
     assert archive_path.read_bytes() == before
     overlay = database.project_root / database.relative("B3_001")
     assert overlay.is_file() and overlay.read_bytes() != raw16()
+    assert overlay.relative_to(database.project_root).as_posix() == (
+        "StreamingAssets/Assets/Resources/BattleMap/BattleScene/"
+        "EVT_BATTLE_B3_001/dbfile0000.raw16.bytes"
+    )
 
 
 def test_encounter_save_bounds_and_stale_hash(store):
