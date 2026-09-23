@@ -148,3 +148,34 @@ def test_direct_project_deploy_refuses_real_pak_collision_and_restores_cleanly(
     assert not deployed_pak_path(game).exists()
     assert external.is_file()
     assert _sha(external) == external_sha
+
+def test_mod_library_recovers_interrupted_owned_deployment(monkeypatch, tmp_path):
+    _install_repak(monkeypatch, tmp_path)
+    game = _game(tmp_path)
+    recoverable = _pack(
+        tmp_path,
+        "recoverable",
+        {"End/Content/GameContents/DataObject/Resident/Item.uasset": b"recoverable"},
+    ).parent
+    adapter = PakModAdapter()
+    plan = adapter.activate([recoverable], game)
+
+    destination = Path(plan["destination"])
+    deployed = destination / "recoverable_P.pak"
+    deployed_sha = _sha(deployed)
+    deployment_bytes = (destination / "deployment.json").read_bytes()
+    backup = destination.parent / ".LexeditorLibrary-recovery"
+
+    destination.rename(backup)
+    assert not destination.exists()
+    assert backup.is_dir()
+
+    adapter.recover(game)
+
+    restored = destination / "recoverable_P.pak"
+    assert destination.is_dir()
+    assert not backup.exists()
+    assert _sha(restored) == deployed_sha
+    assert (destination / "deployment.json").read_bytes() == deployment_bytes
+    assert adapter.active_mod_ids(game) == ["recoverable"]
+

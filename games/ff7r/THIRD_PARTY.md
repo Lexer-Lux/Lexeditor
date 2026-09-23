@@ -60,6 +60,15 @@ does not download repak at setup time.
 - Linux release archive SHA-256:
   `933bdb8e26f34e8fd70ea50201efca39df041de58aa83b1cd6eb83da124a2046`
 
+Release/provenance audit (2026-09-23): GitHub's v0.2.3 release metadata
+reports those same archive SHA-256 digests, and the annotated v0.2.3 tag resolves
+to commit `e215472c51db69328b1ce77be2db24d24c1d646b`. Upstream
+`Cargo.toml` declares `MIT OR Apache-2.0`. The vendored license files are
+byte-identical Git blobs to that tag (`LICENSE-MIT`
+`f42304c8413d57a70da5d9ea7e82b13dec063b08`; `LICENSE-APACHE`
+`1b5ec8b78e237b5c3b3d812a7c0a6589d0f7161d`), and the tagged repository
+contains no separate `NOTICE` file.
+
 The unchanged release archives, manifest and required MIT/Apache-2.0 license
 texts live under `games/ff7r/runtime/repak/v0.2.3/`. The installer verifies
 both the archive and extracted executable hashes before an atomic install. The
