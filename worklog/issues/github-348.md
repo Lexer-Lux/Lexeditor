@@ -13,3 +13,6 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes disposition
+Attachment tilt plus melee-belt disappearance need movement observation with the game; the pose calibration in belt_lantern.cpp already keeps plus-x as runtime-rejected control. Test: ride and run with the lantern on, watch orientation at gait changes and during melee-belt use, report tilt angles and any disappearance with log lines. Separate from #105 behavior and #295 clipping. Issue stays actionable.
