@@ -658,6 +658,8 @@
         detailSection({title:"FORMULA STATUS",body:[
           detailField({label:"STATUS",control:readonlyField("Source data only; the complete Steal formula has not been reconstructed.")}),
           detailField({label:"RATE EVIDENCE",control:readonlyField("Public mod evidence reports the 25% rate data is shared between steals and drops.")}),
+          detailField({label:"RATE MODIFIER",control:readonlyField("Generated runtime types include StealSuccessRateAdd; its arithmetic/order is not exposed.")}),
+          detailField({label:"RESULT STATES",control:readonlyField("Generated runtime types distinguish StealFailed, AlreadyStolen and NothingToSteal; their branch conditions are not exposed.")}),
         ]}),
         detailSection({title:"IDENTITY",body:[
           detailField({label:"ROW FNAME",control:readonlyField(row.key)}),
