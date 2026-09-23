@@ -7,9 +7,9 @@
       "overriding": "Template only. A shipping plugin must declare whether mods stack, replace whole files, merge semantic records, or are mutually exclusive."
     },
     "ff7": {
-      "loader": "Not implemented. Lexeditor currently edits safe project copies and does not deploy or load mods into the current Steam FFVII installation.",
-      "structure": "One selected Lexeditor project mirrors the supported FFVII game-data sources outside the installed game. The installed game files are treated as read-only source data.",
-      "overriding": "No runtime mod stack exists yet. Lexeditor edits one project at a time; multiple FFVII mods are not composed or resolved by priority."
+      "loader": "FFNx Direct Mode. Lexeditor can build an isolated Direct Mode export, deploy to an existing FFNx.toml, or install the pinned upstream FFNx-v1.24.3.0 release for the classic 2026 Steam layout. The archive is SHA-256 verified and manual/7th-Heaven FFNx installs remain externally owned.",
+      "structure": "Lexeditor project saves remain outside the game. Export writes .lexeditor/ffnx-direct plus an ownership manifest. Deploy maps only proved KERNEL/KERNEL2 chunks, scene blocks, field encounter section 7 and world enc_w.bin into FFNx's configured direct_mode_path. Executable-backed edits remain project-only.",
+      "overriding": "Lexeditor owns only files listed in .lexeditor-ff7.json and refuses pre-existing unowned Direct Mode paths. Updates/removal require the deployed file hash to match the prior manifest. An opt-in read-only 7th Heaven profile/folder scan reports active ordered mods and blocks definite same-path Direct overlaps; conditional roots and .iro packages remain explicitly incomplete rather than guessed."
     },
     "ff7-2013": {
       "loader": "Not implemented. Lexeditor currently edits safe project copies and does not deploy or load mods into the 2013 PC release.",

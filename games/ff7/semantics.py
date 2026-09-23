@@ -454,7 +454,8 @@ DEFAULT_GROUPS = {
     "enemyAttacks": "Attack", "encounters": "Battle setup", "shops": "Shop",
     "prices": "Price", "limitBreaks": "Attack", "materiaEquipEffects": "Stat changes",
     "itemSortOrder": "Menu ordering", "materiaPriority": "Menu ordering", "audioMixing": "Audio mixing",
-    "apMultiplier": "Economy", "fieldEncounters": "Encounter settings", "worldEncounters": "Encounter settings",
+    "apMultiplier": "Economy", "keyItems": "Text", "worldMovement": "World movement",
+    "fieldEncounters": "Encounter settings", "worldEncounters": "Encounter settings",
 }
 RAW_HINTS = (" id", " flags", " mask", " byte", "camera", "animation", "layout", "arena", "cover flags")
 

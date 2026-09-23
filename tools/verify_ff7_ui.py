@@ -143,6 +143,7 @@ class PageTests(unittest.TestCase):
         bridge = "window.fetch=async(path,options={})=>{const r=await window.testRequest(path,options);return new Response(r.body,{status:r.status})};"
         identity = {"id": server.PLUGIN_ID, "name": server.PLUGIN_NAME, "edition": server.PLUGIN_EDITION}
         html = html.replace('<script src="/shared/framework.js"></script>', '<script>' + FRAMEWORK + bridge + 'window.__lexeditorPlugin=' + json.dumps(identity) + ';</script>')
+        html = html.replace('<script src="editor.js"></script>', '<script>' + (server.PLUGIN_ROOT / "editor.js").read_text(encoding="utf-8") + '</script>')
         html = html.replace('<link rel="stylesheet" href="/shared/framework.css">', '')
         self.page.set_content(html)
         self.page.wait_for_function("window.testLoaded === true")
@@ -171,7 +172,7 @@ class PageTests(unittest.TestCase):
         (self.backend.game / "FFNx.toml").write_bytes(CONFIG)
         self.page.get_by_label("windowed", exact=True).wait_for(timeout=8000)
         self.assertEqual(self.page.get_by_label("ff8_option", exact=True).count(), 0)
-        self.assertEqual(self.page.evaluate("state.dataMap.rows.find(row=>row.category==='tweaks').status"), "integrated")
+        self.assertEqual(self.page.evaluate("state.dataMap.rows.find(row=>row.category==='tweaks').status"), "partial")
         self.page.get_by_label("windowed", exact=True).uncheck()
         self.page.evaluate("window.dispatchEvent(new Event('focus'))")
         self.assertFalse(self.page.get_by_label("windowed", exact=True).is_checked())
@@ -280,7 +281,7 @@ class PageTests(unittest.TestCase):
         self.save_wait()
         self.assertEqual(SceneArchive((self.backend.project/"data/battle/scene.bin").read_bytes()).records("enemies")[0]["values"]["hp"],12345)
         self.click("Encounters")
-        self.page.get_by_label("X for Battle 0",exact=True).first.fill("-123")
+        self.page.get_by_label("Enemy slot 1 Position X for Battle 0",exact=True).first.fill("-123")
         self.save_wait()
         self.open();self.click("Enemies")
         self.assertEqual(self.page.get_by_label("HP for Enemy0",exact=True).input_value(),"12345")

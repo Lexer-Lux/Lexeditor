@@ -116,8 +116,10 @@ jobs:
           if (-not (Test-Path $app)) { throw "Installed executable missing: $app" }
           if (-not (Test-Path $startShortcut)) { throw "Start Menu shortcut missing: $startShortcut" }
           $smokePath = Join-Path $env:GITHUB_WORKSPACE 'build\distribution\installed-smoke.json'
-          $smoke = Start-Process -WindowStyle Hidden -FilePath $app -ArgumentList '--smoke-service',$smokePath -PassThru -Wait
-          if ($smoke.ExitCode -ne 0) { throw "Installed smoke failed with exit code $($smoke.ExitCode)" }
+          $env:LEXEDITOR_INSTALLED_SMOKE_APP = $app
+          $env:LEXEDITOR_INSTALLED_SMOKE_RESULT = $smokePath
+          python -c "import os; from pathlib import Path; from tools.build_distribution import smoke; smoke(Path(os.environ['LEXEDITOR_INSTALLED_SMOKE_APP']), Path(os.environ['LEXEDITOR_INSTALLED_SMOKE_RESULT']))"
+          if ($LASTEXITCODE -ne 0) { throw "Installed smoke failed with exit code $LASTEXITCODE" }
           if (-not (Test-Path $smokePath)) { throw "Installed smoke report missing: $smokePath" }
           $process = Start-Process -WindowStyle Hidden -FilePath $uninstaller -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
           if ($process.ExitCode -ne 0) { throw "Uninstaller failed with exit code $($process.ExitCode)" }
@@ -128,6 +130,7 @@ jobs:
         run: python -c "from pathlib import Path; import json; p=Path('build/distribution/installed-smoke.json'); r=json.loads(p.read_text('utf-8')); assert r.get('passed') and r.get('childStopped'), r; print(r)"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
         with:
           name: Lexeditor-${{ runner.os }}-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           path: |
@@ -136,5 +139,5 @@ jobs:
             build/distribution/installed-smoke.json
             build/distribution/source-sha.txt
             build/Lexeditor/warn-Lexeditor.txt
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30

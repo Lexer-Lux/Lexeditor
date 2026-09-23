@@ -114,7 +114,7 @@
   }
   function syncConfigMap(config){
     const row=state.dataMap?.rows.find(item=>item.category==="tweaks");
-    if(row)Object.assign(row,{status:config.available?"integrated":"partial",coverage:config.available?"structured":"unavailable",openable:config.available,sourcePath:config.path,notes:config.message});
+    if(row)Object.assign(row,{status:"partial",coverage:config.available?"structured":"unavailable",openable:config.available,sourcePath:config.path,notes:config.message+(config.available?" Typed supported settings are editable; unknown FFNx lines are preserved.":"")});
   }
   async function refreshPlatformConfig(force=false){
     if(state.platformLoading||state.saving||state.activeSource!=="mine")return;
@@ -145,6 +145,15 @@
     ]});
     return tabbedPanel({tabs:[{id:"ffnx",label:"FFNx"}],active:"ffnx",label:"Tweaks sections",change:()=>{},content:panel});
   }
+  function ff7ModLoaderSection(){
+    return LexeditorUI.modLoaderSection({
+      loader:"FFNx Direct Mode is the proved runtime path for deployable FF7 data. Classic FF7 can install the pinned upstream FFNx stable release into ff7/workingdir; an existing manual or 7th Heaven FFNx install stays externally owned.",
+      output:"Project saves stay isolated until Export or Deploy. Direct Mode output covers KERNEL data sections 1–9, KERNEL2 text sections 10–27, scene blocks, field encounter section 7 and world enc_w.bin. Executable-backed project edits remain explicitly undeployable.",
+      order:"Lexeditor writes only paths listed in its deployment manifest. It refuses unowned Direct Mode collisions; an opt-in read-only 7th Heaven scan also blocks definite same-path folder-mod overlaps instead of guessing a load-order winner.",
+      safety:"Installed KERNEL, scene, LGP and executable files are never replaced. Deploy writes only to FFNx Direct Mode and blocks projects containing unsupported changes.",
+      removal:"Remove Deployment deletes only unchanged files recorded as Lexeditor-owned; externally changed files are left in place.",
+    });
+  }
   function infoView(){
     const baseline=state.dashboard.baseline,sounds=LexeditorUI.sharedSettings()?.developerMode?LexeditorUI.soundCoverageTable(state.dashboard.themeSounds?.rows||[]):null;
     return detailPanel({className:"lex-information-panel ff7-detail",icon:infoIcon(),title:identity.name,identity:null,meta:identity.edition,body:[
@@ -159,14 +168,94 @@
       ]}),
       ...((state.dashboard.problems||[]).length?[detailSection({title:"PROBLEMS",body:(state.dashboard.problems||[]).map((problem,index)=>detailField({label:`Problem ${index+1}`,control:readonlyField(problem)}))})]:[]),
       ...(sounds?[detailSection({title:"THEME SOUNDS",body:[sounds]})]:[]),
-      LexeditorUI.modLoaderSection({
-        loader:"FFNx, the community runtime for the PC releases. It loads from the game folder and applies Lexeditor's data alongside its own patches.",
-        output:"Edited kernel, scene, text and executable data are written into the selected project folder, not over the installed files.",
-        order:"FFNx applies its own configuration first, then mod data. Two mods editing the same kernel section conflict; the later one wins.",
-        safety:"Installed kernel, scene and executable files are read only. Every write goes to the project copy.",
-        removal:"Point FFNx away from the project folder, or delete it. The install is already untouched.",
-      }),
+      ff7ModLoaderSection(),
+      detailSection({title:"DEPLOYMENT",body:[detailField({label:"FFNx Direct Mode",control:el("button",{type:"button",onclick:()=>navigate("deployment")},"Open deployment")})]}),
     ]});
+  }
+  function syncDeploymentMap(plan){
+    const row=state.dataMap?.rows.find(item=>item.category==="deployment");
+    if(row)Object.assign(row,{status:"partial",coverage:"structured",openable:true,
+      sourcePath:plan?.ffnx?.config||"",
+      notes:"FFNx Direct export/deploy is implemented for KERNEL data 1–9, KERNEL2 text 10–27, scene blocks, field encounter section 7 and enc_w.bin. Executable-backed edits remain project-only."
+        +(plan?.blocked?.length?" Current project blocker: "+plan.blocked[0]:"")});
+  }
+  async function refreshDeployment(){
+    if(state.deploymentLoading)return;
+    state.deploymentLoading=true;state.deploymentError="";
+    try{state.deployment=await api("/api/deployment");syncDeploymentMap(state.deployment)}
+    catch(error){state.deploymentError=error.message;state.deployment={ready:false,blocked:[error.message],files:[],ffnx:{available:false,message:error.message}}}
+    finally{state.deploymentLoading=false;if(state.loaded&&state.tab==="deployment")render();shellRefresh()}
+  }
+  async function deploymentAction(action){
+    if(action!=="remove"&&action!=="setup"&&dirtyCount()){state.deploymentError="Save or discard editor changes before exporting or deploying.";render();return}
+    state.deploymentLoading=true;state.deploymentError="";render();
+    try{
+      const result=await api("/api/deployment/"+action,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+      if(action==="remove"){await refreshDeployment();return}
+      state.deployment=result;syncDeploymentMap(result);
+      if(action==="setup"){
+        await refreshPlatformConfig();
+        LexeditorUI.showToast?.("Pinned FFNx setup installed.");
+      }else LexeditorUI.showToast?.(action==="deploy"?"FF7 Direct Mode deployment updated.":"FF7 Direct Mode export refreshed.");
+    }catch(error){state.deploymentError=error.message}
+    finally{state.deploymentLoading=false;if(state.loaded&&state.tab==="deployment")render();shellRefresh()}
+  }
+  async function setupFFNx(){
+    if(identity.id!=="ff7")return;
+    const owned=!!state.deployment?.setup?.owned;
+    const ok=await LexeditorUI.confirmAction({
+      title:owned?"Verify/update pinned FFNx?":"Install pinned FFNx?",
+      message:owned
+        ?"Lexeditor will verify the pinned upstream FFNx archive and update only files recorded in its setup manifest. Externally changed owned files are refused, not overwritten."
+        :"Lexeditor will download the pinned upstream FFNx stable archive, verify its SHA-256, and install it into ff7/workingdir. Existing manual or 7th Heaven FFNx files will not be replaced.",
+      confirmLabel:owned?"Verify/update FFNx":"Install FFNx",cancelLabel:"Cancel"
+    });
+    if(ok)await deploymentAction("setup");
+  }
+  function deploymentView(){
+    const plan=state.deployment||{files:[],blocked:[],ffnx:{}};
+    const disabled=state.deploymentLoading||state.saving||state.activeSource!=="mine";
+    const external=plan.externalMods||{overlaps:[],conditionalOverlaps:[],opaque:[],missing:[]};
+    const setupOwned=!!plan.setup?.owned;
+    const setupButton=el("button",{type:"button",disabled:disabled||identity.id!=="ff7"||(!!plan.ffnx?.available&&!setupOwned),onclick:()=>setupFFNx()},setupOwned?"Verify/update pinned FFNx":"Install pinned FFNx");
+    const exportButton=el("button",{type:"button",disabled,onclick:()=>deploymentAction("export")},"Export Direct Mode");
+    const deployButton=el("button",{type:"button",disabled:disabled||!plan.ffnx?.available||!!(external.overlaps||[]).length,onclick:()=>deploymentAction("deploy")},"Deploy to FFNx");
+    const removeButton=el("button",{type:"button",disabled:state.deploymentLoading||state.saving||!plan.ffnx?.available,onclick:()=>deploymentAction("remove")},"Remove Lexeditor deployment");
+    const issues=[...(plan.blocked||[])];
+    if((external.overlaps||[]).length){
+      const paths=external.overlaps.slice(0,4).map(row=>row.path).join(", ");
+      issues.push("Active 7th Heaven folder mod(s) overlap Lexeditor Direct paths: "+paths+((external.overlaps||[]).length>4?" …":""));
+    }
+    if(state.deploymentError&&!issues.includes(state.deploymentError))issues.unshift(state.deploymentError);
+    const fileSummary=(plan.files||[]).length
+      ? (plan.files||[]).slice(0,24).map(row=>detailField({label:row.path,control:readonlyField(row.bytes+" bytes")}))
+      : [detailField({label:"Generated files",control:readonlyField("No supported project differences yet")})];
+    return detailPanel({className:"ff7-detail",title:"FFNx Direct deployment",identity:null,
+      meta:plan.ready===false?"Blocked project":"Safe project overlay",body:[
+        detailSection({title:"STATUS",body:[
+          detailField({label:"FFNx",control:readonlyField(plan.ffnx?.available?"Detected":"Not detected")}),
+          detailField({label:"Pinned setup",control:readonlyField(plan.setup?.pinned||"Unavailable")}),
+          detailField({label:"Configuration",control:readonlyField(plan.ffnx?.config||"Unavailable")}),
+          detailField({label:"Direct root",control:readonlyField(plan.ffnx?.directRoot||"Unavailable until FFNx is configured")}),
+          detailField({label:"Generated",control:readonlyField(String((plan.files||[]).length)+" file(s)")}),
+        ]}),
+        detailSection({title:"ACTIONS",body:[
+          ...(identity.id==="ff7"?[detailField({label:setupOwned?"Runtime maintenance":"First-time runtime setup",control:setupButton})]:[]),
+          detailField({label:"Build isolated project export",control:exportButton}),
+          detailField({label:"Apply owned Direct Mode files",control:deployButton}),
+          detailField({label:"Remove owned Direct Mode files",control:removeButton}),
+        ]}),
+        ...(issues.length?[detailSection({title:"BLOCKERS",body:issues.map((value,index)=>detailField({label:"Blocker "+(index+1),control:readonlyField(value)}))})]:[]),
+        detailSection({title:"EXTERNAL MOD STACK",body:[
+          detailField({label:"7th Heaven",control:readonlyField(external.checked?(external.profile||"Checked"):"Not configured")}),
+          detailField({label:"Result",control:readonlyField(external.message||"Not checked")}),
+          detailField({label:"Definite overlaps",control:readonlyField(String((external.overlaps||[]).length))}),
+          detailField({label:"Conditional overlaps",control:readonlyField(String((external.conditionalOverlaps||[]).length))}),
+          detailField({label:"Opaque IRO packages",control:readonlyField(String((external.opaque||[]).length))}),
+        ]}),
+        detailSection({title:"DIRECT MODE FILES",body:fileSummary}),
+        detailSection({title:"LIMIT",body:[detailField({label:"Executable data",control:readonlyField("Project-only. Current FFNx does not document FF7 executable-data Direct Mode, so Lexeditor will not overwrite or patch the executable.")})]}),
+      ]});
   }
   function mapView(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,open:row=>{const target=row.target||row.category;if(target)navigate(target)},query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changePage:value=>{state.mapPage=value;render()},changeSort:key=>{const[active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];render()}});state.mapPage=view.page;return view.content}
   // The strip above the table repeated the record count the pager already

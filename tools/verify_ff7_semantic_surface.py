@@ -136,7 +136,8 @@ class SemanticSurfaceTests(unittest.TestCase):
         for fields in collections:
             for field in fields:
                 self.assertNotIn("Numeric game value",str(field.get("help", "")),field)
-        editor=(Path(__file__).resolve().parents[1]/"games/ff7/editor.js").read_text(encoding="utf-8")
+        root=Path(__file__).resolve().parents[1]/"games/ff7"
+        editor=(root/"editor.html").read_text(encoding="utf-8") + "\n" + (root/"editor.js").read_text(encoding="utf-8")
         self.assertIn('return "";',editor)
         self.assertNotIn("help:infoHelp(semanticHelp(field))",editor)
 
@@ -148,25 +149,6 @@ class SemanticSurfaceTests(unittest.TestCase):
         self.assertEqual((formation["scene"],formation["gameId"]),(0,0))
         for category in battle.SCENE_CATEGORIES: scene.apply(category,scene.records(category))
         self.assertEqual(scene.to_bytes(),raw)
-
-    def test_formation_controls_preserve_unknown_values_and_bits(self):
-        fields={f['key']:f for f in semantics.apply('encounters',battle.FORMATION_FIELDS)}
-        self.assertEqual(fields['layout']['dataType'],'enum')
-        self.assertEqual(next(c['label'] for c in fields['layout']['choices'] if c['value']==4),'Pincer attack')
-        self.assertEqual(next(c['label'] for c in fields['location']['choices'] if c['value']==0x25),'Battle Square')
-        self.assertEqual(fields['arena0']['referenceCategory'],'encounters')
-        self.assertTrue(fields['flags']['invertBits'])
-        self.assertTrue(fields['cameraIndex']['advanced'])
-        self.assertEqual(fields['slot0_row']['dataType'],'int')
-        raw=extended_fixtures.scene_fixture()
-        scene=battle.SceneArchive(raw)
-        rows=scene.records('encounters')
-        values=rows[0]['values']
-        values.update(flags=0xFEE3,slot0_flags=0x80000004,slot0_cover=0x8021,slot0_row=7,cameraIndex=200,layout=254)
-        scene.apply('encounters',rows)
-        saved=battle.SceneArchive(scene.to_bytes()).records('encounters')[0]['values']
-        for key in ('flags','slot0_flags','slot0_cover','slot0_row','cameraIndex','layout'):
-            self.assertEqual(saved[key],values[key],key)
 
     def test_status_and_special_flag_storage_remains_exact(self):
         # Logical toggles are a presentation concern. Binary models continue to

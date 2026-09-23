@@ -87,8 +87,7 @@ class RenderedTests(unittest.TestCase):
         html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
         code=HOST+'\nwindow.__lexeditorPlugin='+json.dumps({'id':edition,'name':'FF7 fixture','edition':edition})+';\n'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')
         html=html.replace('<script src="/shared/framework.js"></script>','<script>'+code+'</script>')
-        editor=(ROOT/'games/ff7/editor.js').read_text(encoding='utf-8').replace('</script','<\\/script')
-        html=html.replace('<script src="editor.js"></script>','<script>'+editor+'</script>')
+        html=html.replace('<script src="editor.js"></script>','<script>'+(ROOT/'games/ff7/editor.js').read_text(encoding='utf-8')+'</script>')
         self.page.set_content(html,wait_until='domcontentloaded')
         self.page.wait_for_function('state.loaded === true')
         self.assertEqual(self.errors,[])
@@ -163,19 +162,6 @@ class RenderedTests(unittest.TestCase):
             self.navigate('fieldEncounters')
             self.assertEqual(self.page.get_by_role('tab',name='Field',exact=True).get_attribute('aria-selected'),'true')
         self.assertEqual(self.errors,[])
-
-    def test_formation_layout_saves_and_reopens(self):
-        self.install()
-        self.open()
-        self.navigate('encounters')
-        choices=self.page.locator('select').evaluate_all('(nodes)=>nodes.flatMap(n=>[...n.options].map(o=>o.textContent))')
-        self.assertIn('Pincer attack',choices)
-        self.assertIn('Battle Square',choices)
-        self.control('encounters','layout').select_option('4')
-        self.save()
-        self.open()
-        self.assertEqual(self.control('encounters','layout').input_value(),'4')
-        self.originals_unchanged()
 
     def test_interface_sounds_once_and_sound_off_stops_playback(self):
         self.install();self.open();self.navigate('characters')

@@ -121,18 +121,25 @@ coll=COLLECT(exe,a.binaries,a.datas,strip=False,upx=False,name="Lexeditor")
     return DIST/'Lexeditor.app/Contents/MacOS/Lexeditor' if sys.platform=='darwin' else DIST/'Lexeditor'/('Lexeditor.exe' if os.name=='nt' else 'Lexeditor')
 
 
-def smoke(executable: Path) -> None:
+def smoke(executable: Path, result_path: Path | None = None) -> None:
     # Packaging must preserve child-service dispatch; launching a second GUI is a failure.
     executable=executable.resolve(strict=True)
-    result=ROOT/'build/distribution/smoke.json'
+    result=(Path(result_path) if result_path is not None else ROOT/'build/distribution/smoke.json').resolve()
     result.parent.mkdir(parents=True,exist_ok=True)
     result.unlink(missing_ok=True)
     env=os.environ.copy()
     env['LEXEDITOR_NO_AUTO_SCAN']='1'
-    p=subprocess.run([str(executable),'--smoke-service',str(result)],cwd=Path.home(),env=env,timeout=90)
-    if p.returncode or not result.exists():raise RuntimeError('Frozen app/service smoke failed')
+    command=[str(executable),'--smoke-service',str(result)]
+    try:
+        p=subprocess.run(command,cwd=Path.home(),env=env,timeout=90)
+    except subprocess.TimeoutExpired as error:
+        report=json.loads(result.read_text('utf-8')) if result.is_file() else {}
+        raise RuntimeError(f"Frozen app/service smoke timed out: {report}") from error
+    if not result.exists():
+        raise RuntimeError(f"Frozen app/service smoke exited {p.returncode} without a diagnostic report")
     report=json.loads(result.read_text('utf-8'))
-    if not report.get('passed') or not report.get('childStopped'):raise RuntimeError('Frozen child did not shut down')
+    if p.returncode or not report.get('passed') or not report.get('childStopped'):
+        raise RuntimeError(f"Frozen app/service smoke failed: {report}")
     print(json.dumps(report),flush=True)
 
 

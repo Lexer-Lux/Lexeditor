@@ -158,6 +158,17 @@ class BinaryTests(unittest.TestCase):
         rows=obj.records();rows[0]['values']['text']='a'*27648;obj.apply('texts',rows)
         with self.assertRaises(ValueError):obj.to_bytes()
 
+    def test_key_items_pair_name_help_without_overlapping_generic_text(self):
+        source=text_fixture();obj=ex.KernelText(source)
+        self.assertFalse(any((row['id'] >> 16) in ex.KEY_ITEM_SECTIONS for row in obj.records('texts')))
+        rows=obj.records('keyItems');self.assertEqual(len(rows),2)
+        before=ex.KernelText(source);rows[0]['values']['name']='Keycard';rows[0]['values']['description']='Opens the gate'
+        obj.apply('keyItems',rows);saved=ex.KernelText(obj.to_bytes())
+        self.assertEqual(saved.records('keyItems')[0]['values'],{'name':'Keycard','description':'Opens the gate'})
+        changed={ex.KEY_ITEM_HELP_SECTION,ex.KEY_ITEM_NAME_SECTION}
+        for index in range(len(ex.TEXT_SECTIONS)):
+            if index not in changed:self.assertEqual(saved.sections[index],before.sections[index])
+
     def test_shop_profile_and_only_data_changes(self):
         for shift in (0x200,0x400):
             source=exe_fixture(shift);sha=hashlib.sha1(source).hexdigest().upper()
@@ -182,7 +193,7 @@ class BinaryTests(unittest.TestCase):
         with patch.dict(ex.EXE_PROFILES,{sha:shift}):
             obj=ex.ShopExecutable(source,source)
             expected={'limitBreaks':71,'materiaEquipEffects':21,'exeText':476,'itemSortOrder':320,
-                      'materiaPriority':96,'audioMixing':128,'apMultiplier':1}
+                      'materiaPriority':96,'audioMixing':128,'apMultiplier':1,'worldMovement':16}
             self.assertEqual({key:len(obj.records(key)) for key in expected},expected)
             for key in expected:obj.apply(key,obj.records(key))
             self.assertEqual(obj.to_bytes(),source)
@@ -194,6 +205,7 @@ class BinaryTests(unittest.TestCase):
             rows=obj.records('materiaPriority');rows[95]['values']['priority']=1;obj.apply('materiaPriority',rows)
             rows=obj.records('audioMixing');rows[0]['values']['volume']=-123;rows[0]['values']['pan']=456;obj.apply('audioMixing',rows)
             rows=obj.records('apMultiplier');rows[0]['values']['multiplier']=3;obj.apply('apMultiplier',rows)
+            rows=obj.records('worldMovement');tiny=next(row for row in rows if row['id']==3);tiny['values']['terrainMask']=0x12345678;obj.apply('worldMovement',rows)
             saved=obj.to_bytes(); reread=ex.ShopExecutable(saved,source)
             self.assertEqual(reread.records('limitBreaks')[0]['values']['attackPower'],77)
             self.assertEqual(reread.records('materiaEquipEffects')[0]['values']['strength'],-7)
@@ -202,7 +214,10 @@ class BinaryTests(unittest.TestCase):
             self.assertEqual(reread.records('materiaPriority')[95]['values']['priority'],1)
             self.assertEqual(reread.records('audioMixing')[0]['values'],{'volume':-123,'pan':456})
             self.assertEqual(reread.records('apMultiplier')[0]['values']['multiplier'],3)
+            self.assertEqual(next(row for row in reread.records('worldMovement') if row['id']==3)['values']['terrainMask'],0x12345678)
             self.assertEqual(saved[0x31ED4F+shift],3);self.assertEqual(saved[0x31ED9E+shift],3)
+            for offset in (ex.WORLD_WALK_POS[3],*ex.TINY_BRONCO_WALK_MIRRORS):
+                self.assertEqual(struct.unpack_from('<I',saved,offset+shift)[0],0x12345678)
 
             bad=bytearray(saved);bad[0x51CF40+shift]^=1
             with self.assertRaisesRegex(ValueError,'outside supported data'):ex.ShopExecutable(bytes(bad),source)

@@ -50,7 +50,7 @@ def seed_project_layout(game_root: Path, template_root: Path,
     readme.write_text(
         "Final Fantasy VII Lexeditor mod project\n\n"
         "Lexeditor edits project copies of supported English kernel, battle, field, world and executable data. "
-        "The installed game remains unchanged. Saving is not game deployment.\n",
+        "The installed game remains unchanged. Saving is not deployment; the Deployment screen can build a verified FFNx Direct Mode overlay for supported project data.\n",
         encoding="utf-8",
     )
 
@@ -143,7 +143,7 @@ def smoke() -> list[str]:
                 raise RuntimeError("FF7 editor returned the wrong managed identity")
             if identity.get("name") != DISPLAY_NAME:
                 raise RuntimeError("FF7 editor returned the wrong display name")
-            if identity.get("capabilities") != ["data-map", "kernel-data", "save"]:
+            if identity.get("capabilities") != ["data-map", "kernel-data", "save", "ffnx-direct-export", "ffnx-direct-deploy"]:
                 raise RuntimeError("FF7 editor did not advertise its proved capabilities")
             data_map = request_json(session.url + "api/datamap")
             rows = data_map.get("rows", [])
