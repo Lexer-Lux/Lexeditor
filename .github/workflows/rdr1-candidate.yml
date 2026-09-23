@@ -64,10 +64,12 @@ jobs:
           PY
           python -m compileall -q *.py games/rdr
           python -m unittest discover -s tests -p 'test_rdr_string_tables.py'
+          python -m unittest discover -s tests -p 'test_rdr_rbf.py'
           python tools/verify_rdr_editing.py
           python tools/verify_rdr_cache_reuse_71.py
           python tools/verify_rdr_items_split_issue_19.py
           python tools/verify_rdr_data_map_audit.py
+          python tools/verify_rdr_mod_compatibility.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
