@@ -100,3 +100,78 @@ def load_base_objects(game_root: Path) -> tuple[dict[str, dict], dict]:
         "sha256": _sha256(path),
     })
     return rows, status
+
+def dataset_source_path(game_root: Path, key: str) -> Path:
+    spec = dataset_spec(key)
+    return Path(game_root).expanduser().resolve() / "Content (unpacked)" / "Data" / f"{spec['source']}.json"
+
+
+def dataset_source_status(game_root: Path, key: str) -> dict:
+    root = Path(game_root).expanduser().resolve()
+    spec = dataset_spec(key)
+    path = dataset_source_path(root, key)
+    helpers = [root / "StardewXnbHack.exe", root / "StardewXnbHack"]
+    helper = next((candidate for candidate in helpers if candidate.is_file()), None)
+    xnb = root / "Content" / "Data" / f"{spec['source']}.xnb"
+    return {
+        "kind": "stardew-xnb-hack-json", "datasetKey": key, "asset": spec["target"],
+        "path": str(path), "available": path.is_file(), "helperInstalled": helper is not None,
+        "helperPath": str(helper) if helper else None, "xnbPath": str(xnb), "xnbAvailable": xnb.is_file(),
+    }
+
+
+def load_base_dataset(game_root: Path, key: str) -> tuple[dict[str, dict], dict]:
+    """Load one supported 1.6 string-to-model lookup without writing installed data."""
+    if key == "objects":
+        return load_base_objects(game_root)
+    spec = dataset_spec(key)
+    status = dataset_source_status(game_root, key)
+    path = Path(status["path"])
+    if not path.is_file():
+        return {}, status
+    size = path.stat().st_size
+    if size > MAX_SOURCE_BYTES:
+        status.update({"available": False, "error": f"Unpacked {spec['target']} JSON is too large ({size} bytes)"})
+        return {}, status
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        status.update({"available": False, "error": f"Could not read unpacked {spec['target']} JSON: {error}"})
+        return {}, status
+    if isinstance(payload, dict) and isinstance(payload.get("content"), dict):
+        payload = payload["content"]
+    if not isinstance(payload, dict) or not payload:
+        status.update({"available": False, "error": f"Unpacked {spec['target']} JSON is not a non-empty object lookup"})
+        return {}, status
+
+    rows: dict[str, dict] = {}
+    invalid_records = 0
+    for record_id, raw in payload.items():
+        if not isinstance(raw, dict):
+            invalid_records += 1
+            continue
+        base_fields = {}
+        invalid_fields = 0
+        for field_key, field in spec["fields"].items():
+            if field_key in raw:
+                try:
+                    base_fields[field_key] = validate_field_value(field, raw[field_key])
+                except ValueError:
+                    invalid_fields += 1
+            elif "default" in field:
+                base_fields[field_key] = field["default"]
+        name = raw.get("DisplayName") or raw.get("Name") or raw.get("ID") or record_id
+        rows[str(record_id)] = {
+            "id": str(record_id), "name": str(name), "internalName": str(raw.get("Name") or record_id),
+            "description": str(raw.get("Description") or ""), "baseFields": base_fields,
+            "invalidFieldCount": invalid_fields,
+        }
+    if not rows:
+        status.update({"available": False, "error": f"Unpacked {spec['target']} JSON contained no model records"})
+        return {}, status
+    status.update({
+        "available": True, "recordCount": len(rows), "ignoredRecordCount": invalid_records,
+        "sha256": _sha256(path),
+    })
+    return rows, status
+
