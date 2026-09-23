@@ -489,12 +489,12 @@ function datasetPanel() {
   });
 }
 async function openDataset(key) {
-  if (key === "objects") {
-    state.datasetKey = "objects"; state.dataset = null; navigate("objects"); return;
-  }
   if (dirtyCount()) {
     LexeditorUI.showAlert({title: "Save or discard changes first", message: "Switching data families is blocked while this project has unsaved edits."});
     return;
+  }
+  if (key === "objects") {
+    state.datasetKey = "objects"; state.dataset = null; navigate("objects"); return;
   }
   state.busy = true; state.error = ""; shell.refresh();
   try {
