@@ -23,6 +23,7 @@ OODLE_NAME = "oo2core_9_win64.dll"
 ENGINE_VERSION = "GAME_UE4_26"
 MOUNT_POINT = "../../../End/Content/"
 PACKAGE_NAME = "Lexeditor-FF7R2_P"
+CUE4PARSE_VERSION = "1.1.1"
 STAGED_PLAYER = Path("content/End/Content/DataObject/Resident/PlayerParameter.uasset")
 
 
@@ -41,6 +42,26 @@ def _sha256(path: Path) -> str:
 def _explicit_path(environment: Mapping[str, str], key: str) -> Path | None:
     value = str(environment.get(key, "") or "").strip()
     return Path(value).expanduser() if value else None
+
+
+def _expected_deps_path(packer: Path) -> Path:
+    return packer.with_name(packer.stem + ".deps.json")
+
+
+def _packer_dependency_ok(packer: Path | None) -> bool:
+    if packer is None or not packer.is_file():
+        return False
+    deps_path = _expected_deps_path(packer)
+    if not deps_path.is_file():
+        return False
+    try:
+        payload = json.loads(deps_path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
+    libraries = payload.get("libraries")
+    if not isinstance(libraries, dict):
+        return False
+    return f"CUE4Parse/{CUE4PARSE_VERSION}" in libraries
 
 
 def _candidate_manifests(project: Path | None) -> list[Path]:
@@ -62,6 +83,7 @@ def status(project: Path | None, game: Path | None,
     paks = game / "End/Content/Paks" if game is not None else None
 
     packer_present = bool(packer and packer.is_file())
+    packer_dependency_ok = _packer_dependency_ok(packer)
     oodle_present = bool(oodle and oodle.is_file())
     staged_present = bool(staged and staged.is_file())
     paks_present = bool(paks and paks.is_dir())
@@ -82,6 +104,10 @@ def status(project: Path | None, game: Path | None,
         missing.append("Rebirth .utoc/.ucas archives in End/Content/Paks")
     if not packer_present:
         missing.append(f"explicit {UNREALREZEN_ENV} executable")
+    elif not packer_dependency_ok:
+        missing.append(
+            f"UnrealReZen distribution with CUE4Parse/{CUE4PARSE_VERSION} dependency manifest"
+        )
     if not oodle_present:
         missing.append(f"explicit {OODLE_ENV} DLL")
 
@@ -91,6 +117,7 @@ def status(project: Path | None, game: Path | None,
         "missing": missing,
         "packerExplicit": packer is not None,
         "packerPresent": packer_present,
+        "packerDependencyOk": packer_dependency_ok,
         "packerPath": str(packer) if packer else "",
         "oodleExplicit": oodle is not None,
         "oodlePresent": oodle_present,
@@ -102,6 +129,7 @@ def status(project: Path | None, game: Path | None,
         "mode": "candidate-only",
         "installsGame": False,
         "downloadsDependencies": False,
+        "requiredCUE4Parse": CUE4PARSE_VERSION,
     }
 
 
@@ -125,11 +153,12 @@ def build_candidate(project: Path | None, game: Path | None,
                     runner=subprocess.run) -> dict:
     """Build an isolated, never-installed IoStore candidate.
 
-    UnrealReZen's FF7R2 fork loads CUE4Parse Oodle at startup even when package
-    compression is Zlib.  Lexeditor therefore places the explicitly supplied
-    DLL in an isolated working directory before the process starts.  Proxy
-    variables are pointed at an unreachable loopback endpoint as defense in
-    depth: an unexpected downloader path must fail rather than acquire Oodle.
+    UnrealReZen's FF7R2 release loads CUE4Parse Oodle at startup even when
+    package compression is Zlib.  Its CUE4Parse/1.1.1 helper returns immediately
+    when oo2core_9_win64.dll already exists and otherwise enters its downloader.
+    Lexeditor therefore requires that exact dependency manifest and places only
+    the explicitly supplied DLL in an isolated working directory before process
+    start.  No Lexeditor code calls or implements the downloader.
     """
     env = dict(os.environ if environment is None else environment)
     packer, oodle, content_root, game_paks = _plan(project, game, env)
@@ -141,6 +170,8 @@ def build_candidate(project: Path | None, game: Path | None,
     output_utoc = candidate / f"{PACKAGE_NAME}.utoc"
     staged = project / STAGED_PLAYER
     staged_sha256 = _sha256(staged)
+    packer_sha256 = _sha256(packer)
+    oodle_sha256 = _sha256(oodle)
 
     try:
         with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packer-") as runtime_name:
@@ -159,18 +190,10 @@ def build_candidate(project: Path | None, game: Path | None,
                 "--mount-point", MOUNT_POINT,
                 "--game-dir-top-only",
             ]
-            process_env = dict(env)
-            blocked_proxy = "http://127.0.0.1:9"
-            process_env.update({
-                "HTTP_PROXY": blocked_proxy,
-                "HTTPS_PROXY": blocked_proxy,
-                "ALL_PROXY": blocked_proxy,
-                "NO_PROXY": "127.0.0.1,localhost",
-            })
             completed = runner(
                 command,
                 cwd=str(runtime),
-                env=process_env,
+                env=dict(env),
                 capture_output=True,
                 text=True,
                 timeout=300,
@@ -189,6 +212,10 @@ def build_candidate(project: Path | None, game: Path | None,
 
         if _sha256(staged) != staged_sha256:
             raise PackagingError("Staged PlayerParameter changed while the package was being built")
+        if _sha256(packer) != packer_sha256:
+            raise PackagingError("UnrealReZen executable changed while the package was being built")
+        if _sha256(oodle) != oodle_sha256:
+            raise PackagingError("Supplied Oodle DLL changed while the package was being built")
 
         outputs = [
             output_utoc,
@@ -213,13 +240,16 @@ def build_candidate(project: Path | None, game: Path | None,
                 "sha256": staged_sha256,
             },
             "tooling": {
-                "unrealReZen": {"sha256": _sha256(packer)},
-                "oodle": {"sha256": _sha256(oodle), "copiedAs": OODLE_NAME},
+                "unrealReZen": {
+                    "sha256": packer_sha256,
+                    "requiredCUE4Parse": CUE4PARSE_VERSION,
+                },
+                "oodle": {"sha256": oodle_sha256, "copiedAs": OODLE_NAME},
                 "engine": ENGINE_VERSION,
                 "compression": "Zlib",
                 "mountPoint": MOUNT_POINT,
                 "gameDirTopOnly": True,
-                "networkFallbackBlocked": True,
+                "dependencyDownloadInvokedByLexeditor": False,
             },
             "outputs": [
                 {"file": path.name, "sha256": _sha256(path), "bytes": path.stat().st_size}
