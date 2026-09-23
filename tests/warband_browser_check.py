@@ -61,7 +61,7 @@ RECORD_SOURCES={
     'module_skins.py':'skins=[("man",0,"body","calf","hand","head",face_keys,["hair"],[],["hair_tex"],[],[],[],"skel_human",1.0)]\n',
     'module_particle_systems.py':'particle_systems=[("dust",psf_billboard_3d,"dust",5,2.0,10,0.05,10.0,39.0,(0.2,0.5),(1,0),(0,1),(1,1),(0,0.9),(1,0.9),(0,0.78),(1,0.78),(0,2),(1,3.5),(0.2,0.3,0.2),(0,0,3.9),0.5,130,0.5)]\n',
 }
-// Enough real source records to prove the shared fitted pager, not a one-page demo.
+# Enough real source records to prove the shared fitted pager, not a one-page demo.
 RECORD_SOURCES['module_skills.py']='skills=[\n'+',\n'.join(
     ('("power_strike","Power Strike",sf_base_att_str,10,"Hit harder.")' if i==0 else
      f'("skill_{i:03}","Skill {i:03}",sf_base_att_int,10,"Fixture skill {i:03}.")')
