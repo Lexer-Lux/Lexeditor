@@ -29,7 +29,9 @@ RDR_TEST_TOOLS = {
     "tools/verify_rdr_cache_reuse_71.py",
     "tools/verify_rdr_items_split_issue_19.py",
     "tools/verify_rdr_data_map_audit.py",
+    "tools/verify_rdr_mod_compatibility.py",
     "tests/test_rdr_string_tables.py",
+    "tests/test_rdr_rbf.py",
     "tools/magic-rdr/README.md",
 }
 FONT_SUFFIXES = {".ttf", ".otf", ".woff", ".woff2"}
@@ -42,6 +44,8 @@ REQUIRED = (
     "games/rdr/editor.js",
     "games/rdr/strings.js",
     "games/rdr/string_tables.py",
+    "games/rdr/rbf.js",
+    "games/rdr/rbf.py",
     "games/rdr/magic_rdr_manager.py",
     "tools/magic-rdr/README.md",
 )
@@ -182,10 +186,11 @@ def build(root: Path, output: Path, commit: str) -> dict:
                 "  3. Strings: language tabs appear before resource selection; search spans resources; Resource shows the owning STRTBL path.\n"
                 "  4. Edit one string, Save, switch to Vanilla and back, then reload: Vanilla stays unchanged and the project text reopens.\n"
                 "  5. Make another unsaved string edit and Discard string edits: the last saved text returns.\n"
-                "  6. Data Map: supported PC STRTBL rows are Partial/openable; _ps3 STRTBL and unknown formats remain visible as Not integrated.\n"
-                "  7. Items/Shops/Missions/Tweaks: change one safe field, Save, reopen, and confirm the project override without changing prepared source bytes.\n"
-                "  8. Info: if RedHook is absent, Keep editing works and Open official download only opens the official page. RedHook is never bundled or silently installed.\n"
-                "  9. Do not click Deploy Project for source/rendered acceptance. Deployment and in-game behavior are separate acceptance levels.\n"
+                "  6. Data Map: supported PC STRTBL and actual parsed RBF0 scalar rows are Partial/openable; _ps3 STRTBL, unsafe RBF0 content and unknown formats remain visible as Not integrated.\n"
+                "  7. RBF Scalars: edit one bool/uint32/float leaf, Save, switch Vanilla/back, then verify only the project override changes; strings, vectors, byte blocks and unknown records stay opaque.\n"
+                "  8. Items/Shops/Missions/Tweaks: change one safe field, Save, reopen, and confirm the project override without changing prepared source bytes.\n"
+                "  9. Info: if RedHook is absent, Keep editing works and Open official download only opens the official page. RedHook is never bundled or silently installed.\n"
+                "  10. Do not click Deploy Project for source/rendered acceptance. Deployment and in-game behavior are separate acceptance levels.\n"
             ),
         )
 
