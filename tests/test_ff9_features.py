@@ -169,3 +169,15 @@ def test_revert_restores_owned_mod_when_ini_update_fails(env):
     assert target.is_dir()
     assert deployed_runtime.read_bytes() == before_runtime
     assert ini.read_bytes() == duplicate
+
+
+def test_unquoted_comma_is_one_memoria_path(env):
+    game, project, runtime = env
+    folder = game / "OtherMod, SecondMod"
+    folder.mkdir()
+    (game / "Memoria.ini").write_bytes(
+        b"[Mod]\r\nFolderNames = OtherMod, SecondMod\r\n"
+    )
+    features.deploy(game, project, runtime)
+    deployed = (game / "Memoria.ini").read_bytes()
+    assert b'FolderNames = "Lexeditor", "OtherMod, SecondMod"' in deployed
