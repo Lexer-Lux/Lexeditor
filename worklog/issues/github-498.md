@@ -42,3 +42,16 @@ whether the FFNx gains move vanilla audio with use_external_sfx/music off.
 Needs Lexer/game: install a build with the backend, confirm each slider
 moves only its named category, confirm restart persistence, report audible
 pass/fail.
+
+## 2026-09-23 impl/ff8-actionables: editor half implemented + tested
+
+New agent-side slice landed on this branch: SFX VOLUME and MUSIC VOLUME
+rows on the Tweaks page (bounded 0-100 number controls, `%` unit,
+help text; unset shows 100 without arming), `sfxVolume`/`musicVolume`
+persisted per mod (`None` = unmanaged), applied per-key to FFNx.toml on
+launch via the previously orphaned `set_audio_volumes` (now wired in
+`gameplay_settings.save` under `install_runtime`). Covered by new
+`tests/test_ff8_audio_volumes_issue_498.py` (9 passed) and the full
+non-browser ff8 unit set (212 passed, 3 skipped). Codex updated.
+Still game-side: in-game Config-menu replacement plus audible
+isolation/persistence proof. Stays actionable.

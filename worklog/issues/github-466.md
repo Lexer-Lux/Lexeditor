@@ -40,3 +40,12 @@ passed session closes it subject to the merge workflow.
   four acceptance renders of the three-column battle reward screen (single
   reward, several rewards, long description, modded description) and the
   award-once confirm check with save/fixture details, reported on #466.
+
+## 2026-09-23 impl/ff8-actionables: game confirmed FF8, labeled
+
+Verified from the issue body: `Shear Feather` is FF8 item id 147
+(`plugins/ff8/schema/item.json`), so the missing game label was added
+(`ff8`). No new agent-side slice exists: the reward screen is drawn by
+the game exe natively and the three-column layout needs its drawing
+hooks plus the four acceptance renders from a game session. Stays
+actionable.

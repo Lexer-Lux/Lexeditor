@@ -38,3 +38,12 @@ selection) plus the L1-Journal/R1-map Modern Controls bindings, and
 Needs Lexer/game: proved native overlay injection points for the
 full-screen map (activation fails closed until then), plus the Modern
 Controls runtime layer for position/vehicle data.
+
+## 2026-09-23 impl/ff8-actionables: verified, no new code
+
+Re-verified on this branch: the `world_map_fullscreen_issue_90`
+contract already encodes Lexer's answers (texl.obj base,
+discovered/revealed-only labels, waypoint-only, L1-Journal/R1-map
+under Modern Controls) and `tests/test_ff8_world_map_fullscreen_issue_90.py`
+is green. No new agent-side slice exists: native overlay injection
+points need the game. Stays actionable.
