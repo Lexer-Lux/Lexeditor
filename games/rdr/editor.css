@@ -10,3 +10,5 @@
   --lex-input-bg:#29241f;
   --lex-notice-bg:#211d19;
 }
+.rdr-language-tabs{flex:1 1 620px;min-width:0}
+.rdr-language-tabs .lex-subtab-button{padding-inline:10px;font-size:.84em}
