@@ -106,7 +106,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-developer-mode-", ignore_clea
     assert "developerMode" not in packaged
 
     plugin = GamePlugin(
-        "test", "Test", "TEST", "Test", "#fff", lambda: [], lambda: None,
+        "test", "Test",   "#fff", lambda: [], lambda: None,
         session_factory=FakeSession,
     )
     host = HostApi(

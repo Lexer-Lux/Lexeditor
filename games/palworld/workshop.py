@@ -17,6 +17,7 @@ import tempfile
 from typing import Any
 
 from . import build as package_build
+from plugin_files import atomic_write
 
 
 STEAM_APP_ID = "1623730"
@@ -101,19 +102,6 @@ def _load_manifest(path: Path) -> dict[str, Any] | None:
     if not isinstance(digest, str) or len(digest) != 64 or not isinstance(root, str) or not root:
         raise WorkshopOwnershipError("Palworld local deployment manifest is incomplete")
     return value
-
-
-def _atomic_write(path: Path, payload: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temp_name, path)
-    finally:
-        Path(temp_name).unlink(missing_ok=True)
 
 
 def _read_info(info_path: Path) -> dict[str, Any]:
@@ -357,7 +345,7 @@ def deploy(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
             "version": version,
             "debugMode": debug_mode,
         }
-        _atomic_write(
+        atomic_write(
             manifest_path,
             (json.dumps(record, ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
         )
@@ -371,7 +359,7 @@ def deploy(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
         if old_manifest is None:
             manifest_path.unlink(missing_ok=True)
         else:
-            _atomic_write(manifest_path, old_manifest)
+            atomic_write(manifest_path, old_manifest)
         if staging.exists():
             shutil.rmtree(staging, ignore_errors=True)
         raise

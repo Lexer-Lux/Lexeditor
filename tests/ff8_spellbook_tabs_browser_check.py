@@ -3,6 +3,9 @@ import json,re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 def main():
  with sync_playwright() as pw:
   browser=pw.chromium.launch(headless=True);page=browser.new_page()
@@ -10,11 +13,15 @@ def main():
   page.route('**/api/kernel?*',lambda r:r.fulfill(body=json.dumps({'rows':[{'id':10,'spellbook':None}],'spellbook':{'magicOptions':[],'abilityOptions':[]}}),content_type='application/json'))
   page.goto('http://fixture/')
   page.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  page.add_style_tag(content=re.search(r'<style>(.*?)</style>',(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8'),re.S).group(1))
+  page.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
   page.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
+  # The GF page gives its detail host a way to swap one of its panels; the
+  # spellbook uses it to put the abilities panel inside its tabs.
+  page.evaluate("()=>{document.querySelector('#gf-detail').lexReplacePanel=(old,next)=>old.replaceWith(next)}")
   page.add_script_tag(content=(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8'))
   page.get_by_role('tab',name='SPELLBOOK').wait_for()
-  assert page.locator('[data-gf-panel="abilities"] .lexeditor-gf-spellbook').count()==1
+  # The abilities panel is replaced by one tabbed panel holding both views.
+  assert page.locator('.lex-tabbed-panel .lexeditor-gf-spellbook').count()==1
   assert page.get_by_label('Native ability').is_visible()
   page.get_by_role('tab',name='SPELLBOOK').click()
   page.get_by_role('button',name='ENABLE SPELLBOOK').wait_for(state='visible')

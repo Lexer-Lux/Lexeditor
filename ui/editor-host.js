@@ -16,10 +16,14 @@
     const animations = nodes.map((node, index) => node.animate(
       positions[index].map(x => ({transform: `translateX(${x})`})),
       {duration: 300, easing: "cubic-bezier(.4,0,.2,1)", fill: "forwards"}));
-    await Promise.all(animations.map(animation => animation.finished));
-    nodes.forEach((node, index) => { node.style.transform = `translateX(${positions[index][1]})`; });
-    animations.forEach(animation => animation.cancel());
-    nodes[entering ? 1 : 0].inert = false;
+    try {
+      await Promise.race([Promise.all(animations.map(animation => animation.finished)),
+        new Promise(resolve=>setTimeout(resolve,500))]);
+    } finally {
+      nodes.forEach((node, index) => { node.style.transform = `translateX(${positions[index][1]})`; });
+      animations.forEach(animation => animation.cancel());
+      nodes[entering ? 1 : 0].inert = false;
+    }
   };
 
   async function home() {
@@ -47,13 +51,15 @@
     try {
       let result;
       if (message.method === "editor_ready") {
-        if (opening) {
+        if (opening && !opening.entering) {
+          const pending=opening;
+          pending.entering=true;
           await document.fonts.ready;
           await paint();
           await slide(true);
           menu().inert = true;
           frame.focus();
-          opening.resolve();
+          pending.resolve();
           opening = null;
         }
         result = true;
@@ -68,13 +74,15 @@
       }
       source.postMessage({type: "lexeditor-host-result", id: message.id, result}, event.origin);
     } catch (error) {
+      if(message.method==='editor_ready')opening?.reject(error);
       source.postMessage({type: "lexeditor-host-result", id: message.id, error: String(error.message || error)}, event.origin);
     }
   });
 
   window.LexeditorHost = {
     async open(url) {
-      if (frame || opening) return;
+      if (opening) return opening.promise;
+      if (frame) return;
       const destination = new URL(url);
       // The parent owns the slide; the child still owns its loading message.
       origin = destination.origin;
@@ -84,6 +92,7 @@
       frame.title = "Game editor";
       frame.style.cssText = "position:fixed;inset:0;width:100%;height:100%;border:0;z-index:85;transform:translateX(100%);background:var(--lex-bg)";
       const ready = new Promise((resolve, reject) => { opening = {resolve, reject}; });
+      opening.promise=ready;
       frame.src = destination.href;
       document.body.append(frame);
       const timeout = setTimeout(() => opening?.reject(new Error("The editor did not finish loading. Try opening it again.")), 120000);

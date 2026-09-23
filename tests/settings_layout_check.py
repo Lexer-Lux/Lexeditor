@@ -56,13 +56,17 @@ def main():
             }""")
             for width in (900,2048):
                 page.set_viewport_size({'width':width,'height':700});page.wait_for_timeout(300)
-                panel=page.locator('.lex-tweaks-columns')
-                metrics=panel.evaluate('e=>({w:e.clientWidth,sw:e.scrollWidth,h:e.clientHeight,sh:e.scrollHeight,fragments:[...e.querySelectorAll(".lex-settings-column > section")].map(c=>c.getClientRects().length)})')
-                assert metrics['sw']<=metrics['w']+1 and metrics['sh']>metrics['h'],metrics
+                panel=page.locator('.lex-tweaks-scroll')
+                metrics=panel.evaluate('e=>({w:e.clientWidth,sw:e.scrollWidth,h:e.clientHeight,sh:e.scrollHeight,fragments:[...e.querySelectorAll(".lex-tweak-column > section")].map(c=>c.getClientRects().length)})')
+                # Tweaks are paged, not scrolled (71226ff). Seven groups of
+                # thirty rows are taller than a page, so they go on in the next
+                # column and on further pages: nothing overflows either way, no
+                # section is split mid-row, and there is more than one page.
+                assert metrics['sw']<=metrics['w']+1 and metrics['sh']<=metrics['h']+1,metrics
                 assert all(n==1 for n in metrics['fragments']),metrics
-                panel.evaluate('e=>e.scrollTop=e.scrollHeight')
-                assert panel.evaluate('e=>e.scrollTop')>0
-                assert panel.locator('.lex-detail-field').last.evaluate('(e)=>{const a=e.getBoundingClientRect(),b=e.closest(".lex-tweaks-columns").getBoundingClientRect();return a.bottom<=b.bottom+1}')
+                pages=page.locator('.lex-tweaks-paged').evaluate('n=>n.lexPaging().starts.length')
+                assert pages>1,pages
+                assert panel.locator('.lex-detail-field').last.evaluate('(e)=>{const a=e.getBoundingClientRect(),b=e.closest(".lex-tweaks-scroll").getBoundingClientRect();return a.bottom<=b.bottom+1}')
                 page.screenshot(path=str(Path(tempfile.gettempdir())/f'lex-tweaks-scroll-{width}.png'))
             browser.close()
     finally:server.shutdown();server.server_close();thread.join(timeout=2)

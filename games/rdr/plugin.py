@@ -11,7 +11,7 @@ import urllib.request
 from pathlib import Path
 
 from plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProjectSpec, PluginFont
-from service_session import LocalPluginSession, request_json
+from service_session import project_session, request_json
 from .extractor import ensure_rdr_data
 from .paths import LEXEDITOR_ROOT, MOD_ROOT, PLUGIN_ROOT, PROJECT_ROOT, RDR2_FONT_ROOT, check as check_paths
 
@@ -24,20 +24,11 @@ def check() -> list[str]:
     return check_paths()
 
 
-class RdrSession(LocalPluginSession):
+class RdrSession(project_session(
+        module="games.rdr.server", plugin_id="rdr", app_root=LEXEDITOR_ROOT,
+        check=check, project_env="LEXEDITOR_RDR_PROJECT", project_root=project_root,
+        port_env="LEXEDITOR_RDR_PORT")):
     """One host-owned RDR editor service."""
-
-    def __init__(self, extra_env: dict[str, str] | None = None):
-        environment = {"LEXEDITOR_RDR_PROJECT": str(project_root())}
-        environment.update(extra_env or {})
-        super().__init__(
-            module="games.rdr.server",
-            plugin_id="rdr",
-            app_root=LEXEDITOR_ROOT,
-            check=check,
-            port_env="LEXEDITOR_RDR_PORT",
-            extra_env=environment,
-        )
 
 
 def launch() -> int:
@@ -306,8 +297,6 @@ def smoke() -> list[str]:
 PLUGIN = GamePlugin(
     plugin_id="rdr",
     name="Red Dead Redemption",
-    subtitle="RDR",
-    description="Edit RDR tuning, weapons, vehicles, AI, effects, population, and more.",
     accent="#a92b20",
     check=check,
     launch=launch,

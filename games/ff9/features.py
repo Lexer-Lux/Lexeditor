@@ -15,6 +15,7 @@ import tempfile
 from typing import Iterable
 
 from . import memoria_manager, paths
+from plugin_files import atomic_write
 
 MOD_NAME = "Lexeditor"
 CONFIG_NAME = "lexeditor-ff9.ini"
@@ -183,19 +184,6 @@ def status(game_root: Path | None = None, project_root: Path | None = None,
     }
 
 
-def _atomic_write(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(data)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(name, path)
-    finally:
-        Path(name).unlink(missing_ok=True)
-
-
 def deploy(game_root: Path | None = None, project_root: Path | None = None,
            runtime_source: Path | None = None) -> dict:
     game = Path(game_root or paths.GAME_ROOT).resolve()
@@ -224,15 +212,15 @@ def deploy(game_root: Path | None = None, project_root: Path | None = None,
             scripts = staging / "StreamingAssets" / "Scripts"
             scripts.mkdir(parents=True, exist_ok=True)
             shutil.copy2(runtime, scripts / RUNTIME_NAME)
-            _atomic_write(staging / CONFIG_NAME, _encode(config["features"]))
-            _atomic_write(staging / MARKER_NAME,
+            atomic_write(staging / CONFIG_NAME, _encode(config["features"]))
+            atomic_write(staging / MARKER_NAME,
                           ("Lexeditor FF9 managed mod\n" + _digest(runtime) + "\n").encode("ascii"))
             if target.exists():
                 backup = Path(tempfile.mkdtemp(prefix="Lexeditor.ff9-old-", dir=game))
                 backup.rmdir()
                 os.replace(target, backup)
             os.replace(staging, target)
-            _atomic_write(ini, _edit_folder_names(original_ini, add=True))
+            atomic_write(ini, _edit_folder_names(original_ini, add=True))
             if backup and backup.exists():
                 shutil.rmtree(backup)
         except Exception:
@@ -241,7 +229,7 @@ def deploy(game_root: Path | None = None, project_root: Path | None = None,
             if backup and backup.exists():
                 os.replace(backup, target)
             if ini.exists():
-                _atomic_write(ini, original_ini)
+                atomic_write(ini, original_ini)
             if staging.exists():
                 shutil.rmtree(staging, ignore_errors=True)
             raise
@@ -264,9 +252,9 @@ def revert(game_root: Path | None = None, project_root: Path | None = None,
             if target.exists():
                 shutil.rmtree(target)
             if original_ini:
-                _atomic_write(ini, _edit_folder_names(original_ini, add=False))
+                atomic_write(ini, _edit_folder_names(original_ini, add=False))
         except Exception:
             if original_ini and ini.exists():
-                _atomic_write(ini, original_ini)
+                atomic_write(ini, original_ini)
             raise
     return status(game, project, runtime)

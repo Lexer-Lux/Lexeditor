@@ -3,19 +3,22 @@ import re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 def main():
- source=(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8')
+ source=plugin_ui('ff8')
  helpers=source[source.index('  function worldDrawPosition'):source.index('  function worldDrawPointDetail')]
  visual=source[source.index('  function renderWorldVisual'):source.index('  function worldDetail')]
  with sync_playwright() as pw:
   b=pw.chromium.launch(headless=True);p=b.new_page(viewport={'width':1400,'height':900})
   p.route('http://fixture/',lambda r:r.fulfill(body='<div id="fixture" style="height:800px"></div>',content_type='text/html'));p.goto('http://fixture/')
   p.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  p.add_style_tag(content=re.search(r'<style>(.*?)</style>',source,re.S).group(1))
+  p.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
   p.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
-  p.add_script_tag(content='''const {el,infoHelp}=LexeditorUI;const state={data:{world:{rows:[{kind:'worldSegment',id:0,groupId:0}],drawPoints:[{id:0,drawId:129,x:192,y:24},{id:127,drawId:256,x:0,y:0}],sha256:'fixture'}},selected:{},pages:{},filters:{world:'old'},modOnly:true};function worldTextureDataset(){return 'vanilla'}function worldRow(){return {regionId:0}}function worldSegmentDetail(){return el('div',{},'Details')}function rerenderWorldMap(){window.opened=state.selected.world}'''+helpers+visual+"document.querySelector('#fixture').append(renderWorldVisual());")
+  p.add_script_tag(content='''const {el,infoHelp,detailPanel}=LexeditorUI;const state={data:{world:{rows:[{kind:'worldSegment',id:0,groupId:0}],drawPoints:[{id:0,drawId:129,x:192,y:24},{id:127,drawId:256,x:0,y:0}],sha256:'fixture'}},selected:{},pages:{},filters:{world:'old'},modOnly:true};function worldTextureDataset(){return 'vanilla'}function worldRow(){return {regionId:0}}function worldSegmentDetail(){return el('div',{},'Details')}function rerenderWorldMap(){window.opened=state.selected.world}'''+helpers+visual+"document.querySelector('#fixture').append(renderWorldVisual());")
   assert p.evaluate('''()=>{for(let y=0;y<96;y++)for(let x=0;x<128;x++){const v=worldDrawPosition(worldDrawBytes(x,y));if(v.x!==x||v.y!==y)return false}return true}''')
-  marker=p.get_by_role('button',name='Open Draw Point 129');assert p.locator('.world-map-marker').count()==1
+  marker=p.get_by_role('button',name='Open Draw Point 129');assert p.locator('.lex-image-map-point').count()==1
   assert marker.evaluate("e=>parseFloat(e.style.top)>50 && parseFloat(e.style.left)===50")
   marker.click();assert p.evaluate('window.opened')==0
   assert p.evaluate("state.filters.world==='' && !state.modOnly")

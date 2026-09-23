@@ -4,6 +4,9 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 SHOT = ROOT / "out" / "ff8_row_pointer.png"
 
 
@@ -18,8 +21,7 @@ def main():
             else r.fulfill(status=404))
         page.goto("http://fixture/")
         page.add_style_tag(content=(ROOT / "ui/framework.css").read_text(encoding="utf-8"))
-        page.add_style_tag(content=re.search(r"<style>(.*?)</style>",
-                           (ROOT / "games/ff8/editor.html").read_text(encoding="utf-8"), re.S).group(1))
+        page.add_style_tag(content=(ROOT / "games/ff8/editor.css").read_text(encoding="utf-8"))
         page.add_script_tag(content=(ROOT / "ui/framework.js").read_text(encoding="utf-8"))
         # The icon comes from the player's game data; mark where it would draw.
         page.add_style_tag(content=".lex-column-cell-content::before{outline:2px solid red}")
@@ -38,14 +40,14 @@ def main():
               const texts=[...range.getClientRects()].filter(r=>r.width>0);
               const before=getComputedStyle(content,'::before');
               const text=Math.min(...texts.map(r=>r.left));
-              const handRight=text-parseFloat(before.marginRight);
+              const handRight=content.getBoundingClientRect().left+parseFloat(before.left)+parseFloat(before.width);
               const handLeft=handRight-parseFloat(before.width);
               return {content:content.getBoundingClientRect().left,text,handLeft,handRight,position:before.position};
             }""")
         page.screenshot(path=str(SHOT))
         browser.close()
     for align, row in results.items():
-        assert row["position"] == "relative", row
+        assert row["position"] == "absolute", row
         # The hand's right edge sits a few pixels left of the text, wherever the text is.
         assert 0 < row["text"] - row["handRight"] <= 10, (align, row)
     print("FF8 hand cursor sits beside the selected text:", results)

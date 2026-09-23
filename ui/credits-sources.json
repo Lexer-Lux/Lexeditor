@@ -95,6 +95,16 @@
           "name": "Christian Bauer / ff7tools",
           "role": "Reference for FF7 archive and kernel formats.",
           "url": "https://github.com/cebix/ff7tools"
+        },
+        {
+          "name": "petfriendamy / Scarlet",
+          "role": "Reference for FF7 formation layouts, battle restrictions, and initial-condition flags.",
+          "url": "https://github.com/petfriendamy/ff7-scarlet"
+        },
+        {
+          "name": "FF7 modding community / ff7-flat-wiki",
+          "role": "Reference for battle arena names and formation layout.",
+          "url": "https://ff7-mods.github.io/ff7-flat-wiki/FF7/Battle/Battle_Scenes.html"
         }
       ],
       "thanks": [],
@@ -263,6 +273,21 @@
           "name": "RageLib contributors",
           "role": "Resource format support used by the archive tool.",
           "url": "https://github.com/WesternSpace/gta-toolkit"
+        },
+        {
+          "name": "Tsuda Kageyu / MinHook contributors",
+          "role": "Vendored minimal x86/x64 Windows API hooking library used by the RDR2 native runtime.",
+          "url": "https://github.com/TsudaKageyu/minhook"
+        },
+        {
+          "name": "Alexander Blade / ScriptHookRDR2",
+          "role": "External runtime loader required by the RDR2 native ASI; not redistributed by Lexeditor.",
+          "url": "https://www.dev-c.com/rdr2/scripthookrdr2/"
+        },
+        {
+          "name": "Smerdokryl / RDR2_SDK",
+          "role": "External ScriptHookRDR2 SDK headers and import library used to build the RDR2 native runtime; not redistributed by Lexeditor.",
+          "url": "https://github.com/Smerdokryl/RDR2_SDK"
         }
       ],
       "thanks": [],
@@ -286,34 +311,12 @@
         {
           "name": "RageLib — MIT",
           "sourcePath": "tools/rpf-cli/RAGELIB-LICENSE.txt"
+        },
+        {
+          "name": "MinHook — BSD 2-Clause License",
+          "sourcePath": "games/rdr2/native_runtime/GameplayTweaks/third_party/minhook/LICENSE.txt"
         }
       ]
-    },
-    "chrono-trigger": {
-      "contributions": [
-        {
-          "name": "jimzrt / ChronoMod contributors",
-          "role": "Steam resources.bin ARC1 archive format reference.",
-          "url": "https://github.com/jimzrt/ChronoMod"
-        },
-        {
-          "name": "GitExl / CTViewer contributors",
-          "role": "Steam scene, overworld, map, tileset, palette and script format references.",
-          "url": "https://github.com/GitExl/CTViewer"
-        },
-        {
-          "name": "OnemusCT / Temporal Redux contributors",
-          "role": "PC Atel event command widths and behavior references.",
-          "url": "https://github.com/OnemusCT/temporal-redux"
-        },
-        {
-          "name": "TheRealBiggs / CTExt contributors",
-          "role": "Chrono Trigger Steam loose-file and CTP runtime loading model.",
-          "url": "https://github.com/TheRealBiggs/ctext"
-        }
-      ],
-      "thanks": [],
-      "licenses": []
     }
   }
 }

@@ -53,6 +53,7 @@ from .semantics import (
 from .storage import load_package, save_edits
 from .text_storage import load_text_package, resident_text_map, save_text_edits
 from .tooling import FF7R_MOUNT_POINT, helper_status, pack_directory
+from plugin_http import PluginRequestHandler
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -388,28 +389,7 @@ def _semantic_save_from_generic(asset: str, *, source_sha256: str,
     return None
 
 
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, _format, *_args):
-        return
-
-    def send_json(self, payload, status=200):
-        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
-    def send_file(self, target: Path):
-        data = target.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
+class Handler(PluginRequestHandler):
     def read_json(self):
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -430,6 +410,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 return self.send_file(PLUGIN_ROOT / "editor.html")
+            if self.send_page_module(PLUGIN_ROOT, path):
+                return
             if path.startswith("/shared/"):
                 shared = (ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()

@@ -8,7 +8,7 @@ owns the one copy of ReShade and Lexeditor's effects.
 
 from __future__ import annotations
 
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 import json
 import mimetypes
 import os
@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from games.ff7r2 import shader_injector
+from plugin_http import PluginRequestHandler
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -49,32 +50,51 @@ def injector_state() -> dict:
     return {"available": True, **shader_injector.status(folder)}
 
 
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, _format, *_args):
-        return
+def data_map_payload() -> dict:
+    """The files this plugin reads or writes, and what it does with each.
 
-    def send_json(self, payload, status=200):
-        data = json.dumps(payload).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
+    Rebirth's own data is not edited here - the plugin manages presentation
+    tools - so the map lists those tools' files, where they live, and how far
+    the plugin understands them.
+    """
+    binaries = f"{shader_injector.INSTALL_FOLDER}/"
+    cache = "Documents/" + "/".join(shader_injector.CACHE_FOLDER) + "/"
+    rows = [
+        {"filename": binaries + shader_injector.DLL,
+         "controls": "Shader Injector's loader. Installed, switched on and off by renaming it to "
+                     + shader_injector.DISABLED_DLL + ", and removed.",
+         "notes": "Only the pinned release (" + shader_injector.VERSION + ", "
+                  + shader_injector.VARIANT + ") is installed, checked by its SHA-256 before use.",
+         "coverage": "structured", "status": "integrated", "target": "tweaks"},
+        {"filename": binaries + shader_injector.INI,
+         "controls": "Every Shader Injector setting, as a typed control: switches, numbers and key bindings.",
+         "notes": "Written back in place; settings the plugin does not know are preserved.",
+         "coverage": "structured", "status": "integrated", "target": "tweaks"},
+        {"filename": binaries + shader_injector.FOLDER + "/",
+         "controls": "The shader replacements Shader Injector loads.",
+         "notes": "Installed with the release and removed with it; not edited.",
+         "coverage": "source", "status": "partial", "target": "tweaks"},
+        {"filename": cache + shader_injector.CACHE_PATTERN,
+         "controls": "The game's compiled shader cache. Cleared on request so the injector sees shaders being created.",
+         "notes": "Deleted files go to the Recycle Bin; the game rebuilds them on its next start.",
+         "coverage": "view", "status": "partial", "target": "tweaks"},
+        {"filename": binaries + "dxgi.dll / ReShade.ini / ReShadePreset.ini",
+         "controls": "ReShade and Lexeditor's effects: the master switch, each effect and its values.",
+         "notes": "Installed and configured by the desktop host, which owns the one copy of ReShade.",
+         "coverage": "structured", "status": "integrated", "target": "tweaks"},
+    ]
+    for index, row in enumerate(rows):
+        row["id"] = str(index)
+    return {"rows": rows}
 
-    def send_file(self, target: Path):
-        data = target.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", mimetypes.guess_type(target.name)[0]
-                         or "application/octet-stream")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
 
+class Handler(PluginRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
         if path == "/":
             self.send_file(PLUGIN_ROOT / "editor.html")
+        elif self.send_page_module(PLUGIN_ROOT, path):
+            return
         elif path.startswith("/shared/"):
             shared = (ROOT / "ui").resolve()
             target = (shared / path.removeprefix("/shared/")).resolve()
@@ -86,7 +106,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"apiVersion": 1, "pluginId": "ff7r2",
                             "name": "Final Fantasy VII Rebirth",
                             "hosted": True, "windowHost": "webview2",
-                            "capabilities": ["reshade", "shader-injector"]})
+                            "capabilities": ["reshade", "shader-injector", "data-map"]})
+        elif path == "/api/datamap":
+            self.send_json(data_map_payload())
         elif path == "/api/game":
             root = game_root()
             binaries = root / "End/Binaries/Win64" if root else None

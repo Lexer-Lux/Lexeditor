@@ -693,6 +693,15 @@
     ]});
     return tabbedPanel({tabs:[{id:"ffnx",label:"FFNx"}],active:"ffnx",label:"Tweaks sections",change:()=>{},content:panel});
   }
+  function ff7ModLoaderSection(){
+    return LexeditorUI.modLoaderSection({
+      loader:"FFNx Direct Mode is the proved runtime path for deployable FF7 data. Lexeditor detects FFNx.toml at the game root or ff7/workingdir and uses its configured direct_mode_path.",
+      output:"Project saves stay isolated until Export or Deploy. Direct Mode output covers KERNEL data sections 1–9, KERNEL2 text sections 10–27, scene blocks, field encounter section 7 and world enc_w.bin. Executable-backed project edits remain explicitly undeployable.",
+      order:"Lexeditor writes only paths listed in its deployment manifest. It refuses an unowned Direct Mode collision instead of deciding which mod should win.",
+      safety:"Installed KERNEL, scene, LGP and executable files are never replaced. Deploy writes only to FFNx Direct Mode and blocks projects containing unsupported changes.",
+      removal:"Remove Deployment deletes only unchanged files recorded as Lexeditor-owned; externally changed files are left in place.",
+    });
+  }
   function infoView(){
     const baseline=state.dashboard.baseline,sounds=LexeditorUI.sharedSettings()?.developerMode?LexeditorUI.soundCoverageTable(state.dashboard.themeSounds?.rows||[]):null;
     return detailPanel({className:"lex-information-panel ff7-detail",icon:infoIcon(),title:identity.name,identity:null,meta:identity.edition,body:[
@@ -707,7 +716,7 @@
       ]}),
       ...((state.dashboard.problems||[]).length?[detailSection({title:"PROBLEMS",body:(state.dashboard.problems||[]).map((problem,index)=>detailField({label:`Problem ${index+1}`,control:readonlyField(problem)}))})]:[]),
       ...(sounds?[detailSection({title:"THEME SOUNDS",body:[sounds]})]:[]),
-      window.ff7ModLoaderSection(),
+      ff7ModLoaderSection(),
       detailSection({title:"DEPLOYMENT",body:[detailField({label:"FFNx Direct Mode",control:el("button",{type:"button",onclick:()=>navigate("deployment")},"Open deployment")})]}),
     ]});
   }

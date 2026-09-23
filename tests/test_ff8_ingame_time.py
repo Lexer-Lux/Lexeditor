@@ -5,6 +5,9 @@ import unittest
 from games.ff8 import menu_qol_issue_61
 
 ROOT = Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 
 
 class InGameTimeTests(unittest.TestCase):
@@ -36,7 +39,7 @@ class InGameTimeTests(unittest.TestCase):
         self.assertIn("in_game_time=in_game_time", settings)
 
     def test_editor_exposes_clock_and_explains_semantics(self):
-        editor = (ROOT / "games/ff8/editor.html").read_text(encoding="utf-8")
+        editor = plugin_ui('ff8')
         self.assertIn('"aria-label":"In-game Time"', editor)
         self.assertIn('row("IN-GAME TIME"', editor)
         self.assertIn("local clock", editor)
@@ -51,7 +54,8 @@ class InGameTimeTests(unittest.TestCase):
         # rather than by one exact spelling that keeps moving.
         gate = "if (!ff8 || (!enable_ff8_xp_bars && !enable_ff8_hp_bars"
         self.assertIn(gate, source)
-        self.assertIn("!enable_ff8_gf_hp_bars && !enable_ff8_ingame_time))", source)
+        self.assertIn("!enable_ff8_gf_hp_bars", source)
+        self.assertIn("!enable_ff8_ingame_time && !enable_ff8_better_hp_colors", source)
         self.assertIn("if (!enable_ff8_xp_bars) return;", source)
         # The clock is not an overlay surface any more; it hooks the native
         # PLAY-time renderer. What still has to hold is the ordering: the

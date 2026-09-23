@@ -22,6 +22,7 @@ from typing import Callable
 
 from .memoria_patcher import inspect_payload, installation_files
 from .memoria_recovery import Recovery, atomic_json, digest, install_lock, root_key, verify_install
+from plugin_files import fetch_file
 
 LOCAL_DATA = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parents[2] / "out")) / "Lexeditor"
 STATE_PATH = LOCAL_DATA / "helpers" / "memoria.json"
@@ -39,6 +40,11 @@ Progress = Callable[[int, int, str], None]
 JsonFetcher = Callable[[str], dict]
 FileFetcher = Callable[[str, Path, "Progress | None"], None]
 _sha256 = digest
+
+
+def _fetch_file(url: str, target: Path, progress: Progress | None = None) -> None:
+    fetch_file(url, target, limit=MAX_ASSET_BYTES, progress=progress,
+               label="Downloading Memoria…", too_large="The Memoria download is larger than the allowed limit")
 
 
 def _now() -> str:
@@ -76,25 +82,6 @@ def _fetch_json(url: str) -> dict:
     if len(data) > 2 * 1024 * 1024:
         raise RuntimeError("The Memoria release metadata is too large")
     return json.loads(data.decode("utf-8"))
-
-
-def _fetch_file(url: str, target: Path, progress: Progress | None = None) -> None:
-    request = urllib.request.Request(url, headers={"User-Agent": "Lexeditor/1.0"})
-    with urllib.request.urlopen(request, timeout=30) as response, target.open("wb") as stream:
-        total = int(response.headers.get("Content-Length") or 0)
-        if total > MAX_ASSET_BYTES:
-            raise RuntimeError("The Memoria download is larger than the allowed limit")
-        current = 0
-        while True:
-            block = response.read(1024 * 1024)
-            if not block:
-                break
-            current += len(block)
-            if current > MAX_ASSET_BYTES:
-                raise RuntimeError("The Memoria download is larger than the allowed limit")
-            stream.write(block)
-            if progress:
-                progress(current, total, "Downloading Memoria…")
 
 
 def release(fetch_json: JsonFetcher = _fetch_json) -> dict:

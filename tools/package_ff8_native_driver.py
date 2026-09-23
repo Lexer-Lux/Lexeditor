@@ -32,6 +32,7 @@ SUPPORT_FILES = {
     'verify-issue51-build.ps1',
 }
 NEW_DRIVER_MARKERS = (
+    b'enable_ff8_better_hp_colors', b'enable_ff8_interaction_indicators',
     b'enable_ff8_gf_hp_bars', b'enable_ff8_party_switch',
     b'enable_ff8_no_magic_consumption', b'lexeditor_ff8_shared_party_contract_version',
     b'lexeditor_ff8_no_consume_battle_debit',
@@ -80,15 +81,19 @@ def verify_compilation_patch(candidate: bytes, complete: bytes) -> None:
 
 
 def package(candidate: Path, ffnx_source: Path, *, driver_sha256: str,
-            build_revision: str, build_run: int) -> dict:
+            build_revision: str, build_run: int = 0, local_build: bool = False) -> dict:
     candidate = candidate.resolve()
     require(re.fullmatch(r'[0-9a-f]{64}', driver_sha256) is not None,
             'An explicit reviewed driver SHA-256 is required')
-    require(re.fullmatch(r'[0-9a-f]{40}', build_revision) is not None and build_run > 0,
+    require(re.fullmatch(r'[0-9a-f]{40}', build_revision) is not None and
+            ((local_build and build_run == 0) or (not local_build and build_run > 0)),
             'A reviewed source revision and Actions run are required')
     driver = candidate / 'AF3DN.P'
     require(sha256(driver) == driver_sha256, 'Candidate does not match reviewed driver digest')
     build = (candidate / 'BUILD.txt').read_text(encoding='utf-8-sig')
+    if local_build:
+        require('Local build from uncommitted worktree; complete patch is authoritative.' in build,
+                'Local build receipt must identify its uncommitted source boundary')
     require(f'Editor source: {build_revision}' in build and f'FFNx source: {BASE}' in build,
             'Build receipt does not match requested source revisions')
     require(sha256(candidate / 'FFNx.pdb') != hashlib.sha256(b'').hexdigest(), 'Empty build symbols')
@@ -134,13 +139,16 @@ def package(candidate: Path, ffnx_source: Path, *, driver_sha256: str,
                     'CMake cache were recovered without changing the binary; all '
                     'linked-artifact and package checks were rerun before publication.'
                     if 'Recovered from' in build else '')
+        origin = ('Local MSVC x86 build from the uncommitted editor worktree; '
+                  'the complete derivative patch identifies the compiled source.'
+                  if local_build else f'Actions build run: `{build_run}`')
         report = f'''# Lexeditor FFNx battle repair build
 
 ## Artifact and source
 
 - FFNx base: `{BASE}`
 - Editor build revision: `{build_revision}`
-- Actions build run: `{build_run}`
+- {origin}
 - Supported private game SHA-256: `{runtime_package.SUPPORTED_GAME_SHA256}`
 - Identity: `{manifest['identity']}`
 - Driver SHA-256: `{driver_sha256}`
@@ -160,12 +168,23 @@ Party Switch retires the outgoing model through native event 69 before event
 66 loads its replacement. Native saved/kernel names are resolved and measured
 before drawing. Cancellation keeps the turn; invalidated reserves reload the
 original character; the HUD cache is refreshed after a completed replacement.
-HP and GF HP use two thin rails, with separate anchors, directions and colors.
+HP, GF HP and XP use the measured vanilla two-edge rail profile, with a clear
+center, separate anchors, directions and colors.
 GF HP requires one junctioned GF and reads live charging HP during a summon.
 Menu XP bars follow native character and GF widgets. Active and reserve main
-menu rows show progress below names; character details and GF details show it
+menu rows show progress below LV; character details and GF details show it
 below the level row. GF lists show progress below each level. Each capture
 keeps its native viewport and clears after drawing. Post-battle XP code remains.
+Active main-menu HP also draws below HP X/Y when XP is disabled. Modern Controls
+suppresses native camera-left/right input and the overhead-view toggle at their
+consumers. Battle camera elevation uses FF8's downward-positive Y axis, so
+the floor blocks underground movement and the upper limit allows elevation.
+In-game Time uses the native TIME label instead of PLAY.
+Better HP Colors adds optional smooth HP-number colour in battle, shared
+character panels and active/reserve main-menu rows. Native KO and status
+palettes take priority. Interaction Indicators observes the native field target
+and adds a CARD cue for Talk scripts that directly contain CARDGAME. Both
+settings default off; neither changes input or starts a field interaction.
 Party Switch explicitly relinquishes and re-registers the replaced
 actor's shared-stock mirror, rather than copying its private record over the
 canonical pool. Shared Magic works with the configured stock cap (1–255);
@@ -176,8 +195,8 @@ a separate guarded one-byte Hext change, retaining Mug-once and reward-once chec
 ## Build reproduction
 
 Use the exact FFNx base and its pinned vcpkg submodule. Apply the complete
-`ISSUE51_DERIVATIVE_SOURCE.patch`. The build uses MSVC x86 on the
-`windows-2025-vs2026` runner, CMake 4.2.0, Ninja, Release, and the
+`ISSUE51_DERIVATIVE_SOURCE.patch`. The build uses MSVC x86 on Windows,
+CMake 4.2.0, Ninja, Release, and the
 `x86-windows-static` triplet with `VCPKG_BUILD_TYPE release`.
 Configure with `FFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON`,
 `FFNX_LEXEDITOR_LIVE_CONDITIONS=ON`, and `FFNX_DEPLOY_TO_GAME_DIRS=OFF`,
@@ -244,7 +263,9 @@ if __name__ == '__main__':
     parser.add_argument('--ffnx-source', type=Path, required=True)
     parser.add_argument('--driver-sha256', required=True)
     parser.add_argument('--build-revision', required=True)
-    parser.add_argument('--build-run', type=int, required=True)
+    parser.add_argument('--build-run', type=int, default=0)
+    parser.add_argument('--local-build', action='store_true')
     args = parser.parse_args()
     print(json.dumps(package(args.candidate, args.ffnx_source, driver_sha256=args.driver_sha256,
-                             build_revision=args.build_revision, build_run=args.build_run), indent=2))
+                             build_revision=args.build_revision, build_run=args.build_run,
+                             local_build=args.local_build), indent=2))

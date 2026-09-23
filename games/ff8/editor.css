@@ -1,0 +1,149 @@
+    @font-face {font-family:"FF8 Menu";src:url("/assets/ff8-menu.ttf?v=4") format("truetype");font-display:swap;ascent-override:88%;descent-override:12%;line-gap-override:0%}
+    :root {--lex-font-synthesis:none;--lex-number-font:var(--lex-font);--lex-main-display:flex;--lex-main-overflow:hidden;--lex-card-bg:#22357e;--lex-card-fg:#fff;--lex-card-image-crop:3%;--lex-math-font:var(--lex-font);--lex-font-size:17px;--lex-line-height:1.28;--lex-bg:#000;--lex-panel:#626262;--lex-panel-2:#4f4f4f;--lex-border:#929292;
+      --lex-text:#fff;--lex-muted:#d0d0d0;--lex-accent:#aa2432;--lex-accent-text:#fff;
+      --lex-highlight:#fff;--lex-success:#d8d8d8;--lex-font:"FF8 Menu","Arial Narrow",sans-serif;--lex-font-size-adjust:none;--lex-text-nudge:0px;--lex-text-line:1.25;
+      /* FF8 draws the whole PlayStation menu, so it takes the shared skin and
+         the font-metric rules; games that do not ask keep their own look. */
+      --lex-skin:on;--lex-font-metrics:on;
+      /* Toasts are FF8 menu panels: large, centred under the window bar. */
+      --lex-toast-top:calc(var(--lex-shell-header-bottom, 180px) + var(--lex-panel-gap));
+      --lex-toast-bottom:auto;--lex-toast-right:auto;--lex-toast-left:50%;
+      --lex-toast-shift:-50% 0;--lex-toast-align:center;
+      --lex-toast-bg:var(--ff8-menu-surface);--lex-toast-fg:#fff;
+      --lex-toast-border:3px solid;--lex-toast-border-color:#aaa #282828 #282828 #aaa;
+      --lex-toast-font-size:26px;--lex-toast-padding:14px 28px;
+      --lex-heading-font:"FF8 Menu","Arial Narrow",sans-serif;--lex-radius:0;--lex-tab-hover-radius:0;
+      --ff8-menu-surface:linear-gradient(135deg,#707070 0%,#626262 52%,#575757 100%);
+      --ff8-bevel-light:#aaa;--ff8-bevel-dark:#282828;
+
+      /* The menu itself, as values. Bevelled grey slabs, black behind the
+         tabs, and the game's own pointing hand marking what is selected. */
+      --lex-text-shadow:2px 2px 0 #252525;
+      --lex-shell-header-bg:#000;--lex-shell-header-gap:var(--lex-panel-gap);--lex-shell-header-padding:0;
+      --lex-command-row-padding:0 10px;--lex-command-row-bg:linear-gradient(135deg,#737373,#555 72%);
+      --lex-command-row-border:3px solid;--lex-command-row-border-color:#aaa #282828 #282828 #aaa;
+
+      /* Twelve tabs, one row: the labels scale rather than wrapping and
+         stealing height from every list below. */
+      --lex-nav-bg:#000;--lex-nav-padding-inline:var(--lex-panel-gap);
+      --lex-tab-min-height:44px;--lex-tab-padding-inline:clamp(5px,.75vw,20px);
+      --lex-tab-font-size:clamp(12px,1.02vw,20px);--lex-tab-fg:#eee;
+      --lex-tab-bg:linear-gradient(135deg,#6d6d6d,#505050);
+      --lex-tab-border:3px solid;--lex-tab-border-color:#a7a7a7 #292929 #292929 #a7a7a7;
+      --lex-tab-hover-bg:linear-gradient(135deg,#7b7b7b,#5b5b5b);
+      --lex-tab-active-fg:#fff;--lex-tab-active-bg:linear-gradient(135deg,#888,#626262);
+      --lex-tab-active-border-color:#d0d0d0 #313131 #313131 #d0d0d0;
+      --lex-tab-marker-content:"";--lex-tab-marker-image:url("/assets/icons/0.png");
+      --lex-tab-marker-width:32px;--lex-tab-marker-height:22px;--lex-tab-marker-gap:10px;
+      /* The hand is the marker, so the shared lift and underline go away. */
+      --lex-tab-lift:0px;--lex-tab-underline-content:none;
+      --lex-unit-align:baseline;
+      --lex-settings-tab-bg:linear-gradient(135deg,#555,#3f3f3f);
+      --lex-settings-tab-hover-bg:linear-gradient(135deg,#666,#494949);
+      --lex-settings-tab-active-bg:linear-gradient(135deg,#777,#555);
+
+      /* Window buttons: the same bevel, round where the game draws it round. */
+      --lex-shell-button-fg:#fff;--lex-shell-button-border-width:2px;
+      --lex-shell-button-border-color:#aaa #292929 #292929 #aaa;
+      --lex-shell-button-bg:linear-gradient(135deg,#666,#484848);
+      --lex-window-button-height:34px;--lex-save-icon-size:36px;--lex-shell-icon-size:20px;
+      --lex-round-button-radius:50%;
+      --lex-process-running-fg:#ff6b64;--lex-process-running-bg:linear-gradient(135deg,#704846,#412c2b);
+
+      /* Panels, lists and the marked row. */
+      --lex-surface-bg:var(--ff8-menu-surface);--lex-surface-border:3px solid;
+      --lex-surface-border-color:#aaa #282828 #282828 #aaa;
+      --lex-surface-shadow:inset 1px 1px #5d5d5d,inset -1px -1px #222;
+      --lex-list-header-bg:#565656;--lex-list-cell-border:#ffffff2b;
+      --lex-sort-header-bg:#303030;--lex-sort-header-fg:#fff;
+      --lex-row-hover-bg:#6c6c6c;--lex-row-selected-bg:#777;--lex-row-selected-fg:#fff;
+      --lex-cell-padding:5px 8px;--lex-head-cell-padding:5px 8px;
+      --lex-row-marker-content:"";--lex-row-marker-image:url("/assets/icons/0.png");
+      --lex-row-marker-width:28px;--lex-row-marker-height:19px;--lex-row-marker-gap:8px;
+      --lex-row-marker-filter:drop-shadow(1px 1px #111);
+      /* Smaller, dimmer and tilted, so the sorted column is not mistaken for
+         the selected record. */
+      --lex-sort-marker-image:url("/assets/icons/0.png");--lex-sort-marker-clip:none;
+      --lex-sort-marker-clip-ascending:none;--lex-sort-marker-opacity:.75;
+      --lex-sort-marker-sorted-opacity:.75;--lex-sort-marker-width:22px;--lex-sort-marker-height:15px;
+      --lex-sort-marker-filter:drop-shadow(1px 1px #111);
+      --lex-sort-marker-ascending:rotate(-30deg);--lex-sort-marker-descending:rotate(30deg);
+      --lex-head-cell-overflow:visible;
+      --lex-pager-fg:#fff;--lex-pager-bg:#4f4f4f;--lex-pager-border:3px solid;
+      --lex-pager-border-color:#aaa #282828 #282828 #aaa;--lex-pager-button-fg:#fff;
+      --lex-pager-button-bg:#606060;--lex-pager-button-border:2px solid;
+      --lex-pager-button-border-color:#aaa #292929 #292929 #aaa;--lex-pager-button-radius:0;
+
+      /* Every value sits in the same recessed slab the game uses. */
+      --lex-input-fg:#fff;--lex-input-border:2px solid;
+      --lex-input-border-color:#292929 #a5a5a5 #a5a5a5 #292929;--lex-input-radius:0;
+      --lex-input-bg:#3b3b3b;--lex-input-shadow:none;--lex-input-text-shadow:inherit;
+      --lex-field-padding:6px 8px;
+
+      /* Section titles keep the game lettering and separate content with a line. */
+      --lex-section-title-fg:#d0d0d0;--lex-section-title-font:20px/1 var(--lex-heading-font);
+      --lex-section-title-shadow:-2px -2px 0 #151515,0 -2px 0 #151515,2px -2px 0 #151515,-2px 0 0 #151515,
+        2px 0 0 #151515,-2px 2px 0 #151515,0 2px 0 #151515,2px 2px 0 #151515;
+      --lex-section-title-border:1px solid #929292;--lex-section-title-stroke:.65px #d0d0d0;
+      --lex-section-title-position:static;--lex-section-title-top:auto;--lex-section-title-left:auto;
+      --lex-section-title-shift:none;--lex-section-title-padding:1px 4px 4px;
+      --lex-section-title-letter-spacing:.01em;--lex-section-title-transform:uppercase;
+      --lex-subsection-border:0;--lex-subsection-gap:0;
+      /* Subtabs are the window's tabs, smaller: the same bevel everywhere. */
+      --lex-subtab-fg:#eee;--lex-subtab-border:3px solid;
+      --lex-subtab-border-color:#a7a7a7 #292929 #292929 #a7a7a7;
+      --lex-subtab-bg:linear-gradient(135deg,#6d6d6d,#505050);
+      --lex-subtab-hover-fg:#fff;--lex-subtab-hover-bg:linear-gradient(135deg,#7b7b7b,#5b5b5b);
+      --lex-subtab-active-fg:#fff;--lex-subtab-active-border-color:#d0d0d0 #313131 #313131 #d0d0d0;
+      --lex-subtab-active-bg:linear-gradient(135deg,#888,#626262);
+      --lex-subtab-active-shadow:inset 2px 2px #717171,inset -2px -2px #3d3d3d;
+      --lex-tab-text-shadow:2px 2px #222;
+      --lex-subtab-text-shadow:var(--lex-tab-text-shadow);
+      /* The record's name heads the panel with no band or rule under it. */
+      --lex-detail-heading-bg:transparent;--lex-detail-heading-border:0;
+      --lex-detail-heading-padding:2px 6px 4px;
+      --lex-section-border:0;--lex-section-bg:transparent;
+      /* Sections take the height of their content. */
+      --lex-section-flex:0 0 auto;--lex-panel-body-gap:4px;
+      --lex-section-content-padding:4px 0 0;
+      --lex-detail-title-size:clamp(28px,3.5vw,46px);--lex-detail-title-fg:#fff;--lex-detail-id-fg:#c0c0c0;
+
+      /* The growth curves. */
+      --lex-curve-bg:#303030;--lex-curve-border:2px solid;
+      --lex-curve-border-color:#292929 #a5a5a5 #a5a5a5 #292929;
+      --lex-curve-stroke:#fff;--lex-curve-line-filter:drop-shadow(2px 2px #222);
+      --lex-curve-grid:#ffffff25;--lex-curve-fill:#aa243266;}
+
+    .item-icon-property {--ff8-item-icon-size:2em;}
+
+    .item-menu-section {--lex-toggle-minimum:132px;}
+
+    .magic-detail {--lex-reference-rail-width:3.2em;}
+
+    .magic-junction-stats {--ff8-inline-columns:9;}
+
+    /* Only the title shares a line with the control; the description takes the
+       card's full width instead of the title's narrow column. */
+
+    .field-card-table {--lex-column-list-template:minmax(100px,.9fr) minmax(100px,.8fr) minmax(150px,1.2fr) 95px minmax(100px,.7fr);}
+    .field-gateway-table {--lex-column-list-template:76px minmax(132px,.7fr) repeat(3,minmax(160px,1fr));}
+    .field-trigger-table {--lex-column-list-template:86px minmax(98px,.55fr) repeat(2,minmax(160px,1fr));}
+
+    /* The column is exactly its pane's height so its content scrolls under the tabs, not the tabs with it. */
+
+    .enemy-flags {--lex-toggle-basis:9.5em;--lex-toggle-padding:5px 7px;--lex-toggle-gap:6px;}
+
+    .enemy-tier-table {--lex-cell-padding:4px 3px;--lex-head-cell-padding:3px 1px;--lex-list-cell-border:#ffffff20;--lex-surface-border:0;--lex-surface-shadow:none;--lex-surface-bg:transparent;}
+
+    .drop-chance-table {--lex-cell-padding:3px 5px;--lex-head-cell-padding:3px 5px;--lex-list-cell-border:#ffffff28;--lex-surface-border:0;--lex-surface-shadow:none;--lex-surface-bg:transparent;}
+
+/* Per-view spacing, as values on the view: the tables and panels that FF8 packs
+   tighter than the shared defaults. (These were rules on shared classes.) */
+.ff8-record-list {--lex-cell-padding:5px 8px;}
+
+.ff8-shop-table {--lex-cell-padding:1px 5px;}
+
+.field-card-table {--lex-cell-padding:5px 8px;}
+
+/* A record's icon before its name in the panel heading. */
+.ff8-heading-label, .ff8-ability-label {--ff8-item-icon-size:1.15em;}

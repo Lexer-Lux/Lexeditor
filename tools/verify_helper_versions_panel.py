@@ -114,25 +114,23 @@ def main() -> int:
           return {hidden:panel.hidden,right:Math.round(box.right),width:Math.round(box.width),
             onScreen:box.left<window.innerWidth-40,
             states:rows.map(row=>row.querySelector('.lexer-helper-state').textContent),
-            behind:rows.filter(row=>row.classList.contains('behind')).length,
+            behind:rows.filter(row=>row.classList.contains('state-warning')).length,
             text:rows.map(row=>row.textContent),
-            note:panel.querySelector('.lexer-panel-note').textContent,
+            removedTables:panel.querySelectorAll('#lexer-dev-budget,#lexer-dev-code').length,
             calls:window.__helperCalls};})())"""))
         assert not opened["hidden"], "the panel did not open"
         assert abs(opened["right"] - 1440) <= 1, f"the panel is not on the right edge: {opened}"
         assert opened["onScreen"], f"the panel did not slide in: {opened}"
-        assert opened["states"] == ["NEWER RELEASE", "UP TO DATE"], opened["states"]
+        assert opened["states"] == ["UPDATE AVAILABLE", "UP TO DATE"], opened["states"]
         assert opened["behind"] == 1, opened
         assert "1.24.3" in opened["text"][0] and "1.25.0" in opened["text"][0], opened["text"]
         assert opened["calls"] == [False], f"opening must not force a refresh: {opened['calls']}"
-        assert "self-updating disabled" in opened["note"], opened["note"]
+        assert opened["removedTables"] == 0, opened
         # Capture it open, which is the state worth looking at.
         shot = cdp.call("Page.captureScreenshot", {"format": "png", "fromSurface": True})
         target = ROOT / "worklog" / "issues" / "rendered" / "helper-versions-panel.png"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(base64.b64decode(shot["data"]))
-        cdp.eval("document.querySelector('#lexer-panel-refresh').click()")
-        wait_eval(cdp, "JSON.stringify(window.__helperCalls)==='[false,true]'", 10)
         # Nothing in this panel may install: it is a report, not an updater.
         actions = cdp.eval("""JSON.stringify([...document.querySelectorAll('#lexer-panel button')]
           .map(node=>node.textContent.trim()))""")
@@ -150,6 +148,8 @@ def main() -> int:
     finally:
         if browser:
             browser.terminate()
+            browser.wait(timeout=10)
+        profile.cleanup()
     return 0
 
 
