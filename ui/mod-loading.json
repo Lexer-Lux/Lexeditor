@@ -58,7 +58,7 @@
     }
   },
   "ff9": {
-    "loader": "Memoria. Its Mod Manager installs, enables and removes external FF9 mods; Lexeditor deploys only its marker-owned Lexeditor mod folder and hands external-mod management to Memoria's launcher.",
+    "loader": "Memoria. Its Mod Manager installs, enables and removes external FF9 mods; Lexeditor deploys only its marker-owned Lexeditor mod folder and hands external-mod management to Memoria's launcher. Mods declaring a MinimumMemoriaVersion newer than Lexeditor's pinned v2025.07.04 are unsupported until the helper pin is deliberately updated and re-verified.",
     "structure": "Lexeditor projects contain game-relative overrides under StreamingAssets/ plus Lexeditor-owned feature configuration. Deploy copies only those overrides and the Lexeditor runtime into <FF9>/Lexeditor. Other Memoria mod folders and installed p0data archives are not rewritten.",
     "overriding": "Memoria runtime priority is FolderNames order, highest priority first. Lexeditor deploy keeps Lexeditor first in both FolderNames and the launcher's Priorities list, so exact-path collisions are whole-file Lexeditor-wins. Separate mods are not semantically merged by Lexeditor. Memoria's MergeScripts setting is preserved unchanged; its script merge mode is experimental and is not enabled or claimed by Lexeditor."
   }
