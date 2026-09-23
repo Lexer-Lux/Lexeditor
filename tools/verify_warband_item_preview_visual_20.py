@@ -48,11 +48,13 @@ def main() -> int:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
             cdp.eval("state.selectedItem='ankle_boots';renderItems()")
-            wait_eval(cdp, "document.querySelectorAll('.warband-item-detail canvas').length===1&&document.querySelector('.warband-item-thumbnail img')?.naturalWidth>0&&window.__warbandPreview?.length===1", 90)
+            wait_eval(cdp, "document.querySelector('.warband-item-thumbnail img')?.naturalWidth>0", 90)
+            cdp.eval("document.querySelector('.warband-item-detail .lex-detail-panel-icon').click()")
+            wait_eval(cdp, "document.querySelector('.warband-item-detail.lex-model-preview-open')&&document.querySelectorAll('.lex-model-preview-drawer canvas').length===1&&window.__warbandPreview?.length===1", 90)
             result = cdp.eval("""(()=>{
               const heading=document.querySelector('.warband-item-detail>.lex-detail-panel-heading');
               const icon=document.querySelector('.lex-detail-panel-icon');
-              const canvases=[...document.querySelectorAll('.warband-item-detail canvas')];
+              const canvases=[...document.querySelectorAll('.lex-model-preview-drawer canvas')];
               const labels=[...document.querySelectorAll('nav button')].map(button=>({
                 label:button.getAttribute('aria-label'),glyphs:button.querySelectorAll('.warband-glyph').length,
                 bitmap:!!button.querySelector('.warband-bitmap-text')
