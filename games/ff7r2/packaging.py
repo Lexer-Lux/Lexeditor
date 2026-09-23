@@ -201,15 +201,18 @@ def build_candidate(project: Path | None, game: Path | None,
             "--mount-point", MOUNT_POINT,
             "--game-dir-top-only",
         ]
-        completed = runner(
-            command,
-            cwd=str(packer.parent),
-            env=dict(env),
-            capture_output=True,
-            text=True,
-            timeout=300,
-            check=False,
-        )
+        try:
+            completed = runner(
+                command,
+                cwd=str(packer.parent),
+                env=dict(env),
+                capture_output=True,
+                text=True,
+                timeout=300,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise PackagingError("UnrealReZen timed out after 300 seconds") from error
         if completed.returncode != 0:
             detail = (completed.stderr or completed.stdout or "").strip()
             if len(detail) > 800:
