@@ -117,7 +117,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 page.evaluate('navigate("datamap")')
                 page.wait_for_selector(".lex-data-map")
                 expect(page.get_by_text("BattlePlayerParameter.uasset", exact=False)).to_be_visible()
-                expect(page.get_by_text("Faster Queen", exact=False)).to_be_visible()
+                expect(page.get_by_text("CardGameCommonParameter.uasset + CardGameAIParam.uasset (#477)", exact=False)).to_be_visible()
                 assert page.locator(".lex-integration-status.partial").count() >= 1
                 player_map_file = page.get_by_text(
                     "End/Content/DataObject/Resident/PlayerParameter.uasset", exact=True)
