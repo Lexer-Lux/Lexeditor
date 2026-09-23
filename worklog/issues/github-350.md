@@ -13,3 +13,6 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes finding
+plugin.py launches through FF8_Launcher.exe normally and notes warning-skip as a separate opt-in tweak; no suppression code exists in the launch path. The toggle needs the owning component identified first (launcher vs game), then implementation at that boundary with restore-on-disable. Needs the game. Issue stays actionable.

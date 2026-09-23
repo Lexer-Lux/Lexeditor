@@ -160,3 +160,6 @@ All four translation units compiled with the existing MSVC x86 build cache.
 These menu/field changes remain source/object only, not in the installed DLL.
 The full request owner must still bind menu admission, exit readiness, both
 native battle gates and count feedback; startup and purchase remain guarded.
+
+## 2026-09-22 misc-fixes disposition
+Source and object stage stands; the remaining owner work is unchanged (menu admission, exit readiness, both native battle gates, count feedback). Analog-trigger vehicle movement plus the Modern-Controls-gated Flare trigger still need implementation and game proof. Issue stays actionable.
