@@ -13,3 +13,6 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes finding: table needs deployed data
+Searched native modules, plugin JS/PY data, codex topics, and this handoff for the five bait values: no bait pricing, outputs, recipe costs, or stations exist in the repo (bait appears only as editor carry-capacity help and purchase-container wiring). The exact expected results live in the deployed shop/catalog data, so the test table needs game-machine extraction first. The handoff conversation mirrors the issue text only. Issue stays actionable.
