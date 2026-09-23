@@ -2660,9 +2660,9 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
 
 .lex-page-row-override input {
   box-sizing:border-box;
-  width:calc(2ch + 24px);
+  width:calc(2ch + 14px);
   min-height:32px;
-  padding:4px 2px;
+  padding:4px 6px;
   color:var(--lex-text);
   border:1px solid var(--lex-border);
   border-radius:var(--lex-radius);
@@ -2672,6 +2672,25 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
   font:inherit;
   text-align:center;
   text-shadow:none;
+  appearance:textfield;
+  transition:width 160ms ease;
+}
+
+.lex-page-row-override input:focus {
+  width:calc(2ch + 32px);
+  appearance:auto;
+}
+
+.lex-page-row-override input:not(:focus)::-webkit-inner-spin-button,
+.lex-page-row-override input:not(:focus)::-webkit-outer-spin-button {
+  -webkit-appearance:none;
+  margin:0;
+}
+
+.lex-page-row-override input:focus::-webkit-inner-spin-button { opacity:1; }
+
+@media (prefers-reduced-motion:reduce) {
+  .lex-page-row-override input { transition:none; }
 }
 
 .lex-page-row-override.inherited,
