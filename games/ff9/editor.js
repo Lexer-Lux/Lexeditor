@@ -247,7 +247,7 @@
     const compatibility=state.dashboard.modCompatibility||{},externalMods=compatibility.mods||[];
     const value=text=>readonlyField(String(text??""),{format:false});
     const summary=(values,empty="None detected")=>values.length
-      ? values.slice(0,4).join(", ")+(values.length>4?\` (+\${values.length-4} more)\`:"")
+      ? values.slice(0,4).join(", ")+(values.length>4?` (+${values.length-4} more)`:"")
       : empty;
     const disabled=state.busy||state.activeSource!=="mine";
     const actions=LexeditorUI.actionRow(
@@ -282,11 +282,11 @@
       detailSection({title:"EXTERNAL MOD COMPATIBILITY",body:[
         detailField({label:"ENABLED",control:value(summary(externalMods.map(mod=>mod.name))),
           help:infoHelp("Read-only snapshot of Memoria FolderNames and enabled mods' ModDescription.xml metadata. Lexeditor does not install, edit, enable, disable, or remove these mods.")}),
-        detailField({label:"UNSUPPORTED RUNTIME",control:value(summary((compatibility.unsupportedByPinnedMemoria||[]).map(mod=>\`\${mod.name} (needs \${mod.minimumMemoriaVersion})\`),"None detected"),
+        detailField({label:"UNSUPPORTED RUNTIME",control:value(summary((compatibility.unsupportedByPinnedMemoria||[]).map(mod=>`${mod.name} (needs ${mod.minimumMemoriaVersion})`),"None detected"),
           help:infoHelp("Mods declaring a MinimumMemoriaVersion newer than Lexeditor's pinned helper are outside this candidate's supported runtime boundary.")}),
         detailField({label:"DECLARED CONFLICTS",control:value(summary((compatibility.declaredConflicts||[]).map(row=>row.mods.join(" ↔ ")),"None declared"),
           help:infoHelp("These are author-declared incompatibilities among enabled mods. Missing metadata is not proof that a combination is safe in game.")}),
-        detailField({label:"EXACT PATH OVERLAPS",control:value(summary((compatibility.overlaps||[]).map(row=>\`\${row.mod}: \${row.path}\`),"None detected"),
+        detailField({label:"EXACT PATH OVERLAPS",control:value(summary((compatibility.overlaps||[]).map(row=>`${row.mod}: ${row.path}`),"None detected"),
           help:infoHelp("For identical loose override paths, Lexeditor is first in Memoria's FolderNames and wins the whole file. Separate mods are not semantically merged by Lexeditor."+(compatibility.projectScanTruncated?" The project scan hit its 10,000-file safety cap, so additional overlaps may exist.":""))}),
       ]}),
       LexeditorUI.modLoaderSection({
