@@ -3216,9 +3216,9 @@
             :card.offsetWidth>card.parentElement.clientWidth+1?`it is ${card.offsetWidth}px wide in a ${card.parentElement.clientWidth}px column`
             :card.offsetHeight>scroll.clientHeight+1?`it is ${card.offsetHeight}px tall on a ${scroll.clientHeight}px page`:"";
           // Too tall is fixed here: the section goes on in the next column.
-          if(why&&card.offsetHeight>scroll.clientHeight+1&&card.scrollWidth<=card.clientWidth+1&&splitSection(card,scroll.clientHeight))
+          if(why&&options.splitOversized!==false&&card.offsetHeight>scroll.clientHeight+1&&card.scrollWidth<=card.clientWidth+1&&splitSection(card,scroll.clientHeight))
             return paginate(cards.filter(entry=>!entry.hidden),true);
-          if(why)throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title')?.textContent||card.textContent.slice(0,80)} - ${why}`);
+          if(why)throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title,h2')?.textContent||card.textContent.slice(0,80)} - ${why}`);
         }
       }
       const count=columnCount(visible.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
@@ -3337,7 +3337,8 @@
   };
   const settingsColumns = (sections, options = {}) => {
     const content = element("div", {class:"lex-tweak-card-grid"}, ...(sections || []).filter(Boolean));
-    const root = paginateSettings(content, {columns:6,columnMajor:true,strictColumns:true,...options});
+    const root = paginateSettings(content, {columnMajor:true,strictColumns:true,...options,
+      columns:sharedSettings()?.tweakColumnsPerPage||options.columns||6});
     root.classList.add("lex-settings-columns");
     if(options.className) root.classList.add(...options.className.split(/\s+/));
     if(options.columnWidth) content.style.setProperty("--lex-tweak-card-width",options.columnWidth);
@@ -4598,6 +4599,7 @@ ${contents.path}`});
         {key:"absentGameDesaturationPercent", scope:"packaged", title:"Absent game desaturation", description:"Amount of color removed from Absent game cover art on the Home screen.", type:"number", min:0, max:100, step:5, unit:"%"},
         {key:"globalMessageRarity", scope:"packaged", title:"Global message rarity", description:"Makes each global loading message this many times less likely than each game-specific message.", type:"number", min:1, max:100, step:1, unit:"× rarer"},
         {key:"loadingTransitionMinimumSeconds", scope:"packaged", title:"Loading screen minimum", description:"Keeps the loading screen visible for at least this long. Actual loading can take longer.", type:"number", min:0, max:10, step:.25, unit:"s", fallback:1.5},
+        {key:"tweakColumnsPerPage", scope:"packaged", title:"Tweak columns per page", description:"Maximum columns on one Tweaks page. Each tweak stays in one column.", type:"number", min:1, max:12, step:1, fallback:6},
       ];
       const ordinaryDefinitions = definitions.filter(definition => definition.scope !== "packaged");
       const supportsCurrent = definition => Object.prototype.hasOwnProperty.call(settings, definition.key);

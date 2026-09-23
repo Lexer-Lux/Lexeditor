@@ -3217,7 +3217,8 @@ body:has(.lex-data-map-table) #main {
                       margin:0; min-width:0; border:1px solid var(--lex-border); background:var(--lex-panel); }
   .settings-section h2 { margin:0; padding:10px 14px; border-bottom:2px solid var(--lex-accent); background:#18140f;
                          font:400 20px/1 var(--lex-heading-font); color:var(--lex-highlight); letter-spacing:.04em; }
-  .settings-subs { display:grid; grid-template-columns:repeat(auto-fit,minmax(232px,1fr)); }
+  .settings-subs { display:flex; flex-direction:column; gap:0; }
+  .settings-subs > .settings-sub { margin:0; }
   .settings-sub { min-width:0; border-right:1px solid var(--lex-border); border-bottom:1px solid var(--lex-border); }
   .settings-sub h3 { margin:0; padding:6px 12px; background:var(--lex-panel-2); border-bottom:1px solid var(--lex-border);
                      font:600 11px Consolas,monospace; letter-spacing:.09em; text-transform:uppercase; color:var(--lex-highlight);
@@ -6171,7 +6172,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   align-items:stretch;
   display:flex;
 }
-.lex-tweaks-scroll { flex:1 1 0; min-height:0; overflow:auto; overscroll-behavior:contain; }
+.lex-tweaks-scroll { flex:1 1 0; min-height:0; overflow:hidden; overscroll-behavior:contain; }
 .lex-tweaks-pages { flex:0 0 auto; min-width:0; }
 /* Dealt columns, not a grid: a grid row takes the height of its tallest
    card and opens a band of empty panel across the rest of that row. Each
