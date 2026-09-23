@@ -290,7 +290,14 @@ def exercise_table(page, label):
         assert real_rows.count() == 0, (label, "search did not filter real records")
         assert "No " in page.locator(".lex-detail-panel").last.inner_text(), (label, "filtered table did not show shared empty detail")
         search = page.locator(".lex-pager").first.locator('input[type="search"]').first
-        search.fill("")
+        # Clear with real keystrokes. The pager search re-renders on every
+        # applied input, and a programmatic fill("") can straddle that node
+        # replacement without delivering an input event, leaving the stale
+        # filter applied. Select-all plus Backspace reaches the same handler
+        # a player uses when clearing the box.
+        search.click()
+        page.keyboard.press("ControlOrMeta+a")
+        page.keyboard.press("Backspace")
         page.wait_for_function(
             """()=>{const table=document.querySelector('.lex-column-list');
               return !!table && !!table.querySelector('.lex-column-list-row:not(.lex-filler-row)')}"""
