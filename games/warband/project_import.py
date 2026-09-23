@@ -248,6 +248,14 @@ def import_flat_module_system(selected_root: Path, source_root: Path) -> Path:
     source_root = Path(source_root).expanduser().resolve()
     fingerprint = source_fingerprint(source_root)
     import_root = IMPORT_ROOT.resolve()
+    if (
+        import_root == source_root
+        or import_root in source_root.parents
+        or source_root in import_root.parents
+    ):
+        raise ValueError(
+            "Warband import source and managed destination must be separate folders."
+        )
     import_root.mkdir(parents=True, exist_ok=True)
     target = import_root / f"{_safe_name(selected_root.name)}-{fingerprint[:12]}"
     expected = {
@@ -270,6 +278,14 @@ def import_flat_module_system(selected_root: Path, source_root: Path) -> Path:
         module_system = temporary / "ModuleSystem"
         module_system.mkdir()
         _copy_source(source_root, module_system)
+        if (
+            source_fingerprint(module_system) != fingerprint
+            or source_fingerprint(source_root) != fingerprint
+        ):
+            raise ValueError(
+                "The Warband Module System source changed while it was being imported. "
+                "Retry after the source tree is stable."
+            )
         original_export = _rewrite_module_info(module_system / "module_info.py")
         (temporary / "Module").mkdir()
         (temporary / "settings.ini").write_text(
