@@ -211,6 +211,25 @@ def test_battle_item_possession_service_is_read_only():
             assert caught.value.code == 404
             assert source.read_bytes() == original
 
+
+def test_battle_item_possession_rejects_wrong_dataobject_schema():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-battle-schema-") as temp_name:
+        project = Path(temp_name)
+        (project / "lexeditor-project.json").write_text(
+            '{"format":1,"game":"ff7r2"}\n', encoding="utf-8")
+        source = project / "source" / BATTLE_ITEM
+        source.parent.mkdir(parents=True)
+        # Structurally valid Rebirth DataObject, but deliberately the wrong table.
+        source.write_bytes(fixture())
+
+        with Ff7r2Session({"LEXEDITOR_FF7R2_PROJECT": str(project)}) as session:
+            with pytest.raises(HTTPError) as caught:
+                _json(session.url + "api/battle-item-possession")
+            assert caught.value.code == 404
+            payload = json.loads(caught.value.read().decode("utf-8"))
+            assert "BattleItemPossession schema is missing proved field" in payload["error"]
+
+
 def test_requested_gameplay_datamap_states_are_explicit():
     with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-datamap-") as temp_name:
         project = Path(temp_name)
