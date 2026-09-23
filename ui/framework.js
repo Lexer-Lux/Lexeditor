@@ -3894,7 +3894,7 @@
     const close=()=>{clearTimeout(timer);popup?.remove();popup=null;button.removeAttribute('aria-describedby')};
     const leave=()=>{timer=setTimeout(close,180)};
     const show=()=>{
-      clearTimeout(timer);if(popup)return;
+      clearTimeout(timer);if(popup||button.disabled)return;
       const rows=count?.()?changes?.() || []:[];
       const value=x=>x===undefined?"Not set":x===null?"None":typeof x==='boolean'?(x?'On':'Off'):typeof x==='object'?JSON.stringify(x):String(x);
       popup=element('div',{class:'lex-help-popover lex-save-preview',role:'tooltip',id:`save-preview-${Math.random().toString(36).slice(2)}`},
@@ -3911,6 +3911,7 @@
     button.addEventListener('mouseenter',show);button.addEventListener('mouseleave',leave);
     button.addEventListener('focus',show);button.addEventListener('blur',leave);button.addEventListener('click',close);
     document.addEventListener('keydown',event=>{if(event.key==='Escape')close()});
+    new MutationObserver(()=>{if(button.disabled)close()}).observe(button,{attributes:true,attributeFilter:['disabled']});
   };
 
   const settingsSaveControl = (options = {}) => {

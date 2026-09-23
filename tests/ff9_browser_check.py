@@ -187,12 +187,12 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.evaluate("navigate('enemies')")
             page.wait_for_function("state.datasets.enemies?.rows?.length===1")
             enemy_hp = numeric_field(page, "MAX HP")
-            # Shared numeric controls group large-range values while unfocused,
-            # then expose plain digits on focus so plugin input handlers never
-            # receive presentation commas.
+            # Shared numeric controls keep digit grouping while unfocused and
+            # while focused; input handlers receive plain digits and grouping
+            # returns after dispatch.
             expect(enemy_hp).to_have_value("1,234")
             enemy_hp.focus()
-            expect(enemy_hp).to_have_value("1234")
+            expect(enemy_hp).to_have_value("1,234")
             enemy_hp.fill("2345")
             expect(save).to_be_enabled()
             save.click()

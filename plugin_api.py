@@ -72,6 +72,9 @@ class GameInstallSpec:
     install_dir_names: tuple[str, ...]
     default_roots: tuple[Path, ...]
     data_env: str | None = None
+    # Steam artwork to show when the runtime's own capsule is the wrong game.
+    # Terraria installs target the tModLoader loader, not Terraria itself.
+    art_app_id: str | None = None
     prepare: PrepareFunction | None = None
     prepare_on_scan: bool = False
     # The executable Lexeditor starts. Without this the shell picks the first
@@ -195,6 +198,8 @@ def validate_plugin(plugin: GamePlugin) -> None:
             raise ValueError(f"{plugin.plugin_id} has an incomplete installation descriptor")
         if not spec.steam_app_id.isdigit():
             raise ValueError(f"{plugin.plugin_id} has an invalid Steam application ID")
+        if spec.art_app_id is not None and not spec.art_app_id.isdigit():
+            raise ValueError(f"{plugin.plugin_id} has an invalid Steam artwork ID")
         for relative in spec.required_paths:
             path = Path(relative)
             if path.is_absolute() or ".." in path.parts:

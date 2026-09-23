@@ -190,6 +190,7 @@ PLUGIN = GamePlugin(
         root_env="LEXEDITOR_TERRARIA_ROOT",
         required_paths=("start-tModLoader.bat", "tModLoader.dll", "LaunchUtils"),
         steam_app_id="1281930",
+        art_app_id="105600",
         install_dir_names=("tModLoader",),
         default_roots=(Path(r"C:\Program Files (x86)\Steam\steamapps\common\tModLoader"),),
         launch_path="start-tModLoader.bat",

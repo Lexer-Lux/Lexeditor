@@ -32,7 +32,7 @@ DEFAULTS = {
     "mainMenuHeightPercent": 9.0,
     "soundEnabled": True,
     "soundVolumePercent": 50.0,
-    "absentGameDesaturationPercent": 75.0,
+    "absentGameDesaturationPercent": 40.0,
     "globalMessageRarity": 3.0,
     "loadingTransitionMinimumSeconds": 1.5,
     "viewPreferences": {},

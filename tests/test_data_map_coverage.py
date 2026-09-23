@@ -19,16 +19,19 @@ class CoverageTests(unittest.TestCase):
             with patch.object(server,'GAME_ROOT',game),patch.object(server,'PROJECT_ROOT',project):
                 rows=server.data_map()['rows']
                 editable=[row for row in rows if row['coverage']=='structured']
-                self.assertEqual({row['target'] for row in editable},set(server.CATEGORIES))
+                self.assertEqual({row['target'] for row in editable},set(server.CATEGORIES)|{'deployment'})
                 self.assertEqual(len({row['id'] for row in editable}),len(editable))
                 self.assertTrue(all(row['status']=='partial' for row in editable))
-                self.assertEqual(len({row['filename'] for row in editable}),1)
+                kernel=[row for row in editable if row['target'] in server.CATEGORIES]
+                self.assertEqual(len({row['filename'] for row in kernel}),1)
+                deploy=next(row for row in editable if row['target']=='deployment')
+                self.assertEqual(deploy['filename'],'FFNx Direct Mode')
                 config=next(row for row in rows if row['filename']=='FFNx.toml')
                 self.assertEqual(config['coverage'],'unavailable');self.assertFalse(config['openable'])
                 source.write_bytes(b'truncated fixture')
                 broken=server.data_map()['rows']
-                self.assertTrue(all(row['coverage']=='unavailable' for row in broken))
-                self.assertTrue(all(not row['openable'] for row in broken))
+                self.assertTrue(all(row['coverage']=='unavailable' for row in broken if row['target'] in server.CATEGORIES))
+                self.assertTrue(all(not row['openable'] for row in broken if row['target'] in server.CATEGORIES))
 
     def test_ff9_dataset_target_and_source_availability_are_independent(self):
         from games.ff9 import server

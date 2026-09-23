@@ -130,9 +130,9 @@ class ProjectManager:
         # resolving it renames it to the link target. Keep the name the player
         # actually sees in that folder.
         display_names: dict[str, str] = {}
-        if spec.discover:
+        if getattr(spec, "discover", None):
             try:
-                for found in spec.discover():
+                for found in getattr(spec, "discover", None)():
                     found = Path(found).expanduser()
                     resolved = found.resolve()
                     display_names.setdefault(os.path.normcase(str(resolved)), found.name)
@@ -167,16 +167,16 @@ class ProjectManager:
         return {"pluginId": plugin_id, "current": str(current),
                 "environment": spec.root_env, "projects": rows,
                 "canCreate": spec.template_root.is_dir(),
-                "modSupport": {"verified": bool(plugin.mod_adapter and plugin.mod_adapter.verified),
-                    "message": getattr(plugin.mod_adapter, "message", "Mod management is not supported for this game yet."),
-                    "packageTypes": list(getattr(plugin.mod_adapter, "package_types", ()))}}
+                "modSupport": {"verified": bool(getattr(plugin, "mod_adapter", None) and getattr(plugin, "mod_adapter", None).verified),
+                    "message": getattr(getattr(plugin, "mod_adapter", None), "message", "Mod management is not supported for this game yet."),
+                    "packageTypes": list(getattr(getattr(plugin, "mod_adapter", None), "package_types", ()))}}
 
     def select(self, plugin_id: str, root_value: str) -> dict:
         _plugin, spec = self._spec(plugin_id)
         root = Path(root_value).expanduser().resolve()
         problems = self._problems(root, spec.required_paths, spec.required_any)
-        if problems and spec.prepare_existing is not None:
-            prepared = Path(spec.prepare_existing(root)).expanduser().resolve()
+        if problems and getattr(spec, "prepare_existing", None) is not None:
+            prepared = Path(getattr(spec, "prepare_existing", None)(root)).expanduser().resolve()
             root = prepared
             problems = self._problems(root, spec.required_paths, spec.required_any)
         if problems:
@@ -211,8 +211,8 @@ class ProjectManager:
                 spec.template_root, target,
                 ignore=lambda _root, names: [name for name in names if name in IGNORED_NAMES],
             )
-            if spec.initialize is not None:
-                spec.initialize(target)
+            if getattr(spec, "initialize", None) is not None:
+                getattr(spec, "initialize", None)(target)
             return self.select(plugin_id, str(target))
         except Exception as error:
             if target.exists():
@@ -277,7 +277,7 @@ class ProjectManager:
             entry = payload.get(plugin_id, {}) if isinstance(payload.get(plugin_id), dict) else {}
             root = Path(entry.get("current") or spec.default_root).expanduser().resolve()
         categories = [(label, tuple(suffix.lower() for suffix in suffixes))
-                      for label, suffixes in (spec.content_types or ())]
+                      for label, suffixes in (getattr(spec, "content_types", None) or ())]
         known = {suffix: label for label, suffixes in categories for suffix in suffixes}
         counts = {label: 0 for label, _suffixes in categories}
         unrecognized = 0

@@ -272,6 +272,23 @@ def test_save_preview_does_not_cover_bottom_save_button(page):
     assert page.evaluate('window.saved')==1
 
 
+def test_save_preview_dismisses_when_button_disables(page):
+    framework(page)
+    page.evaluate('''() => {
+      const button=LexeditorUI.settingsSaveControl({dirtyCount:()=>1,
+        pendingChanges:()=>[{label:'Panel spacing',before:.25,after:.85}]});
+      document.body.append(button);window.saveButton=button;
+    }''')
+    button=page.locator('.lex-settings-save-control')
+    button.hover()
+    page.locator('.lex-save-preview').wait_for(state='visible')
+    page.evaluate('saveButton.disabled=true')
+    page.wait_for_function("!document.querySelector('.lex-save-preview')")
+    button.hover()
+    page.wait_for_timeout(150)
+    assert page.locator('.lex-save-preview').count()==0
+
+
 def test_readonly_pin_does_not_cover_lock(page):
     framework(page)
     page.evaluate('''() => {
