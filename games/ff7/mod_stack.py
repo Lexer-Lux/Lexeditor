@@ -9,6 +9,7 @@ location, folder mods select ModFolder/Conditional roots through mod.xml, and
 from __future__ import annotations
 
 import os
+from decimal import Decimal, InvalidOperation
 from pathlib import Path, PurePosixPath
 import re
 import xml.etree.ElementTree as ET
@@ -56,8 +57,10 @@ def _norm(path: str) -> str:
 
 
 def _version_key(text: str) -> tuple:
-    pieces = re.findall(r"\d+|[^\d]+", text or "")
-    return tuple((0, int(part)) if part.isdigit() else (1, part.casefold()) for part in pieces)
+    try:
+        return (0, Decimal(str(text or "").strip()))
+    except InvalidOperation:
+        return (1, str(text or "").casefold())
 
 
 def _settings(workshop: Path) -> tuple[Path, Path, str]:
