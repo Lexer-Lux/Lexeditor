@@ -19,14 +19,14 @@ require('"toId": target', SERVER, "Upgrade targets do not expose a stable troop 
 require("showAlert,hoverable", EDITOR, "Warband does not import the shared hoverable component")
 require('targetType:"warband-troop",targetId:troopId', EDITOR,
         "Warband troop relationships are not typed by stable ID")
-require('state.filters.troops="";state.filters.cut=false;state.selectedTroop=troop.id', EDITOR,
-        "Troop navigation does not clear filters and select the exact record")
+require('state.filters.troops="";state.filters.cut=false;state.selectedTroop=troopRowKey(troop)', EDITOR,
+        "Troop navigation does not clear filters and select the exact source record")
 require('state.pages.troops=0;navigate("troops")', EDITOR,
         "Troop navigation does not enter the target Table view")
 if 'revealSelected:false' in EDITOR:
     raise AssertionError("Warband explicitly disables the shared selected-record reveal")
-require('key:troop=>troop.id,selected:()=>state.selectedTroop', EDITOR,
-        "Troop destination selection does not use the stable troop ID")
+require('key:troopRowKey,selected:()=>state.selectedTroop', EDITOR,
+        "Troop destination selection does not use unique source-record identity")
 
 # Troop upgrades are now a shared tree graph rather than a from/to table. The
 # relationship contract is the edge plus clickable stable-ID nodes, not a
