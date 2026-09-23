@@ -11,7 +11,8 @@ from urllib.parse import urlparse
 from . import paths
 from .acceptance import acceptance_status, begin_acceptance
 from .content_pack import ContentPackStore, deploy, deployment_status, loader_status, revert
-from .source_data import load_base_objects
+from .datasets import DATASET_SPECS, schema as dataset_schema
+from .source_data import load_base_dataset, load_base_objects
 
 try:
     from plugin_http import PluginRequestHandler
