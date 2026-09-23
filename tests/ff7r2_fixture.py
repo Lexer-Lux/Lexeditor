@@ -113,9 +113,9 @@ def battle_item_possession_fixture() -> bytes:
     record = "EnemyTest"
     properties = [
         ("NormalItemName_Array", 11),
-        ("NormalItemPercent_Array", 7),
+        ("NormalItemPercent_Array", 2),
         ("RareItemName_Array", 11),
-        ("RareItemPercent_Array", 7),
+        ("RareItemPercent_Array", 2),
         ("StealItemName_Array", 11),
         ("StealItemQuantity_Array", 2),
         ("StealFaildCountArrayIndex", 7),
