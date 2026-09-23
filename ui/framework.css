@@ -3275,6 +3275,9 @@ body:has(.lex-data-map-table) #main {
 }
 
 .lex-global-setting {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
   min-width:0;
   margin-top: 0;
   padding: 10px;
@@ -3293,6 +3296,7 @@ body:has(.lex-data-map-table) #main {
 }
 
 .lex-setting-control-pair {
+  margin-top:auto;
   display:grid;
   grid-template-columns:minmax(0,1fr) minmax(0,1fr);
   gap:6px;
@@ -3346,7 +3350,7 @@ body:has(.lex-data-map-table) #main {
   text-shadow:none;
 }
 
-.lex-global-setting .lex-setting-control-pair > :is(select,input,.lex-unit-field),
+.lex-global-setting .lex-setting-control-pair > :is(select,input:not([type="checkbox"]),.lex-unit-field),
 .lex-global-setting .lex-setting-control-pair .lex-unit-field > :is(input,select),
 .lex-global-setting .lex-setting-control-pair :is(select,input[type="number"]) {
   box-sizing:border-box;
@@ -3354,6 +3358,15 @@ body:has(.lex-data-map-table) #main {
   min-width:0;
 }
 
+.lex-global-setting .lex-setting-default-control { display:grid; }
+.lex-global-setting :is(input:not([type="checkbox"]),select) {
+  width:100%;min-width:0;height:36px;min-height:36px;box-sizing:border-box;font-size:1em;font-weight:400;
+}
+.lex-global-setting input[type="checkbox"] {
+  width:1.2em;min-width:1.2em;height:1.2em;min-height:1.2em;justify-self:start;align-self:end;
+}
+.lex-library-setting { grid-column:1 / -1; }
+.lex-library-setting > output { width:100%;min-height:36px;padding:6px 8px;overflow-wrap:anywhere; }
 .lex-setting-dependency-arrows {
   position:absolute;
   inset:0;

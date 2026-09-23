@@ -721,6 +721,10 @@
     };
     control.addEventListener("input", place);
     control.addEventListener("change", place);
+    if(typeof ResizeObserver!=="undefined"){
+      const observer=new ResizeObserver(place);observer.observe(control);observer.observe(unitNode);
+    }
+    new MutationObserver(place).observe(control,{attributes:true,attributeFilter:['style','class']});
     field.lexPlaceUnit = place;
     requestAnimationFrame(place);
     document.fonts?.ready?.then(place);
@@ -4696,7 +4700,8 @@ ${contents.path}`});
             class:"lex-global-setting lex-developer-setting lex-packaged-setting", hidden:true,
           }, element("div", {class:"lex-setting-copy"},
             element("label", {for:`lex-default-${definition.key}`}, definition.title),
-            element("p", {}, `${definition.description}${supported ? "" : " Restart LEXEDITOR to enable this newly added setting."}`)), wrapped);
+            element("p", {}, definition.description)), wrapped);
+          if(!supported)controlNode(wrapped).title="Restart Lexeditor to make this setting available.";
           card.dataset.lexSettingSupported = String(supported);
           developerLane.append(card);
           defaultCards.push(card);
@@ -4706,10 +4711,11 @@ ${contents.path}`});
         const defaultSupported = supportsDefault(definition);
         const wrapped = makeControl(definition, initialValue(definition), `lex-${definition.key}`);
         controlNode(wrapped).disabled = !currentSupported;
+        if(!currentSupported)controlNode(wrapped).title="Restart Lexeditor to make this setting available.";
         currentControls.set(definition.key, wrapped);
         const copy = element("div", {class:"lex-setting-copy"},
           element("label", {for:`lex-${definition.key}`}, definition.title),
-          element("p", {}, `${definition.description}${currentSupported ? "" : " Restart LEXEDITOR to enable this newly added setting."}`));
+          element("p", {}, definition.description));
         const defaultWrapped = makeControl(definition, initialValue(definition, true), `lex-default-${definition.key}`);
         defaultControls.set(definition.key, defaultWrapped);
         const defaultControl = element("label", {
@@ -4777,7 +4783,7 @@ ${contents.path}`});
         heading,
         element("div", {class:"lex-settings-columns"}, userLane, developerLane),
       ];
-      const libraryPath = element("span", {}, "Loading library location…");
+      const libraryPath = element("output", {class:"lex-readonly-field","aria-label":"Mod library location"}, "Loading library location…");
       let libraryStatus = null;
       const libraryRecover = element("button", {type:"button", hidden:true, onclick:async () => {
         try {
@@ -4821,8 +4827,9 @@ ${contents.path}`});
         } catch (error) { libraryPath.textContent = String(error?.message || error); }
         finally { libraryMoveActive = false; if (progressTimer) clearInterval(progressTimer); libraryMove.disabled = false; }
       }}, "Move…");
-      dialogChildren.push(element("section", {class:"lex-dialog-status"},
-        element("strong", {}, "Mod library "), libraryPath, libraryMove, libraryRecover, libraryCleanup));
+      userLane.append(element("section", {class:"lex-global-setting lex-library-setting"},
+        element("div", {class:"lex-setting-copy"},element("strong", {}, "Mod library")),
+        libraryPath,actionRow(libraryMove,libraryRecover,libraryCleanup)));
       const refreshLibraryLocation = async () => {
         const value = await callWindow("mod_library_location");
         libraryStatus = value;
@@ -4841,9 +4848,7 @@ ${contents.path}`});
       // setting cannot be saved at all.
       dialog.addEventListener("input", () => save.refresh?.());
       dialog.addEventListener("change", () => save.refresh?.());
-      message.textContent = unsupportedDefinitions.length
-        ? "Restart LEXEDITOR to enable newly added settings. Other settings can still be saved."
-        : "";
+      message.textContent = "";
       fitDialog();
       controlNode(currentControls.get("updateCheckFrequency")).focus();
     } catch (error) {

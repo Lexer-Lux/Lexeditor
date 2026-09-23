@@ -2,6 +2,7 @@
 import functools
 import threading
 import tempfile
+import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 from global_browser_check import Handler, ThreadingHTTPServer, STUB, ROOT
@@ -36,11 +37,20 @@ def main():
             assert not page.locator('#modal').is_visible()
             page.evaluate('LexeditorUI.openSettings()')
             page.wait_for_selector('.lex-global-setting input')
+            font=Path(os.environ['LOCALAPPDATA'])/'Lexeditor/game-data/ff8/generated/ff8-menu.ttf'
+            page.route('**/assets/ff8-menu.ttf*',lambda r:r.fulfill(path=str(font)))
+            page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+            page.evaluate('document.fonts.ready')
             assert page.get_by_role('checkbox',name='Wrap around at the ends',exact=True).count()==2
             for width,height in [(2048,1080),(900,620),(600,500)]:
                 page.set_viewport_size({'width':width,'height':height});page.wait_for_timeout(250)
                 metrics=page.locator('.lex-global-settings').evaluate("""dialog=>({width:dialog.getBoundingClientRect().width,scroll:dialog.scrollWidth,client:dialog.clientWidth,cards:[...dialog.querySelectorAll('.lex-global-setting:not([hidden])')].map(e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height}})})""")
                 assert metrics['scroll']<=metrics['client']+2,metrics
+                checks=page.locator('.lex-global-setting input[type="checkbox"]').evaluate_all('ns=>ns.map(n=>({w:n.getBoundingClientRect().width,h:n.getBoundingClientRect().height,p:getComputedStyle(n).padding}))')
+                assert all(abs(n['w']-n['h'])<1 for n in checks),checks
+                assert page.locator('.lex-global-setting input:not([type="checkbox"]),.lex-global-setting select').evaluate_all('ns=>new Set(ns.filter(n=>n.getBoundingClientRect().height).map(n=>Math.round(n.getBoundingClientRect().height))).size===1')
+                assert page.locator('.lex-library-setting .lex-readonly-field').count()==1
+                assert page.locator('.lex-global-settings > .lex-dialog-status').inner_text()==''
                 assert all(c['w']>=190 for c in metrics['cards']),metrics
                 cards=metrics['cards']
                 for i,a in enumerate(cards):
