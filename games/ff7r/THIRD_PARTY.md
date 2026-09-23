@@ -72,6 +72,23 @@ is passed explicitly when listing, extracting and packing. For Oodle-compressed
 game data, Lexeditor uses an already-present explicit/game-owned Oodle library;
 the repak fallback is never allowed to fetch Oodle silently.
 
+## Public FF7R mod-set compatibility reference
+
+akitaonrails' **distrobox-gaming** repository is used only as public
+interoperability evidence for real-world Remake PAK deployment and conflicts:
+
+- https://github.com/akitaonrails/distrobox-gaming
+- Reviewed revision: `114a092ae593e30b80e3f7e36fa062a319feb75f`
+- No repository license file was present at the reviewed revision.
+
+Its FF7R role installs ordinary UE4 `.pak` mods under
+`End/Content/Paks/~mods` and documents a concrete incompatibility between its
+Equipment Rebalance (#85) and Gameplay Enhancement (#586) selections because
+both replace equipment data. Lexeditor copies no code or mod payloads from this
+repository. The reference is used to exercise the same package layout and
+exact-asset conflict policy with synthetic repak-built fixtures; third-party mod
+bytes and installed-game behavior remain separate acceptance evidence.
+
 ## Improved Keyboard and Mouse Controls / Native Mod Loader research
 
 The FF7R native-runtime probe uses independently implemented compatibility checks

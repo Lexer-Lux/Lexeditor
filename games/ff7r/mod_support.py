@@ -17,8 +17,11 @@ class PakModAdapter:
         plan = json.loads((destination / "deployment.json").read_text(encoding="utf-8"))
         return plan.get("modIds", [Path(path).name for path in plan.get("mods", [])])
 
-    verified = False
-    message = "Mod management is not supported yet. PAK import checks are under test."
+    verified = True
+    message = (
+        "Imports FF7R PAK folders/ZIPs, rejects exact asset collisions, and deploys "
+        "only into Lexeditor's ownership-verified ~mods/LexeditorLibrary folder."
+    )
     package_types = ("folder", "zip")
 
     @staticmethod

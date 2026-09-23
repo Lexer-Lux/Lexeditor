@@ -15,6 +15,39 @@ from pathlib import Path
 import shutil
 
 
+def _active_pak_conflicts(game_root: Path, built: Path) -> list[dict]:
+    """Return exact asset-path collisions with other active ~mods PAKs.
+
+    FF7R/Unreal can resolve colliding archives by load order, but Lexeditor does
+    not guess a winner for user data. Listing PAK indexes is enough to detect
+    the ambiguity and does not extract or modify third-party content.
+    """
+    from .tooling import list_pak
+
+    root = Path(game_root) / "End" / "Content" / "Paks" / "~mods"
+    target = deployed_pak_path(game_root)
+    if not root.is_dir():
+        return []
+    others = [
+        path for path in root.rglob("*.pak")
+        if path.is_file() and path.resolve() != target.resolve()
+    ]
+    if not others:
+        return []
+
+    mine = {entry.casefold(): entry for entry in list_pak(built)}
+    conflicts = []
+    for package in sorted(others, key=lambda path: path.as_posix().casefold()):
+        for entry in list_pak(package):
+            key = entry.casefold()
+            if key in mine:
+                conflicts.append({
+                    "asset": mine[key],
+                    "package": str(package.relative_to(root)),
+                })
+    return conflicts
+
+
 DEPLOYMENT_SCHEMA_VERSION = 1
 DEPLOYED_PAK_NAME = "Lexeditor-FF7R_P.pak"
 MARKER_NAME = DEPLOYED_PAK_NAME + ".lexeditor.json"
@@ -142,6 +175,19 @@ def deploy_built_pak(game_root: Path, built: Path) -> dict:
         ))
     if not target.is_file() and marker.is_file() and status["state"] == "marker-error":
         raise RuntimeError(status["error"])
+
+    conflicts = _active_pak_conflicts(game_root, built)
+    if conflicts:
+        preview = "; ".join(
+            f"{row['asset']} ({row['package']})" for row in conflicts[:4]
+        )
+        extra = len(conflicts) - min(len(conflicts), 4)
+        if extra:
+            preview += f"; +{extra} more"
+        raise RuntimeError(
+            "Built FF7R PAK conflicts with another active mod. "
+            "Lexeditor will not guess a PAK load-order winner: " + preview
+        )
 
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix(target.suffix + ".lexeditor.tmp")
