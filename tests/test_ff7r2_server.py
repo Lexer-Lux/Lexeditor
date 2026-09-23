@@ -46,6 +46,8 @@ def test_service_stages_save_preserves_source_and_reopens_candidate():
             workspace = _json(session.url + "api/workspace")
             assert workspace["playerParameter"]["sourcePresent"] is True
             assert workspace["playerParameter"]["outputPresent"] is False
+            assert workspace["delivery"]["staged"] is False
+            assert workspace["delivery"]["stagedFileCount"] == 0
 
             data = _json(session.url + "api/player-parameter")
             cloud = data["records"][0]
@@ -66,6 +68,12 @@ def test_service_stages_save_preserves_source_and_reopens_candidate():
             assert next(field for field in saved_cloud["fields"]
                         if field["name"] == "HPMax")["value"] == 1234
             assert source.read_bytes() == original
+            workspace = _json(session.url + "api/workspace")
+            assert workspace["delivery"]["staged"] is True
+            assert workspace["delivery"]["stagedFileCount"] == 1
+            assert workspace["delivery"]["stagedFiles"] == [
+                "content/End/Content/DataObject/Resident/PlayerParameter.uasset"
+            ]
 
             vanilla = _json(session.url + "api/player-parameter?source=vanilla")
             assert next(field for field in vanilla["records"][0]["fields"]
