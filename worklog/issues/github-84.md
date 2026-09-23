@@ -42,3 +42,6 @@ Issue remains actionable. World marker placement, Draw Point imagery, the
 textured 3D toggle, 4×4 palette controls, field-local detail tabs, and full
 in-game enemy-AI acceptance remain in scope. No user game or open editor was
 restarted. Reload the local plugin to load this Python repair.
+
+## 2026-09-22 misc-fixes evidence
+Enemy-AI suites pass on current tree (part of the 23 passed above). The prior Python repair stands. Remaining: misplaced world markers, Draw Point imagery, textured 3D toggle, palette controls, field-local detail tabs, plus save and runtime proof instead of tab presence. Needs game plus rendered checks. Issue stays actionable.

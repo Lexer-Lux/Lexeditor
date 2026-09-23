@@ -13,3 +13,6 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes finding
+No journal or quest-state code exists anywhere in the FF8 plugin (searched). The Journal needs quest-state mapping research with the game first, plus editable progression rules compatible with #88. No code written. Issue stays actionable.

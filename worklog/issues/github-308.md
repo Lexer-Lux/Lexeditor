@@ -13,3 +13,6 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes disposition
+Crash repair installed. Acceptance test, needs the game: open GF, Quezacotl, Learn Abilities, page left then both ways, confirm no crash or damaged names; with Auto-sort Inventory on, check battle Item menu order and quantities, and report the failing step. Ability presentation, magic grouping, and clock/order controls remain unimplemented. Issue stays actionable.

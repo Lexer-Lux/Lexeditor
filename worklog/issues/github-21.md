@@ -34,3 +34,6 @@ labels still use the narrow global label lane at minimum detail width.
 The parent issue remains actionable. Its unfinished runtime/features and human
 gameplay acceptance remain in scope. Load the repaired local service before
 testing Refine in game; no user app or game was restarted by these checks.
+
+## 2026-09-22 misc-fixes note
+Coverage parent: no direct work here. Children are being processed on PR 506 (#31, #84, #91, #308 plus #407-409 and #93/#100 pending). The plugin is ready only when the children close with acceptance, not when tabs exist. Issue stays actionable.
