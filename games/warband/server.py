@@ -19,7 +19,6 @@ from . import paths
 from .item_icons import CACHE as ICON_CACHE
 from .catalog import DATA_CATALOG
 from .dump_infopages import parse_info_pages
-from .dump_troops import parse_troops
 from .troop_editor import troop_data, save_troops
 from .module_records import SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME, dataset_data, save_dataset
 from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
@@ -244,15 +243,20 @@ def _item_records(text: str) -> list[dict]:
     return records
 
 
-def item_rows() -> list[dict]:
+def item_data() -> dict:
     source = MODULE_SYSTEM / "module_items.py"
     if not source.is_file():
-        return []
-    text, _encoding, _raw = _module_items_source()
-    rows = []
-    for record in _item_records(text):
-        rows.append({key: value for key, value in record.items() if not key.startswith("_")})
-    return rows
+        return {"rows": [], "sha256": ""}
+    text, _encoding, raw = _module_items_source()
+    rows = [
+        {key: value for key, value in record.items() if not key.startswith("_")}
+        for record in _item_records(text)
+    ]
+    return {"rows": rows, "sha256": hashlib.sha256(raw).hexdigest()}
+
+
+def item_rows() -> list[dict]:
+    return item_data()["rows"]
 
 
 def _validate_item_expression(expression: str) -> str:
@@ -290,10 +294,7 @@ def _python_string(value: str) -> str:
 
 
 def _validate_module_items_candidate(text: str, encoding: str) -> bytes:
-    records = _item_records(text)
-    ids = [record["id"] for record in records]
-    if len(ids) != len(set(ids)):
-        raise ValueError("Saving would create duplicate item IDs")
+    _item_records(text)
     encoded = text.encode(encoding)
     python27 = Path(r"C:\Python27\python.exe")
     if python27.is_file():
@@ -313,60 +314,92 @@ def _validate_module_items_candidate(text: str, encoding: str) -> bytes:
     return encoded
 
 
-def save_item_edits(edits: list[dict]) -> dict:
+def save_item_edits(edits: list[dict], expected_sha256: str | None = None) -> dict:
     source = MODULE_SYSTEM / "module_items.py"
     if not source.is_file():
         raise FileNotFoundError(source)
-    if not edits:
-        return {"saved": 0, "backup": ""}
-    text, encoding, raw = _module_items_source()
-    records = _item_records(text)
-    by_index = {record["recordIndex"]: record for record in records}
-    replacements: list[tuple[int, int, str]] = []
-    edited_records: set[int] = set()
-    for edit in edits:
-        record_index = int(edit.get("recordIndex", -1))
-        record = by_index.get(record_index)
-        if record is None:
-            raise ValueError(f"Item record {record_index} no longer exists")
-        original_id = str(edit.get("originalId", ""))
-        if original_id and original_id != record["id"]:
-            raise ValueError(f"Item record {record_index} changed from {original_id} to {record['id']}; reload before saving")
-        field_order = record["fieldOrder"]
-        for field, value in dict(edit.get("fields") or {}).items():
-            if field not in field_order:
-                raise ValueError(f"Item {record['id']} has no field named {field}")
-            if field == "id":
-                value = str(value).strip()
-                if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value):
-                    raise ValueError("Item IDs must contain only letters, digits, and underscores and cannot start with a digit")
-                replacement = _python_string(value)
-            elif field == "name":
-                replacement = _python_string(str(value))
-            else:
-                replacement = _validate_item_expression(str(value))
-            field_index = field_order.index(field)
-            left, right = record["_fieldSpans"][field_index]
-            replacements.append((left, right, replacement))
-            edited_records.add(record_index)
-    candidate = text
-    for left, right, replacement in sorted(replacements, reverse=True):
-        candidate = candidate[:left] + replacement + candidate[right:]
-    candidate_records = _item_records(candidate)
-    if len(candidate_records) != len(records):
-        raise ValueError("Saving changed the number of item records; refusing the write")
-    encoded = _validate_module_items_candidate(candidate, encoding)
-    backup = source.with_name(source.name + ".lexeditor.bak")
-    backup.write_bytes(raw)
-    source.write_bytes(encoded)
-    return {"saved": len(edited_records), "backup": str(backup)}
+    with CATALOG_LOCK:
+        text, encoding, raw = _module_items_source()
+        current_sha256 = hashlib.sha256(raw).hexdigest()
+        if expected_sha256 is not None and expected_sha256 != current_sha256:
+            raise ValueError("module_items.py changed; reload before saving")
+        if not edits:
+            return {"saved": 0, "backup": "", "sha256": current_sha256}
+        records = _item_records(text)
+        identities = [record["id"] for record in records]
+        by_index = {record["recordIndex"]: record for record in records}
+        replacements: list[tuple[int, int, str]] = []
+        edited_records: set[int] = set()
+        for edit in edits:
+            record_index = int(edit.get("recordIndex", -1))
+            record = by_index.get(record_index)
+            if record is None:
+                raise ValueError(f"Item record {record_index} no longer exists")
+            original_id = str(edit.get("originalId", ""))
+            if original_id and original_id != record["id"]:
+                raise ValueError(
+                    f"Item record {record_index} changed from {original_id} to {record['id']}; reload before saving"
+                )
+            if record_index in edited_records:
+                raise ValueError("Send each item record only once")
+            row_changed = False
+            field_order = record["fieldOrder"]
+            for field, value in dict(edit.get("fields") or {}).items():
+                if field not in field_order:
+                    raise ValueError(f"Item {record['id']} has no field named {field}")
+                if field == "id":
+                    raise ValueError("Item IDs are fixed because other Module System records reference them")
+                replacement = (
+                    _python_string(str(value))
+                    if field == "name"
+                    else _validate_item_expression(str(value))
+                )
+                field_index = field_order.index(field)
+                left, right = record["_fieldSpans"][field_index]
+                if text[left:right] == replacement:
+                    continue
+                replacements.append((left, right, replacement))
+                row_changed = True
+            if row_changed:
+                edited_records.add(record_index)
+        if not replacements:
+            return {"saved": 0, "backup": "", "sha256": current_sha256}
+        candidate = text
+        for left, right, replacement in sorted(replacements, reverse=True):
+            candidate = candidate[:left] + replacement + candidate[right:]
+        candidate_records = _item_records(candidate)
+        if len(candidate_records) != len(records):
+            raise ValueError("Saving changed the number of item records; refusing the write")
+        if [record["id"] for record in candidate_records] != identities:
+            raise ValueError("Saving changed item record identities; refusing the write")
+        encoded = _validate_module_items_candidate(candidate, encoding)
+        if source.read_bytes() != raw:
+            raise ValueError("module_items.py changed while validating; reload before saving")
+        backup = source.with_name(source.name + ".lexeditor.bak")
+        backup.write_bytes(raw)
+        fd, temporary_name = tempfile.mkstemp(prefix=".items-", dir=source.parent)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(encoded)
+            os.replace(temporary_name, source)
+        finally:
+            if os.path.exists(temporary_name):
+                os.unlink(temporary_name)
+        return {
+            "saved": len(edited_records),
+            "backup": str(backup),
+            "sha256": hashlib.sha256(encoded).hexdigest(),
+        }
 
 
 def upgrade_rows() -> list[dict]:
     source = MODULE_SYSTEM / "module_troops.py"
     if not source.is_file():
         return []
-    names = {row["id"]: row["name"] for row in parse_troops(str(source))}
+    names = {}
+    for row in troop_data(MODULE_SYSTEM).get("rows", []):
+        if row["id"] not in names or row.get("status") != "CUT":
+            names[row["id"]] = row["name"]
     pattern = re.compile(r'^\s*(upgrade2?)\(troops,\s*"([^"]+)"\s*,\s*"([^"]+)"(?:\s*,\s*"([^"]+)")?')
     rows = []
     for line_number, line in enumerate(source.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
@@ -633,7 +666,7 @@ class Handler(PluginRequestHandler):
             elif path == "/api/troops":
                 self.json_response(troop_data(MODULE_SYSTEM))
             elif path == "/api/items":
-                self.json_response({"rows": item_rows()})
+                self.json_response(item_data())
             elif path == "/api/warband-font":
                 self.json_response(font_manifest())
             elif path == "/api/warband-font/atlas":
@@ -694,7 +727,7 @@ class Handler(PluginRequestHandler):
             elif path == "/api/troops/save":
                 self.json_response(save_troops(MODULE_SYSTEM, body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/items/save":
-                self.json_response(save_item_edits(body.get("edits", [])))
+                self.json_response(save_item_edits(body.get("edits", []), body.get("sha256", "")))
             elif path == "/api/module-records/save":
                 self.json_response(save_dataset(MODULE_SYSTEM, body.get("dataset", ""), body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/catalog/file/save":
