@@ -109,6 +109,27 @@ def test_brand_pointer_gestures_never_select_text(page,surface):
     assert page.locator('#editable').evaluate('n=>n.selectionEnd-n.selectionStart')==20
 
 
+def test_brand_has_no_pressed_text_highlight(page):
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      document.body.prepend(U.el('div',{id:'shell'}));
+      U.mountShell({host:'#shell',plugin:{id:'blank',name:'Blank'},tabs:[],activeTab:()=>'',navigate(){}});
+      U.finishPluginLoading();
+      document.documentElement.style.setProperty('--lex-accent','#72ff1e');
+    }''')
+    brand=page.locator('.lex-brand-button')
+    before=brand.evaluate('n=>({bg:getComputedStyle(n).backgroundColor,fg:getComputedStyle(n).color})')
+    brand.hover()
+    page.mouse.down()
+    assert brand.evaluate('n=>({bg:getComputedStyle(n).backgroundColor,fg:getComputedStyle(n).color})')==before
+    assert page.evaluate('String(window.getSelection())')==''
+    page.mouse.move(1000,700)
+    page.mouse.up()
+    brand.evaluate('n=>n.classList.add("lex-command-pressed")')
+    assert brand.evaluate('n=>({bg:getComputedStyle(n).backgroundColor,fg:getComputedStyle(n).color})')==before
+
+
 def test_brand_real_return_action_and_scriptless_snapshot(page):
     page.evaluate('''()=>{
       window.homeCalls=0;

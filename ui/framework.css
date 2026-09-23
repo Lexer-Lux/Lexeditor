@@ -5934,7 +5934,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    display:inline-grid; place-items:center; margin:0; line-height:1;
  overflow:visible;
 }
-.lex-shell-header button:is(:active,.lex-command-pressed) {
+.lex-shell-header button:not(.lex-brand-button):is(:active,.lex-command-pressed) {
   background:var(--lex-accent);
   color:var(--lex-accent-text);
 }
