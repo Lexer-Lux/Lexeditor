@@ -366,7 +366,12 @@ class DataObjectPackage:
                 values.append(str(value) if prop.type_id == 8 else value)
             elif prop.type_id == 11:
                 mapped = offset_names.get(cursor - frozen_start)
-                values.append(mapped.display if mapped is not None else "")
+                if mapped is None:
+                    raise DataObjectError(
+                        f"{item} has no minimal-name identity at frozen offset "
+                        f"{cursor - frozen_start}"
+                    )
+                values.append(mapped.display)
             elif prop.type_id == 10:
                 packed = _u64(data, cursor, f"{item} string pointer")
                 signed = struct.unpack("<q", struct.pack("<Q", packed))[0]
