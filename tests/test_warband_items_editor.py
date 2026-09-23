@@ -57,7 +57,7 @@ class WarbandItemEditorTests(unittest.TestCase):
         self.assertEqual(Path(result["backup"]).read_bytes(), original)
         rows = server.item_rows(); sword, boots = rows
         self.assertEqual(sword["name"], "New café Sword")
-        self.assertTrue(self.path.read_text(encoding="utf-8").startswith("# coding: utf-8\\n"))
+        self.assertTrue(self.path.read_text(encoding="utf-8").startswith("# coding: utf-8\n"))
         self.assertEqual(sword["value"], "250")
         self.assertEqual(sword["type"], "two_handed_wpn")
         self.assertEqual(sword["weight"], "2.25")
