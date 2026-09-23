@@ -52,6 +52,21 @@ relabels, `hasattr(send_page_module)` guard (master's shared
   change (needs real game archives/tool; pre-existing environment failure).
 - Browser legs (`verify_rdr_editing_browser.py`, `tests/rdr_browser_check.py`)
   not run here (need Playwright/Chromium); left for CI.
+- Follow-up `fcb52f73`: loot row also gates on `LOOT_FILE.is_file()`;
+  `test_data_map_coverage.py` 8/8 and `verify_rdr_editing.py` 29/29 green
+  in this worktree after the change.
+
+## CI on PR 541 after `fcb52f73` (not caused by this branch)
+
+- `editor` fails in `tests/rdr_browser_check.py:201`: label-lane ratio
+  0.189 > 0.16 at 900px on the items Amount field. This branch does not
+  touch that test, `ui/framework.*`, or `games/rdr/editor.*`
+  (`git diff origin/master...HEAD` on those paths is empty); the lane
+  fitter (12f3575c) is already in master. Pre-existing/environmental.
+- `Stardew rendered UI acceptance` fails on a different game; out of scope.
+- Master itself is red in the same lanes (Shared UI contract, FF9
+  verification failed on the #540 merge push), so these are not PR 541
+  regressions. Left for the owning lane work, not chased here.
 
 ## Remaining (needs Lexer / game)
 
