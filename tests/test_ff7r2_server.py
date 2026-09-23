@@ -199,6 +199,16 @@ def test_battle_item_possession_service_is_read_only():
             assert fields["StealItemName_Array"]["arrayCount"] == 2
             assert fields["NormalItemPercent_Array"]["value"] == [25, 75]
             assert fields["NormalItemPercent_Array"]["editable"] is False
+
+            request = Request(
+                session.url + "api/battle-item-possession/save",
+                method="POST",
+                data=b"{}",
+                headers={"Content-Type": "application/json"},
+            )
+            with pytest.raises(HTTPError) as caught:
+                urlopen(request, timeout=10)
+            assert caught.value.code == 404
             assert source.read_bytes() == original
 
 def test_requested_gameplay_datamap_states_are_explicit():
