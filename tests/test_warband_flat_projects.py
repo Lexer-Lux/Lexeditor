@@ -1,6 +1,7 @@
 """Non-destructive flat Warband Module System import and preservation tests."""
 
 from pathlib import Path
+import json
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -138,10 +139,9 @@ class WarbandFlatProjectTests(unittest.TestCase):
         selected = manager.select("warband", str(repository))
         imported = Path(selected["current"])
         self.assertTrue((imported / "ModuleSystem" / "module_items.py").is_file())
-        self.assertIn(
-            str(repository.resolve()),
-            (imported / project_import.MANIFEST).read_text(encoding="utf-8"),
-        )
+        manifest = json.loads((imported / project_import.MANIFEST).read_text(encoding="utf-8"))
+        self.assertEqual(Path(manifest["source"]), repository.resolve())
+        self.assertEqual(Path(manifest["moduleSystem"]), source.resolve())
 
     def test_source_change_during_import_is_rejected_without_partial_project(self):
         source = self.make_flat(self.root / "changing")
