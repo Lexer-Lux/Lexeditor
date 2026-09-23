@@ -545,8 +545,8 @@ function recordsPanel(kind) {
     className: "factorio-layout",
     splitKey: `factorio-${kind}`,
     rowsKey: `factorio-${kind}`,
-    defaultSplit: 50,
-    minLeft: 380,
+    defaultSplit: 55,
+    minLeft: 400,
     minRight: 360,
     search: {
       key: `factorio-${kind}`,
