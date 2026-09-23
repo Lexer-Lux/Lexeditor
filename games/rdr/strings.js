@@ -108,8 +108,6 @@
         className:"record-detail string-detail",
         title: row.identifier || row.hash,
         meta: `${row.sourceLabel} · ${row.hash}`,
-        actions: UI.badge(row.project ? "Project" : "Vanilla",
-          {tone: row.project ? "success" : null}),
         body:[
           detailField("Resource", shown(row.path), "",
             "The PC STRTBL resource that owns this localized text."),
