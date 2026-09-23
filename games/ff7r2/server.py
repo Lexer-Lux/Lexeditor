@@ -475,8 +475,9 @@ class Handler(PluginRequestHandler):
                             "name": "Final Fantasy VII Rebirth",
                             "hosted": True, "windowHost": "webview2",
                             "capabilities": ["reshade", "shader-injector", "data-map",
-                            "player-parameter", "battle-item-possession-view",
-                            "fixed-width-edit", "project-staging", "package-candidate"]})
+                            "player-parameter", "battle-player-parameter-view",
+                            "battle-item-possession-view", "fixed-width-edit",
+                            "project-staging", "package-candidate"]})
         elif path == "/api/datamap":
             self.send_json(data_map_payload())
         elif path == "/api/workspace":
@@ -485,6 +486,11 @@ class Handler(PluginRequestHandler):
             try:
                 source = parse_qs(urlparse(self.path).query).get("source", ["mine"])[0]
                 self.send_json(player_payload(source))
+            except (OSError, DataObjectError) as error:
+                self.send_json({"error": str(error), "workspace": workspace_payload()}, 404)
+        elif path == "/api/battle-player-parameter":
+            try:
+                self.send_json(battle_player_payload())
             except (OSError, DataObjectError) as error:
                 self.send_json({"error": str(error), "workspace": workspace_payload()}, 404)
         elif path == "/api/battle-item-possession":
