@@ -58,9 +58,9 @@ class FF72013Discard(target.RenderedTests):
         self.page.set_viewport_size({"width": 900, "height": 620})
         self.open("ff7-2013")
 
-        # The shared Help action is the FF7 Data Map. Verify it renders with the
-        # explicit coverage control rather than inferring completeness from source.
-        self.page.get_by_title("Open the FF7 Data Map").click()
+        # Verify the Data Map itself through the shared page navigation contract.
+        # The shell button's exact title is shared-UI copy owned by PR #485.
+        self.page.evaluate('navigate("datamap")')
         self.page.wait_for_function("state.tab === 'datamap'")
         self.assertTrue(self.page.locator(".lex-data-map-view").is_visible())
         coverage = self.page.get_by_label("Filter files by coverage", exact=True)
