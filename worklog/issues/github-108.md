@@ -42,3 +42,9 @@ Remaining technical work is to obtain and inspect the actual follow-vehicle hand
 
 ## 2026-09-22 misc-fixes disposition
 Standing, crouched, aiming, horseback, vehicle, and prone profiles exist; continuous Y is unsupported and LOW and NORMAL are ignored in vehicles. Vehicle-height research plus open defects #269 (transition recorder) and #270 (crouched bob vs lantern collision) remain; #267 settled-equality test recorded separately. Shared developer-mode boundary exists in module. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (prototype/research still owed on
+the agent side), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.
