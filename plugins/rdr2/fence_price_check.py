@@ -67,3 +67,43 @@ def validate_price_check(plan: Mapping) -> list[str]:
             "as an open unknown instead of assuming it installed."
         )
     return errors
+
+def validate_session_result(result: Mapping) -> list[str]:
+    """Check a completed fence-pricing session's recorded leg prices."""
+    errors: list[str] = []
+    if not isinstance(result, Mapping):
+        return ["Session result must be a mapping."]
+    legs = result.get("legs")
+    if not isinstance(legs, Mapping):
+        return ["Session result must map each required leg to its observation."]
+
+    def _price(leg):
+        price = leg.get("price") if isinstance(leg, Mapping) else None
+        if isinstance(price, bool) or not isinstance(price, (int, float)):
+            return None
+        return price
+
+    for required in REQUIRED_LEGS:
+        leg = legs.get(required)
+        if not isinstance(leg, Mapping):
+            errors.append(f"Result must include a {required} leg.")
+            continue
+        for control in MATCHED_CONTROLS:
+            if not leg.get(control):
+                errors.append(f"Leg {required} must name {control}.")
+        if _price(leg) is None:
+            errors.append(f"Leg {required} must record a readable numeric price.")
+    low_price = _price(legs.get("low_honor"))
+    high_price = _price(legs.get("high_honor"))
+    if (
+        low_price is not None
+        and high_price is not None
+        and low_price <= high_price
+    ):
+        errors.append(
+            "Low-Honor fence price must beat the high-Honor price; "
+            "equal or worse prices repeat the baseline failure."
+        )
+    if result.get("shop_kind") != "fence":
+        errors.append("Session must run at a fence.")
+    return errors

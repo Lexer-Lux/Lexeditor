@@ -76,5 +76,52 @@ class MeasurementPlanTests(unittest.TestCase):
         self.assertTrue(any("interception" in e for e in vcc.validate_measurement(plan)))
 
 
+def valid_session_result():
+    return {
+        "interaction": "greet troveller at Horseshoe",
+        "cases": [
+            {"amount": 10, "social": True, "mission": False, "before": 100, "after": 120},
+            {"amount": 10, "social": True, "mission": True, "before": 120, "after": 130},
+        ],
+    }
+
+
+class CombSessionResultTests(unittest.TestCase):
+    def test_valid_session_result_passes(self):
+        self.assertEqual(vcc.validate_session_result(valid_session_result()), [])
+
+    def test_undoubled_eligible_gain_is_rejected(self):
+        result = valid_session_result()
+        result["cases"][0]["after"] = 110
+        errors = vcc.validate_session_result(result)
+        self.assertTrue(any("expected 20" in e for e in errors))
+
+    def test_doubled_mission_gain_is_rejected(self):
+        result = valid_session_result()
+        result["cases"][1]["after"] = 140
+        errors = vcc.validate_session_result(result)
+        self.assertTrue(any("expected 10" in e for e in errors))
+
+    def test_missing_readings_are_rejected(self):
+        result = valid_session_result()
+        del result["cases"][0]["after"]
+        errors = vcc.validate_session_result(result)
+        self.assertTrue(any("before/after" in e for e in errors))
+
+    def test_unnamed_interaction_is_rejected(self):
+        result = valid_session_result()
+        del result["interaction"]
+        errors = vcc.validate_session_result(result)
+        self.assertTrue(any("interaction" in e for e in errors))
+
+    def test_empty_cases_are_rejected(self):
+        result = valid_session_result()
+        result["cases"] = []
+        self.assertTrue(vcc.validate_session_result(result))
+
+    def test_non_mapping_result_is_rejected(self):
+        self.assertTrue(vcc.validate_session_result("comb works"))
+
+
 if __name__ == "__main__":
     unittest.main()

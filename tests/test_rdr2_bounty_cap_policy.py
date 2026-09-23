@@ -74,5 +74,46 @@ class BountyCapPolicyTests(unittest.TestCase):
         self.assertTrue(any("at least one region" in e for e in errors))
 
 
+def valid_enforcement_proof():
+    return {
+        "configured_maximum": 50000,
+        "layers": {"engine": 50000, "regional_clamp": 50000},
+        "pre_existing_bounties": "preserved",
+    }
+
+
+class EnforcementProofTests(unittest.TestCase):
+    def test_valid_enforcement_proof_passes(self):
+        self.assertEqual(bc.validate_enforcement_proof(valid_enforcement_proof()), [])
+
+    def test_single_layer_clamp_is_rejected(self):
+        proof = valid_enforcement_proof()
+        proof["layers"]["regional_clamp"] = 150000
+        errors = bc.validate_enforcement_proof(proof)
+        self.assertTrue(any("regional_clamp" in e for e in errors))
+
+    def test_zeroed_bounties_are_rejected(self):
+        proof = valid_enforcement_proof()
+        proof["pre_existing_bounties"] = "zeroed"
+        errors = bc.validate_enforcement_proof(proof)
+        self.assertTrue(any("preserved" in e for e in errors))
+
+    def test_out_of_bounds_maximum_is_rejected(self):
+        proof = valid_enforcement_proof()
+        proof["configured_maximum"] = 2000000
+        proof["layers"] = {"engine": 2000000, "regional_clamp": 2000000}
+        errors = bc.validate_enforcement_proof(proof)
+        self.assertTrue(any("1..1000000" in e for e in errors))
+
+    def test_missing_layers_are_rejected(self):
+        proof = valid_enforcement_proof()
+        del proof["layers"]
+        errors = bc.validate_enforcement_proof(proof)
+        self.assertTrue(any("both clamp layers" in e for e in errors))
+
+    def test_non_mapping_proof_is_rejected(self):
+        self.assertTrue(bc.validate_enforcement_proof("cap works"))
+
+
 if __name__ == "__main__":
     unittest.main()

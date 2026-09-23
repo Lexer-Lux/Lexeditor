@@ -90,5 +90,56 @@ class VariantBriefTests(unittest.TestCase):
         self.assertTrue(mi.validate_variant_brief("variant"))
 
 
+def valid_review_session():
+    return {
+        "briefs": [
+            {
+                "subject": "gunsmith",
+                "style_axis": "engraved-vs-flat",
+                "sizes": "32/64px",
+                "presentation_state": "approved",
+                "feedback": ["thin the engraving lines"],
+                "revisions": ["rev B with thinner lines"],
+                "replace": True,
+            }
+        ]
+    }
+
+
+class ReviewSessionTests(unittest.TestCase):
+    def test_valid_review_session_passes(self):
+        self.assertEqual(mi.validate_review_session(valid_review_session()), [])
+
+    def test_unrevised_feedback_is_rejected(self):
+        session = valid_review_session()
+        session["briefs"][0]["revisions"] = []
+        errors = mi.validate_review_session(session)
+        self.assertTrue(any("revise every feedback" in e for e in errors))
+
+    def test_replacement_before_approval_is_rejected(self):
+        session = valid_review_session()
+        session["briefs"][0]["presentation_state"] = "presented"
+        errors = mi.validate_review_session(session)
+        self.assertTrue(any("approved before replacement" in e for e in errors))
+
+    def test_unapproved_non_replacing_brief_passes(self):
+        session = valid_review_session()
+        session["briefs"][0]["presentation_state"] = "presented"
+        session["briefs"][0]["replace"] = False
+        self.assertEqual(mi.validate_review_session(session), [])
+
+    def test_brief_missing_field_is_rejected(self):
+        session = valid_review_session()
+        del session["briefs"][0]["sizes"]
+        errors = mi.validate_review_session(session)
+        self.assertTrue(any("sizes" in e for e in errors))
+
+    def test_empty_briefs_are_rejected(self):
+        self.assertTrue(mi.validate_review_session({"briefs": []}))
+
+    def test_non_mapping_session_is_rejected(self):
+        self.assertTrue(mi.validate_review_session("approved"))
+
+
 if __name__ == "__main__":
     unittest.main()

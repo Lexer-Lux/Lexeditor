@@ -117,5 +117,58 @@ class LockerFilterTests(unittest.TestCase):
         self.assertTrue(lr.validate_locker_filter("filter"))
 
 
+def valid_session_result():
+    return {
+        "outcomes": [
+            {
+                "case": "VIKING_HATCHET",
+                "route": "locker_list",
+                "verdict": "pass",
+                "unequipped": True,
+                "no_duplication": True,
+                "evidence": "locker capture reel B",
+            }
+        ]
+    }
+
+
+class RecoverySessionResultTests(unittest.TestCase):
+    def test_valid_session_result_passes(self):
+        self.assertEqual(lr.validate_session_result(valid_session_result()), [])
+
+    def test_failed_case_passes_validation(self):
+        result = valid_session_result()
+        result["outcomes"][0] = {
+            "case": "VIKING_HATCHET",
+            "route": "locker_list",
+            "verdict": "fail",
+        }
+        self.assertEqual(lr.validate_session_result(result), [])
+
+    def test_recover_action_route_is_rejected(self):
+        result = valid_session_result()
+        result["outcomes"][0]["route"] = "recover_action"
+        errors = lr.validate_session_result(result)
+        self.assertTrue(any("ordinary locker list" in e for e in errors))
+
+    def test_pass_without_dupe_check_is_rejected(self):
+        result = valid_session_result()
+        del result["outcomes"][0]["no_duplication"]
+        errors = lr.validate_session_result(result)
+        self.assertTrue(any("no_duplication" in e for e in errors))
+
+    def test_unknown_case_is_rejected(self):
+        result = valid_session_result()
+        result["outcomes"][0]["case"] = "GOLDEN_GUN"
+        errors = lr.validate_session_result(result)
+        self.assertTrue(any("evidenced lost-weapon case" in e for e in errors))
+
+    def test_empty_outcomes_are_rejected(self):
+        self.assertTrue(lr.validate_session_result({"outcomes": []}))
+
+    def test_non_mapping_result_is_rejected(self):
+        self.assertTrue(lr.validate_session_result("hatchet back"))
+
+
 if __name__ == "__main__":
     unittest.main()

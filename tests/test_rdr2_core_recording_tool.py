@@ -73,5 +73,42 @@ class CoreRecordingToolTests(unittest.TestCase):
         self.assertTrue(crt.validate_trace_records([], 60))
 
 
+def trace(values, cadence_hz=60.0):
+    gap = 1.0 / cadence_hz
+    return [
+        {"timestamp": index * gap, "core_value": value}
+        for index, value in enumerate(values)
+    ]
+
+
+class TraceSummaryTests(unittest.TestCase):
+    def test_single_step_trace_reads_single_step_only(self):
+        samples = trace([50, 50, 51, 52, 52, 53])
+        self.assertEqual(crt.validate_trace_records(samples, 60.0), [])
+        summary = crt.summarize_trace(samples)
+        self.assertEqual(summary["cadence_read"], "single_step_only")
+        self.assertEqual(summary["max_step"], 1)
+        self.assertEqual(summary["changes"], 3)
+
+    def test_multi_point_jump_reads_batching(self):
+        samples = trace([50, 50, 55, 55, 56])
+        self.assertEqual(crt.validate_trace_records(samples, 60.0), [])
+        summary = crt.summarize_trace(samples)
+        self.assertEqual(summary["cadence_read"], "multi_point_batching")
+        self.assertEqual(summary["max_step"], 5)
+
+    def test_flat_trace_reads_no_change(self):
+        samples = trace([70, 70, 70])
+        summary = crt.summarize_trace(samples)
+        self.assertEqual(summary["cadence_read"], "no_change_observed")
+        self.assertEqual(summary["samples"], 3)
+
+    def test_summary_counts_samples_and_changes(self):
+        samples = trace([10, 11, 11, 12])
+        summary = crt.summarize_trace(samples)
+        self.assertEqual(summary["samples"], 4)
+        self.assertEqual(summary["changes"], 2)
+
+
 if __name__ == "__main__":
     unittest.main()

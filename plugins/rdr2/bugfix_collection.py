@@ -119,3 +119,27 @@ def validate_first_target_manifests(manifests) -> list[str]:
                 "later fixes ship under the collection schema."
             )
     return errors
+
+# Fields each delivered fix must record: what basis it was built from, how
+# it was verified against current files, and that it ships independently.
+DELIVERY_RECORD_FIELDS = ("built_from", "verification", "ships_independently")
+
+
+def validate_delivery_record(record: Mapping) -> list[str]:
+    """Check one delivered fix against the modular delivery contract."""
+    errors: list[str] = []
+    if not isinstance(record, Mapping):
+        return ["Delivery record must be a mapping."]
+    entry = str(record.get("entry", ""))
+    if not entry:
+        errors.append("Delivery record must name its collection entry.")
+    elif entry in EXCLUDED_ENTRIES:
+        errors.append(f"Delivery record must not ship {entry}.")
+    for field in DELIVERY_RECORD_FIELDS:
+        if not record.get(field):
+            errors.append(f"Delivery record must state {field}.")
+    if entry in COMPARISON_CANDIDATES and not record.get("asset_regression_comparison"):
+        errors.append(
+            f"Entry {entry} needs an asset regression comparison first."
+        )
+    return errors

@@ -74,5 +74,62 @@ class ContinuousSavingTests(unittest.TestCase):
         self.assertTrue(cs.validate_saving_plan("autosave"))
 
 
+def valid_observer_report():
+    return {
+        "read_only": True,
+        "pairs": [
+            {
+                "sequence": 1,
+                "request": "func_110 save request",
+                "completion": "func_506 done",
+                "correlated": True,
+            },
+            {
+                "sequence": 2,
+                "request": "func_110 save request",
+                "completion": "func_506 done",
+                "correlated": True,
+            },
+        ],
+    }
+
+
+class ObserverReportTests(unittest.TestCase):
+    def test_valid_observer_report_passes(self):
+        self.assertEqual(cs.validate_observer_report(valid_observer_report()), [])
+
+    def test_observer_must_be_read_only(self):
+        report = valid_observer_report()
+        report["read_only"] = False
+        errors = cs.validate_observer_report(report)
+        self.assertTrue(any("read-only" in e for e in errors))
+
+    def test_uncorrelated_completion_is_rejected(self):
+        report = valid_observer_report()
+        report["pairs"][0]["correlated"] = False
+        errors = cs.validate_observer_report(report)
+        self.assertTrue(any("uncorrelated" in e for e in errors))
+
+    def test_reused_sequence_is_rejected(self):
+        report = valid_observer_report()
+        report["pairs"][1]["sequence"] = 1
+        errors = cs.validate_observer_report(report)
+        self.assertTrue(any("one-to-one" in e for e in errors))
+
+    def test_pair_must_carry_request_and_completion(self):
+        report = valid_observer_report()
+        del report["pairs"][0]["completion"]
+        errors = cs.validate_observer_report(report)
+        self.assertTrue(any("completion" in e for e in errors))
+
+    def test_empty_pairs_are_rejected(self):
+        report = valid_observer_report()
+        report["pairs"] = []
+        self.assertTrue(cs.validate_observer_report(report))
+
+    def test_non_mapping_report_is_rejected(self):
+        self.assertTrue(cs.validate_observer_report("saved"))
+
+
 if __name__ == "__main__":
     unittest.main()

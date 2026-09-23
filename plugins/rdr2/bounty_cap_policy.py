@@ -71,3 +71,27 @@ def validate_cap_policy(config: Mapping) -> list[str]:
             "Disabling must preserve existing bounties, never zero them."
         )
     return errors
+
+def validate_enforcement_proof(proof: Mapping) -> list[str]:
+    """Check game-side proof that a configured cap clamps both layers."""
+    errors: list[str] = []
+    if not isinstance(proof, Mapping):
+        return ["Enforcement proof must be a mapping."]
+    configured = proof.get("configured_maximum")
+    if not isinstance(configured, int) or isinstance(configured, bool):
+        return ["Enforcement proof must state the configured whole-dollar maximum."]
+    if configured <= 0 or configured > MAX_CONFIGURED_CAP:
+        errors.append(
+            f"Configured maximum must stay within 1..{MAX_CONFIGURED_CAP} dollars."
+        )
+    layers = proof.get("layers")
+    if not isinstance(layers, Mapping):
+        return errors + ["Enforcement proof must record both clamp layers."]
+    for layer in ("engine", "regional_clamp"):
+        if layers.get(layer) != configured:
+            errors.append(
+                f"Layer {layer} must clamp at the configured {configured} dollars."
+            )
+    if proof.get("pre_existing_bounties") != "preserved":
+        errors.append("Pre-existing bounties must be preserved, never zeroed.")
+    return errors

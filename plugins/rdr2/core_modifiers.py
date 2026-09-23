@@ -81,3 +81,45 @@ def validate_removal_proposal(proposal: Mapping) -> list[str]:
                 f"Proposal must own the unproven {owned} as an open unknown."
             )
     return errors
+
+# Evidence fields a researched engine decrement routine candidate must
+# carry: the matching binary fingerprint, the decrement behavior, and the
+# identified term inputs.
+ROUTINE_EVIDENCE_FIELDS = (
+    "binary_fingerprint",
+    "decrement_behavior",
+    "term_inputs",
+)
+
+
+def validate_routine_candidate(candidate: Mapping) -> list[str]:
+    """Check a researched engine decrement routine candidacy record."""
+    errors: list[str] = []
+    if not isinstance(candidate, Mapping):
+        return ["Routine candidate must be a mapping."]
+    if candidate.get("routine") in (None, ""):
+        errors.append("Candidate must name the engine decrement routine.")
+    if candidate.get("routine") in FORECAST_ONLY_ROUTINES:
+        errors.append(
+            f"Routine {candidate.get('routine')} is forecast-only: func_1632 "
+            "discards it, so it cannot own the drain."
+        )
+    for field in ROUTINE_EVIDENCE_FIELDS:
+        if not candidate.get(field):
+            errors.append(f"Candidate must state {field}.")
+    targets = [str(item) for item in (candidate.get("targets") or [])]
+    for target in targets:
+        if target in SHARED_FIELDS:
+            errors.append(
+                f"Target {target} is shared with trinket/outfit benefits; "
+                "zeroing it is not an isolated removal."
+            )
+    unknowns = " ".join(
+        str(item) for item in (candidate.get("open_unknowns") or [])
+    ).lower()
+    for owned in ("ownership", "cadence"):
+        if owned not in unknowns:
+            errors.append(
+                f"Candidate must own the unproven {owned} as an open unknown."
+            )
+    return errors
