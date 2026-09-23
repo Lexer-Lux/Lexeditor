@@ -183,8 +183,13 @@
         },
         {
           "name": "matyamod / UnrealReZen (ff7r branch)",
-          "role": "GPL-3.0 FF7R2 packaging reference used to verify UE4.26, End/Content mounting and the Rebirth dependency-manifest workaround. No code is bundled or invoked.",
+          "role": "GPL-3.0 FF7R2 packaging reference used to verify UE4.26, End/Content mounting and the Rebirth dependency-manifest workaround. Lexeditor can invoke only a separately supplied local executable through its candidate-only packaging route; no UnrealReZen code or binary is bundled.",
           "url": "https://github.com/matyamod/UnrealReZen"
+        },
+        {
+          "name": "nikolaybutnik / FFVII-Rebirth-Mesh-Patcher",
+          "role": "MIT-licensed public Rebirth tooling used to cross-check that native IoStore mod triples are discovered under End/Content/Paks/~mods. No code is vendored or adapted.",
+          "url": "https://github.com/nikolaybutnik/FFVII-Rebirth-Mesh-Patcher"
         }
       ],
       "thanks": [],
