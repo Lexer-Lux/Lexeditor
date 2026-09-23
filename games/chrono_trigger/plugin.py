@@ -354,7 +354,7 @@ def smoke() -> list[str]:
             if not exported.get("replacementOnly"):
                 raise RuntimeError("CTP export did not assert replacement-only loader compatibility")
             with zipfile.ZipFile(exported["path"]) as ctp:
-                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/chara/dat/c005.dat", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/MapTable/MapTable_0006.dat", "Game/field/palette_bin/plt4.bin", "Game/field/BGAnime/bganimeinfo_4.dat", "Game/field/BGSetTable/bgsettable_4.dat", "Game/field/ChipTable/ChipTable_0004.dat", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/Map/Map_0000.dat", "Game/world/Id/Id_0000.dat", "Game/world/SeId/SeId_0000.dat", "Game/world/colanim_bin/0_colanim.bin", "Game/world/EventTable/EventTable_0004.dat"}:
+                if set(ctp.namelist()) != {"Localize/en/msg/cmes0.txt", "Game/chara/dat/c005.dat", "Game/chara/cell/c005.cel", "Game/field/Mapinfo/mapinfo_1.dat", "Game/field/MapTable/MapTable_0006.dat", "Game/field/palette_bin/plt4.bin", "Game/field/BGAnime/bganimeinfo_4.dat", "Game/field/BGSetTable/bgsettable_4.dat", "Game/field/ChipTable/ChipTable_0004.dat", "Game/common/MapJumpDataTbl.dat", "Game/common/TakaraDataTbl.dat", BANK_PATH, "Game/world/Map/Map_0000.dat", "Game/world/Id/Id_0000.dat", "Game/world/SeId/SeId_0000.dat", "Game/world/colanim_bin/0_colanim.bin", "Game/world/EventTable/EventTable_0004.dat"}:
                     raise RuntimeError("CTP export did not contain exactly the changed resources")
         if (game / "resources.bin").read_bytes() != original_archive:
             raise RuntimeError("Fresh Chrono Trigger plugin modified resources.bin")
