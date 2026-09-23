@@ -255,9 +255,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
 
                 # Info/version/DLC and deterministic export action.
                 page.evaluate('navigate("info")')
-                page.get_by_text("2.1.19", exact=True).wait_for()
-                page.get_by_text(
-                    "installed; active in imported mod set", exact=False).wait_for()
+                assert page.get_by_label(
+                    "DETECTED VERSION", exact=True).input_value() == "2.1.19"
+                assert page.get_by_label(
+                    "SPACE AGE", exact=True
+                ).input_value() == "installed; active in imported mod set"
                 page.get_by_role("button", name="Export Mod", exact=True).click()
                 page.get_by_text("Candidate built only", exact=False).wait_for()
                 export_name = page.locator(
