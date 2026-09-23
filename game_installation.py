@@ -13,7 +13,7 @@ except ImportError:
     winreg = None
 from pathlib import Path
 
-from plugin_api import GamePlugin
+from plugin_api import GamePlugin, plugin_helpers
 
 
 ROOT = Path(__file__).resolve().parent
@@ -105,27 +105,34 @@ class GameInstallationManager:
                 self.begin_scan(plugin_id)
 
     def _apply_helper(self, plugin_id: str, state: dict) -> dict:
-        """Refuse to report a game as ready when its helper is missing."""
+        """Refuse readiness until every required runtime/helper dependency is present."""
         plugin = self._plugins.get(plugin_id)
-        if plugin is None or not (plugin.helper_status or plugin.helper_status_for_root) or state["status"] == "not-added":
+        specs = plugin_helpers(plugin) if plugin is not None else ()
+        if plugin is None or not specs or state["status"] == "not-added":
             return state
-        try:
-            helper = (plugin.helper_status_for_root(Path(state["root"]) if state.get("root") else None)
-                      if plugin.helper_status_for_root else plugin.helper_status()) or {}
-        except Exception as error:
-            state["problems"] = list(state["problems"]) + [
-                f"{plugin.helper_name or 'The runtime helper'} could not be checked: {error}"]
+        helpers = []
+        root = Path(state["root"]) if state.get("root") else None
+        for spec in specs:
+            try:
+                helper = (spec.status_for_root(root) if spec.status_for_root else spec.status()) or {}
+            except Exception as error:
+                helper = {"installed": False, "error": str(error)}
+            helper = {"key": spec.key, "name": spec.name, **helper}
+            helper["installable"] = bool(spec.install or spec.install_for_root)
+            helpers.append(helper)
+            if not spec.required or helper.get("installed"):
+                continue
+            problem = helper.get("message")
+            if not problem:
+                detail = helper.get("error")
+                problem = (f"{spec.name} could not be checked: {detail}" if detail
+                           else f"{spec.name} is not installed. {plugin.name} cannot load edited data without it.")
+            state["problems"] = list(state["problems"]) + [problem]
             state["status"] = "broken"
             state["statusText"] = "Broken"
-            return state
-        state["helper"] = helper
-        if helper.get("installed"):
-            return state
-        name = plugin.helper_name or helper.get("runtime") or "The runtime helper"
-        state["problems"] = list(state["problems"]) + [
-            helper.get("message") or f"{name} is not installed. {plugin.name} cannot load edited data without it."]
-        state["status"] = "broken"
-        state["statusText"] = "Broken"
+        state["helpers"] = helpers
+        # Compatibility for old Home/UI consumers and every existing one-helper plugin.
+        state["helper"] = helpers[0] if helpers else {}
         return state
 
     def snapshot(self, plugin_id: str) -> dict:
