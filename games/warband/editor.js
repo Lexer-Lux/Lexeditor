@@ -59,9 +59,10 @@
       detail:options.detail||detail,sync:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");},change:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");render();}}));
   }
 
+  function troopRowKey(troop){return String(troop.recordIndex??troop.line??troop.id);}
   function openTroop(troopId){
-    const troop=state.troops.rows.find(row=>row.id===troopId);if(!troop)return;
-    state.filters.troops="";state.filters.cut=false;state.selectedTroop=troop.id;
+    const matches=state.troops.rows.filter(row=>row.id===troopId),troop=matches.find(row=>row.status!=="CUT")||matches[0];if(!troop)return;
+    state.filters.troops="";state.filters.cut=false;state.selectedTroop=troopRowKey(troop);
     state.pages.troops=0;navigate("troops");
   }
   function troopLink(troopId,label){
@@ -73,14 +74,15 @@
   // names are long enough to push the table past its panel and cut the last
   // column in half. Bounded widths let the long ones ellipsise instead.
   function itemColumns(){return [{key:"name",label:"Name",width:"minmax(9em,1.4fr)",render:row=>el("span",{title:row.name},row.name)},{key:"id",label:"ID",width:"minmax(6em,.8fr)"},{key:"type",label:"Type",width:"minmax(6em,.7fr)"},{key:"inventoryMesh",label:"Inventory mesh",width:"minmax(7em,1fr)"}];}
+  function itemRowKey(item){return String(item.recordIndex??item.line??item.id);}
   function renderItems(){
     const view="items",columns=itemColumns(),query=state.filters.items||"";
     const filtered=sorted(search(state.items.rows,query,["name","id","type","inventoryMesh"]),view);
     $("#toolbar").replaceChildren();
-    $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec("items",item=>Object.keys(state.itemEdits[itemEditKey(item)]?.fields||{}).length>0),rows:filtered,key:row=>row.id,slots:false,fit:{minRowHeight:36},page:state.pages.items,pageSize:state.pageSizes.items,selected:state.selectedItem,noun:"items",splitKey:"warband-items",className:"warband-paged-table warband-items",defaultSplit:43,
+    $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec("items",item=>Object.keys(state.itemEdits[itemEditKey(item)]?.fields||{}).length>0),rows:filtered,key:itemRowKey,slots:false,fit:{minRowHeight:36},page:state.pages.items,pageSize:state.pageSizes.items,selected:state.selectedItem,noun:"items",splitKey:"warband-items",className:"warband-paged-table warband-items",defaultSplit:43,
       search:{key:"warband-items",value:query,placeholder:"Search items…",change:value=>{state.filters.items=value;state.pages.items=0;renderItems();}},
-      master:({rows,selected,select})=>columnList({rows,key:row=>row.id,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts.items[0],dir:state.sorts.items[1]},sort:key=>sort("items",key),selected,selectedClass:"selected",select,class:"warband-record-list","aria-label":"Warband items"}),
-      detail:()=>warbandItemDetail(state.items.rows.find(row=>row.id===state.selectedItem)),sync:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";},change:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";renderItems();}}));
+      master:({rows,selected,select})=>columnList({rows,key:itemRowKey,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts.items[0],dir:state.sorts.items[1]},sort:key=>sort("items",key),selected,selectedClass:"selected",select,class:"warband-record-list","aria-label":"Warband items"}),
+      detail:()=>warbandItemDetail(state.items.rows.find(row=>itemRowKey(row)===state.selectedItem)),sync:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";},change:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";renderItems();}}));
   }
 
   function warbandEyeIcon(){
@@ -91,7 +93,7 @@
   function disposeWarbandPreview(){
     if(window.__warbandPreview){window.__warbandPreview.forEach(controller=>controller.dispose());delete window.__warbandPreview;}
   }
-  function itemEditKey(item){return String(item.recordIndex??item.line??item.id);}
+  function itemEditKey(item){return itemRowKey(item);}
   function effectiveItemField(item,key){return state.itemEdits[itemEditKey(item)]?.fields?.[key]??item.fields?.[key]??"";}
   function setItemField(item,key,value){
     const recordKey=itemEditKey(item),base=String(item.fields?.[key]??""),next=String(value);
@@ -112,7 +114,7 @@
     setItemField(item,"stats",next);const control=document.querySelector('[data-lex-property="stats"] textarea');if(control)control.value=next;
   }
   const ITEM_HELP={
-    id:"Module System identifier referenced by troops, shops, scripts, and other records. Renaming it here does not rewrite those references.",
+    id:"Stable Module System identifier referenced by troops, shops, scripts, and other records. It is read-only because Lexeditor does not rewrite every reference when an item ID changes.",
     name:"Player-facing item name compiled into the module's item data.",
     type:"The itp_type_* flag defines the item's fundamental equipment/use class and changes how Warband interprets its other stats.",
     value:"Base item price before merchant, trade-skill, abundance, and other economy adjustments.",
@@ -132,7 +134,7 @@
     const thumbnail=LexeditorUI.iconSlot({className:"warband-item-thumbnail",message:item.inventoryMesh?"Preparing icon…":"No mesh"}),thumbnailMessage=thumbnail.lexMessage;
     const readOnly=state.activeSource!=="mine";
     const core=detailGroup({title:"Item",body:[
-      detailField({label:"ID",property:"id",dataType:"STRING",description:ITEM_HELP.id,control:el("input",{value:effectiveItemField(item,"id"),disabled:readOnly,oninput:event=>setItemField(item,"id",event.target.value)})}),
+      detailField({label:"ID",property:"id",dataType:"STRING",description:ITEM_HELP.id,control:el("input",{value:item.id,disabled:true})}),
       detailField({label:"Name",property:"name",dataType:"STRING",description:ITEM_HELP.name,control:el("input",{value:effectiveItemField(item,"name"),disabled:readOnly,oninput:event=>setItemField(item,"name",event.target.value)})}),
       detailField({label:"Type",property:"type",dataType:"STRING",description:ITEM_HELP.type,control:el("input",{value:itemTypeFromFlags(effectiveItemField(item,"flags")),disabled:readOnly,onchange:event=>setItemType(item,event.target.value)})}),
       detailField({label:"Value",property:"value",dataType:"EXPR",description:ITEM_HELP.value,control:el("input",{value:effectiveItemField(item,"value"),disabled:readOnly,oninput:event=>setItemField(item,"value",event.target.value)})}),
@@ -212,7 +214,7 @@
   function renderTroops(){
     const base=state.filters.cut?state.troops.rows.filter(row=>row.status==="CUT"):state.troops.rows;
     const cutFilter=el("label",{class:"lex-bottom-filter"},el("input",{type:"checkbox",checked:state.filters.cut,onchange:event=>{state.filters.cut=event.target.checked;state.pages.troops=0;render();}})," Cut only");
-    renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name"},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{key:troop=>troop.id,selected:()=>state.selectedTroop,setSelected:value=>{state.selectedTroop=value;},filters:[cutFilter],detail:troopEditorPanel});
+    renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name"},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{key:troopRowKey,selected:()=>state.selectedTroop,setSelected:value=>{state.selectedTroop=value;},filters:[cutFilter],detail:troopEditorPanel});
   }
   function troopTreeDetail(node){
     disposeWarbandPreview();
@@ -223,7 +225,7 @@
     // look at - rather than staying shut because a troop is not one model.
     // The tree node carries only the upgrade graph, so the troop's own record
     // is what holds its equipment.
-    const record=state.troops?.rows?.find(row=>row.id===node.id)||node;
+    const matching=state.troops?.rows?.filter(row=>row.id===node.id)||[],record=matching.find(row=>row.status!=="CUT")||matching[0]||node;
     // module_troops.py names an item "itm_leather_cap"; the item table's own id
     // is "leather_cap". Matching the two without stripping the prefix found
     // nothing, so the viewer stayed shut on every troop in the game.
@@ -395,9 +397,9 @@
         if(state.catalogFile?.filename==="module_troops.py"){state.catalogFile=await api("/api/catalog/file?name=module_troops.py");state.catalogDraft=state.catalogFile.text;}
       }
       if(itemDirtyCount()){
-        const selectedRecord=state.items.rows.find(row=>row.id===state.selectedItem)?.recordIndex,edits=Object.values(state.itemEdits);
-        const result=await api("/api/items/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.items=await api("/api/items");state.itemEdits={};
-        if(selectedRecord!==undefined)state.selectedItem=state.items.rows.find(row=>row.recordIndex===selectedRecord)?.id||"";
+        const selectedRecord=state.items.rows.find(row=>itemRowKey(row)===state.selectedItem)?.recordIndex,edits=Object.values(state.itemEdits);
+        const result=await api("/api/items/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sha256:state.items.sha256,edits})});state.items=await api("/api/items");state.itemEdits={};
+        if(selectedRecord!==undefined){const selected=state.items.rows.find(row=>row.recordIndex===selectedRecord);state.selectedItem=selected?itemRowKey(selected):"";}
         if(state.catalogFile?.filename==="module_items.py"){state.catalogFile=await api("/api/catalog/file?name=module_items.py");state.catalogDraft=state.catalogFile.text;}
         setStatus(`Saved ${result.saved} item records`);
       }
