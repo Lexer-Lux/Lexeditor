@@ -912,6 +912,7 @@
     if(tab==="datamap")content=dataMapView();
     else if(tab==="info")content=panelLayout([informationPanel()],"ff7r2-layout",{layoutKey:"ff7r2-info",defaultSizes:[100]});
     else if(tab==="tweaks")content=tweaks();
+    else if(tab==="battleparams")content=battleParamsPanel();
     else if(tab==="formulae")content=formulaePanel();
     else content=charactersPanel();
     main.replaceChildren(content);
@@ -922,7 +923,7 @@
   const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",
     plugin:{id:PLUGIN,name:"Final Fantasy VII Rebirth",themeName:"ff7r2",
       theme:{accent:"#3f7fd0","accent-text":"#f2f7ff"}},
-    tabs:[{id:"characters",label:"Characters"},{id:"formulae",label:"Formulae"},{id:"tweaks",label:"Tweaks"}],
+    tabs:[{id:"characters",label:"Characters"},{id:"battleparams",label:"Battle Params"},{id:"formulae",label:"Formulae"},{id:"tweaks",label:"Tweaks"}],
     activeTab:()=>tab,navigate,
     help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open the FF7 Rebirth Data Map",
     info:()=>navigate("info"),infoActive:()=>tab==="info",infoTitle:"Open Rebirth plugin information",
@@ -932,7 +933,7 @@
   });
 
   (async()=>{
-    await Promise.all([loadGame(),loadReshade(),loadInjector(),loadDataMap(),loadWorkspace(),loadPlayer(),loadBattleItem()]);
+    await Promise.all([loadGame(),loadReshade(),loadInjector(),loadDataMap(),loadWorkspace(),loadPlayer(),loadBattlePlayer(),loadBattleItem()]);
     render();
     LexeditorUI.finishPluginLoading();
   })();
