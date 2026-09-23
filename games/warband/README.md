@@ -27,6 +27,22 @@ Systems that generate entries through helpers or wrappers remain visible but
 source-only for those records rather than being rewritten speculatively. The
 normal shell Save then runs the selected project's Module System build.
 
+### Flat Module System imports
+
+**Find a Mod** also accepts real flat Warband Module System source trees such as
+Persistent World / Rome at War layouts, including a repository root whose one
+child is named like `Module System`. Lexeditor never rearranges or writes that
+chosen source. It creates a content-addressed managed copy under the user's
+Lexeditor application-data folder, places the copied sources in `ModuleSystem/`,
+and records source/fingerprint provenance in `.lexeditor-warband-import.json`.
+
+Only the managed copy's literal `module_info.py export_dir` is redirected to
+`../Module/`. The generated wrapper `build.bat` runs one pass of Python
+commands extracted from upstream `build_module.bat`; pause/loop/display commands
+are omitted and any unknown batch command rejects the import instead of being
+executed. Re-selecting an unchanged source tree reuses the existing managed copy,
+so Lexeditor edits are preserved rather than overwritten by a fresh import.
+
 ## Theme and installed assets
 
 The parchment/burgundy chrome is original CSS inspired by Warband's visual
