@@ -18,3 +18,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes disposition
 Recover action workaround installed; ordinary locker-list entries need the native melee and throwable filter solved safely. Verify the filter approach before another acceptance request for the workaround. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side filter/asset/
+prototype still owed), so flipping to waiting would be a fake checklist.
+Left actionable until a real session can be written.

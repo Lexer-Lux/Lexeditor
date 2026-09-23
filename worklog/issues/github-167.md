@@ -18,3 +18,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes disposition
 Prone weapon animation needs compatible clips or authored upper-body poses; reusing unchanged clips already failed its test. Asset creation workflow comes first, with a specified test after. No code written. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side filter/asset/
+prototype still owed), so flipping to waiting would be a fake checklist.
+Left actionable until a real session can be written.
