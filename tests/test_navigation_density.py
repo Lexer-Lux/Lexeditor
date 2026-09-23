@@ -1,4 +1,6 @@
 import pytest
+import tempfile
+from pathlib import Path
 from io import BytesIO
 from PIL import Image
 from test_shared_ui_feedback import ROOT, page, framework
@@ -119,21 +121,24 @@ def test_brand_has_no_pressed_text_highlight(page):
       document.documentElement.style.setProperty('--lex-accent','#72ff1e');
     }''')
     brand=page.locator('.lex-brand-button')
-    before=brand.evaluate('n=>({bg:getComputedStyle(n).backgroundColor,fg:getComputedStyle(n).color})')
+    page.wait_for_timeout(200)
+    before=brand.evaluate('n=>({bg:getComputedStyle(n,"::before").backgroundColor,fg:getComputedStyle(n).color})')
     brand.hover()
-    hover=brand.evaluate('n=>({bg:getComputedStyle(n).backgroundColor,fg:getComputedStyle(n).color})')
+    hover=brand.evaluate('n=>({bg:getComputedStyle(n,"::before").backgroundColor,fg:getComputedStyle(n).color})')
     assert hover['bg']!=before['bg'] and hover['fg']==before['fg']
     bounds=brand.bounding_box()
     text=brand.locator('h1').bounding_box()
-    assert text['x']-bounds['x']>=8 and text['y']-bounds['y']>=4
+    assert abs(text['x']-bounds['x'])<1
+    assert brand.locator('h1').evaluate('n=>n.scrollWidth<=n.clientWidth+1'),brand.locator('h1').evaluate('n=>({w:n.clientWidth,s:n.scrollWidth,font:getComputedStyle(n).fontSize,inline:n.style.fontSize,parent:n.parentElement.clientWidth})')
     page.mouse.down()
     assert page.evaluate('String(window.getSelection())')==''
     page.mouse.move(1000,700)
     page.mouse.up()
     brand.evaluate('n=>n.classList.add("lex-command-pressed")')
-    pressed=brand.evaluate('n=>({bg:getComputedStyle(n).backgroundColor,fg:getComputedStyle(n).color})')
+    pressed=brand.evaluate('n=>({bg:getComputedStyle(n,"::before").backgroundColor,fg:getComputedStyle(n).color})')
     assert pressed['bg']!=hover['bg'] and pressed['fg']==before['fg']
     assert brand.bounding_box()==bounds
+    page.locator('.lex-shell-command-row').screenshot(path=str(Path(tempfile.gettempdir())/'lex-brand-header.png'))
 
 
 def test_brand_real_return_action_and_scriptless_snapshot(page):
