@@ -244,7 +244,11 @@
   function toolbar(){const keys=choices(state.tab);if(keys.length<=1){setToolbar();return}const label=key=>key==="characters"?"Characters":key==="leveling"?"Level curve":catalogRow(key)?.label||key;const buttons=keys.map(key=>({id:key,label:label(key)}));const strip=subtabBar({tabs:buttons,active:activeKey(),label:`${tabs.find(tab=>tab.id===state.tab)?.label} datasets`,change:key=>{state.datasetChoice[state.tab]=key;state.page[key]=0;loadDataset(key).then(render)}});setToolbar([strip])}
   function info(){
     const game=state.dashboard.game,base=state.dashboard.baseline,runtime=state.dashboard.runtime||{};
+    const compatibility=state.dashboard.modCompatibility||{},externalMods=compatibility.mods||[];
     const value=text=>readonlyField(String(text??""),{format:false});
+    const summary=(values,empty="None detected")=>values.length
+      ? values.slice(0,4).join(", ")+(values.length>4?\` (+\${values.length-4} more)\`:"")
+      : empty;
     const disabled=state.busy||state.activeSource!=="mine";
     const actions=LexeditorUI.actionRow(
       el("button",{type:"button",disabled:disabled||runtime.recoveryRequired,onclick:()=>runtimeAction("install")},runtime.installed?"Reinstall pinned Memoria":"Install Memoria"),
@@ -274,6 +278,16 @@
         detailField({label:"ACTIONS",control:actions,help:infoHelp("Play opens Memoria's launcher, where its own settings can be edited. Installation keeps recovery copies and preserves existing INI files.")}),
         ...(runtime.recoveryRequired?[detailField({label:"RECOVERY COPY",control:value(runtime.recoveryBackup)})]:[]),
         ...(state.runtimeError?[el("p",{role:"alert"},state.runtimeError)]:[]),
+      ]}),
+      detailSection({title:"EXTERNAL MOD COMPATIBILITY",body:[
+        detailField({label:"ENABLED",control:value(summary(externalMods.map(mod=>mod.name))),
+          help:infoHelp("Read-only snapshot of Memoria FolderNames and enabled mods' ModDescription.xml metadata. Lexeditor does not install, edit, enable, disable, or remove these mods.")}),
+        detailField({label:"UNSUPPORTED RUNTIME",control:value(summary((compatibility.unsupportedByPinnedMemoria||[]).map(mod=>\`\${mod.name} (needs \${mod.minimumMemoriaVersion})\`),"None detected"),
+          help:infoHelp("Mods declaring a MinimumMemoriaVersion newer than Lexeditor's pinned helper are outside this candidate's supported runtime boundary.")}),
+        detailField({label:"DECLARED CONFLICTS",control:value(summary((compatibility.declaredConflicts||[]).map(row=>row.mods.join(" ↔ ")),"None declared"),
+          help:infoHelp("These are author-declared incompatibilities among enabled mods. Missing metadata is not proof that a combination is safe in game.")}),
+        detailField({label:"EXACT PATH OVERLAPS",control:value(summary((compatibility.overlaps||[]).map(row=>\`\${row.mod}: \${row.path}\`),"None detected"),
+          help:infoHelp("For identical loose override paths, Lexeditor is first in Memoria's FolderNames and wins the whole file. Separate mods are not semantically merged by Lexeditor."+(compatibility.projectScanTruncated?" The project scan hit its 10,000-file safety cap, so additional overlaps may exist.":""))}),
       ]}),
       LexeditorUI.modLoaderSection({
         loader:"Memoria's Mod Manager installs, enables and removes external FF9 mods. Lexeditor owns only its separate Lexeditor mod folder and opens Memoria's launcher for the external-mod UI. Mods that require a Memoria version newer than Lexeditor's pinned v2025.07.04 are outside the current supported loader boundary.",
