@@ -767,7 +767,7 @@
         output:"Lexeditor packs your project's content folder into Lexeditor-FF7R_P.pak and, on an explicit Deploy, copies that one file into ~mods.",
         order:"Before direct deployment Lexeditor lists active ~mods PAK indexes and refuses an exact game-asset collision instead of guessing an Unreal load-order winner. Non-overlapping PAKs coexist.",
         safety:"Installed base PAKs are never written. Direct deployment preserves every third-party PAK and refuses to replace or remove Lexeditor-FF7R_P.pak unless its sidecar and SHA-256 still prove ownership.",
-        removal:"Use Remove deployed PAK. Lexeditor deletes only its ownership-verified archive and marker; unrelated PAKs remain untouched.",
+        removal:"Use Remove deployed PAK. Lexeditor deletes only its ownership-verified archive and marker; unmanaged or externally changed files are preserved, and unrelated PAKs remain untouched.",
       })]})}
 
   function render(){let content;const curated=curatedSpec(state.tab);if(curated)content=curatedPanel(curated);else if(state.tab==="datamap")content=dataMapPanel();else if(state.tab==="tweaks")content=tweaksPanel();else if(state.tab==="info")content=infoPanel();else if(state.tab==="text")content=textPanel();else if(isEconomyTab(state.tab))content=economyPanel();else if(state.tab==="loot")content=lootPanel();else content=dataPanel();$("#main").replaceChildren(content);refreshShell()}
