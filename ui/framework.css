@@ -2624,7 +2624,13 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
 
 .lex-page-sized-table .lex-column-list-row {
   min-height:0;
-  font-size:clamp(11px,calc((100vh - 245px) / var(--lex-page-font-row-count,var(--lex-page-row-count)) * .65),24px);
+  font-size:clamp(11px,calc((var(--lex-fitted-row-height, 32px) - 5px) / 1.75),24px);
+}
+
+/* The fitted row includes cell padding. Reserve it before sizing the text;
+   window height alone says nothing about the space this table receives. */
+.lex-page-sized-table .lex-column-list-cell {
+  padding-block:2px;
 }
 
 .lex-pager-controls {

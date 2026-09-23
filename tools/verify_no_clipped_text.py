@@ -1,10 +1,8 @@
-"""Sweep every plugin and every tab for text the layout is cutting off.
+"""Check initially rendered plugin tabs for hard-clipped text.
 
-Lexer's question was not "nudge this one box" but "is there no way to prevent
-this whole class of bug for good". Twenty-three verifiers already check
-overflow, but each only on its own page, so a clip anywhere else ships
-unnoticed. This one walks all plugins and all tabs and fails on any element
-whose own text does not fit the box drawn for it.
+This samples each main tab at two window sizes. It does not exercise every
+record, subtab, hover state or UI scale. The fast verify_text_clipping gate
+separately tests dense shared tables, scaling and the detector itself.
 """
 
 from __future__ import annotations
@@ -59,61 +57,8 @@ def use_installed_games() -> list[str]:
 from shot import EDGE, STUB, session_for  # noqa: E402
 import browser_guard  # noqa: E402
 
-# A scrollable region is allowed to be larger than its viewport; that is what
-# scrolling is for. Only leaf text in a box that cannot scroll is a clip.
-PROBE = r"""
-(()=>{
-  const bad=[];
-  const scrollable=node=>{const cs=getComputedStyle(node);
-    return /(auto|scroll)/.test(cs.overflowX+' '+cs.overflowY);};
-  for(const node of document.querySelectorAll('*')){
-    if(node.children.length) continue;
-    const text=(node.textContent||'').trim();
-    if(!text) continue;
-    const cs=getComputedStyle(node);
-    // display:none and visibility:hidden are skipped because they are not laid
-    // out. opacity is NOT skipped: it does not affect layout at all, so a faded
-    // hover-only surface measures exactly as it will when revealed. Skipping it
-    // was the gap that let the hover drawers go unchecked.
-    if(cs.display==='none'||cs.visibility==='hidden') continue;
-    // SVG elements have no CSS box: clientWidth/scrollWidth read 0 and the
-    // whole text width then looks like overflow. SVG clipping is governed by
-    // the viewBox, which this sweep does not model.
-    if(node.ownerSVGElement || node.tagName==='svg') continue;
-    const r=node.getBoundingClientRect();
-    if(r.width<2||r.height<2) continue;
-    if(scrollable(node)) continue;
-    // Deliberate single-line truncation is a designed affordance, not a bug -
-    // but only where the property can actually take effect. text-overflow does
-    // nothing on a flex or grid container, and nothing without nowrap, so a box
-    // that merely DECLARES ellipsis can still hard-clip its text at both ends.
-    // Trusting the declaration is what let centred table cells lose the start
-    // of every long identifier while this sweep reported zero clipping.
-    const ellipsisApplies = cs.textOverflow==='ellipsis'
-      && !/(flex|grid)/.test(cs.display)
-      && cs.whiteSpace!=='normal';
-    if(ellipsisApplies) continue;
-    // Text under overflow:visible SPILLS; it is still fully readable. Only a
-    // box that actually clips can cut a glyph off, so that is what we flag.
-    const clips=/(hidden|clip)/.test(cs.overflowX+' '+cs.overflowY);
-    if(!clips) continue;
-    const overW=/(hidden|clip)/.test(cs.overflowX)?node.scrollWidth-node.clientWidth:0;
-    const overH=/(hidden|clip)/.test(cs.overflowY)?node.scrollHeight-node.clientHeight:0;
-    // NOTE: this checks a box clipping its OWN text. Detecting an ANCESTOR
-    // clipping a visible-overflow child was tried and removed: comparing
-    // border-box rects over-reports badly (flex rows, centred children) and
-    // produced 556 hits of which the ones checked by hand were all false -
-    // a pager "cut off by 49px" was sitting well inside the viewport with no
-    // clipping ancestor at all. Doing it properly needs the ancestor's client
-    // area and per-axis intersection, not getBoundingClientRect.
-    if(overW>1||overH>1){
-      bad.push({text:text.slice(0,30),cls:String(node.className).slice(0,40),
-                tag:node.tagName,overW,overH});
-    }
-  }
-  return JSON.stringify(bad.slice(0,25));
-})()
-"""
+# Share the exact detector with the fast browser regression gate.
+PROBE = (ROOT / "tools/text_clipping_probe.js").read_text(encoding="utf-8")
 
 
 # A list of records without a pager is a list the user cannot page or search.
@@ -345,6 +290,7 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
                         "(()=>{const b=[...document.querySelectorAll('nav button[data-tab]')]"
                         f".find(x=>x.dataset.tab==={json.dumps(tab)});if(b)b.click();}})()")
                     time.sleep(.55)
+                wait_eval(cdp, "document.fonts.status==='loaded'", 30)
                 for entry in json.loads(cdp.eval(PROBE)):
                     entry["plugin"] = plugin
                     entry["tab"] = tab

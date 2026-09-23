@@ -7357,7 +7357,9 @@ ${contents.path}`});
     // A Table page uses one global row target. Plugin-local page sizes are only
     // compatibility state until the shared settings snapshot arrives.
     const rowPreferenceKey = tableRowPreferenceKey(options);
-    const fitMinimum = Math.max(0, Number(options.fit?.minRowHeight) || 0);
+    // Pagination must leave enough height for readable text and controls.
+    // The requested row count is a ceiling, not permission to crush rows.
+    const fitMinimum = options.fit === false ? 0 : Math.max(32, Number(options.fit?.minRowHeight) || 0);
     const fitCapacity = fitMinimum ? tableFitCapacityCache.get(rowPreferenceKey) : null;
     const globalPageSize = boundedTableRows(sharedSettingsSnapshot?.tableRowsPerPage || fitCapacity?.requested || options.pageSize || 15);
     const hasRowOverride = hasTableRowsOverride(rowPreferenceKey);
