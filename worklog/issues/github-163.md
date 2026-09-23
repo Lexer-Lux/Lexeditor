@@ -22,3 +22,9 @@ Diagnostic test, needs built ASI on a game machine: visit the Cat pickup, then r
 
 ## 2026-09-22 production evidence from Sept 6 log
 Mined the installed GameplayTweaks.log: world-masks stayed idle the whole session (nearby=0, scans=0, suppressions=0). The sweep never saw any authored point, so the Cat pickup the player found is not within 150 m of the listed position or is a different spawned instance. The fix is locating the real pickup position, not stronger suppression. Next: record the observed pickup coordinates from the next visit and compare against the authored point. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

@@ -18,3 +18,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes finding
 honor_actions.cpp (80 lines) holds event bit controls plus shared tier remapping from CSV. No per-action amount path exists: the engine applies tier amounts after the event fires, and intercepting one event before its identity is lost is unproven. That interception proof is native research needing the game. No invented hook added. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side fixes/research still
+owed), so flipping to waiting would be a fake checklist. Left actionable
+until a real session can be written.
