@@ -80,7 +80,7 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
         self.assertIn('type:"checkbox"', text)
         self.assertIn("edit:(row,value)=>setDraftValue", text)
         self.assertIn("editor:(row,commit)=>cellEditor", text)
-        self.assertIn('width:"minmax(9rem,1.25fr)"', text)
+        self.assertIn('width:"minmax(9rem,1.5fr)"', text)
         self.assertIn('keepMeshAnimations:{label:"Keep Anims",width:"8rem"}', text)
         self.assertIn('maxInstancesPerEmitter:{label:"Max Instances",width:"minmax(9rem,1fr)"}', text)
         self.assertNotIn('{key:"module",label:"Module",sortable:true,help:"ZedScript module containing the record."}', text)

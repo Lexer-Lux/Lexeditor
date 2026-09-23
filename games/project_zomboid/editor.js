@@ -405,7 +405,7 @@ function scriptDetail(row){
     sharedReadonly("File",row.path,"Project-relative script file containing the record."),
     sharedReadonly("Integration",row.editable?"Partial · structured editor":"Partial · read-only viewer",row.editable?"A structured editor exists, but unsupported fields remain preserved rather than exposed.":"Lexeditor can identify this record but has no structured editor for its fields yet."),
   ]})];
-  if(target)body.push(LexeditorUI.detailSection({title:"ACTIONS",body:[LexeditorUI.el("div",{class:"pz-shared-actions"},LexeditorUI.el("button",{type:"button",class:"lex-command-primary",onclick:()=>openScriptRecord(row)},"Open Structured Editor"))]}));
+  if(target)body.push(LexeditorUI.detailSection({title:"ACTIONS",body:[LexeditorUI.el("div",{class:"lex-action-row"},LexeditorUI.el("button",{type:"button",class:"lex-command-primary",onclick:()=>openScriptRecord(row)},"Open Structured Editor"))]}));
   if((scripts.errors||[]).length)body.push(LexeditorUI.detailSection({title:"CURRENT PROBLEMS",body:[sharedReadonly("Parser Errors",String(scripts.errors.length),"At least one script file failed closed. The affected file is left untouched and is also reported in Data Map.")]}));
   return LexeditorUI.detailPanel({title:row.name,identity:null,meta:row.kind,body});
 }
@@ -435,7 +435,7 @@ function renderInfo(){
       sharedReadonly("Game Source","Read only","The installed Build 42 Steam tree is source material only; Lexeditor does not modify it."),
     ]}),
     LexeditorUI.modLoaderSection({loader:"Project Zomboid native Build 42 mod system.",output:"A full local development mod copy under <user>/Zomboid/mods/<project>.",order:"Project Zomboid owns activation and ordering; mod.info can declare require/incompatible/loadModBefore/loadModAfter relationships.",safety:"The installed Steam game tree is never modified; only the owned local deployment is replaced or removed.",removal:"Remove the owned local deployment; the authoring project is preserved."}),
-    LexeditorUI.detailSection({title:"ACTIONS",body:[LexeditorUI.el("div",{class:"pz-shared-actions"},deploy,remove)]}),
+    LexeditorUI.detailSection({title:"ACTIONS",body:[LexeditorUI.el("div",{class:"lex-action-row"},deploy,remove)]}),
   ]}));
 }
 async function changeDeployment(path){try{deployment=await api(path,{method:"POST",body:"{}"});setStatus(path.endsWith("undeploy")?"Owned deployment removed":"Local mod deployed");await reload()}catch(error){setStatus(error.message,true)}}
