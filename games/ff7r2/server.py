@@ -245,47 +245,55 @@ def data_map_payload() -> dict:
             ), "status": "not-integrated",
         },
         {
-            "filename": "Chocobo whistle behavior (#470)",
-            "controls": "None", "coverage": "unavailable",
+            "filename": "End/Content/DataObject/Resident/ResidentParameter.uasset (#470)",
+            "controls": "None — Chocobo whistle research target", "coverage": "unavailable",
             "notes": (
-                "Requires safe teleport/mount placement plus vanilla fallback in no-ride "
-                "areas. Current public research found no matching Rebirth implementation."
+                "Public Rebirth constants identify CallChocoboAtFieldActionDistanceParamRatio0/1; "
+                "Item also identifies key_ChocoboWhistle, CharaSpec identifies "
+                "FA0407_00_ChocoboWhistle_Standard, and CameraModule identifies ChocoboRide. "
+                "Those names do not prove a teleport/mount hook, safe-placement rule, ride-legality "
+                "predicate or vanilla fallback, and the distance-ratio semantics/ranges are unproved."
             ), "status": "not-integrated",
         },
         {
-            "filename": "Formulae / Steal (#471)",
-            "controls": "None", "coverage": "unavailable",
+            "filename": "End/Content/DataObject/Resident/BattleItemPossession.uasset (#471)",
+            "controls": "None — Steal/drop formula research target", "coverage": "unavailable",
             "notes": (
-                "A public 100% Steal/Drop packaged mod proves some Rebirth data can change "
-                "rates, but it does not identify the game's Steal formula, named terms, or "
-                "failure-message branch required by #471."
+                "Public constants identify NormalItemPercent_Array, RareItemPercent_Array, "
+                "StealItemName_Array, StealItemQuantity_Array and StealFaildCountArrayIndex. "
+                "The public 100% Steal/Drop mod author reports Rebirth shares the 25% rate data "
+                "between steals and drops. Lexeditor intentionally cannot write arrays yet, and "
+                "no source proves the complete Steal formula, roll-vs-no-item failure branch or message hook."
             ), "status": "not-integrated",
         },
         {
-            "filename": "Blue benches / cushion (#472)",
-            "controls": "None", "coverage": "unavailable",
+            "filename": "End/Content/DataObject/Resident/StateChange.uasset + StateTrigger.uasset + ActionGroup.uasset (#472)",
+            "controls": "None — restable-bench/cushion research family", "coverage": "unavailable",
             "notes": (
-                "Public rest-stop mesh mods show multiple bench assets are involved. #472 "
-                "also needs the gameplay distinction between restable/non-restable benches "
-                "and universal cushion consumption, so a global mesh swap is insufficient."
+                "Public constants identify scgCmn_Tmp_Bench_Init/Rest, trgCmn_Bench_Rest and "
+                "acgCmn_RecoverAll_ForBench; CharaSpec also identifies UI7033_00_ConsumedItem_Cushion. "
+                "Public mesh work confirms the blue bench and Chocobo-rest benches are separate models. "
+                "No public mapping yet proves every restable bench identity or the universal cushion-consumption gate."
             ), "status": "not-integrated",
         },
         {
-            "filename": "Minimap zoom (#473)",
-            "controls": "None", "coverage": "unavailable",
+            "filename": "End/Content/DataObject/Resident/MapIconInfo.uasset + HUD package assets (#473)",
+            "controls": "None — world-minimap zoom research family", "coverage": "unavailable",
             "notes": (
-                "Public accessibility mods can enlarge the minimap/HUD, but that is not "
-                "evidence for the world-minimap zoom value #473 requests. No proved scalar "
-                "or persistence path has been found."
+                "MapIconInfo publicly exposes navimap visibility/layer, offsets and view-distance fields, "
+                "but no minimap zoom field. A 2026 accessibility mod proves minimap position/size can live "
+                "in packaged HUD data, while its runtime HUD mover is separate UE4SS code. No proved world-minimap "
+                "zoom scalar, valid range or persistence path has been found, so size/position is not relabeled as zoom."
             ), "status": "not-integrated",
         },
         {
-            "filename": "Faster Queen's Blood (#477)",
-            "controls": "None", "coverage": "unavailable",
+            "filename": "End/Content/DataObject/Resident/CardGameCommonParameter.uasset + CardGameAIParam.uasset (#477)",
+            "controls": "None — Queen's Blood turn-flow research family", "coverage": "unavailable",
             "notes": (
-                "The request depends on the game's own legal-move test, turn transition and "
-                "intro input state. Current public research found no implementation proving "
-                "those hooks, so Lexeditor does not approximate the rules."
+                "Public constants expose CardGameCommonParameter rows such as EffectWaitTime and "
+                "CardGameAIParam fields including NeedCanPutCount and Player/EnemyPredictionTurn. "
+                "They do not establish the game's legal-move predicate, auto-pass transition, both-sides-no-moves "
+                "end condition or the intro's first skippable input state. Lexeditor does not infer those rules from names."
             ), "status": "not-integrated",
         },
         {"filename": binaries + shader_injector.DLL,
