@@ -4161,7 +4161,7 @@ body:has(.lex-data-map-table) #main {
 .lex-unit-field:has(> .lex-value-fill) { position:relative; }
 .lex-value-fill {
   position:absolute;
-  z-index:0;
+  z-index:auto;
   left:1px;
   right:1px;
   bottom:1px;
@@ -4173,11 +4173,8 @@ body:has(.lex-data-map-table) #main {
   transition:height .12s ease,bottom .12s ease;
 }
 
-/* The input is a later sibling, so it paints over the handle and swallowed
-   every press: the slider could be clicked but never dragged. While the
-   slider is actually offered, the fill rises above the input. It stays
-   pointer-events:none and translucent, so only the handle becomes grabbable
-   and the value underneath stays readable. */
+/* Keep the fill below the value. It must not create a stacking context:
+   only its handle rises above the input to receive drag events. */
 /* The fill is prepended to the source control, which is a grid whose second
    column is the reference rail. Spanning the whole grid let the slider run
    well past the right edge of the number box it belongs to - the handle
@@ -4342,15 +4339,12 @@ body:has(.lex-data-map-table) #main {
    only grabbable strip was the part sticking out, and the input painted over
    the handle everywhere else. */
 .lex-detail-field:hover .lex-value-fill {
-  z-index:3;
  height: calc(100% - 2px); bottom: 1px;
 }
 .lex-detail-field:focus-within .lex-value-fill {
-  z-index:3;
  height: calc(100% - 2px); bottom: 1px;
 }
 .lex-value-dragging .lex-value-fill {
-  z-index:3;
  height: calc(100% - 2px); bottom: 1px;
 }
 .lex-value-handle {

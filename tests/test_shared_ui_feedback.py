@@ -24,6 +24,31 @@ def framework(page):
     page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
 
 
+def test_value_fill_stays_behind_text_while_handle_can_drag(page):
+    import tempfile
+    framework(page)
+    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      const input=U.el('input',{type:'number',value:75,min:0,max:100,step:1});
+      document.querySelector('main').append(U.detailField({label:'Hit rate',min:0,max:100,control:U.unitField(input,'%')}));
+    }''')
+    field=page.locator('.lex-detail-field')
+    field.hover()
+    page.wait_for_timeout(150)
+    assert page.locator('.lex-value-fill').evaluate('n=>getComputedStyle(n).zIndex')=='auto'
+    field.screenshot(path=str(Path(tempfile.gettempdir())/'lex-hit-rate-fill.png'))
+    handle=page.locator('.lex-value-handle')
+    box=handle.bounding_box()
+    x,y=box['x']+box['width']/2,box['y']+box['height']/2
+    assert page.evaluate('([x,y])=>document.elementFromPoint(x,y).classList.contains("lex-value-handle")',[x,y])
+    page.mouse.move(x,y)
+    page.mouse.down()
+    page.mouse.move(x-80,y,steps=5)
+    page.mouse.up()
+    assert float(page.locator('input').input_value())<75
+
+
 def test_refresh_loading_blocks_input_and_uses_shared_quote(page):
     page.evaluate('''() => {
       document.body.insertAdjacentHTML('afterbegin','<div id="lexeditor-shell"></div>');
