@@ -140,7 +140,7 @@ def test_triangle_save_toggles_only_active_bit_and_reopens_project(store):
     before = bgi_bytes(); after = target.read_bytes()
     changed = [i for i, (x, y) in enumerate(zip(before, after)) if x != y]
     assert changed == [64]
-    assert struct.unpack_from("<H", after, 64)[0] == 0x20
+    assert struct.unpack_from("<H", after, 64)[0] == 0xD020
     assert after[:64] == before[:64] and after[65:] == before[65:]
     assert saved["activeScene"] == row["scene"]
     assert saved["rows"][0]["source"] == "project"
