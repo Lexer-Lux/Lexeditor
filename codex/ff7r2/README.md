@@ -91,10 +91,15 @@ The exact FF7R2 command contract is GAME_UE4_26,
 --mount-point ../../../End/Content/, --game-dir-top-only, game archives from
 End/Content/Paks, and staged content rooted at project/content/End/Content.
 Output is always an isolated project/build/ff7r2-candidate-* directory containing
-Lexeditor-FF7R2_P.pak/.utoc/.ucas plus a manifest with input/tool/output hashes.
-The builder never copies that candidate to the installed game and marks it
-acceptedInGame=false. Current public Rebirth mod instructions consistently place
-accepted .pak/.utoc/.ucas triples in End/Content/Paks/~mods; that remains a manual
+Lexeditor-FF7R2_P.pak/.utoc/.ucas plus a manifest with staged/tool/output hashes.
+The builder now treats every regular file beneath content/End/Content as an
+explicit candidate input: staged symlinks are refused, every input path/size/hash
+is recorded, and the complete file set plus hashes are checked again after
+UnrealReZen exits. This closes the old PlayerParameter-only audit gap while
+keeping the candidate reusable for future proved Rebirth editors. The builder
+never copies that candidate to the installed game and marks it acceptedInGame=false.
+Current public Rebirth mod instructions consistently place accepted
+.pak/.utoc/.ucas triples in End/Content/Paks/~mods; that remains a manual
 acceptance step until Lexeditor has proved collision/removal behavior in-game.
 
 A real package candidate cannot be produced in the agent environment because it
@@ -125,30 +130,54 @@ scale, not installed-app or game acceptance.
 
 ## Current public leads for unresolved requests
 
-The issue audit was refreshed on 2026-09-19 rather than treating the five open
-gameplay requests as one generic IoStore blocker.
+The issue audit was refreshed on 2026-09-22 rather than treating the five open
+gameplay requests as one generic IoStore blocker. Synthlight's generated Rebirth
+constants are used here as naming/schema evidence only; they do not prove runtime
+meaning by themselves.
 
-- #470 Chocobo whistle: no matching public Rebirth implementation was found.
-  The requested behavior still needs a proved runtime/asset hook for legal riding,
-  safe placement, instant mount and vanilla fallback.
-- #471 Formulae / Steal: Gantz79's public "100 Percent Steal and Drop Rate" mod
-  demonstrates that a packaged Rebirth tweak can force rates, but its published
-  description does not expose the actual Steal formula, named inputs, roll-vs-
-  no-item failure distinction, or source asset. It is evidence of feasibility,
-  not enough semantics for a Formulae screen.
-- #472 blue benches / cushion: the public "Refreshed Chocobo Rest Stops (Static
-  Mesh)" mod confirms rest-stop mesh replacement is practical and also shows this
-  is not safely reducible to one universal bench mesh. The Lexeditor request also
-  needs the gameplay identity of restable benches plus cushion consumption.
-- #473 minimap zoom: the 2026 "FF7 Rebirth Accessibility - Visibility Overhaul"
-  publicly enlarges the minimap/HUD and can resize HUD windows, while
-  FF7RebirthFix exposes gameplay/camera FOV changes. Neither documents a world-
-  minimap zoom scalar or persistence path, so those controls are not conflated
-  with the requested zoom setting.
-- #477 Faster Queen's Blood: current public research found no implementation that
-  proves the legal-move predicate, turn-skip transition, no-moves-for-both end
-  condition, or intro input-state hook. Lexeditor will not recreate those rules
-  from guesswork.
+- #470 Chocobo whistle: ResidentParameter publicly names
+  CallChocoboAtFieldActionDistanceParamRatio0 and
+  CallChocoboAtFieldActionDistanceParamRatio1. Other public constants identify
+  Item row key_ChocoboWhistle, CharaSpec row FA0407_00_ChocoboWhistle_Standard
+  and CameraModule row ChocoboRide. These are concrete research anchors, but no
+  public source connects them to the requested instant teleport+mount operation,
+  safe nav/ground placement, the game's ride-legality predicate or vanilla
+  fallback. The two distance-ratio rows also lack proved units/ranges/behavior,
+  so Lexeditor does not expose speculative controls.
+- #471 Formulae / Steal: BattleItemPossession publicly names
+  NormalItemPercent_Array, RareItemPercent_Array, StealItemName_Array,
+  StealItemQuantity_Array and StealFaildCountArrayIndex. Gantz79's public
+  "100 Percent Steal and Drop Rate" mod proves a packaged rate edit works, and
+  the author explicitly reports that Rebirth shares the 25% data between stolen
+  and dropped items. That means a standalone Steal-rate control would currently
+  misrepresent the data. The current Lexeditor reader safely recognizes array
+  headers/counts but intentionally does not write array elements. Public evidence
+  still does not establish the full Steal formula, named terms, roll-vs-no-item
+  failure branch or message hook required for the requested Formulae screen.
+- #472 blue benches / cushion: public constants identify
+  scgCmn_Tmp_Bench_Init/Rest in StateChange, trgCmn_Bench_Rest in StateTrigger,
+  acgCmn_RecoverAll_ForBench in ActionGroup, and
+  UI7033_00_ConsumedItem_Cushion in CharaSpec. The public "Refreshed Chocobo
+  Rest Stops (Static Mesh)" author also confirms the blue bench is separate from
+  Chocobo rest benches and that the game has multiple bench models. What remains
+  unproved is the complete mapping from every restable placement to the blue
+  model plus the gameplay gate that consumes a cushion for every successful rest.
+  A global mesh replacement would therefore be both incomplete and overbroad.
+- #473 minimap zoom: MapIconInfo publicly exposes navimap visibility/layer,
+  offsets and view-distance fields but no zoom field. The September 2026
+  "FF7 Rebirth Accessibility - Visibility Overhaul" proves minimap position/size
+  can be changed in packaged HUD data; its author specifically distinguishes the
+  pak-based minimap placement from the optional UE4SS HUD mover. That is useful
+  format evidence, but still not a world-minimap zoom scalar, valid range or
+  persistence path. Lexeditor does not relabel size/position/FOV controls as zoom.
+- #477 Faster Queen's Blood: CardGameCommonParameter publicly names rows such as
+  EffectWaitTime, while CardGameAIParam exposes NeedCanPutCount,
+  PlayerPredictionTurn and EnemyPredictionTurn among other AI tuning fields.
+  ForceFeedback also contains an FFB_CardGame_Pass identifier. None of those
+  names proves the legal-move predicate, automatic pass transition,
+  both-sides-no-moves match termination, or the intro's first skippable input
+  state. Public cheat/mod evidence found score/card manipulation but not those
+  hooks, so Lexeditor does not approximate Queen's Blood rules from field names.
 
 FF7R Row Forger (published July 2026) is also a useful ecosystem signal: its
 public description says it can edit/add rows in most Resident DataObject tables
