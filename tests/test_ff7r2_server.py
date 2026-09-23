@@ -13,10 +13,11 @@ from urllib.request import Request, urlopen
 
 from games.ff7r2.dataobject import DataObjectPackage
 from games.ff7r2.plugin import Ff7r2Session
-from ff7r2_fixture import fixture
+from ff7r2_fixture import battle_item_possession_fixture, fixture
 
 
 PLAYER = Path("End/Content/DataObject/Resident/PlayerParameter.uasset")
+BATTLE_ITEM = Path("End/Content/DataObject/Resident/BattleItemPossession.uasset")
 
 
 def _json(url: str, body: dict | None = None) -> dict:
@@ -171,3 +172,32 @@ def test_negative_content_length_is_rejected_without_unbounded_read():
                 connection.close()
             assert response.status == 400
             assert "Request size is invalid" in payload["error"]
+
+def test_battle_item_possession_service_is_read_only():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-battle-item-") as temp_name:
+        project = Path(temp_name)
+        (project / "lexeditor-project.json").write_text(
+            '{"format":1,"game":"ff7r2"}\n', encoding="utf-8")
+        source = project / "source" / BATTLE_ITEM
+        source.parent.mkdir(parents=True)
+        original = battle_item_possession_fixture()
+        source.write_bytes(original)
+
+        environment = {"LEXEDITOR_FF7R2_PROJECT": str(project)}
+        with Ff7r2Session(environment) as session:
+            workspace = _json(session.url + "api/workspace")
+            assert workspace["battleItemPossession"]["sourcePresent"] is True
+            assert workspace["battleItemPossession"]["readOnly"] is True
+
+            payload = _json(session.url + "api/battle-item-possession")
+            assert payload["readOnly"] is True
+            assert payload["source"] == "source"
+            assert payload["recordCount"] == 1
+            row = payload["records"][0]
+            fields = {field["name"]: field for field in row["fields"]}
+            assert fields["StealItemName_Array"]["value"] == ["Potion", "Ether"]
+            assert fields["StealItemName_Array"]["arrayCount"] == 2
+            assert fields["NormalItemPercent_Array"]["value"] == [25, 75]
+            assert fields["NormalItemPercent_Array"]["editable"] is False
+            assert source.read_bytes() == original
+
