@@ -1364,13 +1364,14 @@ class HostApi:
             raise ValueError("Mod management is not supported for this game yet")
         if kind == "folder":
             selected = self._choose_folder()
-        elif kind == "zip":
+        elif kind in {"zip", "ctp"}:
             import webview
+            file_types = ("ZIP archives (*.zip)",) if kind == "zip" else ("Chrono Trigger patches (*.ctp)",)
             selection = self._bound_window().create_file_dialog(webview.OPEN_DIALOG,
-                allow_multiple=False, file_types=("ZIP archives (*.zip)",))
+                allow_multiple=False, file_types=file_types)
             selected = selection[0] if selection else ""
         else:
-            raise ValueError("Choose a folder or ZIP archive")
+            raise ValueError("Choose a folder, ZIP archive, or supported game package")
         return {"source": str(selected), "cancelled": not bool(selected)}
 
     def begin_mod_upload(self, plugin_id: str) -> dict:
