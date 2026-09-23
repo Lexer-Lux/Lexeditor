@@ -21,8 +21,12 @@ Draft PR: #491, FF7R-2 Plugin
   visually inspected. Desktop, narrow, Data Map, Information and Tweaks were
   usable; unsupported Data Map rows remained visible. The 150% browser check now
   captures the viewport rather than a CSS-zoomed full page, which previously
-  created an artificial blank tail. Latest-head rerun is required after the new
-  packaging-preflight UI change.
+  created an artificial blank tail. The exact live head `5a7149ae9cdd5351f998800c47835f1bc21d681e`
+  reran the FF7R2 workflow successfully on Linux, Windows and Chromium. Its
+  `ff7r2-rendered` artifact was downloaded and visually inspected: desktop,
+  narrow, simulated 150%, Data Map, Information and Tweaks all remained usable;
+  unsupported Data Map rows stayed visible and Information still states that the
+  staged output is not packaged or installed.
 - Extraction: retoc v0.1.5 remains researched/pinned but is not invoked because
   its absent-Oodle path can acquire a DLL. GamePlugin still exposes one shared
   managed-helper slot, already owned by Shader Injector. Do not compete for a
@@ -48,6 +52,12 @@ Draft PR: #491, FF7R-2 Plugin
   not attempted.
 - Other open Rebirth requests #470, #471, #472, #473 and #477 remain visible as
   not integrated because no proved asset/runtime path is available yet.
+- Shared-suite status at that head: `Shared UI contract` fails because merged
+  `ui/framework.css` defines `--lex-detail-label-width:7.5%` while the current
+  verifier expects `minmax(var(--lex-detail-label-floor),10%)`; PR #491 does not
+  modify that shared file. `Shared UI visual acceptance` times out in the shared
+  Blank acceptance before any Rebirth-specific check. These are tracked as
+  shared-baseline failures, not Rebirth regressions.
 - Real-game acceptance remains required: parse a real extracted PlayerParameter,
   make one harmless fixed-width edit, build the isolated package candidate, copy
   the three candidate files manually to End/Content/Paks/~mods, start Rebirth,
