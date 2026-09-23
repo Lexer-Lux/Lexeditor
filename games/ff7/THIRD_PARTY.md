@@ -86,3 +86,16 @@ Conditional roots, and FFNx Direct Mode integration. Lexeditor uses that
 published behavior only to inspect an explicitly configured 7thWorkshop tree
 read-only. It never edits 7th Heaven state, does not guess inside `.iro`
 packages, and does not choose a winner for overlapping external mod paths.
+
+## 60/30 FPS Gameplay compatibility fixture
+
+Source: <https://github.com/tangtang95/ff7-60fps-mod>
+Reference revision used by the compatibility test:
+`8195d9c0dc1a38a497ef7674f8e412936f11b120`
+
+License: GNU General Public License v3.0 (GPL-3.0).
+
+The public v1.15 `mod.xml` was used as an interoperability fixture for 7th
+Heaven `ModFolder` / `ActiveWhen` profile-option behavior. Lexeditor does not
+bundle this mod or its assets; the test builds a tiny synthetic folder tree
+using only the proved metadata shape.
