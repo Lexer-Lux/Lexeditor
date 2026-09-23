@@ -14,27 +14,6 @@ import verify_ff7_rendered_neutral as neutral
 target = neutral.target
 OUT = ROOT / "out" / "ff7-2013-acceptance"
 
-# set_content() leaves Chromium on about:blank, whose opaque origin rejects Web
-# Storage access. Production pages are served from the plugin HTTP origin, so give
-# this synthetic harness in-memory Storage objects without changing application JS.
-OPAQUE_STORAGE_SHIM = r"""
-(() => {
-  const makeStorage = () => {
-    const values = new Map();
-    return {
-      get length() { return values.size; },
-      key: index => Array.from(values.keys())[index] ?? null,
-      getItem: key => values.has(String(key)) ? values.get(String(key)) : null,
-      setItem: (key, value) => values.set(String(key), String(value)),
-      removeItem: key => values.delete(String(key)),
-      clear: () => values.clear(),
-    };
-  };
-  Object.defineProperty(window, "sessionStorage", {value: makeStorage(), configurable: true});
-  Object.defineProperty(window, "localStorage", {value: makeStorage(), configurable: true});
-})();
-"""
-
 
 def open_current_modules(self, edition: str = "ff7") -> None:
     """Load the same FF7 page code as production, including the split editor.js module."""
@@ -52,9 +31,7 @@ def open_current_modules(self, edition: str = "ff7") -> None:
     )
     html = html.replace('<link rel="stylesheet" href="/shared/neutral.css">', "")
     bootstrap = (
-        OPAQUE_STORAGE_SHIM
-        + "\n"
-        + target.HOST
+        target.HOST
         + "\nwindow.__lexeditorPlugin="
         + json.dumps({"id": edition, "name": "FF7 fixture", "edition": edition})
         + ";\n"
