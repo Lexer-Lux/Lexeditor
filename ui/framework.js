@@ -8679,13 +8679,12 @@ ${contents.path}`});
   // reference readings - but a plugin's own input[type=number] cannot hold a
   // comma at all: assigning "50,000" to one leaves it empty. So the box is
   // rebuilt as a text box that carries the number, groups it while the reader
-  // is looking at it, and shows the bare digits the moment they start typing.
+  // is looking at it and while they edit it.
   //
   // Two things keep this safe for plugins that never asked for it. Only boxes
   // that can actually hold a big number are touched - a 0-100 percentage gains
-  // nothing from a separator - and the grouped form only ever exists while the
-  // box is NOT focused, so every input and change event a plugin listens for
-  // still reports plain digits.
+  // nothing from a separator. Input and change handlers receive plain digits;
+  // grouping returns after dispatch, with the caret in the same digit position.
   const GROUPING_FLOOR = 10000;
   const groupedBoxes = new WeakSet();
   const wantsGrouping = input => {
@@ -8715,7 +8714,7 @@ ${contents.path}`});
         return bounded;
       };
       const show = () => {
-        if (input === document.activeElement) return;
+        if (input === document.activeElement) { groupEditing(); return; }
         const value = Number(plain());
         if (plain() === "" || !Number.isFinite(value)) return;
         const bounded = clamp(value);
@@ -8729,14 +8728,35 @@ ${contents.path}`});
       input.type = "text";
       input.inputMode = "decimal";
       input.autocomplete = "off";
+      const groupEditing = () => {
+        const value=input.value;
+        const start=value.slice(0,input.selectionStart??value.length).replace(/,/g,'').length;
+        const end=value.slice(0,input.selectionEnd??value.length).replace(/,/g,'').length;
+        const raw=plain();
+        if(!/^-?\d+(\.\d*)?$/.test(raw))return;
+        const [integer,fraction]=raw.split('.');
+        const formatted=integer.replace(/\B(?=(\d{3})+(?!\d))/g,',')+(fraction===undefined?'':'.'+fraction);
+        const position=count=>{let i=0,seen=0;while(i<formatted.length&&seen<count){if(formatted[i]!==',')seen++;i++}return i};
+        input.value=formatted;
+        if(input===document.activeElement)input.setSelectionRange(position(start),position(end));
+      };
+      // Handlers receive plain numbers; restore grouping after event dispatch.
+      const editEvent = () => {
+        const start=input.value.slice(0,input.selectionStart??input.value.length).replace(/,/g,'').length;
+        const end=input.value.slice(0,input.selectionEnd??input.value.length).replace(/,/g,'').length;
+        input.value=plain();input.setSelectionRange(start,end);
+        setTimeout(groupEditing,0);
+      };
+      input.addEventListener('input',editEvent,true);
+      input.addEventListener('change',editEvent,true);
       input.addEventListener("focus", () => {
-        input.value = plain();
+        groupEditing();
         input.select();
       });
       input.addEventListener("blur", show);
       // A plugin that writes a fresh value into the box while it sits unfocused
       // re-groups it; while it is focused the reader's own digits stand.
-      input.addEventListener("change", show);
+      input.addEventListener("change", () => setTimeout(show,0));
       show();
     }
   };

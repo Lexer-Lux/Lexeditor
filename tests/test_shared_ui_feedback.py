@@ -24,6 +24,27 @@ def framework(page):
     page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
 
 
+def test_grouped_number_keeps_commas_during_editing(page):
+    framework(page)
+    page.evaluate('''()=>{
+      const input=LexeditorUI.el('input',{type:'number',min:0,max:655350,value:421400});
+      input.addEventListener('input',()=>window.received=Number(input.value));
+      document.querySelector('main').append(input);
+    }''')
+    control=page.locator('input')
+    page.wait_for_function('document.querySelector("input").value==="421,400"')
+    control.focus()
+    assert control.input_value()=='421,400'
+    control.fill('123456')
+    page.wait_for_function('document.querySelector("input").value==="123,456"')
+    assert page.evaluate('received')==123456
+    control.evaluate('n=>n.setSelectionRange(2,2)')
+    control.press('Backspace')
+    page.wait_for_function('document.querySelector("input").value==="13,456"')
+    assert control.evaluate('n=>n.selectionStart')==1
+    assert page.evaluate('received')==13456
+
+
 def test_value_fill_stays_behind_text_while_handle_can_drag(page):
     import tempfile
     framework(page)
