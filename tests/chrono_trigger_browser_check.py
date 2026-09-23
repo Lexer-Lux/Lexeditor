@@ -730,7 +730,10 @@ def main():
                 page.locator("#plugin-data-map").click()
                 page.locator(".lex-data-map-table").wait_for()
                 assert page.locator(".lex-data-map-table").count()==1
-                assert "Area settings" in page.locator("#main").inner_text()
+                page.get_by_label("Search the data map",exact=True).fill("Area settings")
+                area_settings_row=page.locator(".lex-column-list-row",has_text="Area settings").first
+                area_settings_row.wait_for()
+                assert area_settings_row.get_by_label("Integrated",exact=True).count()==1
                 layout=metrics(page)
                 assert layout["bodyHeight"]<=height+2,layout
                 assert layout["mainBottom"]<=height+2,layout
