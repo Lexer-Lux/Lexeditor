@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 import importlib
+import json
 import sys
 from pathlib import Path
 
@@ -18,6 +19,14 @@ from plugin_metadata import validate_repository_metadata
 
 
 ROOT = Path(__file__).resolve().parent
+
+
+def _write_smoke_report(path: str | None, payload: dict) -> None:
+    if not path:
+        return
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(payload), encoding="utf-8")
 
 
 def discover_plugins() -> dict[str, GamePlugin]:
@@ -68,19 +77,30 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--smoke-host", action="store_true", help="test two editable plugins in one hidden WebView2 window")
     parser.add_argument("--smoke-service", metavar="RESULT", help="test the bundled Blank child service without game files")
     args = parser.parse_args(argv)
+    if args.smoke_service:
+        _write_smoke_report(args.smoke_service, {"passed": False, "stage": "discover-plugins"})
     plugins = discover_plugins()
     if args.smoke_service:
-        import json
+        _write_smoke_report(args.smoke_service, {
+            "passed": False, "stage": "start-blank-service", "plugins": list(plugins),
+        })
         session = plugins["blank"].session_factory()
         try:
             identity = session.start()
             if identity.get("pluginId") != "blank":
                 raise RuntimeError("Wrong bundled service identity")
+            _write_smoke_report(args.smoke_service, {
+                "passed": False, "stage": "stop-blank-service",
+                "plugins": list(plugins), "identity": identity,
+            })
         finally:
             session.stop()
         if not session.wait_closed():
             raise RuntimeError("Bundled child service did not stop")
-        Path(args.smoke_service).write_text(json.dumps({"passed": True, "plugins": list(plugins), "identity": identity, "childStopped": True}), encoding="utf-8")
+        _write_smoke_report(args.smoke_service, {
+            "passed": True, "stage": "complete", "plugins": list(plugins),
+            "identity": identity, "childStopped": True,
+        })
         return 0
     selected = {args.game: plugins[args.game]} if args.game in plugins else plugins
     if args.game and args.game not in plugins:
@@ -118,6 +138,20 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as error:
+        if "--smoke-service" in sys.argv:
+            try:
+                index = sys.argv.index("--smoke-service")
+                target = sys.argv[index + 1] if index + 1 < len(sys.argv) else None
+                previous = {}
+                if target and Path(target).is_file():
+                    previous = json.loads(Path(target).read_text(encoding="utf-8"))
+                _write_smoke_report(target, {
+                    **previous, "passed": False,
+                    "error": f"{type(error).__name__}: {error}",
+                })
+            except Exception:
+                pass
+            raise SystemExit(1)
         if "pythonw" in Path(sys.executable).name.casefold():
             ctypes.windll.user32.MessageBoxW(0, str(error), "Lexeditor", 0x10)
         else:
