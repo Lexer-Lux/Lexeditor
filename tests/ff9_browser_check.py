@@ -259,7 +259,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
 
             page.evaluate("state.datasetChoice.world='field-walkmesh-triangles';loadDataset('field-walkmesh-triangles').then(render)")
             page.wait_for_function("state.datasets['field-walkmesh-triangles']?.rows?.length===2")
-            chooser = page.get_by_label("Field walkmesh")
+            chooser = page.get_by_label("Field walkmesh", exact=True)
             expect(chooser.locator("option")).to_have_count(2)
             tri_active = field(page, "TRIANGLE ACTIVE").locator('input[type="checkbox"]')
             expect(tri_active).to_be_checked()
@@ -281,7 +281,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             second_scene = page.evaluate("state.datasets['field-walkmesh-triangles'].scenes.find(row=>row.value!==state.datasets['field-walkmesh-triangles'].activeScene).value")
             chooser.select_option(second_scene)
             page.wait_for_function("scene=>state.datasets['field-walkmesh-triangles']?.activeScene===scene", second_scene)
-            chooser = page.get_by_label("Field walkmesh")
+            chooser = page.get_by_label("Field walkmesh", exact=True)
             chooser.select_option(first_scene)
             page.wait_for_function("scene=>state.datasets['field-walkmesh-triangles']?.activeScene===scene", first_scene)
             expect(field(page, "TRIANGLE ACTIVE").locator('input[type="checkbox"]')).not_to_be_checked()
