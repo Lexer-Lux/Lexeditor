@@ -31,14 +31,16 @@ Draft PR: #491, FF7R-2 Plugin
   implemented. It requires explicit LEXEDITOR_FF7R2_UNREALREZEN and
   LEXEDITOR_FF7R2_OODLE paths and the known CUE4Parse/1.1.1 dependency manifest.
   That CUE4Parse helper checks for oo2core_9_win64.dll before its downloader, so
-  Lexeditor copies only the supplied DLL into a temporary working directory
-  before launch. Proxy variables are not relied on because that historical
-  downloader disables proxy use. The route uses GAME_UE4_26 +
+  LEXEDITOR_FF7R2_OODLE must point to that exact filename already beside the
+  explicit UnrealReZen executable. Lexeditor does not download, copy or relocate
+  Oodle and runs the tool from that directory. Proxy variables are not relied on
+  because that historical downloader disables proxy use. The route uses GAME_UE4_26 +
   ../../../End/Content/ + top-only archive scanning and writes only
   project/build/ff7r2-candidate-*.
   Candidate output is .pak/.utoc/.ucas plus a manifest with input/tool/output
   hashes and acceptedInGame=false. Tests prove dependency refusal, exact command,
-  no game-folder writes, runtime Oodle-copy integrity and cleanup on failure.
+  adjacent Oodle requirement, no game-folder writes, tool/dependency hash
+  stability and cleanup on failure.
   Lexeditor does not install the candidate or claim mod collision order.
 - Candidate blocker in this agent environment: no mounted Rebirth installation,
   real IoStore archives or user-supplied Oodle DLL exist here, so producing a
