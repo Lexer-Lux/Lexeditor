@@ -403,12 +403,76 @@ def exercise_data_map(page, label: str) -> None:
     assert page.locator(".lex-pager").count() == 1
     geometry(page, label + "-datamap")
     take(page, f"datamap-{label}.png")
-    row = page.locator(".lex-data-map-table .lex-column-list-row").filter(has_text="Objects.xnb").first
+    row = page.locator(".lex-data-map-table .lex-column-list-row").filter(has_text="Crops.xnb").first
+    assert row.count() == 1, (label, "Crops Data Map row missing")
     row.click()
-    open_button = page.get_by_role("button", name="Open objects", exact=True)
-    if open_button.count():
-        open_button.click()
-        page.wait_for_selector(".sv-table")
+    open_button = page.get_by_role("button", name="Open crops", exact=True)
+    assert open_button.count() == 1, (label, "Crops open action missing")
+    open_button.click()
+    page.wait_for_selector(".sv-table")
+
+
+def exercise_typed_data(page, project: Path, label: str, new_value: int) -> None:
+    search = page.locator(".lex-pager-search input").first
+    search.fill("Fixture Crop")
+    page.wait_for_timeout(180)
+    crop = page.locator(".lex-column-list-row").filter(has_text="Fixture Crop").first
+    assert crop.count() == 1, (label, "fixture crop missing")
+    crop.click()
+    panel = page.locator(".sv-detail")
+    assert "Fixture Crop" in panel.inner_text()
+    assert page.locator('[data-lex-property="HarvestMethod"] select').count() == 1
+    assert page.locator('[data-lex-property="NeedsWatering"] input[type="checkbox"]').count() >= 1
+    geometry(page, label + "-crops")
+    take(page, f"crops-{label}.png")
+
+    override = page.get_by_role("checkbox", name="Override Regrow days", exact=True)
+    if not override.is_checked():
+        override.click()
+    value = page.locator('[data-lex-property="RegrowDays"] input[aria-label="Regrow days"]')
+    value.fill(str(new_value))
+    assert value.input_value() == str(new_value)
+    assert page.locator("#global-save").is_enabled()
+
+    # Unsaved edits must survive a Data Map visit and block switching families.
+    page.locator("#plugin-data-map").click()
+    page.wait_for_selector(".lex-data-map-table .lex-column-list-row")
+    objects = page.locator(".lex-data-map-table .lex-column-list-row").filter(has_text="Objects.xnb").first
+    objects.click()
+    open_objects = page.get_by_role("button", name="Open objects", exact=True)
+    assert open_objects.count() == 1
+    open_objects.click()
+    dialog = page.get_by_role("alertdialog")
+    dialog.wait_for()
+    assert "save or discard" in dialog.inner_text().lower()
+    dialog.get_by_role("button", name="Close", exact=True).click()
+
+    # Return to the current typed family and persist the edit.
+    crops = page.locator(".lex-data-map-table .lex-column-list-row").filter(has_text="Crops.xnb").first
+    crops.click()
+    page.get_by_role("button", name="Open crops", exact=True).click()
+    page.wait_for_selector(".sv-table")
+    page.locator(".lex-pager-search input").first.fill("Fixture Crop")
+    page.wait_for_timeout(120)
+    page.locator(".lex-column-list-row").filter(has_text="Fixture Crop").first.click()
+    assert page.locator('[data-lex-property="RegrowDays"] input[aria-label="Regrow days"]').input_value() == str(new_value)
+    page.locator("#global-save").click()
+    page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
+    assert typed_patch_value(project, "Data/Crops", "FixtureCrop", "RegrowDays") == new_value
+
+    # Discard must restore the saved typed value.
+    override = page.get_by_role("checkbox", name="Override Regrow days", exact=True)
+    assert override.is_checked()
+    value = page.locator('[data-lex-property="RegrowDays"] input[aria-label="Regrow days"]')
+    value.fill(str(new_value + 20))
+    assert page.locator("#global-save").is_enabled()
+    page.locator("#global-save").click(button="right")
+    page.get_by_role("button", name="Discard Changes", exact=True).click()
+    page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
+    page.locator(".lex-pager-search input").first.fill("Fixture Crop")
+    page.wait_for_timeout(100)
+    page.locator(".lex-column-list-row").filter(has_text="Fixture Crop").first.click()
+    assert page.locator('[data-lex-property="RegrowDays"] input[aria-label="Regrow days"]').input_value() == str(new_value)
 
 
 def exercise_info(page, label: str, height: int) -> None:
