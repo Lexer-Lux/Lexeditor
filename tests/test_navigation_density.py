@@ -6,9 +6,10 @@ from PIL import Image
 from test_shared_ui_feedback import ROOT, page, framework
 
 
-def test_row_pointer_follows_clickable_label(page):
+@pytest.mark.parametrize('with_icon',[False,True])
+def test_row_pointer_follows_clickable_label(page,with_icon):
     import os
-    marker=Path(os.environ['LOCALAPPDATA'])/'Lexeditor/game-data/ff8/generated/icons/0.png'
+    marker=Path(os.environ.get('LOCALAPPDATA',str(ROOT/'out')))/'Lexeditor/game-data/ff8/generated/icons/0.png'
     if marker.exists():
         page.route('**/assets/icons/0.png',lambda r:r.fulfill(path=str(marker)))
     framework(page)
@@ -16,6 +17,12 @@ def test_row_pointer_follows_clickable_label(page):
     page.evaluate('''()=>{
       document.querySelector('main').innerHTML='<div class="lex-column-list-row selected"><div class="lex-column-pointer-cell"><span class="lex-column-cell-content" style="position:relative;display:flex;justify-content:center;width:900px;height:60px"><button><span id="ability-name">HP-J</span></button></span></div></div>';
     }''')
+    if with_icon:
+        page.evaluate('''()=>{
+          const name=document.querySelector('#ability-name'),button=name.parentElement,U=LexeditorUI;
+          button.replaceChildren(U.inlineLabel(U.inlineLabel(U.el('img',{id:'ability-icon',
+            src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path fill="%23998ab6" d="M0 0h16v16H0z"/></svg>'})),name));
+        }''')
     page.wait_for_timeout(100)
     for width in (900,600):
         page.locator('.lex-column-cell-content').evaluate('(n,w)=>n.style.width=w+"px"',width)
@@ -23,7 +30,9 @@ def test_row_pointer_follows_clickable_label(page):
         assert page.locator('.lex-column-cell-content').evaluate('''n=>{
           const p=getComputedStyle(n,'::before'),box=n.getBoundingClientRect();
           const range=document.createRange();range.selectNodeContents(document.querySelector('#ability-name'));
-          return Math.abs(range.getBoundingClientRect().left-(box.left+parseFloat(p.left)+parseFloat(p.width))-6)<2;
+          const icon=document.querySelector('#ability-icon');
+          const start=icon?icon.getBoundingClientRect().left:range.getBoundingClientRect().left;
+          return Math.abs(start-(box.left+parseFloat(p.left)+parseFloat(p.width))-6)<2;
         }''')
     page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-clickable-row-pointer.png'))
 

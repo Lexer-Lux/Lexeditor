@@ -8575,7 +8575,7 @@ ${contents.path}`});
   scheduleFit();
 })();
 
-// Selection marks follow the first visible glyph, without joining its layout.
+// Selection marks precede the label, including its leading icon.
 (() => {
   let pending=false;
   const sizes=new ResizeObserver(()=>schedule());
@@ -8593,10 +8593,18 @@ ${contents.path}`});
       const range=document.createRange();range.selectNodeContents(node);
       const text=range.getBoundingClientRect(),box=host.getBoundingClientRect(),css=getComputedStyle(host);
       if(!text.width)continue;
+      let labelLeft=text.left;
+      for(const icon of label.querySelectorAll('img,svg,canvas')){
+        if(icon.closest('.lex-reference-values,.lex-info-help,.lex-tab-shortcut'))continue;
+        const iconStyle=getComputedStyle(icon),bounds=icon.getBoundingClientRect();
+        if(iconStyle.visibility==='hidden'||!bounds.width||!bounds.height)continue;
+        sizes.observe(icon);
+        if(bounds.right<=text.left+1)labelLeft=Math.min(labelLeft,bounds.left);
+      }
       const width=parseFloat(css.getPropertyValue(tab?'--lex-tab-marker-width':'--lex-row-marker-width'))||24;
       const gap=6;
       const scale=box.width/host.offsetWidth||1;
-      const left=(text.left-box.left)/scale-width-gap-(parseFloat(css.borderLeftWidth)||0);
+      const left=(labelLeft-box.left)/scale-width-gap-(parseFloat(css.borderLeftWidth)||0);
       host.style.setProperty('--lex-marker-left',`${left}px`);
     }
   };
