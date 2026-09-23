@@ -1,6 +1,7 @@
   function renderCharacters(){const rows=[...state.data.characters.rows].sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}));if(!rows.some(row=>row.id===state.selected.characters))state.selected.characters=rows[0]?.id??null;const row=rows.find(candidate=>candidate.id===state.selected.characters);if(!row){$("#toolbar").replaceChildren();$("#main").replaceChildren(LexeditorUI.notice({message:"No character records were found."}));return}const detailId="character-detail";$("#toolbar").replaceChildren(portraitTabs("characters",rows,row.id,detailId,id=>{state.selected.characters=id;renderCharacters();shell.refresh()}));$("#main").replaceChildren(detailPanel({heading:false,className:"lex-detail detail character-detail",attrs:{id:detailId,role:"tabpanel","aria-labelledby":`characters-tab-${row.id}`,"data-character":row.id},body:characterDetail(row)}))}
-  const gfPanelOrder=["GF Compatibility","General","Abilities"];
-  function gfFieldsByPanel(row){const routed=new Map(gfPanelOrder.map(group=>[group,[]])),seen=new Set();for(const field of row.fields){if(seen.has(field.field)||!routed.has(field.group))throw new Error(`GF field routing failed: ${field.field}`);seen.add(field.field);routed.get(field.group).push(field)}if(seen.size!==row.fields.length)throw new Error("GF field routing omitted a field");return routed}
+  const GF_ATTACK_FIELDS=new Set(['attack_animation','attack_type','gf_power','status_window_flags','target_info','attack_flags_type','attack_flags','target_animation','hit_count','element','status_1','status_2','status_attack_enabler','power_mod','level_mod','ability1_unlocker']);
+  const gfPanelOrder=["GF Compatibility","General","Attack","Abilities"];
+  function gfFieldsByPanel(row){const routed=new Map(gfPanelOrder.map(group=>[group,[]])),seen=new Set();for(const field of row.fields){const group=GF_ATTACK_FIELDS.has(field.field)?'Attack':field.group;if(seen.has(field.field)||!routed.has(group))throw new Error(`GF field routing failed: ${field.field}`);seen.add(field.field);routed.get(group).push(field)}if(seen.size!==row.fields.length)throw new Error("GF field routing omitted a field");return routed}
   function gfEntityLabel(field){const target=gfByName(field.label);return target?hoverable({content:LexeditorUI.inlineLabel(el("img",{src:`/assets/portraits/gfs/${target.id}.png`,alt:""}),el("span",{},field.label)),targetType:"gf",targetId:target.id,targetLabel:`${field.label} GF`,activate:()=>openGFByName(field.label)}):field.label}
   function gfFieldRow(field,row){return detailField({attrs:{"data-field":field.field},label:gfEntityLabel(field),help:field.help?infoHelp(field.help):null,control:fieldSourceControl(field,"gfs",row.id)})}
   function gfCompatibilityLabel(field){return gfEntityLabel(field)}
@@ -60,10 +61,20 @@
     const subtabs=portraitTabs("gfs",rows,row.id,"gf-detail",id=>{state.selected.gfs=id;renderGFs();shell.refresh()});
     $("#toolbar").replaceChildren(subtabs);
     const routed=gfFieldsByPanel(row),defaults=state.data.init.gfs.rows.find(value=>Number(value.id)===Number(row.id));
-    const center=tabbedPanel({tabs:[{id:'properties',label:'Properties'},{id:'defaults',label:'Defaults',help:'Initial GF state used when a new game begins. Changes do not alter an existing save.'}],active:state.gfDetailTab||'properties',label:'GF details',change:id=>{state.gfDetailTab=id;renderGFs()},content:state.gfDetailTab==='defaults'?(defaults?startingFields(defaults.fields,'gf',defaults.id):LexeditorUI.detailNote('No initial state for this GF.')):gfPanel('',routed.get('General'),row,'general')});
+    const center=gfCenterPanel(row,routed,defaults);
     const panels=[compatibilityPanel(routed.get('GF Compatibility'),'gfs',row.id),center,gfAbilities(routed.get('Abilities'),row)];
     const layout=panelLayout(panels,"gf-three-panel",{layoutKey:"ff8-gfs",defaultSizes:[.9,1.05,1.4],minSizes:[230,245,470],stackAt:1000});
     Object.assign(layout,{id:"gf-detail"});layout.setAttribute("role","tabpanel");layout.setAttribute("aria-labelledby",`gfs-tab-${row.id}`);layout.dataset.gf=row.id;$("#main").replaceChildren(layout);
+  }
+  function gfCenterPanel(row,routed,defaults){
+    const active=state.gfDetailTab||'properties';
+    const content=active==='attack'?gfPanel('',routed.get('Attack'),row,'attack'):
+      active==='defaults'?(defaults?startingFields(defaults.fields,'gf',defaults.id):LexeditorUI.detailNote('No initial state for this GF.')):
+      gfPanel('',routed.get('General'),row,'general');
+    return tabbedPanel({tabs:[{id:'properties',label:'Properties'},
+      {id:'attack',label:'Attack',help:'Set the GF summon’s power, animation, targets, damage, elements and status effects.'},
+      {id:'defaults',label:'Defaults',help:'Initial GF state used when a new game begins. Changes do not alter an existing save.'}],
+      active,label:'GF details',change:id=>{state.gfDetailTab=id;renderGFs()},content});
   }
   function fieldGroups(fields,view,rowId,collapsible=true,prefs=null){
     const groups=new Map();
