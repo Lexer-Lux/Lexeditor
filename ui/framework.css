@@ -2215,7 +2215,7 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 }
 
 .lex-column-list .lex-column-cell-content { width:100%; }
-.lex-column-cell-content:not(:has(input,select,textarea)) { padding-block:.15em; box-sizing:border-box; }
+.lex-column-cell-content:not(:has(input,select,textarea,.lex-choice-field)) { padding-block:.15em; box-sizing:border-box; }
 .lex-column-list-cell:has(.lex-source-control) .lex-column-cell-content { width:100%; }
 /* An editable cell is the control, as in a spreadsheet: the box is the whole
    cell and its value sits where a read-only cell's text sits. The control
@@ -2245,11 +2245,33 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
    the vanilla one. */
 .lex-column-list .lex-source-control {
   position:relative;
-  display:block;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  align-items:stretch;
   width:100%;
   height:100%;
   --lex-reference-rail-width:0px;
 }
+.lex-column-list .lex-source-control > input[type="checkbox"] {
+  place-self:center;
+}
+/* Composite editors must fill the cell just like a direct input. */
+.lex-column-list .lex-source-control > :is(.lex-stack,.lex-choice-field) {
+  height:100%;
+  min-height:0;
+}
+.lex-column-list .lex-source-control > .lex-stack {
+  display:grid;
+  grid-auto-rows:minmax(0,1fr);
+  gap:0;
+}
+.lex-column-list .lex-source-control > .lex-stack > :is(input,select) {
+  height:100%;
+  min-height:0;
+  box-sizing:border-box;
+}
+.lex-column-list .lex-choice-field > :first-child { align-self:stretch; display:flex; align-items:center; }
+.lex-column-list .lex-choice-field > button:last-child { height:100%; }
 .lex-column-list .lex-source-control > :is(input:not([type="checkbox"]),select,textarea,.lex-unit-field,.lex-readonly-field) {
   box-sizing:border-box;
   width:100%;
