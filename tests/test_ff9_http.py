@@ -183,3 +183,22 @@ def test_data_map_keeps_battle_editor_integration_when_game_source_is_missing(se
     row = next(row for row in service[0].data_map()["rows"] if row.get("datasetKey") == "enemies")
     assert row["status"] == "integrated" and row["coverage"] == "structured"
     assert row["openable"] is True and row["sourceAvailable"] is False
+
+
+def test_data_map_keeps_each_known_p0data_gap_visible(service):
+    rows = service[0].data_map()["rows"]
+    gaps = {row["filename"]: row for row in rows if row["status"] == "not-integrated"}
+    expected = {
+        "StreamingAssets/p0data1*.bin",
+        "StreamingAssets/p0data2.bin (outside BattleScene raw16)",
+        "StreamingAssets/p0data3.bin",
+        "StreamingAssets/p0data4.bin",
+        "StreamingAssets/p0data5.bin",
+        "StreamingAssets/p0data7.bin",
+        "StreamingAssets/p0data6*.bin and other unmatched p0data*.bin",
+    }
+    assert expected <= set(gaps)
+    assert all(gaps[name]["coverage"] == "unavailable" and not gaps[name]["openable"]
+               for name in expected)
+    assert "mesh/rig" in gaps["StreamingAssets/p0data4.bin"]["notes"]
+    assert "event-script" in gaps["StreamingAssets/p0data7.bin"]["notes"]
