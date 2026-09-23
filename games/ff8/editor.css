@@ -97,7 +97,8 @@
       --lex-subtab-active-fg:#fff;--lex-subtab-active-border-color:#d0d0d0 #313131 #313131 #d0d0d0;
       --lex-subtab-active-bg:linear-gradient(135deg,#888,#626262);
       --lex-subtab-active-shadow:inset 2px 2px #717171,inset -2px -2px #3d3d3d;
-      --lex-subtab-text-shadow:2px 2px #222;
+      --lex-tab-text-shadow:2px 2px #222;
+      --lex-subtab-text-shadow:var(--lex-tab-text-shadow);
       /* The record's name heads the panel with no band or rule under it. */
       --lex-detail-heading-bg:transparent;--lex-detail-heading-border:0;
       --lex-detail-heading-padding:2px 6px 4px;
