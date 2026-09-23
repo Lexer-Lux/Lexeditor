@@ -26,6 +26,7 @@ PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 MAX_BODY_BYTES = 512 * 1024
 PROJECT_ENV = "LEXEDITOR_FF7R2_PROJECT"
 PLAYER_PARAMETER = Path("End/Content/DataObject/Resident/PlayerParameter.uasset")
+BATTLE_ITEM_POSSESSION = Path("End/Content/DataObject/Resident/BattleItemPossession.uasset")
 
 
 def game_root() -> Path | None:
@@ -57,6 +58,33 @@ def source_path() -> Path | None:
 def output_path() -> Path | None:
     root = project_root()
     return root / "content" / PLAYER_PARAMETER if root else None
+
+
+def battle_item_source_path() -> Path | None:
+    root = project_root()
+    return root / "source" / BATTLE_ITEM_POSSESSION if root else None
+
+
+def battle_item_payload() -> dict:
+    root = project_root()
+    path = battle_item_source_path()
+    if root is None:
+        raise DataObjectError("No FF7 Rebirth project is selected.")
+    if path is None or not path.is_file():
+        raise DataObjectError(
+            "BattleItemPossession source is missing. Place the extracted IoStore-state "
+            f"asset at source/{BATTLE_ITEM_POSSESSION.as_posix()} inside this project."
+        )
+    package = DataObjectPackage.from_bytes(path.read_bytes())
+    payload = package.payload()
+    payload.update({
+        "source": "source",
+        "path": str(path),
+        "projectRelativePath": str(path.relative_to(root)).replace("\\", "/"),
+        "readOnly": True,
+        "purpose": "Steal/drop source data; the Steal formula is not yet reconstructed.",
+    })
+    return payload
 
 
 def active_player_path(source: str = "mine") -> tuple[Path, str]:
@@ -96,6 +124,7 @@ def workspace_payload() -> dict:
     root = project_root()
     baseline = source_path()
     candidate = output_path()
+    battle_item = battle_item_source_path()
     game = game_root()
     package = packaging.status(root, game)
     return {
@@ -114,6 +143,12 @@ def workspace_payload() -> dict:
             "outputRelative": f"content/{PLAYER_PARAMETER.as_posix()}",
             "sourcePresent": bool(baseline and baseline.is_file()),
             "outputPresent": bool(candidate and candidate.is_file()),
+        },
+        "battleItemPossession": {
+            "relative": BATTLE_ITEM_POSSESSION.as_posix(),
+            "sourceRelative": f"source/{BATTLE_ITEM_POSSESSION.as_posix()}",
+            "sourcePresent": bool(battle_item and battle_item.is_file()),
+            "readOnly": True,
         },
         "delivery": {
             "staged": package["stagedPresent"],
@@ -261,14 +296,16 @@ def data_map_payload() -> dict:
         },
         {
             "filename": "End/Content/DataObject/Resident/BattleItemPossession.uasset (#471)",
-            "controls": "None — Steal/drop formula research target", "coverage": "unavailable",
+            "controls": "Formulae — read-only row and array-element view", "coverage": "view",
             "notes": (
-                "Public constants identify NormalItemPercent_Array, RareItemPercent_Array, "
-                "StealItemName_Array, StealItemQuantity_Array and StealFaildCountArrayIndex. "
-                "The public 100% Steal/Drop mod author reports Rebirth shares the 25% rate data "
-                "between steals and drops. Lexeditor intentionally cannot write arrays yet, and "
-                "no source proves the complete Steal formula, roll-vs-no-item failure branch or message hook."
-            ), "status": "not-integrated",
+                "Public format evidence proves _Array headers point to elements of the property's "
+                "underlying type, so Lexeditor can decode supplied BattleItemPossession rows and "
+                "array elements read-only. Public constants identify NormalItemPercent_Array, "
+                "RareItemPercent_Array, StealItemName_Array, StealItemQuantity_Array and "
+                "StealFaildCountArrayIndex; public mod evidence says the 25% rate data is shared "
+                "between steal/drop. Writes, the complete formula, failure branch and message hook "
+                "remain unproved."
+            ), "status": "partial", "target": "formulae",
         },
         {
             "filename": "End/Content/DataObject/Resident/StateChange.uasset + StateTrigger.uasset + ActionGroup.uasset (#472)",
@@ -347,8 +384,8 @@ class Handler(PluginRequestHandler):
                             "name": "Final Fantasy VII Rebirth",
                             "hosted": True, "windowHost": "webview2",
                             "capabilities": ["reshade", "shader-injector", "data-map",
-                            "player-parameter", "fixed-width-edit", "project-staging",
-                            "package-candidate"]})
+                            "player-parameter", "battle-item-possession-view",
+                            "fixed-width-edit", "project-staging", "package-candidate"]})
         elif path == "/api/datamap":
             self.send_json(data_map_payload())
         elif path == "/api/workspace":
@@ -357,6 +394,11 @@ class Handler(PluginRequestHandler):
             try:
                 source = parse_qs(urlparse(self.path).query).get("source", ["mine"])[0]
                 self.send_json(player_payload(source))
+            except (OSError, DataObjectError) as error:
+                self.send_json({"error": str(error), "workspace": workspace_payload()}, 404)
+        elif path == "/api/battle-item-possession":
+            try:
+                self.send_json(battle_item_payload())
             except (OSError, DataObjectError) as error:
                 self.send_json({"error": str(error), "workspace": workspace_payload()}, 404)
         elif path == "/api/game":
