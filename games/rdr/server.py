@@ -354,7 +354,20 @@ def _string_table_metadata(
             "project": project.is_file() and not vanilla_only,
             "rowCount": 0,
             "languageCount": 0,
+            "languages": [],
         }
+    language_rows = []
+    seen_languages = set()
+    for row in string_tables.rows(table):
+        identity = (row["languageIndex"], row["language"])
+        if identity in seen_languages:
+            continue
+        seen_languages.add(identity)
+        language_rows.append({
+            "id": str(row["languageIndex"]),
+            "index": row["languageIndex"],
+            "label": row["language"],
+        })
     return {
         "id": f"{source_id}:{relative.as_posix()}",
         "source": source_id,
@@ -368,6 +381,7 @@ def _string_table_metadata(
         "project": project.is_file() and not vanilla_only,
         "rowCount": sum(len(block.entries) for block in table.blocks.values()),
         "languageCount": len(table.blocks),
+        "languages": language_rows,
         "version": table.version,
         "identifierCount": len(table.identifiers),
     }
@@ -384,8 +398,18 @@ def string_tables_index(vanilla_only: bool = False) -> dict:
             if not _string_table_supported(relative):
                 continue
             tables.append(_string_table_metadata(source_id, relative, vanilla_only))
+    languages = {}
+    for table in tables:
+        if not table.get("available"):
+            continue
+        for language in table.get("languages", []):
+            languages[(int(language["index"]), str(language["label"]))] = dict(language)
     return {
         "tables": tables,
+        "languages": [
+            languages[key]
+            for key in sorted(languages, key=lambda item: (item[0], item[1]))
+        ],
         "counts": {
             "tables": len(tables),
             "available": sum(bool(row["available"]) for row in tables),
@@ -426,6 +450,50 @@ def string_table_payload(
             "records": len(rows),
             "languages": len(table.blocks),
             "identifiers": len(table.identifiers),
+        },
+    }
+
+
+def strings_payload(language_index: int | None = None, vanilla_only: bool = False) -> dict:
+    index = string_tables_index(vanilla_only)
+    languages = index.get("languages", [])
+    if language_index is None:
+        language_index = languages[0]["index"] if languages else None
+    if isinstance(language_index, bool) or (
+            language_index is not None and not isinstance(language_index, int)):
+        raise ValueError("String-table language index must be an integer")
+    selected = next(
+        (row for row in languages if row["index"] == language_index),
+        None,
+    )
+    if language_index is not None and selected is None:
+        raise ValueError("String-table language is not available")
+
+    rows = []
+    table_ids = set()
+    if selected is not None:
+        for metadata in index["tables"]:
+            if not metadata.get("available"):
+                continue
+            if not any(
+                    language.get("index") == language_index
+                    for language in metadata.get("languages", [])):
+                continue
+            payload = string_table_payload(
+                metadata["source"], metadata["path"], vanilla_only)
+            for row in payload["rows"]:
+                if row["languageIndex"] != language_index:
+                    continue
+                rows.append(row)
+                table_ids.add(row["tableId"])
+    return {
+        "language": selected,
+        "languages": languages,
+        "rows": rows,
+        "counts": {
+            "records": len(rows),
+            "tables": len(table_ids),
+            "availableTables": index["counts"]["available"],
         },
     }
 
@@ -1980,6 +2048,13 @@ class Handler(PluginRequestHandler):
                 self.json_response(string_table_payload(
                     query.get("source", [""])[0],
                     query.get("path", [""])[0],
+                    query.get("dataset", ["current"])[0] == "vanilla",
+                ))
+            elif path == "/api/strings":
+                raw_language = query.get("language", [""])[0]
+                language_index = None if raw_language == "" else int(raw_language)
+                self.json_response(strings_payload(
+                    language_index,
                     query.get("dataset", ["current"])[0] == "vanilla",
                 ))
             elif path == "/api/loot":
