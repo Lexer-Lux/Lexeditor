@@ -1489,9 +1489,7 @@
       // The Boxicons pin tip is at 3.71,21.71 in its 24-by-24 view box.
       const tipX = icon.width * 3.71 / 24;
       const tipY = icon.height * 21.71 / 24;
-      const lock=control.closest(".lex-detail-field")?.querySelector(".lex-field-readonly-lock");
-      const lockInset=lock ? lock.getBoundingClientRect().width + 12 * (owner.width/control.offsetWidth || 1) : 0;
-      const targetX = target.right - lockInset + (outward ? inset : -inset);
+      const targetX = target.right + (outward ? inset : -inset);
       const targetY = target.top + (outward ? -inset : inset);
       const scale = owner.width / control.offsetWidth || 1;
       pin.style.setProperty("left", `${(targetX - owner.left - tipX) / scale}px`, "important");
