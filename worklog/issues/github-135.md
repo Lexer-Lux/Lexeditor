@@ -38,3 +38,9 @@ Development build passed. Installed ASI and matching release manifest with RDR2 
 
 ## 2026-09-22 misc-fixes evidence
 Re-ran tools/verify_rdr2_train_tracking.py today: PASS production with four mutations rejected (driver-required, carriage-duplicates, stream-out-leak, disabled-leak). Discovery and cleanup hold in source; real-train resolution plus distinct cargo, passenger, and streetcar artwork need the game. The missing-markers report means detection and cleanup repair first. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

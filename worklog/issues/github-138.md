@@ -16,3 +16,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes disposition
 No reviewable variants are supplied. Preparing and presenting candidate map icons is the development task; approval of unseen artwork is not requested. Artwork plus approval. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side prototype/artwork/
+design still owed), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.

@@ -16,3 +16,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes disposition
 No display implementation exists to test. Representative display layouts plus their limits come first; full automatic one-to-one shelving is unproven and vanilla already has more menu entries than display positions. Design work with the game. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side prototype/artwork/
+design still owed), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.
