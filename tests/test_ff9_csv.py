@@ -187,3 +187,94 @@ def test_failed_default_baseline_is_retried(tmp_path, monkeypatch):
     first = baseline.ensure(downloader=downloader)
     second = baseline.ensure(downloader=downloader)
     assert not first["ready"] and second["ready"] and calls["count"] == 2
+
+
+def test_symbolic_integer_enums_are_named_editable_choices(store):
+    fixture(store, "actions",
+            b"# Comment;id;menuWindow;targets\n"
+            b"# ;Int32;UInt8;UInt8\n"
+            b"Fire;1;Hp(1);SingleEnemy(2);# Fire\n"
+            b"Cure;2;Hp(1);ManyAny(3);# Cure\n")
+    loaded = store.load("actions")
+    menu = next(field for field in loaded["fields"] if field["key"] == "menuWindow")
+    targets = next(field for field in loaded["fields"] if field["key"] == "targets")
+    assert menu["kind"] == "enum" and menu["editable"] and menu["choices"] == ["Hp(1)"]
+    assert targets["kind"] == "enum" and targets["editable"]
+    saved = store.save("actions", loaded["sha256"], [{
+        "line": loaded["rows"][0]["line"], "values": {"targets": "ManyAny(3)"}
+    }])
+    assert saved["rows"][0]["values"]["targets"] == "ManyAny(3)"
+    with pytest.raises(ValueError, match="named values"):
+        store.save("actions", saved["sha256"], [{
+            "line": saved["rows"][0]["line"], "values": {"targets": "Invented(99)"}
+        }])
+
+
+def test_status_visual_vectors_and_color_are_bounded_fixed_lists(store):
+    fixture(store, "status-data",
+            b"# Comment;Id;SPSExtraPos;SHPExtraPos;ColorBase\n"
+            b"# ;Int32;Vector3;Vector3;Int32[3]\n"
+            b"Petrify;0;1, 2, 3;4, 5, 6;-48, -72, -88;# Petrify\n")
+    loaded = store.load("status-data")
+    fields = {field["key"]: field for field in loaded["fields"]}
+    assert fields["SPSExtraPos"]["kind"] == "fixed-list"
+    assert fields["SPSExtraPos"]["length"] == 3 and fields["SPSExtraPos"]["itemKind"] == "number"
+    assert fields["ColorBase"]["kind"] == "fixed-list"
+    assert fields["ColorBase"]["length"] == 3 and fields["ColorBase"]["itemKind"] == "integer"
+    row = loaded["rows"][0]
+    assert row["values"]["SPSExtraPos"] == [1.0, 2.0, 3.0]
+    assert row["values"]["ColorBase"] == [-48, -72, -88]
+    saved = store.save("status-data", loaded["sha256"], [{
+        "line": row["line"],
+        "values": {"SPSExtraPos": [1.5, 2.0, 3.0], "ColorBase": [-40, -70, -80]},
+    }])
+    assert saved["rows"][0]["values"]["SPSExtraPos"] == [1.5, 2.0, 3.0]
+    assert b"1.5, 2, 3" in Path(saved["sourcePath"]).read_bytes()
+    with pytest.raises(ValueError, match="exactly 3"):
+        store.save("status-data", saved["sha256"], [{
+            "line": saved["rows"][0]["line"], "values": {"ColorBase": [1, 2]}
+        }])
+
+
+def test_comments_are_source_annotations_not_editable_gameplay_fields(store):
+    fixture(store, "shops",
+            b"# Comment;Id;Items\n# ;Int32;Int32[]\nShop 0000;0;1, 2;# Shop 0000 Dali\n")
+    loaded = store.load("shops")
+    comment = next(field for field in loaded["fields"] if field["key"] == "Comment")
+    assert comment["editable"] is False
+    with pytest.raises(ValueError, match="not an editable field"):
+        store.save("shops", loaded["sha256"], [{
+            "line": loaded["rows"][0]["line"], "values": {"Comment": "Fake game name"}
+        }])
+
+
+@pytest.mark.parametrize(("key", "data", "expected"), [
+    ("leveling",
+     b"# Experience;BonusHP;BonusMP\n# UInt32;UInt16;UInt16\n0;250;200;# Level 1\n",
+     1),
+    ("initial-items",
+     b"# ItemID;Count\n# Int32;UInt8\n236;7;# Potion\n",
+     None),
+    ("world-transport",
+     b"# type;speed_move\n# Byte;Int16\n0;112;# Walking\n",
+     None),
+    ("world-weather",
+     b"# light0.vx;fogAMP\n# Int16;UInt16\n100;4096;# Daylight 0\n",
+     None),
+])
+def test_no_id_tables_never_invent_a_displayed_record_id(store, key, data, expected):
+    fixture(store, key, data)
+    assert store.load(key)["rows"][0]["id"] == expected
+
+
+def test_field_labels_are_humanized_without_changing_keys(store):
+    fixture(store, "status-data",
+            b"# Comment;Id;SPSExtraPos;SHPExtraPos;ColorBase\n"
+            b"# ;Int32;Vector3;Vector3;Int32[3]\n"
+            b"Petrify;0;1, 2, 3;4, 5, 6;-48, -72, -88;# Petrify\n")
+    loaded = store.load("status-data")
+    labels = {field["key"]: field["label"] for field in loaded["fields"]}
+    assert labels["SPSExtraPos"] == "SPS Extra Position"
+    assert labels["SHPExtraPos"] == "SHP Extra Position"
+    assert labels["ColorBase"] == "Glow Base Color"
+    assert csv._field_label("DefaultCommandSet") == "Default Command Set"

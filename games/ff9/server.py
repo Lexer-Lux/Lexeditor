@@ -14,8 +14,9 @@ from urllib.parse import parse_qs, urlparse
 from . import paths
 from .memoria_csv import MemoriaDataStore, catalog
 from .battle_scene import BattleSceneStore
+from .field_walkmesh import FieldWalkmeshStore
 from .memoria_baseline import ensure as ensure_baseline
-from . import memoria_manager, features
+from . import memoria_manager, features, mod_compat
 from plugin_http import PluginRequestHandler
 
 
@@ -25,14 +26,32 @@ PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
+FIELD_WALKMESH = FieldWalkmeshStore()
+
+
 POST_ROUTES = {"/api/save", "/api/runtime/install", "/api/runtime/recover",
                "/api/runtime/settings", "/api/features/save",
                "/api/deployment/deploy", "/api/deployment/revert"}
 
 
+# Known p0data areas that remain outside Lexeditor's structured editor.
+# These stay explicit even when a narrow sub-format is integrated, so partial
+# coverage never hides the still-protected bytes or implies a generic raw editor.
 UNRESOLVED_AREAS = (
-    ("StreamingAssets/p0data*.bin", "Vanilla Unity asset containers",
-     "Battle-scene records are decoded read-only from p0data2 and written only as Memoria project overlays; other container data remains outside the integrated surface."),
+    ("StreamingAssets/p0data1*.bin (outside integrated BGI pathing flags)", "Field backgrounds, cameras, walkmesh geometry/topology and animations",
+     "Lexeditor has preservation-safe editors for BGI_FLOOR_ACTIVE plus Memoria Field Creator's documented triangle Active, Alternate footstep, Prevent NPC pathing and Prevent PC pathing flags. Background art, cameras, walkmesh geometry/topology, edge semantics, transforms, remaining/internal flag semantics and moving-platform animation data remain protected and unintegrated rather than being routed through a lossy generic editor."),
+    ("StreamingAssets/p0data2.bin (outside BattleScene raw16)", "Battle geometry, scene assets and effects",
+     "Enemy and encounter BattleScene raw16 records are integrated separately. Public tooling also reads battle meshes/background assets, SPS/effect data and related scene resources from p0data2; Lexeditor has no safe structured editor for those assets yet."),
+    ("StreamingAssets/p0data3.bin", "World-map geometry, materials and effects",
+     "Public FF9 tooling reads and overrides world-map assets from p0data3. Lexeditor's World tab currently edits only documented Memoria CSV controls, not the packed world geometry/material/effect data."),
+    ("StreamingAssets/p0data4.bin", "Field and character 3D models",
+     "Public tooling identifies native Unity GameObject/skinned-mesh prefabs in p0data4 and can export them to editable model formats. Lexeditor has no preservation-tested mesh/rig import and override editor yet."),
+    ("StreamingAssets/p0data5.bin", "Character and model animations",
+     "Public tooling identifies serialized AnimationClips in p0data5 and Memoria supports loose animation overrides. Lexeditor has no semantic animation editor/import round-trip yet."),
+    ("StreamingAssets/p0data7.bin", "Compiled field, battle and world event scripts",
+     "Public tooling decodes and emits the compiled .eb event-script families loaded from p0data7. Lexeditor has no safe script decompiler/editor/recompiler UI with preservation coverage yet."),
+    ("StreamingAssets/p0data6*.bin and other unmatched p0data*.bin", "Audio evidence plus remaining packed Unity asset families",
+     "Public research byte-identifies at least title BGM music033.akb in p0data61.bin/p0data601.bin, and Memoria recognizes p0data61.bin, p0data62.bin and p0data63.bin as mod-content bundle names. That does not establish a bounded schema for the whole p0data6* family, so Lexeditor keeps the remaining contents visible and unintegrated rather than guessing."),
 )
 
 
@@ -69,8 +88,20 @@ def data_map() -> dict:
     for row in BattleSceneStore().status_rows():
         integrated.append({
             "filename": row["relativePath"], "controls": row["controls"],
-            "notes": row["notes"], "status": "integrated" if row["available"] else "partial",
-            "openable": row["available"], "target": row["tab"], "datasetKey": row["key"],
+            "notes": (row["notes"] + (" Source data is available now." if row["available"] else
+                      " The installed p0data2 source is not available yet; opening the view shows that dependency without changing integration status.")),
+            "status": "integrated", "coverage": "structured",
+            "openable": True, "sourceAvailable": bool(row["available"]),
+            "target": row["tab"], "datasetKey": row["key"],
+        })
+    for row in FIELD_WALKMESH.status_rows():
+        integrated.append({
+            "filename": row["relativePath"], "controls": row["controls"],
+            "notes": (row["notes"] + (" Source data is available now." if row["available"] else
+                      " No installed p0data1 field bundle or project BGI override is available yet; opening the view shows that dependency without changing integration status.")),
+            "status": "partial", "coverage": "structured",
+            "openable": True, "sourceAvailable": bool(row["available"]),
+            "target": row["tab"], "datasetKey": row["key"],
         })
     launcher = paths.GAME_ROOT / "FF9_Launcher.exe"
     deployment = features.status()
@@ -78,13 +109,14 @@ def data_map() -> dict:
         "filename": "Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.Lexeditor.dll",
         "controls": "Lexeditor FF9 runtime tweaks",
         "notes": "Lexeditor-owned optional Memoria script runtime. Deploy Project activates the fixed Lexeditor mod folder; Memoria.ini remains otherwise untouched.",
-        "status": "integrated" if deployment["runtimeReady"] else "partial",
-        "openable": True, "target": "tweaks",
+        "status": "integrated", "coverage": "structured",
+        "openable": True, "sourceAvailable": bool(deployment["runtimeReady"]), "target": "tweaks",
     })
     return {"contract": "Lexeditor.data-map", "rows": integrated + [{
         "filename": "FF9_Launcher.exe", "controls": "Memoria settings in its own launcher",
         "notes": "Play opens the launcher. Lexeditor does not edit Memoria.ini; Tweaks explains this handoff.",
-        "status": "integrated" if launcher.is_file() else "partial", "openable": True, "target": "tweaks",
+        "status": "integrated", "coverage": "handoff", "sourceAvailable": launcher.is_file(),
+        "openable": True, "target": "tweaks",
     }] + [{
         "filename": filename, "controls": controls, "notes": notes,
         "status": "not-integrated", "coverage": "unavailable", "openable": False,
@@ -111,7 +143,8 @@ def dashboard() -> dict:
                      "problems": memoria["problems"]},
         "problems": problems, "project": {"root": str(paths.PROJECT_ROOT)},
         "runtime": memoria_manager.status(paths.GAME_ROOT), "features": features.load(),
-        "deployment": features.status(), "scaffold": False,
+        "deployment": features.status(), "modCompatibility": mod_compat.audit(),
+        "scaffold": False,
     }
 
 
@@ -137,15 +170,18 @@ class Handler(PluginRequestHandler):
                 self.json_response({"apiVersion": 1, "pluginId": "ff9", "name": "Final Fantasy IX",
                     "edition": "Steam Unity / Memoria CSV", "hosted": HOSTED, "windowHost": WINDOW_HOST,
                     "projectRoot": str(paths.PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
-                    "capabilities": ["data-map", "memoria-csv", "battle-scenes", "ff9-features", "deploy", "read", "save"]})
+                    "capabilities": ["data-map", "memoria-csv", "battle-scenes", "field-walkmesh", "ff9-features", "deploy", "read", "save"]})
             elif path == "/api/dashboard": self.json_response(dashboard())
             elif path == "/api/datamap": self.json_response(data_map())
-            elif path == "/api/catalog": self.json_response({"datasets": catalog() + BattleSceneStore().status_rows()})
+            elif path == "/api/catalog": self.json_response({"datasets": catalog() + BattleSceneStore().status_rows() + FIELD_WALKMESH.status_rows()})
             elif path == "/api/dataset":
-                key = parse_qs(parsed.query).get("key", [""])[0]
-                self.json_response(BattleSceneStore().load(key) if key in {"enemies", "encounters"} else MemoriaDataStore().load(key))
+                query = parse_qs(parsed.query)
+                key = query.get("key", [""])[0]
+                scene = query.get("scene", [None])[0]
+                self.json_response(BattleSceneStore().load(key) if key in {"enemies", "encounters"} else FIELD_WALKMESH.load(key, scene) if key in FIELD_WALKMESH.KEYS else MemoriaDataStore().load(key))
             elif path == "/api/runtime": self.json_response(memoria_manager.status(paths.GAME_ROOT))
             elif path == "/api/runtime/available": self.json_response(memoria_manager.available())
+            elif path == "/api/mod-compat": self.json_response(mod_compat.audit())
             elif path == "/api/features": self.json_response(features.load())
             elif path == "/api/deployment": self.json_response(features.status())
             else: self.json_response({"error": "Not found"}, 404)
@@ -181,6 +217,8 @@ class Handler(PluginRequestHandler):
                 key = str(payload.get("key", ""))
                 result = (BattleSceneStore().save(key, payload.get("sceneHashes", {}), payload.get("changes", []))
                           if key in {"enemies", "encounters"} else
+                          FIELD_WALKMESH.save(key, payload.get("sceneHashes", {}), payload.get("changes", []))
+                          if key in FIELD_WALKMESH.KEYS else
                           MemoriaDataStore().save(key, str(payload.get("sha256", "")), payload.get("changes", [])))
             self.json_response(result)
         except FileNotFoundError as error: self.json_response({"error": str(error)}, 409)

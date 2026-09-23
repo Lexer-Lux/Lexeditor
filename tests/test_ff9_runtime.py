@@ -13,6 +13,8 @@ import sys
 import pytest
 
 from games.ff9 import memoria_manager as manager
+from games.ff9 import memoria_update as update
+from games.ff9.plugin import PLUGIN
 from games.ff9.memoria_patcher import MAGIC, inspect_payload, installation_files
 from games.ff9.memoria_recovery import Recovery, digest, root_key, install_lock
 
@@ -288,3 +290,107 @@ with install_lock(Path(sys.argv[1]), Path(sys.argv[2])):
     assert process.returncode == 0
     with install_lock(root, control):
         pass
+
+
+def test_install_disables_memoria_launcher_updates_and_preserves_other_settings(setup):
+    root, kwargs, _, _ = setup
+    original = (b"\xef\xbb\xbf; keep comment\r\n[Memoria]\r\n"
+                b"CheckUpdates = True ; keep suffix\r\nOther = Mine\r\n"
+                b"[Settings]\r\nWindowMode = 3\r\n")
+    (root / "Settings.ini").write_bytes(original)
+    result = manager.install(root, **kwargs)
+    expected = original.replace(b"CheckUpdates = True", b"CheckUpdates = False")
+    assert (root / "Settings.ini").read_bytes() == expected
+    assert result["updatesDisabled"] is True
+
+
+def test_first_install_adds_disabled_update_setting(setup):
+    root, kwargs, _, _ = setup
+    result = manager.install(root, **kwargs)
+    settings = (root / "Settings.ini").read_text(encoding="utf-8")
+    assert "[Settings]\nEnabled = 1" in settings
+    assert "[Memoria]\nCheckUpdates = False" in settings
+    assert result["updatesDisabled"] is True
+
+
+def test_disable_launcher_updates_preserves_cp1252_and_missing_final_newline(tmp_path):
+    path = tmp_path / "Settings.ini"
+    raw = "[Memoria]\r\nName = Caf\xe9\r\nCheckUpdates=True;note".encode("cp1252")
+    path.write_bytes(manager._disable_launcher_updates(raw))
+    assert path.read_bytes() == "[Memoria]\r\nName = Caf\xe9\r\nCheckUpdates=False;note".encode("cp1252")
+    assert manager._launcher_updates_disabled(path)
+
+
+def test_shared_updates_contract_is_metadata_only(tmp_path):
+    assert PLUGIN.helper_name == "Memoria"
+    assert PLUGIN.helper_pinned == manager.PINNED_RELEASE
+    assert callable(PLUGIN.helper_upstream) and callable(PLUGIN.helper_install)
+    calls = []
+    payload = {"tag_name": manager.PINNED_RELEASE, "draft": False, "prerelease": False,
+               "published_at": "2025-07-04T20:27:01Z"}
+    result = update.upstream_release(fetch_json=lambda url: calls.append(url) or payload,
+                                     cache_path=tmp_path / "upstream.json", force=True)
+    assert calls == [manager.LATEST_RELEASE_API]
+    assert result["pinned"] == manager.PINNED_RELEASE
+    assert result["latest"] == manager.PINNED_RELEASE and result["behind"] is False
+    assert not (tmp_path / "Memoria.Patcher.exe").exists()
+
+
+def test_pinned_helper_metadata_is_repository_owned():
+    release = manager.pinned_release()
+    assert release["version"] == manager.PINNED_RELEASE
+    assert release["url"] == manager.PINNED_ASSET_URL
+    assert release["sha256"] == manager.PINNED_ASSET_SHA256
+    assert release["size"] == manager.PINNED_ASSET_SIZE
+    assert release["published"] == manager.PINNED_PUBLISHED_AT
+
+
+def test_stage_default_uses_repository_pin_without_metadata_lookup(tmp_path, monkeypatch):
+    payload = b"synthetic pinned helper"
+    metadata = {
+        "version": manager.PINNED_RELEASE, "published": "fixture",
+        "name": manager.ASSET_NAME, "url": manager.PINNED_ASSET_URL,
+        "sha256": hashlib.sha256(payload).hexdigest(), "size": len(payload),
+        "source": manager.REPOSITORY,
+    }
+    monkeypatch.setattr(manager, "pinned_release", lambda: metadata)
+    calls = []
+    def fetch_file(url, target, progress):
+        calls.append(url)
+        target.write_bytes(payload)
+    staged, published = manager.stage(fetch_file=fetch_file, cache_root=tmp_path)
+    assert calls == [manager.PINNED_ASSET_URL]
+    assert staged.read_bytes() == payload and published == metadata
+
+
+def test_real_patcher_shape_without_settings_is_recoverable(setup):
+    root, kwargs, files, metadata = setup
+    files.pop("Settings.ini")
+    payload = pack(files)
+    metadata["assets"][0]["digest"] = "sha256:" + hashlib.sha256(payload).hexdigest()
+    metadata["assets"][0]["size"] = len(payload)
+    kwargs["fetch_file"] = lambda _url, target, _progress: target.write_bytes(payload)
+    result = manager.install(root, **kwargs)
+    assert result["installed"] and result["updatesDisabled"]
+    settings = root / manager.SETTINGS_NAME
+    assert settings.is_file()
+    assert settings.read_bytes() == b"[Memoria]\r\nCheckUpdates = False\r\n"
+
+
+def test_new_settings_file_is_removed_if_install_rolls_back(setup, monkeypatch):
+    root, kwargs, files, metadata = setup
+    files.pop("Settings.ini")
+    payload = pack(files)
+    metadata["assets"][0]["digest"] = "sha256:" + hashlib.sha256(payload).hexdigest()
+    metadata["assets"][0]["size"] = len(payload)
+    kwargs["fetch_file"] = lambda _url, target, _progress: target.write_bytes(payload)
+    real_status = manager.status
+    def reject_after_settings(game_root, state_path=manager.STATE_PATH):
+        value = real_status(game_root, state_path)
+        if (Path(game_root) / manager.SETTINGS_NAME).is_file():
+            value = {**value, "installed": False}
+        return value
+    monkeypatch.setattr(manager, "status", reject_after_settings)
+    with pytest.raises(RuntimeError, match="previous game files were restored"):
+        manager.install(root, **kwargs)
+    assert not (root / manager.SETTINGS_NAME).exists()

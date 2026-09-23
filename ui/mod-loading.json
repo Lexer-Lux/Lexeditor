@@ -2,7 +2,7 @@
   "schema": 1,
   "plugins": {
     "blank": {
-      "loader": "Template only \u2014 not implemented.",
+      "loader": "Template only — not implemented.",
       "structure": "Template only. A shipping plugin must declare its mod root or package format and the file layout users should install or edit.",
       "overriding": "Template only. A shipping plugin must declare whether mods stack, replace whole files, merge semantic records, or are mutually exclusive."
     },
@@ -27,9 +27,9 @@
       "overriding": "Enabled mods compose from low to high priority. Same-path ordinary files are higher-priority-wins and Hext patches are ordered; supported packed gameplay data such as kernel.bin is semantically merged against vanilla so non-overlapping record or field edits coexist, while overlapping semantic edits conflict and the higher-priority edit wins."
     },
     "ff9": {
-      "loader": "Memoria. Lexeditor deploys one Lexeditor-owned Memoria mod folder and manages only that folder's entry in Memoria.ini.",
-      "structure": "Edit one Lexeditor project with overlays under StreamingAssets/ (especially StreamingAssets/Data/). Deploy Project copies those overlays into <FF9>\\Lexeditor\\ while preserving other Memoria mods and unrelated Memoria.ini settings.",
-      "overriding": "Lexeditor does not stack or semantically merge multiple FFIX projects. Other Memoria mods may coexist and Memoria resolves them according to its FolderNames ordering; conflicts with the same underlying content therefore follow Memoria's own resolution rules."
+      "loader": "Memoria. Its Mod Manager installs, enables and removes external FF9 mods; Lexeditor deploys only its marker-owned Lexeditor mod folder and hands external-mod management to Memoria's launcher. Mods declaring a MinimumMemoriaVersion newer than Lexeditor's pinned v2025.07.04 are unsupported until the helper pin is deliberately updated and re-verified.",
+      "structure": "Lexeditor projects contain game-relative overrides under StreamingAssets/ plus Lexeditor-owned feature configuration. Deploy copies only those overrides and the Lexeditor runtime into <FF9>/Lexeditor. Other Memoria mod folders and installed p0data archives are not rewritten.",
+      "overriding": "Memoria runtime priority is FolderNames order, highest priority first. Lexeditor deploy keeps Lexeditor first there and, when Priorities already exists, first in that launcher list too; it does not invent a missing Priorities setting. Lexeditor-generated CSV, battle raw16 and field-walkmesh BGI replacements are first-hit whole-file overrides. Format-specific Memoria patch files may compose low-to-high, and event scripts have separate append/MergeScripts behavior. Lexeditor does not claim a universal semantic merge between separate mods."
     },
     "palworld": {
       "loader": "Pocketpair's official Palworld v0.7+ mod loader and Workshop package model. Lexeditor authors compatible packages and PalSchema raw-table patches, builds a clean snapshot, can create one owned unregistered client test package, and can stage/activate a server-compatible package for the Windows dedicated server. Client activation remains read-only; dedicated-server activation is an explicit stale-guarded reversible PalModSettings.ini transaction. Lexeditor does not publish to Steam or install/replace PalSchema or UE4SS.",

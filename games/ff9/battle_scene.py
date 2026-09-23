@@ -1,8 +1,9 @@
 """Read vanilla FF9 battle scenes from p0data2 and write Memoria raw16 overlays.
 
-The Unity 5 archive layout follows Hades Workshop's public UnityArchiver parser;
-Lexeditor only reads the installed archive. Saves are standalone raw16 files in
-the selected Memoria project and never rewrite p0data2.bin.
+The Unity serialized-file/container facts used here were cross-checked against
+the permissively licensed UnityPy reader and Hades Workshop's published FF9
+research. No third-party parser or binary is bundled or invoked. Lexeditor only
+reads the installed archive; saves are standalone raw16 project overlays.
 """
 from __future__ import annotations
 
@@ -72,7 +73,7 @@ class UnityArchive:
         self.path = Path(path)
         size = self.path.stat().st_size
         if size <= 0 or size > MAX_ARCHIVE_BYTES:
-            raise ValueError("p0data2.bin has an unexpected size")
+            raise ValueError(f"{self.path.name} has an unexpected size")
         self.data = self.path.read_bytes()
         self.start = 0x70 if self.data.startswith(b"UnityRaw") else 0
         self.objects: list[UnityObject] = []
@@ -120,7 +121,7 @@ class UnityArchive:
             pos += 28
             absolute = self.start + file_offset + rel
             if absolute < 0 or size > len(data) - absolute:
-                raise ValueError("Unity archive object points outside p0data2.bin")
+                raise ValueError(f"Unity archive object points outside {self.path.name}")
             records.append((info, absolute, size, type_id, type_index, flags))
         for info, absolute, size, type_id, type_index, flags in records:
             name = ""
@@ -315,7 +316,11 @@ class BattleSceneStore:
 
     @staticmethod
     def relative(scene: str) -> Path:
-        return Path("BattleMap") / "BattleScene" / f"EVT_BATTLE_{scene}" / "dbfile0000.raw16"
+        # Memoria AssetManager resolves battle-scene TextAssets through the
+        # StreamingAssets/Assets/Resources loose-override tree. Hades Workshop
+        # and ff9mapkit emit the same path with the serialized TextAsset suffix.
+        return (Path("StreamingAssets") / "Assets" / "Resources" / "BattleMap" /
+                "BattleScene" / f"EVT_BATTLE_{scene}" / "dbfile0000.raw16.bytes")
 
     def _source(self, scene: str) -> tuple[bytes, str, Path | None]:
         project = self.project_root / self.relative(scene)
@@ -328,16 +333,20 @@ class BattleSceneStore:
 
     def status_rows(self) -> list[dict[str, Any]]:
         available = self.archive_path.is_file()
-        note = "Reads vanilla battle-scene TextAssets from p0data2; saves Memoria raw16 project overlays."
+        note = "Reads vanilla battle-scene TextAssets from p0data2; saves canonical Memoria loose raw16 project overlays under StreamingAssets/Assets/Resources, which Deploy Project copies into the Lexeditor mod folder."
         return [
-            {"key": "enemies", "tab": "enemies", "label": "Enemies", "relativePath": "StreamingAssets/p0data2.bin → BattleMap/BattleScene/*/dbfile0000.raw16", "controls": "Enemy HP/MP, rewards, stats, elements, defences, Blue Magic, geometry, SFX, card and shadow fields", "available": available, "source": "vanilla" if available else None, "sourcePath": str(self.archive_path) if available else None, "projectPath": str(self.project_root / "BattleMap/BattleScene"), "notes": note},
-            {"key": "encounters", "tab": "encounters", "label": "Encounters", "relativePath": "StreamingAssets/p0data2.bin → BattleMap/BattleScene/*/dbfile0000.raw16", "controls": "Pattern rate, monster count, camera, AP and four enemy placements", "available": available, "source": "vanilla" if available else None, "sourcePath": str(self.archive_path) if available else None, "projectPath": str(self.project_root / "BattleMap/BattleScene"), "notes": note},
+            {"key": "enemies", "tab": "enemies", "label": "Enemies", "relativePath": "StreamingAssets/p0data2.bin → StreamingAssets/Assets/Resources/BattleMap/BattleScene/*/dbfile0000.raw16.bytes", "controls": "Enemy HP/MP, rewards, stats, elements, defences, Blue Magic, geometry, SFX, card and shadow fields", "available": available, "source": "vanilla" if available else None, "sourcePath": str(self.archive_path) if available else None, "projectPath": str(self.project_root / "StreamingAssets/Assets/Resources/BattleMap/BattleScene"), "notes": note},
+            {"key": "encounters", "tab": "encounters", "label": "Encounters", "relativePath": "StreamingAssets/p0data2.bin → StreamingAssets/Assets/Resources/BattleMap/BattleScene/*/dbfile0000.raw16.bytes", "controls": "Pattern rate, monster count, camera, AP and four enemy placements", "available": available, "source": "vanilla" if available else None, "sourcePath": str(self.archive_path) if available else None, "projectPath": str(self.project_root / "StreamingAssets/Assets/Resources/BattleMap/BattleScene"), "notes": note},
         ]
 
     @staticmethod
     def _descriptors(fields: tuple[Field, ...]) -> list[dict[str, Any]]:
-        return [{"key": f.key, "label": f.label, "declaredType": f.fmt[-1], "editable": True,
-                 "kind": "integer", "min": f.min, "max": f.max} for f in fields]
+        result = []
+        for field in fields:
+            maximum = 4 if field.key == "MonsterCount" else field.max
+            result.append({"key": field.key, "label": field.label, "declaredType": field.fmt[-1],
+                           "editable": True, "kind": "integer", "min": field.min, "max": maximum})
+        return result
 
     def load(self, key: str) -> dict[str, Any]:
         if key not in {"enemies", "encounters"}:
@@ -356,8 +365,15 @@ class BattleSceneStore:
                 base = start + index * stride
                 values = {field.key: scene.read(base, field) for field in fields}
                 label = f"{scene_name} · {'Enemy' if key == 'enemies' else 'Pattern'} {index + 1}"
+                bounds = {}
+                if key == "encounters":
+                    bounds["MonsterCount"] = {"min": 0, "max": 4}
+                    type_max = max(0, scene.type_count - 1)
+                    for slot in range(1, 5):
+                        bounds[f"Slot{slot}Type"] = {"min": 0, "max": type_max}
                 rows.append({"line": len(rows), "id": f"{scene_name}:{index}", "name": label,
-                             "scene": scene_name, "record": index, "source": source_kind, "values": values})
+                             "scene": scene_name, "record": index, "source": source_kind,
+                             "fieldBounds": bounds, "values": values})
         status = next(row for row in self.status_rows() if row["key"] == key)
         return {**status, "sha256": _sha256(self.archive_path.read_bytes()) if self.archive_path.is_file() else "",
                 "sceneHashes": scene_hashes, "fields": self._descriptors(fields), "rows": rows}

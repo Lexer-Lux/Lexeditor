@@ -206,12 +206,32 @@
       "contributions": [
         {
           "name": "Memoria contributors",
-          "role": "FF9 runtime integration and documented gameplay data formats.",
+          "role": "FF9 runtime integration, CSV schemas and documented gameplay data formats.",
           "url": "https://github.com/Albeoris/Memoria"
+        },
+        {
+          "name": "K0lb3 / UnityPy contributors",
+          "role": "Permissively licensed Unity serialized-file and UnityRaw interoperability reference used to cross-check FF9 archive handling.",
+          "url": "https://github.com/K0lb3/UnityPy"
+        },
+        {
+          "name": "Tirlititi / Hades Workshop",
+          "role": "Additional FF9 Steam archive reverse-engineering reference; its source and binaries are not bundled or invoked by Lexeditor.",
+          "url": "https://github.com/Tirlititi/Hades-Workshop"
+        },
+        {
+          "name": "GameJawnsInc / Dream World IX / ff9mapkit",
+          "role": "MIT-licensed public FF9 p0data interoperability research for fields, event scripts, models, animations, world-map assets and Memoria loose overrides.",
+          "url": "https://github.com/GameJawnsInc/Dream-World-IX"
         }
       ],
       "thanks": [],
-      "licenses": []
+      "licenses": [
+        {
+          "name": "FF9 references — source and license notices",
+          "sourcePath": "games/ff9/THIRD_PARTY.md"
+        }
+      ]
     },
     "palworld": {
       "contributions": [

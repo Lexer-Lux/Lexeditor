@@ -106,6 +106,10 @@ def test_enemy_save_writes_raw16_overlay_only(store):
     assert archive_path.read_bytes() == before
     overlay = database.project_root / database.relative("B3_001")
     assert overlay.is_file() and overlay.read_bytes() != raw16()
+    assert overlay.relative_to(database.project_root).as_posix() == (
+        "StreamingAssets/Assets/Resources/BattleMap/BattleScene/"
+        "EVT_BATTLE_B3_001/dbfile0000.raw16.bytes"
+    )
 
 
 def test_encounter_save_bounds_and_stale_hash(store):
@@ -119,3 +123,13 @@ def test_encounter_save_bounds_and_stale_hash(store):
     source.write_bytes(source.read_bytes() + b"changed")
     with pytest.raises(RuntimeError, match="changed outside"):
         database.save("encounters", stale["sceneHashes"], [{"scene":"B3_001","record":0,"values":{"Rate":99}}])
+
+
+def test_encounter_descriptors_match_runtime_bounds(store):
+    database, _ = store
+    data = database.load("encounters")
+    fields = {field["key"]: field for field in data["fields"]}
+    assert fields["MonsterCount"]["max"] == 4
+    row = data["rows"][0]
+    assert row["fieldBounds"]["MonsterCount"] == {"min": 0, "max": 4}
+    assert row["fieldBounds"]["Slot1Type"] == {"min": 0, "max": 0}

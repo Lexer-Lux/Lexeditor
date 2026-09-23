@@ -21,7 +21,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -34,7 +34,9 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - name: Install test dependencies
-        run: python -m pip install pytest
+        run: |
+          python -m pip install pytest playwright
+          python -m playwright install --with-deps chromium
       - name: Verify deterministic FF9 feature UI integration
         shell: bash
         run: |
@@ -76,6 +78,16 @@ jobs:
           python -m compileall -q games/ff9
           python -m pytest -q tests/test_ff9*.py
           node --test tests/ff9_editor.test.cjs
+      - name: Render and interact with FF9 editor
+        run: python tests/ff9_browser_check.py out/ff9-browser
+      - name: Upload rendered FF9 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ff9-rendered-ui
+          path: out/ff9-browser
+          retention-days: 7
+          if-no-files-found: warn
       - name: Collect exact public sources for offline integration checks
         if: always()
         shell: bash
