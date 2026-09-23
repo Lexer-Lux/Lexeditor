@@ -217,6 +217,11 @@
           "url": "https://github.com/nikolaybutnik/FFVII-Rebirth-Mesh-Patcher"
         },
         {
+          "name": "f80h / FF7 Rebirth Load ordering",
+          "role": "August 2026 public UE4.26/Rebirth load-order analysis used to implement read-only native package precedence reporting. No article text, mod assets or code are bundled.",
+          "url": "https://www.nexusmods.com/finalfantasy7rebirth/articles/46"
+        },
+        {
           "name": "Gantz79 / 100 Percent Steal and Drop Rate",
           "role": "Public Rebirth behavior evidence for #471: a packaged rate edit works and the author reports the 25% rate data is shared between steals and enemy drops. Used for semantic boundary research only; no mod assets are copied or redistributed.",
           "url": "https://www.nexusmods.com/finalfantasy7rebirth/mods/157"
