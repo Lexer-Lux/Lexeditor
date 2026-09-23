@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from pathlib import Path, PurePosixPath
 
-from . import loot_script, mission_rewards, paths, string_tables
+from . import loot_script, mission_rewards, paths, rbf, string_tables
 from .server import _shop_records
 
 
@@ -231,6 +231,32 @@ def _string_table_records(caches: dict[str, Path]) -> dict[tuple[str, str], dict
     return records
 
 
+def _rbf_records(tuning_cache: Path) -> dict[str, dict]:
+    records: dict[str, dict] = {}
+    if not tuning_cache.is_dir():
+        return records
+    for target in sorted(path for path in tuning_cache.rglob("*") if path.is_file()):
+        try:
+            with target.open("rb") as stream:
+                if stream.read(4) != rbf.MAGIC:
+                    continue
+            document = rbf.parse(target.read_bytes())
+            scalar_count = len(document["scalars"])
+            records[target.relative_to(tuning_cache).as_posix()] = {
+                "supported": scalar_count > 0,
+                "scalarCount": scalar_count,
+                "descriptorCount": document["descriptorCount"],
+                "skipped": document["skipped"],
+                "reason": "" if scalar_count else "RBF0 contains no protected fixed-width scalar leaves.",
+            }
+        except (OSError, ValueError, struct.error) as error:
+            records[target.relative_to(tuning_cache).as_posix()] = {
+                "supported": False, "scalarCount": 0, "descriptorCount": 0,
+                "skipped": {}, "reason": str(error),
+            }
+    return records
+
+
 def _setting_count(path: Path) -> int:
     if not path.is_file():
         return 0
@@ -287,6 +313,7 @@ def _archive_row(
     inventory_records: dict[str, int],
     shops_by_file: dict[str, dict],
     string_table_records: dict[tuple[str, str], dict],
+    rbf_records: dict[str, dict],
 ) -> dict:
     archive = definition["archive"]
     archive_id = definition["id"]
@@ -372,6 +399,22 @@ def _archive_row(
                 "No complete ShopInventory item record was found. The dictionary is "
                 "indexed, but it has no supported editor record."
             )
+    elif archive_id == "tuning" and source_path in rbf_records:
+        record = rbf_records[source_path]
+        record_count = record["scalarCount"]
+        record_unit = "protected RBF0 scalar leaves"
+        if record["supported"]:
+            status = "partial"
+            target = "rbf"
+            openable = prepared
+            editable_fields = ["bool", "uint32", "float"]
+            write_target = f"mod/{source_path}"
+            caveat = (
+                "Only fixed-width bool, uint32 and float leaves are editable in-place. "
+                "Strings, vectors, byte blocks and unknown records remain opaque and byte-preserved."
+            )
+        else:
+            caveat = "RBF0 parsing did not produce a protected scalar set: " + record["reason"]
     elif prepared:
         caveat = "Prepared as read-only research data. No dedicated Lexeditor editor is connected."
     else:
@@ -490,6 +533,7 @@ def build_data_map(data_root: Path, game_root: Path, project_root: Path) -> dict
     inventory_records, inventory_types = _inventory_records(caches["content"])
     shops_by_file, shop_count = _shop_records_by_file(caches["gringoresUnpacked"])
     string_table_records = _string_table_records(caches)
+    rbf_records = _rbf_records(caches["tuning"])
     setting_count = _setting_count(project_root / "LexerRDR.ini")
     loot_counts = _loot_counts(project_root / "LexerRDR.loot.json")
     mission_document = mission_rewards.load_generated()
@@ -522,7 +566,7 @@ def build_data_map(data_root: Path, game_root: Path, project_root: Path) -> dict
             _archive_row(
                 definition, indexed_row,
                 indexed_row["sourcePath"] in prepared_files,
-                inventory_records, shops_by_file, string_table_records,
+                inventory_records, shops_by_file, string_table_records, rbf_records,
             )
             for indexed_row in indexed
         )
@@ -605,13 +649,14 @@ def build_data_map(data_root: Path, game_root: Path, project_root: Path) -> dict
             "fileCount": len(archive_indexes["tuning"]),
             "recordCount": None,
             "recordUnit": "",
-            "status": "not-integrated",
-            "target": None,
-            "editability": "Read-only Data Map coverage except parsed PC STRTBL entries.",
+            "status": "partial" if any(value["supported"] for value in rbf_records.values()) else "not-integrated",
+            "target": "rbf" if any(value["supported"] for value in rbf_records.values()) else None,
+            "editability": "Parsed PC STRTBL text plus fixed-width scalars from RBF0 resources proved by the protected parser.",
             "caveats": [
-                "String Tables handles parsed PC .strtbl text; the other prepared tuning files "
-                "remain read-only until a format-specific editor is verified."
+                "RBF Scalars only patches bool, uint32 and float byte spans in-place. "
+                "Strings, vectors, byte blocks, unknown tags and non-RBF tuning files remain read-only."
             ],
+            "details": {"rbfByFile": rbf_records},
         },
         {
             "id": "content-index",
