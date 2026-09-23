@@ -8429,79 +8429,6 @@ ${contents.path}`});
     }));
   }, true);
 
-  // Tabs share one row of equal lanes while every name fits in its lane at
-  // full size. When one does not, the bar takes another row rather than
-  // shrinking the names: one row at any cost put PROPERTIES at seven pixels
-  // beside LOOT at fifteen. The names are measured at their own size, so a
-  // bar that has room again goes back to one row.
-  const tabLabelObserver=new ResizeObserver(()=>scheduleBalance());
-  const balanceTabRows = () => {
-    for (const bar of document.querySelectorAll('.lex-shell-header nav, .lex-subtab-bar')) {
-      const tabs=[...bar.children].filter(node=>node instanceof HTMLElement && !node.hidden);
-      bar.dataset.lexTabRows='1';
-      bar.dataset.lexTabTight='';
-      tabs.forEach(tab=>tab.style.removeProperty('--lex-tab-span'));
-      const width=bar.clientWidth;
-      let columns=Math.max(1,tabs.length);
-      // A bar of pictures (GF portraits) scales its pictures to the lanes and
-      // stays one row; only names are measured.
-      if(width>0&&tabs.length>1&&!bar.matches('.lex-subtab-bar-images')){
-        const needs=tabs.map(tab=>{
-          const label=tab.querySelector('.lex-tab-label-text');
-          if(!label)return 0;
-          label.style.fontSize='';
-          // The whole name, the tab's padding and border, and whatever else
-          // sits beside the name in the flow (a help mark). Read from those
-          // parts, not from the tab: a tab is as wide as its lane, so the
-          // lane would feed back into what it is measured to need.
-          const px=(style,...names)=>names.reduce((sum,name)=>sum+(parseFloat(style[name])||0),0);
-          const own=getComputedStyle(tab);
-          // The text's own width: a Range, since the label box is as wide as its lane.
-          const text=document.createRange();text.selectNodeContents(label);
-          let need=text.getBoundingClientRect().width+px(own,'paddingLeft','paddingRight','borderLeftWidth','borderRightWidth');
-          for(let wrap=label.parentElement;wrap&&wrap!==tab;wrap=wrap.parentElement)need+=px(getComputedStyle(wrap),'paddingLeft','paddingRight');
-          for(const child of tab.children){
-            if(child.contains(label))continue;
-            const style=getComputedStyle(child);
-            if(style.position==='absolute'||style.position==='fixed'||style.display==='none')continue;
-            need+=child.offsetWidth+px(style,'marginLeft','marginRight');
-          }
-          // Letter spacing trails the last glyph and is not in the text box.
-          return Math.ceil(need+(parseFloat(getComputedStyle(label).letterSpacing)||0)*2)+6;
-        });
-        const widest=Math.max(...needs);
-        if(widest*tabs.length>width){
-          const perRow=Math.max(1,Math.floor(width/Math.max(1,widest)));
-          const rows=Math.ceil(tabs.length/perRow);
-          columns=Math.ceil(tabs.length/rows);
-        }
-      }
-      bar.style.setProperty('--lex-tab-columns',String(columns));
-      bar.dataset.lexTabRows=String(Math.ceil(Math.max(1,tabs.length)/columns));
-      bar.querySelectorAll('.lex-tab-label-text').forEach(label=>tabLabelObserver.observe(label));
-    }
-  };
-  let balancePending = false;
-  const scheduleBalance = () => {
-    if (balancePending) return;
-    balancePending = true;
-    requestAnimationFrame(() => { balancePending = false; balanceTabRows(); scheduleFit(); });
-  };
-  window.addEventListener('resize', scheduleBalance);
-  document.fonts?.ready?.then(scheduleBalance).catch(() => {});
-  new MutationObserver(records => {
-    for (const record of records) {
-      for (const node of record.addedNodes) {
-        if (node instanceof Element &&
-            (node.matches?.('nav,.lex-subtab-bar') || node.querySelector?.('nav,.lex-subtab-bar'))) {
-          scheduleBalance();
-          return;
-        }
-      }
-    }
-  }).observe(document.documentElement, {childList: true, subtree: true});
-  scheduleBalance();
-
   const dedupeShortcuts = root => root.querySelectorAll?.('nav button[data-tab]').forEach(button => {
     if (button.querySelector('.lex-tab-shortcut')) {
       button.querySelectorAll('.lex-tab-ordinal').forEach(node => node.remove());
@@ -8538,11 +8465,7 @@ ${contents.path}`});
     label.style.fontSize = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
     if(label.classList.contains('lex-tab-label-text')) {
-      // A subtab keeps its name at full size and its bar wraps onto another
-      // row when the names no longer fit. Shrinking came first and made
-      // wrapping unreachable: a seven-tab panel read PROPERTIES at seven
-      // pixels beside LOOT at fifteen.
-      if(label.closest('.lex-subtab-button')){fitted.set(label,fitKey(label));return;}
+      // Main tabs and subtabs fit their labels inside a single row.
       const range=document.createRange();range.selectNodeContents(label);
       const fits=()=>{const css=getComputedStyle(label);return range.getBoundingClientRect().width <= label.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight)-3;};
       while(size>LABEL_MIN_PX&&!fits()){size-=.5;label.style.fontSize=`${size}px`;}
@@ -8621,7 +8544,7 @@ ${contents.path}`});
   document.fonts?.ready?.then(() => scheduleFit());
   document.fonts?.addEventListener?.('loadingdone', () => {
     document.querySelectorAll(LABEL_SELECTOR).forEach(label => fitted.delete(label));
-    scheduleBalance();
+    scheduleFit();
   });
   scheduleFit();
 })();

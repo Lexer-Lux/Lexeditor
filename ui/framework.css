@@ -1133,12 +1133,12 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
   width:100%;
   align-self:stretch;
   justify-content:center;
-  display:flex;
+  display:grid;
+  grid-auto-flow:column;
+  grid-auto-columns:minmax(0,1fr);
   flex:0 0 auto;
   min-width:0;
-  /* Buttons keep their content width. Where they no longer fit on one line the
-     bar wraps onto a second, the way the main nav does - scrolling hid whole
-     tabs behind an edge and cut the label of the one straddling it. */
+  /* Navigation always uses one row, regardless of label length. */
   flex-wrap:nowrap;
   overflow-x:visible;
   border-bottom:1px solid var(--lex-border);
@@ -1150,9 +1150,9 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
   user-select: none;
   -webkit-user-select: none;
 
-  /* Equal widths while they fit, never narrower than the label needs. */
+  /* Equal lanes can shrink without adding another row. */
   flex:1 1 0;
-  min-width:max-content;
+  min-width:0;
   box-sizing:border-box;
   height:min(31px, calc(var(--lex-command-row-height) * .6667));
   min-height:min(31px, calc(var(--lex-command-row-height) * .6667));
@@ -4537,15 +4537,8 @@ nav button.active:focus-visible .lex-tab-shortcut,
      inside a short command row. */
   --lex-tab-badge-size:min(1.6em,calc(min(46px,var(--lex-command-row-height)) - 12px));
   --lex-tab-badge-gap:.4em;
-  /* Reserved on BOTH sides. Two things have to be true at once: the label is
-     centred in its button, and the badge never covers it. Reserving only the
-     badge's own side satisfies the second and breaks the first, because the
-     label then centres inside an off-centre content box. The symmetric
-     reservation is the only arrangement that holds both.
-     It is because this is what keeps the badge off the label, and a
-     plugin's blanket nav-button padding must not quietly remove it - FF8 set
-     six pixels on both sides and the badge sat on top of "Abilities". */
-  padding-inline:var(--lex-tab-label-padding,calc(var(--lex-tab-badge-size) + var(--lex-tab-badge-gap) * 2));
+  /* Ctrl prompts overlay the tabs without reserving label space. */
+  padding-inline:4px;
 }
 .lex-shell-header nav button[data-tab] > .lex-tab-label,
 .lex-subtab-button > .lex-tab-label {
@@ -4562,7 +4555,7 @@ nav button.active:focus-visible .lex-tab-shortcut,
   /* Bold game fonts can paint outside their advance box. Keep that ink and
      its shadow inside the clip area; retain ellipsis for narrow tabs. */
   box-sizing:border-box;
-  padding:.12em .2em;
+  padding:.12em max(3px,.2em);
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
@@ -5540,30 +5533,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 }
 
-/* Tabs sit in equal lanes, as many to a row as fit at full size; see
-   balanceTabRows. */
-.lex-shell-header nav[data-lex-tab-rows],
-.lex-subtab-bar[data-lex-tab-rows] {
-  display:grid;
-  grid-template-columns:repeat(var(--lex-tab-columns, 1), minmax(0, 1fr));
-}
-.lex-shell-header nav[data-lex-tab-rows] > *,
-.lex-subtab-bar[data-lex-tab-rows] > * {
-  width:auto;
-  grid-column:span var(--lex-tab-span, 1);
-  min-width:0;
-  max-width:none;
-}
-
-/* A bar that wrapped is a bar asking for less padding before it asks for a
-   second row. The measuring pass runs again after this lands, so a bar that
-   now fits on one line drops the attribute and its tabs go back to full size. */
-.lex-shell-header nav[data-lex-tab-tight] > button,
-.lex-subtab-bar[data-lex-tab-tight] > .lex-subtab-button {
-  --lex-tab-label-padding:4px;
-  padding-inline:6px;
-  letter-spacing:0;
-}
 /* Shortcut badges are overlays. Hover never changes the label lane. */
 
 /* A boolean reads across the row like every other property: its name in the
@@ -6899,7 +6868,9 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 }
 .lex-shell-header nav {
 
-  display: flex;
+  display: grid;
+  grid-auto-flow:column;
+  grid-auto-columns:minmax(0,1fr);
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -6933,6 +6904,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   letter-spacing:.03em;
   text-transform:uppercase;
   flex: 1 1 0;
+  min-width:0;
   margin: 0;
   padding: 8px 14px;
   white-space: nowrap;
@@ -6945,7 +6917,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
     border-radius .14s ease;
 
   min-height: var(--lex-tab-min-height, 0);
-  padding-inline: var(--lex-tab-padding-inline, 10px);
+  padding-inline: var(--lex-tab-padding-inline, 6px);
   font-size: var(--lex-tab-font-size, inherit);
   color: var(--lex-tab-fg, inherit);
   text-shadow: var(--lex-tab-text-shadow, none);
