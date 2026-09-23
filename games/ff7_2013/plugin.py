@@ -12,6 +12,7 @@ from pathlib import Path
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from service_session import LocalPluginSession, request_json
 from games.ff7.plugin import prepare_product, kernel_save_payload
+from games.ff7.plugin import PLUGIN as SHARED_PLUGIN
 from games.ff7.kernel import Kernel, resolve_kernel
 
 
@@ -28,9 +29,11 @@ PROJECT_TEMPLATE = DEFAULT_DATA / "project-template"
 PROJECT_KERNEL_PATH = Path("data/lang-en/kernel/KERNEL.BIN")
 
 
+
 def check() -> list[str]:
     required = (
         SHARED_PLUGIN_ROOT / "editor.html",
+        SHARED_PLUGIN_ROOT / "editor.js",
         SHARED_PLUGIN_ROOT / "kernel.py",
         SHARED_PLUGIN_ROOT / "server.py",
     )
@@ -78,15 +81,42 @@ def smoke() -> list[str]:
         target = game / relative
         target.parent.mkdir(parents=True)
         shutil.copy2(source, target)
+        installed_before = target.read_bytes()
         (game / "ff7_en.exe").write_bytes(b"test")
-        with FF7LegacySession({"LEXEDITOR_FF7_ROOT": str(game),
-                "LEXEDITOR_FF7_DATA_ROOT": str(root / "data"),
-                "LEXEDITOR_FF7_PROJECT": str(root / "project")}) as session:
+        project = root / "project"
+        session_env = {
+            "LEXEDITOR_FF7_ROOT": str(game),
+            "LEXEDITOR_FF7_DATA_ROOT": str(root / "data"),
+            "LEXEDITOR_FF7_PROJECT": str(project),
+        }
+        with FF7LegacySession(session_env) as session:
             identity = request_json(session.url + "api/plugin")
             if identity.get("pluginId") != "ff7-2013":
                 raise RuntimeError("The legacy FF7 product returned the wrong identity")
-            if identity.get("capabilities") != ["data-map", "kernel-data", "save"]:
+            capabilities = identity.get("capabilities")
+            required_capabilities = {"data-map", "kernel-data", "save"}
+            if not isinstance(capabilities, list) or not required_capabilities <= set(capabilities):
                 raise RuntimeError("The legacy FF7 product did not expose the proved editor capabilities")
+            editor_root = identity.get("editorRoot")
+            if not isinstance(editor_root, str) or Path(editor_root).resolve() != SHARED_PLUGIN_ROOT.resolve():
+                raise RuntimeError("The legacy FF7 product stopped using the shared FF7 editor")
+            data_map = request_json(session.url + "api/datamap")
+            rows = data_map.get("rows")
+            if not isinstance(rows, list) or not rows:
+                raise RuntimeError("The legacy FF7 product returned an empty Data Map")
+            required_targets = {"items", "weapons", "armor", "accessories", "materia", "characters", "tweaks"}
+            targets = {row.get("target") for row in rows}
+            if not required_targets <= targets:
+                raise RuntimeError("The legacy FF7 Data Map is missing required structured surfaces")
+            inconsistent = [
+                row.get("target") for row in rows
+                if bool(row.get("openable")) != (row.get("coverage") == "structured")
+            ]
+            if inconsistent:
+                raise RuntimeError(
+                    "The legacy FF7 Data Map disagrees about structured/openable coverage: "
+                    + ", ".join(str(value) for value in inconsistent)
+                )
             data = request_json(session.url + "api/data")
             expected_counts = {"items": 128, "weapons": 128, "armor": 32, "accessories": 32, "materia": 96}
             if {key: len(data["records"][key]) for key in expected_counts} != expected_counts:
@@ -100,14 +130,31 @@ def smoke() -> list[str]:
             with urllib.request.urlopen(request, timeout=10) as response:
                 saved = json.loads(response.read().decode("utf-8"))
             saved_path = Path(saved["path"])
+            resolved_saved = saved_path.resolve()
+            if (not resolved_saved.is_relative_to(project.resolve())
+                    or resolved_saved.is_relative_to(game.resolve())):
+                raise RuntimeError("The legacy FF7 save escaped its isolated project")
             if not saved_path.is_file() or Kernel(saved_path).records("armor")[0]["values"]["defense"] != changed:
                 raise RuntimeError("The legacy FF7 project save did not survive binary readback")
+            if target.read_bytes() != installed_before:
+                raise RuntimeError("The legacy FF7 project save modified its installed source")
         if not session.wait_closed():
             raise RuntimeError("The legacy FF7 child service stayed open")
+        with FF7LegacySession(session_env) as reopened:
+            reopened_data = request_json(reopened.url + "api/data")
+            reopened_defense = reopened_data["records"]["armor"][0]["values"]["defense"]
+            if reopened_defense != changed:
+                raise RuntimeError("The legacy FF7 project edit did not survive a fresh service reopen")
+        if not reopened.wait_closed():
+            raise RuntimeError("The reopened legacy FF7 child service stayed open")
+        if target.read_bytes() != installed_before:
+            raise RuntimeError("The reopened legacy FF7 project modified its installed source")
     return [
-        "legacy FF7 product identity and editor capabilities confirmed",
+        "legacy FF7 product identity, shared editor and capabilities confirmed",
+        "Data Map structured/openable coverage contract confirmed",
         "416 English KERNEL.BIN records decoded",
-        "bounded armor edit saved to the legacy project and survived binary readback",
+        "bounded armor edit stayed inside the project, survived binary readback and reopened",
+        "installed English KERNEL.BIN source remained byte-identical",
     ]
 
 
@@ -126,6 +173,7 @@ PLUGIN = GamePlugin(
         default_root=DEFAULT_PROJECT,
         required_paths=(PROJECT_KERNEL_PATH.as_posix(),),
         template_root=PROJECT_TEMPLATE,
+        content_types=SHARED_PLUGIN.projects.content_types,
     ),
     installation=GameInstallSpec(
         root_env="LEXEDITOR_FF7_2013_ROOT",
@@ -134,6 +182,7 @@ PLUGIN = GamePlugin(
         steam_app_id="39140",
         install_dir_names=("FINAL FANTASY VII",),
         default_roots=(DEFAULT_ROOT, Path(r"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VII")),
+        launch_path="ff7_en.exe",
         prepare=prepare,
     ),
 )
