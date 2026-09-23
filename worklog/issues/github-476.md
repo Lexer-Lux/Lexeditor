@@ -1,0 +1,19 @@
+# #476: Lexeditor's own ReShade effects
+
+[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/476)
+
+## Requirements and decisions
+
+Read the live issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
+
+## Current implementation and evidence
+
+Reconcile live code, PRs and existing topic/session worklogs. Do not infer build, deployment, gameplay success, or acceptance from documentation alone.
+
+## Next agent work
+
+Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-23 misc-fixes triage
+
+Moved to waiting. All seven effects (AmbientOcclusion, DepthOfField, Bloom, Colors, Sharpen, Vignette, Compare) are written, bundled from tools/reshade/shaders/Lexerian, and covered by tests/test_reshade_effects.py (5 passed 2026-09-23). Remaining needs the game: per-effect ReShade compile, in-game look judgment, per-game HUD marking, collection replacement approval. The issue body ends with the exact Lexer checklist. Resume when Lexer answers.
