@@ -174,8 +174,10 @@ def run(output: Path, executable: str | None) -> None:
                 expect(page.locator(".string-detail .lex-detail-field")).to_have_count(7)
                 expect(page.get_by_role("tab", name="🇺🇸 English")).to_have_count(1)
                 assert page.get_by_label("Select string table").count() == 0
-                assert page.locator(".string-detail").get_by_text(
-                    "tune/stringtable/global.strtbl", exact=True).count()
+                resource = page.locator(".string-detail .lex-detail-field").filter(
+                    has_text="Resource").first
+                expect(resource.locator("input.lex-readonly-field")).to_have_value(
+                    "tune/stringtable/global.strtbl")
                 assert page.locator(".string-detail .lex-record-id").count() == 0
                 page.screenshot(path=str(output / f"rdr-strings-{width}-zoom{zoom}.png"), full_page=True)
 
