@@ -116,16 +116,19 @@ def workspace_payload() -> dict:
             "outputPresent": bool(candidate and candidate.is_file()),
         },
         "delivery": {
-            "staged": bool(candidate and candidate.is_file()),
+            "staged": package["stagedPresent"],
+            "stagedFileCount": package["stagedFileCount"],
+            "stagedFiles": package["stagedFiles"],
             "path": str(candidate) if candidate and candidate.is_file() else "",
             "packaged": package["candidateCount"] > 0,
             "installed": False,
             "packaging": package,
             "reason": (
-                "Lexeditor stages the proved DataObject edit without touching the game. "
-                "An isolated package candidate can be built only when UnrealReZen and Oodle "
-                "are explicitly supplied; candidates are never installed automatically and "
-                "remain unaccepted until verified in the real game."
+                "Lexeditor stages proved project outputs without touching the game. "
+                "The candidate builder audits every regular file under content/End/Content, "
+                "rejects symlinks and rechecks the full staged file set and hashes after packing. "
+                "UnrealReZen and Oodle must be explicitly supplied; candidates are never installed "
+                "automatically and remain unaccepted until verified in the real game."
             ),
         },
         "tooling": {
