@@ -7,6 +7,7 @@
   let game={found:false,root:"",renderer:"dxgi",binaries:""};
   let reshade={available:false,effects:[]};
   let injector=null, injectorDraft=null, injectorBusy=false;
+  let packageBusy=false;
   // What the Data Map shows and where the reader has got to in it.
   const state={dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
 
@@ -421,6 +422,19 @@
     finally{playerBusy=false;render()}
   }
 
+  async function buildPackageCandidate(){
+    if(packageBusy)return;
+    packageBusy=true;render();
+    try{
+      const value=await api("/api/package/build",{});
+      workspace=value.workspace||workspace;
+      const path=value.result?.candidateDirectory||"the project build folder";
+      LexeditorUI.showToast?.("Built an isolated FF7R2 package candidate in "+path+". It is not installed or game-accepted.");
+    }catch(error){
+      LexeditorUI.showToast?.(error.message||String(error),true);
+    }finally{packageBusy=false;render()}
+  }
+
   async function switchProjectSource(value){
     activeSource=String(value||"mine")==="vanilla"?"vanilla":"mine";
     selectedRecord=null;recordPage=0;
@@ -558,8 +572,16 @@
     const ws=workspace||{};
     const pp=ws.playerParameter||{};
     const delivery=ws.delivery||{};
+    const packaging=delivery.packaging||{};
     const retoc=ws.tooling?.retoc||{};
     const rezen=ws.tooling?.unrealReZen||{};
+    const packageState=packaging.ready
+      ?"Explicit dependencies and game archives are ready; build stays inside this project."
+      :("Not ready: "+((packaging.missing||["explicit dependencies"]).join("; ")));
+    const packageActions=el("div",{class:"lex-reshade-actions"},
+      el("button",{type:"button",class:"lex-dialog-action primary",
+        disabled:packageBusy||ws.readOnly===true||packaging.ready!==true,
+        onclick:buildPackageCandidate},"Build isolated candidate"));
     return detailPanel({className:"ff7r2-detail lex-information-panel",icon:infoIcon(),title:"Information",
       identity:null,meta:"Rebirth source, project and delivery state",body:[
       detailSection({title:"GAME",body:[
@@ -570,21 +592,28 @@
         detailField({label:"ROOT",control:readonlyField(ws.projectRoot||"No project selected")}),
         detailField({label:"SOURCE",control:readonlyField(pp.sourcePresent?(pp.sourceRelative+" — ready"):(pp.sourceRelative||"Missing"))}),
         detailField({label:"STAGED OUTPUT",control:readonlyField(pp.outputPresent?(pp.outputRelative+" — present"):(pp.outputRelative||"Not written"))}),
-        detailField({label:"DELIVERY",control:readonlyField(delivery.staged?"Staged DataObject only; not packaged or installed.":"No staged gameplay output.")}),
+        detailField({label:"DELIVERY",control:readonlyField(
+          delivery.packaged
+            ?"Isolated package candidate exists; it is not installed or accepted in-game."
+            :delivery.staged?"Staged DataObject only; not packaged or installed.":"No staged gameplay output.")}),
         detailField({label:"SAFETY",control:readonlyField(delivery.reason||"The installed game is never overwritten by the DataObject editor.")}),
       ]}),
       detailSection({title:"IOSTORE TOOLING",body:[
         detailField({label:"RETOC",control:readonlyField((retoc.pinned||"v0.1.5")+" — not automatically integrated"),
           help:infoHelp(retoc.reason||"Requires explicit dependency setup.")}),
-        detailField({label:"UNREALREZEN",control:readonlyField((rezen.reference||"FF7R2 fork")+" — packaging reference only"),
+        detailField({label:"UNREALREZEN",control:readonlyField((rezen.reference||"FF7R2 fork")+" — dependency-explicit candidate route"),
           help:infoHelp(rezen.reason||"Real-game package acceptance is pending.")}),
+        detailField({label:"PACKAGING PREFLIGHT",control:readonlyField(packageState),
+          help:infoHelp("Lexeditor does not download UnrealReZen or Oodle here. The candidate route requires explicit LEXEDITOR_FF7R2_UNREALREZEN and LEXEDITOR_FF7R2_OODLE paths, plus the installed game's local IoStore archives.")}),
+        detailField({label:"BUILD CANDIDATE",control:packageActions,
+          help:infoHelp("Builds .pak/.utoc/.ucas only under this project's build folder. Nothing is copied to End/Content/Paks/~mods.")}),
       ]}),
       LexeditorUI.modLoaderSection({
-        loader:"Rebirth gameplay assets are loaded from IoStore. ReShade uses dxgi.dll; Shader Injector uses dsound.dll.",
-        output:"Gameplay Save stages content/End/Content/DataObject/Resident/PlayerParameter.uasset inside the selected Lexeditor project.",
-        order:"Gameplay package/load order is not claimed until a safe FF7R2 package has been built and accepted in the real game.",
-        safety:"The gameplay editor never writes the installed game or extracted source asset. Presentation helpers retain their existing DLL ownership checks.",
-        removal:"Delete or revert the staged project file. No gameplay package is installed by this integration yet."
+        loader:"Rebirth gameplay assets are loaded from IoStore. A candidate can be packed with explicitly supplied UnrealReZen + Oodle; ReShade uses dxgi.dll and Shader Injector uses dsound.dll.",
+        output:"Gameplay Save stages content/End/Content/DataObject/Resident/PlayerParameter.uasset. Build Candidate writes a three-file IoStore package only under <project>/build/.",
+        order:"The game natively loads accepted .pak/.utoc/.ucas triples from End/Content/Paks/~mods, but Lexeditor does not install this unaccepted candidate or claim a collision winner yet.",
+        safety:"The candidate process requires explicit local dependencies, blocks downloader fallback, and never writes the installed game. Presentation helpers retain their DLL ownership checks.",
+        removal:"Revert/delete the staged project file or delete an isolated project build candidate. No gameplay package is installed by this integration yet."
       }),
     ]});
   }
