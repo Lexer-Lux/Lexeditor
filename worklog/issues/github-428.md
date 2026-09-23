@@ -1,0 +1,20 @@
+# #428 — Dog Whistle item that redirects dog enemies to the user
+
+## State (2026-09-23 per-game-ff7r pass)
+
+- Source already present: `games/ff7r/dog_whistle_probe.py`,
+  `games/ff7r/dog_whistle_safety.py`, `games/ff7r/dog_whistle_commit_probe.py`
+  (Chapter 4 completion award, battle use redirects active canine enemies'
+  target/aggro to the user; non-dogs unaffected; redirect only, no
+  damage/stun/charm/faction change; reversible, disabled by default).
+- Tests: `tests/test_ff7r_dog_whistle_probe.py`,
+  `tests/test_ff7r_dog_whistle_safety.py`,
+  `tests/test_ff7r_dog_whistle_commit_probe.py` pass (full ff7r selection:
+  519 passed). No code change needed on this branch.
+
+## Needs Lexer (installed game)
+
+- Confirm the exact canine archetype/class/ID set and the runtime
+  targeting/aggro write path against the installed build; confirm Chapter 4
+  reward grants once, battle use retargets all active dogs (scripted/
+  untargetable/entering dogs defined), non-dogs unaffected.

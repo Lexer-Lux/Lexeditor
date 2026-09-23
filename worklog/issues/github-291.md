@@ -33,3 +33,16 @@ horse shop (35000). Consequence for the check: the belt lantern cannot be
 purchase-tested — its acquisition path must be loot/pickup, or a purchase
 route must be created first. Light-control fixes still owed; no waiting flip
 until they land and the loot-path check is written.
+
+## 2026-09-23 agent slice (per-game-rdr2): checkable lantern purchase path
+
+games/rdr2/lantern_purchase_paths.py records the catalog finding as data
+(saddle lantern purchasable at the horse shop for 35000, Halloween lantern
+at the fence for 25450, belt handhelds with no buy path) plus
+validate_lantern_test(), which rejects purchase-testing a belt lantern,
+wrong-shop purchases, unknown records/routes, and plans that assume the
+light-control fixes done. Covered by
+tests/test_rdr2_lantern_purchase_paths.py (9 hermetic tests). No gameplay
+claim: light-control fixes and the loot-path check still need a real
+session.
+

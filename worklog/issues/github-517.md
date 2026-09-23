@@ -1,0 +1,22 @@
+# #517 — Create Editor
+
+## State (2026-09-23 per-game-ff7r pass)
+
+- Source already present: `games/ff7r/editor.js` (split feature modules;
+  tables/panels load before core), `games/ff7r/server.py` semantic endpoints,
+  structured controls over every schema-validated Data Map area, unknown bytes
+  and source archives preserved, unsupported rows visible, source provenance
+  recorded. PR #488 (FF7R-1 Plugin) is merged; follow-ups
+  `dc3cdc28` (Data Map routing) and `dc469bf0` (game-key record identity)
+  are on master.
+- This branch adds Runtime Tweaks surfacing for `minimapZoom`/`fieldCast`
+  (commit `cba2f0fa`).
+- Tests: `tests/test_ff7r_editor_semantics.py`,
+  `tests/test_ff7r_editor_history.py`, `tests/test_ff7r_server_semantic_build.py`
+  pass (full ff7r selection: 519 passed). No further code change on this branch.
+
+## Needs Lexer (installed game + rendered UI)
+
+- Exact-head rendered acceptance stays separate from installed-game proof:
+  inspect the editor against installed data and record per-area provenance;
+  any area whose installed schema cannot be validated stays read-only.

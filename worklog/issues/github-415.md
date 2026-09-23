@@ -1,0 +1,16 @@
+# #415 — Editable item prices
+
+## State (2026-09-23 per-game-ff7r pass)
+
+- Source already present: `games/ff7r/semantics.py` economy surface exposes
+  `BuyValue`/`SaleValue`/`CanSale` first-class in the normal Items editor
+  (distinct buy/sell where the data has them; authoritative source field and
+  formula, no invented duplicate settings; names/descriptions resolved to
+  installed-game text; project-overlay writes only).
+- Tests: `tests/test_ff7r_semantics.py` and `tests/test_ff7r_editor_semantics.py`
+  pass (full ff7r selection: 519 passed). No code change needed on this branch.
+
+## Needs Lexer (installed game)
+
+- Cover multiple item categories in game and confirm the edited price is
+  actually used by an in-game shop (buy and sell paths).

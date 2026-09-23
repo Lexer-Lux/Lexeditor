@@ -42,3 +42,16 @@ the game: melee, magic-damage, status-infliction and Mug-comparison runtime
 patches (no blind x86 written). The FF8 review/mod Google Doc is a Drive-only
 `.gdoc` link and could not be read from disk, so the "did you miss any
 formulae" audit against Lexer's doc is still open.
+
+## 2026-09-23 per-game-ff8: verify-only, still needs the game
+
+Re-verified on branch per-game-ff8: Formulae subtab gating and the scroll
+fix stand as merged, and `tests/test_ff8_formulae_rework.py` is green in
+the full ff8 unit run. No new code: melee, magic-damage, status-infliction
+and Mug-comparison runtime patches still need hand-written x86 against the
+game and were deliberately not written blind; the Google-Doc formulae audit
+is still open (Drive-only .gdoc, unreadable from disk).
+
+Needs Lexer/game: in-game verification of the four runtime patches,
+Formulae scroll confirmation at an 800px viewport, and the review/mod doc
+formulae section (paste the text or grant access).

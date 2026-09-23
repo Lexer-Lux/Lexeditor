@@ -24,12 +24,13 @@ async function editor() {
   let finish;
   const loaded = new Promise(resolve => finish = resolve);
   let confirm = true;
+  let shellOptions = null;
   const ui = {el: node, clone: structuredClone, finishPluginLoading: finish,
     // The editor asks the desktop host for its ReShade state; there is no host
     // here, so the call fails and the section falls back to its empty state,
     // which is exactly what the browser preview does.
     callWindow: async () => { throw new Error('no desktop host in tests'); },
-    mountShell: () => ({refresh(){}})};
+    mountShell: options => { shellOptions = options; return {refresh(){}}; }};
   // The shared components are stubbed as nodes that KEEP the controls handed
   // to them, so a test can still find a checkbox after the page moved from a
   // bespoke card to the shared settings panel. Dropping the arguments was why
@@ -74,7 +75,7 @@ async function editor() {
   vm.runInContext(source, context);
   await loaded;
   vm.runInContext('state.tab="info"', context);
-  return {context, calls, data, listeners, targets, run: code => vm.runInContext(code, context),
+  return {context, calls, data, listeners, targets, shell: () => shellOptions, run: code => vm.runInContext(code, context),
     cancel: () => confirm = false};
 }
 
@@ -290,4 +291,26 @@ test('battle scene detail labels raw16 instead of CSV', async () => {
   const rendered = JSON.stringify(panel);
   assert.match(rendered, /Enemies · vanilla BattleScene raw16/);
   assert.doesNotMatch(rendered, /Enemies · vanilla CSV/);
+});
+
+test('FF9 shell carries a fitting system-font theme with no bundled proprietary assets', async () => {
+  const e = await editor();
+  const plugin = e.shell().plugin;
+  assert.equal(plugin.id, 'ff9');
+  assert.equal(plugin.themeName, 'ff9');
+  const theme = plugin.theme;
+  for (const key of ['bg', 'panel', 'panel-2', 'border', 'text', 'muted',
+                     'accent', 'accent-text', 'highlight', 'success',
+                     'font', 'heading-font'])
+    assert.ok(typeof theme[key] === 'string' && theme[key].length > 0, key);
+  // Provenance boundary: the theme is CSS values plus system fonts only.
+  // No bundled, downloaded, or game-ripped font/image/audio asset reference.
+  for (const value of Object.values(theme))
+    assert.doesNotMatch(value, /url\(|https?:|data:|\.ttf|\.woff|\.otf/i);
+  assert.match(theme.font, /Trebuchet MS|Segoe UI|Georgia|Palatino|sans-serif|serif/);
+  assert.match(theme['heading-font'], /Palatino|Book Antiqua|Georgia|serif/);
+  // FF9 identity lock: deep-navy menu surface with parchment-gold highlight.
+  assert.equal(theme.bg, '#090d1a');
+  assert.equal(theme.panel, '#171f38');
+  assert.equal(theme.highlight, '#d7c47a');
 });

@@ -37,6 +37,8 @@ OPTIONAL_HOOKS = (
     "hpRebalance",
     "betterSprint",
     "atbTweaks",
+    "minimapZoom",
+    "fieldCast",
 )
 LEGACY_MINIMAP_CONFIG = {
     "enabled": False,
@@ -68,6 +70,22 @@ DEFAULT_RUNTIME_CONFIG = {
         # a faster default. The validated runtime hook must scale actual player
         # dash/sprint translation while leaving walk/jog/scripted movement alone.
         "speedMultiplier": 1.0,
+    },
+    "minimapZoom": {
+        "enabled": False,
+        # 1.0x reproduces the vanilla field-minimap zoom exactly. The
+        # validated runtime hook must scale only the field minimap and
+        # persist the chosen value across area changes and reloads.
+        "zoomMultiplier": 1.0,
+        "persistAcrossAreas": True,
+    },
+    "fieldCast": {
+        "enabled": False,
+        # Opt-in Rebirth-style field casting. The validated runtime hook
+        # must cast through the field menu with equipped materia, spend MP
+        # as in battle, refuse unaffordable spells, and offer only these
+        # schools. Vanilla behavior is preserved when disabled.
+        "schools": ["healing", "cleansing", "buffs"],
     },
 }
 
@@ -103,7 +121,8 @@ def _clone_default() -> dict:
 def validate_runtime_config(value: dict) -> dict:
     if not isinstance(value, dict):
         raise ValueError("runtime config must be an object")
-    if set(value) - {"schemaVersion", "cutsceneSpeed", "minimap", "hpRebalance", "betterSprint"}:
+    if set(value) - {"schemaVersion", "cutsceneSpeed", "minimap", "hpRebalance", "betterSprint",
+                       "minimapZoom", "fieldCast"}:
         raise ValueError("runtime config contains unsupported top-level fields")
     if value.get("schemaVersion", RUNTIME_SCHEMA_VERSION) != RUNTIME_SCHEMA_VERSION:
         raise ValueError(f"unsupported FF7R runtime config schema: {value.get('schemaVersion')}")
@@ -181,6 +200,42 @@ def validate_runtime_config(value: dict) -> dict:
     if not math.isfinite(sprint_multiplier) or sprint_multiplier <= 0.0:
         raise ValueError("betterSprint.speedMultiplier must be greater than 0")
 
+    zoom = value.get("minimapZoom", {})
+    if not isinstance(zoom, dict):
+        raise ValueError("minimapZoom must be an object")
+    if set(zoom) - {"enabled", "zoomMultiplier", "persistAcrossAreas"}:
+        raise ValueError("minimapZoom contains unsupported fields")
+    zoom_enabled = zoom.get("enabled", False)
+    if not isinstance(zoom_enabled, bool):
+        raise ValueError("minimapZoom.enabled must be boolean")
+    zoom_multiplier = zoom.get(
+        "zoomMultiplier", DEFAULT_RUNTIME_CONFIG["minimapZoom"]["zoomMultiplier"])
+    if isinstance(zoom_multiplier, bool) or not isinstance(zoom_multiplier, (int, float)):
+        raise ValueError("minimapZoom.zoomMultiplier must be numeric")
+    zoom_multiplier = float(zoom_multiplier)
+    if not math.isfinite(zoom_multiplier) or zoom_multiplier <= 0.0:
+        raise ValueError("minimapZoom.zoomMultiplier must be greater than 0")
+    zoom_persist = zoom.get(
+        "persistAcrossAreas", DEFAULT_RUNTIME_CONFIG["minimapZoom"]["persistAcrossAreas"])
+    if not isinstance(zoom_persist, bool):
+        raise ValueError("minimapZoom.persistAcrossAreas must be boolean")
+
+    field_cast = value.get("fieldCast", {})
+    if not isinstance(field_cast, dict):
+        raise ValueError("fieldCast must be an object")
+    if set(field_cast) - {"enabled", "schools"}:
+        raise ValueError("fieldCast contains unsupported fields")
+    field_cast_enabled = field_cast.get("enabled", False)
+    if not isinstance(field_cast_enabled, bool):
+        raise ValueError("fieldCast.enabled must be boolean")
+    field_cast_schools = field_cast.get(
+        "schools", list(DEFAULT_RUNTIME_CONFIG["fieldCast"]["schools"]))
+    if (not isinstance(field_cast_schools, list) or not field_cast_schools
+            or any(school not in ("healing", "cleansing", "buffs")
+                   for school in field_cast_schools)):
+        raise ValueError("fieldCast.schools must be a non-empty list drawn from "
+                         "healing, cleansing and buffs")
+
     return {
         "schemaVersion": RUNTIME_SCHEMA_VERSION,
         "cutsceneSpeed": {
@@ -195,6 +250,15 @@ def validate_runtime_config(value: dict) -> dict:
         "betterSprint": {
             "enabled": sprint_enabled,
             "speedMultiplier": sprint_multiplier,
+        },
+        "minimapZoom": {
+            "enabled": zoom_enabled,
+            "zoomMultiplier": zoom_multiplier,
+            "persistAcrossAreas": zoom_persist,
+        },
+        "fieldCast": {
+            "enabled": field_cast_enabled,
+            "schools": list(field_cast_schools),
         },
     }
 
@@ -339,6 +403,10 @@ def _requested_hook_names(config: dict) -> tuple[str, ...]:
         requested.append("hpRebalance")
     if config["betterSprint"]["enabled"]:
         requested.append("betterSprint")
+    if config["minimapZoom"]["enabled"]:
+        requested.append("minimapZoom")
+    if config["fieldCast"]["enabled"]:
+        requested.append("fieldCast")
     return tuple(requested)
 
 
@@ -354,6 +422,10 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
     hp_hook_validated = bool(manifest) and manifest["hooks"].get("hpRebalance", False)
     sprint_requested = config["betterSprint"]["enabled"]
     sprint_hook_validated = bool(manifest) and manifest["hooks"].get("betterSprint", False)
+    zoom_requested = config["minimapZoom"]["enabled"]
+    zoom_hook_validated = bool(manifest) and manifest["hooks"].get("minimapZoom", False)
+    field_cast_requested = config["fieldCast"]["enabled"]
+    field_cast_hook_validated = bool(manifest) and manifest["hooks"].get("fieldCast", False)
     requested_hooks = _requested_hook_names(config)
     missing_requested_hooks = [
         name
@@ -384,6 +456,10 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
         "hpRebalanceHookValidated": hp_hook_validated,
         "betterSprintRequested": sprint_requested,
         "betterSprintHookValidated": sprint_hook_validated,
+        "minimapZoomRequested": zoom_requested,
+        "minimapZoomHookValidated": zoom_hook_validated,
+        "fieldCastRequested": field_cast_requested,
+        "fieldCastHookValidated": field_cast_hook_validated,
         "installedExeTimestamp": timestamp,
         "installedExeTimestampHex": f"0x{timestamp:08X}" if timestamp is not None else None,
         "buildSupported": build_supported,

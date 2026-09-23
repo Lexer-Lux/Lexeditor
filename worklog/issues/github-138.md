@@ -22,3 +22,11 @@ No reviewable variants are supplied. Preparing and presenting candidate map icon
 No concrete Lexer-side session exists yet (agent-side prototype/artwork/
 design still owed), so flipping to waiting would be a fake checklist. Left
 actionable until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. No reviewable icon variants are
+supplied. Exact needs: prepare candidate map-icon artwork, revise from
+Lexer feedback, and replace existing artwork only after Lexer approval.
+No code written here.
+

@@ -30,3 +30,15 @@ Per Lexer's rule (needs concrete Lexer-side work means waiting), posted the
 exact game-session/decision checklist as a comment and swapped actionable
 for waiting. A failed session returns it to actionable with evidence; a
 passed session closes it subject to the merge workflow.
+
+## 2026-09-23 per-game-ff8: backend stands, sliders and proof need the game
+
+Verified on branch per-game-ff8: `ffnx_manager.set_audio_volumes` and
+`tests/test_ff8_ffnx_volumes.py` are green as merged. No code change: the
+in-game Config-menu SFX/Music slider replacement and the audible
+isolation/persistence proof require a game session, including settling
+whether the FFNx gains move vanilla audio with use_external_sfx/music off.
+
+Needs Lexer/game: install a build with the backend, confirm each slider
+moves only its named category, confirm restart persistence, report audible
+pass/fail.

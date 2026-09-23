@@ -1,0 +1,17 @@
+# #442 — Disable eye adaptation
+
+## State (2026-09-23 per-game-ff7r pass)
+
+- Source already present: `games/ff7r/graphics_tweaks.py` (UE
+  `r.EyeAdaptationQuality=0` CVar only; authored brightness, fades and
+  unrelated post-processing untouched; managed `Engine.ini` deployment gated
+  on validation; disabled = vanilla).
+- Tests: `tests/test_ff7r_graphics_tweaks.py` passes (full ff7r selection:
+  519 passed). No code change needed on this branch.
+
+## Needs Lexer (installed game)
+
+- Move repeatedly between dark/bright areas that normally trigger adaptation
+  and confirm exposure no longer ramps with the tweak on; confirm fades,
+  lighting changes and brightness controls still work; disable and confirm
+  vanilla adaptation returns.

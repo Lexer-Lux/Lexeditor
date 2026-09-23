@@ -1,0 +1,19 @@
+# #431 — No More Cheats, remove convenience/cheat options
+
+## State (2026-09-23 per-game-ff7r pass)
+
+- Source already present: `games/ff7r/no_more_cheats_tweaks.py` (Fast Start,
+  Easy mode, Gift Box under System, Streamlined Progression under Options;
+  actual selectable entries suppressed, unrelated entries untouched;
+  previously-set saves still load safely; disabled = vanilla menus).
+- Research surface: `games/ff7r/cheat_probe.py` plus safety guard
+  `games/ff7r/cheat_probe_safety.py`.
+- Tests: `tests/test_ff7r_no_more_cheats_tweaks.py`,
+  `tests/test_ff7r_cheat_probe.py`, `tests/test_ff7r_cheat_probe_safety.py`
+  pass (full ff7r selection: 519 passed). No code change needed on this branch.
+
+## Needs Lexer (installed game)
+
+- Enabled: none of the four cheat/convenience surfaces visible/selectable in
+  their normal menus. Disabled: all vanilla options return. New game, loaded
+  save, and chapter/menu transitions do not reintroduce removed entries.

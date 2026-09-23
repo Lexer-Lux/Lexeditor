@@ -28,3 +28,13 @@ Design doc exists (docs/rdr2-continuous-saving-design.md) with engine boundaries
 No concrete Lexer-side session exists yet (agent-side previews/prototype
 still owed), so flipping to waiting would be a fake checklist. Left
 actionable until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. The design exists
+(docs/rdr2-continuous-saving-design.md) with engine boundaries and the
+known save-blocked-mission crash gap. Exact needs: Lexer design approval,
+then a read-only request/completion observer plus proved idempotent
+consequence handling, with no save mutation until then. No code written
+here.
+

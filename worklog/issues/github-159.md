@@ -30,3 +30,13 @@ zero WICKIUP keys (142 MAP_ records are documents/vouchers, not the
 targets). The wickiup artwork and Dreamcatcher cleanup fixes live in
 map/world data, not editable catalog XML, so no headless fix is possible
 from here. Left actionable for game-side work.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. The negative catalog finding stands
+(zero DREAMCATCHER and zero WICKIUP keys; fixes live in map/world data,
+not editable catalog XML). Exact needs: game-side delivery of the
+separate fixes, starting with wickiup map artwork and
+completed-Dreamcatcher cleanup as independently verified,
+permission-compatible changes. No code written here.
+
