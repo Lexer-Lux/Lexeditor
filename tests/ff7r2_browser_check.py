@@ -142,6 +142,23 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 expect(steal_row).to_have_count(1)
                 assert steal_row.locator(".lex-integration-status.partial").count() == 1
                 assert page.locator(".lex-integration-status.partial").count() >= 3
+
+                evidence_rows = page.evaluate("""async()=> {
+                  const response = await fetch('/api/datamap');
+                  return (await response.json()).rows;
+                }""")
+                issue_evidence = {}
+                for row in evidence_rows:
+                    for issue in (470, 471, 472, 473, 477):
+                        if f"#{issue}" in row["filename"]:
+                            issue_evidence[issue] = row
+                assert "bDisableChocoboRide" in issue_evidence[470]["notes"]
+                assert "array elements read-only" in issue_evidence[471]["notes"].lower()
+                assert "ZabutonActorClass" in issue_evidence[472]["notes"]
+                assert "AreaNaviMapScale" in issue_evidence[473]["notes"]
+                assert "LocationNaviMapScale" in issue_evidence[473]["notes"]
+                assert "_PassClass" in issue_evidence[477]["notes"]
+                assert "CardPlacementActor" in issue_evidence[477]["notes"]
                 player_map_file = page.get_by_text(
                     "End/Content/DataObject/Resident/PlayerParameter.uasset", exact=True)
                 expect(player_map_file).to_be_visible()
