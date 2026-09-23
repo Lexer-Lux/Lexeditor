@@ -4,8 +4,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.project_zomboid import core
-from games.project_zomboid import evolvedrecipe
+from plugins.project_zomboid import core
+from plugins.project_zomboid import evolvedrecipe
 
 
 class ProjectZomboidEvolvedRecipeTests(unittest.TestCase):

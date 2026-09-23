@@ -6,14 +6,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FRAMEWORK = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-FF8 = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
-WARBAND = (ROOT / "games" / "warband" / "editor.html").read_text(encoding="utf-8")
+FF8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+WARBAND = (ROOT / "plugins" / "warband" / "editor.html").read_text(encoding="utf-8")
 RDR = (
-    (ROOT / "games" / "rdr" / "editor.html").read_text(encoding="utf-8")
+    (ROOT / "plugins" / "rdr" / "editor.html").read_text(encoding="utf-8")
     + "\n"
-    + (ROOT / "games" / "rdr" / "editor.js").read_text(encoding="utf-8")
+    + (ROOT / "plugins" / "rdr" / "editor.js").read_text(encoding="utf-8")
 )
-RDR2 = (ROOT / "games" / "rdr2" / "editor.html").read_text(encoding="utf-8")
+RDR2 = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
 
 
 def require(condition: bool, message: str) -> None:

@@ -6,8 +6,8 @@ import tempfile
 import unittest
 
 import verify_ff7_datasets as fixtures
-from games.ff7 import kernel as base
-from games.ff7.datasets import Kernel
+from plugins.ff7 import kernel as base
+from plugins.ff7.datasets import Kernel
 
 
 class MateriaSemanticTests(unittest.TestCase):

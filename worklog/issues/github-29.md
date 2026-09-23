@@ -59,7 +59,7 @@ native acceptance. This batch fixes additional plugin restart and save defects.
   Frontend syntax:22/22. Four new store tests cover atomic failure, corrupt input,
   invalid current sample, cross-origin writes, and storage size limits.
 
-Files: ui/framework.js; games/blank/editor.html; games/blank/server.py;
+Files: ui/framework.js; plugins/blank/editor.html; plugins/blank/server.py;
 tests/restart_browser_check.py; tests/test_blank_projects.py;
 .github/scripts/ui_visual_acceptance.py.
 

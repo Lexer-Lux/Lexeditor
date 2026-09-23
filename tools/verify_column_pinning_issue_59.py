@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main() -> int:
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
     styles = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-    ff8 = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    ff8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
     assert "const columnPreferences =" in framework
     assert "lexeditor:columns:" in framework
     assert "pinButton:" in framework and 'class: `lex-column-pin${pinned ? " pinned" : ""}`' in framework

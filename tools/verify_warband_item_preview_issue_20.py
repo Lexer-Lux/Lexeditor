@@ -5,12 +5,12 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-EDITOR = (ROOT / "games" / "warband" / "editor.js").read_text(encoding="utf-8")
-SERVER = (ROOT / "games" / "warband" / "server.py").read_text(encoding="utf-8")
-PREVIEW = (ROOT / "games" / "warband" / "model_preview.py").read_text(encoding="utf-8")
-FONT = (ROOT / "games" / "warband" / "game_font.py").read_text(encoding="utf-8")
+EDITOR = (ROOT / "plugins" / "warband" / "editor.js").read_text(encoding="utf-8")
+SERVER = (ROOT / "plugins" / "warband" / "server.py").read_text(encoding="utf-8")
+PREVIEW = (ROOT / "plugins" / "warband" / "model_preview.py").read_text(encoding="utf-8")
+FONT = (ROOT / "plugins" / "warband" / "game_font.py").read_text(encoding="utf-8")
 
-from games.warband.game_font import FONT_TEXTURE, atlas_path  # noqa: E402
+from plugins.warband.game_font import FONT_TEXTURE, atlas_path  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:

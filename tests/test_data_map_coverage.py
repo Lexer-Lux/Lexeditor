@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 class CoverageTests(unittest.TestCase):
     def test_ff7_same_file_different_editors_and_missing_config(self):
-        from games.ff7 import server
+        from plugins.ff7 import server
         from tools.verify_ff7_datasets import write_kernel
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);game=root/'game';project=root/'project'
@@ -34,7 +34,7 @@ class CoverageTests(unittest.TestCase):
                 self.assertTrue(all(not row['openable'] for row in broken if row['target'] in server.CATEGORIES))
 
     def test_ff9_dataset_target_and_source_availability_are_independent(self):
-        from games.ff9 import server
+        from plugins.ff9 import server
         fixture=[{'key':'one','tab':'characters','relativePath':'one.csv','label':'One','controls':'Starting data','available':True},
                  {'key':'two','tab':'characters','relativePath':'two.csv','label':'Two','controls':'Growth data','available':False}]
         with tempfile.TemporaryDirectory() as name,patch.object(server,'catalog',return_value=fixture),patch.object(server.paths,'GAME_ROOT',Path(name)):
@@ -45,7 +45,7 @@ class CoverageTests(unittest.TestCase):
             self.assertFalse(rows[1]['sourceAvailable']);self.assertTrue(rows[1]['openable'])
 
     def test_ff8_partial_fields_and_exact_navigation(self):
-        from games.ff8 import formats
+        from plugins.ff8 import formats
         with tempfile.TemporaryDirectory() as name,patch.object(formats.paths,'GAME_ROOT',Path(name)):
             rows={row['filename']:row for row in formats.data_map_rows()['rows']}
             self.assertEqual(rows['init.out']['status'],'partial')
@@ -55,25 +55,26 @@ class CoverageTests(unittest.TestCase):
             self.assertTrue(all(row.get('targets') for row in rows.values() if row['coverage']=='structured'))
 
     def test_rdr_generated_inventory_cannot_invent_editors(self):
-        from games.rdr import server
+        from plugins.rdr import server
         supplied=[{'filename':'unknown.xml','status':'integrated','target':'items','openable':True,'notes':'Everything editable'}]
         rows=server._normalize_data_map_rows(supplied,interfaces={})
         self.assertEqual(rows[0]['coverage'],'unavailable');self.assertFalse(rows[0]['openable'])
         self.assertEqual(rows[0]['target'],'');self.assertEqual(rows[0]['status'],'not-integrated')
 
     def test_rdr_missing_files_and_nonshop_resource_not_integrated(self):
-        from games.rdr import server
+        from plugins.rdr import server
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);(root/'raw').mkdir();(root/'raw'/'not-a-shop.wgd').write_bytes(b'fixture')
             with patch.multiple(server,PREPARED_ROOT=root/'prepared',CONTENT_PREPARED_ROOT=root/'content',
                                 GRINGO_UNPACKED_ROOT=root/'raw',GRINGO_PACKED_ROOT=root/'packed',
-                                SETTINGS_FILE=root/'settings.ini',LOOT_FILE=root/'loot.json'),patch.object(server,'_map_has_shop_records',return_value=False):
+                                SETTINGS_FILE=root/'settings.ini',LOOT_FILE=root/'loot.json',
+                                EXTRACT_ROOT=root/'extract',GAME_ROOT=root/'game'),patch.object(server,'_map_has_shop_records',return_value=False):
                 rows=server._provisional_data_map_rows()
                 self.assertTrue(all(row['coverage']=='unavailable' for row in rows))
                 self.assertTrue(all(not row['openable'] for row in rows))
 
     def test_rdr2_preservation_and_inactive_runtime_not_editing(self):
-        from games.rdr2.data_map import build_data_map
+        from plugins.rdr2.data_map import build_data_map
         with tempfile.TemporaryDirectory() as name:
             source=Path(name)/'map.md'
             source.write_text('## Files\n- `weaponcomponents.meta` - Components\n- `catalog_sp.ymt` - Catalog\n- `unknown.bin` - Unknown\n',encoding='utf-8')
@@ -86,7 +87,7 @@ class CoverageTests(unittest.TestCase):
             self.assertTrue(all(row.get('target') for row in rows.values() if row['coverage']=='structured'))
 
     def test_stardew_marks_project_patch_editor_partial_until_xnb_read_exists(self):
-        from games.stardew_valley import server
+        from plugins.stardew_valley import server
         with tempfile.TemporaryDirectory() as name,patch.object(server.paths,'PROJECT_ROOT',Path(name)):
             rows=server.data_map()['rows']
             objects=next(row for row in rows if row.get('target')=='objects')
@@ -102,6 +103,6 @@ class CoverageTests(unittest.TestCase):
             # Two sanctioned spellings: a direct LexeditorUI.dataMap( call, or
             # dataMap pulled from the LexeditorUI destructure (ffx-x2 style).
             self.assertTrue('LexeditorUI.dataMap(' in text or 'dataMap,' in text,game)
-        self.assertIn('games.ff7.server',(root/'games/ff7_2013/plugin.py').read_text(encoding='utf-8'))
+        self.assertIn('plugins.ff7.server',(root/'plugins/ff7_2013/plugin.py').read_text(encoding='utf-8'))
 
 if __name__=='__main__':unittest.main()

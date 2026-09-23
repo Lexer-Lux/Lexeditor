@@ -3,11 +3,11 @@ on:
   push:
     branches: [fix/rdr1-runtime-repo-link, fix/rdr1-carriage-auto-rest, fix/rdr1-skip-travel-remap, fix/rdr1-horse-icon]
     paths:
-      - 'games/rdr/archive_deployment.py'
-      - 'games/rdr/script_features.py'
-      - 'games/rdr/input_remaps.py'
-      - 'games/rdr/map_icon_features.py'
-      - 'games/rdr/server.py'
+      - 'plugins/rdr/archive_deployment.py'
+      - 'plugins/rdr/script_features.py'
+      - 'plugins/rdr/input_remaps.py'
+      - 'plugins/rdr/map_icon_features.py'
+      - 'plugins/rdr/server.py'
       - 'tools/magic-rdr/cli/**'
       - 'tools/magic-rdr/app/Rpf6ReadCli.exe'
       - 'tools/verify_rdr_archive_deployment.py'
@@ -19,11 +19,11 @@ on:
       - '.github/workflows/rdr1-rpf-copy.yml'
   pull_request:
     paths:
-      - 'games/rdr/archive_deployment.py'
-      - 'games/rdr/script_features.py'
-      - 'games/rdr/input_remaps.py'
-      - 'games/rdr/map_icon_features.py'
-      - 'games/rdr/server.py'
+      - 'plugins/rdr/archive_deployment.py'
+      - 'plugins/rdr/script_features.py'
+      - 'plugins/rdr/input_remaps.py'
+      - 'plugins/rdr/map_icon_features.py'
+      - 'plugins/rdr/server.py'
       - 'tools/magic-rdr/cli/**'
       - 'tools/magic-rdr/app/Rpf6ReadCli.exe'
       - 'tools/verify_rdr_archive_deployment.py'

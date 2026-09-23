@@ -3,7 +3,7 @@ from copy import deepcopy
 import struct
 import unittest
 
-from games.ff8 import enemy_ai
+from plugins.ff8 import enemy_ai
 
 
 def dat(first=b"\x23\x01\x00\x00"):

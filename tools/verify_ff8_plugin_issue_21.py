@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app import discover_plugins  # noqa: E402
-from games.ff8 import paths  # noqa: E402
-from games.ff8.plugin import FF8Session  # noqa: E402
+from plugins.ff8 import paths  # noqa: E402
+from plugins.ff8.plugin import FF8Session  # noqa: E402
 from service_session import request_json  # noqa: E402
 
 
@@ -33,7 +33,7 @@ def main() -> int:
     assert plugin.installation and plugin.installation.steam_app_id == "39150"
     assert not plugin.check()
 
-    html = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    html = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
     for required in ("/shared/framework.css", "/shared/framework.js", "pagedListDetail",
                      "LexeditorUI.dataMap", '["characters","Characters"]',
                      'type:"text",inputmode:"decimal"', 'search:{key:`ff8-${view}`',
@@ -43,7 +43,7 @@ def main() -> int:
     assert 'value:gfCompatibilityFormat(field.value)' in html
     assert "gf-compat-sign" not in html, "GF Compatibility restored the detached plus-sign overlay"
 
-    lzs_source = ROOT / "games" / "ff8" / "vendor" / "ff8ue" / "lzs.py"
+    lzs_source = ROOT / "plugins" / "ff8" / "vendor" / "ff8ue" / "lzs.py"
     assert digest(lzs_source) == "eb0fa352685f9ef6b7ce3c2d9f8f70cfc289d23551449175d9aa1ed2eaf3e8f6"
     baseline_files = [
         paths.BASELINE_ROOT / "main" / "kernel.bin",

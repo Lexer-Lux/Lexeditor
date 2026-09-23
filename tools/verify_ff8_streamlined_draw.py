@@ -14,7 +14,7 @@ import pefile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import battle_issue_54, gameplay_settings, streamlined_draw  # noqa: E402
+from plugins.ff8 import battle_issue_54, gameplay_settings, streamlined_draw  # noqa: E402
 
 EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")
 EXPECTED_EXE = "064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570"

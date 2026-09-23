@@ -2,9 +2,9 @@ name: RDR2 checks
 on:
   push:
     branches: [master, fix/rdr2-issue-batch]
-    paths: ['games/rdr2/**', 'tests/test_rdr2*', 'tests/rdr2_browser_check.py', '.github/workflows/rdr2-checks.yml']
+    paths: ['plugins/rdr2/**', 'tests/test_rdr2*', 'tests/rdr2_browser_check.py', '.github/workflows/rdr2-checks.yml']
   pull_request:
-    paths: ['games/rdr2/**', 'tests/test_rdr2*', 'tests/rdr2_browser_check.py', '.github/workflows/rdr2-checks.yml']
+    paths: ['plugins/rdr2/**', 'tests/test_rdr2*', 'tests/rdr2_browser_check.py', '.github/workflows/rdr2-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
           node tests/test_rdr2_boot.js
           node tests/test_rdr2_global_save.js
       - name: Check RDR2 Python syntax
-        run: python -m compileall -q games/rdr2
+        run: python -m compileall -q plugins/rdr2
       - name: Install the headless browser test dependency
         run: |
           python -m pip install playwright==1.57.0

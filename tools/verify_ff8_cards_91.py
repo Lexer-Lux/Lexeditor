@@ -6,7 +6,7 @@ import unittest
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.ff8 import cards
+from plugins.ff8 import cards
 
 
 class CardTests(unittest.TestCase):
@@ -65,7 +65,7 @@ def integration(path):
         assert record == bytes([edit["value"]])
     assert path.read_bytes() == exe
     with tempfile.TemporaryDirectory(prefix="lexeditor-cards-91-") as temporary:
-        from games.ff8 import runtime_layout, gameplay_settings
+        from plugins.ff8 import runtime_layout, gameplay_settings
         root = Path(temporary)
         project = root / "project"
         cards.save_project(project, exe, [edit])
@@ -98,7 +98,7 @@ def integration(path):
 
 
 def http_integration():
-    from games.ff8.plugin import FF8Session
+    from plugins.ff8.plugin import FF8Session
     from service_session import request_json
     with tempfile.TemporaryDirectory(prefix="lexeditor-cards-http-91-") as temporary:
         with FF8Session({"LEXEDITOR_FF8_PROJECT": temporary}) as session:

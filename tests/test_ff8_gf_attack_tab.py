@@ -4,14 +4,14 @@ from test_shared_ui_feedback import page, framework, ROOT
 
 
 def test_attack_fields_move_without_losing_edits(page):
-    schema=json.loads((ROOT/'games/ff8/schema/kernel_section_fields.json').read_text(encoding='utf-8'))
+    schema=json.loads((ROOT/'plugins/ff8/schema/kernel_section_fields.json').read_text(encoding='utf-8'))
     fields=next(s['fields'] for s in schema.values() if any(f['name']=='gf_hp_modifier_1' for f in s['fields']))
     rows=[{'field':f['name'],'group':f['group'],'label':f.get('label',f['name']),'value':1} for f in fields]
-    source=(ROOT/'games/ff8/party.js').read_text(encoding='utf-8')
+    source=(ROOT/'plugins/ff8/party.js').read_text(encoding='utf-8')
     routing=source[source.index('  const GF_ATTACK_FIELDS'):source.index('  function gfEntityLabel')]
     panel=source[source.index('  function gfCenterPanel'):source.index('  function fieldGroups')]
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.add_script_tag(content='''
       const {tabbedPanel,el}=LexeditorUI;
       const state={};

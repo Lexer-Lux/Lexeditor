@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.warband.module_records import SCHEMAS, dataset_data, save_dataset
+from plugins.warband.module_records import SCHEMAS, dataset_data, save_dataset
 
 
 FIXTURES = {

@@ -18,9 +18,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.rdr2 import extractor  # noqa: E402
-from games.rdr2 import server as rdr2_server  # noqa: E402
-from games.rdr2.plugin import PLUGIN, Rdr2Session  # noqa: E402
+from plugins.rdr2 import extractor  # noqa: E402
+from plugins.rdr2 import server as rdr2_server  # noqa: E402
+from plugins.rdr2.plugin import PLUGIN, Rdr2Session  # noqa: E402
 from game_installation import GameInstallationManager  # noqa: E402
 
 
@@ -67,7 +67,7 @@ def verify_copied_clean_install() -> None:
     """Run preparation from an isolated minimum Lexeditor installation."""
     with tempfile.TemporaryDirectory(prefix="lexeditor-rdr2-clean-install-", ignore_cleanup_errors=True) as name:
         copied_root = Path(name) / "Lexeditor"
-        copied_plugin = copied_root / "games" / "rdr2"
+        copied_plugin = copied_root / "plugins" / "rdr2"
         copied_tools = copied_root / "tools" / "rpf-cli" / "bin"
         copied_plugin.mkdir(parents=True)
         copied_tools.mkdir(parents=True)
@@ -78,10 +78,10 @@ def verify_copied_clean_install() -> None:
         for relative in ("plugin_api.py", "service_session.py", "game_installation.py",
                          "runtime_bootstrap.py"):
             shutil.copy2(ROOT / relative, copied_root / relative)
-        (copied_root / "games").mkdir(exist_ok=True)
-        shutil.copy2(ROOT / "games" / "__init__.py", copied_root / "games" / "__init__.py")
+        (copied_root / "plugins").mkdir(exist_ok=True)
+        shutil.copy2(ROOT / "plugins" / "__init__.py", copied_root / "plugins" / "__init__.py")
         for relative in ("__init__.py", "extractor.py", "paths.py", "plugin.py"):
-            shutil.copy2(ROOT / "games" / "rdr2" / relative, copied_plugin / relative)
+            shutil.copy2(ROOT / "plugins" / "rdr2" / relative, copied_plugin / relative)
         for name in extractor.TOOL_FILES:
             target = copied_tools / name
             target.parent.mkdir(parents=True, exist_ok=True)

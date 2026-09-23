@@ -2,10 +2,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-STYLE = (ROOT / "games" / "rdr" / "editor.css").read_text(encoding="utf-8")
-SOURCE = (ROOT / "games" / "rdr" / "editor.js").read_text(encoding="utf-8")
-STRINGS = (ROOT / "games" / "rdr" / "strings.js").read_text(encoding="utf-8")
-RBF = (ROOT / "games" / "rdr" / "rbf.js").read_text(encoding="utf-8")
+STYLE = (ROOT / "plugins" / "rdr" / "editor.css").read_text(encoding="utf-8")
+SOURCE = (ROOT / "plugins" / "rdr" / "editor.js").read_text(encoding="utf-8")
+STRINGS = (ROOT / "plugins" / "rdr" / "strings.js").read_text(encoding="utf-8")
+RBF = (ROOT / "plugins" / "rdr" / "rbf.js").read_text(encoding="utf-8")
 
 
 def require(condition: bool, message: str) -> None:

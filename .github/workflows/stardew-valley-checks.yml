@@ -4,7 +4,7 @@ on:
   push:
     branches: [master, stardew-valley-plugin]
     paths:
-      - 'games/stardew_valley/**'
+      - 'plugins/stardew_valley/**'
       - 'tests/test_stardew_valley.py'
       - 'tests/test_data_map_coverage.py'
       - 'tests/stardew_valley_browser_check.py'
@@ -12,7 +12,7 @@ on:
       - '.github/workflows/stardew-valley-checks.yml'
   pull_request:
     paths:
-      - 'games/stardew_valley/**'
+      - 'plugins/stardew_valley/**'
       - 'tests/test_stardew_valley.py'
       - 'tests/test_data_map_coverage.py'
       - 'tests/stardew_valley_browser_check.py'
@@ -40,16 +40,16 @@ jobs:
       - name: Stardew Data Map coverage contract
         run: python -m unittest tests.test_data_map_coverage.CoverageTests.test_stardew_marks_project_patch_editor_partial_until_xnb_read_exists
       - name: Stardew Python syntax
-        run: python -m compileall -q games/stardew_valley
+        run: python -m compileall -q plugins/stardew_valley
       - name: Stardew editor module syntax and shared-control contract
         run: |
-          node --check games/stardew_valley/editor.js
+          node --check plugins/stardew_valley/editor.js
           python - <<'PY'
           from pathlib import Path
           import re
-          html = Path('games/stardew_valley/editor.html').read_text(encoding='utf-8')
-          css = Path('games/stardew_valley/editor.css').read_text(encoding='utf-8')
-          js = Path('games/stardew_valley/editor.js').read_text(encoding='utf-8')
+          html = Path('plugins/stardew_valley/editor.html').read_text(encoding='utf-8')
+          css = Path('plugins/stardew_valley/editor.css').read_text(encoding='utf-8')
+          js = Path('plugins/stardew_valley/editor.js').read_text(encoding='utf-8')
           script_blocks = re.findall(r'<script([^>]*)>(.*?)</script>', html, flags=re.I | re.S)
           inline_scripts = [body for attrs, body in script_blocks if 'src=' not in attrs.casefold()]
           if ('<style' in html.casefold() or len(inline_scripts) != 1
@@ -70,7 +70,7 @@ jobs:
               raise SystemExit(f'Missing required Stardew editor controls: {missing}')
           PY
       - name: Managed plugin smoke path
-        run: python -c "from games.stardew_valley.plugin import smoke; print(*smoke(), sep='\n')"
+        run: python -c "from plugins.stardew_valley.plugin import smoke; print(*smoke(), sep='\n')"
 
   browser-acceptance:
     name: Stardew rendered UI acceptance
@@ -207,8 +207,8 @@ jobs:
           import os
           import shutil
           from pathlib import Path
-          from games.stardew_valley import paths
-          from games.stardew_valley.content_pack import initialize_project
+          from plugins.stardew_valley import paths
+          from plugins.stardew_valley.content_pack import initialize_project
 
           root = Path(os.environ["LEXEDITOR_STARDEW_PROJECT"]).resolve()
           if not root.exists():
@@ -295,8 +295,8 @@ jobs:
           $verify = @'
           import os
           from pathlib import Path
-          from games.stardew_valley import paths
-          from games.stardew_valley.plugin import PLUGIN, smoke
+          from plugins.stardew_valley import paths
+          from plugins.stardew_valley.plugin import PLUGIN, smoke
 
           expected = Path(os.environ["LEXEDITOR_STARDEW_PROJECT"]).resolve()
           assert paths.DEFAULT_PROJECT_ROOT == expected

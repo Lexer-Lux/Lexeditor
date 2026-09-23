@@ -16,7 +16,7 @@ remain; FF7/FF8 and shared configuration/UI modules are untouched.
 Validation for this correction:
 - `python -m pytest -q tests/test_ff9_http.py`: 22 passed.
 - `node --test tests/ff9_editor.test.cjs`: 10 passed.
-- `python -m compileall -q games/ff9`: passed for the changed Python files.
+- `python -m compileall -q plugins/ff9`: passed for the changed Python files.
 
 HTTP tests execute the real handler with isolated data/runtime fixtures; the
 launcher target is checked in the plugin's AST. JS tests execute the controller

@@ -34,3 +34,11 @@ write, logs only diagnostics, and keeps its init entry point wired.
 (5 hermetic tests.) No gameplay claim: the safe entity-local mechanism
 still needs research with the game, and nothing here is a player test.
 
+## 2026-09-23 agent slice (per-game-rdr2): verified, no new code
+
+Re-read the live issue plus comments. The safe-disabled boundary guards
+still hold and match the current request (failed hooks stay removed, no
+entity writes). Re-ran tests/test_rdr2_issue201_safety_boundary.py:
+5 green. Stays actionable: the safe entity-local mechanism still needs
+research with the game.
+

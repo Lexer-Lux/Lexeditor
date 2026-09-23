@@ -4,10 +4,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.bannerlord import paths
-from games.bannerlord.deploy_data import sync_project_assets
-from games.bannerlord.game_launch import _launch_command, installed_modules
-from games.bannerlord.project_data import run_build
+from plugins.bannerlord import paths
+from plugins.bannerlord.deploy_data import sync_project_assets
+from plugins.bannerlord.game_launch import _launch_command, installed_modules
+from plugins.bannerlord.project_data import run_build
 
 
 CSPROJ = '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net472</TargetFramework></PropertyGroup></Project>'
@@ -56,7 +56,7 @@ class BannerlordGameRootContainmentTests(unittest.TestCase):
                 return real_resolve(path, *args, **kwargs)
 
             with patch.object(Path, "resolve", new=fake_resolve), \
-                 patch("games.bannerlord.project_data.subprocess.run") as runner:
+                 patch("plugins.bannerlord.project_data.subprocess.run") as runner:
                 with self.assertRaisesRegex(ValueError, "game path escaped"):
                     run_build(project, game_root=game)
             runner.assert_not_called()
@@ -78,7 +78,7 @@ class BannerlordGameRootContainmentTests(unittest.TestCase):
                 return real_resolve(path, *args, **kwargs)
 
             with patch.object(Path, "resolve", new=fake_resolve), \
-                 patch("games.bannerlord.project_data.subprocess.run") as runner:
+                 patch("plugins.bannerlord.project_data.subprocess.run") as runner:
                 with self.assertRaisesRegex(ValueError, "game path escaped"):
                     run_build(project, game_root=game)
             runner.assert_not_called()

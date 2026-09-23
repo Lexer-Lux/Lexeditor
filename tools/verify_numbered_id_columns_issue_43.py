@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FRAMEWORK = ROOT / "ui" / "framework.js"
-FF8 = ROOT / "games" / "ff8" / "editor.html"
+FF8 = ROOT / "plugins" / "ff8" / "editor.html"
 
 
 def require(condition: bool, message: str) -> None:

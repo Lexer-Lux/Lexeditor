@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-source = (ROOT / 'games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp').read_text()
+source = (ROOT / 'plugins/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp').read_text()
 capture = source[source.index('struct MenuXpRow'):source.index('float gf_xp_fraction')]
 draw = source[source.index('void draw_menu_xp()'):source.index('void draw_after_battle_xp()')]
 harness = r'''

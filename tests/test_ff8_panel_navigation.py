@@ -4,7 +4,7 @@ from test_shared_ui_feedback import ROOT, page, framework
 
 def test_sort_pointer_does_not_resize_columns(page):
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''() => {
       const U=LexeditorUI;
       document.querySelector('main').append(U.columnList({
@@ -22,7 +22,7 @@ def test_sort_pointer_does_not_resize_columns(page):
 
 def test_panel_tabs_have_no_number_badges_and_code_fills_panel(page):
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''() => {
       const U=LexeditorUI;
       const code=U.provenanceControl({control:U.codeField(),current:()=>'',vanilla:'',internal:true});
@@ -41,9 +41,9 @@ def test_panel_tabs_have_no_number_badges_and_code_fills_panel(page):
 
 def test_ai_compile_failure_blocks_navigation_and_keeps_source(page):
     framework(page)
-    source=(ROOT/'games/ff8/party.js').read_text(encoding='utf-8')
+    source=(ROOT/'plugins/ff8/party.js').read_text(encoding='utf-8')
     guard=source[source.index('  async function enemyAiApplySource('):source.index('  function enemyAiPanel(')]
-    boot=(ROOT/'games/ff8/boot.js').read_text(encoding='utf-8')
+    boot=(ROOT/'plugins/ff8/boot.js').read_text(encoding='utf-8')
     navigation=next(line for line in boot.splitlines() if 'async function navigate(tab)' in line)
     page.add_script_tag(content='''
       const row={id:1,name:'Enemy'},documentData={scripts:[{id:0,source:'bad draft'}]};

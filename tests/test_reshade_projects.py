@@ -585,7 +585,7 @@ def test_the_executable_play_starts_decides_between_two_renderers(tmp_path):
 
 
 def test_warband_play_names_the_executable_it_starts(tmp_path):
-    from games.warband.game_launch import WarbandGameController, play_executable
+    from plugins.warband.game_launch import WarbandGameController, play_executable
     (tmp_path / "mb_warband.exe").write_bytes(b"MZ")
     assert play_executable(tmp_path).name == "mb_warband.exe"
     (tmp_path / "mb_warband_wse2.exe").write_bytes(b"MZ")

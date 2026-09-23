@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 import desktop_host
 from desktop_host import HostApi
-from games.ff8.plugin import PLUGIN
+from plugins.ff8.plugin import PLUGIN
 
 
 class Settings:

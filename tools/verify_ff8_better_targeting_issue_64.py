@@ -15,11 +15,11 @@ import pefile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import better_targeting_issue_64 as targeting, gameplay_settings  # noqa: E402
+from plugins.ff8 import better_targeting_issue_64 as targeting, gameplay_settings  # noqa: E402
 
 EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")
 FFNX = ROOT / "_scratch/ffnx-upstream"
-APPLICATOR = ROOT / "games/ff8/ffnx_better_targeting/apply_to_ffnx.py"
+APPLICATOR = ROOT / "plugins/ff8/ffnx_better_targeting/apply_to_ffnx.py"
 
 
 def require(condition: bool, message: str) -> None:
@@ -126,7 +126,7 @@ def main() -> int:
     require("draw_infos->field_8 = no_a6_mask ? a6 |" in ffnx_source,
             "official FFNx primitive opacity path changed")
 
-    module_source = (ROOT / "games/ff8/better_targeting_issue_64.py").read_text(encoding="utf-8")
+    module_source = (ROOT / "plugins/ff8/better_targeting_issue_64.py").read_text(encoding="utf-8")
     require("OPACITY_HOOK" not in module_source and "0x004B7622" not in module_source,
             "disproved native-body opacity hook returned")
     require("bit 31 of a6" in module_source.lower(),

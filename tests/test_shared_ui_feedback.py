@@ -64,7 +64,7 @@ def test_data_map_header_location_and_state(page):
 def test_property_help_is_always_beside_name(page,theme):
     import tempfile
     if theme=='ff8':
-        page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+        page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     framework(page)
     page.evaluate('''()=>{
       const U=LexeditorUI, main=document.querySelector('main');
@@ -131,7 +131,7 @@ def test_grouped_number_keeps_commas_during_editing(page):
 def test_value_fill_stays_behind_text_while_handle_can_drag(page):
     import tempfile
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''()=>{
       const U=LexeditorUI;
       const input=U.el('input',{type:'number',value:75,min:0,max:100,step:1});
@@ -330,7 +330,7 @@ def test_mod_actions_use_one_dropdown(page):
 
 
 def test_ff8_dropdown_preserves_options_when_reordering(page):
-    source=(ROOT/'games/ff8/boot.js').read_text(encoding='utf-8')
+    source=(ROOT/'plugins/ff8/boot.js').read_text(encoding='utf-8')
     change=source[source.index('  async function changeProjectSource('):source.index('  function addProjectSource(')]
     page.add_script_tag(content='''
       let db={rows:[{id:'a',selected:true,enabled:true,folderOptions:{quality:2}},

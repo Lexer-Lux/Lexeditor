@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.ff8.server import create_server
+from plugins.ff8.server import create_server
 from playwright.sync_api import sync_playwright
 
 OPEN_AI = """(()=>{const button=document.querySelector('[aria-label="Enemy AI scripts"] [role="tab"]');

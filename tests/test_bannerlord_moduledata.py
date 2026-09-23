@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.bannerlord.module_xml_data import (
+from plugins.bannerlord.module_xml_data import (
     augment_data_map,
     list_documents,
     read_document,
@@ -184,7 +184,7 @@ class BannerlordModuleDataTests(unittest.TestCase):
         finally: temporary.cleanup()
 
     def test_moduledata_editor_sends_revision_and_exposes_reload(self):
-        text=(Path(__file__).resolve().parents[1]/"games"/"bannerlord"/"editor_moduledata.js").read_text(encoding="utf-8")
+        text=(Path(__file__).resolve().parents[1]/"plugins"/"bannerlord"/"editor_moduledata.js").read_text(encoding="utf-8")
         self.assertIn('sourceHash:state.savedModuleData.sourceHash||""',text);self.assertIn("async function reloadModuleData",text);self.assertIn('uiButton("Reload",()=>reloadModuleData())',text)
 
     def test_moduledata_root_redirection_outside_project_is_rejected(self):

@@ -105,12 +105,12 @@ GAUNTLET = {
 
 def inline_editor(shared_ui_root: Path | None = None) -> str:
     shared_ui_root = shared_ui_root or ROOT
-    html = (ROOT / "games/bannerlord/editor.html").read_text(encoding="utf-8")
+    html = (ROOT / "plugins/bannerlord/editor.html").read_text(encoding="utf-8")
     html = html.replace("<head>", '<head><base href="http://127.0.0.1:9/">', 1)
     html = html.replace('<link rel="stylesheet" href="/shared/framework.css">',
                         "<style>" + (shared_ui_root / "ui/framework.css").read_text(encoding="utf-8") + "</style>")
     html = html.replace('<link rel="stylesheet" href="./editor.css">',
-                        "<style>" + (ROOT / "games/bannerlord/editor.css").read_text(encoding="utf-8") + "</style>")
+                        "<style>" + (ROOT / "plugins/bannerlord/editor.css").read_text(encoding="utf-8") + "</style>")
     credits_fixture = json.loads((ROOT / "ui/credits.json").read_text(encoding="utf-8"))
     mod_loading_fixture = json.loads((ROOT / "ui/mod-loading.json").read_text(encoding="utf-8"))
     fixtures = {
@@ -176,7 +176,7 @@ window.fetch=async function(input,options={{}}){{
         "editor_moduledata_validation.js", "editor_boot.js",
     ):
         html = html.replace(f'<script src="./{name}"></script>',
-                            "<script>" + (ROOT / "games/bannerlord" / name).read_text(encoding="utf-8") + "</script>")
+                            "<script>" + (ROOT / "plugins/bannerlord" / name).read_text(encoding="utf-8") + "</script>")
     return html
 
 

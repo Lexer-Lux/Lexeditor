@@ -82,8 +82,8 @@ class Helpers(unittest.TestCase):
 class Credits(unittest.TestCase):
     def test_all_plugins_have_roles_and_exact_offline_notices(self):
         data=json.loads((ROOT/'ui/credits.json').read_text('utf-8'))
-        for path in (ROOT/'games').glob('*/plugin.py'):
-            module=importlib.import_module('games.'+path.parent.name+'.plugin')
+        for path in (ROOT/'plugins').glob('*/plugin.py'):
+            module=importlib.import_module('plugins.'+path.parent.name+'.plugin')
             p=module.PLUGIN
             self.assertIn(p.plugin_id,data['plugins'])
             rows=data['plugins'][p.plugin_id]
@@ -93,7 +93,7 @@ class Credits(unittest.TestCase):
             for license in rows.get('licenses',[]):
                 self.assertEqual(license['text'],(ROOT/license['sourcePath']).read_text('utf-8-sig'))
     def test_original_ff8_attributions_are_not_dropped(self):
-        old=json.loads((ROOT/'games/ff8/credits.json').read_text('utf-8'))
+        old=json.loads((ROOT/'plugins/ff8/credits.json').read_text('utf-8'))
         new=json.loads((ROOT/'ui/credits.json').read_text('utf-8'))['plugins']['ff8']
         for section in ('contributions','thanks'):self.assertEqual(old[section],new[section])
         self.assertEqual([x['name'] for x in old['licenses']],[x['name'] for x in new['licenses']])
@@ -103,17 +103,17 @@ class Bootstrap(unittest.TestCase):
     def test_service_whitelist(self):
         with self.assertRaises(ValueError):boot.service_command('os')
         with patch.object(sys,'frozen',True,create=True),patch.object(sys,'executable','/opt/Lexeditor'):
-            self.assertEqual(boot.service_command('games.blank.server'),['/opt/Lexeditor','--plugin-service','games.blank.server'])
+            self.assertEqual(boot.service_command('plugins.blank.server'),['/opt/Lexeditor','--plugin-service','plugins.blank.server'])
         self.assertFalse(boot.dispatch_service(['--list']))
         with self.assertRaises(ValueError):boot.dispatch_service(['--plugin-service','os'])
     def test_service_dispatch_runs_only_named_module(self):
         with patch.object(boot.runpy,'run_module') as run,patch.object(sys,'argv',[]):
-            self.assertTrue(boot.dispatch_service(['--plugin-service','games.blank.server']))
-            run.assert_called_once_with('games.blank.server',run_name='__main__')
+            self.assertTrue(boot.dispatch_service(['--plugin-service','plugins.blank.server']))
+            run.assert_called_once_with('plugins.blank.server',run_name='__main__')
     @unittest.skipIf(os.name=='nt','Non-Windows descriptor validation')
     def test_plugins_import_without_registry_and_project_roots_are_absolute(self):
-        for path in (ROOT/'games').glob('*/plugin.py'):
-            p=importlib.import_module('games.'+path.parent.name+'.plugin').PLUGIN
+        for path in (ROOT/'plugins').glob('*/plugin.py'):
+            p=importlib.import_module('plugins.'+path.parent.name+'.plugin').PLUGIN
             # Source fixtures omit large cover art. The production validator is not weakened.
             validate_plugin(dataclasses.replace(p,cover_art=None))
     @unittest.skipIf(os.name=='nt','POSIX path rules')
@@ -121,7 +121,7 @@ class Bootstrap(unittest.TestCase):
         with patch.dict(os.environ,{'XDG_DATA_HOME':'relative'}),patch.object(sys,'platform','linux'):
             self.assertTrue(boot.user_data_dir().is_absolute())
     def test_real_blank_service_starts_and_stops(self):
-        from games.blank.plugin import BlankSession
+        from plugins.blank.plugin import BlankSession
         session=BlankSession()
         try:self.assertEqual(session.start()['pluginId'],'blank')
         finally:session.stop()

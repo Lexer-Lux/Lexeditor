@@ -31,3 +31,12 @@ cover plants. Exact needs: engine placement/spawn research with the game
 and a real candidate to test. No code written; recording the needs here
 instead of inventing a spawn hook.
 
+## 2026-09-23 agent slice (per-game-rdr2): candidate contract
+
+games/rdr2/plant_density.py pins the acceptance boundary as code plus
+validate_density_candidate(), which requires a named placement/spawn
+mechanism with a density target and pickability proof, and rejects the
+scenario-point-only disable and animal-multiplier substitution. Covered
+by tests/test_rdr2_plant_density.py (7 hermetic tests). No gameplay
+claim: engine research and a real candidate are still owed.
+

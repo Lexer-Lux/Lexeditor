@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_cached_preview_opens_once_and_closes_from_the_same_icon():
-    source = (ROOT / 'games/rdr2/items.js').read_text(encoding='utf-8')
+    source = (ROOT / 'plugins/rdr2/items.js').read_text(encoding='utf-8')
     attach = source[source.index('function attachItemModelPreview('):source.index('// The drawer\'s contents.')]
     detail = source[source.index('function itemDetailPane('):source.index('const inventoryIconLoads=')]
     with sync_playwright() as play:
@@ -55,7 +55,7 @@ def test_cached_preview_opens_once_and_closes_from_the_same_icon():
 
 
 def test_missing_thumbnail_and_disposed_rdr_renderer_reopen():
-    source = (ROOT / 'games/rdr2/items.js').read_text(encoding='utf-8')
+    source = (ROOT / 'plugins/rdr2/items.js').read_text(encoding='utf-8')
     arm = source[source.index('function armItemModelPreview('):source.index('function prepareModelPreview(')]
     with sync_playwright() as play:
         browser = play.chromium.launch(headless=True)

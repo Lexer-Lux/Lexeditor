@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.terraria.build_diagnostics import parse_build_diagnostics
+from plugins.terraria.build_diagnostics import parse_build_diagnostics
 
 
 class TerrariaBuildDiagnosticTests(unittest.TestCase):

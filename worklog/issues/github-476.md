@@ -16,4 +16,4 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-23 misc-fixes triage
 
-Moved to waiting. All seven effects (AmbientOcclusion, DepthOfField, Bloom, Colors, Sharpen, Vignette, Compare) are written, bundled from tools/reshade/shaders/Lexerian, and covered by tests/test_reshade_effects.py (5 passed 2026-09-23). Remaining needs the game: per-effect ReShade compile, in-game look judgment, per-game HUD marking, collection replacement approval. The issue body ends with the exact Lexer checklist. Resume when Lexer answers.
+Moved to waiting. All seven effects (AmbientOcclusion, DepthOfField, Bloom, Colors, Sharpen, Vignette, Compare) are written, bundled from shaders, and covered by tests/test_reshade_effects.py (5 passed 2026-09-23). Remaining needs the game: per-effect ReShade compile, in-game look judgment, per-game HUD marking, collection replacement approval. The issue body ends with the exact Lexer checklist. Resume when Lexer answers.

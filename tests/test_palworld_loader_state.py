@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.palworld.loader_state import LoaderSettingsError, parse_settings_bytes, status
+from plugins.palworld.loader_state import LoaderSettingsError, parse_settings_bytes, status
 
 
 class PalworldLoaderStateTests(unittest.TestCase):

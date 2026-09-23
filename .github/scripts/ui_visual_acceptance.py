@@ -13,7 +13,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 
 def blank_html() -> str:
-    html = (ROOT / "games" / "blank" / "editor.html").read_text(encoding="utf-8")
+    html = (ROOT / "plugins" / "blank" / "editor.html").read_text(encoding="utf-8")
     html = html.replace("<head>", '<head><base href="http://127.0.0.1:9/">', 1)
     html = html.replace(
         '<link rel="stylesheet" href="/shared/framework.css">',
@@ -24,11 +24,11 @@ def blank_html() -> str:
     # page stylesheet cannot resolve against 127.0.0.1:9.
     html = html.replace(
         '<link rel="stylesheet" href="editor.css">',
-        "<style>" + (ROOT / "games" / "blank" / "editor.css").read_text(encoding="utf-8") + "</style>",
+        "<style>" + (ROOT / "plugins" / "blank" / "editor.css").read_text(encoding="utf-8") + "</style>",
     )
     for src in ("/shared/component-catalog.js", "editor.js"):
         name = src.rsplit("/", 1)[-1]
-        folder = ROOT / "ui" if src.startswith("/shared/") else ROOT / "games" / "blank"
+        folder = ROOT / "ui" if src.startswith("/shared/") else ROOT / "plugins" / "blank"
         html = html.replace(
             f'<script src="{src}"></script>',
             "<script>" + (folder / name).read_text(encoding="utf-8") + "</script>",

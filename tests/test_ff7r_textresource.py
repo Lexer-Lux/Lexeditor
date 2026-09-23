@@ -4,7 +4,7 @@ import struct
 
 import pytest
 
-from games.ff7r.textresource import (
+from plugins.ff7r.textresource import (
     TextFormatError,
     TextResourcePackage,
     TEXT_NAME_COUNT_OFFSET,

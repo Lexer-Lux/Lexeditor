@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from plugin_ui import plugin_ui, plugins_with_ui
 
-PLUGIN_EDITORS = sorted((ROOT / "games").glob("*/editor.html"))
+PLUGIN_EDITORS = sorted((ROOT / "plugins").glob("*/editor.html"))
 
 def text(path):
     return (ROOT / path).read_text("utf-8")

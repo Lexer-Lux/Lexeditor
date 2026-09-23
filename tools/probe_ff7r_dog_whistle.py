@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from games.ff7r.archive import build_index
-from games.ff7r.dog_whistle_probe import probe_dog_whistle_sources
+from plugins.ff7r.archive import build_index
+from plugins.ff7r.dog_whistle_probe import probe_dog_whistle_sources
 
 
 def main() -> int:

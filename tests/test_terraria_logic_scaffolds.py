@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.terraria.content_wizard import (
+from plugins.terraria.content_wizard import (
     create_mod_player,
     create_mod_system,
     render_mod_player_source,

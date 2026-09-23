@@ -6,9 +6,9 @@ import struct
 
 import pytest
 
-from games.ffx_x2 import paths
-from games.ffx_x2.plugin import _write_fixture_vbf
-from games.ffx_x2.vbf import VBFError, extract_to, normalize_archive_path, read_entry, read_index
+from plugins.ffx_x2 import paths
+from plugins.ffx_x2.plugin import _write_fixture_vbf
+from plugins.ffx_x2.vbf import VBFError, extract_to, normalize_archive_path, read_entry, read_index
 
 
 def test_vbf_round_trip_extracts_compressed_and_partial_blocks(tmp_path: Path):

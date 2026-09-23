@@ -5,9 +5,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.palworld.palschema import RawPatchDocument
-from games.palworld.palschema_fields import available_fields, coerce_new_value
-from games.palworld.server import apply_additions
+from plugins.palworld.palschema import RawPatchDocument
+from plugins.palworld.palschema_fields import available_fields, coerce_new_value
+from plugins.palworld.server import apply_additions
 
 
 class PalSchemaFieldCatalogTests(unittest.TestCase):

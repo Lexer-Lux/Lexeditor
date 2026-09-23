@@ -16,7 +16,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_pla
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from games.warband import server
+from plugins.warband import server
 
 ARTIFACTS=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/'out'/'warband-browser'
 ARTIFACTS.mkdir(parents=True,exist_ok=True)
@@ -92,7 +92,7 @@ def main():
                     record_fixtures={key:server.dataset_data(module,key) for key in server.MODULE_RECORD_SCHEMAS}
                     model={**MODEL,'texture':'data:image/png;base64,'+base64.b64encode(TEXTURE).decode()}
                     stub='const replaceState=history.replaceState.bind(history);history.replaceState=(state,unused)=>replaceState(state,unused);const recordFixtures='+json.dumps(record_fixtures)+';let failSound=true;window.fetch=async function(input,options={}){const path=String(input);const fixtures='+json.dumps(fixtures)+';if(path.startsWith("/api/module-records?")){const key=new URL(path,"http://fixture").searchParams.get("dataset");if(key==="sounds"&&failSound){failSound=false;return new Response(JSON.stringify({error:"Synthetic sound parse failure"}),{status:400});}await new Promise(r=>setTimeout(r,80));return new Response(JSON.stringify(recordFixtures[key]||{error:"Unknown fixture dataset"}));}if(path==="/api/module-records/save"){const body=JSON.parse(options.body||"{}"),data=recordFixtures[body.dataset];for(const edit of body.edits||[]){const row=data.rows.find(r=>r.recordIndex===edit.recordIndex);Object.assign(row.fields,edit.fields||{});if(Object.hasOwn(edit.fields||{},"name"))row.name=edit.fields.name;}data.sha256="saved-"+Date.now();return new Response(JSON.stringify({saved:(body.edits||[]).length,sha256:data.sha256}));}if(path==="/api/build/start")return new Response(JSON.stringify({started:true}));if(path.startsWith("/api/build/status"))return new Response(JSON.stringify({cursor:1,lines:["Build verified: fixture\\n"],running:false,returnCode:0}));if(path.startsWith("/api/item-preview?")){return new Response(JSON.stringify(path.includes("broken")?{error:"Missing diffuse texture fixture"}:'+json.dumps(model)+'),{status:path.includes("broken")?422:200});}if(path.startsWith("/api/item-icon?")){if(path.includes("broken"))return new Response(JSON.stringify({error:"Missing diffuse texture fixture"}),{status:422});const bytes=Uint8Array.from(atob("'+base64.b64encode(ICON).decode()+'"),c=>c.charCodeAt(0));return new Response(bytes,{headers:{"Content-Type":"image/png"}});}return new Response(JSON.stringify(fixtures[path]||{}));};'
-                    html=(ROOT/'games/warband/editor.html').read_text(encoding="utf-8")
+                    html=(ROOT/'plugins/warband/editor.html').read_text(encoding="utf-8")
                     # Synthetic set_content pages need a hierarchical base for shared optional asset URLs.
                     html=html.replace('<head>','<head><base href="http://warband-fixture.test/">',1)
                     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding="utf-8")+'</style>')

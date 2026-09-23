@@ -20,8 +20,8 @@ if os.name != 'nt':
 else:
     from desktop_host import HostApi
     from game_installation import GameInstallationManager
-from games.warband.plugin import PLUGIN
-from games.warband import wse2_manager as wse2
+from plugins.warband.plugin import PLUGIN
+from plugins.warband import wse2_manager as wse2
 
 
 class HelperPanelTests(unittest.TestCase):

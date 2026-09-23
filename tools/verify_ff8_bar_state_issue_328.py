@@ -75,7 +75,7 @@ for index in (0, 1, 2, 3):
     assert struct.unpack('<I', u.mem_read(0xB86E00, 4))[0] == 0xB86DA0 + 32 * index
 assert image[0x972E1:0x972E6] == bytes.fromhex('A3 00 6E B8 00')
 
-source = (ROOT / 'games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp').read_text()
+source = (ROOT / 'plugins/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp').read_text()
 after = source[source.index('void draw_after_battle_xp()'):source.index('void draw_battle_hp()')]
 assert 'g_result_state(0)' in after
 assert 'result_state[0x38] != 0' in after

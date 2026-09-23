@@ -4,8 +4,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EDITOR = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
-FORMATS = (ROOT / "games" / "ff8" / "formats.py").read_text(encoding="utf-8")
+EDITOR = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+FORMATS = (ROOT / "plugins" / "ff8" / "formats.py").read_text(encoding="utf-8")
 
 
 def require(condition: bool, message: str) -> None:

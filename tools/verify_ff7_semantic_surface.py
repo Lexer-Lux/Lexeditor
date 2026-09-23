@@ -6,7 +6,7 @@ import unittest
 
 import verify_ff7_datasets as kernel_fixtures
 import verify_ff7_extended as extended_fixtures
-from games.ff7 import battle, datasets, extended, semantics, server
+from plugins.ff7 import battle, datasets, extended, semantics, server
 
 
 class SemanticSurfaceTests(unittest.TestCase):
@@ -93,7 +93,7 @@ class SemanticSurfaceTests(unittest.TestCase):
         categories={}
         for key, spec in battle.SCENE_CATEGORIES.items(): categories[key]=semantics.apply(key,spec["fields"])
         categories["shops"]=semantics.apply("shops",extended.SHOP_FIELDS)
-        from games.ff7 import archives
+        from plugins.ff7 import archives
         categories["fieldEncounters"]=semantics.apply("fieldEncounters",archives.FIELD_FIELDS)
         categories["chocoboRatings"]=semantics.apply("chocoboRatings",archives.CHOCOBO_FIELDS)
         by={key:{f["key"]:f for f in fields} for key,fields in categories.items()}
@@ -136,7 +136,7 @@ class SemanticSurfaceTests(unittest.TestCase):
         for fields in collections:
             for field in fields:
                 self.assertNotIn("Numeric game value",str(field.get("help", "")),field)
-        root=Path(__file__).resolve().parents[1]/"games/ff7"
+        root=Path(__file__).resolve().parents[1]/"plugins/ff7"
         editor=(root/"editor.html").read_text(encoding="utf-8") + "\n" + "\n".join((root/name).read_text(encoding="utf-8") for name in ("editor.js","controls.js","details.js","workspace.js"))
         self.assertIn('return "";',editor)
         self.assertNotIn("help:infoHelp(semanticHelp(field))",editor)

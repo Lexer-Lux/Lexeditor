@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.ff8 import local_native_candidate as local
+from plugins.ff8 import local_native_candidate as local
 
 
 class LocalCandidateTests(unittest.TestCase):

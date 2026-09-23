@@ -1,4 +1,4 @@
-from games.ff7r.bench_probe import pair_spatial_vectors, rank_bench_candidates
+from plugins.ff7r.bench_probe import pair_spatial_vectors, rank_bench_candidates
 
 
 def test_bench_probe_ranks_map_with_bench_and_vending_above_single_evidence_files():

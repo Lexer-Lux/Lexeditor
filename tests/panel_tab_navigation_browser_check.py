@@ -46,7 +46,7 @@ def main():
   p.evaluate("document.body.insertAdjacentHTML('beforeend','<div role=dialog><input id=d1><input id=d2></div>')")
   p.locator('#d1').focus();p.keyboard.press('Tab');assert p.locator('#d2').evaluate('(e)=>e===document.activeElement')
   ff8=plugin_ui('ff8')
-  p.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
+  p.add_style_tag(content=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8'))
   p.add_style_tag(content='#magic{width:700px;height:650px}.magic-detail{height:100%}')
   fn=ff8[ff8.index('  function magicDetail('):ff8.index('  function abilityIcon(')]
   p.add_script_tag(content="""const {el,detailField,detailSection,tabbedPanel,multiNumberRow,infoHelp}=LexeditorUI;

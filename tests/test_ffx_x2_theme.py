@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from games.ffx_x2 import theme
-from games.ffx_x2.plugin import _write_fixture_vbf
-from games.ffx_x2.vbf import read_index
+from plugins.ffx_x2 import theme
+from plugins.ffx_x2.plugin import _write_fixture_vbf
+from plugins.ffx_x2.vbf import read_index
 
 
 def test_theme_cache_uses_installed_assets_without_touching_archives(tmp_path: Path):

@@ -8,7 +8,7 @@ Independent edits from enabled mods must coexist. When two mods edit the same pr
 
 ## Current implementation and evidence
 
-`games/ff8/runtime_layout.py` composes fixed-data files through the semantic merger in `games/ff8/fixed_data_merge.py` when an extracted baseline is available. The existing load-order verifier covers managed order, Hext order and conflict presentation.
+`plugins/ff8/runtime_layout.py` composes fixed-data files through the semantic merger in `plugins/ff8/fixed_data_merge.py` when an extracted baseline is available. The existing load-order verifier covers managed order, Hext order and conflict presentation.
 
 Issue #100 now also has `tools/prepare_ff8_mod_combining_fixture.py`, which generates two ordinary folder mods from the user's own extracted `menu/price.bin`; no game data is committed. The fixture makes independent Hi-Potion/Phoenix Down edits and a deliberate Potion collision. `tools/verify_ff8_mod_combining_issue_100.py` composes both load orders from a synthetic baseline and verifies that independent fields coexist, only the Potion collision changes with priority, untouched bytes remain baseline-identical, and the conflict manifest names the correct winner/claimants.
 

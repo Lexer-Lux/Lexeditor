@@ -19,7 +19,7 @@ def main():
  try:
   with sync_playwright() as pw:
    browser=pw.chromium.launch(headless=True);page=browser.new_page();page.add_init_script(STUB);page.route('**/api/**',route_api)
-   page.goto(f'http://127.0.0.1:{server.server_port}/games/ff7r/editor.html')
+   page.goto(f'http://127.0.0.1:{server.server_port}/plugins/ff7r/editor.html')
    page.wait_for_function('state.data?.records?.length===1')
    page.get_by_role('button',name='Enemies',exact=True).click()
    page.wait_for_function('state.data?.records?.length===509')

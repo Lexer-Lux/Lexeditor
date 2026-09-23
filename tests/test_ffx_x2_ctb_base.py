@@ -5,8 +5,8 @@ import struct
 
 import pytest
 
-from games.ffx_x2.ctb_base import ARCHIVE_PATH, CtbBaseError, apply_edits, parse_ctb_base, payload
-from games.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
+from plugins.ffx_x2.ctb_base import ARCHIVE_PATH, CtbBaseError, apply_edits, parse_ctb_base, payload
+from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
 from service_session import request_json
 
 

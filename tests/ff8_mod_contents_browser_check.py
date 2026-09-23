@@ -25,7 +25,7 @@ state.base=structuredClone(state.data);
   assert page.locator('.lex-value-modified').count()==1
   page.evaluate('value=100;control.refreshReference()')
   assert page.locator('.lex-value-modified').count()==0
-  page.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
+  page.add_style_tag(content=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8'))
   page.add_script_tag(content="""
 const {el,detailSection,infoHelp,unitField}=LexeditorUI;
 const conceptIcon=()=>null,enemyTableSource=control=>control,shell={refresh:()=>{}};

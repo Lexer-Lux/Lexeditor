@@ -12,11 +12,11 @@ import sys
 
 import pytest
 
-from games.ff9 import memoria_manager as manager
-from games.ff9 import memoria_update as update
-from games.ff9.plugin import PLUGIN
-from games.ff9.memoria_patcher import MAGIC, inspect_payload, installation_files
-from games.ff9.memoria_recovery import Recovery, digest, root_key, install_lock
+from plugins.ff9 import memoria_manager as manager
+from plugins.ff9 import memoria_update as update
+from plugins.ff9.plugin import PLUGIN
+from plugins.ff9.memoria_patcher import MAGIC, inspect_payload, installation_files
+from plugins.ff9.memoria_recovery import Recovery, digest, root_key, install_lock
 
 
 def pack(files, *, signed=False):
@@ -256,7 +256,7 @@ def test_recovery_can_acquire_lock_after_owner_crashes(setup):
     control = manager._control_root(kwargs["state_path"])
     script = """import os,sys
 from pathlib import Path
-from games.ff9.memoria_recovery import install_lock
+from plugins.ff9.memoria_recovery import install_lock
 with install_lock(Path(sys.argv[1]), Path(sys.argv[2])):
     os._exit(17)
 """
@@ -272,7 +272,7 @@ def test_recovery_does_not_clear_live_process_lock(setup):
     control = manager._control_root(kwargs["state_path"])
     script = """import sys
 from pathlib import Path
-from games.ff9.memoria_recovery import install_lock
+from plugins.ff9.memoria_recovery import install_lock
 with install_lock(Path(sys.argv[1]), Path(sys.argv[2])):
     print('locked', flush=True)
     sys.stdin.readline()
@@ -324,7 +324,11 @@ def test_disable_launcher_updates_preserves_cp1252_and_missing_final_newline(tmp
 def test_shared_updates_contract_is_metadata_only(tmp_path):
     assert PLUGIN.helper_name == "Memoria"
     assert PLUGIN.helper_pinned == manager.PINNED_RELEASE
-    assert callable(PLUGIN.helper_upstream) and callable(PLUGIN.helper_install)
+    assert callable(PLUGIN.helper_upstream)
+    assert callable(PLUGIN.helper_install_for_root)
+    # plugin_api rejects declaring both install shapes; the host serves
+    # the Updates drawer and readiness from the root-aware hooks.
+    assert PLUGIN.helper_install is None and PLUGIN.helper_status is None
     calls = []
     payload = {"tag_name": manager.PINNED_RELEASE, "draft": False, "prerelease": False,
                "published_at": "2025-07-04T20:27:01Z"}

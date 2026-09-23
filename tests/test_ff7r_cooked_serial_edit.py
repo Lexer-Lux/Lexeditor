@@ -4,8 +4,8 @@ import struct
 
 import pytest
 
-from games.ff7r.cooked_serial_edit import rewrite_unique_linear_color
-from games.ff7r.cooked_serial_probe import extract_serialized_name_refs
+from plugins.ff7r.cooked_serial_edit import rewrite_unique_linear_color
+from plugins.ff7r.cooked_serial_probe import extract_serialized_name_refs
 
 
 def _fstring(value: str) -> bytes:

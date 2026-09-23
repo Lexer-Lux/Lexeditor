@@ -16,7 +16,7 @@ MODULE = '''<Module><Name value="Mod"/><Id value="Mod"/><Version value="v1.0.0"/
 
 class BannerlordPerksRuntimeTests(unittest.TestCase):
     def test_perk_and_xp_source_safe_edits(self):
-        from games.bannerlord.perk_data import (
+        from plugins.bannerlord.perk_data import (
             read_perk_definitions, read_xp_source_definitions,
             save_perk_definitions, save_xp_source_definitions,
         )
@@ -37,7 +37,7 @@ class BannerlordPerksRuntimeTests(unittest.TestCase):
                 save_xp_source_definitions(project,[{'index':0,'originalId':sources[0]['id'],'fields':{'defaultAmount':-1}}])
 
     def test_perk_and_xp_writers_preserve_bom_and_crlf(self):
-        from games.bannerlord.perk_data import read_perk_definitions,read_xp_source_definitions,save_perk_definitions,save_xp_source_definitions
+        from plugins.bannerlord.perk_data import read_perk_definitions,read_xp_source_definitions,save_perk_definitions,save_xp_source_definitions
         with tempfile.TemporaryDirectory() as name:
             project=Path(name);(project/"src").mkdir();perk_path=project/"src/CustomSkillPerks.cs";xp_path=project/"src/CustomSkillXpSourcesConfig.cs"
             perk_path.write_bytes(b"\xef\xbb\xbf"+PERKS.replace("\n","\r\n").encode());xp_path.write_bytes(b"\xef\xbb\xbf"+XP.replace("\n","\r\n").encode())
@@ -47,7 +47,7 @@ class BannerlordPerksRuntimeTests(unittest.TestCase):
                 raw=path.read_bytes();self.assertTrue(raw.startswith(b"\xef\xbb\xbf"));self.assertNotIn(b"\n",raw[3:].replace(b"\r\n",b""))
 
     def test_deployment_status_uses_launcher_version_semantics_and_blocks_missing_dependency(self):
-        from games.bannerlord.runtime_data import deployment_status
+        from plugins.bannerlord.runtime_data import deployment_status
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);project=root/'project';game=root/'game';project.mkdir()
             (project/'SubModule.xml').write_text(MODULE,encoding='utf-8')

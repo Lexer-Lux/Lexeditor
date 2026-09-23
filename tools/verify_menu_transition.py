@@ -12,7 +12,7 @@ sys.path.insert(0,str(ROOT))
 sys.path.insert(0,r'C:\RDR2Mod\tools\reverse-engineering')
 from render_crime_editors_55_62 import Cdp, free_port, wait_json, wait_eval
 from desktop_host import HostApi, CHOOSER
-from games.ff7.plugin import PLUGIN, FF7Session
+from plugins.ff7.plugin import PLUGIN, FF7Session
 from settings_manager import SettingsStore
 import webview
 OUT=ROOT/'_scratch'/'transition-proof'

@@ -93,14 +93,14 @@ def main() -> int:
             "FFNx no longer confirms the eight saved characters")
 
     sys.path.insert(0, str(ROOT))
-    from games.ff8 import battle_shortcuts
-    from games.ff8 import party_switch_issue_62 as module
+    from plugins.ff8 import battle_shortcuts
+    from plugins.ff8 import party_switch_issue_62 as module
 
     require(module.PARTY_SWITCH_AVAILABLE is True, "Native feature is unavailable")
     require(module.build_hext(enabled=False) == "", "Disabled output changed")
     require("FFNx native extension" in module.build_hext(enabled=True), "Missing native routing")
     require(battle_shortcuts.build_hext(universal_item=False, party_switch=True) == module.build_hext(enabled=True), "Party-only mode emitted shared shortcut caves")
-    native_source=(ROOT / "games/ff8/ffnx_party_switch/ffnx-src/lexeditor_ff8_party_switch.cpp").read_text()
+    native_source=(ROOT / "plugins/ff8/ffnx_party_switch/ffnx-src/lexeditor_ff8_party_switch.cpp").read_text()
     require("VirtualAlloc" in native_source, "Trampoline must own allocated memory")
     for forbidden in ("0x4971F0", "0x497270", "0x1D28E01", "0x1D28E28"):
         require(forbidden not in native_source, "Encounter callback/global reused")

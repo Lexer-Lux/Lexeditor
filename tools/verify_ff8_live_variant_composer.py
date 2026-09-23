@@ -12,7 +12,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import runtime_layout
+from plugins.ff8 import runtime_layout
 
 
 def price(record0: tuple[int, int, int], record1: tuple[int, int, int]) -> bytes:

@@ -16,5 +16,5 @@ from plugin_ui import plugin_ui  # noqa: E402
 
 
 def plugin_source(name: str) -> str:
-    """games/<name>/editor.html followed by every module and stylesheet beside it."""
+    """plugins/<name>/editor.html followed by every module and stylesheet beside it."""
     return plugin_ui(name)

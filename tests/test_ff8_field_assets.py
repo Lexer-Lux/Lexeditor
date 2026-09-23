@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.ff8 import field_data
+from plugins.ff8 import field_data
 
 
 class FieldAssetTests(unittest.TestCase):

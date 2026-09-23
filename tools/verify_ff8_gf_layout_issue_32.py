@@ -12,9 +12,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EDITOR = ROOT / "games" / "ff8" / "editor.html"
-GF_SCHEMA = ROOT / "games" / "ff8" / "schema" / "gforce.json"
-KERNEL_SCHEMA = ROOT / "games" / "ff8" / "schema" / "kernel_section_fields.json"
+EDITOR = ROOT / "plugins" / "ff8" / "editor.html"
+GF_SCHEMA = ROOT / "plugins" / "ff8" / "schema" / "gforce.json"
+KERNEL_SCHEMA = ROOT / "plugins" / "ff8" / "schema" / "kernel_section_fields.json"
 
 EXPECTED_GF_NAMES = [
     "Quezacotl", "Shiva", "Ifrit", "Siren", "Brothers", "Diablos",

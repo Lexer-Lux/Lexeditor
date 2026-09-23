@@ -7,7 +7,7 @@ import struct
 
 import pytest
 
-from games.ff9 import field_walkmesh as walkmesh
+from plugins.ff9 import field_walkmesh as walkmesh
 
 
 def align4(value):

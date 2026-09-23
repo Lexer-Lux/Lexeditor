@@ -45,3 +45,14 @@ Exact needs: identify the engine core-decrement function and its two term
 inputs from a matching game binary, then prove ownership and cadence.
 No code written; recording the needs here instead of inventing a hook.
 
+## 2026-09-23 agent slice (per-game-rdr2): boundary contract
+
+games/rdr2/core_modifiers.py pins the evidenced forecast math as data
+(+0.15 perfect weight, -0.25 extremes, +0.25 mounted) plus
+validate_removal_proposal(), which requires the named engine decrement
+routine, rejects forecast-only and shared-field targets and unrelated
+rate changes, and requires ownership of unproven ownership/cadence.
+Covered by tests/test_rdr2_core_modifiers.py (8 hermetic tests). No
+gameplay claim: the engine routine identity still needs a matching
+binary.
+

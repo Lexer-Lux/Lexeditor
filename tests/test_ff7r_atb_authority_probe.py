@@ -1,11 +1,11 @@
 import struct
 
-from games.ff7r.atb_authority_probe import (
+from plugins.ff7r.atb_authority_probe import (
     _candidate_functions,
     _function_float_refs,
     analyze_atb_authority_refs,
 )
-from games.ff7r.native_probe import PEImage, RuntimeFunction, Section
+from plugins.ff7r.native_probe import PEImage, RuntimeFunction, Section
 
 
 def _assessment():

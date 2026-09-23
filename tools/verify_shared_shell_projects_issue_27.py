@@ -16,14 +16,14 @@ from project_manager import ProjectManager  # noqa: E402
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
 editors = {
-    name: (ROOT / "games" / name / "editor.html").read_text(encoding="utf-8")
+    name: (ROOT / "plugins" / name / "editor.html").read_text(encoding="utf-8")
     for name in ("blank", "ff7", "ff8", "ff9", "rdr", "rdr2", "warband")
 }
 editors["rdr"] += "\n" + (
-    ROOT / "games" / "rdr" / "editor.js"
+    ROOT / "plugins" / "rdr" / "editor.js"
 ).read_text(encoding="utf-8")
-ff7_2013_plugin = (ROOT / "games" / "ff7_2013" / "plugin.py").read_text(encoding="utf-8")
-rdr_server = (ROOT / "games" / "rdr" / "server.py").read_text(encoding="utf-8")
+ff7_2013_plugin = (ROOT / "plugins" / "ff7_2013" / "plugin.py").read_text(encoding="utf-8")
+rdr_server = (ROOT / "plugins" / "rdr" / "server.py").read_text(encoding="utf-8")
 
 for required in ("mapIcon()", 'id: "plugin-info"', "mountProjectControl", "browse_mod_project", "create_mod_project", "rename_mod_project",
                  'class: "lex-project-menu-actions"', '"➕ Add a Mod"', '"🔍 Find a Mod"',

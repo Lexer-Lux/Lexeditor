@@ -9,7 +9,7 @@ import zipfile
 
 import pytest
 
-from games.ff7r2 import shader_injector as si
+from plugins.ff7r2 import shader_injector as si
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -274,7 +274,7 @@ def test_upstream_is_information_not_an_install_target():
 
 
 def test_the_plugin_puts_it_into_first_time_setup_and_the_updates_drawer():
-    from games.ff7r2.plugin import PLUGIN
+    from plugins.ff7r2.plugin import PLUGIN
     assert PLUGIN.helper_name == "Shader Injector"
     assert PLUGIN.helper_pinned == si.VERSION
     assert PLUGIN.helper_status_for_root is si.helper_status

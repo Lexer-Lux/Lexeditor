@@ -43,8 +43,8 @@ def main():
                     }};
                     window.dispatchEvent(new Event('pywebviewready'));
                 }''',{'settings':SETTINGS,'helpers':HELPERS,'plugin':PLUGIN})
-                page.wait_for_function('!document.querySelector("#chooser-lexer").hidden')
-                page.locator('#chooser-lexer').click();page.wait_for_function('document.querySelectorAll(".lexer-helper").length===3')
+                page.wait_for_function('!document.querySelector("#lexer-handle").hidden')
+                page.locator('#lexer-handle').click();page.wait_for_function('document.querySelectorAll(".lexer-helper").length===3')
                 page.wait_for_timeout(300)
                 rows=page.locator('.lexer-helper')
                 assert 'Installed: v1.1.5.1 (verified)' in rows.nth(2).inner_text()
@@ -87,7 +87,7 @@ def main():
                 assert page.get_by_role('button',name='INSTALL / REPAIR WSE2').count()==0
                 assert page.evaluate('window.__installs')==['warband']
                 page.evaluate('window.dispatchEvent(new CustomEvent("lexeditor-settings-changed",{detail:{developerMode:false}}))')
-                assert page.locator('#chooser-lexer').is_hidden()
+                assert page.locator('#lexer-handle').is_hidden()
                 assert errors==[],errors
                 results.append({'width':width,'height':height,'passed':True,'bridge':'fixture responses, real HTML/CSS/JS'})
                 page.close()

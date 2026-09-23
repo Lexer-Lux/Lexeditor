@@ -12,7 +12,7 @@ TYPES = {".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".j
 
 def main() -> int:
     sys.path.insert(0, str(ROOT))
-    from games.blank.plugin import PLUGIN
+    from plugins.blank.plugin import PLUGIN
 
     catalogue_ids = set()
     session = PLUGIN.session_factory()

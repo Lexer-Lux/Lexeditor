@@ -1,7 +1,7 @@
 """Contracts for FF8 Better HP Colors, GitHub #481."""
 from pathlib import Path
 import tempfile, unittest
-from games.ff8 import gameplay_settings
+from plugins.ff8 import gameplay_settings
 ROOT=Path(__file__).resolve().parents[1]
 class BetterHpColorsTests(unittest.TestCase):
     def test_default_is_off_and_tweak_is_registered(self):
@@ -19,7 +19,7 @@ class BetterHpColorsTests(unittest.TestCase):
             self.assertNotIn("enable_ff8_better_hp_colors = true",disabled)
             self.assertEqual(disabled.count("enable_ff8_better_hp_colors = false"),1)
     def test_editor_exposes_control_and_semantics(self):
-        editor=(ROOT/"games/ff8/boot.js").read_text()
+        editor=(ROOT/"plugins/ff8/boot.js").read_text()
         self.assertIn('"aria-label":"Better HP Colors"',editor)
         self.assertIn('row("BETTER HP COLORS"',editor)
         for phrase in ("white at full HP","yellow at 50%","orange at 25%","KO"):self.assertIn(phrase,editor)

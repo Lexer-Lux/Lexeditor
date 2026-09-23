@@ -9,9 +9,9 @@ import pefile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.ff8 import shoot_issue_54 as shoot
-from games.ff8 import battle_shortcuts
-from games.ff8 import fixed_command_menu as menu
+from plugins.ff8 import shoot_issue_54 as shoot
+from plugins.ff8 import battle_shortcuts
+from plugins.ff8 import fixed_command_menu as menu
 
 EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")
 SHA = "064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570"

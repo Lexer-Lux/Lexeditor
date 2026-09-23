@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.terraria import server
+from plugins.terraria import server
 
 
 class TerrariaLocalizationServiceLifecycleTests(unittest.TestCase):

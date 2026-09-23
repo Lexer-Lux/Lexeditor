@@ -3,7 +3,7 @@ import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RDR2 = (ROOT / "games" / "rdr2" / "editor.html").read_text(encoding="utf-8")
+RDR2 = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
 
 
 def require(condition: bool, message: str) -> None:

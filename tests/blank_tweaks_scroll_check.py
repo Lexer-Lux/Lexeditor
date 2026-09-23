@@ -9,7 +9,7 @@ def main():
   with sync_playwright() as pw:
    browser=pw.chromium.launch(headless=True);page=browser.new_page();page.add_init_script(STUB)
    errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
-   page.goto(f'http://127.0.0.1:{server.server_port}/games/blank/editor.html')
+   page.goto(f'http://127.0.0.1:{server.server_port}/plugins/blank/editor.html')
    # Blank's tabs are the component catalogue now; its demonstration views
    # still render and are opened by name.
    page.wait_for_selector('nav button[data-tab=organism]')

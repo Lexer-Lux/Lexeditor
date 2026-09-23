@@ -18,10 +18,10 @@ import tempfile
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from games.ff8 import max_spell
+from plugins.ff8 import max_spell
 
 EXPECTED='064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570'
-SOURCE=ROOT/'games/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_stock_tweaks.cpp'
+SOURCE=ROOT/'plugins/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_stock_tweaks.cpp'
 HOOK=0x2800000
 DATA=0x2810000
 

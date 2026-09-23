@@ -14,7 +14,7 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
 
 
 def patch_menu_contract() -> None:
-    path = ROOT / "games/ff8/menu_qol_issue_61.py"
+    path = ROOT / "plugins/ff8/menu_qol_issue_61.py"
     text = path.read_text(encoding="utf-8")
     old = '''INGAME_TIME_BLOCKER = (
     "In-game Time is unresolved: FF8 imports GetLocalTime at IAT 0x00B69178, "
@@ -33,7 +33,7 @@ INGAME_TIME_BLOCKER = ""
 
 
 def patch_bars_runtime() -> None:
-    path = ROOT / "games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp"
+    path = ROOT / "plugins/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp"
     text = path.read_text(encoding="utf-8")
     text = replace_once(
         text,
@@ -189,7 +189,7 @@ def patch_prepare_build() -> None:
 
 
 def patch_gameplay_settings() -> None:
-    path = ROOT / "games/ff8/gameplay_settings.py"
+    path = ROOT / "plugins/ff8/gameplay_settings.py"
     text = path.read_text(encoding="utf-8")
     text = replace_once(text, "DEFAULT_GF_HP_BARS = False\n", "DEFAULT_GF_HP_BARS = False\nDEFAULT_INGAME_TIME = menu_qol_issue_61.DEFAULT_INGAME_TIME\n", "clock default")
     text = replace_once(text, '    "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "gfHpBars",\n', '    "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "gfHpBars", "inGameTime",\n', "accepted clock tweak")
@@ -241,7 +241,7 @@ def patch_gameplay_settings() -> None:
 
 
 def patch_editor() -> None:
-    path = ROOT / "games/ff8/editor.html"
+    path = ROOT / "plugins/ff8/editor.html"
     text = path.read_text(encoding="utf-8")
     text = replace_once(text, 'gfHpBars:state.data.settings.gfHpBars,noMagicConsumption:', 'gfHpBars:state.data.settings.gfHpBars,inGameTime:state.data.settings.inGameTime,noMagicConsumption:', "settings payload clock")
     text = replace_once(

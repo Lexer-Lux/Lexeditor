@@ -4,7 +4,7 @@ Issue 161 asks for a real editable amount beside each honor action. The
 recorded finding is that Story Mode applies shared magnitude tiers after the
 event fires, so per-action interception is unproven and the editor must not
 pretend independent per-event amounts exist. These tests lock that reality
-into games.rdr2.honor_actions: event edits cannot carry an amount, the
+into plugins.rdr2.honor_actions: event edits cannot carry an amount, the
 editor-facing note says tiers are shared, and the 21-event/19-tier tables
 round-trip intact.
 """
@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.rdr2 import honor_actions as honor
+from plugins.rdr2 import honor_actions as honor
 
 
 class PerActionAmountGuards(unittest.TestCase):

@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from games.ff7r.atb_movement_probe import probe_atb_movement_bridge  # noqa: E402
+from plugins.ff7r.atb_movement_probe import probe_atb_movement_bridge  # noqa: E402
 
 
 def _parser() -> argparse.ArgumentParser:

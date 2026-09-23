@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from games.ff8 import cards
+from plugins.ff8 import cards
 
 
 def pair(project):

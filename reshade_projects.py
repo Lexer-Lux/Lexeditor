@@ -7,7 +7,7 @@ Three requirements pull against each other, so the shape is deliberate:
   * and a published mod still working for someone who has never used Lexeditor.
 
 The last one decides the format. A mod ships a plain ReShade preset and the
-shaders it uses. The effects are Lexeditor's own (tools/reshade/shaders), so
+shaders it uses. The effects are Lexeditor's own (shaders), so
 they may travel with a mod. Nothing here invents a container that only
 Lexeditor can open.
 """
@@ -397,9 +397,10 @@ def install_loader(version: str = "", *, variant: str = DEFAULT_LOADER_VARIANT,
 NEWLINE = chr(10)
 
 # Lexeditor's own effects, shipped with the app rather than downloaded.
-BUNDLED_SHADERS = Path(__file__).resolve().parent / "tools" / "reshade" / "shaders" / "Lexerian"
+BUNDLED_SHADERS = Path(__file__).resolve().parent / "shaders"
 # Where a mod keeps a copy of them, so a by-hand install has everything.
-BUNDLED_FOLDER_NAME = BUNDLED_SHADERS.name
+# Exported mods already carry this folder name; keep it stable.
+BUNDLED_FOLDER_NAME = "Lexerian"
 
 
 def _fetch(url: str, timeout: int = 120) -> bytes:

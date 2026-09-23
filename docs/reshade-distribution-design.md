@@ -13,7 +13,7 @@ someone who does not use Lexeditor.
   name that is not ReShade is never overwritten or removed.
 - **ReshadeEffectShaderToggler**, pinned and bundled in `tools/reshade/addons/`,
   installed beside ReShade so effects can run before a game draws its HUD.
-- **The effects**, Lexeditor's own, in `tools/reshade/shaders/Lexerian`: Colors,
+- **The effects**, Lexeditor's own, in `shaders`: Colors,
   Bloom, Sharpen (AMD CAS), AmbientOcclusion, DepthOfField, Vignette and Compare,
   with one shared depth setup in `LexerianDepth.fxh`. They are always on
   ReShade's search path. No third-party shader collection is downloaded.

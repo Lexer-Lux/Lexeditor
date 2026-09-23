@@ -182,7 +182,7 @@ def main() -> int:
     parser.add_argument("--live", action="store_true")
     args = parser.parse_args()
     width, height = (int(part) for part in args.size.lower().split("x"))
-    plugins = args.plugins or [path.name for path in sorted((ROOT / "games").iterdir())
+    plugins = args.plugins or [path.name for path in sorted((ROOT / "plugins").iterdir())
                                if (path / "editor.html").exists()]
     failures: list[str] = []
     for plugin in plugins:

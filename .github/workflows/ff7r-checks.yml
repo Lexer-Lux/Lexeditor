@@ -4,7 +4,7 @@ on:
   push:
     branches: [master, feature/ff7-remake-plugin, 'work/ff7r-*']
     paths:
-      - 'games/ff7r/**'
+      - 'plugins/ff7r/**'
       - 'tools/ff7r_*.py'
       - 'tools/ff7r/**'
       - 'tools/build_distribution.py'
@@ -17,7 +17,7 @@ on:
       - '.github/workflows/ff7r-checks.yml'
   pull_request:
     paths:
-      - 'games/ff7r/**'
+      - 'plugins/ff7r/**'
       - 'tools/ff7r_*.py'
       - 'tools/ff7r/**'
       - 'tools/build_distribution.py'
@@ -54,22 +54,22 @@ jobs:
       - name: Install test and theme decoder dependencies
         run: python -m pip install pytest Pillow==12.3.0 texfury==1.6.2 'cryptography>=42'
       - name: Python syntax
-        run: python -m compileall -q games/ff7r tools
+        run: python -m compileall -q plugins/ff7r tools
       - name: Editor JavaScript syntax
         run: >-
-          python -c "from pathlib import Path; import re; s=Path('games/ff7r/editor.html').read_text(encoding='utf-8'); Path('ff7r-inline.js').write_text('\n'.join(re.findall(r'<script(?![^>]*src=)[^>]*>(.*?)</script>', s, re.S)), encoding='utf-8')"
+          python -c "from pathlib import Path; import re; s=Path('plugins/ff7r/editor.html').read_text(encoding='utf-8'); Path('ff7r-inline.js').write_text('\n'.join(re.findall(r'<script(?![^>]*src=)[^>]*>(.*?)</script>', s, re.S)), encoding='utf-8')"
           && node --check ff7r-inline.js
       - name: Editor module JavaScript syntax
-        run: node --check games/ff7r/editor.js
+        run: node --check plugins/ff7r/editor.js
       - name: Theme JavaScript syntax
-        run: node --check games/ff7r/game-appearance.js
+        run: node --check plugins/ff7r/game-appearance.js
       - name: Plugin descriptor
-        run: python -c "from games.ff7r.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ff7r.server' in SERVICE_MODULES; assert 'games.ff7r.themed_server' in SERVICE_MODULES; print(PLUGIN.name)"
+        run: python -c "from plugins.ff7r.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'plugins.ff7r.server' in SERVICE_MODULES; assert 'plugins.ff7r.themed_server' in SERVICE_MODULES; print(PLUGIN.name)"
       - name: Gameplay, text, semantic and runtime regressions
         run: >-
           python -c "from pathlib import Path; import pytest; files=[str(path) for path in sorted(Path('tests').glob('test_ff7r_*.py'))]; print(f'Running {len(files)} FF7R test files'); raise SystemExit(pytest.main(['-q', *files]))"
       - name: Managed service smoke
-        run: python -c "from games.ff7r.plugin import smoke; [print('PASS:', line) for line in smoke()]"
+        run: python -c "from plugins.ff7r.plugin import smoke; [print('PASS:', line) for line in smoke()]"
 
   browser:
     runs-on: ubuntu-latest
@@ -119,9 +119,9 @@ jobs:
           if (-not (Test-Path "$root/Lexeditor/Lexeditor.exe")) { throw 'Candidate app is missing' }
           if (-not (Test-Path "$root/Launch-FF7R-Candidate.cmd")) { throw 'Candidate launcher is missing' }
           if (-not (Test-Path "$root/FF7R-ACCEPTANCE.txt")) { throw 'Candidate acceptance guide is missing' }
-          if (-not (Test-Path "$root/Lexeditor/_internal/games/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip")) { throw 'Bundled repak archive is missing' }
-          if (-not (Test-Path "$root/Lexeditor/_internal/games/ff7r/runtime/repak/v0.2.3/LICENSE-MIT")) { throw 'repak MIT license is missing' }
-          if (-not (Test-Path "$root/Lexeditor/_internal/games/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE")) { throw 'repak Apache license is missing' }
+          if (-not (Test-Path "$root/Lexeditor/_internal/plugins/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip")) { throw 'Bundled repak archive is missing' }
+          if (-not (Test-Path "$root/Lexeditor/_internal/plugins/ff7r/runtime/repak/v0.2.3/LICENSE-MIT")) { throw 'repak MIT license is missing' }
+          if (-not (Test-Path "$root/Lexeditor/_internal/plugins/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE")) { throw 'repak Apache license is missing' }
           if ($manifest.headSha -ne '${{ github.event.pull_request.head.sha || github.sha }}') { throw 'Candidate manifest head SHA mismatch' }
           $manifest | ConvertTo-Json -Depth 6
       - name: Upload isolated FF7R acceptance candidate

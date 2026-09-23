@@ -7,7 +7,7 @@ import tempfile
 
 import pytest
 
-from games.ff7r2 import packaging
+from plugins.ff7r2 import packaging
 
 
 def _fixture(root: Path):

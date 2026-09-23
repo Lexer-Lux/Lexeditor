@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'games/ff8/**'
+      - 'plugins/ff8/**'
       - 'tests/test_ff8_field_assets.py'
       - 'tests/test_ff8_drop_chance.py'
       - 'tests/test_ff8_formulae_rework.py'
@@ -18,7 +18,7 @@ on:
   push:
     branches: [master, fix/ff8-native-battle-batch]
     paths:
-      - 'games/ff8/**'
+      - 'plugins/ff8/**'
       - 'tests/test_ff8_field_assets.py'
       - 'tests/test_ff8_drop_chance.py'
       - 'tests/test_ff8_formulae_rework.py'
@@ -62,11 +62,11 @@ jobs:
           python -m unittest tests.test_ff8_field_assets tests.test_ff8_drop_chance tests.test_ff8_formulae_rework tests.test_ff8_rinoa_angelo tests.test_ff8_ingame_time tests.test_ff8_hp_colors_issue_481 tests.test_ff8_world_draw_points -v
           python tests/ff8_hp_colors_browser_check.py
           python tests/ff8_formulae_scroll_browser_check.py
-          python -m compileall -q games/ff8 tools/prepare_ff8_native_build.py tools/package_ff8_native_driver.py tools/verify_ff8_native_battle_regressions.py tools/verify_ff8_linked_runtime.py tools/verify_ff8_cards_players_ui.py tools/verify_ff8_battle_camera.py tools/verify_ff8_battle_camera_native_seam.py tools/verify_ff8_reptile_atb.py tools/verify_ff8_reptile_atb_native_seam.py tools/verify_ff8_reptile_atb_binary.py
-          node --check games/ff8/cards_ui.js
+          python -m compileall -q plugins/ff8 tools/prepare_ff8_native_build.py tools/package_ff8_native_driver.py tools/verify_ff8_native_battle_regressions.py tools/verify_ff8_linked_runtime.py tools/verify_ff8_cards_players_ui.py tools/verify_ff8_battle_camera.py tools/verify_ff8_battle_camera_native_seam.py tools/verify_ff8_reptile_atb.py tools/verify_ff8_reptile_atb_native_seam.py tools/verify_ff8_reptile_atb_binary.py
+          node --check plugins/ff8/cards_ui.js
           python - <<'PY'
           import pathlib, re, subprocess
-          text = pathlib.Path('games/ff8/editor.html').read_text(encoding='utf-8')
+          text = pathlib.Path('plugins/ff8/editor.html').read_text(encoding='utf-8')
           for script in re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', text, re.S | re.I):
               subprocess.run(['node', '--check'], input=script, text=True, check=True)
           PY

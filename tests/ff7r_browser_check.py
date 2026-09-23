@@ -293,7 +293,7 @@ window.fetch = async function(input, options={}) {
   });
 };
 """.replace("FIXTURE", json.dumps(fixture))
-    html = (ROOT / "games/ff7r/editor.html").read_text(encoding="utf-8")
+    html = (ROOT / "plugins/ff7r/editor.html").read_text(encoding="utf-8")
     html = html.replace("<head>", '<head><base href="https://lexeditor.test/">', 1)
     html = html.replace(
         '<link rel="stylesheet" href="/shared/framework.css">',
@@ -307,7 +307,7 @@ window.fetch = async function(input, options={}) {
     # Match the repository-wide rendered harness: after the shared framework is
     # inlined, replace every plugin-local module exactly where production loads
     # it. This keeps editor.js after LexeditorUI has been defined.
-    folder = ROOT / "games" / "ff7r"
+    folder = ROOT / "plugins" / "ff7r"
     html = re.sub(
         r'<script src="(?!/shared/)/?([A-Za-z0-9_./-]+\.js)"></script>',
         lambda match: "<script>"

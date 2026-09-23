@@ -10,8 +10,8 @@ from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.rdr2 import alcohol_strengths as alcohol
-from games.rdr2 import server as s
+from plugins.rdr2 import alcohol_strengths as alcohol
+from plugins.rdr2 import server as s
 
 
 def weapon_xml(effect="SHELL_ALPHA", weapon="WEAPON_ALPHA", flags="Alpha Beta"):

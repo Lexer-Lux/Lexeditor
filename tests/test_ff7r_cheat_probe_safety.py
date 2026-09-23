@@ -1,4 +1,4 @@
-from games.ff7r.cheat_probe_safety import assess_menu_candidate_removals, assess_target_removal
+from plugins.ff7r.cheat_probe_safety import assess_menu_candidate_removals, assess_target_removal
 
 
 def _target(*, rows, text_ids=("$Gift",), key="giftBox", total_rows=None):

@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from games.ff8 import (  # noqa: E402
+from plugins.ff8 import (  # noqa: E402
     battle_shortcuts,
     better_targeting_issue_64,
     fast_start,
@@ -415,8 +415,8 @@ def main() -> int:
     assert 'row("FAST START"' in gameplay_view
     assert 'row("MONOGAMY"' in gameplay_view
     assert 'row("UNIVERSAL ITEM"' in gameplay_view
-    assert "healing_rework.build_hext(formulae_rework)" in (ROOT / "games" / "ff8" / "gameplay_settings.py").read_text(encoding="utf-8")
-    assert "luck_accuracy.build_hext(formulae_rework)" in (ROOT / "games" / "ff8" / "gameplay_settings.py").read_text(encoding="utf-8")
+    assert "healing_rework.build_hext(formulae_rework)" in (ROOT / "plugins" / "ff8" / "gameplay_settings.py").read_text(encoding="utf-8")
+    assert "luck_accuracy.build_hext(formulae_rework)" in (ROOT / "plugins" / "ff8" / "gameplay_settings.py").read_text(encoding="utf-8")
 
     print("FF8 visible Tweak persistence and composition passed")
     return 0

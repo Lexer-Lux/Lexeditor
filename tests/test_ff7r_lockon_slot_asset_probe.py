@@ -1,4 +1,4 @@
-from games.ff7r.lockon_slot_asset_probe import (
+from plugins.ff7r.lockon_slot_asset_probe import (
     canonical_cooked_package_path,
     correlate_marker_slots_to_assets,
     plan_red_reticle_rewrites,

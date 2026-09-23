@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from games.ff7 import mod_stack
+from plugins.ff7 import mod_stack
 
 
 class SeventhHeavenCompatibilityTests(unittest.TestCase):

@@ -12,7 +12,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import iroj_archive, runtime_layout
+from plugins.ff8 import iroj_archive, runtime_layout
 
 
 def write_archive(path: Path, members: list[tuple[str, bytes]]) -> None:
@@ -202,8 +202,8 @@ def main() -> int:
         else:
             raise AssertionError("An invalid folder option was accepted")
 
-    editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
-    server = (ROOT / "games" / "ff8" / "server.py").read_text(encoding="utf-8")
+    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    server = (ROOT / "plugins" / "ff8" / "server.py").read_text(encoding="utf-8")
     assert "ff8-mod-folder-options" in editor
     assert "folderOptions:Object.fromEntries" in editor
     assert 'body.get("folderOptions", {})' in server

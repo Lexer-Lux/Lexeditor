@@ -8,7 +8,7 @@ from unittest.mock import patch
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from http.server import ThreadingHTTPServer
-from games.blank import server
+from plugins.blank import server
 
 
 class BlankProjectsTests(unittest.TestCase):

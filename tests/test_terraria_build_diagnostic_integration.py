@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import unittest
 
-from games.terraria import server
+from plugins.terraria import server
 
 
 class TerrariaBuildDiagnosticIntegrationTests(unittest.TestCase):

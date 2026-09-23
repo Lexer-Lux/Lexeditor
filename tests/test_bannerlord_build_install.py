@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.bannerlord.project_data import primary_project_file, run_build
+from plugins.bannerlord.project_data import primary_project_file, run_build
 
 
 CSPROJ = '''<Project Sdk="Microsoft.NET.Sdk">
@@ -36,7 +36,7 @@ class BannerlordBuildInstallTests(unittest.TestCase):
             selected_game = root / "Selected Bannerlord Install"
             selected_game.mkdir()
             completed = subprocess.CompletedProcess(["dotnet"], 0, stdout="Build succeeded\n", stderr="")
-            with patch("games.bannerlord.project_data.subprocess.run", return_value=completed) as runner:
+            with patch("plugins.bannerlord.project_data.subprocess.run", return_value=completed) as runner:
                 result = run_build(project, configuration="Release", game_root=selected_game)
 
             command = runner.call_args.args[0]
@@ -67,7 +67,7 @@ class BannerlordBuildInstallTests(unittest.TestCase):
             selected_game.mkdir()
             completed = subprocess.CompletedProcess(["dotnet"], 0, stdout="ok", stderr="")
             with patch.dict("os.environ", {"LEXEDITOR_BANNERLORD_ROOT": str(selected_game)}, clear=False), \
-                 patch("games.bannerlord.project_data.subprocess.run", return_value=completed) as runner:
+                 patch("plugins.bannerlord.project_data.subprocess.run", return_value=completed) as runner:
                 result = run_build(project)
             selected = selected_game.resolve()
             command = runner.call_args.args[0]
@@ -86,7 +86,7 @@ class BannerlordBuildInstallTests(unittest.TestCase):
             (project / "SubModule.xml").write_text(
                 '<Module><Id value="../Escape" /></Module>', encoding="utf-8"
             )
-            with patch("games.bannerlord.project_data.subprocess.run") as runner:
+            with patch("plugins.bannerlord.project_data.subprocess.run") as runner:
                 with self.assertRaisesRegex(ValueError, "unsafe module Id"):
                     run_build(project, game_root=root / "game")
             runner.assert_not_called()
@@ -112,7 +112,7 @@ class BannerlordBuildInstallTests(unittest.TestCase):
                 return real_resolve(path, *args, **kwargs)
 
             with patch.object(Path, "resolve", new=fake_resolve), \
-                 patch("games.bannerlord.project_data.subprocess.run") as runner:
+                 patch("plugins.bannerlord.project_data.subprocess.run") as runner:
                 with self.assertRaisesRegex(ValueError, "build module path escaped"):
                     run_build(project, game_root=selected_game)
             runner.assert_not_called()
@@ -139,7 +139,7 @@ class BannerlordBuildInstallTests(unittest.TestCase):
                 return real_resolve(path, *args, **kwargs)
 
             with patch.object(Path, "resolve", new=fake_resolve), \
-                 patch("games.bannerlord.project_data.subprocess.run") as runner:
+                 patch("plugins.bannerlord.project_data.subprocess.run") as runner:
                 with self.assertRaisesRegex(ValueError, "build output path escaped"):
                     run_build(project, game_root=selected_game)
             runner.assert_not_called()
@@ -151,7 +151,7 @@ class BannerlordBuildInstallTests(unittest.TestCase):
             project.mkdir()
             outside = root / "Outside.csproj"
             outside.write_text(CSPROJ, encoding="utf-8")
-            with patch("games.bannerlord.project_data._project_files", return_value=[outside]):
+            with patch("plugins.bannerlord.project_data._project_files", return_value=[outside]):
                 with self.assertRaisesRegex(ValueError, "stay inside"):
                     primary_project_file(project)
 
@@ -162,7 +162,7 @@ class BannerlordBuildInstallTests(unittest.TestCase):
             project.mkdir()
             outside = root / "Outside.csproj"
             outside.write_text(CSPROJ, encoding="utf-8")
-            with patch("games.bannerlord.project_data.primary_project_file", return_value=outside):
+            with patch("plugins.bannerlord.project_data.primary_project_file", return_value=outside):
                 with self.assertRaisesRegex(ValueError, "stay inside"):
                     run_build(project)
 

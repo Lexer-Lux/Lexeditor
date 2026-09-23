@@ -6,7 +6,7 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 def test_ff8_numeric_bounds_percentages_and_reference_restore():
-    source=(ROOT/'games/ff8/core.js').read_text(encoding='utf-8')
+    source=(ROOT/'plugins/ff8/core.js').read_text(encoding='utf-8')
     controls=source[source.index('  function numberControl('):source.index('  // A long list')]
     with sync_playwright() as play:
         browser=play.chromium.launch(headless=True)
@@ -53,7 +53,7 @@ def test_ff8_numeric_bounds_percentages_and_reference_restore():
 
 
 def test_rdr_reference_restore_works_outside_a_table_cell():
-    source=(ROOT/'games/rdr2/core.js').read_text(encoding='utf-8')
+    source=(ROOT/'plugins/rdr2/core.js').read_text(encoding='utf-8')
     ref=source[source.index('function refField('):source.index('function multiValueReferenceStack(')]
     apply=source[source.index('function applyToInput('):source.index('function applyToControl(')]
     with sync_playwright() as play:
@@ -77,7 +77,7 @@ def test_rdr_reference_restore_works_outside_a_table_cell():
 
 
 def test_ff8_select_preserves_named_views_and_numeric_record_ids():
-    source=(ROOT/'games/ff8/core.js').read_text(encoding='utf-8')
+    source=(ROOT/'plugins/ff8/core.js').read_text(encoding='utf-8')
     control=source[source.index('  function selectControl('):source.index('  function openItem(')]
     with sync_playwright() as play:
         browser=play.chromium.launch(headless=True)

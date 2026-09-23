@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from plugin_ui import plugin_ui
 def main():
     font=Path(os.environ['LOCALAPPDATA'])/'Lexeditor/game-data/ff8/generated/ff8-menu.ttf'
-    css=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8')
+    css=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8')
     css=css.replace('/assets/ff8-menu.ttf?v=4','data:font/ttf;base64,'+base64.b64encode(font.read_bytes()).decode())
     with sync_playwright() as pw:
         browser=pw.chromium.launch(headless=True);page=browser.new_page()

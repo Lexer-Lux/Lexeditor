@@ -11,7 +11,7 @@ def main():
   with sync_playwright() as pw:
    browser=pw.chromium.launch(headless=True);page=browser.new_page(viewport={'width':1500,'height':900});page.add_init_script(STUB)
    page.route('**/api/**',lambda route:route.fulfill(json={}))
-   page.goto(f'http://127.0.0.1:{server.server_port}/games/ff7r/editor.html')
+   page.goto(f'http://127.0.0.1:{server.server_port}/plugins/ff7r/editor.html')
    page.wait_for_function('!!state.error')
    page.evaluate("""()=>{
     state.error='';state.busy=false;state.tab='abilities';state.selected=0;

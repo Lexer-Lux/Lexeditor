@@ -7,9 +7,9 @@ import subprocess
 import tempfile
 import unittest
 
-from games.terraria.build_metadata import parse_build_text, update_build_text
-from games.terraria import plugin as terraria_plugin
-from games.terraria import server
+from plugins.terraria.build_metadata import parse_build_text, update_build_text
+from plugins.terraria import plugin as terraria_plugin
+from plugins.terraria import server
 from project_manager import ProjectManager
 
 

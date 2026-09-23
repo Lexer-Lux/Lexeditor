@@ -8,10 +8,10 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.ff7r.archive import extract_pair
-from games.ff7r.textresource import TextResourcePackage
-from games.ff7r.tooling import pack_directory, get_file
-from games.ff7r.mod_support import PakModAdapter
+from plugins.ff7r.archive import extract_pair
+from plugins.ff7r.textresource import TextResourcePackage
+from plugins.ff7r.tooling import pack_directory, get_file
+from plugins.ff7r.mod_support import PakModAdapter
 from mod_library import file_tree, digest
 
 

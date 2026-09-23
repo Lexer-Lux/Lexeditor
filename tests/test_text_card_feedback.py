@@ -38,7 +38,7 @@ def test_part_pins_and_text_pin_follow_input_corner(page):
 
 def test_hover_has_no_box_or_dashed_spelling_like_line(page):
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''()=>{const U=LexeditorUI;document.querySelector('main').append(
       U.hoverable({content:'Ability',targetId:1}),U.columnList({rows:[{name:'Belhelmel'}],
       columns:[{key:'name',label:'Name',edit(){}}]}));}''')

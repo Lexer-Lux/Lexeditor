@@ -3,7 +3,7 @@ name: FF7 2013 candidate
 on:
   pull_request:
     paths:
-      - 'games/ff7_2013/**'
+      - 'plugins/ff7_2013/**'
       - 'tools/verify_ff7_2013_rendered.py'
       - 'tools/verify_ff7_2013_adapter.py'
       - '.github/workflows/ff7-2013-candidate.yml'

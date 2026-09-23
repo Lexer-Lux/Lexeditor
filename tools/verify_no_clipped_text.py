@@ -346,7 +346,7 @@ def main() -> int:
     live = use_installed_games()
     if live:
         print(json.dumps({"usingInstalledGames": sorted(live)}))
-    plugins = [p.name for p in sorted((ROOT / "games").iterdir())
+    plugins = [p.name for p in sorted((ROOT / "plugins").iterdir())
                if (p / "editor.html").is_file()]
     findings: list[dict] = []
     for plugin in plugins:

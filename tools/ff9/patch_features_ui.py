@@ -5,7 +5,7 @@ on stale source transforms. The UI is now checked as shipped instead.
 """
 from pathlib import Path
 
-source = Path("games/ff9/editor.js").read_text(encoding="utf-8")
+source = Path("plugins/ff9/editor.js").read_text(encoding="utf-8")
 required = (
     "ImprovedInterface", "BetterEat", "XPBars", "HPMPBars", "RowRework",
     "/api/features/save", "/api/deployment/${action}", "LexeditorUI.reshadeSection",

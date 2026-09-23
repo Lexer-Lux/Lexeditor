@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.rdr2 import unique_gun_parts as ugp
+from plugins.rdr2 import unique_gun_parts as ugp
 
 
 class PrototypeValidityTests(unittest.TestCase):

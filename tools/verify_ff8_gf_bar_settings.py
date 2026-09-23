@@ -5,7 +5,7 @@ import sys
 import tempfile
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from games.ff8 import gameplay_settings as settings
+from plugins.ff8 import gameplay_settings as settings
 
 
 def run():
@@ -31,7 +31,7 @@ def run():
             else: raise AssertionError('Invalid GF bar value was accepted')
         assert 'gfHpBars' in settings.ACCEPTED_TWEAKS
     # The page and the modules it loads.
-    ui=chr(10).join(path.read_text(encoding='utf-8') for path in [ROOT/'games/ff8/editor.html',*sorted((ROOT/'games/ff8').glob('*.js'))])
+    ui=chr(10).join(path.read_text(encoding='utf-8') for path in [ROOT/'plugins/ff8/editor.html',*sorted((ROOT/'plugins/ff8').glob('*.js'))])
     assert 'gfHpBars:state.data.settings.gfHpBars' in ui
     assert '"aria-label":\'GF "MP" Bars\'' in ui
     assert 'platformConfigView({config:state.platformConfig,showHeader:false,' in ui

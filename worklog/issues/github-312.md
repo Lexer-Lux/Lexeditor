@@ -10,7 +10,7 @@
 
 ## Current implementation and evidence
 
-- `games/ff8/fixed_command_menu.py` implements the GF learned-command selection and the Siren/Treatment learning gate.
+- `plugins/ff8/fixed_command_menu.py` implements the GF learned-command selection and the Siren/Treatment learning gate.
 - Switch, Shoot, Defend, Draw, and Summon have concrete sources or custom payloads.
 - Rinoa/Angelo is still explicitly unimplemented. That is the remaining functional blocker before #312 can enter player acceptance.
 

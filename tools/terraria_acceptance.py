@@ -26,7 +26,7 @@ def _application_root() -> Path:
 ROOT = _application_root()
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-TEMPLATE_ROOT = ROOT / "games" / "terraria" / "template"
+TEMPLATE_ROOT = ROOT / "plugins" / "terraria" / "template"
 DEFAULT_SAVE_ROOT = Path.home() / "Documents" / "My Games" / "Terraria" / "tModLoader"
 DEFAULT_INSTALL_ROOT = Path(r"C:\Program Files (x86)\Steam\steamapps\common\tModLoader")
 
@@ -69,8 +69,8 @@ def populate_acceptance_project(project: Path) -> list[dict]:
         raise ValueError(f"Terraria template is missing: {TEMPLATE_ROOT}")
 
     # Imports are deliberately delayed so the caller can configure Terraria env vars first.
-    from games.terraria.plugin import initialize_project
-    from games.terraria.structured_content import create_structured_content
+    from plugins.terraria.plugin import initialize_project
+    from plugins.terraria.structured_content import create_structured_content
 
     try:
         shutil.copytree(TEMPLATE_ROOT, project)
@@ -126,7 +126,7 @@ def main(argv: list[str] | None = None) -> int:
     name = args.name or default_project_name()
     project = save_root / "ModSources" / name
 
-    # These must be set before importing games.terraria.server/plugin because those modules
+    # These must be set before importing plugins.terraria.server/plugin because those modules
     # intentionally resolve the configured save/install roots at import time.
     os.environ["LEXEDITOR_TERRARIA_ROOT"] = str(install_root)
     os.environ["LEXEDITOR_TERRARIA_SAVE_ROOT"] = str(save_root)
@@ -159,7 +159,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     try:
-        from games.terraria import server
+        from plugins.terraria import server
 
         status = server.build_status("nt")
         if not status.get("available"):

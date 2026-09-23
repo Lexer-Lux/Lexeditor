@@ -18,7 +18,7 @@ EXPECTED_SHA256 = "064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 
-from games.ff8.plugin import FF8Session  # noqa: E402
+from plugins.ff8.plugin import FF8Session  # noqa: E402
 from render_crime_editors_55_62 import wait_eval  # noqa: E402
 from tools.verify_panel_layout_visual_46 import (  # noqa: E402
     browser_session, close_browser, screenshot,
@@ -138,7 +138,7 @@ def verify_executable() -> dict:
 
 
 def verify_source_and_render() -> dict:
-    editor = (ROOT / "games/ff8/editor.html").read_text(encoding="utf-8")
+    editor = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
     formulae = editor[editor.index("function renderFormulae"):
                       editor.index("async function saveAll")]
     assert "Not yet transcribed from the game" not in formulae

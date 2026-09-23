@@ -6,7 +6,7 @@
 
 The blocker asked for the Difficulty-to-stored-rate contract to be made
 explicit before touching the native Mug comparison. Done in
-`games/ff8/formulae_rework.py`: `mug_difficulty_from_rate` maps the stored
+`plugins/ff8/formulae_rework.py`: `mug_difficulty_from_rate` maps the stored
 Mug rate byte (0-100, higher is easier) to Difficulty (100 - rate), and
 `mug_stored_success_chance` applies the requested formula to a stored byte
 while keeping vanilla immunity for rate 0. Two committed tests cover the

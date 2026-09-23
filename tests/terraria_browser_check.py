@@ -168,7 +168,7 @@ def main() -> None:
         for i in range(18):
             shutil.copyfile(sample_png, asset_dir / f"BrowserExtra{i:02d}.png")
 
-        from games.terraria.plugin import TerrariaSession
+        from plugins.terraria.plugin import TerrariaSession
         with TerrariaSession({
             "LEXEDITOR_TERRARIA_ROOT": str(install_root),
             "LEXEDITOR_TERRARIA_SAVE_ROOT": str(save_root),

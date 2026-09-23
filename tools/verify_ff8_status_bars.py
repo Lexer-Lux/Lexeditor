@@ -16,7 +16,7 @@ import pefile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-MODULE_DIR = ROOT / "games/ff8/ffnx_status_bars"
+MODULE_DIR = ROOT / "plugins/ff8/ffnx_status_bars"
 SOURCE = MODULE_DIR / "ffnx-src/lexeditor_ff8_bars.cpp"
 APPLICATOR = MODULE_DIR / "apply_to_ffnx.py"
 FFNX = ROOT / "_scratch/ffnx-upstream"
@@ -274,7 +274,7 @@ def main() -> int:
         verify_applied_tree(fixture)
         mutation_checks(source, fixture)
 
-    from games.ff8 import gameplay_settings
+    from plugins.ff8 import gameplay_settings
 
     with tempfile.TemporaryDirectory() as temporary:
         project = Path(temporary)
@@ -304,10 +304,10 @@ def main() -> int:
         require(configured.count("enable_ff8_hp_bars = true") == 1,
                 "HP bar activation was not replaced")
 
-    gameplay_source = (ROOT / "games/ff8/gameplay_settings.py").read_text(encoding="utf-8")
+    gameplay_source = (ROOT / "plugins/ff8/gameplay_settings.py").read_text(encoding="utf-8")
     # The page and the modules it loads beside it.
     editor = "\n".join(path.read_text(encoding="utf-8") for path in
-                       [ROOT / "games/ff8/editor.html", *sorted((ROOT / "games/ff8").glob("*.js"))])
+                       [ROOT / "plugins/ff8/editor.html", *sorted((ROOT / "plugins/ff8").glob("*.js"))])
     for key, label in (("xpBars", "XP BARS"), ("hpBars", "HP BARS")):
         require(f'"{key}": False' in gameplay_source,
                 f"new mods do not default {key} off")

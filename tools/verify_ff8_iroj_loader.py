@@ -14,7 +14,7 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import iroj_archive, paths, runtime_layout, server
+from plugins.ff8 import iroj_archive, paths, runtime_layout, server
 def _archive(path: Path, members: list[tuple[str, bytes, int]]) -> None:
     encoded = []
     for name, plain, compression in members:

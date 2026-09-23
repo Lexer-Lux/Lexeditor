@@ -11,7 +11,7 @@ WORK = ROOT / '_scratch' / 'modern-camera-core-test'
 
 def main():
     WORK.mkdir(exist_ok=True)
-    header = ROOT / 'games/ff8/ffnx_modern_controls/camera_axis.h'
+    header = ROOT / 'plugins/ff8/ffnx_modern_controls/camera_axis.h'
     cpp = '#include "' + header.as_posix() + '"\n' + r'''
 #include <cstdio>
 #include <cassert>

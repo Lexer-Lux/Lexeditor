@@ -16,7 +16,7 @@ VCVARS = Path(r"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\V
 class FlarePolicyTests(unittest.TestCase):
     @unittest.skipUnless(os.name == "nt" and VCVARS.exists(), "Windows C++ Build Tools required")
     def test_compiled_policy_restores_failed_requests_and_temporary_movement(self):
-        header = ROOT / "games/ff8/ffnx_gameplay_extensions/ffnx-src/flare_encounter.h"
+        header = ROOT / "plugins/ff8/ffnx_gameplay_extensions/ffnx-src/flare_encounter.h"
         code = '#include "' + header.as_posix() + '"\n' + r'''
 #include <cstring>
 int main() {
@@ -96,8 +96,8 @@ class NativeWorldSelectorTests(unittest.TestCase):
             import pefile
         except ImportError as error:
             raise unittest.SkipTest(str(error))
-        from games.ff8 import paths
-        from games.ff8.ffnx_issue_51 import runtime_package
+        from plugins.ff8 import paths
+        from plugins.ff8.ffnx_issue_51 import runtime_package
         if not (paths.GAME_ROOT / "FF8_EN.exe").is_file():
             raise unittest.SkipTest("Supported private FF8 executable required")
         executable = runtime_package.verify_game_installation(paths.GAME_ROOT)
@@ -426,7 +426,7 @@ class NativeWorldSelectorTests(unittest.TestCase):
         u = Uc(UC_ARCH_X86, UC_MODE_32)
         u.mem_map(0x400000, 0x3000000)
         u.mem_write(0x400000, self.image)
-        source = (ROOT / "games/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_flare_shop.cpp").read_text()
+        source = (ROOT / "plugins/ff8/ffnx_gameplay_extensions/ffnx-src/lexeditor_ff8_flare_shop.cpp").read_text()
         for name, expected in (("id_operands", 0x1D8D038), ("quantity_operands", 0x1D8D039),
                                ("end_operands", 0x1D8D058)):
             body = re.search(name + r"\[\]\s*=\s*\{([^}]+)\}", source).group(1)

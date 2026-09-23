@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.project_data import read_source, save_source
+from plugins.bannerlord.project_data import read_source, save_source
 
 
 class BannerlordSourceSafetyTests(unittest.TestCase):

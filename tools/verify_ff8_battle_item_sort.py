@@ -5,7 +5,7 @@ import random
 import struct
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.ff8 import inventory_auto_sort as source
+from plugins.ff8 import inventory_auto_sort as source
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32
 from unicorn.x86_const import UC_X86_REG_ESP
 

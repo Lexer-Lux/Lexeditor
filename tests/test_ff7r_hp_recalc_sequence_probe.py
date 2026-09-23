@@ -1,7 +1,7 @@
 import struct
 
-from games.ff7r.hp_recalc_sequence_probe import analyze_hp_recalc_call_sequences
-from games.ff7r.native_probe import PEImage, RuntimeFunction, Section
+from plugins.ff7r.hp_recalc_sequence_probe import analyze_hp_recalc_call_sequences
+from plugins.ff7r.native_probe import PEImage, RuntimeFunction, Section
 
 
 def _assessment(*, collision=False):

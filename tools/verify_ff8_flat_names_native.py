@@ -2,7 +2,7 @@
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.ff8 import kernel_text, flat_stat_abilities as flat, formats
+from plugins.ff8 import kernel_text, flat_stat_abilities as flat, formats
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32
 from unicorn.x86_const import UC_X86_REG_EDI, UC_X86_REG_ESP, UC_X86_REG_ECX
 

@@ -2,8 +2,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.dependency_relations import dependency_declaration_conflicts
-from games.bannerlord.game_launch import module_load_order
+from plugins.bannerlord.dependency_relations import dependency_declaration_conflicts
+from plugins.bannerlord.game_launch import module_load_order
 
 
 def module_model(*, dependencies=(), load_after=(), incompatible=()):

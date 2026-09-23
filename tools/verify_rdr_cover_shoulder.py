@@ -6,7 +6,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.rdr.camera_features import (
+from plugins.rdr.camera_features import (
     COVER_ASSIGNMENT_LINE,
     CAMERA_ENTRY_RELATIVE,
     ensure_cover_shoulder_override,

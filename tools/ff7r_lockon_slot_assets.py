@@ -20,8 +20,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from games.ff7r.lockon_probe import probe_better_lockon_sources  # noqa: E402
-from games.ff7r.lockon_slot_asset_probe import (  # noqa: E402
+from plugins.ff7r.lockon_probe import probe_better_lockon_sources  # noqa: E402
+from plugins.ff7r.lockon_slot_asset_probe import (  # noqa: E402
     correlate_marker_slots_to_assets,
     plan_red_reticle_rewrites,
 )

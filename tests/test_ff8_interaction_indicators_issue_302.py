@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.ff8 import gameplay_settings
+from plugins.ff8 import gameplay_settings
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -38,7 +38,7 @@ class InteractionIndicatorTests(unittest.TestCase):
             )
 
     def test_editor_exposes_non_invasive_semantics(self):
-        editor = (ROOT / "games/ff8/boot.js").read_text(encoding="utf-8")
+        editor = (ROOT / "plugins/ff8/boot.js").read_text(encoding="utf-8")
         self.assertIn('"aria-label":"Interaction Indicators"', editor)
         self.assertIn('row("INTERACTION INDICATORS"', editor)
         self.assertIn("never presses a button", editor)

@@ -17,8 +17,8 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.ff8 import ffnx_manager, gameplay_settings
-from games.ff8.ffnx_issue_51 import runtime_package
+from plugins.ff8 import ffnx_manager, gameplay_settings
+from plugins.ff8.ffnx_issue_51 import runtime_package
 from tools.package_ff8_native_driver import NEW_DRIVER_MARKERS, SUPPORT_FILES, sections
 
 
@@ -31,7 +31,7 @@ def run() -> None:
     print('PASS: shipping package pins, PE exports/manifest, new native modules and full source provenance')
 
     # Check the actual Git smudge/checkout path, not a Python newline model.
-    relative = Path('games/ff8/ffnx_issue_51/package')
+    relative = Path('plugins/ff8/ffnx_issue_51/package')
     with tempfile.TemporaryDirectory(prefix='ff8-package-checkout-') as directory:
         repo = Path(directory) / 'repo'
         repo.mkdir()

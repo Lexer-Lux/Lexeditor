@@ -103,7 +103,7 @@ def framework_counts(path: Path) -> dict:
 
 def plugin_sheets() -> dict[str, list[Path]]:
     sheets = collections.defaultdict(list)
-    for path in sorted((ROOT / "games").glob("*/*.css")):
+    for path in sorted((ROOT / "plugins").glob("*/*.css")):
         sheets[path.parent.name].append(path)
     return dict(sheets)
 

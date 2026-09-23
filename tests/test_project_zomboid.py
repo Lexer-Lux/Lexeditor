@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.project_zomboid import core
+from plugins.project_zomboid import core
 
 
 SCRIPT = """module LexTest

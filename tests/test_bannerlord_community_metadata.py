@@ -2,9 +2,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.community_metadata import community_version_matches, read_community_dependencies
-from games.bannerlord.game_launch import module_load_order
-from games.bannerlord.runtime_data import deployment_status
+from plugins.bannerlord.community_metadata import community_version_matches, read_community_dependencies
+from plugins.bannerlord.game_launch import module_load_order
+from plugins.bannerlord.runtime_data import deployment_status
 
 
 def write_module(

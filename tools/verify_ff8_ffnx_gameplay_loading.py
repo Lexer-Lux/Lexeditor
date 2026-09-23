@@ -12,7 +12,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import ffnx_manager, gameplay_settings  # noqa: E402
+from plugins.ff8 import ffnx_manager, gameplay_settings  # noqa: E402
 
 
 def main() -> int:

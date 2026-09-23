@@ -4,7 +4,7 @@ from test_shared_ui_feedback import ROOT, page, framework
 
 def test_quantity_is_one_row_at_each_panel_width(page):
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''() => {
       const U=LexeditorUI;
       const choice=U.choiceField(U.inlineLabel(U.el('span',{},'Potion')),U.el('button',{},U.selectionIcon()));
@@ -26,7 +26,7 @@ def test_quantity_is_one_row_at_each_panel_width(page):
 
 def test_help_circle_and_portrait_tabs_keep_shape(page):
     framework(page)
-    page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''() => {
       const U=LexeditorUI,src='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="60"><rect width="40" height="60" fill="red"/></svg>';
       const tabs=U.subtabBar({images:true,shortcuts:false,active:0,tabs:Array.from({length:16},(_,id)=>({id,label:U.el('img',{src,alt:'GF '+id})}))});

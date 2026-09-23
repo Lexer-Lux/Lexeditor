@@ -13,10 +13,10 @@ class ProjectZomboidDistributionTests(unittest.TestCase):
     def test_project_zomboid_editor_and_template_are_packaged(self):
         resources = {path.relative_to(ROOT).as_posix() for path in resource_files(ROOT)}
         for relative in (
-            "games/project_zomboid/editor.html",
-            "games/project_zomboid/editor.js",
-            "games/project_zomboid/editor.css",
-            "games/project_zomboid/template/42/mod.info",
+            "plugins/project_zomboid/editor.html",
+            "plugins/project_zomboid/editor.js",
+            "plugins/project_zomboid/editor.css",
+            "plugins/project_zomboid/template/42/mod.info",
         ):
             with self.subTest(relative=relative):
                 self.assertIn(relative, resources)

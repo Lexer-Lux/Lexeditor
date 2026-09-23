@@ -56,7 +56,7 @@ The reverse-engineering projects are factual format cross-checks; their source i
   - Stage 0 is spawned with Windows `CREATE_NO_WINDOW`; Lexeditor does not allocate a helper console.
   - the Square Enix collection launcher is never used.
 - `/api/launch`, dashboard state, Data Map, and explicit **Play FFX / Play FFX-2** UI controls expose fixed launch readiness.
-- Read-only real-install verifier: `python -m games.ffx_x2.verify_install`.
+- Read-only real-install verifier: `python -m plugins.ffx_x2.verify_install`.
   - validates both actual installed VBFs;
   - resolves raw/canonical source paths;
   - parses every currently claimed structured table with production parsers;
@@ -77,7 +77,7 @@ Reviewed against current `master` `72ee978`, not the older branch snapshots:
 - `docs/ADDING_A_GAME.md` `7fe6d35` — markup-only page modules, shared UI budget, helper/update rules and acceptance ladder.
 - `docs/UI-MANUAL.md` `14a3269` — Table + Detail identity/group/help semantics.
 - `ui/component-catalog.js` `a11e52e` — shared component inventory.
-- Blank gallery: `games/blank/editor.html` `b0b235d`, `editor.js` `bec94d0`, `editor.css` `4e01602`.
+- Blank gallery: `plugins/blank/editor.html` `b0b235d`, `editor.js` `bec94d0`, `editor.css` `4e01602`.
 - RDR2 Table + Detail references: `items.js` `a42f987`, `loot.js` `5483171`, `crafting.js` `a92cd8c`, `effects.js` `ae814a1`.
 
 Requirement / gap / evidence:
@@ -131,11 +131,11 @@ Current safe behavior remains interoperability with an existing Fahrenheit insta
   deletions kept on conflict.
 - Fixed a real editor race: concurrent `renderGroup` calls joined a half-loaded
   dataset and rendered a stuck empty view. `ensureDataset`/`ensureArchive` now join
-  the in-flight load (`games/ffx_x2/editor.js`). Fast tab switches are the repro.
+  the in-flight load (`plugins/ffx_x2/editor.js`). Fast tab switches are the repro.
 - Repaired the browser harness: subtab center-clicks land on the `?` help at narrow
   widths (label shrinks to a sliver), so `_open_dataset` activates tabs by keyboard,
   asserts `aria-selected`, and waits for list auto-fit to settle before touching rows.
-- Removed one `!important` split override from `games/ffx_x2/editor.css` (splitter
+- Removed one `!important` split override from `plugins/ffx_x2/editor.css` (splitter
   default already matches); registered the `ffx_x2: 25` CSS ceiling, important 0.
 - Cut chrono-trigger entries that leaked into this branch out of `ui/mod-loading.json`,
   `ui/credits.json`, `ui/credits-sources.json`; they return with the Chrono branch.
@@ -156,3 +156,15 @@ Current safe behavior remains interoperability with an existing Fahrenheit insta
 - On a real Steam collection, run `worklog/acceptance/ffx-x2/run-verifier.ps1` to capture the baseline, test one byte-identical EFL replacement in each game, verify actual **Play FFX / Play FFX-2** Stage 0 startup and reversible structured round trips, then rerun with `-BaselinePath` to prove both installed VBFs remained unchanged.
 
 Do not close #461 or mark PR #462 ready from synthetic/API/CI evidence alone. Real installed-game and in-game acceptance remain the draft exit criteria.
+
+## 2026-09-23 misc-bucket review (no agent slice)
+
+- Verified live: PR #462 is MERGED into `master` (`9640d1e0`, merged
+  2026-09-23T19:29:01Z, head `2555bc75`). Agent-side packaging/CI is done.
+- No code change on `per-game-misc` for this issue. Remaining work is
+  Lexer-only: real Steam app 359870 install with Fahrenheit, run
+  `run-verifier.ps1` baseline, full-catalog UI smoke, byte-identical EFL
+  deploy/startup/revert + Play FFX and Play FFX-2 through Stage 0, one
+  reversible structured round trip per game, then verifier compare proving
+  both installed VBFs byte-identical. Report `baseline.json`/`after.json`
+  plus pass/fail per checklist item on #461.

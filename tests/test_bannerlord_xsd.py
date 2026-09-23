@@ -2,8 +2,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.module_xml_data import read_document, save_document
-from games.bannerlord.xsd_data import find_schema, parse_schema
+from plugins.bannerlord.module_xml_data import read_document, save_document
+from plugins.bannerlord.xsd_data import find_schema, parse_schema
 
 
 SCHEMA = '''<?xml version="1.0" encoding="utf-8"?>

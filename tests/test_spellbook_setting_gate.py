@@ -1,6 +1,6 @@
 """Settings control runtime books without deleting the editable document."""
 from unittest.mock import patch
-from games.ff8 import spellbook_integration as integration, gf_spellbooks as books
+from plugins.ff8 import spellbook_integration as integration, gf_spellbooks as books
 
 
 def test_settings_gate_preserves_books(tmp_path):

@@ -6,11 +6,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import games.ds3.server as ds3_server
-from games.ds3.plugin import PLUGIN, check as plugin_check
-from games.ds3.server import _data_map, _path_within
+import plugins.ds3.server as ds3_server
+from plugins.ds3.plugin import PLUGIN, check as plugin_check
+from plugins.ds3.server import _data_map, _path_within
 from plugin_api import validate_plugin
-from games.ds3.formats import (
+from plugins.ds3.formats import (
     BND4View,
     DS3FormatError,
     RegulationDocument,
@@ -22,7 +22,7 @@ from games.ds3.formats import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-METADATA = ROOT / "games" / "ds3" / "metadata"
+METADATA = ROOT / "plugins" / "ds3" / "metadata"
 
 
 def _row_ids(table: str) -> tuple[int, int]:

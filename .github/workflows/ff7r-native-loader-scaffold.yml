@@ -4,11 +4,11 @@ on:
   push:
     branches: [work/ff7r-native-loader-scaffold, 'work/ff7r-*']
     paths:
-      - 'games/ff7r/native_runtime/**'
+      - 'plugins/ff7r/native_runtime/**'
       - '.github/workflows/ff7r-native-loader-scaffold.yml'
   pull_request:
     paths:
-      - 'games/ff7r/native_runtime/**'
+      - 'plugins/ff7r/native_runtime/**'
       - '.github/workflows/ff7r-native-loader-scaffold.yml'
 
 permissions:
@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Configure
-        run: cmake -S games/ff7r/native_runtime -B out/ff7r-native-runtime -A x64
+        run: cmake -S plugins/ff7r/native_runtime -B out/ff7r-native-runtime -A x64
       - name: Build
         run: cmake --build out/ff7r-native-runtime --config Release --parallel
       - name: Runtime contract test

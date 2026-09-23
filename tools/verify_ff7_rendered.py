@@ -17,7 +17,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 import verify_ff7_datasets as fixtures
 import verify_ff7_completion as complete
 import verify_ff7_extended as extended_fixtures
-from games.ff7 import extended as ex, ai
+from plugins.ff7 import extended as ex, ai
 ROOT=Path(__file__).resolve().parents[1]
 OUT=Path(os.environ.get('FF7_SCREENSHOTS',str(ROOT/'out/ff7-rendered')))
 
@@ -80,14 +80,14 @@ class RenderedTests(unittest.TestCase):
         (game/'FFNx.toml').write_bytes(fixtures.CONFIG)
     def open(self,edition='ff7'):
         self.page.goto('about:blank')
-        html=(ROOT/'games/ff7/editor.html').read_text(encoding='utf-8')
+        html=(ROOT/'plugins/ff7/editor.html').read_text(encoding='utf-8')
         # framework.js resolves optional shared assets relative to document.baseURI.
         # Synthetic set_content() pages otherwise use the non-hierarchical about:blank URL.
         html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
         html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
         code=HOST+'\nwindow.__lexeditorPlugin='+json.dumps({'id':edition,'name':'FF7 fixture','edition':edition})+';\n'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')
         html=html.replace('<script src="/shared/framework.js"></script>','<script>'+code+'</script>')
-        scripts=''.join('<script>'+(ROOT/'games/ff7/'+name).read_text(encoding='utf-8')+'</script>' for name in ('editor.js','controls.js','details.js','workspace.js'))
+        scripts=''.join('<script>'+(ROOT/'plugins/ff7/'+name).read_text(encoding='utf-8')+'</script>' for name in ('editor.js','controls.js','details.js','workspace.js'))
         html=html.replace('<script src="editor.js"></script>',scripts)
         for extra in ('controls.js','details.js','workspace.js'):
             html=html.replace('<script src="%s"></script>'%extra,'')

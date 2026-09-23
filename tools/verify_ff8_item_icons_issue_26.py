@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 
-from games.ff8 import formats  # noqa: E402
-from games.ff8.game_icons import ensure_icons, icon_path, item_icon_id  # noqa: E402
+from plugins.ff8 import formats  # noqa: E402
+from plugins.ff8.game_icons import ensure_icons, icon_path, item_icon_id  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:

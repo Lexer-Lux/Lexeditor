@@ -11,7 +11,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from games.ff8 import ffnx_manager, gameplay_settings, paths
+from plugins.ff8 import ffnx_manager, gameplay_settings, paths
 
 
 def _fresh_log(path: Path, barrier_ns: int) -> str:

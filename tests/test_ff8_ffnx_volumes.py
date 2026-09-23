@@ -5,7 +5,7 @@ import sys
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.ff8.ffnx_manager import set_audio_volumes
+from plugins.ff8.ffnx_manager import set_audio_volumes
 
 
 BASE = "use_external_sfx = true\nexternal_sfx_volume = -1\nexternal_music_volume = -1\n"

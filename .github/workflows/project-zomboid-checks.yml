@@ -4,7 +4,7 @@ on:
   push:
     branches: [master]
     paths:
-      - 'games/project_zomboid/**'
+      - 'plugins/project_zomboid/**'
       - 'tests/test_project_zomboid*.py'
       - 'tests/fixtures/project_zomboid_acceptance/**'
       - 'tools/verify_project_zomboid_ui.py'
@@ -17,7 +17,7 @@ on:
       - '.github/workflows/project-zomboid-checks.yml'
   pull_request:
     paths:
-      - 'games/project_zomboid/**'
+      - 'plugins/project_zomboid/**'
       - 'tests/test_project_zomboid*.py'
       - 'tests/fixtures/project_zomboid_acceptance/**'
       - 'tools/verify_project_zomboid_ui.py'
@@ -51,11 +51,11 @@ jobs:
       - name: Project Zomboid regressions
         run: python -m unittest discover -v -s tests -p 'test_project_zomboid*.py'
       - name: Project Zomboid service smoke
-        run: python -c "from games.project_zomboid.plugin import smoke; [print(line) for line in smoke()]"
+        run: python -c "from plugins.project_zomboid.plugin import smoke; [print(line) for line in smoke()]"
       - name: Python syntax
-        run: python -m compileall -q games/project_zomboid tests
+        run: python -m compileall -q plugins/project_zomboid tests
       - name: Editor JavaScript syntax
-        run: node --check games/project_zomboid/editor.js
+        run: node --check plugins/project_zomboid/editor.js
       - name: Plugin metadata
         run: python plugin_metadata.py
       - name: Offline credits are current

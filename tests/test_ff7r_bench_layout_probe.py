@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from games.ff7r.bench_layout_probe import (
+from plugins.ff7r.bench_layout_probe import (
     classify_object_layout_rows,
     correlate_object_layout_rows,
 )

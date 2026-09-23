@@ -1,4 +1,4 @@
-from games.ff7r.dog_whistle_safety import assess_dog_whistle_probe
+from plugins.ff7r.dog_whistle_safety import assess_dog_whistle_probe
 
 
 def _inbound(*callers):

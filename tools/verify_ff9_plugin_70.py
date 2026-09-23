@@ -10,9 +10,9 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff9 import paths  # noqa: E402
-from games.ff9.memoria_csv import MemoriaCsvDocument, MemoriaDataStore  # noqa: E402
-from games.ff9.plugin import PLUGIN, smoke  # noqa: E402
+from plugins.ff9 import paths  # noqa: E402
+from plugins.ff9.memoria_csv import MemoriaCsvDocument, MemoriaDataStore  # noqa: E402
+from plugins.ff9.plugin import PLUGIN, smoke  # noqa: E402
 from app import discover_plugins  # noqa: E402
 from project_manager import ProjectManager  # noqa: E402
 
@@ -69,7 +69,7 @@ def main() -> int:
         assert fields["Abilities"]["kind"] == "list" and fields["Abilities"]["editable"]
         assert not fields["Id"]["editable"]
         public = document.public_rows(next(value for value in __import__(
-            "games.ff9.memoria_csv", fromlist=["DATASETS"]
+            "plugins.ff9.memoria_csv", fromlist=["DATASETS"]
         ).DATASETS if value.key == "items"))
         assert public[0]["name"] == "Potion"
         assert public[0]["values"]["Price"] == 250

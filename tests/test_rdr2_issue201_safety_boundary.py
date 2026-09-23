@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-RUNTIME = ROOT / "games" / "rdr2" / "native_runtime" / "GameplayTweaks"
+RUNTIME = ROOT / "plugins" / "rdr2" / "native_runtime" / "GameplayTweaks"
 MODULE = RUNTIME / "modules" / "child_vulnerability.cpp"
 
 

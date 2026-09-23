@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from games.ff7r import hp_rebalance_probe as probe
+from plugins.ff7r import hp_rebalance_probe as probe
 
 
 def _entry(index, tag, values):

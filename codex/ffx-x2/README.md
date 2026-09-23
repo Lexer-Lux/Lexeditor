@@ -255,18 +255,18 @@ It requires `fhstage0.exe`, `fhstage1.dll` and the selected game executable. Act
 
 ## Read-only real-install verifier
 
-CI cannot prove the actual Steam inventory, so `games.ffx_x2.verify_install` turns that requirement into a deterministic read-only check.
+CI cannot prove the actual Steam inventory, so `plugins.ffx_x2.verify_install` turns that requirement into a deterministic read-only check.
 
 Typical run:
 
 ```powershell
-python -m games.ffx_x2.verify_install --game-root "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster"
+python -m plugins.ffx_x2.verify_install --game-root "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster"
 ```
 
 Draft-exit baseline with Fahrenheit prerequisites, machine-readable output and complete VBF SHA-256 hashes:
 
 ```powershell
-python -m games.ffx_x2.verify_install --game-root "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" --require-fahrenheit --hash-archives --json
+python -m plugins.ffx_x2.verify_install --game-root "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" --require-fahrenheit --hash-archives --json
 ```
 
 The verifier:

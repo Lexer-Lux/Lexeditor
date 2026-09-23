@@ -16,7 +16,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import formats, kernel_text  # noqa: E402
+from plugins.ff8 import formats, kernel_text  # noqa: E402
 
 
 def pack_sections(payloads: list[bytes]) -> bytes:
@@ -151,7 +151,7 @@ def main() -> int:
     sys.path.insert(0, str(ROOT / "tests"))
     from plugin_ui import plugin_ui
     source = plugin_ui("ff8")
-    server = (ROOT / "games/ff8/server.py").read_text(encoding="utf-8")
+    server = (ROOT / "plugins/ff8/server.py").read_text(encoding="utf-8")
     assert '"text"' in source and 'renderText' in source
     assert '"/api/text"' in server and '"/api/text/save"' in server
     controls = "{NewPage}{Red}{WhiteBlink}{Var0}{Var07}{Varb7}{Wait000}{Wait223}"

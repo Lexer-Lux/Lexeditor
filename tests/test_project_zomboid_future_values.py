@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 import unittest
 
-from games.project_zomboid import core
-from games.project_zomboid.server import _guard_known_select_values
+from plugins.project_zomboid import core
+from plugins.project_zomboid.server import _guard_known_select_values
 
 
 class ProjectZomboidFutureValueTests(unittest.TestCase):

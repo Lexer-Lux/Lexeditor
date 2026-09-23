@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from games.ff7r import tooling
+from plugins.ff7r import tooling
 from tools import build_distribution
 
 OUT = ROOT / "out" / "ff7r-windows-candidate"
@@ -99,7 +99,7 @@ def main() -> None:
     if not internal.is_dir():
         raise RuntimeError("Unexpected PyInstaller onedir layout: _internal is missing")
 
-    frozen_bundle = internal / "games" / "ff7r" / "runtime" / "repak" / tooling.REPAK_TAG
+    frozen_bundle = internal / "plugins" / "ff7r" / "runtime" / "repak" / tooling.REPAK_TAG
     helper = verify_windows_repak(frozen_bundle)
 
     local_appdata = OUT / "candidate-localappdata"

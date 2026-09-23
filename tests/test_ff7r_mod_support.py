@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from games.ff7r import tooling
-from games.ff7r.mod_support import PakModAdapter
-from games.ff7r.project_deployment import (
+from plugins.ff7r import tooling
+from plugins.ff7r.mod_support import PakModAdapter
+from plugins.ff7r.project_deployment import (
     deploy_built_pak,
     deployed_pak_path,
     marker_path,

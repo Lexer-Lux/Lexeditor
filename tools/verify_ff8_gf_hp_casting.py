@@ -5,8 +5,8 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import pefile
 from unicorn import Uc,UC_ARCH_X86,UC_MODE_32,UC_HOOK_CODE
 from unicorn.x86_const import *
-from games.ff8 import gf_hp_casting as casting,gf_hp_casting_asm as a,max_spell
-from games.ff8.gf_hp_casting_code import SOURCE_SHA256
+from plugins.ff8 import gf_hp_casting as casting,gf_hp_casting_asm as a,max_spell
+from plugins.ff8.gf_hp_casting_code import SOURCE_SHA256
 assert hashlib.sha256(repr(a.SOURCES).encode()).hexdigest()==SOURCE_SHA256, "Reassemble changed GF HP Casting source"
 EXE=Path(r'D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe')
 raw=EXE.read_bytes()
@@ -78,7 +78,7 @@ for cost in (0,1,255,9999):
 print('GF HP Casting: 336 actor/GF affordability cases, queued costs, rejection, live HP, Items and display passed')
 # Save/load and dependency checks use a disposable project, never the active mod.
 from tempfile import TemporaryDirectory
-from games.ff8 import gameplay_settings as settings,paths
+from plugins.ff8 import gameplay_settings as settings,paths
 with TemporaryDirectory(prefix='lexeditor-gf-cost-save-') as tmp:
  root=Path(tmp);project=root/'project';settings.initialize_project(project)
  data=settings.load(project,paths.GAME_ROOT)

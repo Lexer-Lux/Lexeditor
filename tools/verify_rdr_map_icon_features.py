@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.rdr import map_icon_features as icons
+from plugins.rdr import map_icon_features as icons
 
 
 def mip_bytes(width: int, height: int, levels: int, block: int) -> int:

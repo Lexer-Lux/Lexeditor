@@ -2,8 +2,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.game_launch import module_load_order
-from games.bannerlord.runtime_data import deployment_status
+from plugins.bannerlord.game_launch import module_load_order
+from plugins.bannerlord.runtime_data import deployment_status
 
 
 def write_module(root: Path, module_id: str, *, dependencies=(), load_after=()) -> Path:

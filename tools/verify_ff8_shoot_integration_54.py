@@ -13,8 +13,8 @@ import urllib.error
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import paths  # noqa: E402
-from games.ff8.plugin import FF8Session  # noqa: E402
+from plugins.ff8 import paths  # noqa: E402
+from plugins.ff8.plugin import FF8Session  # noqa: E402
 from service_session import request_json  # noqa: E402
 
 

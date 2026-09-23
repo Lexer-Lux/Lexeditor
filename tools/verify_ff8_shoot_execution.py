@@ -1,7 +1,7 @@
 """Execute fixed Shoot queue, native timer setup and ATB debit without launching FF8."""
 from verify_ff8_scan_draw_execution import machine, run, put32, read32, pe, STACK, STOP
 from unicorn.x86_const import *
-from games.ff8 import shoot_issue_54 as s
+from plugins.ff8 import shoot_issue_54 as s
 
 for site in s.QUEUE_CALLS:
     assert pe.get_data(site-0x400000,5)==s._near(site,s.QUEUE_FUNCTION,b'\xe8')

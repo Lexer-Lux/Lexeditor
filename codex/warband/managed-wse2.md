@@ -1,7 +1,7 @@
 # Managed WSE2 contract
 
 The initial pin is WSE2 v1.1.5.1 / Lexeditor package 1.1.5.1-lex1. The package is
-bundled under `games/warband/runtime/`, not selected from latest-release metadata.
+bundled under `plugins/warband/runtime/`, not selected from latest-release metadata.
 The deterministic build tool verifies the publisher ZIP and the repack digest.
 Engine and Steam component bytes are unmodified; the updating launcher, servers
 and PDBs are excluded. This is custom packaging, not a source-built engine fork.

@@ -3,7 +3,7 @@ from __future__ import annotations
 import struct
 import unittest
 
-from games.rdr import rbf
+from plugins.rdr import rbf
 
 
 def record(index: int, kind: int, name: str | None = None, payload: bytes = b"") -> bytes:

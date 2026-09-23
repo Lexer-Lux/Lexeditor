@@ -9,7 +9,7 @@ import urllib.request
 
 import pytest
 
-from games.ffx_x2 import ffx2_jobs, server
+from plugins.ffx_x2 import ffx2_jobs, server
 
 
 def _fixture(record_size: int = ffx2_jobs.RECORD_SIZE) -> bytes:

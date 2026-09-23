@@ -18,7 +18,7 @@ OUT.mkdir(parents=True,exist_ok=True)
 # Derived, never hand-listed: a hardcoded tuple silently skipped ff7r, so its
 # Data Map went unchecked from the day the plugin landed. New plugins are
 # covered by existing. ff7_2013 is an edition of ff7 rather than its own folder.
-GAMES=tuple(sorted({p.name for p in (ROOT/'games').iterdir()
+GAMES=tuple(sorted({p.name for p in (ROOT/'plugins').iterdir()
                     if (p/'editor.html').is_file()} | {'ff7_2013'}))
 if os.environ.get('DATAMAP_GAMES'):
     GAMES=tuple(os.environ['DATAMAP_GAMES'].split(','))
@@ -33,7 +33,7 @@ OPEN_TARGETS={'bannerlord':'skills','stardew_valley':'objects'}
 
 def html_for(game):
     source_game='ff7' if game=='ff7_2013' else game
-    game_root=ROOT/'games'/source_game
+    game_root=ROOT/'plugins'/source_game
     html=(game_root/'editor.html').read_text(encoding='utf-8')
     # Synthetic set_content() documents otherwise use about:blank, which cannot
     # resolve the shared framework's optional relative assets or push fragment URLs.
@@ -47,7 +47,7 @@ def html_for(game):
     # A plugin page loads its code and styles from modules beside it. There is
     # no server here, so every one the page names is inlined where it stands,
     # or nothing of the plugin runs and it looks like a plugin that failed to boot.
-    folder=ROOT/'games'/source_game
+    folder=ROOT/'plugins'/source_game
     html=re.sub(r'<script src="(?!/shared/)/?([A-Za-z0-9_./-]+\.js)"></script>',
                 lambda m:'<script>'+(folder/Path(m[1]).name).read_text(encoding='utf-8').replace('</script','<\\/script')+'</script>',html)
     html=re.sub(r'<link rel="stylesheet" href="(?!/shared/)/?([A-Za-z0-9_./-]+\.css)">',

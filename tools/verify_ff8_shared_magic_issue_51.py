@@ -13,8 +13,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-MODULE_PATH = ROOT / "games" / "ff8" / "shared_magic_issue_51.py"
-CORE_ROOT = ROOT / "games" / "ff8" / "ffnx_issue_51"
+MODULE_PATH = ROOT / "plugins" / "ff8" / "shared_magic_issue_51.py"
+CORE_ROOT = ROOT / "plugins" / "ff8" / "ffnx_issue_51"
 AUDIT_PATH = CORE_ROOT / "audit_magic_accesses.py"
 INSTALLED_EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")
 

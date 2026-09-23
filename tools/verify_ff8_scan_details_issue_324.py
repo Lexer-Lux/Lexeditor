@@ -9,9 +9,9 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import enemy_tables, scan_details, scan_text
+from plugins.ff8 import enemy_tables, scan_details, scan_text
 
-SCHEMA = ROOT / "games" / "ff8" / "schema"
+SCHEMA = ROOT / "plugins" / "ff8" / "schema"
 
 
 def main() -> int:
@@ -66,7 +66,7 @@ def main() -> int:
     assert "Devour High: Unknown 42" in neutral
     scan_text.encode_text(neutral)
 
-    editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
     for marker in (
         "enemyGeneratedScanDetails", "UPDATE DETAILS", "UPDATE ALL",
         "choices.devour", "cut-offs differ for a few vanilla enemies",

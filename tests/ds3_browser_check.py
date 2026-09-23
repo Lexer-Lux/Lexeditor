@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
-from games.ds3.formats import encrypt_regulation
+from plugins.ds3.formats import encrypt_regulation
 from service_session import LocalPluginSession, request_json
 from test_ds3_plugin import _bnd4, _row_ids
 
@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
         }
 
         session = LocalPluginSession(
-            module="games.ds3.server",
+            module="plugins.ds3.server",
             plugin_id="ds3",
             app_root=ROOT,
             check=lambda: [],
@@ -162,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
             raise RuntimeError("Browser acceptance modified the installed/source Data0.bdt")
 
         with LocalPluginSession(
-            module="games.ds3.server",
+            module="plugins.ds3.server",
             plugin_id="ds3",
             app_root=ROOT,
             check=lambda: [],

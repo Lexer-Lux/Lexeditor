@@ -44,7 +44,7 @@ patch. It is not an Actions artifact or official release.
 `out/ff8-native-candidate/` contains the source patch, input hashes, BUILD.txt,
 PDB, test instructions and one rollback under `local-install/`. Original DLL:
 `655ca256e95bfc48e6d5a8d1e969ca75276f278d6d830d9d573142eee607a473`.
-Rollback: `.venv/Scripts/python.exe -m games.ff8.local_native_candidate rollback out/ff8-native-candidate`.
+Rollback: `.venv/Scripts/python.exe -m plugins.ff8.local_native_candidate rollback out/ff8-native-candidate`.
 The installer checks the supported EXE, explicit DLL hash, PE exports/XML,
 provenance and closed-game state; it preserves settings and refuses unrelated
 later DLL replacements. Official package trust policy is unchanged.

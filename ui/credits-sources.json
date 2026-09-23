@@ -152,7 +152,7 @@
       "licenses": [
         {
           "name": "FF7 format/runtime reference notices",
-          "sourcePath": "games/ff7/THIRD_PARTY.md"
+          "sourcePath": "plugins/ff7/THIRD_PARTY.md"
         }
       ]
     },
@@ -206,15 +206,15 @@
       "licenses": [
         {
           "name": "FF7R references and tools — source/license notices",
-          "sourcePath": "games/ff7r/THIRD_PARTY.md"
+          "sourcePath": "plugins/ff7r/THIRD_PARTY.md"
         },
         {
           "name": "repak — MIT License",
-          "sourcePath": "games/ff7r/runtime/repak/v0.2.3/LICENSE-MIT"
+          "sourcePath": "plugins/ff7r/runtime/repak/v0.2.3/LICENSE-MIT"
         },
         {
           "name": "repak — Apache License 2.0",
-          "sourcePath": "games/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE"
+          "sourcePath": "plugins/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE"
         }
       ]
     },
@@ -285,13 +285,13 @@
       "licenses": [
         {
           "name": "Shader Injector — MIT License",
-          "sourcePath": "games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt"
+          "sourcePath": "plugins/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt"
         }
       ]
     },
     "ff8": {
-      "source": "games/ff8/credits.json",
-      "licenseRoot": "games/ff8"
+      "source": "plugins/ff8/credits.json",
+      "licenseRoot": "plugins/ff8"
     },
     "ff9": {
       "contributions": [
@@ -320,7 +320,7 @@
       "licenses": [
         {
           "name": "FF9 references — source and license notices",
-          "sourcePath": "games/ff9/THIRD_PARTY.md"
+          "sourcePath": "plugins/ff9/THIRD_PARTY.md"
         }
       ]
     },
@@ -341,13 +341,13 @@
       "licenses": [
         {
           "name": "Palworld / PalSchema references — source and license notes",
-          "sourcePath": "games/palworld/THIRD_PARTY.md"
+          "sourcePath": "plugins/palworld/THIRD_PARTY.md"
         }
       ]
     },
     "project-zomboid": {
-      "source": "games/project_zomboid/credits.json",
-      "licenseRoot": "games/project_zomboid"
+      "source": "plugins/project_zomboid/credits.json",
+      "licenseRoot": "plugins/project_zomboid"
     },
     "warband": {
       "contributions": [
@@ -374,7 +374,7 @@
         },
         {
           "name": "Warband Module System schema reference — MIT",
-          "sourcePath": "games/warband/THIRD_PARTY.md"
+          "sourcePath": "plugins/warband/THIRD_PARTY.md"
         }
       ]
     },
@@ -441,11 +441,11 @@
       "licenses": [
         {
           "name": "PyLibDrawable — source notice",
-          "sourcePath": "games/rdr2/vendor/reddead2blend/NOTICE.md"
+          "sourcePath": "plugins/rdr2/vendor/reddead2blend/NOTICE.md"
         },
         {
           "name": "PyLibDrawable — MIT",
-          "sourcePath": "games/rdr2/vendor/reddead2blend/LICENSE"
+          "sourcePath": "plugins/rdr2/vendor/reddead2blend/LICENSE"
         },
         {
           "name": "RPF tool — source notice",
@@ -461,7 +461,7 @@
         },
         {
           "name": "MinHook — BSD 2-Clause License",
-          "sourcePath": "games/rdr2/native_runtime/GameplayTweaks/third_party/minhook/LICENSE.txt"
+          "sourcePath": "plugins/rdr2/native_runtime/GameplayTweaks/third_party/minhook/LICENSE.txt"
         }
       ]
     },
@@ -554,7 +554,7 @@
       "licenses": [
         {
           "name": "FFX/X-2 references — source and BSD notice",
-          "sourcePath": "games/ffx_x2/THIRD_PARTY.md"
+          "sourcePath": "plugins/ffx_x2/THIRD_PARTY.md"
         }
       ]
     },
@@ -570,8 +570,8 @@
       "licenses": []
     },
     "ds3": {
-      "source": "games/ds3/credits.json",
-      "licenseRoot": "games/ds3"
+      "source": "plugins/ds3/credits.json",
+      "licenseRoot": "plugins/ds3"
     },
     "chrono-trigger": {
       "contributions": [
@@ -605,7 +605,7 @@
       "licenses": [
         {
           "name": "Chrono Trigger research sources — licenses and evidence limits",
-          "sourcePath": "games/chrono_trigger/THIRD_PARTY.md"
+          "sourcePath": "plugins/chrono_trigger/THIRD_PARTY.md"
         }
       ]
     }

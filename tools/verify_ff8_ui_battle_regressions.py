@@ -75,7 +75,7 @@ def run(framework_path: Path, *, executable: str | None = None) -> None:
     from playwright.sync_api import sync_playwright
 
     framework = framework_path.read_text(encoding="utf-8")
-    editor = (ROOT / "games/ff8/boot.js").read_text(encoding="utf-8")
+    editor = (ROOT / "plugins/ff8/boot.js").read_text(encoding="utf-8")
     assert "platformConfigView({config:state.platformConfig,showHeader:false," in editor
     with sync_playwright() as playwright:
         kwargs = {"headless": True}

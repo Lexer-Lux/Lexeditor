@@ -8,9 +8,9 @@ import unittest
 from verify_ff7_semantic_surface import SemanticSurfaceTests
 
 import verify_ff7_datasets as fixtures
-from games.ff7 import kernel as base
-from games.ff7.datasets import Kernel, load_datasets, save_datasets
-from games.ff7.format_codec import pack_strings
+from plugins.ff7 import kernel as base
+from plugins.ff7.datasets import Kernel, load_datasets, save_datasets
+from plugins.ff7.format_codec import pack_strings
 
 
 class AccessoryDescriptionTests(unittest.TestCase):

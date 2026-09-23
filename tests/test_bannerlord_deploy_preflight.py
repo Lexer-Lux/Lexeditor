@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.bannerlord.deploy_data import sync_project_assets
+from plugins.bannerlord.deploy_data import sync_project_assets
 
 
 def write_project(root: Path) -> Path:
@@ -130,7 +130,7 @@ class BannerlordDeployPreflightTests(unittest.TestCase):
                     raise OSError("stage copy failed")
                 return real_copy2(source, destination, *args, **kwargs)
 
-            with patch("games.bannerlord.deploy_data.shutil.copy2", side_effect=fail_second_stage):
+            with patch("plugins.bannerlord.deploy_data.shutil.copy2", side_effect=fail_second_stage):
                 with self.assertRaisesRegex(OSError, "stage copy failed"):
                     sync_project_assets(project, game)
 

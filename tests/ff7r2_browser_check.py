@@ -17,7 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ff7r2_fixture import battle_item_possession_fixture, battle_player_parameter_fixture, fixture
-from games.ff7r2.plugin import Ff7r2Session
+from plugins.ff7r2.plugin import Ff7r2Session
 
 
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "ff7r2-browser"

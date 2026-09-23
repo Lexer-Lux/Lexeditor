@@ -5,12 +5,12 @@ import json
 from pathlib import Path
 import unittest
 import verify_ff7_rendered as target
-from games.ff7 import deployment
+from plugins.ff7 import deployment
 
 
 def open_with_neutral(self, edition="ff7"):
     self.page.goto("about:blank")
-    html = (target.ROOT / "games/ff7/editor.html").read_text(encoding="utf-8")
+    html = (target.ROOT / "plugins/ff7/editor.html").read_text(encoding="utf-8")
     # framework.js resolves optional shared assets relative to document.baseURI.
     # Synthetic set_content() pages otherwise use the non-hierarchical about:blank URL.
     html = html.replace("<head>", '<head><base href="http://127.0.0.1:9/">', 1)
@@ -20,7 +20,7 @@ def open_with_neutral(self, edition="ff7"):
     code = target.HOST + "\nwindow.__lexeditorPlugin=" + json.dumps({"id":edition,"name":"FF7 fixture","edition":edition}) + ";\n" + (target.ROOT / "ui/framework.js").read_text(encoding="utf-8")
     html = html.replace('<script src="/shared/framework.js"></script>', "<script>" + code + "</script>")
     scripts = "".join(
-        "<script>" + (target.ROOT / "games/ff7" / name).read_text(encoding="utf-8") + "</script>"
+        "<script>" + (target.ROOT / "plugins/ff7" / name).read_text(encoding="utf-8") + "</script>"
         for name in ("editor.js", "controls.js", "details.js", "workspace.js"))
     html = html.replace('<script src="editor.js"></script>', scripts)
     for extra in ("controls.js", "details.js", "workspace.js"):

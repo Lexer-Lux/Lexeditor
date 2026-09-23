@@ -16,7 +16,7 @@ sys.path.append(str(ROOT / "_scratch/gf-spellbooks-test-deps"))
 import unicorn  # noqa: E402
 from unicorn.x86_const import UC_X86_REG_EAX, UC_X86_REG_ESP, UC_X86_REG_EIP  # noqa: E402
 
-from games.ff8 import switch_issue_52 as s  # noqa: E402
+from plugins.ff8 import switch_issue_52 as s  # noqa: E402
 
 STACK, RETURN = 0x30F0000, 0x30E0000
 

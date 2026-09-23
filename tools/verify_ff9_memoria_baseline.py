@@ -8,7 +8,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.ff9 import memoria_baseline
+from plugins.ff9 import memoria_baseline
 
 
 def main() -> None:

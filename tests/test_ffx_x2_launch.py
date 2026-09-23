@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from games.ffx_x2 import launch
+from plugins.ffx_x2 import launch
 
 
 def _installation(tmp_path: Path) -> Path:

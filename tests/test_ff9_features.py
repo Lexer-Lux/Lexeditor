@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from pathlib import Path
 import pytest
-from games.ff9 import features
+from plugins.ff9 import features
 
 
 @pytest.fixture

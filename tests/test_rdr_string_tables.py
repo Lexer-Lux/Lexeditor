@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 import unittest
 
-from games.rdr import string_tables
+from plugins.rdr import string_tables
 
 
 ROOT = Path(__file__).resolve().parents[1]

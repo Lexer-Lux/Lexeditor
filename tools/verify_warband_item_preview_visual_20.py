@@ -14,9 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 
-from games.warband import paths  # noqa: E402
-from games.warband.game_font import FONT_TEXTURE  # noqa: E402
-from games.warband.plugin import WarbandSession  # noqa: E402
+from plugins.warband import paths  # noqa: E402
+from plugins.warband.game_font import FONT_TEXTURE  # noqa: E402
+from plugins.warband.plugin import WarbandSession  # noqa: E402
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 
 

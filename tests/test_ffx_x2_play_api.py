@@ -9,8 +9,8 @@ import urllib.request
 
 import pytest
 
-from games.ffx_x2 import server
-from games.ffx_x2.plugin import FFXX2Session
+from plugins.ffx_x2 import server
+from plugins.ffx_x2.plugin import FFXX2Session
 
 
 def _installation(tmp_path: Path) -> Path:

@@ -15,11 +15,11 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.rdr import loot_script, server
+from plugins.rdr import loot_script, server
 
 
 def _rows() -> list[dict]:
-    path = ROOT / "games" / "rdr" / "data_map.generated.json"
+    path = ROOT / "plugins" / "rdr" / "data_map.generated.json"
     document = json.loads(path.read_text(encoding="utf-8-sig"))
     rows = document.get("rows", document.get("files", [])) if isinstance(document, dict) else document
     if not isinstance(rows, list) or not rows:

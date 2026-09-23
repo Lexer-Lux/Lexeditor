@@ -4,9 +4,9 @@
 
 ## Current request / ownership
 
-Lexer requested a fresh completion audit of the **classic FF7** plugin on `codex/ff7-plugin-completion`. This worker owns `games/ff7` and this issue handoff only. The separate FF7 2013 product adapter `games/ff7_2013/plugin.py` is out of scope.
+Lexer requested a fresh completion audit of the **classic FF7** plugin on `codex/ff7-plugin-completion`. This worker owns `plugins/ff7` and this issue handoff only. The separate FF7 2013 product adapter `plugins/ff7_2013/plugin.py` is out of scope.
 
-Both product identities currently import/run shared `games.ff7` parser/server/editor code. No open FF7-2013 PR or branch was visible during the 2026-09-19 live inspection. Therefore shared `games/ff7` format changes in this PR must remain backward-compatible with both identities, and a separate FF7-2013 worker must coordinate before changing the same shared parser surface.
+Both product identities currently import/run shared `plugins.ff7` parser/server/editor code. No open FF7-2013 PR or branch was visible during the 2026-09-19 live inspection. Therefore shared `plugins/ff7` format changes in this PR must remain backward-compatible with both identities, and a separate FF7-2013 worker must coordinate before changing the same shared parser surface.
 
 ## Audit baseline
 
@@ -16,8 +16,8 @@ Reviewed current guidance / references:
 - `AGENTS.md` @ `ec8d363d7fa9b937c8849dfa4c13c7c0fc5d1fde`
 - `docs/ADDING_A_GAME.md` @ `78a987c5f61d3f28fb6f4195d08717c98dcb2af8`
 - `docs/UI-MANUAL.md` @ `14a3269992031d7e7893fcb127728a48b944e71f`
-- `games/blank/editor.html` @ `cd3c79bab8a5b13b3167a26e8fe4e0617c940802`
-- `games/rdr2/editor.html` @ `9d11f8a0bd35526dbb4959fd3e964a4f72472718`
+- `plugins/blank/editor.html` @ `cd3c79bab8a5b13b3167a26e8fe4e0617c940802`
+- `plugins/rdr2/editor.html` @ `9d11f8a0bd35526dbb4959fd3e964a4f72472718`
 - `codex/ff7-data.md` @ `00b63e396487461d8bc8ca82bfc1872a45800848`
 - `ui/component-catalog.js` is not present on current master (GitHub 404); do not invent a substitute path.
 

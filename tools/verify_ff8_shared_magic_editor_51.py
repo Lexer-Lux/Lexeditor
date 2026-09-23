@@ -14,8 +14,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from games.ff8 import ffnx_manager, gameplay_settings  # noqa: E402
-from games.ff8.ffnx_issue_51 import runtime_config, runtime_package  # noqa: E402
+from plugins.ff8 import ffnx_manager, gameplay_settings  # noqa: E402
+from plugins.ff8.ffnx_issue_51 import runtime_config, runtime_package  # noqa: E402
 
 
 def sha256(path: Path) -> str:
@@ -159,7 +159,7 @@ def verify_final_package_if_staged() -> bool:
 
 
 def main() -> int:
-    editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
     gameplay_view = editor[editor.index("function renderGameplaySettings"):editor.index("function renderPlatformSettings")]
     assert 'row("SHARED PARTY MAGIC INVENTORY"' in gameplay_view
     settings_dirty = editor.index("const settingsDirty=")
@@ -167,7 +167,7 @@ def main() -> int:
     settings_save = editor.index('results.push(await api("/api/settings/save"')
     assert settings_dirty < other_saves < settings_save
     assert 'jobs.push(api("/api/settings/save"' not in editor
-    settings_source = (ROOT / "games" / "ff8" / "gameplay_settings.py").read_text(
+    settings_source = (ROOT / "plugins" / "ff8" / "gameplay_settings.py").read_text(
         encoding="utf-8",
     )
     save_source = settings_source[

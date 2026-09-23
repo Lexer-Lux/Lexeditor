@@ -89,3 +89,12 @@ regeneration. Covered by tests/test_rdr2_dead_eye_replacement.py
 (9 hermetic tests). No gameplay claim: engine research, the comparison,
 and the game session are still owed.
 
+## 2026-09-23 agent slice (per-game-rdr2): verified, no new code
+
+Re-read the live issue plus comments. The replacement protocol still
+matches the request (kill-gain source first, disposable baseline-1 /
+candidate-0 comparison, regeneration only after selective suppression,
+never alongside kill gains). Re-ran
+tests/test_rdr2_dead_eye_replacement.py: 9 green. Stays actionable:
+engine research, the comparison, and the game session are still owed.
+

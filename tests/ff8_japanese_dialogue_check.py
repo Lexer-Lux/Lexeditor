@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.ff8 import field_dialogue, japanese_text, kernel_text
+from plugins.ff8 import field_dialogue, japanese_text, kernel_text
 
 # Original bccent12 strings: jump to coast; do squats.
 payloads = [bytes.fromhex("6b8d2bb96736beb84d"),

@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.bannerlord.gauntlet_data import (
+from plugins.bannerlord.gauntlet_data import (
     augment_data_map,
     list_prefabs,
     read_prefab,
@@ -135,7 +135,7 @@ class BannerlordGauntletTests(unittest.TestCase):
         finally: temporary.cleanup()
 
     def test_gauntlet_editor_sends_revision_and_exposes_reload(self):
-        text=(Path(__file__).resolve().parents[1]/"games"/"bannerlord"/"editor_gauntlet.js").read_text(encoding="utf-8")
+        text=(Path(__file__).resolve().parents[1]/"plugins"/"bannerlord"/"editor_gauntlet.js").read_text(encoding="utf-8")
         self.assertIn('sourceHash:state.savedGauntlet.sourceHash||""',text);self.assertIn("async function reloadGauntlet",text);self.assertIn('uiButton("Reload",()=>reloadGauntlet())',text)
 
     def test_prefab_root_redirection_outside_project_is_rejected(self):

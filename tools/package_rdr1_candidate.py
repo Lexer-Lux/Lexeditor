@@ -37,16 +37,16 @@ RDR_TEST_TOOLS = {
 FONT_SUFFIXES = {".ttf", ".otf", ".woff", ".woff2"}
 REQUIRED = (
     "app.py",
-    "games/rdr/plugin.py",
-    "games/rdr/server.py",
-    "games/rdr/editor.html",
-    "games/rdr/editor.css",
-    "games/rdr/editor.js",
-    "games/rdr/strings.js",
-    "games/rdr/string_tables.py",
-    "games/rdr/rbf.js",
-    "games/rdr/rbf.py",
-    "games/rdr/magic_rdr_manager.py",
+    "plugins/rdr/plugin.py",
+    "plugins/rdr/server.py",
+    "plugins/rdr/editor.html",
+    "plugins/rdr/editor.css",
+    "plugins/rdr/editor.js",
+    "plugins/rdr/strings.js",
+    "plugins/rdr/string_tables.py",
+    "plugins/rdr/rbf.js",
+    "plugins/rdr/rbf.py",
+    "plugins/rdr/magic_rdr_manager.py",
     "tools/magic-rdr/README.md",
 )
 
@@ -61,7 +61,7 @@ def _candidate_path(path: PurePosixPath) -> bool:
         return path.suffix.casefold() in ROOT_RUNTIME_SUFFIXES or text in {
             "README.md", "pytest.ini",
         }
-    if text == "games/__init__.py" or path.parts[:2] == ("games", "rdr"):
+    if text == "plugins/__init__.py" or path.parts[:2] == ("plugins", "rdr"):
         return True
     if path.parts[0] == "ui":
         return not text.startswith("ui/assets/blank-game")
@@ -168,7 +168,7 @@ def build(root: Path, output: Path, commit: str) -> dict:
                 "  LEXEDITOR_RDR_RPF6_TOOL=<existing>\\tools\\magic-rdr\\app\\Rpf6ReadCli.exe\n"
                 "  LEXEDITOR_RDR_RPF6_NAMES=<existing>\\tools\\magic-rdr\\app\\Settings\\ImportedFileNames.txt\n"
                 "Use an isolated LEXEDITOR_RDR_PROJECT and LEXEDITOR_RDR_EXTRACT_ROOT.\n"
-                "This candidate contains only games/rdr; its copied Credits/Mod Loading metadata "
+                "This candidate contains only plugins/rdr; its copied Credits/Mod Loading metadata "
                 "is narrowed to that plugin so shared discovery remains valid.\n"
                 "RDR_GAME_ROOT may point at the installed game; preparation reads source "
                 "archives and writes only the isolated cache/project until Deploy Project "
@@ -215,8 +215,8 @@ def verify(archive_path: Path, commit: str) -> dict:
             raise RuntimeError("Candidate redistributed omitted MagicRDR content")
         other_games = sorted(
             name for name in names
-            if name.startswith("games/") and not (
-                name == "games/__init__.py" or name.startswith("games/rdr/")
+            if name.startswith("plugins/") and not (
+                name == "plugins/__init__.py" or name.startswith("plugins/rdr/")
             )
         )
         if other_games:

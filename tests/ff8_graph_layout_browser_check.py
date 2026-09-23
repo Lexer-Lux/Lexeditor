@@ -9,7 +9,7 @@ from plugin_ui import plugin_ui
 FRAMEWORK_CSS=(ROOT/'ui/framework.css').read_text(encoding='utf-8')
 FRAMEWORK_JS=(ROOT/'ui/framework.js').read_text(encoding='utf-8')
 def main():
- css=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8')
+ css=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8')
  with sync_playwright() as pw:
   browser=pw.chromium.launch(headless=True);page=browser.new_page(viewport={'width':2048,'height':1100})
   page.route('http://fixture/**',lambda route:route.fulfill(body='<html></html>',content_type='text/html'))

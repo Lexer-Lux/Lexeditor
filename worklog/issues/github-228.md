@@ -109,10 +109,10 @@ Left actionable until a real session can be written.
 
 ## 2026-09-23 master: resolver run, 2294 new labels, stays actionable
 
-Ran games/rdr2/resolve_hash_labels.py against the local corpus
+Ran plugins/rdr2/resolve_hash_labels.py against the local corpus
 (_downloads/RDR2-Unhashed-Strings: ArchiveItems/DataLines/MemberNames):
 resolved 2759 of 8280 hashed catalog identifiers, +2294 insertions into
-games/rdr2/labels.json. RDR2 hermetic suite green (24 passed), contract
+plugins/rdr2/labels.json. RDR2 hermetic suite green (24 passed), contract
 audit passed. Remaining for the audit: the tag198 extraction path itself
 and the cap-policy design, then game-side proof. Left actionable.
 
@@ -124,4 +124,14 @@ games/rdr2/labels.json via games/rdr2/resolve_hash_labels.py); verified
 present on this branch. Exact remaining needs: the tag198 decryption path
 for short_update, the guarded cap-policy design, then game-side proof.
 No new code written.
+
+## 2026-09-23 agent slice (per-game-rdr2): cap-policy contract
+
+games/rdr2/bounty_cap_policy.py records the vanilla caps (30000/50000/
+150000, network -1) plus validate_cap_policy(), which requires a script
+fingerprint with fail-closed builds, bounded whole-dollar regional
+maxima with explicit conversion, one amount driving both engine and
+regional clamp, and preservation of existing bounties on disable.
+Covered by tests/test_rdr2_bounty_cap_policy.py (9 hermetic tests). No
+gameplay claim: the tag198 path, patch design, and proof are still owed.
 

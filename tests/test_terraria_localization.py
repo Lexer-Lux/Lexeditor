@@ -5,15 +5,15 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.terraria.localization import (
+from plugins.terraria.localization import (
     append_localization_entry,
     apply_localization_changes,
     parse_localization_text,
     try_get_culture_and_prefix,
     update_localization_text,
 )
-from games.terraria import plugin as terraria_plugin
-from games.terraria import server
+from plugins.terraria import plugin as terraria_plugin
+from plugins.terraria import server
 from project_manager import ProjectManager
 
 

@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 
-from games.ff8 import field_data, field_encounters, runtime_layout  # noqa: E402
-from games.ff8.plugin import FF8Session  # noqa: E402
+from plugins.ff8 import field_data, field_encounters, runtime_layout  # noqa: E402
+from plugins.ff8.plugin import FF8Session  # noqa: E402
 from render_crime_editors_55_62 import wait_eval  # noqa: E402
 from tools.verify_panel_layout_visual_46 import (  # noqa: E402
     browser_session, close_browser, screenshot,
@@ -138,7 +138,7 @@ def api_and_render() -> dict:
 
 
 def main() -> int:
-    source = (ROOT / "games/ff8/editor.html").read_text(encoding="utf-8")
+    source = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
     assert "fieldEncounterSection" in source and 'type:"fieldEncounter"' in source
     print({"runtime": runtime_merge(), "rendered": api_and_render()})
     return 0

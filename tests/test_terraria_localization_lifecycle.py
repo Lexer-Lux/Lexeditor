@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from games.terraria.localization_lifecycle import (
+from plugins.terraria.localization_lifecycle import (
     apply_localization_transaction,
     delete_localization_entries,
 )

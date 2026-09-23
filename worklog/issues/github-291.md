@@ -46,3 +46,13 @@ tests/test_rdr2_lantern_purchase_paths.py (9 hermetic tests). No gameplay
 claim: light-control fixes and the loot-path check still need a real
 session.
 
+## 2026-09-23 agent slice (per-game-rdr2): verified, no new code
+
+Re-read the live issue plus comments. The catalog finding still stands
+(saddle lantern at horse shop 35000, Halloween lantern at fence 25450,
+belt handhelds with no buy path) and the validator still rejects
+purchase-testing a belt lantern. Re-ran
+tests/test_rdr2_lantern_purchase_paths.py: 9 green. Stays actionable:
+light-control fixes, the loot-path check, and the game session are
+still owed.
+

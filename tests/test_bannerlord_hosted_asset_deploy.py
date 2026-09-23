@@ -2,7 +2,7 @@ from pathlib import Path
 import unittest
 import xml.etree.ElementTree as ET
 
-from games.bannerlord import paths
+from plugins.bannerlord import paths
 
 
 class BannerlordHostedAssetDeployTests(unittest.TestCase):

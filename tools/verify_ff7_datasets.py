@@ -21,8 +21,8 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.ff7 import kernel as base
-from games.ff7.datasets import (
+from plugins.ff7 import kernel as base
+from plugins.ff7.datasets import (
     CATEGORIES, INITIAL_FIELDS, LIMIT_FIELDS, Kernel, load_datasets, save_datasets,
 )
 
@@ -32,7 +32,7 @@ with patch.dict(sys.modules, {
     "theme_sounds": types.SimpleNamespace(ensure_theme_sounds=lambda *a, **k: {"rows": []}, sound_file=lambda *a: None),
     "process_probe": types.SimpleNamespace(live_processes=lambda *a: []),
 }):
-    from games.ff7 import server
+    from plugins.ff7 import server
     import platform_config
 
 PATHS = (Path("data/lang-en/kernel/KERNEL.BIN"), Path("ff7/workingdir/data/lang-en/kernel/kernel.bin"))

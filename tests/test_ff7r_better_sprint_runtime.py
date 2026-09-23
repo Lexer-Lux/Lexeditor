@@ -4,8 +4,8 @@ import struct
 
 import pytest
 
-from games.ff7r.native_probe import DEFAULT_NEEDLES
-from games.ff7r.runtime_config import (
+from plugins.ff7r.native_probe import DEFAULT_NEEDLES
+from plugins.ff7r.runtime_config import (
     DEFAULT_RUNTIME_CONFIG,
     LEGACY_MINIMAP_CONFIG,
     RUNTIME_DLL_NAME,
@@ -17,8 +17,8 @@ from games.ff7r.runtime_config import (
     validate_runtime_config,
     validate_runtime_manifest,
 )
-from games.ff7r.runtime_dataobject import runtime_settings_package, save_runtime_edits
-from games.ff7r.sprint_probe import assess_sprint_evidence
+from plugins.ff7r.runtime_dataobject import runtime_settings_package, save_runtime_edits
+from plugins.ff7r.sprint_probe import assess_sprint_evidence
 
 
 FIXTURE_TIMESTAMP = 0x12345678

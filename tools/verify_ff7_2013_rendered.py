@@ -18,7 +18,7 @@ OUT = ROOT / "out" / "ff7-2013-acceptance"
 def open_current_modules(self, edition: str = "ff7") -> None:
     """Load the same FF7 page code as production, including the split editor.js modules."""
     self.page.goto("about:blank")
-    html = (ROOT / "games" / "ff7" / "editor.html").read_text(encoding="utf-8")
+    html = (ROOT / "plugins" / "ff7" / "editor.html").read_text(encoding="utf-8")
     html = html.replace("<head>", '<head><base href="http://127.0.0.1:9/">', 1)
     shared_css = (
         (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
@@ -41,7 +41,7 @@ def open_current_modules(self, edition: str = "ff7") -> None:
         '<script src="/shared/framework.js"></script>',
         "<script>" + bootstrap + "</script>",
     )
-    scripts = "".join("<script>" + (ROOT / "games" / "ff7" / name).read_text(encoding="utf-8") + "</script>" for name in ("editor.js", "controls.js", "details.js", "workspace.js"))
+    scripts = "".join("<script>" + (ROOT / "plugins" / "ff7" / name).read_text(encoding="utf-8") + "</script>" for name in ("editor.js", "controls.js", "details.js", "workspace.js"))
     html = html.replace('<script src="editor.js"></script>', scripts)
     for extra in ("controls.js", "details.js", "workspace.js"):
         html = html.replace('<script src="%s"></script>' % extra, "")

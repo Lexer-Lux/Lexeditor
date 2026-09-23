@@ -6,8 +6,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.terraria import server
-from games.terraria.source_text import (
+from plugins.terraria import server
+from plugins.terraria.source_text import (
     UTF8_BOM,
     create_source,
     delete_source,

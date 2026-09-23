@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.warband import server
+from plugins.warband import server
 
 
 SOURCE = """from header_items import *

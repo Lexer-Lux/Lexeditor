@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from games.rdr2 import dead_eye_replacement as der
+from plugins.rdr2 import dead_eye_replacement as der
 
 
 def valid_plan():

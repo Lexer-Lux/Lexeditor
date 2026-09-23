@@ -5,8 +5,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EDITOR = (ROOT / "games" / "warband" / "editor.js").read_text(encoding="utf-8")
-SERVER = (ROOT / "games" / "warband" / "server.py").read_text(encoding="utf-8")
+EDITOR = (ROOT / "plugins" / "warband" / "editor.js").read_text(encoding="utf-8")
+SERVER = (ROOT / "plugins" / "warband" / "server.py").read_text(encoding="utf-8")
 
 
 def require(text: str, source: str, message: str) -> None:

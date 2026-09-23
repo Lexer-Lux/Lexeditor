@@ -12,9 +12,9 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from PIL import Image
-from games.warband import server, model_preview as models, item_icons as icons
-from games.warband import game_font
-from games.warband.game_launch import launch_command, WarbandGameController, WindowsGameJob
+from plugins.warband import server, model_preview as models, item_icons as icons
+from plugins.warband import game_font
+from plugins.warband.game_launch import launch_command, WarbandGameController, WindowsGameJob
 
 
 class CoverageTests(unittest.TestCase):
@@ -253,7 +253,7 @@ class LaunchTests(unittest.TestCase):
     def setUp(self):
         # This suite isolates process/window behavior. Package integrity has
         # real-bundle coverage in test_wse2_manager.py.
-        guard=patch('games.warband.wse2_manager.require_managed')
+        guard=patch('plugins.warband.wse2_manager.require_managed')
         guard.start();self.addCleanup(guard.stop)
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name)
         self.module=self.root/'Modules'/'My Mod';self.module.mkdir(parents=True);(self.module/'module.ini').write_text('module_name = Test')

@@ -1,6 +1,6 @@
 # FF7 edition parity and naming
 
-The two supported FF7 Steam products intentionally share one editing implementation under `games/ff7`.
+The two supported FF7 Steam products intentionally share one editing implementation under `plugins/ff7`.
 
 - `ff7-2013` remains a thin installation/identity adapter and must not acquire its own editor, server, parsers or writers.
 - Equivalent source data must expose the same editor categories, fields, Data Map surface and capabilities and must serialize the same semantic edits to identical FF7 binary output.

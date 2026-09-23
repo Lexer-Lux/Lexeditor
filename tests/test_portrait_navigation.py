@@ -8,7 +8,7 @@ from test_shared_ui_feedback import ROOT, page, framework
 
 @pytest.mark.parametrize('view,count',[('gfs',16),('characters',11)])
 def test_portrait_strip(page,view,count):
-    assets=ROOT / 'games/ff8'
+    assets=ROOT / 'plugins/ff8'
     generated=Path(os.environ['LOCALAPPDATA'])/'Lexeditor/game-data/ff8/generated'
     if not (generated/'portraits'/f'{view}-0.png').is_file():
         pytest.skip('Requires locally extracted FF8 portraits')

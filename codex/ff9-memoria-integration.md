@@ -2,7 +2,7 @@
 
 ## Ownership and boundaries
 
-`games/ff9` owns this integration. Lexer's later decision in #73 supersedes the
+`plugins/ff9` owns this integration. Lexer's later decision in #73 supersedes the
 old direct-launch/embedded-INI-editor specification:
 https://github.com/Lexer-Lux/Lexeditor/issues/73#issuecomment-5550129793
 

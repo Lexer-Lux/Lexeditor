@@ -7,8 +7,8 @@ import json
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, r"C:\RDR2Mod\tools\reverse-engineering")
-from games.ff8 import formats, game_icons
-from games.ff8.plugin import FF8Session
+from plugins.ff8 import formats, game_icons
+from plugins.ff8.plugin import FF8Session
 from render_crime_editors_55_62 import wait_eval
 from tools.verify_panel_layout_visual_46 import browser_session, close_browser, screenshot
 

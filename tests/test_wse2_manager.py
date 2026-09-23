@@ -10,8 +10,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.warband import wse2_manager as m
-from games.warband.game_launch import launch_command, WarbandGameController
+from plugins.warband import wse2_manager as m
+from plugins.warband.game_launch import launch_command, WarbandGameController
 
 
 class ManagedPackageTests(unittest.TestCase):

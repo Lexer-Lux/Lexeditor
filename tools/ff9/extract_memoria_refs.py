@@ -7,8 +7,8 @@ from pathlib import Path
 import struct
 import sys
 
-from games.ff9 import memoria_manager
-from games.ff9.memoria_patcher import MAGIC, inspect_payload
+from plugins.ff9 import memoria_manager
+from plugins.ff9.memoria_patcher import MAGIC, inspect_payload
 
 WANTED = {
     "Assembly-CSharp.dll": "Assembly-CSharp.dll",

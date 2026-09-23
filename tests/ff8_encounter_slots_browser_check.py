@@ -14,7 +14,7 @@ def main():
   page=browser.new_page(viewport={'width':1100,'height':900})
   page.on('pageerror',lambda e:print(e));page.route('http://fixture/',lambda route:route.fulfill(body='<html></html>',content_type='text/html'));page.goto('http://fixture/');page.set_content('<main style="width:850px"></main>')
   page.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  page.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
+  page.add_style_tag(content=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8'))
   page.add_style_tag(content=':root{--lex-text:#fff;--lex-panel:#626262;--lex-panel-2:#4f4f4f;--lex-border:#929292;--lex-accent:#aa2432;--lex-panel-gap:8px}')
   page.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
   page.add_script_tag(content="""

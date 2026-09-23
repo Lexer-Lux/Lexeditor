@@ -4,8 +4,8 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
-from games.bannerlord.project_template import initialize_project
-from games.bannerlord import paths
+from plugins.bannerlord.project_template import initialize_project
+from plugins.bannerlord import paths
 
 
 class BannerlordTemplateEscapeTests(unittest.TestCase):
