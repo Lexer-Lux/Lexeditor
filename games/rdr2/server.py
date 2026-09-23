@@ -1,4 +1,4 @@
-"""Lexeditor RDR2 plugin service.
+r"""Lexeditor RDR2 plugin service.
 
 Parses the mod's XML data files (catalog_sp.ymt, loot tables, loot matrix),
 serves them as JSON to editor.html, and writes edits back to disk.
