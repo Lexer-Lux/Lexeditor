@@ -138,6 +138,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 expect(retoc_field).to_be_visible()
                 retoc_value = retoc_field.locator("input.lex-readonly-field")
                 assert "v0.1.5" in retoc_value.input_value(), retoc_value.input_value()
+                preflight = page.locator(".lex-detail-field").filter(has_text="PACKAGING PREFLIGHT").first
+                expect(preflight).to_be_visible()
+                candidate_button = page.get_by_role("button", name="Build isolated candidate")
+                expect(candidate_button).to_be_visible()
+                expect(candidate_button).to_be_disabled()
                 page.screenshot(path=str(OUT / "information.png"), full_page=True)
 
                 page.evaluate('navigate("tweaks")')
@@ -157,7 +162,10 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 page.evaluate('document.documentElement.style.zoom="150%"')
                 page.wait_for_timeout(100)
                 expect(page.locator('input[aria-label="HPMax"]')).to_be_visible()
-                page.screenshot(path=str(OUT / "characters-150-percent.png"), full_page=True)
+                # CSS zoom approximates desktop-host UI scale. A full-page
+                # capture multiplies Chromium's document height and adds an
+                # artificial blank tail that is not visible in the host.
+                page.screenshot(path=str(OUT / "characters-150-percent.png"), full_page=False)
                 page.close()
             finally:
                 browser.close()
