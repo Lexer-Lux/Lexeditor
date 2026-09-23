@@ -418,9 +418,11 @@ def data_map_payload() -> dict:
                 "Public constants identify the bench rest trigger/action rows and the consumed-cushion "
                 "resource. The public generated SDK exposes AEndFieldActionActorBenchBreak with both "
                 "BenchMeshComponent and ZabutonActorClass, directly narrowing the model/cushion actor seam; "
-                "public mesh work also confirms multiple bench models. Missing evidence is the complete "
-                "restable-placement -> desired blue-mesh mapping and the inventory/state transition that "
-                "must consume a cushion for every valid rest without changing unusable benches."
+                "public mesh work also confirms multiple bench models. Public gameplay documentation independently "
+                "confirms vanilla blue benches and Chocobo-stop benches are distinct: ordinary blue benches do not "
+                "consume a cushion, while Chocobo stops do. Missing evidence is the complete restable-placement -> "
+                "desired blue-mesh mapping and the inventory/state transition that must consume a cushion for every "
+                "valid rest without changing unusable benches."
             ), "status": "not-integrated",
         },
         {
@@ -429,9 +431,11 @@ def data_map_payload() -> dict:
             "notes": (
                 "The public generated Rebirth SDK explicitly defines option categories AreaNaviMapScale, "
                 "LocationNaviMapScale and ZackNaviMapScale; UEndNaviMap also exposes PixelPerCm, and the option "
-                "model supports Range entries with integer MinValue/MaxValue. This is direct zoom/scale evidence, "
-                "but public sources still do not map the two requested categories to their concrete range/default "
-                "values or persistent save/config storage, so Lexeditor does not invent a slider contract."
+                "model supports Range entries with integer MinValue/MaxValue. Independent player-facing documentation "
+                "confirms Rebirth already exposes separate world-navigation and specific-location minimap scale controls, "
+                "with larger numeric choices showing a wider area. Public sources still do not prove which generated "
+                "category maps to which persisted setting, its exact stored range/default, or the save/config location, "
+                "so Lexeditor does not invent a slider contract."
             ), "status": "not-integrated",
         },
         {
