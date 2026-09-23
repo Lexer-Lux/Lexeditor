@@ -82,11 +82,37 @@ def main() -> None:
         encoding="utf-8",
     )
 
+    acceptance = OUT / "FF9-ACCEPTANCE.txt"
+    acceptance.write_text(
+        "FF9 Lexeditor isolated acceptance candidate\n"
+        "===========================================\n\n"
+        "This artifact is for installed-game acceptance only. It keeps its own "
+        "LOCALAPPDATA and FF9 project beside the extracted candidate.\n\n"
+        "1. Extract the entire artifact to a writable folder. Do not run it from inside the ZIP.\n"
+        "2. Close FINAL FANTASY IX, its launcher, Memoria tools, and any installed Lexeditor window.\n"
+        "3. Run Launch-FF9-Candidate.cmd and pass the FF9 Steam install folder as the first argument "
+        "if auto-detection does not find it. Example:\n"
+        "   Launch-FF9-Candidate.cmd \"D:\\\\SteamLibrary\\\\steamapps\\\\common\\\\FINAL FANTASY IX\"\n"
+        "4. Open Final Fantasy 9 in Lexeditor. In the Updates/Info helper controls, install or repair "
+        "the pinned Memoria helper if it is not reported installed. Confirm automatic updates are disabled.\n"
+        "5. Open Enemies or Encounters. Change one obvious, reversible value (for example an enemy HP value "
+        "or one encounter rate), then Save.\n"
+        "6. Reopen that record before deployment and confirm the saved value is still present.\n"
+        "7. Use Deploy Project. Launch the game through the normal FF9 launcher/Memoria path from Lexeditor.\n"
+        "8. Reach the affected battle and confirm the edited behavior/value is active in game.\n"
+        "9. Return to Lexeditor and Revert/remove the deployed project. Confirm unrelated Memoria settings "
+        "and other mods remain intact, then relaunch and confirm the edited behavior is gone.\n\n"
+        "Report: whether helper install/repair succeeded, whether save survived reopen, whether deployment "
+        "loaded in battle, whether revert restored vanilla behavior, and any error text shown.\n",
+        encoding="utf-8",
+    )
+
     manifest = {
         "headSha": os.environ.get("LEXEDITOR_CANDIDATE_HEAD_SHA", ""),
         "artifactPurpose": "FF9 installed-game acceptance only",
         "isolatedLocalAppData": str(local_appdata.relative_to(OUT)),
         "isolatedProject": "FF9-project",
+        "acceptanceGuide": acceptance.name,
         "runtime": {
             "path": str(runtime_target.relative_to(OUT)),
             "sha256": digest(runtime_target),
