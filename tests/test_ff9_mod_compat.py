@@ -189,3 +189,16 @@ def test_unparseable_minimum_memoria_version_fails_closed(tmp_path):
     assert mod["minimumMemoriaVersionValid"] is False
     assert mod["supportedByPinnedMemoria"] is False
     assert report["unsupportedByPinnedMemoria"][0]["reason"] == "invalid MinimumMemoriaVersion metadata"
+
+
+def test_unquoted_comma_is_one_compatibility_path(tmp_path):
+    game, project = tmp_path / "game", tmp_path / "project"
+    game.mkdir(); project.mkdir()
+    folder = write_mod(game, "OtherMod, SecondMod", description("Comma Named Mod"))
+    (game / "Memoria.ini").write_text(
+        "[Mod]\nFolderNames = OtherMod, SecondMod\n",
+        encoding="utf-8",
+    )
+    report = mod_compat.audit(game, project)
+    assert report["folderNames"] == ["OtherMod, SecondMod"]
+    assert [mod["name"] for mod in report["mods"]] == ["Comma Named Mod"]
