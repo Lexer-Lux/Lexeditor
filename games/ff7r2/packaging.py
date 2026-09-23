@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -72,6 +73,80 @@ def _candidate_manifests(project: Path | None) -> list[Path]:
     if not build.is_dir():
         return []
     return sorted(build.glob("ff7r2-candidate-*/manifest.json"), key=lambda path: path.stat().st_mtime_ns)
+
+
+_PATCH_LEVEL = re.compile(r"(?:_(\\d+))?_P$", re.IGNORECASE)
+
+
+def _native_mod_load_order(game: Path | None) -> dict:
+    """Inspect native ~mods triples without opening or changing package contents.
+
+    Public UE4.26/Rebirth research published in August 2026 establishes that
+    higher numeric patch levels win; at the same level, complete PAK paths
+    compare case-insensitively and the alphabetically smaller path wins.
+    This reports only filename/path precedence, not asset compatibility.
+    """
+    root = game / "End/Content/Paks/~mods" if game is not None else None
+    result = {
+        "root": str(root) if root else "",
+        "present": bool(root and root.is_dir()),
+        "ranked": [],
+        "unranked": [],
+        "incomplete": [],
+        "rule": (
+            "Higher numeric _<n>_P patch level wins. At the same patch level, "
+            "the case-insensitively smaller complete path wins."
+        ),
+        "scope": "Filename/path precedence only; package contents are not inspected.",
+    }
+    if root is None or not root.is_dir():
+        return result
+
+    packages: list[dict] = []
+    for current, directories, files in os.walk(root, followlinks=False):
+        current_path = Path(current)
+        directories[:] = [
+            name for name in directories
+            if not (current_path / name).is_symlink()
+        ]
+        lower_names = {name.lower(): name for name in files}
+        for name in files:
+            pak = current_path / name
+            if pak.is_symlink() or pak.suffix.lower() != ".pak":
+                continue
+            stem = pak.stem
+            expected = [stem + ".utoc", stem + ".ucas"]
+            missing = [suffix for suffix in expected if suffix.lower() not in lower_names]
+            relative = pak.relative_to(root).as_posix()
+            if missing:
+                result["incomplete"].append({"package": relative, "missing": missing})
+                continue
+            match = _PATCH_LEVEL.search(stem)
+            if match is None or not relative.isascii():
+                result["unranked"].append({
+                    "package": relative,
+                    "reason": (
+                        "Priority is not classified because this path does not use "
+                        "an ASCII *_P / *_<n>_P package name."
+                    ),
+                })
+                continue
+            patch_level = int(match.group(1) or 0)
+            packages.append({
+                "package": relative,
+                "patchLevel": patch_level,
+                "effectiveOrder": 100 * (patch_level + 1),
+                "normalizedPath": relative.casefold(),
+            })
+
+    packages.sort(key=lambda item: (-item["patchLevel"], item["normalizedPath"]))
+    for index, item in enumerate(packages, start=1):
+        item["winnerRank"] = index
+        item.pop("normalizedPath", None)
+    result["ranked"] = packages
+    result["unranked"].sort(key=lambda item: item["package"].casefold())
+    result["incomplete"].sort(key=lambda item: item["package"].casefold())
+    return result
 
 
 def _staged_inputs(project: Path | None) -> list[Path]:
@@ -200,6 +275,7 @@ def status(project: Path | None, game: Path | None,
         "gameArchivesPresent": archives_present,
         "candidateCount": len(manifests),
         "latestManifest": str(manifests[-1]) if manifests else "",
+        "loadOrder": _native_mod_load_order(game),
         "mode": "candidate-only",
         "installsGame": False,
         "downloadsDependencies": False,
