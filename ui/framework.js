@@ -6363,6 +6363,7 @@ ${contents.path}`});
       return bindColumnHighlight(element("div", {
         class: ["lex-column-list-head-cell", active ? "sorted" : "", headerAlignmentClass(column), column.class || ""].filter(Boolean).join(" "),
         role: "columnheader",
+        title: column.headerTitle || null,
         draggable: false,
         "data-column-key": column.key,
         "data-lex-id-column": numberedColumn(column) ? "true" : false,
