@@ -15,3 +15,6 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
 
 - [Original Lexer-Lux/Lexers-Mod-For-RDR2 #68 worklog](github-167/imports/Lexer-Lux--Lexers-Mod-For-RDR2/4fe6c76d17cc9c526cbb208e7d28f26e6395ca60/github-68.md) — verified transferred issue identity; historical evidence, not a replacement for newer central progress.
+
+## 2026-09-22 misc-fixes disposition
+Prone weapon animation needs compatible clips or authored upper-body poses; reusing unchanged clips already failed its test. Asset creation workflow comes first, with a specified test after. No code written. Issue stays actionable.

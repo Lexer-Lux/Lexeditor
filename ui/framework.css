@@ -3644,12 +3644,19 @@ body:has(.lex-data-map-table) #main {
   margin:var(--lex-toolbar-margin, var(--lex-panel-gap) var(--lex-panel-gap) 0);
 }
 .lex-toolbar { position:relative; flex-wrap:wrap; margin:0; padding:var(--lex-toolbar-padding, 0); border:var(--lex-toolbar-border, 0); background:var(--lex-toolbar-bg, transparent); box-shadow:var(--lex-toolbar-shadow, none); }
-.lex-toolbar:has(> .lex-subtab-bar-images) { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,3fr) minmax(0,1fr); width:100%; height:80px; box-sizing:border-box; padding:5px 12px; }
+.lex-toolbar:has(> .lex-subtab-bar-images) { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,3fr) minmax(0,1fr); width:100%; height:80px; box-sizing:border-box; padding:5px 12px; border:var(--lex-surface-border, 1px solid var(--lex-border)); border-color:var(--lex-surface-border-color, var(--lex-border)); background:var(--lex-surface-bg, var(--lex-panel)); background-position:var(--lex-surface-background-position, 0 0); background-size:var(--lex-surface-background-size, auto); box-shadow:var(--lex-surface-shadow, none); }
 .lex-toolbar > .lex-subtab-bar-images { height:100%; min-height:0; }
 .lex-toolbar > .lex-subtab-bar-images > button { height:100%; min-height:0; }
 .lex-toolbar > .lex-subtab-bar-images img { height:100%; max-height:none; object-fit:contain; }
 .lex-toolbar > label { font-weight:700; }
 .lex-toolbar > select { min-width:0; max-width:min(720px,100%); }
+/* Icon-button toolbars (token pickers and the like): fixed-geometry image
+   buttons and colour chips, sized by tokens so games set values, not rules. */
+.lex-toolbar-icons button { display:inline-flex; align-items:center; justify-content:center; min-width:var(--lex-toolbar-icon-min-width,26px); min-height:var(--lex-toolbar-icon-min-height,28px); padding:3px; }
+.lex-toolbar-icons img { width:var(--lex-toolbar-icon-width,22px); height:var(--lex-toolbar-icon-height,28px); object-fit:contain; }
+.lex-toolbar-icons select { width:auto; max-width:100%; min-width:0; }
+.lex-toolbar-chip { display:block; width:var(--lex-toolbar-chip-size,18px); height:var(--lex-toolbar-chip-size,18px); border:1px solid #222; background:var(--lex-toolbar-chip-bg,transparent); }
+.lex-toolbar-chip-blink { background:linear-gradient(90deg,var(--lex-toolbar-chip-bg,transparent) 50%,#555 50%); }
 /* Important, so a game's own toolbar class cannot show an empty bar. */
 #toolbar:empty {
   display:none;
@@ -3722,13 +3729,9 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-axis-name { position:absolute; color:var(--lex-muted); font:10px/1 var(--lex-font); pointer-events:none; }
 .lex-curve-axis-name-x { bottom:3px; left:50%; transform:translateX(-50%); }
 .lex-curve-axis-name-y { top:50%; left:2px; writing-mode:vertical-rl; transform:translateY(-50%) rotate(180deg); }
-.lex-curve-variables { position:absolute; z-index:6; left:0; right:0; bottom:0; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:4px 8px; padding:6px; color:var(--lex-text); background:var(--lex-input-bg,var(--lex-panel)); border:1px solid var(--lex-border); opacity:0; pointer-events:none; transform:translateY(100%); transition:opacity .15s,transform .15s; }
+.lex-curve-variables { position:absolute; z-index:6; left:0; right:0; bottom:0; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:4px 8px; padding:6px; color:var(--lex-text); background:color-mix(in srgb,var(--lex-panel) 90%,var(--lex-text) 10%); border:1px solid var(--lex-border); border-color:color-mix(in srgb,var(--lex-border) 65%,var(--lex-text) 35%); box-shadow:0 -4px 12px rgb(0 0 0 / 28%),inset 0 1px rgb(255 255 255 / 18%); opacity:0; pointer-events:none; transform:translateY(100%); transition:opacity .15s,transform .15s; }
 .lex-curve-editor:is(:hover,:focus-within) > .lex-curve-variables { opacity:1; pointer-events:auto; transform:none; }
-.lex-curve-variables {
-  background:color-mix(in srgb,var(--lex-panel) 90%,var(--lex-text) 10%);
-  border-color:color-mix(in srgb,var(--lex-border) 65%,var(--lex-text) 35%);
-  box-shadow:0 -4px 12px rgb(0 0 0 / 28%),inset 0 1px rgb(255 255 255 / 18%);
-}
+
 .lex-curve-variable { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:4px; min-width:0; }
 .lex-curve-variable :is(input,select) { width:100%; min-width:0; }
 .lex-curve-variable-a { color:#f05b5b; fill:#f05b5b; }
@@ -6521,8 +6524,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 /* More of the same: a plain list and its rows, so a game's own palette reaches
    them without a game naming the classes. A tabbed panel standing as a pane
    beside them is the same kind of surface. */
-.lex-tabbed-panel.lex-panel-layout-pane,
-.lex-toolbar:has(> .lex-subtab-bar-images) {
+.lex-tabbed-panel.lex-panel-layout-pane {
   border: var(--lex-surface-border, 1px solid var(--lex-border));
   border-color: var(--lex-surface-border-color, var(--lex-border));
   background: var(--lex-surface-bg, var(--lex-panel));

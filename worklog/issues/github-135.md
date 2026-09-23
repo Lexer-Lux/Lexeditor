@@ -35,3 +35,6 @@ Inspected local vanilla `blip_ambient_train.png` and `blip_shop_train.png`. They
 ## Local delivery, 2026-09-08
 
 Development build passed. Installed ASI and matching release manifest with RDR2 closed; SHA-256 `EC0ECC477BE9089E3C17C25816580FD85D597A113236C94B3041E0E3504819E2`. Previous ASI retained as a small hash-named rollback copy. No catalog or settings changed. Production executable tests pass; rejected four train regressions and three card-conversion regressions. No game launch or rendered acceptance claimed. Full issue remains actionable.
+
+## 2026-09-22 misc-fixes evidence
+Re-ran tools/verify_rdr2_train_tracking.py today: PASS production with four mutations rejected (driver-required, carriage-duplicates, stream-out-leak, disabled-leak). Discovery and cleanup hold in source; real-train resolution plus distinct cargo, passenger, and streetcar artwork need the game. The missing-markers report means detection and cleanup repair first. Issue stays actionable.

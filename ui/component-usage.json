@@ -879,7 +879,11 @@
     "sharedSettings": [
       "blank",
       "ff7",
-      "ff8"
+      "ff7r",
+      "ff7r2",
+      "ff8",
+      "rdr",
+      "rdr2"
     ],
     "shellTextNodes": [],
     "showAlert": [
@@ -989,6 +993,7 @@
   "shell": [
     "EditHistory",
     "NavigationHistory",
+    "actionRow",
     "applyTheme",
     "autoFitControlText",
     "booleanMark",
@@ -1003,7 +1008,6 @@
     "copyText",
     "createWindowActions",
     "creditsPanel",
-    "dataMap",
     "detailField",
     "detailPanel",
     "detailSection",

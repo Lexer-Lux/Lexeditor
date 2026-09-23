@@ -32,7 +32,7 @@ class ProjectFixture(unittest.TestCase):
         self.patches = patch.multiple(s, DATASETS={
             'mine': {'dir': self.mine, 'readonly': False},
             'vanilla': {'dir': self.vanilla, 'readonly': True}},
-            _files={}, _PROVENANCE_CACHE={})
+            _files={}, _PROVENANCE_CACHE={}, _CATALOG_RESULT_CACHE={})
         self.patches.start(); self.addCleanup(self.patches.stop)
         (self.mine/'install.xml').write_text('<LML><Resources><Resource/></Resources></LML>')
 
@@ -208,6 +208,23 @@ class StartupCacheTests(ProjectFixture):
         before=s.provenance_cache_key('mine')
         (self.mine/s.LOCALIZATION_FILE).write_text('[LEXEDITOR OVERRIDES]\nNAME = Different')
         self.assertNotEqual(before, s.provenance_cache_key('mine'))
+
+    def test_catalog_result_memoized_until_inputs_change(self):
+        path = self.write_catalog('ITEM_ALPHA')
+        calls = []
+        def counting(ds='mine'):
+            calls.append(ds)
+            return {'items': [], 'effects': [], 'build': len(calls)}
+        with patch.object(s, '_build_catalog', side_effect=counting):
+            first = s.get_catalog('mine')
+            self.assertIs(s.get_catalog('mine'), first)
+            self.assertEqual(len(calls), 1)
+            stamp = path.stat().st_mtime_ns
+            self.write_catalog('ITEM_BETA', path)
+            os.utime(path, ns=(stamp+1_000_000_000, stamp+1_000_000_000))
+            third = s.get_catalog('mine')
+            self.assertEqual(len(calls), 2)
+            self.assertIsNot(third, first)
 
 
 class AlcoholTests(unittest.TestCase):

@@ -276,8 +276,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     const abilitiesPanel=host.querySelector('[data-gf-panel="abilities"]');
     if(!abilitiesPanel)return;
     const parts=LexeditorUI.sectionParts(abilitiesPanel);
-    const abilitiesContent=parts.content.querySelector(':scope > .lex-column-list') || parts.content;
-    if(abilitiesContent.classList.contains('lex-column-list')) abilitiesContent.classList.add('lex-table-fill');
+    const abilitiesContent=parts.content.querySelector(':scope > [data-gf-abilities]') || parts.content;
     parts.title?.remove();
     let spellbookReady=false;
     const tabbed=LexeditorUI.tabbedPanel({label:'GF abilities and spellbook',active:'abilities',tabs:[{id:'abilities',label:'ABILITIES'},{id:'spellbook',label:'SPELLBOOK',attrs:{'aria-disabled':'true'}}],content:[abilitiesContent,marker],change:id=>{

@@ -13,3 +13,6 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes finding
+No saddle or horse-lantern code exists anywhere in the runtime tree (only belt_lantern.cpp matches lantern). The reported-installed implementation is not in this tree, and no shop or item route names it. The test needs the exact purchase and equip path plus light-control fixes first. Issue stays actionable.

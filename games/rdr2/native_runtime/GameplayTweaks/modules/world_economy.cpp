@@ -728,7 +728,19 @@ static bool updateVikingVictims(Ped playerPed, bool mission) {
 		if (looting && !it->looting) { it->looting = true; it->cashBefore = CASH_BALANCE(); }
 		else if (!looting && it->looting) {
 			int gained = CASH_BALANCE() - it->cashBefore;
-			if (gained > 0 && !mission) cashChanged = ADD_CASH(gained * 4);
+			if (gained > 0 && !mission) {
+				// #203: the bonus top-up is 4x the rolled loot on top of it.
+				// Whether the spec means 4x total is settled by the controlled
+				// test, not by editing this line blind. The log below reports
+				// rolled and bonus separately so the ratio is measurable.
+				const int bonus = gained * 4;
+				const bool added = ADD_CASH(bonus);
+				cashChanged = added;
+				GtLogStream log("viking", GT_INFO);
+				log << "hatchet victim=" << (int)it->ped
+					<< " rolled=" << gained << " bonus=" << bonus
+					<< " added=" << (added ? 1 : 0) << "\n";
+			}
 			it = g_vikingVictims.erase(it); continue;
 		}
 		++it;

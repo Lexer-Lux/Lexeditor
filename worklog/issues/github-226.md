@@ -25,3 +25,6 @@ Crucial boundary: short_update func1632 discards those three return values. Thei
 `tools/audit_rdr2_core_modifiers.py` checks the source evidence and reports its limit. Existing CoreClock in script.cpp replaces ordinary one-point changes, but it does not prove removal of these engine terms and must not be presented as this request's implementation.
 
 Next: identify the actual engine core decrement function and its two specific term inputs from a matching game binary or established hook source. Then prove exact ownership and cadence before mutation. A script forecast patch or undocumented native name is insufficient. Keep actionable; no prepared human test exists yet.
+
+## 2026-09-22 misc-fixes evidence
+Re-ran tools/audit_rdr2_core_modifiers.py today: UI forecast values confirmed (+0.15 perfect weight, -0.25 extreme, +0.25 mounted) but discarded as unproved core writers; removal stays unimplemented. The recorded next step stands: identify the engine decrement function and its two term inputs from a matching binary. No code written. Issue stays actionable.

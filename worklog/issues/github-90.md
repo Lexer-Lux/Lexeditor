@@ -4,7 +4,7 @@
 
 ## Requirements and decisions
 
-Read the live GitHub issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
+Read the live issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
 
 ## Current implementation and evidence
 
@@ -13,3 +13,16 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-23 misc-fixes: design revised per Lexer, moved to waiting
+
+Lexer asked why the design draws a map from scratch when the game and the
+editor already have one (the blue and brown world map). Revised: the base
+layer is the existing 20 fixed world-map TIMs in `texl.obj` (256x256 indexed,
+16 palettes each; `games/ff8/world_textures.py`), already parsed and
+previewed in the editor. Terrain/coastline stays always visible because it is
+baked into the game's own art; no fog-of-war drawing, no separate map
+database. Discovery policy covers labels and markers only. Posted as a
+comment with the three-item Lexer checklist (approve texl base, Q1 names,
+Q2 waypoint vs fast travel) and flipped actionable to waiting. Returns to
+actionable when Lexer answers.

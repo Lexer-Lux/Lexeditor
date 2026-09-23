@@ -1,4 +1,4 @@
-"""Lexeditor RDR2 plugin service.
+r"""Lexeditor RDR2 plugin service.
 
 Parses the mod's XML data files (catalog_sp.ymt, loot tables, loot matrix),
 serves them as JSON to editor.html, and writes edits back to disk.
@@ -261,6 +261,7 @@ WEAPON_SCHEMA_TYPES = {
 _PROVENANCE_CACHE = {}
 _SCRIPT_INDEX_CACHE = None
 _ORIGIN_MARKER_CACHE = {}
+_CATALOG_RESULT_CACHE = {}
 WEAPON_SCHEMA_FIELDS = {
     "UNK_MEMBER_0x1A782082": "Distances",
     "UNK_MEMBER_0x8E00F0C6": "DegradeOnTotalShots",
@@ -1463,7 +1464,34 @@ def cost_list(container):
     return out
 
 
+def _catalog_result_key(ds):
+    """File signature covering catalog inputs that provenance_cache_key misses."""
+    paths = [LABELS_FILE, ORIGIN_PROVENANCE_FILE, ds_dir("mine") / "install.xml"]
+    stats = []
+    for path in paths:
+        try:
+            stat = path.stat()
+            stats.append((str(path), stat.st_mtime_ns, stat.st_size))
+        except FileNotFoundError:
+            continue
+    return (provenance_cache_key(ds), tuple(stats))
+
+
 def get_catalog(ds="mine"):
+    """Return the memoized built catalog; callers must not mutate the result."""
+    key = (ds, _catalog_result_key(ds))
+    cached = _CATALOG_RESULT_CACHE.get(key)
+    if cached is not None:
+        return cached
+    result = _build_catalog(ds)
+    for old_key in list(_CATALOG_RESULT_CACHE):
+        if old_key[0] == ds:
+            del _CATALOG_RESULT_CACHE[old_key]
+    _CATALOG_RESULT_CACHE[key] = result
+    return result
+
+
+def _build_catalog(ds="mine"):
     root = load_file(CATALOG_FILE, ds)["root"]
     origin_markers = catalog_origin_marker_sets(ds)
     shop_listings = {}

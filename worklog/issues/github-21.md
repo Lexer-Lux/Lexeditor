@@ -34,3 +34,15 @@ labels still use the narrow global label lane at minimum detail width.
 The parent issue remains actionable. Its unfinished runtime/features and human
 gameplay acceptance remain in scope. Load the repaired local service before
 testing Refine in game; no user app or game was restarted by these checks.
+
+## 2026-09-22 misc-fixes note
+Coverage parent: no direct work here. Children are being processed on PR 506 (#31, #84, #91, #308 plus #407-409 and #93/#100 pending). The plugin is ready only when the children close with acceptance, not when tabs exist. Issue stays actionable.
+
+Draw-check slice done on PR 506 (b338b02a): tests/test_ff8_streamlined_draw.py, 7 green. Refine tables covered (4 tests). Text-override slice done on PR 506 (c8a8183a): tests/test_ff8_kernel_text.py, 7 green, including a pinned apostrophe asymmetry (encode ' decodes U+2018, benign).
+
+## 2026-09-23 misc-fixes: flipped to waiting with concrete checklist
+
+Per Lexer's rule (needs concrete Lexer-side work means waiting), posted the
+exact game-session/decision checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

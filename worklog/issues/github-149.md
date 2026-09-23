@@ -15,3 +15,6 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
 
 - [Original Lexer-Lux/Lexers-Mod-For-RDR2 #50 worklog](github-149/imports/Lexer-Lux--Lexers-Mod-For-RDR2/4fe6c76d17cc9c526cbb208e7d28f26e6395ca60/github-50.md) — verified transferred issue identity; historical evidence, not a replacement for newer central progress.
+
+## 2026-09-22 misc-fixes disposition
+Diagnostic crash repaired; the overhaul itself remains research: duration/state experiment plus a concrete persistent-zone prototype with re-entry consequences, all needing the game. Drawn circles alone do not prove law behavior. No repo change available. Issue stays actionable.

@@ -13,3 +13,6 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes disposition
+Split-root approach stays rejected (duplicate entries, progress problems). A runtime solution preserving the original strand needs game UI research. No code written. Issue stays actionable.

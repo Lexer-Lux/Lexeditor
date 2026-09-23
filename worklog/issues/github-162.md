@@ -39,3 +39,6 @@ A save now claims one fixed `.loot-sounds-recovery` directory with atomic direct
 ## Root integration check
 
 Added an injected concurrent edit between the initial read and rollback staging. It failed before the repair: the later snapshot hid the source change and stale output replaced it. The save now compares that snapshot with the original bytes before any live replacement. Focused result: five tests and ten subtests pass. The prior full suite passed333 tests,149 subtests, with four skips; the new focused race test ran after that full result.
+
+## 2026-09-22 misc-fixes evidence
+Sound mapping editor stands: test_rdr2_loot_sounds.py passes (5 tests, 10 subtests), and the run exposed a real defect fixed on this branch, an invalid escape in the server.py docstring now a raw string. No brass casing references exist anywhere in plugin code; the custom sample with source and permission details is still Lexer-supplied input and does not block the existing controls. Issue stays actionable.
