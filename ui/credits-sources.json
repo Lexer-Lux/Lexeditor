@@ -208,7 +208,7 @@
         },
         {
           "name": "narknon / FF7R2UProj",
-          "role": "Public generated Rebirth type declarations used only as reverse-engineering/schema evidence for #470/#472/#473/#477: chocobo ride-legality/location seams, bench mesh/cushion actor members, navimap scale option categories, and Queen's Blood field/pass/turn types. No root repository license file was found in the audited snapshot, so no source is copied, adapted, vendored or redistributed.",
+          "role": "Public generated Rebirth type declarations used only as reverse-engineering/schema evidence for #470/#471/#472/#473/#477: Chocobo ride-legality/location seams; the concrete BattleItemPossession TArray<FName>/TArray<uint8>/int32 schema; bench mesh/cushion actor members; navimap scale option categories; and Queen's Blood field/pass/turn types. No root repository license file was found in the audited snapshot, so no source is copied, adapted, vendored or redistributed.",
           "url": "https://github.com/narknon/FF7R2UProj"
         }
       ],
