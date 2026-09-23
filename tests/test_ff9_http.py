@@ -31,6 +31,7 @@ def service(tmp_path, monkeypatch):
     dependency("battle_scene", BattleSceneStore=FakeBattleSceneStore)
     class FakeFieldWalkmeshStore:
         KEY = "field-walkmesh"
+        KEYS = frozenset({"field-walkmesh", "field-walkmesh-triangles"})
         def status_rows(self): return []
     dependency("field_walkmesh", FieldWalkmeshStore=FakeFieldWalkmeshStore)
     dependency("memoria_baseline", ensure=lambda: {"release": "fixture", "source": "fixture", "problems": []})
@@ -207,11 +208,24 @@ def test_data_map_marks_walkmesh_floor_activity_partial_when_available(service, 
     assert row["openable"] is True and row["sourceAvailable"] is True
 
 
+def test_data_map_marks_walkmesh_triangle_activity_partial_when_available(service, monkeypatch):
+    monkeypatch.setattr(service[0].FIELD_WALKMESH, "status_rows", lambda: [{
+        "available": True,
+        "relativePath": "StreamingAssets/p0data1*.bin → StreamingAssets/Assets/Resources/FieldMaps/*/*.bgi.bytes",
+        "controls": "Per-field triangle active/inactive state (BGI_TRI_ACTIVE)",
+        "notes": "Edits only the documented triangle-active bit.",
+        "tab": "world", "key": "field-walkmesh-triangles",
+    }])
+    row = next(row for row in service[0].data_map()["rows"] if row.get("datasetKey") == "field-walkmesh-triangles")
+    assert row["status"] == "partial" and row["coverage"] == "structured"
+    assert row["openable"] is True and row["sourceAvailable"] is True
+
+
 def test_data_map_keeps_each_known_p0data_gap_visible(service):
     rows = service[0].data_map()["rows"]
     gaps = {row["filename"]: row for row in rows if row["status"] == "not-integrated"}
     expected = {
-        "StreamingAssets/p0data1*.bin (outside integrated BGI floor activity)",
+        "StreamingAssets/p0data1*.bin (outside integrated BGI activity bits)",
         "StreamingAssets/p0data2.bin (outside BattleScene raw16)",
         "StreamingAssets/p0data3.bin",
         "StreamingAssets/p0data4.bin",
