@@ -11,10 +11,12 @@ keeping the installed game archives read-only.
 - **Shops** — verified `ShopInventory` records from RSC85/WGD resources.
   Price modifier, purchase quantity, and available stock are editable; other
   Gringo components are preserved.
-- **Strings** — parsed PC `.strtbl` localization entries. Only displayed UTF-16
-  text is editable. Identifier bytes, hashes, glyph metrics, layout metadata,
-  shared language blocks, padding, and `_ps3.strtbl` duplicates remain
-  structural/read-only.
+- **Strings** — parsed PC `.strtbl` localization entries. The editor is
+  language-first: every logical language slot has its own flagged subtab and
+  searches across all prepared STRTBL resources for that language. Shared
+  physical language blocks remain one underlying write. Only displayed UTF-16
+  text is editable; identifier bytes, hashes, glyph metrics, layout metadata,
+  padding, and `_ps3.strtbl` duplicates remain structural/read-only.
 - **Loot Tables** — the schema-versioned `LexerRDR.loot.json` runtime override,
   plus the exact verified item-enum call sites in
   `lootcorpsegenericnoanim.wsc`. Other WSC bytecode is not presented as editable.
@@ -30,9 +32,11 @@ is not promoted merely because Lexeditor can read its bytes.
 ## Preparation and writes
 
 The pinned local MagicRDR bridge reads RPF6 archives and prepares private cache
-copies. The bridge is pinned; the plugin does not silently update or download it.
-MagicRDR's repository declares no redistribution license, so the checked-in
-bridge usage constraints are documented in `tools/magic-rdr/README.md`.
+copies. Lexeditor's shared helper-version panel reports local presence, the
+v1.3.10 pin, and newer upstream release metadata, but exposes no install or
+automatic-update action. MagicRDR's repository declares no redistribution
+license, so the checked-in bridge usage constraints are documented in
+`tools/magic-rdr/README.md`.
 
 Preparation currently covers the tuning archive, inventory/content data needed
 by structured screens, PC string tables, and packed/unpacked Gringo resources.
@@ -47,9 +51,10 @@ project workspace.
 ## First-time runtime setup
 
 RedHook is an external prerequisite for using the delivered overrides in-game.
-Lexeditor reports exactly which RedHook files are missing and exposes a
-user-initiated link to the official download page; it does not silently install
-or update RedHook. When RedHook is already installed, the existing
+Its author permissions prohibit re-uploading the runtime, so Lexeditor does not
+bundle it. Lexeditor reports exactly which RedHook files are missing and exposes
+a user-initiated link to the official Nexus Mods page; it does not silently
+install or update RedHook. When RedHook is already installed, the existing
 `SkipIntroLogos` setting can be configured with a backup-preserving edit.
 
 Source tests, synthetic round trips, rendered browser evidence, an isolated
