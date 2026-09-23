@@ -61,6 +61,11 @@
       "structure": "One selected Lexeditor project is a Content Patcher pack with manifest.json and content.json. Deploy Project copies that project into a Lexeditor-owned [CP] folder under <Stardew Valley>\\Mods after confirming SMAPI and Pathoschild.ContentPatcher are installed.",
       "overriding": "Content Patcher owns cross-mod ordering and conflict resolution. Lexeditor emits field-level EditData patches where supported so unrelated field edits can coexist instead of replacing an entire Data asset; it does not rewrite or merge other installed content packs."
     },
+    "terraria": {
+      "loader": "tModLoader 1.4.4 stable. Lexeditor targets tModLoader's native source-project, build, local-mod and Workshop ecosystem instead of patching vanilla Terraria or shipping another loader.",
+      "structure": "Editable source mods live under the tModLoader save root at ModSources/<ModName>/ with build.txt, a .csproj importing ..\\tModLoader.targets, C# source, localization and content assets. tModLoader owns compiled .tmod output and enabled-mod state.",
+      "overriding": "tModLoader loads multiple mods through its API/dependency model rather than whole-file replacement order. Lexeditor does not invent cross-mod file priority or semantically merge unrelated source projects; runtime interactions and conflicts follow tModLoader and the participating mods."
+    },
     "warband": {
       "loader": "Warband's native module system. WSE2 is Lexeditor's optional enhanced runtime helper, not a multi-mod overlay loader.",
       "structure": "Each installed mod is its own folder under <Warband>\\Modules\\ with module.ini. Lexeditor can also edit and build a Module System source project before it becomes an installed module.",

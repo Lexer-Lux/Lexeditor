@@ -1,0 +1,13 @@
+author = Lexer
+
+displayName = __LEXEDITOR_DISPLAY_NAME__
+
+version = 0.1
+
+hideCode = false
+hideResources = false
+includeSource = true
+
+buildIgnore = *.csproj, *.user, obj\*, bin\*, .vs\*
+
+side = Both

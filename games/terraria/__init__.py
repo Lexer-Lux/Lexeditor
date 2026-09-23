@@ -1,0 +1,1 @@
+"""Terraria / tModLoader plugin."""

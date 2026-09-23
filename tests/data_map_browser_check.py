@@ -93,6 +93,16 @@ with sync_playwright() as p:
                 fixture_rows=[{**row,'target':target} for row in ROWS]
                 if game=='blank':
                     page.evaluate('navigate("datamap")')
+                elif game=='terraria':
+                    # Terraria maps server rows by file extension; seed one of
+                    # each kind so the shared filter sees every status.
+                    page.evaluate('''rows=>{
+                      const kinds=['.cs','.hjson','.png','.csproj','.txt'];
+                      mapRows=rows.map((row,index)=>({path:index===0?'build.txt':
+                        'file-'+String(index).padStart(3,'0')+kinds[index%kinds.length],
+                        family:'Fixture'}));
+                      navigate("datamap");
+                    }''',fixture_rows)
                 elif game=='project_zomboid':
                     # Zomboid keeps its map rows in a module-level datamap object
                     # keyed by editor label; seed and render through its own path.

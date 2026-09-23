@@ -18,11 +18,11 @@ import css_audit  # noqa: E402
 # Non-token rules per plugin; the target for every one is 0.
 PLUGIN_RULES = {
     "bannerlord": 24, "blank": 0, "factorio": 0, "ff7r": 0, "ff7r2": 0, "ff8": 0, "ff9": 0,
-    "palworld": 0, "project_zomboid": 6, "rdr": 0, "rdr2": 0, "warband": 0, "ffx_x2": 25, "stardew_valley": 10,
+    "palworld": 0, "project_zomboid": 6, "rdr": 0, "rdr2": 0, "terraria": 30, "warband": 0, "ffx_x2": 25, "stardew_valley": 10,
 }
 PLUGIN_IMPORTANT = {
     "bannerlord": 0, "blank": 0, "factorio": 0, "ff7r": 0, "ff7r2": 0, "ff8": 0, "ff9": 0,
-    "palworld": 0, "project_zomboid": 0, "rdr": 0, "rdr2": 0, "warband": 0, "ffx_x2": 0, "stardew_valley": 0,
+    "palworld": 0, "project_zomboid": 0, "rdr": 0, "rdr2": 0, "terraria": 0, "warband": 0, "ffx_x2": 0, "stardew_valley": 0,
 }
 FRAMEWORK_DUPLICATES = 0
 # One, and only for `[hidden]`: see the comment on it in ui/framework.css.

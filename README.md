@@ -12,6 +12,7 @@ Currently supports:
 * Red Dead Redemption 2
 * Stardew Valley
 * Project Zomboid
+* Terraria
 
 Coming soon:
 * Final Fantasy IV
