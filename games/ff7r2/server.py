@@ -287,11 +287,13 @@ def data_map_payload() -> dict:
             "filename": "End/Content/DataObject/Resident/ResidentParameter.uasset (#470)",
             "controls": "None — Chocobo whistle research target", "coverage": "unavailable",
             "notes": (
-                "Public Rebirth constants identify CallChocoboAtFieldActionDistanceParamRatio0/1; "
-                "Item also identifies key_ChocoboWhistle, CharaSpec identifies "
-                "FA0407_00_ChocoboWhistle_Standard, and CameraModule identifies ChocoboRide. "
-                "Those names do not prove a teleport/mount hook, safe-placement rule, ride-legality "
-                "predicate or vanilla fallback, and the distance-ratio semantics/ranges are unproved."
+                "Public constants identify CallChocoboAtFieldActionDistanceParamRatio0/1 and the "
+                "whistle/chocobo identities. The public generated Rebirth SDK further exposes "
+                "AEndLocationVolume.bDisableChocoboRide, UEndEnvQueryTest_IsDisabledChocoboRide, "
+                "UEndEnvQueryContext_LastEnableChocoboRideLocation and a "
+                "FEndBehaviorChocoboRideOnExtraAction type. This proves ride-legality/location/action "
+                "seams exist, but not the callable sequence for safe teleport + immediate mount, "
+                "nor the distance-ratio semantics/ranges or vanilla fallback."
             ), "status": "not-integrated",
         },
         {
@@ -311,30 +313,34 @@ def data_map_payload() -> dict:
             "filename": "End/Content/DataObject/Resident/StateChange.uasset + StateTrigger.uasset + ActionGroup.uasset (#472)",
             "controls": "None — restable-bench/cushion research family", "coverage": "unavailable",
             "notes": (
-                "Public constants identify scgCmn_Tmp_Bench_Init/Rest, trgCmn_Bench_Rest and "
-                "acgCmn_RecoverAll_ForBench; CharaSpec also identifies UI7033_00_ConsumedItem_Cushion. "
-                "Public mesh work confirms the blue bench and Chocobo-rest benches are separate models. "
-                "No public mapping yet proves every restable bench identity or the universal cushion-consumption gate."
+                "Public constants identify the bench rest trigger/action rows and the consumed-cushion "
+                "resource. The public generated SDK exposes AEndFieldActionActorBenchBreak with both "
+                "BenchMeshComponent and ZabutonActorClass, directly narrowing the model/cushion actor seam; "
+                "public mesh work also confirms multiple bench models. Missing evidence is the complete "
+                "restable-placement -> desired blue-mesh mapping and the inventory/state transition that "
+                "must consume a cushion for every valid rest without changing unusable benches."
             ), "status": "not-integrated",
         },
         {
             "filename": "End/Content/DataObject/Resident/MapIconInfo.uasset + HUD package assets (#473)",
             "controls": "None — world-minimap zoom research family", "coverage": "unavailable",
             "notes": (
-                "MapIconInfo publicly exposes navimap visibility/layer, offsets and view-distance fields, "
-                "but no minimap zoom field. A 2026 accessibility mod proves minimap position/size can live "
-                "in packaged HUD data, while its runtime HUD mover is separate UE4SS code. No proved world-minimap "
-                "zoom scalar, valid range or persistence path has been found, so size/position is not relabeled as zoom."
+                "The public generated Rebirth SDK explicitly defines option categories AreaNaviMapScale, "
+                "LocationNaviMapScale and ZackNaviMapScale; UEndNaviMap also exposes PixelPerCm, and the option "
+                "model supports Range entries with integer MinValue/MaxValue. This is direct zoom/scale evidence, "
+                "but public sources still do not map the two requested categories to their concrete range/default "
+                "values or persistent save/config storage, so Lexeditor does not invent a slider contract."
             ), "status": "not-integrated",
         },
         {
             "filename": "End/Content/DataObject/Resident/CardGameCommonParameter.uasset + CardGameAIParam.uasset (#477)",
             "controls": "None — Queen's Blood turn-flow research family", "coverage": "unavailable",
             "notes": (
-                "Public constants expose CardGameCommonParameter rows such as EffectWaitTime and "
-                "CardGameAIParam fields including NeedCanPutCount and Player/EnemyPredictionTurn. "
-                "They do not establish the game's legal-move predicate, auto-pass transition, both-sides-no-moves "
-                "end condition or the intro's first skippable input state. Lexeditor does not infer those rules from names."
+                "Public CardGame data exposes EffectWaitTime, NeedCanPutCount and player/enemy prediction fields. "
+                "The generated SDK additionally exposes UEndCardGameMenu._PassClass with OnYesButtonPressed/OnNoButtonPressed, "
+                "and AEndCardGame3DManager player/enemy turn visibility plus CardPlacementActor state. These are real "
+                "pass/turn/board seams, but they still do not prove the legal-move predicate, automatic pass transition, "
+                "both-sides-no-moves match termination or intro first-skippable-input hook."
             ), "status": "not-integrated",
         },
         {"filename": binaries + shader_injector.DLL,
