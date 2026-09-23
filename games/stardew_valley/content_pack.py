@@ -272,6 +272,51 @@ class ContentPackStore:
         return self.objects()
 
 
+    def save_dataset(self, key: str, expected_sha256: str, edits: list[dict]) -> dict:
+        """Save bounded top-level fields for one typed family and preserve all other JSON."""
+        if key == "objects":
+            result = self.save_objects(expected_sha256, edits)
+            result["schema"] = dataset_schema("objects")
+            result["datasetKey"] = "objects"
+            return result
+        self.validate()
+        spec = dataset_spec(key)
+        if not isinstance(expected_sha256, str) or not expected_sha256:
+            raise ValueError("A source SHA-256 is required")
+        if _sha256(self.content_path) != expected_sha256:
+            raise RuntimeError("content.json changed since it was opened; reload before saving")
+        if not isinstance(edits, list) or len(edits) > 10000:
+            raise ValueError("edits must be a bounded array")
+        payload = _json(self.content_path)
+        change = _dataset_change(payload, key, create=True)
+        assert change is not None
+        records = change["Fields"]
+        for edit in edits:
+            if not isinstance(edit, dict):
+                raise ValueError("Each data edit must be an object")
+            record_id = str(edit.get("id", "")).strip()
+            if not record_id or len(record_id) > 200 or any(ch in record_id for ch in "\r\n"):
+                raise ValueError("Each data edit needs a valid record ID")
+            incoming = edit.get("fields")
+            if not isinstance(incoming, dict) or set(incoming) - set(spec["fields"]):
+                raise ValueError(f"Unsupported {spec['target']} field edit")
+            existing = records.get(record_id)
+            if existing is None:
+                existing = {}
+                records[record_id] = existing
+            if not isinstance(existing, dict):
+                raise ValueError(f"{spec['target']} patch {record_id} is not a field object")
+            for field_key, value in incoming.items():
+                if value is None:
+                    existing.pop(field_key, None)
+                else:
+                    existing[field_key] = validate_field_value(spec["fields"][field_key], value)
+            if not existing:
+                records.pop(record_id, None)
+        _atomic_json(self.content_path, payload)
+        return self.dataset(key)
+
+
 def initialize_project(root: Path) -> None:
     """Give a cloned template a stable, project-specific SMAPI identity."""
     root = Path(root).resolve()
