@@ -289,6 +289,16 @@
           "name": "MagicRDR contributors",
           "role": "Reference and separately installed tool for Red Dead Redemption archives.",
           "url": "https://github.com/Foxxyyy/Magic-RDR"
+        },
+        {
+          "name": "CodeX.Games.RDR1 contributors",
+          "role": "Public RDR1 STRTBL/RPF6 format research consulted for independently implemented string-table compatibility.",
+          "url": "https://github.com/Foxxyyy/CodeX.Games.RDR1"
+        },
+        {
+          "name": "K3rhos / RedHook",
+          "role": "External RDR1 runtime prerequisite. Lexeditor links to the official download and does not redistribute RedHook files.",
+          "url": "https://www.nexusmods.com/reddeadredemption/mods/192"
         }
       ],
       "thanks": [],

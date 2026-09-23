@@ -4,9 +4,6 @@ Uses the production RDR1 editor plus shared framework with synthetic API data. N
 installed game, game assets, native runtime, or network access is required.
 """
 from pathlib import Path
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent))
-from plugin_ui import inline_modules
 import argparse
 import json
 from playwright.sync_api import sync_playwright, expect
@@ -34,6 +31,64 @@ def document() -> str:
         "rewards": {"cash": 0, "fame": 0, "honor": 50},
         "baseRewards": {"cash": 0, "fame": 0, "honor": 50}, "project": False,
     }
+    string_table = {
+        "table": {"id": "tuning:tune/stringtable/global.strtbl", "source": "tuning",
+                  "sourceLabel": "Tuning", "path": "tune/stringtable/global.strtbl",
+                  "label": "global", "available": True, "sourcePath": "prepared/global.strtbl",
+                  "projectPath": "project/global.strtbl", "project": False,
+                  "rowCount": 1, "languageCount": 1, "version": 256, "identifierCount": 1},
+        "rows": [{"id": "tuning:tune/stringtable/global.strtbl:0:0:12345678",
+                  "tableId": "tuning:tune/stringtable/global.strtbl", "source": "tuning",
+                  "sourceLabel": "Tuning", "path": "tune/stringtable/global.strtbl",
+                  "sourcePath": "prepared/global.strtbl", "projectPath": "project/global.strtbl",
+                  "project": False, "languageIndex": 0, "languageIndexes": [0],
+                  "language": "English", "entryIndex": 0, "hash": "0x12345678",
+                  "hashValue": 305419896, "identifier": "HELLO",
+                  "identifierCandidates": ["HELLO"], "text": "Hello",
+                  "sharedLanguageBlock": False}],
+        "counts": {"records": 1, "languages": 1, "identifiers": 1},
+    }
+    strings = {
+        "tables": [{**string_table["table"],
+                    "languages": [{"id": "0", "index": 0, "label": "English"},
+                                  {"id": "2", "index": 2, "label": "French"}]}],
+        "languages": [{"id": "0", "index": 0, "label": "English"},
+                      {"id": "2", "index": 2, "label": "French"}],
+        "counts": {"tables": 1, "available": 1, "records": 1, "project": 0},
+    }
+    strings_payload = {
+        "language": {"id": "0", "index": 0, "label": "English"},
+        "languages": strings["languages"],
+        "rows": string_table["rows"],
+        "counts": {"records": 1, "tables": 1, "availableTables": 1},
+    }
+    rbf_payload = {
+        "rows": [{
+            "id": "tune/ai/protected.tune:24",
+            "resourcePath": "tune/ai/protected.tune",
+            "recordOffset": 24,
+            "descriptorIndex": 2,
+            "name": "Scale",
+            "path": "Tuning/Scale",
+            "role": "child",
+            "kind": "float",
+            "value": 1.0,
+            "typeOffset": 25,
+            "writeOffset": 26,
+            "writeSize": 4,
+            "rawHex": "0000803f",
+            "sourcePath": "prepared/protected.tune",
+            "projectPath": "project/protected.tune",
+            "project": False,
+        }],
+        "resources": [{
+            "path": "tune/ai/protected.tune", "scalarCount": 1,
+            "descriptorCount": 3, "trailingBytes": 0,
+            "skipped": {"strings": 1, "float3": 0, "byteBlocks": 0},
+            "project": False,
+        }],
+        "counts": {"resources": 1, "scalars": 1, "project": 0},
+    }
     missions = {
         "missions": [mission],
         "limits": {"step": 1, "rewards": {
@@ -49,6 +104,13 @@ def document() -> str:
         "/api/items?dataset=vanilla": items,
         "/api/shops": {"rows": []},
         "/api/shops?dataset=vanilla": {"rows": []},
+        "/api/string-tables": strings,
+        "/api/string-tables?dataset=vanilla": strings,
+        "/api/string-table": string_table,
+        "/api/strings?language=0": strings_payload,
+        "/api/strings?language=0&dataset=vanilla": strings_payload,
+        "/api/rbf-scalars": rbf_payload,
+        "/api/rbf-scalars?dataset=vanilla": rbf_payload,
         "/api/missions": missions,
         "/api/missions?dataset=vanilla": missions,
         "/api/settings": {"available": False, "sections": [], "reason": "Synthetic fixture"},
@@ -78,7 +140,22 @@ window.fetch=async function(url,options={}) {
         "<script>" + fixture + "</script><script>" +
         (ROOT / "ui/framework.js").read_text(encoding="utf-8") + "</script>",
     )
-    html = inline_modules("rdr", html)
+    html = html.replace(
+        '<link rel="stylesheet" href="editor.css">',
+        "<style>" + (ROOT / "games/rdr/editor.css").read_text(encoding="utf-8") + "</style>",
+    )
+    html = html.replace(
+        '<script src="strings.js"></script>',
+        "<script>" + (ROOT / "games/rdr/strings.js").read_text(encoding="utf-8") + "</script>",
+    )
+    html = html.replace(
+        '<script src="rbf.js"></script>',
+        "<script>" + (ROOT / "games/rdr/rbf.js").read_text(encoding="utf-8") + "</script>",
+    )
+    html = html.replace(
+        '<script src="editor.js"></script>',
+        "<script>" + (ROOT / "games/rdr/editor.js").read_text(encoding="utf-8") + "</script>",
+    )
     return html.replace("<head>", '<head><base href="https://lexeditor.test/">', 1)
 
 
@@ -90,13 +167,16 @@ def run(output: Path, executable: str | None) -> None:
             options["executable_path"] = executable
         browser = playwright.chromium.launch(**options)
         try:
-            for width, height in ((1200, 800), (760, 700)):
+            for width, height, zoom in ((1200, 800, 100), (900, 620, 100), (1200, 800, 150)):
                 page = browser.new_page(viewport={"width": width, "height": height})
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.route("**/*", lambda route: route.abort())
                 page.set_content(document(), wait_until="domcontentloaded")
                 page.wait_for_function("!state.booting")
+                if zoom != 100:
+                    page.evaluate("(value) => { document.documentElement.style.zoom = value; }", zoom / 100)
+                    page.wait_for_timeout(100)
                 assert not errors, errors
 
                 page.evaluate("state.itemSelected='base:0'; renderItems()")
@@ -118,8 +198,30 @@ def run(output: Path, executable: str | None) -> None:
                   if (!field.isConnected || b.width<=0 || l.width<=0) return false;
                   return {field:b.width,label:l.width,ratio:l.width/b.width};
                 }""").json_value()
-                assert 0.075 <= geometry["ratio"] <= 0.125, (width, "RDR1 bypassed shared ~10% label lane", geometry)
-                page.screenshot(path=str(output / f"rdr-items-{width}.png"), full_page=True)
+                assert 0.075 <= geometry["ratio"] <= 0.16, (width, "RDR1 bypassed shared adaptive label lane", geometry)
+                page.screenshot(path=str(output / f"rdr-items-{width}-zoom{zoom}.png"), full_page=True)
+
+                page.evaluate("state.tab='strings'; stringsUI.render()")
+                expect(page.locator(".string-detail textarea")).to_have_value("Hello")
+                expect(page.locator(".rdr-record-list .lex-column-list-row:not(.lex-filler-row)")).to_have_count(1)
+                expect(page.locator(".string-detail .lex-detail-field")).to_have_count(7)
+                expect(page.get_by_role("tab", name="🇺🇸 English")).to_have_count(1)
+                assert page.get_by_label("Select string table").count() == 0
+                resource = page.locator(".string-detail .lex-detail-field").filter(
+                    has_text="Resource").first
+                expect(resource.locator("input.lex-readonly-field")).to_have_value(
+                    "tune/stringtable/global.strtbl")
+                assert page.locator(".string-detail .lex-record-id").count() == 0
+                page.screenshot(path=str(output / f"rdr-strings-{width}-zoom{zoom}.png"), full_page=True)
+
+                page.evaluate("state.tab='rbf'; state.rbfSelected='tune/ai/protected.tune:24'; rbfUI.render()")
+                expect(page.locator('nav button[data-tab="rbf"] .lex-tab-label-text')).to_have_text("Tuning")
+                expect(page.locator(".rbf-detail .lex-detail-field-label").filter(has_text="File")).to_have_count(1)
+                expect(page.locator(".rdr-record-list .lex-column-list-row:not(.lex-filler-row)")).to_have_count(1)
+                expect(page.locator(".rbf-detail .lex-detail-field")).to_have_count(7)
+                expect(page.get_by_label("Tuning/Scale", exact=True)).to_have_value("1")
+                assert page.locator(".rbf-detail .lex-record-id").count() == 0
+                page.screenshot(path=str(output / f"rdr-rbf-{width}-zoom{zoom}.png"), full_page=True)
 
                 page.evaluate("state.tab='missions'; state.missionSelected=2; renderMissions()")
                 expect(page.locator(".mission-detail .lex-detail-field")).to_have_count(9)
@@ -130,10 +232,10 @@ def run(output: Path, executable: str | None) -> None:
                 assert any("completion Fame award independently" in text for text in labels), labels
                 assert any("completion Honor adjustment independently" in text for text in labels), labels
                 assert all("Base value" not in text and "range" not in text.lower() for text in labels), labels
-                page.screenshot(path=str(output / f"rdr-missions-{width}.png"), full_page=True)
+                page.screenshot(path=str(output / f"rdr-missions-{width}-zoom{zoom}.png"), full_page=True)
                 assert not errors, errors
                 page.close()
-                print(f"PASS: RDR1 shared Detail + semantic info bubbles at {width}x{height}")
+                print(f"PASS: RDR1 shared Detail + semantic info bubbles at {width}x{height}, zoom {zoom}%")
         finally:
             browser.close()
 

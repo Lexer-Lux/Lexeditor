@@ -27,6 +27,7 @@ INVENTORY_XML = Path("content") / "init" / "inventory" / "inventory.xml"
 DLC_INVENTORY_XML = Path("content") / "init" / "inventory" / "dlc_inventory.xml"
 MINIMUM_FILE_COUNT = 1000
 GRINGO_FILE_COUNT = 39
+MINIMUM_STRING_TABLE_COUNT = 1
 
 
 def sha256(path: Path) -> str:
@@ -55,12 +56,13 @@ def _source_record(archive: Path) -> dict:
 
 
 def _valid_cache(data_root: Path, records: dict, tool: dict, manifest: dict) -> bool:
-    if manifest.get("version") != 3 or manifest.get("sources") != records:
+    if manifest.get("version") != 4 or manifest.get("sources") != records:
         return False
     if manifest.get("tool") != tool:
         return False
     counts = manifest.get("fileCounts", {})
     if (counts.get("tuning", 0) < MINIMUM_FILE_COUNT or counts.get("inventory") != 2
+            or counts.get("stringTables", 0) < MINIMUM_STRING_TABLE_COUNT
             or counts.get("gringoPacked") != GRINGO_FILE_COUNT
             or counts.get("gringoUnpacked") != GRINGO_FILE_COUNT):
         return False
@@ -134,7 +136,7 @@ def ensure_rdr_data(game_root: Path, data_root: Path, progress) -> dict:
 
     data_root.mkdir(parents=True, exist_ok=True)
     manifest_path = data_root / "manifest.json"
-    progress(0, 7, "Checking the installed RDR data archives…")
+    progress(0, 8, "Checking the installed RDR data archives…")
     sources_before = {label: _source_record(path) for label, path in archives.items()}
     tool = {
         "path": str(RPF6_TOOL),
@@ -142,7 +144,7 @@ def ensure_rdr_data(game_root: Path, data_root: Path, progress) -> dict:
     }
     current_manifest = _manifest(manifest_path)
     if _valid_cache(data_root, sources_before, tool, current_manifest):
-        progress(7, 7, "RDR editor data is ready")
+        progress(8, 8, "RDR editor data is ready")
         return current_manifest
 
     temporary_root = data_root / f".prepare-{uuid.uuid4().hex}"
@@ -152,7 +154,7 @@ def ensure_rdr_data(game_root: Path, data_root: Path, progress) -> dict:
     gringo_unpacked_temporary = temporary_root / GRINGO_UNPACKED_CACHE_NAME
     temporary_root.mkdir()
     try:
-        progress(1, 7, "Extracting editable RDR tuning data…")
+        progress(1, 8, "Extracting editable RDR tuning data…")
         _extract(archives["tuning"], tuning_temporary, "**", 180)
         tuning_files = [path for path in tuning_temporary.rglob("*") if path.is_file()]
         if len(tuning_files) < MINIMUM_FILE_COUNT:
@@ -162,7 +164,7 @@ def ensure_rdr_data(game_root: Path, data_root: Path, progress) -> dict:
             )
         ET.parse(tuning_temporary / KNOWN_TUNING_XML)
 
-        progress(2, 7, "Extracting RDR inventory definitions…")
+        progress(2, 8, "Extracting RDR inventory definitions…")
         _extract(archives["content"], content_temporary, "*inventory.xml", 60)
         inventory_files = [path for path in content_temporary.rglob("*") if path.is_file()]
         expected_inventory = (
@@ -176,7 +178,15 @@ def ensure_rdr_data(game_root: Path, data_root: Path, progress) -> dict:
         for target in expected_inventory:
             ET.parse(target)
 
-        progress(3, 7, "Extracting packed RDR shop dictionaries…")
+        progress(3, 8, "Extracting RDR string tables…")
+        _extract(archives["content"], content_temporary, "**/*.strtbl", 120)
+        string_table_files = [
+            path for path in content_temporary.rglob("*.strtbl") if path.is_file()
+        ]
+        if len(string_table_files) < MINIMUM_STRING_TABLE_COUNT:
+            raise RuntimeError("RPF6 content extraction returned no string tables.")
+
+        progress(4, 8, "Extracting packed RDR shop dictionaries…")
         _extract(archives["gringores"], gringo_packed_temporary, "**/*.wgd", 60)
         gringo_packed = [path for path in gringo_packed_temporary.rglob("*.wgd")]
         if len(gringo_packed) != GRINGO_FILE_COUNT:
@@ -185,7 +195,7 @@ def ensure_rdr_data(game_root: Path, data_root: Path, progress) -> dict:
                 f"expected {GRINGO_FILE_COUNT}."
             )
 
-        progress(4, 7, "Unpacking editable RDR shop dictionaries…")
+        progress(5, 8, "Unpacking editable RDR shop dictionaries…")
         _extract(
             archives["gringores"], gringo_unpacked_temporary,
             "**/*.wgd", 60, command="unpack",
@@ -197,7 +207,7 @@ def ensure_rdr_data(game_root: Path, data_root: Path, progress) -> dict:
                 f"expected {GRINGO_FILE_COUNT}."
             )
 
-        progress(5, 7, "Verifying the installed archives stayed unchanged…")
+        progress(6, 8, "Verifying the installed archives stayed unchanged…")
         sources_after = {label: _source_record(path) for label, path in archives.items()}
         if sources_after != sources_before:
             raise RuntimeError("An installed RDR archive changed during preparation.")
@@ -209,13 +219,14 @@ def ensure_rdr_data(game_root: Path, data_root: Path, progress) -> dict:
         _install_cache(
             gringo_unpacked_temporary, data_root / GRINGO_UNPACKED_CACHE_NAME, data_root)
         payload = {
-            "version": 3,
+            "version": 4,
             "preparedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "sources": sources_before,
             "tool": tool,
             "fileCounts": {
                 "tuning": len(tuning_files),
                 "inventory": len(inventory_files),
+                "stringTables": len(string_table_files),
                 "gringoPacked": len(gringo_packed),
                 "gringoUnpacked": len(gringo_unpacked),
             },
@@ -232,9 +243,10 @@ def ensure_rdr_data(game_root: Path, data_root: Path, progress) -> dict:
         )
         os.replace(manifest_temporary, manifest_path)
         progress(
-            7, 7,
+            8, 8,
             f"Prepared {len(tuning_files)} tuning files, 2 inventory files, "
-            f"and {len(gringo_unpacked)} shop dictionaries",
+            f"{len(string_table_files)} string tables, and "
+            f"{len(gringo_unpacked)} shop dictionaries",
         )
         return payload
     finally:

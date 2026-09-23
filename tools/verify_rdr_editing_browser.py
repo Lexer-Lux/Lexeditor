@@ -32,15 +32,15 @@ def main():
                     page.on('pageerror', lambda error: errors.append(str(error)))
                     page.goto(f'http://127.0.0.1:{service.server_port}/')
                     page.wait_for_function('typeof state !== "undefined" && !state.booting')
-                    assert page.locator('.rdr-record-entry').count(), page.locator('#main').inner_text()
-                    for tab in ('items', 'shops', 'missions'):
+                    assert page.locator('.lex-column-list-row:not(.lex-filler-row)').count(), page.locator('#main').inner_text()
+                    for tab in ('items', 'shops', 'strings', 'missions'):
                         for width, height in ((1600, 900), (1280, 720)):
                             page.set_viewport_size({'width': width, 'height': height})
                             page.evaluate('(tab) => navigate(tab)', tab)
                             page.wait_for_timeout(500)
                             result = page.evaluate('''() => {
                               const list=document.querySelector('.rdr-record-list'),rect=list.getBoundingClientRect();
-                              const rows=[...list.querySelectorAll('.rdr-record-entry')];
+                              const rows=[...list.querySelectorAll('.lex-column-list-row:not(.lex-filler-row)')];
                               const detail=document.querySelector('.lex-detail'),bounds=detail.getBoundingClientRect();
                               return {rows:rows.length,cut:rows.filter(row=>row.getBoundingClientRect().bottom>rect.bottom+1).length,
                                 scroll:list.scrollHeight>list.clientHeight+1,
@@ -56,7 +56,8 @@ def main():
                     page.evaluate('navigate("items")')
                     page.locator('.item-detail input[type=number]').first.fill('9')
                     page.evaluate('navigate("missions")')
-                    page.locator('.mission-detail input[type=number]').first.fill('')
+                    page.evaluate('state.missionSelected=state.missions.missions[0].id;renderMissions()')
+                    page.locator('.mission-detail input[inputmode="decimal"][aria-label="Cash"]').fill('')
                     requests = []
                     page.on('request', lambda request: requests.append(request.url) if request.method == 'POST' else None)
                     page.evaluate('saveAll()')
@@ -70,6 +71,32 @@ def main():
                     assert page.evaluate('dirtyCount()') == 0
                     assert page.locator('.shop-detail input[type=number]').first.input_value() == '1.1'
                     assert server.shops_payload()['rows'][0]['project']
+                    page.evaluate('navigate("strings")')
+                    string_box = page.locator('.string-detail textarea')
+                    assert string_box.count() == 1
+                    assert string_box.input_value() == 'Hello'
+                    string_box.fill('Hello from New Austin')
+                    page.evaluate('saveAll()')
+                    page.wait_for_function('dirtyCount() === 0')
+                    assert string_box.input_value() == 'Hello from New Austin'
+                    saved_table = server.string_table_payload(
+                        'tuning', 'tune/stringtable/global.strtbl')
+                    assert next(row for row in saved_table['rows']
+                                if row['languageIndex'] == 0 and row['identifier'] == 'HELLO')['text'] == 'Hello from New Austin'
+                    page.evaluate('switchProjectSource("vanilla")')
+                    assert page.locator('.string-detail textarea').input_value() == 'Hello'
+                    page.evaluate('switchProjectSource("mine")')
+                    assert page.locator('.string-detail textarea').input_value() == 'Hello from New Austin'
+                    page.locator('.string-detail textarea').fill('Discard me')
+                    assert page.evaluate('stringsUI.dirtyCount()') == 1
+                    discard_button = page.get_by_role('button', name='Discard string edits')
+                    assert discard_button.is_enabled()
+                    discard_button.click()
+                    assert page.locator('.string-detail textarea').input_value() == 'Hello from New Austin'
+                    page.reload()
+                    page.wait_for_function('typeof state !== "undefined" && !state.booting')
+                    page.evaluate('navigate("strings")')
+                    assert page.locator('.string-detail textarea').input_value() == 'Hello from New Austin'
                     # That decimal-save regression deliberately changed the same
                     # first deterministic fixture candidate. Restore only that
                     # deliberate test field before exercising the handoff helper;
@@ -96,20 +123,35 @@ def main():
                     page.reload()
                     page.wait_for_function('typeof state !== "undefined" && !state.booting')
                     page.evaluate('navigate("loot")')
-                    assert page.get_by_text('Not supplied', exact=True).count() == 2
+                    evidence = page.locator('.lex-detail-section').filter(has_text='Which script this is reading').first
+                    for label in ('Archive', 'Script'):
+                        field = evidence.locator('.lex-detail-field').filter(has_text=label).first
+                        assert field.locator('input.lex-readonly-field').input_value() == 'Not supplied'
                     paths['LOOT_FILE'].write_text('{broken')
                     page.reload()
                     page.wait_for_function('typeof state !== "undefined" && !state.booting')
-                    assert page.locator('.rdr-record-entry').count()
+                    assert page.locator('.lex-column-list-row:not(.lex-filler-row)').count()
                     page.evaluate('navigate("loot")')
                     assert page.get_by_text('Loot ASI override is unavailable', exact=True).count()
                     page.evaluate('navigate("settings")')
-                    assert page.locator('.settings-section').count() == 2
+                    settings = page.locator('.lex-settings-columns')
+                    assert settings.count() == 1
+                    for section in ('WeaponRadial', 'DevelopmentCamera'):
+                        card = settings.locator('.lex-detail-section').filter(has_text=section).first
+                        assert card.count() == 1 and card.is_visible()
+                        assert card.get_attribute('aria-label') == section
+                    active_settings = page.locator('nav button[data-tab="settings"].active')
+                    assert active_settings.count() == 1
                     page.evaluate('navigate("project")')
-                    assert page.get_by_text('Saved files and game delivery', exact=True).count()
+                    information_button = page.get_by_role('button', name='Open RDR setup information')
+                    assert information_button.count() == 1
+                    assert 'active' in (information_button.get_attribute('class') or '').split()
+                    delivery = page.locator('.lex-detail-section[aria-label="SAVED FILES AND GAME DELIVERY"]')
+                    assert delivery.count() == 1 and delivery.is_visible()
                     assert page.get_by_role('button', name='Deploy Project').count()
                     assert page.get_by_role('button', name='Revert Deployment').count()
-                    assert page.get_by_text('Shop edit test', exact=True).count()
+                    shop_test = page.locator('.lex-detail-section[aria-label="SHOP EDIT TEST"]')
+                    assert shop_test.count() == 1 and shop_test.is_visible()
                     assert page.get_by_role('button', name='Stage Shop Test').count()
                     plan = server.shop_test_plan()
                     assert plan['available'] and plan['status'] == 'baseline'
@@ -120,7 +162,8 @@ def main():
                     page.get_by_role('button', name='Restore Shop Test').click()
                     page.wait_for_function('state.dashboard.shopTest.status === "baseline"')
                     assert server.shop_test_plan()['currentPriceModifier'] == plan['baselinePriceModifier']
-                    assert page.get_by_text('Mission reward test', exact=True).count()
+                    mission_test = page.locator('.lex-detail-section[aria-label="MISSION REWARD TEST"]')
+                    assert mission_test.count() == 1 and mission_test.is_visible()
                     mission_plan = server.mission_test_plan()
                     assert mission_plan['missionId'] == 2 and mission_plan['status'] == 'baseline'
                     page.get_by_role('button', name='Stage Mission Test').click()
@@ -134,7 +177,7 @@ def main():
                     assert 'Deploy Project rebuilds verified copies' in delivery_text
                     assert 'original' in delivery_text and 'never overwritten' in delivery_text
                     assert not errors, errors
-                    print('RDR browser: split views, preflight, decimal save, loot validation, discard, optional-file recovery passed')
+                    print('RDR browser: split views, string save/reopen, preflight, decimal save, loot validation, discard, optional-file recovery passed')
                 finally:
                     browser.close()
         finally:

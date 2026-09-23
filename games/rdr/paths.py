@@ -30,17 +30,24 @@ EXTRACT_ROOT = Path(
         / "Lexeditor" / "game-data" / "rdr",
     )
 ).expanduser().resolve()
-RPF6_TOOL = LEXEDITOR_ROOT / "tools" / "magic-rdr" / "app" / "Rpf6ReadCli.exe"
-RPF6_NAMES = (
-    LEXEDITOR_ROOT / "tools" / "magic-rdr" / "app"
-    / "Settings" / "ImportedFileNames.txt"
-)
+RPF6_TOOL = Path(
+    os.environ.get(
+        "LEXEDITOR_RDR_RPF6_TOOL",
+        LEXEDITOR_ROOT / "tools" / "magic-rdr" / "app" / "Rpf6ReadCli.exe",
+    )
+).expanduser().resolve()
+RPF6_NAMES = Path(
+    os.environ.get(
+        "LEXEDITOR_RDR_RPF6_NAMES",
+        LEXEDITOR_ROOT / "tools" / "magic-rdr" / "app"
+        / "Settings" / "ImportedFileNames.txt",
+    )
+).expanduser().resolve()
 RDR2_FONT_ROOT = LEXEDITOR_ROOT / "games" / "rdr2" / "assets" / "fonts"
 
 
 def check() -> list[str]:
     required = (
-        (PROJECT_ROOT, "RDR project"),
         (PLUGIN_ROOT / "server.py", "RDR plugin service"),
         (PLUGIN_ROOT / "editor.html", "RDR plugin interface"),
         (PLUGIN_ROOT / "extractor.py", "RDR preparation service"),

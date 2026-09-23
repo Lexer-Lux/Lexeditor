@@ -24,6 +24,12 @@ def make_cache(root: Path) -> tuple[dict, dict, dict]:
     for path in xml_files:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("<root><entry /></root>\n", encoding="utf-8")
+    string_table = (
+        root / extractor.CONTENT_CACHE_NAME
+        / "content" / "stringtable" / "fixture.strtbl"
+    )
+    string_table.parent.mkdir(parents=True, exist_ok=True)
+    string_table.write_bytes(b"synthetic string-table cache fixture")
     packed = (
         root / extractor.GRINGO_PACKED_CACHE_NAME / "gringores" / "armadillo.wgd"
     )
@@ -37,12 +43,13 @@ def make_cache(root: Path) -> tuple[dict, dict, dict]:
     records = {"source": "unchanged"}
     tool = {"tool": "unchanged"}
     manifest = {
-        "version": 3,
+        "version": 4,
         "sources": records,
         "tool": tool,
         "fileCounts": {
             "tuning": extractor.MINIMUM_FILE_COUNT,
             "inventory": 2,
+            "stringTables": extractor.MINIMUM_STRING_TABLE_COUNT,
             "gringoPacked": extractor.GRINGO_FILE_COUNT,
             "gringoUnpacked": extractor.GRINGO_FILE_COUNT,
         },
@@ -93,7 +100,7 @@ def main() -> int:
                 result = extractor.ensure_rdr_data(
                     game_root, data_root, lambda *_progress: None
                 )
-                assert result.get("version") == 3
+                assert result.get("version") == 4
         finally:
             extractor._extract = original_extract
         after = {path.name for path in data_root.glob("*.previous-*")}

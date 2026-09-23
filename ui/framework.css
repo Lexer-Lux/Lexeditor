@@ -1141,6 +1141,8 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
   border-bottom:1px solid var(--lex-border);
   background:var(--lex-panel-2);
 }
+/* A subtab bar that shares its row with other controls takes the free space. */
+.lex-subtab-bar-fill{flex:1 1 auto;min-width:0}
 
 .lex-subtab-button {
 

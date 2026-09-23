@@ -1,11 +1,11 @@
-import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULES = {name: (ROOT / "games" / "rdr" / f"{name}.js").read_text(encoding="utf-8")
-           for name in ("items", "shops", "missions")}
-CSS = (ROOT / "games" / "rdr" / "editor.css").read_text(encoding="utf-8")
+STYLE = (ROOT / "games" / "rdr" / "editor.css").read_text(encoding="utf-8")
+SOURCE = (ROOT / "games" / "rdr" / "editor.js").read_text(encoding="utf-8")
+STRINGS = (ROOT / "games" / "rdr" / "strings.js").read_text(encoding="utf-8")
+RBF = (ROOT / "games" / "rdr" / "rbf.js").read_text(encoding="utf-8")
 
 
 def require(condition: bool, message: str) -> None:
@@ -13,22 +13,20 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-# Items, Shops, and Missions keep the shared paged Table + Detail view: one
-# shared pagedListDetail call per module, each with its own split setting, all
-# carrying the rdr-split hook the page frame keys off.
-for name, source in MODULES.items():
-    require(source.count("pagedListDetail({") == 1,
-            f"RDR {name} must keep one shared paged Table + Detail view")
-    require(f'splitKey:"rdr-{name}"' in source or
-            f"splitKey:'rdr-{name}'" in source,
-            f"RDR {name} must keep its own shared two-panel split setting")
-    require('className:"rdr-split"' in source or "className:'rdr-split'" in source,
-            f"RDR {name} must keep the rdr-split view hook")
-# Sizing lives in the shared list-detail component now (see the shared editor
-# layouts fix): RDR must not replace it with its own two-track grid, in either
-# its stylesheet or its view modules.
-combined = CSS + "\n".join(MODULES.values())
-require("grid-template-columns" not in combined,
-        "RDR must not replace the shared list-divider-detail grid with two tracks")
+require(".lex-" not in STYLE,
+        "RDR must not override shared component selectors in its game stylesheet")
+require(SOURCE.count("pagedListDetail({") >= 3,
+        "RDR Items, Shops, and Missions must keep shared paged Table + Detail views")
+require("pagedListDetail({" in STRINGS and "columnList({" in STRINGS,
+        "RDR Strings must keep the shared paged Table + Detail view")
+for key in ("rdr-items", "rdr-shops", "rdr-missions"):
+    require(f'splitKey:"{key}"' in SOURCE,
+            f"RDR {key} must keep its own shared two-panel split setting")
+require('splitKey:"rdr-strings"' in STRINGS,
+        "RDR Strings must keep its own shared two-panel split setting")
+require("pagedListDetail({" in RBF and "columnList({" in RBF and 'splitKey:"rdr-rbf"' in RBF,
+        "RDR RBF0 Scalars must keep the shared paged Table + Detail view")
+require("columnList({" in SOURCE,
+        "RDR record tables must use the shared column list")
 
-print("RDR Items split issue 19 source contract passed")
+print("RDR shared Table + Detail paging contract passed")
