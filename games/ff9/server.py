@@ -15,7 +15,7 @@ from . import paths
 from .memoria_csv import MemoriaDataStore, catalog
 from .battle_scene import BattleSceneStore
 from .memoria_baseline import ensure as ensure_baseline
-from . import memoria_manager, features
+from . import memoria_manager, features, mod_compat
 from plugin_http import PluginRequestHandler
 
 
@@ -132,7 +132,8 @@ def dashboard() -> dict:
                      "problems": memoria["problems"]},
         "problems": problems, "project": {"root": str(paths.PROJECT_ROOT)},
         "runtime": memoria_manager.status(paths.GAME_ROOT), "features": features.load(),
-        "deployment": features.status(), "scaffold": False,
+        "deployment": features.status(), "modCompatibility": mod_compat.audit(),
+        "scaffold": False,
     }
 
 
