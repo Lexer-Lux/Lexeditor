@@ -111,8 +111,8 @@ def package_root(source: Path):
         file_tree(source)
         yield source
         return
-    if source.suffix.casefold() != ".zip":
-        raise ValueError("Choose a folder or ZIP archive")
+    if source.suffix.casefold() not in {".zip", ".ctp"}:
+        raise ValueError("Choose a folder, ZIP archive, or CTP archive")
     with tempfile.TemporaryDirectory(prefix="lexeditor-mod-import-") as temporary:
         root = Path(temporary)
         with zipfile.ZipFile(source) as archive:

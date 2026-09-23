@@ -1392,13 +1392,14 @@ class HostApi:
             raise ValueError("Mod management is not supported for this game yet")
         if kind == "folder":
             selected = self._choose_folder()
-        elif kind == "zip":
+        elif kind in {"zip", "ctp"}:
             import webview
+            file_types = ("ZIP archives (*.zip)",) if kind == "zip" else ("Chrono Trigger patches (*.ctp)",)
             selection = self._bound_window().create_file_dialog(webview.OPEN_DIALOG,
-                allow_multiple=False, file_types=("ZIP archives (*.zip)",))
+                allow_multiple=False, file_types=file_types)
             selected = selection[0] if selection else ""
         else:
-            raise ValueError("Choose a folder or ZIP archive")
+            raise ValueError("Choose a folder, ZIP archive, or supported game package")
         return {"source": str(selected), "cancelled": not bool(selected)}
 
     def begin_mod_upload(self, plugin_id: str) -> dict:
@@ -1450,11 +1451,9 @@ class HostApi:
         root = Path(status["root"]) / plugin_id
         game = self._installations.snapshot(plugin_id).get("root")
         active = []
-        if game and plugin_id == "ff7r":
-            marker = Path(game) / "End/Content/Paks/~mods/LexeditorLibrary/deployment.json"
-            if marker.is_file():
-                deployment = json.loads(marker.read_text(encoding="utf-8"))
-                active = deployment.get("modIds", [Path(path).name for path in deployment.get("mods", [])])
+        adapter = self._plugins[plugin_id].mod_adapter
+        if game and adapter is not None and hasattr(adapter, "active_mod_ids"):
+            active = list(adapter.active_mod_ids(Path(game)))
         entries = []
         for child in sorted(root.iterdir()) if root.is_dir() else []:
             if child.is_dir() and not child.name.startswith(".") and not child.is_symlink():
