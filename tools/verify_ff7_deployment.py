@@ -109,7 +109,7 @@ class DeploymentTests(unittest.TestCase):
         self.assertIn("battle/scene.bin.chunk.0", paths)
         self.assertIn("flevel.lgp/field1.chunk.7", paths)
         self.assertIn("world_us.lgp/enc_w.bin", paths)
-        self.assertEqual(Path(plan["ffnx"]["directRoot"]), self.work / "direct")
+        self.assertEqual(Path(plan["ffnx"]["directRoot"]).resolve(), (self.work / "direct").resolve())
 
         exported = deployment.export_project(self.game, self.project)
         export_root = Path(exported["exportRoot"])
