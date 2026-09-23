@@ -189,6 +189,18 @@ def test_candidate_builder_rejects_dependency_manifest_race():
             packaging.build_candidate(project, game, env, runner=mutating_runner)
         assert not list((project / "build").glob("ff7r2-candidate-*"))
 
+
+def test_candidate_builder_timeout_is_bounded_and_cleans_output():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packaging-timeout-") as temp_name:
+        project, game, _packer, _oodle, env = _fixture(Path(temp_name))
+
+        def timeout_runner(command, **kwargs):
+            raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+        with pytest.raises(packaging.PackagingError, match="timed out after 300 seconds"):
+            packaging.build_candidate(project, game, env, runner=timeout_runner)
+        assert not list((project / "build").glob("ff7r2-candidate-*"))
+
 def test_candidate_builder_refuses_missing_staged_output_before_execution():
     with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packaging-missing-") as temp_name:
         project, game, _packer, _oodle, env = _fixture(Path(temp_name))
