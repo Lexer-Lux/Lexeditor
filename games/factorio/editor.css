@@ -1,0 +1,22 @@
+@font-face{font-family:"Factorio UI";src:url("/game-assets/TitilliumWeb-Regular.ttf") format("truetype");font-style:normal;font-weight:400;font-display:swap}
+@font-face{font-family:"Factorio UI";src:url("/game-assets/TitilliumWeb-SemiBold.ttf") format("truetype");font-style:normal;font-weight:600;font-display:swap}
+@font-face{font-family:"Factorio UI";src:url("/game-assets/TitilliumWeb-Bold.ttf") format("truetype");font-style:normal;font-weight:700;font-display:swap}
+:root{
+  --lex-font:"Factorio UI","Titillium Web","Segoe UI",sans-serif;
+  --lex-font-size-adjust:none;
+  --lex-text-nudge:0px;
+  --lex-heading-font:"Factorio UI","Titillium Web","Segoe UI",sans-serif;
+  --lex-font-synthesis:none;
+  --lex-bg:#171717;
+  --lex-panel:#292929;
+  --lex-panel-2:#202020;
+  --lex-border:#545454;
+  --lex-text:#efefef;
+  --lex-muted:#b7b7b7;
+  --lex-input-bg:#1c1c1c;
+  --lex-accent:#e69b36;
+  --lex-accent-text:#20170b;
+  --lex-highlight:#f6bf66;
+  --lex-radius:2px;
+  --lex-main-overflow:hidden;
+}

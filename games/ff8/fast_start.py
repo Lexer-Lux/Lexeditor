@@ -22,6 +22,16 @@ CREDITS_COMPLETION_CALL = 0x0052DADF
 CREDITS_COMPLETION_ORIGINAL = bytes.fromhex("E8 1C 18 00 00")
 CREDITS_COMPLETE_TRUE = bytes.fromhex("B8 01 00 00 00")
 
+# The two Square Enix cards are not the credits: they are a movie the
+# publisher intro starts in its init (0055A140 with movie 4, 0055A530 sets
+# 0209A798). The intro loop at 004703B0 keeps playing it while that flag is
+# set (004703F9..00470401 JNE 00470436 -> 0055A620) and only then schedules
+# the credits. Dropping the branch schedules the credits on the first frame;
+# the intro's exit (00470340 -> 0055ABB0) closes the movie as usual.
+INTRO_MOVIE_BRANCH = 0x00470401
+INTRO_MOVIE_BRANCH_ORIGINAL = bytes.fromhex("75 33")
+INTRO_MOVIE_SKIP = bytes.fromhex("90 90")
+
 
 def build_hext(enabled: bool) -> str:
     """Return the focused Hext fragment, or no patch for vanilla startup."""
@@ -30,7 +40,8 @@ def build_hext(enabled: bool) -> str:
     if not enabled:
         return ""
     return "\n".join([
-        "# Fast Start: complete the native credits mode immediately.",
+        "# Fast Start: skip the logo movie, then complete the credits immediately.",
+        f"{INTRO_MOVIE_BRANCH:X} = {INTRO_MOVIE_SKIP.hex(' ').upper()}",
         f"{CREDITS_COMPLETION_CALL:X} = {CREDITS_COMPLETE_TRUE.hex(' ').upper()}",
         "",
     ])

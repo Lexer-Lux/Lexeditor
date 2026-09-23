@@ -7,6 +7,7 @@ import os
 import socket
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -41,6 +42,26 @@ def request_json(url: str, body: dict | None = None) -> dict:
     # nothing about which request gave up.
     with urllib.request.urlopen(request, timeout=45) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def project_session(*, module: str, plugin_id: str, app_root: Path,
+                    check: Callable[[], list[str]], project_env: str,
+                    project_root: Callable[[], Path], port_env: str | None = None):
+    """A session class for a plugin whose service is told where its project is.
+
+    Four plugins had the same eleven-line constructor: read the project root,
+    put it in the environment under this plugin's name, hand the rest to the
+    session. Subclass the result to keep the plugin's own name and docstring.
+    """
+
+    class ProjectSession(LocalPluginSession):
+        def __init__(self, extra_env: dict[str, str] | None = None):
+            environment = {project_env: str(project_root())}
+            environment.update(extra_env or {})
+            super().__init__(module=module, plugin_id=plugin_id, app_root=app_root,
+                             check=check, port_env=port_env, extra_env=environment)
+
+    return ProjectSession
 
 
 class LocalPluginSession:
@@ -84,11 +105,28 @@ class LocalPluginSession:
             creationflags=creation_flags,
             start_new_session=os.name != "nt",
         )
+        # Nothing else reads the service's output. Left unread, the pipe fills
+        # and the service blocks on its next write - a traceback or a warning -
+        # and every request after that hangs. Keep the tail for error messages.
+        self.output_tail = []
+        process = self.process
+
+        def drain() -> None:
+            try:
+                for line in process.stdout:
+                    self.output_tail.append(line.rstrip())
+                    del self.output_tail[:-200]
+            except (OSError, ValueError):
+                pass
+
+        threading.Thread(target=drain, name=f"{self.plugin_id}-service-output", daemon=True).start()
         deadline = time.monotonic() + 15.0
         last_error = "service did not answer"
         while time.monotonic() < deadline:
             if self.process.poll() is not None:
-                output = self.process.communicate()[0].strip()
+                self.process.wait()
+                time.sleep(0.1)
+                output = "\n".join(self.output_tail).strip()
                 raise RuntimeError(output or f"{self.plugin_id} service exited with {self.process.returncode}")
             try:
                 identity = request_json(self.url + "api/plugin")

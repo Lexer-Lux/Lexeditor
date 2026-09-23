@@ -1,4 +1,4 @@
-"""Build a native app and OS installer, without bundling private helper binaries."""
+"""Build a native app and OS installer, bundling only redistribution-cleared helpers."""
 from __future__ import annotations
 import argparse
 import importlib.metadata
@@ -13,11 +13,37 @@ import tempfile
 ROOT=Path(__file__).resolve().parents[1]
 DIST=ROOT/'dist'
 VERSION='0.1.0'
-RESOURCE_EXTENSIONS={'.html','.css','.js','.json','.csv','.txt','.md','.xml','.svg','.png','.jpg','.jpeg','.webp','.ico','.icns','.ttf','.otf','.woff','.woff2','.toml','.ini','.py','.ps1','.cmd','.bat'}
+RESOURCE_EXTENSIONS={'.html','.css','.js','.json','.csv','.txt','.md','.xml','.svg','.png','.jpg','.jpeg','.webp','.ico','.icns','.ttf','.otf','.woff','.woff2','.toml','.ini','.info','.py','.ps1','.cmd','.bat'}
 # Helpers with no proven redistribution grant are never copied into an installer.
 FORBIDDEN_PARTS={'__pycache__','.git','worklog','codex','baseline','game-data','out',
                  '_scratch','.venv','.build','build','vcpkg','.vcpkg','buildtrees',
                  'node_modules','.pytest_cache'}
+# Bundled helpers with a proven redistribution grant. resource_files() skips
+# executable/archive payloads and extensionless licence files, so each such
+# helper payload is named here explicitly. Anything not listed stays out of
+# the installer.
+VENDORED_HELPERS=(
+    'tools/reshade/6.8.0/ReShade_Setup_6.8.0_Addon.exe',
+    'tools/reshade/6.8.0/ReShade_Setup_6.8.0.exe',
+    'tools/reshade/6.8.0/LICENSE.md',
+    'tools/reshade/shaders/Lexerian/LexerianDepth.fxh',
+    'tools/reshade/shaders/Lexerian/Colors.fx',
+    'tools/reshade/shaders/Lexerian/Bloom.fx',
+    'tools/reshade/shaders/Lexerian/Sharpen.fx',
+    'tools/reshade/shaders/Lexerian/AmbientOcclusion.fx',
+    'tools/reshade/shaders/Lexerian/DepthOfField.fx',
+    'tools/reshade/shaders/Lexerian/Vignette.fx',
+    'tools/reshade/shaders/Lexerian/Compare.fx',
+    'tools/reshade/addons/REST-1.3.23.633/ReshadeEffectShaderToggler-1.3.23.633.zip',
+    'tools/reshade/addons/REST-1.3.23.633/LICENSE.txt',
+    'games/ff7r/runtime/repak/v0.2.3/manifest.json',
+    'games/ff7r/runtime/repak/v0.2.3/LICENSE-MIT',
+    'games/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE',
+    'games/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip',
+    'games/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-unknown-linux-gnu.tar.xz',
+    'games/ff7r2/runtime/shader-injector-2-2-1-maximum-dood.zip',
+    'games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt',
+)
 
 
 def resource_files(root: Path) -> list[Path]:
@@ -69,6 +95,12 @@ def build_app() -> Path:
     # Include text/license provenance, not executables, game DLLs or private exports.
     for path in [ROOT/'tools/magic-rdr/README.md',ROOT/'tools/brf-sync/LICENSE',ROOT/'tools/brf-sync/SOURCE.md']:
         if path.exists():datas.append((str(path),str(path.relative_to(ROOT).parent)))
+    for relative in VENDORED_HELPERS:
+        path=ROOT/relative
+        if not path.is_file():
+            raise FileNotFoundError(f'Bundled helper is missing: {relative}')
+        entry=(str(path),str(path.relative_to(ROOT).parent))
+        if entry not in datas:datas.append(entry)
     icon=ROOT/'ui/assets/lexeditor.ico'
     if not icon.is_file():icon=None
     spec=generated/'Lexeditor.spec'
@@ -89,15 +121,25 @@ coll=COLLECT(exe,a.binaries,a.datas,strip=False,upx=False,name="Lexeditor")
     return DIST/'Lexeditor.app/Contents/MacOS/Lexeditor' if sys.platform=='darwin' else DIST/'Lexeditor'/('Lexeditor.exe' if os.name=='nt' else 'Lexeditor')
 
 
-def smoke(executable: Path) -> None:
+def smoke(executable: Path, result_path: Path | None = None) -> None:
     # Packaging must preserve child-service dispatch; launching a second GUI is a failure.
-    result=ROOT/'build/distribution/smoke.json'
+    executable=executable.resolve(strict=True)
+    result=(Path(result_path) if result_path is not None else ROOT/'build/distribution/smoke.json').resolve()
+    result.parent.mkdir(parents=True,exist_ok=True)
+    result.unlink(missing_ok=True)
     env=os.environ.copy()
     env['LEXEDITOR_NO_AUTO_SCAN']='1'
-    p=subprocess.run([str(executable),'--smoke-service',str(result)],cwd=Path.home(),env=env,timeout=90)
-    if p.returncode or not result.exists():raise RuntimeError('Frozen app/service smoke failed')
+    command=[str(executable),'--smoke-service',str(result)]
+    try:
+        p=subprocess.run(command,cwd=Path.home(),env=env,timeout=90)
+    except subprocess.TimeoutExpired as error:
+        report=json.loads(result.read_text('utf-8')) if result.is_file() else {}
+        raise RuntimeError(f"Frozen app/service smoke timed out: {report}") from error
+    if not result.exists():
+        raise RuntimeError(f"Frozen app/service smoke exited {p.returncode} without a diagnostic report")
     report=json.loads(result.read_text('utf-8'))
-    if not report.get('passed') or not report.get('childStopped'):raise RuntimeError('Frozen child did not shut down')
+    if p.returncode or not report.get('passed') or not report.get('childStopped'):
+        raise RuntimeError(f"Frozen app/service smoke failed: {report}")
     print(json.dumps(report),flush=True)
 
 

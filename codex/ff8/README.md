@@ -1,3 +1,9 @@
 # FF8 codex
 
 Canonical game-specific knowledge. No standalone source has been imported for this game yet; this is a routing page, not a completeness claim. Consult `worklog/migrations/game-knowledge.json` and the relevant issue sources.
+
+- [Triple Triad field opponents](triple-triad.md): entity identity, setup variants, and documented argument meanings.
+
+- [Smooth HP-number colours](hp-colours.md): FFNx RGB seam, verified native HP scopes, and acceptance boundary.
+
+- [Audio volumes](audio-volumes.md): vanilla Sound slider scope, FFNx SFX/Music layer gains, and the #498 split.

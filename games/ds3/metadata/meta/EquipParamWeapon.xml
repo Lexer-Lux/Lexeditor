@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self OffsetSize="100" FieldLayout="EquipParamWeapon" />
+  <Field>
+    <behaviorVariationId VRef="behaviorVariation" />
+    <sortId />
+    <wanderingEquipId Refs="EquipParamWeapon" />
+    <weight />
+    <weaponWeightRate />
+    <fixPrice />
+    <basicPrice />
+    <sellValue />
+    <correctStrength />
+    <correctAgility />
+    <corretMagic />
+    <corretFaith />
+    <physGuardCutRate IsInvertedPercentage="" />
+    <magGuardCutRate IsInvertedPercentage="" />
+    <fireGuardCutRate IsInvertedPercentage="" />
+    <thunGuardCutRate IsInvertedPercentage="" />
+    <spEffectBehaviorId0 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <spEffectBehaviorId1 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <spEffectBehaviorId2 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <residentSpEffectId0 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <residentSpEffectId1 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <residentSpEffectId2 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <materialSetId Refs="EquipMtrlSetParam" />
+    <originEquipWep0 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep1 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep2 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep3 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep4 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep5 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep6 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep7 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep8 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep9 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep10 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep11 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep12 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep13 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep14 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep15 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <weakA_DamageRate />
+    <weakB_DamageRate />
+    <weakC_DamageRate />
+    <weakD_DamageRate />
+    <vagrantItemLotId />
+    <vagrantBonuseneDropItemLotId />
+    <vagrantItemEneDropItemLotId />
+    <equipModelId />
+    <iconId IconConfig="Item" />
+    <durability />
+    <durailityMax />
+    <attackThrowEscape />
+    <parryDamageLife />
+    <atkBasePhysics />
+    <atkBaseMagic />
+    <atkBaseFire />
+    <atkBaseThunder />
+    <atkBaseStamina />
+    <saWeaponDamage />
+    <saDurability />
+    <guardAngle />
+    <staminaGuardDef />
+    <reinforceTypeId Refs="ReinforceParamWeapon" />
+    <trophySGradeId />
+    <trophySeqId />
+    <throwAtkRate />
+    <bowDistRate />
+    <equipModelCategory Enum="EQUIP_MODEL_CATEGORY" />
+    <equipModelGender Enum="EQUIP_MODEL_GENDER" />
+    <weaponCategory Enum="WEAPON_CATEGORY" />
+    <wepmotionCategory Enum="WEAPON_MOTION_CATEGORY" />
+    <guardmotionCategory Enum="GUARDMOTION_CATEGORY" />
+    <atkMaterial />
+    <defMaterial />
+    <defSfxMaterial />
+    <correctType Refs="CalcCorrectGraph" />
+    <spAttribute Enum="ATKPARAM_SPATTR_TYPE" />
+    <spAtkCategory Enum="WEPMOTION_OVERRIDE_CATEGORY" />
+    <wepmotionOneHandId Enum="HOLD_MOTION_CATEGORY" />
+    <wepmotionBothHandId Enum="HOLD_MOTION_CATEGORY" />
+    <properStrength />
+    <properAgility />
+    <properMagic />
+    <properFaith />
+    <overStrength />
+    <attackBaseParry />
+    <defenseBaseParry />
+    <guardBaseRepel />
+    <attackBaseRepel />
+    <guardCutCancelRate />
+    <guardLevel />
+    <slashGuardCutRate />
+    <blowGuardCutRate />
+    <thrustGuardCutRate />
+    <poisonGuardResist />
+    <toxicGuardResist />
+    <bloodGuardResist />
+    <curseGuardResist />
+    <atkAttribute Enum="ATKPARAM_ATKATTR_TYPE" />
+    <rightHandEquipable IsBool="" />
+    <leftHandEquipable IsBool="" />
+    <bothHandEquipable IsBool="" />
+    <arrowSlotEquipable IsBool="" />
+    <boltSlotEquipable IsBool="" />
+    <enableGuard IsBool="" />
+    <enableParry IsBool="" />
+    <enableMagic IsBool="" />
+    <enablePyromancy IsBool="" />
+    <enableMiracle IsBool="" />
+    <enableVowMagic IsBool="" />
+    <isNormalAttackType IsBool="" />
+    <isBlowAttackType IsBool="" />
+    <isSlashAttackType IsBool="" />
+    <isThrustAttackType IsBool="" />
+    <isEnhance IsBool="" />
+    <isHeroPointCorrect IsBool="" />
+    <isCustom IsBool="" />
+    <disableBaseChangeReset IsBool="" />
+    <disableRepair IsBool="" />
+    <isDarkHand IsBool="" />
+    <simpleModelForDlc IsBool="" />
+    <lanternWep IsBool="" />
+    <isVersusGhostWep IsBool="" />
+    <infusion_icon_a IsBool="" />
+    <infusion_icon_b IsBool="" />
+    <infusion_icon_c IsBool="" />
+    <infusion_icon_d IsBool="" />
+    <infusion_icon_e IsBool="" />
+    <infusion_icon_f IsBool="" />
+    <DisableShoot IsBool="" />
+    <EnableRepository IsBool="" />
+    <DisableMultiDropShare2 IsBool="" />
+    <IsDiscard IsBool="" />
+    <IsDrop IsBool="" />
+    <showLogCondType IsBool="" />
+    <enableThrow IsBool="" />
+    <showDialogCondType />
+    <disableGemAttr IsBool="" />
+    <defSfxMaterial1 />
+    <wepCollidableType0 Enum="WEP_COLLIDABLE_TYPE" />
+    <wepCollidableType1 Enum="WEP_COLLIDABLE_TYPE" />
+    <postureControlId_Right Refs="UpperArmParam" />
+    <postureControlId_Left Refs="UpperArmParam" />
+    <Group0_AtkVfxId />
+    <Group0_DummyPolyId0 />
+    <Group0_DummyPolyId1 />
+    <Group1_AtkVfxId />
+    <Group1_DummyPolyId0 />
+    <Group1_DummyPolyId1 />
+    <Group2_AtkVfxId />
+    <Group2_DummyPolyId0 />
+    <Group2_DummyPolyId1 />
+    <Group3_AtkVfxId />
+    <Group3_DummyPolyId0 />
+    <Group3_DummyPolyId1 />
+    <Group4_AtkVfxId />
+    <Group4_DummyPolyId0 />
+    <Group4_DummyPolyId1 />
+    <Group5_AtkVfxId />
+    <Group5_DummyPolyId0 />
+    <Group5_DummyPolyId1 />
+    <Group6_AtkVfxId />
+    <Group6_DummyPolyId0 />
+    <Group6_DummyPolyId1 />
+    <Group7_AtkVfxId />
+    <Group7_DummyPolyId0 />
+    <Group7_DummyPolyId1 />
+    <defSfxMaterial2 />
+    <defSeMaterial2 />
+    <absorpParamId Refs="WepAbsorpPosParam" />
+    <toughnessCorrectRate />
+    <isValidTough_ProtSADmg IsBool="" />
+    <isDualBlade IsBool="" />
+    <isAutoEquip IsBool="" />
+    <isEnableEmergencyStep IsBool="" />
+    <invisibleOnRemo IsBool="" />
+    <pad2 Padding="" />
+    <correctType_Magic Refs="CalcCorrectGraph" />
+    <correctType_Fire Refs="CalcCorrectGraph" />
+    <correctType_Thunder Refs="CalcCorrectGraph" />
+    <weakE_DamageRate />
+    <weakF_DamageRate />
+    <darkGuardCutRate />
+    <atkBaseDark />
+    <correctType_Dark Refs="CalcCorrectGraph" />
+    <correctType_Poison Refs="CalcCorrectGraph" />
+    <swordArt_ActId />
+    <correctType_Bleed Refs="CalcCorrectGraph" />
+    <properLuck />
+    <freezeGuardResist />
+    <autoReplenishType />
+    <swordArtsParamId Refs="SwordArtsParam" />
+    <correctLuck />
+    <arrowBoltEquipId />
+    <DerivationLevelType Enum="WEAPON_DERIVATION_LEVEL_TYPE" />
+    <enchantSfxSize Enum="WEP_ENCHANT_SFX_SIZE" />
+    <displayTypeId VRef="menuValue" Enum="MENU_DISPLAY_TYPE" />
+    <physGuardCutRate_MaxCorrect />
+    <magGuardCutRate_MaxCorrect />
+    <fireGuardCutRate_MaxCorrect />
+    <thunGuardCutRate_MaxCorrect />
+    <darkGuardCutRate_MaxCorrect />
+    <poisonGuardResist_MaxCorrect />
+    <diseaseGuardResist_MaxCorrect />
+    <bloodGuardResist_MaxCorrect />
+    <curseGuardResist_MaxCorrect />
+    <freezeGuardResist_MaxCorrect />
+    <staminaGuardDef_MaxCorrect />
+    <weaponVfx0 />
+    <weaponVfx1 />
+    <weaponVfx2 />
+    <weaponVfx3 />
+    <weaponVfx4 />
+    <weaponVfx5 />
+    <weaponVfx6 />
+    <weaponVfx7 />
+    <StaminaConsumeRate />
+    <vsPlayerDmgCorrectRate_Physics />
+    <vsPlayerDmgCorrectRate_Magic />
+    <vsPlayerDmgCorrectRate_Fire />
+    <vsPlayerDmgCorrectRate_Thunder />
+    <vsPlayerDmgCorrectRate_Dark />
+    <vsPlayerDmgCorrectRate_Poison />
+    <vsPlayerDmgCorrectRate_Blood />
+    <vsPlayerDmgCorrectRate_Freeze />
+    <attainmentWepStatusStr />
+    <attainmentWepStatusDex />
+    <attainmentWepStatusMag />
+    <attainmentWepStatusFai />
+    <attainmentWepStatusLuc />
+    <attackElementCorrectId Refs="AttackElementCorrectParam" />
+    <saleValue />
+    <reinforceShopCategory Enum="REINFORCE_MENU_TYPE" />
+    <maxArrowQuantity />
+    <residentSfx_1_IsVisibleForHang IsBool="" />
+    <residentSfx_2_IsVisibleForHang IsBool="" />
+    <residentSfx_3_IsVisibleForHang IsBool="" />
+    <residentSfx_4_IsVisibleForHang IsBool="" />
+    <isSoulParamIdChange_model0 IsBool="" />
+    <isSoulParamIdChange_model1 IsBool="" />
+    <isSoulParamIdChange_model2 IsBool="" />
+    <isSoulParamIdChange_model3 IsBool="" />
+    <wepSeIdOffset />
+    <baseChangePrice />
+    <levelSyncCorrectId Refs="CalcCorrectGraph" />
+    <pad1 />
+  </Field>
+</PARAMMETA>

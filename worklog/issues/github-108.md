@@ -39,3 +39,12 @@ The separate vertical native `SET_GAMEPLAY_HINT_CAMERA_RELATIVE_VERTICAL_OFFSET`
 The existing 2.2 MB `_analysis/cameras_ymt.xml` is a mostly unresolved hashed camera metadata export. The horse-camera builder identifies one horse block and four unrelated centering/damping edits; it supplies no proved vehicle-height field or live profile setter. Editing guessed metadata hashes would not complete continuous per-profile calibration.
 
 Remaining technical work is to obtain and inspect the actual follow-vehicle handler/metadata layout through an independently supported source path, then prove a height parameter and its ownership contract. This is a limit of the evidence available in this pass, not universal impossibility or a new user question. Full height scope remains actionable. No height code was changed.
+
+## 2026-09-22 misc-fixes disposition
+Standing, crouched, aiming, horseback, vehicle, and prone profiles exist; continuous Y is unsupported and LOW and NORMAL are ignored in vehicles. Vehicle-height research plus open defects #269 (transition recorder) and #270 (crouched bob vs lantern collision) remain; #267 settled-equality test recorded separately. Shared developer-mode boundary exists in module. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (prototype/research still owed on
+the agent side), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.

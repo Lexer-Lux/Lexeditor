@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.rdr import server, mission_rewards
+from games.rdr import magic_rdr_manager, mission_rewards, server, string_tables
 from tools.rdr_test_support import workspace, loot_document, fake_resource_tool
 
 
@@ -35,6 +35,29 @@ class EditingTests(unittest.TestCase):
 
     def ini_save(self, value, key="TimeScale", section="WeaponRadial"):
         return server.save_settings([{"section": section, "key": key, "value": value}])
+
+    def test_magic_rdr_helper_is_pinned_read_only_and_reports_upstream(self):
+        tool = Path(self.temp.name) / "Rpf6ReadCli.exe"
+        names = Path(self.temp.name) / "ImportedFileNames.txt"
+        missing = magic_rdr_manager.status(tool, names)
+        self.assertFalse(missing["installed"])
+        self.assertFalse(missing["installable"])
+        tool.write_bytes(b"local bridge")
+        names.write_text("example")
+        ready = magic_rdr_manager.status(tool, names)
+        self.assertTrue(ready["installed"])
+        self.assertEqual(ready["version"], magic_rdr_manager.PINNED_RELEASE)
+        self.assertFalse(ready["autoUpdate"])
+        latest = magic_rdr_manager.upstream_release(lambda _url: {
+            "tag_name": "v1.3.11",
+            "draft": False,
+            "prerelease": False,
+            "published_at": "2026-01-01T00:00:00Z",
+        })
+        self.assertEqual(latest["pinned"], "v1.3.10")
+        self.assertEqual(latest["latest"], "v1.3.11")
+        self.assertTrue(latest["behind"])
+        self.assertFalse(latest["installable"])
 
     def test_decimal_shop_price_roundtrip_and_noop(self):
         original = Path(self.shop["sourcePath"]).read_bytes()
@@ -194,6 +217,173 @@ class EditingTests(unittest.TestCase):
         document["corpseBonusItem"]["entries"][0]["quantity"] = 7
         self.assertEqual(server.save_loot(document)["saved"], 1)
         self.assertEqual(server.loot_payload()["document"], document)
+
+    def test_string_table_index_edit_reopen_and_vanilla_source(self):
+        index = server.string_tables_index()
+        self.assertEqual(index["counts"]["tables"], 2)
+        self.assertEqual(index["counts"]["available"], 2)
+        self.assertEqual(index["counts"]["records"], 8)
+        self.assertFalse(any(
+            row["path"].casefold().endswith("_ps3.strtbl")
+            for row in index["tables"]
+        ))
+
+        path = "tune/stringtable/global.strtbl"
+        payload = server.string_table_payload("tuning", path)
+        row = next(
+            entry for entry in payload["rows"]
+            if entry["languageIndex"] == 0 and entry["identifier"] == "HELLO"
+        )
+        source = Path(payload["table"]["sourcePath"])
+        source_bytes = source.read_bytes()
+        result = server.save_string_table("tuning", path, [{
+            "languageIndex": row["languageIndex"],
+            "entryIndex": row["entryIndex"],
+            "expectedHash": row["hash"],
+            "expectedText": row["text"],
+            "value": "Hello from New Austin",
+        }])
+        self.assertEqual(result["saved"], 1)
+        self.assertEqual(source.read_bytes(), source_bytes)
+        project = Path(payload["table"]["projectPath"])
+        self.assertTrue(project.is_file())
+
+        reopened = server.string_table_payload("tuning", path)
+        current = next(
+            entry for entry in reopened["rows"]
+            if entry["languageIndex"] == 0 and entry["identifier"] == "HELLO"
+        )
+        self.assertEqual(current["text"], "Hello from New Austin")
+        vanilla = server.string_table_payload("tuning", path, True)
+        original = next(
+            entry for entry in vanilla["rows"]
+            if entry["languageIndex"] == 0 and entry["identifier"] == "HELLO"
+        )
+        self.assertEqual(original["text"], "Hello")
+
+        no_change = server.save_string_table("tuning", path, [{
+            "languageIndex": current["languageIndex"],
+            "entryIndex": current["entryIndex"],
+            "expectedHash": current["hash"],
+            "expectedText": current["text"],
+            "value": current["text"],
+        }])
+        self.assertEqual(no_change["saved"], 0)
+
+    def test_string_language_view_combines_resources_without_fake_record_ids(self):
+        index = server.string_tables_index()
+        english = next(row for row in index["languages"] if row["label"] == "English")
+        self.assertIn("Spanish (Spain)", {row["label"] for row in index["languages"]})
+        self.assertIn("Spanish (Mexico)", {row["label"] for row in index["languages"]})
+        payload = server.strings_payload(english["index"])
+        self.assertEqual(payload["language"]["label"], "English")
+        self.assertGreaterEqual(payload["counts"]["tables"], 2)
+        paths = {row["path"] for row in payload["rows"]}
+        self.assertIn("tune/stringtable/global.strtbl", paths)
+        self.assertIn("content/dlc/zombiepack/zombiepack_standalone.strtbl", paths)
+        self.assertTrue(all(row["language"] == "English" for row in payload["rows"]))
+
+    def test_shared_string_block_has_separate_logical_language_tabs(self):
+        index = server.string_tables_index()
+        mexican = next(row for row in index["languages"] if row["label"] == "Spanish (Mexico)")
+        payload = server.strings_payload(mexican["index"])
+        self.assertTrue(payload["rows"])
+        self.assertTrue(all(row["language"] == "Spanish (Mexico)" for row in payload["rows"]))
+        self.assertTrue(all(mexican["index"] in row["languageIndexes"] for row in payload["rows"]))
+        row = payload["rows"][0]
+        self.assertNotEqual(row["languageIndex"], row["languageIndexes"][0])
+        candidate, changed = string_tables.apply_text_edits(
+            Path(row["sourcePath"]).read_bytes(),
+            [{
+                "languageIndex": row["languageIndex"],
+                "entryIndex": row["entryIndex"],
+                "expectedHash": row["hash"],
+                "expectedText": row["text"],
+                "value": row["text"] + " FR",
+            }],
+        )
+        self.assertEqual(changed, 1)
+        reparsed = string_tables.rows(string_tables.parse(candidate))
+        shared = next(item for item in reparsed if row["entryIndex"] == item["entryIndex"]
+                      and mexican["index"] in item["languageIndexes"])
+        self.assertEqual(shared["text"], row["text"] + " FR")
+
+    def test_string_table_stale_identity_does_not_write(self):
+        path = "content/dlc/zombiepack/zombiepack_standalone.strtbl"
+        payload = server.string_table_payload("content", path)
+        row = payload["rows"][0]
+        project = Path(payload["table"]["projectPath"])
+        with self.assertRaisesRegex(ValueError, "text changed"):
+            server.save_string_table("content", path, [{
+                "languageIndex": row["languageIndex"],
+                "entryIndex": row["entryIndex"],
+                "expectedHash": row["hash"],
+                "expectedText": "stale text",
+                "value": "changed",
+            }])
+        self.assertFalse(project.exists())
+
+    def test_data_map_routes_supported_strings_and_keeps_ps3_duplicate_visible(self):
+        payload = server.data_map_payload()
+        rows = {row["filename"]: row for row in payload["rows"]}
+        pc = rows[
+            "game/content.rpf:/content/dlc/zombiepack/zombiepack_standalone.strtbl"
+        ]
+        ps3 = rows[
+            "game/content.rpf:/content/dlc/zombiepack/zombiepack_standalone_ps3.strtbl"
+        ]
+        tuning = rows["game/tune_d11generic.rpf:/tune/stringtable/global.strtbl"]
+        loot = rows[f"game/content.rpf:/{server.loot_script.ARCHIVE_PATH}"]
+        self.assertEqual((pc["status"], pc["target"], pc["openable"]),
+                         ("partial", "strings", True))
+        self.assertEqual((tuning["status"], tuning["target"], tuning["openable"]),
+                         ("partial", "strings", True))
+        self.assertEqual((ps3["status"], ps3["target"], ps3["openable"]),
+                         ("not-integrated", "", False))
+        self.assertEqual((loot["status"], loot["target"], loot["openable"]),
+                         ("partial", "loot", True))
+
+    def test_rbf0_scalar_editor_is_in_place_and_data_map_gated(self):
+        payload = server.rbf_scalars_payload()
+        self.assertEqual(payload["counts"]["resources"], 1)
+        self.assertEqual(payload["counts"]["scalars"], 3)
+        row = next(item for item in payload["rows"] if item["path"].endswith("/Scale"))
+        source = Path(row["sourcePath"])
+        before = source.read_bytes()
+        result = server.save_rbf_scalars(row["resourcePath"], [{
+            "recordOffset": row["recordOffset"], "path": row["path"],
+            "kind": row["kind"], "rawHex": row["rawHex"], "value": 2.5,
+        }])
+        self.assertEqual(result["saved"], 1)
+        self.assertEqual(source.read_bytes(), before)
+        current = server.rbf_scalars_payload()
+        saved = next(item for item in current["rows"] if item["id"] == row["id"])
+        self.assertAlmostEqual(saved["value"], 2.5)
+        vanilla = next(item for item in server.rbf_scalars_payload(True)["rows"] if item["id"] == row["id"])
+        self.assertAlmostEqual(vanilla["value"], 1.0)
+
+        pretend = server.PREPARED_ROOT / "tune/ai/not_really_rbf.tune"
+        pretend.write_bytes(b"plain tuning text\n")
+        rows = {item["filename"]: item for item in server.data_map_payload()["rows"]}
+        supported = rows["game/tune_d11generic.rpf:/tune/ai/protected.tune"]
+        unsupported = rows["game/tune_d11generic.rpf:/tune/ai/not_really_rbf.tune"]
+        self.assertEqual((supported["status"], supported["target"], supported["openable"]),
+                         ("partial", "rbf", True))
+        self.assertEqual((unsupported["status"], unsupported["target"], unsupported["openable"]),
+                         ("not-integrated", "", False))
+
+    def test_data_map_never_promotes_unverified_research_rows(self):
+        rows = server._normalize_data_map_rows([{
+            "filename": "game/content.rpf:/content/unknown.bin",
+            "status": "integrated",
+            "target": "items",
+            "notes": "Research inventory claimed this was editable.",
+        }], interfaces={})
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["filename"], "game/content.rpf:/content/unknown.bin")
+        self.assertEqual(rows[0]["status"], "not-integrated")
+        self.assertEqual(rows[0]["target"], "")
+        self.assertFalse(rows[0]["openable"])
 
     def test_mission_identity_schema_and_reward_limits(self):
         for document in (None, [], {"schemaVersion": True},

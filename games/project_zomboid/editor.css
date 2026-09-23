@@ -1,0 +1,4 @@
+/* Project Zomboid draws on the shared baseline and nothing else: colour
+   and structure come from the framework; this file only tunes the page. */
+:root{--lex-accent:#708057;--lex-highlight:#4f5e3f;
+  --lex-detail-label-width:minmax(min(9em,30%),20%)}

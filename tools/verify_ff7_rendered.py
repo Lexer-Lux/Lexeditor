@@ -87,6 +87,7 @@ class RenderedTests(unittest.TestCase):
         html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
         code=HOST+'\nwindow.__lexeditorPlugin='+json.dumps({'id':edition,'name':'FF7 fixture','edition':edition})+';\n'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')
         html=html.replace('<script src="/shared/framework.js"></script>','<script>'+code+'</script>')
+        html=html.replace('<script src="editor.js"></script>','<script>'+(ROOT/'games/ff7/editor.js').read_text(encoding='utf-8')+'</script>')
         self.page.set_content(html,wait_until='domcontentloaded')
         self.page.wait_for_function('state.loaded === true')
         self.assertEqual(self.errors,[])

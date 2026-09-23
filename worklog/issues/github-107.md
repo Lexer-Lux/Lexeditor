@@ -13,3 +13,12 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes disposition
+Schofield prototype proposed; component and engraved-mesh compatibility unproven. A working example comes before design or gameplay review. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (prototype/research still owed on
+the agent side), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.

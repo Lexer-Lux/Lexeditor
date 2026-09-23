@@ -19,3 +19,12 @@ The new resolver tools/research_rdr2_horse_feed_dispatch.py verifies the complet
 Keep hParam1 item identity in func_739 at annotated0x152FC. Replace its two func_454 call sites with an item-aware award variant that keeps func_454's rank/event-cap/motivation checks, substitutes the configured magnitude once, applies the selected bonus policy consistently and retains func_760/func_472 accounting. Eligibility must also extend func_724; preferred interaction selection must extend func_789. Do not hook generic SET_ATTRIBUTE_POINTS or add an after-consumption award, because neither retains this item-specific path.
 
 No installed-bytecode signature or safe script dispatcher hook is validated. The #228 extraction audit already found the nested script archive uses missing encryption key198; a decompiled annotation is not a file offset. Recovering a verified executable script surface remains agent work. No runtime patch, arbitrary item control, game write or double-award watcher was added.
+
+## 2026-09-22 misc-fixes disposition
+Feeding path mapped in codex horse-feeding.md (allowlist, nutrition, bond events, accumulator) with an explicit editing boundary: keep the item hash through func_739 and substitute the magnitude, never an after-consumption watcher. The item-aware dispatcher hook is unvalidated and needs the game. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side experiment/prototype
+still owed), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.

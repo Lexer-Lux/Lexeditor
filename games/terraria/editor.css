@@ -1,0 +1,3 @@
+/* Terraria draws on the shared baseline and nothing else: colour
+   and structure come from the framework; this file only tunes the page. */
+:root{--lex-accent:#77b255;--lex-highlight:#36502c}

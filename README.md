@@ -6,9 +6,14 @@ Currently supports:
 * Final Fantasy VII Remake Intergrade
 * Final Fantasy VIII
 * Final Fantasy IX
+* Final Fantasy X/X-2 HD Remaster
 * Mount & Blade: Warband
 * Red Dead Redemption
 * Red Dead Redemption 2
+* Stardew Valley
+* Project Zomboid
+* Terraria
+* Dark Souls 3
 
 Coming soon:
 * Final Fantasy IV

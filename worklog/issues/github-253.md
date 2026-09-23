@@ -15,3 +15,12 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
 
 - [Original Lexer-Lux/Lexers-Mod-For-RDR2 #161 worklog](github-253/imports/Lexer-Lux--Lexers-Mod-For-RDR2/4fe6c76d17cc9c526cbb208e7d28f26e6395ca60/github-161.md) — verified transferred issue identity; historical evidence, not a replacement for newer central progress.
+
+## 2026-09-22 misc-fixes disposition
+Sideways movement is a static grip pose; the ladder cycle is removed and no animated traverse is proven. Sequenced behind reliable grabbing (#193, then #251): restore entry first, then present the actual pose and animation choice with A and D traverse, reversal, and release tests. Static sliding is not the finished animation. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

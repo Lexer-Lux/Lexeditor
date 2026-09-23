@@ -7,11 +7,17 @@ import subprocess
 import sys
 
 SERVICE_MODULES = frozenset({
-    'games.blank.server', 'games.ff7.server', 'games.ff7r.server', 'games.ff7r.themed_server',
-    'games.ff8.server', 'games.ff9.server', 'games.palworld.full_server', 'games.rdr.server', 'games.rdr2.server',
-    'games.stardew_valley.server', 'games.warband.server',
+
+    'games.bannerlord.server', 'games.blank.server', 'games.ff7.server', 'games.ff7r.server', 'games.ff7r.themed_server',
+    'games.ds3.server', 'games.ff8.server', 'games.ff9.server', 'games.ffx_x2.server', 'games.palworld.full_server', 'games.project_zomboid.server',
+    'games.rdr.server', 'games.rdr2.server', 'games.terraria.server',
+    'games.stardew_valley.server', 'games.warband.server', 'games.ff7r2.server', 'games.factorio.server', 'games.chrono_trigger.server',
+
+
+
+
+
 })
-SERVICE_MODULES = SERVICE_MODULES | frozenset({'games.chrono_trigger.server'})
 
 
 def user_data_dir() -> Path:
@@ -37,7 +43,7 @@ def bootstrap_environment() -> None:
     if os.name != 'nt':
         for key, game in [('LEXEDITOR_FF8_PROJECT', 'ff8'), ('LEXEDITOR_RDR_PROJECT', 'rdr'),
                           ('LEXEDITOR_RDR2_PROJECT', 'rdr2'), ('LEXEDITOR_STARDEW_PROJECT', 'stardew-valley'),
-                          ('LEXEDITOR_MOD_PROJECT', 'warband')]:
+                          ('LEXEDITOR_MOD_PROJECT', 'warband'), ('LEXEDITOR_PROJECT_ZOMBOID_PROJECT', 'project-zomboid')]:
             os.environ.setdefault(key, str(root / 'projects' / game))
 
 

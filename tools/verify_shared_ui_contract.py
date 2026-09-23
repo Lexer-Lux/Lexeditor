@@ -18,17 +18,27 @@ def text(path: str) -> str:
 
 
 def require(condition: bool, message: str) -> None:
+
     if not condition:
         raise AssertionError(message)
 
 
+# Pages became pages: each shell loads its demo from page modules beside it,
+# so page-level contracts read the served page (shell plus local modules).
+def page_source(plugin):
+    parts = [(ROOT / plugin).joinpath('editor.html').read_text(encoding='utf-8')]
+    for module in sorted((ROOT / plugin).glob('*.js')):
+        parts.append(module.read_text(encoding='utf-8'))
+    return chr(10).join(parts)
+
+
+
 framework = text("ui/framework.js")
 css = text("ui/framework.css")
-manual = text("docs/UI-MANUAL.md")
 host = text("desktop_host.py")
 github = text("github_integration.py")
-blank = text("games/blank/editor.html")
-warband = text("games/warband/editor.html")
+blank = page_source("games/blank")
+warband = page_source("games/warband")
 
 # Shared chrome is global by construction. Every real editor shell must load the
 # shared framework, and a game theme may not swap the info-bubble glyph back to
@@ -86,10 +96,8 @@ require('repository.issue_label' in github and '"--label"' in github,
         "GitHub issue listing must apply the game label filter")
 
 # There is one owner-authenticated Developer Mode and no legacy Lexer Mode.
-for path in ("desktop_host.py", "settings_manager.py", "ui/framework.js", "docs/UI-MANUAL.md"):
+for path in ("desktop_host.py", "settings_manager.py", "ui/framework.js"):
     require("lexerMode" not in text(path), f"legacy lexerMode remains in {path}")
-require("There is no separate Lexer Mode." in manual,
-        "manual must explicitly retire Lexer Mode")
 require("developerAuthorized" in host,
         "host must expose owner authorization for automatic Developer Mode")
 
@@ -119,17 +127,13 @@ require("detailField" in warband and "/api/items/save" in warband,
 require("warband-item-preview-action" not in warband,
         "Warband still owns its old separate model-preview action")
 
-# Shared semantic-control rules and terminology.
-for phrase in ("most human-friendly semantic control", "checkless toggle", "Bitflags", "info bubble", "ref rail"):
-    require(phrase.casefold() in manual.casefold(), f"UI manual is missing: {phrase}")
-
 # Every plugin explains its mod loader, in the same five fields, in the same
 # words. Five of the eight editors previously said nothing about how their
 # output is loaded, which is the first thing anyone installing a mod needs.
 for plugin in sorted((ROOT / "games").iterdir()):
     if not (plugin / "editor.html").is_file():
         continue
-    editor = (plugin / "editor.html").read_text(encoding="utf-8")
+    editor = page_source(plugin)
     require("modLoaderSection(" in editor,
             f"{plugin.name} does not render the shared MOD LOADER section")
     for field in ("loader:", "output:", "order:", "safety:", "removal:"):
@@ -158,12 +162,12 @@ require("const confirmAction = options =>" in framework,
 
 require("reshadeSection" in framework,
         "the shared ReShade section is not defined in the framework")
-require("reshadeSection(" in (ROOT / "games" / "blank" / "editor.html").read_text(encoding="utf-8"),
+require("reshadeSection(" in page_source("games/blank"),
         "games/blank does not demonstrate the shared ReShade section")
 for plugin in sorted((ROOT / "games").iterdir()):
     if not (plugin / "editor.html").is_file():
         continue
-    editor = (plugin / "editor.html").read_text(encoding="utf-8")
+    editor = page_source(plugin)
     if 'id:"tweaks"' not in editor and "id: \"tweaks\"" not in editor:
         continue
     require("reshadeSection(" in editor,
@@ -174,17 +178,11 @@ for plugin in sorted((ROOT / "games").iterdir()):
 # Pin the single definition, not the number. Three separate declarations of
 # this width existed at once and only the last one was live, so edits to the
 # others silently did nothing.
-# The lane is still ten percent wherever ten percent is wide enough to hold a
-# property name. It now carries a font-relative floor as well, because ten
-# percent of a narrow detail panel is a twenty-pixel column that cuts every
-# label off. Both halves are required: the floor without the percentage would
-# let the lane grow without limit.
+# The user changed the shared lane to 7.5%. Do not restore the old 10% rule
+# while bringing back an archived UI patch.
 flat = css.replace(" ", "")
-require("--lex-detail-label-width:minmax(var(--lex-detail-label-floor),10%)" in flat,
-        "Detail property-name lane is not standardized to the shared 10% lane "
-        "with its font-relative floor")
-require("--lex-detail-label-floor:" in flat,
-        "Detail property-name lane has no font-relative minimum width")
+require("--lex-detail-label-width:7.5%" in flat,
+        "Detail property-name lane does not use the shared 7.5% default")
 require("lex-info-help" in css and "place-items:center" in css.replace(" ", ""),
         "info bubble glyph centering is not defined")
 require("lex-toggle-name" in css and "writing-mode:horizontal-tb" in css,

@@ -97,3 +97,21 @@ Next: supply/support the actual tag198 decryption path, extract only short_updat
 verify its resource/native table and full opcode ranges against this versioned
 mapping, then design the guarded cap-policy replacement. No patch tool can safely
 write offsets from source annotations alone. This remains actionable research.
+
+## 2026-09-22 misc-fixes finding
+Searched world_economy.cpp and the native tree for a maximum-bounty field or hook: none exists (bounty code covers payment, law state, and databinding only). Configurable maxima need engine research with the game first. No code written. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (engine research/agent-side
+candidate still owed), so flipping to waiting would be a fake checklist.
+Left actionable until a real session can be written.
+
+## 2026-09-23 master: resolver run, 2294 new labels, stays actionable
+
+Ran games/rdr2/resolve_hash_labels.py against the local corpus
+(_downloads/RDR2-Unhashed-Strings: ArchiveItems/DataLines/MemberNames):
+resolved 2759 of 8280 hashed catalog identifiers, +2294 insertions into
+games/rdr2/labels.json. RDR2 hermetic suite green (24 passed), contract
+audit passed. Remaining for the audit: the tag198 extraction path itself
+and the cap-policy design, then game-side proof. Left actionable.

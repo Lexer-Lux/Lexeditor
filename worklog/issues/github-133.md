@@ -13,3 +13,12 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes disposition
+No evidence proves usable trails persist without a live animal. A controlled trail and streaming experiment with the game comes before choosing native trails or custom signs. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side experiment/prototype
+still owed), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.

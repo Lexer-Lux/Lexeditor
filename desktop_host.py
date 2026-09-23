@@ -11,7 +11,7 @@ import sys
 import threading
 import time
 import webbrowser
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from cover_art import CoverArtCache
 from font_manager import font_status, install_missing_fonts
@@ -25,7 +25,7 @@ from settings_manager import SettingsStore
 from windows_host import (
     begin_window_resize, configure_process_identity, configure_window_icon, maximize_to_work_area,
     install_mouse_navigation, native_window_metrics, resize_window_by, restore_from_work_area,
-    square_window_edges,
+    square_window_edges, set_ui_scale,
 )
 
 
@@ -147,6 +147,11 @@ class HostApi:
         # every line has been used.
         self._shown_quotes: set[str] = set()
         self._projects = projects or ProjectManager(plugins)
+        self._mod_library_lock = threading.RLock()
+        self._mod_uploads = {}
+        self._managed_mod_results = {}
+        self._session_project_path = None
+        self._library_move_progress = None
         self._window_state_path = window_state_path
         self._session: PluginSession | None = None
         self._session_identity: dict | None = None
@@ -294,6 +299,42 @@ class HostApi:
             raise
         return {"restarting": True}
 
+    def app_update_status(self) -> dict:
+        """Check the latest published release only when the user asks."""
+        import app_update
+        return app_update.check(ROOT)
+
+    def app_update_result(self) -> dict:
+        from runtime_bootstrap import user_data_dir
+        path = user_data_dir() / "updates" / "last-result.json"
+        if not path.is_file():
+            return {}
+        result = json.loads(path.read_text(encoding="utf-8"))
+        path.unlink()
+        return result
+
+    def install_app_update(self) -> dict:
+        import app_update
+        from runtime_bootstrap import user_data_dir
+        with self._lock:
+            if self._dirty_count:
+                raise RuntimeError("Save or discard editor changes before updating Lexeditor.")
+            if getattr(self, "_update_requested", False) or self._restart_requested:
+                raise RuntimeError("Lexeditor is already closing or updating.")
+            plan = app_update.prepare(ROOT, user_data_dir())
+            self._update_requested = True
+            previous = self._close_authorized
+            self._close_authorized = True
+            try:
+                app_update.launch(plan)
+                self._bound_window().destroy()
+            except Exception:
+                plan.with_suffix(".cancelled").touch()
+                self._update_requested = False
+                self._close_authorized = previous
+                raise
+        return {"updating": True}
+
     def window_closing(self) -> bool:
         """Cancel an unconfirmed native close while the editor is dirty."""
         with self._lock:
@@ -355,6 +396,29 @@ class HostApi:
                 "resident": True,
             }
 
+    def loading_quote_counts(self) -> dict:
+        """How many loading lines each plugin owns, plus the shared pool."""
+        root = Path(__file__).resolve().parent
+        try:
+            shared = json.loads((root / "ui" / "loading_quotes.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            shared = {}
+        shared_lines = shared.get("global", []) if isinstance(shared, dict) else []
+        counts = {}
+        games_dir = root / "games"
+        try:
+            names = sorted(path.name for path in games_dir.iterdir()
+                           if path.is_dir() and not path.name.startswith(("_", ".")))
+        except OSError:
+            names = []
+        for name in names:
+            try:
+                own = json.loads((games_dir / name / "loading_quotes.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                own = None
+            counts[name] = len(own) if isinstance(own, list) else 0
+        return {"global": len(shared_lines) if isinstance(shared_lines, list) else 0,
+                "plugins": counts}
     def loading_quote(self, plugin_id: str) -> dict:
         """Choose one editable game or down-weighted global line."""
         if plugin_id != "__home__" and plugin_id not in self._plugins:
@@ -452,7 +516,7 @@ class HostApi:
                 continue
             installation = managed["installation"]
             problems = installation["problems"]
-            if plugin.projects is not None:
+            if plugin.projects is not None and installation["status"] != "not-added":
                 project = self._projects.snapshot(plugin.plugin_id)
                 selected = next((row for row in project["projects"] if row["current"]), None)
                 if selected and selected["problems"]:
@@ -467,6 +531,8 @@ class HostApi:
                 "helperName": plugin.helper_name or helper.get("runtime") or "",
                 "helperInstalled": bool(helper.get("installed")),
                 "helperInstallable": plugin.helper_install is not None or plugin.helper_install_for_root is not None,
+                # A step setup still needs once the helper is in, with its button.
+                "helperNotice": helper.get("setupNotice") if helper.get("installed") else None,
             }
             if plugin.session_factory is None:
                 problems = problems + ["Shared UI session is not implemented"]
@@ -479,8 +545,6 @@ class HostApi:
                 **row_extra,
                 "id": plugin.plugin_id,
                 "name": plugin.name,
-                "subtitle": plugin.subtitle,
-                "description": plugin.description,
                 "accent": plugin.accent,
                 "ready": installation["canOpen"] and not problems,
                 "problem": (problems or [None])[0],
@@ -499,6 +563,18 @@ class HostApi:
                 "coverArt": self._cover_art.snapshot(plugin.plugin_id),
             })
         return rows
+
+    def ui_scale(self, percent=None) -> dict:
+        """Apply the saved scale, or save a scale selected in the menu bar."""
+        if percent is None:
+            percent = self._settings.snapshot().get("viewPreferences", {}).get("ui-scale", 100)
+        else:
+            percent = int(percent)
+            if not 50 <= percent <= 150:
+                raise ValueError("UI scale must be from 50% to 150%")
+        set_ui_scale(self._bound_window(), percent)
+        self._settings.save_view_preference("ui-scale", percent)
+        return {"percent": percent}
 
     def lexeditor_settings(self) -> dict:
         """Return shared settings; Developer Mode is owner-authenticated."""
@@ -531,6 +607,7 @@ class HostApi:
             None if "soundEnabled" not in payload else bool(payload["soundEnabled"]),
             payload.get("soundVolumePercent"),
             None if "pageWrapAround" not in payload else bool(payload["pageWrapAround"]),
+            payload.get("panelTabTarget"),
         )
         return self.lexeditor_settings()
 
@@ -572,6 +649,18 @@ class HostApi:
     def github_repository(self, plugin_id: str) -> dict | None:
         """Show the central game-filtered issue tracker to the owner."""
         return self._github.visible_repository(self._github_repository(plugin_id))
+
+    def open_plugin_repository(self, plugin_id: str) -> dict:
+        """Open the plugin's known GitHub tracker in the default browser."""
+        import re
+        repository = self.github_repository(plugin_id)
+        if not repository:
+            raise ValueError("No GitHub repository is available for this plugin")
+        name = repository["repository"]
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", name):
+            raise ValueError("Invalid GitHub repository")
+        url = f"https://github.com/{name}"
+        return {"opened": bool(webbrowser.open(url, new=2)), "url": url}
 
     def default_views(self, plugin_id: str) -> dict:
         """Return packaged view defaults for one plugin."""
@@ -672,7 +761,7 @@ class HostApi:
             "installation": self._installations.configure_directory(plugin_id, selected),
         }
 
-    def open_game_data_location(self, plugin_id: str, filename: str) -> dict:
+    def game_data_location(self, plugin_id: str, filename: str) -> dict:
         from game_data_location import find_original_location
         if plugin_id not in self._plugins:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
@@ -681,6 +770,10 @@ class HostApi:
         roots = []
         roots.append(Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Lexeditor" / "game-data" / plugin_id)
         target = find_original_location(filename, roots, Path(configured) if configured else None)
+        return {"path": str(target)}
+
+    def open_game_data_location(self, plugin_id: str, filename: str) -> dict:
+        target = Path(self.game_data_location(plugin_id, filename)["path"])
         subprocess.Popen(["explorer.exe", str(target)] if target.is_dir() else
                          ["explorer.exe", "/select,", str(target)])
         return {"path": str(target)}
@@ -726,6 +819,116 @@ class HostApi:
             "problems": snapshot.get("problems", []),
         }
 
+    def run_helper_action(self, plugin_id: str, action: str) -> dict:
+        """Run one named setup step a helper asked for, then re-check the game."""
+        plugin = self._plugins.get(plugin_id)
+        if plugin is None:
+            raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
+        step = (plugin.helper_actions or {}).get(str(action))
+        if step is None:
+            raise ValueError(f"{plugin.name} has no setup step called {action}")
+        current = self._installations.snapshot(plugin_id)
+        result = step(Path(current["root"]) if current.get("root") else None) or {}
+        snapshot = self._installations.snapshot(plugin_id)
+        helper = snapshot.get("helper") or {}
+        return {"result": result, "helperNotice": helper.get("setupNotice"),
+                "status": snapshot.get("status"), "canOpen": snapshot.get("canOpen")}
+
+    def developer_overview(self) -> dict:
+        """Every game and what is still left to set up for it. Developer Mode only."""
+        if not self._developer():
+            raise ValueError("The developer page needs Developer Mode.")
+        games = []
+        for managed in self._installations.rows(bypass=not self._enforce_installations):
+            plugin = managed["plugin"]
+            if plugin.plugin_id == "blank":
+                continue
+            installation = managed["installation"]
+            tasks = []
+            if plugin.installation is not None:
+                tasks.append({"label": "ReShade defaults set",
+                              "done": self._reshade_defaults(plugin.plugin_id).is_file()})
+            games.append({"id": plugin.plugin_id, "name": plugin.name,
+                          "status": installation.get("statusText") or installation.get("status", ""),
+                          "modLoading": self._mod_loading_state(plugin),
+                          "tasks": tasks})
+        return {"games": sorted(games, key=lambda row: row["name"].lower()),
+                "sharedUi": self._shared_ui_budget(),
+                "sharedCode": self._shared_code_budget(),
+                "quotes": self.loading_quote_counts()}
+
+    def _shared_code_budget(self) -> list[dict]:
+        """Plugin Python that is a second copy of another plugin's function."""
+        import json
+        import sys
+
+        root = Path(__file__).resolve().parent
+        sys.path.insert(0, str(root / "tools"))
+        try:
+            from verify_shared_code_budget import counts
+            live = counts()
+        except Exception:
+            return []
+        try:
+            recorded = json.loads((root / "ui" / "shared-code-budget.json").read_text(encoding="utf-8"))["plugins"]
+        except (OSError, ValueError, KeyError):
+            recorded = {}
+        rows = [{"plugin": name, "copiedLines": live.get(name, 0), "recorded": recorded.get(name, 0),
+                 "over": live.get(name, 0) > recorded.get(name, 0)}
+                for name in sorted(set(live) | set(recorded))]
+        return sorted(rows, key=lambda row: -row["copiedLines"])
+
+    def _mod_loading_state(self, plugin) -> dict:
+        """Whether this game can load a mod yet, and how.
+
+        A plugin that can install and enable a package has an adapter; one that
+        only edits project copies does not, and says so in ui/mod-loading.json.
+        """
+        import json
+
+        try:
+            entry = json.loads((Path(__file__).resolve().parent / "ui" / "mod-loading.json")
+                               .read_text(encoding="utf-8"))["plugins"].get(plugin.plugin_id, {})
+        except (OSError, ValueError, KeyError):
+            entry = {}
+        loader = str(entry.get("loader", ""))
+        works = bool(getattr(plugin, "mods_load", False))
+        return {"works": works,
+                "state": "Loads mods" if works else "Not yet",
+                "loader": loader.split(". ")[0] if loader else "No loader declared."}
+
+    def _shared_ui_budget(self) -> list[dict]:
+        """How far each plugin still reaches into the shared components.
+
+        Recorded counts against live ones, so the developer page shows the
+        conversion work left rather than only failing a test when it grows.
+        """
+        import json
+        import sys
+
+        root = Path(__file__).resolve().parent
+        sys.path.insert(0, str(root / "tools"))
+        try:
+            from verify_shared_ui_budget import counts
+            live = counts()
+        except Exception:
+            return []
+        try:
+            recorded = json.loads((root / "ui" / "shared-ui-budget.json").read_text(encoding="utf-8"))["files"]
+        except (OSError, ValueError, KeyError):
+            recorded = {}
+        rows = []
+        for name in sorted(set(live) | set(recorded)):
+            now = live.get(name, {"sharedSelectors": 0, "handBuiltRows": 0})
+            was = recorded.get(name, {"sharedSelectors": 0, "handBuiltRows": 0})
+            rows.append({"file": name,
+                         "sharedSelectors": now["sharedSelectors"], "handBuiltRows": now["handBuiltRows"],
+                         "recordedSelectors": was.get("sharedSelectors", 0),
+                         "recordedRows": was.get("handBuiltRows", 0),
+                         "over": now["sharedSelectors"] > was.get("sharedSelectors", 0)
+                                 or now["handBuiltRows"] > was.get("handBuiltRows", 0)})
+        return sorted(rows, key=lambda row: -(row["sharedSelectors"] + row["handBuiltRows"]))
+
     def helper_versions(self, refresh: bool = False) -> dict:
         """Report every plugin helper whose upstream has a newer release.
 
@@ -761,11 +964,17 @@ class HostApi:
                     from urllib.parse import quote
                     row["releaseNotes"] = source.rstrip("/") + "/releases/tag/" + quote(latest, safe="")
                 rows.append(row)
+            # ReShade is not a plugin's helper: it is one copy shared by every
+            # game. It is checked and cached with the rest all the same, so a
+            # refresh means the same thing for every row on the panel.
+            rows.append(self._reshade_helper_row())
             with self._lock:
                 self._helper_versions = [dict(row) for row in rows]
         # Installed state is always fresh even when upstream metadata is cached.
         # A failed remote lookup must never hide the pin or local install state.
         for row in rows:
+            if not row.get("pluginId"):
+                continue
             plugin = self._plugins[row["pluginId"]]
             try:
                 snapshot = self._installations.snapshot(row["pluginId"])
@@ -784,13 +993,63 @@ class HostApi:
                 row["installedError"] = str(error)
         return {"helpers": rows, "cached": reused}
 
+    def download_reshade(self, plugin_id: str) -> dict:
+        """Fetch ReShade from a game's own page, then restate that game.
+
+        Same store as the helper panel fills: one ReShade for the machine. The
+        panel is where it is updated; this is here so a first install does not
+        send the user to another screen to get started.
+        """
+        import reshade_projects
+
+        try:
+            reshade_projects.install_loader()
+        except Exception as error:
+            return {**self.mod_reshade(plugin_id), "error": str(error)}
+        return self.mod_reshade(plugin_id)
+
+    def _reshade_helper_row(self) -> dict:
+        """ReShade's row, never cached with the rest: it is one HTTP call."""
+        import reshade_projects
+
+        try:
+            return reshade_projects.loader_upstream()
+        except Exception as error:
+            return {"helper": "ReShade", "plugin": "Every game", "pluginId": "",
+                    "installable": True, "behind": False, "error": str(error)}
+
+    def install_reshade_loader(self, version: str = "", variant: str = "") -> dict:
+        """Fetch ReShade itself into Lexeditor's store.
+
+        Every other helper in this panel is a pinned fork and updating one on
+        its own can break the program, which is why the panel only reports.
+        ReShade is unmodified upstream and shared by every game, so it is the
+        one entry that may install itself.
+        """
+        import reshade_projects
+
+        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
+            raise PermissionError("Developer Mode requires Lexer's active GitHub account")
+        try:
+            state = reshade_projects.install_loader(
+                version, variant=variant or reshade_projects.DEFAULT_LOADER_VARIANT)
+        except Exception as error:
+            return {"installed": False, "error": str(error),
+                    "helper": self._reshade_helper_row()}
+        return {"installed": True, "store": state,
+                "helper": self._reshade_helper_row()}
+
     def open_helper_release_notes(self, plugin_id: str) -> dict:
         """Open a known cached release in the external browser, never arbitrary URLs."""
         if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
             raise PermissionError("Developer Mode requires Lexer's active GitHub account")
         from urllib.parse import urlsplit
-        with self._lock:
-            row = next((r for r in (self._helper_versions or []) if r["pluginId"] == plugin_id), None)
+        if not plugin_id:
+            row = self._reshade_helper_row()
+        else:
+            with self._lock:
+                row = next((r for r in (self._helper_versions or [])
+                            if r["pluginId"] == plugin_id), None)
         if row is None:
             raise ValueError("Check helper versions before opening release notes.")
         url = str(row.get("releaseNotes", ""))
@@ -884,26 +1143,35 @@ class HostApi:
         started game sit invisible behind a Play button while the helper
         manager refused to work because that same process existed.
         """
+        can_launch = getattr(self._plugins[plugin_id], "can_launch", True)
         controller = self._game_controller(plugin_id)
         if controller is not None:
-            return controller.status()
+            return {**controller.status(), "canLaunch": can_launch}
         with self._lock:
             process = self._game_processes.get(plugin_id)
             running = process is not None and process.poll() is None
             if process is not None and not running:
                 self._game_processes.pop(plugin_id, None)
             if running:
-                return {"running": True, "pid": process.pid, "owned": True}
+                return {"running": True, "pid": process.pid, "owned": True, "canLaunch": can_launch}
         external = self._external_game_processes(plugin_id)
         return {
             "running": bool(external),
             "pid": external[0]["pid"] if external else None,
             "owned": False,
             "processes": external,
+            "canLaunch": can_launch,
         }
 
     def launch_game(self, plugin_id: str) -> dict:
         """Start the configured game without opening a command window."""
+        if not getattr(self._plugins[plugin_id], "can_launch", True):
+            raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
+        adapter = self._plugins[plugin_id].mod_adapter
+        if adapter is not None and hasattr(adapter, "recover") and not self.game_process_status(plugin_id).get("running"):
+            root, _executable = self._game_executable(plugin_id)
+            with self._mod_library_lock:
+                adapter.recover(root)
         controller = self._game_controller(plugin_id)
         if controller is not None:
             root, _executable = self._game_executable(plugin_id)
@@ -974,7 +1242,280 @@ class HostApi:
 
     def mod_projects(self, plugin_id: str) -> dict:
         """Return known editable projects for the shared header selector."""
-        return self._projects.snapshot(plugin_id)
+        result = self._projects.snapshot(plugin_id)
+        for row in result["projects"]:
+            row["readOnly"] = self._managed_project_locked(plugin_id, Path(row["path"]))
+        return result
+
+    def _managed_project_locked(self, plugin_id: str, path: Path) -> bool:
+        policy = self._plugins[plugin_id].managed_mod
+        if policy is None:
+            return False
+        managed = Path(self.mod_library_location()["root"]) / plugin_id / policy.folder_name
+        return (path.resolve() == managed.resolve() and
+                not self._github.visible_repository(LEXEDITOR_REPOSITORY))
+
+    def copy_library_mod(self, plugin_id: str, source: str, name: str) -> dict:
+        from mod_library import ModLibrary
+        if not self.mod_library_status(plugin_id)["canManage"]:
+            raise ValueError("Mod management is not supported for this game yet")
+        library = ModLibrary(Path(self.mod_library_location()["root"]))
+        source_path = Path(source).resolve()
+        if source_path.parent != (library.root / plugin_id).resolve():
+            raise ValueError("Choose a mod in this game's library")
+        adapter = self._plugins[plugin_id].mod_adapter
+        if adapter is None:
+            raise ValueError("This game does not support editable mod copies yet")
+        with self._mod_library_lock:
+            target = library.import_mod(plugin_id, source_path, adapter, name, prepare_editable=True)
+            project = self._projects.select(plugin_id, str(target))
+        return self._restart_for_project(plugin_id, project)
+
+    def mod_library_status(self, plugin_id: str) -> dict:
+        from mod_library import documents_folder
+        plugin = self._plugins[plugin_id]
+        adapter = plugin.mod_adapter
+        root = self._settings.snapshot().get("modLibraryPath") or str(documents_folder() / "Mods")
+        author = bool(adapter and self._github.visible_repository(LEXEDITOR_REPOSITORY))
+        return {"root": root, "verified": bool(adapter and adapter.verified),
+                "canManage": bool(adapter and (adapter.verified or author)),
+                "authorTest": bool(adapter and not adapter.verified and author),
+                "message": getattr(adapter, "message", "Mod management is not supported for this game yet."),
+                "packageTypes": list(getattr(adapter, "package_types", ()))}
+
+    def mod_library_location(self) -> dict:
+        from mod_library import documents_folder
+        journal = self._settings.path.parent / "mod-library-move.json"
+        move = json.loads(journal.read_text(encoding="utf-8")) if journal.is_file() else None
+        return {"root": self._settings.snapshot().get("modLibraryPath") or str(documents_folder() / "Mods"),
+                "move": move}
+
+    def _save_library_move(self, move: dict) -> None:
+        target = self._settings.path.parent / "mod-library-move.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        pending = target.with_suffix(".tmp")
+        pending.write_text(json.dumps(move, indent=2) + "\n", encoding="utf-8")
+        pending.replace(target)
+
+    def recover_mod_library_move(self) -> dict:
+        from mod_library import ModLibrary
+        restart_plugin = None
+        with self._mod_library_lock:
+            status = self.mod_library_location()
+            move = status.get("move")
+            if not move:
+                return status
+            if self._session_uses_library(Path(move["source"])):
+                if self._dirty_count:
+                    raise ValueError("Save the current mod before recovering its library move")
+                restart_plugin = self._plugin_id
+            result = ModLibrary.recover_move(move, lambda target:
+                self._projects.relocate_library(Path(move["source"]), target, self._settings.set_mod_library_path))
+            self._save_library_move(result)
+            status = self.mod_library_location()
+        if restart_plugin and result.get("phase") == "committed":
+            status["url"] = self.open_plugin(restart_plugin)["url"]
+        return status
+
+    def remove_mod_library_recovery(self) -> dict:
+        from mod_library import ModLibrary
+        with self._mod_library_lock:
+            status = self.mod_library_location()
+            move = status.get("move")
+            if not move:
+                raise ValueError("No library recovery copy is registered")
+            if self._session_uses_library(Path(move["source"])):
+                raise ValueError("Reopen the active editor before removing its old library folder")
+            ModLibrary.remove_move_recovery(move, Path(status["root"]))
+            (self._settings.path.parent / "mod-library-move.json").unlink()
+            return self.mod_library_location()
+
+    def choose_mod_library_location(self) -> dict:
+        current = self.mod_library_location()["root"]
+        parent = self._choose_folder(str(Path(current).parent))
+        return {"source": current, "destination": str(Path(parent) / "Mods") if parent else "",
+                "cancelled": not bool(parent)}
+
+    def move_mod_library(self, source: str, destination: str) -> dict:
+        from mod_library import ModLibrary
+        current = Path(self.mod_library_location()["root"]).resolve()
+        if Path(source).resolve() != current:
+            raise ValueError("The library location changed. Review the move again.")
+        if not Path(destination).is_absolute():
+            raise ValueError("Choose an absolute destination")
+        restart_plugin = self._plugin_id if self._session_uses_library(current) else None
+        if restart_plugin and self._dirty_count:
+            raise ValueError("Save the current mod before moving its library")
+        self._library_move_progress = {"completed": 0, "total": 0, "file": "Preparing copy", "running": True}
+        def progress(done, total, name):
+            self._library_move_progress = {"completed": done, "total": total, "file": name, "running": True}
+        try:
+            with self._mod_library_lock:
+                result = ModLibrary(current).relocate(Path(destination), lambda target:
+                    self._projects.relocate_library(current, target, self._settings.set_mod_library_path),
+                    progress=progress, journal=self._save_library_move)
+            if restart_plugin:
+                opened = self.open_plugin(restart_plugin)
+                result["url"] = opened["url"]
+            return result
+        finally:
+            self._library_move_progress = {**(self._library_move_progress or {}), "running": False}
+
+    def _session_uses_library(self, root: Path) -> bool:
+        path = self._session_project_path
+        return bool(self._session and path and (root.resolve() == path.resolve() or root.resolve() in path.resolve().parents))
+
+    def mod_library_move_progress(self) -> dict:
+        return self._library_move_progress or {"running": False}
+
+    def inspect_mod_package(self, plugin_id: str, source: str, data_root: str = "", selected: list[str] | None = None) -> dict:
+        from mod_library import ModLibrary
+        adapter = self._plugins[plugin_id].mod_adapter
+        if adapter is None:
+            raise ValueError("Mod management is not supported for this game yet")
+        return ModLibrary(Path(self.mod_library_status(plugin_id)["root"])).inspect(
+            Path(source), adapter, data_root, selected)
+
+    def import_mod_package(self, plugin_id: str, source: str, name: str,
+                           data_root: str = "", selected: list[str] | None = None) -> dict:
+        from mod_library import ModLibrary
+        adapter = self._plugins[plugin_id].mod_adapter
+        if adapter is None or not self.mod_library_status(plugin_id)["canManage"]:
+            raise ValueError("Mod management is not supported for this game yet")
+        with self._mod_library_lock:
+            target = ModLibrary(Path(self.mod_library_status(plugin_id)["root"])).import_mod(
+                plugin_id, Path(source), adapter, name, data_root, selected)
+        return {"path": str(target), "name": name}
+
+    def choose_mod_package(self, plugin_id: str, kind: str = "folder") -> dict:
+        if not self.mod_library_status(plugin_id)["canManage"]:
+            raise ValueError("Mod management is not supported for this game yet")
+        if kind == "folder":
+            selected = self._choose_folder()
+        elif kind in {"zip", "ctp"}:
+            import webview
+            file_types = ("ZIP archives (*.zip)",) if kind == "zip" else ("Chrono Trigger patches (*.ctp)",)
+            selection = self._bound_window().create_file_dialog(webview.OPEN_DIALOG,
+                allow_multiple=False, file_types=file_types)
+            selected = selection[0] if selection else ""
+        else:
+            raise ValueError("Choose a folder, ZIP archive, or supported game package")
+        return {"source": str(selected), "cancelled": not bool(selected)}
+
+    def begin_mod_upload(self, plugin_id: str) -> dict:
+        import tempfile
+        import uuid
+        if not self.mod_library_status(plugin_id)["canManage"]:
+            raise ValueError("Mod management is not supported for this game yet")
+        with self._mod_library_lock:
+            if len(self._mod_uploads) >= 2:
+                raise ValueError("Close the other package preview first")
+            token = uuid.uuid4().hex
+            temporary = tempfile.TemporaryDirectory(prefix="lexeditor-mod-drop-")
+            self._mod_uploads[token] = {"temporary": temporary, "files": {}, "bytes": 0}
+            return {"token": token, "root": temporary.name}
+
+    def upload_mod_chunk(self, token: str, name: str, offset: int, encoded: str) -> dict:
+        import base64
+        from mod_library import relative_path, MAX_FILES, MAX_BYTES
+        if len(encoded) > 6 * 1024 * 1024:
+            raise ValueError("Upload chunk is too large")
+        relative = relative_path(name)
+        block = base64.b64decode(encoded, validate=True)
+        with self._mod_library_lock:
+            state = self._mod_uploads[token]
+            key = relative.as_posix().casefold()
+            previous = state["files"].get(key)
+            if (previous and (previous["name"] != name or previous["size"] != offset)) or (not previous and offset != 0):
+                raise ValueError("Duplicate file or invalid upload position")
+            if state["bytes"] + len(block) > MAX_BYTES or (not previous and len(state["files"]) >= MAX_FILES):
+                raise ValueError("The package exceeds the import limit")
+            target = Path(state["temporary"].name) / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("ab" if previous else "xb") as output:
+                output.write(block)
+            state["files"][key] = {"name": name, "size": offset + len(block)}
+            state["bytes"] += len(block)
+            return {"bytes": state["bytes"]}
+
+    def end_mod_upload(self, token: str) -> dict:
+        with self._mod_library_lock:
+            state = self._mod_uploads.pop(token, None)
+            if state:
+                state["temporary"].cleanup()
+        return {"closed": True}
+
+    def mod_library_entries(self, plugin_id: str) -> dict:
+        from mod_library import metadata
+        status = self.mod_library_status(plugin_id)
+        root = Path(status["root"]) / plugin_id
+        game = self._installations.snapshot(plugin_id).get("root")
+        active = []
+        adapter = self._plugins[plugin_id].mod_adapter
+        if game and adapter is not None and hasattr(adapter, "active_mod_ids"):
+            active = list(adapter.active_mod_ids(Path(game)))
+        entries = []
+        for child in sorted(root.iterdir()) if root.is_dir() else []:
+            if child.is_dir() and not child.name.startswith(".") and not child.is_symlink():
+                try:
+                    info = metadata(child)
+                    policy = self._plugins[plugin_id].managed_mod
+                    locked = bool(policy and child.name == policy.folder_name and
+                                  not self._github.visible_repository(LEXEDITOR_REPOSITORY))
+                    entries.append({"path": str(child), "name": info["name"], "readOnly": locked,
+                                    "version": info["version"], "enabled": child.name in active})
+                except (OSError, ValueError) as error:
+                    entries.append({"path": str(child), "name": child.name, "error": str(error)})
+        return {**status, "entries": entries, "managedUpdate": self._managed_mod_results.get(plugin_id)}
+
+    def update_managed_mod(self, plugin_id: str) -> dict:
+        from managed_mods import update_mod, refresh_active_mod
+        from mod_library import ModLibrary
+        plugin = self._plugins[plugin_id]
+        if plugin.managed_mod is None or plugin.mod_adapter is None:
+            return {"updated": False, "message": "No managed release is configured for this game."}
+        author = bool(self._github.visible_repository(LEXEDITOR_REPOSITORY))
+        if not author and self.game_process_status(plugin_id).get("running"):
+            return {"updated": False, "message": "Close the game to update its managed mod."}
+        try:
+            with self._mod_library_lock:
+                result = update_mod(ModLibrary(Path(self.mod_library_location()["root"])),
+                    plugin_id, plugin.mod_adapter, plugin.managed_mod,
+                    self._settings.path.parent / "managed-mods" / (plugin_id + ".json"), author=author)
+                game = self._installations.snapshot(plugin_id).get("root")
+                if not author and game:
+                    try:
+                        result["deploymentRefreshed"] = refresh_active_mod(
+                            ModLibrary(Path(self.mod_library_location()["root"])),
+                            plugin_id, plugin.mod_adapter, plugin.managed_mod, Path(game))
+                    except Exception as error:
+                        result["error"] = str(error)
+                        result["message"] = (
+                            "The library update finished, but activation failed. "
+                            "The previous game deployment was kept. Opening the plugin will retry activation.")
+        except Exception as error:
+            result = {"updated": False, "error": str(error), "message": "The managed mod update did not finish."}
+        self._managed_mod_results[plugin_id] = result
+        return result
+
+    def activate_library_mods(self, plugin_id: str, paths: list[str]) -> dict:
+        from mod_library import relative_path
+        status = self.mod_library_status(plugin_id)
+        if not status["canManage"]:
+            raise ValueError("Mod management is not supported for this game yet")
+        game = self._installations.snapshot(plugin_id).get("root")
+        if not game:
+            raise ValueError("Locate the game first")
+        current = self.game_process_status(plugin_id)
+        if current.get("running"):
+            raise ValueError("Close the game before changing active mods")
+        library = (Path(status["root"]) / relative_path(plugin_id)).resolve()
+        roots = [Path(path).resolve() for path in paths]
+        if len(set(roots)) != len(roots) or any(path.parent != library for path in roots):
+            raise ValueError("Choose each mod once from this game's library")
+        with self._mod_library_lock:
+            self._plugins[plugin_id].mod_adapter.activate(roots, Path(game))
+        return self.mod_library_entries(plugin_id)
 
     def _choose_folder(self, directory: str = "") -> str:
         import webview
@@ -1018,77 +1559,152 @@ class HostApi:
         return {**self._restart_for_project(plugin_id, project),
                 "contents": self._projects.contents(plugin_id, str(Path(selected) / name))}
 
+    def _reshade_root(self, plugin_id: str) -> Path | None:
+        """Where this game's ReShade loader belongs, as the game declares it.
+
+        Every plugin states this itself. Lexeditor used to work it out from
+        the launch path, which put the DLL at the top of Rebirth's folder
+        where nothing would ever load it, and then reported success.
+
+        A game that declares a folder it does not have is an error, not a
+        reason to fall back to the root: falling back is how the file ended up
+        somewhere useless in the first place.
+        """
+        root = self._installations.snapshot(plugin_id).get("root")
+        if not root:
+            return None
+        root = Path(root)
+        plugin = self._plugins.get(plugin_id)
+        declared = getattr(getattr(plugin, "installation", None), "reshade_root", "") or ""
+        if not declared:
+            return root
+        target = root / Path(*PurePosixPath(declared.replace("\\", "/")).parts)
+        if not target.is_dir():
+            raise ValueError(
+                f"{plugin_id} says ReShade belongs in {declared}, which this "
+                f"installation does not have. Nothing was written.")
+        return target
+
+    def _reshade_executable(self, plugin_id: str, folder: Path) -> Path | None:
+        """The executable Play starts, which is the build ReShade has to match.
+
+        A plugin's own controller decides when it has one - Warband starts WSE2
+        once Lexeditor manages it - and otherwise the installation's launch
+        executable. Nothing is asked of the player: this is what their install
+        runs, and a launcher that draws nothing hands over to the executable
+        beside it that does.
+        """
+        try:
+            root, executable = self._game_executable(plugin_id)
+            controller = self._game_controller(plugin_id)
+        except (RuntimeError, ValueError, KeyError):
+            return None
+        chooser = getattr(controller, "executable", None)
+        if callable(chooser):
+            try:
+                executable = Path(chooser(root))
+            except (RuntimeError, ValueError, OSError):
+                pass
+        return executable if executable.is_file() else None
+
+    def _reshade_defaults(self, plugin_id: str) -> Path:
+        """The game's ReShade defaults: a preset kept beside its plugin."""
+        import inspect
+        import reshade_effects
+
+        plugin = self._plugins[plugin_id]
+        return Path(inspect.getfile(plugin.check)).resolve().parent / reshade_effects.DEFAULTS_NAME
+
+    def _developer(self) -> bool:
+        return bool(self._github.visible_repository(LEXEDITOR_REPOSITORY))
+
     def mod_reshade(self, plugin_id: str) -> dict:
-        """Report the ReShade preset the current mod ships, if it ships one."""
+        """This game's ReShade: on or off, and every effect with its values.
+
+        A game with no defaults set has no ReShade for players at all; in
+        Developer Mode it shows, so the defaults can be made.
+        """
+        import reshade_effects
         import reshade_projects
 
-        snapshot = self._projects.snapshot(plugin_id)
-        game_root = self._installations.snapshot(plugin_id).get("root")             if hasattr(self, "_installations") else None
-        return reshade_projects.snapshot(
-            Path(snapshot["current"]), Path(game_root) if game_root else None)
+        defaults = self._reshade_defaults(plugin_id)
+        developer = self._developer()
+        error = ""
+        try:
+            root = self._reshade_root(plugin_id)
+        except ValueError as problem:
+            root, error = None, str(problem)
+        installed = reshade_projects.installed_renderer(root) if root else ""
+        if installed:
+            # ReShade.ini must name Lexeditor's effects, whatever an older
+            # Lexeditor or a hand edit left in it.
+            try:
+                reshade_projects.configure(root)
+            except (OSError, ValueError) as problem:
+                error = str(problem)
+        state = reshade_effects.state(root, defaults)
+        return {**state, "manifest": {}, "installed": bool(installed), "renderer": installed,
+                "gameFound": root is not None, "developerMode": developer,
+                "available": state["hasDefaults"] or developer, "error": error}
 
-    def save_mod_reshade(self, plugin_id: str, manifest: dict) -> dict:
-        """Write the mod's ReShade manifest and report the new state."""
+    def set_reshade_enabled(self, plugin_id: str, enabled: bool) -> dict:
+        """Turn ReShade on or off for this game."""
+        import reshade_effects
         import reshade_projects
 
-        snapshot = self._projects.snapshot(plugin_id)
-        root = Path(snapshot["current"])
-        reshade_projects.write_manifest(root, manifest or {})
-        game_root = self._installations.snapshot(plugin_id).get("root")             if hasattr(self, "_installations") else None
-        return reshade_projects.snapshot(
-            root, Path(game_root) if game_root else None)
-
-    def install_reshade(self, plugin_id: str, renderer: str) -> dict:
-        """Put Lexeditor's one ReShade into this game, under its loader name."""
-        import reshade_projects
-
-        root = self._installations.snapshot(plugin_id).get("root")
+        root = self._reshade_root(plugin_id)
         if not root:
-            raise ValueError("Add this game before installing ReShade for it.")
-        reshade_projects.install(Path(root), renderer)
+            raise ValueError("Add this game before turning ReShade on.")
+        defaults = self._reshade_defaults(plugin_id)
+        if enabled:
+            if not defaults.is_file() and not self._developer():
+                raise ValueError("ReShade is not set up for this game yet.")
+            plugin = self._plugins[plugin_id]
+            renderer = getattr(plugin.installation, "reshade_renderer", "") or "dxgi"
+            reshade_projects.install(root, renderer, self._reshade_executable(plugin_id, root))
+            reshade_effects.ensure_preset(root, defaults)
+        else:
+            reshade_projects.uninstall(Path(root))
         return self.mod_reshade(plugin_id)
 
-    def uninstall_reshade(self, plugin_id: str) -> dict:
-        """Remove ReShade from this game. A game's own loader is left alone."""
-        import reshade_projects
+    def set_reshade_effect(self, plugin_id: str, file: str, enabled: bool) -> dict:
+        import reshade_effects
 
-        root = self._installations.snapshot(plugin_id).get("root")
+        root = self._reshade_root(plugin_id)
         if not root:
-            raise ValueError("This game has no folder to remove ReShade from.")
-        reshade_projects.uninstall(Path(root))
+            raise ValueError("Add this game first.")
+        reshade_effects.set_enabled(root, str(file), bool(enabled))
         return self.mod_reshade(plugin_id)
 
-    def reshade_repositories(self) -> list:
-        """The shader repositories this machine has, shared by every project."""
-        import reshade_projects
+    def set_reshade_value(self, plugin_id: str, file: str, name: str, value) -> dict:
+        import reshade_effects
 
-        return reshade_projects.repositories()
-
-    def add_reshade_repository(self, plugin_id: str, name: str,
-                               version: str = "", url: str = "") -> dict:
-        """Record one repository for the machine, then restate this mod."""
-        import reshade_projects
-
-        reshade_projects.add_repository(name, version, url)
+        root = self._reshade_root(plugin_id)
+        if not root:
+            raise ValueError("Add this game first.")
+        reshade_effects.set_value(root, str(file), str(name), value)
         return self.mod_reshade(plugin_id)
 
-    def remove_reshade_repository(self, plugin_id: str, name: str) -> dict:
-        """Forget one repository. Mods that name it still name it."""
-        import reshade_projects
+    def reset_reshade_defaults(self, plugin_id: str) -> dict:
+        import reshade_effects
 
-        reshade_projects.remove_repository(name)
+        root = self._reshade_root(plugin_id)
+        if not root:
+            raise ValueError("Add this game first.")
+        reshade_effects.reset(root, self._reshade_defaults(plugin_id))
         return self.mod_reshade(plugin_id)
 
-    def write_reshade_note(self, plugin_id: str) -> dict:
-        """Write the by-hand install note into the mod's reshade folder."""
-        import reshade_projects
+    def save_reshade_defaults(self, plugin_id: str) -> dict:
+        """Make the current look this game's defaults. Developer Mode only."""
+        import reshade_effects
 
-        snapshot = self._projects.snapshot(plugin_id)
-        root = Path(snapshot["current"])
-        game_root = self._installations.snapshot(plugin_id).get("root")             if hasattr(self, "_installations") else None
-        path = reshade_projects.write_export_note(
-            root, Path(game_root) if game_root else None)
-        return {**self.mod_reshade(plugin_id), "notePath": path}
+        if not self._developer():
+            raise ValueError("Only Developer Mode can change a game's defaults.")
+        root = self._reshade_root(plugin_id)
+        if not root:
+            raise ValueError("Add this game first.")
+        reshade_effects.save_defaults(root, self._reshade_defaults(plugin_id))
+        return self.mod_reshade(plugin_id)
 
     def adopt_reshade(self) -> dict:
         """Take a ReShade DLL the user picks as Lexeditor's one copy."""
@@ -1121,6 +1737,8 @@ class HostApi:
         return self._restart_for_project(plugin_id, project) if was_current else project
 
     def rename_mod_project(self, plugin_id: str, path: str, name: str) -> dict:
+        if self._managed_project_locked(plugin_id, Path(path)):
+            raise ValueError("This mod updates automatically. Make an editable copy instead of renaming it.")
         """Rename one editable project and restart it when it is active."""
         before = self._projects.snapshot(plugin_id)
         was_current = os.path.normcase(before.get("current", "")) == os.path.normcase(str(Path(path).resolve()))
@@ -1137,6 +1755,8 @@ class HostApi:
                 raise RuntimeError("\n".join(problems))
             if plugin.session_factory is None:
                 raise RuntimeError(f"{plugin.name} has not moved to the shared UI host")
+            if plugin.managed_mod is not None:
+                self.update_managed_mod(plugin_id)
             if self._enforce_installations and plugin.installation is not None:
                 self._installations.prepare(plugin_id)
             environment = (
@@ -1150,6 +1770,8 @@ class HostApi:
                     raise RuntimeError("\n".join((current or {}).get(
                         "problems", [f"{plugin.name} has no valid editable project"])))
                 environment[plugin.projects.root_env] = project["current"]
+                environment["LEXEDITOR_MOD_READ_ONLY"] = "1" if self._managed_project_locked(
+                    plugin_id, Path(project["current"])) else "0"
             fonts = self.download_fonts(plugin_id)
             session = plugin.session_factory(environment) if environment else plugin.session_factory()
             try:
@@ -1159,6 +1781,7 @@ class HostApi:
                 raise
             previous = self._session
             self._session = session
+            self._session_project_path = Path(environment[plugin.projects.root_env]) if plugin.projects else None
             self._session_identity = identity
             self._plugin_id = plugin_id
             self._dirty_count = 0

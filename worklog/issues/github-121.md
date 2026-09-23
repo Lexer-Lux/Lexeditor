@@ -19,3 +19,12 @@ Read the live issue and comments and preserve the latest explicit human correcti
 Read live #121 and comments, current save-owner source and prior progression-loss record. Design: [continuous saving](../../docs/rdr2-continuous-saving-design.md). It covers request/acknowledgement sequencing, consequences, death/arrest/checkpoints, crash recovery, all normal load entry points, development recovery and bounded storage. Local1491.50 long_update source SHA-256: 881DECB771F95139FC199970CBD7F190354077F5A48C51226B27EE7565024940. Functions110/501/506/508/1313/1314 establish the engine preparation/request/snapshot boundaries; save_menu_ui_event_handler alone is not a correlated durable acknowledgement.
 
 Next: read-only request/completion observer and proved idempotent consequence handling. Crash during a save-blocked mission remains a substantive gap; periodic autosaving does not satisfy the full request. No real saves were read or modified. No runtime feature installed. Remains actionable.
+
+## 2026-09-22 misc-fixes note
+Design doc exists (docs/rdr2-continuous-saving-design.md) with engine boundaries and a known gap (crash during a save-blocked mission). Next: read-only request and completion observer plus proved idempotent consequence handling. No saves touched, no runtime installed. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side previews/prototype
+still owed), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.

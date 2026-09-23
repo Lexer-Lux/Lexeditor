@@ -75,8 +75,8 @@ def _decrypt(data: bytes) -> bytes:
     return decryptor.update(data) + decryptor.finalize()
 
 
-def oodle_library() -> Path | None:
-    """Locate an Oodle shared library without downloading one."""
+def repak_oodle_library() -> Path | None:
+    """Return an explicitly present Oodle library beside repak."""
     for name in _OODLE_NAMES:
         candidate = repak_path().with_name(name)
         if candidate.is_file():
@@ -84,11 +84,31 @@ def oodle_library() -> Path | None:
     return None
 
 
-def _oodle_decompress(payload: bytes, expected: int) -> bytes:
+def oodle_library(pak: Path | None = None) -> Path | None:
+    """Locate Oodle without downloading or copying proprietary game files."""
+    explicit = repak_oodle_library()
+    if explicit is not None:
+        return explicit
+    if pak is not None:
+        resolved = Path(pak).resolve()
+        end_root = next((parent for parent in resolved.parents
+                         if parent.name.casefold() == "end"), None)
+        if end_root is not None:
+            candidate = (
+                end_root.parent
+                / "Engine" / "Binaries" / "ThirdParty" / "Oodle" / "Win64"
+                / "oo2core_7_win64.dll"
+            )
+            if candidate.is_file():
+                return candidate
+    return None
+
+
+def _oodle_decompress(payload: bytes, expected: int, pak: Path | None = None) -> bytes:
     global _oodle
     with _oodle_lock:
         if _oodle is None:
-            library = oodle_library()
+            library = oodle_library(pak)
             if library is None:
                 raise PakError(
                     "An Oodle library is required to read this archive. Place "
@@ -183,13 +203,13 @@ def read_index(pak: Path) -> dict[str, Entry]:
     return entries
 
 
-def _decompress_block(entry: Entry, payload: bytes, expected: int) -> bytes:
+def _decompress_block(entry: Entry, payload: bytes, expected: int, pak: Path) -> bytes:
     if entry.compression == COMPRESSION_ZLIB:
         return zlib.decompress(payload)
     if entry.compression == COMPRESSION_GZIP:
         return zlib.decompress(payload, 16 + zlib.MAX_WBITS)
     if entry.compression == COMPRESSION_CUSTOM:
-        return _oodle_decompress(payload, expected)
+        return _oodle_decompress(payload, expected, pak)
     raise PakError(f"unsupported compression value {entry.compression}")
 
 
@@ -231,7 +251,7 @@ def read_file(pak: Path, internal_path: str) -> bytes:
                 padded = (len(payload) + _AES_BLOCK - 1) // _AES_BLOCK * _AES_BLOCK
                 payload = _decrypt(payload.ljust(padded, b"\0"))
             expected = min(entry.block_size, entry.uncompressed - len(out))
-            out += _decompress_block(entry, payload, expected)
+            out += _decompress_block(entry, payload, expected, pak)
         if len(out) != entry.uncompressed:
             raise PakError(
                 f"{internal_path} decoded to {len(out)} bytes, expected {entry.uncompressed}"

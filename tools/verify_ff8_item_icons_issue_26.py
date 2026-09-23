@@ -8,6 +8,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "tools"))
 
 from games.ff8 import formats  # noqa: E402
 from games.ff8.game_icons import ensure_icons, icon_path, item_icon_id  # noqa: E402
@@ -43,7 +44,10 @@ def main() -> int:
     require(all("iconId" in row for row in formats.item_choices()),
             "shop and weapon item choices must carry the same icon identity")
 
-    editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    # The item views moved out of editor.html into core.js/records.js and
+    # battle.js (shared renders split, issue #20).
+    from plugin_source import plugin_source
+    editor = plugin_source("ff8")
     require("function itemLabel(" in editor and "function itemSelectControl(" in editor,
             "FF8 must use shared item-label and selected-item helpers")
     require('render:row=>itemLabel(row)' in editor,

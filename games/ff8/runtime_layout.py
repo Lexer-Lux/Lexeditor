@@ -589,6 +589,10 @@ def _resolved_mod_sources(mod: dict, archive: iroj_archive.Archive | None,
             # FF8 and FFNx run on the Windows case-insensitive filesystem.
             # One mod's Foo.bin and another's foo.bin are the same conflict.
             key = "/".join((parts[0], *parts[1:])).casefold()
+            # FFNx reads every file, including backups. Never deploy those
+            # into its patch directory: stale hooks can overwrite current ones.
+            if parts[0].casefold() == "hext" and Path(parts[-1]).suffix.casefold() != ".txt":
+                continue
             if layer is not None:
                 active, reason = mod_folders.condition_for_file(
                     layer, key, rules, condition_state,
@@ -628,6 +632,8 @@ def _resolved_mod_sources(mod: dict, archive: iroj_archive.Archive | None,
             if len(parts) < 2 or parts[0].casefold() not in SOURCE_FOLDERS:
                 continue
             key = "/".join((parts[0], *parts[1:])).casefold()
+            if parts[0].casefold() == "hext" and Path(parts[-1]).suffix.casefold() != ".txt":
+                continue
             program = mod_folders.runtime_program(layer, key, rules)
             if program is None:
                 continue

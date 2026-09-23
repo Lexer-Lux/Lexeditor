@@ -19,10 +19,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 from urllib.parse import parse_qs, urlparse
 
-from . import camera_features, input_remaps, map_icon_features, mission_rewards, paths, script_features
+from . import (camera_features, input_remaps, loot_script, map_icon_features,
+               mission_rewards, paths, script_features)
 from .archive_deployment import (
     ArchiveSpec, deploy_archives, deployment_status, revert_archives,
 )
+from plugin_http import PluginRequestHandler
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -1061,6 +1063,90 @@ def validate_loot_document(document: dict) -> None:
         raise ValueError("Money decorator paths do not match the proven WSC contract")
 
 
+# The corpse loot table, read out of the script that holds it. There is no
+# drops XML in content.rpf; the items are constants compiled into
+# lootcorpsegenericnoanim.wsc, and loot_script decodes and rewrites them. The
+# unpacked and decompiled copies are cached beside the other prepared data
+# because unpacking the archive takes seconds and the page asks on every open.
+LOOT_SCRIPT_CACHE = EXTRACT_ROOT / "loot-script"
+
+
+def _loot_script_sources() -> tuple[bytes, str]:
+    script = LOOT_SCRIPT_CACHE / "script.wsc"
+    decompiled = LOOT_SCRIPT_CACHE / "script.c"
+    if not (script.is_file() and decompiled.is_file()):
+        archive = GAME_ROOT / "game" / "content.rpf"
+        if not archive.is_file():
+            raise FileNotFoundError(f"No content.rpf under {GAME_ROOT}")
+        tool = paths.RPF6_TOOL
+        if not Path(tool).is_file():
+            raise FileNotFoundError("The RPF6 bridge is not installed")
+        wanted = "*lootcorpsegenericnoanim*"
+        LOOT_SCRIPT_CACHE.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="rdr-loot-script-") as folder:
+            work = Path(folder)
+            for command, target in (("unpack", "u"), ("decompile", "d")):
+                subprocess.run([str(tool), command, str(archive), str(work / target),
+                                wanted], check=True, capture_output=True, timeout=600)
+            script.write_bytes(next((work / "u").rglob("*.wsc")).read_bytes())
+            decompiled.write_text(
+                next((work / "d").rglob("*.c")).read_text(encoding="utf-8", errors="replace"),
+                encoding="utf-8")
+    return script.read_bytes(), decompiled.read_text(encoding="utf-8", errors="replace")
+
+
+def loot_script_payload() -> dict:
+    """Every branch of the LootType switch, and the item it hands over."""
+    try:
+        script, decompiled = _loot_script_sources()
+        slots = loot_script.verify(script, decompiled)
+    except Exception as error:
+        return {"available": False, "reason": str(error),
+                "path": loot_script.ARCHIVE_PATH}
+    override = loot_script.override_path(PROJECT)
+    edited = []
+    if override.is_file():
+        try:
+            edited = [slot.item for slot
+                      in loot_script.read_slots(override.read_bytes(), decompiled)]
+        except Exception:
+            edited = []
+    return {
+        "available": True,
+        "path": loot_script.ARCHIVE_PATH,
+        "override": str(override),
+        "overrideExists": override.is_file(),
+        "maximum": loot_script.MAX_ITEM,
+        "smallMaximum": loot_script.PUSH_SMALL_MAX,
+        "slots": [{
+            "index": index,
+            "item": (edited[index] if index < len(edited) else slot.item),
+            "vanilla": slot.item,
+            # A branch encoded as a small push cannot hold a value above
+            # fifteen without moving every address after it.
+            "maximum": (loot_script.PUSH_SMALL_MAX if slot.width == 1
+                        else loot_script.MAX_ITEM),
+        } for index, slot in enumerate(slots)],
+    }
+
+
+def save_loot_script(slots) -> dict:
+    """Write the branches the reader changed into a loose script override."""
+    script, decompiled = _loot_script_sources()
+    changes = {}
+    for entry in slots or []:
+        index = int(entry.get("index"))
+        item = int(entry.get("item"))
+        changes[index] = item
+    patched = loot_script.write_slots(script, changes, decompiled)
+    override = loot_script.override_path(PROJECT)
+    override.parent.mkdir(parents=True, exist_ok=True)
+    temporary = override.with_suffix(override.suffix + ".tmp")
+    temporary.write_bytes(patched)
+    temporary.replace(override)
+    return {"saved": True, "path": str(override), "bytes": len(patched)}
+
+
 def loot_payload() -> dict:
     if not LOOT_FILE.is_file():
         return {
@@ -1549,11 +1635,8 @@ def dashboard_payload() -> dict:
     }
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(PluginRequestHandler):
     server_version = "LexeditorRDR/1.0"
-
-    def log_message(self, _format, *_args):
-        return
 
     def json_response(self, payload: dict, status: int = 200) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -1591,6 +1674,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 self.file_response(PLUGIN_ROOT / "editor.html")
+            elif self.send_page_module(PLUGIN_ROOT, path):
+                return
             elif path.startswith("/shared/"):
                 shared_root = (LEXEDITOR_ROOT / "ui").resolve()
                 target = (shared_root / path.removeprefix("/shared/")).resolve()
@@ -1639,6 +1724,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response(shops_payload(query.get("dataset", ["current"])[0] == "vanilla"))
             elif path == "/api/loot":
                 self.json_response(loot_payload())
+            elif path == "/api/loot/script":
+                self.json_response(loot_script_payload())
             elif path == "/api/missions":
                 self.json_response(missions_payload(query.get("dataset", ["current"])[0] == "vanilla"))
             elif path == "/api/settings":
@@ -1677,6 +1764,8 @@ class Handler(BaseHTTPRequestHandler):
                 ))
             elif path == "/api/loot/save":
                 self.json_response(save_loot(body.get("document")))
+            elif path == "/api/loot/script/save":
+                self.json_response(save_loot_script(body.get("slots")))
             elif path == "/api/missions/save":
                 self.json_response(save_missions(body.get("document", body)))
             elif path == "/api/settings/save":

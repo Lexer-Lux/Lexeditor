@@ -43,3 +43,12 @@ Before binding: supply verified complete catalog classification, current invento
 ## Recurrence audit
 
 Read C:/RDR2Mod/fuckups.txt and the module rules before preparation. Relevant prior failures: unsanctioned UI/native guesses, reacting to shared input before disabling it, permanent native writes fighting game state, and calling source/build proof visual acceptance. Primary evidence: retained1491.50 satchel filter and existing native settings renderer/modal input route. Execution proof: the actual predicate harness plus the unbound page harness above. Player-visible boundary: full in-game text, focus, controller, Back and inventory acceptance remain untested. The page performs no inventory writes and installs no native UI hooks.
+
+## 2026-09-22 misc-fixes disposition
+Native category insertion still needs a feasibility test with the game. A concrete native-tab or separate-page proposal comes before any presentation choice. No code written. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side prototype/artwork/
+design still owed), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.

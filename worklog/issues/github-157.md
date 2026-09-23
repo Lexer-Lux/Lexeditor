@@ -13,3 +13,12 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes finding
+Ammunition lives in weapon-ammo storage, not provision stacks, so a catalog category edit cannot conjure a valid satchel row. The missing entries need an audit plus a truthful display preserving real quantities; no new satchel view exists. Needs game-side audit. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

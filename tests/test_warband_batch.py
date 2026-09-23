@@ -31,15 +31,74 @@ class CoverageTests(unittest.TestCase):
     def test_structured_settings_and_items_count_integrated(self):
         rows={r['filename']:r for r in server.data_map_rows()['rows']}
         self.assertEqual(rows['settings.ini']['coverage'],'structured')
-        self.assertEqual(rows['module_skills.py']['coverage'],'source')
+        self.assertEqual(rows['module_skills.py']['coverage'],'structured')
+        self.assertEqual(rows['module_skills.py']['status'],'partial')
+        self.assertEqual(rows['module_skills.py']['view'],'misc')
         self.assertEqual(rows['module_items.py']['coverage'],'structured')
         self.assertEqual(rows['module_items.py']['status'],'integrated')
         self.assertEqual(rows['module_items.py']['view'],'items')
         self.assertEqual(rows['module_troops.py']['view'],'troops')
         self.assertEqual(server.data_map_rows()['counts']['integrated'],2)
         self.assertTrue(rows['module_skills.py']['openable'])
+        self.assertEqual(rows['module_skills.py']['dataset'],'skills')
         self.assertFalse(rows['module_quests.py']['openable'])
         self.assertEqual(rows['module_quests.py']['coverage'],'unavailable')
+
+    def test_every_data_map_row_has_audited_capability(self):
+        # Materialize every source-backed catalog row so this checks the
+        # intended capability of all 33 rows rather than availability accidents.
+        for records in server.DATA_CATALOG.values():
+            for filename,_description in records:
+                if filename.endswith('.py'):
+                    (self.root/'ModuleSystem'/filename).touch(exist_ok=True)
+        result=server.data_map_rows();rows={row['filename']:row for row in result['rows']}
+        catalog={filename for records in server.DATA_CATALOG.values() for filename,_description in records}
+        self.assertEqual(set(rows),catalog);self.assertEqual(len(rows),33)
+
+        expected_integrated={
+            'settings.ini':('structured','integrated','tweaks'),
+            'module_items.py':('structured','integrated','items'),
+            'module_strings.py':('structured','integrated','misc'),
+            'module_info_pages.py':('structured','integrated','misc'),
+        }
+        expected_structured_partial={'module_troops.py':'troops'}
+        expected_structured_partial.update({
+            schema['filename']:'misc' for schema in server.MODULE_RECORD_SCHEMAS.values()
+            if schema['filename'] not in {'module_strings.py','module_info_pages.py'}
+        })
+        expected_source_only={
+            'module.ini','module_animations.py','module_scripts.py','module_triggers.py',
+            'module_simple_triggers.py','module_dialogs.py',
+        }
+        expected_read_only={'Resource/*.brf','Textures/*.dds'}
+        expected_unavailable={'*.txt','SceneObj/*.sco'}
+
+        self.assertEqual(set(expected_integrated)|set(expected_structured_partial)|expected_source_only|expected_read_only|expected_unavailable,catalog)
+        for filename,capability in expected_integrated.items():
+            self.assertEqual((rows[filename]['coverage'],rows[filename]['status'],rows[filename]['view']),capability,filename)
+        for filename,view in expected_structured_partial.items():
+            self.assertEqual((rows[filename]['coverage'],rows[filename]['status'],rows[filename]['view']),('structured','partial',view),filename)
+        for filename in expected_source_only:
+            self.assertEqual((rows[filename]['coverage'],rows[filename]['status'],rows[filename]['view']),('source','not-integrated',''),filename)
+            self.assertTrue(rows[filename]['sourceOpenable'],filename)
+            self.assertIn('not a structured editor',rows[filename]['openLabel'].lower(),filename)
+        for filename in expected_read_only:
+            self.assertEqual((rows[filename]['coverage'],rows[filename]['status'],rows[filename]['view']),('view','partial','items'),filename)
+            self.assertFalse(rows[filename]['sourceOpenable'],filename)
+        for filename in expected_unavailable:
+            self.assertEqual((rows[filename]['coverage'],rows[filename]['status'],rows[filename]['view']),('unavailable','not-integrated',''),filename)
+            self.assertFalse(rows[filename]['sourceOpenable'],filename)
+        self.assertEqual(result['counts'],{'integrated':4,'partial':21,'not-integrated':8})
+
+    def test_module_discovery_uses_module_ini_not_optional_manual(self):
+        modules=self.root/'Modules';modules.mkdir()
+        for name in ('Native','No Manual'):
+            folder=modules/name;folder.mkdir();(folder/'module.ini').write_text('module_name = '+name)
+        (modules/'Native'/'info_pages.txt').write_text('manual')
+        (modules/'Not A Module').mkdir()
+        with patch.object(server,'MODULES',modules):
+            self.assertEqual(server.modules(),['Native','No Manual'])
+            self.assertEqual(server.modules_with_manual(),['Native'])
 
     def test_installed_module_ini_resolves_without_source(self):
         (self.root/'module.ini').write_text('module_name = Installed')
@@ -59,9 +118,22 @@ class CoverageTests(unittest.TestCase):
         path=self.root/'ModuleSystem'/'module_skills.py'
         path.write_text('old = 1\n')
         with patch.object(server,'resolve_catalog_file',return_value=path):
-            result=server.save_catalog_file('module_skills.py','old = 2\n','utf-8')
+            loaded=server.read_catalog_file('module_skills.py')
+            result=server.save_catalog_file('module_skills.py','old = 2\n','utf-8',loaded['sha256'])
         self.assertEqual(path.read_text(),'old = 2\n')
         self.assertEqual(Path(result['backup']).read_text(),'old = 1\n')
+        self.assertEqual(server.read_catalog_file('module_skills.py')['sha256'],result['sha256'])
+
+    def test_source_edit_rejects_stale_external_change(self):
+        path=self.root/'ModuleSystem'/'module_skills.py'
+        path.write_text('old = 1\n')
+        with patch.object(server,'resolve_catalog_file',return_value=path):
+            loaded=server.read_catalog_file('module_skills.py')
+            path.write_text('external = 9\n')
+            with self.assertRaisesRegex(ValueError,'changed; reload'):
+                server.save_catalog_file('module_skills.py','old = 2\n','utf-8',loaded['sha256'])
+        self.assertEqual(path.read_text(),'external = 9\n')
+        self.assertFalse(path.with_name(path.name+'.lexeditor.bak').exists())
 
 
 class FontTests(unittest.TestCase):
@@ -234,7 +306,9 @@ class HostControllerTests(unittest.TestCase):
         import threading
         host=HostApi.__new__(HostApi)
         controller=SimpleNamespace(status=lambda:{'running':True,'pid':11},launch=lambda root,project:{'running':True,'module':project.name},stop=lambda:{'running':False})
-        host._plugins={'warband':SimpleNamespace(game_process_factory=lambda:controller),'other':SimpleNamespace(process_names=())}
+        # The stub stands in for a GamePlugin, so it carries the optional fields
+        # the host reads. mod_adapter is one of them and defaults to None.
+        host._plugins={'warband':SimpleNamespace(game_process_factory=lambda:controller,mod_adapter=None),'other':SimpleNamespace(process_names=(),mod_adapter=None)}
         host._lock=threading.RLock();host._game_processes={}
         host._projects=SimpleNamespace(snapshot=lambda key:{'current':str(Path.cwd()/'selected-mod')})
         with patch.object(host,'_game_executable',return_value=(Path.cwd(),Path.cwd()/'game.exe')):

@@ -1,1 +1,1 @@
-"""Chrono Trigger (Steam) Lexeditor plugin."""
+"""Chrono Trigger Steam plugin."""

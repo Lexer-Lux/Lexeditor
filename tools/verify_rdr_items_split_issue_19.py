@@ -1,9 +1,11 @@
-import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = (ROOT / "games" / "rdr" / "editor.html").read_text(encoding="utf-8")
+STYLE = (ROOT / "games" / "rdr" / "editor.css").read_text(encoding="utf-8")
+SOURCE = (ROOT / "games" / "rdr" / "editor.js").read_text(encoding="utf-8")
+STRINGS = (ROOT / "games" / "rdr" / "strings.js").read_text(encoding="utf-8")
+RBF = (ROOT / "games" / "rdr" / "rbf.js").read_text(encoding="utf-8")
 
 
 def require(condition: bool, message: str) -> None:
@@ -11,13 +13,20 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-rule = re.search(r"\.lex-master-detail\.rdr-split\{([^}]*)\}", SOURCE)
-require(rule is not None, "RDR list-detail sizing rule is missing")
-require("grid-template-columns" not in rule.group(1),
-        "RDR must not replace the shared list-divider-detail grid with two tracks")
-require(SOURCE.count('pagedListDetail({') >= 3,
-        "RDR Items, Shops, and Missions must keep the shared paged Table + Detail view")
-require('splitKey:"rdr-items"' in SOURCE,
-        "RDR Items must keep its own shared two-panel split setting")
+require(".lex-" not in STYLE,
+        "RDR must not override shared component selectors in its game stylesheet")
+require(SOURCE.count("pagedListDetail({") >= 3,
+        "RDR Items, Shops, and Missions must keep shared paged Table + Detail views")
+require("pagedListDetail({" in STRINGS and "columnList({" in STRINGS,
+        "RDR Strings must keep the shared paged Table + Detail view")
+for key in ("rdr-items", "rdr-shops", "rdr-missions"):
+    require(f'splitKey:"{key}"' in SOURCE,
+            f"RDR {key} must keep its own shared two-panel split setting")
+require('splitKey:"rdr-strings"' in STRINGS,
+        "RDR Strings must keep its own shared two-panel split setting")
+require("pagedListDetail({" in RBF and "columnList({" in RBF and 'splitKey:"rdr-rbf"' in RBF,
+        "RDR RBF0 Scalars must keep the shared paged Table + Detail view")
+require("columnList({" in SOURCE,
+        "RDR record tables must use the shared column list")
 
-print("RDR Items split issue 19 source contract passed")
+print("RDR shared Table + Detail paging contract passed")

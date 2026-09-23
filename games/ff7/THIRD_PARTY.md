@@ -1,7 +1,8 @@
-# Final Fantasy VII format references
+# Final Fantasy VII format and runtime references
 
-`kernel.py` uses format knowledge from these permissively licensed projects.
-No compiled third-party dependency is bundled.
+Lexeditor does not copy source code from the projects below. Their published
+format/runtime behavior materially informed this plugin, so the exact role and
+license are recorded here.
 
 ## Elena
 
@@ -38,3 +39,63 @@ Copyright (C) Christian Bauer <www.cebix.net>
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above
 copyright notice and this permission notice appear in all copies.
+
+## Scarlet
+
+Source: <https://github.com/petfriendamy/ff7-scarlet>
+Reference revision used by the executable-data audit: `10a2283`
+
+License: Microsoft Public License (MS-PL).
+
+Scarlet's source was used as a reference for named, fixed-layout FF7 executable
+data. Lexeditor does not bundle Scarlet or copy Scarlet source code.
+
+## FFNx
+
+Source: <https://github.com/julianxhokaxhiu/FFNx>
+Direct Mode source revision used by the deployment implementation:
+`b341cf135941ed745f89a5080a7cd95adb54018a`
+
+Pinned setup release: `FFNx-v1.24.3.0` (tag `1.24.3`)
+Upstream asset: `FFNx-Steam-v1.24.3.0.zip`
+Published asset SHA-256:
+`2be45f486974f0979b849d0525eb66427df62483ec99e9339e9773e9e52afc0d`
+
+License: GNU General Public License v3.0 (GPL-3.0).
+
+FFNx's source documents the Direct Mode paths and chunk loading behavior used
+by `deployment.py`: KERNEL/KERNEL2 chunks, scene chunks, field section chunks,
+and LGP-member overrides. FFNx's install guide also documents the 2026 Steam
+working-directory setup that `tooling.py` follows. Lexeditor does not
+redistribute FFNx bytes in the repository or installer: the setup action
+fetches the exact upstream release asset, verifies its published SHA-256, and
+refuses to replace a manual/7th-Heaven install or externally changed owned
+files.
+
+## 7th Heaven
+
+Source: <https://github.com/tsunamods-codes/7th-Heaven>
+Reference revision used by the read-only compatibility scanner:
+`ae129f0bbeeeb236b1c37fb136e5fec25fd292a3`
+
+License: Microsoft Public License (MS-PL).
+
+7th Heaven's source documents the ordered active profile, `library.xml`
+installed locations, folder and `.iro` mod forms, `mod.xml` ModFolder and
+Conditional roots, and FFNx Direct Mode integration. Lexeditor uses that
+published behavior only to inspect an explicitly configured 7thWorkshop tree
+read-only. It never edits 7th Heaven state, does not guess inside `.iro`
+packages, and does not choose a winner for overlapping external mod paths.
+
+## 60/30 FPS Gameplay compatibility fixture
+
+Source: <https://github.com/tangtang95/ff7-60fps-mod>
+Reference revision used by the compatibility test:
+`8195d9c0dc1a38a497ef7674f8e412936f11b120`
+
+License: GNU General Public License v3.0 (GPL-3.0).
+
+The public v1.15 `mod.xml` was used as an interoperability fixture for 7th
+Heaven `ModFolder` / `ActiveWhen` profile-option behavior. Lexeditor does not
+bundle this mod or its assets; the test builds a tiny synthetic folder tree
+using only the proved metadata shape.

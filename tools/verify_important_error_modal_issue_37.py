@@ -8,7 +8,11 @@ FRAMEWORK = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
 FF8 = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
 WARBAND = (ROOT / "games" / "warband" / "editor.html").read_text(encoding="utf-8")
-RDR = (ROOT / "games" / "rdr" / "editor.html").read_text(encoding="utf-8")
+RDR = (
+    (ROOT / "games" / "rdr" / "editor.html").read_text(encoding="utf-8")
+    + "\n"
+    + (ROOT / "games" / "rdr" / "editor.js").read_text(encoding="utf-8")
+)
 RDR2 = (ROOT / "games" / "rdr2" / "editor.html").read_text(encoding="utf-8")
 
 

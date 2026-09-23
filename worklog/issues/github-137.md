@@ -35,3 +35,22 @@ A safe suppression target must identify the two grant calls inside the premium-c
 ## Preservation repair delivered, 2026-09-08
 
 Development build passed. Installed ASI and matching release manifest with RDR2 closed; SHA-256 `A1CF1EE032EBEA7A2AAFB566A6299F84ADD9F19FCAED64C01E91AEF2A1782D72`. Small prior ASI rollback retained. No catalog/settings/save changes. Production C++ smoking/preservation tests passed and four mutations were rejected. No game launch. This removes the unsafe deletion only; native pack-grant suppression and full player acceptance remain actionable.
+
+## 2026-09-22 misc-fixes evidence
+
+Re-ran `tools/verify_rdr2_smoking_cards.py` on current tree: PASS production;
+four mutations rejected (repeat-event, ignore-zero, ignore-hundred,
+unowned-bypassed). Acquire/discard grant nothing, consume edge rolls, 0% never
+grants, 100% always grants, unowned-first until 144, cigars excluded.
+`ChancePercent` is already exposed in the settings schema (0-100, re-read in
+about 2 s, no restart). No code change; residual gap unchanged (native
+acquisition-grant suppression needs a VM call-site mechanism).
+
+Human test, needs built ASI on a game machine; watch `GameplayTweaks.log`
+beside the ASI:
+1. Set `ChancePercent=0`, smoke 3 premium cigarettes: expect 3 `result=miss`
+   lines and no card granted.
+2. Set `ChancePercent=100` without restarting, smoke 1: expect `result=won`
+   and one unowned card granted.
+3. Heartbeat line shows `ownedUnique` increased.
+Report the log lines with before/after card counts. Issue stays `actionable`.

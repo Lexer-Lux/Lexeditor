@@ -13,6 +13,7 @@ from plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProject
 from service_session import LocalPluginSession, request_json
 
 from . import paths, wse2_manager
+from .project_import import prepare_existing_project
 from .game_launch import WarbandGameController
 
 
@@ -137,8 +138,6 @@ PLUGIN = GamePlugin(
     helper_install_for_root=wse2_manager.install,
     helper_upstream=wse2_manager.upstream_release,
     name="Mount & Blade: Warband",
-    subtitle="WARBAND",
-    description="Edit module data, settings, troops, manuals, and builds.",
     accent="#7a2020",
     check=check,
     launch=launch,
@@ -158,6 +157,7 @@ PLUGIN = GamePlugin(
             ("ModuleSystem/module_items.py", "settings.ini", "build.bat"),
             ("module.ini",),
         ),
+        prepare_existing=prepare_existing_project,
         discover=installed_modules,
         template_root=Path(paths.MOD_PROJECT),
     ),

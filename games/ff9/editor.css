@@ -1,0 +1,3 @@
+/* FF9 draws on the shared baseline and nothing else: colour and structure
+   come from the framework; this file only tunes the page. */
+:root{--lex-main-overflow:hidden}

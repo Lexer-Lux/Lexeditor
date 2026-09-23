@@ -12,6 +12,8 @@ __pycache__/
 *.pyc
 *.obj
 *.bak
+.pytest_cache/
+node_modules/
 
 # Reproducible tool build outputs; keep the packaged runtime under tools/rpf-cli/bin.
 tools/rpf-cli/build/

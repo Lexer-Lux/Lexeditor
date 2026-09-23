@@ -1,126 +1,55 @@
-"""Browser contract for the FF8 Cards redesign and NPC Players subtab."""
-from __future__ import annotations
-
+"""Exercise current card/player views with production controls and synthetic records."""
 import argparse
 from pathlib import Path
+from playwright.sync_api import sync_playwright
+ROOT=Path(__file__).resolve().parents[1]
 
-ROOT = Path(__file__).resolve().parents[1]
-
-
-def run(browser_path: str | None) -> None:
-    from playwright.sync_api import sync_playwright
-
+def run(browser_path=None):
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True, **({'executable_path': browser_path} if browser_path else {}))
+        browser=pw.chromium.launch(headless=True,**({'executable_path':browser_path} if browser_path else {}))
         try:
-            page = browser.new_page(viewport={'width': 1200, 'height': 800})
+            page=browser.new_page(viewport={'width':1200,'height':800})
             page.set_default_timeout(5000)
-            errors: list[str] = []
-            page.on('pageerror', lambda error: errors.append(str(error)))
-            page.set_content('<!doctype html><html><head><base href="http://localhost/"></head><body><main id="main"></main><div id="toolbar"></div></body></html>')
-            page.add_script_tag(content=(ROOT / 'ui/framework.js').read_text(encoding='utf-8'))
-            page.add_script_tag(content=(ROOT / 'games/ff8/cards_ui.js').read_text(encoding='utf-8'))
-            page.evaluate(r'''() => {
-              const el = LexeditorUI.el;
-              window.cardSave = null;
-              window.fetch = async (url, options={}) => {
-                if (String(url).startsWith('/api/field?')) return {
-                  ok: true,
-                  json: async () => ({
-                    key: 'balamb',
-                    players: [{id:0, entity:'Queen', script:'talk', params:[
-                      {id:0, name:'Rare card', value:1, editable:true, mode:'literal'},
-                      {id:1, name:'Region rule', value:4, editable:false, mode:'variable'}
-                    ]}]
-                  })
-                };
-                if (String(url) === '/api/field/save') {
-                  window.cardSave = JSON.parse(options.body);
-                  return {ok:true, json:async()=>({saved:true})};
-                }
-                throw new Error(`Unexpected fetch: ${url}`);
-              };
-              const card={id:0,name:'Geezard',top:1,bottom:2,left:3,right:10,element:0,power:5};
-              const state={
-                tab:'cards',
-                data:{
-                  cards:{rows:[card],elements:[{id:0,name:'None'}]},
-                  fields:{rows:[{key:'balamb',name:'Balamb'}]},
-                  text:{rows:[]}
-                },
-                base:{cards:[structuredClone(card)]},
-                vanilla:{cards:{rows:[structuredClone(card)]}},
-              };
-              let capturedDetail=null, capturedMount=null;
-              const rowOf=(dataset,_view,id)=>(dataset.cards?.rows||[]).find(row=>row.id===id);
-              const filtered=()=>state.data.cards.rows;
-              const showPaged=(_view,_rows,_columns,detail,_template,_layout,mount)=>{
-                capturedDetail=detail;capturedMount=mount;
-                return el('div',{class:'fake-paged'},'CARDS LIST');
-              };
-              const detailField=({control})=>el('div',{class:'test-field'},control);
-              const detailSection=({title,body})=>el('section',{},el('h3',{},title),...(Array.isArray(body)?body:[body]));
-              const sharedDetail=(_row,_prefs,sections)=>el('div',{class:'test-detail'},...sections);
-              const numberControl=(value,_min,_max,_step,update,attrs={})=>el('input',{...attrs,type:'number',value,oninput:event=>update(event.target.value)});
-              const selectControl=(value,options,update)=>el('select',{value,onchange:event=>update(event.target.value)},...options.map(option=>el('option',{value:option.value,selected:Number(option.value)===Number(value)},option.name)));
-              const sourceControl=control=>control;
-              const referenceValues=()=>[];
-              const infoHelp=()=>null;
-              const shell={refresh(){}};
-              const noteFieldEdit=()=>{};
-              window.cardsContract={state,get capturedMount(){return capturedMount;},get capturedDetail(){return capturedDetail;}};
-              window.cardsUI=FF8CardsUI({
-                el,state,rowOf,filtered,showPaged,sharedDetail,detailSection,detailField,
-                numberControl,selectControl,sourceControl,referenceValues,infoHelp,shell,noteFieldEdit,
-                subtabBar:LexeditorUI.subtabBar,
-                detailPanel:LexeditorUI.detailPanel,
-                recordId:LexeditorUI.recordId,
-                columnList:LexeditorUI.columnList,
-              });
-              cardsUI.render();
-            }''')
-
-            assert not errors, errors
-            assert page.evaluate('cardsContract.capturedMount') is False
-            assert page.locator('#main > .ff8-card-root').count() == 1
-            labels = page.locator('.lex-subtab-bar button .lex-tab-label-text').all_text_contents()
-            assert labels == ['CARDS', 'PLAYERS'], labels
-            assert page.locator('.fake-paged').count() == 1
-
+            errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
+            page.route('http://fixture/',lambda route:route.fulfill(content_type='text/html',body='<main id="main"></main><div id="toolbar"></div>'))
+            page.goto('http://fixture/')
+            page.add_style_tag(path=str(ROOT/'ui/framework.css'))
+            page.add_script_tag(path=str(ROOT/'ui/framework.js'))
+            page.add_script_tag(path=str(ROOT/'games/ff8/cards_ui.js'))
             page.evaluate('''() => {
-              const prefs={pinButton:()=>null};
-              const node=cardsContract.capturedDetail(cardsContract.state.data.cards.rows[0],prefs);
-              document.body.append(node);
+              const U=LexeditorUI,card={id:0,name:'Geezard',top:1,bottom:2,left:3,right:10,element:0,power:5};
+              const map={key:'balamb',name:'Balamb',_loaded:true,players:[{id:0,entity:'queen_est',script:'talk',params:[
+                {id:0,name:'Deck',value:1,editable:true,mode:'literal'},
+                {id:1,name:'Region rule',value:4,editable:false,mode:'variable'}]}]};
+              window.state={tab:'cards',activeSource:'mine',data:{cards:{rows:[card],elements:[{id:0,name:'None'}]},fields:{rows:[map]},text:{rows:[]}},
+                base:{cards:[structuredClone(card)]},vanilla:{cards:{rows:[structuredClone(card)]},fields:{rows:[structuredClone(map)]}}};
+              window.fetch=async url=>{if(url!='/api/card-players')throw Error('Unexpected request '+url);return {json:async()=>({ready:true,players:[{map:'balamb',entity:'queen_est',id:0}]})}};
+              window.cardsUI=FF8CardsUI({...U,el:U.el,state,
+                rowOf:(data,view,id)=>data[view].rows.find(row=>row.id===id),filtered:()=>state.data.cards.rows,
+                showPaged:(view,rows,columns,detail)=>detail(rows[0]),
+                numberControl:(value,min,max,step,update,attrs)=>U.el('input',{...attrs,type:'number',value,min,max,step,oninput:e=>update(Number(e.target.value))}),
+                selectControl:(value,options,update)=>U.el('select',{onchange:e=>update(Number(e.target.value))},...options.map(o=>U.el('option',{value:o.value,selected:o.value===value},o.name))),
+                sourceControl:control=>control,referenceValues:()=>[],shell:{refresh(){}},noteFieldEdit(){},ensureFieldDetail:async()=>{}});
+              cardsUI.render();U.finishPluginLoading();
             }''')
-            assert page.locator('.ff8-card-preview').count() == 1
-            assert page.locator('.ff8-card-preview img').get_attribute('src') == '/assets/cards/0.png'
-            right_rank = page.locator('.ff8-card-rank[style*="--ff8-rank-area:right"]')
-            assert right_rank.inner_text() == 'A'
-            print('PASS card list stays mounted and artwork/rank preview uses production classes')
+            assert page.locator('.lex-tab-label-text').all_text_contents()==['CARDS','PLAYERS']
+            assert page.locator('.lex-stat-card > img').get_attribute('src')=='/assets/cards/0.png'
+            assert page.get_by_role('button',name='Right, currently A',exact=True).inner_text()=='A'
+            page.get_by_role('button',name='Top, currently 1',exact=True).click()
+            assert page.evaluate('cardsUI.edits()')==[{'id':0,'field':'top','value':2}]
+            page.get_by_role('tab',name='PLAYERS',exact=True).click()
+            field=page.get_by_label('queen_est Deck',exact=True);field.wait_for()
+            assert page.get_by_label('queen_est Region rule',exact=True).is_disabled()
+            field.fill('7')
+            assert page.evaluate('state.data.fields.rows[0].players[0].params[0].value')==7
+            page.evaluate('cardsUI.render()')
+            assert field.input_value()=='7'
+            assert 'Opponent queen_est' not in page.locator('body').inner_text()
+            page.evaluate("state.activeSource='vanilla';cardsUI.render()")
+            assert field.is_disabled()
+            assert not errors,errors
+            print('PASS current Cards/Players tabs, rank edits, native identifier, editable literal, protected variable and read-only source')
+        finally:browser.close()
 
-            page.locator('.lex-subtab-button').filter(has_text='PLAYERS').click()
-            page.wait_for_selector('.ff8-card-players .lex-column-list-row')
-            rows = page.locator('.ff8-card-players .lex-column-list-row')
-            assert rows.count() == 2
-            first_text = rows.nth(0).inner_text()
-            assert 'Queen' in first_text and 'talk' in first_text and 'Rare card' in first_text and 'Literal' in first_text
-            rare = page.get_by_label('Queen Rare card', exact=True)
-            region = page.get_by_label('Queen Region rule', exact=True)
-            assert rare.count() == 1 and region.count() == 1
-            assert not rare.is_disabled() and region.is_disabled()
-            rare.fill('7')
-            page.get_by_role('button', name='SAVE PLAYERS').click()
-            page.wait_for_function('window.cardSave !== null')
-            assert page.evaluate('window.cardSave') == {'edits':[{'map':'balamb','player':0,'param':0,'value':7}]}
-            assert 'Saved 1 CARDGAME parameter change.' in page.locator('.ff8-card-player-state').last.inner_text()
-            print('PASS Players subtab loads CARDGAME parameters, preserves read-only variables, and saves edits')
-            assert not errors, errors
-        finally:
-            browser.close()
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--browser')
-    args = parser.parse_args()
-    run(args.browser)
+if __name__=='__main__':
+    parser=argparse.ArgumentParser();parser.add_argument('--browser');run(parser.parse_args().browser)

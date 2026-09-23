@@ -546,6 +546,7 @@ def text_rows(dataset: str = "current") -> dict:
     executable = executable_text_rows(dataset)
     return {
         "rows": [*kernel["rows"], *menu["rows"], *executable["rows"]],
+        "tokens": kernel_text.editor_tokens(),
         "sections": [*kernel["sections"], *menu["sections"], *executable["sections"]],
         "sources": [
             {"id": "kernel", "name": "Kernel text", "file": "main/kernel.bin"},

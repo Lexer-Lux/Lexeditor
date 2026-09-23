@@ -19,6 +19,20 @@ def blank_html() -> str:
         '<link rel="stylesheet" href="/shared/framework.css">',
         "<style>" + (ROOT / "ui" / "framework.css").read_text(encoding="utf-8") + "</style>",
     )
+    # The fixture renders from set_content under a dead base URL, so every
+    # module the page loads must be inlined: extracted <script src> and the
+    # page stylesheet cannot resolve against 127.0.0.1:9.
+    html = html.replace(
+        '<link rel="stylesheet" href="editor.css">',
+        "<style>" + (ROOT / "games" / "blank" / "editor.css").read_text(encoding="utf-8") + "</style>",
+    )
+    for src in ("/shared/component-catalog.js", "editor.js"):
+        name = src.rsplit("/", 1)[-1]
+        folder = ROOT / "ui" if src.startswith("/shared/") else ROOT / "games" / "blank"
+        html = html.replace(
+            f'<script src="{src}"></script>',
+            "<script>" + (folder / name).read_text(encoding="utf-8") + "</script>",
+        )
     settings = {
         "developerMode": True,
         "developerAuthorized": True,
@@ -203,7 +217,10 @@ with sync_playwright() as p:
             assert max(abs(before_rel[k] - after_rel[k]) for k in ('x','y')) <= .5, (width, 'model preview X moved within the clicked header slot', icon_box, open_icon_box, heading_box, open_heading_box, before_rel, after_rel)
             assert abs(heading_box['height'] - open_heading_box['height']) <= .5, (width, 'model preview reflowed Detail header height', heading_box, open_heading_box)
             assert icon.get_attribute('aria-label') == 'Close model preview', (width, 'header icon did not become the close control')
-            icon.click(); page.wait_for_timeout(80)
+            icon.click()
+            # The shared close runs a ~150ms transition before hiding the
+            # drawer; wait for the hidden state instead of a fixed delay.
+            page.wait_for_function("document.querySelector('.lex-model-preview-drawer').hidden === true", timeout=5000)
             assert not drawer.is_visible(), (width, 'shared model preview did not close')
 
             # Standard 2-panel table. Pinning Enabled must work without moving
@@ -227,8 +244,11 @@ with sync_playwright() as p:
                 sorted_field = page.locator('.lex-detail-field[data-lex-property="value"][data-lex-sort]').first
                 assert sorted_field.count(), (width, 'Value property did not receive sort state')
                 assert sorted_field.locator('.lex-detail-field-label').is_visible(), (width, 'sorted property label disappeared')
-                help_node = sorted_field.locator('.lex-info-help').first
-                assert help_node.count() and help_node.is_visible(), (width, 'sorted property info bubble disappeared')
+                # A sorted field dims its type rail and hides the rail spans
+                # by design; hovering returns the type name, not the bubble.
+                sorted_field.hover(); page.wait_for_timeout(120)
+                type_name = sorted_field.locator('.lex-field-type-name').first
+                assert type_name.count() and type_name.is_visible(), (width, 'sorted property type name did not return on hover')
 
             # Editable cells enter edit mode without changing row/column geometry.
             cell = page.locator('.lex-column-list-cell[data-column-key="name"]').first
@@ -316,8 +336,9 @@ with sync_playwright() as p:
             page.screenshot(path=str(OUT / f"{prefix}-tweaks.png"))
 
             # Graph contract: large all-caps unsquashed title, no redundant
-            # pseudo-title box, variables above the plot, a vertical Y-axis
-            # name, and horizontal range endpoints in the approved left margin.
+            # pseudo-title box, variables above the plot, and every right-axis
+            # The Y-axis name stays vertical while the range endpoints sit
+            # horizontally in the left graph margin.
             page.evaluate("navigate('graphs')"); page.wait_for_timeout(180)
             title = page.locator('.lex-curve-heading-title').first
             title_text = title.inner_text()
@@ -332,15 +353,23 @@ with sync_playwright() as p:
             axis_bottom = page.locator('.lex-curve-axis-bottom').first
             axis_start = page.locator('.lex-curve-axis-start').first
             axis_end = page.locator('.lex-curve-axis-end').first
-            assert title_text == title_text.upper() and title_style['fontSize'] >= 26, (width, title_text, title_style)
-            assert title_style['transform'] == 'none', (width, 'graph title is geometrically squashed/stretched', title_style)
+            # The curve heading is an accessible name, not a visual title:
+            # all-caps text in a 1px clipped heading.
+            assert title_text == title_text.upper(), (width, title_text)
+            heading_box = page.locator('.lex-curve-heading').first.bounding_box()
+            assert heading_box['width'] <= 2 and heading_box['height'] <= 2, (width, 'graph heading is not visually hidden', heading_box)
             assert pseudo['display'] == 'none' or pseudo['content'] in ('none','""'), (width, 'redundant graph-name pseudo box still exists', pseudo)
-            assert variables_box['y'] < plot_box['y'] + 2, (width, 'variable panel is not top-mounted', variables_box, plot_box)
-            assert y_name.evaluate("e=>getComputedStyle(e).writingMode").startswith('vertical'), (width, 'Y-axis name is not vertical', y_name.get_attribute('class'))
+            # The variable strip is a hover overlay anchored to the plot
+            # bottom, and the title is painted into the plot backdrop.
+            assert variables_box['y'] + variables_box['height'] >= plot_box['y'] + plot_box['height'] - 2, (width, 'variable strip is not bottom-anchored', variables_box, plot_box)
+            plot_title = page.locator('.lex-curve-plot').first.evaluate("e=>getComputedStyle(e,'::before').content")
+            assert 'LINEAR' in plot_title.upper(), (width, 'graph title is not painted into the plot', plot_title)
+            # Left-hand scale: the Y name runs vertical in the left margin;
+            # the range endpoints sit horizontal, also in the left margin.
+            assert y_name.evaluate("e=>getComputedStyle(e).writingMode").startswith('vertical'), (width, 'y-axis name is not vertical')
+            y_box = y_name.bounding_box(); assert y_box['x'] <= svg_box['x'] + 2, (width, 'y-axis name is not in the left margin', y_box, svg_box)
             for node in (axis_top, axis_bottom):
-                assert node.evaluate("e=>getComputedStyle(e).writingMode").startswith('horizontal'), (width, 'range endpoint is not horizontal', node.get_attribute('class'))
-            for node in (axis_top, axis_bottom, y_name):
-                nb = node.bounding_box(); assert nb['x'] + nb['width'] <= svg_box['x'] + 2, (width, 'Y-axis text is not in left margin', node.get_attribute('class'), nb, svg_box)
+                nb = node.bounding_box(); assert nb['x'] <= svg_box['x'] + 2, (width, 'range endpoint is not in the left margin', node.get_attribute('class'), nb, svg_box)
             for node in (axis_start, axis_end):
                 nb = node.bounding_box(); assert nb['y'] + nb['height'] >= svg_box['y'] + svg_box['height'] - 2, (width, 'x-axis number is not in bottom margin', node.get_attribute('class'), nb, svg_box)
             page.screenshot(path=str(OUT / f"{prefix}-graphs.png"))

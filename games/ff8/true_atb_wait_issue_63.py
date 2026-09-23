@@ -11,11 +11,8 @@ DEFAULT_TRUE_ATB_WAIT = False
 ATB_WAIT_HOOK = 0x004842D1
 ATB_WAIT_HOOK_ORIGINAL = bytes.fromhex("E8 7A 51 02 00")
 WAIT_PREDICATE = 0x004A9450
-CONFIG_ACCESSOR = 0x00403E00
-CONFIG_FLAGS_OFFSET = 0x3AE
-# The one configuration bit WAIT_PREDICATE itself consults; it treats the bit
-# being clear as the waiting state.
-ATB_WAIT_CONFIG_MASK = 0x10
+CONFIG_FLAGS = 0x01CFE73C
+ATB_WAIT_CONFIG_MASK = 0x01  # Saved configuration: 0=Active, 1=Wait.
 PARTY_FLAGS = 0x01D27B8C
 PARTICIPANT_STRIDE = 0xD0
 PARTY_COUNT = 3
@@ -29,23 +26,33 @@ def _rel32(opcode: int, source: int, target: int) -> bytes:
 
 
 def build_code_cave() -> bytes:
-    # Preserve every native stop condition, then add the requested stronger
-    # rule. True ATB Wait is a Tweak, not a modification to the player's
-    # Active/Wait configuration choice, so party readiness must stop gauges in
-    # either configuration mode.
-    #
-    # if native_wait_predicate(): return 1
-    # for the three party battle records:
-    #     if active and ready: return 1
-    # return 0
+    # Native predicate: zero stops gauge updates, one permits them.
+    # Retain native stops. Add party readiness only in saved ATB Wait mode.
     payload = bytearray()
-    payload += _rel32(0xE8, CODE_CAVE + len(payload), WAIT_PREDICATE)
-    payload += bytes.fromhex("85 C0 75 1E")                # native stop -> return 1
+    labels = {}
+    branches = []
+    def branch(opcode, label):
+        payload.extend((opcode, 0))
+        branches.append((len(payload) - 1, label))
+    payload += _rel32(0xE8, CODE_CAVE, WAIT_PREDICATE)
+    payload += bytes.fromhex("85 C0")
+    branch(0x74, "stop")
+    payload += bytes.fromhex("F6 05") + CONFIG_FLAGS.to_bytes(4, "little") + b"\x01"
+    branch(0x74, "advance")
     payload += b"\xB9" + PARTY_FLAGS.to_bytes(4, "little")
     payload += b"\xBA" + PARTY_COUNT.to_bytes(4, "little")
-    payload += bytes.fromhex("8A 01 24 09 3C 09 74 0C")
+    labels["loop"] = len(payload)
+    payload += bytes.fromhex("8A 01 24 09 3C 09")
+    branch(0x74, "stop")
     payload += bytes.fromhex("81 C1") + PARTICIPANT_STRIDE.to_bytes(4, "little")
-    payload += bytes.fromhex("4A 75 EF 31 C0 C3 B8 01 00 00 00 C3")
+    payload += b"\x4A"
+    branch(0x75, "loop")
+    labels["advance"] = len(payload)
+    payload += bytes.fromhex("B8 01 00 00 00 C3")
+    labels["stop"] = len(payload)
+    payload += bytes.fromhex("31 C0 C3")
+    for offset, label in branches:
+        payload[offset] = (labels[label] - offset - 1) & 0xFF
     return bytes(payload)
 
 CODE_CAVE_LENGTH = len(build_code_cave())

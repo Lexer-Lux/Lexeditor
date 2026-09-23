@@ -26,3 +26,6 @@ Keep the full issue actionable until delivery and rendered checks are prepared. 
 
 Combined development build passed: 334A268547E779406A80C5865FD4463DEE8E80FF2BF5FA3E4D352FBD88C22342. Candidate: out/rdr2-after-duration/GameplayTweaks.asi, matching release manifest. Not installed: duration experiment #151 remains active. Build log: out/rdr2-build-overflow-binoculars.log. Agent-side module tests passed; game acceptance remains open.
 
+
+## 2026-09-22 misc-fixes disposition
+Hold-cover draw and stow with normal animations is blocked by the #357 binocular crash; the earlier shortcut repair does not prove the current transition safe. Repair the crash first, then test hold-Q locomotion, stowing, and tap-for-cover on the new build. Issue stays actionable.

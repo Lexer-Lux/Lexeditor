@@ -194,7 +194,7 @@ def exercise_objects(page, project: Path, label: str, *, mutate: bool) -> None:
     search = page.locator(".lex-pager-search input").first
     search.fill("NO_SUCH_STARDew_OBJECT")
     page.wait_for_timeout(180)
-    assert "No Data/Objects records match" in page.locator(".sv-detail").inner_text()
+    assert "No Data/Objects records match" in page.locator(".lex-detail-panel").inner_text()
     search.fill("")
     page.wait_for_timeout(180)
 
@@ -325,7 +325,7 @@ def assert_navigation_loading(page, button_selector: str, expected: str, screens
       };
     }""")
     page.locator(button_selector).click()
-    loading = page.locator("#main .sv-state", has_text=expected)
+    loading = page.locator("#main .lex-notice", has_text=expected)
     loading.wait_for(state="visible", timeout=2000)
     take(page, screenshot_name)
     page.evaluate("""() => {
@@ -353,7 +353,7 @@ def exercise_data_map(page, label: str) -> None:
     open_button = page.get_by_role("button", name="Open objects", exact=True)
     if open_button.count():
         open_button.click()
-        page.wait_for_selector(".sv-table")
+        page.wait_for_selector(".lex-column-list")
 
 
 def exercise_info(page, label: str, height: int) -> None:

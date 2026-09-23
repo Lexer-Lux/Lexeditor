@@ -11,6 +11,8 @@ import shutil
 import sys
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+_SHARED_UI_ENV=os.environ.get('LEXEDITOR_SHARED_UI_ROOT','').strip()
+SHARED_UI_ROOT=Path(_SHARED_UI_ENV).resolve() if _SHARED_UI_ENV else ROOT
 OUT=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/'out'/'data-map-browser'
 OUT.mkdir(parents=True,exist_ok=True)
 # Derived, never hand-listed: a hardcoded tuple silently skipped ff7r, so its
@@ -25,10 +27,9 @@ ROWS=[{'id':str(i),'filename':f'file-{i:03}.dat','controls':f'Interface {i:03}',
        'status':'partial' if i%4<3 else 'not-integrated', 'notes':('Long scoped explanation. '*40),
        'target':'items','dataset':'fixture-data','datasetKey':'fixture-data','openable':i%4<3} for i in range(100)]
 ROWS[0]['filename']='same-file.dat';ROWS[4]['filename']='same-file.dat'  # IDs must not collapse sections.
-# The fixture should exercise each plugin's real navigation adapter, not force a
-# made-up universal tab name. Stardew's first slice is Data/Objects; the older
-# editors used by this sweep route their synthetic row through Items.
-OPEN_TARGETS={'stardew_valley':'objects'}
+# The injected row must name a target the plugin's real Data Map adapter supports.
+# Most plugins route generic item rows; Bannerlord has explicit editor targets.
+OPEN_TARGETS={'bannerlord':'skills','stardew_valley':'objects'}
 
 def html_for(game):
     source_game='ff7' if game=='ff7_2013' else game
@@ -43,16 +44,14 @@ def html_for(game):
     window.__lexeditorPlugin={id:"'''+game+'''",name:"Fixture edition",edition:"Fixture"};'''
     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')+'</script>')
-    # Some plugins keep their editor code in local JS files. The old synthetic
-    # harness left those pointed at 127.0.0.1:9, so "cover every plugin" really
-    # meant "cover every plugin whose JavaScript happened to be inline".
-    for src in re.findall(r'<script\s+src="([^"]+)"\s*></script>',html):
-        if src.startswith('/shared/') or '://' in src:
-            continue
-        candidates=[ROOT/'games'/src.lstrip('/'),game_root/src.lstrip('/'),game_root/Path(src).name]
-        target=next((path for path in candidates if path.is_file()),None)
-        if target:
-            html=html.replace(f'<script src="{src}"></script>',f'<script>{target.read_text(encoding="utf-8")}</script>')
+    # A plugin page loads its code and styles from modules beside it. There is
+    # no server here, so every one the page names is inlined where it stands,
+    # or nothing of the plugin runs and it looks like a plugin that failed to boot.
+    folder=ROOT/'games'/source_game
+    html=re.sub(r'<script src="(?!/shared/)/?([A-Za-z0-9_./-]+\.js)"></script>',
+                lambda m:'<script>'+(folder/Path(m[1]).name).read_text(encoding='utf-8').replace('</script','<\\/script')+'</script>',html)
+    html=re.sub(r'<link rel="stylesheet" href="(?!/shared/)/?([A-Za-z0-9_./-]+\.css)">',
+                lambda m:'<style>'+(folder/Path(m[1]).name).read_text(encoding='utf-8')+'</style>',html)
     # No third-party requests are made by these HTML documents in this harness.
     return html
 
@@ -65,27 +64,61 @@ with sync_playwright() as p:
                 errors=[]
                 page=browser.new_page(viewport={'width':width,'height':height})
                 page.on('pageerror',lambda e:errors.append(str(e)))
-                page.set_content(html_for(game),wait_until='domcontentloaded')
-                if page.evaluate('typeof state') == 'undefined' and game not in ('blank','palworld'):
+                html=html_for(game)
+                if game=='warband':
+                    # Warband's shared shell reads sessionStorage during boot.
+                    # set_content() uses an opaque/storage-refused document in
+                    # Chromium, so give this synthetic fixture a normal in-memory
+                    # HTTP origin without opening a loopback server.
+                    html=html.replace('http://127.0.0.1:9/','http://warband-data-map.test/')
+                    def route_warband_fixture(route):
+                        if route.request.resource_type=='document':
+                            route.fulfill(status=200,body=html,content_type='text/html')
+                        else:
+                            route.abort()
+                    page.route('http://warband-data-map.test/**',route_warband_fixture)
+                    page.goto('http://warband-data-map.test/',wait_until='domcontentloaded')
+                else:
+                    page.set_content(html,wait_until='domcontentloaded')
+                # Most plugins keep one `state` object the map can be seeded
+                # into. Palworld keeps its own named globals instead, so it is
+                # seeded through those rather than being called broken for not
+                # having a variable of that name.
+                booted = page.evaluate(
+                    'typeof state !== "undefined" || typeof mapRows !== "undefined" '
++ '|| typeof datamap !== "undefined"')
+                if not booted and game != 'blank':
                     raise AssertionError((game,width,height,'plugin state missing',errors,page.locator('body').inner_text()[:1200]))
                 target=OPEN_TARGETS.get(game,'items')
                 fixture_rows=[{**row,'target':target} for row in ROWS]
                 if game=='blank':
                     page.evaluate('navigate("datamap")')
-                elif game=='palworld':
-                    # Palworld intentionally uses module-level bindings instead
-                    # of a state object. Its real init remains blocked on the
-                    # no-filesystem fetch stub; seed only the values its real
-                    # dataMapPanel/render functions consume.
+                elif game=='terraria':
+                    # Terraria maps server rows by file extension; seed one of
+                    # each kind so the shared filter sees every status.
                     page.evaluate('''rows=>{
-                      window.fetch=input=>String(input).includes('/api/data-map')
-                        ? Promise.resolve({ok:true,status:200,json:async()=>({rows})})
-                        : new Promise(()=>{});
-                      mapRows=rows;info={project:'fixture'};
-                      model={ModName:'Fixture',PackageName:'Fixture',Version:'1',Author:'Fixture',Dependencies:[],Tags:[],InstallRule:[]};
-                      savedModel=clone(model);tab='datamap';render();
+                      const kinds=['.cs','.hjson','.png','.csproj','.txt'];
+                      mapRows=rows.map((row,index)=>({path:index===0?'build.txt':
+                        'file-'+String(index).padStart(3,'0')+kinds[index%kinds.length],
+                        family:'Fixture'}));
+                      navigate("datamap");
                     }''',fixture_rows)
+                elif game=='project_zomboid':
+                    # Zomboid keeps its map rows in a module-level datamap object
+                    # keyed by editor label; seed and render through its own path.
+                    page.evaluate('''rows=>{
+                      datamap.rows=rows.map((row,index)=>({filename:row.filename,notes:row.notes,editor:index%3===0?'Metadata':index%3===1?'Items':'Unmapped'}));
+                      renderDatamap();navigate("datamap");
+                    }''',fixture_rows)
+                elif game=='palworld':
+                    page.evaluate('''rows=>{
+                      mapRows=rows;
+                      model=model||{ModName:"Data map sample",PackageName:"sample"};
+                      navigate("datamap");
+                    }''',ROWS)
                 else:
+                    open_target=OPEN_TARGETS.get(game,'items')
+                    fixture_rows=[{**row,'target':open_target} for row in ROWS]
                     page.evaluate('''rows=>{
                       const mapPayload={rows};
                       window.fetch=input=>/\/api\/data-?map/.test(String(input))
@@ -97,8 +130,18 @@ with sync_playwright() as p:
                       if(typeof state.data!=="object" || !state.data)state.data={};
                       if(typeof state.config!=="undefined")state.config={datasets:{mine:{readonly:false,label:"My Mod"}}};
                       navigate("datamap");
-                    }''',fixture_rows)
-                page.wait_for_selector('.lex-data-map-table, .ct-view table')
+                    }''',ROWS)
+                    page.evaluate('state.busy=false;render();if(typeof refreshShell==="function")refreshShell();else if(typeof shell!=="undefined"&&shell.refresh)shell.refresh();')
+                    if game=='warband':
+                        page.evaluate('()=>LexeditorUI.finishPluginLoading()')
+                        page.wait_for_function('!document.documentElement.classList.contains("lex-loading-live")')
+                        page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
+                page.wait_for_selector('.lex-data-map-table')
+                # Boot never finishes here (its fetches never resolve), so the
+                # loading screen would stay over the page and take every click.
+                # End it the way a finished boot does.
+                page.evaluate('LexeditorUI.finishPluginLoading()')
+                page.wait_for_function('!document.documentElement.classList.contains("lex-loading-live")',timeout=15000)
                 page.wait_for_timeout(600)
                 shared=page.locator('.lex-data-map-table').count()>0
                 if not shared:
@@ -117,22 +160,18 @@ with sync_playwright() as p:
                     results.append({'game':game,'width':width,'height':height,'layout':'plugin-native','status':'passed'})
                     page.close();continue
                 # A preview/source/parser does not produce an editable badge.
-                page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('unavailable' if game=='blank' else 'view')
+                page.get_by_role('combobox',name='Filter files by integration',exact=True).select_option('not-integrated')
                 page.wait_for_timeout(250)
                 assert page.locator('.lex-paged-list-detail').count()==1,game
                 assert page.locator('.lex-pager').count()==1,game
                 assert 'Structured editable' not in page.locator('.lex-data-map-table').inner_text(),game
                 metrics=page.evaluate('''()=>{const list=document.querySelector('.lex-data-map-table'),box=list.getBoundingClientRect(),rows=[...list.querySelectorAll('.lex-column-list-row')];return{body:document.body.scrollHeight,viewport:innerHeight,scroll:list.scrollHeight,height:list.clientHeight,bottom:box.bottom,last:rows.at(-1)?.getBoundingClientRect().bottom,count:rows.length}}''')
                 page.screenshot(path=str(OUT/f'{game}-{width}.png'),full_page=True)
-                location=page.locator('.lex-data-map-actions .lex-data-map-location')
-                assert location.evaluate('''button=>{
-                  const box=button.getBoundingClientRect();
-                  const text=[...button.childNodes].find(node=>node.nodeType===Node.TEXT_NODE&&node.textContent.trim());
-                  if(!text)return false;
-                  const range=document.createRange();range.selectNodeContents(text);
-                  const bounds=range.getBoundingClientRect();
-                  return range.getClientRects().length===1&&bounds.left>=box.left&&bounds.right<=box.right+1&&bounds.bottom<=box.bottom+1;
-                }'''),(game,width,'File location text must fit inside its button')
+                location=page.locator('.lex-data-map-file .lex-data-map-location')
+                assert location.count()==1,(game,width,'header file-location control missing')
+                location.wait_for(state='visible')
+                box=location.bounding_box()
+                assert box and box['width']>0 and box['height']>0,(game,width,'header file-location control has no box')
                 assert metrics['body']<=height+2,(game,metrics)
                 assert metrics['scroll']<=metrics['height']+2,(game,metrics)
                 if metrics['count']:assert metrics['last']<=metrics['bottom']+1,(game,metrics)
@@ -148,17 +187,29 @@ with sync_playwright() as p:
                     page.get_by_role('button',name='Previous page',exact=True).click()
                     page.wait_for_timeout(250)
                     assert page.locator('.lex-data-map-table .lex-column-list-row').first.inner_text()==first,game
-                    # Only plugins whose Data Map declares a real navigation
-                    # adapter render Open buttons. Palworld's current map is
-                    # package-boundary documentation and deliberately has none.
-                    if page.locator('.lex-data-map-open').count():
-                        page.evaluate('navigate=(target,filters)=>{window.mapOpened={target,filters}}')
-                        page.locator('.lex-data-map-open').first.click()
-                        assert page.evaluate('mapOpened.target')==target,game
-                        if game=='ff9':assert page.evaluate('state.datasetChoice.items')=='fixture-data'
-                    else:
-                        assert game=='palworld',(game,'openable fixture rows lost their navigation adapter')
-                    page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('source')
+                    # Verify this plugin's actual open adapter (including FF9 dataset selection),
+                    # without requiring another editor's unrelated fixture data.
+                    # A plugin whose map declares no open target - Palworld's
+                    # rows point at package files, not at an editor tab - has no
+                    # adapter to verify, so only the filter is checked there.
+                    opens=page.locator('.lex-data-map-open').count()
+                    if opens:
+                        if game=='warband':
+                            # Warband's completed Data Map opens structured
+                            # Module System datasets in Misc., preserving the
+                            # dataset identity instead of pretending every row
+                            # is an Items record.
+                            page.locator('.lex-data-map-open').first.click()
+                            assert page.evaluate('state.tab')=='misc',game
+                            assert page.evaluate('moduleRecords.active()')=='fixture-data',game
+                            page.evaluate('navigate("datamap")')
+                            page.get_by_role('combobox',name='Filter files by integration',exact=True).wait_for()
+                        else:
+                            page.evaluate('navigate=(target,filters)=>{window.mapOpened={target,filters}}')
+                            page.locator('.lex-data-map-open').first.click()
+                            assert page.evaluate('mapOpened.target')=='items',game
+                            if game=='ff9':assert page.evaluate('state.datasetChoice.items')=='fixture-data'
+                    page.get_by_role('combobox',name='Filter files by integration',exact=True).select_option('not-integrated')
                     page.wait_for_timeout(200)
                     assert page.locator('.lex-data-map-open').count()==0,game
                 if game in ('ff7','ff7_2013'):

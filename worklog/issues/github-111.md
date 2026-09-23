@@ -15,3 +15,12 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
 
 - [Original Lexer-Lux/Lexers-Mod-For-RDR2 #11 worklog](github-111/imports/Lexer-Lux--Lexers-Mod-For-RDR2/4fe6c76d17cc9c526cbb208e7d28f26e6395ca60/github-11.md) — verified transferred issue identity; historical evidence, not a replacement for newer central progress.
+
+## 2026-09-22 misc-fixes disposition
+Icons appear but look poor: artwork-quality task, not missing images. Replacement previews come before any approval ask, then a pickup and acquisition-card check with the art toolchain. Unapproved YTD must not ship. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side previews/prototype
+still owed), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.

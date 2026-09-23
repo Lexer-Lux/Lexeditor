@@ -1,7 +1,11 @@
 """Info bubbles explain semantics; visible property metadata stays out of them."""
 from pathlib import Path
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui, plugins_with_ui
+
 PLUGIN_EDITORS = sorted((ROOT / "games").glob("*/editor.html"))
 
 def text(path):
@@ -15,14 +19,8 @@ def test_detail_field_never_fabricates_info_bubbles_from_metadata():
     for forbidden in ('Allowed range:', 'Minimum:', 'Maximum:', 'Whole numbers only.', 'Step:', 'Unit:', 'Edit the stored', 'Enable or disable', 'Choose ${labelText}'):
         assert forbidden not in semantic_block
 
-def test_manual_defines_semantic_only_contract():
-    manual = text("docs/UI-MANUAL.md")
-    assert "Info-bubble text explains **meaning and consequences**" in manual
-    assert "Never put the property's data type, allowed/storage numeric range, step size, displayed unit" in manual
-    assert "If no useful semantic explanation is known, omit the info" in manual
-
 def test_known_metadata_filler_is_gone_from_plugins():
-    sources = "\n".join(path.read_text("utf-8") for path in PLUGIN_EDITORS)
+    sources = "\n".join(plugin_ui(name) for name in plugins_with_ui())
     for forbidden in (
         "Storage range:", "Editor range:", "This Memoria array is edited as a comma-separated list.",
         "Stored parameter 1.", "Stored parameter 2.", "These are the exact stored Renzokuken table values.",
@@ -36,7 +34,7 @@ def test_known_metadata_filler_is_gone_from_plugins():
         assert forbidden not in sources
 
 def test_ff9_has_real_semantic_help_for_core_relationships():
-    ff9 = text("games/ff9/editor.html")
+    ff9 = plugin_ui('ff9')
     for key in (
         '"characters:Strength"', '"characters:Magic"', '"leveling:BonusHP"',
         '"leveling:BonusMP"', '"items:AbilityIds"', '"items:BonusId"',
@@ -47,7 +45,7 @@ def test_ff9_has_real_semantic_help_for_core_relationships():
     assert 'return FIELD_HELP[`${dataKey}:${field.key}`]||"";' in ff9
 
 def test_rdr2_setting_help_does_not_append_visible_metadata():
-    rdr2 = text("games/rdr2/editor.html")
+    rdr2 = plugin_ui('rdr2')
     block = rdr2[rdr2.index("function settingHelp(section,setting)"):rdr2.index("function settingUnit(section,key)")]
     assert "Editor range:" not in block
     assert "Unit:" not in block
@@ -55,7 +53,7 @@ def test_rdr2_setting_help_does_not_append_visible_metadata():
 
 
 def test_rdr_uses_shared_detail_fields_and_semantic_reward_help():
-    rdr = text("games/rdr/editor.html")
+    rdr = plugin_ui('rdr')
     helper = rdr[rdr.index("function detailField"):rdr.index("function applyControlValue")]
     # RDR's rows now also carry the shared info bubble, so the helper forwards
     # both `description` (prose under the row) and `help` (the bubble). The
@@ -78,4 +76,6 @@ def test_rdr_uses_shared_detail_fields_and_semantic_reward_help():
     # fixed label lane or the legacy private generic Detail-row classes.
     assert ".detail-field{display:grid" not in rdr
     assert ".detail-field{grid-template-columns" not in rdr
-    assert ".record-detail .lex-detail-field-label" in rdr
+    # The label is styled through the shared token now, not by naming the
+    # shared class: see tools/verify_shared_ui_budget.py.
+    assert "--lex-field-label-fg" in rdr

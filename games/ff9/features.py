@@ -1,8 +1,8 @@
 """Lexeditor-owned FF9 feature toggles and transactional Memoria mod deployment.
 
 This is intentionally separate from Memoria's settings UI. Lexeditor only owns
-its own mod folder and the single FolderNames entry required for Memoria to load
-that folder; every unrelated Memoria.ini byte is preserved.
+its own mod folder plus its FolderNames/Priorities entries required to keep that
+folder first; every unrelated Memoria.ini setting and external mod is preserved.
 """
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ import tempfile
 from typing import Iterable
 
 from . import memoria_manager, paths
+from plugin_files import atomic_write
 
 MOD_NAME = "Lexeditor"
 CONFIG_NAME = "lexeditor-ff9.ini"
@@ -22,6 +23,7 @@ CONFIG_NAME = "lexeditor-ff9.ini"
 # For the Lexeditor mod folder its required assembly name is Memoria.Scripts.Lexeditor.dll.
 RUNTIME_NAME = "Memoria.Scripts.Lexeditor.dll"
 MARKER_NAME = ".lexeditor-ff9-owned"
+DESCRIPTION_NAME = "ModDescription.xml"
 PROJECT_CONFIG = paths.PROJECT_ROOT / CONFIG_NAME
 RUNTIME_SOURCE = paths.PLUGIN_ROOT / "runtime" / RUNTIME_NAME
 DEPLOY_ROOT = paths.GAME_ROOT / MOD_NAME
@@ -41,6 +43,21 @@ def _encode(values: dict[str, bool]) -> bytes:
         f"{key} = {'1' if values.get(key, False) else '0'}\r\n" for key in FEATURE_KEYS
     )
     return text.encode("utf-8")
+
+
+def _mod_description() -> bytes:
+    # Memoria's launcher auto-creates this file inside unidentified mod folders.
+    # Shipping our own minimal metadata keeps the Lexeditor-owned deployment
+    # deterministic and prevents the launcher from writing into it.
+    return (
+        "<Mod>\r\n"
+        "  <Name>Lexeditor</Name>\r\n"
+        "  <Author>Lexer</Author>\r\n"
+        "  <InstallationPath>Lexeditor</InstallationPath>\r\n"
+        "  <Category>Editor</Category>\r\n"
+        "  <Description>Lexeditor-owned Final Fantasy IX project overrides.</Description>\r\n"
+        "</Mod>\r\n"
+    ).encode("utf-8")
 
 
 def load(project_root: Path | None = None) -> dict:
@@ -97,20 +114,35 @@ def _decode_ini(raw: bytes) -> tuple[str, str, bytes]:
 
 
 def _split_folder_names(raw_value: str) -> list[str]:
-    return re.findall(r'"([^"]*)"', raw_value)
+    quoted = re.findall(r'"([^"]*)"', raw_value)
+    if quoted:
+        return [value for value in quoted if value]
+    # Memoria's launcher also accepts one unquoted path because its parser
+    # trims outer quotes and then splits only on the quoted comma separator.
+    value = raw_value.strip().strip('"')
+    return [value] if value else []
 
 
 def _folder_line(names: Iterable[str], prefix: str = "FolderNames = ") -> str:
     return prefix + ", ".join(f'"{name}"' for name in names)
 
 
-def _edit_folder_names(raw: bytes, *, add: bool) -> bytes:
+def _edit_mod_order(raw: bytes, *, add: bool) -> bytes:
+    """Keep Lexeditor first in Memoria runtime and launcher ordering.
+
+    FolderNames is the runtime load order: Memoria reads mod INIs in reverse so
+    the first folder overwrites later folders. Priorities is the launcher's
+    persisted installed-mod ordering. If Priorities already exists, keeping the
+    same Lexeditor entry first prevents the launcher from moving Lexeditor to
+    the end the next time it saves the mod list.
+    """
     text, encoding, bom = _decode_ini(raw)
     newline = "\r\n" if "\r\n" in text else "\n"
     had_final = text.endswith(("\n", "\r"))
     lines = text.splitlines()
     in_mod = False
-    found = False
+    found_folder_names = False
+    seen_settings: set[str] = set()
     for index, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith("[") and stripped.endswith("]"):
@@ -118,17 +150,21 @@ def _edit_folder_names(raw: bytes, *, add: bool) -> bytes:
             continue
         if not in_mod:
             continue
-        match = re.match(r"^(\s*FolderNames\s*=\s*)(.*)$", line, flags=re.I)
+        match = re.match(r"^(\s*(FolderNames|Priorities)\s*=\s*)(.*)$", line, flags=re.I)
         if not match:
             continue
-        found = True
-        names = _split_folder_names(match.group(2))
+        setting = match.group(2).casefold()
+        if setting in seen_settings:
+            raise RuntimeError(f"Memoria.ini has duplicate [Mod] {match.group(2)} settings")
+        seen_settings.add(setting)
+        if setting == "foldernames":
+            found_folder_names = True
+        names = _split_folder_names(match.group(3))
         names = [name for name in names if name.casefold() != MOD_NAME.casefold()]
         if add:
             names.insert(0, MOD_NAME)
         lines[index] = _folder_line(names, match.group(1))
-        break
-    if not found:
+    if not found_folder_names:
         raise RuntimeError("Memoria.ini has no [Mod] FolderNames setting")
     updated = newline.join(lines) + (newline if had_final else "")
     return bom + updated.encode(encoding)
@@ -183,19 +219,6 @@ def status(game_root: Path | None = None, project_root: Path | None = None,
     }
 
 
-def _atomic_write(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(data)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(name, path)
-    finally:
-        Path(name).unlink(missing_ok=True)
-
-
 def deploy(game_root: Path | None = None, project_root: Path | None = None,
            runtime_source: Path | None = None) -> dict:
     game = Path(game_root or paths.GAME_ROOT).resolve()
@@ -224,15 +247,16 @@ def deploy(game_root: Path | None = None, project_root: Path | None = None,
             scripts = staging / "StreamingAssets" / "Scripts"
             scripts.mkdir(parents=True, exist_ok=True)
             shutil.copy2(runtime, scripts / RUNTIME_NAME)
-            _atomic_write(staging / CONFIG_NAME, _encode(config["features"]))
-            _atomic_write(staging / MARKER_NAME,
+            atomic_write(staging / CONFIG_NAME, _encode(config["features"]))
+            atomic_write(staging / DESCRIPTION_NAME, _mod_description())
+            atomic_write(staging / MARKER_NAME,
                           ("Lexeditor FF9 managed mod\n" + _digest(runtime) + "\n").encode("ascii"))
             if target.exists():
                 backup = Path(tempfile.mkdtemp(prefix="Lexeditor.ff9-old-", dir=game))
                 backup.rmdir()
                 os.replace(target, backup)
             os.replace(staging, target)
-            _atomic_write(ini, _edit_folder_names(original_ini, add=True))
+            atomic_write(ini, _edit_mod_order(original_ini, add=True))
             if backup and backup.exists():
                 shutil.rmtree(backup)
         except Exception:
@@ -241,7 +265,7 @@ def deploy(game_root: Path | None = None, project_root: Path | None = None,
             if backup and backup.exists():
                 os.replace(backup, target)
             if ini.exists():
-                _atomic_write(ini, original_ini)
+                atomic_write(ini, original_ini)
             if staging.exists():
                 shutil.rmtree(staging, ignore_errors=True)
             raise
@@ -260,13 +284,20 @@ def revert(game_root: Path | None = None, project_root: Path | None = None,
     ini = game / "Memoria.ini"
     with memoria_manager.configuration_write(game):
         original_ini = ini.read_bytes() if ini.is_file() else b""
+        backup = None
         try:
             if target.exists():
-                shutil.rmtree(target)
+                backup = Path(tempfile.mkdtemp(prefix="Lexeditor.ff9-revert-", dir=game))
+                backup.rmdir()
+                os.replace(target, backup)
             if original_ini:
-                _atomic_write(ini, _edit_folder_names(original_ini, add=False))
+                atomic_write(ini, _edit_mod_order(original_ini, add=False))
+            if backup and backup.exists():
+                shutil.rmtree(backup)
         except Exception:
-            if original_ini and ini.exists():
-                _atomic_write(ini, original_ini)
+            if backup and backup.exists() and not target.exists():
+                os.replace(backup, target)
+            if original_ini:
+                atomic_write(ini, original_ini)
             raise
     return status(game, project, runtime)

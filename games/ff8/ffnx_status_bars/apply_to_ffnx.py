@@ -37,7 +37,7 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
     if check_revision:
         verify_revision(root)
     source = Path(__file__).resolve().parent / "ffnx-src"
-    for name in ("lexeditor_ff8_bars.cpp", "lexeditor_ff8_bars.h"):
+    for name in ("lexeditor_ff8_bars.cpp", "lexeditor_ff8_bars.h", "lexeditor_ff8_hp_colors.h"):
         destination = root / "src" / name
         if destination.exists():
             raise RuntimeError(f"Refusing to overwrite existing {destination}")
@@ -46,7 +46,7 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
     replace_once(
         root / "src/cfg.cpp",
         b"bool enable_devtools;\r\n",
-        b"bool enable_devtools;\r\nbool enable_ff8_xp_bars;\r\nbool enable_ff8_hp_bars;\r\nbool enable_ff8_gf_hp_bars;\r\n",
+        b"bool enable_devtools;\r\nbool enable_ff8_xp_bars;\r\nbool enable_ff8_hp_bars;\r\nbool enable_ff8_better_hp_colors;\r\nbool enable_ff8_gf_hp_bars;\r\n",
     )
     replace_once(
         root / "src/cfg.cpp",
@@ -54,12 +54,13 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
         b'\tenable_devtools = config["enable_devtools"].value_or(false);\r\n'
         b'\tenable_ff8_xp_bars = config["enable_ff8_xp_bars"].value_or(false);\r\n'
         b'\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);\r\n'
+        b'\tenable_ff8_better_hp_colors = config["enable_ff8_better_hp_colors"].value_or(false);\r\n'
         b'\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);\r\n',
     )
     replace_once(
         root / "src/cfg.h",
         b"extern bool enable_devtools;\r\n",
-        b"extern bool enable_devtools;\r\nextern bool enable_ff8_xp_bars;\r\nextern bool enable_ff8_hp_bars;\r\nextern bool enable_ff8_gf_hp_bars;\r\n",
+        b"extern bool enable_devtools;\r\nextern bool enable_ff8_xp_bars;\r\nextern bool enable_ff8_hp_bars;\r\nextern bool enable_ff8_better_hp_colors;\r\nextern bool enable_ff8_gf_hp_bars;\r\n",
     )
     replace_once(
         root / "misc/FFNx.toml",
@@ -69,6 +70,8 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
         b"enable_ff8_xp_bars = false\r\n\r\n"
         b"# Draw current/max HP bars for FF8's three active battle characters.\r\n"
         b"enable_ff8_hp_bars = false\r\n\r\n"
+        b"# Smoothly tint living HP numbers; KO keeps FF8's native display.\r\n"
+        b"enable_ff8_better_hp_colors = false\r\n\r\n"
         b"# Draw blue junctioned-GF HP bars above the FF8 party names.\r\n"
         b"enable_ff8_gf_hp_bars = false\r\n",
     )
@@ -81,6 +84,12 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
         root / "src/ff8_opengl.cpp",
         b"void ff8_init_hooks(struct game_obj *_game_object)\r\n{\r\n",
         b"void ff8_init_hooks(struct game_obj *_game_object)\r\n{\r\n\tlexeditor_ff8_bars_install();\r\n",
+    )
+    replace_once(
+        root / "src/ff8_opengl.cpp",
+        b"\tret->draw_paletted2D = common_draw_paletted2D;\r\n",
+        b"\tret->draw_paletted2D = lexeditor_ff8_hp_colors_requested() ? "
+        b"lexeditor_ff8_hp_colors_draw_paletted2D : common_draw_paletted2D;\r\n",
     )
     replace_once(
         root / "src/overlay.cpp",

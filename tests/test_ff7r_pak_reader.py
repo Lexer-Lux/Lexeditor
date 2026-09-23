@@ -167,8 +167,8 @@ class InstalledGameTests(unittest.TestCase):
             self.skipTest("no installed FF7R archives")
 
     def test_oodle_entry_decodes_to_a_cooked_package(self):
-        if pak_reader.oodle_library() is None:
-            self.skipTest("no Oodle library beside repak")
+        if pak_reader.oodle_library(self.paks[0]) is None:
+            self.skipTest("no explicit or game-owned Oodle library available")
         from games.ff7r.tooling import get_file
 
         target = "Menu/Resident/Battle/Status.uasset"

@@ -1,5 +1,8 @@
 """Contract tests for the FF8 Formulae Rework inventory and implemented arithmetic."""
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 import unittest
 
 from games.ff8 import formulae_rework, healing_rework, luck_accuracy
@@ -70,10 +73,24 @@ class FormulaeReworkTests(unittest.TestCase):
         self.assertIn("Difficulty", row["blocker"])
         self.assertIn("stored-rate", row["blocker"])
 
+    def test_mug_difficulty_contract_maps_stored_rate(self):
+        self.assertEqual(formulae_rework.mug_difficulty_from_rate(0), 100.0)
+        self.assertEqual(formulae_rework.mug_difficulty_from_rate(100), 0.0)
+        self.assertEqual(formulae_rework.mug_difficulty_from_rate(80), 20.0)
+        with self.assertRaises(ValueError):
+            formulae_rework.mug_difficulty_from_rate(101)
+        with self.assertRaises(ValueError):
+            formulae_rework.mug_difficulty_from_rate(True)
+
+    def test_mug_stored_chance_keeps_rate_zero_immune(self):
+        self.assertEqual(formulae_rework.mug_stored_success_chance(0, 0, 255), 0.0)
+        self.assertEqual(formulae_rework.mug_stored_success_chance(80, 50, 70), 100.0)
+        self.assertEqual(formulae_rework.mug_stored_success_chance(100, 255, 0), 0.0)
+        with self.assertRaises(ValueError):
+            formulae_rework.mug_stored_success_chance(-1, 0, 0)
+
     def test_editor_does_not_hard_code_a_fake_complete_formula_inventory(self):
-        editor = (Path(__file__).resolve().parents[1] / "games/ff8/editor.html").read_text(
-            encoding="utf-8"
-        )
+        editor = plugin_ui("ff8")
         self.assertNotIn("formula cards below define the complete requested rework", editor)
 
     def test_settings_module_alias_cannot_be_shadowed_by_boolean(self):

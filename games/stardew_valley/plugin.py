@@ -107,8 +107,6 @@ def smoke() -> list[str]:
 PLUGIN = GamePlugin(
     plugin_id="stardew-valley",
     name="Stardew Valley",
-    subtitle="STARDEW VALLEY",
-    description="Edit Stardew Valley 1.6 Content Patcher data mods without replacing game XNB files.",
     accent="#6cae43",
     check=check,
     launch=launch,

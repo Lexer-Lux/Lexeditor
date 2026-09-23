@@ -29,7 +29,17 @@ def service(tmp_path, monkeypatch):
     class FakeBattleSceneStore:
         def status_rows(self): return []
     dependency("battle_scene", BattleSceneStore=FakeBattleSceneStore)
+    class FakeFieldWalkmeshStore:
+        KEY = "field-walkmesh"
+        KEYS = frozenset({"field-walkmesh", "field-walkmesh-triangles"})
+        def status_rows(self): return []
+    dependency("field_walkmesh", FieldWalkmeshStore=FakeFieldWalkmeshStore)
     dependency("memoria_baseline", ensure=lambda: {"release": "fixture", "source": "fixture", "problems": []})
+    dependency("mod_compat", audit=lambda: {
+        "pinnedMemoria": "v2025.07.04", "mods": [], "declaredConflicts": [],
+        "overlaps": [], "unsupportedByPinnedMemoria": [], "folderNames": [],
+        "priorities": [], "mergeScripts": False, "projectScanTruncated": False,
+    })
     runtime = dependency("memoria_manager", status=lambda root: {"installed": False},
                          available=lambda: {"available": False})
     called = []
@@ -172,3 +182,76 @@ def test_data_map_reports_editor_integration_even_before_baseline_arrives(servic
     row = service[0].data_map()["rows"][0]
     assert row["status"] == "integrated" and row["coverage"] == "structured"
     assert row["openable"] is True and row["sourceAvailable"] is False
+
+
+def test_data_map_keeps_battle_editor_integration_when_game_source_is_missing(service, monkeypatch):
+    monkeypatch.setattr(service[0].BattleSceneStore, "status_rows", lambda self: [{
+        "available": False, "relativePath": "StreamingAssets/p0data2.bin → BattleMap/BattleScene/*/dbfile0000.raw16",
+        "controls": "Enemy fields", "notes": "Reads p0data2 and saves raw16 overlays.",
+        "tab": "enemies", "key": "enemies",
+    }])
+    row = next(row for row in service[0].data_map()["rows"] if row.get("datasetKey") == "enemies")
+    assert row["status"] == "integrated" and row["coverage"] == "structured"
+    assert row["openable"] is True and row["sourceAvailable"] is False
+
+
+def test_data_map_marks_walkmesh_floor_activity_partial_when_available(service, monkeypatch):
+    monkeypatch.setattr(service[0].FIELD_WALKMESH, "status_rows", lambda: [{
+        "available": True,
+        "relativePath": "StreamingAssets/p0data1*.bin → StreamingAssets/Assets/Resources/FieldMaps/*/*.bgi.bytes",
+        "controls": "Field walkmesh floor active/inactive state (BGI_FLOOR_ACTIVE)",
+        "notes": "Edits only the documented active bit.",
+        "tab": "world", "key": "field-walkmesh",
+    }])
+    row = next(row for row in service[0].data_map()["rows"] if row.get("datasetKey") == "field-walkmesh")
+    assert row["status"] == "partial" and row["coverage"] == "structured"
+    assert row["openable"] is True and row["sourceAvailable"] is True
+
+
+def test_data_map_marks_walkmesh_triangle_activity_partial_when_available(service, monkeypatch):
+    monkeypatch.setattr(service[0].FIELD_WALKMESH, "status_rows", lambda: [{
+        "available": True,
+        "relativePath": "StreamingAssets/p0data1*.bin → StreamingAssets/Assets/Resources/FieldMaps/*/*.bgi.bytes",
+        "controls": "Per-field triangle active/inactive state (BGI_TRI_ACTIVE)",
+        "notes": "Edits only the documented triangle-active bit.",
+        "tab": "world", "key": "field-walkmesh-triangles",
+    }])
+    row = next(row for row in service[0].data_map()["rows"] if row.get("datasetKey") == "field-walkmesh-triangles")
+    assert row["status"] == "partial" and row["coverage"] == "structured"
+    assert row["openable"] is True and row["sourceAvailable"] is True
+
+
+def test_data_map_keeps_each_known_p0data_gap_visible(service):
+    rows = service[0].data_map()["rows"]
+    gaps = {row["filename"]: row for row in rows if row["status"] == "not-integrated"}
+    expected = {
+        "StreamingAssets/p0data1*.bin (outside integrated BGI pathing flags)",
+        "StreamingAssets/p0data2.bin (outside BattleScene raw16)",
+        "StreamingAssets/p0data3.bin",
+        "StreamingAssets/p0data4.bin",
+        "StreamingAssets/p0data5.bin",
+        "StreamingAssets/p0data7.bin",
+        "StreamingAssets/p0data6*.bin and other unmatched p0data*.bin",
+    }
+    assert expected <= set(gaps)
+    assert all(gaps[name]["coverage"] == "unavailable" and not gaps[name]["openable"]
+               for name in expected)
+    assert "mesh/rig" in gaps["StreamingAssets/p0data4.bin"]["notes"]
+    assert "event-script" in gaps["StreamingAssets/p0data7.bin"]["notes"]
+
+
+def test_dashboard_exposes_read_only_mod_compatibility_snapshot(service):
+    status, dashboard = request(service, "/api/dashboard", method="GET")
+    assert status == 200
+    report = dashboard["modCompatibility"]
+    assert report["pinnedMemoria"] == "v2025.07.04"
+    assert report["mods"] == [] and report["overlaps"] == []
+
+
+def test_mod_compat_endpoint_is_read_only(service):
+    status, report = request(service, "/api/mod-compat", method="GET")
+    assert status == 200
+    assert report["pinnedMemoria"] == "v2025.07.04"
+    before = list(service[2])
+    assert request(service, "/api/mod-compat", method="POST")[0] == 404
+    assert service[2] == before

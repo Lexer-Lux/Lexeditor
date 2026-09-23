@@ -21,6 +21,7 @@ from . import better_card
 from . import fixed_command_menu
 from . import true_atb_wait_issue_63
 from . import flying_eva
+from . import gf_hp_casting
 from . import character_growth
 from . import luck_accuracy
 from . import modern_controls_issue_65
@@ -53,6 +54,9 @@ DEFAULT_FIXED_COMMAND_MENU = False
 DEFAULT_TRUE_ATB_WAIT = true_atb_wait_issue_63.DEFAULT_TRUE_ATB_WAIT
 DEFAULT_FORMULAE_REWORK = False
 DEFAULT_MODERN_CONTROLS = modern_controls_issue_65.DEFAULT_MODERN_CONTROLS
+DEFAULT_CAMERA_SPEED = modern_controls_issue_65.DEFAULT_CAMERA_SPEED
+MINIMUM_CAMERA_SPEED = modern_controls_issue_65.MINIMUM_CAMERA_SPEED
+MAXIMUM_CAMERA_SPEED = modern_controls_issue_65.MAXIMUM_CAMERA_SPEED
 DEFAULT_VIBRATION_CONSOLIDATION = vibration_consolidation_issue_66.DEFAULT_VIBRATION_CONSOLIDATION
 DEFAULT_BETTER_TARGETING = better_targeting_issue_64.DEFAULT_BETTER_TARGETING
 DEFAULT_DAMAGE_LIMIT_REMOVAL = damage_limit.DEFAULT_DAMAGE_LIMIT_REMOVAL
@@ -61,8 +65,10 @@ DEFAULT_STREAMLINED_DRAW = streamlined_draw.DEFAULT_STREAMLINED_DRAW
 DEFAULT_SHARED_MAGIC_INVENTORY = False
 DEFAULT_XP_BARS = False
 DEFAULT_HP_BARS = False
+DEFAULT_BETTER_HP_COLORS = False
 DEFAULT_GF_HP_BARS = False
 DEFAULT_INGAME_TIME = menu_qol_issue_61.DEFAULT_INGAME_TIME
+DEFAULT_INTERACTION_INDICATORS = False
 DEFAULT_FLAT_STAT_ABILITIES = flat_stat_abilities.DEFAULT_FLAT_STAT_ABILITIES
 DEFAULT_MAX_SPELL_ENABLED = max_spell.DEFAULT_MAX_SPELL_ENABLED
 DEFAULT_MAX_SPELL = max_spell.DEFAULT_MAX_SPELL
@@ -75,9 +81,10 @@ ACCEPTED_TWEAKS = frozenset({
     "sharedMagicInventory", "partySwitch", "drawOncePerEnemy",
     "streamlinedDraw", "betterCard", "fixedCommandMenu", "trueAtbWait",
     "modernControls", "vibrationConsolidation", "betterTargeting",
-    "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "gfHpBars", "inGameTime",
+    "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "betterHpColors", "gfHpBars", "inGameTime",
+    "interactionIndicators",
     "flatStatAbilities", "maxSpellEnabled", "noMagicConsumption", "dropsAfterMug",
-    "dropChance",
+    "dropChance", "gfHpCasting",
 })
 MIN_FLYING_EVA_BONUS = 0
 MAX_FLYING_EVA_BONUS = 100
@@ -318,6 +325,15 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         modern_controls = DEFAULT_MODERN_CONTROLS
     if not modern_controls_issue_65.MODERN_CONTROLS_AVAILABLE:
         modern_controls = False
+    camera_speed = data.get("cameraSpeed", DEFAULT_CAMERA_SPEED)
+    try:
+        camera_speed = float(camera_speed)
+    except (TypeError, ValueError):
+        camera_speed = DEFAULT_CAMERA_SPEED
+    if not camera_speed > 0:
+        camera_speed = DEFAULT_CAMERA_SPEED
+    camera_speed = round(
+        min(MAXIMUM_CAMERA_SPEED, max(MINIMUM_CAMERA_SPEED, camera_speed)), 2)
     vibration_consolidation = data.get(
         "vibrationConsolidation", DEFAULT_VIBRATION_CONSOLIDATION,
     )
@@ -340,13 +356,23 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
     hp_bars = data.get("hpBars", DEFAULT_HP_BARS)
     if not isinstance(hp_bars, bool):
         hp_bars = DEFAULT_HP_BARS
+    better_hp_colors = data.get("betterHpColors", DEFAULT_BETTER_HP_COLORS)
+    if not isinstance(better_hp_colors, bool):
+        better_hp_colors = DEFAULT_BETTER_HP_COLORS
     gf_hp_bars = data.get("gfHpBars", DEFAULT_GF_HP_BARS)
     if not isinstance(gf_hp_bars, bool):
         gf_hp_bars = DEFAULT_GF_HP_BARS
     in_game_time = data.get("inGameTime", DEFAULT_INGAME_TIME)
     if not isinstance(in_game_time, bool):
         in_game_time = DEFAULT_INGAME_TIME
+    interaction_indicators = data.get(
+        "interactionIndicators", DEFAULT_INTERACTION_INDICATORS,
+    )
+    if not isinstance(interaction_indicators, bool):
+        interaction_indicators = DEFAULT_INTERACTION_INDICATORS
     no_magic_consumption = data.get("noMagicConsumption") is True
+    gf_casting = data.get("gfHpCasting") is True
+    gf_costs = gf_hp_casting.costs(data.get("gfHpCastingCosts"))
     drops_after_mug = data.get("dropsAfterMug") is True
     drop_chance_enabled = data.get("dropChance") is True
     flat_stat_abilities_enabled = data.get(
@@ -376,6 +402,7 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "autoSortMagic": auto_sort_magic,
         "enhancedAbilityMenu": enhanced_ability_menu,
         "singleGf": single_gf,
+        "gfSpellbooksEnabled": data.get("gfSpellbooksEnabled", False) is True,
         "universalItem": universal_item,
         "scannedTargetScan": scanned_target_scan,
         "enhancedScanAvailable": battle_shortcuts.ENHANCED_SCAN_AVAILABLE,
@@ -390,6 +417,9 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "fixedCommandMenu": fixed_command_menu_enabled,
         "trueAtbWait": true_atb_wait,
         "modernControls": modern_controls,
+        "cameraSpeed": camera_speed,
+        "cameraSpeedMinimum": MINIMUM_CAMERA_SPEED,
+        "cameraSpeedMaximum": MAXIMUM_CAMERA_SPEED,
         "modernControlsAvailable": modern_controls_issue_65.MODERN_CONTROLS_AVAILABLE,
         "modernControlsBlocker": modern_controls_issue_65.MODERN_CONTROLS_BLOCKER,
         "vibrationConsolidation": vibration_consolidation,
@@ -398,9 +428,13 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "fastStart": fast_start_enabled,
         "xpBars": xp_bars,
         "hpBars": hp_bars,
+        "betterHpColors": better_hp_colors,
         "gfHpBars": gf_hp_bars,
         "inGameTime": in_game_time,
+        "interactionIndicators": interaction_indicators,
         "noMagicConsumption": no_magic_consumption,
+        "gfHpCasting": gf_casting,
+        "gfHpCastingCosts": gf_costs,
         "dropsAfterMug": drops_after_mug,
         "dropChance": drop_chance_enabled,
         "dropChanceWeights": drop_chance.metadata(),
@@ -458,6 +492,7 @@ def _verify_executable(game_root: Path) -> Path:
         for address, original in (
             (inventory_auto_sort.BATTLE_CACHE_HOOK, inventory_auto_sort.BATTLE_CACHE_ORIGINAL),
             (character_growth.HOOK, character_growth.ORIGINAL),
+            (character_growth.ZERO_HOOK, character_growth.ZERO_ORIGINAL),
             (battle_issue_54.BATTLE_ENTER_HOOK, battle_issue_54.BATTLE_ENTER_ORIGINAL),
             (battle_issue_54.BATTLE_EXIT_HOOK, battle_issue_54.BATTLE_EXIT_ORIGINAL),
             (battle_issue_54.DRAW_RESULT_HOOK, battle_issue_54.DRAW_RESULT_ORIGINAL),
@@ -577,6 +612,10 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
             f"{ALWAYS_HIT_BRANCH:X} = EB",
             f"{HIT_FORMULA_HOOK:X} = E9 06 C0 30 02 90",
             f"{CODE_CAVE:X} = {payload.hex(' ').upper()}",
+            "# Physical Attack and the gunblade get the same penalty.",
+            f"{flying_eva.PHYSICAL_CAVE:X}:{len(flying_eva.PHYSICAL_TEMPLATE):X}",
+            *(f"{site:X} = {replacement}" for site, (replacement, _) in flying_eva.PHYSICAL_HOOKS.items()),
+            f"{flying_eva.PHYSICAL_CAVE:X} = {flying_eva.build_physical_payload(bonus).hex(' ').upper()}",
         ])
     else:
         lines.append("# Flying EVA Bonus is disabled.")
@@ -615,9 +654,12 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
         lines.append("# Enhanced Scan is disabled; camera and battle input remain vanilla.")
     if not party_switch:
         lines.append("# FF10-style Party Switch is disabled; Look Left keeps vanilla behavior.")
+    # Summon's gate is not a taste: a GF slot that does nothing and never says
+    # why reads as a broken game, so it rides along with every build.
     draw_patch = battle_issue_54.build_command_eligibility_patch(
         draw_once=draw_once_per_enemy, better_card=better_card_enabled,
         streamlined_draw=streamlined_draw_enabled,
+        summon_gate=battle_issue_54.DEFAULT_SUMMON_GATE,
     )
     if draw_patch:
         lines.extend(draw_patch.rstrip().splitlines())
@@ -717,18 +759,23 @@ def _atomic_bytes(target: Path, content: bytes) -> None:
 
 
 def _set_ffnx_runtime_tweaks(config: Path, *, xp_bars: bool, hp_bars: bool,
-                             better_targeting: bool, fast_start: bool = False,
+                             better_targeting: bool, better_hp_colors: bool = False,
+                             fast_start: bool = False,
                              modern_controls: bool = False, party_switch: bool = False,
                              gf_hp_bars: bool = False,
                              in_game_time: bool = False,
-                             no_magic_consumption: bool = False) -> None:
+                             interaction_indicators: bool = False,
+                             no_magic_consumption: bool = False,
+                             camera_speed: float = DEFAULT_CAMERA_SPEED) -> None:
     """Set derivative options without changing unrelated FFNx settings."""
     text = config.read_text(encoding="utf-8", errors="strict")
     for key, enabled in (
         ("enable_ff8_xp_bars", xp_bars),
         ("enable_ff8_hp_bars", hp_bars),
+        ("enable_ff8_better_hp_colors", better_hp_colors),
         ("enable_ff8_gf_hp_bars", gf_hp_bars),
         ("enable_ff8_ingame_time", in_game_time),
+        ("enable_ff8_interaction_indicators", interaction_indicators),
         ("enable_ff8_better_targeting", better_targeting),
         ("enable_ff8_fast_start", fast_start),
         ("enable_ff8_modern_controls", modern_controls),
@@ -743,6 +790,16 @@ def _set_ffnx_runtime_tweaks(config: Path, *, xp_bars: bool, hp_bars: bool,
             text = pattern.sub(replacement, text, count=1)
         else:
             text = text.rstrip() + f"\n\n{replacement}\n"
+    # The camera turn rate is a number rather than a switch, so it needs its own
+    # pass; the runtime clamps whatever it reads to a usable range.
+    rate = min(MAXIMUM_CAMERA_SPEED, max(MINIMUM_CAMERA_SPEED, float(camera_speed)))
+    speed_pattern = re.compile(
+        r"(?m)^\s*ff8_modern_controls_camera_speed\s*=\s*[-+0-9.eE]+\s*$")
+    speed_line = f"ff8_modern_controls_camera_speed = {rate:g}"
+    if speed_pattern.search(text):
+        text = speed_pattern.sub(speed_line, text, count=1)
+    else:
+        text = text.rstrip() + f"\n\n{speed_line}\n"
     _atomic_text(config, text)
 
 
@@ -803,14 +860,17 @@ def initialize_project(project_root: Path) -> None:
         "fastStart": False,
         "xpBars": False,
         "hpBars": False,
+        "betterHpColors": False,
         "gfHpBars": False,
         "inGameTime": False,
+        "interactionIndicators": False,
         "noMagicConsumption": False,
         "dropsAfterMug": False,
         "dropChance": False,
         "flatStatAbilities": False,
         "maxSpellEnabled": False,
         "maxSpell": DEFAULT_MAX_SPELL,
+        "cameraSpeed": DEFAULT_CAMERA_SPEED,
     }
     _atomic_text(settings_path(project), json.dumps(
         settings_data, indent=2, sort_keys=True,
@@ -852,6 +912,7 @@ def save(data: dict, game_root: Path | None = None,
     )
 
     single_gf = _boolean(data.get("singleGf", DEFAULT_SINGLE_GF), "Monogamy")
+    spellbooks_enabled = _boolean(data.get("gfSpellbooksEnabled", False), "GF Spellbooks")
     universal_item = _boolean(
         data.get("universalItem", DEFAULT_UNIVERSAL_ITEM), "Universal Item",
     )
@@ -888,6 +949,16 @@ def save(data: dict, game_root: Path | None = None,
     modern_controls = _boolean(
         data.get("modernControls", DEFAULT_MODERN_CONTROLS), "Modern Controls",
     )
+    # The camera turn rate travels with the switch that uses it. A value the
+    # page never sent, or one outside the usable range, becomes the shipped
+    # rate rather than refusing the whole apply.
+    try:
+        camera_speed = float(data.get("cameraSpeed", DEFAULT_CAMERA_SPEED))
+    except (TypeError, ValueError):
+        camera_speed = DEFAULT_CAMERA_SPEED
+    if not camera_speed > 0:
+        camera_speed = DEFAULT_CAMERA_SPEED
+    camera_speed = min(MAXIMUM_CAMERA_SPEED, max(MINIMUM_CAMERA_SPEED, camera_speed))
     vibration_consolidation = _boolean(
         data.get("vibrationConsolidation", DEFAULT_VIBRATION_CONSOLIDATION),
         "Vibration Rationalization",
@@ -904,8 +975,15 @@ def save(data: dict, game_root: Path | None = None,
     )
     xp_bars = _boolean(data.get("xpBars", DEFAULT_XP_BARS), "XP Bars")
     hp_bars = _boolean(data.get("hpBars", DEFAULT_HP_BARS), "HP Bars")
-    gf_hp_bars = _boolean(data.get("gfHpBars", DEFAULT_GF_HP_BARS), "GF HP Bars")
+    better_hp_colors = _boolean(
+        data.get("betterHpColors", DEFAULT_BETTER_HP_COLORS), "Better HP Colors",
+    )
+    gf_hp_bars = _boolean(data.get("gfHpBars", DEFAULT_GF_HP_BARS), 'GF "MP" Bars')
     in_game_time = _boolean(data.get("inGameTime", DEFAULT_INGAME_TIME), "In-game Time")
+    interaction_indicators = _boolean(
+        data.get("interactionIndicators", DEFAULT_INTERACTION_INDICATORS),
+        "Interaction Indicators",
+    )
     no_magic_consumption = _boolean(data.get("noMagicConsumption", False), "No Magic Consumption")
     drops_after_mug = _boolean(data.get("dropsAfterMug", False), "Drops After Mug")
     drop_chance_enabled = _boolean(data.get("dropChance", False), "Drop Chance")
@@ -940,9 +1018,18 @@ def save(data: dict, game_root: Path | None = None,
     # Keep the selected mod's requested value even when the runtime is not yet
     # installed. Activation installs and verifies the runtime before launch.
     # Save must never turn an enabled feature off behind the user's back.
+    if gf_hp_bars and not single_gf:
+        raise ValueError('GF "MP" Bars requires Monogamy')
     if fixed_command_menu_enabled and not single_gf:
         raise ValueError("Fixed Command Menu requires Monogamy")
+    gf_casting = _boolean(data.get("gfHpCasting", False), "GF HP Casting")
+    gf_costs = gf_hp_casting.costs(data.get("gfHpCastingCosts"))
+    if gf_casting and not (single_gf and no_magic_consumption):
+        raise ValueError("GF HP Casting requires Monogamy and No Magic Consumption")
     executable = _verify_executable(game)
+    if gf_casting:
+        with executable.open("rb") as stream:
+            gf_hp_casting.verify_executable(stream)
     drop_chance_plan = (
         drop_chance.discover_path(executable) if drop_chance_enabled else None
     )
@@ -970,6 +1057,7 @@ def save(data: dict, game_root: Path | None = None,
         drop_chance_enabled=drop_chance_enabled,
         drop_chance_plan=drop_chance_plan,
     )
+    hext += gf_hp_casting.build_hext(gf_casting, gf_costs)
     settings_data = {
         "autoSortInventory": auto_sort,
         "autoSortMagic": auto_sort_magic,
@@ -977,6 +1065,7 @@ def save(data: dict, game_root: Path | None = None,
         "flyingEvaBonus": bonus,
         "flyingEvaEnabled": flying_enabled,
         "singleGf": single_gf,
+        "gfSpellbooksEnabled": spellbooks_enabled,
         "universalItem": universal_item,
         "scannedTargetScan": scanned_target_scan,
         "partySwitch": party_switch,
@@ -987,15 +1076,22 @@ def save(data: dict, game_root: Path | None = None,
         "fixedCommandMenu": fixed_command_menu_enabled,
         "trueAtbWait": true_atb_wait,
         "modernControls": modern_controls,
+        # Stored with the switch it belongs to. Written only to FFNx.toml, it
+        # read back as the default and the next save overwrote the reader's.
+        "cameraSpeed": round(camera_speed, 2),
         "vibrationConsolidation": vibration_consolidation,
         "betterTargeting": better_targeting,
         "damageLimitRemoval": damage_limit_removal,
         "fastStart": fast_start_enabled,
         "xpBars": xp_bars,
         "hpBars": hp_bars,
+        "betterHpColors": better_hp_colors,
         "gfHpBars": gf_hp_bars,
         "inGameTime": in_game_time,
+        "interactionIndicators": interaction_indicators,
         "noMagicConsumption": no_magic_consumption,
+        "gfHpCasting": gf_casting,
+        "gfHpCastingCosts": gf_costs,
         "dropsAfterMug": drops_after_mug,
         "dropChance": drop_chance_enabled,
         "flatStatAbilities": flat_stat_abilities_enabled,
@@ -1010,7 +1106,7 @@ def save(data: dict, game_root: Path | None = None,
     install_needed = bool(
         install_runtime
         and
-        (shared_magic_inventory or xp_bars or hp_bars or gf_hp_bars or in_game_time or better_targeting or fast_start_enabled
+        (shared_magic_inventory or xp_bars or hp_bars or interaction_indicators or better_hp_colors or gf_hp_bars or in_game_time or better_targeting or fast_start_enabled
          or modern_controls or party_switch or no_magic_consumption)
         and not shared_magic_status.get("sharedMagicInventoryRuntime")
     )
@@ -1076,11 +1172,14 @@ def save(data: dict, game_root: Path | None = None,
             ffnx_manager._verify_project_path(config, direct_root)
         if install_runtime:
             _set_ffnx_runtime_tweaks(
-                game / "FFNx.toml", xp_bars=xp_bars, hp_bars=hp_bars, gf_hp_bars=gf_hp_bars,
+                game / "FFNx.toml", xp_bars=xp_bars, hp_bars=hp_bars,
+                better_hp_colors=better_hp_colors, gf_hp_bars=gf_hp_bars,
                 in_game_time=in_game_time, better_targeting=better_targeting,
                 fast_start=fast_start_enabled,
+                interaction_indicators=interaction_indicators,
                 modern_controls=modern_controls, party_switch=party_switch,
                 no_magic_consumption=no_magic_consumption,
+                camera_speed=camera_speed,
             )
     except Exception:
         _restore_files(snapshots)

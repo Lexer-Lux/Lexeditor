@@ -15,8 +15,13 @@ from project_manager import ProjectManager  # noqa: E402
 
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-editors = {name: (ROOT / "games" / name / "editor.html").read_text(encoding="utf-8")
-           for name in ("blank", "ff7", "ff8", "ff9", "rdr", "rdr2", "warband")}
+editors = {
+    name: (ROOT / "games" / name / "editor.html").read_text(encoding="utf-8")
+    for name in ("blank", "ff7", "ff8", "ff9", "rdr", "rdr2", "warband")
+}
+editors["rdr"] += "\n" + (
+    ROOT / "games" / "rdr" / "editor.js"
+).read_text(encoding="utf-8")
 ff7_2013_plugin = (ROOT / "games" / "ff7_2013" / "plugin.py").read_text(encoding="utf-8")
 rdr_server = (ROOT / "games" / "rdr" / "server.py").read_text(encoding="utf-8")
 
@@ -72,7 +77,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-projects-", ignore_cleanup_er
     (template / "data" / "required.txt").write_text("seed", encoding="utf-8")
     def initialize_project(target: Path) -> None:
         (target / "initialized.txt").write_text("new project only", encoding="utf-8")
-    plugin = GamePlugin("test", "Test", "TEST", "Test plugin", "#fff",
+    plugin = GamePlugin("test", "Test",   "#fff",
                         lambda: [], lambda: None,
                         projects=ModProjectSpec("TEST_PROJECT", template,
                                                 ("data/required.txt",), template,

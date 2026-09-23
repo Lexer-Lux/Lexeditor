@@ -48,3 +48,12 @@ Read the old overflow verifier before the module and read the live issues/commen
 
 Combined development build passed: 334A268547E779406A80C5865FD4463DEE8E80FF2BF5FA3E4D352FBD88C22342. Candidate: out/rdr2-after-duration/GameplayTweaks.asi, matching release manifest. Not installed: duration experiment #151 remains active. Build log: out/rdr2-build-overflow-binoculars.log. Agent-side module tests passed; game acceptance remains open.
 
+
+## 2026-09-22 misc-fixes disposition
+Chained behind #126, which carries an installed untested Baked Beans prototype (buy/collect, F7 deposit/withdraw, persistence checks). Shared registry layer verified today: verify_rdr2_overflow_registry.py PASS with four mutations rejected. Tonic capacities build on that storage only after the prototype passes. No code change. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

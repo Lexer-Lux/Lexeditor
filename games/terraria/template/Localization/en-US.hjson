@@ -1,0 +1,5 @@
+# tModLoader may add generated localization entries here after build/reload.
+Mods: {
+	__LEXEDITOR_ID__: {
+	}
+}

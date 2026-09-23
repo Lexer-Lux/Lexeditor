@@ -13,3 +13,23 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes finding
+No saddle or horse-lantern code exists anywhere in the runtime tree (only belt_lantern.cpp matches lantern). The reported-installed implementation is not in this tree, and no shop or item route names it. The test needs the exact purchase and equip path plus light-control fixes first. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (purchase/equip path plus
+light-control fixes still owed), so flipping to waiting would be a fake
+checklist. Left actionable until a real session can be written.
+
+## 2026-09-23 master: purchase path defined from catalog, stays actionable
+
+Queried the live dataset via get_catalog('mine'): 5 lantern/lamp records.
+The belt-relevant handhelds (WEAPON_MELEE_LANTERN, WEAPON_MELEE_DAVY_LANTERN)
+carry NO buy path and NO shop listings. The only purchasable lanterns are
+the Halloween lantern at the fence (25450) and the saddle lantern at the
+horse shop (35000). Consequence for the check: the belt lantern cannot be
+purchase-tested — its acquisition path must be loot/pickup, or a purchase
+route must be created first. Light-control fixes still owed; no waiting flip
+until they land and the loot-path check is written.

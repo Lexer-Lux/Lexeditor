@@ -36,6 +36,21 @@
         "name": "Lexend Project authors",
         "role": "Bundled Lexend interface font.",
         "url": "https://github.com/googlefonts/lexend"
+      },
+      {
+        "name": "crosire / ReShade",
+        "role": "The post-processing loader Lexeditor bundles, pinned to 6.8.0, and installs per game.",
+        "url": "https://github.com/crosire/reshade"
+      },
+      {
+        "name": "4lex4nder and Frans Bouma / ReshadeEffectShaderToggler",
+        "role": "The add-on Lexeditor installs beside ReShade to run effects before a game draws its HUD.",
+        "url": "https://github.com/4lex4nder/ReshadeEffectShaderToggler"
+      },
+      {
+        "name": "AMD / FidelityFX CAS",
+        "role": "The Contrast Adaptive Sharpening algorithm Lexeditor's Sharpen effect implements.",
+        "url": "https://github.com/GPUOpen-Effects/FidelityFX-CAS"
       }
     ],
     "licenses": [
@@ -46,6 +61,14 @@
       {
         "name": "Lexend — source notice",
         "sourcePath": "ui/assets/fonts/SOURCE.md"
+      },
+      {
+        "name": "ReShade — BSD 3-Clause License",
+        "sourcePath": "tools/reshade/6.8.0/LICENSE.md"
+      },
+      {
+        "name": "ReshadeEffectShaderToggler — MIT License",
+        "sourcePath": "tools/reshade/addons/REST-1.3.23.633/LICENSE.txt"
       }
     ]
   },
@@ -56,6 +79,32 @@
           "name": "Lexeditor contributors",
           "role": "Shared-control examples and test fixtures.",
           "url": "https://github.com/Lexer-Lux/Lexeditor"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
+    },
+    "bannerlord": {
+      "contributions": [
+        {
+          "name": "Lexer / Lexers Mod for Bannerlord",
+          "role": "Source project, module fixtures, and compatibility behavior used to develop and validate the Bannerlord integration.",
+          "url": "https://github.com/Lexer-Lux/Lexers-Mod-For-Bannerlord"
+        },
+        {
+          "name": "BUTR / Bannerlord.BLSE",
+          "role": "Reference for community SubModule.xml dependency metadata and extended launcher behavior.",
+          "url": "https://github.com/BUTR/Bannerlord.BLSE"
+        },
+        {
+          "name": "BUTR / Bannerlord.ModuleManager",
+          "role": "Reference for community dependency normalization, load-order precedence, optional/incompatible handling, and version-range semantics.",
+          "url": "https://github.com/BUTR/Bannerlord.ModuleManager"
+        },
+        {
+          "name": "BUTR / Bannerlord.XmlSchemas",
+          "role": "Reference for SubModule.xml community metadata fields and UpdateInfo grammar.",
+          "url": "https://github.com/BUTR/Bannerlord.XmlSchemas"
         }
       ],
       "thanks": [],
@@ -72,12 +121,37 @@
           "name": "Christian Bauer / ff7tools",
           "role": "Reference for FF7 archive and kernel formats.",
           "url": "https://github.com/cebix/ff7tools"
+        },
+        {
+          "name": "petfriendamy / Scarlet",
+          "role": "Reference for FF7 formation layouts, battle restrictions, and initial-condition flags.",
+          "url": "https://github.com/petfriendamy/ff7-scarlet"
+        },
+        {
+          "name": "FF7 modding community / ff7-flat-wiki",
+          "role": "Reference for battle arena names and formation layout.",
+          "url": "https://ff7-mods.github.io/ff7-flat-wiki/FF7/Battle/Battle_Scenes.html"
+        },
+        {
+          "name": "FFNx contributors",
+          "role": "Reference/runtime contract for FFNx Direct Mode paths, chunk loading, and 2026 Steam setup.",
+          "url": "https://github.com/julianxhokaxhiu/FFNx"
+        },
+        {
+          "name": "7th Heaven contributors",
+          "role": "Reference for ordered active profiles, installed mod locations, mod.xml folder roots, and read-only external-stack compatibility.",
+          "url": "https://github.com/tsunamods-codes/7th-Heaven"
+        },
+        {
+          "name": "tangtang95 / 60/30 FPS Gameplay",
+          "role": "Public 7th Heaven mod.xml compatibility fixture for profile-option ModFolder activation.",
+          "url": "https://github.com/tangtang95/ff7-60fps-mod"
         }
       ],
       "thanks": [],
       "licenses": [
         {
-          "name": "Elena and ff7tools — original notices",
+          "name": "FF7 format/runtime reference notices",
           "sourcePath": "games/ff7/THIRD_PARTY.md"
         }
       ]
@@ -104,7 +178,7 @@
         },
         {
           "name": "trumank / repak",
-          "role": "Pinned external helper for reading and building Unreal Engine PAK files.",
+          "role": "Bundled pinned v0.2.3 helper for reading and building Unreal Engine PAK files.",
           "url": "https://github.com/trumank/repak"
         },
         {
@@ -121,6 +195,11 @@
           "name": "narknon / EndGameProj",
           "role": "Generated Remake API research reference for reflected FF7R types, properties, enums and functions.",
           "url": "https://github.com/narknon/EndGameProj"
+        },
+        {
+          "name": "akitaonrails / distrobox-gaming",
+          "role": "Public FF7R mod-set interoperability reference for ~mods PAK deployment and documented overlapping equipment-data mods.",
+          "url": "https://github.com/akitaonrails/distrobox-gaming"
         }
       ],
       "thanks": [],
@@ -128,6 +207,85 @@
         {
           "name": "FF7R references and tools — source/license notices",
           "sourcePath": "games/ff7r/THIRD_PARTY.md"
+        },
+        {
+          "name": "repak — MIT License",
+          "sourcePath": "games/ff7r/runtime/repak/v0.2.3/LICENSE-MIT"
+        },
+        {
+          "name": "repak — Apache License 2.0",
+          "sourcePath": "games/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE"
+        }
+      ]
+    },
+    "ff7r2": {
+      "contributions": [
+        {
+          "name": "David Matos (frostbone25) / Shader Injector",
+          "role": "The D3D12 shader-replacement mod Lexeditor bundles for Rebirth, pinned to the 2.2.1 Maximum quality release.",
+          "url": "https://github.com/frostbone25/ShaderInjector"
+        },
+        {
+          "name": "Microsoft / DirectX Shader Compiler",
+          "role": "dxc, dxcompiler and dxil, shipped inside the Shader Injector release to recompile its shaders.",
+          "url": "https://github.com/microsoft/DirectXShaderCompiler"
+        },
+        {
+          "name": "Yoraiz0r / FF7RebirthDataObjectEditor",
+          "role": "MIT-licensed Rebirth editor used as a public behavior cross-check for editing extracted DataObject .uasset files in original IoStore state. No code is vendored.",
+          "url": "https://github.com/Yoraiz0r/FF7RebirthDataObjectEditor"
+        },
+        {
+          "name": "Synthlight / FF7R2-DataObject-Parser",
+          "role": "CC BY-NC 4.0 Rebirth format documentation used to independently verify IoStore-state DataObject layout and public table/row/property names across PlayerParameter and the unresolved Rebirth gameplay areas. Lexeditor does not vendor or adapt this implementation.",
+          "url": "https://github.com/Synthlight/FF7R2-DataObject-Parser"
+        },
+        {
+          "name": "trumank / retoc",
+          "role": "MIT-licensed IoStore CLI reviewed as the pinned DirectoryIndex extraction route. It is not automatically invoked because its Oodle dependency may be acquired when absent.",
+          "url": "https://github.com/trumank/retoc"
+        },
+        {
+          "name": "matyamod / UnrealReZen (ff7r branch)",
+          "role": "GPL-3.0 FF7R2 packaging reference used to verify UE4.26, End/Content mounting and the Rebirth dependency-manifest workaround. Lexeditor can invoke only a separately supplied local executable through its candidate-only packaging route; no UnrealReZen code or binary is bundled.",
+          "url": "https://github.com/matyamod/UnrealReZen"
+        },
+        {
+          "name": "nikolaybutnik / FFVII-Rebirth-Mesh-Patcher",
+          "role": "MIT-licensed public Rebirth tooling used to cross-check that native IoStore mod triples are discovered under End/Content/Paks/~mods. No code is vendored or adapted.",
+          "url": "https://github.com/nikolaybutnik/FFVII-Rebirth-Mesh-Patcher"
+        },
+        {
+          "name": "f80h / FF7 Rebirth Load ordering",
+          "role": "August 2026 public UE4.26/Rebirth load-order analysis used to implement read-only native package precedence reporting. No article text, mod assets or code are bundled.",
+          "url": "https://www.nexusmods.com/finalfantasy7rebirth/articles/46"
+        },
+        {
+          "name": "Gantz79 / 100 Percent Steal and Drop Rate",
+          "role": "Public Rebirth behavior evidence for #471: a packaged rate edit works and the author reports the 25% rate data is shared between steals and enemy drops. Used for semantic boundary research only; no mod assets are copied or redistributed.",
+          "url": "https://www.nexusmods.com/finalfantasy7rebirth/mods/157"
+        },
+        {
+          "name": "TheWolfster / Refreshed Chocobo Rest Stops (Static Mesh)",
+          "role": "Public Rebirth evidence for #472 that Chocobo rest-stop meshes can be replaced and that the blue bench is a separate asset among multiple bench models. Used for research only; no mod assets are copied or redistributed.",
+          "url": "https://www.nexusmods.com/finalfantasy7rebirth/mods/2048"
+        },
+        {
+          "name": "DaniRBT / FF7 Rebirth Accessibility - Visibility Overhaul",
+          "role": "Public Rebirth evidence for #473 separating pak-based minimap position/size changes from the optional UE4SS HUD mover. Used to avoid conflating HUD layout with world-minimap zoom; no mod assets are copied or redistributed.",
+          "url": "https://www.nexusmods.com/finalfantasy7rebirth/mods/2357"
+        },
+        {
+          "name": "narknon / FF7R2UProj",
+          "role": "Public generated Rebirth type declarations used only as reverse-engineering/schema evidence for #470/#471/#472/#473/#477: Chocobo ride-legality/location seams; the concrete BattleItemPossession TArray<FName>/TArray<uint8>/int32 schema; bench mesh/cushion actor members; navimap scale option categories; and Queen's Blood field/pass/turn types. No root repository license file was found in the audited snapshot, so no source is copied, adapted, vendored or redistributed.",
+          "url": "https://github.com/narknon/FF7R2UProj"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Shader Injector — MIT License",
+          "sourcePath": "games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt"
         }
       ]
     },
@@ -139,12 +297,32 @@
       "contributions": [
         {
           "name": "Memoria contributors",
-          "role": "FF9 runtime integration and documented gameplay data formats.",
+          "role": "FF9 runtime integration, CSV schemas and documented gameplay data formats.",
           "url": "https://github.com/Albeoris/Memoria"
+        },
+        {
+          "name": "K0lb3 / UnityPy contributors",
+          "role": "Permissively licensed Unity serialized-file and UnityRaw interoperability reference used to cross-check FF9 archive handling.",
+          "url": "https://github.com/K0lb3/UnityPy"
+        },
+        {
+          "name": "Tirlititi / Hades Workshop",
+          "role": "Additional FF9 Steam archive reverse-engineering reference; its source and binaries are not bundled or invoked by Lexeditor.",
+          "url": "https://github.com/Tirlititi/Hades-Workshop"
+        },
+        {
+          "name": "GameJawnsInc / Dream World IX / ff9mapkit",
+          "role": "MIT-licensed public FF9 p0data interoperability research for fields, event scripts, models, animations, world-map assets and Memoria loose overrides.",
+          "url": "https://github.com/GameJawnsInc/Dream-World-IX"
         }
       ],
       "thanks": [],
-      "licenses": []
+      "licenses": [
+        {
+          "name": "FF9 references — source and license notices",
+          "sourcePath": "games/ff9/THIRD_PARTY.md"
+        }
+      ]
     },
     "palworld": {
       "contributions": [
@@ -167,12 +345,21 @@
         }
       ]
     },
+    "project-zomboid": {
+      "source": "games/project_zomboid/credits.json",
+      "licenseRoot": "games/project_zomboid"
+    },
     "warband": {
       "contributions": [
         {
           "name": "BRF Sync contributors",
           "role": "Separate read-only tool for converting Warband model resources.",
           "url": "https://github.com/markpryk/brf_sync_tools"
+        },
+        {
+          "name": "Sea-Monster / WarbandModuleSystem",
+          "role": "MIT-licensed Module System 1.171 reference for documented Warband record schemas and export semantics.",
+          "url": "https://github.com/Sea-Monster/WarbandModuleSystem"
         }
       ],
       "thanks": [],
@@ -184,6 +371,10 @@
         {
           "name": "BRF Sync — GNU GPL v2",
           "sourcePath": "tools/brf-sync/LICENSE"
+        },
+        {
+          "name": "Warband Module System schema reference — MIT",
+          "sourcePath": "games/warband/THIRD_PARTY.md"
         }
       ]
     },
@@ -193,6 +384,16 @@
           "name": "MagicRDR contributors",
           "role": "Reference and separately installed tool for Red Dead Redemption archives.",
           "url": "https://github.com/Foxxyyy/Magic-RDR"
+        },
+        {
+          "name": "CodeX.Games.RDR1 contributors",
+          "role": "Public RDR1 STRTBL/RPF6 format research consulted for independently implemented string-table compatibility.",
+          "url": "https://github.com/Foxxyyy/CodeX.Games.RDR1"
+        },
+        {
+          "name": "K3rhos / RedHook",
+          "role": "External RDR1 runtime prerequisite. Lexeditor links to the official download and does not redistribute RedHook files.",
+          "url": "https://www.nexusmods.com/reddeadredemption/mods/192"
         }
       ],
       "thanks": [],
@@ -219,6 +420,21 @@
           "name": "RageLib contributors",
           "role": "Resource format support used by the archive tool.",
           "url": "https://github.com/WesternSpace/gta-toolkit"
+        },
+        {
+          "name": "Tsuda Kageyu / MinHook contributors",
+          "role": "Vendored minimal x86/x64 Windows API hooking library used by the RDR2 native runtime.",
+          "url": "https://github.com/TsudaKageyu/minhook"
+        },
+        {
+          "name": "Alexander Blade / ScriptHookRDR2",
+          "role": "External runtime loader required by the RDR2 native ASI; not redistributed by Lexeditor.",
+          "url": "https://www.dev-c.com/rdr2/scripthookrdr2/"
+        },
+        {
+          "name": "Smerdokryl / RDR2_SDK",
+          "role": "External ScriptHookRDR2 SDK headers and import library used to build the RDR2 native runtime; not redistributed by Lexeditor.",
+          "url": "https://github.com/Smerdokryl/RDR2_SDK"
         }
       ],
       "thanks": [],
@@ -242,6 +458,10 @@
         {
           "name": "RageLib — MIT",
           "sourcePath": "tools/rpf-cli/RAGELIB-LICENSE.txt"
+        },
+        {
+          "name": "MinHook — BSD 2-Clause License",
+          "sourcePath": "games/rdr2/native_runtime/GameplayTweaks/third_party/minhook/LICENSE.txt"
         }
       ]
     },
@@ -271,31 +491,123 @@
       "thanks": [],
       "licenses": []
     },
-    "chrono-trigger": {
+    "factorio": {
       "contributions": [
         {
-          "name": "jimzrt / ChronoMod contributors",
-          "role": "Steam resources.bin ARC1 archive format reference.",
-          "url": "https://github.com/jimzrt/ChronoMod"
+          "name": "Wube Software / Factorio API documentation",
+          "role": "Official Factorio 2.1 prototype schemas, prototype-stage lifecycle and mod interoperability contract.",
+          "url": "https://lua-api.factorio.com/latest/"
         },
         {
-          "name": "GitExl / CTViewer contributors",
-          "role": "Steam scene, overworld, map, tileset, palette and script format references.",
-          "url": "https://github.com/GitExl/CTViewer"
+          "name": "Factorio Wiki contributors",
+          "role": "Official modding tutorial, mod structure and --dump-data workflow reference.",
+          "url": "https://wiki.factorio.com/Tutorial:Modding_tutorial"
         },
         {
-          "name": "OnemusCT / Temporal Redux contributors",
-          "role": "PC Atel event command widths and behavior references.",
-          "url": "https://github.com/OnemusCT/temporal-redux"
+          "name": "Wube Software / factorio-data",
+          "role": "Official prototype data and examples used as a read-only implementation reference.",
+          "url": "https://github.com/wube/factorio-data"
         },
         {
-          "name": "TheRealBiggs / CTExt contributors",
-          "role": "Chrono Trigger Steam loose-file and CTP runtime loading model.",
-          "url": "https://github.com/TheRealBiggs/ctext"
+          "name": "jacquev6 / factorio-data-raw-json-schema",
+          "role": "Reference-only research for Factorio JSON dump edge cases. No code or schema is bundled because no repository license file was found.",
+          "url": "https://github.com/jacquev6/factorio-data-raw-json-schema"
+        },
+        {
+          "name": "Factorio community font documentation",
+          "role": "Installed core-font path and Titillium Web mapping used for the local-only Factorio UI font route; Lexeditor does not bundle the game font.",
+          "url": "https://forums.factorio.com/viewtopic.php?t=31891"
         }
       ],
       "thanks": [],
       "licenses": []
+    },
+    "ffx-x2": {
+      "contributions": [
+        {
+          "name": "Fahrenheit contributors",
+          "role": "FFX/X-2 runtime, file-only mod manifest/load-order contract, and External File Loader interoperability reference.",
+          "url": "https://github.com/fahrenheit-crew/fahrenheit"
+        },
+        {
+          "name": "Michivi / vbf-fs",
+          "role": "BSD-licensed reference for VBF archive headers, entries, block compression and validation.",
+          "url": "https://github.com/michivi/vbf-fs"
+        },
+        {
+          "name": "Karifean / FFXDataParser",
+          "role": "Research cross-check for extracted FFX data organization; no source copied.",
+          "url": "https://github.com/Karifean/FFXDataParser"
+        },
+        {
+          "name": "HeartlessSeph / FFX2-010-Templates",
+          "role": "Independent research cross-check for FFX-2 accessory and dressphere job.bin layouts; no source copied.",
+          "url": "https://github.com/HeartlessSeph/FFX2-010-Templates"
+        },
+        {
+          "name": "topher-au / VBFTool",
+          "role": "Historical VBF and Steam launcher-layout research cross-check; no source copied.",
+          "url": "https://github.com/topher-au/VBFTool"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "FFX/X-2 references — source and BSD notice",
+          "sourcePath": "games/ffx_x2/THIRD_PARTY.md"
+        }
+      ]
+    },
+    "terraria": {
+      "contributions": [
+        {
+          "name": "tModLoader team / tModLoader",
+          "role": "Terraria mod loader, source-project/build conventions, ExampleMod, build.txt semantics and API reference.",
+          "url": "https://github.com/tModLoader/tModLoader"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
+    },
+    "ds3": {
+      "source": "games/ds3/credits.json",
+      "licenseRoot": "games/ds3"
+    },
+    "chrono-trigger": {
+      "contributions": [
+        {
+          "name": "GitExl / CTViewer contributors",
+          "role": "MIT-licensed current-PC reference for Steam ARC1 resources, area exits, treasure and other separated PC layouts.",
+          "url": "https://github.com/GitExl/CTViewer"
+        },
+        {
+          "name": "NaGaa95 / ct_nx contributors",
+          "role": "MIT-licensed independent reference for ARC1 handling and ChronoMod-compatible CTP package semantics.",
+          "url": "https://github.com/NaGaa95/ct_nx"
+        },
+        {
+          "name": "jimzrt / ChronoMod contributors",
+          "role": "Historical resources.bin interoperability evidence only; no source code is copied because the audited repository has no clear top-level license.",
+          "url": "https://github.com/jimzrt/ChronoMod"
+        },
+        {
+          "name": "TheRealBiggs / CTExt contributors",
+          "role": "Steam loose-file and CTP runtime behavior evidence only; no binary or source is bundled because the audited repository has no clear top-level license.",
+          "url": "https://github.com/TheRealBiggs/ctext"
+        },
+        {
+          "name": "OnemusCT / Temporal Redux contributors",
+          "role": "GPLv3 event-format research reference only; no code is copied into the fresh fixed-format editing slice.",
+          "url": "https://github.com/OnemusCT/temporal-redux"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Chrono Trigger research sources — licenses and evidence limits",
+          "sourcePath": "games/chrono_trigger/THIRD_PARTY.md"
+        }
+      ]
     }
   }
 }

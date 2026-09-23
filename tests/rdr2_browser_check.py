@@ -8,6 +8,7 @@ are executed.
 from pathlib import Path
 import argparse
 import json
+import re
 from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +58,14 @@ window.fetch=async function(url,options={}) {
                       '<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
     html=html.replace('<script src="/shared/framework.js"></script>',
                       '<script>'+fixture+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')+'</script>')
+    # The page loads its own script and stylesheet from modules beside it. There
+    # is no server here, so they are inlined in the order the page lists them.
+    for module in re.findall(r'<script src="/?([A-Za-z0-9_.-]+\.js)"></script>', html):
+        html=html.replace(f'<script src="{module}"></script>',
+                          '<script>'+(ROOT/'games/rdr2'/module).read_text(encoding='utf-8')+'</script>')
+    for sheet in re.findall(r'<link rel="stylesheet" href="/?([A-Za-z0-9_.-]+\.css)">', html):
+        html=html.replace(f'<link rel="stylesheet" href="{sheet}">',
+                          '<style>'+(ROOT/'games/rdr2'/sheet).read_text(encoding='utf-8')+'</style>')
     return html
 
 
@@ -75,9 +84,9 @@ def run(output: Path, executable: str | None):
                 html=document(unavailable=case=='unavailable').replace(
                     '<head>','<head><base href="https://lexeditor.test/">',1)
                 page.set_content(html,wait_until='domcontentloaded')
-                control=page.locator('.alcohol-strength input')
+                control=page.locator('.lex-inline-label').filter(has_text='Drunkenness').locator('input')
                 expect(control).to_have_count(1)
-                expect(page.locator('.loot-item')).to_have_count(3)
+                expect(page.locator('.lex-list-row')).to_have_count(3)
                 page.wait_for_timeout(150)
                 assert not errors,errors
                 if case=='unavailable':
@@ -88,9 +97,9 @@ def run(output: Path, executable: str | None):
                     page.screenshot(path=str(output/'unavailable.png'),full_page=True)
                 else:
                     expect(control).to_have_value('0.17')
-                    page.locator('.loot-item').filter(has_text='CONSUMABLE_MOONSHINE').click()
+                    page.locator('.lex-list-row').filter(has_text='CONSUMABLE_MOONSHINE').click()
                     expect(control).to_have_value('1')
-                    page.locator('.loot-item').filter(has_text='CONSUMABLE_BRANDY').click()
+                    page.locator('.lex-list-row').filter(has_text='CONSUMABLE_BRANDY').click()
                     expect(control).to_have_value('0.17')
                     control.scroll_into_view_if_needed()
                     page.screenshot(path=str(output/'baseline.png'),full_page=True)

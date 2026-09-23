@@ -57,12 +57,22 @@ def main() -> int:
             """})
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
-            cdp.eval("state.selectedItem='ankle_boots';renderItems()")
-            wait_eval(cdp, "document.querySelectorAll('.warband-item-detail canvas').length===1&&document.querySelector('.warband-item-thumbnail img')?.naturalWidth>0&&window.__warbandPreview?.length===1", 90)
+            target = cdp.eval("""(()=>{
+              const item=state.items.rows.find(row=>row.inventoryMesh);
+              return {fontAvailable:!!state.font?.available,
+                item:item?{id:item.id,name:item.name,key:itemRowKey(item)}:null};
+            })()""")
+            if not target["fontAvailable"] or not target["item"]:
+                print("SKIPPED: installed Warband font/item preview assets are unavailable on this machine")
+                return 0
+            cdp.eval(f"state.selectedItem={target['item']['key']!r};renderItems()")
+            wait_eval(cdp, "document.querySelector('.warband-item-thumbnail img')?.naturalWidth>0", 90)
+            cdp.eval("document.querySelector('.warband-item-detail .lex-detail-panel-icon').click()")
+            wait_eval(cdp, "document.querySelector('.warband-item-detail.lex-model-preview-open')&&document.querySelectorAll('.lex-model-preview-drawer canvas').length===1&&window.__warbandPreview?.length===1", 90)
             result = cdp.eval("""(()=>{
               const heading=document.querySelector('.warband-item-detail>.lex-detail-panel-heading');
               const icon=document.querySelector('.lex-detail-panel-icon');
-              const canvases=[...document.querySelectorAll('.warband-item-detail canvas')];
+              const canvases=[...document.querySelectorAll('.lex-model-preview-drawer canvas')];
               const labels=[...document.querySelectorAll('nav button')].map(button=>({
                 label:button.getAttribute('aria-label'),glyphs:button.querySelectorAll('.warband-glyph').length,
                 bitmap:!!button.querySelector('.warband-bitmap-text')
@@ -73,8 +83,9 @@ def main() -> int:
                 id:document.querySelector('.lex-detail-panel-id')?.textContent,
                 errors:window.__testErrors};
             })()""")
-            if (result["errors"] or result["title"] != "Ankle Boots" or result["id"] != "ankle_boots"):
-                raise AssertionError(result)
+            if (result["errors"] or result["title"] != target["item"]["name"] or
+                    result["id"] != target["item"]["id"]):
+                raise AssertionError({"target": target, "result": result})
             if result["icon"]["width"] < 24 or result["icon"]["height"] < 24:
                 raise AssertionError(result)
             if len(result["canvases"]) != 1 or any(row["width"] < 24 or row["height"] < 24
@@ -91,7 +102,7 @@ def main() -> int:
             assert all(b["badges"] == 1 for b in badges), badges
             badge_geometry = cdp.eval("[...document.querySelectorAll('nav .lex-tab-shortcut')].map(n=>{const a=n.getBoundingClientRect(),b=n.closest('button').getBoundingClientRect();return Math.abs((a.top+a.bottom-b.top-b.bottom)/2)})")
             assert all(delta <= 1 for delta in badge_geometry), badge_geometry
-            output = ROOT / "worklog" / "issues" / "rendered" / "github-20-warband-detail-icon-font.png"
+            output = ROOT / "worklog" / "acceptance" / "warband" / "github-20-warband-detail-icon-font.png"
             output.parent.mkdir(parents=True, exist_ok=True)
             shot = cdp.call("Page.captureScreenshot", {
                 "format": "png", "captureBeyondViewport": False, "fromSurface": True,

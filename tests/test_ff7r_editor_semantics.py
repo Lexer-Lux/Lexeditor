@@ -1,11 +1,13 @@
 from pathlib import Path
 
 
-EDITOR = Path(__file__).resolve().parents[1] / "games" / "ff7r" / "editor.html"
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 
 
 def test_item_and_enemy_loot_tabs_are_first_class_surfaces():
-    html = EDITOR.read_text(encoding="utf-8")
+    html = plugin_ui("ff7r")
     # Equipment, Item and Materia are three top-level tabs, not one tab with a
     # subtab bar: they are three separate tables in the game and the plugin
     # already knows all three names.
@@ -25,8 +27,10 @@ def test_item_and_enemy_loot_tabs_are_first_class_surfaces():
 
 
 def test_loot_chance_editor_is_percent_bounded_and_reuses_generic_save_path():
-    html = EDITOR.read_text(encoding="utf-8")
+    html = plugin_ui("ff7r")
     assert 'min:0,max:100' in html
     assert 'Math.max(0,Math.min(100,value))' in html
     assert 'api("/api/save"' in html
-    assert '["data","loot","text"].includes(state.tab)||isEconomyTab(state.tab)' in html
+    assert '["misc","loot","text","tweaks"].includes(state.tab)' in html
+    assert "isEconomyTab(state.tab)" in html
+    assert "!!curatedSpec(state.tab)" in html

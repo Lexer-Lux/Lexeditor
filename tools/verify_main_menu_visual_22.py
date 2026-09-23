@@ -235,7 +235,7 @@ def main() -> int:
         assert settings_layout["defaults"] >= 8 and settings_layout["copied"] == "weekly" and settings_layout["paired"], settings_layout
         assert settings_layout["rarity"] == "3", settings_layout
         assert settings_layout["transitionMinimum"] == "1.5", settings_layout
-        assert cdp.eval("document.querySelector('#lex-absentGameDesaturationPercent')===null&&document.querySelector('#lex-default-absentGameDesaturationPercent').value==='75'"), settings_layout
+        assert cdp.eval("document.querySelector('#lex-absentGameDesaturationPercent')===null&&document.querySelector('#lex-default-absentGameDesaturationPercent').value==='40'"), settings_layout
         assert settings_layout["authorized"] and settings_layout["userBg"] != settings_layout["developerBg"], settings_layout
         assert settings_layout["defaultLabel"] == "DEFAULT" and settings_layout["defaultBorder"] == "0px", settings_layout
         assert settings_layout["defaultBackground"] == "rgba(0, 0, 0, 0)", settings_layout

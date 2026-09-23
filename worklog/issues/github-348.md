@@ -1,15 +1,31 @@
-# #348: Keep belt lanterns upright and visible
+# Issue 348 — Belt lantern orientation and visibility
 
-[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/348)
+## Requirements
+Fix sideways tilt at several attachment points and intermittent
+disappearance with the melee belt. Correct orientation and visibility
+during movement. Main lantern behavior is #105; leg clipping is #295.
+The issue states deferral must not become waiting-on-Lexer.
 
-## Requirements and decisions
+## Findings (2026-09-22)
+- Code: `games/rdr2/native_runtime/GameplayTweaks/modules/belt_lantern.cpp`
+  (482 lines). Attachment is bone-resolved (PH_Belt_Thrower / bone 2656,
+  WEAPON_ATTACH_POINT_LANTERN) with runtime pose calibration
+  (`attachBeltLanternCalibrationPose`, best-pose selection with rotation
+  scores and attach readback).
+- Pose selection is empirical: the right fix is a calibration-data or
+  pose-table change driven by in-game observation, not a blind constant
+  edit. No compile check is possible here either (build needs the external
+  RDR2 SDK).
+- Left actionable: needs an in-game session (equip states incl. melee
+  belt, movement) to capture calibration logs, then a data-driven fix.
 
-Read the live GitHub issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
+## Next work (agent with game access)
+Run the calibration path in-game across belt states, collect the pose
+logs, and set the per-state pose from evidence.
 
-## Current implementation and evidence
+## 2026-09-23 misc-fixes: flipped to waiting with concrete checklist
 
-Reconcile live code, PRs and existing topic/session worklogs. Do not infer build, deployment, gameplay success, or acceptance from documentation alone.
-
-## Next agent work
-
-Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+Per Lexer's rule (needs concrete Lexer-side work means waiting), posted the
+exact game-session/decision checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self Row0Dummy="" FieldLayout="Magic" />
+  <Field>
+    <yesNoDialogMessageId />
+    <limitCancelSpEffectId />
+    <sortId />
+    <requirementLuck />
+    <aiNotifyType />
+    <refIdFpCost1 />
+    <refIdSpCost1 />
+    <iconId IconConfig="Item" />
+    <behaviorId />
+    <mtrlItemId />
+    <replaceMagicId />
+    <maxQuantity />
+    <heroPoint />
+    <overDexterity />
+    <sfxVariationId />
+    <slotLength />
+    <requirementIntellect />
+    <requirementFaith />
+    <analogDexterityMin />
+    <analogDexterityMax />
+    <ezStateBehaviorType Enum="MAGIC_CATEGORY" />
+    <refCategory1 Enum="BEHAVIOR_REF_TYPE" />
+    <spEffectCategory Enum="MAGIC_SCHOOL" />
+    <refType Enum="MAGIC_MOTION_TYPE" />
+    <menuType />
+    <refCategory4 Enum="BEHAVIOR_REF_TYPE" />
+    <hasSpEffectType />
+    <unknown1 IsBool="" />
+    <spellchange1 IsBool="" />
+    <spellchange2 IsBool="" />
+    <unknown2 IsBool="" />
+    <unknown3 IsBool="" />
+    <unknown4 IsBool="" />
+    <unknown5 IsBool="" />
+    <unknown6 IsBool="" />
+    <enableMulti IsBool="" />
+    <enableMultOnly IsBool="" />
+    <isEnchant IsBool="" />
+    <isShieldEnchant IsBool="" />
+    <enable_live IsBool="" />
+    <enable_gray IsBool="" />
+    <enable_white IsBool="" />
+    <enable_black IsBool="" />
+    <disable_offline IsBool="" />
+    <vowType1 IsBool="" />
+    <vowType2 IsBool="" />
+    <vowType3 IsBool="" />
+    <vowType4 IsBool="" />
+    <vowType5 IsBool="" />
+    <vowType6 IsBool="" />
+    <vowType7 IsBool="" />
+    <VowType8 IsBool="" />
+    <VowType9 IsBool="" />
+    <VowType10 IsBool="" />
+    <VowType11 IsBool="" />
+    <VowType12 IsBool="" />
+    <VowType13 IsBool="" />
+    <VowType14 IsBool="" />
+    <VowType15 IsBool="" />
+    <Unk7 />
+    <Unk8 />
+    <CastSfx1 />
+    <CastSfx2 />
+    <CastSfx3 />
+    <toughnessCorrectRate />
+    <ReplacementStatusType Enum="MAGIC_STATUS_TYPE" />
+    <ReplacementStatus1 />
+    <ReplacementStatus2 />
+    <ReplacementStatus3 />
+    <ReplacementStatus4 />
+    <refCategory2 Enum="BEHAVIOR_REF_TYPE" />
+    <refIdSpCost4 />
+    <magicId0 Refs="Magic" />
+    <magicId1 Refs="Magic" />
+    <magicId2 Refs="Magic" />
+    <magicId3 Refs="Magic" />
+    <refIdFpCost2 />
+    <refIdSpCost2 />
+    <Unk10 />
+    <refCategory3 Enum="BEHAVIOR_REF_TYPE" />
+    <refIdFpCost4 />
+    <refIdFpCost3 />
+    <refIdSpCost3 />
+    <refId1 Refs="Bullet,SpEffectParam,BehaviorParam_PC" />
+    <refId2 Refs="Bullet,SpEffectParam,BehaviorParam_PC" />
+    <refId3 Refs="Bullet,SpEffectParam,BehaviorParam_PC" />
+    <refId4 Refs="Bullet,SpEffectParam,BehaviorParam_PC" />
+    <pad1 Padding="" />
+  </Field>
+</PARAMMETA>

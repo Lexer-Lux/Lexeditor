@@ -1,0 +1,8 @@
+{
+  "mods": [
+    {"name": "base", "enabled": true},
+    {"name": "fixture-source", "enabled": true},
+    {"name": "space-age", "enabled": true},
+    {"name": "disabled-source", "enabled": false}
+  ]
+}

@@ -13,3 +13,16 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes status
+Healing and accuracy runtimes stand (tests green). Melee, magic-damage, and status-infliction patches are still missing: each needs hand-written x86 against its routine, which cannot be validated without the game, so no blind machine code was written. Mug prerequisite done on this branch (explicit Difficulty contract plus tests, see github-408.md); the Mug comparison patch itself remains. Formulae page scroll report still needs a rendered check. Issue stays actionable.
+
+## 2026-09-23 misc-fixes status
+Scroll report resolved and fixed: the Formulae tab mounted a bare detailPanel while the FF8 plugin clips #main (`--lex-main-overflow:hidden`), so stacked cards below the fold were unreachable (reproduced headless: last card bottom 819px at 800px viewport, no scroll path). Fix wraps the panel in the shared `.lex-tweaks-scroll` container in `renderFormulae` (games/ff8/boot.js). Verified by new `tests/ff8_formulae_scroll_browser_check.py` (stubbed data, no game, no writes; wired into native-regressions.yml): scroller scrolls and last card lands inside the window. Melee, magic-damage, status-infliction and Mug-comparison runtime patches still need the game; issue stays actionable.
+
+## 2026-09-23 misc-fixes: flipped to waiting with concrete checklist
+
+Per Lexer's rule (needs concrete Lexer-side work means waiting), posted the
+exact game-session/decision checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

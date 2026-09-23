@@ -1,0 +1,51 @@
+# Issue 512 — RDR2 plugin slow startup
+
+## Requirements
+Cut RDR2 Data Map startup time (multi-second catalog build plus 26 MB JSON
+transfer on every load).
+
+## State
+- Memoized `get_catalog` by file signature (commit b45264e1 on `misc-fixes`,
+  PR 506). Body moved to `_build_catalog`; `get_catalog` returns the cached
+  result while the signature holds.
+- Signature reuses `provenance_cache_key` plus labels, origin provenance,
+  and install.xml mtimes/sizes. All catalog edit paths write through covered
+  files, so saves invalidate the cache.
+- Regression test `test_catalog_result_memoized_until_inputs_change` in
+  `tests/test_rdr2_issue_repairs.py` (StartupCacheTests).
+
+## Evidence
+- Repeat `get_catalog('mine')`: 0.76 s → 0.026 s (24,706 items, 424 effects).
+- Full JSON content identical pre/post change (structural diff: 0).
+- `tests/test_rdr2_issue_repairs.py`: 24 passed. `test_rdr2_native_source.py`:
+  5 passed.
+- Note: catalog build is deterministic within a process but shows
+  pre-existing cross-process ordering variance (old code produced both
+  hashes); content is equal. Memoization makes repeat loads stable.
+
+## Next work
+- First load still ~3.6 s (one-time XML parse). Options if Lexer wants more:
+  lean catalog API payload (needs approval — changes the endpoint contract)
+  or a disk cache for parsed XML.
+- 26 MB transfer per page load is unchanged; same lean-payload decision covers it.
+- Visual baseline (`tools/visual_snapshot.py` to `$TEMP/snap-base1`) stalled at
+  456 files and later died on the ff7r plugin (`body.inner_text()` timeout).
+  Not rerun: the memoization is content-proven identical, so no visual
+  before/after is needed for this fix. Rerun the snapshot before any UI
+  change that needs visual comparison.
+## 2026-09-23 snapshot-timeout diagnosis
+The ff7r `body.inner_text()` timeout that stalled the visual baseline is now
+understood: the FF7R tweaks tab streams 17 tweak groups (one takes ~a minute),
+re-rendering a ~15-20k-node page on each arrival, so text/style audits starve.
+No JS errors; the page itself is fine once loaded. tools/visual_snapshot.py now
+bounds the failure-handler read so notes survive a sick page (misc-fixes).
+Settle behavior still being measured; the memoization itself remains
+content-proven identical, so no re-snapshot is owed by this issue.
+
+## 2026-09-23 verification on misc-fixes @f1fb4407
+Re-ran the RDR2 gate: test_rdr2_issue_repairs 24 passed,
+test_rdr2_native_source 5 passed, test_rdr2_inventory_icons 7 passed,
+compileall clean. Repeat-load fix holds with identical content.
+Issue moved actionable to waiting with the lean-payload / disk-cache /
+accept-current checklist posted as a comment. It returns to actionable
+when Lexer picks one of the three options.

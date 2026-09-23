@@ -1,0 +1,3 @@
+/* Chrono Trigger draws on the shared baseline and nothing else: colour and
+   structure come from the framework; this file only tunes the page. */
+:root{--lex-accent:#d3a348;--lex-accent-text:#1c1608;--lex-highlight:#5d4b2c}

@@ -1,63 +1,33 @@
-"""Paths and support checks for the Chrono Trigger Steam plugin."""
-
+"""Chrono Trigger Steam installation/project paths."""
 from __future__ import annotations
 
 import os
 from pathlib import Path
 
+from runtime_bootstrap import user_data_dir
 
+
+LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
-DEFAULT_GAME_ROOT = Path(r"D:\SteamLibrary\steamapps\common\Chrono Trigger")
-GAME_ROOT = Path(os.environ.get("LEXEDITOR_CHRONO_TRIGGER_ROOT", str(DEFAULT_GAME_ROOT)))
-RESOURCE_PATH = GAME_ROOT / "resources.bin"
-
-PROJECT_MARKER = "lexeditor-project.json"
-PROJECT_TEMPLATE_ROOT = PLUGIN_ROOT / "project_template"
-PROJECT_ROOT = Path(os.environ.get("LEXEDITOR_CHRONO_TRIGGER_PROJECT", r"C:\ChronoTriggerMod"))
-DEFAULT_PROJECT_ROOT = (
-    PROJECT_ROOT if (PROJECT_ROOT / PROJECT_MARKER).is_file()
-    else PROJECT_TEMPLATE_ROOT
-)
+GAME_ROOT = Path(os.environ.get("LEXEDITOR_CHRONO_TRIGGER_ROOT", r"D:\SteamLibrary\steamapps\common\Chrono Trigger"))
+PROJECT_ROOT = Path(os.environ.get("LEXEDITOR_CHRONO_TRIGGER_PROJECT", user_data_dir() / "projects" / "chrono-trigger"))
 
 
-def check() -> list[str]:
-    """Check the plugin-owned implementation files, not the user's install."""
-    problems: list[str] = []
-    for relative in (
-        "editor.html", "plugin.py", "server.py", "paths.py", "resources.py", "resource_view.py",
-        "inventory.py", "coverage.py", "data.py", "labels.py", "events.py", "field_commands.py",
-        "field_semantics.py", "event_flow.py", "event_edit.py", "field_editors.py", "palettes.py",
-        "scene_tables.py", "scene_maps.py", "scene_render.py", "worlds.py", "world_tables.py",
-        "world_scripts.py", "world_render.py", "changes.py", "ctp.py", "ctext_manager.py",
-        "deployment.py", "integrity.py",
-    ):
-        target = PLUGIN_ROOT / relative
-        if not target.is_file():
-            problems.append(f"Chrono Trigger plugin file is missing: {target}")
-    if not (PROJECT_TEMPLATE_ROOT / PROJECT_MARKER).is_file():
-        problems.append(f"Chrono Trigger project template is missing: {PROJECT_TEMPLATE_ROOT / PROJECT_MARKER}")
+def check_paths(game_root: Path, project_root: Path) -> list[str]:
+    problems = []
+    if not (game_root / "Chrono Trigger.exe").is_file():
+        problems.append(f"Chrono Trigger.exe was not found under {game_root}")
+    if not (game_root / "resources.bin").is_file():
+        problems.append(f"resources.bin was not found under {game_root}")
+    try:
+        game = game_root.resolve()
+        project = project_root.resolve()
+        if project == game or game in project.parents:
+            problems.append("The Chrono Trigger project must be outside the installed game folder")
+    except OSError:
+        pass
     return problems
 
 
-def game_problems(root: Path | None = None) -> list[str]:
-    """Check the minimum Steam layout needed for archive browsing."""
-    game_root = Path(root or GAME_ROOT)
-    required = ("Chrono Trigger.exe", "resources.bin")
-    return [
-        f"Chrono Trigger Steam file is missing: {game_root / relative}"
-        for relative in required
-        if not (game_root / relative).is_file()
-    ]
-
-
-def discover_projects() -> list[Path]:
-    """Find CTExt-style loose-file mods beside the selected Steam install."""
-    mods = GAME_ROOT / "mods"
-    if not mods.is_dir():
-        return []
-    found = []
-    for root in sorted((path for path in mods.iterdir() if path.is_dir()), key=lambda path: path.name.casefold()):
-        if ((root / PROJECT_MARKER).is_file() or (root / "Game").is_dir()
-                or (root / "Localize").is_dir()):
-            found.append(root)
-    return found
+def check() -> list[str]:
+    return check_paths(GAME_ROOT, PROJECT_ROOT)

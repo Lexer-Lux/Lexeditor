@@ -1,4 +1,4 @@
-"""Lexeditor RDR2 plugin service.
+r"""Lexeditor RDR2 plugin service.
 
 Parses the mod's XML data files (catalog_sp.ymt, loot tables, loot matrix),
 serves them as JSON to editor.html, and writes edits back to disk.
@@ -261,6 +261,7 @@ WEAPON_SCHEMA_TYPES = {
 _PROVENANCE_CACHE = {}
 _SCRIPT_INDEX_CACHE = None
 _ORIGIN_MARKER_CACHE = {}
+_CATALOG_RESULT_CACHE = {}
 WEAPON_SCHEMA_FIELDS = {
     "UNK_MEMBER_0x1A782082": "Distances",
     "UNK_MEMBER_0x8E00F0C6": "DegradeOnTotalShots",
@@ -1463,7 +1464,34 @@ def cost_list(container):
     return out
 
 
+def _catalog_result_key(ds):
+    """File signature covering catalog inputs that provenance_cache_key misses."""
+    paths = [LABELS_FILE, ORIGIN_PROVENANCE_FILE, ds_dir("mine") / "install.xml"]
+    stats = []
+    for path in paths:
+        try:
+            stat = path.stat()
+            stats.append((str(path), stat.st_mtime_ns, stat.st_size))
+        except FileNotFoundError:
+            continue
+    return (provenance_cache_key(ds), tuple(stats))
+
+
 def get_catalog(ds="mine"):
+    """Return the memoized built catalog; callers must not mutate the result."""
+    key = (ds, _catalog_result_key(ds))
+    cached = _CATALOG_RESULT_CACHE.get(key)
+    if cached is not None:
+        return cached
+    result = _build_catalog(ds)
+    for old_key in list(_CATALOG_RESULT_CACHE):
+        if old_key[0] == ds:
+            del _CATALOG_RESULT_CACHE[old_key]
+    _CATALOG_RESULT_CACHE[key] = result
+    return result
+
+
+def _build_catalog(ds="mine"):
     root = load_file(CATALOG_FILE, ds)["root"]
     origin_markers = catalog_origin_marker_sets(ds)
     shop_listings = {}
@@ -4389,11 +4417,19 @@ def _weapon_shell_nodes(root):
     return nodes
 
 
+def _weapon_identity_key(name):
+    """A readable asset name and an extracted hash identify the same record."""
+    match = re.fullmatch(r"(?:UNK_MEMBER_)?0x([0-9a-f]{8})", name, re.IGNORECASE)
+    return int(match.group(1), 16) if match else joaat(name)
+
+
 def _weapon_shell_status(root, vanilla_root):
-    current = _weapon_shell_nodes(root)
-    vanilla = _weapon_shell_nodes(vanilla_root)
+    current = {_weapon_identity_key(name): node for name, node in _weapon_shell_nodes(root).items()}
+    vanilla_nodes = _weapon_shell_nodes(vanilla_root)
+    vanilla = {_weapon_identity_key(name): node for name, node in vanilla_nodes.items()}
+    names = {_weapon_identity_key(name): name for name in vanilla_nodes}
     targets = {name: node for name, node in vanilla.items() if (node.text or "").strip()}
-    missing = sorted(set(targets) - set(current))
+    missing = sorted(names[key] for key in set(targets) - set(current))
     blank = sum(1 for name in targets
                 if name in current and not (current[name].text or "").strip())
     return {"available": bool(targets) and not missing, "blank": blank,
@@ -4431,12 +4467,12 @@ def get_weapon_shell_vfx_status(ds="mine"):
 
 
 def _set_weapon_shell_vfx(root, vanilla_root, blanked):
-    current = _weapon_shell_nodes(root)
+    current = {_weapon_identity_key(name): node for name, node in _weapon_shell_nodes(root).items()}
     vanilla = _weapon_shell_nodes(vanilla_root)
     changed = 0
     for name, vanilla_node in vanilla.items():
         vanilla_value = (vanilla_node.text or "").strip()
-        node = current.get(name)
+        node = current.get(_weapon_identity_key(name))
         if node is None or not vanilla_value:
             continue
         value = "" if blanked else vanilla_value
@@ -5045,12 +5081,28 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_response(200)
                     self.send_header("Content-Type", "text/html; charset=utf-8")
                     self.send_header("X-Lexeditor-Plugin", PLUGIN_ID)
-                    # The editor is a single HTML file (CSS + JS inline). Without
-                    # this the browser caches it and keeps showing an OLD build
-                    # after edits, which made fixes look like they did nothing.
+                    # Without this the browser caches the page and keeps showing
+                    # an OLD build after edits, which made fixes look like they
+                    # did nothing. The modules below say the same.
                     self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
                     self.send_header("Pragma", "no-cache")
                     self.send_header("Expires", "0")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                elif path.endswith((".js", ".css")) and "/" not in path.strip("/"):
+                    # The page is a page: its script and its stylesheet live in
+                    # modules beside it, named for what they hold.
+                    module = (ROOT / path.lstrip("/")).resolve()
+                    if module.parent != ROOT.resolve() or not module.is_file():
+                        self.send_error(404)
+                        return
+                    data = module.read_bytes()
+                    self.send_response(200)
+                    self.send_header("Content-Type",
+                                     "text/css; charset=utf-8" if path.endswith(".css")
+                                     else "application/javascript; charset=utf-8")
+                    self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
                     self.send_header("Content-Length", str(len(data)))
                     self.end_headers()
                     self.wfile.write(data)

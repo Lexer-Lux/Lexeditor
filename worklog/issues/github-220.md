@@ -29,3 +29,6 @@ Integration delivery: installed combined ASI12C8E7078225280EF18E365FFB49EE6FBE92
 ## 2026-09-08 follow-up scope review
 
 Live #220 still asks only for the failed vehicle V handoff; accepted foot/horse checks must not be repeated. The earlier installed hash above is historical: #151 now owns the live game installation. Parent holds later candidates and must name the restored/delivered candidate before a new vehicle test. No additional vehicle-native change was justified by this review. Separate #108 source repairs now cover frame-rate-independent calibration and failure-aware profile saves; they do not claim vehicle height is solved.
+
+## 2026-09-22 misc-fixes disposition
+Vehicle profile and mode detection exist in gameplay_camera.cpp; foot and horse are already accepted. The V-toggle candidate needs installation and a wagon/cart/buggy test, but #151 owns the live game installation, so no new vehicle test can run yet. Do not repeat foot/horse checks. Issue stays actionable.

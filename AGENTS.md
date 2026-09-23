@@ -1,5 +1,9 @@
 # Lexeditor project rules
 
+- Reuse existing controls, panel functions, layouts, and CSS classes. When two
+  screens show the same kind of data, use one component and one set of sizing
+  rules. Fix that component and check each caller before adding a screen override.
+
 - Before creating a new game plugin, read `docs/ADDING_A_GAME.md` and follow its
   research-first workflow. Survey existing open-source tools/loaders, documentation
   and format knowledge before writing new parsers, and record material sources in
@@ -17,9 +21,47 @@
 - Keep list and detail views consistent with the RDR2 plugin: record identity
   stays in the master list, and all editable fields stay in the selected
   record's detail pane.
+- Give editor tabs, sections, and fields shared question-mark help. Explain the
+  gameplay effect, how to use the control, and any known limits in plain language.
+  File offsets and parser details are not a substitute for user instructions.
 - Do not claim visual acceptance from source, API, or smoke checks.
 
 ## GitHub issues are the source of truth
+
+### Standard plugin issue structure
+
+Use one parent issue titled `Plugin`, identified by its game label. Link these
+four actual subissues in this order, with the same game label on each:
+
+1. `Create Editor`: Research existing tools and format knowledge first. Build
+   the plugin and required code, vendor permitted helpers, and record Credits.
+   Integrate every Data Map area with appropriate editable views. Do not hide
+   unsupported rows or call raw-file access full integration. Only Lexer can
+   exclude areas as not worth the effort; ask when scope or value is in doubt.
+   Unknown semantics remain protected until proven; report the gap, not success.
+2. `Implement Mod Loading`: Find, add, load and remove real mods. Support record
+   overrides and composition against vanilla where the format requires them,
+   rather than silently replacing a whole file for unrelated record changes.
+   Define load order, conflicts, dependencies and restoration. Test a documented
+   range of real online mods in isolation, including overlapping edits, and
+   make supported mods work without manual repair. Record unsupported cases.
+3. `Create Theme`: Use the game's fonts, colours and sound effects for a fitting
+   theme. Record asset provenance and distribution rights; extract locally when
+   redistribution is not permitted. Do not publish proprietary assets blindly.
+4. `Create GUI`: Build usable, human-friendly screens with shared controls,
+   clear help and good navigation. Inspect rendered screens and interactions,
+   repair UI defects, and check small windows and large UI scales.
+
+Reuse existing matching issues and preserve their discussion. These four
+subissues track one plugin branch/PR, not four separate implementation PRs.
+Keep game names out of issue titles. Each open issue needs its own truthful
+workflow label. Source, rendered UI, mod compatibility, delivered candidate and
+in-game acceptance are separate checks; the parent is not complete while required
+scope remains. Do not infer permission to merge from completion.
+
+Issue/PR administration belongs here. Keep private worker coordination, chat
+URLs, monitoring, recovery and cleanup out of `docs/ADDING_A_GAME.md`; that guide
+is the public technical methodology for users and their agents.
 
 GitHub issues and their comments are the canonical record of requests and public
 project discussion. Agents may summarize implementation state in an internal
@@ -125,3 +167,18 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
   mods, saves, required game data, and diagnostic evidence that is still needed.
 - Do not open visible test windows during a routine check. Native window
   fixtures require explicit user approval; headless checks are the default.
+
+## Editing files from a shell
+
+- Do not pass code containing quotes or backslashes through a bash heredoc.
+  Escaping inside `<<'PY' ... PY` fails on the outer shell first, which reads as
+  ``unexpected EOF while looking for matching `'``. Write the patch script to
+  the scratchpad with the file-writing tool, then run it: `python
+  <scratchpad>/patch.py`. Same for one-off checks longer than a single line.
+- A patch script asserts what it expects to find before replacing it, so a
+  changed file fails loudly instead of silently matching nothing.
+
+## Actionable-to-waiting handoff on plugin PRs
+
+- Work every open actionable issue you can on the PR: verify the code, re-run executable checks, and record evidence plus human test plans (or blocked findings with proof) in the per-issue handoff. Close nothing without a delivered candidate; merge auto-flips closed issues to untested.
+- When agent work is done and only a specific Lexer action blocks the next step, flip the issue to waiting: append an unchecked checklist of the exact actions or answers needed from Lexer and swap the actionable label for waiting. Everything else keeps actionable.

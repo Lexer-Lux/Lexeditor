@@ -17,3 +17,12 @@ No merge or file write was required. No source or installed game data was change
 ## Acceptance boundary
 
 The two mappings are installed; this audit does not prove wheel visibility in game. Test each owned bottle in Story Mode: open the item wheel, locate it under provisions, use it, and report a missing name, icon, slot or effect. No game was launched for this audit. Full imported Online-content support remains broader than these two mappings.
+
+## 2026-09-22 misc-fixes disposition
+Mappings prepared and audited in source; install plus game proof pending. Test, needs the game: own each bottle in Story Mode, open the item wheel, locate it under provisions, use it, and report any missing name, icon, slot, or effect. Do not touch unrelated catalog entries to satisfy the old 1865 baseline. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

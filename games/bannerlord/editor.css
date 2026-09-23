@@ -1,0 +1,6 @@
+/* Bannerlord draws on the shared baseline and nothing else: colour
+   and structure come from the framework; this file only tunes the page. */
+:root{--lex-accent:#8d2f25;--lex-highlight:#a56b34}
+/* Destructive Remove/Delete actions keep the accent fill so they read
+   as warnings without restating button structure. */
+.bannerlord-danger{color:var(--lex-accent-text,#fff);background:var(--lex-accent);border-color:var(--lex-accent)}

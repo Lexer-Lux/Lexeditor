@@ -6,10 +6,15 @@
       "structure": "Template only. A shipping plugin must declare its mod root or package format and the file layout users should install or edit.",
       "overriding": "Template only. A shipping plugin must declare whether mods stack, replace whole files, merge semantic records, or are mutually exclusive."
     },
+    "bannerlord": {
+      "loader": "Bannerlord's native module loader. Lexeditor deploys the selected project as one Modules/<SubModule ID> module and launches the game with Bannerlord's native /singleplayer _MODULES_*...*_MODULES_ module list.",
+      "structure": "Each mod is a native Bannerlord module rooted at <Bannerlord>/Modules/<module>/ with SubModule.xml, optional bin/Win64_Shipping_Client assemblies, ModuleData XML/data files, GUI assets, and other module-owned resources. Lexeditor edits one source project and deploys its module-owned outputs additively into that layout.",
+      "overriding": "Bannerlord can load multiple modules together. Lexeditor resolves the selected module's required dependency closure and launch order, but it does not semantically merge independent external modules or invent conflict resolution for two modules that replace the same runtime resource."
+    },
     "ff7": {
-      "loader": "Not implemented. Lexeditor currently edits safe project copies and does not deploy or load mods into the current Steam FFVII installation.",
-      "structure": "One selected Lexeditor project mirrors the supported FFVII game-data sources outside the installed game. The installed game files are treated as read-only source data.",
-      "overriding": "No runtime mod stack exists yet. Lexeditor edits one project at a time; multiple FFVII mods are not composed or resolved by priority."
+      "loader": "FFNx Direct Mode. Lexeditor can build an isolated Direct Mode export, deploy to an existing FFNx.toml, or install the pinned upstream FFNx-v1.24.3.0 release for the classic 2026 Steam layout. The archive is SHA-256 verified and manual/7th-Heaven FFNx installs remain externally owned.",
+      "structure": "Lexeditor project saves remain outside the game. Export writes .lexeditor/ffnx-direct plus an ownership manifest. Deploy maps only proved KERNEL/KERNEL2 chunks, scene blocks, field encounter section 7 and world enc_w.bin into FFNx's configured direct_mode_path. Executable-backed edits remain project-only.",
+      "overriding": "Lexeditor owns only files listed in .lexeditor-ff7.json and refuses pre-existing unowned Direct Mode paths. Updates/removal require the deployed file hash to match the prior manifest. An opt-in read-only 7th Heaven profile/folder scan reports active ordered mods and blocks definite same-path Direct overlaps; conditional roots and .iro packages remain explicitly incomplete rather than guessed."
     },
     "ff7-2013": {
       "loader": "Not implemented. Lexeditor currently edits safe project copies and does not deploy or load mods into the 2013 PC release.",
@@ -17,9 +22,9 @@
       "overriding": "No runtime mod stack exists yet. Lexeditor edits one project at a time; multiple FFVII 2013 mods are not composed or resolved by priority."
     },
     "ff7r": {
-      "loader": "Lexeditor builds one FF7R Unreal PAK with the pinned repak helper and explicitly deploys it to End/Content/Paks/~mods/Lexeditor-FF7R_P.pak. Runtime-only features use the plugin's separate NativeMods deployment path.",
-      "structure": "Lexeditor keeps installed FF7R PAKs read-only, saves edited game-relative assets under the selected project's content/ tree, builds Lexeditor-FF7R_P.pak under <project>/build/, and keeps runtime/config state separate from the source game archives.",
-      "overriding": "Lexeditor composes its own saved content and enabled semantic overrides into one Lexeditor-owned PAK. It does not semantically merge separate external FF7R mods; collisions with another PAK that replaces the same game asset are resolved by FF7R/Unreal PAK load order."
+      "loader": "Lexeditor supports two guarded PAK paths for FF7R. Build & Deploy writes one ownership-marked Lexeditor-FF7R_P.pak; Mod Library imports PAK folders/ZIPs and deploys enabled packages only under ~mods/LexeditorLibrary. Runtime-only features use the separate NativeMods path.",
+      "structure": "Installed game archives stay read-only. Project edits live under the selected project's content/ tree and build into <project>/build/. Mod Library keeps imported packages outside the game, then copies enabled PAKs into its owned LexeditorLibrary subfolder under End/Content/Paks/~mods.",
+      "overriding": "Lexeditor does not semantically merge separate PAK mods or guess a load-order winner. Mod Library and direct project deployment inspect PAK indexes and refuse exact game-asset collisions with another active PAK. Non-overlapping PAKs coexist; ownership hashes prevent replacement/removal of unmanaged or externally changed Lexeditor deployments."
     },
     "ff8": {
       "loader": "De novo Lexeditor pre-launch compositor targeting FFNx. It reads Junction VIII-compatible mod.xml folder metadata and imports .iroj packages, but does not adopt Junction's live load model.",
@@ -27,19 +32,24 @@
       "overriding": "Enabled mods compose from low to high priority. Same-path ordinary files are higher-priority-wins and Hext patches are ordered; supported packed gameplay data such as kernel.bin is semantically merged against vanilla so non-overlapping record or field edits coexist, while overlapping semantic edits conflict and the higher-priority edit wins."
     },
     "ff9": {
-      "loader": "Memoria. Lexeditor deploys one Lexeditor-owned Memoria mod folder and manages only that folder's entry in Memoria.ini.",
-      "structure": "Edit one Lexeditor project with overlays under StreamingAssets/ (especially StreamingAssets/Data/). Deploy Project copies those overlays into <FF9>\\Lexeditor\\ while preserving other Memoria mods and unrelated Memoria.ini settings.",
-      "overriding": "Lexeditor does not stack or semantically merge multiple FFIX projects. Other Memoria mods may coexist and Memoria resolves them according to its FolderNames ordering; conflicts with the same underlying content therefore follow Memoria's own resolution rules."
+      "loader": "Memoria. Its Mod Manager installs, enables and removes external FF9 mods; Lexeditor deploys only its marker-owned Lexeditor mod folder and hands external-mod management to Memoria's launcher. Mods declaring a MinimumMemoriaVersion newer than Lexeditor's pinned v2025.07.04 are unsupported until the helper pin is deliberately updated and re-verified.",
+      "structure": "Lexeditor projects contain game-relative overrides under StreamingAssets/ plus Lexeditor-owned feature configuration. Deploy copies only those overrides and the Lexeditor runtime into <FF9>/Lexeditor. Other Memoria mod folders and installed p0data archives are not rewritten.",
+      "overriding": "Memoria runtime priority is FolderNames order, highest priority first. Lexeditor deploy keeps Lexeditor first there and, when Priorities already exists, first in that launcher list too; it does not invent a missing Priorities setting. Lexeditor-generated CSV, battle raw16 and field-walkmesh BGI replacements are first-hit whole-file overrides. Format-specific Memoria patch files may compose low-to-high, and event scripts have separate append/MergeScripts behavior. Lexeditor does not claim a universal semantic merge between separate mods."
     },
     "palworld": {
       "loader": "Pocketpair's official Palworld v0.7+ mod loader and Workshop package model. Lexeditor authors compatible packages and PalSchema raw-table patches, builds a clean snapshot, can create one owned unregistered client test package, and can stage/activate a server-compatible package for the Windows dedicated server. Client activation remains read-only; dedicated-server activation is an explicit stale-guarded reversible PalModSettings.ini transaction. Lexeditor does not publish to Steam or install/replace PalSchema or UE4SS.",
       "structure": "One selected Lexeditor project is rooted at Info.json. Build Package creates <project>/build/official-package from Info.json, Thumbnail and declared InstallRule targets while excluding Lexeditor recovery artifacts. Client local testing uses one owned random 10-digit folder under workshop/content/1623730. Server deployment requires IsServer=true and uses <PalServer>/Mods/Workshop/Lexeditor-<PackageName>; server activation recovery state stays under the project, never inside the package.",
       "overriding": "The official loader identifies packages by PackageName. Lexeditor refuses client or server deployment when another source folder already uses the same PackageName and refuses to overwrite externally modified owned state. PalSchema raw patches apply named DataTable row/property values rather than whole assets; when several runtime patches target the same field, Lexeditor does not claim a separate conflict winner beyond PalSchema's runtime order."
     },
+    "project-zomboid": {
+      "loader": "Project Zomboid's native Build 42 mod system. Lexeditor deploys a local development copy for testing; it does not replace the game loader or publish to Steam Workshop.",
+      "structure": "A Build 42 mod uses common/ plus version folders such as 42/, with mod.info beside that version's media/ content. Lexeditor keeps its authoring project outside the installed game and can copy it to <user>/Zomboid/mods/<project> for local testing.",
+      "overriding": "Project Zomboid owns activation and mod ordering. common content is layered with the selected version folder, while mod.info may declare require, incompatible, loadModBefore and loadModAfter relationships. Lexeditor does not semantically merge conflicts between separate mods."
+    },
     "rdr": {
-      "loader": "De novo Lexeditor deployment through RedHook / Ultimate ASI Loader's update-folder override mechanism.",
-      "structure": "Lexeditor edits one project (C:\\RDRMod by default); game-data replacements live under <project>\\mod\\ in archive-relative trees. Deploy Project rebuilds affected RPF6 archive copies under <RDR>\\update\\... while leaving the installed source archives untouched.",
-      "overriding": "Lexeditor has one active project deployment, not a multi-mod priority stack. Its generated update archive copies override stock data; separate mods replacing the same update archive are not semantically merged, and Lexeditor refuses to overwrite a deployed archive that was changed externally."
+      "loader": "Archive-backed RDR1 project replacements deploy through Ultimate ASI Loader's update-folder overload mechanism. RedHook is a separate external runtime prerequisite for Lexeditor's runtime/plugin features; Lexeditor does not bundle either third-party runtime.",
+      "structure": "Lexeditor edits one project (C:\\RDRMod by default); archive-relative replacements live under <project>\\mod\\. Deploy Project rebuilds only affected RPF6 copies under <RDR>\\update\\game\\... while leaving installed source archives untouched. External RedHook .red plugins remain separate files in the game root.",
+      "overriding": "Lexeditor has one active archive deployment, not a multi-mod priority stack. Root RedHook .red and ASI files are left untouched and can remain side-by-side on disk, but runtime coexistence is not claimed. A whole-archive mod that also owns update/game/<archive>.rpf conflicts at that exact path: Lexeditor does not semantically merge it, preserves/restores the pre-existing archive while it owns deployment, and refuses to overwrite an externally changed deployed archive. The public rpf_patch.asi loader documents patch0.rpf, patch1.rpf, ... with higher numbers overriding lower ones; Lexeditor does not import, create, reorder, or verify that runtime priority."
     },
     "rdr2": {
       "loader": "Lenny's Mod Loader (LML) EasyInstall package format. Lexeditor edits an LML package but does not fork, bundle, or replace LML's runtime or Mod Manager.",
@@ -51,15 +61,40 @@
       "structure": "One selected Lexeditor project is a Content Patcher pack with manifest.json and content.json. Deploy Project copies that project into a Lexeditor-owned [CP] folder under <Stardew Valley>\\Mods after confirming SMAPI and Pathoschild.ContentPatcher are installed.",
       "overriding": "Content Patcher owns cross-mod ordering and conflict resolution. Lexeditor emits field-level EditData patches where supported so unrelated field edits can coexist instead of replacing an entire Data asset; it does not rewrite or merge other installed content packs."
     },
+    "terraria": {
+      "loader": "tModLoader 1.4.4 stable. Lexeditor targets tModLoader's native source-project, build, local-mod and Workshop ecosystem instead of patching vanilla Terraria or shipping another loader.",
+      "structure": "Editable source mods live under the tModLoader save root at ModSources/<ModName>/ with build.txt, a .csproj importing ..\\tModLoader.targets, C# source, localization and content assets. tModLoader owns compiled .tmod output and enabled-mod state.",
+      "overriding": "tModLoader loads multiple mods through its API/dependency model rather than whole-file replacement order. Lexeditor does not invent cross-mod file priority or semantically merge unrelated source projects; runtime interactions and conflicts follow tModLoader and the participating mods."
+    },
     "warband": {
       "loader": "Warband's native module system. WSE2 is Lexeditor's optional enhanced runtime helper, not a multi-mod overlay loader.",
       "structure": "Each installed mod is its own folder under <Warband>\\Modules\\ with module.ini. Lexeditor can also edit and build a Module System source project before it becomes an installed module.",
       "overriding": "Warband selects one module at launch. Lexeditor does not stack several modules or apply a cross-module priority order; resources and dependencies declared by the selected module follow Warband's own module rules."
     },
+    "ff7r2": {
+      "loader": "Rebirth gameplay assets use native IoStore patch triples. Lexeditor can build an isolated candidate with explicitly supplied UnrealReZen and Oodle paths; it never downloads either dependency and never installs the unaccepted candidate. ReShade remains dxgi.dll and pinned Shader Injector 2.2.1 remains dsound.dll.",
+      "structure": "The current Characters editor keeps read-only source/End/Content/DataObject/Resident/PlayerParameter.uasset and stages its edit under content/End/Content/.... The candidate builder treats every regular file below content/End/Content as an explicit input, rejects staged symlinks, records each input path/size/hash, rechecks the complete set after packing, and writes .pak/.utoc/.ucas plus a manifest under build/ff7r2-candidate-*/. Real accepted triples are loaded by Rebirth from End/Content/Paks/~mods, but this PR does not copy candidates there.",
+      "overriding": "Characters Save and Build Candidate remain project-only operations. For complete native *_P triples, current public UE4.26/Rebirth load-order research shows that higher numeric _<n>_P patch levels win; at the same patch level the case-insensitively smaller complete package path wins. Lexeditor reports this filename/path precedence read-only, does not inspect package contents or claim semantic compatibility, and does not activate a gameplay package until a real-game candidate has been accepted. ReShade and Shader Injector continue to stack independently and retain their existing DLL ownership safety."
+    },
+    "factorio": {
+      "loader": "Factorio's native mod loader. Lexeditor exports one generated Factorio 2.1 override mod and does not install, execute, or modify source mods.",
+      "structure": "A Factorio project keeps the imported source/data-raw-dump.json and optional source/mod-list.json read-only, saves structured edits in overrides.json, and exports build/<name>_<version>.zip containing info.json plus data-final-fixes.lua.",
+      "overriding": "The generated data-final-fixes.lua runs in Factorio's final prototype stage. Authored dependencies are preserved and enabled source mods are added as optional dependencies for load ordering when present; generated assignments touch only modeled fields of existing prototypes."
+    },
+    "ffx-x2": {
+      "loader": "Fahrenheit's External File Loader. Lexeditor creates one file-only Fahrenheit mod and does not patch or rebuild the installed FFX_Data.vbf or FFX2_Data.vbf archives.",
+      "structure": "The selected project mirrors Fahrenheit EFL roots under <project>/efl/x/ for FFX and <project>/efl/x2/ for FFX-2. Deploy Project copies those replacements into <game>/fahrenheit/mods/lexeditor-ffx-x2/ with a Fahrenheit manifest and one managed loadorder entry.",
+      "overriding": "Fahrenheit indexes enabled mods in loadorder order and later replacements supersede earlier same-path files. Lexeditor owns only its lexeditor-ffx-x2 mod folder and exact loadorder line; it preserves other mods and refuses to overwrite its deployment if those files changed externally."
+    },
+    "ds3": {
+      "loader": "Lexeditor does not claim a managed Dark Souls III loader yet. It exports a project-local Data0.bdt for manual offline use with a compatible external loader; Lexeditor neither installs nor configures that loader.",
+      "structure": "One selected Lexeditor project contains a marker file and, after Save, one encrypted Data0.bdt. The installed <Dark Souls III>/Game/Data0.bdt is always treated as read-only source data.",
+      "overriding": "Lexeditor authors one complete regulation archive and does not define a multi-mod priority stack. Separate external mods that replace Data0.bdt are not semantically merged by Lexeditor; combine intended parameter edits in one selected project before export."
+    },
     "chrono-trigger": {
-      "loader": "CTExt. Lexeditor uses an already-installed CTExt runtime for explicit loose-file deployment and activation; it never installs or replaces the CTExt DLLs automatically.",
-      "structure": "One selected Lexeditor project is a CTExt-compatible archive-relative overlay containing Game/... and Localize/... paths. External projects can be mirrored into <Chrono Trigger>/mods/<project-name>; a source project already directly under mods/<name> is used in place and is never deleted by Lexeditor.",
-      "overriding": "CTExt owns runtime mod load order through ctext.json. Lexeditor appends or removes only its selected project entry, preserves unrelated entries, and never semantically merges separate projects; within the selected project, loose files replace the corresponding resources.bin resources while the installed archive remains immutable."
+      "loader": "Lexeditor exports standard Chrono Trigger .ctp packages and has an unverified author-test Mod Library adapter for an already-installed CTExt. Lexeditor does not bundle or install CTExt because the audited upstream repository has no clear top-level redistribution license; in-game loading remains unproved.",
+      "structure": "Editable projects and imported CTPs live outside the installed game as Game/... and Localize/... overrides. Export creates a replacement-only CTP. Author-test activation stages selected packages under <Chrono Trigger>/mods/LexeditorLibrary/ and updates only Lexeditor-owned CTExt load-order entries; resources.bin remains read-only.",
+      "overriding": "CTExt CTPs are ordered low to high; later selected Lexeditor packages win whole-resource conflicts. Lexeditor reports overlapping resource paths, preserves external CTExt load-order entries, appends its owned entries in the selected order, and does not claim semantic merging across separate CTP packages."
     }
   }
 }

@@ -13,3 +13,12 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 ## Next agent work
 
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+
+## 2026-09-22 misc-fixes disposition
+Research only. The controlled drowning-time prototype is not built; zero-second and trough-animation proposals stay rejected. The prototype plus recovery checks come before any new drowning test. Death at zero stamina stays inevitable with no rescue window or HUD warning. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side filter/asset/
+prototype still owed), so flipping to waiting would be a fake checklist.
+Left actionable until a real session can be written.

@@ -36,6 +36,21 @@
         "name": "Lexend Project authors",
         "role": "Bundled Lexend interface font.",
         "url": "https://github.com/googlefonts/lexend"
+      },
+      {
+        "name": "crosire / ReShade",
+        "role": "The post-processing loader Lexeditor bundles, pinned to 6.8.0, and installs per game.",
+        "url": "https://github.com/crosire/reshade"
+      },
+      {
+        "name": "4lex4nder and Frans Bouma / ReshadeEffectShaderToggler",
+        "role": "The add-on Lexeditor installs beside ReShade to run effects before a game draws its HUD.",
+        "url": "https://github.com/4lex4nder/ReshadeEffectShaderToggler"
+      },
+      {
+        "name": "AMD / FidelityFX CAS",
+        "role": "The Contrast Adaptive Sharpening algorithm Lexeditor's Sharpen effect implements.",
+        "url": "https://github.com/GPUOpen-Effects/FidelityFX-CAS"
       }
     ],
     "licenses": [
@@ -48,6 +63,16 @@
         "name": "Lexend — source notice",
         "sourcePath": "ui/assets/fonts/SOURCE.md",
         "text": "# Lexend source record\n\nLexeditor bundles the unmodified Lexend variable font as its neutral interface\nfont.\n\n- Family: Lexend\n- Font version: 1.007\n- Weight axis: 100 through 900; default 400\n- Local file: `Lexend-Variable.ttf`\n- Original file: `ofl/lexend/Lexend[wght].ttf`\n- File size: 175,756 bytes\n- SHA-256: `3ADD53E641FBC81DA64DA4BB254285E2831B52B029527BC0714E2B9610832EE6`\n- Distribution source: `https://github.com/google/fonts`\n- Pinned Google Fonts commit: `e2332cf862ac3145c0ee5f24f04f4c1819b2410b`\n- Upstream project: `https://github.com/googlefonts/lexend`\n- Upstream source commit recorded by Google Fonts:\n  `20491885ca2cf7ffc556432973e7bdbc701952b5`\n- License: SIL Open Font License 1.1 (`OFL.txt`)\n\nThe local filename is shorter for stable CSS addressing. The font bytes and\ninternal font names are unchanged.\n"
+      },
+      {
+        "name": "ReShade — BSD 3-Clause License",
+        "sourcePath": "tools/reshade/6.8.0/LICENSE.md",
+        "text": "Copyright 2014 Patrick Mours. All rights reserved.\n\nRedistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:\n\n  * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.\n  * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.\n  * Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
+      },
+      {
+        "name": "ReshadeEffectShaderToggler — MIT License",
+        "sourcePath": "tools/reshade/addons/REST-1.3.23.633/LICENSE.txt",
+        "text": "MIT License\n\nCopyright (c) 2023 alex\nCopyright (c) 2022 Frans Bouma\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE."
       }
     ]
   },
@@ -58,6 +83,32 @@
           "name": "Lexeditor contributors",
           "role": "Shared-control examples and test fixtures.",
           "url": "https://github.com/Lexer-Lux/Lexeditor"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
+    },
+    "bannerlord": {
+      "contributions": [
+        {
+          "name": "Lexer / Lexers Mod for Bannerlord",
+          "role": "Source project, module fixtures, and compatibility behavior used to develop and validate the Bannerlord integration.",
+          "url": "https://github.com/Lexer-Lux/Lexers-Mod-For-Bannerlord"
+        },
+        {
+          "name": "BUTR / Bannerlord.BLSE",
+          "role": "Reference for community SubModule.xml dependency metadata and extended launcher behavior.",
+          "url": "https://github.com/BUTR/Bannerlord.BLSE"
+        },
+        {
+          "name": "BUTR / Bannerlord.ModuleManager",
+          "role": "Reference for community dependency normalization, load-order precedence, optional/incompatible handling, and version-range semantics.",
+          "url": "https://github.com/BUTR/Bannerlord.ModuleManager"
+        },
+        {
+          "name": "BUTR / Bannerlord.XmlSchemas",
+          "role": "Reference for SubModule.xml community metadata fields and UpdateInfo grammar.",
+          "url": "https://github.com/BUTR/Bannerlord.XmlSchemas"
         }
       ],
       "thanks": [],
@@ -74,14 +125,39 @@
           "name": "Christian Bauer / ff7tools",
           "role": "Reference for FF7 archive and kernel formats.",
           "url": "https://github.com/cebix/ff7tools"
+        },
+        {
+          "name": "petfriendamy / Scarlet",
+          "role": "Reference for FF7 formation layouts, battle restrictions, and initial-condition flags.",
+          "url": "https://github.com/petfriendamy/ff7-scarlet"
+        },
+        {
+          "name": "FF7 modding community / ff7-flat-wiki",
+          "role": "Reference for battle arena names and formation layout.",
+          "url": "https://ff7-mods.github.io/ff7-flat-wiki/FF7/Battle/Battle_Scenes.html"
+        },
+        {
+          "name": "FFNx contributors",
+          "role": "Reference/runtime contract for FFNx Direct Mode paths, chunk loading, and 2026 Steam setup.",
+          "url": "https://github.com/julianxhokaxhiu/FFNx"
+        },
+        {
+          "name": "7th Heaven contributors",
+          "role": "Reference for ordered active profiles, installed mod locations, mod.xml folder roots, and read-only external-stack compatibility.",
+          "url": "https://github.com/tsunamods-codes/7th-Heaven"
+        },
+        {
+          "name": "tangtang95 / 60/30 FPS Gameplay",
+          "role": "Public 7th Heaven mod.xml compatibility fixture for profile-option ModFolder activation.",
+          "url": "https://github.com/tangtang95/ff7-60fps-mod"
         }
       ],
       "thanks": [],
       "licenses": [
         {
-          "name": "Elena and ff7tools — original notices",
+          "name": "FF7 format/runtime reference notices",
           "sourcePath": "games/ff7/THIRD_PARTY.md",
-          "text": "# Final Fantasy VII format references\n\n`kernel.py` uses format knowledge from these permissively licensed projects.\nNo compiled third-party dependency is bundled.\n\n## Elena\n\nSource: <https://github.com/Shojy/Elena>\n\nMIT License\n\nCopyright (c) 2019 Joshua Moon\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\n## ff7tools\n\nSource: <https://github.com/cebix/ff7tools>\n\nCopyright (C) Christian Bauer <www.cebix.net>\n\nPermission to use, copy, modify, and/or distribute this software for any\npurpose with or without fee is hereby granted, provided that the above\ncopyright notice and this permission notice appear in all copies.\n"
+          "text": "# Final Fantasy VII format and runtime references\n\nLexeditor does not copy source code from the projects below. Their published\nformat/runtime behavior materially informed this plugin, so the exact role and\nlicense are recorded here.\n\n## Elena\n\nSource: <https://github.com/Shojy/Elena>\n\nMIT License\n\nCopyright (c) 2019 Joshua Moon\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\n## ff7tools\n\nSource: <https://github.com/cebix/ff7tools>\n\nCopyright (C) Christian Bauer <www.cebix.net>\n\nPermission to use, copy, modify, and/or distribute this software for any\npurpose with or without fee is hereby granted, provided that the above\ncopyright notice and this permission notice appear in all copies.\n\n## Scarlet\n\nSource: <https://github.com/petfriendamy/ff7-scarlet>\nReference revision used by the executable-data audit: `10a2283`\n\nLicense: Microsoft Public License (MS-PL).\n\nScarlet's source was used as a reference for named, fixed-layout FF7 executable\ndata. Lexeditor does not bundle Scarlet or copy Scarlet source code.\n\n## FFNx\n\nSource: <https://github.com/julianxhokaxhiu/FFNx>\nDirect Mode source revision used by the deployment implementation:\n`b341cf135941ed745f89a5080a7cd95adb54018a`\n\nPinned setup release: `FFNx-v1.24.3.0` (tag `1.24.3`)\nUpstream asset: `FFNx-Steam-v1.24.3.0.zip`\nPublished asset SHA-256:\n`2be45f486974f0979b849d0525eb66427df62483ec99e9339e9773e9e52afc0d`\n\nLicense: GNU General Public License v3.0 (GPL-3.0).\n\nFFNx's source documents the Direct Mode paths and chunk loading behavior used\nby `deployment.py`: KERNEL/KERNEL2 chunks, scene chunks, field section chunks,\nand LGP-member overrides. FFNx's install guide also documents the 2026 Steam\nworking-directory setup that `tooling.py` follows. Lexeditor does not\nredistribute FFNx bytes in the repository or installer: the setup action\nfetches the exact upstream release asset, verifies its published SHA-256, and\nrefuses to replace a manual/7th-Heaven install or externally changed owned\nfiles.\n\n## 7th Heaven\n\nSource: <https://github.com/tsunamods-codes/7th-Heaven>\nReference revision used by the read-only compatibility scanner:\n`ae129f0bbeeeb236b1c37fb136e5fec25fd292a3`\n\nLicense: Microsoft Public License (MS-PL).\n\n7th Heaven's source documents the ordered active profile, `library.xml`\ninstalled locations, folder and `.iro` mod forms, `mod.xml` ModFolder and\nConditional roots, and FFNx Direct Mode integration. Lexeditor uses that\npublished behavior only to inspect an explicitly configured 7thWorkshop tree\nread-only. It never edits 7th Heaven state, does not guess inside `.iro`\npackages, and does not choose a winner for overlapping external mod paths.\n\n## 60/30 FPS Gameplay compatibility fixture\n\nSource: <https://github.com/tangtang95/ff7-60fps-mod>\nReference revision used by the compatibility test:\n`8195d9c0dc1a38a497ef7674f8e412936f11b120`\n\nLicense: GNU General Public License v3.0 (GPL-3.0).\n\nThe public v1.15 `mod.xml` was used as an interoperability fixture for 7th\nHeaven `ModFolder` / `ActiveWhen` profile-option behavior. Lexeditor does not\nbundle this mod or its assets; the test builds a tiny synthetic folder tree\nusing only the proved metadata shape.\n"
         }
       ]
     },
@@ -96,14 +172,39 @@
           "name": "Christian Bauer / ff7tools",
           "role": "Reference for FF7 archive and kernel formats.",
           "url": "https://github.com/cebix/ff7tools"
+        },
+        {
+          "name": "petfriendamy / Scarlet",
+          "role": "Reference for FF7 formation layouts, battle restrictions, and initial-condition flags.",
+          "url": "https://github.com/petfriendamy/ff7-scarlet"
+        },
+        {
+          "name": "FF7 modding community / ff7-flat-wiki",
+          "role": "Reference for battle arena names and formation layout.",
+          "url": "https://ff7-mods.github.io/ff7-flat-wiki/FF7/Battle/Battle_Scenes.html"
+        },
+        {
+          "name": "FFNx contributors",
+          "role": "Reference/runtime contract for FFNx Direct Mode paths, chunk loading, and 2026 Steam setup.",
+          "url": "https://github.com/julianxhokaxhiu/FFNx"
+        },
+        {
+          "name": "7th Heaven contributors",
+          "role": "Reference for ordered active profiles, installed mod locations, mod.xml folder roots, and read-only external-stack compatibility.",
+          "url": "https://github.com/tsunamods-codes/7th-Heaven"
+        },
+        {
+          "name": "tangtang95 / 60/30 FPS Gameplay",
+          "role": "Public 7th Heaven mod.xml compatibility fixture for profile-option ModFolder activation.",
+          "url": "https://github.com/tangtang95/ff7-60fps-mod"
         }
       ],
       "thanks": [],
       "licenses": [
         {
-          "name": "Elena and ff7tools — original notices",
+          "name": "FF7 format/runtime reference notices",
           "sourcePath": "games/ff7/THIRD_PARTY.md",
-          "text": "# Final Fantasy VII format references\n\n`kernel.py` uses format knowledge from these permissively licensed projects.\nNo compiled third-party dependency is bundled.\n\n## Elena\n\nSource: <https://github.com/Shojy/Elena>\n\nMIT License\n\nCopyright (c) 2019 Joshua Moon\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\n## ff7tools\n\nSource: <https://github.com/cebix/ff7tools>\n\nCopyright (C) Christian Bauer <www.cebix.net>\n\nPermission to use, copy, modify, and/or distribute this software for any\npurpose with or without fee is hereby granted, provided that the above\ncopyright notice and this permission notice appear in all copies.\n"
+          "text": "# Final Fantasy VII format and runtime references\n\nLexeditor does not copy source code from the projects below. Their published\nformat/runtime behavior materially informed this plugin, so the exact role and\nlicense are recorded here.\n\n## Elena\n\nSource: <https://github.com/Shojy/Elena>\n\nMIT License\n\nCopyright (c) 2019 Joshua Moon\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\n## ff7tools\n\nSource: <https://github.com/cebix/ff7tools>\n\nCopyright (C) Christian Bauer <www.cebix.net>\n\nPermission to use, copy, modify, and/or distribute this software for any\npurpose with or without fee is hereby granted, provided that the above\ncopyright notice and this permission notice appear in all copies.\n\n## Scarlet\n\nSource: <https://github.com/petfriendamy/ff7-scarlet>\nReference revision used by the executable-data audit: `10a2283`\n\nLicense: Microsoft Public License (MS-PL).\n\nScarlet's source was used as a reference for named, fixed-layout FF7 executable\ndata. Lexeditor does not bundle Scarlet or copy Scarlet source code.\n\n## FFNx\n\nSource: <https://github.com/julianxhokaxhiu/FFNx>\nDirect Mode source revision used by the deployment implementation:\n`b341cf135941ed745f89a5080a7cd95adb54018a`\n\nPinned setup release: `FFNx-v1.24.3.0` (tag `1.24.3`)\nUpstream asset: `FFNx-Steam-v1.24.3.0.zip`\nPublished asset SHA-256:\n`2be45f486974f0979b849d0525eb66427df62483ec99e9339e9773e9e52afc0d`\n\nLicense: GNU General Public License v3.0 (GPL-3.0).\n\nFFNx's source documents the Direct Mode paths and chunk loading behavior used\nby `deployment.py`: KERNEL/KERNEL2 chunks, scene chunks, field section chunks,\nand LGP-member overrides. FFNx's install guide also documents the 2026 Steam\nworking-directory setup that `tooling.py` follows. Lexeditor does not\nredistribute FFNx bytes in the repository or installer: the setup action\nfetches the exact upstream release asset, verifies its published SHA-256, and\nrefuses to replace a manual/7th-Heaven install or externally changed owned\nfiles.\n\n## 7th Heaven\n\nSource: <https://github.com/tsunamods-codes/7th-Heaven>\nReference revision used by the read-only compatibility scanner:\n`ae129f0bbeeeb236b1c37fb136e5fec25fd292a3`\n\nLicense: Microsoft Public License (MS-PL).\n\n7th Heaven's source documents the ordered active profile, `library.xml`\ninstalled locations, folder and `.iro` mod forms, `mod.xml` ModFolder and\nConditional roots, and FFNx Direct Mode integration. Lexeditor uses that\npublished behavior only to inspect an explicitly configured 7thWorkshop tree\nread-only. It never edits 7th Heaven state, does not guess inside `.iro`\npackages, and does not choose a winner for overlapping external mod paths.\n\n## 60/30 FPS Gameplay compatibility fixture\n\nSource: <https://github.com/tangtang95/ff7-60fps-mod>\nReference revision used by the compatibility test:\n`8195d9c0dc1a38a497ef7674f8e412936f11b120`\n\nLicense: GNU General Public License v3.0 (GPL-3.0).\n\nThe public v1.15 `mod.xml` was used as an interoperability fixture for 7th\nHeaven `ModFolder` / `ActiveWhen` profile-option behavior. Lexeditor does not\nbundle this mod or its assets; the test builds a tiny synthetic folder tree\nusing only the proved metadata shape.\n"
         }
       ]
     },
@@ -126,7 +227,7 @@
         },
         {
           "name": "trumank / repak",
-          "role": "Pinned external helper for reading and building Unreal Engine PAK files.",
+          "role": "Bundled pinned v0.2.3 helper for reading and building Unreal Engine PAK files.",
           "url": "https://github.com/trumank/repak"
         },
         {
@@ -143,6 +244,11 @@
           "name": "narknon / EndGameProj",
           "role": "Generated Remake API research reference for reflected FF7R types, properties, enums and functions.",
           "url": "https://github.com/narknon/EndGameProj"
+        },
+        {
+          "name": "akitaonrails / distrobox-gaming",
+          "role": "Public FF7R mod-set interoperability reference for ~mods PAK deployment and documented overlapping equipment-data mods.",
+          "url": "https://github.com/akitaonrails/distrobox-gaming"
         }
       ],
       "thanks": [],
@@ -150,20 +256,112 @@
         {
           "name": "FF7R references and tools — source/license notices",
           "sourcePath": "games/ff7r/THIRD_PARTY.md",
-          "text": "# Third-party references and tools\n\n## FF7 Remake Data Editor\n\nThe narrow `DataObject` package reader/writer in this plugin is a clean Python\nimplementation based on the documented behavior and MIT-licensed source of\nJordan Tucker's **FF7 Remake Data Editor**:\n\n- https://github.com/jordanbtucker/ff7r-data-editor\n- License: MIT\n\nThat project established the FF7R DataObject `.uasset` name/export-table shape,\nthe `.uexp` property type codes and fixed-row layout, and the safe same-size\nediting model used here. Lexeditor does not bundle its application or proprietary\ngame data.\n\n## FF7R Text Tool\n\nThe `GameContents/Text/<language>/*_TxtRes` reader/writer is a clean Python\nimplementation based on the documented behavior and MIT-licensed source of\nMatyaModding's **ff7r-text-tool**:\n\n- https://github.com/matyamod/ff7r-text-tool\n- License: MIT\n\nThat project documents the FF7R text-resource entry/sub-entry layout, Unreal\nFString encoding, name-map references and the paired `.uasset` serialized-size\nfield required when variable-length text changes. Lexeditor does not bundle the\ntool or any extracted game text.\n\n## FF7R Font Mod Tools\n\nThe local-only menu-font theming path is a narrow Python implementation based on\nthe documented layouts and MIT-licensed source of MatyaModding's\n**FF7R-font-mod-tools**:\n\n- https://github.com/matyamod/FF7R-font-mod-tools\n- License: MIT\n\nThat project documents the `GameContents/Menu/Resident/Font/JP/SystemFont*4K`\nglyph UEXP record shape and the matching\n`GameContents/Menu/Billboard/Common/U_Com_JP_SystemFont*4K-01` 2048x2048 BC5\nbitmap-atlas layout. Lexeditor validates those exact installed assets, decodes\n`SystemFontNormal` only into the user's private cache, and uses the resulting\natlas/glyph metrics for editor chrome. It does not bundle or publish Square Enix\nfont assets.\n\n## repak\n\nLexeditor downloads a pinned release of **repak** only when the user chooses to\ninstall the FF7R archive helper:\n\n- https://github.com/trumank/repak\n- License: dual Apache-2.0 / MIT\n- Pinned release: v0.2.3\n\nrepak reads the installed Unreal Engine PAK indexes/files on demand and packs the\nseparate Lexeditor project tree into a mod PAK. FF7R's `../../../` mount point is\npassed explicitly when listing, extracting and packing. repak is not committed\ninto this repository.\n\n## Improved Keyboard and Mouse Controls / Native Mod Loader research\n\nThe FF7R native-runtime probe uses independently implemented compatibility checks\ninformed by TheUnlocked's maintained, MIT-licensed **ff7r-kbm-hook**:\n\n- https://github.com/TheUnlocked/ff7r-kbm-hook\n- License: MIT\n\nThat project provides public evidence for the Native Mod Loader `Init()` export\ncontract and current FF7R byte signatures around map control and raw-input\ninitialization. Lexeditor uses those signatures only as compatibility probes. It\ndoes not copy the hook implementation and does not treat those known addresses as\nthe cutscene-speed or minimap-toggle hook sites required by #413/#414.\n\n## FinalFantasy7Remake-Menu interoperability research\n\nThe guarded HP runtime implementation is informed by public interoperability\ninformation in xCENTx's **FinalFantasy7Remake-Menu** repository:\n\n- https://github.com/xCENTx/FinalFantasy7Remake-Menu\n- No repository license file was present when this reference was recorded.\n\nLexeditor does not copy or bundle that project's implementation. It uses factual\nprocess-layout information (the `AGameState` / `APlayerStats` field layout and a\nRIP-relative game-state lookup instruction shape) as a research reference, then\nindependently validates the installed executable at runtime. No fixed RVA from\nthat project is shipped or trusted.\n\n## EndGameProj generated Remake API research\n\nPublic generated Remake headers in narknon's **EndGameProj** are used only as\ninteroperability/research evidence for reflected type, property, enum and function\nnames such as `EGameSpeed_CUT`, `AEndGameState::SetGameSpeed`, ATB DataObject\nfields, and menu widget settings:\n\n- https://github.com/narknon/EndGameProj\n\nThese generated declarations are not bundled into Lexeditor and are not treated\nas current installed-build offsets or validated hook addresses. Installed-game\nprobes must still establish the concrete target before a runtime mutation can be\nenabled.\n"
+          "text": "# Third-party references and tools\n\n## FF7 Remake Data Editor\n\nThe narrow `DataObject` package reader/writer in this plugin is a clean Python\nimplementation based on the documented behavior and MIT-licensed source of\nJordan Tucker's **FF7 Remake Data Editor**:\n\n- https://github.com/jordanbtucker/ff7r-data-editor\n- License: MIT\n\nThat project established the FF7R DataObject `.uasset` name/export-table shape,\nthe `.uexp` property type codes and fixed-row layout, and the safe same-size\nediting model used here. Lexeditor does not bundle its application or proprietary\ngame data.\n\n## FF7R Text Tool\n\nThe `GameContents/Text/<language>/*_TxtRes` reader/writer is a clean Python\nimplementation based on the documented behavior and MIT-licensed source of\nMatyaModding's **ff7r-text-tool**:\n\n- https://github.com/matyamod/ff7r-text-tool\n- License: MIT\n\nThat project documents the FF7R text-resource entry/sub-entry layout, Unreal\nFString encoding, name-map references and the paired `.uasset` serialized-size\nfield required when variable-length text changes. Lexeditor does not bundle the\ntool or any extracted game text.\n\n## FF7R Font Mod Tools\n\nThe local-only menu-font theming path is a narrow Python implementation based on\nthe documented layouts and MIT-licensed source of MatyaModding's\n**FF7R-font-mod-tools**:\n\n- https://github.com/matyamod/FF7R-font-mod-tools\n- License: MIT\n\nThat project documents the `GameContents/Menu/Resident/Font/JP/SystemFont*4K`\nglyph UEXP record shape and the matching\n`GameContents/Menu/Billboard/Common/U_Com_JP_SystemFont*4K-01` 2048x2048 BC5\nbitmap-atlas layout. Lexeditor validates those exact installed assets, decodes\n`SystemFontNormal` only into the user's private cache, and uses the resulting\natlas/glyph metrics for editor chrome. It does not bundle or publish Square Enix\nfont assets.\n\n## repak\n\nLexeditor bundles the exact upstream **repak v0.2.3** release archives used by\nthe FF7R plugin. Install/Repair extracts the platform executable locally; it\ndoes not download repak at setup time.\n\n- https://github.com/trumank/repak\n- License: dual Apache-2.0 / MIT\n- Pinned release: v0.2.3\n- Upstream release commit: `e215472c51db69328b1ce77be2db24d24c1d646b`\n- Windows release archive SHA-256:\n  `6720d602144d75df477a99d5bedb6ea780997546afc335901d4937cafeaa73fa`\n- Linux release archive SHA-256:\n  `933bdb8e26f34e8fd70ea50201efca39df041de58aa83b1cd6eb83da124a2046`\n\nRelease/provenance audit (2026-09-23): GitHub's v0.2.3 release metadata\nreports those same archive SHA-256 digests, and the annotated v0.2.3 tag resolves\nto commit `e215472c51db69328b1ce77be2db24d24c1d646b`. Upstream\n`Cargo.toml` declares `MIT OR Apache-2.0`. The vendored license files are\nbyte-identical Git blobs to that tag (`LICENSE-MIT`\n`f42304c8413d57a70da5d9ea7e82b13dec063b08`; `LICENSE-APACHE`\n`1b5ec8b78e237b5c3b3d812a7c0a6589d0f7161d`), and the tagged repository\ncontains no separate `NOTICE` file.\n\nThe unchanged release archives, manifest and required MIT/Apache-2.0 license\ntexts live under `games/ff7r/runtime/repak/v0.2.3/`. The installer verifies\nboth the archive and extracted executable hashes before an atomic install. The\nshared Updates view may report a newer upstream release, but neither Lexeditor\nnor repak automatically updates the pinned helper.\n\nrepak reads installed Unreal Engine PAK indexes/files on demand and packs the\nseparate Lexeditor project tree into a mod PAK. FF7R's `../../../` mount point\nis passed explicitly when listing, extracting and packing. For Oodle-compressed\ngame data, Lexeditor uses an already-present explicit/game-owned Oodle library;\nthe repak fallback is never allowed to fetch Oodle silently.\n\n## Public FF7R mod-set compatibility reference\n\nakitaonrails' **distrobox-gaming** repository is used only as public\ninteroperability evidence for real-world Remake PAK deployment and conflicts:\n\n- https://github.com/akitaonrails/distrobox-gaming\n- Reviewed revision: `114a092ae593e30b80e3f7e36fa062a319feb75f`\n- No repository license file was present at the reviewed revision.\n\nIts FF7R role installs ordinary UE4 `.pak` mods under\n`End/Content/Paks/~mods` and documents a concrete incompatibility between its\nEquipment Rebalance (#85) and Gameplay Enhancement (#586) selections because\nboth replace equipment data. Lexeditor copies no code or mod payloads from this\nrepository. The reference is used to exercise the same package layout and\nexact-asset conflict policy with synthetic repak-built fixtures; third-party mod\nbytes and installed-game behavior remain separate acceptance evidence.\n\n## Improved Keyboard and Mouse Controls / Native Mod Loader research\n\nThe FF7R native-runtime probe uses independently implemented compatibility checks\ninformed by TheUnlocked's maintained, MIT-licensed **ff7r-kbm-hook**:\n\n- https://github.com/TheUnlocked/ff7r-kbm-hook\n- License: MIT\n\nThat project provides public evidence for the Native Mod Loader `Init()` export\ncontract and current FF7R byte signatures around map control and raw-input\ninitialization. Lexeditor uses those signatures only as compatibility probes. It\ndoes not copy the hook implementation and does not treat those known addresses as\nthe cutscene-speed or minimap-toggle hook sites required by #413/#414.\n\n## FinalFantasy7Remake-Menu interoperability research\n\nThe guarded HP runtime implementation is informed by public interoperability\ninformation in xCENTx's **FinalFantasy7Remake-Menu** repository:\n\n- https://github.com/xCENTx/FinalFantasy7Remake-Menu\n- No repository license file was present when this reference was recorded.\n\nLexeditor does not copy or bundle that project's implementation. It uses factual\nprocess-layout information (the `AGameState` / `APlayerStats` field layout and a\nRIP-relative game-state lookup instruction shape) as a research reference, then\nindependently validates the installed executable at runtime. No fixed RVA from\nthat project is shipped or trusted.\n\n## EndGameProj generated Remake API research\n\nPublic generated Remake headers in narknon's **EndGameProj** are used only as\ninteroperability/research evidence for reflected type, property, enum and function\nnames such as `EGameSpeed_CUT`, `AEndGameState::SetGameSpeed`, ATB DataObject\nfields, and menu widget settings:\n\n- https://github.com/narknon/EndGameProj\n\nThese generated declarations are not bundled into Lexeditor and are not treated\nas current installed-build offsets or validated hook addresses. Installed-game\nprobes must still establish the concrete target before a runtime mutation can be\nenabled.\n"
+        },
+        {
+          "name": "repak — MIT License",
+          "sourcePath": "games/ff7r/runtime/repak/v0.2.3/LICENSE-MIT",
+          "text": "MIT License\n\nCopyright 2024 Truman Kilen, spuds\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\n"
+        },
+        {
+          "name": "repak — Apache License 2.0",
+          "sourcePath": "games/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE",
+          "text": "                              Apache License\n                        Version 2.0, January 2004\n                     http://www.apache.org/licenses/\n\nTERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n1. Definitions.\n\n   \"License\" shall mean the terms and conditions for use, reproduction,\n   and distribution as defined by Sections 1 through 9 of this document.\n\n   \"Licensor\" shall mean the copyright owner or entity authorized by\n   the copyright owner that is granting the License.\n\n   \"Legal Entity\" shall mean the union of the acting entity and all\n   other entities that control, are controlled by, or are under common\n   control with that entity. For the purposes of this definition,\n   \"control\" means (i) the power, direct or indirect, to cause the\n   direction or management of such entity, whether by contract or\n   otherwise, or (ii) ownership of fifty percent (50%) or more of the\n   outstanding shares, or (iii) beneficial ownership of such entity.\n\n   \"You\" (or \"Your\") shall mean an individual or Legal Entity\n   exercising permissions granted by this License.\n\n   \"Source\" form shall mean the preferred form for making modifications,\n   including but not limited to software source code, documentation\n   source, and configuration files.\n\n   \"Object\" form shall mean any form resulting from mechanical\n   transformation or translation of a Source form, including but\n   not limited to compiled object code, generated documentation,\n   and conversions to other media types.\n\n   \"Work\" shall mean the work of authorship, whether in Source or\n   Object form, made available under the License, as indicated by a\n   copyright notice that is included in or attached to the work\n   (an example is provided in the Appendix below).\n\n   \"Derivative Works\" shall mean any work, whether in Source or Object\n   form, that is based on (or derived from) the Work and for which the\n   editorial revisions, annotations, elaborations, or other modifications\n   represent, as a whole, an original work of authorship. For the purposes\n   of this License, Derivative Works shall not include works that remain\n   separable from, or merely link (or bind by name) to the interfaces of,\n   the Work and Derivative Works thereof.\n\n   \"Contribution\" shall mean any work of authorship, including\n   the original version of the Work and any modifications or additions\n   to that Work or Derivative Works thereof, that is intentionally\n   submitted to Licensor for inclusion in the Work by the copyright owner\n   or by an individual or Legal Entity authorized to submit on behalf of\n   the copyright owner. For the purposes of this definition, \"submitted\"\n   means any form of electronic, verbal, or written communication sent\n   to the Licensor or its representatives, including but not limited to\n   communication on electronic mailing lists, source code control systems,\n   and issue tracking systems that are managed by, or on behalf of, the\n   Licensor for the purpose of discussing and improving the Work, but\n   excluding communication that is conspicuously marked or otherwise\n   designated in writing by the copyright owner as \"Not a Contribution.\"\n\n   \"Contributor\" shall mean Licensor and any individual or Legal Entity\n   on behalf of whom a Contribution has been received by Licensor and\n   subsequently incorporated within the Work.\n\n2. Grant of Copyright License. Subject to the terms and conditions of\n   this License, each Contributor hereby grants to You a perpetual,\n   worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n   copyright license to reproduce, prepare Derivative Works of,\n   publicly display, publicly perform, sublicense, and distribute the\n   Work and such Derivative Works in Source or Object form.\n\n3. Grant of Patent License. Subject to the terms and conditions of\n   this License, each Contributor hereby grants to You a perpetual,\n   worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n   (except as stated in this section) patent license to make, have made,\n   use, offer to sell, sell, import, and otherwise transfer the Work,\n   where such license applies only to those patent claims licensable\n   by such Contributor that are necessarily infringed by their\n   Contribution(s) alone or by combination of their Contribution(s)\n   with the Work to which such Contribution(s) was submitted. If You\n   institute patent litigation against any entity (including a\n   cross-claim or counterclaim in a lawsuit) alleging that the Work\n   or a Contribution incorporated within the Work constitutes direct\n   or contributory patent infringement, then any patent licenses\n   granted to You under this License for that Work shall terminate\n   as of the date such litigation is filed.\n\n4. Redistribution. You may reproduce and distribute copies of the\n   Work or Derivative Works thereof in any medium, with or without\n   modifications, and in Source or Object form, provided that You\n   meet the following conditions:\n\n   (a) You must give any other recipients of the Work or\n       Derivative Works a copy of this License; and\n\n   (b) You must cause any modified files to carry prominent notices\n       stating that You changed the files; and\n\n   (c) You must retain, in the Source form of any Derivative Works\n       that You distribute, all copyright, patent, trademark, and\n       attribution notices from the Source form of the Work,\n       excluding those notices that do not pertain to any part of\n       the Derivative Works; and\n\n   (d) If the Work includes a \"NOTICE\" text file as part of its\n       distribution, then any Derivative Works that You distribute must\n       include a readable copy of the attribution notices contained\n       within such NOTICE file, excluding those notices that do not\n       pertain to any part of the Derivative Works, in at least one\n       of the following places: within a NOTICE text file distributed\n       as part of the Derivative Works; within the Source form or\n       documentation, if provided along with the Derivative Works; or,\n       within a display generated by the Derivative Works, if and\n       wherever such third-party notices normally appear. The contents\n       of the NOTICE file are for informational purposes only and\n       do not modify the License. You may add Your own attribution\n       notices within Derivative Works that You distribute, alongside\n       or as an addendum to the NOTICE text from the Work, provided\n       that such additional attribution notices cannot be construed\n       as modifying the License.\n\n   You may add Your own copyright statement to Your modifications and\n   may provide additional or different license terms and conditions\n   for use, reproduction, or distribution of Your modifications, or\n   for any such Derivative Works as a whole, provided Your use,\n   reproduction, and distribution of the Work otherwise complies with\n   the conditions stated in this License.\n\n5. Submission of Contributions. Unless You explicitly state otherwise,\n   any Contribution intentionally submitted for inclusion in the Work\n   by You to the Licensor shall be under the terms and conditions of\n   this License, without any additional terms or conditions.\n   Notwithstanding the above, nothing herein shall supersede or modify\n   the terms of any separate license agreement you may have executed\n   with Licensor regarding such Contributions.\n\n6. Trademarks. This License does not grant permission to use the trade\n   names, trademarks, service marks, or product names of the Licensor,\n   except as required for reasonable and customary use in describing the\n   origin of the Work and reproducing the content of the NOTICE file.\n\n7. Disclaimer of Warranty. Unless required by applicable law or\n   agreed to in writing, Licensor provides the Work (and each\n   Contributor provides its Contributions) on an \"AS IS\" BASIS,\n   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n   implied, including, without limitation, any warranties or conditions\n   of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n   PARTICULAR PURPOSE. You are solely responsible for determining the\n   appropriateness of using or redistributing the Work and assume any\n   risks associated with Your exercise of permissions under this License.\n\n8. Limitation of Liability. In no event and under no legal theory,\n   whether in tort (including negligence), contract, or otherwise,\n   unless required by applicable law (such as deliberate and grossly\n   negligent acts) or agreed to in writing, shall any Contributor be\n   liable to You for damages, including any direct, indirect, special,\n   incidental, or consequential damages of any character arising as a\n   result of this License or out of the use or inability to use the\n   Work (including but not limited to damages for loss of goodwill,\n   work stoppage, computer failure or malfunction, or any and all\n   other commercial damages or losses), even if such Contributor\n   has been advised of the possibility of such damages.\n\n9. Accepting Warranty or Additional Liability. While redistributing\n   the Work or Derivative Works thereof, You may choose to offer,\n   and charge a fee for, acceptance of support, warranty, indemnity,\n   or other liability obligations and/or rights consistent with this\n   License. However, in accepting such obligations, You may act only\n   on Your own behalf and on Your sole responsibility, not on behalf\n   of any other Contributor, and only if You agree to indemnify,\n   defend, and hold each Contributor harmless for any liability\n   incurred by, or claims asserted against, such Contributor by reason\n   of your accepting any such warranty or additional liability.\n\nEND OF TERMS AND CONDITIONS\n"
+        }
+      ]
+    },
+    "ff7r2": {
+      "contributions": [
+        {
+          "name": "David Matos (frostbone25) / Shader Injector",
+          "role": "The D3D12 shader-replacement mod Lexeditor bundles for Rebirth, pinned to the 2.2.1 Maximum quality release.",
+          "url": "https://github.com/frostbone25/ShaderInjector"
+        },
+        {
+          "name": "Microsoft / DirectX Shader Compiler",
+          "role": "dxc, dxcompiler and dxil, shipped inside the Shader Injector release to recompile its shaders.",
+          "url": "https://github.com/microsoft/DirectXShaderCompiler"
+        },
+        {
+          "name": "Yoraiz0r / FF7RebirthDataObjectEditor",
+          "role": "MIT-licensed Rebirth editor used as a public behavior cross-check for editing extracted DataObject .uasset files in original IoStore state. No code is vendored.",
+          "url": "https://github.com/Yoraiz0r/FF7RebirthDataObjectEditor"
+        },
+        {
+          "name": "Synthlight / FF7R2-DataObject-Parser",
+          "role": "CC BY-NC 4.0 Rebirth format documentation used to independently verify IoStore-state DataObject layout and public table/row/property names across PlayerParameter and the unresolved Rebirth gameplay areas. Lexeditor does not vendor or adapt this implementation.",
+          "url": "https://github.com/Synthlight/FF7R2-DataObject-Parser"
+        },
+        {
+          "name": "trumank / retoc",
+          "role": "MIT-licensed IoStore CLI reviewed as the pinned DirectoryIndex extraction route. It is not automatically invoked because its Oodle dependency may be acquired when absent.",
+          "url": "https://github.com/trumank/retoc"
+        },
+        {
+          "name": "matyamod / UnrealReZen (ff7r branch)",
+          "role": "GPL-3.0 FF7R2 packaging reference used to verify UE4.26, End/Content mounting and the Rebirth dependency-manifest workaround. Lexeditor can invoke only a separately supplied local executable through its candidate-only packaging route; no UnrealReZen code or binary is bundled.",
+          "url": "https://github.com/matyamod/UnrealReZen"
+        },
+        {
+          "name": "nikolaybutnik / FFVII-Rebirth-Mesh-Patcher",
+          "role": "MIT-licensed public Rebirth tooling used to cross-check that native IoStore mod triples are discovered under End/Content/Paks/~mods. No code is vendored or adapted.",
+          "url": "https://github.com/nikolaybutnik/FFVII-Rebirth-Mesh-Patcher"
+        },
+        {
+          "name": "f80h / FF7 Rebirth Load ordering",
+          "role": "August 2026 public UE4.26/Rebirth load-order analysis used to implement read-only native package precedence reporting. No article text, mod assets or code are bundled.",
+          "url": "https://www.nexusmods.com/finalfantasy7rebirth/articles/46"
+        },
+        {
+          "name": "Gantz79 / 100 Percent Steal and Drop Rate",
+          "role": "Public Rebirth behavior evidence for #471: a packaged rate edit works and the author reports the 25% rate data is shared between steals and enemy drops. Used for semantic boundary research only; no mod assets are copied or redistributed.",
+          "url": "https://www.nexusmods.com/finalfantasy7rebirth/mods/157"
+        },
+        {
+          "name": "TheWolfster / Refreshed Chocobo Rest Stops (Static Mesh)",
+          "role": "Public Rebirth evidence for #472 that Chocobo rest-stop meshes can be replaced and that the blue bench is a separate asset among multiple bench models. Used for research only; no mod assets are copied or redistributed.",
+          "url": "https://www.nexusmods.com/finalfantasy7rebirth/mods/2048"
+        },
+        {
+          "name": "DaniRBT / FF7 Rebirth Accessibility - Visibility Overhaul",
+          "role": "Public Rebirth evidence for #473 separating pak-based minimap position/size changes from the optional UE4SS HUD mover. Used to avoid conflating HUD layout with world-minimap zoom; no mod assets are copied or redistributed.",
+          "url": "https://www.nexusmods.com/finalfantasy7rebirth/mods/2357"
+        },
+        {
+          "name": "narknon / FF7R2UProj",
+          "role": "Public generated Rebirth type declarations used only as reverse-engineering/schema evidence for #470/#471/#472/#473/#477: Chocobo ride-legality/location seams; the concrete BattleItemPossession TArray<FName>/TArray<uint8>/int32 schema; bench mesh/cushion actor members; navimap scale option categories; and Queen's Blood field/pass/turn types. No root repository license file was found in the audited snapshot, so no source is copied, adapted, vendored or redistributed.",
+          "url": "https://github.com/narknon/FF7R2UProj"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Shader Injector — MIT License",
+          "sourcePath": "games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt",
+          "text": "MIT License\n\nCopyright (c) 2026 David Matos\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
         }
       ]
     },
     "ff8": {
       "contributions": [
         {
+          "name": "Final Fantasy Inside contributors",
+          "role": "CARDGAME opcode research: deck, carried rules, region rules, rare-card probability, and three arguments whose effects remain unknown.",
+          "url": "https://wiki.ffrtt.ru/index.php/FF8/Field/Script/Opcodes/13A_CARDGAME"
+        },
+        {
           "name": "HobbitDur",
-          "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas and editor references.",
+          "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas, Ifrit AI instruction-row design and ai_cronos target/condition reference, and Cid packed world Draw Point coordinate conversion.",
           "url": "https://github.com/HobbitDur/FF8UltimateEditor"
         },
         {
+          "name": "HobbitDur and the FF8 modding wiki contributors",
+          "role": "wmset Section 34 reference: the sub-ID location discriminator, the five record-range blocks, and how the game resolves a standing position to a draw-point record.",
+          "url": "https://github.com/hobbitdur/ff8moddingwiki/blob/HEAD/FF8/TechnicalReference/WorldMap/WorldMap_wmsetxx.md"
+        },
+        {
           "name": "Julian Xhokaxhiu (TrueOdin), Tang-Tang Zhou (vertex2995), Jérôme Arzel (myst6re), CosmosXIII and FFNx contributors",
-          "role": "FFNx runtime, game hooks and reverse-engineering references.",
+          "role": "FFNx runtime, game hooks and reverse-engineering references, including the embedded Triple Triad card and icon TIM locations.",
           "url": "https://github.com/julianxhokaxhiu/FFNx"
         },
         {
@@ -173,7 +371,7 @@
         },
         {
           "name": "Jérôme Arzel (myst6re) and Deling contributors",
-          "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, encounters and world-map format references.",
+          "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, encounters and world-map format references; special-text toolbar design and control-byte reference from src/FF8Text.cpp; Japanese glyph mapping from src/qt/fonts/sysfnt_jp.txt (GPL v3 or later).",
           "url": "https://github.com/myst6re/deling"
         },
         {
@@ -401,12 +599,33 @@
       "contributions": [
         {
           "name": "Memoria contributors",
-          "role": "FF9 runtime integration and documented gameplay data formats.",
+          "role": "FF9 runtime integration, CSV schemas and documented gameplay data formats.",
           "url": "https://github.com/Albeoris/Memoria"
+        },
+        {
+          "name": "K0lb3 / UnityPy contributors",
+          "role": "Permissively licensed Unity serialized-file and UnityRaw interoperability reference used to cross-check FF9 archive handling.",
+          "url": "https://github.com/K0lb3/UnityPy"
+        },
+        {
+          "name": "Tirlititi / Hades Workshop",
+          "role": "Additional FF9 Steam archive reverse-engineering reference; its source and binaries are not bundled or invoked by Lexeditor.",
+          "url": "https://github.com/Tirlititi/Hades-Workshop"
+        },
+        {
+          "name": "GameJawnsInc / Dream World IX / ff9mapkit",
+          "role": "MIT-licensed public FF9 p0data interoperability research for fields, event scripts, models, animations, world-map assets and Memoria loose overrides.",
+          "url": "https://github.com/GameJawnsInc/Dream-World-IX"
         }
       ],
       "thanks": [],
-      "licenses": []
+      "licenses": [
+        {
+          "name": "FF9 references — source and license notices",
+          "sourcePath": "games/ff9/THIRD_PARTY.md",
+          "text": "# Final Fantasy IX third-party sources\n\nLexeditor's FF9 plugin uses the following external projects as runtime or format references.\nNo proprietary game data is included here.\n\n## Memoria\n\n- Project: https://github.com/Albeoris/Memoria\n- Pinned helper/data release: `v2025.07.04`\n- Pinned source revision used for format/runtime verification: `d8df6e69ddb618adc753a27d9424409d66216a35`\n- License: MIT (`LICENSE` in the Memoria repository).\n- Use: FF9 runtime/helper, CSV schemas and serialization behavior, battle-scene field semantics, BGI field-walkmesh layout/runtime floor-active semantics, launcher update-setting behavior.\n- Lexeditor verifies the official `Memoria.Patcher.exe` SHA-256 published by that release before execution.\n\n## UnityPy\n\n- Project: https://github.com/K0lb3/UnityPy\n- License: MIT.\n- Use: permissively licensed interoperability reference for Unity serialized-file and UnityRaw/container structure.\n- No UnityPy source file or binary is vendored or invoked by this plugin.\n\n## Hades Workshop\n\n- Project: https://github.com/Tirlititi/Hades-Workshop\n- Reference revision audited: `7bd24784cbb5099f678a78275af366104efb386d`\n- License: GNU GPL v3 (`LICENSE` in the Hades Workshop repository).\n- Use: additional FF9-specific reverse-engineering provenance for Steam Unity archive structure.\n- No Hades Workshop source file or binary is vendored or invoked by Lexeditor.\n\n## Dream World IX / ff9mapkit\n\n- Project: https://github.com/GameJawnsInc/Dream-World-IX\n- Reference revision audited: `8c7a5b48e9041110dad9e06b69d47c0eecc7b010`\n- License: MIT for toolkit source code; FF9-derived game bytes are explicitly excluded from that grant.\n- Use: public interoperability evidence for FF9 field-scene bundles and loose BGI override paths, compiled event scripts, p0data4 model prefabs, p0data5 animation clips, world-map authoring and other Memoria loose-override paths.\n- No Dream World IX source, binary, generated game asset, or FF9-derived byte is bundled or invoked by Lexeditor.\n\n"
+        }
+      ]
     },
     "palworld": {
       "contributions": [
@@ -430,12 +649,38 @@
         }
       ]
     },
+    "project-zomboid": {
+      "contributions": [
+        {
+          "name": "PZ Wiki Modding / PZ API Docs",
+          "role": "Build 42 mod.info and ZedScript schema reference used to define the first structured editor boundary.",
+          "url": "https://github.com/PZ-Wiki-Modding/PZ-API-Docs"
+        },
+        {
+          "name": "PZ Wiki Modding / ZedScripts",
+          "role": "Build 42 ZedScript validation and tooling reference.",
+          "url": "https://github.com/PZ-Wiki-Modding/ZedScripts"
+        },
+        {
+          "name": "PZ Wiki Modding / pz-scripts-data",
+          "role": "Current Build 42 script parameter and type-schema research reference.",
+          "url": "https://github.com/PZ-Wiki-Modding/pz-scripts-data"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
+    },
     "warband": {
       "contributions": [
         {
           "name": "BRF Sync contributors",
           "role": "Separate read-only tool for converting Warband model resources.",
           "url": "https://github.com/markpryk/brf_sync_tools"
+        },
+        {
+          "name": "Sea-Monster / WarbandModuleSystem",
+          "role": "MIT-licensed Module System 1.171 reference for documented Warband record schemas and export semantics.",
+          "url": "https://github.com/Sea-Monster/WarbandModuleSystem"
         }
       ],
       "thanks": [],
@@ -449,6 +694,11 @@
           "name": "BRF Sync — GNU GPL v2",
           "sourcePath": "tools/brf-sync/LICENSE",
           "text": "                    GNU GENERAL PUBLIC LICENSE\n                       Version 2, June 1991\n\n Copyright (C) 1989, 1991 Free Software Foundation, Inc.,\n 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA\n Everyone is permitted to copy and distribute verbatim copies\n of this license document, but changing it is not allowed.\n\n                            Preamble\n\n  The licenses for most software are designed to take away your\nfreedom to share and change it.  By contrast, the GNU General Public\nLicense is intended to guarantee your freedom to share and change free\nsoftware--to make sure the software is free for all its users.  This\nGeneral Public License applies to most of the Free Software\nFoundation's software and to any other program whose authors commit to\nusing it.  (Some other Free Software Foundation software is covered by\nthe GNU Lesser General Public License instead.)  You can apply it to\nyour programs, too.\n\n  When we speak of free software, we are referring to freedom, not\nprice.  Our General Public Licenses are designed to make sure that you\nhave the freedom to distribute copies of free software (and charge for\nthis service if you wish), that you receive source code or can get it\nif you want it, that you can change the software or use pieces of it\nin new free programs; and that you know you can do these things.\n\n  To protect your rights, we need to make restrictions that forbid\nanyone to deny you these rights or to ask you to surrender the rights.\nThese restrictions translate to certain responsibilities for you if you\ndistribute copies of the software, or if you modify it.\n\n  For example, if you distribute copies of such a program, whether\ngratis or for a fee, you must give the recipients all the rights that\nyou have.  You must make sure that they, too, receive or can get the\nsource code.  And you must show them these terms so they know their\nrights.\n\n  We protect your rights with two steps: (1) copyright the software, and\n(2) offer you this license which gives you legal permission to copy,\ndistribute and/or modify the software.\n\n  Also, for each author's protection and ours, we want to make certain\nthat everyone understands that there is no warranty for this free\nsoftware.  If the software is modified by someone else and passed on, we\nwant its recipients to know that what they have is not the original, so\nthat any problems introduced by others will not reflect on the original\nauthors' reputations.\n\n  Finally, any free program is threatened constantly by software\npatents.  We wish to avoid the danger that redistributors of a free\nprogram will individually obtain patent licenses, in effect making the\nprogram proprietary.  To prevent this, we have made it clear that any\npatent must be licensed for everyone's free use or not licensed at all.\n\n  The precise terms and conditions for copying, distribution and\nmodification follow.\n\n                    GNU GENERAL PUBLIC LICENSE\n   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION\n\n  0. This License applies to any program or other work which contains\na notice placed by the copyright holder saying it may be distributed\nunder the terms of this General Public License.  The \"Program\", below,\nrefers to any such program or work, and a \"work based on the Program\"\nmeans either the Program or any derivative work under copyright law:\nthat is to say, a work containing the Program or a portion of it,\neither verbatim or with modifications and/or translated into another\nlanguage.  (Hereinafter, translation is included without limitation in\nthe term \"modification\".)  Each licensee is addressed as \"you\".\n\nActivities other than copying, distribution and modification are not\ncovered by this License; they are outside its scope.  The act of\nrunning the Program is not restricted, and the output from the Program\nis covered only if its contents constitute a work based on the\nProgram (independent of having been made by running the Program).\nWhether that is true depends on what the Program does.\n\n  1. You may copy and distribute verbatim copies of the Program's\nsource code as you receive it, in any medium, provided that you\nconspicuously and appropriately publish on each copy an appropriate\ncopyright notice and disclaimer of warranty; keep intact all the\nnotices that refer to this License and to the absence of any warranty;\nand give any other recipients of the Program a copy of this License\nalong with the Program.\n\nYou may charge a fee for the physical act of transferring a copy, and\nyou may at your option offer warranty protection in exchange for a fee.\n\n  2. You may modify your copy or copies of the Program or any portion\nof it, thus forming a work based on the Program, and copy and\ndistribute such modifications or work under the terms of Section 1\nabove, provided that you also meet all of these conditions:\n\n    a) You must cause the modified files to carry prominent notices\n    stating that you changed the files and the date of any change.\n\n    b) You must cause any work that you distribute or publish, that in\n    whole or in part contains or is derived from the Program or any\n    part thereof, to be licensed as a whole at no charge to all third\n    parties under the terms of this License.\n\n    c) If the modified program normally reads commands interactively\n    when run, you must cause it, when started running for such\n    interactive use in the most ordinary way, to print or display an\n    announcement including an appropriate copyright notice and a\n    notice that there is no warranty (or else, saying that you provide\n    a warranty) and that users may redistribute the program under\n    these conditions, and telling the user how to view a copy of this\n    License.  (Exception: if the Program itself is interactive but\n    does not normally print such an announcement, your work based on\n    the Program is not required to print an announcement.)\n\nThese requirements apply to the modified work as a whole.  If\nidentifiable sections of that work are not derived from the Program,\nand can be reasonably considered independent and separate works in\nthemselves, then this License, and its terms, do not apply to those\nsections when you distribute them as separate works.  But when you\ndistribute the same sections as part of a whole which is a work based\non the Program, the distribution of the whole must be on the terms of\nthis License, whose permissions for other licensees extend to the\nentire whole, and thus to each and every part regardless of who wrote it.\n\nThus, it is not the intent of this section to claim rights or contest\nyour rights to work written entirely by you; rather, the intent is to\nexercise the right to control the distribution of derivative or\ncollective works based on the Program.\n\nIn addition, mere aggregation of another work not based on the Program\nwith the Program (or with a work based on the Program) on a volume of\na storage or distribution medium does not bring the other work under\nthe scope of this License.\n\n  3. You may copy and distribute the Program (or a work based on it,\nunder Section 2) in object code or executable form under the terms of\nSections 1 and 2 above provided that you also do one of the following:\n\n    a) Accompany it with the complete corresponding machine-readable\n    source code, which must be distributed under the terms of Sections\n    1 and 2 above on a medium customarily used for software interchange; or,\n\n    b) Accompany it with a written offer, valid for at least three\n    years, to give any third party, for a charge no more than your\n    cost of physically performing source distribution, a complete\n    machine-readable copy of the corresponding source code, to be\n    distributed under the terms of Sections 1 and 2 above on a medium\n    customarily used for software interchange; or,\n\n    c) Accompany it with the information you received as to the offer\n    to distribute corresponding source code.  (This alternative is\n    allowed only for noncommercial distribution and only if you\n    received the program in object code or executable form with such\n    an offer, in accord with Subsection b above.)\n\nThe source code for a work means the preferred form of the work for\nmaking modifications to it.  For an executable work, complete source\ncode means all the source code for all modules it contains, plus any\nassociated interface definition files, plus the scripts used to\ncontrol compilation and installation of the executable.  However, as a\nspecial exception, the source code distributed need not include\nanything that is normally distributed (in either source or binary\nform) with the major components (compiler, kernel, and so on) of the\noperating system on which the executable runs, unless that component\nitself accompanies the executable.\n\nIf distribution of executable or object code is made by offering\naccess to copy from a designated place, then offering equivalent\naccess to copy the source code from the same place counts as\ndistribution of the source code, even though third parties are not\ncompelled to copy the source along with the object code.\n\n  4. You may not copy, modify, sublicense, or distribute the Program\nexcept as expressly provided under this License.  Any attempt\notherwise to copy, modify, sublicense or distribute the Program is\nvoid, and will automatically terminate your rights under this License.\nHowever, parties who have received copies, or rights, from you under\nthis License will not have their licenses terminated so long as such\nparties remain in full compliance.\n\n  5. You are not required to accept this License, since you have not\nsigned it.  However, nothing else grants you permission to modify or\ndistribute the Program or its derivative works.  These actions are\nprohibited by law if you do not accept this License.  Therefore, by\nmodifying or distributing the Program (or any work based on the\nProgram), you indicate your acceptance of this License to do so, and\nall its terms and conditions for copying, distributing or modifying\nthe Program or works based on it.\n\n  6. Each time you redistribute the Program (or any work based on the\nProgram), the recipient automatically receives a license from the\noriginal licensor to copy, distribute or modify the Program subject to\nthese terms and conditions.  You may not impose any further\nrestrictions on the recipients' exercise of the rights granted herein.\nYou are not responsible for enforcing compliance by third parties to\nthis License.\n\n  7. If, as a consequence of a court judgment or allegation of patent\ninfringement or for any other reason (not limited to patent issues),\nconditions are imposed on you (whether by court order, agreement or\notherwise) that contradict the conditions of this License, they do not\nexcuse you from the conditions of this License.  If you cannot\ndistribute so as to satisfy simultaneously your obligations under this\nLicense and any other pertinent obligations, then as a consequence you\nmay not distribute the Program at all.  For example, if a patent\nlicense would not permit royalty-free redistribution of the Program by\nall those who receive copies directly or indirectly through you, then\nthe only way you could satisfy both it and this License would be to\nrefrain entirely from distribution of the Program.\n\nIf any portion of this section is held invalid or unenforceable under\nany particular circumstance, the balance of the section is intended to\napply and the section as a whole is intended to apply in other\ncircumstances.\n\nIt is not the purpose of this section to induce you to infringe any\npatents or other property right claims or to contest validity of any\nsuch claims; this section has the sole purpose of protecting the\nintegrity of the free software distribution system, which is\nimplemented by public license practices.  Many people have made\ngenerous contributions to the wide range of software distributed\nthrough that system in reliance on consistent application of that\nsystem; it is up to the author/donor to decide if he or she is willing\nto distribute software through any other system and a licensee cannot\nimpose that choice.\n\nThis section is intended to make thoroughly clear what is believed to\nbe a consequence of the rest of this License.\n\n  8. If the distribution and/or use of the Program is restricted in\ncertain countries either by patents or by copyrighted interfaces, the\noriginal copyright holder who places the Program under this License\nmay add an explicit geographical distribution limitation excluding\nthose countries, so that distribution is permitted only in or among\ncountries not thus excluded.  In such case, this License incorporates\nthe limitation as if written in the body of this License.\n\n  9. The Free Software Foundation may publish revised and/or new versions\nof the General Public License from time to time.  Such new versions will\nbe similar in spirit to the present version, but may differ in detail to\naddress new problems or concerns.\n\nEach version is given a distinguishing version number.  If the Program\nspecifies a version number of this License which applies to it and \"any\nlater version\", you have the option of following the terms and conditions\neither of that version or of any later version published by the Free\nSoftware Foundation.  If the Program does not specify a version number of\nthis License, you may choose any version ever published by the Free Software\nFoundation.\n\n  10. If you wish to incorporate parts of the Program into other free\nprograms whose distribution conditions are different, write to the author\nto ask for permission.  For software which is copyrighted by the Free\nSoftware Foundation, write to the Free Software Foundation; we sometimes\nmake exceptions for this.  Our decision will be guided by the two goals\nof preserving the free status of all derivatives of our free software and\nof promoting the sharing and reuse of software generally.\n\n                            NO WARRANTY\n\n  11. BECAUSE THE PROGRAM IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY\nFOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW.  EXCEPT WHEN\nOTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES\nPROVIDE THE PROGRAM \"AS IS\" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED\nOR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF\nMERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.  THE ENTIRE RISK AS\nTO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU.  SHOULD THE\nPROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING,\nREPAIR OR CORRECTION.\n\n  12. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING\nWILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR\nREDISTRIBUTE THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES,\nINCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING\nOUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED\nTO LOSS OF DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY\nYOU OR THIRD PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER\nPROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE\nPOSSIBILITY OF SUCH DAMAGES.\n\n                     END OF TERMS AND CONDITIONS\n\n            How to Apply These Terms to Your New Programs\n\n  If you develop a new program, and you want it to be of the greatest\npossible use to the public, the best way to achieve this is to make it\nfree software which everyone can redistribute and change under these terms.\n\n  To do so, attach the following notices to the program.  It is safest\nto attach them to the start of each source file to most effectively\nconvey the exclusion of warranty; and each file should have at least\nthe \"copyright\" line and a pointer to where the full notice is found.\n\n    <one line to give the program's name and a brief idea of what it does.>\n    Copyright (C) <year>  <name of author>\n\n    This program is free software; you can redistribute it and/or modify\n    it under the terms of the GNU General Public License as published by\n    the Free Software Foundation; either version 2 of the License, or\n    (at your option) any later version.\n\n    This program is distributed in the hope that it will be useful,\n    but WITHOUT ANY WARRANTY; without even the implied warranty of\n    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n    GNU General Public License for more details.\n\n    You should have received a copy of the GNU General Public License along\n    with this program; if not, write to the Free Software Foundation, Inc.,\n    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.\n\nAlso add information on how to contact you by electronic and paper mail.\n\nIf the program is interactive, make it output a short notice like this\nwhen it starts in an interactive mode:\n\n    Gnomovision version 69, Copyright (C) year name of author\n    Gnomovision comes with ABSOLUTELY NO WARRANTY; for details type `show w'.\n    This is free software, and you are welcome to redistribute it\n    under certain conditions; type `show c' for details.\n\nThe hypothetical commands `show w' and `show c' should show the appropriate\nparts of the General Public License.  Of course, the commands you use may\nbe called something other than `show w' and `show c'; they could even be\nmouse-clicks or menu items--whatever suits your program.\n\nYou should also get your employer (if you work as a programmer) or your\nschool, if any, to sign a \"copyright disclaimer\" for the program, if\nnecessary.  Here is a sample; alter the names:\n\n  Yoyodyne, Inc., hereby disclaims all copyright interest in the program\n  `Gnomovision' (which makes passes at compilers) written by James Hacker.\n\n  <signature of Ty Coon>, 1 April 1989\n  Ty Coon, President of Vice\n\nThis General Public License does not permit incorporating your program into\nproprietary programs.  If your program is a subroutine library, you may\nconsider it more useful to permit linking proprietary applications with the\nlibrary.  If this is what you want to do, use the GNU Lesser General\nPublic License instead of this License.\n"
+        },
+        {
+          "name": "Warband Module System schema reference — MIT",
+          "sourcePath": "games/warband/THIRD_PARTY.md",
+          "text": "# Warband third-party references\n\nLexeditor does not bundle code or data from the following Module System mirror.\nIt is a public format/schema reference used to verify record fields and export\nsemantics before implementing Warband-specific editors.\n\n## WarbandModuleSystem\n\n- Repository: https://github.com/Sea-Monster/WarbandModuleSystem\n- Reference revision: `66c67147692707b85c457db10a112627118733a5`\n- Referenced subtree: `Module_system 1.171/`\n- License: MIT\n- Copyright notice in upstream license: Copyright (c) 2018 Sea-Monster\n- Files consulted: `module_skills.py`, `process_skills.py`,\n  `module_quests.py`, `process_quests.py`, `module_factions.py`,\n  `process_factions.py`, `module_strings.py`, `process_strings.py`,\n  `module_info_pages.py`, `module_meshes.py`, `process_meshes.py`,\n  `module_music.py`, `process_music.py`, `module_sounds.py`, `process_sounds.py`,\n  `module_parties.py`, `module_party_templates.py`, `module_map_icons.py`,\n  `module_scenes.py`, `module_scene_props.py`, `module_mission_templates.py`,\n  `module_game_menus.py`, `module_presentations.py`, `module_tableau_materials.py`,\n  `module_skins.py`, `module_particle_systems.py`, and their relevant\n  `header_*.py` declarations.\n\nThe implementation in Lexeditor is original span-preserving source editing code.\nThe upstream repository is credited because its documented schemas materially\ninform which Warband fields can be represented without guessing.\n\n## Persistent World compatibility reference\n\n- Repository: https://github.com/vornne/pw_module_system\n- Reference revision: `a35fd5d89cbb4e684ddf2fe4a6de9fe5066b9988`\n- License: 3-clause BSD-style terms in upstream `LICENSE.txt`\n- Copyright notice: Copyright (c) 2010 Steven Schwartfeger, Persistent World\n- Files inspected include `module_items.py`, `module_troops.py`,\n  `module_skills.py`, `module_parties.py`, `module_scene_props.py`,\n  `module_skins.py`, and `module_particle_systems.py`.\n\nThis is a read-only real-world compatibility reference. In particular,\nPersistent World generates particle-system entries through a `psys(...)`\nhelper, which is valid Module System source but is not a literal record suitable\nfor Lexeditor's span-based structured editor. Lexeditor now reports such\nhelper/wrapper-generated records as source-only and refuses structured writes\ninstead of treating helper arguments as tuple fields.\n\nThe Items audit found 463 literal top-level records using the supported 8-9\nfield forms and no duplicate item IDs. The Troops audit exposed a 13-entry\nquoted equipment list that matched the old line-based troop heuristic even\nthough it is nested data, not a troop. Structured troop discovery now limits\nrecords to the top level of `troops = [...]`; this revision yields 50 true\ntop-level troop records and no `itm_*` false records.\n Its flat source\nlayout is also accepted by Lexeditor's non-destructive project importer:\n`module_info.py` has one literal `export_dir` and `build_module.bat` reduces\nto the allowlisted one-shot step `python -tt build_module.py`. The managed copy\nredirects the export locally and never executes the interactive `pause`.\nNo Persistent World code or data is bundled.\n\n## Native++ compatibility reference\n\n- Repository: https://github.com/Batyan/MnB-Nativepp-mod\n- Reference revision: `995afc62159d63ed08b369283c8924703ef11e1b`\n- Repository terms: custom README terms permit private modification and require\n  credit to the authors credited by the project for published reuse; no standard\n  open-source LICENSE file was present at the inspected revision.\n- Scope inspected: the 20 Module System source families exposed by Lexeditor's\n  Misc. editor plus `module_items.py` and `module_troops.py`.\n\nThis is read-only compatibility evidence only; no Native++ code or data is\nbundled or copied. A top-level tuple-shape audit matched Lexeditor's current\nschema expectations for every inspected family except two legacy particle-system\nrecords (`torch_smoke` and `pistol_smoke`), which use 22 fields rather than\nthe current 24-field shape. Lexeditor must keep those records source-only rather\nthan guessing missing rotation fields.\n\nNative++ also contains 624 literal item records in supported 8-10 field forms,\nincluding pre-existing duplicate tutorial IDs, and active/cut troop pairs that\nshare four IDs. Lexeditor keeps item IDs fixed and keys Items/Troops edits by\nsource record index, so those pre-existing identities can be preserved rather\nthan making the whole source unsavable.\n\nIts pinned `build_module.bat` contains only the documented Python process\nscripts plus display/cleanup/pause commands. Every referenced Python script is\npresent at the pinned revision, so the safe importer accepts the build plan and\nredirects the copied `module_info.py` away from its hard-coded game path.\n\n## Rome at War compatibility reference\n\n- Repository: https://github.com/sndtaleworlds/RaW---Module-System\n- Reference revision: `f4da7d5d242647506d8209e6f5fd22489c7fcabd`\n- License stated by upstream README: NPOSL-3.0.\n- Scope inspected: the 20 Module System source families exposed by Lexeditor's\n  Misc. editor plus `module_items.py` and `module_troops.py`.\n\nThis is read-only compatibility evidence only; no Rome at War code or data is\nbundled or copied. Its top-level tuple shapes match Lexeditor's current\nexpectations for every inspected family except the same two legacy 22-field\nparticle-system records. Those records are intentionally refused by structured\nsaving and remain available through source editing.\n\nRome at War contains 1,901 literal item records in supported 8-10 field forms,\nincluding two pre-existing duplicate IDs, and an active/cut `woman_walker`\ntroop pair sharing one ID. The same source-record identity rules preserve these\nrecords without rewriting game IDs or conflating the two source entries.\n\nIts pinned build plan is also accepted: the importer keeps the one-pass Python\nprocess sequence (including `flora_kinds.py`, resolved case-insensitively for\nWarband's Windows runtime) while dropping the batch label, `pause`, and restart\nloop. The copied `module_info.py` export is redirected locally rather than\nwriting to the upstream hard-coded Steam path.\n\n## Installed Warband assets\n\nWarband's bitmap font remains proprietary installed-game data. Lexeditor does\nnot redistribute `font.dds` or `font_data.xml`; when present in the user's\nWarband installation they are read locally and an alpha-only atlas is generated\ninside the user's private application-data cache. No Warband sound effect is\nbundled by this plugin.\n"
         }
       ]
     },
@@ -458,6 +708,16 @@
           "name": "MagicRDR contributors",
           "role": "Reference and separately installed tool for Red Dead Redemption archives.",
           "url": "https://github.com/Foxxyyy/Magic-RDR"
+        },
+        {
+          "name": "CodeX.Games.RDR1 contributors",
+          "role": "Public RDR1 STRTBL/RPF6 format research consulted for independently implemented string-table compatibility.",
+          "url": "https://github.com/Foxxyyy/CodeX.Games.RDR1"
+        },
+        {
+          "name": "K3rhos / RedHook",
+          "role": "External RDR1 runtime prerequisite. Lexeditor links to the official download and does not redistribute RedHook files.",
+          "url": "https://www.nexusmods.com/reddeadredemption/mods/192"
         }
       ],
       "thanks": [],
@@ -485,6 +745,21 @@
           "name": "RageLib contributors",
           "role": "Resource format support used by the archive tool.",
           "url": "https://github.com/WesternSpace/gta-toolkit"
+        },
+        {
+          "name": "Tsuda Kageyu / MinHook contributors",
+          "role": "Vendored minimal x86/x64 Windows API hooking library used by the RDR2 native runtime.",
+          "url": "https://github.com/TsudaKageyu/minhook"
+        },
+        {
+          "name": "Alexander Blade / ScriptHookRDR2",
+          "role": "External runtime loader required by the RDR2 native ASI; not redistributed by Lexeditor.",
+          "url": "https://www.dev-c.com/rdr2/scripthookrdr2/"
+        },
+        {
+          "name": "Smerdokryl / RDR2_SDK",
+          "role": "External ScriptHookRDR2 SDK headers and import library used to build the RDR2 native runtime; not redistributed by Lexeditor.",
+          "url": "https://github.com/Smerdokryl/RDR2_SDK"
         }
       ],
       "thanks": [],
@@ -513,6 +788,11 @@
           "name": "RageLib — MIT",
           "sourcePath": "tools/rpf-cli/RAGELIB-LICENSE.txt",
           "text": "MIT License\n\nCopyright (c) 2021 WesternGamer\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+        },
+        {
+          "name": "MinHook — BSD 2-Clause License",
+          "sourcePath": "games/rdr2/native_runtime/GameplayTweaks/third_party/minhook/LICENSE.txt",
+          "text": "MinHook - The Minimalistic API Hooking Library for x64/x86\nCopyright (C) 2009-2017 Tsuda Kageyu.\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions\nare met:\n\n 1. Redistributions of source code must retain the above copyright\n    notice, this list of conditions and the following disclaimer.\n 2. Redistributions in binary form must reproduce the above copyright\n    notice, this list of conditions and the following disclaimer in the\n    documentation and/or other materials provided with the distribution.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS\n\"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED\nTO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A\nPARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER\nOR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\nEXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,\nPROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR\nPROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF\nLIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING\nNEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\nSOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\n================================================================================\nPortions of this software are Copyright (c) 2008-2009, Vyacheslav Patkov.\n================================================================================\nHacker Disassembler Engine 32 C\nCopyright (c) 2008-2009, Vyacheslav Patkov.\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions\nare met:\n\n 1. Redistributions of source code must retain the above copyright\n    notice, this list of conditions and the following disclaimer.\n 2. Redistributions in binary form must reproduce the above copyright\n    notice, this list of conditions and the following disclaimer in the\n    documentation and/or other materials provided with the distribution.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS\n\"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED\nTO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A\nPARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR\nCONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\nEXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,\nPROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR\nPROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF\nLIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING\nNEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\nSOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\n-------------------------------------------------------------------------------\nHacker Disassembler Engine 64 C\nCopyright (c) 2008-2009, Vyacheslav Patkov.\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions\nare met:\n\n 1. Redistributions of source code must retain the above copyright\n    notice, this list of conditions and the following disclaimer.\n 2. Redistributions in binary form must reproduce the above copyright\n    notice, this list of conditions and the following disclaimer in the\n    documentation and/or other materials provided with the distribution.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS\n\"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED\nTO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A\nPARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR\nCONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\nEXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,\nPROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR\nPROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF\nLIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING\nNEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\nSOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
         }
       ]
     },
@@ -542,31 +822,149 @@
       "thanks": [],
       "licenses": []
     },
-    "chrono-trigger": {
+    "factorio": {
       "contributions": [
         {
-          "name": "jimzrt / ChronoMod contributors",
-          "role": "Steam resources.bin ARC1 archive format reference.",
-          "url": "https://github.com/jimzrt/ChronoMod"
+          "name": "Wube Software / Factorio API documentation",
+          "role": "Official Factorio 2.1 prototype schemas, prototype-stage lifecycle and mod interoperability contract.",
+          "url": "https://lua-api.factorio.com/latest/"
         },
         {
-          "name": "GitExl / CTViewer contributors",
-          "role": "Steam scene, overworld, map, tileset, palette and script format references.",
-          "url": "https://github.com/GitExl/CTViewer"
+          "name": "Factorio Wiki contributors",
+          "role": "Official modding tutorial, mod structure and --dump-data workflow reference.",
+          "url": "https://wiki.factorio.com/Tutorial:Modding_tutorial"
         },
         {
-          "name": "OnemusCT / Temporal Redux contributors",
-          "role": "PC Atel event command widths and behavior references.",
-          "url": "https://github.com/OnemusCT/temporal-redux"
+          "name": "Wube Software / factorio-data",
+          "role": "Official prototype data and examples used as a read-only implementation reference.",
+          "url": "https://github.com/wube/factorio-data"
         },
         {
-          "name": "TheRealBiggs / CTExt contributors",
-          "role": "Chrono Trigger Steam loose-file and CTP runtime loading model.",
-          "url": "https://github.com/TheRealBiggs/ctext"
+          "name": "jacquev6 / factorio-data-raw-json-schema",
+          "role": "Reference-only research for Factorio JSON dump edge cases. No code or schema is bundled because no repository license file was found.",
+          "url": "https://github.com/jacquev6/factorio-data-raw-json-schema"
+        },
+        {
+          "name": "Factorio community font documentation",
+          "role": "Installed core-font path and Titillium Web mapping used for the local-only Factorio UI font route; Lexeditor does not bundle the game font.",
+          "url": "https://forums.factorio.com/viewtopic.php?t=31891"
         }
       ],
       "thanks": [],
       "licenses": []
+    },
+    "ffx-x2": {
+      "contributions": [
+        {
+          "name": "Fahrenheit contributors",
+          "role": "FFX/X-2 runtime, file-only mod manifest/load-order contract, and External File Loader interoperability reference.",
+          "url": "https://github.com/fahrenheit-crew/fahrenheit"
+        },
+        {
+          "name": "Michivi / vbf-fs",
+          "role": "BSD-licensed reference for VBF archive headers, entries, block compression and validation.",
+          "url": "https://github.com/michivi/vbf-fs"
+        },
+        {
+          "name": "Karifean / FFXDataParser",
+          "role": "Research cross-check for extracted FFX data organization; no source copied.",
+          "url": "https://github.com/Karifean/FFXDataParser"
+        },
+        {
+          "name": "HeartlessSeph / FFX2-010-Templates",
+          "role": "Independent research cross-check for FFX-2 accessory and dressphere job.bin layouts; no source copied.",
+          "url": "https://github.com/HeartlessSeph/FFX2-010-Templates"
+        },
+        {
+          "name": "topher-au / VBFTool",
+          "role": "Historical VBF and Steam launcher-layout research cross-check; no source copied.",
+          "url": "https://github.com/topher-au/VBFTool"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "FFX/X-2 references — source and BSD notice",
+          "sourcePath": "games/ffx_x2/THIRD_PARTY.md",
+          "text": "# FFX/X-2 research references and notices\n\nLexeditor does not bundle proprietary FINAL FANTASY X/X-2 data. Installed VBFs are treated as read-only source archives.\n\n## michivi/vbf-fs\n\nLexeditor's clean Python VBF reader was implemented from the documented behavior and BSD-licensed source of **michivi/vbf-fs**:\n\n- https://github.com/michivi/vbf-fs\n- License: BSD 3-Clause\n\nThe reference establishes the `SRYK` header, entry/name/block tables, 64 KiB block model, zlib-compressed block handling, and trailing MD5 validation used by this plugin.\n\nCopyright 2020 Michivi\n\nRedistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:\n\n1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.\n\n2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.\n\n3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\n## Fahrenheit\n\n**fahrenheit-crew/fahrenheit** is the interoperability reference and deployment/runtime boundary for this plugin:\n\n- https://github.com/fahrenheit-crew/fahrenheit\n- License: LGPL-3.0-or-later\n\nFahrenheit documents file-only mods, `<mod>.manifest.json`, `mods/loadorder`, and the External File Loader roots `efl/x` and `efl/x2`. No Fahrenheit source or binary is bundled by this plugin.\n\nFahrenheit is also an independent data-layout cross-check. In particular its public FFX-2 `Job` structure is exactly `0xE4` bytes and places the 32-u16 ability-tree array after the 46-byte stat-growth block. Lexeditor interprets that array conservatively as sixteen `(required ability ID, ability ID)` pairs and leaves every other dressphere field opaque.\n\n## FFXDataParser, FFX2-010-Templates, and VBFTool\n\nThe following public reverse-engineering projects were used as research cross-checks only; their code is not copied or distributed by Lexeditor:\n\n- https://github.com/Karifean/FFXDataParser\n- https://github.com/HeartlessSeph/FFX2-010-Templates\n- https://github.com/topher-au/VBFTool\n\n`HeartlessSeph/FFX2-010-Templates` independently identifies the same sixteen `job.bin` ability records as a required-ability field followed by an ability field. That agreement is the basis for the narrow FFX-2 dressphere ability-tree editor; stat growth, weapon data, creature data, flags, text references, and strings remain read-only.\n"
+        }
+      ]
+    },
+    "terraria": {
+      "contributions": [
+        {
+          "name": "tModLoader team / tModLoader",
+          "role": "Terraria mod loader, source-project/build conventions, ExampleMod, build.txt semantics and API reference.",
+          "url": "https://github.com/tModLoader/tModLoader"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
+    },
+    "ds3": {
+      "contributions": [
+        {
+          "name": "Vawser / Smithbox contributors",
+          "role": "Pinned Dark Souls III PARAMDEF, field-layout, annotation, enum, reference, and row-name metadata; regulation interoperability reference.",
+          "url": "https://github.com/vawser/Smithbox"
+        },
+        {
+          "name": "JKAnderson / SoulsTemplates",
+          "role": "Apache-2.0 BND4 and PARAM binary-format reference used for Lexeditor's independent byte-preserving parser.",
+          "url": "https://github.com/JKAnderson/SoulsTemplates"
+        }
+      ],
+      "thanks": [
+        {
+          "name": "JKAnderson / SoulsFormats",
+          "role": "Independent DS3 regulation behavior cross-check; GPL code is not bundled or copied.",
+          "url": "https://github.com/JKAnderson/SoulsFormats"
+        }
+      ],
+      "licenses": [
+        {
+          "name": "DS3 references and metadata — source/license notices",
+          "sourcePath": "games/ds3/THIRD_PARTY.md",
+          "text": "# Dark Souls III source and license record\n\n## Smithbox\n\nSource: https://github.com/vawser/Smithbox  \nPinned revision: `43f9b49a022260b6a76b1adcbe20cc0989ccff95`\n\nLexeditor vendors only the DS3 parameter metadata required by this plugin:\nPARAMDEFs, Param Meta, Field Layouts, English Param Annotations, enum tables,\nand English row-name tables for the six integrated parameter sets. XML encoding\ndeclarations were normalized from UTF-16 to UTF-8 to match the stored text;\nthe metadata content is otherwise pinned to the revision above.\n\nSmithbox's DS3 regulation behavior was also used as an interoperability check.\nLexeditor does not bundle Smithbox or its embedded SoulsFormats code.\n\nMIT License\n\nCopyright (c) 2025 Vawser\nCopyright (c) 2018 Katalash, Meowmaritus\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\n## SoulsTemplates\n\nSource: https://github.com/JKAnderson/SoulsTemplates  \nPinned revision: `f1d114a3668e3c97a1ace82411158df6b3bc50a4`\n\nThe Apache-2.0 BND4 and PARAM binary templates were used as the permissive\nformat reference for Lexeditor's independent fixed-width parser/patcher.\nNo SoulsTemplates source file is bundled verbatim.\n\nApache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an example is provided in the Appendix below).\n\n      \"Derivative Works\" shall mean any work, whether in Source or Object\n      form, that is based on (or derived from) the Work and for which the\n      editorial revisions, annotations, elaborations, or other modifications\n      represent, as a whole, an original work of authorship. For the purposes\n      of this License, Derivative Works shall not include works that remain\n      separable from, or merely link (or bind by name) to the interfaces of,\n      the Work and Derivative Works thereof.\n\n      \"Contribution\" shall mean any work of authorship, including\n      the original version of the Work and any modifications or additions\n      to that Work or Derivative Works thereof, that is intentionally\n      submitted to Licensor for inclusion in the Work by the copyright owner\n      or by an individual or Legal Entity authorized to submit on behalf of\n      the copyright owner. For the purposes of this definition, \"submitted\"\n      means any form of electronic, verbal, or written communication sent\n      to the Licensor or its representatives, including but not limited to\n      communication on electronic mailing lists, source code control systems,\n      and issue tracking systems that are managed by, or on behalf of, the\n      Licensor for the purpose of discussing and improving the Work, but\n      excluding communication that is conspicuously marked or otherwise\n      designated in writing by the copyright owner as \"Not a Contribution.\"\n\n      \"Contributor\" shall mean Licensor and any individual or Legal Entity\n      on behalf of whom a Contribution has been received by Licensor and\n      subsequently incorporated within the Work.\n\n   2. Grant of Copyright License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      copyright license to reproduce, prepare Derivative Works of,\n      publicly display, publicly perform, sublicense, and distribute the\n      Work and such Derivative Works in Source or Object form.\n\n   3. Grant of Patent License. Subject to the terms and conditions of\n      this License, each Contributor hereby grants to You a perpetual,\n      worldwide, non-exclusive, no-charge, royalty-free, irrevocable\n      (except as stated in this section) patent license to make, have made,\n      use, offer to sell, sell, import, and otherwise transfer the Work,\n      where such license applies only to those patent claims licensable\n      by such Contributor that are necessarily infringed by their\n      Contribution(s) alone or by combination of their Contribution(s)\n      with the Work to which such Contribution(s) was submitted. If You\n      institute patent litigation against any entity (including a\n      cross-claim or counterclaim in a lawsuit) alleging that the Work\n      or a Contribution incorporated within the Work constitutes direct\n      or contributory patent infringement, then any patent licenses\n      granted to You under this License for that Work shall terminate\n      as of the date such litigation is filed.\n\n   4. Redistribution. You may reproduce and distribute copies of the\n      Work or Derivative Works thereof in any medium, with or without\n      modifications, and in Source or Object form, provided that You\n      meet the following conditions:\n\n      (a) You must give any other recipients of the Work or\n          Derivative Works a copy of this License; and\n\n      (b) You must cause any modified files to carry prominent notices\n          stating that You changed the files; and\n\n      (c) You must retain, in the Source form of any Derivative Works\n          that You distribute, all copyright, patent, trademark, and\n          attribution notices from the Source form of the Work,\n          excluding those notices that do not pertain to any part of\n          the Derivative Works; and\n\n      (d) If the Work includes a \"NOTICE\" text file as part of its\n          distribution, then any Derivative Works that You distribute must\n          include a readable copy of the attribution notices contained\n          within such NOTICE file, excluding those notices that do not\n          pertain to any part of the Derivative Works, in at least one\n          of the following places: within a NOTICE text file distributed\n          as part of the Derivative Works; within the Source form or\n          documentation, if provided along with the Derivative Works; or,\n          within a display generated by the Derivative Works, if and\n          wherever such third-party notices normally appear. The contents\n          of the NOTICE file are for informational purposes only and\n          do not modify the License. You may add Your own attribution\n          notices within Derivative Works that You distribute, alongside\n          or as an addendum to the NOTICE text from the Work, provided\n          that such additional attribution notices cannot be construed\n          as modifying the License.\n\n      You may add Your own copyright statement to Your modifications and\n      may provide additional or different license terms and conditions\n      for use, reproduction, or distribution of Your modifications, or\n      for any such Derivative Works as a whole, provided Your use,\n      reproduction, and distribution of the Work otherwise complies with\n      the conditions stated in this License.\n\n   5. Submission of Contributions. Unless You explicitly state otherwise,\n      any Contribution intentionally submitted for inclusion in the Work\n      by You to the Licensor shall be under the terms and conditions of\n      this License, without any additional terms or conditions.\n      Notwithstanding the above, nothing herein shall supersede or modify\n      the terms of any separate license agreement you may have executed\n      with Licensor regarding such Contributions.\n\n   6. Trademarks. This License does not grant permission to use the trade\n      names, trademarks, service marks, or product names of the Licensor,\n      except as required for reasonable and customary use in describing the\n      origin of the Work and reproducing the content of the NOTICE file.\n\n   7. Disclaimer of Warranty. Unless required by applicable law or\n      agreed to in writing, Licensor provides the Work (and each\n      Contributor provides its Contributions) on an \"AS IS\" BASIS,\n      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or\n      implied, including, without limitation, any warranties or conditions\n      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A\n      PARTICULAR PURPOSE. You are solely responsible for determining the\n      appropriateness of using or redistributing the Work and assume any\n      risks associated with Your exercise of permissions under this License.\n\n   8. Limitation of Liability. In no event and under no legal theory,\n      whether in tort (including negligence), contract, or otherwise,\n      unless required by applicable law (such as deliberate and grossly\n      negligent acts) or agreed to in writing, shall any Contributor be\n      liable to You for damages, including any direct, indirect, special,\n      incidental, or consequential damages of any character arising as a\n      result of this License or out of the use or inability to use the\n      Work (including but not limited to damages for loss of goodwill,\n      work stoppage, computer failure or malfunction, or any and all\n      other commercial damages or losses), even if such Contributor\n      has been advised of the possibility of such damages.\n\n   9. Accepting Warranty or Additional Liability. While redistributing\n      the Work or Derivative Works thereof, You may choose to offer,\n      and charge a fee for, acceptance of support, warranty, indemnity,\n      or other liability obligations and/or rights consistent with this\n      License. However, in accepting such obligations, You may act only\n      on Your own behalf and on Your sole responsibility, not on behalf\n      of any other Contributor, and only if You agree to indemnify,\n      defend, and hold each Contributor harmless for any liability\n      incurred by, or claims asserted against, such Contributor by reason\n      of your accepting any such warranty or additional liability.\n\n   END OF TERMS AND CONDITIONS\n\n   APPENDIX: How to apply the Apache License to your work.\n\n      To apply the Apache License to your work, attach the following\n      boilerplate notice, with the fields enclosed by brackets \"[]\"\n      replaced with your own identifying information. (Don't include\n      the brackets!)  The text should be enclosed in the appropriate\n      comment syntax for the file format. We also recommend that a\n      file or class name and description of purpose be included on the\n      same \"printed page\" as the copyright notice for easier\n      identification within third-party archives.\n\n   Copyright [yyyy] [name of copyright owner]\n\n   Licensed under the Apache License, Version 2.0 (the \"License\");\n   you may not use this file except in compliance with the License.\n   You may obtain a copy of the License at\n\n       http://www.apache.org/licenses/LICENSE-2.0\n\n   Unless required by applicable law or agreed to in writing, software\n   distributed under the License is distributed on an \"AS IS\" BASIS,\n   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n   See the License for the specific language governing permissions and\n   limitations under the License.\n\n## SoulsFormats\n\nSource: https://github.com/JKAnderson/SoulsFormats\n\nSoulsFormats is GPL-3.0. It was consulted only as an independent behavior\ncross-check for established DS3 regulation encryption/container handling.\nNo SoulsFormats code or binary is copied, adapted, linked, or bundled here.\n"
+        }
+      ]
+    },
+    "chrono-trigger": {
+      "contributions": [
+        {
+          "name": "GitExl / CTViewer contributors",
+          "role": "MIT-licensed current-PC reference for Steam ARC1 resources, area exits, treasure and other separated PC layouts.",
+          "url": "https://github.com/GitExl/CTViewer"
+        },
+        {
+          "name": "NaGaa95 / ct_nx contributors",
+          "role": "MIT-licensed independent reference for ARC1 handling and ChronoMod-compatible CTP package semantics.",
+          "url": "https://github.com/NaGaa95/ct_nx"
+        },
+        {
+          "name": "jimzrt / ChronoMod contributors",
+          "role": "Historical resources.bin interoperability evidence only; no source code is copied because the audited repository has no clear top-level license.",
+          "url": "https://github.com/jimzrt/ChronoMod"
+        },
+        {
+          "name": "TheRealBiggs / CTExt contributors",
+          "role": "Steam loose-file and CTP runtime behavior evidence only; no binary or source is bundled because the audited repository has no clear top-level license.",
+          "url": "https://github.com/TheRealBiggs/ctext"
+        },
+        {
+          "name": "OnemusCT / Temporal Redux contributors",
+          "role": "GPLv3 event-format research reference only; no code is copied into the fresh fixed-format editing slice.",
+          "url": "https://github.com/OnemusCT/temporal-redux"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Chrono Trigger research sources — licenses and evidence limits",
+          "sourcePath": "games/chrono_trigger/THIRD_PARTY.md",
+          "text": "# Chrono Trigger research sources and licenses\n\nNo third-party source is vendored by this plugin. The implementation is a small independent Python implementation of publicly demonstrated Steam layouts.\n\n## CTViewer\n\nSource: https://github.com/GitExl/CTViewer\n\nRevision audited: `2e5a206e09f0028fd5a1ca6cb9a9ed18bfc64fea` (2026-07-19).\n\nUsed as the primary current-PC reference for `resources.bin`, scene exits, treasure records, current-PC scene/world families and the explicit separation between PC and SNES layouts.\n\nLicense (MIT), copyright 2025 Dennis Meuwissen. The complete upstream license is available at `LICENSE.txt` in CTViewer.\n\n## ct_nx\n\nSource: https://github.com/NaGaa95/ct_nx\n\nRevision audited: `e6bc0b4b032df2dbc62a6f142fe08ae0470b61fe` (2026-07-08).\n\nUsed as an independent MIT-licensed corroborating reference for the Steam/Android ARC1 layout and ChronoMod-compatible `.ctp` semantics: standard ZIP members whose paths match `resources.bin` resource paths, applied without changing the original archive.\n\nLicense: MIT. Copyright (C) 2021 Andy Nguyen, fgsfds. The complete upstream license is in ct_nx `LICENSE`.\n\n## Evidence-only references (no code copied or bundled)\n\n- jimzrt / ChronoMod — `4566e9dea7a3510cbb442991cd9efa223b95fdc7` (2025-07-11), historical `resources.bin` tooling. No clear top-level repository license was found during this audit, so its code is not reused.\n- TheRealBiggs / CTExt — `892c47166c56f6d20a2c805c303586096e8d466a` (2026-07-04), Steam loose-file / CTP runtime behavior. No clear top-level repository license was found during this audit, so it is not bundled or copied.\n- OnemusCT / Temporal Redux — `d8d4e38c0bf08b51a29441ef7ea2a489d63da58f` (2026-09-02), GPLv3 event-editor research. It is not copied into this replacement; event editing remains outside the first low-cost slice.\n- julianxhokaxhiu / CTNx — `fda83d565897737d9853cb5ba0b4e7e5d87aa674` (2024-11-14), GPLv3 reimplementation research. It is edition-adjacent evidence only and is not used to transfer SNES/DS layouts into Steam.\n"
+        }
+      ]
     }
   }
 }

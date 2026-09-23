@@ -4,7 +4,7 @@ const {test} = require('node:test');
 const {readFileSync} = require('node:fs');
 const {join} = require('node:path');
 const vm = require('node:vm');
-const source = readFileSync(join(__dirname, '../games/ff9/editor.html'), 'utf8').match(/<script>\s*"use strict";([\s\S]*?)<\/script>/)[1];
+const source = readFileSync(join(__dirname, '../games/ff9/editor.js'), 'utf8');
 const message = "can't be bothered to make this when the memoria guys already did this themselves. just hit play and you can edit the settings in the launcher that comes up";
 
 async function editor() {
@@ -13,9 +13,11 @@ async function editor() {
     append(...values) { this.children.push(...values); },
     replaceChildren(...values) { this.children = values; }});
   const data = {
-    '/api/dashboard': {game: {ready: true}, baseline: {}, project: {root: 'fixture'}, runtime: {installed: false}},
+    '/api/dashboard': {game: {ready: true}, baseline: {}, project: {root: 'fixture'}, runtime: {installed: false},
+      modCompatibility: {mods:[], unsupportedByPinnedMemoria:[], declaredConflicts:[], overlaps:[], projectScanTruncated:false}},
     '/api/catalog': {datasets: []}, '/api/datamap': {rows: []},
     '/api/runtime': {installed: false},
+    '/api/mod-compat': {mods:[], unsupportedByPinnedMemoria:[], declaredConflicts:[], overlaps:[], projectScanTruncated:false},
     '/api/features': {features: {ImprovedInterface:false, BetterEat:false, XPBars:false, HPMPBars:false, RowRework:false}, sha256:'feature-fixture'},
     '/api/deployment': {deployed:false, runtimeReady:true, runtimeCurrent:false},
   };
@@ -38,8 +40,10 @@ async function editor() {
     if ('tag' in value) return [value];
     return Object.values(value).flatMap(carried);
   };
-  for (const name of ['columnList','columnPreferences','detailPanel','detailSection','detailField','readonlyField','recordId','pagedListDetail','booleanMark','subtabBar','infoHelp','infoIcon','modLoaderSection','reshadeSection','pagerToggle','pagerSelect','showToast'])
+  for (const name of ['columnList','detailPanel','detailSection','detailField','multiNumberRow','readonlyField','recordId','pagedListDetail','booleanMark','subtabBar','infoHelp','infoIcon','modLoaderSection','reshadeSection','pagerToggle','pagerSelect','showToast','notice','detailNote'])
     ui[name] = (...args) => node(name, args[0], ...carried(args[0]));
+  ui.columnPreferences = () => ({pinButton:(key,label)=>node('pin',{key,label})});
+  ui.actionRow = (...args) => node('actionRow',{},...args);
   // Lexeditor asks its own questions now instead of calling window.confirm, so
   // the answer this test wants comes from the same flag it always did.
   ui.confirmAction = async () => confirm;
@@ -168,10 +172,12 @@ test('runtime refresh never replaces unsaved CSV data', async () => {
   assert.equal(e.run('dirtyCount()'), 1);
 });
 
-test('information help describes launcher-first Play', async () => {
+test('information help describes launcher-first Play and read-only external mod audit', async () => {
   const e = await editor(); e.run('info()');
   const description = JSON.stringify(e.targets['#main']);
   assert.match(description, /Play opens Memoria's launcher/);
+  assert.match(description, /EXTERNAL MOD COMPATIBILITY/);
+  assert.match(description, /exact path/i);
   assert.doesNotMatch(description, /Play starts FF9 directly/);
 });
 
@@ -204,4 +210,84 @@ test('FF9 uses shared multi-boolean properties and conceptual character/equipmen
   assert.match(source, /renderEquipmentComposite/);
   e.run('state.catalog=[{key:"characters",tab:"characters"},{key:"character-parameters",tab:"characters"},{key:"default-equipment",tab:"characters"},{key:"leveling",tab:"characters"}]');
   assert.deepEqual(Array.from(e.run('choices("characters")')), ['characters','leveling']);
+});
+
+
+test('semantic CSV controls and source identity stay truthful', async () => {
+  const e=await editor();
+  e.run(`installData({key:"actions",label:"Actions",source:"baseline",fields:[
+    {key:"Id",label:"Id",kind:"integer",editable:false,declaredType:"Int32"},
+    {key:"targets",label:"targets",kind:"enum",editable:true,declaredType:"UInt8",choices:["SingleEnemy(2)","ManyAny(3)"]},
+    {key:"Offset",label:"Offset",kind:"fixed-list",editable:true,declaredType:"Vector3",length:3,itemKind:"number",vector3:true}
+  ],rows:[{line:7,id:4,name:"Fire",values:{Id:4,targets:"SingleEnemy(2)",Offset:[1,2,3]}}]})`);
+  const enumField=e.run('fieldControl(state.datasets.actions,state.datasets.actions.rows[0],state.datasets.actions.fields[1])');
+  const vectorField=e.run('fieldControl(state.datasets.actions,state.datasets.actions.rows[0],state.datasets.actions.fields[2])');
+  assert.ok(JSON.stringify(enumField).includes('SingleEnemy(2)'));
+  assert.ok(JSON.stringify(vectorField).includes('multiNumberRow'));
+  assert.deepEqual(Array.from(e.run('columnsFor(state.datasets.actions,"actions").map(column=>column.key)')),['id','name','targets','Offset']);
+
+  e.run(`installData({key:"leveling",label:"Leveling",source:"baseline",fields:[
+    {key:"Experience",label:"Experience",kind:"integer",editable:true,declaredType:"UInt32",min:0,max:4294967295}
+  ],rows:[{line:7,id:1,name:"Level 1",values:{Experience:0}}]})`);
+  assert.deepEqual(Array.from(e.run('columnsFor(state.datasets.leveling,"leveling").map(column=>column.key)')),['name','Experience']);
+  const detailNode=e.run('detail(state.datasets.leveling,state.datasets.leveling.rows[0])');
+  assert.ok(!JSON.stringify(detailNode).includes('recordId'));
+});
+
+
+test('Mod Loading explains real Memoria priority and format-specific overlap', async () => {
+  const e = await editor();
+  e.run('info()');
+  const info = JSON.stringify(e.targets['#main']);
+  assert.match(info, /highest-priority first/);
+  assert.match(info, /CSV, battle raw16, and field-walkmesh BGI replacements are first-hit whole-file overrides/);
+  assert.match(info, /patch files may compose low-to-high/);
+  assert.match(info, /MergeScripts/);
+  assert.doesNotMatch(info, /later one wins/);
+});
+
+
+test('field walkmesh detail labels BGI and exposes only the active bit as editable', async () => {
+  const e = await editor();
+  e.run(`state.datasets['field-walkmesh']={key:'field-walkmesh',label:'Field walkmesh floors',source:'vanilla/project',fields:[
+    {key:'Field',label:'Field',kind:'stored',editable:false,declaredType:'Path'},
+    {key:'Active',label:'Floor active',kind:'boolean',editable:true,declaredType:'Boolean'},
+    {key:'OtherFlags',label:'Other flag bits',kind:'stored',editable:false,declaredType:'UInt16'}
+  ],rows:[{line:0,name:'FBG_TEST · Floor 0',source:'project',values:{Field:'FBG_TEST',Active:true,OtherFlags:64}}]};`);
+  const node=e.run(`detail(state.datasets['field-walkmesh'],state.datasets['field-walkmesh'].rows[0])`);
+  const text=JSON.stringify(node);
+  assert.match(text,/Field walkmesh floors · project BGI/);
+  assert.match(text,/BGI_FLOOR_ACTIVE/);
+  assert.match(text,/STORED DATA/);
+});
+
+test('field walkmesh triangle detail exposes documented pathing flags as editable', async () => {
+  const e = await editor();
+  e.run(`state.datasets['field-walkmesh-triangles']={key:'field-walkmesh-triangles',label:'Field walkmesh triangles',source:'vanilla/project',fields:[
+    {key:'Field',label:'Field',kind:'stored',editable:false,declaredType:'Path'},
+    {key:'Triangle',label:'Triangle',kind:'stored',editable:false,declaredType:'UInt16'},
+    {key:'Floor',label:'Floor',kind:'stored',editable:false,declaredType:'Int16'},
+    {key:'Active',label:'Triangle active',kind:'boolean',editable:true,declaredType:'Boolean'},
+    {key:'AlternateFootstep',label:'Alternate footstep',kind:'boolean',editable:true,declaredType:'Boolean'},
+    {key:'PreventNPC',label:'Prevent NPC pathing',kind:'boolean',editable:true,declaredType:'Boolean'},
+    {key:'PreventPC',label:'Prevent PC pathing',kind:'boolean',editable:true,declaredType:'Boolean'},
+    {key:'OtherFlags',label:'Other flag bits',kind:'stored',editable:false,declaredType:'UInt16'}
+  ],rows:[{line:0,id:0,name:'Triangle 0',source:'project',values:{Field:'FBG_TEST',Triangle:0,Floor:2,Active:true,AlternateFootstep:true,PreventNPC:true,PreventPC:true,OtherFlags:32}}]};`);
+  const node=e.run(`detail(state.datasets['field-walkmesh-triangles'],state.datasets['field-walkmesh-triangles'].rows[0])`);
+  const text=JSON.stringify(node);
+  assert.match(text,/Field walkmesh triangles · project BGI/);
+  assert.match(text,/BGI_TRI_ACTIVE/);
+  assert.match(text,/Alternate footstep/);
+  assert.match(text,/Prevent NPC pathing/);
+  assert.match(text,/Prevent PC pathing/);
+  assert.match(text,/STORED DATA/);
+});
+
+test('battle scene detail labels raw16 instead of CSV', async () => {
+  const e = await editor();
+  e.run('installData({key:"enemies",label:"Enemies",source:"vanilla",fields:[{key:"MaxHP",label:"Max HP",kind:"integer",editable:true,min:0,max:65535}],rows:[{line:0,id:"B3_001:0",name:"B3_001 · Enemy 1",values:{MaxHP:1234}}]})');
+  const panel = e.run('detail(state.datasets.enemies,state.datasets.enemies.rows[0])');
+  const rendered = JSON.stringify(panel);
+  assert.match(rendered, /Enemies · vanilla BattleScene raw16/);
+  assert.doesNotMatch(rendered, /Enemies · vanilla CSV/);
 });

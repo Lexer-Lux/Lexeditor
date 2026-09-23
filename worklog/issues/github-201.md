@@ -15,3 +15,12 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
 
 - [Original Lexer-Lux/Lexers-Mod-For-RDR2 #105 worklog](github-201/imports/Lexer-Lux--Lexers-Mod-For-RDR2/4fe6c76d17cc9c526cbb208e7d28f26e6395ca60/github-105.md) — verified transferred issue identity; historical evidence, not a replacement for newer central progress.
+
+## 2026-09-22 misc-fixes disposition
+Module stands deliberately safe-disabled with full reasoning (process-wide predicates own shop and station behavior; heartbeat logs protection equals rockstar). A safe entity-local mechanism still needs research. Nothing is ready for a player test. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (safe mechanism/research still
+owed), so flipping to waiting would be a fake checklist. Left actionable
+until a real session can be written.

@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import unittest
 import verify_ff7_rendered as target
+from games.ff7 import deployment
 
 
 def open_with_neutral(self, edition="ff7"):
@@ -17,6 +19,7 @@ def open_with_neutral(self, edition="ff7"):
     html = html.replace('<link rel="stylesheet" href="/shared/neutral.css">', "")
     code = target.HOST + "\nwindow.__lexeditorPlugin=" + json.dumps({"id":edition,"name":"FF7 fixture","edition":edition}) + ";\n" + (target.ROOT / "ui/framework.js").read_text(encoding="utf-8")
     html = html.replace('<script src="/shared/framework.js"></script>', "<script>" + code + "</script>")
+    html = html.replace('<script src="editor.js"></script>', "<script>" + (target.ROOT / "games/ff7/editor.js").read_text(encoding="utf-8") + "</script>")
     self.page.set_content(html, wait_until="domcontentloaded")
     self.page.wait_for_function("state.loaded === true")
     self.assertEqual(self.errors, [])
@@ -198,7 +201,7 @@ def test_refined_master_and_detail_ux(self):
     self.navigate("materia")
     progression = self.page.get_by_label("Materia AP level progression", exact=True)
     self.assertEqual(progression.count(), 1)
-    self.assertEqual(progression.locator('input[type="number"]').count(), 4)
+    self.assertEqual(progression.locator('input[inputmode="decimal"]').count(), 4)
     self.assertEqual(self.page.locator('[data-concept="editable-description"] textarea').count(), 1)
 
     self.navigate("items")
@@ -242,7 +245,7 @@ def test_finished_high_value_detail_views(self):
 
     self.navigate("materiaEquipEffects")
     self.assertEqual(self.page.locator('[data-concept="materia-equip-effect"]').count(),1)
-    self.assertEqual(self.page.get_by_label("Materia equip-effect stat changes", exact=True).locator('input[type="number"]').count(),6)
+    self.assertEqual(self.page.get_by_label("Materia equip-effect stat changes", exact=True).locator('input[inputmode="decimal"]').count(),6)
 
     self.navigate("recruits")
     self.assertEqual(self.page.locator('[data-concept="recruit-loadout"]').count(),1)
@@ -305,6 +308,70 @@ def test_small_fixed_datasets_do_not_stretch_or_overlap(self):
     self.originals_unchanged()
 
 
+
+def test_discard_restores_saved_baseline(self):
+    self.install(); self.open()
+    original = self.page.evaluate("state.saved.weapons.find(row=>row.id===state.selected.weapons)?.values.attackStrength")
+    control = self.control("weapons", "attackStrength")
+    changed = original + 1 if original < 255 else original - 1
+    control.fill(str(changed))
+    self.assertEqual(self.page.evaluate("dirtyCount()"), 1)
+    self.assertEqual(self.page.evaluate("state.records.weapons.find(row=>row.id===state.selected.weapons).values.attackStrength"), changed)
+
+    self.page.locator("#global-save").click(button="right")
+    self.page.get_by_role("button", name="Discard Changes", exact=True).click()
+    self.page.wait_for_function("dirtyCount() === 0")
+
+    self.assertEqual(self.page.evaluate("state.records.weapons.find(row=>row.id===state.selected.weapons).values.attackStrength"), original)
+    self.assertEqual(self.control("weapons", "attackStrength").input_value(), str(original))
+    self.originals_unchanged()
+
+
+def test_direct_mode_deployment_surface_for_both_identities(self):
+    self.install(); self.open("ff7")
+    control = self.control("weapons", "attackStrength")
+    original = int(control.input_value())
+    control.fill(str(original + 1 if original < 255 else original - 1))
+    self.save()
+
+    for edition in ("ff7", "ff7-2013"):
+        with self.subTest(edition=edition):
+            self.open(edition)
+            row = self.page.evaluate("state.dataMap.rows.find(row=>row.category==='deployment')")
+            self.assertEqual(row["coverage"], "structured")
+            self.assertEqual(row["status"], "partial")
+            self.assertTrue(row["openable"])
+
+            self.navigate("deployment")
+            self.page.wait_for_function("!state.deploymentLoading")
+            self.assertTrue(self.page.evaluate("state.deployment.ready"), self.page.evaluate("state.deployment.blocked"))
+            self.assertGreater(self.page.evaluate("state.deployment.fileCount"), 0)
+            self.assertEqual(self.page.get_by_role("button", name="Export Direct Mode", exact=True).count(), 1)
+            self.assertEqual(self.page.get_by_role("button", name="Deploy to FFNx", exact=True).count(), 1)
+
+            self.page.get_by_role("button", name="Export Direct Mode", exact=True).click()
+            self.page.wait_for_function("!state.deploymentLoading")
+            self.assertEqual(self.page.evaluate("state.deploymentError"), "")
+            export_root = Path(self.page.evaluate("state.deployment.exportRoot"))
+            self.assertTrue((export_root / deployment.MANIFEST_NAME).is_file())
+            self.originals_unchanged()
+
+            self.page.get_by_role("button", name="Deploy to FFNx", exact=True).click()
+            self.page.wait_for_function("!state.deploymentLoading")
+            self.assertEqual(self.page.evaluate("state.deploymentError"), "")
+            direct_root = Path(self.page.evaluate("state.deployment.directRoot"))
+            self.assertTrue((direct_root / deployment.MANIFEST_NAME).is_file())
+            for relative in self.page.evaluate("state.deployment.files.map(row=>row.path)"):
+                self.assertTrue((direct_root / relative).is_file(), relative)
+            self.originals_unchanged()
+
+            self.page.get_by_role("button", name="Remove Lexeditor deployment", exact=True).click()
+            self.page.wait_for_function("!state.deploymentLoading")
+            self.assertEqual(self.page.evaluate("state.deploymentError"), "")
+            self.assertFalse((direct_root / deployment.MANIFEST_NAME).exists())
+            self.originals_unchanged()
+
+
 def test_master_summary_headers_stay_single_line_at_narrow_width(self):
     self.install(); self.open(); self.page.set_viewport_size({"width":900,"height":620})
     for group in ("characters","items","weapons","armor","materia","playerAttacks","enemies","encounters"):
@@ -325,6 +392,8 @@ target.RenderedTests.test_finished_high_value_detail_views = test_finished_high_
 target.RenderedTests.test_dense_custom_views_fit_narrow_detail_pane = test_dense_custom_views_fit_narrow_detail_pane
 target.RenderedTests.test_small_fixed_datasets_do_not_stretch_or_overlap = test_small_fixed_datasets_do_not_stretch_or_overlap
 target.RenderedTests.test_master_summary_headers_stay_single_line_at_narrow_width = test_master_summary_headers_stay_single_line_at_narrow_width
+target.RenderedTests.test_discard_restores_saved_baseline = test_discard_restores_saved_baseline
+target.RenderedTests.test_direct_mode_deployment_surface_for_both_identities = test_direct_mode_deployment_surface_for_both_identities
 
 if __name__ == "__main__":
     unittest.main(module=target, verbosity=2)

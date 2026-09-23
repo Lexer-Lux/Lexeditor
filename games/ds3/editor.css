@@ -1,0 +1,7 @@
+/* Dark Souls 3 draws on the shared baseline and nothing else: colour and
+   structure come from the framework; this file only tunes the page. */
+:root{
+  --lex-bg:#11110f;--lex-panel:#191915;--lex-panel-2:#22211c;--lex-border:#514a3c;
+  --lex-text:#e8e1d4;--lex-muted:#aaa08e;--lex-accent:#a4824c;--lex-accent-text:#17130d;
+  --lex-highlight:#c2a66f;--lex-success:#779363;--lex-nav-bg:#171713;
+}

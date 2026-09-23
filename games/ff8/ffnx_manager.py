@@ -19,6 +19,7 @@ from typing import Callable
 import process_probe
 from settings_manager import SettingsStore
 from .ffnx_issue_51 import runtime_package
+from plugin_files import fetch_file
 
 
 LOCAL_DATA = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parents[2] / "out")) / "Lexeditor"
@@ -49,6 +50,11 @@ Progress = Callable[[int, int, str], None]
 JsonFetcher = Callable[[str], dict]
 FileFetcher = Callable[[str, Path, Progress | None], None]
 RunningCheck = Callable[[], bool]
+
+
+def _fetch_file(url: str, target: Path, progress: Progress | None = None) -> None:
+    fetch_file(url, target, limit=MAX_ARCHIVE_BYTES, progress=progress,
+               label="Downloading FFNx…", too_large="The FFNx archive is larger than the allowed limit")
 
 
 def _now() -> str:
@@ -114,25 +120,6 @@ def _fetch_json(url: str) -> dict:
     request = urllib.request.Request(url, headers={"User-Agent": "Lexeditor/1.0"})
     with urllib.request.urlopen(request, timeout=20) as response:
         return json.loads(response.read().decode("utf-8"))
-
-
-def _fetch_file(url: str, target: Path, progress: Progress | None = None) -> None:
-    request = urllib.request.Request(url, headers={"User-Agent": "Lexeditor/1.0"})
-    with urllib.request.urlopen(request, timeout=30) as response, target.open("wb") as stream:
-        total = int(response.headers.get("Content-Length") or 0)
-        if total > MAX_ARCHIVE_BYTES:
-            raise RuntimeError("The FFNx archive is larger than the allowed limit")
-        current = 0
-        while True:
-            block = response.read(1024 * 1024)
-            if not block:
-                break
-            current += len(block)
-            if current > MAX_ARCHIVE_BYTES:
-                raise RuntimeError("The FFNx archive is larger than the allowed limit")
-            stream.write(block)
-            if progress:
-                progress(current, total, "Downloading FFNx…")
 
 
 def _release(fetch_json: JsonFetcher) -> dict:
@@ -299,6 +286,44 @@ def _set_project_paths(config: Path, direct_root: Path) -> None:
     temporary = config.with_suffix(config.suffix + ".tmp")
     temporary.write_text(text, encoding="utf-8", newline="\n")
     temporary.replace(config)
+
+
+AUDIO_VOLUME_KEYS = ("external_sfx_volume", "external_music_volume")
+
+
+def set_audio_volumes(config: Path, *, sfx: int | None = None,
+                      music: int | None = None) -> dict:
+    """Write FFNx audio-layer gains (0..100) into FFNx.toml.
+
+    A side left as None keeps its existing key, so the FFNx -1
+    auto-detect default survives when that layer is unmanaged.
+    Returns the gains written, keyed by FFNx.toml name.
+    """
+    wanted = {"external_sfx_volume": sfx, "external_music_volume": music}
+    for key, value in wanted.items():
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) \
+                or not 0 <= value <= 100:
+            raise ValueError(f"{key} must be an int from 0 to 100")
+    text = config.read_text(encoding="utf-8", errors="strict")
+    written = {}
+    for key, value in wanted.items():
+        if value is None:
+            continue
+        pattern = re.compile(
+            rf'(?m)^[ \t]*{re.escape(key)}[ \t]*=[ \t]*-?\d+[ \t]*$')
+        replacement = f"{key} = {value}"
+        if pattern.search(text):
+            text = pattern.sub(replacement, text, count=1)
+        else:
+            text += f"\n{replacement}\n"
+        written[key] = value
+    if written:
+        temporary = config.with_suffix(config.suffix + ".tmp")
+        temporary.write_text(text, encoding="utf-8", newline="\n")
+        temporary.replace(config)
+    return written
 
 
 def _configured_direct_root(config: Path) -> Path:

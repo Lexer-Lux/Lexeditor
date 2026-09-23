@@ -47,3 +47,7 @@ Source files: runtime `recon.cpp`, `settings_menu.cpp`, `settings_menu_schema.ge
 Root owns build and later delivery. Runtime installation is on hold while the separate #151 DurationProbe experiment owns the game files; this agent made no game-directory or experiment-bundle changes. Remaining #254 work is candidate build/delivery after that experiment and actual rendered geometry, hit/study behavior and sustained performance acceptance. Separate radius controls are no longer outstanding coding scope.
 
 Root verified the development build and executable radius checks. Built ASI SHA-256: `5FF544CFB543099812D9FB0ED3F81F8EE57B081AFA9AAECCFE2A20A9D46A63D8`. This build is not installed while #151 is active. The main runtime audit now includes the radius regression harness.
+
+## 2026-09-22 misc-fixes evidence
+Re-ran both harnesses on current tree: verify_rdr2_recon_radii.py PASS with shared-radius, legacy-default-lost and save-branch mutations rejected; verify_rdr2_recon_area.py PASS with ten mutations rejected (aspect-distortion, center-only-rays, expired-hit-accepted, slow-result-published, frame-based-budget, old-mode/session published, lost-result, animal-origin range/LOS). Area geometry, persistent results, and hit integration hold in source.
+Human test, needs built ASI on a game machine after #151: confirm the visible acquisition circle, reliable animal/plant hits through it, and sustained frame rate with MaxTags=24. Report rendered shape, hit rate, and fps. Binocular paths also wait on #357. Issue stays actionable.
