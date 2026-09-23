@@ -217,9 +217,10 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             map_search.fill("BattleScene")
             page.wait_for_function("state.mapQuery==='BattleScene'")
             assert "BattleScene" in page.locator(".lex-data-map-view").inner_text()
-            map_search.fill("Other vanilla Unity asset-container content")
-            page.wait_for_function("state.mapQuery==='Other vanilla Unity asset-container content'")
-            assert "Other vanilla Unity asset-container content" in page.locator(".lex-data-map-view").inner_text()
+            map_search.fill("p0data4.bin")
+            page.wait_for_function("state.mapQuery==='p0data4.bin'")
+            map_text = page.locator(".lex-data-map-view").inner_text()
+            assert "p0data4.bin" in map_text and "Field and character 3D models" in map_text
             map_search.fill("")
 
             page.set_viewport_size({"width": 820, "height": 700})
