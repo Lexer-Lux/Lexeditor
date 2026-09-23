@@ -506,12 +506,13 @@ def main() -> int:
             browser = play.chromium.launch(headless=True, args=["--no-sandbox"])
             results = []
             try:
-                for width, height, zoom in ((1440, 900, 1.0), (900, 620, 1.0), (1100, 760, 1.35)):
+                for index, (width, height, zoom) in enumerate(((1440, 900, 1.0), (900, 620, 1.0), (1100, 760, 1.35))):
                     label = f"{width}x{height}-z{zoom}"
                     page, errors = open_editor(browser, session.url, width, height, zoom)
                     try:
                         exercise_objects(page, project, label, mutate=(width == 1440 and zoom == 1.0))
                         exercise_data_map(page, label)
+                        exercise_typed_data(page, project, label, 4 + index)
                         exercise_info(page, label, height)
                         assert not errors, (label, errors)
                         results.append({"label": label, "passed": True})
