@@ -1,8 +1,8 @@
 """Lexeditor-owned FF9 feature toggles and transactional Memoria mod deployment.
 
 This is intentionally separate from Memoria's settings UI. Lexeditor only owns
-its own mod folder and the single FolderNames entry required for Memoria to load
-that folder; every unrelated Memoria.ini byte is preserved.
+its own mod folder plus its FolderNames/Priorities entries required to keep that
+folder first; every unrelated Memoria.ini setting and external mod is preserved.
 """
 from __future__ import annotations
 
