@@ -331,4 +331,32 @@ class StardewContentPackTests(unittest.TestCase):
 
 
 
+    def test_typed_dataset_sources_are_read_only_and_expose_only_modeled_fields(self):
+        game = self.root / "game-typed"
+        source = game / "Content (unpacked)" / "Data" / "Crops.json"
+        source.parent.mkdir(parents=True)
+        source.write_text(json.dumps({
+            "472": {
+                "Seasons": ["Spring"], "DaysInPhase": [1, 1, 1, 1],
+                "RegrowDays": -1, "IsRaised": False, "IsPaddyCrop": False,
+                "NeedsWatering": True, "HarvestItemId": "24", "HarvestMethod": "Grab",
+                "HarvestMinStack": 1, "HarvestMaxStack": 1, "ExtraHarvestChance": 0.2,
+                "SpriteIndex": 0, "CountForMonoculture": True, "CountForPolyculture": True,
+                "PlantableLocationRules": [{"Id": "keep", "Result": "Allow"}],
+            }
+        }, indent=2) + "\n", encoding="utf-8")
+        before = source.read_bytes()
+        from games.stardew_valley.source_data import load_base_dataset
+        rows, status = load_base_dataset(game, "crops")
+        self.assertTrue(status["available"])
+        self.assertEqual(rows["472"]["baseFields"]["ExtraHarvestChance"], 0.2)
+        self.assertNotIn("PlantableLocationRules", rows["472"]["baseFields"])
+        with patch.object(server.paths, "GAME_ROOT", game), patch.object(server.paths, "PROJECT_ROOT", self.project):
+            payload = server.dataset_payload("crops")
+            self.assertTrue(payload["baseSource"]["available"])
+            self.assertEqual(payload["rows"][0]["baseFields"]["HarvestMethod"], "Grab")
+        self.assertEqual(source.read_bytes(), before)
+
+
+
 if __name__ == "__main__": unittest.main()
