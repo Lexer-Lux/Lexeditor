@@ -126,16 +126,19 @@ with sync_playwright() as p:
                     # adapter to verify, so only the filter is checked there.
                     opens=page.locator('.lex-data-map-open').count()
                     if opens:
-                        page.evaluate('navigate=(target,filters)=>{window.mapOpened={target,filters}}')
-                        page.locator('.lex-data-map-open').first.click()
                         if game=='warband':
                             # Warband's completed Data Map opens structured
                             # Module System datasets in Misc., preserving the
                             # dataset identity instead of pretending every row
                             # is an Items record.
+                            page.locator('.lex-data-map-open').first.click()
                             assert page.evaluate('state.tab')=='misc',game
                             assert page.evaluate('moduleRecords.active()')=='fixture-data',game
+                            page.evaluate('navigate("datamap")')
+                            page.get_by_role('combobox',name='Filter files by coverage',exact=True).wait_for()
                         else:
+                            page.evaluate('navigate=(target,filters)=>{window.mapOpened={target,filters}}')
+                            page.locator('.lex-data-map-open').first.click()
                             assert page.evaluate('mapOpened.target')=='items',game
                             if game=='ff9':assert page.evaluate('state.datasetChoice.items')=='fixture-data'
                     page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('source')
