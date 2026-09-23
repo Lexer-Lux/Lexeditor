@@ -18,3 +18,13 @@
 Only #524 and #525 are agent-complete; #522, #523, #74 stay actionable and must
 not be merge-closed by this branch. Do not infer merge permission from issue
 completion.
+
+## 2026-09-23 --- per-game-ff9: verification session (no scope change)
+
+- Branch now tracks master `e0e15a63`; this session adds one repair per issue:
+  #523 helper-descriptor correction (`games/ff9/plugin.py`,
+  `tests/test_ff9_runtime.py`), #524 credits-bundle regeneration
+  (`ui/credits.json`), status notes in `github-523.md` and `github-74.md`.
+- Full agent-side verification green (see `github-74.md` for the exact list).
+- #522, #523, #74 stay actionable: per-family Lexer decisions and
+  installed-game proof remain human work. Do not infer merge permission.

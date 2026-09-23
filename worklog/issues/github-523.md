@@ -35,3 +35,16 @@ Needs a human with a supported Steam FF9 install:
 - [ ] Documented unsupported cases (newer-helper mods, MergeScripts behavior).
 
 Status: actionable, blocked on installed-game proof. Do not close on metadata.
+
+## 2026-09-23 --- per-game-ff9: helper-descriptor correction
+
+- `app.py --list` and `tests/test_plugin_descriptors.py` were red: FF9 declared
+  both `helper_install` and `helper_install_for_root`, which `plugin_api`
+  validation (`bf4342a8`, predates the `8ec554d2` restore) rejects.
+- Fix on this branch: `games/ff9/plugin.py` keeps the root-aware hooks only,
+  the shape the host actually uses for install, status, and the Updates
+  drawer. Legacy default-root hooks removed; no runtime behavior change.
+- `test_shared_updates_contract_is_metadata_only` now asserts the for_root
+  hook and guards `helper_install is None and helper_status is None` so a
+  future restore cannot re-break discovery.
+- The installed-game proof checklist above is unchanged and still needs a human.
