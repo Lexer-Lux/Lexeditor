@@ -261,7 +261,7 @@ test('field walkmesh detail labels BGI and exposes only the active bit as editab
   assert.match(text,/STORED DATA/);
 });
 
-test('field walkmesh triangle detail exposes only BGI_TRI_ACTIVE as editable', async () => {
+test('field walkmesh triangle detail exposes documented pathing flags as editable', async () => {
   const e = await editor();
   e.run(`state.datasets['field-walkmesh-triangles']={key:'field-walkmesh-triangles',label:'Field walkmesh triangles',source:'vanilla/project',fields:[
     {key:'Field',label:'Field',kind:'stored',editable:false,declaredType:'Path'},
