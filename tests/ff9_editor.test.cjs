@@ -261,6 +261,22 @@ test('field walkmesh detail labels BGI and exposes only the active bit as editab
   assert.match(text,/STORED DATA/);
 });
 
+test('field walkmesh triangle detail exposes only BGI_TRI_ACTIVE as editable', async () => {
+  const e = await editor();
+  e.run(`state.datasets['field-walkmesh-triangles']={key:'field-walkmesh-triangles',label:'Field walkmesh triangles',source:'vanilla/project',fields:[
+    {key:'Field',label:'Field',kind:'stored',editable:false,declaredType:'Path'},
+    {key:'Triangle',label:'Triangle',kind:'stored',editable:false,declaredType:'UInt16'},
+    {key:'Floor',label:'Floor',kind:'stored',editable:false,declaredType:'Int16'},
+    {key:'Active',label:'Triangle active',kind:'boolean',editable:true,declaredType:'Boolean'},
+    {key:'OtherFlags',label:'Other flag bits',kind:'stored',editable:false,declaredType:'UInt16'}
+  ],rows:[{line:0,id:0,name:'Triangle 0',source:'project',values:{Field:'FBG_TEST',Triangle:0,Floor:2,Active:true,OtherFlags:32}}]};`);
+  const node=e.run(`detail(state.datasets['field-walkmesh-triangles'],state.datasets['field-walkmesh-triangles'].rows[0])`);
+  const text=JSON.stringify(node);
+  assert.match(text,/Field walkmesh triangles · project BGI/);
+  assert.match(text,/BGI_TRI_ACTIVE/);
+  assert.match(text,/STORED DATA/);
+});
+
 test('battle scene detail labels raw16 instead of CSV', async () => {
   const e = await editor();
   e.run('installData({key:"enemies",label:"Enemies",source:"vanilla",fields:[{key:"MaxHP",label:"Max HP",kind:"integer",editable:true,min:0,max:65535}],rows:[{line:0,id:"B3_001:0",name:"B3_001 · Enemy 1",values:{MaxHP:1234}}]})');
