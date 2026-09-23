@@ -1423,11 +1423,9 @@ class HostApi:
         root = Path(status["root"]) / plugin_id
         game = self._installations.snapshot(plugin_id).get("root")
         active = []
-        if game and plugin_id == "ff7r":
-            marker = Path(game) / "End/Content/Paks/~mods/LexeditorLibrary/deployment.json"
-            if marker.is_file():
-                deployment = json.loads(marker.read_text(encoding="utf-8"))
-                active = deployment.get("modIds", [Path(path).name for path in deployment.get("mods", [])])
+        adapter = self._plugins[plugin_id].mod_adapter
+        if game and adapter is not None and hasattr(adapter, "active_mod_ids"):
+            active = list(adapter.active_mod_ids(Path(game)))
         entries = []
         for child in sorted(root.iterdir()) if root.is_dir() else []:
             if child.is_dir() and not child.name.startswith(".") and not child.is_symlink():
