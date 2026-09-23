@@ -47,7 +47,15 @@ def main() -> int:
             """})
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
-            cdp.eval("(()=>{const item=state.items.rows.find(row=>row.id==='ankle_boots');if(!item)throw new Error('ankle_boots fixture item is missing');state.selectedItem=itemRowKey(item);renderItems();})()")
+            target = cdp.eval("""(()=>{
+              const item=state.items.rows.find(row=>row.inventoryMesh);
+              return {fontAvailable:!!state.font?.available,
+                item:item?{id:item.id,name:item.name,key:itemRowKey(item)}:null};
+            })()""")
+            if not target["fontAvailable"] or not target["item"]:
+                print("SKIPPED: installed Warband font/item preview assets are unavailable on this machine")
+                return 0
+            cdp.eval(f"state.selectedItem={target['item']['key']!r};renderItems()")
             wait_eval(cdp, "document.querySelector('.warband-item-thumbnail img')?.naturalWidth>0", 90)
             cdp.eval("document.querySelector('.warband-item-detail .lex-detail-panel-icon').click()")
             wait_eval(cdp, "document.querySelector('.warband-item-detail.lex-model-preview-open')&&document.querySelectorAll('.lex-model-preview-drawer canvas').length===1&&window.__warbandPreview?.length===1", 90)
@@ -65,8 +73,9 @@ def main() -> int:
                 id:document.querySelector('.lex-detail-panel-id')?.textContent,
                 errors:window.__testErrors};
             })()""")
-            if (result["errors"] or result["title"] != "Ankle Boots" or result["id"] != "ankle_boots"):
-                raise AssertionError(result)
+            if (result["errors"] or result["title"] != target["item"]["name"] or
+                    result["id"] != target["item"]["id"]):
+                raise AssertionError({"target": target, "result": result})
             if result["icon"]["width"] < 24 or result["icon"]["height"] < 24:
                 raise AssertionError(result)
             if len(result["canvases"]) != 1 or any(row["width"] < 24 or row["height"] < 24
