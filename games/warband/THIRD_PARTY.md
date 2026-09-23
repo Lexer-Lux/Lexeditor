@@ -25,3 +25,29 @@ semantics before implementing Warband-specific editors.
 The implementation in Lexeditor is original span-preserving source editing code.
 The upstream repository is credited because its documented schemas materially
 inform which Warband fields can be represented without guessing.
+
+## Persistent World compatibility reference
+
+- Repository: https://github.com/vornne/pw_module_system
+- Reference revision: `a35fd5d89cbb4e684ddf2fe4a6de9fe5066b9988`
+- License: 3-clause BSD-style terms in upstream `LICENSE.txt`
+- Copyright notice: Copyright (c) 2010 Steven Schwartfeger, Persistent World
+- Files inspected: `module_skills.py`, `module_parties.py`,
+  `module_scene_props.py`, `module_skins.py`, and
+  `module_particle_systems.py`.
+
+This is a read-only real-world compatibility reference. In particular,
+Persistent World generates particle-system entries through a `psys(...)`
+helper, which is valid Module System source but is not a literal record suitable
+for Lexeditor's span-based structured editor. Lexeditor now reports such
+helper/wrapper-generated records as source-only and refuses structured writes
+instead of treating helper arguments as tuple fields. No Persistent World code
+or data is bundled.
+
+## Installed Warband assets
+
+Warband's bitmap font remains proprietary installed-game data. Lexeditor does
+not redistribute `font.dds` or `font_data.xml`; when present in the user's
+Warband installation they are read locally and an alpha-only atlas is generated
+inside the user's private application-data cache. No Warband sound effect is
+bundled by this plugin.
