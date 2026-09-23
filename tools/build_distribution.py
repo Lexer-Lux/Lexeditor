@@ -124,10 +124,17 @@ def smoke(executable: Path) -> None:
     result.unlink(missing_ok=True)
     env=os.environ.copy()
     env['LEXEDITOR_NO_AUTO_SCAN']='1'
-    p=subprocess.run([str(executable),'--smoke-service',str(result)],cwd=Path.home(),env=env,timeout=90)
-    if p.returncode or not result.exists():raise RuntimeError('Frozen app/service smoke failed')
+    command=[str(executable),'--smoke-service',str(result)]
+    try:
+        p=subprocess.run(command,cwd=Path.home(),env=env,timeout=90)
+    except subprocess.TimeoutExpired as error:
+        report=json.loads(result.read_text('utf-8')) if result.is_file() else {}
+        raise RuntimeError(f"Frozen app/service smoke timed out: {report}") from error
+    if not result.exists():
+        raise RuntimeError(f"Frozen app/service smoke exited {p.returncode} without a diagnostic report")
     report=json.loads(result.read_text('utf-8'))
-    if not report.get('passed') or not report.get('childStopped'):raise RuntimeError('Frozen child did not shut down')
+    if p.returncode or not report.get('passed') or not report.get('childStopped'):
+        raise RuntimeError(f"Frozen app/service smoke failed: {report}")
     print(json.dumps(report),flush=True)
 
 
