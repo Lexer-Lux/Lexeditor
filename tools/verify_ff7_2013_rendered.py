@@ -75,12 +75,29 @@ class FF72013Discard(target.RenderedTests):
 
         OUT.mkdir(parents=True, exist_ok=True)
         self.page.screenshot(path=str(OUT / "ff7-2013-900x620.png"))
-        self.page.evaluate('document.documentElement.style.zoom = "1.5"')
-        self.page.wait_for_timeout(80)
-        self.assertTrue(self.page.locator("#lexeditor-shell").is_visible())
-        self.assertTrue(control.is_visible())
+
+        # Reopen the exact same UI at a real 1.5 device scale factor. This models
+        # 150% display scaling without changing application CSS or page zoom.
+        self.page.close()
+        self.page = self.browser.new_page(
+            viewport={"width": 900, "height": 620},
+            device_scale_factor=1.5,
+        )
+        self.page.set_default_timeout(10000)
+        self.errors = []
+        self.page.on("pageerror", lambda error: self.errors.append(str(error)))
+        self.page.expose_function("testRequest", self.bridge)
+        self.open("ff7-2013")
+        self.navigate("armor")
+        control = self.control("armor", "defense")
+        self.assertEqual(self.page.evaluate("window.devicePixelRatio"), 1.5)
+        metrics = self.page.evaluate(
+            """()=>{const r=document.querySelector('.ff7-detail').getBoundingClientRect();
+            return {right:r.right,bottom:r.bottom,width:innerWidth,height:innerHeight}}"""
+        )
+        self.assertLessEqual(metrics["right"], metrics["width"] + 2, metrics)
+        self.assertLessEqual(metrics["bottom"], metrics["height"] + 2, metrics)
         self.page.screenshot(path=str(OUT / "ff7-2013-900x620-150pct.png"))
-        self.page.evaluate('document.documentElement.style.zoom = ""')
 
         original = int(control.input_value())
         changed = original + 1 if original < 255 else original - 1
