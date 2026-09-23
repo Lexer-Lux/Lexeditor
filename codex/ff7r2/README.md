@@ -161,8 +161,11 @@ meaning by themselves.
   NormalItemPercent_Array, RareItemPercent_Array, StealItemName_Array,
   StealItemQuantity_Array and StealFaildCountArrayIndex. Synthlight's public
   format work proves an _Array header points to repeated values of the property's
-  underlying type, with explicit alignment. Lexeditor now independently decodes
-  those array elements read-only and exposes supplied BattleItemPossession rows
+  underlying type, with explicit alignment. The generated Rebirth row declaration
+  independently cross-checks the concrete schema: item arrays are TArray<FName>,
+  NormalItemPercent_Array/RareItemPercent_Array/StealItemQuantity_Array are
+  TArray<uint8>, and StealFaildCountArrayIndex is int32. Lexeditor now independently
+  decodes those array elements read-only and exposes supplied BattleItemPossession rows
   in a shared paged Formulae Table+Detail. Gantz79's public mod evidence says the
   25% rate data is shared between steal/drop, so a Steal-only percentage control
   would still be misleading. Array writes, the complete Steal formula/terms,
