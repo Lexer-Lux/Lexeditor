@@ -206,7 +206,12 @@
       LexeditorUI.detailNote(`${implementedCount}/${formulaRows.length} requested runtime formulae are implemented. The owning toggle remains unavailable until every listed formula has a guarded game patch.`)]);
     const view=LexeditorUI.stack({fill:false},master,LexeditorUI.tileGrid([damage,accuracy,...formulaRows.map(reworkCard)],{minWidth:450}));
     view.addEventListener("input",()=>requestAnimationFrame(updateOutputs));updateOutputs();
-    $("#main").replaceChildren(detailPanel({heading:false,body:view}));
+    // The stacked damage, accuracy and per-formula cards run taller than the
+    // main region, and this plugin clips #main, so the page needs the shared
+    // tweaks scroll container; without it the lowest cards render below the
+    // window with no way to reach them.
+    const scroller=el("div",{class:"lex-tweaks-scroll",tabindex:"-1"},detailPanel({heading:false,body:view}));
+    $("#main").replaceChildren(scroller);
   }
 
   function startingDataEdits(){const edits=[],current=state.data.init,before=state.base.init;if(!current||!before)return edits;for(const kind of ["general","config"])current[kind].fields.forEach((field,index)=>{if(field.value!==before[kind].fields[index].value)edits.push({kind,id:0,field:field.field,value:field.value})});for(const [key,kind] of [["gfs","gf"],["characters","character"]])for(const row of current[key].rows){const base=before[key].rows.find(value=>value.id===row.id);row.fields.forEach((field,index)=>{if(field.value!==base.fields[index].value)edits.push({kind,id:row.id,field:field.field,value:field.value})});if(kind==="character")row.magics.forEach((slot,index)=>{const old=base.magics[index];if(slot.magicId!==old.magicId||slot.quantity!==old.quantity)edits.push({kind:"magic",id:row.id,slot:slot.slot,magicId:slot.magicId,quantity:slot.quantity})})}current.inventory.rows.forEach((slot,index)=>{const old=before.inventory.rows[index];if(slot.itemId!==old.itemId||slot.quantity!==old.quantity)edits.push({kind:"inventory",id:0,slot:slot.slot,itemId:slot.itemId,quantity:slot.quantity})});return edits}
