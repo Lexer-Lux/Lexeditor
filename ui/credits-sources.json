@@ -240,6 +240,11 @@
           "name": "BRF Sync contributors",
           "role": "Separate read-only tool for converting Warband model resources.",
           "url": "https://github.com/markpryk/brf_sync_tools"
+        },
+        {
+          "name": "Sea-Monster / WarbandModuleSystem",
+          "role": "MIT-licensed Module System 1.171 reference for documented Warband record schemas and export semantics.",
+          "url": "https://github.com/Sea-Monster/WarbandModuleSystem"
         }
       ],
       "thanks": [],
@@ -251,6 +256,10 @@
         {
           "name": "BRF Sync — GNU GPL v2",
           "sourcePath": "tools/brf-sync/LICENSE"
+        },
+        {
+          "name": "Warband Module System schema reference — MIT",
+          "sourcePath": "games/warband/THIRD_PARTY.md"
         }
       ]
     },

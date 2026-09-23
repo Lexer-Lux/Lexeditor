@@ -7,6 +7,7 @@
   <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
   <link rel="stylesheet" href="/shared/framework.css">
   <link rel="stylesheet" href="editor.css">
+  <link rel="stylesheet" href="module_records.css">
 </head>
 <body>
   <div id="lexeditor-shell"></div>
@@ -14,6 +15,7 @@
   <main id="main"><div>Loading Warband data…</div></main>
   <script src="/shared/framework.js"></script>
   <script src="/warband/troop_trees.js"></script>
+  <script src="module_records.js"></script>
   <script src="editor.js"></script><script src="/warband/troop_editor.js"></script>
   <script src="items.js"></script><script src="troops.js"></script><script src="settings.js"></script><script src="datamap.js"></script><script src="dashboard.js"></script>
   <script src="boot.js"></script>

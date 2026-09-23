@@ -13,6 +13,7 @@ from plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProject
 from service_session import LocalPluginSession, request_json
 
 from . import paths, wse2_manager
+from .project_import import prepare_existing_project
 from .game_launch import WarbandGameController
 
 
@@ -156,6 +157,7 @@ PLUGIN = GamePlugin(
             ("ModuleSystem/module_items.py", "settings.ini", "build.bat"),
             ("module.ini",),
         ),
+        prepare_existing=prepare_existing_project,
         discover=installed_modules,
         template_root=Path(paths.MOD_PROJECT),
     ),

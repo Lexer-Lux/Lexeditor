@@ -58,7 +58,22 @@ with sync_playwright() as p:
                 errors=[]
                 page=browser.new_page(viewport={'width':width,'height':height})
                 page.on('pageerror',lambda e:errors.append(str(e)))
-                page.set_content(html_for(game),wait_until='domcontentloaded')
+                html=html_for(game)
+                if game=='warband':
+                    # Warband's shared shell reads sessionStorage during boot.
+                    # set_content() uses an opaque/storage-refused document in
+                    # Chromium, so give this synthetic fixture a normal in-memory
+                    # HTTP origin without opening a loopback server.
+                    html=html.replace('http://127.0.0.1:9/','http://warband-data-map.test/')
+                    def route_warband_fixture(route):
+                        if route.request.resource_type=='document':
+                            route.fulfill(status=200,body=html,content_type='text/html')
+                        else:
+                            route.abort()
+                    page.route('http://warband-data-map.test/**',route_warband_fixture)
+                    page.goto('http://warband-data-map.test/',wait_until='domcontentloaded')
+                else:
+                    page.set_content(html,wait_until='domcontentloaded')
                 # Most plugins keep one `state` object the map can be seeded
                 # into. Palworld keeps its own named globals instead, so it is
                 # seeded through those rather than being called broken for not
@@ -85,6 +100,10 @@ with sync_playwright() as p:
                       navigate("datamap");
                     }''',ROWS)
                     page.evaluate('state.busy=false;render();if(typeof refreshShell==="function")refreshShell();else if(typeof shell!=="undefined"&&shell.refresh)shell.refresh();')
+                    if game=='warband':
+                        page.evaluate('()=>LexeditorUI.finishPluginLoading()')
+                        page.wait_for_function('!document.documentElement.classList.contains("lex-loading-live")')
+                        page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
                 page.wait_for_selector('.lex-data-map-table')
                 # Boot never finishes here (its fetches never resolve), so the
                 # loading screen would stay over the page and take every click.
@@ -131,10 +150,21 @@ with sync_playwright() as p:
                     # adapter to verify, so only the filter is checked there.
                     opens=page.locator('.lex-data-map-open').count()
                     if opens:
-                        page.evaluate('navigate=(target,filters)=>{window.mapOpened={target,filters}}')
-                        page.locator('.lex-data-map-open').first.click()
-                        assert page.evaluate('mapOpened.target')=='items',game
-                        if game=='ff9':assert page.evaluate('state.datasetChoice.items')=='fixture-data'
+                        if game=='warband':
+                            # Warband's completed Data Map opens structured
+                            # Module System datasets in Misc., preserving the
+                            # dataset identity instead of pretending every row
+                            # is an Items record.
+                            page.locator('.lex-data-map-open').first.click()
+                            assert page.evaluate('state.tab')=='misc',game
+                            assert page.evaluate('moduleRecords.active()')=='fixture-data',game
+                            page.evaluate('navigate("datamap")')
+                            page.get_by_role('combobox',name='Filter files by coverage',exact=True).wait_for()
+                        else:
+                            page.evaluate('navigate=(target,filters)=>{window.mapOpened={target,filters}}')
+                            page.locator('.lex-data-map-open').first.click()
+                            assert page.evaluate('mapOpened.target')=='items',game
+                            if game=='ff9':assert page.evaluate('state.datasetChoice.items')=='fixture-data'
                     page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('source')
                     page.wait_for_timeout(200)
                     assert page.locator('.lex-data-map-open').count()==0,game

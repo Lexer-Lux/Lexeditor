@@ -616,7 +616,8 @@
     ],
     "multiNumberRow": [
       "blank",
-      "ff8"
+      "ff8",
+      "warband"
     ],
     "newButton": [
       "blank",
@@ -948,7 +949,8 @@
       "ff7r",
       "ff8",
       "palworld",
-      "rdr2"
+      "rdr2",
+      "warband"
     ],
     "tileGrid": [
       "blank",

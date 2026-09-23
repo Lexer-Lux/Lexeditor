@@ -37,6 +37,7 @@
     .chooser-title h1 { user-select:none; -webkit-user-select:none; }
     .chooser-window-controls { position:relative; z-index:80; display:flex; align-self:flex-start; align-items:center; gap:8px; }
     .chooser-settings,.chooser-restart { display:grid; width:36px; height:36px; place-items:center; padding:0; color:var(--lex-muted); border:1px solid var(--lex-border); border-radius:5px; background:var(--lex-panel-2); }
+    .chooser-settings[hidden],.chooser-restart[hidden] { display:none; }
     .chooser-settings:hover,.chooser-restart:hover { color:var(--lex-text); }
     .chooser-restart svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2}
     h1 { margin:0; font:900 clamp(20px,3.3vh,30px)/1 var(--lex-heading-font); }

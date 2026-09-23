@@ -1,0 +1,3 @@
+/* Module-record views reuse the shared panels and notices; only the
+   parchment detail background differs, as a token the framework owns. */
+.warband-module-detail{--lex-detail-panel-bg:#f7edcf}

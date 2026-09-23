@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import mimetypes
 import os
@@ -18,8 +19,8 @@ from . import paths
 from .item_icons import CACHE as ICON_CACHE
 from .catalog import DATA_CATALOG
 from .dump_infopages import parse_info_pages
-from .dump_troops import parse_troops
 from .troop_editor import troop_data, save_troops
+from .module_records import SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME, dataset_data, save_dataset
 from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
 from .model_preview import PreviewUnavailable, preview as item_preview, texture_path as preview_texture_path
 from plugin_http import PluginRequestHandler
@@ -35,6 +36,7 @@ MODULES = Path(paths.MODULES_DIR)
 PORT = int(os.environ.get("LEXEDITOR_PORT", "8766"))
 HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED", "0") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "")
+CATALOG_LOCK = threading.Lock()
 
 
 def settings_rows() -> list[dict]:
@@ -241,15 +243,20 @@ def _item_records(text: str) -> list[dict]:
     return records
 
 
-def item_rows() -> list[dict]:
+def item_data() -> dict:
     source = MODULE_SYSTEM / "module_items.py"
     if not source.is_file():
-        return []
-    text, _encoding, _raw = _module_items_source()
-    rows = []
-    for record in _item_records(text):
-        rows.append({key: value for key, value in record.items() if not key.startswith("_")})
-    return rows
+        return {"rows": [], "sha256": ""}
+    text, _encoding, raw = _module_items_source()
+    rows = [
+        {key: value for key, value in record.items() if not key.startswith("_")}
+        for record in _item_records(text)
+    ]
+    return {"rows": rows, "sha256": hashlib.sha256(raw).hexdigest()}
+
+
+def item_rows() -> list[dict]:
+    return item_data()["rows"]
 
 
 def _validate_item_expression(expression: str) -> str:
@@ -287,10 +294,7 @@ def _python_string(value: str) -> str:
 
 
 def _validate_module_items_candidate(text: str, encoding: str) -> bytes:
-    records = _item_records(text)
-    ids = [record["id"] for record in records]
-    if len(ids) != len(set(ids)):
-        raise ValueError("Saving would create duplicate item IDs")
+    _item_records(text)
     encoded = text.encode(encoding)
     python27 = Path(r"C:\Python27\python.exe")
     if python27.is_file():
@@ -310,60 +314,95 @@ def _validate_module_items_candidate(text: str, encoding: str) -> bytes:
     return encoded
 
 
-def save_item_edits(edits: list[dict]) -> dict:
+def save_item_edits(edits: list[dict], expected_sha256: str | None = None) -> dict:
     source = MODULE_SYSTEM / "module_items.py"
     if not source.is_file():
         raise FileNotFoundError(source)
-    if not edits:
-        return {"saved": 0, "backup": ""}
-    text, encoding, raw = _module_items_source()
-    records = _item_records(text)
-    by_index = {record["recordIndex"]: record for record in records}
-    replacements: list[tuple[int, int, str]] = []
-    edited_records: set[int] = set()
-    for edit in edits:
-        record_index = int(edit.get("recordIndex", -1))
-        record = by_index.get(record_index)
-        if record is None:
-            raise ValueError(f"Item record {record_index} no longer exists")
-        original_id = str(edit.get("originalId", ""))
-        if original_id and original_id != record["id"]:
-            raise ValueError(f"Item record {record_index} changed from {original_id} to {record['id']}; reload before saving")
-        field_order = record["fieldOrder"]
-        for field, value in dict(edit.get("fields") or {}).items():
-            if field not in field_order:
-                raise ValueError(f"Item {record['id']} has no field named {field}")
-            if field == "id":
-                value = str(value).strip()
-                if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value):
-                    raise ValueError("Item IDs must contain only letters, digits, and underscores and cannot start with a digit")
-                replacement = _python_string(value)
-            elif field == "name":
-                replacement = _python_string(str(value))
-            else:
-                replacement = _validate_item_expression(str(value))
-            field_index = field_order.index(field)
-            left, right = record["_fieldSpans"][field_index]
-            replacements.append((left, right, replacement))
-            edited_records.add(record_index)
-    candidate = text
-    for left, right, replacement in sorted(replacements, reverse=True):
-        candidate = candidate[:left] + replacement + candidate[right:]
-    candidate_records = _item_records(candidate)
-    if len(candidate_records) != len(records):
-        raise ValueError("Saving changed the number of item records; refusing the write")
-    encoded = _validate_module_items_candidate(candidate, encoding)
-    backup = source.with_name(source.name + ".lexeditor.bak")
-    backup.write_bytes(raw)
-    source.write_bytes(encoded)
-    return {"saved": len(edited_records), "backup": str(backup)}
+    with CATALOG_LOCK:
+        text, encoding, raw = _module_items_source()
+        current_sha256 = hashlib.sha256(raw).hexdigest()
+        if expected_sha256 is not None and expected_sha256 != current_sha256:
+            raise ValueError("module_items.py changed; reload before saving")
+        if not edits:
+            return {"saved": 0, "backup": "", "sha256": current_sha256}
+        records = _item_records(text)
+        identities = [record["id"] for record in records]
+        by_index = {record["recordIndex"]: record for record in records}
+        replacements: list[tuple[int, int, str]] = []
+        edited_records: set[int] = set()
+        for edit in edits:
+            record_index = int(edit.get("recordIndex", -1))
+            record = by_index.get(record_index)
+            if record is None:
+                raise ValueError(f"Item record {record_index} no longer exists")
+            original_id = str(edit.get("originalId", ""))
+            if original_id and original_id != record["id"]:
+                raise ValueError(
+                    f"Item record {record_index} changed from {original_id} to {record['id']}; reload before saving"
+                )
+            if record_index in edited_records:
+                raise ValueError("Send each item record only once")
+            row_changed = False
+            field_order = record["fieldOrder"]
+            for field, value in dict(edit.get("fields") or {}).items():
+                if field not in field_order:
+                    raise ValueError(f"Item {record['id']} has no field named {field}")
+                if field == "id":
+                    raise ValueError("Item IDs are fixed because other Module System records reference them")
+                replacement = (
+                    _python_string(str(value))
+                    if field == "name"
+                    else _validate_item_expression(str(value))
+                )
+                field_index = field_order.index(field)
+                left, right = record["_fieldSpans"][field_index]
+                if text[left:right] == replacement:
+                    continue
+                replacements.append((left, right, replacement))
+                row_changed = True
+            if row_changed:
+                edited_records.add(record_index)
+        if not replacements:
+            return {"saved": 0, "backup": "", "sha256": current_sha256}
+        candidate = text
+        for left, right, replacement in sorted(replacements, reverse=True):
+            candidate = candidate[:left] + replacement + candidate[right:]
+        candidate_records = _item_records(candidate)
+        if len(candidate_records) != len(records):
+            raise ValueError("Saving changed the number of item records; refusing the write")
+        if [record["id"] for record in candidate_records] != identities:
+            raise ValueError("Saving changed item record identities; refusing the write")
+        if any(ord(char) > 127 for char in candidate) and not re.search(
+                r"coding[:=]\s*[-\w.]+", "\n".join(candidate.splitlines()[:2])):
+            candidate = f"# coding: {encoding}\n" + candidate
+        encoded = _validate_module_items_candidate(candidate, encoding)
+        if source.read_bytes() != raw:
+            raise ValueError("module_items.py changed while validating; reload before saving")
+        backup = source.with_name(source.name + ".lexeditor.bak")
+        backup.write_bytes(raw)
+        fd, temporary_name = tempfile.mkstemp(prefix=".items-", dir=source.parent)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(encoded)
+            os.replace(temporary_name, source)
+        finally:
+            if os.path.exists(temporary_name):
+                os.unlink(temporary_name)
+        return {
+            "saved": len(edited_records),
+            "backup": str(backup),
+            "sha256": hashlib.sha256(encoded).hexdigest(),
+        }
 
 
 def upgrade_rows() -> list[dict]:
     source = MODULE_SYSTEM / "module_troops.py"
     if not source.is_file():
         return []
-    names = {row["id"]: row["name"] for row in parse_troops(str(source))}
+    names = {}
+    for row in troop_data(MODULE_SYSTEM).get("rows", []):
+        if row["id"] not in names or row.get("status") != "CUT":
+            names[row["id"]] = row["name"]
     pattern = re.compile(r'^\s*(upgrade2?)\(troops,\s*"([^"]+)"\s*,\s*"([^"]+)"(?:\s*,\s*"([^"]+)")?')
     rows = []
     for line_number, line in enumerate(source.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
@@ -403,6 +442,15 @@ def modules_with_manual() -> list[str]:
             if (MODULES / name / "info_pages.txt").is_file()]
 
 
+SOURCE_ONLY_NOTES = {
+    "module.ini": "Warband engine/module INI directives are available as source. Resource load order and engine flags do not yet have a dedicated bounded settings screen.",
+    "module_animations.py": "Animation records contain variable sequence lists and order-sensitive hardcoded animation slots. No dedicated safe sequence editor is implemented.",
+    "module_scripts.py": "Script records are operation blocks. Lexeditor has no structured Warband operation editor.",
+    "module_triggers.py": "Global triggers are timing/condition/consequence operation blocks without stable record IDs.",
+    "module_simple_triggers.py": "Simple triggers are timed operation blocks without stable record IDs.",
+    "module_dialogs.py": "Dialogs are state transitions with condition/consequence operation blocks and no independent stable record ID.",
+}
+
 def data_map_rows() -> dict:
     """Describe actual user-facing capabilities, not merely file I/O support."""
     rows = []
@@ -411,6 +459,7 @@ def data_map_rows() -> dict:
         for filename, controls in records:
             source = resolve_catalog_file(filename)
             source_available = source is not None and source.is_file()
+            dataset = SCHEMA_BY_FILENAME.get(filename, "")
             view = ""
             if filename == "settings.ini" and source_available:
                 coverage, status, view = "structured", "integrated", "tweaks"
@@ -421,9 +470,13 @@ def data_map_rows() -> dict:
             elif filename in browsers and source_available:
                 coverage, status, view = "structured", "partial", browsers[filename]
                 notes = "Troop names, factions, attributes, flags and equipment have controls. Advanced fields use source expressions. Saves preserve record IDs and upgrade code, then use the project build."
+            elif dataset and source_available:
+                schema = MODULE_RECORD_SCHEMAS[dataset]
+                coverage, status, view = "structured", schema["status"], "misc"
+                notes = schema["notes"] + " Structured controls apply to literal top-level records; helper/wrapper-generated records stay source-only."
             elif source_available:
-                coverage, status = "source", "partial"
-                notes = "Source-only editing with a backup. No dedicated record editor. Python syntax validation requires the installed Python 2 validator."
+                coverage, status = "source", "not-integrated"
+                notes = SOURCE_ONLY_NOTES.get(filename, "Source-only editing with backup is available, but no format-specific record screen is implemented.")
             elif filename in {"Resource/*.brf", "Textures/*.dds"}:
                 coverage, status, view = "view", "partial", "items"
                 notes = "Read-only installed item preview dependencies. Availability is checked per mesh, material and texture; binary editing is not supported."
@@ -432,14 +485,17 @@ def data_map_rows() -> dict:
                 notes = ("This source file is not present in the selected project. Installed compiled modules do not supply Module System source."
                          if area != "Generated output" else
                          "No dedicated editor. Compiled text is generated by the Module System; scenes require Warband's scene editor.")
-            rows.append({"filename": filename, "controls": controls, "notes": notes,
-                         "status": status, "coverage": coverage, "view": view,
-                         "openable": source_available, "sourceOpenable": source_available,
-                         "openLabel": "Edit source (not a structured editor)" if source_available else ""})
+            row = {"filename": filename, "controls": controls, "notes": notes,
+                   "status": status, "coverage": coverage, "view": view,
+                   "openable": source_available, "sourceOpenable": source_available,
+                   "openLabel": "Edit source (not a structured editor)" if source_available else ""}
+            if dataset:
+                row["dataset"] = dataset
+                row["recordLabel"] = MODULE_RECORD_SCHEMAS[dataset]["label"]
+            rows.append(row)
     rows.sort(key=lambda row: row["filename"].casefold())
     return {"rows": rows, "counts": {status: sum(row["status"] == status for row in rows)
             for status in ("integrated", "partial", "not-integrated")}, "path": str(MODULE_SYSTEM)}
-
 
 def resolve_catalog_file(filename: str) -> Path | None:
     known = {name for records in DATA_CATALOG.values() for name, _description in records}
@@ -471,34 +527,49 @@ def read_catalog_file(filename: str) -> dict:
             break
         except UnicodeDecodeError:
             pass
-    return {"filename": filename, "editable": True, "path": str(path), "encoding": encoding, "text": text}
+    return {"filename": filename, "editable": True, "path": str(path), "encoding": encoding, "text": text,
+            "sha256": hashlib.sha256(raw).hexdigest()}
 
 
-def save_catalog_file(filename: str, text: str, encoding: str) -> dict:
+def save_catalog_file(filename: str, text: str, encoding: str, expected_sha256: str) -> dict:
     path = resolve_catalog_file(filename)
     if path is None:
         raise ValueError("This catalog row is not an editable text file")
-    encoded = text.encode(encoding)
-    if path.suffix.casefold() == ".py":
-        python27 = Path(r"C:\Python27\python.exe")
-        if python27.is_file():
-            with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temporary:
-                temporary.write(encoded)
-                temporary_path = Path(temporary.name)
-            try:
-                check = subprocess.run(
-                    [str(python27), "-c", "import sys; compile(open(sys.argv[1],'rb').read(),sys.argv[1],'exec')", str(temporary_path)],
-                    capture_output=True, text=True,
-                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                )
-                if check.returncode:
-                    raise ValueError((check.stderr or check.stdout).strip())
-            finally:
-                temporary_path.unlink(missing_ok=True)
-    backup = path.with_name(path.name + ".lexeditor.bak")
-    backup.write_bytes(path.read_bytes())
-    path.write_bytes(encoded)
-    return {"saved": 1, "backup": str(backup)}
+    with CATALOG_LOCK:
+        raw = path.read_bytes()
+        current_sha256 = hashlib.sha256(raw).hexdigest()
+        if not expected_sha256 or current_sha256 != expected_sha256:
+            raise ValueError(f"{filename} changed; reload before saving")
+        encoded = text.encode(encoding)
+        if path.suffix.casefold() == ".py":
+            python27 = Path(r"C:\Python27\python.exe")
+            if python27.is_file():
+                with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as temporary:
+                    temporary.write(encoded)
+                    temporary_path = Path(temporary.name)
+                try:
+                    check = subprocess.run(
+                        [str(python27), "-c", "import sys; compile(open(sys.argv[1],'rb').read(),sys.argv[1],'exec')", str(temporary_path)],
+                        capture_output=True, text=True,
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                    )
+                    if check.returncode:
+                        raise ValueError((check.stderr or check.stdout).strip())
+                finally:
+                    temporary_path.unlink(missing_ok=True)
+        if path.read_bytes() != raw:
+            raise ValueError(f"{filename} changed while validating; reload before saving")
+        backup = path.with_name(path.name + ".lexeditor.bak")
+        backup.write_bytes(raw)
+        fd, temporary_name = tempfile.mkstemp(prefix=f".{path.stem}-", dir=path.parent)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(encoded)
+            os.replace(temporary_name, path)
+        finally:
+            if os.path.exists(temporary_name):
+                os.unlink(temporary_name)
+        return {"saved": 1, "backup": str(backup), "sha256": hashlib.sha256(encoded).hexdigest()}
 
 
 class BuildState:
@@ -590,7 +661,7 @@ class Handler(PluginRequestHandler):
                 else:
                     self.file_response(target)
             elif path == "/api/plugin":
-                self.json_response({"apiVersion": 1, "pluginId": "warband", "name": "Mount & Blade: Warband", "hosted": HOSTED, "windowHost": WINDOW_HOST, "projectRoot": str(PROJECT), "editorRoot": str(PLUGIN_ROOT), "capabilities": ["build", "catalog", "data-map", "game-font", "item-edit", "item-preview", "items", "manuals", "settings", "troops", "upgrades"]})
+                self.json_response({"apiVersion": 1, "pluginId": "warband", "name": "Mount & Blade: Warband", "hosted": HOSTED, "windowHost": WINDOW_HOST, "projectRoot": str(PROJECT), "editorRoot": str(PLUGIN_ROOT), "capabilities": ["build", "catalog", "data-map", "game-font", "item-edit", "item-preview", "items", "manuals", "module-records", "settings", "troops", "upgrades"]})
             elif path == "/api/dashboard":
                 self.json_response({"paths": {"Project": str(PROJECT), "Module System": str(MODULE_SYSTEM), "Game": paths.WARBAND_ROOT, "Installed modules": str(MODULES)}, "problems": paths.check()})
             elif path == "/api/settings":
@@ -598,7 +669,7 @@ class Handler(PluginRequestHandler):
             elif path == "/api/troops":
                 self.json_response(troop_data(MODULE_SYSTEM))
             elif path == "/api/items":
-                self.json_response({"rows": item_rows()})
+                self.json_response(item_data())
             elif path == "/api/warband-font":
                 self.json_response(font_manifest())
             elif path == "/api/warband-font/atlas":
@@ -637,6 +708,8 @@ class Handler(PluginRequestHandler):
                 self.json_response({"areas": [{"name": area, "files": [{"name": name, "description": description} for name, description in rows]} for area, rows in DATA_CATALOG.items()]})
             elif path == "/api/datamap":
                 self.json_response(data_map_rows())
+            elif path == "/api/module-records":
+                self.json_response(dataset_data(MODULE_SYSTEM, query.get("dataset", [""])[0]))
             elif path == "/api/catalog/file":
                 self.json_response(read_catalog_file(query.get("name", [""])[0]))
             elif path == "/api/build/status":
@@ -657,9 +730,11 @@ class Handler(PluginRequestHandler):
             elif path == "/api/troops/save":
                 self.json_response(save_troops(MODULE_SYSTEM, body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/items/save":
-                self.json_response(save_item_edits(body.get("edits", [])))
+                self.json_response(save_item_edits(body.get("edits", []), body.get("sha256", "")))
+            elif path == "/api/module-records/save":
+                self.json_response(save_dataset(MODULE_SYSTEM, body.get("dataset", ""), body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/catalog/file/save":
-                self.json_response(save_catalog_file(body.get("filename", ""), body.get("text", ""), body.get("encoding", "utf-8")))
+                self.json_response(save_catalog_file(body.get("filename", ""), body.get("text", ""), body.get("encoding", "utf-8"), body.get("sha256", "")))
             elif path == "/api/build/start":
                 self.json_response(BUILD_STATE.start())
             else:

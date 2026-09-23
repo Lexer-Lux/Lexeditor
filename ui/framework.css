@@ -837,6 +837,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-detail-panel {
   min-width: 0;
   min-height: 0;
+  background: var(--lex-detail-panel-bg, transparent);
   /* No label lane of its own. This clamp predates the shared ten-percent rule
      and quietly exempted every panel built through detailPanel() from it, so
      the same property row was one width in a shared panel and another in a

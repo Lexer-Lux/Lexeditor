@@ -21,19 +21,107 @@ def _source(path):
         except UnicodeDecodeError:pass
 
 
+_TROOP_START = re.compile(r'(?m)^[ \t]*(#*)[ \t]*\[\s*["\'][^"\']+["\']\s*,\s*["\']')
+
+
+def _top_level_troop_starts(text):
+    """Return only literal/cut troop entries directly inside troops = [...]."""
+    from .server import _skip_python_string
+    assignment = re.search(r'(?m)^[ \t]*troops[ \t]*=[ \t]*\[', text)
+    if not assignment:
+        return [], len(text)
+    outer = text.find('[', assignment.start(), assignment.end())
+    depth = 1
+    cursor = outer + 1
+    outer_end = len(text)
+    while cursor < len(text):
+        char = text[cursor]
+        if char in '"\'':
+            cursor = _skip_python_string(text, cursor)
+            continue
+        if char == '#':
+            newline = text.find('\n', cursor)
+            cursor = len(text) if newline < 0 else newline + 1
+            continue
+        if char == '[':
+            depth += 1
+        elif char == ']':
+            depth -= 1
+            if depth == 0:
+                outer_end = cursor + 1
+                break
+        cursor += 1
+
+    candidates = [match for match in _TROOP_START.finditer(text)
+                  if outer < match.start() < outer_end]
+    depths = {}
+    depth = 1
+    cursor = outer + 1
+    for match in candidates:
+        target = match.start()
+        while cursor < target:
+            char = text[cursor]
+            if char in '"\'':
+                cursor = _skip_python_string(text, cursor)
+                continue
+            if char == '#':
+                newline = text.find('\n', cursor, target)
+                cursor = target if newline < 0 else newline + 1
+                continue
+            if char == '[':
+                depth += 1
+            elif char == ']':
+                depth -= 1
+            cursor += 1
+        depths[target] = depth
+
+    accepted = []
+    skip_until = -1
+    for match in candidates:
+        if depths.get(match.start()) != 1 or match.start() < skip_until:
+            continue
+        accepted.append(match)
+        block = text[match.start():outer_end]
+        cut = bool(match[1])
+        normalized = re.sub(r'(?m)^([ \t]*)#+',
+                            lambda marker: ' ' * len(marker[0]), block) if cut else block
+        record_start = normalized.find('[')
+        record_depth = 0
+        cursor = record_start
+        while 0 <= cursor < len(normalized):
+            char = normalized[cursor]
+            if char in '"\'':
+                cursor = _skip_python_string(normalized, cursor)
+                continue
+            if char == '#':
+                newline = normalized.find('\n', cursor)
+                cursor = len(normalized) if newline < 0 else newline + 1
+                continue
+            if char == '[':
+                record_depth += 1
+            elif char == ']':
+                record_depth -= 1
+                if record_depth == 0:
+                    skip_until = match.start() + cursor + 1
+                    break
+            cursor += 1
+    return accepted, outer_end
+
+
 def _records(text):
     from .server import _skip_python_string, _split_item_fields
-    starts=list(re.finditer(r'(?m)^[ \t]*(#*)[ \t]*\[\s*[\"\'][^\"\']+[\"\']\s*,\s*[\"\']',text))
+    starts, outer_end = _top_level_troop_starts(text)
     rows=[]
-    for i,match in enumerate(starts):
-        stop=starts[i+1].start() if i+1<len(starts) else len(text)
+    for record_index, match in enumerate(starts):
+        stop=starts[record_index+1].start() if record_index+1<len(starts) else outer_end
         block=text[match.start():stop]
         cut=bool(match[1])
         normalized=re.sub(r'(?m)^([ \t]*)#+',lambda m:' '*len(m[0]),block) if cut else block
         start=normalized.index('[');cursor=start;depth=0
         while cursor<len(normalized):
             char=normalized[cursor]
-            if char in '\"\'':cursor=_skip_python_string(normalized,cursor);continue
+            if char in '"\'':
+                cursor=_skip_python_string(normalized,cursor);continue
             if char=='#':
                 cursor=normalized.find('\n',cursor)
                 if cursor<0:break
@@ -45,7 +133,7 @@ def _records(text):
             cursor+=1
         if depth:
             names=re.match(r"\[\s*[\"']([^\"']+)[\"']\s*,\s*[\"']([^\"']*)[\"']",normalized[start:])
-            rows.append({'id':names[1],'name':names[2],'plural':'','status':'CUT' if cut else 'active',
+            rows.append({'recordIndex':record_index,'id':names[1],'name':names[2],'plural':'','status':'CUT' if cut else 'active',
                          'line':text.count('\n',0,match.start())+1,'fields':{},'_spans':[],
                          'problem':'This source record has unbalanced brackets. Repair its source before editing.'})
             continue
@@ -55,11 +143,10 @@ def _records(text):
         values=dict(zip(FIELDS,expressions))
         for key in ('id','name','plural'):
             values[key]=ast.literal_eval(values[key])
-        rows.append({'id':values['id'],'name':values['name'],'plural':values['plural'],
+        rows.append({'recordIndex':record_index,'id':values['id'],'name':values['name'],'plural':values['plural'],
                      'status':'CUT' if cut else 'active','line':text.count('\n',0,match.start())+1,
                      'fields':values,'_spans':[(a+match.start(),b+match.start()) for a,b in spans]})
     return rows
-
 
 def _number(expression,symbols):
     node=ast.parse(re.sub(r'(?<=[0-9a-fA-F])L\b','',expression),mode='eval').body
@@ -126,12 +213,21 @@ def save_troops(root,expected,edits):
     with _LOCK:
         text,encoding,raw=_source(path)
         if hashlib.sha256(raw).hexdigest()!=expected:raise ValueError('Troop source changed; reload before saving')
-        records=_records(text);by_id={r['id']:r for r in records};patches=[]
-        if len(by_id)!=len(records):raise ValueError('Duplicate troop IDs require source repair')
-        if len({e['id'] for e in edits})!=len(edits):raise ValueError('Send each troop only once')
+        records=_records(text);by_index={r['recordIndex']:r for r in records};patches=[];edited=set()
         for edit in edits:
-            row=by_id.get(edit['id'])
-            if row is None:raise ValueError('Troop no longer exists')
+            if 'recordIndex' in edit:
+                record_index=int(edit['recordIndex']);row=by_index.get(record_index)
+                if row is None:raise ValueError('Troop record no longer exists')
+                original=str(edit.get('originalId',edit.get('id','')))
+                if original and row['id']!=original:
+                    raise ValueError(f"Troop record {record_index} changed from {original} to {row['id']}; reload before saving")
+            else:
+                troop_id=str(edit.get('id',''));matches=[r for r in records if r['id']==troop_id]
+                if len(matches)!=1:
+                    raise ValueError(f"Troop ID {troop_id!r} is missing or ambiguous; reload and use record identity")
+                row=matches[0];record_index=row['recordIndex']
+            if record_index in edited:raise ValueError('Send each troop record only once')
+            edited.add(record_index)
             for field,val in edit['fields'].items():
                 if field=='id' or field not in row['fields']:raise ValueError('Unknown or fixed troop field')
                 if field in ('name','plural'):replacement=json.dumps(str(val),ensure_ascii=False)
@@ -161,4 +257,4 @@ def save_troops(root,expected,edits):
             os.replace(tmp,path)
         finally:
             if os.path.exists(tmp):os.unlink(tmp)
-        return {'saved':len(edits),'sha256':hashlib.sha256(encoded).hexdigest(),'backup':str(backup)}
+        return {'saved':len(edited),'sha256':hashlib.sha256(encoded).hexdigest(),'backup':str(backup)}
