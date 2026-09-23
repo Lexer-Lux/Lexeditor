@@ -247,6 +247,17 @@ class EditingTests(unittest.TestCase):
         }])
         self.assertEqual(no_change["saved"], 0)
 
+    def test_string_language_view_combines_resources_without_fake_record_ids(self):
+        index = server.string_tables_index()
+        english = next(row for row in index["languages"] if row["label"] == "English")
+        payload = server.strings_payload(english["index"])
+        self.assertEqual(payload["language"]["label"], "English")
+        self.assertGreaterEqual(payload["counts"]["tables"], 2)
+        paths = {row["path"] for row in payload["rows"]}
+        self.assertIn("tune/stringtable/global.strtbl", paths)
+        self.assertIn("content/dlc/zombiepack/zombiepack_standalone.strtbl", paths)
+        self.assertTrue(all(row["language"] == "English" for row in payload["rows"]))
+
     def test_string_table_stale_identity_does_not_write(self):
         path = "content/dlc/zombiepack/zombiepack_standalone.strtbl"
         payload = server.string_table_payload("content", path)
