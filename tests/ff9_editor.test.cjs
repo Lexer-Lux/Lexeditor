@@ -245,3 +245,13 @@ test('Mod Loading explains real Memoria priority and format-specific overlap', a
   assert.match(info, /MergeScripts/);
   assert.doesNotMatch(info, /later one wins/);
 });
+
+
+test('battle scene detail labels raw16 instead of CSV', async () => {
+  const e = await editor();
+  e.run('installData({key:"enemies",label:"Enemies",source:"vanilla",fields:[{key:"MaxHP",label:"Max HP",kind:"integer",editable:true,min:0,max:65535}],rows:[{line:0,id:"B3_001:0",name:"B3_001 · Enemy 1",values:{MaxHP:1234}}]})');
+  const panel = e.run('detail(state.datasets.enemies,state.datasets.enemies.rows[0])');
+  const rendered = JSON.stringify(panel);
+  assert.match(rendered, /Enemies · vanilla BattleScene raw16/);
+  assert.doesNotMatch(rendered, /Enemies · vanilla CSV/);
+});
