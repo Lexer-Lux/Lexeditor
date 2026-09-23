@@ -29,10 +29,13 @@ Draft PR: #491, FF7R-2 Plugin
   shared framework/multi-helper rewrite from this PR.
 - Packaging/deployment: a dependency-explicit UnrealReZen candidate builder is
   implemented. It requires explicit LEXEDITOR_FF7R2_UNREALREZEN and
-  LEXEDITOR_FF7R2_OODLE paths, copies only that supplied Oodle DLL into a
-  temporary working directory before launch, sets unreachable HTTP(S)/ALL proxy
-  fallback, uses GAME_UE4_26 + ../../../End/Content/ + top-only archive scanning,
-  and writes only project/build/ff7r2-candidate-*.
+  LEXEDITOR_FF7R2_OODLE paths and the known CUE4Parse/1.1.1 dependency manifest.
+  That CUE4Parse helper checks for oo2core_9_win64.dll before its downloader, so
+  Lexeditor copies only the supplied DLL into a temporary working directory
+  before launch. Proxy variables are not relied on because that historical
+  downloader disables proxy use. The route uses GAME_UE4_26 +
+  ../../../End/Content/ + top-only archive scanning and writes only
+  project/build/ff7r2-candidate-*.
   Candidate output is .pak/.utoc/.ucas plus a manifest with input/tool/output
   hashes and acceptedInGame=false. Tests prove dependency refusal, exact command,
   no game-folder writes, runtime Oodle-copy integrity and cleanup on failure.
