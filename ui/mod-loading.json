@@ -53,7 +53,7 @@
     },
     "ff7r2": {
       "loader": "Rebirth gameplay assets use native IoStore patch triples. Lexeditor can build an isolated candidate with explicitly supplied UnrealReZen and Oodle paths; it never downloads either dependency and never installs the unaccepted candidate. ReShade remains dxgi.dll and pinned Shader Injector 2.2.1 remains dsound.dll.",
-      "structure": "A gameplay project keeps a read-only extracted source/End/Content/DataObject/Resident/PlayerParameter.uasset, saves edited content under content/End/Content/..., and can write candidate .pak/.utoc/.ucas triples plus a hash manifest under build/ff7r2-candidate-*/. Real accepted triples are loaded by Rebirth from End/Content/Paks/~mods, but this PR does not copy candidates there.",
+      "structure": "The current Characters editor keeps read-only source/End/Content/DataObject/Resident/PlayerParameter.uasset and stages its edit under content/End/Content/.... The candidate builder treats every regular file below content/End/Content as an explicit input, rejects staged symlinks, records each input path/size/hash, rechecks the complete set after packing, and writes .pak/.utoc/.ucas plus a manifest under build/ff7r2-candidate-*/. Real accepted triples are loaded by Rebirth from End/Content/Paks/~mods, but this PR does not copy candidates there.",
       "overriding": "Characters Save and Build Candidate remain project-only operations. Lexeditor does not claim a winner for collisions with existing ~mods packages and does not activate a package until a real-game candidate has been accepted. ReShade and Shader Injector continue to stack independently and retain their existing DLL ownership safety."
     }
   }
