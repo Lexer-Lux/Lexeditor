@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from games.ff7r2 import shader_injector
+from games.ff7r2 import packaging, shader_injector
 from games.ff7r2.dataobject import DataObjectError, DataObjectPackage
 from plugin_http import PluginRequestHandler
 
@@ -97,6 +97,7 @@ def workspace_payload() -> dict:
     baseline = source_path()
     candidate = output_path()
     game = game_root()
+    package = packaging.status(root, game)
     return {
         "projectRoot": str(root) if root else "",
         "projectName": root.name if root else "",
@@ -117,12 +118,14 @@ def workspace_payload() -> dict:
         "delivery": {
             "staged": bool(candidate and candidate.is_file()),
             "path": str(candidate) if candidate and candidate.is_file() else "",
-            "packaged": False,
+            "packaged": package["candidateCount"] > 0,
             "installed": False,
+            "packaging": package,
             "reason": (
                 "Lexeditor stages the proved DataObject edit without touching the game. "
-                "FF7R2 IoStore packaging is not automated until its Oodle dependency can "
-                "be supplied explicitly and a real-game patch is accepted."
+                "An isolated package candidate can be built only when UnrealReZen and Oodle "
+                "are explicitly supplied; candidates are never installed automatically and "
+                "remain unaccepted until verified in the real game."
             ),
         },
         "tooling": {
@@ -140,10 +143,12 @@ def workspace_payload() -> dict:
                 "reference": "matyamod/UnrealReZen ff7r",
                 "license": "GPL-3.0",
                 "integrated": False,
+                "candidateBuilder": True,
                 "reason": (
-                    "The FF7R2 fork documents UE4.26 packaging, but its startup path "
-                    "can acquire Oodle. Packaging remains explicit until that dependency "
-                    "and real-game output are safely verified."
+                    "The FF7R2 fork documents UE4.26 packaging. Lexeditor's candidate "
+                    "builder refuses to run without explicit local UnrealReZen and Oodle "
+                    "paths, blocks downloader fallback, writes only under the project build "
+                    "folder, and still requires real-game acceptance plus shared-helper ownership."
                 ),
             },
         },
@@ -233,8 +238,9 @@ def data_map_payload() -> dict:
             "filename": "FF7R2 IoStore patch package (.utoc/.ucas/.pak)",
             "controls": "None", "coverage": "unavailable",
             "notes": (
-                "The FF7R2 UnrealReZen fork is documented, but automatic packaging "
-                "would currently permit silent Oodle acquisition and has no real-game acceptance."
+                "A dependency-explicit UnrealReZen candidate builder is available only when "
+                "local tool and Oodle paths are supplied. It writes under the project and never "
+                "installs; shared-helper ownership and real-game load acceptance are still pending."
             ), "status": "not-integrated",
         },
         {
@@ -328,7 +334,8 @@ class Handler(PluginRequestHandler):
                             "name": "Final Fantasy VII Rebirth",
                             "hosted": True, "windowHost": "webview2",
                             "capabilities": ["reshade", "shader-injector", "data-map",
-                            "player-parameter", "fixed-width-edit", "project-staging"]})
+                            "player-parameter", "fixed-width-edit", "project-staging",
+                            "package-candidate"]})
         elif path == "/api/datamap":
             self.send_json(data_map_payload())
         elif path == "/api/workspace":
@@ -367,6 +374,7 @@ class Handler(PluginRequestHandler):
             return
         actions = {
             "/api/player-parameter/save", "/api/player-parameter/reset",
+            "/api/package/build",
             "/api/shader-injector/install", "/api/shader-injector/uninstall",
             "/api/shader-injector/enabled", "/api/shader-injector/settings",
             "/api/shader-injector/clear-cache",
@@ -386,6 +394,16 @@ class Handler(PluginRequestHandler):
                 return
             if path == "/api/player-parameter/reset":
                 self.send_json(_reset_player_candidate())
+                return
+            if path == "/api/package/build":
+                if project_read_only():
+                    raise ValueError("This project is read-only.")
+                root = project_root()
+                game = game_root()
+                self.send_json({
+                    "result": packaging.build_candidate(root, game),
+                    "workspace": workspace_payload(),
+                })
                 return
             folder = injector_folder()
             if folder is None:
