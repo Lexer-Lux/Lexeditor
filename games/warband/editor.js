@@ -149,7 +149,7 @@
         label:`${item.name} model`,
         openLabel:`Open the ${item.name} model`,
         closeLabel:`Close the ${item.name} model`,
-        content:warbandPreviewStage(item),
+        content:()=>warbandPreviewStage(item),
       }:null});
     if(item.inventoryMesh)requestAnimationFrame(()=>loadWarbandIcon(item,detail,thumbnail,thumbnailMessage));
     return detail;
@@ -158,8 +158,23 @@
   // this is the turnable model behind it.
   function warbandPreviewStage(item){
     const stage=LexeditorUI.modelStage({className:"warband-preview-stage",busy:Boolean(item.inventoryMesh),message:"This item has no inventory mesh."}),message=stage.lexMessage;
-    if(item.inventoryMesh)requestAnimationFrame(()=>loadWarbandIcon(item,stage,stage,message));
+    if(item.inventoryMesh)requestAnimationFrame(()=>loadWarbandModel(item,stage,message));
     return stage;
+  }
+  async function loadWarbandModel(item,stage,message){
+    try{
+      const response=await fetch(`/api/item-preview?mesh=${encodeURIComponent(item.inventoryMesh)}`);
+      const data=await response.json();
+      if(!response.ok||data.error)throw new Error(data.error||"Model unavailable");
+      if(!stage.isConnected)return;
+      const canvas=el("canvas",{"aria-label":`${item.name} model`});
+      stage.replaceChildren(canvas);
+      const controller=await createWarbandRenderer(canvas,data,true);
+      if(!stage.isConnected){controller.dispose();return;}
+      (window.__warbandPreview ||= []).push(controller);
+    }catch(error){
+      if(stage.isConnected){message.textContent="Model unavailable";message.title=error.message||String(error);stage.replaceChildren(message);}
+    }
   }
 
   async function loadWarbandIcon(item,detail,thumbnail,message){
@@ -200,6 +215,7 @@
     renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name"},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{key:troop=>troop.id,selected:()=>state.selectedTroop,setSelected:value=>{state.selectedTroop=value;},filters:[cutFilter],detail:troopEditorPanel});
   }
   function troopTreeDetail(node){
+    disposeWarbandPreview();
     if(!node)return detailPanel({title:"Select a troop"});
     // A troop has no mesh of its own: it is a body, a face built from morph
     // keys and a list of equipment. The equipment is the part that resolves to
@@ -219,13 +235,18 @@
     // The shared viewer control lives in the heading's icon slot, so a panel
     // without an icon has nowhere to put it. A troop's icon is the first piece
     // of equipment it carries, which is also the first thing the drawer shows.
-    const icon=gear.length?LexeditorUI.iconSlot({className:"warband-item-thumbnail",content:warbandPreviewStage(gear[0])}):null;
+    let icon=null;
+    if(gear.length){
+      icon=LexeditorUI.iconSlot({className:"warband-item-thumbnail",message:"Preparing icon…"});
+      const iconMessage=icon.lexMessage;
+      requestAnimationFrame(()=>loadWarbandIcon(gear[0],icon,icon,iconMessage));
+    }
     return detailPanel({className:"warband-tree-detail",icon,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(node.name||node.id,24)),identity:node.id,
       modelPreview:gear.length?{
         label:`${node.name||node.id} equipment`,
         openLabel:`Open ${node.name||node.id}'s equipment`,
         closeLabel:`Close ${node.name||node.id}'s equipment`,
-        content:LexeditorUI.figureGrid(gear.map(item=>({media:warbandPreviewStage(item),caption:item.name||item.id}))),
+        content:()=>LexeditorUI.figureGrid(gear.map(item=>({media:warbandPreviewStage(item),caption:item.name||item.id}))),
       }:null,
       body:node.missing?[LexeditorUI.notice({tone:"warning",message:"This upgrade refers to a troop missing from the parsed active source."})]:[
         ...troopFields(record)
