@@ -232,10 +232,11 @@ def test_candidate_builder_tracks_all_staged_inputs():
         state = packaging.status(project, game, env)
         assert state["ready"] is True
         assert state["stagedFileCount"] == 2
-        assert state["stagedFiles"] == [
+        expected_inputs = sorted([
             packaging.STAGED_PLAYER.as_posix(),
             (packaging.CONTENT_ROOT / "DataObject/Resident/CardGameCommonParameter.uasset").as_posix(),
-        ]
+        ])
+        assert state["stagedFiles"] == expected_inputs
 
         def fake_runner(command, **_kwargs):
             output = Path(command[command.index("--output-path") + 1])
