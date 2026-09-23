@@ -89,6 +89,14 @@ def test_array_elements_decode_read_only_and_preserve_source_bytes():
     assert values["StealItemName_Array"] == ["Potion", "Ether"]
     assert values["StealItemQuantity_Array"] == [1, 2]
     assert values["StealFaildCountArrayIndex"] == 3
+    types = {field.name: field.type_name for field in row.fields}
+    assert types["NormalItemName_Array"] == "NameProperty"
+    assert types["RareItemName_Array"] == "NameProperty"
+    assert types["StealItemName_Array"] == "NameProperty"
+    assert types["NormalItemPercent_Array"] == "ByteProperty"
+    assert types["RareItemPercent_Array"] == "ByteProperty"
+    assert types["StealItemQuantity_Array"] == "ByteProperty"
+    assert types["StealFaildCountArrayIndex"] == "IntProperty"
     arrays = [field for field in row.fields if field.kind == "array"]
     assert arrays
     assert all(field.editable is False for field in arrays)
