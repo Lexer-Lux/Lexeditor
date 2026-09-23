@@ -55,6 +55,7 @@ def main() -> int:
             "universalItem", "scannedTargetScan", "partySwitch", "drawOncePerEnemy",
             "streamlinedDraw", "formulaeRework",
             "fixedCommandMenu", "trueAtbWait", "modernControls",
+            "worldMapFullscreen",
             "vibrationConsolidation", "betterTargeting",
             "damageLimitRemoval", "betterCard",
             "fastStart", "xpBars", "hpBars",
@@ -205,6 +206,7 @@ def main() -> int:
                 "trueAtbWait": False,
                 "modernControls": False,
                 "vibrationConsolidation": False,
+                "worldMapFullscreen": False,
                 "betterTargeting": False,
                 "damageLimitRemoval": False,
                 "fastStart": False,
@@ -278,6 +280,7 @@ def main() -> int:
             ("formulaeRework", "Formulae Rework"),
             ("partySwitch", "FF10-style Party Switch"),
             ("modernControls", "Modern Controls"),
+            ("worldMapFullscreen", "Full-screen World Map"),
             ("vibrationConsolidation", "Vibration Rationalization"),
             ("betterTargeting", "Better Targeting"),
             ("damageLimitRemoval", "Damage Limit Removal"),
@@ -290,6 +293,8 @@ def main() -> int:
             for value in (0, 1, "true", None):
                 expect_invalid({**base, key: value}, label)
         expect_invalid({**base, "formulaeRework": True}, "Formulae Rework is not available")
+        expect_invalid({**base, "worldMapFullscreen": True}, "requires Modern Controls")
+        expect_invalid({**base, "modernControls": True, "worldMapFullscreen": True}, "no proved native overlay hooks")
 
         with tempfile.TemporaryDirectory(prefix="lexeditor-ff8-new-settings-", ignore_cleanup_errors=True) as name:
             project = Path(name)
@@ -327,14 +332,14 @@ def main() -> int:
                 "flyingEvaEnabled", "autoSortInventory", "autoSortMagic",
                 "enhancedAbilityMenu", "singleGf", "universalItem", "scannedTargetScan",
                 "drawOncePerEnemy", "fixedCommandMenu",
-                "trueAtbWait", "formulaeRework", "partySwitch", "modernControls", "vibrationConsolidation",
+                "trueAtbWait", "formulaeRework", "partySwitch", "modernControls", "worldMapFullscreen", "vibrationConsolidation",
                 "betterTargeting",
                 "enhancedAbilityMenu",
                 "betterCard", "streamlinedDraw", "damageLimitRemoval",
                 "fastStart", "xpBars", "hpBars",
                 "flatStatAbilities", "maxSpellEnabled",
             ):
-                expected = key not in {"formulaeRework", "partySwitch", "modernControls"}
+                expected = key not in {"formulaeRework", "partySwitch", "modernControls", "worldMapFullscreen"}
                 assert saved[key] is expected, (key, saved[key], expected)
                 assert result[key] is expected
             generated = gameplay_settings.patch_path(project).read_text(encoding="utf-8")
@@ -395,6 +400,7 @@ def main() -> int:
         ("FF10-STYLE PARTY SWITCH", "partySwitch"),
         ("BETTER TARGETING", "betterTargeting"),
         ("MODERN CONTROLS", "modernControls"),
+        ("FULL-SCREEN WORLD MAP", "worldMapFullscreen"),
         ("VIBRATION RATIONALIZATION", "vibrationConsolidation"),
         ("ENHANCED ABILITY MENU", "enhancedAbilityMenu"),
         ("STREAMLINED DRAW", "streamlinedDraw"),
