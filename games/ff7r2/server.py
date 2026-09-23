@@ -26,6 +26,7 @@ PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 MAX_BODY_BYTES = 512 * 1024
 PROJECT_ENV = "LEXEDITOR_FF7R2_PROJECT"
 PLAYER_PARAMETER = Path("End/Content/DataObject/Resident/PlayerParameter.uasset")
+BATTLE_PLAYER_PARAMETER = Path("End/Content/DataObject/Resident/BattlePlayerParameter.uasset")
 BATTLE_ITEM_POSSESSION = Path("End/Content/DataObject/Resident/BattleItemPossession.uasset")
 
 
