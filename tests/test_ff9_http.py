@@ -225,7 +225,7 @@ def test_data_map_keeps_each_known_p0data_gap_visible(service):
     rows = service[0].data_map()["rows"]
     gaps = {row["filename"]: row for row in rows if row["status"] == "not-integrated"}
     expected = {
-        "StreamingAssets/p0data1*.bin (outside integrated BGI activity bits)",
+        "StreamingAssets/p0data1*.bin (outside integrated BGI pathing flags)",
         "StreamingAssets/p0data2.bin (outside BattleScene raw16)",
         "StreamingAssets/p0data3.bin",
         "StreamingAssets/p0data4.bin",
