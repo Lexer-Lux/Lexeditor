@@ -42,6 +42,9 @@ def test_feature_save_is_stale_safe(env):
 def test_deploy_preserves_ini_and_activates_first(env):
     game, project, runtime = env
     features.save({"ImprovedInterface": True, "BetterEat": True, "XPBars": True, "HPMPBars": True, "RowRework": True}, "", project)
+    battle = project / "StreamingAssets/Assets/Resources/BattleMap/BattleScene/EVT_BATTLE_B3_001/dbfile0000.raw16.bytes"
+    battle.parent.mkdir(parents=True)
+    battle.write_bytes(b"canonical raw16 fixture")
     state = features.deploy(game, project, runtime)
     assert state["deployed"] and state["runtimeCurrent"]
     ini = (game / "Memoria.ini").read_bytes()
@@ -51,6 +54,7 @@ def test_deploy_preserves_ini_and_activates_first(env):
     assert b'MergeScripts = 1\r\n' in ini
     assert (game / "Lexeditor/StreamingAssets/Data/Items/Items.csv").read_bytes() == b"data"
     assert (game / "Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.Lexeditor.dll").read_bytes() == runtime.read_bytes()
+    assert (game / "Lexeditor/StreamingAssets/Assets/Resources/BattleMap/BattleScene/EVT_BATTLE_B3_001/dbfile0000.raw16.bytes").read_bytes() == b"canonical raw16 fixture"
     config = (game / "Lexeditor/lexeditor-ff9.ini").read_text()
     assert "XPBars = 1" in config and "HPMPBars = 1" in config and "RowRework = 1" in config
     state = features.revert(game, project, runtime)
