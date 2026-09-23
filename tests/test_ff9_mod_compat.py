@@ -151,7 +151,7 @@ def test_shared_mod_loading_metadata_uses_canonical_ff9_entry():
 
 
 @pytest.mark.parametrize("folder,name,minimum,supported", [
-    ("DualsenseButtons", "Dualsense Buttons", "", True),
+    ("DualsenseButtons", "Dualsense Buttons", "", None),
     ("TranslationUkr", "Ukrainian Translation", "2024-11-17", True),
     ("AlternateFantasy", "Alternate Fantasy", "2025-05-11", True),
     ("CostumePack", "CostumePack", "2026.07.21", False),
@@ -168,6 +168,9 @@ def test_real_catalog_examples_in_isolation(tmp_path, folder, name, minimum, sup
     assert len(report["mods"]) == 1
     assert report["mods"][0]["name"] == name
     assert report["mods"][0]["supportedByPinnedMemoria"] is supported
+    if supported is None:
+        assert report["mods"][0]["runtimeCompatibility"] == "unknown"
+        assert report["unknownRuntimeCompatibility"] == [{"name": name, "folder": folder}]
     assert report["declaredConflicts"] == []
     assert report["overlaps"] == []
 
