@@ -233,7 +233,9 @@ def test_data_map_keeps_each_known_p0data_gap_visible(service):
         "StreamingAssets/p0data7.bin",
         "StreamingAssets/p0data6*.bin and other unmatched p0data*.bin",
     }
-    assert expected <= set(gaps)
+    # Exact set, not a subset: a catch-all row previously concealed known format families (#74),
+    # so any added, removed, or re-merged not-integrated row must fail here and be justified.
+    assert set(gaps) == expected
     assert all(gaps[name]["coverage"] == "unavailable" and not gaps[name]["openable"]
                for name in expected)
     assert "mesh/rig" in gaps["StreamingAssets/p0data4.bin"]["notes"]
