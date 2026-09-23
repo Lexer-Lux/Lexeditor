@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from games.rdr import server, mission_rewards
+from games.rdr import magic_rdr_manager, mission_rewards, server
 from tools.rdr_test_support import workspace, loot_document, fake_resource_tool
 
 
@@ -35,6 +35,29 @@ class EditingTests(unittest.TestCase):
 
     def ini_save(self, value, key="TimeScale", section="WeaponRadial"):
         return server.save_settings([{"section": section, "key": key, "value": value}])
+
+    def test_magic_rdr_helper_is_pinned_read_only_and_reports_upstream(self):
+        tool = Path(self.temp.name) / "Rpf6ReadCli.exe"
+        names = Path(self.temp.name) / "ImportedFileNames.txt"
+        missing = magic_rdr_manager.status(tool, names)
+        self.assertFalse(missing["installed"])
+        self.assertFalse(missing["installable"])
+        tool.write_bytes(b"local bridge")
+        names.write_text("example")
+        ready = magic_rdr_manager.status(tool, names)
+        self.assertTrue(ready["installed"])
+        self.assertEqual(ready["version"], magic_rdr_manager.PINNED_RELEASE)
+        self.assertFalse(ready["autoUpdate"])
+        latest = magic_rdr_manager.upstream_release(lambda _url: {
+            "tag_name": "v1.3.11",
+            "draft": False,
+            "prerelease": False,
+            "published_at": "2026-01-01T00:00:00Z",
+        })
+        self.assertEqual(latest["pinned"], "v1.3.10")
+        self.assertEqual(latest["latest"], "v1.3.11")
+        self.assertTrue(latest["behind"])
+        self.assertFalse(latest["installable"])
 
     def test_decimal_shop_price_roundtrip_and_noop(self):
         original = Path(self.shop["sourcePath"]).read_bytes()
