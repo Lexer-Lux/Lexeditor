@@ -66,6 +66,23 @@ class FFNxToolingTests(unittest.TestCase):
         self.assertEqual(self.exe.read_bytes(), original_exe)
         self.assertEqual(self.window.read_bytes(), original_window)
 
+    def test_owned_setup_updates_pinned_payload_and_removes_stale_owned_files(self):
+        old = self.archive({"FFNx.dll": b"old runtime", "old-only.dll": b"stale"})
+        with self.pin(old):
+            tooling.install_pinned(self.game, old)
+        self.assertEqual((self.work / "FFNx.dll").read_bytes(), b"old runtime")
+        self.assertTrue((self.work / "old-only.dll").is_file())
+
+        new = self.root / "FFNx-Steam-new.zip"
+        with zipfile.ZipFile(new, "w") as package:
+            package.writestr("FFNx.toml", 'direct_mode_path = "direct"\n')
+            package.writestr("FFNx.dll", b"new runtime")
+        with self.pin(new):
+            result = tooling.install_pinned(self.game, new)
+        self.assertTrue(result["owned"])
+        self.assertEqual((self.work / "FFNx.dll").read_bytes(), b"new runtime")
+        self.assertFalse((self.work / "old-only.dll").exists())
+
     def test_external_install_and_external_changes_are_never_overwritten(self):
         archive = self.archive()
         (self.work / "FFNx.toml").write_text("external\n", encoding="utf-8")
