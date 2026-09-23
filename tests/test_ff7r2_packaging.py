@@ -61,6 +61,21 @@ def test_packaging_status_rejects_unknown_cue4parse_distribution():
         assert state["packerDependencyOk"] is False
         assert any("CUE4Parse/1.1.1" in item for item in state["missing"])
 
+
+def test_packaging_status_requires_oodle_beside_packer():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packaging-oodle-") as temp_name:
+        root = Path(temp_name)
+        project, game, _packer, oodle, env = _fixture(root)
+        elsewhere = root / "elsewhere" / packaging.OODLE_NAME
+        elsewhere.parent.mkdir()
+        elsewhere.write_bytes(oodle.read_bytes())
+        env[packaging.OODLE_ENV] = str(elsewhere)
+        state = packaging.status(project, game, env)
+        assert state["ready"] is False
+        assert state["oodlePresent"] is True
+        assert state["oodleInToolDirectory"] is False
+        assert any("beside the explicit UnrealReZen executable" in item for item in state["missing"])
+
 def test_candidate_builder_is_isolated_and_never_installs():
     with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packaging-build-") as temp_name:
         project, game, packer, oodle, env = _fixture(Path(temp_name))
@@ -153,6 +168,24 @@ def test_candidate_builder_rejects_dependency_race(target_env, expected):
             return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
         with pytest.raises(packaging.PackagingError, match=expected):
+            packaging.build_candidate(project, game, env, runner=mutating_runner)
+        assert not list((project / "build").glob("ff7r2-candidate-*"))
+
+
+def test_candidate_builder_rejects_dependency_manifest_race():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packaging-deps-race-") as temp_name:
+        project, game, packer, _oodle, env = _fixture(Path(temp_name))
+        deps = packer.with_name("UnrealReZen.deps.json")
+
+        def mutating_runner(command, **kwargs):
+            deps.write_text('{"libraries": {}}', encoding="utf-8")
+            output = Path(command[command.index("--output-path") + 1])
+            output.write_bytes(b"candidate-utoc")
+            output.with_suffix(".ucas").write_bytes(b"candidate-ucas")
+            output.with_suffix(".pak").write_bytes(b"candidate-pak")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with pytest.raises(packaging.PackagingError, match="dependency manifest changed"):
             packaging.build_candidate(project, game, env, runner=mutating_runner)
         assert not list((project / "build").glob("ff7r2-candidate-*"))
 
