@@ -4,6 +4,7 @@ These fixtures reproduce public ModDescription.xml fields and real package path
 families; no third-party package or FF9 game bytes are stored in the repository.
 """
 from pathlib import Path
+import json
 
 from games.ff9 import mod_compat
 
@@ -135,3 +136,14 @@ def test_no_memoria_ini_is_an_empty_non_mutating_report(tmp_path):
     assert report["mods"] == []
     assert report["declaredConflicts"] == []
     assert report["overlaps"] == []
+
+
+def test_shared_mod_loading_metadata_uses_canonical_ff9_entry():
+    root = Path(__file__).parents[1]
+    data = json.loads((root / "ui/mod-loading.json").read_text(encoding="utf-8"))
+    assert "ff9" not in data, "FF9 metadata belongs under plugins, not as a second top-level entry"
+    ff9 = data["plugins"]["ff9"]
+    assert "highest priority first" in ff9["overriding"]
+    assert "Priorities" in ff9["overriding"]
+    assert "MergeScripts" in ff9["overriding"]
+    assert "newer than Lexeditor's pinned" in ff9["loader"]
