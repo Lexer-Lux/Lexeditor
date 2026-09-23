@@ -61,9 +61,27 @@ def output_path() -> Path | None:
     return root / "content" / PLAYER_PARAMETER if root else None
 
 
+def battle_player_source_path() -> Path | None:
+    root = project_root()
+    return root / "source" / BATTLE_PLAYER_PARAMETER if root else None
+
+
 def battle_item_source_path() -> Path | None:
     root = project_root()
     return root / "source" / BATTLE_ITEM_POSSESSION if root else None
+
+
+_BATTLE_PLAYER_SCHEMA = {
+    "CommandAbilityID_Array": ("array", "NameProperty"),
+    "EnableAerialShortCut": ("uint8", "ByteProperty"),
+    "UniqueAbilityType0": ("uint8", "ByteProperty"),
+    "UniqueAbilityParameterValue_Array": ("array", "FloatProperty"),
+    "KeyDownTime": ("float", "FloatProperty"),
+    "KeyDownEffectCreateTime": ("float", "FloatProperty"),
+    "GuardParameterValue_Array": ("array", "FloatProperty"),
+    "DodgeType_Array": ("array", "ByteProperty"),
+    "LimitAbilityID_Array": ("array", "NameProperty"),
+}
 
 
 _BATTLE_ITEM_SCHEMA = {
@@ -77,21 +95,46 @@ _BATTLE_ITEM_SCHEMA = {
 }
 
 
-def _validate_battle_item_schema(package: DataObjectPackage) -> None:
+def _validate_schema(package: DataObjectPackage, table: str,
+                     schema: dict[str, tuple[str, str]]) -> None:
     if not package.records:
-        raise DataObjectError("BattleItemPossession contains no rows to validate")
+        raise DataObjectError(f"{table} contains no rows to validate")
     fields = {field.name: field for field in package.records[0].fields}
-    for name, (kind, type_name) in _BATTLE_ITEM_SCHEMA.items():
+    for name, (kind, type_name) in schema.items():
         field = fields.get(name)
         if field is None:
-            raise DataObjectError(
-                f"BattleItemPossession schema is missing proved field {name}"
-            )
+            raise DataObjectError(f"{table} schema is missing proved field {name}")
         if field.kind != kind or field.type_name != type_name:
             raise DataObjectError(
-                f"BattleItemPossession field {name} has {field.kind}/{field.type_name}; "
+                f"{table} field {name} has {field.kind}/{field.type_name}; "
                 f"expected {kind}/{type_name}"
             )
+
+
+def battle_player_payload() -> dict:
+    root = project_root()
+    path = battle_player_source_path()
+    if root is None:
+        raise DataObjectError("No FF7 Rebirth project is selected.")
+    if path is None or not path.is_file():
+        raise DataObjectError(
+            "BattlePlayerParameter source is missing. Place the extracted IoStore-state "
+            f"asset at source/{BATTLE_PLAYER_PARAMETER.as_posix()} inside this project."
+        )
+    package = DataObjectPackage.from_bytes(path.read_bytes())
+    _validate_schema(package, "BattlePlayerParameter", _BATTLE_PLAYER_SCHEMA)
+    payload = package.payload()
+    payload.update({
+        "source": "source",
+        "path": str(path),
+        "projectRelativePath": str(path.relative_to(root)).replace("\\", "/"),
+        "readOnly": True,
+        "purpose": (
+            "Public generated declarations prove these storage types, but not enough "
+            "gameplay semantics or safe ranges to expose edits."
+        ),
+    })
+    return payload
 
 
 def battle_item_payload() -> dict:
@@ -105,7 +148,7 @@ def battle_item_payload() -> dict:
             f"asset at source/{BATTLE_ITEM_POSSESSION.as_posix()} inside this project."
         )
     package = DataObjectPackage.from_bytes(path.read_bytes())
-    _validate_battle_item_schema(package)
+    _validate_schema(package, "BattleItemPossession", _BATTLE_ITEM_SCHEMA)
     payload = package.payload()
     payload.update({
         "source": "source",
