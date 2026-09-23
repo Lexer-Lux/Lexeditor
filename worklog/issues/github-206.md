@@ -28,3 +28,9 @@ against a 10 buy price, a possible infinite-money loop if honored in game.
 Remaining scope is the in-game purchase/consumption test. Issue stays
 actionable. (Note: one truncated comment fragment was posted by mistake and
 immediately superseded by the full table; comments cannot be deleted.)
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.
