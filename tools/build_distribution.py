@@ -116,10 +116,10 @@ coll=COLLECT(exe,a.binaries,a.datas,strip=False,upx=False,name="Lexeditor")
     return DIST/'Lexeditor.app/Contents/MacOS/Lexeditor' if sys.platform=='darwin' else DIST/'Lexeditor'/('Lexeditor.exe' if os.name=='nt' else 'Lexeditor')
 
 
-def smoke(executable: Path) -> None:
+def smoke(executable: Path, result_path: Path | None = None) -> None:
     # Packaging must preserve child-service dispatch; launching a second GUI is a failure.
     executable=executable.resolve(strict=True)
-    result=ROOT/'build/distribution/smoke.json'
+    result=(Path(result_path) if result_path is not None else ROOT/'build/distribution/smoke.json').resolve()
     result.parent.mkdir(parents=True,exist_ok=True)
     result.unlink(missing_ok=True)
     env=os.environ.copy()
