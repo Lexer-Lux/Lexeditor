@@ -68,6 +68,33 @@ def objects_dataset() -> dict:
     return payload
 
 
+def dataset_payload(key: str) -> dict:
+    payload = ContentPackStore(paths.PROJECT_ROOT).dataset(key)
+    base_rows, source = load_base_dataset(paths.GAME_ROOT, key)
+    patched = {row["id"]: row for row in payload["rows"]}
+    rows = []
+    for record_id in sorted(set(base_rows) | set(patched), key=str.casefold):
+        base = base_rows.get(record_id)
+        patch = patched.get(record_id, {})
+        rows.append({
+            "id": record_id,
+            "name": base["name"] if base else record_id,
+            "internalName": base["internalName"] if base else record_id,
+            "description": base["description"] if base else "",
+            "baseFields": dict(base["baseFields"]) if base else {},
+            "sourcePresent": base is not None,
+            "fields": dict(patch.get("fields", {})),
+            "present": list(patch.get("present", [])),
+            "unsupportedFieldCount": int(patch.get("unsupportedFieldCount", 0)),
+            "invalidFieldCount": int(base.get("invalidFieldCount", 0)) if base else 0,
+        })
+    payload["rows"] = rows
+    payload["baseSource"] = source
+    payload["source"] = "vanilla-unpacked+project-patches" if source.get("available") else "project-patches"
+    payload["schema"] = dataset_schema(key)
+    return payload
+
+
 def data_map() -> dict:
     project_ready = (paths.PROJECT_ROOT / "manifest.json").is_file() and (paths.PROJECT_ROOT / "content.json").is_file()
     _base, source = load_base_objects(paths.GAME_ROOT)
