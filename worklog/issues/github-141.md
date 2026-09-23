@@ -24,3 +24,17 @@ Blackwater recognized shop ID is the proposed first example. The interior, merch
 No concrete Lexer-side session exists yet (agent-side prototype/experiment
 still owed), so flipping to waiting would be a fake checklist. Left
 actionable until a real session can be written.
+
+## 2026-09-23 master: stock+merchant documented headlessly, flipped to waiting
+
+Queried the live editable dataset via games/rdr2 get_catalog('mine'):
+24,706 items; ST_GUNSMITH carries 95 listings, 56 non-advert stock rows
+with buy prices (Schofield at 2190 catalog units). Merchant record
+(merchant_buyers.json vanillaBuyers ST_GUNSMITH) covers 8 ammo types. Buyer
+and catalog keys are by shop TYPE, so the Blackwater location setup
+(interior, interaction, persistence) is game-side by nature.
+
+Flipped to waiting with the Blackwater session checklist (shop ID,
+interior, merchant, Schofield purchase interaction, save/reload
+persistence). Query scripts kept under _scratch (q141_shops.py,
+q141_stock.py); no game data modified.
