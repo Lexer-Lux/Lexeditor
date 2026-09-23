@@ -22,3 +22,12 @@ Animal density multipliers exist (animal_density.cpp) but cover animal spawns, n
 No concrete Lexer-side session exists yet (engine research/agent-side
 candidate still owed), so flipping to waiting would be a fake checklist.
 Left actionable until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. The scenario-point disable stays
+rejected (visible unpickable plants) and animal-density multipliers do not
+cover plants. Exact needs: engine placement/spawn research with the game
+and a real candidate to test. No code written; recording the needs here
+instead of inventing a spawn hook.
+

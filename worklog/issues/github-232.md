@@ -22,3 +22,13 @@ Split-root approach stays rejected (duplicate entries, progress problems). A run
 No concrete Lexer-side session exists yet (interface investigation / UI
 research still owed), so flipping to waiting would be a fake checklist.
 Left actionable until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. The split-root approach stays
+rejected and the runtime strand-preserving solution still needs game UI
+research. Exact needs: RDR2 session investigating a runtime approach that
+keeps one visible strand and correct progress, then a Lexer design
+decision. No code written; recording the needs here instead of reviving
+the rejected split-root version.
+

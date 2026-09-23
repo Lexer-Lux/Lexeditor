@@ -34,3 +34,14 @@ Re-ran tools/audit_rdr2_core_modifiers.py today: UI forecast values confirmed (+
 No concrete Lexer-side session exists yet (engine research/agent-side
 candidate still owed), so flipping to waiting would be a fake checklist.
 Left actionable until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. No verified field or safe hook
+removes the built-in weight and mounted core-drain modifiers yet, and
+changing unrelated core rates would not meet the request.
+tools/audit_rdr2_core_modifiers.py still records the evidence limit.
+Exact needs: identify the engine core-decrement function and its two term
+inputs from a matching game binary, then prove ownership and cadence.
+No code written; recording the needs here instead of inventing a hook.
+

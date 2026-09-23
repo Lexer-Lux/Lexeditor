@@ -22,3 +22,11 @@ No evidence proves usable trails persist without a live animal. A controlled tra
 No concrete Lexer-side session exists yet (agent-side experiment/prototype
 still owed), so flipping to waiting would be a fake checklist. Left
 actionable until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. No evidence proves usable trails
+persist without a live animal. Exact needs: a controlled trail/streaming
+experiment with the game before choosing native trails or custom hunting
+signs. No code written here.
+

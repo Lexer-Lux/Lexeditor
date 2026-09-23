@@ -22,3 +22,12 @@ Data alone cannot extend the nine-link vanilla menu. A replacement interface plu
 No concrete Lexer-side session exists yet (interface investigation / UI
 research still owed), so flipping to waiting would be a fake checklist.
 Left actionable until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. Data alone cannot extend the
+nine-link vanilla menu and no replacement interface exists yet. Exact
+needs: RDR2 session preparing a concrete working interface approach with
+its save/progress behavior, then a Lexer design decision. No code written;
+recording the needs here instead of inventing a menu hook.
+

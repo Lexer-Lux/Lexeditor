@@ -24,3 +24,13 @@ Prone weapon animation needs compatible clips or authored upper-body poses; reus
 No concrete Lexer-side session exists yet (agent-side filter/asset/
 prototype still owed), so flipping to waiting would be a fake checklist.
 Left actionable until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. Reusing unchanged clips failed its
+test, so prone needs compatible clips or authored upper-body poses. Exact
+needs: RDR2-compatible authored animation/export pipeline plus visual
+animation work (draw/holster/idle/aim/fire/reload sets, reticle-driven
+aim poses, recoil/reload events, binocular handling, upper-body masks,
+contacts, zero root motion), then Lexer visual QA. No code written here.
+

@@ -24,3 +24,13 @@ Recover action workaround installed; ordinary locker-list entries need the nativ
 No concrete Lexer-side session exists yet (agent-side filter/asset/
 prototype still owed), so flipping to waiting would be a fake checklist.
 Left actionable until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. The named Recover action workaround
+is installed but ordinary locker-list entries are still owed. Exact needs:
+a safe solution to the native melee/throwable filter, then game
+verification that lost unique hatchets/tomahawks return through the camp
+locker unequipped and without duplication. No code written; recording the
+needs here instead of re-requesting acceptance of the workaround.
+
