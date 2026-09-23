@@ -168,6 +168,7 @@ class Handler(PluginRequestHandler):
                 self.json_response(BattleSceneStore().load(key) if key in {"enemies", "encounters"} else MemoriaDataStore().load(key))
             elif path == "/api/runtime": self.json_response(memoria_manager.status(paths.GAME_ROOT))
             elif path == "/api/runtime/available": self.json_response(memoria_manager.available())
+            elif path == "/api/mod-compat": self.json_response(mod_compat.audit())
             elif path == "/api/features": self.json_response(features.load())
             elif path == "/api/deployment": self.json_response(features.status())
             else: self.json_response({"error": "Not found"}, 404)
