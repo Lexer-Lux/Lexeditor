@@ -113,6 +113,64 @@ class FactorioModelTests(unittest.TestCase):
             self.assertEqual(reset, {})
             self.assertNotIn("recipes", store.overrides["edits"])
 
+    def test_post_mod_snapshot_overlap_preserves_unedited_fields_and_load_order(self):
+        with tempfile.TemporaryDirectory() as name:
+            project = self.project(Path(name))
+            source = project / "source" / "data-raw-dump.json"
+            raw = json.loads(source.read_text(encoding="utf-8"))
+            recipe = raw["recipe"]["iron-gear-wheel"]
+
+            # Model a real source-mod overlap: the imported dump is already the
+            # result of Factorio's data stages, so these are the values Lexeditor
+            # must compose against rather than vanilla defaults.
+            recipe["energy_required"] = 3.5
+            recipe["maximum_productivity"] = 8.0
+            recipe["source_mod_marker"] = "Krastorio2"
+            source.write_text(
+                json.dumps(raw, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+
+            mod_list_path = project / "source" / "mod-list.json"
+            mod_list = json.loads(mod_list_path.read_text(encoding="utf-8"))
+            mod_list["mods"].extend([
+                {"name": "Krastorio2", "enabled": True},
+                {"name": "aai-industry", "enabled": True},
+            ])
+            mod_list_path.write_text(json.dumps(mod_list), encoding="utf-8")
+
+            store = PrototypeStore.from_project(project)
+            delta = store.set_edit("recipes", "iron-gear-wheel", {
+                "enabled": True,
+                "energy_required": 4.0,
+                "maximum_productivity": 8.0,
+            })
+            self.assertEqual(delta, {"energy_required": 4.0})
+
+            _name, package = build_mod_bytes(project, store)
+            with zipfile.ZipFile(io.BytesIO(package)) as archive:
+                info = json.loads(archive.read(
+                    "lexeditor-factorio-fixture_0.1.0/info.json"))
+                script = archive.read(
+                    "lexeditor-factorio-fixture_0.1.0/data-final-fixes.lua"
+                ).decode("utf-8")
+
+            self.assertIn("? Krastorio2", info["dependencies"])
+            self.assertIn("? aai-industry", info["dependencies"])
+            self.assertIn("p.energy_required = 4.0", script)
+            self.assertNotIn("maximum_productivity", script)
+            self.assertNotIn("source_mod_marker", script)
+            self.assertNotIn("p.enabled", script)
+            preserved = json.loads(source.read_text(encoding="utf-8"))
+            self.assertEqual(
+                preserved["recipe"]["iron-gear-wheel"]["source_mod_marker"],
+                "Krastorio2",
+            )
+            self.assertEqual(
+                preserved["recipe"]["iron-gear-wheel"]["maximum_productivity"],
+                8.0,
+            )
+
     def test_ranges_and_references_fail_closed(self):
         with tempfile.TemporaryDirectory() as name:
             store = PrototypeStore.from_project(self.project(Path(name)))
