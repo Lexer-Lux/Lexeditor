@@ -16,13 +16,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from ff7r2_fixture import battle_item_possession_fixture, fixture
+from ff7r2_fixture import battle_item_possession_fixture, battle_player_parameter_fixture, fixture
 from games.ff7r2.plugin import Ff7r2Session
 
 
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "ff7r2-browser"
 OUT.mkdir(parents=True, exist_ok=True)
 PLAYER = Path("End/Content/DataObject/Resident/PlayerParameter.uasset")
+BATTLE_PLAYER = Path("End/Content/DataObject/Resident/BattlePlayerParameter.uasset")
 BATTLE_ITEM = Path("End/Content/DataObject/Resident/BattleItemPossession.uasset")
 
 
@@ -44,6 +45,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
     source = project / "source" / PLAYER
     source.parent.mkdir(parents=True)
     source.write_bytes(fixture())
+    battle_player_source = project / "source" / BATTLE_PLAYER
+    battle_player_source.parent.mkdir(parents=True, exist_ok=True)
+    battle_player_source.write_bytes(battle_player_parameter_fixture())
     battle_source = project / "source" / BATTLE_ITEM
     battle_source.parent.mkdir(parents=True, exist_ok=True)
     battle_source.write_bytes(battle_item_possession_fixture())
@@ -118,6 +122,21 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 page.wait_for_function(
                     "()=>document.querySelector('input[aria-label=\"HPMax\"]')?.value.replaceAll(',','').replaceAll(' ','')==='1234'")
 
+                page.evaluate('navigate("battleparams")')
+                page.wait_for_selector(".ff7r2-battle-player-table")
+                expect(page.get_by_text("BattleCharacterTest", exact=True).first).to_be_visible()
+                expect(page.get_by_role("searchbox", name="Search BattlePlayerParameter records")).to_be_visible()
+                expect(page.get_by_text(
+                    "Public declarations prove the storage schema, but not the gameplay behavior, enum domains or safe edit ranges. This page therefore stops at structured source inspection.",
+                    exact=True,
+                )).to_be_visible()
+                battle_values = page.locator(".ff7r2-battle-player-detail input.lex-readonly-field")
+                assert battle_values.evaluate_all(
+                    "els=>els.some(el=>el.value.includes('0: AbilityTest'))"
+                )
+                assert page.locator(".ff7r2-battle-player-detail input:not([readonly])").count() == 0
+                page.screenshot(path=str(OUT / "battle-params.png"), full_page=True)
+
                 page.evaluate('navigate("formulae")')
                 page.wait_for_selector(".ff7r2-formulae-table")
                 expect(page.get_by_text("EnemyTest", exact=True).first).to_be_visible()
@@ -140,6 +159,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 page.evaluate('navigate("datamap")')
                 page.wait_for_selector(".lex-data-map")
                 expect(page.get_by_text("BattlePlayerParameter.uasset", exact=False)).to_be_visible()
+                battle_player_row = page.locator(".lex-column-list-row").filter(has_text="BattlePlayerParameter.uasset")
+                expect(battle_player_row).to_have_count(1)
+                assert battle_player_row.locator(".lex-integration-status.partial").count() == 1
                 expect(page.get_by_text("BattleItemPossession.uasset (#471)", exact=False)).to_be_visible()
                 expect(page.get_by_text("CardGameCommonParameter.uasset + CardGameAIParam.uasset (#477)", exact=False)).to_be_visible()
                 for issue in ("#470", "#472", "#473", "#477"):
@@ -182,6 +204,10 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
 
                 page.evaluate('navigate("info")')
                 expect(page.get_by_text("IOSTORE TOOLING", exact=True)).to_be_visible()
+                expect(page.get_by_text("NATIVE MOD LOAD ORDER", exact=True)).to_be_visible()
+                precedence_field = page.locator(".lex-detail-field").filter(has_text="PRECEDENCE").first
+                expect(precedence_field).to_be_visible()
+                assert "~mods is not available" in precedence_field.locator("input.lex-readonly-field").input_value()
                 retoc_field = page.locator(".lex-detail-field").filter(has_text="RETOC").first
                 expect(retoc_field).to_be_visible()
                 retoc_value = retoc_field.locator("input.lex-readonly-field")
@@ -219,6 +245,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 browser.close()
 
     assert source.read_bytes() == fixture(), "Browser save modified the extracted source"
+    assert battle_player_source.read_bytes() == battle_player_parameter_fixture(), "Browser view modified BattlePlayerParameter"
     assert battle_source.read_bytes() == battle_item_possession_fixture(), "Browser view modified BattleItemPossession"
     assert not errors, errors
 
