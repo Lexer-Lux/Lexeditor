@@ -11,7 +11,7 @@ from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from runtime_bootstrap import user_data_dir
 from service_session import project_session, request_json
 
-from .tooling import REPAK_TAG, helper_install, helper_status
+from .tooling import REPAK_TAG, helper_install, helper_status, upstream_release
 from .mod_support import PakModAdapter
 from managed_mods import ManagedModSpec
 
@@ -19,9 +19,10 @@ from managed_mods import ManagedModSpec
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 USER_ROOT = user_data_dir()
-# Lexer's FF7R mod lives outside Lexeditor's own data, beside the other
-# per-game mod repositories, so the mod can be worked on without Lexeditor.
-DEFAULT_PROJECT = Path(r"C:/FF7R-1Mod")
+# The fallback project belongs to Lexeditor's per-user data root. ProjectManager
+# persists an explicitly selected external project, so existing mod repositories
+# remain usable without hard-coding one developer's C: drive.
+DEFAULT_PROJECT = USER_ROOT / "projects" / "ff7r"
 DISPLAY_NAME = "FINAL FANTASY VII REMAKE INTERGRADE"
 
 
@@ -215,11 +216,36 @@ def smoke() -> list[str]:
                 raise RuntimeError("FF7R text service save did not survive variable-length UTF-16 readback")
         if not session.wait_closed():
             raise RuntimeError("FF7R child port is still open after host shutdown")
+
+        # Reopen through a new child process to prove the project overlay is
+        # durable on disk, not merely retained in one service's memory.
+        with FF7RSession({
+            "LEXEDITOR_FF7R_ROOT": str(game),
+            "LEXEDITOR_FF7R_DATA_ROOT": str(temp / "data"),
+            "LEXEDITOR_FF7R_PROJECT": str(project),
+            "LEXEDITOR_FF7R_TEST_DATAOBJECTS": str(fixture),
+        }) as reopened:
+            reopened_catalog = request_json(reopened.url + "api/catalog")
+            reopened_asset = reopened_catalog["assets"][0]["asset"]
+            reopened_data = request_json(
+                reopened.url + "api/data?asset=" + quote(reopened_asset, safe=""))
+            if (reopened_data["records"][0]["values"]["Power"] != 99
+                    or not reopened_data.get("usingProject")):
+                raise RuntimeError("FF7R gameplay project overlay did not survive a fresh service process")
+            reopened_text_asset = reopened_catalog["textAssets"][0]["asset"]
+            reopened_text = request_json(
+                reopened.url + "api/text?asset=" + quote(reopened_text_asset, safe=""))
+            if (reopened_text["records"][0]["text"] != "Lexeditor テスト Sword"
+                    or not reopened_text.get("usingProject")):
+                raise RuntimeError("FF7R text project overlay did not survive a fresh service process")
+        if not reopened.wait_closed():
+            raise RuntimeError("Reopened FF7R child port is still open after host shutdown")
     return [
         "generated FF7R DataObject parser/write round-trip passed",
         "installed-style Resident text IDs resolve without bundled game strings",
         "generated FF7R variable-length text resource round-trip passed",
         "managed service saved/read back gameplay and UTF-16 text project overlays",
+        "fresh FF7R service reopened the saved gameplay and text overlays from disk",
         "host-owned FF7R child service stopped cleanly",
     ]
 
@@ -241,6 +267,7 @@ PLUGIN = GamePlugin(
     helper_status=helper_status,
     helper_install=helper_install,
     helper_pinned=REPAK_TAG,
+    helper_upstream=upstream_release,
     projects=ModProjectSpec(
         root_env="LEXEDITOR_FF7R_PROJECT",
         default_root=DEFAULT_PROJECT,

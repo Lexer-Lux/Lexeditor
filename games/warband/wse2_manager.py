@@ -20,7 +20,9 @@ import urllib.request
 import uuid
 import zipfile
 
+from functools import partial
 from game_version import game_version
+from upstream_fetch import fetch_json
 
 PINNED_RELEASE = "v1.1.5.1"
 PACKAGE_VERSION = "1.1.5.1-lex1"
@@ -365,13 +367,11 @@ def install(game_root: Path, *, package_root: Path = PACKAGE_ROOT, closed_check=
         return {**status(root, package_root=package_root), "changed": True}
 
 
-def _fetch_json(url: str) -> dict:
-    request = urllib.request.Request(url, headers={"User-Agent": "Lexeditor-WSE2/1"})
-    with urllib.request.urlopen(request, timeout=15) as response:
-        raw = response.read(1024 * 1024 + 1)
-    if len(raw) > 1024 * 1024:
-        raise RuntimeError("WSE2 release metadata is too large.")
-    return json.loads(raw)
+_fetch_json = partial(
+    fetch_json,
+    user_agent="Lexeditor-WSE2/1",
+    size_error="WSE2 release metadata is too large.",
+)
 
 
 def upstream_release(fetch_json=None) -> dict:

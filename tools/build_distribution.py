@@ -1,4 +1,4 @@
-"""Build a native app and OS installer, without bundling private helper binaries."""
+"""Build a native app and OS installer, bundling only redistribution-cleared helpers."""
 from __future__ import annotations
 import argparse
 import importlib.metadata
@@ -18,10 +18,10 @@ RESOURCE_EXTENSIONS={'.html','.css','.js','.json','.csv','.txt','.md','.xml','.s
 FORBIDDEN_PARTS={'__pycache__','.git','worklog','codex','baseline','game-data','out',
                  '_scratch','.venv','.build','build','vcpkg','.vcpkg','buildtrees',
                  'node_modules','.pytest_cache'}
-# Bundled helpers with a proven redistribution grant. resource_files() never
-# copies executables or archives, so each is named here: the pinned ReShade
-# setups (BSD-3-Clause) and Shader Injector's release (MIT), with licences.
-# Anything not listed stays out of the installer.
+# Bundled helpers with a proven redistribution grant. resource_files() skips
+# executable/archive payloads and extensionless licence files, so each such
+# helper payload is named here explicitly. Anything not listed stays out of
+# the installer.
 VENDORED_HELPERS=(
     'tools/reshade/6.8.0/ReShade_Setup_6.8.0_Addon.exe',
     'tools/reshade/6.8.0/ReShade_Setup_6.8.0.exe',
@@ -36,6 +36,11 @@ VENDORED_HELPERS=(
     'tools/reshade/shaders/Lexerian/Compare.fx',
     'tools/reshade/addons/REST-1.3.23.633/ReshadeEffectShaderToggler-1.3.23.633.zip',
     'tools/reshade/addons/REST-1.3.23.633/LICENSE.txt',
+    'games/ff7r/runtime/repak/v0.2.3/manifest.json',
+    'games/ff7r/runtime/repak/v0.2.3/LICENSE-MIT',
+    'games/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE',
+    'games/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip',
+    'games/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-unknown-linux-gnu.tar.xz',
     'games/ff7r2/runtime/shader-injector-2-2-1-maximum-dood.zip',
     'games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt',
 )

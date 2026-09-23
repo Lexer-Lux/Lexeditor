@@ -137,7 +137,7 @@
         },
         {
           "name": "trumank / repak",
-          "role": "Pinned external helper for reading and building Unreal Engine PAK files.",
+          "role": "Bundled pinned v0.2.3 helper for reading and building Unreal Engine PAK files.",
           "url": "https://github.com/trumank/repak"
         },
         {
@@ -154,6 +154,11 @@
           "name": "narknon / EndGameProj",
           "role": "Generated Remake API research reference for reflected FF7R types, properties, enums and functions.",
           "url": "https://github.com/narknon/EndGameProj"
+        },
+        {
+          "name": "akitaonrails / distrobox-gaming",
+          "role": "Public FF7R mod-set interoperability reference for ~mods PAK deployment and documented overlapping equipment-data mods.",
+          "url": "https://github.com/akitaonrails/distrobox-gaming"
         }
       ],
       "thanks": [],
@@ -161,6 +166,14 @@
         {
           "name": "FF7R references and tools — source/license notices",
           "sourcePath": "games/ff7r/THIRD_PARTY.md"
+        },
+        {
+          "name": "repak — MIT License",
+          "sourcePath": "games/ff7r/runtime/repak/v0.2.3/LICENSE-MIT"
+        },
+        {
+          "name": "repak — Apache License 2.0",
+          "sourcePath": "games/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE"
         }
       ]
     },

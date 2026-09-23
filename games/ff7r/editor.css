@@ -1,1 +1,14 @@
 :root{--lex-main-overflow:hidden}
+
+/* At 150% UI scale a 1200px physical window is an 800px CSS viewport.
+   FF7R's declared Table + Detail minimums still fit there, so keep the
+   resizable two-pane layout instead of letting the shared <=850px fallback
+   hide the master list behind a one-row grid. Truly narrower windows still
+   use the shared stacked layout. */
+@media (min-width:760px) and (max-width:850px) {
+  #main {
+    --lex-panel-layout-narrow-template: var(--lex-panel-layout-template,minmax(0,1fr));
+    --lex-panel-layout-narrow-divider-display: block;
+  }
+}
+}

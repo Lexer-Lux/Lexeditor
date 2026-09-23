@@ -3565,11 +3565,11 @@ body:has(.lex-data-map-table) #main {
 @media (max-width: 850px) {
   .lex-panel-layout {
   gap: 14px;
-  grid-template-columns: 1fr;
+  grid-template-columns: var(--lex-panel-layout-narrow-template, 1fr);
 }
 
   .lex-panel-layout-divider {
-    display: none;
+    display: var(--lex-panel-layout-narrow-divider-display, none);
   }
 }
 
