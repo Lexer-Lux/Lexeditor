@@ -169,6 +169,9 @@
     "world-transport:radius":"Collision/footprint radius used for this transport on the world map.",
     "field-walkmesh:Active":"Whether this field walkmesh floor starts enabled for pathing. Lexeditor changes only Memoria's BGI_FLOOR_ACTIVE bit; scripts can still enable or disable floors at runtime.",
     "field-walkmesh-triangles:Active":"Whether this field walkmesh triangle starts enabled for pathing. Lexeditor changes only Memoria's BGI_TRI_ACTIVE bit; scripts can still enable or disable triangles at runtime.",
+    "field-walkmesh-triangles:AlternateFootstep":"Selects Memoria's alternate footstep surface for this triangle. This is the same 0x1000 flag exposed by Memoria Field Creator as “Alternate footstep.”",
+    "field-walkmesh-triangles:PreventNPC":"Prevents non-player field actors from pathing into this triangle. This is Memoria Field Creator's documented 0x4000 “Prevent NPC pathing” flag.",
+    "field-walkmesh-triangles:PreventPC":"Prevents the player-controlled field actor from pathing into this triangle. This is Memoria Field Creator's documented 0x8000 “Prevent PC pathing” flag.",
   };
   function semanticFieldHelp(data,field){
     const dataKey=String(data?.key||"");
