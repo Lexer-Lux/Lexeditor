@@ -47,14 +47,21 @@ Lexeditor's independent bounded implementation therefore:
 - patches a copy of the source bytes and preserves every untouched byte;
 - rejects unproved package shapes rather than falling back to raw hex/files editing.
 
-PlayerParameter remains the writable gameplay slice. BattleItemPossession now
-has a separate read-only Formulae view when an extracted source asset is supplied:
+PlayerParameter remains the writable gameplay slice. BattleItemPossession has
+a separate read-only Formulae view when an extracted source asset is supplied:
 real row FName identity and array elements are visible, but no
 BattleItemPossession file is staged or written. Synthetic fixtures prove no-op
 byte preservation, name/int/byte array decoding, out-of-bounds pointer rejection
-and rejection of attempted array edits without mutation. BattlePlayerParameter
-remains not integrated because its behavior-linked arrays and semantics are not
-proved for editing.
+and rejection of attempted array edits without mutation.
+
+BattlePlayerParameter is now a separate Partial/read-only Battle Params slice.
+Synthlight's public property list and narknon/FF7R2UProj generated declarations
+independently establish a distinctive typed storage signature, so Lexeditor can
+validate the supplied table and show real row FName identities, fixed-width
+scalars and decoded arrays without guessing the table. Its scalar gameplay
+meaning, enum domains and safe edit ranges are not established publicly, so
+Lexeditor deliberately exposes no BattlePlayerParameter save/staging route even
+though the lower-level parser can mechanically decode those storage types.
 
 ### IoStore extraction
 
@@ -110,6 +117,25 @@ Current public Rebirth mod instructions consistently place accepted
 .pak/.utoc/.ucas triples in End/Content/Paks/~mods; that remains a manual
 acceptance step until Lexeditor has proved collision/removal behavior in-game.
 
+f80h's public FF7 Rebirth Load ordering article, added 2026-08-04 and edited
+2026-08-08 after patch 1.005, documents the native UE4.26 precedence rule used
+by the current read-only audit: a higher purely numeric component immediately
+before _P wins (base/_0_P = effective 100, _1_P = 200, _2_P = 300, and so on);
+at equal patch level the case-insensitively smaller complete package path wins
+because packages are mounted in descending path order and later mounts win.
+Directory components participate in that complete-path comparison; directory
+depth has no separate priority. Lexeditor scans only package filenames/paths,
+does not unpack external mods, and reports incomplete or unclassifiable triples
+instead of guessing. Candidate manifests record the observed read-only stack
+snapshot plus the candidate's base patch level so manual in-game acceptance has
+reproducible load-order context.
+
+The current FF7 Rebirth Vortex extension is version 0.5.3 (2026-08-12); its
+public changelog also exposes pak load-order sorting/deployment and its author
+notes that Rebirth pak/ucas/utoc loading does not support symlink deployment.
+That is ecosystem corroboration only: this PR neither depends on Vortex nor
+copies its implementation.
+
 A real package candidate cannot be produced in the agent environment because it
 has no Rebirth installation/archive set and no user-supplied Oodle DLL. The
 candidate builder and refusal/isolation tests are nevertheless complete and
@@ -127,18 +153,20 @@ highlight, #f2f7ff accent text) on the shared shell. The current master removal
 of a game-specific detail-label width override was adopted so shared sizing owns
 the layout.
 
-Rendered CI artifact ff7r2-rendered from exact head
-e45da924d64d3d57c8e6293e2f942f2ac91067c7, workflow run 35806543930, was
-downloaded and visually inspected after browser + Ubuntu + Windows all passed.
-Artifact digest:
-dc94da7164c4bc972fecda51d382be4358a3abff8ab73a05c0200991cd304bd1.
-Desktop Characters, narrow Characters, simulated 150%, Data Map, Information and
-Tweaks were usable; the five requested gameplay areas were still visible at their
-then-current honest integration states and the candidate packaging route remained
-Partial. This is rendered browser evidence, not installed-app/game acceptance.
-The newer Formulae/BattleItemPossession view was implemented after that exact
-artifact and therefore requires a fresh rendered rerun before it inherits that
-evidence.
+The most recent rendered artifact inspected before this feasibility pass was
+ff7r2-rendered from exact head
+cd04c60d2bf30f5301d8d78676d3f66d9832cbe6, workflow run 35811594406. Browser,
+Ubuntu and Windows jobs all passed; artifact digest
+b9be3f73ac6c7b253fd182a7c2857aa09e7c56789db53b5edb8fd5ab0fb1fa8f.
+Desktop Characters, narrow Characters, simulated 150%, Formulae, Data Map,
+Information and Tweaks were visually inspected and usable. The split
+Table+Detail layout remained intact at narrow/150%, and Formulae read-only
+evidence text/fields remained reachable. This is rendered browser evidence,
+not installed-app/game acceptance.
+
+The Battle Params view and native load-order Information slice in this
+feasibility pass were implemented after cd04c60 and therefore require a fresh
+exact-head rendered artifact before they inherit rendered evidence.
 
 ## Current public leads for unresolved requests
 
@@ -147,6 +175,15 @@ gameplay requests as one generic IoStore blocker. Synthlight's generated Rebirth
 constants are used here as naming/schema evidence only; they do not prove runtime
 meaning by themselves.
 
+- BattlePlayerParameter: generated declarations at audited commit
+  ae73efa89db7e48fc7f425dec0847a0208c15b80 identify CommandAbilityID_Array,
+  EnableAerialShortCut, UniqueAbilityType0, UniqueAbilityParameterValue_Array,
+  KeyDownTime, KeyDownEffectCreateTime, guard/dodge/limit arrays and related
+  FName fields with concrete storage types. Synthlight independently publishes
+  the matching property names. This is enough to validate and display a supplied
+  BattlePlayerParameter structurally; searches for these names did not expose
+  documented gameplay domains/ranges. The new Battle Params view is therefore
+  Partial/read-only rather than speculative editing.
 - #470 Chocobo whistle: ResidentParameter publicly names
   CallChocoboAtFieldActionDistanceParamRatio0/1. The public generated Rebirth SDK
   also exposes AEndLocationVolume.bDisableChocoboRide,
@@ -220,7 +257,10 @@ independent bounded implementation and the licensing boundary recorded above.
 Project marker: lexeditor-project.json
 
 Read-only extracted inputs:
-- source/End/Content/DataObject/Resident/PlayerParameter.uasset
+- source/End/Content/DataObject/Resident/PlayerParameter.uasset (baseline source;
+  proved fixed-width edits are written only to the staged project copy)
+- source/End/Content/DataObject/Resident/BattlePlayerParameter.uasset (optional
+  Battle Params source; schema-validated and never staged/written)
 - source/End/Content/DataObject/Resident/BattleItemPossession.uasset (optional
   #471 Formulae source; never staged/written by this integration)
 
