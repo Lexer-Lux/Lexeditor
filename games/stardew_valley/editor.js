@@ -342,6 +342,88 @@ function objectsPanel() {
     change: next => { state.page = next.page; state.pageSize = next.pageSize; if (next.selected !== null) state.selected = next.selected; render(); },
   });
 }
+
+const datasetPrefs = new Map();
+function datasetColumns() {
+  const fields = state.dataset?.schema?.fields || [];
+  return [
+    {key: "id", label: "Record key", sortable: true, width: "10em"},
+    {key: "name", label: "Name", sortable: true, width: "minmax(10em,1.4fr)", render: row => row.name || row.id},
+    ...fields.slice(0, 3).map(field => ({
+      key: field.key, label: field.label, sortable: true, width: "9em",
+      numeric: field.kind === "int" || field.kind === "number",
+      sortValue: row => effective(row, field.key),
+      render: row => {
+        const value = effective(row, field.key);
+        if (value === null || value === undefined) return "—";
+        if (field.kind === "bool") return booleanMark(!!value);
+        const option = field.options?.find(candidate => candidate.value === value);
+        return option ? option.label : String(value);
+      },
+    })),
+  ];
+}
+function currentDatasetPrefs() {
+  const key = state.datasetKey;
+  if (!datasetPrefs.has(key)) {
+    datasetPrefs.set(key, columnPreferences("stardew-"+key, datasetColumns(), () => render()));
+  }
+  return datasetPrefs.get(key);
+}
+function defaultDatasetValue(field) {
+  if (Object.prototype.hasOwnProperty.call(field, "default")) return field.default;
+  if (field.kind === "bool") return false;
+  if (field.kind === "enum") return field.options?.[0]?.value ?? "";
+  return field.min ?? 0;
+}
+function datasetFieldControl(row, field) {
+  const key = field.key;
+  const enabled = has(row, key);
+  const inherited = baseValue(row, key);
+  const shown = enabled ? row.fields[key] : (inherited ?? defaultDatasetValue(field));
+  let control;
+  if (field.kind === "bool") {
+    control = el("input", {
+      type: "checkbox", checked: !!shown, disabled: !enabled || state.busy,
+      "aria-label": field.label,
+      onchange: event => { row.fields[key] = event.target.checked; shell.refresh(); },
+    });
+  } else if (field.kind === "enum") {
+    control = el("select", {
+      disabled: !enabled || state.busy, "aria-label": field.label,
+      onchange: event => { row.fields[key] = JSON.parse(event.target.value); shell.refresh(); },
+    }, ...(field.options || []).map(option => el("option", {
+      value: JSON.stringify(option.value), selected: JSON.stringify(option.value) === JSON.stringify(shown),
+    }, option.label)));
+  } else {
+    control = el("input", {
+      type: "number", min: field.min, max: field.max, step: field.kind === "int" ? 1 : (field.step || 0.01),
+      value: shown, disabled: !enabled || state.busy, "aria-label": field.label,
+      oninput: event => {
+        const value = Number(event.target.value);
+        if (!Number.isFinite(value)) return;
+        row.fields[key] = field.kind === "int" ? Math.round(value) : value;
+        shell.refresh();
+      },
+    });
+  }
+  const override = el("input", {
+    type: "checkbox", checked: enabled, disabled: state.busy, "aria-label": "Override "+field.label,
+    onchange: event => {
+      if (event.target.checked) row.fields[key] = inherited ?? defaultDatasetValue(field);
+      else delete row.fields[key];
+      state.error = ""; render(); shell.refresh();
+    },
+  });
+  return detailField({
+    label: field.label.toUpperCase(),
+    help: field.help ? infoHelp(field.help) : null,
+    control: el("div", {class: "sv-override"}, el("label", {}, override, "Override"), control),
+    dataType: field.kind === "bool" ? "BOOL" : field.kind === "enum" ? "ENUM" : field.kind.toUpperCase(),
+    min: field.min, max: field.max, attrs: {"data-lex-property": key},
+  });
+}
+
 function dataMapPanel() {
   const view = LexeditorUI.dataMap({
     rows: state.dataMap.rows, query: state.mapQuery, status: state.mapStatus, page: state.mapPage,
