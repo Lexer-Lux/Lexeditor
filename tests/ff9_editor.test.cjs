@@ -268,12 +268,18 @@ test('field walkmesh triangle detail exposes only BGI_TRI_ACTIVE as editable', a
     {key:'Triangle',label:'Triangle',kind:'stored',editable:false,declaredType:'UInt16'},
     {key:'Floor',label:'Floor',kind:'stored',editable:false,declaredType:'Int16'},
     {key:'Active',label:'Triangle active',kind:'boolean',editable:true,declaredType:'Boolean'},
+    {key:'AlternateFootstep',label:'Alternate footstep',kind:'boolean',editable:true,declaredType:'Boolean'},
+    {key:'PreventNPC',label:'Prevent NPC pathing',kind:'boolean',editable:true,declaredType:'Boolean'},
+    {key:'PreventPC',label:'Prevent PC pathing',kind:'boolean',editable:true,declaredType:'Boolean'},
     {key:'OtherFlags',label:'Other flag bits',kind:'stored',editable:false,declaredType:'UInt16'}
-  ],rows:[{line:0,id:0,name:'Triangle 0',source:'project',values:{Field:'FBG_TEST',Triangle:0,Floor:2,Active:true,OtherFlags:32}}]};`);
+  ],rows:[{line:0,id:0,name:'Triangle 0',source:'project',values:{Field:'FBG_TEST',Triangle:0,Floor:2,Active:true,AlternateFootstep:true,PreventNPC:true,PreventPC:true,OtherFlags:32}}]};`);
   const node=e.run(`detail(state.datasets['field-walkmesh-triangles'],state.datasets['field-walkmesh-triangles'].rows[0])`);
   const text=JSON.stringify(node);
   assert.match(text,/Field walkmesh triangles · project BGI/);
   assert.match(text,/BGI_TRI_ACTIVE/);
+  assert.match(text,/Alternate footstep/);
+  assert.match(text,/Prevent NPC pathing/);
+  assert.match(text,/Prevent PC pathing/);
   assert.match(text,/STORED DATA/);
 });
 
