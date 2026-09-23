@@ -242,7 +242,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             assert page.locator(".lex-detail-panel-heading .lex-record-id").count() == 0
 
             page.evaluate("state.datasetChoice.world='field-walkmesh';loadDataset('field-walkmesh').then(render)")
-            page.wait_for_function("state.datasets['field-walkmesh']?.rows?.length===2")
+            page.wait_for_function("state.datasets['field-walkmesh']?.rows?.length===4")
             active = field(page, "FLOOR ACTIVE").locator('input[type="checkbox"]')
             expect(active).to_be_checked()
             expect(field(page, "OTHER FLAG BITS").locator("input")).to_have_value("64")
