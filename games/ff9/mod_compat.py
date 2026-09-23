@@ -45,7 +45,8 @@ def _quoted_list(value: str) -> list[str]:
     values = re.findall(r'"([^"]*)"', value)
     if values:
         return [item for item in values if item]
-    return [item.strip() for item in value.split(",") if item.strip()]
+    raw = value.strip().strip('"')
+    return [raw] if raw else []
 
 
 def _version(value: str) -> tuple[int, ...]:
