@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 
 SEVENTH_HEAVEN_SOURCE_REVISION = "ae129f0bbeeeb236b1c37fb136e5fec25fd292a3"
 WORKSHOP_ENV = "LEXEDITOR_FF7_7H_WORKSHOP"
-_CONDITION = re.compile(r"^\\s*([A-Za-z0-9_.-]+)\\s*(<=|>=|!=|=|<|>)\\s*(-?\\d+)\\s*$")
+_CONDITION = re.compile(r"^\s*([A-Za-z0-9_.-]+)\s*(<=|>=|!=|=|<|>)\s*(-?\d+)\s*$")
 
 
 def _local(tag: str) -> str:
@@ -56,7 +56,7 @@ def _norm(path: str) -> str:
 
 
 def _version_key(text: str) -> tuple:
-    pieces = re.findall(r"\\d+|[^\\d]+", text or "")
+    pieces = re.findall(r"\d+|[^\d]+", text or "")
     return tuple((0, int(part)) if part.isdigit() else (1, part.casefold()) for part in pieces)
 
 
