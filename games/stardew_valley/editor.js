@@ -85,6 +85,57 @@ function diffEdits() {
   return edits;
 }
 
+function installDataset(payload) {
+  state.dataset = payload;
+  state.datasetKey = payload.datasetKey;
+  state.datasetRows = clone(payload.rows);
+  state.datasetSavedRows = clone(payload.rows);
+  if (!state.datasetRows.some(row => row.id === state.datasetSelected)) {
+    state.datasetSelected = state.datasetRows[0]?.id ?? null;
+  }
+  return payload;
+}
+function datasetDiffEdits() {
+  const keys = state.dataset?.schema?.fields?.map(field => field.key) || [];
+  const old = Object.fromEntries(state.datasetSavedRows.map(row => [row.id, row]));
+  const current = Object.fromEntries(state.datasetRows.map(row => [row.id, row]));
+  const ids = new Set([...Object.keys(old), ...Object.keys(current)]);
+  const edits = [];
+  for (const id of ids) {
+    const before = old[id]?.fields || {};
+    const after = current[id]?.fields || {};
+    const fields = {};
+    for (const key of keys) {
+      const beforeHas = Object.prototype.hasOwnProperty.call(before, key);
+      const afterHas = Object.prototype.hasOwnProperty.call(after, key);
+      if (beforeHas !== afterHas || (afterHas && JSON.stringify(before[key]) !== JSON.stringify(after[key]))) {
+        fields[key] = afterHas ? after[key] : null;
+      }
+    }
+    if (Object.keys(fields).length) edits.push({id, fields});
+  }
+  return edits;
+}
+function sortedDatasetRows() {
+  const query = state.datasetQuery.trim().toLocaleLowerCase();
+  return [...state.datasetRows]
+    .filter(row => !query || [row.id, row.name, row.internalName]
+      .some(value => String(value || "").toLocaleLowerCase().includes(query)))
+    .sort((a, b) => {
+      let left = state.datasetSort.key === "id" ? a.id
+        : state.datasetSort.key === "name" ? a.name : effective(a, state.datasetSort.key);
+      let right = state.datasetSort.key === "id" ? b.id
+        : state.datasetSort.key === "name" ? b.name : effective(b, state.datasetSort.key);
+      if (left === null || left === undefined) left = "";
+      if (right === null || right === undefined) right = "";
+      const result = typeof left === "string"
+        ? left.localeCompare(String(right), undefined, {numeric: true, sensitivity: "base"})
+        : Number(left) - Number(right);
+      return result * state.datasetSort.dir;
+    });
+}
+
+
 function clampInteger(value, min, max) {
   const number = Number(value);
   if (!Number.isFinite(number)) return null;
