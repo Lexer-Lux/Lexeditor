@@ -46,6 +46,25 @@ def test_refresh_loading_blocks_input_and_uses_shared_quote(page):
     assert page.evaluate('touched') == 1
 
 
+def test_late_quote_cannot_replace_closing_screen(page):
+    page.evaluate('''()=>{
+      sessionStorage.setItem('lex-loading-quote','Keep this quote');
+      document.body.prepend(Object.assign(document.createElement('div'),{id:'lexeditor-shell'}));
+      window.pywebview={api:{loading_quote:()=>new Promise(resolve=>window.resolveQuote=resolve),
+        lexeditor_settings:async()=>({loadingTransitionMinimumSeconds:0})}};
+    }''')
+    framework(page)
+    page.evaluate('''()=>LexeditorUI.mountShell({host:'#lexeditor-shell',plugin:{id:'fixture',name:'Fixture'},tabs:[],activeTab:()=>'',navigate(){}})''')
+    page.wait_for_function('typeof resolveQuote === "function"')
+    page.evaluate('''()=>{
+      window.quoteNode=document.querySelector('.lex-plugin-loading-quote');
+      LexeditorUI.finishPluginLoading();
+      resolveQuote({quote:'Late replacement'});
+    }''')
+    page.wait_for_function('sessionStorage.getItem("lex-loading-quote")==="Late replacement"')
+    assert page.evaluate('quoteNode.textContent')=='Keep this quote'
+
+
 @pytest.mark.parametrize('zoom', [1, 1.25])
 def test_table_never_extends_under_fixed_pager(page, zoom):
     framework(page)

@@ -5265,11 +5265,14 @@ ${contents.path}`});
     document.body.dataset.lexPlugin = options.plugin.id;
     document.body.dataset.lexTheme = options.plugin.themeName || options.plugin.id;
     applyTheme(options.plugin.theme);
-    if (pluginLoadingScreen) callWindow("loading_quote", options.plugin.id).then(result => {
+    const quoteScreen = pluginLoadingScreen;
+    if (quoteScreen && !loadingParameters.get("lexQuote")) callWindow("loading_quote", options.plugin.id).then(result => {
       if (!result?.quote) return;
       sessionQuote.set(result.quote);
-      const quote = document.querySelector(".lex-plugin-loading-quote");
-      if (quote) quote.textContent = result.quote;
+      const quote = quoteScreen.querySelector(".lex-plugin-loading-quote");
+      // Keep one quote for the entire transition. A late response may seed
+      // the next load, but must not replace text already being read or fading.
+      if (pluginLoadingScreen === quoteScreen && quote?.textContent === "Loading editor…") quote.textContent = result.quote;
     }).catch(() => {});
 
     const brand = element("button", {
