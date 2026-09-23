@@ -337,7 +337,8 @@ with sync_playwright() as p:
 
             # Graph contract: large all-caps unsquashed title, no redundant
             # pseudo-title box, variables above the plot, and every right-axis
-            # string (name + range endpoints) rotated in the graph margin.
+            # The Y-axis name stays vertical while the range endpoints sit
+            # horizontally in the left graph margin.
             page.evaluate("navigate('graphs')"); page.wait_for_timeout(180)
             title = page.locator('.lex-curve-heading-title').first
             title_text = title.inner_text()

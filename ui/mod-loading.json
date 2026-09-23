@@ -65,6 +65,11 @@
       "loader": "Factorio's native mod loader. Lexeditor exports one generated Factorio 2.1 override mod and does not install, execute, or modify source mods.",
       "structure": "A Factorio project keeps the imported source/data-raw-dump.json and optional source/mod-list.json read-only, saves structured edits in overrides.json, and exports build/<name>_<version>.zip containing info.json plus data-final-fixes.lua.",
       "overriding": "The generated data-final-fixes.lua runs in Factorio's final prototype stage. Authored dependencies are preserved and enabled source mods are added as optional dependencies for load ordering when present; generated assignments touch only modeled fields of existing prototypes."
+    },
+    "ffx-x2": {
+      "loader": "Fahrenheit's External File Loader. Lexeditor creates one file-only Fahrenheit mod and does not patch or rebuild the installed FFX_Data.vbf or FFX2_Data.vbf archives.",
+      "structure": "The selected project mirrors Fahrenheit EFL roots under <project>/efl/x/ for FFX and <project>/efl/x2/ for FFX-2. Deploy Project copies those replacements into <game>/fahrenheit/mods/lexeditor-ffx-x2/ with a Fahrenheit manifest and one managed loadorder entry.",
+      "overriding": "Fahrenheit indexes enabled mods in loadorder order and later replacements supersede earlier same-path files. Lexeditor owns only its lexeditor-ffx-x2 mod folder and exact loadorder line; it preserves other mods and refuses to overwrite its deployment if those files changed externally."
     }
   }
 }

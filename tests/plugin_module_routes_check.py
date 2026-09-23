@@ -45,8 +45,12 @@ def check(name: str) -> list[str]:
     try:
         page = (ROOT / "games" / name / "editor.html").read_text(encoding="utf-8")
         for asset in modules(page):
+            # Browsers resolve a leading ./ before sending; request the same path.
+            request = asset.lstrip('/')
+            while request.startswith('./'):
+                request = request[2:]
             try:
-                with urllib.request.urlopen(f"{base}/{asset.lstrip('/')}", timeout=10) as reply:
+                with urllib.request.urlopen(f"{base}/{request}", timeout=10) as reply:
                     if not reply.read():
                         problems.append(f"{name}: {asset} served empty")
             except Exception as error:  # noqa: BLE001 - the failure is the result
