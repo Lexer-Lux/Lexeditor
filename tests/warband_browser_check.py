@@ -95,7 +95,7 @@ def main():
                     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding="utf-8")+'</style>')
                     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding="utf-8")+'</script>')
                     html=inline_modules('warband',html)
-                    page.set_content(html,wait_until='domcontentloaded');page.wait_for_function('!state.booting')
+                    page.set_content(html,wait_until='domcontentloaded');page.wait_for_function('typeof state!=="undefined"&&!state.booting')
                     page.wait_for_function('document.querySelector(".warband-item-thumbnail img")?.naturalWidth>0')
                     assert page.locator('.warband-item-detail [data-lex-property="id"] input').count()==1
                     assert page.locator('.warband-item-detail [data-lex-property="name"] input').count()==1
