@@ -16,13 +16,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from ff7r2_fixture import fixture
+from ff7r2_fixture import battle_item_possession_fixture, fixture
 from games.ff7r2.plugin import Ff7r2Session
 
 
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "ff7r2-browser"
 OUT.mkdir(parents=True, exist_ok=True)
 PLAYER = Path("End/Content/DataObject/Resident/PlayerParameter.uasset")
+BATTLE_ITEM = Path("End/Content/DataObject/Resident/BattleItemPossession.uasset")
 
 
 def layout_metrics(page):
@@ -43,6 +44,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
     source = project / "source" / PLAYER
     source.parent.mkdir(parents=True)
     source.write_bytes(fixture())
+    battle_source = project / "source" / BATTLE_ITEM
+    battle_source.parent.mkdir(parents=True, exist_ok=True)
+    battle_source.write_bytes(battle_item_possession_fixture())
     environment = {"LEXEDITOR_FF7R2_PROJECT": str(project)}
 
     errors = []
@@ -114,11 +118,30 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 page.wait_for_function(
                     "()=>document.querySelector('input[aria-label=\"HPMax\"]')?.value.replaceAll(',','').replaceAll(' ','')==='1234'")
 
+                page.evaluate('navigate("formulae")')
+                page.wait_for_selector(".ff7r2-formulae-table")
+                expect(page.get_by_text("EnemyTest", exact=True).first).to_be_visible()
+                expect(page.get_by_role("searchbox", name="Search BattleItemPossession records")).to_be_visible()
+                formula_values = page.locator(".ff7r2-formulae-detail input.lex-readonly-field")
+                assert formula_values.evaluate_all(
+                    "els=>els.some(el=>el.value.includes('0: Potion')&&el.value.includes('1: Ether'))"
+                )
+                assert page.locator(".ff7r2-formulae-detail input:not([readonly])").count() == 0
+                page.screenshot(path=str(OUT / "formulae.png"), full_page=True)
+
                 page.evaluate('navigate("datamap")')
                 page.wait_for_selector(".lex-data-map")
                 expect(page.get_by_text("BattlePlayerParameter.uasset", exact=False)).to_be_visible()
+                expect(page.get_by_text("BattleItemPossession.uasset (#471)", exact=False)).to_be_visible()
                 expect(page.get_by_text("CardGameCommonParameter.uasset + CardGameAIParam.uasset (#477)", exact=False)).to_be_visible()
-                assert page.locator(".lex-integration-status.partial").count() >= 1
+                for issue in ("#470", "#472", "#473", "#477"):
+                    issue_row = page.locator(".lex-column-list-row").filter(has_text=issue)
+                    expect(issue_row).to_have_count(1)
+                    assert issue_row.locator(".lex-integration-status.not-integrated").count() == 1
+                steal_row = page.locator(".lex-column-list-row").filter(has_text="#471")
+                expect(steal_row).to_have_count(1)
+                assert steal_row.locator(".lex-integration-status.partial").count() == 1
+                assert page.locator(".lex-integration-status.partial").count() >= 3
                 player_map_file = page.get_by_text(
                     "End/Content/DataObject/Resident/PlayerParameter.uasset", exact=True)
                 expect(player_map_file).to_be_visible()
@@ -171,6 +194,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 browser.close()
 
     assert source.read_bytes() == fixture(), "Browser save modified the extracted source"
+    assert battle_source.read_bytes() == battle_item_possession_fixture(), "Browser view modified BattleItemPossession"
     assert not errors, errors
 
 print("FF7R2 rendered browser acceptance passed")
