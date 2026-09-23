@@ -1,0 +1,21 @@
+# #475 — Make the minimap zoom adjustable
+
+## State (2026-09-23 per-game-ff7r pass)
+
+- New on this branch: `minimapZoom` opt-in runtime config contract in
+  `games/ff7r/runtime_config.py` (commit `cba2f0fa`), surfaced in Runtime
+  Tweaks via `games/ff7r/runtime_dataobject.py` (`MinimapZoomEnabled`,
+  `MinimapZoomMultiplier`, `MinimapZoomHookValidated`).
+- Contract: one control, vanilla `1.0x` default, `zoomMultiplier > 0` enforced,
+  `persistAcrossAreas: true` default; full-map screen untouched unless it
+  shares the value (native-hook obligation).
+- Tests: `tests/test_ff7r_runtime_config.py` (22 passed; full ff7r selection:
+  519 passed).
+
+## Needs Lexer (installed game)
+
+- No validated minimap-zoom runtime hook exists yet; the authoritative zoom
+  coefficient/path must be identified against the installed build and recorded
+  in the runtime manifest before deployment can succeed (fail-closed).
+- Then verify in game: zoom applies to the field minimap, vanilla default,
+  choice survives area changes and reloads.
