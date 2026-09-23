@@ -16,3 +16,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes finding
 No Viking Comb doubling code exists anywhere in tree (comb matches are combat substrings). Doubling small social Honor gains needs honor-event interception before identity loss, the same unproven path as #161. Recorded the linkage instead of inventing a hook. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (safe mechanism/research still
+owed), so flipping to waiting would be a fake checklist. Left actionable
+until a real session can be written.

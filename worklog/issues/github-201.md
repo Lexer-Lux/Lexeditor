@@ -18,3 +18,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes disposition
 Module stands deliberately safe-disabled with full reasoning (process-wide predicates own shop and station behavior; heartbeat logs protection equals rockstar). A safe entity-local mechanism still needs research. Nothing is ready for a player test. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (safe mechanism/research still
+owed), so flipping to waiting would be a fake checklist. Left actionable
+until a real session can be written.

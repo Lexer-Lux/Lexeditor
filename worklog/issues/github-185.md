@@ -18,3 +18,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes disposition
 Drink/refill behavior lives in water_pumps.cpp. Remaining needs are all game-side: unvisited-pump coverage preparation, mech.meta scenario evidence, and the icon redesign around the pump head and handle in the established map style (latest icon rejected). No executable pump verifier exists in tools. Needs game plus artwork approval. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.
