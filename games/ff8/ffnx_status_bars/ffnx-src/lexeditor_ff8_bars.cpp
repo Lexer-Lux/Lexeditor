@@ -468,14 +468,14 @@ std::uint32_t __cdecl main_row_hook(const std::uint8_t *state,unsigned display,u
     if(slot>=0 && slot<3) {
         const auto id=state[0x35+slot];
         if(id<CHAR_NUM) {
-            if(enable_ff8_xp_bars) capture_menu_xp(114,55+Spacing*slot,48,
+            if(enable_ff8_xp_bars) capture_menu_xp(114,55+Spacing*slot,46,
                 xp_fraction(ff8_externals.savemap->chars[id].exp,id));
             if(enable_ff8_hp_bars) {
                 // The menu uses this 32-byte computed-stat record, including
                 // junctions and abilities, for the HP X/Y text at x162.
                 const auto *stats=reinterpret_cast<const std::uint16_t *>(0x01D771B0+32*id);
                 const auto current=stats[4], maximum=stats[5];
-                if(maximum) capture_menu_xp(162,55+Spacing*slot,94,
+                if(maximum) capture_menu_xp(164,55+Spacing*slot,92,
                     current/static_cast<float>(maximum),true);
             }
         }

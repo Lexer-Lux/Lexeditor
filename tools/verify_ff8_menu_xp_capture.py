@@ -40,11 +40,16 @@ int main(){
  assert(g_menu_xp_count==32);draw_menu_xp();assert(bars.size()==34);
  enable_ff8_xp_bars=false;enable_ff8_hp_bars=true;
  capture_menu_xp(44,138,48,.5f);
- capture_menu_xp(162,55,94,.635f,true);
+ capture_menu_xp(164,55,92,.635f,true);
  draw_menu_xp();assert(bars.size()==35);
- assert((bars.back()==std::array<float,5>{496,185,282,3,.635f}));
+ assert((bars.back()==std::array<float,5>{502,185,276,3,.635f}));
+ enable_ff8_xp_bars=true;
+ capture_menu_xp(114,55,46,.5f);
+ capture_menu_xp(164,55,92,.635f,true);
+ draw_menu_xp();assert(bars.size()==37);
+ assert(bars[35][0]+bars[35][2]<bars[36][0]); // XP and HP bars must not touch.
  enable_ff8_hp_bars=false;
- capture_menu_xp(162,55,94,.635f,true);draw_menu_xp();assert(bars.size()==35);
+ capture_menu_xp(162,55,94,.635f,true);draw_menu_xp();assert(bars.size()==37);
 }
 '''
 vcvars = Path(r'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars32.bat')
