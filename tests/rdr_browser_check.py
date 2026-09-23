@@ -134,13 +134,16 @@ def run(output: Path, executable: str | None) -> None:
             options["executable_path"] = executable
         browser = playwright.chromium.launch(**options)
         try:
-            for width, height in ((1200, 800), (760, 700)):
+            for width, height, zoom in ((1200, 800, 100), (760, 700, 100), (1200, 800, 150)):
                 page = browser.new_page(viewport={"width": width, "height": height})
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.route("**/*", lambda route: route.abort())
                 page.set_content(document(), wait_until="domcontentloaded")
                 page.wait_for_function("!state.booting")
+                if zoom != 100:
+                    page.evaluate("(value) => { document.documentElement.style.zoom = value; }", zoom / 100)
+                    page.wait_for_timeout(100)
                 assert not errors, errors
 
                 page.evaluate("state.itemSelected='base:0'; renderItems()")
@@ -163,7 +166,7 @@ def run(output: Path, executable: str | None) -> None:
                   return {field:b.width,label:l.width,ratio:l.width/b.width};
                 }""").json_value()
                 assert 0.075 <= geometry["ratio"] <= 0.125, (width, "RDR1 bypassed shared ~10% label lane", geometry)
-                page.screenshot(path=str(output / f"rdr-items-{width}.png"), full_page=True)
+                page.screenshot(path=str(output / f"rdr-items-{width}-zoom{zoom}.png"), full_page=True)
 
                 page.evaluate("state.tab='strings'; stringsUI.render()")
                 expect(page.locator(".string-detail textarea")).to_have_value("Hello")
@@ -174,7 +177,7 @@ def run(output: Path, executable: str | None) -> None:
                 assert page.locator(".string-detail").get_by_text(
                     "tune/stringtable/global.strtbl", exact=True).count()
                 assert page.locator(".string-detail .lex-record-id").count() == 0
-                page.screenshot(path=str(output / f"rdr-strings-{width}.png"), full_page=True)
+                page.screenshot(path=str(output / f"rdr-strings-{width}-zoom{zoom}.png"), full_page=True)
 
                 page.evaluate("state.tab='missions'; state.missionSelected=2; renderMissions()")
                 expect(page.locator(".mission-detail .lex-detail-field")).to_have_count(9)
@@ -185,10 +188,10 @@ def run(output: Path, executable: str | None) -> None:
                 assert any("completion Fame award independently" in text for text in labels), labels
                 assert any("completion Honor adjustment independently" in text for text in labels), labels
                 assert all("Base value" not in text and "range" not in text.lower() for text in labels), labels
-                page.screenshot(path=str(output / f"rdr-missions-{width}.png"), full_page=True)
+                page.screenshot(path=str(output / f"rdr-missions-{width}-zoom{zoom}.png"), full_page=True)
                 assert not errors, errors
                 page.close()
-                print(f"PASS: RDR1 shared Detail + semantic info bubbles at {width}x{height}")
+                print(f"PASS: RDR1 shared Detail + semantic info bubbles at {width}x{height}, zoom {zoom}%")
         finally:
             browser.close()
 
