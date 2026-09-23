@@ -52,9 +52,9 @@
       "overriding": "Warband selects one module at launch. Lexeditor does not stack several modules or apply a cross-module priority order; resources and dependencies declared by the selected module follow Warband's own module rules."
     },
     "ff7r2": {
-      "loader": "Presentation helpers sit beside ff7rebirth_.exe in End/Binaries/Win64: ReShade is dxgi.dll and pinned Shader Injector 2.2.1 is dsound.dll. The gameplay editor does not add a loader or overwrite Rebirth's d3d12.dll.",
-      "structure": "A Lexeditor Rebirth gameplay project has lexeditor-project.json, a read-only extracted source/End/Content/DataObject/Resident/PlayerParameter.uasset, and an edited content/End/Content/DataObject/Resident/PlayerParameter.uasset staging path. Shader Injector remains a separately pinned shared helper with ShaderInjector.ini and its ShaderInjector folder in the game binaries directory.",
-      "overriding": "Characters Save only stages the edited IoStore-state PlayerParameter asset in the project. It is not called installed or active: no FF7R2 IoStore package is produced until a dependency-explicit packaging route and real-game acceptance are available. ReShade and Shader Injector continue to stack independently and retain their existing DLL ownership safety."
+      "loader": "Rebirth gameplay assets use native IoStore patch triples. Lexeditor can build an isolated candidate with explicitly supplied UnrealReZen and Oodle paths; it never downloads either dependency and never installs the unaccepted candidate. ReShade remains dxgi.dll and pinned Shader Injector 2.2.1 remains dsound.dll.",
+      "structure": "A gameplay project keeps a read-only extracted source/End/Content/DataObject/Resident/PlayerParameter.uasset, saves edited content under content/End/Content/..., and can write candidate .pak/.utoc/.ucas triples plus a hash manifest under build/ff7r2-candidate-*/. Real accepted triples are loaded by Rebirth from End/Content/Paks/~mods, but this PR does not copy candidates there.",
+      "overriding": "Characters Save and Build Candidate remain project-only operations. Lexeditor does not claim a winner for collisions with existing ~mods packages and does not activate a package until a real-game candidate has been accepted. ReShade and Shader Injector continue to stack independently and retain their existing DLL ownership safety."
     }
   }
 }
