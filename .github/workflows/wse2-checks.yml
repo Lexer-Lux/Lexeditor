@@ -44,6 +44,8 @@ jobs:
       # tools/magic-rdr/source gitlink (no .gitmodules URL). Clear this checkout's
       # read-only token directly before running tests; do not change the index.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Clear temporary checkout credentials
         run: python -c "import subprocess; r=subprocess.run(['git','config','--local','--unset-all','http.https://github.com/.extraheader']); assert r.returncode in (0,1,5)"
       - uses: actions/setup-python@v5
@@ -70,6 +72,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Clear temporary checkout credentials
         run: python -c "import subprocess; r=subprocess.run(['git','config','--local','--unset-all','http.https://github.com/.extraheader']); assert r.returncode in (0,1,5)"
       - uses: actions/setup-python@v5
