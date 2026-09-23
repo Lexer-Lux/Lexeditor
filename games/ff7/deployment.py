@@ -23,7 +23,7 @@ import tempfile
 
 from platform_config import load_config
 
-from . import datasets
+from . import datasets, mod_stack, tooling
 from .archives import LGP
 from .battle import SceneArchive
 from .extended import KernelText, resolve_source
@@ -296,6 +296,7 @@ def build_plan(game_root: Path, project_root: Path) -> dict:
     direct_root, config = _direct_root(game_root)
     rows = [{"path": path, "bytes": len(data), "sha256": _digest(data)}
             for path, data in sorted(files.items())]
+    external_mods = mod_stack.configured_stack(files)
     return {
         "contract": "Lexeditor.ff7-ffnx-direct",
         "sourceRevision": FFNX_SOURCE_REVISION,
@@ -310,6 +311,8 @@ def build_plan(game_root: Path, project_root: Path) -> dict:
             "directRoot": str(direct_root) if direct_root else None,
             "message": config.get("message", ""),
         },
+        "setup": tooling.helper_status(game_root),
+        "externalMods": external_mods,
         "_payload": files,
     }
 
@@ -363,6 +366,14 @@ def deploy_project(game_root: Path, project_root: Path, running_check=None) -> d
     if running_check and running_check():
         raise RuntimeError("Close Final Fantasy VII before deploying FFNx Direct data")
     exported = export_project(game_root, project_root)
+    external_overlaps = exported.get("externalMods", {}).get("overlaps", [])
+    if external_overlaps:
+        paths = sorted({row.get("path", "") for row in external_overlaps if row.get("path")})
+        raise ValueError(
+            "Active 7th Heaven folder mod(s) overlap Lexeditor FFNx Direct paths; "
+            "deployment is blocked rather than guessing a winner: " + ", ".join(paths[:8])
+            + (f" (+{len(paths) - 8} more)" if len(paths) > 8 else "")
+        )
     direct_root = Path(exported["ffnx"]["directRoot"]) if exported["ffnx"]["directRoot"] else None
     if direct_root is None:
         raise ValueError("FFNx.toml is required before deployment")
