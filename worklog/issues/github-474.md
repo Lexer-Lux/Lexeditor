@@ -1,0 +1,22 @@
+# #474 — Cast spells outside combat, the way Rebirth does
+
+## State (2026-09-23 per-game-ff7r pass)
+
+- New on this branch: `fieldCast` opt-in runtime config contract in
+  `games/ff7r/runtime_config.py` (commit `cba2f0fa`), surfaced in Runtime
+  Tweaks via `games/ff7r/runtime_dataobject.py` (`FieldCastEnabled`,
+  read-only `FieldCastSchools`, `FieldCastHookValidated`).
+- Contract: disabled by default (vanilla preserved); when enabled, schools are
+  restricted to healing/cleansing/buffs; MP spend/refusal is a native-hook
+  obligation, not a data edit.
+- Tests: `tests/test_ff7r_runtime_config.py` (22 passed; full ff7r selection:
+  519 passed).
+
+## Needs Lexer (installed game)
+
+- No validated field-menu/materia/MP runtime hook exists yet; the native
+  accessor path must be reverse-engineered against the installed build and
+  recorded in the runtime manifest before deployment can succeed (fail-closed).
+- Then verify in game: cast from the field menu with equipped materia, MP
+  spent as in battle, unaffordable spells refused, only healing/cleansing/buff
+  schools offered, vanilla behavior with the tweak off.

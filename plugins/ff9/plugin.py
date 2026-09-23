@@ -126,6 +126,9 @@ PLUGIN = GamePlugin(
     name="Final Fantasy 9",
     process_names=("FF9.exe", "FF9_Launcher.exe"),
     helper_name="Memoria",
+    # Root-aware hooks only: plugin_api validation rejects declaring both
+    # install shapes, and the host installs through the located game
+    # folder, never the import-time default.
     helper_upstream=memoria_manager.upstream_release,
     helper_status_for_root=lambda root: memoria_manager.status(root or paths.GAME_ROOT),
     helper_install_for_root=lambda root: memoria_manager.install(root),

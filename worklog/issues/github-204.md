@@ -25,3 +25,24 @@ Recorded the negative evidence here instead of inventing a hook. Issue stays act
 No concrete Lexer-side session exists yet (native research/design still
 owed), so flipping to waiting would be a fake checklist. Left actionable
 until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. No Honor reference exists outside
+honor_actions.cpp event amounts and no shop price-modifier mechanism
+exists anywhere in the tree, so the independent shop-modifier correction
+is still unbuilt. Exact needs: native shop-script research finding the
+per-shop Honor price hook with the game, then a purchase-comparison
+session. No code written; recording the needs here instead of inventing
+a hook.
+
+## 2026-09-23 agent slice (per-game-rdr2): comparison contract
+
+games/rdr2/fence_price_check.py pins the valid purchase comparison as
+code plus validate_price_check(), which requires low-Honor and
+high-Honor legs at one fence for one item with readable prices, rejects
+cross-shop/cross-item comparisons and normal-store substitutions, and
+requires ownership of the unbuilt shop-modifier correction. Covered by
+tests/test_rdr2_fence_price_check.py (8 hermetic tests). No gameplay
+claim: the correction and the comparison session are still owed.
+

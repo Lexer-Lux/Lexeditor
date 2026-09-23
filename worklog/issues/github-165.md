@@ -24,3 +24,23 @@ Recover action workaround installed; ordinary locker-list entries need the nativ
 No concrete Lexer-side session exists yet (agent-side filter/asset/
 prototype still owed), so flipping to waiting would be a fake checklist.
 Left actionable until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. The named Recover action workaround
+is installed but ordinary locker-list entries are still owed. Exact needs:
+a safe solution to the native melee/throwable filter, then game
+verification that lost unique hatchets/tomahawks return through the camp
+locker unequipped and without duplication. No code written; recording the
+needs here instead of re-requesting acceptance of the workaround.
+
+## 2026-09-23 agent slice (per-game-rdr2): checkable recovery contract
+
+games/rdr2/locker_recovery.py pins the acceptance boundary as data
+(evidenced Viking Hatchet plus unique hatchet/tomahawk classes) and
+validate_recovery_plan(), which requires the ordinary locker list route,
+unequipped return, a duplication check, and ownership of the unresolved
+melee/throwable filter. Covered by tests/test_rdr2_locker_recovery.py
+(9 hermetic tests). No gameplay claim: the filter solution and the game
+session are still owed.
+

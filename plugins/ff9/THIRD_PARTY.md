@@ -35,3 +35,11 @@ No proprietary game data is included here.
 - Use: public interoperability evidence for FF9 field-scene bundles and loose BGI override paths, compiled event scripts, p0data4 model prefabs, p0data5 animation clips, world-map authoring and other Memoria loose-override paths.
 - No Dream World IX source, binary, generated game asset, or FF9-derived byte is bundled or invoked by Lexeditor.
 
+## Theme provenance
+
+- The FF9 page theme is CSS values plus system font stacks only (deep-navy
+  menu surfaces, parchment-gold highlights, serif storybook headings).
+- No proprietary FF9 font, image, or audio asset is bundled, downloaded, or
+  referenced. Game-derived interface sounds are never shipped: they require
+  local extraction from an installed copy when redistribution is not permitted.
+

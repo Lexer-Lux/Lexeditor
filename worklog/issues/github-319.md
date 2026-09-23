@@ -41,3 +41,24 @@ Next agent work, in order:
 
 No game install or uncensor-mod archive is available in this session, so no
 bytes were vendored and nothing was implemented. Issue stays actionable.
+
+## 2026-09-23 per-game-ff8: Qhimm provenance survey, no vendoring (needs Lexer)
+
+Web survey of the Qhimm `Final Fantasy VIII Blood uncensor Mods` thread
+(topic 17469, vavrinko request) and linked releases: the confirmed uncensor
+releases found are PSX-lineage (MFS Edit topic 19132, FF8 Improvement Hack
+topic 19137) or Remastered-only (McIndus Gerogero Uncensored v1.0, Steam
+Remastered only, explicitly out of scope for this issue). No
+2013-Steam/old-PC-lineage uncensor mod with confirmed redistribution rights
+was found, so no bytes were vendored and no restoration was implemented.
+No uncensor research exists in codex/ff8 or games/ff8; the Selphie Scan
+rotation lock has no known location in the repo (no scan-runtime or
+rotation code beyond Scan text helpers), and the Steam-English kernel/menu
+nunchaku string cannot be checked without the game install.
+
+Needs Lexer/game: (1) supply the uncensor-mod archives (or point at the
+exact old-PC release) plus redistribution permission per target, or approve
+extracting deltas from your own Japanese + Steam installs; (2) game-install
+access for the kernel nunchaku-string check; (3) the Scan rotation lock
+location (exe address or menu script), or confirmation of what the lock
+refers to in game.

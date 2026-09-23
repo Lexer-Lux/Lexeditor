@@ -120,3 +120,34 @@ binary or extracted game data is bundled.
 - [ ] After agent-side Data Map/mod-loading scope is actually exhausted, rebuild an
       exact-head candidate and return #74 to `untested` for installed-game proof.
 
+## 2026-09-23 --- per-game-ff9 branch status (no new codecs)
+
+- No new p0data codec on this branch: each remaining family still needs a
+  preservation-tested player-facing editor or an explicit Lexer exclusion, and
+  only Lexer can exclude a Data Map area as not worth the effort.
+- Gap rows stay explicit in `games/ff9/server.py` `UNRESOLVED_AREAS` and are now
+  locked visible-but-closed by `tests/test_ff9_datamap_gui.py` (#525).
+- Agent-side mod-loading scope stands as audited above; installed-game proof is
+  still required and is now checklisted in `worklog/issues/github-523.md`.
+- Exact needs: per-family pursue-or-exclude decision (see
+  `worklog/issues/github-522.md`), then the installed-game battle proof from the
+  earlier checklist (edit a visible enemy/encounter value, Deploy Project,
+  launch through Memoria, confirm in battle, revert to vanilla).
+
+
+## 2026-09-23 --- per-game-ff9 verification and discovery repair
+
+- `per-game-ff9` fast-forwarded to master `e0e15a63` (PR #540 merged; upstream
+  `origin/per-game-ff9` was gone and is re-pushed by this session).
+- Repaired red discovery on this branch (both install shapes declared; kept
+  root-aware hooks only) and regenerated `ui/credits.json` (the #524 theme
+  provenance note was missing from the bundle).
+- Agent-side verification: FF9 Python 164 passed + 74 subtests, node 18 passed,
+  metadata pass, credits `--check` pass, `app.py --list` / `--game ff9 --check`
+  (`ff9: ready`) / `--game ff9 --smoke` (5 PASS) pass, shared UI contract pass,
+  rendered `ff9_browser_check` pass.
+- Pre-existing failures unrelated to FF9, unchanged by this branch:
+  `plugin_module_routes_check` (missing `LEXEDITOR_CHRONO_TRIGGER_ROOT`),
+  `verify_tweaks_pagination` (harness `TypeError` before any game is reached).
+- Exact needs below are unchanged: p0data codecs or Lexer exclusions, then the
+  installed-game battle proof.

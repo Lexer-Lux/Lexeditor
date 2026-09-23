@@ -156,3 +156,15 @@ Current safe behavior remains interoperability with an existing Fahrenheit insta
 - On a real Steam collection, run `worklog/acceptance/ffx-x2/run-verifier.ps1` to capture the baseline, test one byte-identical EFL replacement in each game, verify actual **Play FFX / Play FFX-2** Stage 0 startup and reversible structured round trips, then rerun with `-BaselinePath` to prove both installed VBFs remained unchanged.
 
 Do not close #461 or mark PR #462 ready from synthetic/API/CI evidence alone. Real installed-game and in-game acceptance remain the draft exit criteria.
+
+## 2026-09-23 misc-bucket review (no agent slice)
+
+- Verified live: PR #462 is MERGED into `master` (`9640d1e0`, merged
+  2026-09-23T19:29:01Z, head `2555bc75`). Agent-side packaging/CI is done.
+- No code change on `per-game-misc` for this issue. Remaining work is
+  Lexer-only: real Steam app 359870 install with Fahrenheit, run
+  `run-verifier.ps1` baseline, full-catalog UI smoke, byte-identical EFL
+  deploy/startup/revert + Play FFX and Play FFX-2 through Stage 0, one
+  reversible structured round trip per game, then verifier compare proving
+  both installed VBFs byte-identical. Report `baseline.json`/`after.json`
+  plus pass/fail per checklist item on #461.

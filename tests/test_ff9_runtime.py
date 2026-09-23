@@ -324,7 +324,11 @@ def test_disable_launcher_updates_preserves_cp1252_and_missing_final_newline(tmp
 def test_shared_updates_contract_is_metadata_only(tmp_path):
     assert PLUGIN.helper_name == "Memoria"
     assert PLUGIN.helper_pinned == manager.PINNED_RELEASE
-    assert callable(PLUGIN.helper_upstream) and callable(PLUGIN.helper_install)
+    assert callable(PLUGIN.helper_upstream)
+    assert callable(PLUGIN.helper_install_for_root)
+    # plugin_api rejects declaring both install shapes; the host serves
+    # the Updates drawer and readiness from the root-aware hooks.
+    assert PLUGIN.helper_install is None and PLUGIN.helper_status is None
     calls = []
     payload = {"tag_name": manager.PINNED_RELEASE, "draft": False, "prerelease": False,
                "published_at": "2025-07-04T20:27:01Z"}

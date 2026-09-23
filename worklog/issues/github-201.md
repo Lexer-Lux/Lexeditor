@@ -24,3 +24,21 @@ Module stands deliberately safe-disabled with full reasoning (process-wide predi
 No concrete Lexer-side session exists yet (safe mechanism/research still
 owed), so flipping to waiting would be a fake checklist. Left actionable
 until a real session can be written.
+
+## 2026-09-23 agent slice (per-game-rdr2): safety-boundary source guards
+
+tests/test_rdr2_issue201_safety_boundary.py locks the deliberately
+safe-disabled boundary into source: the module states safe-disabled with
+no resolved entity-local mechanism, installs no hook, performs no entity
+write, logs only diagnostics, and keeps its init entry point wired.
+(5 hermetic tests.) No gameplay claim: the safe entity-local mechanism
+still needs research with the game, and nothing here is a player test.
+
+## 2026-09-23 agent slice (per-game-rdr2): verified, no new code
+
+Re-read the live issue plus comments. The safe-disabled boundary guards
+still hold and match the current request (failed hooks stay removed, no
+entity writes). Re-ran tests/test_rdr2_issue201_safety_boundary.py:
+5 green. Stays actionable: the safe entity-local mechanism still needs
+research with the game.
+

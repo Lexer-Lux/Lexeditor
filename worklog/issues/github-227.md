@@ -75,3 +75,26 @@ No kill-based Dead Eye gain removal exists in tree (horse_core_clock.cpp has no 
 No concrete Lexer-side session exists yet (engine research/agent-side
 candidate still owed), so flipping to waiting would be a fake checklist.
 Left actionable until a real session can be written.
+
+## 2026-09-23 agent slice (per-game-rdr2): checkable replacement protocol
+
+games/rdr2/dead_eye_replacement.py records the ordered proof protocol as
+data (resolve the kill-gain source, then the disposable baseline-1 /
+candidate-0 comparison over body kill, headshot, consumable, mission
+refill, active drain, and Eagle Eye with multiplier restored, and only
+then core-scaled regeneration that yields nothing on empty cores while
+preserving item/mission restoration and permanent progression) plus
+validate_replacement(), which rejects keeping kill gains alongside
+regeneration. Covered by tests/test_rdr2_dead_eye_replacement.py
+(9 hermetic tests). No gameplay claim: engine research, the comparison,
+and the game session are still owed.
+
+## 2026-09-23 agent slice (per-game-rdr2): verified, no new code
+
+Re-read the live issue plus comments. The replacement protocol still
+matches the request (kill-gain source first, disposable baseline-1 /
+candidate-0 comparison, regeneration only after selective suppression,
+never alongside kill gains). Re-ran
+tests/test_rdr2_dead_eye_replacement.py: 9 green. Stays actionable:
+engine research, the comparison, and the game session are still owed.
+

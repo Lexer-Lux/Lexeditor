@@ -1,0 +1,20 @@
+# #525 — FF9 GUI
+
+[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/525)
+
+## 2026-09-23 — per-game-ff9: Data Map GUI contract locked
+
+- Every integrated area already renders through shared controls: 42 pinned
+  Memoria CSV datasets (Table + Detail), enemy/encounter BattleScene raw16,
+  field-walkmesh floors plus field-scoped triangles, Data Map, Info/mod-compat,
+  save/discard/reopen, loading/empty/error states.
+- New `tests/test_ff9_datamap_gui.py` locks the issue's two remaining clauses:
+  every openable Data Map row resolves to a real tab declared in
+  `games/ff9/editor.js`, and every `UNRESOLVED_AREAS` p0data row stays visible
+  but closed (`not-integrated`/`unavailable`/`openable=False`) instead of
+  becoming a raw-file placeholder.
+- Source and rendered evidence stay separate; no native FF9 behavior is implied.
+
+Status: agent-side complete on `per-game-ff9`. Future newly integrated p0data
+areas (tracked by #522/#74) will need their own shared-control views when they
+land.

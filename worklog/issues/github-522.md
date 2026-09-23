@@ -1,0 +1,35 @@
+# #522 — FF9 editor completion
+
+[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/522)
+
+## 2026-09-23 — per-game-ff9: coverage state, Lexer decision needed
+
+Structured coverage on master (synthetic preservation tests, no game bytes):
+
+- All 42 pinned Memoria CSV datasets (catalogued, schema-aware controls,
+  stale-write refusal, project-only overlays).
+- Enemy/encounter BattleScene raw16 from `p0data2.bin` (canonical loose Memoria
+  overrides; installed archive never rewritten).
+- Field-walkmesh BGI floor-active plus field-scoped triangle pathing flags
+  (`BGI_FLOOR_ACTIVE` / `BGI_TRI_ACTIVE` / Alternate footstep / Prevent NPC-PC
+  pathing); geometry, topology, transforms, animations, and all other bytes
+  preserved; no-op saves create no overlay.
+- Known gaps stay explicit in `games/ff9/server.py` `UNRESOLVED_AREAS` and are
+  locked visible-but-closed by `tests/test_ff9_datamap_gui.py`: field
+  backgrounds/cameras/walkmesh geometry, battle assets beyond raw16, world-map
+  geometry/materials/effects, models, animations, compiled event scripts, and
+  remaining p0data6*/unmatched bundles.
+
+No code change on `per-game-ff9` for this issue: each remaining family needs a
+preservation-tested player-facing codec or an explicit exclusion, and only
+Lexer can exclude a Data Map area as not worth the effort.
+
+Needs Lexer, per p0data family:
+
+- [ ] Pursue (agent builds a preservation-tested editor) or explicitly exclude:
+      field scenes/backgrounds/cameras, battle assets beyond raw16, world map,
+      models, animations, compiled event scripts, unmapped bundles.
+- [ ] After scope is exhausted, installed-game proof per #74's checklist.
+
+Status: actionable. Keep gaps visible until a preservation-tested integration
+exists or Lexer explicitly excludes the area.

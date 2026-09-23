@@ -22,3 +22,22 @@ Hardcoded vanilla menu blocks the data-only approach. A concrete alternative int
 No concrete Lexer-side session exists yet (native research/design still
 owed), so flipping to waiting would be a fake checklist. Left actionable
 until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. The hardcoded vanilla menu blocks
+data-only pages and no alternative interface exists yet. Exact needs:
+RDR2 session preparing a concrete alternative interface and progression
+proposal, then Lexer design approval. No code written; recording the needs
+here instead of inventing a menu page.
+
+## 2026-09-23 agent slice (per-game-rdr2): interface proposal
+
+docs/rdr2-skills-interface-proposal.md prepares the requested concrete
+alternative: a key-bound standalone runtime panel (never a pause-menu
+page), event-counted progression with fixed rank thresholds,
+scalar-only effects, and mod-owned per-profile persistence, with the
+editor planning page as the approval artifact. Not installed; no menu
+or save changed. Next: Lexer design approval of the interface and
+progression model before any prototype.
+

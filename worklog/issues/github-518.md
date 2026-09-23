@@ -1,0 +1,19 @@
+# #518 — Implement Mod Loading
+
+## State (2026-09-23 per-game-ff7r pass)
+
+- Source already present: `games/ff7r/mod_support.py` (find/add/load/order/
+  remove real mods, safe project overlays, reversible deployment) plus
+  `games/ff7r/project_deployment.py` (explicit deploy step, guarded PAK
+  conflicts, safety copy, recovery evidence); retail loading kept separate
+  from synthetic/browser evidence.
+- Tests: `tests/test_ff7r_mod_support.py`,
+  `tests/test_ff7r_project_deployment.py`,
+  `tests/test_ff7r_project_deployment_ui.py` pass (full ff7r selection:
+  519 passed). No code change needed on this branch.
+
+## Needs Lexer (installed game)
+
+- Test a documented range of public mods in isolation: overlapping edits,
+  conflict behavior, dependencies, restoration; confirm retail game loading
+  is unaffected and removal restores the prior state.

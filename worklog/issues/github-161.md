@@ -24,3 +24,23 @@ honor_actions.cpp (80 lines) holds event bit controls plus shared tier remapping
 No concrete Lexer-side session exists yet (agent-side fixes/research still
 owed), so flipping to waiting would be a fake checklist. Left actionable
 until a real session can be written.
+
+## 2026-09-23 agent slice (per-game-rdr2): shared-tier regression guards
+
+tests/test_rdr2_honor_action_amounts.py locks the recorded finding into
+games/rdr2/honor_actions.py: event edits cannot carry an independent
+amount, tier amounts stay editable, the scope note states shared tiers
+(not independent per-action values), and the 21-event/19-tier tables keep
+their shape. (4 hermetic tests.) No gameplay claim: intercepting one
+event before its identity is lost still needs native research with the
+game.
+
+## 2026-09-23 agent slice (per-game-rdr2): verified, no new code
+
+Re-read the live issue plus comments. The editor side is complete and
+honest: the Crime page exposes the 21 event toggles plus the 19-tier
+table with the shared-tier scope note, and per-action amounts stay
+absent as required. Re-ran tests/test_rdr2_honor_action_amounts.py:
+4 green. Stays actionable: native interception research plus the game
+session are still owed.
+

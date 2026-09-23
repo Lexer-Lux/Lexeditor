@@ -22,3 +22,23 @@ Artwork states and HUD extraction done (16 stages). The remaining measurement ne
 No concrete Lexer-side session exists yet (recording tool and exact
 restoration/drain sequence still owed), so flipping to waiting would be a
 fake checklist. Left actionable until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. Artwork states and HUD extraction
+are done (16 stages); the synchronized core-value trace plus video is
+still owed. Exact needs: build the recording tool and the exact
+restoration/drain sequence first, then a Lexer capture session. No code
+written and no smoothing change made; recording the needs here instead of
+repeating the OpenIV inspection.
+
+## 2026-09-23 agent slice (per-game-rdr2): measurement contract
+
+games/rdr2/core_trace.py pins the synchronized measurement contract as
+code plus validate_measurement_plan(), which requires a positive fixed
+cadence, monotonic timebase, paired video reference, exact
+restoration/drain legs, and rejects tween, overlay, and OpenIV-only
+approaches. Covered by tests/test_rdr2_core_trace.py (9 hermetic
+tests). No gameplay claim: the recording tool and capture session are
+still owed.
+
