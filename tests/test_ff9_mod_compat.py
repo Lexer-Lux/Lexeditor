@@ -5,6 +5,7 @@ families; no third-party package or FF9 game bytes are stored in the repository.
 """
 from pathlib import Path
 import json
+import pytest
 
 from games.ff9 import mod_compat
 
@@ -147,3 +148,25 @@ def test_shared_mod_loading_metadata_uses_canonical_ff9_entry():
     assert "Priorities" in ff9["overriding"]
     assert "MergeScripts" in ff9["overriding"]
     assert "newer than Lexeditor's pinned" in ff9["loader"]
+
+
+@pytest.mark.parametrize("folder,name,minimum,supported", [
+    ("DualsenseButtons", "Dualsense Buttons", "", True),
+    ("TranslationUkr", "Ukrainian Translation", "2024-11-17", True),
+    ("AlternateFantasy", "Alternate Fantasy", "2025-05-11", True),
+    ("CostumePack", "CostumePack", "2026.07.21", False),
+])
+def test_real_catalog_examples_in_isolation(tmp_path, folder, name, minimum, supported):
+    game, project = tmp_path / "game", tmp_path / "project"
+    game.mkdir(); project.mkdir()
+    write_mod(game, folder, description(name, minimum=minimum))
+    (game / "Memoria.ini").write_text(
+        f'[Mod]\nFolderNames = "{folder}"\nPriorities = "{folder}"\n',
+        encoding="utf-8",
+    )
+    report = mod_compat.audit(game, project)
+    assert len(report["mods"]) == 1
+    assert report["mods"][0]["name"] == name
+    assert report["mods"][0]["supportedByPinnedMemoria"] is supported
+    assert report["declaredConflicts"] == []
+    assert report["overlaps"] == []
