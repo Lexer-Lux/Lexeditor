@@ -5,7 +5,7 @@
 This note is Rebirth-only. Remake remains a separate plugin/worker under games/ff7r.
 Shared Unreal/helper framework changes are blockers here rather than changes this PR competes for.
 
-The work began from master a47f0a57f8b44113b0ca1d42e5795f59f707372a and has been repeatedly reconciled against live master as concurrent shared-UI and Rebirth presentation work landed. The latest audited master is 72ee978a2ff36686a6349696b19860057356468a.
+The work began from master a47f0a57f8b44113b0ca1d42e5795f59f707372a and was last reconciled wholesale against 72ee978a2ff36686a6349696b19860057356468a. Live master was re-audited at 76ec7c3b9b289f1d52bcf684c691d5020619c3f6; it has advanced substantially, so this worker adopted only Rebirth-local compatible changes instead of overwriting concurrent shared work.
 
 Current-master references read for this audit:
 - AGENTS.md — 41355ce0b783c55a03ad250ed279666f785c6e67
@@ -73,9 +73,49 @@ dependency-manifest workaround.
 
 Release reviewed: ff7r2_v1, asset UnrealReZen_FF7R2_815f48a.zip.
 
-Lexeditor does not invoke it automatically because its startup path can acquire
-Oodle when absent. The project therefore stages the exact End/Content asset path
-without claiming package/install success.
+Lexeditor does not register UnrealReZen as a second shared helper because
+GamePlugin still exposes one managed helper slot and Rebirth already uses it for
+Shader Injector. The candidate route is instead dependency-explicit: the user
+must supply both LEXEDITOR_FF7R2_UNREALREZEN and LEXEDITOR_FF7R2_OODLE local
+paths. The builder copies only the supplied Oodle DLL into a temporary process
+working directory before UnrealReZen starts, uses Zlib package compression, and
+points HTTP/HTTPS/ALL proxy fallback at an unreachable loopback endpoint as
+defense in depth. It never downloads either dependency itself.
+
+The exact FF7R2 command contract is GAME_UE4_26,
+--mount-point ../../../End/Content/, --game-dir-top-only, game archives from
+End/Content/Paks, and staged content rooted at project/content/End/Content.
+Output is always an isolated project/build/ff7r2-candidate-* directory containing
+Lexeditor-FF7R2_P.pak/.utoc/.ucas plus a manifest with input/tool/output hashes.
+The builder never copies that candidate to the installed game and marks it
+acceptedInGame=false. Current public Rebirth mod instructions consistently place
+accepted .pak/.utoc/.ucas triples in End/Content/Paks/~mods; that remains a manual
+acceptance step until Lexeditor has proved collision/removal behavior in-game.
+
+A real package candidate cannot be produced in the agent environment because it
+has no Rebirth installation/archive set and no user-supplied Oodle DLL. The
+candidate builder and refusal/isolation tests are nevertheless complete and
+exercise the exact command, no-install boundary, runtime Oodle copy integrity,
+missing-dependency refusal, and cleanup on failure.
+
+## Theme and rendered browser evidence
+
+The Rebirth theme intentionally uses no copied Square Enix art, fonts, audio or
+other proprietary assets. Public menu references were used only to identify the
+game's dark surface / luminous blue selection / white-text visual vocabulary.
+Lexeditor implements that with original CSS tokens (#3f7fd0 accent, #2a4a72
+highlight, #f2f7ff accent text) on the shared shell. The current master removal
+of a game-specific detail-label width override was adopted so shared sizing owns
+the layout.
+
+Rendered CI artifact ff7r2-rendered from head
+e82aa8ef14cca1fec778c3c5459d3fd50db0e257 was downloaded and visually inspected:
+desktop Characters, narrow Characters, Data Map, Information and Tweaks were
+usable; unsupported Data Map rows remained visible and PlayerParameter remained
+Partial. The old 150% screenshot used CSS zoom plus full-page capture, which
+created an artificial 1440x1350 blank tail. The test now captures the visible
+viewport at simulated 150% instead; this is a browser approximation of host UI
+scale, not installed-app or game acceptance.
 
 ## Current public leads for unresolved requests
 
@@ -129,8 +169,8 @@ candidate and falls back to the extracted source.
 ## Honest acceptance boundary
 
 Synthetic structural tests can prove parser shape handling, bounded editing,
-byte preservation, service save/discard/reopen behavior and rendered UI
-interactions. They cannot prove that an arbitrary live Rebirth asset revision
-matches the public layout, that an IoStore patch produced by an external packer
-loads, or that edited gameplay values behave as intended in-game. Those claims
-remain pending real-game acceptance.
+byte preservation, service save/discard/reopen behavior, dependency-explicit
+candidate construction and rendered UI interactions. They cannot prove that an
+arbitrary live Rebirth asset revision matches the public layout, that the
+candidate produced from real archives loads, or that edited gameplay values
+behave as intended in-game. Those claims remain pending real-game acceptance.
