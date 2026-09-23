@@ -66,3 +66,6 @@ Next exact investigation:
 
 The issue remains actionable. The limitation is current evidence, not a claim that
 replacement is impossible. No build, install, native window, or game launch ran.
+
+## 2026-09-22 misc-fixes finding
+No kill-based Dead Eye gain removal exists in tree (horse_core_clock.cpp has no kill or regen handling). Replacement needs engine research plus a verified replacement with the game; adding regeneration while keeping the gains would only be partial. No code written. Issue stays actionable.
