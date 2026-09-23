@@ -282,6 +282,13 @@
       detailSection({title:"EXTERNAL MOD COMPATIBILITY",body:[
         detailField({label:"ENABLED",control:value(summary(externalMods.map(mod=>mod.name))),
           help:infoHelp("Read-only snapshot of Memoria FolderNames and enabled mods' ModDescription.xml metadata. Lexeditor does not install, edit, enable, disable, or remove these mods.")}),
+        detailField({label:"RUNTIME ORDER",control:value(summary(compatibility.folderNames||[],"No active mod folders")),
+          help:infoHelp("Memoria FolderNames is highest-priority first: the leftmost enabled folder wins an exact loose-file collision.")}),
+        detailField({label:"METADATA WARNINGS",control:value(summary([
+            ...(compatibility.error?[compatibility.error]:[]),
+            ...externalMods.filter(mod=>!mod.metadata||mod.error).map(mod=>`${mod.name}: ${mod.error||"ModDescription.xml unavailable"}`)
+          ],"None detected"),
+          help:infoHelp("Missing or malformed metadata is reported as unknown, never treated as proof that the mod is compatible.")}),
         detailField({label:"UNSUPPORTED RUNTIME",control:value(summary((compatibility.unsupportedByPinnedMemoria||[]).map(mod=>`${mod.name} (needs ${mod.minimumMemoriaVersion})`),"None detected"),
           help:infoHelp("Mods declaring a MinimumMemoriaVersion newer than Lexeditor's pinned helper are outside this candidate's supported runtime boundary.")}),
         detailField({label:"DECLARED CONFLICTS",control:value(summary((compatibility.declaredConflicts||[]).map(row=>row.mods.join(" ↔ ")),"None declared"),
