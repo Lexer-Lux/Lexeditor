@@ -13,6 +13,7 @@ Currently supports:
 * Stardew Valley
 * Project Zomboid
 * Terraria
+* Dark Souls 3
 
 Coming soon:
 * Final Fantasy IV
