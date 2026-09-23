@@ -129,6 +129,8 @@ def build(root: Path, output: Path, commit: str) -> dict:
             "projectEnv": "LEXEDITOR_RDR_PROJECT",
             "dataEnv": "LEXEDITOR_RDR_EXTRACT_ROOT",
             "gameEnv": "RDR_GAME_ROOT",
+            "redHookInstall": "manual-official-download-only",
+            "realGameAcceptanceSeparate": True,
         },
         "files": len(files),
         "scope": {
@@ -165,7 +167,24 @@ def build(root: Path, output: Path, commit: str) -> dict:
                 "is narrowed to that plugin so shared discovery remains valid.\n"
                 "RDR_GAME_ROOT may point at the installed game; preparation reads source "
                 "archives and writes only the isolated cache/project until Deploy Project "
-                "is explicitly invoked.\n"
+                "is explicitly invoked.\n\n"
+                "Exact Windows PowerShell acceptance setup (edit paths for your machine):\n"
+                "  $env:LEXEDITOR_RDR_RPF6_TOOL = 'C:\\Lexeditor\\tools\\magic-rdr\\app\\Rpf6ReadCli.exe'\n"
+                "  $env:LEXEDITOR_RDR_RPF6_NAMES = 'C:\\Lexeditor\\tools\\magic-rdr\\app\\Settings\\ImportedFileNames.txt'\n"
+                "  $env:LEXEDITOR_RDR_PROJECT = \"$PWD\\_rdr-project\"\n"
+                "  $env:LEXEDITOR_RDR_EXTRACT_ROOT = \"$PWD\\_rdr-cache\"\n"
+                "  $env:RDR_GAME_ROOT = 'D:\\SteamLibrary\\steamapps\\common\\Red Dead Redemption'\n"
+                "  python .\\app.py\n\n"
+                "Acceptance checklist:\n"
+                "  1. Home: MagicRDR bridge is present, pinned to v1.3.10, and has no install/auto-update action.\n"
+                "  2. Open RDR1 and prepare data. No source game archive is rewritten.\n"
+                "  3. Strings: language tabs appear before resource selection; search spans resources; Resource shows the owning STRTBL path.\n"
+                "  4. Edit one string, Save, switch to Vanilla and back, then reload: Vanilla stays unchanged and the project text reopens.\n"
+                "  5. Make another unsaved string edit and Discard string edits: the last saved text returns.\n"
+                "  6. Data Map: supported PC STRTBL rows are Partial/openable; _ps3 STRTBL and unknown formats remain visible as Not integrated.\n"
+                "  7. Items/Shops/Missions/Tweaks: change one safe field, Save, reopen, and confirm the project override without changing prepared source bytes.\n"
+                "  8. Info: if RedHook is absent, Keep editing works and Open official download only opens the official page. RedHook is never bundled or silently installed.\n"
+                "  9. Do not click Deploy Project for source/rendered acceptance. Deployment and in-game behavior are separate acceptance levels.\n"
             ),
         )
 
