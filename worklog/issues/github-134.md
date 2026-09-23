@@ -22,3 +22,9 @@ No installed-bytecode signature or safe script dispatcher hook is validated. The
 
 ## 2026-09-22 misc-fixes disposition
 Feeding path mapped in codex horse-feeding.md (allowlist, nutrition, bond events, accumulator) with an explicit editing boundary: keep the item hash through func_739 and substitute the magnitude, never an after-consumption watcher. The item-aware dispatcher hook is unvalidated and needs the game. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side experiment/prototype
+still owed), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.

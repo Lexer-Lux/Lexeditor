@@ -31,3 +31,9 @@ Source: tools/prepare_rdr2_gold_cores.py and tools/verify_rdr2_gold_core_render.
 
 ## 2026-09-22 misc-fixes finding
 fortification_hud.cpp drawMeter combines bar and core fill through max into one outer ring; the independent core overlay plus separate value handling are missing. Splitting them plus resident 85-glyph integration needs game and HUD-scale verification. No behavior change made blind. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.
