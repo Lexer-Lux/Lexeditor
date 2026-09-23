@@ -15,21 +15,28 @@ def align4(value):
 
 
 def bgi_bytes() -> bytes:
-    # Header offsets follow Memoria's BGI_DEF.ReadData. Two 32-byte floors start
-    # at relative offset 60 (absolute byte 64); each points at one triangle id.
-    data = bytearray(136)
+    # Memoria BGI_DEF offsets are relative to byte 4. Two 40-byte triangles
+    # start at absolute 64; two 32-byte floors follow at 144; each floor
+    # points at one triangle id in the trailing int32 lists.
+    data = bytearray(216)
     struct.pack_into("<I", data, 0, walkmesh.BGI_MAGIC)
     struct.pack_into("<H", data, 4, len(data) - 4)
     struct.pack_into("<hh", data, 36, 0, 0)
     struct.pack_into("<HHHHHHHHHHHH", data, 40,
-                     0, 60, 0, 60, 0, 60, 2, 60, 0, 124, 0, 124)
+                     2, 60, 0, 140, 0, 140, 2, 140, 0, 212, 0, 212)
+
+    # Triangle 0: active plus unknown bit 0x20, floor 7.
+    # Triangle 1: inactive plus unknown bit 0x40, floor 9.
+    struct.pack_into("<HHhhhh", data, 64, 0x21, 0x1234, 7, 0, 0, 0)
+    struct.pack_into("<HHhhhh", data, 104, 0x40, 0x5678, 9, 0, 0, 0)
+
     # Floor 0: active plus unknown bit 0x40. Floor 1: inactive plus 0x80.
-    for index, (flags, floor_ndx, tri_offset) in enumerate(((0x41, 7, 124), (0x80, 9, 128))):
-        off = 64 + index * 32
+    for index, (flags, floor_ndx, tri_offset) in enumerate(((0x41, 7, 204), (0x80, 9, 208))):
+        off = 144 + index * 32
         struct.pack_into("<HH", data, off, flags, floor_ndx)
         struct.pack_into("<HH", data, off + 28, 1, tri_offset)
-    struct.pack_into("<i", data, 128, 123)
-    struct.pack_into("<i", data, 132, 456)
+    struct.pack_into("<i", data, 208, 0)
+    struct.pack_into("<i", data, 212, 1)
     return bytes(data)
 
 
@@ -84,6 +91,84 @@ def test_bgi_floor_parser_bounds_and_unknown_bits():
         walkmesh._floor_table(bgi_bytes()[:70])
 
 
+def test_bgi_triangle_parser_bounds_floor_and_unknown_bits():
+    triangles = walkmesh._triangle_table(bgi_bytes())
+    assert [(t["floorNdx"], t["active"], t["otherFlags"]) for t in triangles] == [
+        (7, True, 0x20), (9, False, 0x40),
+    ]
+    malformed = bytearray(bgi_bytes())
+    struct.pack_into("<H", malformed, 42, 0xFFFF)
+    with pytest.raises(ValueError, match="triangle table"):
+        walkmesh._triangle_table(bytes(malformed))
+
+
+def test_load_scopes_triangle_activity_to_one_field(store):
+    database, archive_path, _project = store
+    second = archive_path.with_name("p0data12.bin")
+    second.write_bytes(archive("FBG_N21_TEST_MAP001_TEST_1"))
+    data = database.load("field-walkmesh-triangles")
+    assert len(data["scenes"]) == 2
+    assert data["activeScene"] == data["scenes"][0]["value"]
+    assert len(data["rows"]) == 2
+    assert data["rows"][0]["values"] == {
+        "Field": "FBG_N21_TEST_MAP000_TEST_0", "Triangle": 0, "Floor": 7,
+        "Active": True, "OtherFlags": 0x20,
+    }
+    other = data["scenes"][1]["value"]
+    scoped = database.load("field-walkmesh-triangles", other)
+    assert scoped["activeScene"] == other and len(scoped["rows"]) == 2
+    assert {row["values"]["Field"] for row in scoped["rows"]} == {"FBG_N21_TEST_MAP001_TEST_1"}
+    with pytest.raises(ValueError, match="Unknown FF9 field-walkmesh scene"):
+        database.load("field-walkmesh-triangles", "not/a/scene.bgi.bytes")
+
+
+def test_triangle_save_toggles_only_active_bit_and_reopens_project(store):
+    database, archive_path, project = store
+    archive_before = archive_path.read_bytes()
+    loaded = database.load("field-walkmesh-triangles")
+    row = loaded["rows"][0]
+    saved = database.save("field-walkmesh-triangles", loaded["sceneHashes"], [{
+        "scene": row["scene"], "record": row["record"], "values": {"Active": False},
+    }])
+    assert archive_path.read_bytes() == archive_before
+    target = project / row["scene"]
+    before = bgi_bytes(); after = target.read_bytes()
+    changed = [i for i, (x, y) in enumerate(zip(before, after)) if x != y]
+    assert changed == [64]
+    assert struct.unpack_from("<H", after, 64)[0] == 0x20
+    assert after[:64] == before[:64] and after[65:] == before[65:]
+    assert saved["activeScene"] == row["scene"]
+    assert saved["rows"][0]["source"] == "project"
+    assert saved["rows"][0]["values"]["Active"] is False
+    assert saved["rows"][0]["values"]["OtherFlags"] == 0x20
+
+
+def test_triangle_noop_and_stale_save_guards(store):
+    database, archive_path, project = store
+    loaded = database.load("field-walkmesh-triangles")
+    row = loaded["rows"][0]
+    saved = database.save("field-walkmesh-triangles", loaded["sceneHashes"], [{
+        "scene": row["scene"], "record": row["record"], "values": {"Active": True},
+    }])
+    assert not (project / row["scene"]).exists()
+    assert saved["rows"][0]["source"] == "vanilla"
+    raw = bytearray(archive_path.read_bytes())
+    marker = raw.index(struct.pack("<I", walkmesh.BGI_MAGIC))
+    raw[marker + 6] ^= 1
+    archive_path.write_bytes(raw)
+    with pytest.raises(RuntimeError, match="changed outside Lexeditor"):
+        database.save("field-walkmesh-triangles", loaded["sceneHashes"], [{
+            "scene": row["scene"], "record": row["record"], "values": {"Active": False},
+        }])
+
+
+def test_walkmesh_validation_rejects_invalid_floor_triangle_reference():
+    malformed = bytearray(bgi_bytes())
+    struct.pack_into("<i", malformed, 208, 99)
+    with pytest.raises(ValueError, match="invalid triangle"):
+        walkmesh.FieldWalkmeshStore._validate_asset(bytes(malformed))
+
+
 def test_load_lists_floor_activity_from_p0data1(store):
     database, _archive, _project = store
     data = database.load("field-walkmesh")
@@ -109,9 +194,9 @@ def test_save_toggles_only_active_bit_and_reopens_project(store):
     assert target.is_file()
     before = bgi_bytes(); after = target.read_bytes()
     changed = [i for i, (a, b) in enumerate(zip(before, after)) if a != b]
-    assert changed == [64]
-    assert struct.unpack_from("<H", after, 64)[0] == 0x40
-    assert after[65:] == before[65:]
+    assert changed == [144]
+    assert struct.unpack_from("<H", after, 144)[0] == 0x40
+    assert after[:144] == before[:144] and after[145:] == before[145:]
     saved_row = next(r for r in saved["rows"] if r["record"] == 0)
     assert saved_row["source"] == "project" and saved_row["values"]["Active"] is False
     assert saved_row["values"]["OtherFlags"] == 0x40
@@ -134,7 +219,8 @@ def test_save_refuses_stale_vanilla_archive(store):
     loaded = database.load("field-walkmesh")
     row = loaded["rows"][0]
     raw = bytearray(archive_path.read_bytes())
-    raw[-1] ^= 1
+    marker = raw.index(struct.pack("<I", walkmesh.BGI_MAGIC))
+    raw[marker + 6] ^= 1
     archive_path.write_bytes(raw)
     with pytest.raises(RuntimeError, match="changed outside Lexeditor"):
         database.save("field-walkmesh", loaded["sceneHashes"], [{
