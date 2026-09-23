@@ -32,6 +32,29 @@ def main():
    assert aligned,i
    clear=card.evaluate("""e=>{const a=e.querySelector('.lex-curve-plot > .lex-math-formula').getBoundingClientRect();return [...e.querySelectorAll('.lex-curve-range-value')].every(n=>{const b=n.getBoundingClientRect();return a.right<=b.left-7||a.left>=b.right+7||a.bottom<=b.top-5||a.top>=b.bottom+5})}""")
    assert clear,i
+  # A narrow card must wrap its variables instead of squeezing them: four
+  # variables in a ~300px drawer used to render ~50px inputs while two-variable
+  # cards rendered ~120px ones, and the drawer covered the BARS toggle parked
+  # at the plot's bottom-right. The toggle now rides in the drawer itself.
+  page.evaluate("""()=>{const mount=document.createElement('div');
+    mount.id='narrow-mount';mount.style.cssText='width:320px;height:520px;margin-top:12px';
+    document.body.append(mount);
+    const variables=['A','B','C','D'].map(label=>({label,control:LexeditorUI.el('input',{type:'number',value:20,min:0,max:255})}));
+    mount.append(LexeditorUI.curveEditor({title:'NARROW',variables,domain:{min:1,max:100},range:{min:0,max:255},evaluate:x=>x,formula:LexeditorUI.mathFormula('N = A')}));}""")
+  narrow=page.locator('#narrow-mount .lex-curve-editor')
+  widths=narrow.evaluate("""e=>[...e.querySelectorAll('.lex-curve-variable input')].map(n=>Math.round(n.getBoundingClientRect().width))""")
+  assert len(widths)==4 and min(widths)>=70,widths
+  narrow.hover();page.wait_for_timeout(220)
+  hit=narrow.evaluate("""e=>{const t=e.querySelector('.lex-curve-mode-toggle'),r=t.getBoundingClientRect();
+    const n=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+    return n?(n.className?.baseVal??n.className):None}""")
+  assert hit and 'lex-curve-mode-toggle' in hit,hit
+  toggle=narrow.locator('.lex-curve-mode-toggle')
+  toggle.click()
+  assert toggle.inner_text()=='LINE'
+  assert narrow.evaluate("e=>e.querySelector('.lex-curve-plot').classList.contains('lex-curve-bar-mode')")
+  toggle.click()
+  assert toggle.inner_text()=='BARS'
   page.mouse.move(1,1);page.wait_for_timeout(250)
   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-ff8-eight-graphs.png'))
   browser.close();print('Eight graphs: titles, borders, colors, drawer bounds and equation spacing passed.')

@@ -3757,7 +3757,7 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-axis-name { position:absolute; color:var(--lex-muted); font:10px/1 var(--lex-font); pointer-events:none; }
 .lex-curve-axis-name-x { bottom:3px; left:50%; transform:translateX(-50%); }
 .lex-curve-axis-name-y { top:50%; left:2px; writing-mode:vertical-rl; transform:translateY(-50%) rotate(180deg); }
-.lex-curve-variables { position:absolute; z-index:6; left:0; right:0; bottom:0; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:4px 8px; padding:6px; color:var(--lex-text); background:color-mix(in srgb,var(--lex-panel) 90%,var(--lex-text) 10%); border:1px solid var(--lex-border); border-color:color-mix(in srgb,var(--lex-border) 65%,var(--lex-text) 35%); box-shadow:0 -4px 12px rgb(0 0 0 / 28%),inset 0 1px rgb(255 255 255 / 18%); opacity:0; pointer-events:none; transform:translateY(100%); transition:opacity .15s,transform .15s; }
+.lex-curve-variables { position:absolute; z-index:6; left:0; right:0; bottom:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,84px),1fr)); gap:4px 8px; padding:6px; color:var(--lex-text); background:color-mix(in srgb,var(--lex-panel) 90%,var(--lex-text) 10%); border:1px solid var(--lex-border); border-color:color-mix(in srgb,var(--lex-border) 65%,var(--lex-text) 35%); box-shadow:0 -4px 12px rgb(0 0 0 / 28%),inset 0 1px rgb(255 255 255 / 18%); opacity:0; pointer-events:none; transform:translateY(100%); transition:opacity .15s,transform .15s; }
 .lex-curve-editor:is(:hover,:focus-within) > .lex-curve-variables { opacity:1; pointer-events:auto; transform:none; }
 
 .lex-curve-variable { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:4px; min-width:0; }
@@ -3774,6 +3774,9 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-status:empty,.lex-curve-hover-extrema { display:none; }
 .lex-curve-mode-toggle { position:absolute; z-index:4; right:22px; bottom:22px; opacity:0; padding:2px 4px; border:1px solid var(--lex-border); color:var(--lex-text); background:var(--lex-panel); font:11px/1.2 var(--lex-font); }
 .lex-curve-plot:hover > .lex-curve-mode-toggle,.lex-curve-mode-toggle:focus-visible { opacity:1; }
+/* The toggle rides in the variable drawer when one exists, so it is
+   a grid cell there instead of an overlay: same control, no overlap. */
+.lex-curve-variables > .lex-curve-mode-toggle { position:static; min-width:max-content; align-self:center; justify-self:end; opacity:1; }
 .lex-curve-bars { display:none; fill:var(--lex-curve-fill,var(--lex-accent)); stroke:var(--lex-curve-stroke,var(--lex-highlight)); stroke-width:.3; }
 .lex-curve-bar-mode .lex-curve-bars { display:block; }
 .lex-curve-bar-mode :is(.lex-curve-line,.lex-curve-fill,.lex-curve-path-formula) { display:none; }

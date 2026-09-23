@@ -2203,18 +2203,10 @@
     const status = element("span", {class: "lex-curve-status", "aria-live": "polite"});
     const axisTop = element("span", {class: "lex-curve-axis lex-curve-axis-top"}, formatNumber(initialRange.max));
     const axisBottom = element("span", {class: "lex-curve-axis lex-curve-axis-bottom"}, formatNumber(initialRange.min));
-    const variables = element("div", {class: "lex-curve-variables lex-curve-variable-strip"},
-      ...(options.variables || []).map(variable => {
-        const key = String(variable.label || "").trim().toLocaleLowerCase();
-        return element("label", {class: "lex-curve-variable", "data-curve-variable": key},
-          element("span", {class: `lex-curve-variable-name lex-curve-variable-${key}`}, variable.label), variable.control);
-      }));
-    const tooltip = element("output", {class:"lex-curve-tooltip", "aria-live":"polite"});
-    const hoverExtrema = element("div", {class:"lex-curve-hover-extrema", "aria-hidden":"true"},
-      element("output", {class:"lex-curve-hover-minimum", title:"Curve minimum"}, "—"),
-      element("output", {class:"lex-curve-hover-maximum", title:"Curve maximum"}, "—"));
-    // Bottom-right switch between the smooth line and a bar reading of the
-    // same samples. The mode is a class on the plot, so nothing is redrawn.
+    // Switch between the smooth line and a bar reading of the same samples.
+    // The mode is a class on the plot, so nothing is redrawn. The toggle rides
+    // in the variable drawer whenever one exists: the drawer overlays the
+    // plot's bottom edge, so a toggle parked there ends up underneath it.
     const modeToggle = element("button", {
       type: "button",
       class: "lex-curve-mode-toggle",
@@ -2228,6 +2220,17 @@
         modeToggle.textContent = bar ? "LINE" : "BARS";
       },
     }, "BARS");
+    const variables = element("div", {class: "lex-curve-variables lex-curve-variable-strip"},
+      ...(options.variables || []).map(variable => {
+        const key = String(variable.label || "").trim().toLocaleLowerCase();
+        return element("label", {class: "lex-curve-variable", "data-curve-variable": key},
+          element("span", {class: `lex-curve-variable-name lex-curve-variable-${key}`}, variable.label), variable.control);
+      }),
+      ...(curveVariableKeys.length ? [modeToggle] : []));
+    const tooltip = element("output", {class:"lex-curve-tooltip", "aria-live":"polite"});
+    const hoverExtrema = element("div", {class:"lex-curve-hover-extrema", "aria-hidden":"true"},
+      element("output", {class:"lex-curve-hover-minimum", title:"Curve minimum"}, "—"),
+      element("output", {class:"lex-curve-hover-maximum", title:"Curve maximum"}, "—"));
     // The title is drawn INTO the plot, behind the drawing, so "centred in the
     // graph" means the graph rather than the card around it. The heading keeps
     // the text for a screen reader and stops painting it.
@@ -2248,7 +2251,7 @@
       element("span", {class: "lex-curve-axis-name lex-curve-axis-name-y"},
         options.yLabel || options.title || "VALUE"),
       options.overlayExtrema ? hoverExtrema : null,
-      modeToggle,
+      ...(curveVariableKeys.length ? [] : [modeToggle]),
       tooltip);
     const title = element("h4", {},
       element("span", {class: "lex-curve-heading-title"}, String(options.title || "CURVE").toLocaleUpperCase()));
