@@ -292,3 +292,43 @@ def test_candidate_builder_rejects_staged_set_mutation():
             packaging.build_candidate(project, game, env, runner=mutating_runner)
         assert not list((project / "build").glob("ff7r2-candidate-*"))
 
+
+
+def test_native_mod_precedence_reports_numeric_patch_levels_and_path_order():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-load-order-") as temp_name:
+        project, game, _packer, _oodle, env = _fixture(Path(temp_name))
+        mods = game / "End/Content/Paks/~mods"
+        mods.mkdir()
+
+        def triple(relative: str) -> None:
+            pak = mods / relative
+            pak.parent.mkdir(parents=True, exist_ok=True)
+            for suffix in (".pak", ".utoc", ".ucas"):
+                pak.with_suffix(suffix).write_bytes(b"synthetic-mod")
+
+        triple("ZMod_2_P.pak")
+        triple("A_Mod/Other_P.pak")
+        triple("ZMod_P.pak")
+        triple("!Mod_P.pak")
+        triple("LooseName.pak")
+        incomplete = mods / "Broken_P.pak"
+        incomplete.write_bytes(b"pak-only")
+
+        state = packaging.status(project, game, env)["loadOrder"]
+        assert state["present"] is True
+        ranked = state["ranked"]
+        assert [item["package"] for item in ranked] == [
+            "ZMod_2_P.pak",
+            "!Mod_P.pak",
+            "A_Mod/Other_P.pak",
+            "ZMod_P.pak",
+        ]
+        assert ranked[0]["patchLevel"] == 2
+        assert ranked[0]["effectiveOrder"] == 300
+        assert [item["winnerRank"] for item in ranked] == [1, 2, 3, 4]
+        assert state["unranked"][0]["package"] == "LooseName.pak"
+        assert state["incomplete"][0]["package"] == "Broken_P.pak"
+        assert set(state["incomplete"][0]["missing"]) == {
+            "Broken_P.utoc", "Broken_P.ucas"
+        }
+        assert "package contents are not inspected" in state["scope"].lower()
