@@ -93,33 +93,33 @@ def main() -> int:
         cdp.eval(STUB.replace("SETTINGS", json.dumps(SETTINGS))
                  .replace("PLUGINS", json.dumps(PLUGINS))
                  .replace("HELPERS", json.dumps(HELPERS)))
-        wait_eval(cdp, "!document.querySelector('#chooser-lexer').hidden", 20)
+        wait_eval(cdp, "!document.querySelector('#lexer-handle').hidden", 20)
         import base64
         closed_shot = cdp.call("Page.captureScreenshot", {"format": "png", "fromSurface": True})
-        closed_target = ROOT / "worklog" / "issues" / "rendered" / "helper-versions-button.png"
+        closed_target = ROOT / "worklog" / "issues" / "rendered" / "helper-versions-handle.png"
         closed_target.parent.mkdir(parents=True, exist_ok=True)
         closed_target.write_bytes(base64.b64decode(closed_shot["data"]))
-        button = json.loads(cdp.eval("""JSON.stringify((()=>{const node=document.querySelector('#chooser-lexer'),
-          box=node.getBoundingClientRect(),header=document.querySelector('#chooser-window-header').getBoundingClientRect();
-          return {text:node.textContent,width:Math.round(box.width),height:Math.round(box.height),
-            insideHeader:box.top>=header.top-1&&box.bottom<=header.bottom+1,
-            clipped:node.scrollWidth>Math.ceil(box.width)+1};})())"""))
-        assert button["insideHeader"], f"the button escaped the menu bar: {button}"
-        assert not button["clipped"], f"the button label is cut off: {button}"
-        cdp.eval("document.querySelector('#chooser-lexer').click()")
+        button = json.loads(cdp.eval("""JSON.stringify((()=>{const node=document.querySelector('#lexer-handle'),
+          box=node.getBoundingClientRect();
+          return {text:node.textContent.trim(),left:Math.round(box.left),width:Math.round(box.width),height:Math.round(box.height),
+            fullHeight:box.top<=1&&box.bottom>=window.innerHeight-1};})())"""))
+        assert button["text"] == "DEV", f"the handle has no DEV label: {button}"
+        assert button["left"] <= 1, f"the handle is not on the left edge: {button}"
+        assert button["fullHeight"], f"the handle does not span the window height: {button}"
+        cdp.eval("document.querySelector('#lexer-handle').click()")
         wait_eval(cdp, "document.querySelectorAll('#lexer-panel-list .lexer-helper').length===2", 20)
         time.sleep(.4)
         opened = json.loads(cdp.eval("""JSON.stringify((()=>{const panel=document.querySelector('#lexer-panel'),
           box=panel.getBoundingClientRect(),rows=[...panel.querySelectorAll('.lexer-helper')];
-          return {hidden:panel.hidden,right:Math.round(box.right),width:Math.round(box.width),
-            onScreen:box.left<window.innerWidth-40,
+          return {hidden:panel.hidden,left:Math.round(box.left),width:Math.round(box.width),
+            onScreen:box.right>40,
             states:rows.map(row=>row.querySelector('.lexer-helper-state').textContent),
             behind:rows.filter(row=>row.classList.contains('state-warning')).length,
             text:rows.map(row=>row.textContent),
             removedTables:panel.querySelectorAll('#lexer-dev-budget,#lexer-dev-code').length,
             calls:window.__helperCalls};})())"""))
         assert not opened["hidden"], "the panel did not open"
-        assert abs(opened["right"] - 1440) <= 1, f"the panel is not on the right edge: {opened}"
+        assert abs(opened["left"]) <= 1, f"the panel is not on the left edge: {opened}"
         assert opened["onScreen"], f"the panel did not slide in: {opened}"
         assert opened["states"] == ["UPDATE AVAILABLE", "UP TO DATE"], opened["states"]
         assert opened["behind"] == 1, opened
@@ -141,10 +141,10 @@ def main() -> int:
         # Without Lexer Mode the button does not exist for anyone else.
         cdp.eval("""window.__testSettings.developerMode=false;
           window.dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:structuredClone(window.__testSettings)}))""")
-        assert cdp.eval("document.querySelector('#chooser-lexer').hidden") is True, \
-            "the helper panel button must belong to Lexer Mode alone"
+        assert cdp.eval("document.querySelector('#lexer-handle').hidden") is True, \
+            "the helper panel handle must belong to Lexer Mode alone"
         print(json.dumps(opened))
-        print("Helper versions panel: Lexer Mode only, right-hand slide-out, report-only.")
+        print("Helper versions panel: Lexer Mode only, left-hand slide-out, report-only.")
     finally:
         if browser:
             browser.terminate()

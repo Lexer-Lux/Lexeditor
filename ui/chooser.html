@@ -116,11 +116,17 @@
     .resident-game-name { position:absolute; z-index:2; left:50%; bottom:var(--lex-resident-safe-inset,15%); display:block; max-height:var(--lex-resident-name-height,26vh); overflow:hidden; color:#fff; font:700 var(--lex-resident-name-size,12px)/1.05 "Lexend","Segoe UI",sans-serif; letter-spacing:.02em; text-overflow:ellipsis; text-shadow:0 1px 3px #000; white-space:nowrap; writing-mode:vertical-rl; transform:translateX(-50%) rotate(180deg); }
     .resident-handle:hover,.resident-handle:focus-visible { width:calc(var(--lex-resident-handle-width,5vw) + .65vw); color:#fff; }
     .resident-handle[hidden] { display:none; }
+    /* Developer drawer handle: mirrors the back-to-editor handle on the
+       opposite edge. Same sizing rules, arrow flipped to point outward. */
+    .lexer-handle { position:fixed; z-index:40; top:0; left:0; bottom:0; display:block; width:var(--lex-resident-handle-width,5vw); height:100vh; overflow:hidden; padding:0; border:0; border-radius:0; color:#fff; background:#303640 center/cover no-repeat; box-shadow:4px 0 14px #0008; }
+    .lexer-handle:hover,.lexer-handle:focus-visible { width:calc(var(--lex-resident-handle-width,5vw) + .65vw); color:#fff; }
+    .lexer-handle[hidden] { display:none; }
+    .lexer-handle-name { position:absolute; z-index:2; left:50%; bottom:var(--lex-resident-safe-inset,15%); display:block; max-height:var(--lex-resident-name-height,26vh); overflow:hidden; color:#fff; font:700 var(--lex-resident-name-size,12px)/1.05 "Lexend","Segoe UI",sans-serif; letter-spacing:.02em; text-overflow:ellipsis; text-shadow:0 1px 3px #000; white-space:nowrap; writing-mode:vertical-rl; transform:translateX(-50%); }
     /* Developer helper-version reporting path. Lexeditor helpers are custom
        forks with self-updating disabled, because a user updating one part on
        its own can break the whole program, so this panel only ever REPORTS
-       what upstream has published. It slides in over the right edge. */
-    .lexer-panel { position:fixed; z-index:70; top:0; right:0; bottom:0; display:flex; width:min(430px,86vw); box-sizing:border-box; flex-direction:column; gap:12px; padding:18px; border-left:1px solid var(--lex-border); background:var(--lex-panel); box-shadow:-14px 0 34px #000a; transform:translateX(100%); transition:transform .22s cubic-bezier(.4,0,.2,1); }
+       what upstream has published. It slides in over the left edge, opened by its own edge handle. */
+    .lexer-panel { position:fixed; z-index:70; top:0; left:0; bottom:0; display:flex; width:min(430px,86vw); box-sizing:border-box; flex-direction:column; gap:12px; padding:18px; border-right:1px solid var(--lex-border); background:var(--lex-panel); box-shadow:14px 0 34px #000a; transform:translateX(-100%); transition:transform .22s cubic-bezier(.4,0,.2,1); }
     .lexer-panel.open { transform:translateX(0); }
     .lexer-panel[hidden] { display:none; }
     .lexer-panel-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
@@ -153,7 +159,7 @@
     .lexer-panel-actions { display:flex; gap:8px; }
     .lexer-panel-actions button { padding:6px 11px; color:var(--lex-text); border:1px solid var(--lex-border); border-radius:5px; background:var(--lex-panel-2); font:inherit; }
     .lexer-panel-actions button:hover { border-color:var(--lex-highlight); }
-    #chooser-lexer { width:auto; padding:0 11px; font:800 11px/1 var(--lex-font); letter-spacing:.07em; }
+    #lexer-handle-name { font-weight:700; }
     .home-social { position:fixed; z-index:45; left:16px; bottom:15px; display:flex; gap:8px; }
     .home-social-button { display:grid; width:38px; height:38px; place-items:center; padding:7px; color:var(--lex-text); border:1px solid var(--lex-border); border-radius:5px; background:#111c; box-shadow:0 3px 12px #0008; }
     .home-social-button:hover,.home-social-button:focus-visible { color:#fff; border-color:var(--lex-highlight); background:var(--lex-panel-2); transform:translateY(-1px); }
@@ -186,6 +192,7 @@
       <div id="chooser-window-controls" class="chooser-window-controls"></div>
     </header>
     <main id="games" aria-busy="true"></main>
+  <button id="lexer-handle" class="lexer-handle" type="button" hidden aria-label="Open helper versions" title="Developer helper versions across every Lexeditor plugin"><span class="resident-arrow" aria-hidden="true"><svg viewBox="0 0 24 120"><path d="M18 8L6 60 18 112"/></svg></span><span class="lexer-handle-name" aria-hidden="true">DEV</span></button>
   <button id="resident-handle" class="resident-handle" type="button" hidden><span class="resident-save" aria-hidden="true"></span><span class="resident-arrow" aria-hidden="true"><svg viewBox="0 0 24 120"><path d="M6 8L18 60 6 112"/></svg></span><span class="resident-game-name"></span></button>
   <button id="app-update" hidden type="button" aria-label="Update Lexeditor" title="Update Lexeditor"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 3 3 24h12v17h18V24h12L24 3Z"/></svg></button>
   <div class="home-social" aria-label="Lexeditor links">
@@ -263,8 +270,8 @@
     const restartButton=document.createElement("button");restartButton.id="chooser-restart";restartButton.className="chooser-restart";restartButton.title="Restart Lexeditor";restartButton.setAttribute("aria-label","Restart Lexeditor");restartButton.hidden=true;restartButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.59 5.45 A8 8 0 1 1 9.26 4.48" fill="none" stroke="currentColor" stroke-linecap="round"/><path d="M12.46 3.32 L10.05 6.64 L8.48 2.32 Z" fill="currentColor" stroke="none"/></svg>';
     const settingsButton=document.createElement("button");settingsButton.id="chooser-settings";settingsButton.className="chooser-settings";settingsButton.title="Lexeditor settings";settingsButton.setAttribute("aria-label","Open Lexeditor settings");settingsButton.append(LexeditorUI.settingsIcon());settingsButton.onclick=LexeditorUI.openSettings;
     const residentSave=residentHandle.querySelector(".resident-save"),residentName=residentHandle.querySelector(".resident-game-name");residentSave.append(LexeditorUI.saveIcon(),Object.assign(document.createElement("span"),{className:"lex-save-count",hidden:true}));
-    const lexerButton=document.createElement("button");lexerButton.id="chooser-lexer";lexerButton.className="chooser-settings";lexerButton.title="Developer helper versions across every Lexeditor plugin";lexerButton.setAttribute("aria-label","Open helper versions");lexerButton.hidden=true;lexerButton.textContent="DEV";
-    document.querySelector("#chooser-window-controls").replaceChildren(lexerButton,restartButton,settingsButton,windowControls.root);
+    const lexerHandle=document.querySelector("#lexer-handle");
+    document.querySelector("#chooser-window-controls").replaceChildren(restartButton,settingsButton,windowControls.root);
     const lexerPanel=document.querySelector("#lexer-panel"),lexerList=document.querySelector("#lexer-panel-list");
     function lexerHelperRow(helper){
       const unavailable=!!helper.error||!helper.latest;
@@ -428,9 +435,9 @@
     function setLexerPanel(open){
       if(open){lexerPanel.hidden=false;requestAnimationFrame(()=>lexerPanel.classList.add("open"));loadHelperVersions(false);loadDeveloperOverview();}
       else{lexerPanel.classList.remove("open");setTimeout(()=>{lexerPanel.hidden=true;},240);}
-      lexerButton.setAttribute("aria-expanded",String(!!open));
+      lexerHandle.setAttribute("aria-expanded",String(!!open));lexerHandle.setAttribute("aria-label",open?"Close helper versions":"Open helper versions");
     }
-    lexerButton.onclick=()=>setLexerPanel(lexerPanel.hidden||!lexerPanel.classList.contains("open"));
+    lexerHandle.onclick=()=>setLexerPanel(lexerPanel.hidden||!lexerPanel.classList.contains("open"));
     document.querySelector("#lexer-panel-close").onclick=()=>setLexerPanel(false);
 
     addEventListener("keydown",event=>{if(event.key==="Escape"&&!lexerPanel.hidden)setLexerPanel(false);});
@@ -475,7 +482,7 @@
         residentHandle.style.setProperty("--lex-resident-name-size",`${nameSize}px`);
         if(nameNode.scrollHeight<=nameNode.clientHeight)break;
       }}
-    function applySharedSettings(settings){const width=Math.max(2.5,Math.min(12,Number(settings?.residentHandleWidthPercent)||5)),height=Math.max(3,Math.min(20,Number(settings?.mainMenuHeightPercent)||9)),rawDesaturation=Number(settings?.absentGameDesaturationPercent),desaturation=Math.max(0,Math.min(100,Number.isFinite(rawDesaturation)?rawDesaturation:40));document.documentElement.style.setProperty("--lex-resident-handle-width",`${width}vw`);document.documentElement.style.setProperty("--lex-chooser-menu-height",`${height}vh`);document.documentElement.style.setProperty("--lex-absent-desaturation",`${desaturation}%`);const resolved=settings&&typeof settings==="object"?settings:chooser.settings||{};chooser.settings=resolved;lexerButton.hidden=!resolved.developerMode;restartButton.hidden=!resolved.developerMode;if(lexerButton.hidden&&!lexerPanel.hidden)setLexerPanel(false);requestAnimationFrame(sizeResidentHandle);}
+    function applySharedSettings(settings){const width=Math.max(2.5,Math.min(12,Number(settings?.residentHandleWidthPercent)||5)),height=Math.max(3,Math.min(20,Number(settings?.mainMenuHeightPercent)||9)),rawDesaturation=Number(settings?.absentGameDesaturationPercent),desaturation=Math.max(0,Math.min(100,Number.isFinite(rawDesaturation)?rawDesaturation:40));document.documentElement.style.setProperty("--lex-resident-handle-width",`${width}vw`);document.documentElement.style.setProperty("--lex-chooser-menu-height",`${height}vh`);document.documentElement.style.setProperty("--lex-absent-desaturation",`${desaturation}%`);const resolved=settings&&typeof settings==="object"?settings:chooser.settings||{};chooser.settings=resolved;lexerHandle.hidden=!resolved.developerMode;restartButton.hidden=!resolved.developerMode;if(lexerHandle.hidden&&!lexerPanel.hidden)setLexerPanel(false);requestAnimationFrame(sizeResidentHandle);}
     async function loadSharedSettings(){if(chooser.settingsLoaded)return;try{applySharedSettings(await window.pywebview.api.lexeditor_settings());chooser.settingsLoaded=true;}catch(_error){applySharedSettings(chooser.settings||null);}}
     addEventListener("lexeditor-settings-changed",event=>applySharedSettings(event.detail));
     async function openHomeLink(target){try{const result=await window.pywebview.api.open_home_link(target);if(!result?.opened)throw new Error("The default browser did not accept this link.");}catch(error){setDialog("Could not open link",String(error?.message||error),[button("CLOSE",closeDialog,true)]);}}
@@ -647,7 +654,7 @@
       const cards=plugins.map(plugin=>{const card=existing.get(plugin.id)||createCard();updateCard(card,plugin);return card;});
       cards.forEach((card,index)=>{if(games.children[index]!==card)games.insertBefore(card,games.children[index]||null);});
       [...games.children].forEach(child=>{if(!cards.includes(child))child.remove();});
-      const resident=plugins.find(plugin=>plugin.resident);residentHandle.hidden=!resident;residentHandle._plugin=resident||null;lexerButton.hidden=!chooser.settings?.developerMode;restartButton.hidden=!chooser.settings?.developerMode;if(lexerButton.hidden&&!lexerPanel.hidden)setLexerPanel(false);if(resident){residentHandle.title=`Return to ${resident.name}`;residentHandle.setAttribute("aria-label",residentHandle.title);residentName.textContent=resident.name;const count=residentSave.querySelector(".lex-save-count"),dirty=Math.max(0,Number(resident.dirtyCount)||0);count.textContent=String(dirty);count.hidden=!dirty;residentSave.classList.toggle("disabled",!dirty);const art=resident.coverArt||{};residentHandle.style.backgroundImage=art.state==="ready"&&art.uri?`url("${art.uri.replaceAll('"','%22')}")`:"none";requestAnimationFrame(sizeResidentHandle);}else{residentName.textContent="";residentSave.classList.add("disabled");residentSave.querySelector(".lex-save-count").hidden=true;}
+      const resident=plugins.find(plugin=>plugin.resident);residentHandle.hidden=!resident;residentHandle._plugin=resident||null;lexerHandle.hidden=!chooser.settings?.developerMode;restartButton.hidden=!chooser.settings?.developerMode;if(lexerHandle.hidden&&!lexerPanel.hidden)setLexerPanel(false);if(resident){residentHandle.title=`Return to ${resident.name}`;residentHandle.setAttribute("aria-label",residentHandle.title);residentName.textContent=resident.name;const count=residentSave.querySelector(".lex-save-count"),dirty=Math.max(0,Number(resident.dirtyCount)||0);count.textContent=String(dirty);count.hidden=!dirty;residentSave.classList.toggle("disabled",!dirty);const art=resident.coverArt||{};residentHandle.style.backgroundImage=art.state==="ready"&&art.uri?`url("${art.uri.replaceAll('"','%22')}")`:"none";requestAnimationFrame(sizeResidentHandle);}else{residentName.textContent="";residentSave.classList.add("disabled");residentSave.querySelector(".lex-save-count").hidden=true;}
     }
     async function load(){
       if(chooser.loading)return;chooser.loading=true;

@@ -111,7 +111,7 @@ def main():
                 page.close()
             page=browser.new_page(viewport={'width':1200,'height':800});errors=[]
             page.set_default_timeout(5000);page.on('pageerror',lambda e:(errors.append(str(e)),print('PAGE ERROR',e,flush=True)));page.add_init_script(STUB)
-            load_page(page,base,'/ui/chooser.html');page.wait_for_selector('#chooser-lexer:visible');page.locator('#chooser-lexer').click()
+            load_page(page,base,'/ui/chooser.html');page.wait_for_selector('#lexer-handle:visible');page.locator('#lexer-handle').click()
             page.wait_for_selector('.lexer-helper-versions')
             text=page.locator('#lexer-panel').inner_text()
             assert all(t in text for t in ['Pinned: 1.0','Installed: 1.1','Latest upstream: 1.2','Installed: Not detected','2026-09-01','Offline']),text
