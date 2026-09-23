@@ -1,10 +1,10 @@
 """Read-only compatibility checks for public 7th Heaven FF7 mod stacks.
 
 The contract mirrors 7th Heaven source revision ae129f0: profiles keep an ordered
-list of active ModIDs, library.xml maps each ModID to its installed location,
-folder mods may select ModFolder/Conditional roots via mod.xml, and .iro files
-are opaque unless an IRO reader is available. This module never edits 7th
-Heaven state and never guesses inside .iro packages.
+list of active ModIDs and settings, library.xml maps each ModID to its installed
+location, folder mods select ModFolder/Conditional roots through mod.xml, and
+.iro files are opaque unless an IRO reader is available. This module never edits
+7th Heaven state and never guesses inside .iro packages.
 """
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 
 SEVENTH_HEAVEN_SOURCE_REVISION = "ae129f0bbeeeb236b1c37fb136e5fec25fd292a3"
 WORKSHOP_ENV = "LEXEDITOR_FF7_7H_WORKSHOP"
+_CONDITION = re.compile(r"^\\s*([A-Za-z0-9_.-]+)\\s*(<=|>=|!=|=|<|>)\\s*(-?\\d+)\\s*$")
 
 
 def _local(tag: str) -> str:
@@ -24,6 +25,10 @@ def _local(tag: str) -> str:
 
 def _children_named(node: ET.Element, name: str):
     return [child for child in node.iter() if _local(child.tag) == name]
+
+
+def _direct_children_named(node: ET.Element, name: str):
+    return [child for child in list(node) if _local(child.tag) == name]
 
 
 def _text(node: ET.Element, name: str, default: str = "") -> str:
@@ -51,7 +56,7 @@ def _norm(path: str) -> str:
 
 
 def _version_key(text: str) -> tuple:
-    pieces = re.findall(r"\d+|[^\d]+", text or "")
+    pieces = re.findall(r"\\d+|[^\\d]+", text or "")
     return tuple((0, int(part)) if part.isdigit() else (1, part.casefold()) for part in pieces)
 
 
@@ -94,30 +99,121 @@ def _active_profile(profile_path: Path) -> list[dict]:
         mod_id = _text(item, "ModID")
         if not mod_id:
             continue
-        rows.append({"modId": mod_id, "name": _text(item, "Name") or mod_id})
+        settings: dict[str, int] = {}
+        for setting in _children_named(item, "ProfileSetting"):
+            key, raw = _text(setting, "ID"), _text(setting, "Value")
+            if not key:
+                continue
+            try:
+                settings[key.casefold()] = int(raw)
+            except ValueError:
+                continue
+        rows.append({
+            "modId": mod_id,
+            "name": _text(item, "Name") or mod_id,
+            "settings": settings,
+        })
     return rows
 
 
-def _mod_roots(folder: Path) -> tuple[list[Path], list[Path]]:
+def _int_value(value, default=0) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _config_condition(spec: str, settings: dict[str, int], ffnx_values: dict) -> bool:
+    """Mirror 7H ProfileItem.IsConfigActive for integer profile/FFNx values."""
+    match = _CONDITION.match(str(spec or ""))
+    if not match:
+        return False
+    key, operator, raw_expected = match.groups()
+    expected = int(raw_expected)
+    folded = key.casefold()
+    if folded.startswith("ffnx_"):
+        ffnx_key = key[5:]
+        lookup = {str(k).casefold(): v for k, v in (ffnx_values or {}).items()}
+        actual = _int_value(lookup.get(ffnx_key.casefold(), 0))
+    else:
+        if folded not in settings:
+            return False
+        actual = settings[folded]
+    return {
+        "=": actual == expected,
+        "!=": actual != expected,
+        "<": actual < expected,
+        ">": actual > expected,
+        "<=": actual <= expected,
+        ">=": actual >= expected,
+    }[operator]
+
+
+def _active_node(node: ET.Element, settings: dict[str, int], ffnx_values: dict) -> bool | None:
+    kind = _local(node.tag)
+    if kind == "Option":
+        return _config_condition(node.text or "", settings, ffnx_values)
+    children = list(node)
+    values = [_active_node(child, settings, ffnx_values) for child in children]
+    if any(value is None for value in values):
+        return None
+    bools = [bool(value) for value in values]
+    if kind == "And":
+        return all(bools)
+    if kind == "Or":
+        return any(bools)
+    if kind == "Not":
+        return None if len(bools) != 1 else not bools[0]
+    return None
+
+
+def _active_when(node: ET.Element, settings: dict[str, int], ffnx_values: dict) -> bool | None:
+    attribute = next((value for key, value in node.attrib.items()
+                      if _local(key).casefold() == "activewhen"), None)
+    wrappers = _direct_children_named(node, "ActiveWhen")
+    if wrappers:
+        children = list(wrappers[0])
+        if len(children) != 1:
+            return None
+        return _active_node(children[0], settings, ffnx_values)
+    if attribute is not None:
+        return _config_condition(attribute, settings, ffnx_values)
+    return True
+
+
+def _mod_roots(folder: Path, settings: dict[str, int], ffnx_values: dict
+               ) -> tuple[list[Path], list[Path], list[Path]]:
     mod_xml = folder / "mod.xml"
     if not mod_xml.is_file():
-        return [folder], []
+        return [folder], [], []
     root = _parse(mod_xml)
     ordinary: list[Path] = []
     conditional: list[Path] = []
+    unresolved: list[Path] = []
+    declared = False
     for node in root.iter():
         kind = _local(node.tag)
-        if kind == "ModFolder":
-            name = (node.attrib.get("Folder") or "").strip()
-            if name:
-                ordinary.append(folder / name)
-        elif kind == "Conditional":
-            name = (node.attrib.get("Folder") or "").strip()
-            if name:
-                conditional.append(folder / name)
-    if not ordinary and not conditional:
+        if kind not in {"ModFolder", "Conditional"}:
+            continue
+        declared = True
+        name = (node.attrib.get("Folder") or "").strip()
+        if not name:
+            continue
+        active = _active_when(node, settings, ffnx_values)
+        if active is False:
+            continue
+        target = folder / name
+        if active is None:
+            unresolved.append(target)
+        elif kind == "ModFolder":
+            ordinary.append(target)
+        else:
+            conditional.append(target)
+    if not declared:
         ordinary.append(folder)
-    return ordinary, conditional
+    return ordinary, conditional, unresolved
 
 
 def _direct_files(root: Path) -> set[str]:
@@ -132,11 +228,22 @@ def _direct_files(root: Path) -> set[str]:
     return result
 
 
-def scan_7h_stack(workshop_root: Path, direct_paths) -> dict:
+def _overlap_paths(roots: list[Path], wanted: set[str]) -> list[str]:
+    if not roots:
+        return []
+    found: set[str] = set()
+    for root in roots:
+        found.update(_direct_files(root))
+    return sorted(found & wanted)
+
+
+def scan_7h_stack(workshop_root: Path, direct_paths, *, ffnx_values: dict | None = None) -> dict:
     """Compare Lexeditor Direct Mode paths with one 7H active profile.
 
     direct_paths are relative to FFNx's Direct root. Same-path results are
-    reported, never assigned a guessed winner. IRO packages remain opaque.
+    reported, never assigned a guessed winner. Profile-option ModFolder
+    activation is evaluated from the active profile. Conditional per-file
+    runtime predicates and IRO package contents remain explicitly incomplete.
     """
     workshop = Path(workshop_root).resolve()
     library_root, profile_path, profile_name = _settings(workshop)
@@ -149,7 +256,7 @@ def scan_7h_stack(workshop_root: Path, direct_paths) -> dict:
     for index, item in enumerate(active):
         mod_id = item["modId"].casefold()
         location = library.get(mod_id)
-        row = {**item, "order": index}
+        row = {"modId": item["modId"], "name": item["name"], "order": index}
         if not location:
             missing.append({**row, "reason": "Active ModID is absent from library.xml"})
             order.append({**row, "location": None, "kind": "missing"})
@@ -164,12 +271,16 @@ def scan_7h_stack(workshop_root: Path, direct_paths) -> dict:
         if not source.is_dir():
             missing.append({**row, "location": str(source), "reason": "Installed folder is missing"})
             continue
-        ordinary, conditional = _mod_roots(source)
-        for virtual in sorted(set().union(*(_direct_files(root) for root in ordinary)) & wanted):
+        ordinary, conditional, unresolved = _mod_roots(
+            source, item["settings"], ffnx_values or {})
+        for virtual in _overlap_paths(ordinary, wanted):
             overlaps.append({**row, "path": virtual, "location": str(source)})
-        for virtual in sorted(set().union(*(_direct_files(root) for root in conditional)) & wanted):
+        for virtual in _overlap_paths(conditional, wanted):
             conditional_overlaps.append({**row, "path": virtual, "location": str(source),
-                "reason": "7th Heaven conditional activation was not evaluated"})
+                "reason": "7th Heaven per-file Conditional activation depends on runtime state"})
+        for virtual in _overlap_paths(unresolved, wanted):
+            conditional_overlaps.append({**row, "path": virtual, "location": str(source),
+                "reason": "7th Heaven ActiveWhen expression could not be evaluated safely"})
 
     complete = not opaque and not missing and not conditional_overlaps
     return {
@@ -196,7 +307,7 @@ def scan_7h_stack(workshop_root: Path, direct_paths) -> dict:
     }
 
 
-def configured_stack(direct_paths) -> dict:
+def configured_stack(direct_paths, *, ffnx_values: dict | None = None) -> dict:
     value = os.environ.get(WORKSHOP_ENV, "").strip()
     if not value:
         return {
@@ -208,7 +319,7 @@ def configured_stack(direct_paths) -> dict:
             "message": f"Set {WORKSHOP_ENV} to a 7thWorkshop directory to inspect an active 7th Heaven profile read-only.",
         }
     try:
-        return scan_7h_stack(Path(value), direct_paths)
+        return scan_7h_stack(Path(value), direct_paths, ffnx_values=ffnx_values or {})
     except (OSError, ValueError) as error:
         return {
             "provider": "7th Heaven",
