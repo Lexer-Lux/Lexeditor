@@ -290,6 +290,11 @@
       if(signature(state.data.init)!==signature(state.base.init))jobs.push(api("/api/init/save",post({edits:startingDataEdits()})));
       const settingsDirty=signature(state.data.settings)!==signature(state.base.settings);
       const results=await Promise.all(jobs);
+      if(window.ff8SpellbookDrafts?.size){
+        const edits=[...window.ff8SpellbookDrafts].map(([id,pages])=>({id,field:"__spellbook",value:pages.length?pages:null}));
+        results.push(await api("/api/kernel/save",post({section:3,edits})));
+        window.ff8SpellbookDrafts.clear();
+      }
       if(enemyAiDocuments.length)results.push(await api("/api/enemy-ai/save",post({documents:enemyAiDocuments})));
       if(enemyBattleTextEdits.length)results.push(await api("/api/enemy-battle-text/save",post({edits:enemyBattleTextEdits})));
       for(const request of kernelEdits)results.push(await api("/api/kernel/save",post(request)));
@@ -345,7 +350,7 @@
       document.body.append(input);input.click();
     });
   }
-  function discardAll(){for(const name of editableDatasets)if(state.data[name])state.data[name].rows=clone(state.base[name]||[]);state.data.init=clone(state.base.init||{});state.data.settings=clone(state.base.settings||{});state.platformConfig=clone(state.savedPlatformConfig);shell.history?.clear();setStatus("Restored the last saved state");render();shell.refresh()}
+  function discardAll(){window.ff8SpellbookDrafts?.clear();for(const name of editableDatasets)if(state.data[name])state.data[name].rows=clone(state.base[name]||[]);state.data.init=clone(state.base.init||{});state.data.settings=clone(state.base.settings||{});state.platformConfig=clone(state.savedPlatformConfig);shell.history?.clear();setStatus("Restored the last saved state");render();shell.refresh()}
   let cardsUI;
   function renderCards(){cardsUI??=FF8CardsUI({el,state,rowOf,filtered,showPaged,sharedDetail,detailSection,detailField,numberControl,selectControl,sourceControl,referenceValues,infoHelp,shell,noteFieldEdit,subtabBar,detailPanel,recordId,columnList,conceptIcon,ensureFieldDetail});return cardsUI.render()}
   const views={cards:renderCards,abilities:renderAbilities,starting:renderStartingData,items:renderItems,refine:renderRefine,shops:renderShops,weapons:renderWeapons,magic:()=>renderKernel("magic","Magic"),gfs:renderGFs,characters:renderCharacters,text:renderText,enemies:renderEnemies,encounters:renderEncounters,maps:renderMaps,world:renderWorldMap,fields:renderFields,formulae:renderFormulae,settings:renderSettings,datamap:renderDataMap,dashboard:renderDashboard};
@@ -358,6 +363,6 @@
   const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff8",name:"Final Fantasy 8",themeName:"ff8",theme:{bg:"#000",panel:"#626262","panel-2":"#4f4f4f",border:"#929292",text:"#fff",muted:"#d0d0d0",accent:"#aa2432","accent-text":"#fff",highlight:"#fff",success:"#d8d8d8",font:'"FF8 Menu","Arial Narrow",sans-serif',"heading-font":'"FF8 Menu","Arial Narrow",sans-serif'}},tabs:[["characters","Characters"],["cards","Cards"],["encounters","Encounters"],["maps","Maps"],["enemies","Enemies"],["formulae","Formulae"],["gfs","GFs"],["items","Items"],["refine","Refine"],["abilities","Abilities"],["magic","Magic"],["text","Text"],["shops","Shops"],["starting","New Game"],["weapons","Weapons"],["settings","Tweaks"]].map(([id,label])=>({id,label})),activeTab:()=>state.tab,navigate,resetView:tab=>{state.columnPrefs[tab]?.reset?.()},help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the FF8 Data Map",info:()=>navigate("dashboard"),infoActive:()=>state.tab==="dashboard",infoTitle:"Open FF8 setup and runtime information",projectSnapshot:async()=>({canCreate:false,projects:[]}),projectSources:projectSources,projectActiveSource:()=>state.activeSource,selectProjectSource:switchProjectSource,sourcesReplaceProjects:true,changeProjectSource,addProjectSource,pendingChanges:()=>LexeditorUI.pendingChangeList({...state.base,platformConfig:state.savedPlatformConfig},{...historyCapture(),platformConfig:state.platformConfig}),dirtyCount,readonly:()=>state.activeSource!=="mine",save:saveAll,discard:discardAll,beforeLaunch:prepareGameplayLaunch,afterLaunch:confirmGameplayPatch,history:{capture:historyCapture,restore:historyRestore,render,enabled:()=>!state.booting&&state.activeSource==="mine",limit:50}});
   async function boot(){try{[state.dashboard,state.datamap]=await Promise.all([api("/api/dashboard"),api("/api/datamap")]);LexeditorUI.configureThemeSounds(state.dashboard.themeSounds);await reloadEditable();state.booting=false;setStatus(state.dashboard.runtime.installed?"FFNx ready":"FFNx needed for in-game loading");render();LexeditorUI.finishPluginLoading()}catch(error){state.booting=false;state.bootFailed=true;LexeditorUI.finishPluginLoading();$("#main").replaceChildren(el("div",{class:"empty"},`Failed to load FF8 plugin: ${error.message}`));setStatus("Load failed")}}
   window.addEventListener("lexeditor-settings-ready",()=>{if(!state.booting&&state.tab==="dashboard")renderDashboard()});
-  window.addEventListener("beforeunload",event=>{if(!window.__lexeditorNavigating&&dirtyCount())event.preventDefault()});
+  window.addEventListener("ff8-spellbook-changed",()=>shell.refresh());
   boot();
   

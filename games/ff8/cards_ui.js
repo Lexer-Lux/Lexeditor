@@ -303,13 +303,13 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       }
       const magic = meta.magicOptions || [];
       const abilities = meta.abilityOptions || [];
-      let pages = clone(gf.spellbook?.pages || []);
-      let dirty = false;
+      const drafts = window.ff8SpellbookDrafts ||= new Map();
+      let pages = clone(drafts.get(gfId) ?? gf.spellbook?.pages ?? []);
       marker.replaceChildren();
       const toolbar = LexeditorUI.actionRow();
       const body = LexeditorUI.stack({fill:false});
       const status = LexeditorUI.detailNote("");
-      const setDirty = () => { dirty = true; status.textContent = "Unsaved spellbook changes"; };
+      const setDirty = () => { drafts.set(gfId,pages); status.textContent = "Unsaved spellbook changes"; window.dispatchEvent(new Event("ff8-spellbook-changed")); };
       const usedMagic = (except=null) => new Set(pages.flatMap(page => page).filter(slot => slot !== except).map(slot => slot.magicId));
       const draw = () => {
         toolbar.replaceChildren();
@@ -376,7 +376,8 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
               method:"POST", headers:{"Content-Type":"application/json"},
               body:JSON.stringify({section:3,edits:[{id:gfId,field:"__spellbook",value:pages.length?pages:null}]})
             });
-            dirty=false;status.textContent="Spellbook saved.";
+            drafts.delete(gfId);status.textContent="Spellbook saved.";
+            window.dispatchEvent(new Event("ff8-spellbook-changed"));
           } catch(error) {status.textContent=error.message;}
           finally {save.disabled=false;}
         });
@@ -384,7 +385,6 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       };
       marker.append(toolbar,body,status);
       draw();
-      window.addEventListener("beforeunload", event => {if(dirty){event.preventDefault();event.returnValue="";}}, {once:true});
     } catch (error) {
       marker.textContent = `Spellbook unavailable: ${error.message}`;
     }

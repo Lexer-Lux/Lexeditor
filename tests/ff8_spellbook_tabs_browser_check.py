@@ -34,8 +34,17 @@ def main():
   assert page.get_by_role('button',name='ADD PAGE').count()==1
   page.get_by_role('button',name='ADD SPELL',exact=True).click()
   assert page.locator('.lexeditor-gf-spellbook .lex-column-list-row').count()==1
+  assert page.evaluate('window.ff8SpellbookDrafts.size')==1
+  assert page.evaluate('''()=>{
+    const event=new Event('beforeunload',{cancelable:true});
+    window.dispatchEvent(event);return event.defaultPrevented;
+  }''') is False
   assert page.locator('[role="tab"] .lex-info-help').count()==1
   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-spellbook-list.png'))
+  dialogs=[]
+  page.on('dialog',lambda dialog:(dialogs.append(dialog.type),dialog.dismiss()))
+  page.goto('about:blank')
+  assert dialogs==[],dialogs
   browser.close()
  print('Spellbook tab containment, tab switching and independent ability value passed.')
 if __name__=='__main__':main()
