@@ -1,10 +1,7 @@
+/* Dark Souls 3 draws on the shared baseline and nothing else: colour and
+   structure come from the framework; this file only tunes the page. */
 :root{
   --lex-bg:#11110f;--lex-panel:#191915;--lex-panel-2:#22211c;--lex-border:#514a3c;
   --lex-text:#e8e1d4;--lex-muted:#aaa08e;--lex-accent:#a4824c;--lex-accent-text:#17130d;
   --lex-highlight:#c2a66f;--lex-success:#779363;--lex-nav-bg:#171713;
 }
-.ds3-loading{padding:28px;color:var(--lex-muted)}
-.ds3-detail .lex-detail-panel-meta{max-width:70ch}
-.ds3-detail .lex-detail-field-control input[type="number"],
-.ds3-detail .lex-detail-field-control select{width:100%;min-width:0}
-.ds3-info-path{font-family:Consolas,monospace;overflow-wrap:anywhere}

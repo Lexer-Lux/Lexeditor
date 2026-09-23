@@ -97,7 +97,7 @@
   }
   function rowDetail(table,rowIdentity){
     const row=state.details[table];
-    if(!row||row.id!==rowIdentity.id)return detailPanel({className:"ds3-detail",title:rowIdentity.name,identity:String(rowIdentity.id),
+    if(!row||row.id!==rowIdentity.id)return detailPanel({title:rowIdentity.name,identity:String(rowIdentity.id),
       body:[LexeditorUI.detailNote("Loading this record…")]});
     const groups=new Map();
     for(const field of row.fields||[]){
@@ -107,7 +107,7 @@
         dataType:String(field.dtype||"").toUpperCase(),min:field.minimum,max:field.maximum,
         help:help?infoHelp(help):null,attrs:{"data-field":field.key}}));
     }
-    return detailPanel({className:"ds3-detail",title:row.name,identity:String(row.id),meta:row.description,
+    return detailPanel({title:row.name,identity:String(row.id),meta:row.description,
       body:[...groups].map(([title,fields])=>detailSection({title,body:fields}))});
   }
 

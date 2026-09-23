@@ -132,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
                 for table, name in TABLES:
                     page.locator(f'button[data-tab="{table}"]').click()
                     page.wait_for_selector(".lex-column-list .lex-list-row", timeout=10000)
-                    page.wait_for_selector(".ds3-detail [data-ds3-field]", timeout=10000)
+                    page.wait_for_selector("#main [data-ds3-field]", timeout=10000)
                     page.screenshot(path=str(output / f"{name}.png"), full_page=True)
                     if table == "Magic" and page.locator("select[data-ds3-field]").count() < 1:
                         raise RuntimeError("Spells screen did not expose enum choices")
