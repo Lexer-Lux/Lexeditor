@@ -168,6 +168,20 @@ class ModuleRecordTests(unittest.TestCase):
             }])
         self.assertIn("number=500.0", path.read_text())
 
+    def test_older_particle_shape_is_source_only(self):
+        path = self.root / "module_particle_systems.py"
+        original = 'particle_systems=[("legacy",0,"mesh",5,2.0,0.1,0.0,1.0,0.5,(0,1),(1,0),(0,1),(1,1),(0,1),(1,1),(0,1),(1,1),(0,1),(1,1),(1,1,1),(0,0,1),0.2)]\n'
+        path.write_text(original)
+        data = dataset_data(self.root, "particle-systems")
+        self.assertEqual(len(data["rows"]), 1)
+        self.assertIn("Expected 24 fields; found 22", data["rows"][0]["problem"])
+        with self.assertRaisesRegex(ValueError, "source repair"):
+            save_dataset(self.root, "particle-systems", data["sha256"], [{
+                "recordIndex": 0, "originalId": data["rows"][0]["id"],
+                "fields": {"particleLife": 3},
+            }])
+        self.assertEqual(path.read_text(), original)
+
     def test_noop_save_does_not_create_backup(self):
         data = dataset_data(self.root, "strings")
         result = save_dataset(self.root, "strings", data["sha256"], [])
