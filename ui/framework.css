@@ -3574,6 +3574,31 @@ body:has(.lex-data-map-table) #main {
   .lex-panel-layout-divider {
     display: var(--lex-panel-layout-narrow-divider-display, none);
   }
+
+  /* A paged master/detail page has a fixed-height viewport plus a pager. If
+     only the columns stack, the detail's intrinsic auto row consumes the page
+     and collapses the master's 1fr row to zero. Give master and detail bounded
+     rows instead, and let the master scroll its complete readable records. */
+  .lex-panel-layout.lex-paged-list-detail {
+    grid-template-rows:minmax(120px,.8fr) minmax(160px,1.2fr);
+    align-items:stretch;
+  }
+  .lex-panel-layout.lex-paged-list-detail.has-pager {
+    grid-template-rows:minmax(120px,.8fr) minmax(140px,1.2fr) auto;
+  }
+  .lex-paged-list-detail > .lex-barrelled-master {
+    align-self:stretch;
+    max-height:none;
+    overflow:auto;
+  }
+  .lex-paged-list-detail > .lex-barrelled-master > .lex-barrel-grid {
+    height:auto;
+    overflow:visible;
+  }
+  .lex-paged-list-detail > .lex-barrelled-master .lex-column-list {
+    max-height:none;
+    overflow:visible;
+  }
 }
 
 @media (max-width: 1000px) {
@@ -5942,6 +5967,34 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-ui-scale {display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;margin:0 7px 0 0;color:var(--lex-text);font:12px/1 system-ui,sans-serif;text-shadow:none;}
 .lex-ui-scale input[type="range"] {width:64px;min-width:0;max-width:64px;height:18px;min-height:0;margin:0;padding:0;accent-color:var(--lex-accent);border:0;box-shadow:none;}
 .lex-ui-scale output {width:4ch;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:right;}
+
+/* At an effective viewport below 850 CSS px (including a 1200 px window at
+   150% UI scale), keep the centred history/save/play group clear of the right
+   settings/help rail. Controls remain usable; only their chrome compacts. */
+@media (max-width:850px) {
+  .lex-shell-center-actions,
+  .lex-shell-right-actions { gap:4px; }
+  .lex-shell-command-row :is(.lex-history-button,.lex-save-icon,.lex-game-process) {
+    width:30px;
+    min-width:30px;
+    height:30px;
+    min-height:30px;
+  }
+  #global-save.lex-command-primary,
+  #global-game-process.lex-command-primary {
+    width:30px;
+    min-width:30px;
+    height:30px;
+    min-height:30px;
+  }
+  .lex-shell-command-row :is(.lex-settings-button,.lex-help-button,
+    .lex-developer-button,.lex-shortcuts-button,.lex-info-button,.lex-github-tab) {
+    --lex-menu-icon:28px;
+  }
+  .lex-ui-scale { gap:2px; margin-right:2px; }
+  .lex-ui-scale input[type="range"] { width:36px; max-width:36px; }
+  .lex-window-button { width:32px; min-width:32px; }
+}
 
 @media (max-width:700px) {
   .lex-global-settings .lex-settings-lane {grid-template-columns:minmax(0,1fr);}
