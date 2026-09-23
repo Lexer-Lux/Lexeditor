@@ -488,13 +488,13 @@ def main():
                 page.route("http://127.0.0.1:9/**",lambda route: route.fulfill(status=200,body="<html></html>",content_type="text/html"))
                 page.goto("http://127.0.0.1:9/")
                 page.set_content(editor_html(),wait_until="domcontentloaded")
-                page.wait_for_selector(".ct-long-text")
+                page.wait_for_selector(".lex-detail-panel-body textarea")
                 assert not errors,errors
                 assert page.locator(".lex-paged-list-detail").count()==1
-                page.locator(".ct-long-text").fill("Changed in rendered acceptance")
+                page.locator(".lex-detail-panel-body textarea").fill("Changed in rendered acceptance")
                 page.wait_for_function("!document.querySelector('#global-save')?.disabled")
                 page.locator("#global-save").click()
-                page.wait_for_function("document.querySelector('#global-save')?.disabled && document.querySelector('.ct-long-text')?.value.includes('rendered acceptance')")
+                page.wait_for_function("document.querySelector('#global-save')?.disabled && document.querySelector('.lex-detail-panel-body textarea')?.value.includes('rendered acceptance')")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/messages/save')")
                 page.screenshot(path=str(ARTIFACTS/f"text-{shot}.png"),full_page=True)
 
