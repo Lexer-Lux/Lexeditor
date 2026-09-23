@@ -85,6 +85,25 @@ def string_table_bytes():
     return bytes(prefix) + english + spanish
 
 
+def rbf_bytes():
+    """Synthetic RBF0 fixture with only publicly documented record shapes."""
+    def record(index, kind, name=None, payload=b""):
+        result = bytearray([index, kind])
+        if name is not None:
+            raw = name.encode("ascii")
+            result += struct.pack("<h", len(raw)) + raw
+        result += payload
+        return bytes(result)
+    data = bytearray(b"RBF0")
+    data += record(0, 0x00, "Tuning", struct.pack("<hhh", 0, 0, 1))
+    data += record(1, 0x10, "Version", struct.pack("<I", 1))
+    data += record(2, 0x40, "Scale", struct.pack("<f", 1.0))
+    data += record(3, 0x30, "Enabled")
+    data += record(4, 0x60, "Label", struct.pack("<h", 7) + b"Fixture")
+    data += b"\xff\xff"
+    return bytes(data)
+
+
 def fake_resource_tool(args, **_kwargs):
     """Identity codec for testing save ordering, not the real RSC85 compressor."""
     if args[0] == "resource-pack":
@@ -128,6 +147,8 @@ def workspace(root: Path, count=1):
     tuning = mapping["PREPARED_ROOT"] / "tune/ai/motives.xml"
     tuning.parent.mkdir(parents=True)
     tuning.write_text('<motives><value>vanilla</value></motives>')
+    tuning_rbf = mapping["PREPARED_ROOT"] / "tune/ai/protected.tune"
+    tuning_rbf.write_bytes(rbf_bytes())
     tuning_strings = mapping["PREPARED_ROOT"] / "tune/stringtable/global.strtbl"
     tuning_strings.parent.mkdir(parents=True)
     tuning_strings.write_bytes(string_table_bytes())
