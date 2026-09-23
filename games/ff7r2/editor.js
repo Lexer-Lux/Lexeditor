@@ -650,6 +650,96 @@
     });
   }
 
+  function battlePlayerRows(){
+    const rows=[...(battlePlayer?.records||[])];
+    const needle=battlePlayerQuery.trim().toLocaleLowerCase();
+    const filtered=needle?rows.filter(row=>{
+      const values=[row.key,row.name,...(row.fields||[]).flatMap(field=>
+        Array.isArray(field.value)?field.value:[field.value])];
+      return values.join(" ").toLocaleLowerCase().includes(needle);
+    }):rows;
+    const key=battlePlayerSort.key,dir=battlePlayerSort.dir;
+    return filtered.sort((left,right)=>{
+      const a=left[key],b=right[key];
+      if(typeof a==="number"||typeof b==="number")return (Number(a||0)-Number(b||0))*dir;
+      return String(a??"").localeCompare(String(b??""))*dir;
+    });
+  }
+
+  function battlePlayerTable(rows,picked,select){
+    return columnList({
+      rows,key:row=>row.id,selected:picked,select,
+      sortState:battlePlayerSort,
+      sort:key=>{battlePlayerSort=battlePlayerSort.key===key?{key,dir:-battlePlayerSort.dir}:{key,dir:1};render()},
+      columnPreferences:battlePlayerPrefs,columns:BATTLE_PLAYER_COLUMNS,
+      refresh:()=>{render();shell.refresh?.()},
+      class:"ff7r2-table ff7r2-battle-player-table",
+      "aria-label":"Final Fantasy VII Rebirth BattlePlayerParameter records"
+    });
+  }
+
+  function battlePlayerRecordPanel(row){
+    if(!row)return detailPanel({className:"ff7r2-detail",title:"NO RECORD",icon:infoIcon(),identity:null,
+      meta:"BattlePlayerParameter",body:[detailSection({title:"STATUS",body:[
+        detailField({label:"DETAIL",control:readonlyField("No BattlePlayerParameter record is selected.")})
+      ]})]});
+    const fields=(row.fields||[]).map(field=>detailField({
+      label:field.name.toUpperCase(),
+      dataType:field.kind==="array"?("ARRAY<"+String(field.type||"VALUE").toUpperCase()+">"):String(field.kind||field.type).toUpperCase(),
+      control:readonlyField(field.kind==="array"?arrayDisplay(field):String(field.value??"")),
+      help:infoHelp("Serialized source value. The public schema proves its storage type, but Lexeditor does not infer its gameplay meaning or safe edit range.")
+    }));
+    return detailPanel({className:"ff7r2-detail ff7r2-battle-player-detail",title:row.key,
+      icon:el("span",{class:"ff7r2-record-icon"},"VII"),identity:recordId(row.key),
+      meta:"BattlePlayerParameter — read-only source data",body:[
+        detailSection({title:"INTEGRATION STATUS",body:[
+          LexeditorUI.detailNote("STATUS — Structured source view only. Public declarations prove the storage schema, not enough gameplay semantics or safe ranges to expose edits."),
+          LexeditorUI.detailNote("EDITING — Disabled. No BattlePlayerParameter project file is staged or written."),
+        ]}),
+        detailSection({title:"IDENTITY",body:[
+          detailField({label:"ROW FNAME",control:readonlyField(row.key)}),
+          detailField({label:"NAME INDEX",control:readonlyField(String(row.nameIndex))}),
+          detailField({label:"NAME NUMBER",control:readonlyField(String(row.nameNumber))}),
+        ]}),
+        detailSection({title:"SERIALIZED FIELDS",body:fields.length?fields:[
+          detailField({label:"STATUS",control:readonlyField("This row has no decoded fields.")})
+        ]}),
+        detailSection({title:"SOURCE FILE",body:[
+          detailField({label:"PATH",control:readonlyField(battlePlayer?.projectRelativePath||workspace?.battlePlayerParameter?.sourceRelative||"")}),
+          detailField({label:"MODE",control:readonlyField("Read-only; no BattlePlayerParameter staging or save route.")}),
+        ]}),
+      ]});
+  }
+
+  function battleParamsPanel(){
+    if(battlePlayerBusy&&!battlePlayer)return detailPanel({className:"ff7r2-detail",title:"LOADING",icon:infoIcon(),identity:null,
+      meta:"Battle Params",body:[detailSection({title:"STATUS",body:[
+        detailField({label:"DETAIL",control:readonlyField("Reading the extracted BattlePlayerParameter DataObject.")})
+      ]})]});
+    if(!battlePlayer)return detailPanel({className:"ff7r2-detail",title:"BATTLEPLAYERPARAMETER NOT LOADED",icon:infoIcon(),identity:null,
+      meta:"Battle Params",body:[detailSection({title:"STATUS",body:[
+        detailField({label:"DETAIL",control:readonlyField(battlePlayerError||"The project has no extracted BattlePlayerParameter source asset yet.")}),
+        detailField({label:"SOURCE PATH",control:readonlyField(workspace?.battlePlayerParameter?.sourceRelative||"source/End/Content/DataObject/Resident/BattlePlayerParameter.uasset")}),
+        detailField({label:"ACTION",control:el("div",{class:"lex-reshade-actions"},
+          el("button",{type:"button",class:"lex-dialog-action",disabled:battlePlayerBusy,onclick:async()=>{await loadBattlePlayer();render()}}, "Reopen from disk"))}),
+      ]})]});
+    if(!battlePlayer.records?.length)return detailPanel({className:"ff7r2-detail",title:"EMPTY BATTLEPLAYERPARAMETER",icon:infoIcon(),identity:null,
+      meta:"Battle Params",body:[detailSection({title:"STATUS",body:[
+        detailField({label:"DETAIL",control:readonlyField("The DataObject parsed successfully but contains no rows.")})
+      ]})]});
+    const rows=battlePlayerRows();
+    return pagedListDetail({
+      rows,key:row=>row.id,slots:false,selected:selectedBattlePlayerRecord,page:battlePlayerPage,pageSize:battlePlayerPageSize,noun:"records",
+      className:"ff7r2-layout",splitKey:"ff7r2-battle-player",rowsKey:"ff7r2-battle-player",defaultSplit:48,minLeft:330,minRight:390,
+      search:{key:"ff7r2-battle-player-search",value:battlePlayerQuery,label:"Search BattlePlayerParameter records",
+        change:value=>{battlePlayerQuery=value;battlePlayerPage=0;render()}},
+      sync:next=>{battlePlayerPage=next.page;battlePlayerPageSize=next.pageSize;if(next.selected!==null)selectedBattlePlayerRecord=next.selected},
+      change:next=>{battlePlayerPage=next.page;battlePlayerPageSize=next.pageSize;if(next.selected!==null)selectedBattlePlayerRecord=next.selected;render()},
+      master:state=>battlePlayerTable(state.rows,state.selected,state.select),
+      detail:row=>battlePlayerRecordPanel(row)
+    });
+  }
+
   function battleRows(){
     const rows=[...(battleItem?.records||[])];
     const needle=battleQuery.trim().toLocaleLowerCase();
