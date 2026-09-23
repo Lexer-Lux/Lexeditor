@@ -313,7 +313,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 assert narrow["body"] <= narrow["viewport"] + 2, narrow
                 assert narrow["identities"], narrow
                 assert all(row["scroll"] <= row["client"] + 1 for row in narrow["identities"]), narrow
-                assert page.locator(".lex-toast.visible").count() == 0
+                assert page.locator(".lex-toast").count() == 0
                 page.screenshot(
                     path=str(OUT / "factorio-recipes-900.png"), full_page=True)
 
@@ -358,7 +358,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                         row["scroll"] <= row["client"] + 1
                         for row in scaled["identities"]), scaled
                     assert scaled["center"]["right"] <= scaled["right"]["left"] + 1, scaled
-                    assert scaled_page.locator(".lex-toast.visible").count() == 0
+                    assert scaled_page.locator(".lex-toast").count() == 0
                     assert not scaled_errors, scaled_errors
                     scaled_page.screenshot(
                         path=str(OUT / "factorio-recipes-150pct.png"),
