@@ -240,12 +240,13 @@ def data_map_payload() -> dict:
         },
         {
             "filename": "FF7R2 IoStore patch package (.utoc/.ucas/.pak)",
-            "controls": "None", "coverage": "unavailable",
+            "controls": "Information — Build isolated candidate", "coverage": "structured",
             "notes": (
-                "A dependency-explicit UnrealReZen candidate builder is available only when "
-                "the local tool and its adjacent explicit Oodle path are supplied. It writes under the project and never "
-                "installs; shared-helper ownership and real-game load acceptance are still pending."
-            ), "status": "not-integrated",
+                "The dependency-explicit UnrealReZen route audits every staged regular file, "
+                "rejects symlinks, records input/tool/output hashes and writes only under the project. "
+                "It requires the local tool plus adjacent explicit Oodle and never installs the result; "
+                "shared-helper ownership and real-game load/removal acceptance are still pending."
+            ), "status": "partial",
         },
         {
             "filename": "End/Content/DataObject/Resident/ResidentParameter.uasset (#470)",
