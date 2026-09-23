@@ -5,6 +5,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from .datasets import dataset_spec, validate_field_value
+
 MAX_SOURCE_BYTES = 64 * 1024 * 1024
 OBJECT_DEFAULTS = {"Price": 0, "Edibility": -300, "IsDrink": False}
 
