@@ -71,7 +71,9 @@ jobs:
           python tools/verify_ff7_extended.py
           python tools/verify_ff7_completion.py
           python tools/verify_ff7_deployment.py
-          # Keep the reviewed 38-dataset installed acceptance contract on both OSes.
+          python tools/verify_ff7_tooling.py
+          python tools/verify_ff7_mod_stack.py
+          # Keep the reviewed 40-dataset installed acceptance contract on both OSes.
           python tools/verify_ff7_installed_contract.py
           python tools/verify_ff7_edition_parity.py
           python tools/verify_ff7_blank_ui.py
