@@ -62,6 +62,33 @@ def document() -> str:
         "rows": string_table["rows"],
         "counts": {"records": 1, "tables": 1, "availableTables": 1},
     }
+    rbf_payload = {
+        "rows": [{
+            "id": "tune/ai/protected.tune:24",
+            "resourcePath": "tune/ai/protected.tune",
+            "recordOffset": 24,
+            "descriptorIndex": 2,
+            "name": "Scale",
+            "path": "Tuning/Scale",
+            "role": "child",
+            "kind": "float",
+            "value": 1.0,
+            "typeOffset": 25,
+            "writeOffset": 26,
+            "writeSize": 4,
+            "rawHex": "0000803f",
+            "sourcePath": "prepared/protected.tune",
+            "projectPath": "project/protected.tune",
+            "project": False,
+        }],
+        "resources": [{
+            "path": "tune/ai/protected.tune", "scalarCount": 1,
+            "descriptorCount": 3, "trailingBytes": 0,
+            "skipped": {"strings": 1, "float3": 0, "byteBlocks": 0},
+            "project": False,
+        }],
+        "counts": {"resources": 1, "scalars": 1, "project": 0},
+    }
     missions = {
         "missions": [mission],
         "limits": {"step": 1, "rewards": {
@@ -82,6 +109,8 @@ def document() -> str:
         "/api/string-table": string_table,
         "/api/strings?language=0": strings_payload,
         "/api/strings?language=0&dataset=vanilla": strings_payload,
+        "/api/rbf-scalars": rbf_payload,
+        "/api/rbf-scalars?dataset=vanilla": rbf_payload,
         "/api/missions": missions,
         "/api/missions?dataset=vanilla": missions,
         "/api/settings": {"available": False, "sections": [], "reason": "Synthetic fixture"},
@@ -118,6 +147,10 @@ window.fetch=async function(url,options={}) {
     html = html.replace(
         '<script src="strings.js"></script>',
         "<script>" + (ROOT / "games/rdr/strings.js").read_text(encoding="utf-8") + "</script>",
+    )
+    html = html.replace(
+        '<script src="rbf.js"></script>',
+        "<script>" + (ROOT / "games/rdr/rbf.js").read_text(encoding="utf-8") + "</script>",
     )
     html = html.replace(
         '<script src="editor.js"></script>',
@@ -180,6 +213,13 @@ def run(output: Path, executable: str | None) -> None:
                     "tune/stringtable/global.strtbl")
                 assert page.locator(".string-detail .lex-record-id").count() == 0
                 page.screenshot(path=str(output / f"rdr-strings-{width}-zoom{zoom}.png"), full_page=True)
+
+                page.evaluate("state.tab='rbf'; state.rbfSelected='tune/ai/protected.tune:24'; rbfUI.render()")
+                expect(page.locator(".rdr-record-list .lex-column-list-row:not(.lex-filler-row)")).to_have_count(1)
+                expect(page.locator(".rbf-detail .lex-detail-field")).to_have_count(7)
+                expect(page.get_by_label("Tuning/Scale", exact=True)).to_have_value("1")
+                assert page.locator(".rbf-detail .lex-record-id").count() == 0
+                page.screenshot(path=str(output / f"rdr-rbf-{width}-zoom{zoom}.png"), full_page=True)
 
                 page.evaluate("state.tab='missions'; state.missionSelected=2; renderMissions()")
                 expect(page.locator(".mission-detail .lex-detail-field")).to_have_count(9)
