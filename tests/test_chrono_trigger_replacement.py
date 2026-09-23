@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+import json
 import struct
 import tempfile
 import unittest
@@ -10,6 +11,8 @@ from pathlib import Path
 from games.chrono_trigger.archive import ArchiveError, ResourcesBin, _decode
 from games.chrono_trigger.animation_data import load_chip_animations, save_chip_animations
 from games.chrono_trigger.field_data import load_exits, load_treasure, save_exits, save_treasure
+from games.chrono_trigger.mod_support import ChronoCtpAdapter, OWNED_NAMESPACE
+from mod_library import ModLibrary, file_tree
 from games.chrono_trigger.palette_data import load_palette, save_palette
 from games.chrono_trigger.project import OverlayStore
 from games.chrono_trigger.scene_data import load_scenes, save_scene
@@ -628,6 +631,99 @@ class FreshChronoTriggerTests(unittest.TestCase):
                 save_world_navigation(store, normal["path"], saved["sha256"], [
                     {"token": scripted["token"], "values": {"destinationScene": 3}},
                 ], "en")
+
+    def test_real_ctp_extension_import_becomes_editable_project(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package = root / "Example.ctp"
+            replacement = b"0000,Imported Sword\r\n"
+            with zipfile.ZipFile(package, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("Localize/en/msg/item.txt", replacement)
+            adapter = ChronoCtpAdapter()
+            library = ModLibrary(root / "library")
+            target = library.import_mod("chrono-trigger", package, adapter, "Imported", prepare_editable=True)
+            self.assertEqual((target / "Localize/en/msg/item.txt").read_bytes(), replacement)
+            self.assertTrue((target / "lexeditor-chrono-trigger.json").is_file())
+            self.assertFalse(any(target.glob("*.ctp")))
+            self.assertTrue(package.is_file())
+            report = adapter.inspect(target, file_tree(target))
+            self.assertTrue(report["valid"], report)
+            self.assertEqual(report["resources"], ["Localize/en/msg/item.txt"])
+
+    def test_ctext_adapter_orders_conflicts_preserves_external_entries_and_removes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            game = root / "game"
+            game.mkdir()
+            (game / "Chrono Trigger.exe").write_bytes(b"fixture")
+            (game / "ctext.dll").write_bytes(b"fixture")
+            build_archive(game / "resources.bin", [
+                ("Game/common/Test.dat", b"vanilla"),
+                ("Localize/en/msg/item.txt", b"0000,Sword\r\n"),
+            ])
+            original_archive = (game / "resources.bin").read_bytes()
+            config = {
+                "misc": {"keep": "untouched"},
+                "mods": {"enabled": True, "enable_ctp_loading": True,
+                         "load_order": ["External"]},
+            }
+            (game / "ctext.json").write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+
+            mods = []
+            for name, value in (("one", b"first"), ("two", b"second")):
+                mod = root / name
+                target = mod / "Game/common/Test.dat"
+                target.parent.mkdir(parents=True)
+                target.write_bytes(value)
+                (mod / "mod.json").write_text(json.dumps({"name": name}) + "\n", encoding="utf-8")
+                mods.append(mod)
+
+            adapter = ChronoCtpAdapter()
+            plan = adapter.activate(mods, game)
+            self.assertEqual(plan["modIds"], ["one", "two"])
+            self.assertEqual(plan["conflicts"], [{
+                "path": "Game/common/Test.dat", "lower": "one", "higher": "two",
+            }])
+            self.assertEqual(plan["priority"],
+                             "low-to-high; later selected Lexeditor CTP wins whole-resource conflicts")
+            deployed = game / "mods" / OWNED_NAMESPACE
+            with zipfile.ZipFile(deployed / "one.ctp") as archive:
+                self.assertEqual(archive.read("Game/common/Test.dat"), b"first")
+            with zipfile.ZipFile(deployed / "two.ctp") as archive:
+                self.assertEqual(archive.read("Game/common/Test.dat"), b"second")
+            active_config = json.loads((game / "ctext.json").read_text(encoding="utf-8"))
+            self.assertEqual(active_config["misc"], {"keep": "untouched"})
+            self.assertEqual(active_config["mods"]["load_order"], [
+                "External", f"{OWNED_NAMESPACE}/one", f"{OWNED_NAMESPACE}/two",
+            ])
+            self.assertEqual(adapter.active_mod_ids(game), ["one", "two"])
+
+            # An external CTExt entry added later is preserved; Lexeditor's selected
+            # CTPs are re-appended in explicit low-to-high priority order.
+            active_config["mods"]["load_order"].append("UserLater")
+            (game / "ctext.json").write_text(json.dumps(active_config, indent=2) + "\n", encoding="utf-8")
+            narrowed = adapter.activate([mods[1]], game)
+            self.assertEqual(narrowed["externalEntries"], ["External", "UserLater"])
+            narrowed_config = json.loads((game / "ctext.json").read_text(encoding="utf-8"))
+            self.assertEqual(narrowed_config["mods"]["load_order"], [
+                "External", "UserLater", f"{OWNED_NAMESPACE}/two",
+            ])
+
+            # Externally modifying a managed package blocks removal instead of
+            # deleting somebody else's changes.
+            managed = deployed / "two.ctp"
+            original_managed = managed.read_bytes()
+            managed.write_bytes(original_managed + b"external")
+            with self.assertRaisesRegex(ValueError, "changed outside Lexeditor"):
+                adapter.activate([], game)
+            managed.write_bytes(original_managed)
+
+            removed = adapter.activate([], game)
+            self.assertEqual(removed["modIds"], [])
+            final_config = json.loads((game / "ctext.json").read_text(encoding="utf-8"))
+            self.assertEqual(final_config["mods"]["load_order"], ["External", "UserLater"])
+            self.assertEqual(adapter.active_mod_ids(game), [])
+            self.assertEqual((game / "resources.bin").read_bytes(), original_archive)
 
     def test_ctp_rejects_paths_not_present_in_resources_bin(self):
         with tempfile.TemporaryDirectory() as tmp:
