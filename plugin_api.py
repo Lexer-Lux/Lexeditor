@@ -104,6 +104,21 @@ HelperInstall = Callable[[], dict]
 
 
 @dataclass(frozen=True)
+class PluginHelper:
+    """One independently versioned runtime/helper dependency for a plugin."""
+
+    key: str
+    name: str
+    status: HelperStatus | None = None
+    install: HelperInstall | None = None
+    upstream: HelperStatus | None = None
+    status_for_root: Callable[[Path | None], dict] | None = None
+    install_for_root: Callable[[Path], dict] | None = None
+    pinned: str = ""
+    required: bool = True
+
+
+@dataclass(frozen=True)
 class GamePlugin:
     """One game integration discovered by the Lexeditor shell."""
 
@@ -141,6 +156,31 @@ class GamePlugin:
     helper_status_for_root: Callable[[Path | None], dict] | None = None
     helper_install_for_root: Callable[[Path], dict] | None = None
     helper_pinned: str = ""
+    # Multi-helper plugins opt into independent setup/update rows. Legacy
+    # singular fields above remain valid and are synthesized into one helper.
+    helpers: tuple[PluginHelper, ...] = ()
+
+
+
+def plugin_helpers(plugin: GamePlugin) -> tuple[PluginHelper, ...]:
+    """Return normalized helpers without requiring legacy plugins to change."""
+    if plugin.helpers:
+        return plugin.helpers
+    if not any((
+        plugin.helper_name, plugin.helper_status, plugin.helper_install, plugin.helper_upstream,
+        plugin.helper_status_for_root, plugin.helper_install_for_root, plugin.helper_pinned,
+    )):
+        return ()
+    return (PluginHelper(
+        key="default",
+        name=plugin.helper_name or "Runtime helper",
+        status=plugin.helper_status,
+        install=plugin.helper_install,
+        upstream=plugin.helper_upstream,
+        status_for_root=plugin.helper_status_for_root,
+        install_for_root=plugin.helper_install_for_root,
+        pinned=plugin.helper_pinned,
+    ),)
 
 
 
