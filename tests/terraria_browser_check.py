@@ -238,7 +238,7 @@ def main() -> None:
                     data_search.fill("")
 
                     page.evaluate('navigate("content")')
-                    page.locator(".terraria-content-tabs").wait_for()
+                    page.locator(".lex-tabbed-panel").wait_for()
                     assert int(page.locator(".lex-page-total").first.inner_text()) >= 2
                     page.get_by_role("button", name="Next page").first.click()
                     page.wait_for_timeout(100)
@@ -246,7 +246,9 @@ def main() -> None:
                     page.get_by_role("button", name="First page").first.click()
                     name_sort = page.locator('button.lex-column-sort[data-lex-title="Sort by Name"]')
                     family_sort = page.locator('button.lex-column-sort[data-lex-title="Sort by Family"]')
-                    boxes = [name_sort.bounding_box(), family_sort.bounding_box()]
+                    name_sort.wait_for(timeout=5000)
+                    family_sort.wait_for(state="visible", timeout=5000)
+                    boxes = page.wait_for_function("() => { const rect = t => document.querySelector(`button.lex-column-sort[data-lex-title=\"${t}\"]`)?.getBoundingClientRect(); const a = rect(\"Sort by Name\"), b = rect(\"Sort by Family\"); if (!a || !b || !a.width || !b.width) return null; return [{x: a.x, width: a.width}, {x: b.x, width: b.width}]; }", timeout=5000).json_value()
                     assert boxes[0] and boxes[1] and boxes[0]["x"] + boxes[0]["width"] <= boxes[1]["x"] + 1, boxes
                     name_sort.click()
                     search = page.get_by_role("searchbox", name="Search managed Terraria content")
@@ -328,8 +330,8 @@ def main() -> None:
                     page.get_by_role("button", name="Delete source").scroll_into_view_if_needed()
                     assert page.get_by_role("button", name="Delete source").is_visible()
                     source_width = page.evaluate("""() => {
-                      const detail=document.querySelector('.terraria-record-view .lex-detail-panel');
-                      const editor=document.querySelector('.terraria-source-editor');
+                      const detail=document.querySelector('#main .lex-detail-panel');
+                      const editor=document.querySelector('#main .lex-code-field');
                       if(!detail||!editor)return null;
                       return {detail:detail.getBoundingClientRect().width,editor:editor.getBoundingClientRect().width};
                     }""")
@@ -364,6 +366,7 @@ def main() -> None:
                         no_horizontal_overflow(page, f"{tab}-narrow-150")
 
                     page.evaluate('navigate("metadata")')
+                    page.wait_for_function("!document.querySelector('#main [role=\"status\"]')", timeout=5000)
                     reveal_settings_text(page, "TRANSLATION MOD")
                     page.evaluate('navigate("dependencies")')
                     page.get_by_role("button", name="Build Mod").scroll_into_view_if_needed()

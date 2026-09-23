@@ -31,7 +31,7 @@ class TerrariaUiContractTests(unittest.TestCase):
         for token in (
             "pagedListDetail(", "columnList(", "LexeditorUI.dataMap(",
             'info:()=>navigate("info")', 'help:()=>navigate("datamap")',
-            'tabbedPanel({className:"terraria-localization-tabs"',
+            'tabbedPanel({tabs',
             'edit:(row,value)=>void editLocalizationCell(row,value)',
             'boolControl("noCompile")', 'boolControl("playableOnPreview")',
             'boolControl("translationMod")', "Not declared — check to add",
@@ -40,6 +40,13 @@ class TerrariaUiContractTests(unittest.TestCase):
         self.assertNotIn("confirm(", js)
         self.assertNotIn("terraria-map", js)
         self.assertNotIn("terraria-localization-table", js)
+        for hook in (
+            "terraria-record-view", "terraria-table", "terraria-full-page",
+            "terraria-content-tabs", "terraria-localization-tabs",
+            "terraria-loading", "terraria-note", "terraria-build-card",
+            "terraria-source-editor", "terraria-asset-preview",
+        ):
+            self.assertNotIn(hook, js)
 
     def test_plugin_css_stays_small_and_does_not_reimplement_shared_components(self):
         css = CSS.read_text(encoding="utf-8")

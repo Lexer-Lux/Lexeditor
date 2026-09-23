@@ -1,33 +1,3 @@
-*{box-sizing:border-box}
+/* Terraria draws on the shared baseline and nothing else: colour
+   and structure come from the framework; this file only tunes the page. */
 :root{--lex-accent:#77b255;--lex-highlight:#36502c}
-body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
-main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
-.terraria-loading{height:100%;display:grid;place-items:center;color:var(--lex-muted);font-weight:700}
-.terraria-page{height:100%;min-height:0;max-width:1200px;margin:0 auto;overflow:auto;display:grid;align-content:start;gap:var(--lex-panel-gap)}
-.terraria-full-page{height:100%;min-height:0;display:flex;flex-direction:column;gap:var(--lex-panel-gap)}
-.terraria-full-page>.lex-paged-list-detail,.terraria-full-page>.lex-tabbed-panel{flex:1;min-height:0}
-.terraria-content-tabs,.terraria-localization-tabs{height:100%;min-height:0}
-.terraria-content-tabs>.lex-tabbed-panel-content,.terraria-localization-tabs>.lex-tabbed-panel-content{flex:1;min-height:0;overflow:hidden}
-.terraria-content-tabs>.lex-tabbed-panel-content>.lex-paged-list-detail,.terraria-localization-tabs>.lex-tabbed-panel-content>.lex-paged-list-detail{height:100%}
-.terraria-note{padding:10px 12px;border:1px solid var(--lex-border);background:var(--lex-panel)}
-.terraria-error{border-color:#a84d4d}
-.terraria-success{border-color:var(--lex-success)}
-.terraria-status{font-weight:700;text-transform:uppercase;font-size:.8em;letter-spacing:.04em}
-.terraria-build-card{display:grid;gap:9px}
-.terraria-build-row,.terraria-inline-actions,.terraria-inline-fields{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.terraria-build-path{overflow-wrap:anywhere;color:var(--lex-muted);font-size:.9em}
-.terraria-build-log{max-height:240px;margin:0;padding:10px;overflow:auto;white-space:pre-wrap;background:var(--lex-bg);border:1px solid var(--lex-border);font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
-.terraria-lines{min-height:96px;resize:vertical}
-.terraria-source-editor{width:100%;height:min(46vh,520px);min-height:220px;resize:vertical;padding:10px;border:1px solid var(--lex-border);background:var(--lex-bg);color:var(--lex-text);tab-size:4;font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre}
-.terraria-asset-preview{display:grid;place-items:center;min-height:150px;max-height:42vh;padding:10px;border:1px solid var(--lex-border);background:var(--lex-bg);overflow:auto}
-.terraria-asset-preview img{max-width:100%;max-height:38vh}
-.terraria-asset-preview audio{width:min(640px,100%)}
-.terraria-table .lex-column-list-cell{min-width:0}
-.terraria-diagnostics{max-height:240px;overflow:auto;border:1px solid var(--lex-border)}
-.terraria-info-layout{height:100%}
-@media(max-width:760px){.terraria-inline-fields>*{min-width:0;flex:1 1 100%}.terraria-source-editor{height:38vh;min-height:180px}}
-
-@media(max-width:850px){
-  .terraria-record-view{grid-template-rows:auto;grid-auto-rows:auto;height:100%;overflow:auto;align-content:start}
-  .terraria-record-view>*{max-height:none}
-}

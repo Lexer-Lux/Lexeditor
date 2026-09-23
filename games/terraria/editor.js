@@ -1,5 +1,5 @@
   "use strict";
-  const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,panelLayout,pagedListDetail,columnList,tabbedPanel,confirmAction}=LexeditorUI;
+  const {el,actionRow,badge,codeField,detailNote,detailPanel,detailSection,detailField,logView,notice,readonlyField,infoHelp,panelLayout,pagedListDetail,columnList,stack,textArea,tabbedPanel,confirmAction}=LexeditorUI;
   let tab="metadata",saved=null,current=null,mapRows=[],buildInfo=null,buildResult=null,building=false;
   let localizationFiles=[],locSaved=null,locCurrent=null,locLoading=false,locFilter="",locNewKey="",locNewValue="",locDeletedKeys=new Set();
   let sourceFiles=[],sourceSaved=null,sourceCurrent=null,sourceLoading=false,sourceNewPath="",sourceRenamePath="",sourceGotoLine=0;
@@ -27,8 +27,9 @@
     return [...rows].sort((left,right)=>{const a=get(left),b=get(right);const result=typeof a==="number"&&typeof b==="number"?a-b:String(a??"").localeCompare(String(b??""),undefined,{numeric:true,sensitivity:"base"});return result*dir});
   }
   function nextSort(state,key){return state.key===key?{key,dir:-state.dir}:{key,dir:1}}
-  function loadingPanel(message="Loading…"){return el("div",{class:"terraria-loading",role:"status"},message)}
-  function emptyPanel(title,message){return detailPanel({title,body:[el("p",{},message)]})}
+  function loadingPanel(message="Loading…"){return el("p",{class:"lex-notice",role:"status"},message)}
+
+  function emptyPanel(title,message){return detailPanel({title,body:[el("p",{class:"lex-notice"},message)]})}
   function cultureFlag(culture){const code=String(culture||"").toLowerCase();if(code==="en-us")return "🇺🇸";if(code==="en-gb")return "🇬🇧";if(code==="fr-fr")return "🇫🇷";if(code==="de-de")return "🇩🇪";if(code==="es-es")return "🇪🇸";if(code==="it-it")return "🇮🇹";if(code==="pt-br")return "🇧🇷";if(code==="ru-ru")return "🇷🇺";if(code==="pl-pl")return "🇵🇱";if(code==="zh-hans")return "🇨🇳";if(code==="ja-jp")return "🇯🇵";if(code==="ko-kr")return "🇰🇷";return "🌐"}
   function showNavigationLoading(label){document.querySelector("#main").replaceChildren(loadingPanel(`Loading ${label}…`))}
 
@@ -57,7 +58,7 @@
   }
   function listControl(key,{placeholder="",label=controlLabel(key)}={}){
     const values=Array.isArray(current.values[key])?current.values[key]:[];
-    return el("textarea",{class:"terraria-list",value:values.join("\n"),placeholder,"aria-label":label,disabled:!current.editable,oninput:event=>{current.values[key]=event.target.value.split(/\r?\n/).map(value=>value.trim()).filter(Boolean);shell?.refresh?.()}});
+    return textArea({value:values.join("\n"),placeholder,"aria-label":label,disabled:!current.editable,oninput:event=>{current.values[key]=event.target.value.split(/\r?\n/).map(value=>value.trim()).filter(Boolean);shell?.refresh?.()}});
   }
   function boolControl(key){
     const declared=key in current.values;
@@ -78,8 +79,8 @@
   function warnings(){
     if(!current)return [];
     const items=[];
-    if(current.duplicates.length)items.push(el("div",{class:"terraria-note terraria-error"},`Structured saving is disabled because build.txt repeats: ${current.duplicates.join(", ")}. Remove the ambiguity in source first.`));
-    if(error)items.push(el("div",{class:"terraria-note terraria-error"},error));
+    if(current.duplicates.length)items.push(el("p",{class:"lex-notice lex-tone-warning",role:"alert"},`Structured saving is disabled because build.txt repeats: ${current.duplicates.join(", ")}. Remove the ambiguity in source first.`));
+    if(error)items.push(el("p",{class:"lex-notice lex-tone-warning",role:"alert"},error));
     return items;
   }
   function metadataPanel(){
@@ -102,7 +103,7 @@
         detailField({label:"TRANSLATION MOD",control:boolControl("translationMod"),dataType:"BOOL",help:infoHelp("Marks the project as a translation mod for tModLoader packaging and loading.")}),
       ]}),
     ]});
-    return panelLayout([panel],"terraria-settings-layout",{layoutKey:"terraria-metadata",defaultSizes:[100]});
+    return panelLayout([panel],{layoutKey:"terraria-metadata",defaultSizes:[100]});
   }
   function informationPanel(){
     const runtimeState=buildInfo?.available?"Ready":buildInfo?.reason||"Not detected";
@@ -141,34 +142,33 @@
     if(!buildInfo)return loadingPanel("Checking native tModLoader build handoff…");
     const blockedByDirty=dirtyCount()>0;
     const reason=blockedByDirty?"Save or discard edits before building.":(buildInfo.reason||"Ready to invoke tModLoader native -build path.");
-    const packageLabel=buildInfo.artifactExists?"Package built":"Package missing";
-    const enabledLabel=!buildInfo.enabledStateValid?"Enabled state unknown":(buildInfo.enabled?"Enabled":"Disabled");
-    const card=el("div",{class:"terraria-note terraria-build-card"},
-      el("div",{class:"terraria-build-row"},el("button",{class:"lex-dialog-action primary",disabled:building||blockedByDirty||!buildInfo.available,onclick:buildMod},building?"BUILDING…":"BUILD MOD"),el("strong",{},buildInfo.available&&!blockedByDirty?"Native build ready":"Native build unavailable")),
-      el("div",{},reason),
-      el("div",{class:"terraria-build-row"},el("span",{class:"terraria-status"},packageLabel),el("span",{class:"terraria-status"},enabledLabel)),
-      el("div",{class:"terraria-build-path"},`Expected package: ${buildInfo.expectedArtifact}`),
-      el("div",{class:"terraria-build-path"},`tModLoader state: ${buildInfo.enabledStatePath}`));
-    if(!buildInfo.enabledStateValid&&buildInfo.enabledStateError)card.append(el("div",{class:"terraria-error"},buildInfo.enabledStateError));
+    const body=[detailField({label:"ACTION",control:actionRow(
+      el("button",{class:"lex-dialog-action primary",disabled:building||blockedByDirty||!buildInfo.available,onclick:buildMod},building?"BUILDING…":"BUILD MOD"),el("strong",{},buildInfo.available&&!blockedByDirty?"Native build ready":"Native build unavailable"))}),
+      detailNote(reason),
+      detailField({label:"PACKAGE",control:badge(buildInfo.artifactExists?"Package built":"Package missing")}),
+      detailField({label:"ENABLED",control:badge(!buildInfo.enabledStateValid?"Enabled state unknown":(buildInfo.enabled?"Enabled":"Disabled"))}),
+      detailNote(`Expected package: ${buildInfo.expectedArtifact}`),
+      detailNote(`tModLoader state: ${buildInfo.enabledStatePath}`)];
+    if(!buildInfo.enabledStateValid&&buildInfo.enabledStateError)body.push(el("p",{class:"lex-notice lex-tone-warning",role:"alert"},buildInfo.enabledStateError));
     if(buildResult){
-      const success=buildResult.ok;card.classList.add(success?"terraria-success":"terraria-error");
+      const success=buildResult.ok;
       const summary=success?`Build succeeded${buildResult.artifactExists?" and produced the expected .tmod":""}${buildResult.enabled?"; tModLoader reports it enabled.":"."}`:(buildResult.error||`Build failed with exit code ${buildResult.exitCode??"unknown"}.`);
-      card.append(el("strong",{},summary));
-      if(success&&buildResult.enabledStateValid&&!buildResult.enabled)card.append(el("div",{},"The package was built, but enabled.json does not currently list this mod as enabled."));
+      body.push(notice({message:summary,tone:success?"success":"warning"}));
+      if(success&&buildResult.enabledStateValid&&!buildResult.enabled)body.push(detailNote("The package was built, but enabled.json does not currently list this mod as enabled."));
       const diagnostics=Array.isArray(buildResult.diagnostics)?buildResult.diagnostics:[];
       if(diagnostics.length){
         const rows=diagnostics.map((row,index)=>({...row,id:index+1,location:`${row.path}:${row.line}:${row.column}`}));
-        card.append(el("div",{class:"terraria-diagnostics"},columnList({rows,key:row=>row.id,selected:null,select:row=>openBuildDiagnostic(row),columns:[
+        body.push(columnList({rows,key:row=>row.id,selected:null,select:row=>openBuildDiagnostic(row),columns:[
           {key:"severity",label:"Severity",sortable:true},
           {key:"location",label:"Location",sortable:true,align:"start"},
           {key:"code",label:"Code",sortable:true},
           {key:"message",label:"Message",sortable:true,align:"start"},
-        ],"aria-label":"tModLoader build diagnostics"})));
+        ],"aria-label":"tModLoader build diagnostics"}));
       }
       const log=[buildResult.stdout&&`STDOUT\n${buildResult.stdout}`,buildResult.stderr&&`STDERR\n${buildResult.stderr}`,buildResult.nativeLog&&`TMODLOADER NATIVES LOG\n${buildResult.nativeLog}`].filter(Boolean).join("\n\n");
-      if(log)card.append(el("pre",{class:"terraria-build-log"},log));
+      if(log)body.push(logView(log));
     }
-    return card;
+    return detailSection({title:"BUILD",body});
   }
 
   function dependenciesPanel(){
@@ -187,7 +187,7 @@
       detailSection({title:"BUILD FILTER",body:[detailField({label:"BUILD IGNORE",control:listControl("buildIgnore",{placeholder:"Folder/*\nFile.ext"}),dataType:"LIST",help:infoHelp("Project-relative patterns tModLoader should exclude from the built .tmod package.")})]}),
       buildCard(),
     ]});
-    return panelLayout([panel],"terraria-settings-layout",{layoutKey:"terraria-dependencies",defaultSizes:[100]});
+    return panelLayout([panel],{layoutKey:"terraria-dependencies",defaultSizes:[100]});
   }
 
   function contentSchema(kind=contentKind){return contentSchemas.find(schema=>schema.kind===kind)||null}
@@ -203,7 +203,7 @@
       for(const optionValue of field.options||[]){const option=el("option",{value:optionValue},optionValue);option.selected=String(value)===String(optionValue);select.append(option)}
       return select;
     }
-    if(field.type==="lines")return el("textarea",{...common,class:"terraria-lines",value:String(value??""),placeholder:"One entry per line",oninput:event=>onchange(event.target.value)});
+    if(field.type==="lines")return textArea({...common,value:String(value??""),placeholder:"One entry per line",oninput:event=>onchange(event.target.value)});
     const numeric=field.type==="int"||field.type==="float";
     return el("input",{...common,type:numeric?"number":"text",value:String(value??""),step:field.type==="float"?"any":"1",min:numeric&&field.min!==undefined?field.min:null,max:numeric&&field.max!==undefined?field.max:null,oninput:event=>{if(!numeric||event.target.value!=="")onchange(numeric?Number(event.target.value):event.target.value)}});
   }
@@ -265,11 +265,11 @@
     let rows=contentFiles.filter(row=>!query||`${row.name} ${row.kind} ${row.path}`.toLocaleLowerCase().includes(query));
     rows=sortedRows(rows,contentSort,{name:row=>row.name,kind:row=>row.kind,path:row=>row.path});
     return pagedListDetail({rows,key:row=>row.path,slots:false,noun:"managed content",page:contentPage,pageSize:contentPageSize,selected:structuredCurrent?.path||rows[0]?.path||null,
-      className:"terraria-record-view",splitKey:"terraria-content",rowsKey:"terraria-content",defaultSplit:43,minLeft:300,minRight:360,
+      splitKey:"terraria-content",rowsKey:"terraria-content",defaultSplit:43,minLeft:300,minRight:360,
       search:{key:"terraria-content",value:contentQuery,label:"Search managed Terraria content",placeholder:"Search names, families, or source paths…",change:value=>{contentQuery=value;contentPage=0;render()}},
       sync:next=>{contentPage=next.page;contentPageSize=next.pageSize;if(next.selected&&next.selected!==structuredCurrent?.path&&!structuredLoading)void loadStructuredContent(next.selected)},
       change:next=>{contentPage=next.page;contentPageSize=next.pageSize;if(next.selected&&next.selected!==structuredCurrent?.path)void loadStructuredContent(next.selected);else render()},
-      master:({rows,selected,select})=>columnList({rows,key:row=>row.path,selected,select,sortState:contentSort,sort:key=>{contentSort=nextSort(contentSort,key);render()},class:"terraria-table",
+      master:({rows,selected,select})=>columnList({rows,key:row=>row.path,selected,select,sortState:contentSort,sort:key=>{contentSort=nextSort(contentSort,key);render()},
         template:"minmax(130px,1fr) minmax(105px,.72fr) minmax(170px,1.35fr)",
         columns:[{key:"name",label:"Name",sortable:true,align:"start"},{key:"kind",label:"Family",sortable:true,align:"start"},{key:"path",label:"Source",sortable:true,align:"start"}],"aria-label":"Terraria managed content"}),
       detail:structuredDetail,emptyDetail:()=>emptyPanel("Managed Content","No managed content matches the current search."),
@@ -287,7 +287,7 @@
     const actions=detailSection({title:"CREATE",body:[detailField({label:"ACTION",control:el("button",{class:"lex-dialog-action primary",type:"button",disabled:locked||!schema,onclick:createStructuredContent},contentCreating?"CREATING…":"Create content"),help:infoHelp("Creation never overwrites an existing C# or asset path. Lexeditor also creates the localization and placeholder assets required by the selected family.")})]});
     const result=contentResult?detailSection({title:"LAST CREATED",body:[detailField({label:"SOURCE",control:readonlyField(contentResult.path||contentResult.source?.path||"Created")})]}):null;
     const panel=detailPanel({title:"Create Content",meta:"Native tModLoader structured scaffold",body:[identity,...schemaSections(schema,contentCreateValues,()=>shell?.refresh?.(),{disabled:locked}),actions,result].filter(Boolean)});
-    return panelLayout([panel],"terraria-settings-layout",{layoutKey:"terraria-content-create",defaultSizes:[100]});
+    return panelLayout([panel],{layoutKey:"terraria-content-create",defaultSizes:[100]});
   }
   function logicScaffoldPanel(){
     const locked=contentCreating||logicCreating||structuredLoading||dirtyCount()>0;
@@ -301,7 +301,7 @@
   function contentPanel(){
     const tabs=[{id:"managed",label:"Managed"},{id:"create",label:"Create"},{id:"scaffolds",label:"Scaffolds"}];
     const content=contentView==="create"?contentCreatePanel():contentView==="scaffolds"?logicScaffoldPanel():contentManagedPanel();
-    return el("div",{class:"terraria-full-page"},...warnings(),tabbedPanel({className:"terraria-content-tabs",tabs,active:contentView,label:"Terraria content views",change:value=>{contentView=value;render()},content}));
+    return stack({},...warnings(),tabbedPanel({tabs,active:contentView,label:"Terraria content views",change:value=>{contentView=value;render()},content}));
   }
 
   function projectName(){const parts=String(buildInfo?.project||"").split(/[\\/]/).filter(Boolean);return parts.at(-1)||"ExampleMod"}
@@ -368,11 +368,11 @@
     rows=sortedRows(rows,locSort,{key:row=>row.key,value:row=>row.value,path:row=>row.path});
     const selected=rows.some(row=>row.key===locSelectedKey&&row.path===locCurrent?.path)?locSelectedKey:(rows[0]?.key||"");
     return pagedListDetail({rows,key:row=>`${row.path}\u001f${row.key}`,slots:false,noun:"localization entries",page:locPage,pageSize:locPageSize,selected:rows.find(row=>row.key===selected&&row.path===locCurrent?.path)?`${locCurrent.path}\u001f${selected}`:(rows[0]?`${rows[0].path}\u001f${rows[0].key}`:null),
-      className:"terraria-record-view",splitKey:`terraria-localization-${locCulture}`,rowsKey:`terraria-localization-${locCulture}`,defaultSplit:48,minLeft:320,minRight:360,
+      splitKey:`terraria-localization-${locCulture}`,rowsKey:`terraria-localization-${locCulture}`,defaultSplit:48,minLeft:320,minRight:360,
       search:{key:`terraria-localization-${locCulture}`,value:locQuery,label:`Search ${locCulture} localization`,placeholder:"Search keys, values, or resource paths…",change:value=>{locQuery=value;locPage=0;render()}},
       sync:next=>{locPage=next.page;locPageSize=next.pageSize;if(next.selected){const [path,key]=String(next.selected).split("\u001f");locSelectedKey=key;if(path!==locCurrent?.path&&!locLoading)void loadLocalizationFile(path,key)}},
       change:next=>{locPage=next.page;locPageSize=next.pageSize;if(next.selected){const [path,key]=String(next.selected).split("\u001f");locSelectedKey=key;if(path!==locCurrent?.path)void loadLocalizationFile(path,key);else render()}else render()},
-      master:({rows,selected,select})=>columnList({rows,key:row=>`${row.path}\u001f${row.key}`,selected,select,sortState:locSort,sort:key=>{locSort=nextSort(locSort,key);render()},class:"terraria-table",refresh:()=>{render();shell?.refresh?.()},
+      master:({rows,selected,select})=>columnList({rows,key:row=>`${row.path}\u001f${row.key}`,selected,select,sortState:locSort,sort:key=>{locSort=nextSort(locSort,key);render()},refresh:()=>{render();shell?.refresh?.()},
         template:"minmax(180px,1.25fr) minmax(170px,1.1fr) minmax(160px,1fr)",
         columns:[{key:"key",label:"Key",sortable:true,align:"start"},{key:"value",label:"Value",sortable:true,align:"start",edit:(row,value)=>void editLocalizationCell(row,value),editValue:row=>row.value},{key:"path",label:"Resource",sortable:true,align:"start"}],"aria-label":`${locCulture} localization entries`}),
       detail:localizationDetail,emptyDetail:()=>emptyPanel("Localization","No localization entries match this language/search."),
@@ -380,10 +380,10 @@
   }
   function localizationPanel(){
     const cultures=[...new Set(localizationRows().map(row=>row.culture).filter(Boolean))].sort();
-    if(!cultures.length)return el("div",{class:"terraria-page"},...warnings(),emptyPanel("Localization","No loadable .hjson localization files are present in this source project yet."));
+    if(!cultures.length)return stack({fill:false},...warnings(),emptyPanel("Localization","No loadable .hjson localization files are present in this source project yet."));
     if(!cultures.includes(locCulture))locCulture=cultures[0];
     const tabs=cultures.map(culture=>({id:culture,label:`${cultureFlag(culture)} ${culture}`}));
-    return el("div",{class:"terraria-full-page"},...warnings(),tabbedPanel({className:"terraria-localization-tabs",tabs,active:locCulture,label:"Localization languages",change:value=>{locCulture=value;locQuery="";locPage=0;const row=localizationRows().find(item=>item.culture===value);if(row&&row.path!==locCurrent?.path)void loadLocalizationFile(row.path,row.key);else render()},content:localizationCulturePanel()}));
+    return stack({},...warnings(),tabbedPanel({tabs,active:locCulture,label:"Localization languages",change:value=>{locCulture=value;locQuery="";locPage=0;const row=localizationRows().find(item=>item.culture===value);if(row&&row.path!==locCurrent?.path)void loadLocalizationFile(row.path,row.key);else render()},content:localizationCulturePanel()}));
   }
 
   async function renameSourceFileAction(){
@@ -406,7 +406,7 @@
   function sourceDetail(row){
     if(sourceCreateMode)return sourceCreateDetail();if(!row)return emptyPanel("Source","No C# source file is selected.");
     if(sourceLoading||sourceCurrent?.path!==row.path)return loadingPanel(`Loading ${row.path}…`);
-    const editor=el("textarea",{class:"terraria-source-editor",spellcheck:false,value:sourceCurrent.text,"aria-label":`C# source ${sourceCurrent.path}`,oninput:event=>{sourceCurrent.text=event.target.value;shell?.refresh?.()},onkeydown:event=>{if(event.key!=="Tab")return;event.preventDefault();const target=event.target,start=target.selectionStart,end=target.selectionEnd;target.setRangeText("\t",start,end,"end");sourceCurrent.text=target.value;shell?.refresh?.()}});
+    const editor=codeField({value:sourceCurrent.text,"aria-label":`C# source ${sourceCurrent.path}`,oninput:event=>{sourceCurrent.text=event.target.value;shell?.refresh?.()},onkeydown:event=>{if(event.key!=="Tab")return;event.preventDefault();const target=event.target,start=target.selectionStart,end=target.selectionEnd;target.setRangeText("\t",start,end,"end");sourceCurrent.text=target.value;shell?.refresh?.()}});
     if(sourceGotoLine){const line=sourceGotoLine;sourceGotoLine=0;setTimeout(()=>{const rows=editor.value.split("\n");let start=0;for(let i=1;i<line&&i<=rows.length;i++)start+=rows[i-1].length+1;const end=start+(rows[Math.min(line-1,rows.length-1)]||"").length;editor.focus();editor.setSelectionRange(start,end);editor.scrollTop=Math.max(0,(line-5)*20)},0)}
     const rename=el("input",{type:"text",value:sourceRenamePath||sourceCurrent.path,"aria-label":"Rename C# source path",disabled:sourceLoading||dirtyCount()>0,oninput:event=>{sourceRenamePath=event.target.value}});
     return detailPanel({title:basename(row.path),meta:row.path,body:[
@@ -424,12 +424,12 @@
   }
   function sourcePanel(){
     const query=sourceQuery.trim().toLocaleLowerCase();let rows=sourceFiles.filter(row=>!row.error&&(!query||row.path.toLocaleLowerCase().includes(query)));rows=sortedRows(rows,sourceSort,{path:row=>row.path,lines:row=>row.lines,bytes:row=>row.bytes});
-    return el("div",{class:"terraria-full-page"},...warnings(),pagedListDetail({rows,key:row=>row.path,slots:false,noun:"source files",page:sourcePage,pageSize:sourcePageSize,selected:sourceCreateMode?"__new__":sourceCurrent?.path||rows[0]?.path||null,
-      className:"terraria-record-view",splitKey:"terraria-source",rowsKey:"terraria-source",defaultSplit:44,minLeft:300,minRight:380,add:()=>{sourceCreateMode=true;render()},addTitle:"Add C# source file",addDisabled:sourceLoading||dirtyCount()>0,
+    return stack({},...warnings(),pagedListDetail({rows,key:row=>row.path,slots:false,noun:"source files",page:sourcePage,pageSize:sourcePageSize,selected:sourceCreateMode?"__new__":sourceCurrent?.path||rows[0]?.path||null,
+      splitKey:"terraria-source",rowsKey:"terraria-source",defaultSplit:44,minLeft:300,minRight:380,add:()=>{sourceCreateMode=true;render()},addTitle:"Add C# source file",addDisabled:sourceLoading||dirtyCount()>0,
       search:{key:"terraria-source",value:sourceQuery,label:"Search Terraria source files",placeholder:"Search project-relative C# paths…",change:value=>{sourceQuery=value;sourcePage=0;sourceCreateMode=false;render()}},
       sync:next=>{sourcePage=next.page;sourcePageSize=next.pageSize;if(next.selected&&next.selected!=="__new__"&&next.selected!==sourceCurrent?.path&&!sourceLoading){sourceCreateMode=false;void loadSourceFile(next.selected)}},
       change:next=>{sourcePage=next.page;sourcePageSize=next.pageSize;if(next.selected&&next.selected!=="__new__"&&next.selected!==sourceCurrent?.path){sourceCreateMode=false;void loadSourceFile(next.selected)}else render()},
-      master:({rows,selected,select})=>columnList({rows,key:row=>row.path,selected,select,sortState:sourceSort,sort:key=>{sourceSort=nextSort(sourceSort,key);render()},class:"terraria-table",refresh:()=>render(),
+      master:({rows,selected,select})=>columnList({rows,key:row=>row.path,selected,select,sortState:sourceSort,sort:key=>{sourceSort=nextSort(sourceSort,key);render()},refresh:()=>render(),
         template:"minmax(230px,1fr) 72px 84px",columns:[
         {key:"path",label:"Path",sortable:true,align:"start",edit:(row,value)=>void renameSourceRow(row,String(value)),editValue:row=>row.path},
         {key:"lines",label:"Lines",sortable:true,numeric:true},{key:"bytes",label:"Bytes",sortable:true,numeric:true},
@@ -455,7 +455,7 @@
   async function renameAssetAction(){if(assetLoading||dirtyCount()||!assetCurrent)return;const newPath=assetRenamePath.trim();if(!newPath){error="Enter the new project-relative asset path.";render();return}assetLoading=true;error="";render();try{const renamed=await request("/api/assets/rename",{method:"POST",body:JSON.stringify({path:assetCurrent.path,newPath,expectedSha256:assetCurrent.sha256})});assetRenamePath="";await refreshAssets(renamed.path)}catch(exc){error=String(exc.message||exc)}assetLoading=false;render()}
   async function renameAssetRow(row,newPath){if(row.path===newPath)return;if(assetCurrent?.path!==row.path)await loadAsset(row.path);assetRenamePath=String(newPath);await renameAssetAction()}
   async function deleteAssetAction(){if(assetLoading||dirtyCount()||!assetCurrent)return;const approved=await confirmAction({title:"Delete asset?",message:`Delete ${assetCurrent.path} from this mod source project?`,confirmLabel:"Delete"});if(!approved)return;assetLoading=true;error="";render();try{await request("/api/assets/delete",{method:"POST",body:JSON.stringify({path:assetCurrent.path,expectedSha256:assetCurrent.sha256})});await refreshAssets()}catch(exc){error=String(exc.message||exc)}assetLoading=false;render()}
-  function assetPreview(){if(!assetCurrent)return null;const src=`/api/assets/raw?path=${encodeURIComponent(assetCurrent.path)}&sha=${encodeURIComponent(assetCurrent.sha256)}`;if(assetCurrent.preview==="image")return el("div",{class:"terraria-asset-preview"},el("img",{src,alt:assetCurrent.path}));if(assetCurrent.preview==="audio")return el("div",{class:"terraria-asset-preview"},el("audio",{src,controls:true}));return el("div",{class:"terraria-asset-preview"},el("span",{class:"terraria-status"},"NO BROWSER PREVIEW"))}
+  function assetPreview(){if(!assetCurrent)return null;const src=`/api/assets/raw?path=${encodeURIComponent(assetCurrent.path)}&sha=${encodeURIComponent(assetCurrent.sha256)}`;if(assetCurrent.preview==="image")return el("img",{src,alt:assetCurrent.path});if(assetCurrent.preview==="audio")return el("audio",{src,controls:true});return detailNote("No browser preview is available for this asset format.")}
   function assetImportDetail(){const locked=assetLoading||dirtyCount()>0;return detailPanel({title:"Import Asset",meta:"Known tModLoader package resource",body:[detailSection({title:"IMPORT",body:[
     detailField({label:"PATH",dataType:"STRING",control:el("input",{type:"text",value:assetNewPath,"aria-label":"Asset destination path",placeholder:"Content/Items/Sword.png",disabled:locked,oninput:event=>{assetNewPath=event.target.value}})}),
     detailField({label:"FILE",control:el("input",{type:"file",accept:".png,.xnb,.rawimg,.fxc,.wav,.mp3,.ogg",disabled:locked,"aria-label":"Asset file",onchange:event=>{assetImportFile=event.target.files?.[0]||null}})}),
@@ -466,7 +466,7 @@
     const locked=assetLoading||dirtyCount()>0,dimensions=assetCurrent.width&&assetCurrent.height?`${assetCurrent.width} × ${assetCurrent.height}`:"Not decoded";
     const rename=el("input",{type:"text",value:assetRenamePath||assetCurrent.path,"aria-label":"Rename asset path",disabled:locked,oninput:event=>{assetRenamePath=event.target.value}});
     return detailPanel({title:basename(row.path),meta:row.path,body:[
-      detailSection({title:"PREVIEW",body:[assetPreview()]}),
+      detailSection({title:"PREVIEW",body:[detailField({label:"PREVIEW",control:assetPreview()})]}),
       detailSection({title:"FILE",body:[
         detailField({label:"PATH",dataType:"STRING",control:rename}),detailField({label:"FORMAT",control:readonlyField(assetCurrent.kind||assetCurrent.extension)}),detailField({label:"SIZE",control:readonlyField(`${assetCurrent.bytes} bytes`)}),detailField({label:"DIMENSIONS",control:readonlyField(dimensions)}),
       ]}),
@@ -482,12 +482,12 @@
   }
   function assetsPanel(){
     const query=assetQuery.trim().toLocaleLowerCase();let rows=assetFiles.filter(row=>!row.error&&(!query||`${row.path} ${row.kind}`.toLocaleLowerCase().includes(query)));rows=sortedRows(rows,assetSort,{path:row=>row.path,kind:row=>row.kind,bytes:row=>row.bytes});
-    return el("div",{class:"terraria-full-page"},...warnings(),pagedListDetail({rows,key:row=>row.path,slots:false,noun:"assets",page:assetPage,pageSize:assetPageSize,selected:assetImportMode?"__new__":assetCurrent?.path||rows[0]?.path||null,
-      className:"terraria-record-view",splitKey:"terraria-assets",rowsKey:"terraria-assets",defaultSplit:46,minLeft:300,minRight:360,add:()=>{assetImportMode=true;render()},addTitle:"Import Terraria asset",addDisabled:assetLoading||dirtyCount()>0,
+    return stack({},...warnings(),pagedListDetail({rows,key:row=>row.path,slots:false,noun:"assets",page:assetPage,pageSize:assetPageSize,selected:assetImportMode?"__new__":assetCurrent?.path||rows[0]?.path||null,
+      splitKey:"terraria-assets",rowsKey:"terraria-assets",defaultSplit:46,minLeft:300,minRight:360,add:()=>{assetImportMode=true;render()},addTitle:"Import Terraria asset",addDisabled:assetLoading||dirtyCount()>0,
       search:{key:"terraria-assets",value:assetQuery,label:"Search Terraria assets",placeholder:"Search asset paths or formats…",change:value=>{assetQuery=value;assetPage=0;assetImportMode=false;render()}},
       sync:next=>{assetPage=next.page;assetPageSize=next.pageSize;if(next.selected&&next.selected!=="__new__"&&next.selected!==assetCurrent?.path&&!assetLoading){assetImportMode=false;void loadAsset(next.selected)}},
       change:next=>{assetPage=next.page;assetPageSize=next.pageSize;if(next.selected&&next.selected!=="__new__"&&next.selected!==assetCurrent?.path){assetImportMode=false;void loadAsset(next.selected)}else render()},
-      master:({rows,selected,select})=>columnList({rows,key:row=>row.path,selected,select,sortState:assetSort,sort:key=>{assetSort=nextSort(assetSort,key);render()},class:"terraria-table",refresh:()=>render(),
+      master:({rows,selected,select})=>columnList({rows,key:row=>row.path,selected,select,sortState:assetSort,sort:key=>{assetSort=nextSort(assetSort,key);render()},refresh:()=>render(),
         template:"minmax(220px,1fr) 100px 84px",columns:[
         {key:"path",label:"Path",sortable:true,align:"start",edit:(row,value)=>void renameAssetRow(row,String(value)),editValue:row=>row.path},
         {key:"kind",label:"Format",sortable:true,align:"start"},{key:"bytes",label:"Bytes",sortable:true,numeric:true},
@@ -518,7 +518,7 @@
   }
   function render(){
     let content;
-    if(tab==="datamap")content=dataMapPanel();else if(tab==="info")content=panelLayout([informationPanel()],"terraria-info-layout",{layoutKey:"terraria-info",defaultSizes:[100]});else if(tab==="assets")content=assetsPanel();else if(tab==="source")content=sourcePanel();else if(tab==="localization")content=localizationPanel();else if(tab==="content")content=contentPanel();else if(tab==="dependencies")content=dependenciesPanel();else content=metadataPanel();
+    if(tab==="datamap")content=dataMapPanel();else if(tab==="info")content=panelLayout([informationPanel()],{layoutKey:"terraria-info",defaultSizes:[100]});else if(tab==="assets")content=assetsPanel();else if(tab==="source")content=sourcePanel();else if(tab==="localization")content=localizationPanel();else if(tab==="content")content=contentPanel();else if(tab==="dependencies")content=dependenciesPanel();else content=metadataPanel();
     document.querySelector("#main").replaceChildren(content);shell?.refresh?.();
   }
 
