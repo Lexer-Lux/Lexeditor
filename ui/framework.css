@@ -2324,6 +2324,7 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 /* A pin on a pinnable label is a small mark in that label's top-right corner,
    the same size beside a heading's id as beside a property name. */
 .lex-pinnable-property:not(.lex-detail-field) { position:relative; padding-inline-end:20px; }
+.lex-detail-panel-id > .lex-pinnable-property { padding-inline-end:10px; }
 .lex-pinnable-property:not(.lex-detail-field) > .lex-column-pin {
   position:absolute;
   z-index:5;
@@ -6591,7 +6592,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   border-bottom: var(--lex-detail-heading-border, 1px solid var(--lex-border));
   background: var(--lex-detail-heading-bg, color-mix(in srgb, var(--lex-panel-2) 55%, var(--lex-panel)));
 
- padding: var(--lex-detail-heading-padding, 4px 18px 4px 4px);
+ padding: var(--lex-detail-heading-padding, 4px);
 }
 .lex-detail-panel-icon {
 
