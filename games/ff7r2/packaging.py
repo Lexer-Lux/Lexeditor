@@ -109,14 +109,18 @@ def _native_mod_load_order(game: Path | None) -> dict:
             name for name in directories
             if not (current_path / name).is_symlink()
         ]
-        lower_names = {name.lower(): name for name in files}
+        lower_paths = {name.lower(): current_path / name for name in files}
         for name in files:
             pak = current_path / name
             if pak.is_symlink() or pak.suffix.lower() != ".pak":
                 continue
             stem = pak.stem
             expected = [stem + ".utoc", stem + ".ucas"]
-            missing = [suffix for suffix in expected if suffix.lower() not in lower_names]
+            missing = []
+            for suffix in expected:
+                sidecar = lower_paths.get(suffix.lower())
+                if sidecar is None or sidecar.is_symlink() or not sidecar.is_file():
+                    missing.append(suffix)
             relative = pak.relative_to(root).as_posix()
             if missing:
                 result["incomplete"].append({"package": relative, "missing": missing})
