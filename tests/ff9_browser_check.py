@@ -272,7 +272,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.wait_for_function("state.mapQuery==='p0data1'")
             partial_row = page.locator(".lex-column-list-row").filter(has_text="BGI_FLOOR_ACTIVE").first
             expect(partial_row).to_be_visible()
-            expect(partial_row.get_by_text("Partial", exact=True)).to_be_visible()
+            expect(partial_row.locator('.lex-integration-status[aria-label="Partial"]')).to_be_visible()
             map_search.fill("p0data4.bin")
             page.wait_for_function("state.mapQuery==='p0data4.bin'")
             map_text = page.locator(".lex-data-map-view").inner_text()
