@@ -316,6 +316,19 @@ class EditingTests(unittest.TestCase):
         self.assertEqual((loot["status"], loot["target"], loot["openable"]),
                          ("partial", "loot", True))
 
+    def test_data_map_never_promotes_unverified_research_rows(self):
+        rows = server._normalize_data_map_rows([{
+            "filename": "game/content.rpf:/content/unknown.bin",
+            "status": "integrated",
+            "target": "items",
+            "notes": "Research inventory claimed this was editable.",
+        }], interfaces={})
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["filename"], "game/content.rpf:/content/unknown.bin")
+        self.assertEqual(rows[0]["status"], "not-integrated")
+        self.assertEqual(rows[0]["target"], "")
+        self.assertFalse(rows[0]["openable"])
+
     def test_mission_identity_schema_and_reward_limits(self):
         for document in (None, [], {"schemaVersion": True},
                          {"schemaVersion": 1, "contract": "LexerRDR.mission-rewards", "overrides": {}},
