@@ -22,3 +22,16 @@ No Viking Comb doubling code exists anywhere in tree (comb matches are combat su
 No concrete Lexer-side session exists yet (safe mechanism/research still
 owed), so flipping to waiting would be a fake checklist. Left actionable
 until a real session can be written.
+
+## 2026-09-23 agent slice (per-game-rdr2): checkable measurement contract
+
+games/rdr2/viking_comb_criteria.py pins the measurability contract from
+the issue body as code: is_eligible_gain() (positive, social, non-mission,
+at most 20 points) plus validate_measurement(), which requires a named
+repeatable interaction, readable before/after Honor values, at least one
+doubled and one excluded case with exact expectations, and ownership of
+the unproven interception hook. Covered by
+tests/test_rdr2_viking_comb_criteria.py (10 hermetic tests). No gameplay
+claim: the interception hook and the measurable game session are still
+owed.
+
