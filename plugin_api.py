@@ -122,6 +122,21 @@ HelperInstall = Callable[[], dict]
 
 
 @dataclass(frozen=True)
+class PluginHelper:
+    """One independently versioned runtime/helper dependency for a plugin."""
+
+    key: str
+    name: str
+    status: HelperStatus | None = None
+    install: HelperInstall | None = None
+    upstream: HelperStatus | None = None
+    status_for_root: Callable[[Path | None], dict] | None = None
+    install_for_root: Callable[[Path], dict] | None = None
+    pinned: str = ""
+    required: bool = True
+
+
+@dataclass(frozen=True)
 class GamePlugin:
     """One game integration discovered by the Lexeditor shell."""
 
@@ -174,6 +189,30 @@ class GamePlugin:
     # otherwise in the game itself.
     mods_load: bool = False
     managed_mod: object | None = None
+    # Multi-helper plugins opt into independent setup/update rows. Legacy
+    # singular fields above remain valid and are synthesized into one helper.
+    helpers: tuple[PluginHelper, ...] = ()
+
+
+def plugin_helpers(plugin: GamePlugin) -> tuple[PluginHelper, ...]:
+    """Return normalized helpers without requiring legacy plugins to change."""
+    if plugin.helpers:
+        return plugin.helpers
+    if not any((
+        plugin.helper_name, plugin.helper_status, plugin.helper_install, plugin.helper_upstream,
+        plugin.helper_status_for_root, plugin.helper_install_for_root, plugin.helper_pinned,
+    )):
+        return ()
+    return (PluginHelper(
+        key="default",
+        name=plugin.helper_name or "Runtime helper",
+        status=plugin.helper_status,
+        install=plugin.helper_install,
+        upstream=plugin.helper_upstream,
+        status_for_root=plugin.helper_status_for_root,
+        install_for_root=plugin.helper_install_for_root,
+        pinned=plugin.helper_pinned,
+    ),)
 
 
 def _absolute_for_host_or_windows(path: Path) -> bool:
@@ -188,6 +227,21 @@ def validate_plugin(plugin: GamePlugin) -> None:
     for field in (plugin.name, plugin.accent):
         if not field:
             raise ValueError(f"{plugin.plugin_id} has an empty descriptor field")
+    if plugin.helpers and any((
+        plugin.helper_name, plugin.helper_status, plugin.helper_install, plugin.helper_upstream,
+        plugin.helper_status_for_root, plugin.helper_install_for_root, plugin.helper_pinned,
+    )):
+        raise ValueError(f"{plugin.plugin_id} mixes legacy and multi-helper descriptors")
+    helper_keys: set[str] = set()
+    for helper in plugin_helpers(plugin):
+        if (not helper.key or not helper.key.replace("-", "").isalnum()
+                or helper.key in helper_keys or not helper.name):
+            raise ValueError(f"{plugin.plugin_id} has an invalid or duplicate helper descriptor")
+        if not (helper.status or helper.status_for_root):
+            raise ValueError(f"{plugin.plugin_id}/{helper.key} has no helper status provider")
+        if helper.install and helper.install_for_root:
+            raise ValueError(f"{plugin.plugin_id}/{helper.key} declares two helper installers")
+        helper_keys.add(helper.key)
     if plugin.cover_art is not None:
         if (not plugin.cover_art.is_absolute() or not plugin.cover_art.is_file()
                 or plugin.cover_art.suffix.casefold() not in {".jpg", ".jpeg", ".png", ".webp", ".svg"}):

@@ -65,6 +65,98 @@ def make_fixture(root: Path) -> tuple[Path, Path]:
     source.parent.mkdir(parents=True)
     source.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
 
+    typed_sources = {
+        "BigCraftables": {
+            "FixtureLamp": {
+                "Name": "Fixture Lamp", "Price": 150, "Fragility": 0,
+                "CanBePlacedIndoors": True, "CanBePlacedOutdoors": True,
+                "IsLamp": True, "SpriteIndex": 4,
+                "CustomFields": {"fixture/nested": "preserve"},
+            },
+        },
+        "Crops": {
+            "FixtureCrop": {
+                "Name": "Fixture Crop", "RegrowDays": 3, "IsRaised": False,
+                "IsPaddyCrop": False, "NeedsWatering": True, "HarvestMethod": "Grab",
+                "HarvestMinStack": 1, "HarvestMaxStack": 2, "ExtraHarvestChance": 0.2,
+                "SpriteIndex": 7, "CountForMonoculture": True, "CountForPolyculture": False,
+                "Seasons": ["Spring"], "DaysInPhase": [1, 2, 3],
+            },
+        },
+        "Fences": {
+            "FixtureFence": {"Name": "Fixture Fence", "Health": 100.0, "RemovalDebrisType": 12},
+        },
+        "FloorsAndPaths": {
+            "FixturePath": {
+                "Name": "Fixture Path", "RemovalDebrisType": 12, "ShadowType": "None",
+                "ConnectType": "Path", "CornerSize": 0,
+            },
+        },
+        "Machines": {
+            "FixtureMachine": {
+                "Name": "Fixture Machine", "OnlyCompleteOvernight": False,
+                "AllowLoadWhenFull": True, "WorkingEffectChance": 0.33,
+                "OutputRules": [{"Id": "nested-fixture", "MinutesUntilReady": 30}],
+            },
+        },
+        "Weapons": {
+            "FixtureSword": {
+                "Name": "Fixture Sword", "Type": 3, "SpriteIndex": 2,
+                "MinDamage": 8, "MaxDamage": 14, "CritChance": 0.05,
+                "CanBeLostOnDeath": True, "MineBaseLevel": -1, "MineMinLevel": -1,
+            },
+        },
+    }
+    for asset, payload in typed_sources.items():
+        target = source.parent / f"{asset}.json"
+        target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    typed_sources = {
+        "BigCraftables": {
+            "FixtureLamp": {
+                "Name": "Fixture Lamp", "Price": 150, "Fragility": 0,
+                "CanBePlacedIndoors": True, "CanBePlacedOutdoors": True,
+                "IsLamp": True, "SpriteIndex": 4,
+                "CustomFields": {"fixture/nested": "preserve"},
+            },
+        },
+        "Crops": {
+            "FixtureCrop": {
+                "Name": "Fixture Crop", "RegrowDays": 3, "IsRaised": False,
+                "IsPaddyCrop": False, "NeedsWatering": True, "HarvestMethod": "Grab",
+                "HarvestMinStack": 1, "HarvestMaxStack": 2, "ExtraHarvestChance": 0.2,
+                "SpriteIndex": 7, "CountForMonoculture": True, "CountForPolyculture": False,
+                "Seasons": ["Spring"], "DaysInPhase": [1, 2, 3],
+            },
+        },
+        "Fences": {
+            "FixtureFence": {"Name": "Fixture Fence", "Health": 100.0, "RemovalDebrisType": 12},
+        },
+        "FloorsAndPaths": {
+            "FixturePath": {
+                "Name": "Fixture Path", "RemovalDebrisType": 12, "ShadowType": "None",
+                "ConnectType": "Path", "CornerSize": 0,
+            },
+        },
+        "Machines": {
+            "FixtureMachine": {
+                "Name": "Fixture Machine", "OnlyCompleteOvernight": False,
+                "AllowLoadWhenFull": True, "WorkingEffectChance": 0.33,
+                "OutputRules": [{"Id": "nested-fixture", "MinutesUntilReady": 30}],
+            },
+        },
+        "Weapons": {
+            "FixtureSword": {
+                "Name": "Fixture Sword", "Type": 3, "SpriteIndex": 2,
+                "MinDamage": 8, "MaxDamage": 14, "CritChance": 0.05,
+                "CanBeLostOnDeath": True, "MineBaseLevel": -1, "MineMinLevel": -1,
+            },
+        },
+    }
+    for asset, payload in typed_sources.items():
+        target = source.parent / f"{asset}.json"
+        target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
     shutil.copytree(ROOT / "games" / "stardew_valley" / "project_template", project)
     initialize_project(project)
     return game, project
@@ -78,11 +170,21 @@ def patch_value(project: Path, object_id: str, field: str):
     return None
 
 
+def typed_patch_value(project: Path, target: str, record_id: str, field: str):
+    data = json.loads((project / "content.json").read_text(encoding="utf-8"))
+    log_name = f"Lexeditor {target} overrides"
+    for change in data.get("Changes", []):
+        if change.get("LogName") == log_name:
+            return change.get("Fields", {}).get(record_id, {}).get(field)
+    return None
+
+
 def geometry(page, label: str) -> dict:
     metrics = page.evaluate("""() => {
       const main=document.querySelector('#main');
       const root=main?.firstElementChild;
       const pager=document.querySelector('.lex-pager');
+      const zoom=(()=>{const value=parseFloat(getComputedStyle(document.body).zoom);return Number.isFinite(value)&&value>0?value:1;})();
       const offenders=[...document.querySelectorAll('body *')].map(node=>{
         const box=node.getBoundingClientRect();
         return {
@@ -95,6 +197,7 @@ def geometry(page, label: str) -> dict:
         };
       }).filter(row=>row.right>innerWidth+1||row.left<-1).slice(0,20);
       return {
+        zoom,
         viewport:[innerWidth,innerHeight],
         bodyWidth:document.body.scrollWidth,
         bodyHeight:document.body.scrollHeight,
@@ -107,18 +210,33 @@ def geometry(page, label: str) -> dict:
     }""")
     failures = []
     shared_warnings = []
-    if metrics["bodyWidth"] > metrics["viewport"][0] + 2:
+    # body.style.zoom scales getBoundingClientRect numbers while
+    # innerWidth/innerHeight stay in unscaled CSS pixels. A fill-viewport
+    # screen can never pass a mixed-unit comparison, so normalize the
+    # measured rects into CSS pixels before comparing.
+    scale = metrics.get("zoom", 1) or 1
+    bodyWidth = metrics["bodyWidth"] / scale
+    bodyHeight = metrics["bodyHeight"] / scale
+    mainWidth = metrics["mainWidth"] / scale
+    mainScrollWidth = metrics["mainScrollWidth"] / scale
+    rootBottom = metrics["rootBottom"] / scale
+    pagerBottom = (metrics["pagerBottom"] or 0) / scale
+    for row in metrics.get("offenders", []):
+        row["left"] = round(row["left"] / scale, 1)
+        row["right"] = round(row["right"] / scale, 1)
+        row["width"] = round(row["width"] / scale, 1)
+    if bodyWidth > metrics["viewport"][0] + 2:
         shared_warnings.append("shared shell horizontal overflow")
-    if metrics["bodyHeight"] > metrics["viewport"][1] + 2:
+    if bodyHeight > metrics["viewport"][1] + 2:
         shared_warnings.append("shared document vertical overflow")
-    if metrics["mainScrollWidth"] > metrics["mainWidth"] + 2:
+    if mainScrollWidth > mainWidth + 2:
         failures.append("main horizontal overflow")
-    if metrics["rootBottom"] > metrics["viewport"][1] + 2:
+    if rootBottom > metrics["viewport"][1] + 2:
         if SHARED_UI_MODE == "branch" and "-datamap" in label:
             shared_warnings.append("branch shared Data Map bottom overflow")
         else:
             failures.append("screen bottom clipped")
-    if metrics["pagerBottom"] and metrics["pagerBottom"] > metrics["viewport"][1] + 2:
+    if pagerBottom and pagerBottom > metrics["viewport"][1] + 2:
         failures.append("pager clipped")
     if failures:
         LAYOUT_FAILURES.append({"label": label, "failures": failures, "metrics": metrics})
@@ -348,12 +466,80 @@ def exercise_data_map(page, label: str) -> None:
     assert page.locator(".lex-pager").count() == 1
     geometry(page, label + "-datamap")
     take(page, f"datamap-{label}.png")
-    row = page.locator(".lex-data-map-table .lex-column-list-row").filter(has_text="Objects.xnb").first
+    row = page.locator(".lex-data-map-table .lex-column-list-row").filter(has_text="Crops.xnb").first
+    assert row.count() == 1, (label, "Crops Data Map row missing")
     row.click()
     open_button = page.get_by_role("button", name="Open objects", exact=True)
     if open_button.count():
         open_button.click()
         page.wait_for_selector(".lex-column-list")
+    open_button = page.get_by_role("button", name="Open crops", exact=True)
+    assert open_button.count() == 1, (label, "Crops open action missing")
+    open_button.click()
+    page.wait_for_selector(".lex-column-list")
+
+
+def exercise_typed_data(page, project: Path, label: str, new_value: int) -> None:
+    search = page.locator(".lex-pager-search input").first
+    search.fill("Fixture Crop")
+    page.wait_for_timeout(180)
+    crop = page.locator(".lex-column-list-row").filter(has_text="Fixture Crop").first
+    assert crop.count() == 1, (label, "fixture crop missing")
+    crop.click()
+    panel = page.locator(".lex-detail-panel")
+    assert "Fixture Crop" in panel.inner_text()
+    assert page.locator('select[aria-label="Harvest method"]').count() == 1
+    assert page.locator('input[aria-label="Needs watering"]').count() >= 1
+    geometry(page, label + "-crops")
+    take(page, f"crops-{label}.png")
+
+    override = page.get_by_role("checkbox", name="Override Regrow days", exact=True)
+    if not override.is_checked():
+        override.click()
+    value = page.locator('input[aria-label="Regrow days"]')
+    value.fill(str(new_value))
+    assert value.input_value() == str(new_value)
+    assert page.locator("#global-save").is_enabled()
+
+    # Unsaved edits must survive a Data Map visit and block switching families.
+    page.locator("#plugin-data-map").click()
+    page.wait_for_selector(".lex-data-map-table .lex-column-list-row")
+    objects = page.locator(".lex-data-map-table .lex-column-list-row").filter(has_text="Objects.xnb").first
+    objects.click()
+    open_objects = page.get_by_role("button", name="Open objects", exact=True)
+    assert open_objects.count() == 1
+    open_objects.click()
+    dialog = page.get_by_role("alertdialog")
+    dialog.wait_for()
+    assert "save or discard" in dialog.inner_text().lower()
+    dialog.get_by_role("button", name="Close", exact=True).click()
+
+    # Return to the current typed family and persist the edit.
+    crops = page.locator(".lex-data-map-table .lex-column-list-row").filter(has_text="Crops.xnb").first
+    crops.click()
+    page.get_by_role("button", name="Open crops", exact=True).click()
+    page.wait_for_selector(".lex-column-list")
+    page.locator(".lex-pager-search input").first.fill("Fixture Crop")
+    page.wait_for_timeout(120)
+    page.locator(".lex-column-list-row").filter(has_text="Fixture Crop").first.click()
+    assert page.locator('input[aria-label="Regrow days"]').input_value() == str(new_value)
+    page.locator("#global-save").click()
+    page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
+    assert typed_patch_value(project, "Data/Crops", "FixtureCrop", "RegrowDays") == new_value
+
+    # Discard must restore the saved typed value.
+    override = page.get_by_role("checkbox", name="Override Regrow days", exact=True)
+    assert override.is_checked()
+    value = page.locator('input[aria-label="Regrow days"]')
+    value.fill(str(new_value + 20))
+    assert page.locator("#global-save").is_enabled()
+    page.locator("#global-save").click(button="right")
+    page.get_by_role("button", name="Discard Changes", exact=True).click()
+    page.wait_for_function("() => document.querySelector('#global-save')?.disabled === true")
+    page.locator(".lex-pager-search input").first.fill("Fixture Crop")
+    page.wait_for_timeout(100)
+    page.locator(".lex-column-list-row").filter(has_text="Fixture Crop").first.click()
+    assert page.locator('input[aria-label="Regrow days"]').input_value() == str(new_value)
 
 
 def exercise_info(page, label: str, height: int) -> None:
@@ -387,12 +573,13 @@ def main() -> int:
             browser = play.chromium.launch(headless=True, args=["--no-sandbox"])
             results = []
             try:
-                for width, height, zoom in ((1440, 900, 1.0), (900, 620, 1.0), (1100, 760, 1.35)):
+                for index, (width, height, zoom) in enumerate(((1440, 900, 1.0), (900, 620, 1.0), (1100, 760, 1.35))):
                     label = f"{width}x{height}-z{zoom}"
                     page, errors = open_editor(browser, session.url, width, height, zoom)
                     try:
                         exercise_objects(page, project, label, mutate=(width == 1440 and zoom == 1.0))
                         exercise_data_map(page, label)
+                        exercise_typed_data(page, project, label, 4 + index)
                         exercise_info(page, label, height)
                         assert not errors, (label, errors)
                         results.append({"label": label, "passed": True})

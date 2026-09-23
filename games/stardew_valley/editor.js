@@ -400,9 +400,12 @@ function datasetFieldControl(row, field) {
       type: "number", min: field.min, max: field.max, step: field.kind === "int" ? 1 : (field.step || 0.01),
       value: shown, disabled: !enabled || state.busy, "aria-label": field.label,
       oninput: event => {
-        const value = Number(event.target.value);
-        if (!Number.isFinite(value)) return;
-        row.fields[key] = field.kind === "int" ? Math.round(value) : value;
+        const raw = Number(event.target.value);
+        if (!Number.isFinite(raw)) return;
+        const normalized = field.kind === "int" ? Math.round(raw) : raw;
+        const value = Math.max(field.min, Math.min(field.max, normalized));
+        event.target.value = String(value);
+        row.fields[key] = value;
         shell.refresh();
       },
     });
@@ -489,12 +492,12 @@ function datasetPanel() {
   });
 }
 async function openDataset(key) {
-  if (key === "objects") {
-    state.datasetKey = "objects"; state.dataset = null; navigate("objects"); return;
-  }
   if (dirtyCount()) {
     LexeditorUI.showAlert({title: "Save or discard changes first", message: "Switching data families is blocked while this project has unsaved edits."});
     return;
+  }
+  if (key === "objects") {
+    state.datasetKey = "objects"; state.dataset = null; navigate("objects"); return;
   }
   state.busy = true; state.error = ""; shell.refresh();
   try {
