@@ -100,3 +100,9 @@ write offsets from source annotations alone. This remains actionable research.
 
 ## 2026-09-22 misc-fixes finding
 Searched world_economy.cpp and the native tree for a maximum-bounty field or hook: none exists (bounty code covers payment, law state, and databinding only). Configurable maxima need engine research with the game first. No code written. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (engine research/agent-side
+candidate still owed), so flipping to waiting would be a fake checklist.
+Left actionable until a real session can be written.

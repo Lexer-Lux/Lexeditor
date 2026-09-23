@@ -28,3 +28,9 @@ Next: identify the actual engine core decrement function and its two specific te
 
 ## 2026-09-22 misc-fixes evidence
 Re-ran tools/audit_rdr2_core_modifiers.py today: UI forecast values confirmed (+0.15 perfect weight, -0.25 extreme, +0.25 mounted) but discarded as unproved core writers; removal stays unimplemented. The recorded next step stands: identify the engine decrement function and its two term inputs from a matching binary. No code written. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (engine research/agent-side
+candidate still owed), so flipping to waiting would be a fake checklist.
+Left actionable until a real session can be written.
