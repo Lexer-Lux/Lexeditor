@@ -1,11 +1,25 @@
-# #498: Separate the menu volume control into SFX and Music
+# Issue 498 — Separate SFX and Music volume sliders
 
-[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/498)
+## Requirements
+Replace the single in-game Sound slider with separate SFX and Music sliders.
+Each controls only its category; values persist across restart and stay
+consistent with the active audio backend. Research menu + FFNx audio paths first.
 
-## 2026-09-22 misc-fixes finding
+## Findings (2026-09-22)
+- FFNx.toml audio paths surveyed in the local install:
+  - External SFX layer: `use_external_sfx = false`, `external_sfx_volume = -1`
+    (auto), path `lexeditor-sfx`. Scales only external SFX files.
+  - External music layer: `use_external_music = false`,
+    `external_music_volume = -1`. Scales only external music files.
+  - Both layers are disabled here; neither follows the vanilla menu slider.
+- The vanilla menu Sound slider drives the game's internal audio path. No
+  SFX/Music split point is known in the exe or codex (codex/ff8 has no audio
+  knowledge). The `volume` byte in `games/ff8/init_data.py` is save config,
+  not the menu slider.
+- No implementation exists; nothing to remove or wire.
 
-No volume or audio-path code exists in the FF8 plugin (only unrelated
-init_data.py matches). Separate SFX and Music sliders need menu plus FFNx
-audio-path research with the game first: which backend owns each category,
-where the single Sound slider writes, and persistence across restart. No code
-written. Issue stays actionable.
+## Next work (agent)
+Find the menu slider handler and the SFX vs music gain application points
+in FF8_EN.exe (capstone+pefile available in .venv), then propose a
+Hext/native patch. Acceptance needs audible in-game checks (each slider
+isolated, persistence across restart) — that part will need Lexer.

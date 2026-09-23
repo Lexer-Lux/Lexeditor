@@ -1,18 +1,36 @@
-# #350: Check whether Lexeditor launch still shows the warning
+# Issue 350 — Skip the startup epilepsy warning (toggle)
 
-[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/350)
+## Requirements
+Default-off toggleable tweak that skips the epilepsy warning in the normal
+startup path. No unconditional suppression. Disabling restores the warning.
+Preserve Fast Start behavior.
 
-## Requirements and decisions
+## Findings (static analysis, 2026-09-22)
+- Owner: `FF8_Launcher.exe`, not the game. It embeds a Qt `NoticeWindow`
+  (`Notice`, `NoticeWindowJa1/Ja2`, `videoNoticeLbl`, `okButton`, `es/de/it/fr`
+  language buttons) with `notice/notice_{en,fr,it,de,es}.html` resources.
+  English text verified at file offset 0x5AE7DF: "A very small percentage
+  of people may experience a seizure...".
+- `FF8_EN.exe` (22 MB) contains no epilepsy/seizure strings: the game itself
+  shows no warning.
+- No acceptance persistence exists: no QSettings, no registry keys, no
+  agreed/accepted/don't-show strings. The notice shows on every launcher run.
+- No existing warning-suppression code in the plugin (searched games/ff8).
+- Lexeditor launches `FF8_EN.exe` directly and never runs the launcher, so
+  its path already avoids the warning — but nothing disables the warning
+  itself, exactly as the issue states.
 
-Read the live GitHub issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
+## Why this needs Lexer
+The only skip mechanism is a binary patch to `FF8_Launcher.exe` (Qt C++,
+no settings hook). That touches a Steam-verified executable and cannot be
+verified headless: confirming the skip and the restore needs a visible
+launcher run, which needs explicit approval.
 
-## Current implementation and evidence
+## Next work
+Waiting on the checklist posted to the issue.
 
-Reconcile live code, PRs and existing topic/session worklogs. Do not infer build, deployment, gameplay success, or acceptance from documentation alone.
-
-## Next agent work
-
-Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
-
-## 2026-09-22 misc-fixes finding
-plugin.py launches through FF8_Launcher.exe normally and notes warning-skip as a separate opt-in tweak; no suppression code exists in the launch path. The toggle needs the owning component identified first (launcher vs game), then implementation at that boundary with restore-on-disable. Needs the game. Issue stays actionable.
+## Correction to the prior handoff note
+The earlier stub said plugin.py launches through FF8_Launcher.exe. Current
+code shows no game-process launch through the launcher (server.py only
+references the exe names for process status; the plugin launches FF8_EN.exe
+directly). The launcher-bypass avoidance stands, verified.
