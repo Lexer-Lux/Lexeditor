@@ -382,7 +382,7 @@
       }
       const moduleResult=await moduleRecords.saveAll();
       if(moduleResult.saved){if(moduleResult.files.includes(state.catalogFile?.filename)){state.catalogFile=await api("/api/catalog/file?name="+encodeURIComponent(state.catalogFile.filename));state.catalogDraft=state.catalogFile.text;}setStatus("Saved "+moduleResult.saved+" Module System records");}
-      if(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text){const result=await api("/api/catalog/file/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:state.catalogFile.filename,text:state.catalogDraft,encoding:state.catalogFile.encoding})});state.catalogFile.text=state.catalogDraft;setStatus(`Saved ${state.catalogFile.filename}; backup created`);}
+      if(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text){const result=await api("/api/catalog/file/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:state.catalogFile.filename,text:state.catalogDraft,encoding:state.catalogFile.encoding,sha256:state.catalogFile.sha256})});state.catalogFile.text=state.catalogDraft;state.catalogFile.sha256=result.sha256;setStatus(`Saved ${state.catalogFile.filename}; backup created`);}
       await buildSavedModule();
       shell.history.clear();shell.refresh();render();
     }catch(error){setStatus("Save failed");showAlert({title:"Save failed",items:[{item:"Save",issue:error.message||String(error)}],closeLabel:"Confirm and Close"});}
