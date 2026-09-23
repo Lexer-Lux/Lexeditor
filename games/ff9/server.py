@@ -38,8 +38,8 @@ POST_ROUTES = {"/api/save", "/api/runtime/install", "/api/runtime/recover",
 # These stay explicit even when a narrow sub-format is integrated, so partial
 # coverage never hides the still-protected bytes or implies a generic raw editor.
 UNRESOLVED_AREAS = (
-    ("StreamingAssets/p0data1*.bin (outside integrated BGI floor activity)", "Field backgrounds, cameras, walkmesh geometry/topology and animations",
-     "Lexeditor now has a preservation-safe editor for the documented BGI_FLOOR_ACTIVE bit only. Background art, cameras, walkmesh geometry/topology, edge semantics, transforms and moving-platform animation data remain protected and unintegrated rather than being routed through a lossy generic editor."),
+    ("StreamingAssets/p0data1*.bin (outside integrated BGI activity bits)", "Field backgrounds, cameras, walkmesh geometry/topology and animations",
+     "Lexeditor has preservation-safe editors for the documented BGI_FLOOR_ACTIVE and BGI_TRI_ACTIVE bits. Background art, cameras, walkmesh geometry/topology, edge semantics, transforms, other flag semantics and moving-platform animation data remain protected and unintegrated rather than being routed through a lossy generic editor."),
     ("StreamingAssets/p0data2.bin (outside BattleScene raw16)", "Battle geometry, scene assets and effects",
      "Enemy and encounter BattleScene raw16 records are integrated separately. Public tooling also reads battle meshes/background assets, SPS/effect data and related scene resources from p0data2; Lexeditor has no safe structured editor for those assets yet."),
     ("StreamingAssets/p0data3.bin", "World-map geometry, materials and effects",
@@ -175,8 +175,10 @@ class Handler(PluginRequestHandler):
             elif path == "/api/datamap": self.json_response(data_map())
             elif path == "/api/catalog": self.json_response({"datasets": catalog() + BattleSceneStore().status_rows() + FIELD_WALKMESH.status_rows()})
             elif path == "/api/dataset":
-                key = parse_qs(parsed.query).get("key", [""])[0]
-                self.json_response(BattleSceneStore().load(key) if key in {"enemies", "encounters"} else FIELD_WALKMESH.load(key) if key == FIELD_WALKMESH.KEY else MemoriaDataStore().load(key))
+                query = parse_qs(parsed.query)
+                key = query.get("key", [""])[0]
+                scene = query.get("scene", [None])[0]
+                self.json_response(BattleSceneStore().load(key) if key in {"enemies", "encounters"} else FIELD_WALKMESH.load(key, scene) if key in FIELD_WALKMESH.KEYS else MemoriaDataStore().load(key))
             elif path == "/api/runtime": self.json_response(memoria_manager.status(paths.GAME_ROOT))
             elif path == "/api/runtime/available": self.json_response(memoria_manager.available())
             elif path == "/api/mod-compat": self.json_response(mod_compat.audit())
@@ -216,7 +218,7 @@ class Handler(PluginRequestHandler):
                 result = (BattleSceneStore().save(key, payload.get("sceneHashes", {}), payload.get("changes", []))
                           if key in {"enemies", "encounters"} else
                           FIELD_WALKMESH.save(key, payload.get("sceneHashes", {}), payload.get("changes", []))
-                          if key == FIELD_WALKMESH.KEY else
+                          if key in FIELD_WALKMESH.KEYS else
                           MemoriaDataStore().save(key, str(payload.get("sha256", "")), payload.get("changes", [])))
             self.json_response(result)
         except FileNotFoundError as error: self.json_response({"error": str(error)}, 409)
