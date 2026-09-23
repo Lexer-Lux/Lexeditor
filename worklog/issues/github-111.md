@@ -24,3 +24,14 @@ Icons appear but look poor: artwork-quality task, not missing images. Replacemen
 No concrete Lexer-side session exists yet (agent-side previews/prototype
 still owed), so flipping to waiting would be a fake checklist. Left
 actionable until a real session can be written.
+
+## 2026-09-23 agent slice (per-game-rdr2): icon-input presence guards
+
+tests/test_rdr2_issue111_icon_sources.py locks the art-toolchain inputs in
+games/rdr2/assets/item-icons: source PNGs for pistol, revolver, repeater,
+rifle, shotgun, varmint, and 225 casings, 225 AP ammunition, and empty
+bottles, plus the two review previews. (2 hermetic tests, presence only.)
+No art claim: quality and Lexer approval still need the art toolchain and
+a game check (pickup plus acquisition card). Hull artwork has no
+checked-in source yet and stays a Lexer art question.
+
