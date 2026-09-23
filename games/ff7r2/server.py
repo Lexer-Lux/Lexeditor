@@ -197,6 +197,7 @@ def workspace_payload() -> dict:
     root = project_root()
     baseline = source_path()
     candidate = output_path()
+    battle_player = battle_player_source_path()
     battle_item = battle_item_source_path()
     game = game_root()
     package = packaging.status(root, game)
@@ -216,6 +217,12 @@ def workspace_payload() -> dict:
             "outputRelative": f"content/{PLAYER_PARAMETER.as_posix()}",
             "sourcePresent": bool(baseline and baseline.is_file()),
             "outputPresent": bool(candidate and candidate.is_file()),
+        },
+        "battlePlayerParameter": {
+            "relative": BATTLE_PLAYER_PARAMETER.as_posix(),
+            "sourceRelative": f"source/{BATTLE_PLAYER_PARAMETER.as_posix()}",
+            "sourcePresent": bool(battle_player and battle_player.is_file()),
+            "readOnly": True,
         },
         "battleItemPossession": {
             "relative": BATTLE_ITEM_POSSESSION.as_posix(),
@@ -331,12 +338,15 @@ def data_map_payload() -> dict:
             "status": "partial", "target": "characters",
         },
         {
-            "filename": "End/Content/DataObject/Resident/BattlePlayerParameter.uasset",
-            "controls": "None", "coverage": "unavailable",
+            "filename": BATTLE_PLAYER_PARAMETER.as_posix(),
+            "controls": "Battle Params — read-only structured rows and decoded arrays",
+            "coverage": "view",
             "notes": (
-                "Known table includes arrays and behavior-linked fields. Array resizing "
-                "and semantics have not been proved in Lexeditor."
-            ), "status": "not-integrated",
+                "Public generated declarations and Synthlight's public property list independently "
+                "identify the BattlePlayerParameter storage schema. Lexeditor validates a distinctive "
+                "typed signature before displaying rows and arrays. Gameplay meanings, enum domains "
+                "and safe edit ranges remain unproved, so no staging or save route is exposed."
+            ), "status": "partial", "target": "battleparams",
         },
         {
             "filename": "pakchunk3-WindowsNoEditor.utoc / .ucas",
