@@ -100,6 +100,10 @@ with sync_playwright() as p:
                       navigate("datamap");
                     }''',ROWS)
                     page.evaluate('state.busy=false;render();if(typeof refreshShell==="function")refreshShell();else if(typeof shell!=="undefined"&&shell.refresh)shell.refresh();')
+                    if game=='warband':
+                        page.evaluate('()=>LexeditorUI.finishPluginLoading()')
+                        page.wait_for_function('!document.documentElement.classList.contains("lex-loading-live")')
+                        page.locator('.lex-plugin-loading-screen').wait_for(state='detached')
                 page.wait_for_selector('.lex-data-map-table')
                 page.wait_for_timeout(600)
                 # A preview/source/parser does not produce an editable badge.
