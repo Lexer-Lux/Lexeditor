@@ -101,6 +101,7 @@ jobs:
           $manifest = Get-Content "$root/candidate-manifest.json" | ConvertFrom-Json
           if (-not (Test-Path "$root/Lexeditor/Lexeditor.exe")) { throw 'Candidate app is missing' }
           if (-not (Test-Path "$root/Launch-FF9-Candidate.cmd")) { throw 'Candidate launcher is missing' }
+          if (-not (Test-Path "$root/FF9-ACCEPTANCE.txt")) { throw 'Candidate acceptance guide is missing' }
           if (-not (Test-Path "$root/FF9-project/StreamingAssets/Data")) { throw 'Candidate project is missing' }
           if (-not (Test-Path "$root/candidate-localappdata/Lexeditor/helpers/downloads/Memoria-v2025.07.04.exe")) { throw 'Pinned Memoria patcher is missing' }
           if ($manifest.productionHelperAllowlistModified) { throw 'Candidate must not modify the production helper allowlist' }
