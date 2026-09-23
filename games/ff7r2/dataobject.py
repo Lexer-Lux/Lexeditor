@@ -104,11 +104,14 @@ class Field:
     note: str = ""
 
     def payload(self) -> dict:
-        return {
+        payload = {
             "name": self.name, "typeId": self.type_id, "type": self.type_name,
             "kind": self.kind, "value": self.value, "editable": self.editable,
             "minimum": self.minimum, "maximum": self.maximum, "note": self.note,
         }
+        if self.kind == "array":
+            payload["arrayCount"] = len(self.value) if isinstance(self.value, list) else 0
+        return payload
 
 
 @dataclass
@@ -285,7 +288,7 @@ class DataObjectPackage:
             fields: list[Field] = []
             for prop in properties:
                 field, cursor = cls._read_field(
-                    data, cursor, frozen_start, names, offset_names, prop,
+                    data, cursor, frozen_start, frozen_end, names, offset_names, prop,
                     f"{key.display}.{prop.name}")
                 fields.append(field)
             records.append(Record(key=key, fields=fields))
@@ -334,8 +337,64 @@ class DataObjectPackage:
         return cls._pointer_target(data, header, frozen_start, what), count
 
     @classmethod
+    def _read_array_elements(cls, data: bytes, header: int, frozen_start: int,
+                             frozen_end: int, offset_names: dict[int, FName],
+                             prop: Property, count: int, what: str) -> list[Any]:
+        if count == 0:
+            return []
+        cursor = cls._pointer_target(data, header, frozen_start, what)
+        if not frozen_start <= cursor < frozen_end:
+            raise DataObjectError(f"{what} array data leaves the frozen object")
+        values: list[Any] = []
+        type_name, _kind, size, _minimum, _maximum = _TYPES[prop.type_id]
+
+        for index in range(count):
+            item = f"{what}[{index}]"
+            if prop.type_id in (4, 5):
+                cursor = _align(cursor, 2, frozen_start)
+            elif prop.type_id in (6, 7, 8, 9, 11):
+                cursor = _align(cursor, 4, frozen_start)
+            elif prop.type_id == 10:
+                cursor = _align(cursor, 8, frozen_start)
+
+            if cursor < frozen_start or cursor + size > frozen_end:
+                raise DataObjectError(f"{item} leaves the frozen object")
+
+            if prop.type_id in _STRUCTS:
+                value = struct.unpack_from(_STRUCTS[prop.type_id], data, cursor)[0]
+                # Preserve exact display for browser-unsafe 64-bit values.
+                values.append(str(value) if prop.type_id == 8 else value)
+            elif prop.type_id == 11:
+                mapped = offset_names.get(cursor - frozen_start)
+                values.append(mapped.display if mapped is not None else "")
+            elif prop.type_id == 10:
+                packed = _u64(data, cursor, f"{item} string pointer")
+                signed = struct.unpack("<q", struct.pack("<Q", packed))[0]
+                target = cursor + (signed >> 1)
+                char_count = _i32(data, cursor + 8, f"{item} string length")
+                char_max = _i32(data, cursor + 12, f"{item} string capacity")
+                if char_count < 0 or char_max < char_count:
+                    raise DataObjectError(f"{item} string header is invalid")
+                if char_count == 0:
+                    values.append("")
+                else:
+                    byte_count = char_count * 2
+                    if target < frozen_start or target + byte_count > frozen_end:
+                        raise DataObjectError(f"{item} string data leaves the frozen object")
+                    raw = data[target:target + byte_count]
+                    try:
+                        values.append(raw[:-2].decode("utf-16-le"))
+                    except UnicodeDecodeError as error:
+                        raise DataObjectError(f"{item} string data is not valid UTF-16") from error
+            else:
+                raise DataObjectError(f"Unsupported array element type {type_name}")
+            cursor += size
+        return values
+
+    @classmethod
     def _read_field(cls, data: bytes, cursor: int, frozen_start: int,
-                    names: list[str], offset_names: dict[int, FName],
+                    frozen_end: int, names: list[str],
+                    offset_names: dict[int, FName],
                     prop: Property, what: str) -> tuple[Field, int]:
         type_name, kind, size, minimum, maximum = _TYPES[prop.type_id]
 
@@ -343,12 +402,18 @@ class DataObjectPackage:
             cursor = _align(cursor, 8, frozen_start)
             _need(data, cursor, 16, what)
             count, capacity = struct.unpack_from("<ii", data, cursor + 8)
-            if count < 0 or capacity < count:
+            if count < 0 or capacity < count or count > 1_000_000:
                 raise DataObjectError(f"{what} array header is invalid")
+            values = cls._read_array_elements(
+                data, cursor, frozen_start, frozen_end, offset_names, prop, count, what)
             return Field(
-                prop.name, prop.type_id, type_name, "array", count,
+                prop.name, prop.type_id, type_name, "array", values,
                 cursor, 16, False,
-                note=f"Read-only array with {count} element(s); resizing is not implemented."
+                note=(
+                    f"Read-only {type_name} array with {count} element(s). "
+                    "Public Rebirth format evidence proves pointed element decoding, "
+                    "but array writes remain disabled pending live acceptance."
+                )
             ), cursor + 16
 
         if prop.type_id in (6, 7, 9):
