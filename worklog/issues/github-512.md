@@ -41,3 +41,11 @@ No JS errors; the page itself is fine once loaded. tools/visual_snapshot.py now
 bounds the failure-handler read so notes survive a sick page (misc-fixes).
 Settle behavior still being measured; the memoization itself remains
 content-proven identical, so no re-snapshot is owed by this issue.
+
+## 2026-09-23 verification on misc-fixes @f1fb4407
+Re-ran the RDR2 gate: test_rdr2_issue_repairs 24 passed,
+test_rdr2_native_source 5 passed, test_rdr2_inventory_icons 7 passed,
+compileall clean. Repeat-load fix holds with identical content.
+Issue moved actionable to waiting with the lean-payload / disk-cache /
+accept-current checklist posted as a comment. It returns to actionable
+when Lexer picks one of the three options.
