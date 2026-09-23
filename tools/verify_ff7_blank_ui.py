@@ -4,7 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-FF7 = ROOT / "games" / "ff7" / "editor.html"\nFF7_JS = ROOT / "games" / "ff7" / "editor.js"
+FF7 = ROOT / "games" / "ff7" / "editor.html"
+FF7_JS = ROOT / "games" / "ff7" / "editor.js"
 BLANK = ROOT / "games" / "blank" / "editor.html"
 NEUTRAL = ROOT / "ui" / "neutral.css"
 
@@ -15,6 +16,8 @@ def compact(value: str) -> str:
 
 def main() -> None:
     ff7 = FF7.read_text(encoding="utf-8")
+    ff7_js = FF7_JS.read_text(encoding="utf-8")
+    ff7_code = ff7 + "\n" + ff7_js
     blank = BLANK.read_text(encoding="utf-8")
     neutral = NEUTRAL.read_text(encoding="utf-8")
 
@@ -22,7 +25,7 @@ def main() -> None:
     # for semantics/testing, but it owns no CSS at all.
     if "<style" in ff7.casefold() or "style=" in ff7.casefold() or "style=" in ff7_js.casefold():
         raise AssertionError("FF7 contains local CSS/style overrides")
-    if '<script src="/editor.js"></script>' not in ff7:
+    if '<script src="editor.js"></script>' not in ff7:
         raise AssertionError("FF7 page logic is not modularized into editor.js")
     for marker in (
         '<link rel="stylesheet" href="/shared/framework.css">',
