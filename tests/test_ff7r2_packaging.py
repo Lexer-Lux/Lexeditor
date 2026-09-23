@@ -22,6 +22,10 @@ def _fixture(root: Path):
     (paks / "pakchunk3-WindowsNoEditor.ucas").write_bytes(b"ucas")
     packer = root / "UnrealReZen.exe"
     packer.write_bytes(b"explicit-packer")
+    packer.with_name("UnrealReZen.deps.json").write_text(
+        json.dumps({"libraries": {f"CUE4Parse/{packaging.CUE4PARSE_VERSION}": {}}}),
+        encoding="utf-8",
+    )
     oodle = root / "user-supplied-oodle.dll"
     oodle.write_bytes(b"explicit-oodle")
     env = {
@@ -40,6 +44,20 @@ def test_packaging_status_refuses_implicit_dependencies():
         assert any(packaging.UNREALREZEN_ENV in item for item in state["missing"])
         assert any(packaging.OODLE_ENV in item for item in state["missing"])
 
+
+
+def test_packaging_status_rejects_unknown_cue4parse_distribution():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packaging-version-") as temp_name:
+        project, game, packer, _oodle, env = _fixture(Path(temp_name))
+        packer.with_name("UnrealReZen.deps.json").write_text(
+            json.dumps({"libraries": {"CUE4Parse/9.9.9": {}}}),
+            encoding="utf-8",
+        )
+        state = packaging.status(project, game, env)
+        assert state["ready"] is False
+        assert state["packerPresent"] is True
+        assert state["packerDependencyOk"] is False
+        assert any("CUE4Parse/1.1.1" in item for item in state["missing"])
 
 def test_candidate_builder_is_isolated_and_never_installs():
     with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packaging-build-") as temp_name:
@@ -76,12 +94,13 @@ def test_candidate_builder_is_isolated_and_never_installs():
         assert command[command.index("--compression-format") + 1] == "Zlib"
         assert command[command.index("--mount-point") + 1] == packaging.MOUNT_POINT
         assert "--game-dir-top-only" in command
-        assert observed["env"]["HTTPS_PROXY"] == "http://127.0.0.1:9"
+        assert observed["env"][packaging.UNREALREZEN_ENV] == str(packer)
 
         manifest = json.loads(Path(result["manifest"]).read_text(encoding="utf-8"))
         assert manifest["acceptedInGame"] is False
         assert manifest["installed"] is False
-        assert manifest["tooling"]["networkFallbackBlocked"] is True
+        assert manifest["tooling"]["dependencyDownloadInvokedByLexeditor"] is False
+        assert manifest["tooling"]["unrealReZen"]["requiredCUE4Parse"] == packaging.CUE4PARSE_VERSION
         assert manifest["tooling"]["oodle"]["copiedAs"] == packaging.OODLE_NAME
         assert {item["file"] for item in manifest["outputs"]} == {
             "Lexeditor-FF7R2_P.utoc",
