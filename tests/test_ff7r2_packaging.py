@@ -127,6 +127,30 @@ def test_candidate_builder_rejects_runtime_oodle_mutation_and_cleans_output():
         assert not list((project / "build").glob("ff7r2-candidate-*"))
 
 
+
+@pytest.mark.parametrize(
+    ("target_env", "expected"),
+    [
+        (packaging.UNREALREZEN_ENV, "UnrealReZen executable changed"),
+        (packaging.OODLE_ENV, "Supplied Oodle DLL changed"),
+    ],
+)
+def test_candidate_builder_rejects_dependency_race(target_env, expected):
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packaging-race-") as temp_name:
+        project, game, _packer, _oodle, env = _fixture(Path(temp_name))
+
+        def mutating_runner(command, **kwargs):
+            Path(kwargs["env"][target_env]).write_bytes(b"changed-during-build")
+            output = Path(command[command.index("--output-path") + 1])
+            output.write_bytes(b"candidate-utoc")
+            output.with_suffix(".ucas").write_bytes(b"candidate-ucas")
+            output.with_suffix(".pak").write_bytes(b"candidate-pak")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with pytest.raises(packaging.PackagingError, match=expected):
+            packaging.build_candidate(project, game, env, runner=mutating_runner)
+        assert not list((project / "build").glob("ff7r2-candidate-*"))
+
 def test_candidate_builder_refuses_missing_staged_output_before_execution():
     with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packaging-missing-") as temp_name:
         project, game, _packer, _oodle, env = _fixture(Path(temp_name))
