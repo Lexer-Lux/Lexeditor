@@ -3410,6 +3410,17 @@ body:has(.lex-data-map-table) #main {
 .lex-global-setting :is(input:not([type="checkbox"]),select) {
   width:100%;min-width:0;height:36px;min-height:36px;box-sizing:border-box;font-size:1em;font-weight:400;
 }
+
+.lex-global-settings.lex-settings-wide { width:calc(100vw - 24px); }
+.lex-global-settings.lex-settings-wide .lex-settings-lane {
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));
+}
+.lex-global-settings.lex-settings-must-scroll > .lex-dialog-actions {
+  position:sticky;
+  bottom:0;
+  z-index:2;
+  background:var(--lex-panel);
+}
 .lex-global-setting input[type="checkbox"] {
   width:1.2em;min-width:1.2em;height:1.2em;min-height:1.2em;justify-self:start;align-self:end;
 }

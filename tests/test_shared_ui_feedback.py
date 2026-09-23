@@ -122,6 +122,27 @@ def test_save_preview_and_native_tooltips(page):
     assert card.evaluate("n=>getComputedStyle(n).backgroundColor") != 'rgba(0, 0, 0, 0)'
 
 
+def test_save_preview_does_not_cover_bottom_save_button(page):
+    framework(page)
+    page.evaluate('''() => {
+      window.saved=0;
+      const button=LexeditorUI.settingsSaveControl({dirtyCount:()=>1,
+        pendingChanges:()=>[{label:'Panel spacing',before:.25,after:.85}],
+        save:async()=>{window.saved++}});
+      Object.assign(button.style,{position:'fixed',right:'20px',bottom:'10px'});
+      document.body.append(button);
+    }''')
+    button=page.locator('.lex-settings-save-control')
+    button.hover()
+    page.wait_for_timeout(120)
+    popup=page.locator('.lex-save-preview')
+    box=popup.bounding_box()
+    target=button.bounding_box()
+    assert box['y']+box['height'] <= target['y']-7
+    button.click(timeout=1500)
+    assert page.evaluate('window.saved')==1
+
+
 def test_readonly_pin_does_not_cover_lock(page):
     framework(page)
     page.evaluate('''() => {

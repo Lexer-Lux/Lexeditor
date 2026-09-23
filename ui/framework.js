@@ -3901,7 +3901,10 @@
       document.body.append(popup);button.setAttribute('aria-describedby',popup.id);
       const r=button.getBoundingClientRect(),box=popup.getBoundingClientRect();
       popup.style.left=`${Math.max(8,Math.min(r.left+r.width/2-box.width/2,innerWidth-box.width-8))}px`;
-      popup.style.top=`${Math.max(8,Math.min(r.bottom+8,innerHeight-box.height-8))}px`;
+      const below=innerHeight-r.bottom-16,above=r.top-16;
+      const useBelow=box.height<=below || below>=above;
+      popup.style.maxHeight=`${Math.max(0,useBelow?below:above)}px`;
+      popup.style.top=`${useBelow?r.bottom+8:Math.max(8,r.top-popup.getBoundingClientRect().height-8)}px`;
       popup.addEventListener('mouseenter',()=>clearTimeout(timer));popup.addEventListener('mouseleave',leave);
     };
     button.addEventListener('mouseenter',show);button.addEventListener('mouseleave',leave);
@@ -4554,6 +4557,8 @@ ${contents.path}`});
     let restoreSettings = () => {};
     const fitDialog = () => {
       dialog.classList.remove("lex-settings-must-scroll");
+      dialog.classList.remove("lex-settings-wide");
+      if (dialog.scrollHeight > window.innerHeight - 24) dialog.classList.add("lex-settings-wide");
       dialog.classList.toggle("lex-settings-must-scroll",
         dialog.scrollHeight > Math.max(320, window.innerHeight - 24));
     };

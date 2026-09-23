@@ -46,6 +46,8 @@ def main():
                 page.set_viewport_size({'width':width,'height':height});page.wait_for_timeout(250)
                 metrics=page.locator('.lex-global-settings').evaluate("""dialog=>({width:dialog.getBoundingClientRect().width,scroll:dialog.scrollWidth,client:dialog.clientWidth,cards:[...dialog.querySelectorAll('.lex-global-setting:not([hidden])')].map(e=>{const r=e.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height}})})""")
                 assert metrics['scroll']<=metrics['client']+2,metrics
+                if width == 2048:
+                    assert page.locator('.lex-global-settings').evaluate('n=>n.scrollHeight<=n.clientHeight+1')
                 checks=page.locator('.lex-global-setting input[type="checkbox"]').evaluate_all('ns=>ns.map(n=>({w:n.getBoundingClientRect().width,h:n.getBoundingClientRect().height,p:getComputedStyle(n).padding}))')
                 assert all(abs(n['w']-n['h'])<1 for n in checks),checks
                 assert page.locator('.lex-global-setting input:not([type="checkbox"]),.lex-global-setting select').evaluate_all('ns=>new Set(ns.filter(n=>n.getBoundingClientRect().height).map(n=>Math.round(n.getBoundingClientRect().height))).size===1')
@@ -57,6 +59,11 @@ def main():
                     for b in cards[i+1:]:
                         assert min(a['x']+a['w'],b['x']+b['w'])-max(a['x'],b['x'])<=1 or min(a['y']+a['h'],b['y']+b['h'])-max(a['y'],b['y'])<=1,metrics
                 page.screenshot(path=str(Path(tempfile.gettempdir())/f'lex-settings-{width}.png'))
+                if width == 2048:
+                    page.locator('.lex-settings-save-control').hover()
+                    page.wait_for_timeout(150)
+                    page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-settings-save-preview.png'))
+                    page.mouse.move(0,0)
             page.evaluate("""()=>{
                 document.querySelector('.lex-global-settings-backdrop').remove();
                 const cards=Array.from({length:7},(_,i)=>LexeditorUI.detailSection({title:`Group ${i}`,body:Array.from({length:30},(_,j)=>LexeditorUI.detailField({label:`Property ${j}`,control:LexeditorUI.readonlyField(`Value ${j}`)}))}));
