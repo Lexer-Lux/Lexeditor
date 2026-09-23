@@ -33,3 +33,14 @@ wording, and the mod list shows name plus version. Remaining work is
 per-game in-game acceptance with real mods (FF7 Remake first, authorized
 2026-09-12): import, find, activate, launch, disable, plus relocation and
 managed-update behavior in the real game. Stays actionable.
+
+## 2026-09-23 global-actionables pass (branch impl/global-actionables2)
+
+Re-ran on current origin/master: tools/verify_mod_library.py passes (21
+tests, OK) plus tests/test_ff7r_graphics_tweaks.py (7 passed). No source
+changes needed: shared import/manual data-root selection, Known-Folder
+Documents resolution, verified relocation, release selection, failed-update
+recovery, author exemption, and per-game gating are intact. Remaining work
+is per-game in-game acceptance with real mods (FF7 Remake first): import,
+find, activate, launch, disable, relocation, and managed updates in the
+real game. Stays actionable.

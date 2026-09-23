@@ -26,3 +26,13 @@ file list in tools/build_distribution.py was updated to the new
 shaders/*.fx paths. No code beyond the 505 rename. Everything remaining is
 the release-time build plus Lexer's install/launch acceptance on all three
 platforms. Stays actionable.
+
+## 2026-09-23 global-actionables pass (branch impl/global-actionables2)
+
+Re-ran on current origin/master: tests/test_distribution_hygiene.py passes
+(2 passed). No source changes needed: tools/build_distribution.py still
+excludes private helpers/builds/profiles and pins bundled helpers. This PR
+adds no new vendored helpers. Remaining work is release-time only: re-run
+the distribution build against the release commit, attach the three
+installers, and Lexer's install/launch acceptance on Windows, macOS, Linux
+(children #494/#495/#496). Stays actionable.
