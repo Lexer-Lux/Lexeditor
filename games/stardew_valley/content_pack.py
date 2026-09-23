@@ -195,6 +195,35 @@ class ContentPackStore:
             "source": "project-patches",
         }
 
+    def dataset(self, key: str) -> dict:
+        """Read one owned field patch without flattening foreign Content Patcher blocks."""
+        if key == "objects":
+            payload = self.objects()
+            payload["schema"] = dataset_schema("objects")
+            payload["datasetKey"] = "objects"
+            return payload
+        self.validate()
+        spec = dataset_spec(key)
+        payload = _json(self.content_path)
+        change = _dataset_change(payload, key, create=False)
+        fields = change.get("Fields", {}) if change else {}
+        rows = []
+        supported_keys = set(spec["fields"])
+        for record_id, values in fields.items():
+            if not isinstance(values, dict):
+                continue
+            supported = {name: values[name] for name in supported_keys if name in values}
+            rows.append({
+                "id": str(record_id), "fields": supported, "present": sorted(supported),
+                "unsupportedFieldCount": len(values) - len(supported),
+            })
+        rows.sort(key=lambda row: row["id"].casefold())
+        return {
+            "datasetKey": key, "asset": spec["target"], "sha256": _sha256(self.content_path),
+            "rows": rows, "editableFields": list(spec["fields"]), "schema": dataset_schema(key),
+            "source": "project-patches",
+        }
+
     def save_objects(self, expected_sha256: str, edits: list[dict]) -> dict:
         self.validate()
         if not isinstance(expected_sha256, str) or not expected_sha256:
