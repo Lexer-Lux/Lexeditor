@@ -121,13 +121,19 @@ def test_brand_has_no_pressed_text_highlight(page):
     brand=page.locator('.lex-brand-button')
     before=brand.evaluate('n=>({bg:getComputedStyle(n).backgroundColor,fg:getComputedStyle(n).color})')
     brand.hover()
+    hover=brand.evaluate('n=>({bg:getComputedStyle(n).backgroundColor,fg:getComputedStyle(n).color})')
+    assert hover['bg']!=before['bg'] and hover['fg']==before['fg']
+    bounds=brand.bounding_box()
+    text=brand.locator('h1').bounding_box()
+    assert text['x']-bounds['x']>=8 and text['y']-bounds['y']>=4
     page.mouse.down()
-    assert brand.evaluate('n=>({bg:getComputedStyle(n).backgroundColor,fg:getComputedStyle(n).color})')==before
     assert page.evaluate('String(window.getSelection())')==''
     page.mouse.move(1000,700)
     page.mouse.up()
     brand.evaluate('n=>n.classList.add("lex-command-pressed")')
-    assert brand.evaluate('n=>({bg:getComputedStyle(n).backgroundColor,fg:getComputedStyle(n).color})')==before
+    pressed=brand.evaluate('n=>({bg:getComputedStyle(n).backgroundColor,fg:getComputedStyle(n).color})')
+    assert pressed['bg']!=hover['bg'] and pressed['fg']==before['fg']
+    assert brand.bounding_box()==bounds
 
 
 def test_brand_real_return_action_and_scriptless_snapshot(page):
