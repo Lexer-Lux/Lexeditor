@@ -164,6 +164,16 @@ def main() -> None:
         number.fill('-20')
         number.blur()
         assert number.input_value() == '-20'
+        # A programmatic restore must repaint the number's fill without a
+        # second user input event.
+        page.evaluate('''()=>{
+          const U=LexeditorUI,e=U.el;window.__resetAmount=80;
+          const input=e('input',{id:'reset-number',type:'number',min:0,max:100,value:80,oninput:event=>__resetAmount=Number(event.target.value)});
+          const source=U.provenanceControl({control:input,current:()=>__resetAmount,vanilla:20,apply:value=>{__resetAmount=value;input.value=String(value)}});
+          document.querySelector('#main').replaceChildren(U.detailField({label:'Amount',dataType:'INT',min:0,max:100,control:source}));
+        }''')
+        page.locator('#reset-number').click(button='right')
+        page.wait_for_function('document.querySelector("#reset-number").value === "20" && Math.abs(Number(document.querySelector(".lex-value-fill").style.getPropertyValue("--lex-value-ratio"))-.2)<.001')
         assert not errors, errors
         results={'new_button':'pass','whole_header_sort':'pass','selection_retained':'pass',
           'divider_keyboard_persistence_doubleclick_contextmenu_stack':'pass','units_integer_bounds':'pass',

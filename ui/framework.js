@@ -1767,6 +1767,7 @@
         return Math.max(0, Math.min(1, (value - lowBound) / (highBound - lowBound)));
       };
       const paint = () => fill.style.setProperty("--lex-value-ratio", String(ratio()));
+      input.__lexValueSliderPaint = paint;
       input.addEventListener("input", paint);
       input.addEventListener("change", paint);
       const box = () => (control instanceof Element && control.matches(".lex-unit-field")
@@ -1874,6 +1875,7 @@
       if (!source?.lexRevert) return;
       event.preventDefault();
       source.lexRevert(event);
+      input?.__lexValueSliderPaint?.();
       showToast("Restored the vanilla value");
     });
 
