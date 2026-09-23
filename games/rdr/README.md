@@ -48,6 +48,20 @@ Project** rebuilds verified copies only of affected archives under RedHook's
 `update/game` override folder. Project INI/JSON runtime files remain in the
 project workspace.
 
+## External mod compatibility
+
+Lexeditor does not treat every RDR1 mod as one stack. RedHook `.red` plugins are
+separate game-root files and Lexeditor leaves them alone. Archive replacement
+mods use a different namespace: Ultimate ASI Loader can overload, for example,
+`update/game/content.rpf`, which is also where Lexeditor deploys its rebuilt
+content archive. Only one file can own that exact path, so Lexeditor does not
+claim semantic composition with another whole-`content.rpf` mod and refuses to
+overwrite a deployed archive that changed outside Lexeditor.
+
+Community patch loaders that use `patch0.rpf`, `patch1.rpf`, and similar files
+are separate third-party systems. Lexeditor neither imports nor reorders those
+patches and does not claim their load-order semantics as its own.
+
 ## First-time runtime setup
 
 RedHook is an external prerequisite for using the delivered overrides in-game.
