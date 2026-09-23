@@ -38,9 +38,9 @@
       /* The hand is the marker, so the shared lift and underline go away. */
       --lex-tab-lift:0px;--lex-tab-underline-content:none;
       --lex-unit-align:baseline;
-      --lex-settings-tab-bg:linear-gradient(135deg,#555,#3f3f3f);
-      --lex-settings-tab-hover-bg:linear-gradient(135deg,#666,#494949);
-      --lex-settings-tab-active-bg:linear-gradient(135deg,#777,#555);
+      --lex-settings-tab-bg:linear-gradient(135deg,#303030,#171717);
+      --lex-settings-tab-hover-bg:linear-gradient(135deg,#424242,#282828);
+      --lex-settings-tab-active-bg:linear-gradient(135deg,#505050,#333);
 
       /* Window buttons: the same bevel, round where the game draws it round. */
       --lex-shell-button-fg:#fff;--lex-shell-button-border-width:2px;
