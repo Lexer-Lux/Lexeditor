@@ -343,6 +343,35 @@ class EditingTests(unittest.TestCase):
         self.assertEqual((loot["status"], loot["target"], loot["openable"]),
                          ("partial", "loot", True))
 
+    def test_rbf0_scalar_editor_is_in_place_and_data_map_gated(self):
+        payload = server.rbf_scalars_payload()
+        self.assertEqual(payload["counts"]["resources"], 1)
+        self.assertEqual(payload["counts"]["scalars"], 3)
+        row = next(item for item in payload["rows"] if item["path"].endswith("/Scale"))
+        source = Path(row["sourcePath"])
+        before = source.read_bytes()
+        result = server.save_rbf_scalars(row["resourcePath"], [{
+            "recordOffset": row["recordOffset"], "path": row["path"],
+            "kind": row["kind"], "rawHex": row["rawHex"], "value": 2.5,
+        }])
+        self.assertEqual(result["saved"], 1)
+        self.assertEqual(source.read_bytes(), before)
+        current = server.rbf_scalars_payload()
+        saved = next(item for item in current["rows"] if item["id"] == row["id"])
+        self.assertAlmostEqual(saved["value"], 2.5)
+        vanilla = next(item for item in server.rbf_scalars_payload(True)["rows"] if item["id"] == row["id"])
+        self.assertAlmostEqual(vanilla["value"], 1.0)
+
+        pretend = server.PREPARED_ROOT / "tune/ai/not_really_rbf.tune"
+        pretend.write_bytes(b"plain tuning text\n")
+        rows = {item["filename"]: item for item in server.data_map_payload()["rows"]}
+        supported = rows["game/tune_d11generic.rpf:/tune/ai/protected.tune"]
+        unsupported = rows["game/tune_d11generic.rpf:/tune/ai/not_really_rbf.tune"]
+        self.assertEqual((supported["status"], supported["target"], supported["openable"]),
+                         ("partial", "rbf", True))
+        self.assertEqual((unsupported["status"], unsupported["target"], unsupported["openable"]),
+                         ("not-integrated", "", False))
+
     def test_data_map_never_promotes_unverified_research_rows(self):
         rows = server._normalize_data_map_rows([{
             "filename": "game/content.rpf:/content/unknown.bin",
