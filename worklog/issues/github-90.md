@@ -26,3 +26,15 @@ database. Discovery policy covers labels and markers only. Posted as a
 comment with the three-item Lexer checklist (approve texl base, Q1 names,
 Q2 waypoint vs fast travel) and flipped actionable to waiting. Returns to
 actionable when Lexer answers.
+
+## 2026-09-23 per-game-ff8: Lexer answers already in merged contract, needs native hooks
+
+Verified on branch per-game-ff8 that the merged
+`world_map_fullscreen_issue_90` contract already encodes Lexer's three
+answers (texl.obj base, discovered/revealed-only labels, waypoint-only
+selection) plus the L1-Journal/R1-map Modern Controls bindings, and
+`tests/test_ff8_world_map_fullscreen_issue_90.py` is green. No code change.
+
+Needs Lexer/game: proved native overlay injection points for the
+full-screen map (activation fails closed until then), plus the Modern
+Controls runtime layer for position/vehicle data.

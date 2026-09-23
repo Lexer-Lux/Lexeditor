@@ -13,6 +13,7 @@ from . import ffnx_manager
 from . import runtime_layout
 from . import inventory_auto_sort
 from . import world_map_fullscreen_issue_90
+from . import gf_acquisition_rework
 from . import menu_qol_issue_61
 from . import single_gf
 from . import battle_shortcuts
@@ -56,6 +57,7 @@ DEFAULT_TRUE_ATB_WAIT = true_atb_wait_issue_63.DEFAULT_TRUE_ATB_WAIT
 DEFAULT_FORMULAE_REWORK = False
 DEFAULT_MODERN_CONTROLS = modern_controls_issue_65.DEFAULT_MODERN_CONTROLS
 DEFAULT_WORLD_MAP_FULLSCREEN = world_map_fullscreen_issue_90.DEFAULT_WORLD_MAP_FULLSCREEN
+DEFAULT_GF_ACQUISITION_REWORK = gf_acquisition_rework.DEFAULT_GF_ACQUISITION_REWORK
 DEFAULT_CAMERA_SPEED = modern_controls_issue_65.DEFAULT_CAMERA_SPEED
 MINIMUM_CAMERA_SPEED = modern_controls_issue_65.MINIMUM_CAMERA_SPEED
 MAXIMUM_CAMERA_SPEED = modern_controls_issue_65.MAXIMUM_CAMERA_SPEED
@@ -82,7 +84,7 @@ ACCEPTED_TWEAKS = frozenset({
     "enhancedAbilityMenu", "singleGf", "universalItem", "scannedTargetScan",
     "sharedMagicInventory", "partySwitch", "drawOncePerEnemy",
     "streamlinedDraw", "betterCard", "fixedCommandMenu", "trueAtbWait",
-    "modernControls", "worldMapFullscreen", "vibrationConsolidation", "betterTargeting",
+    "modernControls", "worldMapFullscreen", "gfAcquisitionRework", "vibrationConsolidation", "betterTargeting",
     "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "betterHpColors", "gfHpBars", "inGameTime",
     "interactionIndicators",
     "flatStatAbilities", "maxSpellEnabled", "noMagicConsumption", "dropsAfterMug",
@@ -335,6 +337,12 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         world_map_fullscreen = False
     if not world_map_fullscreen_issue_90.WORLD_MAP_FULLSCREEN_AVAILABLE:
         world_map_fullscreen = False
+    gf_acquisition_rework_enabled = data.get(
+        "gfAcquisitionRework", DEFAULT_GF_ACQUISITION_REWORK)
+    if not isinstance(gf_acquisition_rework_enabled, bool):
+        gf_acquisition_rework_enabled = DEFAULT_GF_ACQUISITION_REWORK
+    if not gf_acquisition_rework.GF_ACQUISITION_AVAILABLE:
+        gf_acquisition_rework_enabled = False
     camera_speed = data.get("cameraSpeed", DEFAULT_CAMERA_SPEED)
     try:
         camera_speed = float(camera_speed)
@@ -435,6 +443,9 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "worldMapFullscreen": world_map_fullscreen,
         "worldMapFullscreenAvailable": world_map_fullscreen_issue_90.WORLD_MAP_FULLSCREEN_AVAILABLE,
         "worldMapFullscreenBlocker": world_map_fullscreen_issue_90.WORLD_MAP_FULLSCREEN_BLOCKER,
+        "gfAcquisitionRework": gf_acquisition_rework_enabled,
+        "gfAcquisitionReworkAvailable": gf_acquisition_rework.GF_ACQUISITION_AVAILABLE,
+        "gfAcquisitionReworkBlocker": gf_acquisition_rework.GF_ACQUISITION_BLOCKER,
         "vibrationConsolidation": vibration_consolidation,
         "betterTargeting": better_targeting,
         "damageLimitRemoval": damage_limit_removal,
@@ -572,7 +583,8 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
                drops_after_mug: bool = False,
                drop_chance_enabled: bool = False,
                drop_chance_plan=None,
-               world_map_fullscreen: bool = DEFAULT_WORLD_MAP_FULLSCREEN) -> str:
+               world_map_fullscreen: bool = DEFAULT_WORLD_MAP_FULLSCREEN,
+               gf_acquisition_rework_enabled: bool = DEFAULT_GF_ACQUISITION_REWORK) -> str:
     bonus = _bounded_bonus(bonus)
     flying_eva_enabled = _boolean(flying_eva_enabled, "Flying EVA Bonus")
     auto_sort = _boolean(auto_sort, "Auto-sort Inventory")
@@ -593,6 +605,8 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
     formulae_rework = _boolean(formulae_rework, "Formulae Rework")
     modern_controls = _boolean(modern_controls, "Modern Controls")
     world_map_fullscreen = _boolean(world_map_fullscreen, "Full-screen World Map")
+    gf_acquisition_rework_enabled = _boolean(
+        gf_acquisition_rework_enabled, "GF Acquisition Rework")
     vibration_consolidation = _boolean(
         vibration_consolidation, "Vibration Rationalization",
     )
@@ -722,6 +736,12 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
         lines.extend(world_map_patch.rstrip().splitlines())
     else:
         lines.append("# Full-screen World Map is disabled; world-map Back behavior is unchanged.")
+    gf_acquisition_patch = gf_acquisition_rework.build_hext(
+        gf_acquisition_rework_enabled)
+    if gf_acquisition_patch:
+        lines.extend(gf_acquisition_patch.rstrip().splitlines())
+    else:
+        lines.append("# GF Acquisition Rework is disabled; drawable GFs keep their vanilla Draw source.")
     vibration_patch = vibration_consolidation_issue_66.build_hext(
         vibration_consolidation,
     )
@@ -876,6 +896,7 @@ def initialize_project(project_root: Path) -> None:
         "trueAtbWait": False,
         "modernControls": False,
         "worldMapFullscreen": False,
+        "gfAcquisitionRework": False,
         "vibrationConsolidation": False,
         "betterTargeting": False,
         "damageLimitRemoval": False,
@@ -975,6 +996,10 @@ def save(data: dict, game_root: Path | None = None,
         data.get("worldMapFullscreen", DEFAULT_WORLD_MAP_FULLSCREEN),
         "Full-screen World Map",
     )
+    gf_acquisition_rework_enabled = _boolean(
+        data.get("gfAcquisitionRework", DEFAULT_GF_ACQUISITION_REWORK),
+        "GF Acquisition Rework",
+    )
     # The camera turn rate travels with the switch that uses it. A value the
     # page never sent, or one outside the usable range, becomes the shipped
     # rate rather than refusing the whole apply.
@@ -1040,6 +1065,10 @@ def save(data: dict, game_root: Path | None = None,
         enabled=world_map_fullscreen, modern_controls=modern_controls,
     ):
         raise ValueError(world_map_requirement)
+    for gf_acquisition_requirement in gf_acquisition_rework.requirement_errors(
+        enabled=gf_acquisition_rework_enabled,
+    ):
+        raise ValueError(gf_acquisition_requirement)
     active_root = _runtime_root(runtime_root, project)
     direct_root = active_root / "direct"
     shared_magic_status = ffnx_manager.status(
@@ -1075,6 +1104,7 @@ def save(data: dict, game_root: Path | None = None,
         formulae_rework=formulae_rework,
         modern_controls=modern_controls,
         world_map_fullscreen=world_map_fullscreen,
+        gf_acquisition_rework_enabled=gf_acquisition_rework_enabled,
         vibration_consolidation=vibration_consolidation,
         better_targeting=better_targeting,
         damage_limit_removal=damage_limit_removal,
@@ -1108,6 +1138,7 @@ def save(data: dict, game_root: Path | None = None,
         "trueAtbWait": true_atb_wait,
         "modernControls": modern_controls,
         "worldMapFullscreen": world_map_fullscreen,
+        "gfAcquisitionRework": gf_acquisition_rework_enabled,
         # Stored with the switch it belongs to. Written only to FFNx.toml, it
         # read back as the default and the next save overwrote the reader's.
         "cameraSpeed": round(camera_speed, 2),
