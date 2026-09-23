@@ -14,6 +14,27 @@ import verify_ff7_rendered_neutral as neutral
 target = neutral.target
 OUT = ROOT / "out" / "ff7-2013-acceptance"
 
+# set_content() leaves Chromium on about:blank, whose opaque origin rejects Web
+# Storage access. Production pages are served from the plugin HTTP origin, so give
+# this synthetic harness in-memory Storage objects without changing application JS.
+OPAQUE_STORAGE_SHIM = r"""
+(() => {
+  const makeStorage = () => {
+    const values = new Map();
+    return {
+      get length() { return values.size; },
+      key: index => Array.from(values.keys())[index] ?? null,
+      getItem: key => values.has(String(key)) ? values.get(String(key)) : null,
+      setItem: (key, value) => values.set(String(key), String(value)),
+      removeItem: key => values.delete(String(key)),
+      clear: () => values.clear(),
+    };
+  };
+  Object.defineProperty(window, "sessionStorage", {value: makeStorage(), configurable: true});
+  Object.defineProperty(window, "localStorage", {value: makeStorage(), configurable: true});
+})();
+"""
+
 
 def open_current_modules(self, edition: str = "ff7") -> None:
     """Load the same FF7 page code as production, including the split editor.js module."""
@@ -31,7 +52,9 @@ def open_current_modules(self, edition: str = "ff7") -> None:
     )
     html = html.replace('<link rel="stylesheet" href="/shared/neutral.css">', "")
     bootstrap = (
-        target.HOST
+        OPAQUE_STORAGE_SHIM
+        + "\n"
+        + target.HOST
         + "\nwindow.__lexeditorPlugin="
         + json.dumps({"id": edition, "name": "FF7 fixture", "edition": edition})
         + ";\n"
@@ -46,7 +69,7 @@ def open_current_modules(self, edition: str = "ff7") -> None:
     self.page.add_script_tag(
         content=(ROOT / "games" / "ff7" / "editor.js").read_text(encoding="utf-8")
     )
-    self.page.wait_for_function("state.loaded === true")
+    self.page.wait_for_function("typeof state !== 'undefined' && state.loaded === true")
     self.assertEqual(self.errors, [])
 
 
@@ -55,9 +78,33 @@ class FF72013Discard(target.RenderedTests):
 
     def test_discard_restores_saved_baseline(self) -> None:
         self.install()
+        self.page.set_viewport_size({"width": 900, "height": 620})
         self.open("ff7-2013")
+
+        # The shared Help action is the FF7 Data Map. Verify it renders with the
+        # explicit coverage control rather than inferring completeness from source.
+        self.page.get_by_title("Open the FF7 Data Map").click()
+        self.page.wait_for_function("state.tab === 'datamap'")
+        self.assertTrue(self.page.locator(".lex-data-map-view").is_visible())
+        coverage = self.page.get_by_label("Filter files by coverage", exact=True)
+        self.assertIn("Structured editable", coverage.locator("option").all_inner_texts())
+
         self.navigate("armor")
         control = self.control("armor", "defense")
+        self.assertEqual(control.get_attribute("type"), "number")
+        self.assertIsNotNone(control.get_attribute("min"))
+        self.assertIsNotNone(control.get_attribute("max"))
+        self.assertGreater(self.page.locator(".ff7-detail .lex-info-help").count(), 0)
+
+        OUT.mkdir(parents=True, exist_ok=True)
+        self.page.screenshot(path=str(OUT / "ff7-2013-900x620.png"))
+        self.page.evaluate('document.documentElement.style.zoom = "1.5"')
+        self.page.wait_for_timeout(80)
+        self.assertTrue(self.page.locator("#lexeditor-shell").is_visible())
+        self.assertTrue(control.is_visible())
+        self.page.screenshot(path=str(OUT / "ff7-2013-900x620-150pct.png"))
+        self.page.evaluate('document.documentElement.style.zoom = ""')
+
         original = int(control.input_value())
         changed = original + 1 if original < 255 else original - 1
         control.fill(str(changed))
@@ -65,7 +112,6 @@ class FF72013Discard(target.RenderedTests):
         self.page.locator("#global-save").click(button="right")
         dialog = self.page.locator(".lex-discard-dialog")
         dialog.wait_for(state="visible")
-        OUT.mkdir(parents=True, exist_ok=True)
         self.page.screenshot(path=str(OUT / "ff7-2013-discard-confirmation.png"))
         dialog.get_by_role("button", name="Discard Changes", exact=True).click()
         self.page.wait_for_function("dirtyCount() === 0")
