@@ -38,8 +38,8 @@ POST_ROUTES = {"/api/save", "/api/runtime/install", "/api/runtime/recover",
 # These stay explicit even when a narrow sub-format is integrated, so partial
 # coverage never hides the still-protected bytes or implies a generic raw editor.
 UNRESOLVED_AREAS = (
-    ("StreamingAssets/p0data1*.bin (outside integrated BGI activity bits)", "Field backgrounds, cameras, walkmesh geometry/topology and animations",
-     "Lexeditor has preservation-safe editors for the documented BGI_FLOOR_ACTIVE and BGI_TRI_ACTIVE bits. Background art, cameras, walkmesh geometry/topology, edge semantics, transforms, other flag semantics and moving-platform animation data remain protected and unintegrated rather than being routed through a lossy generic editor."),
+    ("StreamingAssets/p0data1*.bin (outside integrated BGI pathing flags)", "Field backgrounds, cameras, walkmesh geometry/topology and animations",
+     "Lexeditor has preservation-safe editors for BGI_FLOOR_ACTIVE plus Memoria Field Creator's documented triangle Active, Alternate footstep, Prevent NPC pathing and Prevent PC pathing flags. Background art, cameras, walkmesh geometry/topology, edge semantics, transforms, remaining/internal flag semantics and moving-platform animation data remain protected and unintegrated rather than being routed through a lossy generic editor."),
     ("StreamingAssets/p0data2.bin (outside BattleScene raw16)", "Battle geometry, scene assets and effects",
      "Enemy and encounter BattleScene raw16 records are integrated separately. Public tooling also reads battle meshes/background assets, SPS/effect data and related scene resources from p0data2; Lexeditor has no safe structured editor for those assets yet."),
     ("StreamingAssets/p0data3.bin", "World-map geometry, materials and effects",
