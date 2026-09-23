@@ -27,7 +27,6 @@
   function cell(text){return el("span",{title:String(text??"")},String(text||"—"));}
   function shown(text){return LexeditorUI.readonlyField(text??"—",{format:false,title:String(text??"")});}
   function fact(label,text){return LexeditorUI.detailField({label,control:shown(text)});}
-  function projectBadge(record){return LexeditorUI.badge(record.project?"Project":"Vanilla",{tone:record.project?"success":null});}
   function unavailable(title,message){return LexeditorUI.detailPanel({className:"lex-information-panel",title,body:[LexeditorUI.detailNote(message)]});}
   // `description` is prose under the row; `help` is the shared info bubble that
   // every other plugin's fields carry. RDR's rows had neither, so nothing on
@@ -76,7 +75,6 @@
       renameRecord:state.activeSource==="mine"&&friendly?value=>editItem(item,friendly,value):undefined,
       identity:LexeditorUI.recordId(item.index),
       meta:item.name||"",
-      actions:projectBadge(item),
       body:[
         detailField("Type",shown(item.type),"","The XML element this record comes from. It decides which fields the game reads."),
         detailField("Dataset",shown(item.sourceLabel),"","Which shipped data file this item was defined in: the base game or one of its DLC."),
@@ -121,7 +119,7 @@
   function shopDetail(){
     const item=(state.shops?.rows||[]).find(row=>row.id===state.shopSelected);
     if(!item)return LexeditorUI.detailPanel({className:"record-detail shop-detail",title:"Select a shop item",body:[LexeditorUI.detailNote("Edits create a packed WGD override. The installed gringores.rpf stays unchanged.")]});
-    return LexeditorUI.detailPanel({className:"record-detail shop-detail",title:item.name,actions:projectBadge(item),body:[
+    return LexeditorUI.detailPanel({className:"record-detail shop-detail",title:item.name,body:[
       detailField("Shop",shown(item.shop)),detailField("Type",shown(item.category)),
       detailField("Root",shown(item.rootHash)),
       detailField("Source",shown(item.sourcePath)),
@@ -162,7 +160,7 @@
     const mission=(state.missions?.missions||[]).find(row=>row.id===state.missionSelected);
     if(!mission)return LexeditorUI.detailPanel({className:"record-detail mission-detail",title:"No mission selected"});
     const limits=state.missions.limits;
-    return LexeditorUI.detailPanel({className:"record-detail mission-detail",title:mission.name,actions:projectBadge(mission),body:[
+    return LexeditorUI.detailPanel({className:"record-detail mission-detail",title:mission.name,body:[
       detailField("ID",shown(String(mission.id))),detailField("Script",shown(mission.scriptName)),detailField("Area",shown(missionArea(mission))),
       detailField("Text key",shown(mission.localizationKey)),detailField("Source",shown(mission.archivePath)),
       detailField("Evidence",shown(`${mission.rewardSource.function} / ${mission.rewardSource.case}`)),
