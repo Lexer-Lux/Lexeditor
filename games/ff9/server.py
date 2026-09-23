@@ -30,9 +30,26 @@ POST_ROUTES = {"/api/save", "/api/runtime/install", "/api/runtime/recover",
                "/api/deployment/deploy", "/api/deployment/revert"}
 
 
+# Known p0data families that remain outside Lexeditor's structured editor.
+# These are intentionally specific: public FF9 tooling demonstrates the formats
+# and override paths below, so a single "unknown p0data" bucket would hide real
+# agent-side work. None is promoted to Partial until Lexeditor has an actual
+# player-facing viewer/editor for that family.
 UNRESOLVED_AREAS = (
-    ("StreamingAssets/p0data*.bin (outside BattleScene raw16)", "Other vanilla Unity asset-container content",
-     "Enemy and encounter BattleScene raw16 records are integrated separately. Other p0data asset-container formats have no proved format-specific editor yet and remain unsupported."),
+    ("StreamingAssets/p0data1*.bin", "Field scenes: backgrounds, cameras and walkmeshes",
+     "Public FF9 tooling can extract and rebuild field scene/background/camera/walkmesh data from the numbered p0data1 field bundles. Lexeditor has not adapted those codecs into a preservation-tested field editor yet."),
+    ("StreamingAssets/p0data2.bin (outside BattleScene raw16)", "Battle geometry, scene assets and effects",
+     "Enemy and encounter BattleScene raw16 records are integrated separately. Public tooling also reads battle meshes/background assets, SPS/effect data and related scene resources from p0data2; Lexeditor has no safe structured editor for those assets yet."),
+    ("StreamingAssets/p0data3.bin", "World-map geometry, materials and effects",
+     "Public FF9 tooling reads and overrides world-map assets from p0data3. Lexeditor's World tab currently edits only documented Memoria CSV controls, not the packed world geometry/material/effect data."),
+    ("StreamingAssets/p0data4.bin", "Field and character 3D models",
+     "Public tooling identifies native Unity GameObject/skinned-mesh prefabs in p0data4 and can export them to editable model formats. Lexeditor has no preservation-tested mesh/rig import and override editor yet."),
+    ("StreamingAssets/p0data5.bin", "Character and model animations",
+     "Public tooling identifies serialized AnimationClips in p0data5 and Memoria supports loose animation overrides. Lexeditor has no semantic animation editor/import round-trip yet."),
+    ("StreamingAssets/p0data7.bin", "Compiled field, battle and world event scripts",
+     "Public tooling decodes and emits the compiled .eb event-script families loaded from p0data7. Lexeditor has no safe script decompiler/editor/recompiler UI with preservation coverage yet."),
+    ("StreamingAssets/p0data6*.bin and other unmatched p0data*.bin", "Remaining packed Unity asset families",
+     "Public tools enumerate these UnityRaw bundles, but the remaining content has not been mapped here to sufficiently bounded player-facing schemas. The gap stays visible and actionable rather than being treated as raw-file integration."),
 )
 
 
