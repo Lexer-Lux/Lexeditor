@@ -678,23 +678,30 @@
     });
   }
 
+  function battlePlayerFieldLabel(name){
+    return String(name||"")
+      .replace(/_Array$/," array")
+      .replaceAll("_"," ")
+      .replace(/([a-z0-9])([A-Z])/g,"$1 $2")
+      .replace(/\bId\b/gi,"ID")
+      .replace(/\bFname\b/gi,"FName");
+  }
+
   function battlePlayerRecordPanel(row){
     if(!row)return detailPanel({className:"ff7r2-detail",title:"NO RECORD",icon:infoIcon(),identity:null,
       meta:"BattlePlayerParameter",body:[detailSection({title:"STATUS",body:[
         detailField({label:"DETAIL",control:readonlyField("No BattlePlayerParameter record is selected.")})
       ]})]});
     const fields=(row.fields||[]).map(field=>detailField({
-      label:field.name.toUpperCase(),
+      label:battlePlayerFieldLabel(field.name).toUpperCase(),
       dataType:field.kind==="array"?("ARRAY<"+String(field.type||"VALUE").toUpperCase()+">"):String(field.kind||field.type).toUpperCase(),
-      control:readonlyField(field.kind==="array"?arrayDisplay(field):String(field.value??"")),
-      help:infoHelp("Serialized source value. The public schema proves its storage type, but Lexeditor does not infer its gameplay meaning or safe edit range.")
+      control:readonlyField(field.kind==="array"?arrayDisplay(field):String(field.value??""))
     }));
     return detailPanel({className:"ff7r2-detail ff7r2-battle-player-detail",title:row.key,
       icon:el("span",{class:"ff7r2-record-icon"},"VII"),identity:recordId(row.key),
       meta:"BattlePlayerParameter — read-only source data",body:[
         detailSection({title:"INTEGRATION STATUS",body:[
-          LexeditorUI.detailNote("STATUS — Structured source view only. Public declarations prove the storage schema, not enough gameplay semantics or safe ranges to expose edits."),
-          LexeditorUI.detailNote("EDITING — Disabled. No BattlePlayerParameter project file is staged or written."),
+          LexeditorUI.detailNote("Public declarations prove the storage schema, but not the gameplay behavior, enum domains or safe edit ranges. This page therefore stops at structured source inspection."),
         ]}),
         detailSection({title:"IDENTITY",body:[
           detailField({label:"ROW FNAME",control:readonlyField(row.key)}),
