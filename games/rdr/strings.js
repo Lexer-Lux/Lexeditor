@@ -7,10 +7,14 @@
     const {state, api, el, columnList, pagedListDetail, cell, shown,
       detailField, sourceControl, modOnlySpec, setStatus, shell} = deps;
     const UI = global.LexeditorUI;
-
-    const tableMeta = id => (state.strings?.tables || [])
-      .find(table => table.id === (id === undefined ? state.stringTableId : id));
+    const LANGUAGE_FLAGS = {
+      "English":"🇺🇸", "Spanish":"🇪🇸", "French":"🇫🇷", "German":"🇩🇪",
+      "Italian":"🇮🇹", "Japanese":"🇯🇵", "Chinese (Traditional)":"🇹🇼",
+      "Chinese (Simplified)":"🇨🇳", "Korean":"🇰🇷", "Spanish (Spain)":"🇪🇸",
+      "Spanish (Mexico)":"🇲🇽", "Portuguese":"🇧🇷", "Polish":"🇵🇱", "Russian":"🇷🇺",
+    };
     const value = row => state.stringEdits[row.id]?.value ?? row.text;
+    const languageId = language => String(language?.index ?? language?.id ?? "");
 
     function edit(row, next) {
       if (next === row.text) delete state.stringEdits[row.id];
@@ -25,34 +29,35 @@
     function matchingRows() {
       const needle = state.stringQuery.trim().toLowerCase();
       return (state.stringTable?.rows || []).filter(row =>
-        (!needle || [row.identifier, row.hash, value(row), row.language]
-          .some(candidate => String(candidate || "").toLowerCase().includes(needle)))
-        && (!state.stringLanguage || row.language === state.stringLanguage));
+        !needle || [row.identifier, row.hash, value(row), row.path, row.sourceLabel]
+          .some(candidate => String(candidate || "").toLowerCase().includes(needle)));
     }
 
-    async function load(id = state.stringTableId, renderAfter = true) {
-      const tables = state.strings?.tables || [];
-      let meta = tables.find(table => table.id === id && table.available)
-        || tables.find(table => table.available);
-      state.stringTableId = meta?.id || "";
+    const firstLanguageId = () => languageId((state.strings?.languages || [])[0]);
+
+    async function load(id = state.stringLanguage || firstLanguageId(), renderAfter = true) {
+      const languages = state.strings?.languages || [];
+      let language = languages.find(row => languageId(row) === String(id))
+        || languages[0];
+      state.stringLanguage = languageId(language);
       state.stringLoadError = "";
       state.stringSelected = "";
-      if (!meta) {
+      if (!language) {
         state.stringTable = null;
         state.vanilla.stringTable = null;
         if (renderAfter) render();
         return;
       }
-      const query = new URLSearchParams({source: meta.source, path: meta.path});
+      const query = new URLSearchParams({language: String(language.index)});
       try {
         if (state.activeSource === "vanilla") {
-          const payload = await api(`/api/string-table?${query}&dataset=vanilla`);
+          const payload = await api(`/api/strings?${query}&dataset=vanilla`);
           state.stringTable = payload;
           state.vanilla.stringTable = UI.clone(payload);
         } else {
           [state.stringTable, state.vanilla.stringTable] = await Promise.all([
-            api(`/api/string-table?${query}`),
-            api(`/api/string-table?${query}&dataset=vanilla`),
+            api(`/api/strings?${query}`),
+            api(`/api/strings?${query}&dataset=vanilla`),
           ]);
         }
         const first = state.stringTable.rows?.[0];
@@ -65,9 +70,9 @@
       if (renderAfter) render();
     }
 
-    async function chooseTable(id) {
+    async function chooseLanguage(id) {
+      if (String(id) === state.stringLanguage) return;
       state.stringPage = 0;
-      state.stringLanguage = "";
       await load(id);
     }
 
@@ -76,8 +81,8 @@
         render:row=>cell(row.identifier || row.hash)},
       {key:"text", label:"Text", width:"minmax(0,1.65fr)",
         render:row=>cell(value(row))},
-      {key:"language", label:"Language", width:"minmax(0,.8fr)",
-        render:row=>cell(row.language)},
+      {key:"resource", label:"Resource", width:"minmax(0,1.05fr)",
+        render:row=>cell(row.path)},
       {key:"hash", label:"Hash", width:"minmax(0,.65fr)",
         render:row=>cell(row.hash)},
     ];
@@ -102,12 +107,11 @@
       return UI.detailPanel({
         className:"record-detail string-detail",
         title: row.identifier || row.hash,
-        identity: UI.recordId(row.entryIndex),
-        meta: `${row.language} · ${row.hash}`,
+        meta: `${row.sourceLabel} · ${row.hash}`,
         actions: UI.badge(row.project ? "Project" : "Vanilla",
           {tone: row.project ? "success" : null}),
         body:[
-          detailField("Table", shown(state.stringTable.table.label), "",
+          detailField("Resource", shown(row.path), "",
             "The PC STRTBL resource that owns this localized text."),
           detailField("Key", shown(row.identifier || "Hash only"), "",
             "The stable game key when the identifier table resolves this hash uniquely."),
@@ -138,22 +142,31 @@
       shell().refresh();
     }
 
+    function languageTabs() {
+      return UI.subtabBar({
+        tabs:(state.strings?.languages || []).map(language => ({
+          id:languageId(language),
+          label:`${LANGUAGE_FLAGS[language.label] || "🏳️"} ${language.label}`,
+        })),
+        active:state.stringLanguage,
+        label:"Languages",
+        className:"rdr-language-tabs",
+        change:chooseLanguage,
+      });
+    }
+
     function render() {
-      const tables = state.strings?.tables || [];
-      const selector = el("select", {
-        "aria-label":"Select string table",
-        onchange:event=>chooseTable(event.target.value),
-      }, ...(tables.length ? tables.map(table => el("option", {
-        value:table.id, selected:table.id === state.stringTableId,
-        disabled:!table.available,
-      }, `${table.sourceLabel} · ${table.path}${table.available ? "" : " — unavailable"}`))
-        : [el("option",{value:""},"No prepared PC string tables")]));
+      const discardButton = el("button", {
+        type:"button", disabled:!Object.keys(state.stringEdits).length,
+        onclick:discard,
+      }, "Discard string edits");
+      const count = state.stringTable?.counts
+        ? `${state.stringTable.counts.records} strings · ${state.stringTable.counts.tables} resources`
+        : state.stringLoadError || `${state.strings?.counts?.available || 0} parsed resources`;
+      document.querySelector("#toolbar").replaceChildren(
+        languageTabs(), discardButton, el("span",{class:"count"},count));
 
       if (!state.stringTable) {
-        document.querySelector("#toolbar").replaceChildren(
-          selector,
-          el("span",{class:"count"},state.stringLoadError
-            || `${state.strings?.counts?.available || 0} parsed tables`));
         document.querySelector("#main").replaceChildren(UI.detailPanel({
           className:"lex-information-panel",
           title:"String Tables",
@@ -165,31 +178,14 @@
       }
 
       const rows = matchingRows();
-      const languages = [...new Set(state.stringTable.rows.map(row => row.language))]
-        .sort((a,b)=>a.localeCompare(b));
-      const languageFilter = el("select", {
-        "aria-label":"Filter localized strings by language",
-        onchange:event=>{state.stringLanguage=event.target.value;state.stringPage=0;render();},
-      }, el("option",{value:"",selected:!state.stringLanguage},"All languages"),
-      ...languages.map(language=>el("option",{
-        value:language,selected:language===state.stringLanguage},language)));
-      const discardButton = el("button", {
-        type:"button", disabled:!Object.keys(state.stringEdits).length,
-        onclick:discard,
-      }, "Discard string edits");
-      document.querySelector("#toolbar").replaceChildren(
-        selector, languageFilter, discardButton,
-        el("span",{class:"count"},
-          `${state.stringTable.counts.records} strings · ${state.stringTable.counts.languages} language blocks`));
-
       document.querySelector("#main").replaceChildren(pagedListDetail({
         modOnly:modOnlySpec(state.stringEdits,()=>{state.stringPage=0;}),
         rows,key:row=>row.id,slots:false,page:state.stringPage,
         pageSize:state.stringPageSize,selected:state.stringSelected,noun:"strings",
         splitKey:"rdr-strings",className:"rdr-split",defaultSplit:48,
         fit:{minRowHeight:32},
-        search:{key:"rdr-strings",value:state.stringQuery,
-          placeholder:"Search identifiers, hashes, text or language…",
+        search:{key:`rdr-strings-${state.stringLanguage}`,value:state.stringQuery,
+          placeholder:"Search identifiers, hashes, text or resource…",
           change:next=>{state.stringQuery=next;state.stringPage=0;render();}},
         filters:[],
         master:({rows,selected,select})=>columnList({
@@ -238,10 +234,8 @@
     }
 
     const clearEdits = () => { state.stringEdits = {}; };
-    const firstAvailableId = () => (state.strings?.tables || [])
-      .find(table => table.available)?.id || "";
 
     return {render,load,validate,savePending,clearEdits,
-      dirtyCount:()=>Object.keys(state.stringEdits).length,firstAvailableId};
+      dirtyCount:()=>Object.keys(state.stringEdits).length,firstLanguageId};
   };
 })(window);
