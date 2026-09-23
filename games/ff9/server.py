@@ -48,8 +48,8 @@ UNRESOLVED_AREAS = (
      "Public tooling identifies serialized AnimationClips in p0data5 and Memoria supports loose animation overrides. Lexeditor has no semantic animation editor/import round-trip yet."),
     ("StreamingAssets/p0data7.bin", "Compiled field, battle and world event scripts",
      "Public tooling decodes and emits the compiled .eb event-script families loaded from p0data7. Lexeditor has no safe script decompiler/editor/recompiler UI with preservation coverage yet."),
-    ("StreamingAssets/p0data6*.bin and other unmatched p0data*.bin", "Remaining packed Unity asset families",
-     "Public tools enumerate these UnityRaw bundles, but the remaining content has not been mapped here to sufficiently bounded player-facing schemas. The gap stays visible and actionable rather than being treated as raw-file integration."),
+    ("StreamingAssets/p0data6*.bin and other unmatched p0data*.bin", "Audio evidence plus remaining packed Unity asset families",
+     "Public research byte-identifies at least title BGM music033.akb in p0data61.bin/p0data601.bin, and Memoria recognizes p0data61.bin, p0data62.bin and p0data63.bin as mod-content bundle names. That does not establish a bounded schema for the whole p0data6* family, so Lexeditor keeps the remaining contents visible and unintegrated rather than guessing."),
 )
 
 
