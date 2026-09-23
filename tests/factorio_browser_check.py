@@ -186,7 +186,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 page.wait_for_timeout(120)
                 stack = page.get_by_label("Stack size", exact=True)
                 stack.fill("250")
-                stack.press("Tab")
+                stack.blur()
                 page.wait_for_function("dirtyCount() === 1")
 
                 page.get_by_role("button", name="Machines", exact=True).click()
@@ -195,7 +195,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 page.wait_for_timeout(120)
                 speed = page.get_by_label("Crafting speed", exact=True)
                 speed.fill("1.25")
-                speed.press("Tab")
+                speed.blur()
                 page.wait_for_function("dirtyCount() === 2")
 
                 page.get_by_role("button", name="Technologies", exact=True).click()
@@ -204,10 +204,10 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 page.wait_for_timeout(120)
                 count = page.get_by_label("Research unit count", exact=True)
                 count.fill("25")
-                count.press("Tab")
+                count.blur()
                 unit_time = page.get_by_label("Research unit time", exact=True)
                 unit_time.fill("10")
-                unit_time.press("Tab")
+                unit_time.blur()
                 page.wait_for_function("dirtyCount() === 3")
 
                 tech_search.fill("automation-2")
