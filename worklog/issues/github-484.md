@@ -29,3 +29,13 @@ Remaining, needs Lexer: accept the `[hidden]` ceiling of 1 (or authorize layerin
 ## 2026-09-23 misc-fixes: lane-pin alignment
 
 The branch's contract tool pinned the pre-decision 10%-with-floor lane while the CSS (and master, via bda769f0 "Recover missing ... from archived branches") carries Lexer's decided 7.5% lane — `verify_shared_ui_contract.py` failed on this branch. Aligned the tool pin to master's decided 7.5% text; contract audit passes again. No design change: the 7.5% decision stands.
+
+## 2026-09-23 misc-fixes: audit re-verified, still needs Lexer
+
+Re-ran `tools/css_audit.py` on the current tree: every plugin stylesheet
+(blank, ff7r, ff7r2, ff8, ff9, palworld, rdr, rdr2, warband) at 0 rules /
+0 `!important`; framework at 0 duplicates, 1 `!important` (the deliberate
+`[hidden]` rule). `tests/test_css_budget.py`: 3 passed, 9 subtests passed.
+All machine-verifiable numbers in this handoff hold. The only remainder is
+Lexer's two decisions (accept the ceiling of 1; confirm the snapshot
+baseline gate). Issue stays actionable.
