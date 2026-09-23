@@ -25,9 +25,9 @@ def bgi_bytes() -> bytes:
     struct.pack_into("<HHHHHHHHHHHH", data, 40,
                      2, 60, 0, 140, 0, 140, 2, 140, 0, 212, 0, 212)
 
-    # Triangle 0: active plus unknown bit 0x20, floor 7.
+    # Triangle 0: active + all three documented pathing attributes + unknown bit 0x20.
     # Triangle 1: inactive plus unknown bit 0x40, floor 9.
-    struct.pack_into("<HHhhhh", data, 64, 0x21, 0x1234, 7, 0, 0, 0)
+    struct.pack_into("<HHhhhh", data, 64, 0xD021, 0x1234, 7, 0, 0, 0)
     struct.pack_into("<HHhhhh", data, 104, 0x40, 0x5678, 9, 0, 0, 0)
 
     # Floor 0: active plus unknown bit 0x40. Floor 1: inactive plus 0x80.
@@ -93,8 +93,12 @@ def test_bgi_floor_parser_bounds_and_unknown_bits():
 
 def test_bgi_triangle_parser_bounds_floor_and_unknown_bits():
     triangles = walkmesh._triangle_table(bgi_bytes())
-    assert [(t["floorNdx"], t["active"], t["otherFlags"]) for t in triangles] == [
-        (7, True, 0x20), (9, False, 0x40),
+    assert [
+        (t["floorNdx"], t["active"], t["alternateFootstep"], t["preventNPC"], t["preventPC"], t["otherFlags"])
+        for t in triangles
+    ] == [
+        (7, True, True, True, True, 0x20),
+        (9, False, False, False, False, 0x40),
     ]
     malformed = bytearray(bgi_bytes())
     struct.pack_into("<H", malformed, 42, 0xFFFF)
@@ -112,7 +116,8 @@ def test_load_scopes_triangle_activity_to_one_field(store):
     assert len(data["rows"]) == 2
     assert data["rows"][0]["values"] == {
         "Field": "FBG_N21_TEST_MAP000_TEST_0", "Triangle": 0, "Floor": 7,
-        "Active": True, "OtherFlags": 0x20,
+        "Active": True, "AlternateFootstep": True, "PreventNPC": True, "PreventPC": True,
+        "OtherFlags": 0x20,
     }
     other = data["scenes"][1]["value"]
     scoped = database.load("field-walkmesh-triangles", other)
@@ -141,6 +146,29 @@ def test_triangle_save_toggles_only_active_bit_and_reopens_project(store):
     assert saved["rows"][0]["source"] == "project"
     assert saved["rows"][0]["values"]["Active"] is False
     assert saved["rows"][0]["values"]["OtherFlags"] == 0x20
+
+
+def test_triangle_named_pathing_flags_preserve_unknown_bits(store):
+    database, archive_path, project = store
+    archive_before = archive_path.read_bytes()
+    loaded = database.load("field-walkmesh-triangles")
+    row = loaded["rows"][0]
+    saved = database.save("field-walkmesh-triangles", loaded["sceneHashes"], [{
+        "scene": row["scene"], "record": row["record"],
+        "values": {"AlternateFootstep": False, "PreventNPC": False, "PreventPC": False},
+    }])
+    assert archive_path.read_bytes() == archive_before
+    after = (project / row["scene"]).read_bytes()
+    before = bgi_bytes()
+    changed = [offset for offset, (left, right) in enumerate(zip(before, after)) if left != right]
+    assert changed == [65]
+    assert struct.unpack_from("<H", after, 64)[0] == 0x0021
+    saved_row = saved["rows"][0]
+    assert saved_row["values"]["Active"] is True
+    assert saved_row["values"]["AlternateFootstep"] is False
+    assert saved_row["values"]["PreventNPC"] is False
+    assert saved_row["values"]["PreventPC"] is False
+    assert saved_row["values"]["OtherFlags"] == 0x20
 
 
 def test_triangle_noop_and_stale_save_guards(store):
