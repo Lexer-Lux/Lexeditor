@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 from games.ff7_2013 import plugin as target
 from verify_ff7_datasets import write_kernel
