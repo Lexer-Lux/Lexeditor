@@ -111,7 +111,7 @@ def _rewrite_module_info(path: Path) -> str:
     pattern = re.compile(
         r"(?m)^(?P<indent>[ \t]*)export_dir[ \t]*=[ \t]*"
         r"(?P<quote>[\"'])(?P<value>[^\"']*)(?P=quote)"
-        r"(?P<tail>[ \t]*(?:#.*)?)$"
+        r"(?P<tail>[ \t]*(?:#.*)?)(?P<cr>\r?)$"
     )
     matches = list(pattern.finditer(text))
     if len(matches) != 1:
@@ -122,7 +122,7 @@ def _rewrite_module_info(path: Path) -> str:
     match = matches[0]
     replacement = (
         f"{match.group('indent')}export_dir = {match.group('quote')}../Module/{match.group('quote')}"
-        f"{match.group('tail')}"
+        f"{match.group('tail')}{match.group('cr')}"
     )
     candidate = text[:match.start()] + replacement + text[match.end():]
     path.write_bytes(candidate.encode(encoding))
