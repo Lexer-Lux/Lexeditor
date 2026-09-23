@@ -135,6 +135,14 @@ class WarbandFlatProjectTests(unittest.TestCase):
         source = self.make_flat(repository / "Module System")
         detected = project_import.find_flat_module_system(repository)
         self.assertEqual(detected, source.resolve())
+        manager = ProjectManager({"warband": PLUGIN}, path=self.projects_json)
+        selected = manager.select("warband", str(repository))
+        imported = Path(selected["current"])
+        self.assertTrue((imported / "ModuleSystem" / "module_items.py").is_file())
+        self.assertIn(
+            str(repository.resolve()),
+            (imported / project_import.MANIFEST).read_text(encoding="utf-8"),
+        )
 
     def test_unknown_build_command_is_rejected_before_copy(self):
         source = self.make_flat(self.root / "unsafe")
