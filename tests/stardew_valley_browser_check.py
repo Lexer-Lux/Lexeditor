@@ -83,6 +83,7 @@ def geometry(page, label: str) -> dict:
       const main=document.querySelector('#main');
       const root=main?.firstElementChild;
       const pager=document.querySelector('.lex-pager');
+      const zoom=(()=>{const value=parseFloat(getComputedStyle(document.body).zoom);return Number.isFinite(value)&&value>0?value:1;})();
       const offenders=[...document.querySelectorAll('body *')].map(node=>{
         const box=node.getBoundingClientRect();
         return {
@@ -95,6 +96,7 @@ def geometry(page, label: str) -> dict:
         };
       }).filter(row=>row.right>innerWidth+1||row.left<-1).slice(0,20);
       return {
+        zoom,
         viewport:[innerWidth,innerHeight],
         bodyWidth:document.body.scrollWidth,
         bodyHeight:document.body.scrollHeight,
@@ -107,18 +109,33 @@ def geometry(page, label: str) -> dict:
     }""")
     failures = []
     shared_warnings = []
-    if metrics["bodyWidth"] > metrics["viewport"][0] + 2:
+    # body.style.zoom scales getBoundingClientRect numbers while
+    # innerWidth/innerHeight stay in unscaled CSS pixels. A fill-viewport
+    # screen can never pass a mixed-unit comparison, so normalize the
+    # measured rects into CSS pixels before comparing.
+    scale = metrics.get("zoom", 1) or 1
+    bodyWidth = metrics["bodyWidth"] / scale
+    bodyHeight = metrics["bodyHeight"] / scale
+    mainWidth = metrics["mainWidth"] / scale
+    mainScrollWidth = metrics["mainScrollWidth"] / scale
+    rootBottom = metrics["rootBottom"] / scale
+    pagerBottom = (metrics["pagerBottom"] or 0) / scale
+    for row in metrics.get("offenders", []):
+        row["left"] = round(row["left"] / scale, 1)
+        row["right"] = round(row["right"] / scale, 1)
+        row["width"] = round(row["width"] / scale, 1)
+    if bodyWidth > metrics["viewport"][0] + 2:
         shared_warnings.append("shared shell horizontal overflow")
-    if metrics["bodyHeight"] > metrics["viewport"][1] + 2:
+    if bodyHeight > metrics["viewport"][1] + 2:
         shared_warnings.append("shared document vertical overflow")
-    if metrics["mainScrollWidth"] > metrics["mainWidth"] + 2:
+    if mainScrollWidth > mainWidth + 2:
         failures.append("main horizontal overflow")
-    if metrics["rootBottom"] > metrics["viewport"][1] + 2:
+    if rootBottom > metrics["viewport"][1] + 2:
         if SHARED_UI_MODE == "branch" and "-datamap" in label:
             shared_warnings.append("branch shared Data Map bottom overflow")
         else:
             failures.append("screen bottom clipped")
-    if metrics["pagerBottom"] and metrics["pagerBottom"] > metrics["viewport"][1] + 2:
+    if pagerBottom and pagerBottom > metrics["viewport"][1] + 2:
         failures.append("pager clipped")
     if failures:
         LAYOUT_FAILURES.append({"label": label, "failures": failures, "metrics": metrics})
