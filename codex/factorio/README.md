@@ -3,9 +3,11 @@
 PR: #492 `Factorio Plugin`
 Branch: `codex/factorio-plugin`
 Master baseline at start: `a47f0a57f8b44113b0ca1d42e5795f59f707372a`
-Current reconciled master: `72ee978a2ff36686a6349696b19860057356468a`
+Current reconciled master: `95a15cae8f0e53f2884222f573f8222600aaae58`
 
 ## Repository references
+
+- PR #492 scope was isolated on 2026-09-22 by rebuilding the current Factorio tree delta directly on master `95a15cae8f0e53f2884222f573f8222600aaae58`. The pre-isolation history is preserved at `backup/pr-492-pre-isolation-e1fac3a` (`e1fac3a1c54bf159c6b8ef791da78989cce8d0ae`); it is not an implementation branch and has no PR.
 
 - Starting revisions: `AGENTS.md` `ec8d363d…`, `docs/ADDING_A_GAME.md` `78a987c5…`, Blank `cd3c79ba…`, RDR2 `9d11f8a0…`.
 - Current revisions after reconciliation: `AGENTS.md` `41355ce0b783c55a03ad250ed279666f785c6e67`; `docs/ADDING_A_GAME.md` `7fe6d35dd82fa3fe4e6378ca558ecbb0a316c4c0`; `docs/UI-MANUAL.md` `14a3269992031d7e7893fcb127728a48b944e71f`.
