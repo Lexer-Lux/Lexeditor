@@ -29,8 +29,10 @@ def _active_pak_conflicts(game_root: Path, built: Path) -> list[dict]:
     if not root.is_dir():
         return []
     others = [
-        path for path in root.rglob("*.pak")
-        if path.is_file() and path.resolve() != target.resolve()
+        path for path in root.rglob("*")
+        if path.is_file()
+        and path.suffix.casefold() == ".pak"
+        and path.resolve() != target.resolve()
     ]
     if not others:
         return []

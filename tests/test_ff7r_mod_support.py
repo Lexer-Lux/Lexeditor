@@ -117,7 +117,7 @@ def test_direct_project_deploy_refuses_real_pak_collision_and_restores_cleanly(
         tmp_path,
         "external-direct",
         {"End/Content/GameContents/DataObject/Resident/Equipment.uasset": b"external"},
-        mods_root / "ExternalBalance_P.pak",
+        mods_root / "ExternalBalance_P.PAK",
     )
     external_sha = _sha(external)
 
