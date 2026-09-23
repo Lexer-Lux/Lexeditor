@@ -41,6 +41,7 @@ REQUIRED = (
     "games/rdr/editor.js",
     "games/rdr/strings.js",
     "games/rdr/string_tables.py",
+    "games/rdr/magic_rdr_manager.py",
     "tools/magic-rdr/README.md",
 )
 
