@@ -181,7 +181,7 @@
     };
     const view=LexeditorUI.dataMap({
       rows:state.datamap.rows,query:state.query,status:state.mapStatus,page:state.page,sort:state.sort,
-      tableClass:"bannerlord-data-map",open,openSource,
+      open,openSource,
       changeQuery:value=>{state.query=value;state.page=0;renderDataMap()},
       changeStatus:value=>{state.mapStatus=value;state.page=0;renderDataMap()},
       changePage:value=>{state.page=value;renderDataMap()},

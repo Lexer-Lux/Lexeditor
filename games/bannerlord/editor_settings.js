@@ -30,7 +30,7 @@ async function saveReshade(manifest){
 function renderMcmDefaults(){
   if(!state.reshade&&!state.reshadeLoading){state.reshadeLoading=true;loadReshade().finally(()=>{state.reshadeLoading=false;});}
   const reshadeCard=LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade,act:actReshade});
-  if(!state.mcmDefaults?.available){main.replaceChildren(el("div",{class:"bannerlord-tweaks-page"},uiEmpty("Tweaks","This project does not contain typed MCM defaults in src/LexerSkillTweaksSettings.cs."),reshadeCard));return}
+  if(!state.mcmDefaults?.available){main.replaceChildren(BLUI.settingsColumns([uiEmpty("Tweaks","This project does not contain typed MCM defaults in src/LexerSkillTweaksSettings.cs."),reshadeCard]));return}
   const grouped=new Map();
   for(const row of state.mcmDefaults.settings||[]){const group=row.group||"Other";if(!grouped.has(group))grouped.set(group,[]);grouped.get(group).push(row)}
   const cards=[...grouped].map(([group,rows])=>BLUI.detailSection({title:group,body:rows.map(row=>{
@@ -49,14 +49,14 @@ function renderMcmDefaults(){
   // branch still carries the older shared framework, so keep one compatibility
   // fallback until the PR is combined with master; never draw two pagers.
   if(typeof LexeditorUI.paginateSettings==="function"){
-    main.replaceChildren(BLUI.settingsColumns([...cards,reshadeCard],{className:"bannerlord-tweaks"}));
+    main.replaceChildren(BLUI.settingsColumns([...cards,reshadeCard]));
     return;
   }
   const pageSize=6,pages=Math.max(1,Math.ceil(cards.length/pageSize));
   state.tweakPage=Math.max(0,Math.min(state.tweakPage,pages-1));
   const shown=cards.slice(state.tweakPage*pageSize,(state.tweakPage+1)*pageSize);
-  main.replaceChildren(el("div",{class:"bannerlord-tweaks-page"},
-    BLUI.settingsColumns(shown,{className:"bannerlord-tweaks"}),
+  main.replaceChildren(el("div",{class:"lex-tweaks-pages"},
+    BLUI.settingsColumns(shown),
     reshadeCard,
     BLUI.pager({page:state.tweakPage,pages,total:cards.length,pageSize,change:value=>{state.tweakPage=value;render()}})
   ));

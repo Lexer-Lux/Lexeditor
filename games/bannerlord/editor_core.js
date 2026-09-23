@@ -263,16 +263,16 @@
             BLUI.columnList({rows:assemblies,key:item=>item.index,selected:null,columns:[
               {key:"value",label:"DLL",edit:(item,value)=>{item.assembly.value=String(value);refresh()},editValue:item=>item.assembly.value},
               {key:"remove",label:"",sortable:false,render:item=>uiButton("Remove",()=>{row.assemblies.splice(item.index,1);render();refresh()},{danger:true})}
-            ],refresh:()=>{render();refresh()},class:"bannerlord-nested-table","aria-label":"Submodule assemblies"}),
-            el("div",{class:"bannerlord-inline-actions"},uiButton("Add assembly",()=>addAssembly(row)))
+            ],refresh:()=>{render();refresh()},"aria-label":"Submodule assemblies"}),
+            el("div",{class:"lex-action-row"},uiButton("Add assembly",()=>addAssembly(row)))
           ]}),
           BLUI.detailSection({title:"TAGS",help:BLUI.infoHelp("Bannerlord SubModule tags are preserved as explicit key/value pairs, including unknown attributes outside the edited values."),body:[
             BLUI.columnList({rows:tags,key:item=>item.index,selected:null,columns:[
               {key:"key",label:"Key",edit:(item,value)=>{item.tag.key=String(value);refresh()},editValue:item=>item.tag.key},
               {key:"value",label:"Value",edit:(item,value)=>{item.tag.value=String(value);refresh()},editValue:item=>item.tag.value},
               {key:"remove",label:"",sortable:false,render:item=>uiButton("Remove",()=>{row.tags.splice(item.index,1);render();refresh()},{danger:true})}
-            ],refresh:()=>{render();refresh()},class:"bannerlord-nested-table","aria-label":"Submodule tags"}),
-            el("div",{class:"bannerlord-inline-actions"},uiButton("Add tag",()=>addTag(row)))
+            ],refresh:()=>{render();refresh()},"aria-label":"Submodule tags"}),
+            el("div",{class:"lex-action-row"},uiButton("Add tag",()=>addTag(row)))
           ]})
         ]
       });
@@ -321,8 +321,8 @@
             BLUI.columnList({rows:types,key:value=>value.index,selected:null,columns:[
               {key:"value",label:"Game type",edit:(value,next)=>{value.entry.value=String(next);refresh()},editValue:value=>value.entry.value},
               {key:"remove",label:"",sortable:false,render:value=>uiButton("Remove",()=>{row.includedGameTypes.splice(value.index,1);render();refresh()},{danger:true})}
-            ],refresh:()=>{render();refresh()},class:"bannerlord-nested-table","aria-label":"Included Bannerlord game types"}),
-            el("div",{class:"bannerlord-inline-actions"},uiButton("Add game type",()=>addGameType(row)))
+            ],refresh:()=>{render();refresh()},"aria-label":"Included Bannerlord game types"}),
+            el("div",{class:"lex-action-row"},uiButton("Add game type",()=>addGameType(row)))
           ]})
         ]
       });

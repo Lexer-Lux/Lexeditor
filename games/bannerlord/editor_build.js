@@ -111,11 +111,11 @@
           readField("Backups",(state.deployResult.backups||[]).length)
         ]}):null,
         BLUI.detailSection({title:"OUTPUT",body:[
-          BLUI.detailField({label:"Build log",control:el("pre",{class:"bannerlord-build-log"},state.buildResult?.output||"Build output appears here.")})
+          BLUI.detailField({label:"Build log",control:BLUI.logView(state.buildResult?.output||"Build output appears here.")})
         ]})
       ].filter(Boolean)
     });
-    main.replaceChildren(BLUI.panelLayout([properties,inventory],"bannerlord-build-layout",{
+    main.replaceChildren(BLUI.panelLayout([properties,inventory],{
       layoutKey:"bannerlord-build",stackAt:1000,defaultSizes:[44,56]
     }));
   }
@@ -128,11 +128,8 @@
   }
   function renderSource(){
     if(!state.source){main.replaceChildren(uiEmpty("Source","No source file selected."));return}
-    const textarea=el("textarea",{value:state.source.text,spellcheck:"false",oninput:event=>{state.source.text=event.target.value;refresh()}});
-    main.replaceChildren(el("section",{class:"bannerlord-source"},
-      el("div",{class:"bannerlord-source-head"},el("strong",{},"Source only"),el("code",{},state.source.path),el("span",{},`${state.source.encoding} · ${state.source.size} bytes`)),
-      textarea
-    ));
+    const textarea=el("textarea",{value:state.source.text,spellcheck:"false","aria-label":`Source ${state.source.path}`,oninput:event=>{state.source.text=event.target.value;refresh()}});
+    main.replaceChildren(BLUI.detailPanel({title:"Source only",identity:state.source.path,meta:`${state.source.encoding} · ${state.source.size} bytes`,body:[BLUI.detailSection({title:"SOURCE",body:[BLUI.detailField({label:"TEXT",className:"lex-text-editor lex-detail-field-stacked",control:textarea,help:BLUI.infoHelp("Raw file text. Structured edits to the same file must be saved or discarded first.")})]})]}));
   }
 
   function renderDataMap(){}

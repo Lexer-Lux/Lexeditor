@@ -123,7 +123,7 @@ function missingRequiredControl(attribute){
     type:"checkbox",checked:!!attribute.add,title:"Add this XSD-required attribute on Save",
     onchange:event=>{attribute.add=event.target.checked;render();refresh()}
   });
-  return el("div",{class:"bannerlord-required-control"},toggle,missingRequiredValueControl(attribute));
+  return el("div",{class:"lex-action-row"},toggle,missingRequiredValueControl(attribute));
 }
 
 function moduleDataAttributeLabel(attribute){

@@ -12,7 +12,8 @@ const BLUI={
   pager:LexeditorUI.pager,
   panelLayout:LexeditorUI.panelLayout,
   tabbedPanel:LexeditorUI.tabbedPanel,
-  infoIcon:LexeditorUI.infoIcon
+  infoIcon:LexeditorUI.infoIcon,
+  logView:LexeditorUI.logView
 };
 state.uiTables=state.uiTables||{};
 state.tweakPage=state.tweakPage||0;
@@ -26,18 +27,18 @@ function uiText(value){
   return BLUI.readonlyField(value===undefined||value===null||value===""?"—":String(value));
 }
 function uiButton(label,onclick,{danger=false,disabled=false,title=""}={}){
-  return el("button",{type:"button",class:`bannerlord-action${danger?" danger":""}`,disabled,title,onclick},label);
+  return el("button",{type:"button",class:danger?"bannerlord-danger":"",disabled,title,onclick},label);
 }
 function uiLoading(title,message){
-  return BLUI.detailPanel({className:"bannerlord-state-panel",icon:BLUI.infoIcon(),title,meta:"Loading",
+  return BLUI.detailPanel({icon:BLUI.infoIcon(),title,meta:"Loading",
     body:[BLUI.detailSection({title:"STATUS",body:[BLUI.detailField({label:"State",control:uiText(message)})]})]});
 }
 function uiEmpty(title,message,actions=[]){
-  return BLUI.detailPanel({className:"bannerlord-state-panel",icon:BLUI.infoIcon(),title,meta:"Nothing to edit",actions,
+  return BLUI.detailPanel({icon:BLUI.infoIcon(),title,meta:"Nothing to edit",actions,
     body:[BLUI.detailSection({title:"STATUS",body:[BLUI.detailField({label:"State",control:uiText(message)})]})]});
 }
 function uiError(title,message){
-  return BLUI.detailPanel({className:"bannerlord-state-panel",icon:BLUI.infoIcon(),title,meta:"Problem",
+  return BLUI.detailPanel({icon:BLUI.infoIcon(),title,meta:"Problem",
     body:[BLUI.detailSection({title:"ERROR",body:[BLUI.detailField({label:"What happened",control:uiText(message),
       help:BLUI.infoHelp("This is the specific failure returned by the Bannerlord editor. Correct the project or installation problem, then reopen the page.")})]})]});
 }
@@ -99,13 +100,13 @@ function tableView({key,rows,keyOf,columns,detail,noun="records",placeholder="Se
   ui.selected=selected;
   return BLUI.pagedListDetail({
     rows:prepared,key:keyOf,slots:false,page:ui.page,pageSize:ui.pageSize,selected,noun,
-    splitKey:`bannerlord-${key}`,className:"bannerlord-table-detail",
+    splitKey:`bannerlord-${key}`,
     search:{key:`bannerlord-${key}`,value:ui.query,placeholder,label:`Search ${noun}`,change:value=>{ui.query=value;ui.page=0;render()}},
     filters,
     master:({rows:shown,selected:picked,select})=>BLUI.columnList({
       rows:shown,key:keyOf,selected:picked,select,sortState:ui.sort,
       sort:columnKey=>{ui.sort=ui.sort.key===columnKey?{key:columnKey,dir:-ui.sort.dir}:{key:columnKey,dir:1};ui.page=0;render()},
-      columns,refresh:()=>{render();refresh()},class:"bannerlord-table","aria-label":`Bannerlord ${noun}`
+      columns,refresh:()=>{render();refresh()},"aria-label":`Bannerlord ${noun}`
     }),
     detail,
     emptyDetail:emptyDetail||(()=>uiEmpty(`No ${noun}`,`No ${noun} match the current search.`)),

@@ -70,7 +70,7 @@ function moduleDataValidationSection(){
           {key:"issues",label:"Issues",numeric:true},
           {key:"open",label:"",sortable:false,render:item=>uiButton("Open",()=>{state.moduleDataView="records";loadModuleData(item.row.path)})}
         ],
-        class:"bannerlord-validation-table","aria-label":"ModuleData validation results"
+        "aria-label":"ModuleData validation results"
       }):readField("Files","No ModuleData files scanned yet")
     ]
   });

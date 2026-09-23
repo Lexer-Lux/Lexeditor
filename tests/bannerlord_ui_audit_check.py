@@ -225,7 +225,7 @@ def settle_screen(page, label):
     if label == "datamap":
         page.locator(".lex-data-map-table").wait_for()
     elif label == "source":
-        page.locator(".bannerlord-source textarea").wait_for()
+        page.locator("#main .lex-text-editor textarea").wait_for()
     elif label == "info":
         page.locator(".lex-information-panel").wait_for()
         page.locator(".lex-plugin-mod-loading").wait_for()
@@ -436,7 +436,7 @@ def main() -> None:
             # control must be reachable at enlarged scale.
             page.evaluate('state.tweakPage=0;navigate("tweaks")');page.wait_for_timeout(100)
             assert "Group 11" not in page.locator("#main").inner_text()
-            tweaks_pager = page.locator(".lex-tweaks-pages .lex-pager" if MERGE_TARGET_UI else ".bannerlord-tweaks-page .lex-pager")
+            tweaks_pager = page.locator(".lex-tweaks-pages .lex-pager")
             assert tweaks_pager.count() == 1
             # Page size follows the measured fit, so walk forward until the last group appears.
             for _ in range(6):
@@ -464,7 +464,7 @@ def main() -> None:
             # Raw source remains reachable and editable as a specialized source surface.
             page.evaluate('document.body.style.zoom="";state.source={path:"src/Test.cs",absolutePath:"C:/fixture/src/Test.cs",encoding:"utf-8",size:10,text:"class X{}"};state.savedSourceText="class X{}";navigate("source")')
             settle_screen(page, "source")
-            source_box = page.locator(".bannerlord-source textarea")
+            source_box = page.locator("#main .lex-text-editor textarea")
             assert source_box.count() == 1
             source_box.fill("class Y{}")
             assert page.evaluate("sourceDirty()") is True
