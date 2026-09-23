@@ -130,6 +130,32 @@
   }
   function renderKernel(view,label){const rows=filtered(view,["name","id"]),sample=state.data[view].rows[0],columns=[{key:"id",label:"ID"},{key:"name",label,render:row=>recordHoverLabel(view,row,view==="magic"?magicLabel(row):row.abilityType?abilityLabel(row):row.name)},...(sample?.fields||[]).map(field=>({key:`field:${field.field}`,label:field.label,pinned:false,numeric:field.control!=="boolean"&&field.lookup?.type!=="enum",sortValue:row=>row.fields.find(value=>value.field===field.field)?.value??"",render:row=>displayFieldValue(row.fields.find(value=>value.field===field.field))}))];showPaged(view,rows,columns,view==="magic"?magicDetail:(row,prefs)=>sharedDetail(row.abilityType?{...row,titleContent:abilityLabel(row)}:row,prefs,fieldGroups(row.fields,view,row.id,false,prefs)),"74px minmax(180px,1fr)",view==="magic"?{leadingPanel:magicLeadingPanel,minLeading:260,defaultLeadingWidth:20,minLeft:260,minRight:430}:{})}
   function matchingTextRow(dataset,row){return dataset?.text?.rows?.find(value=>value.source===row.source&&value.sectionId===row.sectionId&&value.recordId===row.recordId&&value.slot===row.slot)}
+  function textTokenToolbar(input){
+    const tokens=state.data.text?.tokens;
+    if(!tokens)return null;
+    let start=input.value.length,end=start;
+    const remember=()=>{start=input.selectionStart;end=input.selectionEnd};
+    for(const event of ["select","keyup","pointerup","input","blur"])input.addEventListener(event,remember);
+    const insert=text=>{
+      if(input.disabled||input.readOnly)return;
+      input.focus({preventScroll:true});
+      input.setSelectionRange(start,end);
+      // Native insertion keeps keyboard undo when the WebView supports it.
+      if(!document.execCommand("insertText",false,text)){
+        input.setRangeText(text,start,end,"end");
+        input.dispatchEvent(new Event("input",{bubbles:true}));
+      }
+      remember();
+    };
+    const button=(entry,content,extra={})=>el("button",{type:"button",title:entry.caption||entry.label,"aria-label":`Insert ${entry.label}`,onmousedown:event=>event.preventDefault(),onclick:()=>insert(entry.text),...extra},content);
+    const group=(label,children)=>el("div",{class:"ff8-text-token-group",role:"group","aria-label":label},...children);
+    const choose=(label,entries)=>el("select",{"aria-label":`Insert ${label}`,onchange:event=>{if(event.target.value)insert(event.target.value);event.target.value=""}},el("option",{value:""},label),...entries.map(entry=>el("option",{value:entry.text},entry.label)));
+    return el("div",{class:"ff8-text-token-toolbar",role:"group","aria-label":"Special text"},
+      group("Character names",tokens.characters.map(entry=>button(entry,entry.portrait!==undefined?el("img",{src:`/assets/portraits/characters/${entry.portrait}.png`,alt:""}):entry.label))),
+      group("Text flow",tokens.breaks.map(entry=>button(entry,entry.caption))),
+      group("Text colours",tokens.colours.map(entry=>button(entry,el("span",{class:`ff8-text-colour${entry.blink?" ff8-text-colour-blink":""}`,style:`--ff8-text-colour:${entry.colour}`}),{class:"ff8-text-colour-button"}))),
+      group("Insert token",[choose("Locations",tokens.locations),choose("Variables",tokens.variables),choose("Keys",tokens.keys),choose("Special characters",tokens.symbols)]));
+  }
   function textDetail(row,prefs){
     const input=LexeditorUI.textArea({rows:8,"aria-label":`Text for ${row.name}`,oninput:event=>{row.value=event.target.value;shell.refresh()}});input.value=row.value;
     const references=state.references.map(reference=>{const value=matchingTextRow(state.referenceData[reference.id],row);return value?{name:reference.name,shortName:reference.shortName,value:value.value}:null}).filter(Boolean);
@@ -144,7 +170,8 @@
     const boundary=boundaries[row.source]||"This text source is not writable.";
     return detailPanel({heading:false,body:[
       LexeditorUI.controlGroup([["Source","sourceLabel"],["Section","sectionId"],["Record","recordId"],["Field","role"]].map(([label,key])=>({label,control:readonlyField(row[key]),pin:prefs?.pinButton(key,label)})),{columns:4,stacked:true}),
-      detailField({className:"lex-detail-field-stacked lex-text-editor",showType:false,label:"",help:infoHelp(`FF8 text supports game tokens such as {Squall} and {L2}. Unsupported characters are rejected when you save. ${boundary}`),control,pin:prefs?.pinButton("value","Text")})]});
+      textTokenToolbar(input),
+      detailField({className:"lex-detail-field-stacked lex-text-editor",showType:false,label:"",help:infoHelp(`Use Special text to insert names, colours, page breaks, pauses, locations, variables and key icons at the cursor. A colour applies to the text that follows it; use White to restore white text. Pause inserts {Wait030}; edit its number from 000 to 223 to change the wait. Variables use values supplied by the current game message. ${boundary}`),control,pin:prefs?.pinButton("value","Text")})]});
   }
   function renderText(){const rows=filtered("text",["sourceLabel","section","recordId","role","value"]),columns=[{key:"sourceLabel",label:"Source",width:"95px"},{key:"sectionId",label:"Section",numeric:true,width:"70px"},{key:"recordId",label:"Record",numeric:true,width:"70px"},{key:"role",label:"Field",width:"minmax(106px,.55fr)"},{key:"value",label:"Text",grow:1}];showPaged("text",rows,columns,textDetail,"95px 70px 70px minmax(106px,.55fr) minmax(160px,1fr)")}
   const characterCurveOrder=["HP","STR","VIT","MAG","SPR","SPD","LUCK"];

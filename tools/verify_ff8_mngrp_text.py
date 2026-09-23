@@ -92,7 +92,7 @@ def main() -> int:
             }
             assert len({row["id"] for row in payload["rows"]}) == len(payload["rows"])
             menu = next(row for row in payload["rows"] if row["source"] == "mngrp" and row["sectionId"] == 39)
-            value = menu["value"] + "A"
+            value = menu["value"] + "{Red}A{White}"
             saved = api(session.url, "/api/text/save", {"edits": [{
                 "source": "mngrp", "sectionId": menu["sectionId"],
                 "recordId": menu["recordId"], "slot": menu["slot"], "value": value,
@@ -126,7 +126,7 @@ def main() -> int:
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
             cdp.eval("navigate('text');state.filters.text='Menu text';state.selected.text=null;renderText()")
             wait_eval(cdp, "document.querySelector('.lex-column-list-row')?.textContent.includes('Menu text')", 30)
-            rendered = cdp.eval("({sources:[...document.querySelectorAll('.lex-column-list-row')].map(row=>row.textContent),headers:[...document.querySelectorAll('.lex-column-list-head-cell')].map(node=>({key:node.dataset.columnKey,text:node.textContent.trim(),left:node.getBoundingClientRect().left,width:node.getBoundingClientRect().width})),detail:document.querySelector('.lex-detail')?.textContent||'',help:document.querySelector('.kernel-text-editor .lex-info-help')?.getAttribute('aria-label')||'',errors:window.__testErrors,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth})")
+            rendered = cdp.eval("({sources:[...document.querySelectorAll('.lex-column-list-row')].map(row=>row.textContent),headers:[...document.querySelectorAll('.lex-column-list-head-cell')].map(node=>({key:node.dataset.columnKey,text:node.textContent.trim(),left:node.getBoundingClientRect().left,width:node.getBoundingClientRect().width})),detail:document.querySelector('.lex-detail')?.textContent||'',help:document.querySelector('.lex-text-editor .lex-info-help')?.getAttribute('aria-label')||'',errors:window.__testErrors,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth})")
             assert rendered["sources"] and all("Menu text" in row for row in rendered["sources"])
             assert "fixed-size mngrp.bin section" in rendered["help"]
             assert not rendered["errors"] and not rendered["overflow"], rendered

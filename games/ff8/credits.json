@@ -22,7 +22,7 @@
     },
     {
       "name": "Jérôme Arzel (myst6re) and Deling contributors",
-      "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, encounters and world-map format references; Japanese glyph mapping from src/qt/fonts/sysfnt_jp.txt (GPL v3 or later).",
+      "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, encounters and world-map format references; special-text toolbar design and control-byte reference from src/FF8Text.cpp; Japanese glyph mapping from src/qt/fonts/sysfnt_jp.txt (GPL v3 or later).",
       "url": "https://github.com/myst6re/deling"
     },
     {

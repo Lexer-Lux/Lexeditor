@@ -79,6 +79,39 @@ _LOCATIONS = (
 _SPECIAL = {0x20: "CurrentSeedTestLevel", 0x22: "NextSeedTestLevel",
             0x23: "CardReceived", 0x26: "SeedRank"}
 
+# Control-byte meanings checked against Deling src/FF8Text.cpp.
+_COLORS = ("Darkgrey", "Grey", "Yellow", "Red", "Green", "Blue", "Purple", "White")
+_EXTRA_TOKENS = {
+    "NewPage": b"\x01",
+    **{name + suffix: bytes((0x06, 0x20 + index + offset))
+       for suffix, offset in (("", 0), ("Blink", 8))
+       for index, name in enumerate(_COLORS)},
+    **{f"Var{prefix}{index}": bytes((0x04, base + index))
+       for prefix, base in (("", 0x20), ("0", 0x30), ("b", 0x40)) for index in range(8)},
+    **{f"Wait{value:03d}": bytes((0x09, value + 0x20)) for value in range(224)},
+}
+_EXTRA_NAMES = {value: name for name, value in _EXTRA_TOKENS.items()}
+
+
+def editor_tokens() -> dict:
+    """Toolbar choices share the save codec's supported tokens."""
+    def token(name, **extra):
+        return {"label": name, "text": "{" + name + "}", **extra}
+    colours = ("#505050", "#9696a0", "#ffff00", "#ff2020", "#00ee20", "#60b8ef", "#e000ed", "#ffffff")
+    return {
+        "characters": [token(name, **({"portrait": index} if index < 11 else {}))
+                       for index, name in enumerate(_CHARACTERS)],
+        "colours": [token(name + suffix, colour=colour, blink=bool(suffix))
+                    for suffix in ("", "Blink") for name, colour in zip(_COLORS, colours)],
+        "locations": [token(name) for name in _LOCATIONS],
+        "variables": [token(name) for name in _EXTRA_TOKENS if name.startswith("Var")]
+                     + [token(name) for name in _SPECIAL.values()],
+        "keys": [token(name) for name in _ICONS],
+        "symbols": [{"label": char, "text": char} for byte, char in _BYTE_TO_TEXT.items()
+                    if byte >= 0xA8],
+        "breaks": [token("NewPage", caption="Page break"), token("Wait030", caption="Pause")],
+    }
+
 _RAW_TOKEN = re.compile(r"\{x([0-9A-Fa-f]{2})\}")
 
 
@@ -88,6 +121,16 @@ def decode(data: bytes) -> str:
     index = 0
     while index < len(data):
         value = data[index]
+        if value == 0x01:
+            out.append("{NewPage}")
+            index += 1
+            continue
+        if value in (0x04, 0x06, 0x09) and index + 1 < len(data):
+            pair = data[index:index + 2]
+            name = _EXTRA_NAMES.get(pair)
+            out.append("{" + name + "}" if name else "".join(f"{{x{b:02X}}}" for b in pair))
+            index += 2
+            continue
         if value == 0x02:
             out.append("\n")
             index += 1
@@ -126,6 +169,7 @@ def encode(text: str, *, compress: bool = True) -> bytes:
     output = bytearray()
     index = 0
     named = {
+        **_EXTRA_TOKENS,
         **{name: bytes((0x03, code)) for name, code in _CHARACTER_CODES.items()},
         **{name: bytes((0x05, 0x20 + slot)) for slot, name in enumerate(_ICONS)},
         **{name: bytes((0x0E, 0x20 + slot)) for slot, name in enumerate(_LOCATIONS)},

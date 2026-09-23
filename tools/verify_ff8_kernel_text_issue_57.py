@@ -74,7 +74,7 @@ def exercise(data: bytes) -> None:
     assert changed == 0 and rebuilt == data, "a no-op save must be byte-identical"
 
     target = next(row for row in parsed["rows"] if row["sectionId"] == 33)
-    replacement = "Longer {Squall} text\n100%"
+    replacement = "{Red}Longer {Squall} text{White}\n100%{NewPage}{Wait030}{Var0}"
     edited, changed = kernel_text.apply_edits(data, formats.SECTIONS, [{
         "sectionId": target["sectionId"], "recordId": target["recordId"],
         "slot": target["slot"], "value": replacement,
@@ -148,10 +148,27 @@ def main() -> int:
         assert len(kernel_text.rows(data, formats.SECTIONS)["rows"]) == 1322
         exercise(data)
 
-    source = (ROOT / "games/ff8/editor.html").read_text(encoding="utf-8")
+    sys.path.insert(0, str(ROOT / "tests"))
+    from plugin_ui import plugin_ui
+    source = plugin_ui("ff8")
     server = (ROOT / "games/ff8/server.py").read_text(encoding="utf-8")
     assert '"text"' in source and 'renderText' in source
     assert '"/api/text"' in server and '"/api/text/save"' in server
+    controls = "{NewPage}{Red}{WhiteBlink}{Var0}{Var07}{Varb7}{Wait000}{Wait223}"
+    expected = bytes((1, 6, 0x23, 6, 0x2F, 4, 0x20, 4, 0x37, 4, 0x47, 9, 0x20, 9, 0xFF))
+    assert kernel_text.encode(controls) == expected
+    assert kernel_text.decode(expected) == controls
+    for group in kernel_text.editor_tokens().values():
+        for entry in group:
+            encoded = kernel_text.encode(entry["text"])
+            assert kernel_text.encode(kernel_text.decode(encoded)) == encoded, entry
+    for invalid in ("{Wait224}", "{Var8}"):
+        try:
+            kernel_text.encode(invalid)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"Invalid parameter accepted: {invalid}")
     print("FF8 kernel text issue 57 verifier: PASS")
     return 0
 
