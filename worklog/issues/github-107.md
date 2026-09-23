@@ -33,3 +33,12 @@ entries, uncovered in-game checks, and unowned engraved-mesh assumptions.
 Covered by tests/test_rdr2_unique_gun_parts.py (11 hermetic tests).
 No gameplay claim: gunsmith visibility, installation, persistence, dual
 wield, mission rewards, and compendium credit still need a real session.
+
+## 2026-09-23 agent slice (impl/rdr2-wave2): session checklist
+
+plugins/rdr2/unique_gun_parts.py gains INSTALLATION_CHECKLIST (each of
+the six verifications expanded into ordered steps with explicit pass
+criteria) plus validate_installation_plan(), which requires full
+six-verification coverage, ordered actions, and pass criteria per step.
+Covered by 7 new tests in tests/test_rdr2_unique_gun_parts.py (18 total,
+green). No gameplay claim: the session itself still needs the game.

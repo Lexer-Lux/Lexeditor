@@ -43,3 +43,13 @@ need in-game reticle validation. Guarded by
 tests/test_rdr2_settings_help.py. No gameplay claim: the authored
 animation pipeline and visual QA are still owed.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): animation workflow contract
+
+New plugins/rdr2/prone_animation_workflow.py records the pipeline stages
+(select/retarget, export, rebuild, load, play, visual QA), the
+single-clip-first rule, and the per-set requirements (reticle-driven
+yaw/pitch poses, recoil/reload events, upper-body masks, contacts, zero
+root motion), with validate_animation_plan() rejecting unchanged-clip
+reuse. Covered by tests/test_rdr2_prone_animation_workflow.py (8
+hermetic tests, green). No gameplay claim: the pipeline, the authored
+sets, and Lexer visual QA still need the game and the art toolchain.

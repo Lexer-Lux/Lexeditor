@@ -40,3 +40,12 @@ approval. Covered by tests/test_rdr2_map_icons.py (7 hermetic tests).
 No art claim: candidate variants and the approval session are still
 owed.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): reviewable-variant brief
+
+plugins/rdr2/map_icons.py gains VARIANT_BRIEF_FIELDS (subject, style
+axis, sizes, presentation state) plus validate_variant_brief(), which
+defines what counts as presentable for the approval session without
+inventing artwork. Covered by 5 new tests in
+tests/test_rdr2_map_icons.py (12 total, green). No art claim: the
+candidate briefs, variants, and approval session are still owed.
+

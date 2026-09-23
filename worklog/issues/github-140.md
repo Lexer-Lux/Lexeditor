@@ -41,3 +41,13 @@ the five per-interior checks for any runtime display manager. Covered
 by tests/test_rdr2_shop_displays.py (7 hermetic tests). No gameplay
 claim: the layouts and the Lexer choice still need the game.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): layout template schema
+
+plugins/rdr2/shop_displays.py gains LAYOUT_TEMPLATE_FIELDS (shop type,
+display slots, category assignment, signature items, stated limits)
+plus validate_layout_template(), which gives the game-side layout work
+a checkable shape while still rejecting automatic mirroring claims.
+Covered by 6 new tests in tests/test_rdr2_shop_displays.py (13 total,
+green). No gameplay claim: the layouts and the Lexer choice still need
+the game.
+

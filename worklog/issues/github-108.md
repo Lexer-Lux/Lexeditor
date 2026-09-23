@@ -59,3 +59,13 @@ apply path. (4 hermetic tests.) No gameplay claim: vehicle-height
 research and the open shoulder/transition defect sessions still need the
 game.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): framing data contract
+
+New plugins/rdr2/camera_vehicle_framing.py records the nine kept
+profiles, the binary LOW/NORMAL vehicle states, and dev-mode authoring
+gating as data, with validate_framing_plan() rejecting continuous-Y and
+unproven vehicle-height claims and keeping the two-mode handoff owned by
+#220. Covered by tests/test_rdr2_camera_vehicle_framing.py (9 hermetic
+tests, green). No gameplay claim: vehicle-height research and the open
+shoulder/transition defect sessions still need the game.
+

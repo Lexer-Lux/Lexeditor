@@ -56,5 +56,45 @@ class ShopDisplaysTests(unittest.TestCase):
         self.assertTrue(sd.validate_display_plan("shelves"))
 
 
+def valid_template():
+    return {
+        "shop_type": "gunsmith",
+        "display_slots": ["counter rack", "wall pegs"],
+        "category_assignment": "long arms on rack, sidearms on pegs",
+        "signature_items": ["engraved Schofield"],
+        "stated_limits": "menu lists more variants than slots hold",
+    }
+
+
+class LayoutTemplateTests(unittest.TestCase):
+    def test_template_fields_recorded(self):
+        self.assertIn("signature_items", sd.layout_template_fields())
+        self.assertIn("stated_limits", sd.layout_template_fields())
+
+    def test_valid_template_passes(self):
+        self.assertEqual(sd.validate_layout_template(valid_template()), [])
+
+    def test_template_without_limits_is_rejected(self):
+        template = valid_template()
+        del template["stated_limits"]
+        errors = sd.validate_layout_template(template)
+        self.assertTrue(any("stated_limits" in e for e in errors))
+
+    def test_empty_slots_are_rejected(self):
+        template = valid_template()
+        template["display_slots"] = []
+        errors = sd.validate_layout_template(template)
+        self.assertTrue(any("display slot" in e for e in errors))
+
+    def test_mirroring_template_is_rejected(self):
+        template = valid_template()
+        template["claim"] = "one_to_one_shelving"
+        errors = sd.validate_layout_template(template)
+        self.assertTrue(any("one_to_one_shelving" in e for e in errors))
+
+    def test_non_mapping_template_is_rejected(self):
+        self.assertTrue(sd.validate_layout_template("layout"))
+
+
 if __name__ == "__main__":
     unittest.main()

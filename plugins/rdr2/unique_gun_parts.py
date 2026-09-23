@@ -206,3 +206,103 @@ def validate_prototype(plan: Mapping) -> list[str]:
 def is_valid(plan: Mapping) -> bool:
     """Return True when the plan passes every structural check."""
     return not validate_prototype(plan)
+
+
+# Ordered in-game session checklist for the working example: every one of
+# the six verifications expands into steps with explicit pass criteria, so
+# the real session has a checkable script instead of a vague retest.
+INSTALLATION_CHECKLIST = (
+    {
+        "verification": "gunsmith_visibility",
+        "steps": (
+            "Pick up Calloway's Schofield in the mission reward flow.",
+            "Open the gunsmith with the base Schofield owned.",
+        ),
+        "pass_criteria": "All three Calloway parts list as installable options.",
+    },
+    {
+        "verification": "installation",
+        "steps": (
+            "Install each Calloway part onto the base Schofield.",
+            "Mix each part with a normal vanilla option in the same slot.",
+        ),
+        "pass_criteria": "Parts install and mix without errors or fallback looks.",
+    },
+    {
+        "verification": "save_persistence",
+        "steps": (
+            "Save with Calloway parts installed.",
+            "Reload the save and inspect the weapon.",
+        ),
+        "pass_criteria": "Installed parts survive save and reload unchanged.",
+    },
+    {
+        "verification": "dual_wield",
+        "steps": (
+            "Equip the converted Schofield in a dual-wield loadout.",
+            "Fire and holster both weapons.",
+        ),
+        "pass_criteria": "Converted parts behave with no missing meshes.",
+    },
+    {
+        "verification": "mission_rewards",
+        "steps": (
+            "Replay the granting mission segment.",
+            "Check the pickup grant count.",
+        ),
+        "pass_criteria": "The pickup grants exactly once per completion.",
+    },
+    {
+        "verification": "compendium_credit",
+        "steps": (
+            "Open the compendium after conversion.",
+            "Check the source weapon entry.",
+        ),
+        "pass_criteria": "The compendium credits the source weapon.",
+    },
+)
+
+
+def installation_checklist() -> list[dict]:
+    """Return an independent copy of the session checklist."""
+    return copy.deepcopy(
+        [
+            {
+                "verification": item["verification"],
+                "steps": list(item["steps"]),
+                "pass_criteria": item["pass_criteria"],
+            }
+            for item in INSTALLATION_CHECKLIST
+        ]
+    )
+
+
+def validate_installation_plan(plan: Mapping) -> list[str]:
+    """Check a session plan covers every verification with pass criteria."""
+    errors: list[str] = []
+    if not isinstance(plan, Mapping):
+        return ["Installation plan must be a mapping."]
+    steps = plan.get("steps")
+    if not isinstance(steps, list) or not steps:
+        return ["Installation plan must list at least one session step."]
+    covered: set[str] = set()
+    for index, step in enumerate(steps):
+        where = f"steps[{index}]"
+        if not isinstance(step, Mapping):
+            errors.append(f"{where} must be a mapping")
+            continue
+        verification = step.get("verification")
+        if verification not in REQUIRED_VERIFICATIONS:
+            errors.append(
+                f"{where} must name one of the six required verifications"
+            )
+        else:
+            covered.add(verification)
+        if not isinstance(step.get("actions"), list) or not step["actions"]:
+            errors.append(f"{where} must list ordered session actions")
+        if not _non_empty_string(step.get("pass_criteria")):
+            errors.append(f"{where} must state explicit pass criteria")
+    for required in REQUIRED_VERIFICATIONS:
+        if required not in covered:
+            errors.append(f"session must cover {required}")
+    return errors

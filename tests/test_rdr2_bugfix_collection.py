@@ -71,5 +71,58 @@ class BugfixCollectionTests(unittest.TestCase):
         self.assertTrue(bc.validate_bugfix_collection("fixes"))
 
 
+def valid_manifests():
+    return {
+        "wickiup_map_artwork": {
+            "problem": "misnamed minimap artwork",
+            "verification": "minimap comparison",
+            "permission": "credited reuse allowed",
+        },
+        "dreamcatcher_cleanup": {
+            "problem": "completed entry remains",
+            "verification": "completion flow check",
+            "permission": "recreated from current assets",
+        },
+    }
+
+
+class FirstTargetManifestTests(unittest.TestCase):
+    def test_shipped_manifests_cover_both_first_targets(self):
+        manifests = {e["entry"]: e for e in bc.first_target_manifests()}
+        self.assertEqual(
+            bc.validate_first_target_manifests(manifests), []
+        )
+
+    def test_valid_manifests_pass(self):
+        self.assertEqual(
+            bc.validate_first_target_manifests(valid_manifests()), []
+        )
+
+    def test_missing_dreamcatcher_manifest_is_rejected(self):
+        manifests = valid_manifests()
+        del manifests["dreamcatcher_cleanup"]
+        errors = bc.validate_first_target_manifests(manifests)
+        self.assertTrue(any("dreamcatcher_cleanup" in e for e in errors))
+
+    def test_manifest_without_permission_is_rejected(self):
+        manifests = valid_manifests()
+        del manifests["wickiup_map_artwork"]["permission"]
+        errors = bc.validate_first_target_manifests(manifests)
+        self.assertTrue(any("permission" in e for e in errors))
+
+    def test_later_fix_is_not_a_first_target(self):
+        manifests = valid_manifests()
+        manifests["nexus_4909_clothing_physics"] = {
+            "problem": "physics assets",
+            "verification": "wear check",
+            "permission": "recreated",
+        }
+        errors = bc.validate_first_target_manifests(manifests)
+        self.assertTrue(any("not a first target" in e for e in errors))
+
+    def test_non_mapping_manifests_are_rejected(self):
+        self.assertTrue(bc.validate_first_target_manifests("manifests"))
+
+
 if __name__ == "__main__":
     unittest.main()

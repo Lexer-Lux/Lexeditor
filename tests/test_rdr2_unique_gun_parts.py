@@ -86,5 +86,66 @@ class PrototypeValidityTests(unittest.TestCase):
         )
 
 
+def valid_installation_plan():
+    verifications = [
+        "gunsmith_visibility",
+        "installation",
+        "save_persistence",
+        "dual_wield",
+        "mission_rewards",
+        "compendium_credit",
+    ]
+    return {
+        "steps": [
+            {
+                "verification": verification,
+                "actions": ["run the checklist actions"],
+                "pass_criteria": "checklist pass criteria met",
+            }
+            for verification in verifications
+        ]
+    }
+
+
+class InstallationChecklistTests(unittest.TestCase):
+    def test_checklist_covers_all_six_verifications(self):
+        covered = {item["verification"] for item in ugp.installation_checklist()}
+        self.assertEqual(covered, set(ugp.REQUIRED_VERIFICATIONS))
+
+    def test_checklist_steps_have_pass_criteria(self):
+        for item in ugp.installation_checklist():
+            self.assertTrue(item["steps"])
+            self.assertTrue(item["pass_criteria"].strip())
+
+    def test_valid_installation_plan_passes(self):
+        self.assertEqual(
+            ugp.validate_installation_plan(valid_installation_plan()), []
+        )
+
+    def test_missing_verification_is_rejected(self):
+        plan = valid_installation_plan()
+        plan["steps"] = [
+            step for step in plan["steps"]
+            if step["verification"] != "dual_wield"
+        ]
+        errors = ugp.validate_installation_plan(plan)
+        self.assertTrue(any("dual_wield" in e for e in errors))
+
+    def test_step_without_pass_criteria_is_rejected(self):
+        plan = valid_installation_plan()
+        plan["steps"][0]["pass_criteria"] = "  "
+        errors = ugp.validate_installation_plan(plan)
+        self.assertTrue(any("pass criteria" in e for e in errors))
+
+    def test_step_without_actions_is_rejected(self):
+        plan = valid_installation_plan()
+        plan["steps"][1]["actions"] = []
+        errors = ugp.validate_installation_plan(plan)
+        self.assertTrue(any("ordered session actions" in e for e in errors))
+
+    def test_non_mapping_plan_is_rejected(self):
+        self.assertTrue(ugp.validate_installation_plan("session"))
+
+
 if __name__ == "__main__":
     unittest.main()

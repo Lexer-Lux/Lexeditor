@@ -57,5 +57,38 @@ class MapIconsTests(unittest.TestCase):
         self.assertTrue(mi.validate_icon_review("icons"))
 
 
+def valid_brief():
+    return {
+        "subject": "gunsmith map marker",
+        "style_axis": "vanilla outline versus filled badge",
+        "sizes": ["minimap", "pause map"],
+        "presentation_state": "draft",
+    }
+
+
+class VariantBriefTests(unittest.TestCase):
+    def test_brief_fields_recorded(self):
+        self.assertIn("style_axis", mi.variant_brief_fields())
+        self.assertIn("presentation_state", mi.variant_brief_fields())
+
+    def test_valid_brief_passes(self):
+        self.assertEqual(mi.validate_variant_brief(valid_brief()), [])
+
+    def test_brief_without_subject_is_rejected(self):
+        brief = valid_brief()
+        del brief["subject"]
+        errors = mi.validate_variant_brief(brief)
+        self.assertTrue(any("subject" in e for e in errors))
+
+    def test_unseen_approval_state_is_rejected(self):
+        brief = valid_brief()
+        brief["presentation_state"] = "approved_unseen"
+        errors = mi.validate_variant_brief(brief)
+        self.assertTrue(any("presentation state" in e for e in errors))
+
+    def test_non_mapping_brief_is_rejected(self):
+        self.assertTrue(mi.validate_variant_brief("variant"))
+
+
 if __name__ == "__main__":
     unittest.main()

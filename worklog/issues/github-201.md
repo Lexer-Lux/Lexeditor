@@ -42,3 +42,6 @@ entity writes). Re-ran tests/test_rdr2_issue201_safety_boundary.py:
 5 green. Stays actionable: the safe entity-local mechanism still needs
 research with the game.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): verified, no new code
+
+Re-ran tests/test_rdr2_issue201_safety_boundary.py: 5 green. No new agent-side slice was owed beyond the existing contract; a safe entity-local mechanism and the game session are still owed.

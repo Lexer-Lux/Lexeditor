@@ -60,3 +60,38 @@ def validate_icon_review(plan: Mapping) -> list[str]:
     ) is not True:
         errors.append("Existing artwork must not be replaced before approval.")
     return errors
+
+
+# Fields that make a candidate a reviewable variant brief. This defines
+# what counts as presentable for the approval session, not the artwork
+# itself: each brief names its subject, style axis, and sizes so Lexer
+# feedback can target a concrete option.
+VARIANT_BRIEF_FIELDS = (
+    "subject",
+    "style_axis",
+    "sizes",
+    "presentation_state",
+)
+
+
+def variant_brief_fields() -> list[str]:
+    """Return the fields a reviewable variant brief must carry."""
+    return list(VARIANT_BRIEF_FIELDS)
+
+
+def validate_variant_brief(brief: Mapping) -> list[str]:
+    """Check one candidate variant brief for review readiness."""
+    errors: list[str] = []
+    if not isinstance(brief, Mapping):
+        return ["Variant brief must be a mapping."]
+    for field in VARIANT_BRIEF_FIELDS:
+        if not brief.get(field):
+            errors.append(f"Variant brief must state {field}.")
+    if brief.get("presentation_state") not in (
+        "draft", "presented", "revised", "approved",
+    ):
+        errors.append(
+            "Variant brief needs a real presentation state, "
+            "not an approval claim for unseen artwork."
+        )
+    return errors

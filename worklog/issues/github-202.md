@@ -44,3 +44,6 @@ Re-ran tests/test_rdr2_viking_comb_criteria.py: 10 green. Stays
 actionable: the interception hook and the measurable session are still
 owed.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): verified, no new code
+
+Re-ran tests/test_rdr2_viking_comb_criteria.py: 10 green. No new agent-side slice was owed beyond the existing contract; interception proof and the measurable game test are still owed.

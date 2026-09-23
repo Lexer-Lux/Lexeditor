@@ -51,3 +51,13 @@ the clothing/carry candidates. Covered by
 tests/test_rdr2_bugfix_collection.py (8 hermetic tests). No gameplay
 claim: delivering the separate verified fixes still needs the game.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): first-target manifests
+
+plugins/rdr2/bugfix_collection.py gains FIRST_TARGET_MANIFESTS (wickiup
+artwork and Dreamcatcher cleanup entries with problem, verification,
+and permission from the audit) plus validate_first_target_manifests(),
+which requires complete records for exactly the two first targets.
+Covered by 6 new tests in tests/test_rdr2_bugfix_collection.py (14
+total, green). No gameplay claim: delivering the separate verified
+fixes still needs the game.
+

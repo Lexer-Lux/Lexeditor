@@ -42,3 +42,13 @@ approaches. Covered by tests/test_rdr2_core_trace.py (9 hermetic
 tests). No gameplay claim: the recording tool and capture session are
 still owed.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): recording tool specification
+
+New plugins/rdr2/core_recording_tool.py specifies the synchronized
+recorder (positive fixed cadence, monotonic timebase, integer 0-100
+samples, output format, video pairing, sequence binding) with
+validate_recorder_plan() plus validate_trace_records(), which checks
+real sample sequences for cadence, monotonic time, and integer range.
+Covered by tests/test_rdr2_core_recording_tool.py (9 hermetic tests,
+green). No gameplay claim: the tool build, the capture session, and any
+smoothing decision are still owed.
