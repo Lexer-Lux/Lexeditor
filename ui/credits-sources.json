@@ -195,6 +195,11 @@
           "name": "Tirlititi / Hades Workshop",
           "role": "Additional FF9 Steam archive reverse-engineering reference; its source and binaries are not bundled or invoked by Lexeditor.",
           "url": "https://github.com/Tirlititi/Hades-Workshop"
+        },
+        {
+          "name": "GameJawnsInc / Dream World IX / ff9mapkit",
+          "role": "MIT-licensed public FF9 p0data interoperability research for fields, event scripts, models, animations, world-map assets and Memoria loose overrides.",
+          "url": "https://github.com/GameJawnsInc/Dream-World-IX"
         }
       ],
       "thanks": [],
