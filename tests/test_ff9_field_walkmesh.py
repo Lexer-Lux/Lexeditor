@@ -117,6 +117,30 @@ def test_save_toggles_only_active_bit_and_reopens_project(store):
     assert saved_row["values"]["OtherFlags"] == 0x40
 
 
+
+def test_noop_save_does_not_create_overlay(store):
+    database, _archive, project = store
+    loaded = database.load("field-walkmesh")
+    row = loaded["rows"][0]
+    saved = database.save("field-walkmesh", loaded["sceneHashes"], [{
+        "scene": row["scene"], "record": row["record"], "values": {"Active": True},
+    }])
+    assert not (project / row["scene"]).exists()
+    assert saved["rows"][0]["source"] == "vanilla"
+
+
+def test_save_refuses_stale_vanilla_archive(store):
+    database, archive_path, _project = store
+    loaded = database.load("field-walkmesh")
+    row = loaded["rows"][0]
+    raw = bytearray(archive_path.read_bytes())
+    raw[-1] ^= 1
+    archive_path.write_bytes(raw)
+    with pytest.raises(RuntimeError, match="changed outside Lexeditor"):
+        database.save("field-walkmesh", loaded["sceneHashes"], [{
+            "scene": row["scene"], "record": row["record"], "values": {"Active": False},
+        }])
+
 def test_save_refuses_unknown_fields_and_stale_project_source(store):
     database, _archive, project = store
     loaded = database.load("field-walkmesh")

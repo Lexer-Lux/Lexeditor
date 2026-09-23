@@ -297,15 +297,27 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             field(page, "WEAPON ID").scroll_into_view_if_needed()
             page.screenshot(path=str(OUT / "ff9-900x620.png"))
 
-            page.set_viewport_size({"width": 1000, "height": 700})
-            page.evaluate("document.documentElement.style.zoom='1.5';navigate('items')")
-            page.wait_for_selector(".lex-paged-list-detail")
-            expect(page.locator("#global-save")).to_be_visible()
-            assert_table_rows_do_not_overlap(page)
-            metrics = page.evaluate("()=>({body:document.body.scrollWidth,viewport:innerWidth,main:document.querySelector('main').scrollWidth,width:document.querySelector('main').clientWidth})")
-            assert metrics["body"] <= metrics["viewport"] + 2 and metrics["main"] <= metrics["width"] + 2, metrics
-            page.screenshot(path=str(OUT / "ff9-scale-150.png"))
-            page.evaluate("document.documentElement.style.zoom='1'")
+            # Desktop UI scale is WebView page zoom, not CSS `zoom`. At 150% a
+            # 1000x700 physical client has about a 667x467 CSS-pixel layout viewport.
+            # Use that responsive viewport plus DPR 1.5 so the artifact is rendered
+            # at the same effective scale without bypassing responsive layout.
+            scale_context = browser.new_context(
+                viewport={"width": 667, "height": 467}, device_scale_factor=1.5)
+            try:
+                scale_page = scale_context.new_page()
+                scale_page.on("pageerror", lambda error: errors.append(str(error)))
+                scale_page.goto(session.url, wait_until="domcontentloaded")
+                scale_page.wait_for_function("typeof state==='object'&&state.dashboard&&typeof shell==='object'")
+                scale_page.wait_for_selector(".lex-paged-list-detail")
+                wait_loaded(scale_page)
+                expect(scale_page.locator("#global-save")).to_be_visible()
+                assert_table_rows_do_not_overlap(scale_page)
+                metrics = scale_page.evaluate("()=>({body:document.body.scrollWidth,viewport:innerWidth,main:document.querySelector('main').scrollWidth,width:document.querySelector('main').clientWidth,dpr:devicePixelRatio})")
+                assert metrics["body"] <= metrics["viewport"] + 2 and metrics["main"] <= metrics["width"] + 2, metrics
+                assert metrics["dpr"] == 1.5, metrics
+                scale_page.screenshot(path=str(OUT / "ff9-scale-150.png"), scale="device")
+            finally:
+                scale_context.close()
 
             page.evaluate("document.querySelector('#main').replaceChildren(statusPanel('Actions','Verified source','Loading records…'))")
             expect(page.get_by_text("Loading records…", exact=True)).to_be_visible()

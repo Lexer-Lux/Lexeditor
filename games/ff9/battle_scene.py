@@ -73,7 +73,7 @@ class UnityArchive:
         self.path = Path(path)
         size = self.path.stat().st_size
         if size <= 0 or size > MAX_ARCHIVE_BYTES:
-            raise ValueError("p0data2.bin has an unexpected size")
+            raise ValueError(f"{self.path.name} has an unexpected size")
         self.data = self.path.read_bytes()
         self.start = 0x70 if self.data.startswith(b"UnityRaw") else 0
         self.objects: list[UnityObject] = []
@@ -121,7 +121,7 @@ class UnityArchive:
             pos += 28
             absolute = self.start + file_offset + rel
             if absolute < 0 or size > len(data) - absolute:
-                raise ValueError("Unity archive object points outside p0data2.bin")
+                raise ValueError(f"Unity archive object points outside {self.path.name}")
             records.append((info, absolute, size, type_id, type_index, flags))
         for info, absolute, size, type_id, type_index, flags in records:
             name = ""

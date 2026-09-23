@@ -34,11 +34,9 @@ POST_ROUTES = {"/api/save", "/api/runtime/install", "/api/runtime/recover",
                "/api/deployment/deploy", "/api/deployment/revert"}
 
 
-# Known p0data families that remain outside Lexeditor's structured editor.
-# These are intentionally specific: public FF9 tooling demonstrates the formats
-# and override paths below, so a single "unknown p0data" bucket would hide real
-# agent-side work. None is promoted to Partial until Lexeditor has an actual
-# player-facing viewer/editor for that family.
+# Known p0data areas that remain outside Lexeditor's structured editor.
+# These stay explicit even when a narrow sub-format is integrated, so partial
+# coverage never hides the still-protected bytes or implies a generic raw editor.
 UNRESOLVED_AREAS = (
     ("StreamingAssets/p0data1*.bin (outside integrated BGI floor activity)", "Field backgrounds, cameras, walkmesh geometry/topology and animations",
      "Lexeditor now has a preservation-safe editor for the documented BGI_FLOOR_ACTIVE bit only. Background art, cameras, walkmesh geometry/topology, edge semantics, transforms and moving-platform animation data remain protected and unintegrated rather than being routed through a lossy generic editor."),
