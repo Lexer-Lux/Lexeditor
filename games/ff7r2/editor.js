@@ -678,7 +678,17 @@
     });
   }
 
-  function battlePlayerFieldLabel(name){
+  function sourceFieldLabel(name){
+    const overrides={
+      NormalItemName_Array:"Normal item names",
+      NormalItemPercent_Array:"Normal item rates",
+      RareItemName_Array:"Rare item names",
+      RareItemPercent_Array:"Rare item rates",
+      StealItemName_Array:"Steal item names",
+      StealItemQuantity_Array:"Steal item quantities",
+      StealFaildCountArrayIndex:"Steal failure count array index",
+    };
+    if(overrides[name])return overrides[name];
     return String(name||"")
       .replace(/_Array$/," array")
       .replaceAll("_"," ")
@@ -693,7 +703,7 @@
         detailField({label:"DETAIL",control:readonlyField("No BattlePlayerParameter record is selected.")})
       ]})]});
     const fields=(row.fields||[]).map(field=>detailField({
-      label:battlePlayerFieldLabel(field.name).toUpperCase(),
+      label:sourceFieldLabel(field.name).toUpperCase(),
       dataType:field.kind==="array"?("ARRAY<"+String(field.type||"VALUE").toUpperCase()+">"):String(field.kind||field.type).toUpperCase(),
       control:readonlyField(field.kind==="array"?arrayDisplay(field):String(field.value??""))
     }));
@@ -786,19 +796,18 @@
         detailField({label:"DETAIL",control:readonlyField("No BattleItemPossession record is selected.")})
       ]})]});
     const fields=(row.fields||[]).map(field=>detailField({
-      label:field.name.toUpperCase(),
+      label:sourceFieldLabel(field.name).toUpperCase(),
       dataType:field.kind==="array"?("ARRAY<"+String(field.type||"VALUE").toUpperCase()+">"):String(field.kind||field.type).toUpperCase(),
-      control:readonlyField(field.kind==="array"?arrayDisplay(field):String(field.value??"")),
-      help:infoHelp(field.note||"Serialized source value; read-only in this integration.")
+      control:readonlyField(field.kind==="array"?arrayDisplay(field):String(field.value??""))
     }));
     return detailPanel({className:"ff7r2-detail ff7r2-formulae-detail",title:row.key,
       icon:el("span",{class:"ff7r2-record-icon"},"VII"),identity:recordId(row.key),
       meta:"BattleItemPossession — read-only source data",body:[
         detailSection({title:"FORMULA STATUS",body:[
-          LexeditorUI.detailNote("STATUS — Source data only; the complete Steal formula has not been reconstructed."),
-          LexeditorUI.detailNote("RATE EVIDENCE — Public mod evidence reports the 25% rate data is shared between steals and drops."),
-          LexeditorUI.detailNote("RATE MODIFIER — Generated runtime types include StealSuccessRateAdd; its arithmetic/order is not exposed."),
-          LexeditorUI.detailNote("RESULT STATES — Generated runtime types distinguish StealFailed, AlreadyStolen and NothingToSteal; their branch conditions are not exposed."),
+          LexeditorUI.detailNote("The complete Steal formula has not been reconstructed; this view exposes only proved serialized source data."),
+          LexeditorUI.detailNote("Public mod evidence reports the 25% rate data is shared between steals and drops."),
+          LexeditorUI.detailNote("Generated runtime types include StealSuccessRateAdd, but its arithmetic/order is not exposed."),
+          LexeditorUI.detailNote("Generated runtime types distinguish StealFailed, AlreadyStolen and NothingToSteal; their branch conditions are not exposed."),
         ]}),
         detailSection({title:"IDENTITY",body:[
           detailField({label:"ROW FNAME",control:readonlyField(row.key)}),
