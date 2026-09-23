@@ -11,6 +11,8 @@ import shutil
 import sys
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+_SHARED_UI_ENV=os.environ.get('LEXEDITOR_SHARED_UI_ROOT','').strip()
+SHARED_UI_ROOT=Path(_SHARED_UI_ENV).resolve() if _SHARED_UI_ENV else ROOT
 OUT=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/'out'/'data-map-browser'
 OUT.mkdir(parents=True,exist_ok=True)
 # Derived, never hand-listed: a hardcoded tuple silently skipped ff7r, so its
@@ -25,6 +27,9 @@ ROWS=[{'id':str(i),'filename':f'file-{i:03}.dat','controls':f'Interface {i:03}',
        'status':'partial' if i%4<3 else 'not-integrated', 'notes':('Long scoped explanation. '*40),
        'target':'items','dataset':'fixture-data','datasetKey':'fixture-data','openable':i%4<3} for i in range(100)]
 ROWS[0]['filename']='same-file.dat';ROWS[4]['filename']='same-file.dat'  # IDs must not collapse sections.
+# The injected row must name a target the plugin's real Data Map adapter supports.
+# Most plugins route generic item rows; Bannerlord has explicit editor targets.
+OPEN_TARGETS={'bannerlord':'skills'}
 
 def html_for(game):
     source_game='ff7' if game=='ff7_2013' else game
@@ -91,6 +96,8 @@ with sync_playwright() as p:
                       navigate("datamap");
                     }''',ROWS)
                 else:
+                    open_target=OPEN_TARGETS.get(game,'items')
+                    fixture_rows=[{**row,'target':open_target} for row in ROWS]
                     page.evaluate('''rows=>{
                       state.dataMap={rows};state.datamap={rows};state.booting=false;
                       if(Object.hasOwn(state,"loaded"))state.loaded=true;

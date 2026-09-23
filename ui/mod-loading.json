@@ -6,6 +6,11 @@
       "structure": "Template only. A shipping plugin must declare its mod root or package format and the file layout users should install or edit.",
       "overriding": "Template only. A shipping plugin must declare whether mods stack, replace whole files, merge semantic records, or are mutually exclusive."
     },
+    "bannerlord": {
+      "loader": "Bannerlord's native module loader. Lexeditor deploys the selected project as one Modules/<SubModule ID> module and launches the game with Bannerlord's native /singleplayer _MODULES_*...*_MODULES_ module list.",
+      "structure": "Each mod is a native Bannerlord module rooted at <Bannerlord>/Modules/<module>/ with SubModule.xml, optional bin/Win64_Shipping_Client assemblies, ModuleData XML/data files, GUI assets, and other module-owned resources. Lexeditor edits one source project and deploys its module-owned outputs additively into that layout.",
+      "overriding": "Bannerlord can load multiple modules together. Lexeditor resolves the selected module's required dependency closure and launch order, but it does not semantically merge independent external modules or invent conflict resolution for two modules that replace the same runtime resource."
+    },
     "ff7": {
       "loader": "FFNx Direct Mode. Lexeditor can build an isolated Direct Mode export, deploy to an existing FFNx.toml, or install the pinned upstream FFNx-v1.24.3.0 release for the classic 2026 Steam layout. The archive is SHA-256 verified and manual/7th-Heaven FFNx installs remain externally owned.",
       "structure": "Lexeditor project saves remain outside the game. Export writes .lexeditor/ffnx-direct plus an ownership manifest. Deploy maps only proved KERNEL/KERNEL2 chunks, scene blocks, field encounter section 7 and world enc_w.bin into FFNx's configured direct_mode_path. Executable-backed edits remain project-only.",

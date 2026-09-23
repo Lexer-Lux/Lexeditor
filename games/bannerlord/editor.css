@@ -1,0 +1,27 @@
+:root{--lex-accent:#8d2f25;--lex-highlight:#a56b34}
+*{box-sizing:border-box}
+body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:14px/1.4 var(--lex-font)}
+main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
+button,input,select,textarea{font:inherit}
+#main>*{height:100%;min-height:0}
+.lex-tabbed-panel-content{flex:1;min-height:0;overflow:auto}
+.bannerlord-table-detail{height:100%;min-height:0}
+.bannerlord-state-panel{height:100%;overflow:auto}
+.bannerlord-action{padding:6px 10px;border:1px solid var(--lex-border);color:var(--lex-text);background:var(--lex-panel-2);cursor:pointer}
+.bannerlord-action:disabled{cursor:default;opacity:.55}
+.bannerlord-action.danger{color:#fff;background:#8d2f25}
+.bannerlord-inline-actions{display:flex;flex-wrap:wrap;gap:8px;padding-top:8px}
+.bannerlord-build-layout{height:100%;min-height:0}
+.bannerlord-build-log{max-height:38vh;margin:0;padding:10px;overflow:auto;color:#d8dee9;background:#101216;font:12px/1.45 "Cascadia Mono",Consolas,monospace;white-space:pre-wrap}
+.bannerlord-tweaks-page{display:flex;flex-direction:column;height:100%;min-height:0}
+.bannerlord-tweaks{flex:1;min-height:0;overflow:auto}
+.bannerlord-source{display:flex;flex-direction:column;height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel)}
+.bannerlord-source-head{display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--lex-border)}
+.bannerlord-source-head code{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bannerlord-source textarea{flex:1;min-height:0;width:100%;padding:12px;resize:none;border:0;outline:0;color:var(--lex-text);background:var(--lex-panel);font:12px/1.45 "Cascadia Mono",Consolas,monospace;tab-size:4}
+.bannerlord-required-control{display:flex;align-items:center;gap:8px;min-width:0}
+code{overflow-wrap:anywhere}
+@media(max-width:900px){
+  main{padding:max(6px,var(--lex-panel-gap))}
+  .bannerlord-build-log{max-height:28vh}
+}

@@ -1,0 +1,56 @@
+from pathlib import Path
+import tempfile
+import unittest
+import xml.etree.ElementTree as ET
+
+from games.bannerlord.module_data import save_module
+
+
+class BannerlordLegacyXmlOrderingTests(unittest.TestCase):
+    def test_missing_legacy_path_inserts_before_included_game_types(self):
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / "SubModule.xml"
+            path.write_text('''<Module><Name value="Example"/><Id value="Example"/><Version value="v1.0.0"/><Xmls><XmlNode><Id value="Items"/><IncludedGameTypes><GameType value="Campaign"/></IncludedGameTypes><Unknown value="keep"/></XmlNode></Xmls></Module>''', encoding="utf-8")
+            save_module(path, {"xmls": [{
+                "index": 0,
+                "id": "Items",
+                "path": "items",
+                "includedGameTypes": [{"index": 0, "value": "Campaign", "attributes": {}}],
+            }]})
+            node = ET.parse(path).getroot().find("./Xmls/XmlNode")
+            tags = [child.tag for child in node]
+            self.assertLess(tags.index("Id"), tags.index("Path"))
+            self.assertLess(tags.index("Path"), tags.index("IncludedGameTypes"))
+            self.assertIsNotNone(node.find("Unknown"))
+
+    def test_missing_legacy_id_inserts_before_included_game_types(self):
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / "SubModule.xml"
+            path.write_text('''<Module><Name value="Example"/><Id value="Example"/><Version value="v1.0.0"/><Xmls><XmlNode><Path value="items"/><IncludedGameTypes><GameType value="Campaign"/></IncludedGameTypes></XmlNode></Xmls></Module>''', encoding="utf-8")
+            save_module(path, {"xmls": [{
+                "index": 0,
+                "id": "Items",
+                "path": "items",
+                "includedGameTypes": [{"index": 0, "value": "Campaign", "attributes": {}}],
+            }]})
+            node = ET.parse(path).getroot().find("./Xmls/XmlNode")
+            tags = [child.tag for child in node]
+            self.assertLess(tags.index("Id"), tags.index("IncludedGameTypes"))
+            self.assertLess(tags.index("Path"), tags.index("IncludedGameTypes"))
+
+    def test_existing_legacy_order_is_not_rewritten(self):
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / "SubModule.xml"
+            path.write_text('''<Module><Name value="Example"/><Id value="Example"/><Version value="v1.0.0"/><Xmls><XmlNode><IncludedGameTypes><GameType value="Campaign"/></IncludedGameTypes><Id value="Items"/><Path value="items"/></XmlNode></Xmls></Module>''', encoding="utf-8")
+            save_module(path, {"xmls": [{
+                "index": 0,
+                "id": "Items",
+                "path": "items",
+                "includedGameTypes": [{"index": 0, "value": "Campaign", "attributes": {}}],
+            }]})
+            tags = [child.tag for child in ET.parse(path).getroot().find("./Xmls/XmlNode")]
+            self.assertEqual(tags, ["IncludedGameTypes", "Id", "Path"])
+
+
+if __name__ == "__main__":
+    unittest.main()
