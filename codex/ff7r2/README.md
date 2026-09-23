@@ -39,14 +39,22 @@ original IoStore state and demonstrates byte-proxy editing as a conservative wri
 Lexeditor's independent bounded implementation therefore:
 - reads real row FName identity and property descriptors;
 - exposes only fixed-width scalar values that can be patched in place;
-- keeps FString, FName-map, arrays and browser-unsafe 64-bit integers read-only;
-- validates storage bounds and finite floats;
+- follows proved _Array pointers and decodes their elements read-only using the
+  property's underlying type and documented alignment;
+- keeps FString/FName writes, array writes and browser-unsafe 64-bit integer
+  edits disabled;
+- validates scalar/array storage bounds and finite floats;
 - patches a copy of the source bytes and preserves every untouched byte;
 - rejects unproved package shapes rather than falling back to raw hex/files editing.
 
-PlayerParameter is the only gameplay table promoted to the first structured UI.
-BattlePlayerParameter remains not integrated because public evidence shows
-behavior-linked arrays and the current writer intentionally does not resize arrays.
+PlayerParameter remains the writable gameplay slice. BattleItemPossession now
+has a separate read-only Formulae view when an extracted source asset is supplied:
+real row FName identity and array elements are visible, but no
+BattleItemPossession file is staged or written. Synthetic fixtures prove no-op
+byte preservation, name/int/byte array decoding, out-of-bounds pointer rejection
+and rejection of attempted array edits without mutation. BattlePlayerParameter
+remains not integrated because its behavior-linked arrays and semantics are not
+proved for editing.
 
 ### IoStore extraction
 
@@ -119,14 +127,18 @@ highlight, #f2f7ff accent text) on the shared shell. The current master removal
 of a game-specific detail-label width override was adopted so shared sizing owns
 the layout.
 
-Rendered CI artifact ff7r2-rendered from head
-e82aa8ef14cca1fec778c3c5459d3fd50db0e257 was downloaded and visually inspected:
-desktop Characters, narrow Characters, Data Map, Information and Tweaks were
-usable; unsupported Data Map rows remained visible and PlayerParameter remained
-Partial. The old 150% screenshot used CSS zoom plus full-page capture, which
-created an artificial 1440x1350 blank tail. The test now captures the visible
-viewport at simulated 150% instead; this is a browser approximation of host UI
-scale, not installed-app or game acceptance.
+Rendered CI artifact ff7r2-rendered from exact head
+e45da924d64d3d57c8e6293e2f942f2ac91067c7, workflow run 35806543930, was
+downloaded and visually inspected after browser + Ubuntu + Windows all passed.
+Artifact digest:
+dc94da7164c4bc972fecda51d382be4358a3abff8ab73a05c0200991cd304bd1.
+Desktop Characters, narrow Characters, simulated 150%, Data Map, Information and
+Tweaks were usable; the five requested gameplay areas were still visible at their
+then-current honest integration states and the candidate packaging route remained
+Partial. This is rendered browser evidence, not installed-app/game acceptance.
+The newer Formulae/BattleItemPossession view was implemented after that exact
+artifact and therefore requires a fresh rendered rerun before it inherits that
+evidence.
 
 ## Current public leads for unresolved requests
 
@@ -136,48 +148,61 @@ constants are used here as naming/schema evidence only; they do not prove runtim
 meaning by themselves.
 
 - #470 Chocobo whistle: ResidentParameter publicly names
-  CallChocoboAtFieldActionDistanceParamRatio0 and
-  CallChocoboAtFieldActionDistanceParamRatio1. Other public constants identify
-  Item row key_ChocoboWhistle, CharaSpec row FA0407_00_ChocoboWhistle_Standard
-  and CameraModule row ChocoboRide. These are concrete research anchors, but no
-  public source connects them to the requested instant teleport+mount operation,
-  safe nav/ground placement, the game's ride-legality predicate or vanilla
-  fallback. The two distance-ratio rows also lack proved units/ranges/behavior,
-  so Lexeditor does not expose speculative controls.
+  CallChocoboAtFieldActionDistanceParamRatio0/1. The public generated Rebirth SDK
+  also exposes AEndLocationVolume.bDisableChocoboRide,
+  UEndEnvQueryTest_IsDisabledChocoboRide,
+  UEndEnvQueryContext_LastEnableChocoboRideLocation,
+  FEndBehaviorChocoboRideOnExtraAction and UEndAnimNotifyCallChocobo. That proves
+  ride-legality, last-safe-location, ride-on and call seams exist. The generated
+  declarations do not expose the callable orchestration needed for safe
+  teleport+immediate mount, nor the distance-ratio semantics/ranges or exact
+  vanilla fallback. #470 remains Not integrated.
 - #471 Formulae / Steal: BattleItemPossession publicly names
   NormalItemPercent_Array, RareItemPercent_Array, StealItemName_Array,
-  StealItemQuantity_Array and StealFaildCountArrayIndex. Gantz79's public
-  "100 Percent Steal and Drop Rate" mod proves a packaged rate edit works, and
-  the author explicitly reports that Rebirth shares the 25% data between stolen
-  and dropped items. That means a standalone Steal-rate control would currently
-  misrepresent the data. The current Lexeditor reader safely recognizes array
-  headers/counts but intentionally does not write array elements. Public evidence
-  still does not establish the full Steal formula, named terms, roll-vs-no-item
-  failure branch or message hook required for the requested Formulae screen.
-- #472 blue benches / cushion: public constants identify
-  scgCmn_Tmp_Bench_Init/Rest in StateChange, trgCmn_Bench_Rest in StateTrigger,
-  acgCmn_RecoverAll_ForBench in ActionGroup, and
-  UI7033_00_ConsumedItem_Cushion in CharaSpec. The public "Refreshed Chocobo
-  Rest Stops (Static Mesh)" author also confirms the blue bench is separate from
-  Chocobo rest benches and that the game has multiple bench models. What remains
-  unproved is the complete mapping from every restable placement to the blue
-  model plus the gameplay gate that consumes a cushion for every successful rest.
-  A global mesh replacement would therefore be both incomplete and overbroad.
-- #473 minimap zoom: MapIconInfo publicly exposes navimap visibility/layer,
-  offsets and view-distance fields but no zoom field. The September 2026
-  "FF7 Rebirth Accessibility - Visibility Overhaul" proves minimap position/size
-  can be changed in packaged HUD data; its author specifically distinguishes the
-  pak-based minimap placement from the optional UE4SS HUD mover. That is useful
-  format evidence, but still not a world-minimap zoom scalar, valid range or
-  persistence path. Lexeditor does not relabel size/position/FOV controls as zoom.
-- #477 Faster Queen's Blood: CardGameCommonParameter publicly names rows such as
-  EffectWaitTime, while CardGameAIParam exposes NeedCanPutCount,
-  PlayerPredictionTurn and EnemyPredictionTurn among other AI tuning fields.
-  ForceFeedback also contains an FFB_CardGame_Pass identifier. None of those
-  names proves the legal-move predicate, automatic pass transition,
-  both-sides-no-moves match termination, or the intro's first skippable input
-  state. Public cheat/mod evidence found score/card manipulation but not those
-  hooks, so Lexeditor does not approximate Queen's Blood rules from field names.
+  StealItemQuantity_Array and StealFaildCountArrayIndex. Synthlight's public
+  format work proves an _Array header points to repeated values of the property's
+  underlying type, with explicit alignment. Lexeditor now independently decodes
+  those array elements read-only and exposes supplied BattleItemPossession rows
+  in a shared paged Formulae Table+Detail. Gantz79's public mod evidence says the
+  25% rate data is shared between steal/drop, so a Steal-only percentage control
+  would still be misleading. Array writes, the complete Steal formula/terms,
+  roll-vs-no-item failure branch and failure-message hook remain unproved. #471 is
+  Partial, not complete.
+- #472 blue benches / cushion: public DataObject names identify the bench
+  rest trigger/action rows and UI7033_00_ConsumedItem_Cushion. The generated SDK
+  narrows the runtime/asset seam further: AEndFieldActionActorBenchBreak has both
+  a UStaticMeshComponent* BenchMeshComponent and a
+  TSubclassOf<AEndSkeletalMeshActor> ZabutonActorClass, and CampBreak derives from
+  that bench actor. Public mesh evidence also confirms multiple bench models.
+  Missing evidence remains the complete restable-placement -> desired blue-mesh
+  mapping and the inventory/state transition that consumes a cushion for every
+  valid rest without changing unusable benches. #472 remains Not integrated.
+- #473 minimap zoom: the generated SDK explicitly contains option categories
+  AreaNaviMapScale, LocationNaviMapScale and ZackNaviMapScale, while UEndNaviMap
+  exposes PixelPerCm and the location prototype data contains Min/Mid/MaxPixelPerCm.
+  The option model can represent integer MinValue/MaxValue ranges. This is direct
+  evidence that Rebirth has navimap scaling concepts, substantially stronger than
+  the earlier HUD-size evidence. Public sources still do not map the requested
+  world-minimap category to its concrete option range/default and persistent
+  storage, so Lexeditor cannot yet present a truthful bounded control. #473
+  remains Not integrated.
+- #477 Faster Queen's Blood: public CardGame data exposes EffectWaitTime and AI
+  tuning fields; generated declarations confirm NeedCanPutCount,
+  PlayerPredictionTurn and EnemyPredictionTurn are int8 members.
+  UEndCardGameMenu also exposes a _PassClass and OnYesButtonPressed/
+  OnNoButtonPressed, while the 3D manager exposes turn/board state. These are
+  concrete pass/turn seams, but generated implementations are empty stubs and do
+  not reveal the legal-move predicate, automatic pass transition,
+  both-sides-no-moves termination or intro first-skippable-input hook. Animation
+  timing such as FlagPlayTurnAnimDuration is not treated as a substitute for the
+  requested logic. #477 remains Not integrated.
+
+narknon/FF7R2UProj at public commit
+ae73efa89db7e48fc7f425dec0847a0208c15b80 is used only as generated
+reverse-engineering/type-declaration evidence for the runtime/schema seams above.
+No root README/LICENSE/License.txt was present in the audited repository snapshot,
+so Lexeditor does not copy, adapt, vendor or redistribute its source; only factual
+type/member names are used as research cross-checks.
 
 FF7R Row Forger (published July 2026) is also a useful ecosystem signal: its
 public description says it can edit/add rows in most Resident DataObject tables
@@ -189,8 +214,10 @@ independent bounded implementation and the licensing boundary recorded above.
 
 Project marker: lexeditor-project.json
 
-Read-only extracted input:
-source/End/Content/DataObject/Resident/PlayerParameter.uasset
+Read-only extracted inputs:
+- source/End/Content/DataObject/Resident/PlayerParameter.uasset
+- source/End/Content/DataObject/Resident/BattleItemPossession.uasset (optional
+  #471 Formulae source; never staged/written by this integration)
 
 Saved staged output:
 content/End/Content/DataObject/Resident/PlayerParameter.uasset
