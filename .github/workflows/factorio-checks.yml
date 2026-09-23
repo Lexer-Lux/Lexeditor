@@ -2,7 +2,7 @@ name: Factorio checks
 
 on:
   push:
-    branches: [codex/factorio-plugin]
+    branches: [master]
     paths:
       - 'plugins/factorio/**'
       - 'tests/test_factorio.py'
