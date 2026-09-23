@@ -67,7 +67,8 @@ class CoverageTests(unittest.TestCase):
             root=Path(name);(root/'raw').mkdir();(root/'raw'/'not-a-shop.wgd').write_bytes(b'fixture')
             with patch.multiple(server,PREPARED_ROOT=root/'prepared',CONTENT_PREPARED_ROOT=root/'content',
                                 GRINGO_UNPACKED_ROOT=root/'raw',GRINGO_PACKED_ROOT=root/'packed',
-                                SETTINGS_FILE=root/'settings.ini',LOOT_FILE=root/'loot.json'),patch.object(server,'_map_has_shop_records',return_value=False):
+                                SETTINGS_FILE=root/'settings.ini',LOOT_FILE=root/'loot.json',
+                                EXTRACT_ROOT=root/'extract',GAME_ROOT=root/'game'),patch.object(server,'_map_has_shop_records',return_value=False):
                 rows=server._provisional_data_map_rows()
                 self.assertTrue(all(row['coverage']=='unavailable' for row in rows))
                 self.assertTrue(all(not row['openable'] for row in rows))
