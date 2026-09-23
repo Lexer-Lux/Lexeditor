@@ -48,8 +48,18 @@ def document() -> str:
                   "sharedLanguageBlock": False}],
         "counts": {"records": 1, "languages": 1, "identifiers": 1},
     }
-    strings = {"tables": [string_table["table"]],
-               "counts": {"tables": 1, "available": 1, "records": 1, "project": 0}}
+    strings = {
+        "tables": [{**string_table["table"],
+                    "languages": [{"id": "0", "index": 0, "label": "English"}]}],
+        "languages": [{"id": "0", "index": 0, "label": "English"}],
+        "counts": {"tables": 1, "available": 1, "records": 1, "project": 0},
+    }
+    strings_payload = {
+        "language": {"id": "0", "index": 0, "label": "English"},
+        "languages": strings["languages"],
+        "rows": string_table["rows"],
+        "counts": {"records": 1, "tables": 1, "availableTables": 1},
+    }
     missions = {
         "missions": [mission],
         "limits": {"step": 1, "rewards": {
@@ -68,6 +78,8 @@ def document() -> str:
         "/api/string-tables": strings,
         "/api/string-tables?dataset=vanilla": strings,
         "/api/string-table": string_table,
+        "/api/strings?language=0": strings_payload,
+        "/api/strings?language=0&dataset=vanilla": strings_payload,
         "/api/missions": missions,
         "/api/missions?dataset=vanilla": missions,
         "/api/settings": {"available": False, "sections": [], "reason": "Synthetic fixture"},
@@ -155,6 +167,11 @@ def run(output: Path, executable: str | None) -> None:
                 expect(page.locator(".string-detail textarea")).to_have_value("Hello")
                 expect(page.locator(".rdr-record-list .lex-column-list-row:not(.lex-filler-row)")).to_have_count(1)
                 expect(page.locator(".string-detail .lex-detail-field")).to_have_count(7)
+                expect(page.get_by_role("tab", name="🇺🇸 English")).to_have_count(1)
+                assert page.get_by_label("Select string table").count() == 0
+                assert page.locator(".string-detail").get_by_text(
+                    "tune/stringtable/global.strtbl", exact=True).count()
+                assert page.locator(".string-detail .lex-record-id").count() == 0
                 page.screenshot(path=str(output / f"rdr-strings-{width}.png"), full_page=True)
 
                 page.evaluate("state.tab='missions'; state.missionSelected=2; renderMissions()")
