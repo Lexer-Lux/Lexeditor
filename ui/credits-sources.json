@@ -105,12 +105,22 @@
           "name": "FF7 modding community / ff7-flat-wiki",
           "role": "Reference for battle arena names and formation layout.",
           "url": "https://ff7-mods.github.io/ff7-flat-wiki/FF7/Battle/Battle_Scenes.html"
+        },
+        {
+          "name": "FFNx contributors",
+          "role": "Reference/runtime contract for FFNx Direct Mode paths, chunk loading, and 2026 Steam setup.",
+          "url": "https://github.com/julianxhokaxhiu/FFNx"
+        },
+        {
+          "name": "7th Heaven contributors",
+          "role": "Reference for ordered active profiles, installed mod locations, mod.xml folder roots, and read-only external-stack compatibility.",
+          "url": "https://github.com/tsunamods-codes/7th-Heaven"
         }
       ],
       "thanks": [],
       "licenses": [
         {
-          "name": "Elena and ff7tools — original notices",
+          "name": "FF7 format/runtime reference notices",
           "sourcePath": "games/ff7/THIRD_PARTY.md"
         }
       ]
