@@ -61,14 +61,17 @@ def _expanded_resources(root: Path, files: list[Path]) -> tuple[list[str], list[
     problems: list[str] = []
     for relative in files:
         name = relative.as_posix()
-        if relative.name in {"mod.json", PROJECT_MARKER} or relative.suffix.casefold() in IGNORED_SUFFIXES:
-            ignored.append(name)
-            continue
+        # Resource suffixes overlap ordinary documentation suffixes: localized
+        # Steam text is itself a .txt resource. Classify the archive-relative
+        # resource roots first, then treat only files outside them as metadata.
         if relative.parts and relative.parts[0] in {"Game", "Localize"}:
             try:
                 resources.append(validate_resource_path(name))
             except ValueError as error:
                 problems.append(str(error))
+            continue
+        if relative.name in {"mod.json", PROJECT_MARKER} or relative.suffix.casefold() in IGNORED_SUFFIXES:
+            ignored.append(name)
             continue
         problems.append(f"Unsupported file: {name}. CTP mods contain Game/... or Localize/... resources only.")
     if not resources and not problems:
