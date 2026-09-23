@@ -16,3 +16,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes disposition
 Data alone cannot extend the nine-link vanilla menu. A replacement interface plus save and progress behavior needs investigation with the game before any design decision. No code written. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (interface investigation / UI
+research still owed), so flipping to waiting would be a fake checklist.
+Left actionable until a real session can be written.

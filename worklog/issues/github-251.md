@@ -19,3 +19,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 ## 2026-09-22 misc-fixes disposition
 Sequenced behind #193, which now carries a delivered entry/surface candidate with a live checklist (vertical wall grab, cluttered/angled geometry, safe release, normal jumps unchanged). Re-ran tools/verify_rdr2_climb_transitions.py on current tree: PASS production, four regressions rejected (fall-called-grounded, fall-velocity-cleared, cooldown-bypassed, timeout-called-grounded).
 Human test, needs built ASI on a game machine after #193 entry passes: climb, release movement, confirm the cycle stops into idle; releasing Sprint while still moving must keep climbing. Report stop behavior per input. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.
