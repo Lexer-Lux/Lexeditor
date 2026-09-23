@@ -7,7 +7,7 @@
   <script>if(new URLSearchParams(location.hash.slice(1)).get("lexTransition")==="home")document.documentElement.classList.add("lex-transition-entry")</script>
   <link rel="stylesheet" href="framework.css">
   <style>
-    :root{--lex-bg:#0d0f12;--lex-panel:#16191e;--lex-panel-2:#22272e;--lex-border:#3f4751;--lex-text:#f0f2f4;--lex-muted:#9ba4ae;--lex-accent:#a92b20;--lex-highlight:#d7b65d;--lex-success:#667b50}
+
     :root {
       --lex-bg:#171a1f;
       --lex-panel:#191c21;
@@ -20,7 +20,8 @@
       --lex-highlight:#c9ced6;
       --lex-success:#66856d;
       --lex-chooser-menu-height:9vh;
-      --lex-absent-desaturation:75%;
+      --lex-page-overflow:auto;
+      --lex-absent-desaturation:40%;
     }
     body { margin:0; overflow-x:hidden; min-height:100vh; color:var(--lex-text); background:var(--lex-bg); font:14px/1.45 var(--lex-font); opacity:1; transition:opacity .12s ease; }
     /* The home screen is revealed by fading its own surface in, rather than
@@ -474,7 +475,7 @@
         residentHandle.style.setProperty("--lex-resident-name-size",`${nameSize}px`);
         if(nameNode.scrollHeight<=nameNode.clientHeight)break;
       }}
-    function applySharedSettings(settings){const width=Math.max(2.5,Math.min(12,Number(settings?.residentHandleWidthPercent)||5)),height=Math.max(3,Math.min(20,Number(settings?.mainMenuHeightPercent)||9)),rawDesaturation=Number(settings?.absentGameDesaturationPercent),desaturation=Math.max(0,Math.min(100,Number.isFinite(rawDesaturation)?rawDesaturation:75));document.documentElement.style.setProperty("--lex-resident-handle-width",`${width}vw`);document.documentElement.style.setProperty("--lex-chooser-menu-height",`${height}vh`);document.documentElement.style.setProperty("--lex-absent-desaturation",`${desaturation}%`);const resolved=settings&&typeof settings==="object"?settings:chooser.settings||{};chooser.settings=resolved;lexerButton.hidden=!resolved.developerMode;restartButton.hidden=!resolved.developerMode;if(lexerButton.hidden&&!lexerPanel.hidden)setLexerPanel(false);requestAnimationFrame(sizeResidentHandle);}
+    function applySharedSettings(settings){const width=Math.max(2.5,Math.min(12,Number(settings?.residentHandleWidthPercent)||5)),height=Math.max(3,Math.min(20,Number(settings?.mainMenuHeightPercent)||9)),rawDesaturation=Number(settings?.absentGameDesaturationPercent),desaturation=Math.max(0,Math.min(100,Number.isFinite(rawDesaturation)?rawDesaturation:40));document.documentElement.style.setProperty("--lex-resident-handle-width",`${width}vw`);document.documentElement.style.setProperty("--lex-chooser-menu-height",`${height}vh`);document.documentElement.style.setProperty("--lex-absent-desaturation",`${desaturation}%`);const resolved=settings&&typeof settings==="object"?settings:chooser.settings||{};chooser.settings=resolved;lexerButton.hidden=!resolved.developerMode;restartButton.hidden=!resolved.developerMode;if(lexerButton.hidden&&!lexerPanel.hidden)setLexerPanel(false);requestAnimationFrame(sizeResidentHandle);}
     async function loadSharedSettings(){if(chooser.settingsLoaded)return;try{applySharedSettings(await window.pywebview.api.lexeditor_settings());chooser.settingsLoaded=true;}catch(_error){applySharedSettings(chooser.settings||null);}}
     addEventListener("lexeditor-settings-changed",event=>applySharedSettings(event.detail));
     async function openHomeLink(target){try{const result=await window.pywebview.api.open_home_link(target);if(!result?.opened)throw new Error("The default browser did not accept this link.");}catch(error){setDialog("Could not open link",String(error?.message||error),[button("CLOSE",closeDialog,true)]);}}
