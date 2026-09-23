@@ -3,8 +3,13 @@ Final Fantasy VII Rebirth Lexeditor project
 Lexeditor edits a proved Rebirth DataObject surface without writing to the
 installed game.
 
-Source input (read-only):
+Source inputs:
   source/End/Content/DataObject/Resident/PlayerParameter.uasset
+    - editable only for proved fixed-width PlayerParameter scalar fields
+  source/End/Content/DataObject/Resident/BattlePlayerParameter.uasset
+    - optional, structured Battle Params view only; never staged or saved
+  source/End/Content/DataObject/Resident/BattleItemPossession.uasset
+    - optional, structured Formulae source view only; never staged or saved
 
 Saved project output:
   content/End/Content/DataObject/Resident/PlayerParameter.uasset
@@ -22,6 +27,12 @@ LEXEDITOR_FF7R2_OODLE must point to oo2core_9_win64.dll already in the same
 directory as UnrealReZen.exe. The reviewed CUE4Parse dependency checks for that
 local file before entering its downloader. Lexeditor does not download, copy,
 relocate or redistribute Oodle or UnrealReZen.
+
+Information also audits complete native package triples already under
+<game>/End/Content/Paks/~mods without opening or changing them. It reports only
+publicly documented filename/path precedence: higher numeric _<n>_P patch levels
+win, and at the same patch level the case-insensitively smaller complete path
+wins. It does not inspect asset overlap or change external mod order.
 
 Build Candidate writes only:
   build/ff7r2-candidate-*/Lexeditor-FF7R2_P.pak
