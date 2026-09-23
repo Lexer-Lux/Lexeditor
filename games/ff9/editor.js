@@ -302,9 +302,13 @@
   async function refreshRuntime(){
     if(runtimeRefresh)return runtimeRefresh;
     runtimeRefresh=(async()=>{
-      state.dashboard.runtime=await api("/api/runtime");
-      state.dataMap=await api("/api/datamap");
-      state.deployment=await api("/api/deployment");
+      const [runtime,map,deployment,compatibility]=await Promise.all([
+        api("/api/runtime"),api("/api/datamap"),api("/api/deployment"),api("/api/mod-compat")
+      ]);
+      state.dashboard.runtime=runtime;
+      state.dataMap=map;
+      state.deployment=deployment;
+      state.dashboard.modCompatibility=compatibility;
     })();
     try{await runtimeRefresh}finally{runtimeRefresh=null}
   }
