@@ -4557,6 +4557,10 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
   visibility:visible;
   opacity:1;
 }
+.lex-subtab-button > .lex-tab-shortcut {
+  width:calc(var(--lex-tab-badge-size,24px) * 1.6);
+  border-radius:6px;
+}
 nav button.active:hover .lex-tab-shortcut,
 nav button.active:focus-visible .lex-tab-shortcut,
 .lex-subtab-button.active:hover .lex-tab-shortcut,

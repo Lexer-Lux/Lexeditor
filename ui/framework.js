@@ -1997,6 +1997,7 @@
       options.images ? "lex-subtab-bar-images" : "",
       options.className || ""].filter(Boolean).join(" "),
     role: "tablist",
+    "data-lex-subtab-shortcuts": String(options.shortcuts !== false),
     "aria-label": options.label || "Subsections",
   }, ...(options.tabs || []).map((tab, index) => element("button", {
     type: "button",
@@ -2020,7 +2021,7 @@
   })() : null,
   (key => key && options.shortcuts !== false ? element("span", {
     class: "lex-tab-shortcut", "aria-hidden": "true",
-  }, key) : "")(shortcutKeyFor(index + 1)))));
+  }, `⇧${key}`) : "")(shortcutKeyFor(index + 1)))));
 
   // The key that selects the Nth tab, matching the shortcut sequence:
   // 1-9, then 0 for the tenth, then - and = for the eleventh and twelfth.
@@ -5751,8 +5752,11 @@ ${contents.path}`});
         },
         tab: () => document.querySelectorAll("nav button[data-tab]")[
           Number(shortcutDigit(event)) - 1]?.click(),
-        subtab: () => document.querySelectorAll(".lex-subtab-bar:not(.lex-tabbed-panel-tabs) > .lex-subtab-button")[
-          Number(shortcutDigit(event)) - 1]?.click(),
+        subtab: () => {
+          const bar = [...document.querySelectorAll('.lex-subtab-bar[data-lex-subtab-shortcuts="true"]:not(.lex-tabbed-panel-tabs)')]
+            .find(node => node.checkVisibility() && !node.closest('[hidden]'));
+          bar?.querySelectorAll(':scope > .lex-subtab-button')[Number(shortcutDigit(event)) - 1]?.click();
+        },
       }[action];
       if (!run) return;
       event.preventDefault();
