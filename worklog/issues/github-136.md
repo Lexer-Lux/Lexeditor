@@ -52,3 +52,12 @@ Native category insertion still needs a feasibility test with the game. A concre
 No concrete Lexer-side session exists yet (agent-side prototype/artwork/
 design still owed), so flipping to waiting would be a fake checklist. Left
 actionable until a real session can be written.
+
+## 2026-09-23 agent review (per-game-rdr2): no new agent-side slice, stays actionable
+
+Re-read the live issue plus comments. Native category insertion still
+needs a feasibility test. Exact needs: one isolated datastore-injection
+probe with the game (or a native-looking mod page proposal), then a
+Lexer presentation choice. No code written; recording the needs here
+instead of pretending catalog metadata can add a tab.
+
