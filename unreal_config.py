@@ -246,8 +246,35 @@ MANAGED_BEGIN_TEMPLATE = "; BEGIN LEXEDITOR UNREAL CONFIG ({game})"
 MANAGED_END_TEMPLATE = "; END LEXEDITOR UNREAL CONFIG ({game})"
 
 
+def _shell_personal() -> Path | None:
+    """Return Windows' redirected Documents folder, if one is configured.
+
+    Returns None off Windows or when the shell value cannot be read, so
+    callers fall back to ``~/Documents``. Registry access stays inside this
+    helper to keep it monkeypatchable in tests.
+    """
+    if os.name != "nt":
+        return None
+    try:
+        import winreg
+    except ImportError:
+        return None
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders",
+        ) as key:
+            value, _ = winreg.QueryValueEx(key, "Personal")
+    except OSError:
+        return None
+    if not value or not isinstance(value, str):
+        return None
+    candidate = Path(os.path.expandvars(value)).expanduser()
+    return candidate if candidate.is_absolute() else None
+
+
 def _documents() -> Path:
-    return Path.home() / "Documents"
+    return _shell_personal() or Path.home() / "Documents"
 
 
 GAMES: dict[str, dict[str, Any]] = {
@@ -275,15 +302,22 @@ GAMES: dict[str, dict[str, Any]] = {
         "config_candidates": (
             "Documents/My Games/FINAL FANTASY VII REBIRTH/Saved/Config/WindowsNoEditor/Engine.ini",
         ),
-        "config_verified": False,
+        # Location verified 2026-09-23 against an installed game: the user
+        # Engine.ini exists at the candidate path, the install ships a
+        # template Engine.ini documenting the same path plus the
+        # [ConsoleVariables] mechanism, crash folders prove UE4, and
+        # GameUserSettings.ini proves the directory is game-managed.
+        # Per-setting effects are still unverified, so every setting
+        # stays in the advanced view until in-game verification.
+        "config_verified": True,
         "supported": [entry["key"] for entry in CATALOGUE
                       if entry["key"] != "r.EyeAdaptationQuality"],
         "legacy_managed_keys": (),
         "legacy_note": "",
-        "exceptions": ("Rebirth config locations are undiscovered: the "
-                       "candidate above is unchecked against an installed "
-                       "game, so every setting stays in the advanced view "
-                       "until discovery and in-game verification."),
+        "exceptions": ("Rebirth Engine.ini location verified against an "
+                       "installed game; per-setting effects are still "
+                       "unverified, so every setting stays in the "
+                       "advanced view until in-game verification."),
     },
 }
 
@@ -780,7 +814,7 @@ def status(game_id: str, project_root: Path, backup: str = "") -> dict[str, Any]
     if overrides and not effective_at_end:
         notes.append("The managed block is not last; content after it may "
                      "take precedence. Re-apply to restore override order.")
-    if not definition["config_verified"]:
+    if not definition["config_verified"] or not settings_for_game(game_id):
         notes.append(definition["exceptions"])
     restart = any(setting(key)["restart_required"] for key in overrides)
     return {

@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, urlparse
 from plugins.ff7r2 import packaging, shader_injector
 from plugins.ff7r2.dataobject import DataObjectError, DataObjectPackage
 from plugin_http import PluginRequestHandler
+import unreal_config  # shared Unreal Engine config editor (issue 478)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -49,6 +50,20 @@ def project_root() -> Path | None:
 
 def project_read_only() -> bool:
     return os.environ.get("LEXEDITOR_MOD_READ_ONLY", "0") == "1"
+
+
+def unreal_state_root() -> Path:
+    """Project sidecar root for Unreal config state (issue 478)."""
+    root = project_root()
+    if root is not None:
+        return root
+    return (Path(os.environ.get("LOCALAPPDATA", str(ROOT / "out")))
+            / "Lexeditor" / "FF7R2")
+
+
+def unreal_status_payload() -> dict:
+    """Shared-editor status for the Rebirth Engine.ini (issue 478)."""
+    return unreal_config.status("ff7r2", unreal_state_root())
 
 
 def source_path() -> Path | None:
@@ -467,6 +482,11 @@ def data_map_payload() -> dict:
          "controls": "The game's compiled shader cache. Cleared on request so the injector sees shaders being created.",
          "notes": "Deleted files go to the Recycle Bin; the game rebuilds them on its next start.",
          "coverage": "view", "status": "partial", "target": "tweaks"},
+        {"filename": "Documents/My Games/FINAL FANTASY VII REBIRTH/Saved/Config/WindowsNoEditor/Engine.ini",
+         "controls": "Shared Unreal Engine config settings as typed controls, with Use game default and reset-all.",
+         "notes": ("File location verified against an installed game; every setting stays marked unverified "
+                   "until in-game effect proof. Values read from the file are observed values, never effective game values. (#478)"),
+         "coverage": "structured", "status": "partial", "target": "tweaks"},
         {"filename": binaries + "dxgi.dll / ReShade.ini / ReShadePreset.ini",
          "controls": "ReShade and Lexeditor's effects: the master switch, each effect and its values.",
          "notes": "Installed and configured by the desktop host, which owns the one copy of ReShade.",
@@ -496,7 +516,7 @@ class Handler(PluginRequestHandler):
                             "name": "Final Fantasy VII Rebirth",
                             "hosted": True, "windowHost": "webview2",
                             "capabilities": ["reshade", "shader-injector", "data-map",
-                            "player-parameter", "battle-player-parameter-view",
+                            "player-parameter", "unreal-config", "battle-player-parameter-view",
                             "battle-item-possession-view", "fixed-width-edit",
                             "project-staging", "package-candidate"]})
         elif path == "/api/datamap":
@@ -534,6 +554,11 @@ class Handler(PluginRequestHandler):
                 self.send_json(injector_state())
             except (OSError, ValueError, DataObjectError) as error:
                 self.send_json({"error": str(error)}, 500)
+        elif path == "/api/unreal-config":
+            try:
+                self.send_json(unreal_status_payload())
+            except (OSError, ValueError) as error:
+                self.send_json({"error": str(error)}, 500)
         else:
             self.send_json({"error": "Not found"}, 404)
 
@@ -551,6 +576,8 @@ class Handler(PluginRequestHandler):
             "/api/shader-injector/install", "/api/shader-injector/uninstall",
             "/api/shader-injector/enabled", "/api/shader-injector/settings",
             "/api/shader-injector/clear-cache",
+            "/api/unreal-config/apply", "/api/unreal-config/default",
+            "/api/unreal-config/reset", "/api/unreal-config/refresh",
         }
         if path not in actions:
             self.send_json({"error": "Not found"}, 404)
@@ -578,6 +605,32 @@ class Handler(PluginRequestHandler):
                     "workspace": workspace_payload(),
                 })
                 return
+            if path.startswith("/api/unreal-config/"):
+                if project_read_only():
+                    raise ValueError("This project is read-only.")
+                state_root = unreal_state_root()
+                if path == "/api/unreal-config/apply":
+                    values = body.get("values")
+                    if not isinstance(values, dict):
+                        raise ValueError("values must be an object")
+                    self.send_json({"result": unreal_config.apply_settings(
+                        "ff7r2", state_root, values)})
+                    return
+                if path == "/api/unreal-config/default":
+                    key = body.get("key")
+                    if not isinstance(key, str) or not key:
+                        raise ValueError("key must be a non-empty string")
+                    self.send_json({"result": unreal_config.use_game_default(
+                        "ff7r2", state_root, key)})
+                    return
+                if path == "/api/unreal-config/reset":
+                    self.send_json({"result": unreal_config.reset_all(
+                        "ff7r2", state_root)})
+                    return
+                if path == "/api/unreal-config/refresh":
+                    self.send_json({"result": unreal_config.refresh_snapshot(
+                        "ff7r2", state_root)})
+                    return
             folder = injector_folder()
             if folder is None:
                 raise ValueError("Locate Final Fantasy VII Rebirth before changing Shader Injector.")
@@ -595,7 +648,7 @@ class Handler(PluginRequestHandler):
             elif path.endswith("/clear-cache"):
                 result = shader_injector.clear_shader_cache()
             self.send_json({"result": result, "status": injector_state()})
-        except (OSError, ValueError) as error:
+        except (OSError, ValueError, unreal_config.ExternalEditError) as error:
             self.send_json({"error": str(error)}, 400)
 
 

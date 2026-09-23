@@ -65,3 +65,16 @@ Re-verified on this branch: `games/ff8` logic stands as merged
 unit run). No new agent-side slice exists: flipping the availability
 gate needs proved battle-victory/Draw-list hooks and GF-owned save
 offsets from the game. Stays actionable.
+
+## 2026-09-23 impl/ff8-wave2: native anchors recorded, gate stays closed
+
+Added a native-anchors comment to `plugins/ff8/gf_acquisition_rework.py`:
+GF-owned state is ff8_externals.savemap->gfs[gf_idx].exists bit 0 with the
+native GF table at 0x01CFDCA8 + gf * 68 (both from the vendored FFNx
+derivative sources), and Draw-list suppression reuses the proved
+streamlined_draw.py hooks. `tests/test_ff8_gf_acquisition_rework.py` and
+the module test stay green (18 passed). The availability gate stays closed:
+the battle-victory trigger routine is still unidentified, so no award bytes
+were written. In-game proof plan: one save per primary boss (6) plus Disc 4
+recovery checks (7), no-duplicate ability check, Draw-list GF absence with
+spells intact, disable-keeps-GF. Stays actionable.

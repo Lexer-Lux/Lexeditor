@@ -65,3 +65,13 @@ status-infliction and Mug-comparison runtime patches need hand-written
 x86 against the game and were not written blind; the review/mod-doc
 formulae audit is still open (Drive-only .gdoc, unreadable from disk).
 Stays actionable; needs the game-session checklist already on the issue.
+
+## 2026-09-23 impl/ff8-wave2: verify-only, doc hunt exhausted on disk
+
+Re-ran `tests/test_ff8_formulae_rework.py`: green. No code change.
+Searched this machine for the review/mod doc (Documents/Desktop/Downloads,
+*.gdoc, review-named docx/txt/md, Drive-synced folders): no Google doc, no
+local Drive sync, nothing FF8-review-shaped on disk. The doc-text audit stays
+blocked on Lexer pasting the formulae text or granting access. Melee,
+magic-damage, status-infliction and Mug-comparison x86 still need the game
+and were deliberately not written blind. Stays actionable.

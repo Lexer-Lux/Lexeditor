@@ -49,3 +49,13 @@ Verified from the issue body: `Shear Feather` is FF8 item id 147
 the game exe natively and the three-column layout needs its drawing
 hooks plus the four acceptance renders from a game session. Stays
 actionable.
+
+## 2026-09-23 impl/ff8-wave2: string sweep confirms exe holds no reward text
+
+Static sweep of the installed FF8_EN.exe found no item names (Shear
+Feather), HELP-box, reward, spoils, or bonus strings: the results screen
+is drawn natively from data-file text, so the three-column layout still
+needs its drawing routine plus available-space analysis in-game. No code
+change. Needs Lexer/game: the four acceptance renders (single, several,
+long, modded descriptions) and the award-once confirm check. Stays
+actionable.

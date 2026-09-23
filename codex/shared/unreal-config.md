@@ -29,10 +29,19 @@ defined-only settings stay in the advanced view, marked, and out of presets.
   override `LEXEDITOR_FF7R_ENGINE_INI`). Writing needs a verified INI
   unlocker; `r.EyeAdaptationQuality` stays owned by the existing FF7R
   Graphics Tweaks group (markers shared and pinned by test).
-- Rebirth: config location undiscovered. Candidate
-  (`Documents/My Games/FINAL FANTASY VII REBIRTH/...`, override
-  `LEXEDITOR_FF7R2_ENGINE_INI`) is unchecked against an installed game.
-  Discovery probes; nothing is claimed until a file is observed.
+- Rebirth: Engine.ini location verified 2026-09-23 against an installed
+  game (`Documents/My Games/FINAL FANTASY VII REBIRTH/Saved/Config/
+  WindowsNoEditor/Engine.ini`, override `LEXEDITOR_FF7R2_ENGINE_INI`).
+  Evidence: the user file exists at the candidate path, the install
+  ships a template Engine.ini documenting the same path plus the
+  `[ConsoleVariables]` mechanism, crash folders prove UE4, and
+  GameUserSettings.ini proves the directory is game-managed.
+  Per-setting effects are still unverified: every setting stays in the
+  advanced view. Document-folder resolution follows the Windows shell
+  Personal folder, so redirected Documents (e.g. `D:\Documents`) work.
+  The Rebirth Tweaks page exposes an Engine Config subtab served by
+  `plugins/ff7r2/server.py` (`/api/unreal-config` status/apply/default/
+  reset/refresh) reusing this module; no per-game editor copy.
 
 ## Rules the module enforces
 
@@ -47,6 +56,7 @@ defined-only settings stay in the advanced view, marked, and out of presets.
 
 ## Verification state
 
-`tests/test_unreal_config.py` (19 tests) and
-`tools/verify_unreal_config.py` (9 checks, verifier sweep). In-game effect
-acceptance for both games is open (issue 478).
+`tests/test_unreal_config.py` (22 tests),
+`tests/test_ff7r2_unreal_config.py` (service endpoints plus editor/server
+wiring) and `tools/verify_unreal_config.py` (9 checks, verifier sweep).
+In-game effect acceptance for both games is open (issue 478).
