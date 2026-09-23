@@ -288,7 +288,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                 assert "data.raw.tile" in unavailable_text
                 assert "other data.raw prototype types" in unavailable_text
 
-                # Desktop, narrow, and high-scale rendered evidence.
+                # Desktop and narrow rendered evidence.
                 page.evaluate('navigate("recipes")')
                 page.set_viewport_size({"width": 1440, "height": 900})
                 page.screenshot(
@@ -303,26 +303,68 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
 
                 page.set_viewport_size({"width": 900, "height": 620})
                 page.wait_for_timeout(250)
-                page.screenshot(
-                    path=str(OUT / "factorio-recipes-900.png"), full_page=True)
                 narrow = page.evaluate("""()=>({
                   body:document.body.scrollHeight, viewport:innerHeight,
-                  main:document.querySelector('#main').getBoundingClientRect().toJSON()
+                  main:document.querySelector('#main').getBoundingClientRect().toJSON(),
+                  identities:[...document.querySelectorAll(
+                    '.lex-column-list-row:not(.lex-filler-row) [data-column-key="name"] .lex-column-cell-content'
+                  )].map(node=>({text:node.textContent.trim(),client:node.clientWidth,scroll:node.scrollWidth}))
                 })""")
                 assert narrow["body"] <= narrow["viewport"] + 2, narrow
-
-                page.set_viewport_size({"width": 1200, "height": 800})
-                page.evaluate("document.documentElement.style.zoom='1.5'")
-                page.wait_for_timeout(250)
+                assert narrow["identities"], narrow
+                assert all(row["scroll"] <= row["client"] + 1 for row in narrow["identities"]), narrow
+                assert page.locator(".lex-toast.visible").count() == 0
                 page.screenshot(
-                    path=str(OUT / "factorio-recipes-150pct.png"),
-                    full_page=True)
-                scaled = page.evaluate("""()=>({
-                  body:document.body.scrollHeight, viewport:innerHeight,
-                  detail:document.querySelector('.lex-detail')?.getBoundingClientRect().toJSON()
-                })""")
-                assert scaled["body"] <= scaled["viewport"] + 2, scaled
-                assert scaled["detail"], scaled
+                    path=str(OUT / "factorio-recipes-900.png"), full_page=True)
+
+                # WebView UI scale is browser/page zoom. Model 150% at a physical
+                # 1200x800 surface as an 800x533 CSS viewport rendered at DPR 1.5,
+                # rather than CSS zoom (which scales boxes without native relayout).
+                scaled_context = browser.new_context(
+                    viewport={"width": 800, "height": 533},
+                    device_scale_factor=1.5,
+                )
+                try:
+                    scaled_page = scaled_context.new_page()
+                    scaled_errors: list[str] = []
+                    scaled_page.on(
+                        "pageerror", lambda error: scaled_errors.append(str(error)))
+                    scaled_page.goto(base_url, wait_until="domcontentloaded")
+                    scaled_page.wait_for_selector(".lex-column-list-row")
+                    scaled_page.get_by_role(
+                        "button", name="Last page", exact=True).click()
+                    scaled_page.wait_for_timeout(200)
+                    scale_control = scaled_page.get_by_label("UI scale", exact=True)
+                    scale_control.evaluate("""input=>{
+                      input.value='150';
+                      input.setAttribute('aria-valuetext','150%');
+                      const output=input.parentElement?.querySelector('output');
+                      if(output) output.textContent='150%';
+                    }""")
+                    scaled = scaled_page.evaluate("""()=>({
+                      body:document.body.scrollHeight,
+                      viewport:innerHeight,
+                      detail:document.querySelector('.lex-detail')?.getBoundingClientRect().toJSON(),
+                      identities:[...document.querySelectorAll(
+                        '.lex-column-list-row:not(.lex-filler-row) [data-column-key="name"] .lex-column-cell-content'
+                      )].map(node=>({text:node.textContent.trim(),client:node.clientWidth,scroll:node.scrollWidth})),
+                      center:document.querySelector('.lex-shell-center-actions')?.getBoundingClientRect().toJSON(),
+                      right:document.querySelector('.lex-shell-right-actions')?.getBoundingClientRect().toJSON()
+                    })""")
+                    assert scaled["body"] <= scaled["viewport"] + 2, scaled
+                    assert scaled["detail"], scaled
+                    assert scaled["identities"], scaled
+                    assert all(
+                        row["scroll"] <= row["client"] + 1
+                        for row in scaled["identities"]), scaled
+                    assert scaled["center"]["right"] <= scaled["right"]["left"] + 1, scaled
+                    assert scaled_page.locator(".lex-toast.visible").count() == 0
+                    assert not scaled_errors, scaled_errors
+                    scaled_page.screenshot(
+                        path=str(OUT / "factorio-recipes-150pct.png"),
+                        full_page=True)
+                finally:
+                    scaled_context.close()
 
                 assert not errors, errors
                 results.append({
