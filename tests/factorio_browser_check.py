@@ -341,18 +341,34 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-factorio-browser-") as temp_n
                       const output=input.parentElement?.querySelector('output');
                       if(output) output.textContent='150%';
                     }""")
-                    scaled = scaled_page.evaluate("""()=>({
-                      body:document.body.scrollHeight,
-                      viewport:innerHeight,
-                      detail:document.querySelector('.lex-detail')?.getBoundingClientRect().toJSON(),
-                      identities:[...document.querySelectorAll(
+                    scaled = scaled_page.evaluate("""()=>{
+                      const masterNode=document.querySelector('.lex-barrelled-master');
+                      const master=masterNode?.getBoundingClientRect();
+                      const identityNodes=[...document.querySelectorAll(
                         '.lex-column-list-row:not(.lex-filler-row) [data-column-key="name"] .lex-column-cell-content'
-                      )].map(node=>({text:node.textContent.trim(),client:node.clientWidth,scroll:node.scrollWidth})),
-                      center:document.querySelector('.lex-shell-center-actions')?.getBoundingClientRect().toJSON(),
-                      right:document.querySelector('.lex-shell-right-actions')?.getBoundingClientRect().toJSON()
-                    })""")
+                      )];
+                      return {
+                        body:document.body.scrollHeight,
+                        viewport:innerHeight,
+                        master:master?.toJSON(),
+                        detail:document.querySelector('.lex-detail')?.getBoundingClientRect().toJSON(),
+                        identities:identityNodes.map(node=>({
+                          text:node.textContent.trim(),client:node.clientWidth,scroll:node.scrollWidth
+                        })),
+                        visibleIdentities:master ? identityNodes.filter(node=>{
+                          const rect=node.getBoundingClientRect();
+                          return rect.bottom>master.top+1 && rect.top<master.bottom-1
+                            && rect.right>master.left && rect.left<master.right;
+                        }).map(node=>node.textContent.trim()) : [],
+                        center:document.querySelector('.lex-shell-center-actions')?.getBoundingClientRect().toJSON(),
+                        right:document.querySelector('.lex-shell-right-actions')?.getBoundingClientRect().toJSON()
+                      };
+                    }""")
                     assert scaled["body"] <= scaled["viewport"] + 2, scaled
+                    assert scaled["master"] and scaled["master"]["height"] >= 100, scaled
                     assert scaled["detail"], scaled
+                    assert scaled["master"]["bottom"] <= scaled["detail"]["top"] + 1, scaled
+                    assert scaled["visibleIdentities"], scaled
                     assert scaled["identities"], scaled
                     assert all(
                         row["scroll"] <= row["client"] + 1
