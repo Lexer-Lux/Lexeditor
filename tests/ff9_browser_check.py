@@ -261,7 +261,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.screenshot(path=str(OUT / "ff9-datamap.png"), full_page=True)
             map_search.fill("")
 
-            page.set_viewport_size({"width": 820, "height": 700})
+            page.set_viewport_size({"width": 900, "height": 620})
             page.evaluate("navigate('items')")
             page.wait_for_selector(".lex-paged-list-detail")
             metrics = page.evaluate("()=>({body:document.body.scrollWidth,viewport:innerWidth,main:document.querySelector('main').scrollWidth,width:document.querySelector('main').clientWidth})")
@@ -272,14 +272,16 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             field(page, "EQUIPPABLE BY").scroll_into_view_if_needed()
             expect(field(page, "EQUIPPABLE BY")).to_be_visible()
             field(page, "WEAPON ID").scroll_into_view_if_needed()
-            page.screenshot(path=str(OUT / "ff9-narrow.png"), full_page=True)
+            page.screenshot(path=str(OUT / "ff9-900x620.png"))
 
             page.set_viewport_size({"width": 1000, "height": 700})
-            page.evaluate("document.documentElement.style.zoom='1.25';navigate('items')")
+            page.evaluate("document.documentElement.style.zoom='1.5';navigate('items')")
             page.wait_for_selector(".lex-paged-list-detail")
             expect(page.locator("#global-save")).to_be_visible()
             assert_table_rows_do_not_overlap(page)
-            page.screenshot(path=str(OUT / "ff9-scale-125.png"), full_page=True)
+            metrics = page.evaluate("()=>({body:document.body.scrollWidth,viewport:innerWidth,main:document.querySelector('main').scrollWidth,width:document.querySelector('main').clientWidth})")
+            assert metrics["body"] <= metrics["viewport"] + 2 and metrics["main"] <= metrics["width"] + 2, metrics
+            page.screenshot(path=str(OUT / "ff9-scale-150.png"))
             page.evaluate("document.documentElement.style.zoom='1'")
 
             page.evaluate("document.querySelector('#main').replaceChildren(statusPanel('Actions','Verified source','Loading records…'))")
