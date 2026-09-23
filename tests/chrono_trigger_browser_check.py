@@ -473,8 +473,17 @@ def main():
             args=["--no-sandbox","--use-gl=angle","--use-angle=swiftshader","--enable-unsafe-swiftshader"],
         )
         try:
-            for width,height in [(1200,800),(900,620)]:
-                page=browser.new_page(viewport={"width":width,"height":height})
+            cases = [
+                (1200, 800, 1.0, "1200"),
+                (900, 620, 1.0, "900"),
+                # WebView2 UI scale is page zoom. A 900x620 physical window at
+                # 150% exposes roughly a 600x413 CSS viewport; device scale keeps
+                # screenshots at the corresponding physical density.
+                (600, 413, 1.5, "900-150pct"),
+            ]
+            for width,height,scale,shot in cases:
+                page=browser.new_page(viewport={"width":width,"height":height},
+                                      device_scale_factor=scale)
                 page.on("pageerror",lambda error: errors.append(str(error)))
                 page.route("http://127.0.0.1:9/**",lambda route: route.fulfill(status=200,body="<html></html>",content_type="text/html"))
                 page.goto("http://127.0.0.1:9/")
@@ -487,7 +496,7 @@ def main():
                 page.locator("#global-save").click()
                 page.wait_for_function("document.querySelector('#global-save')?.disabled && document.querySelector('.ct-long-text')?.value.includes('rendered acceptance')")
                 assert page.evaluate("window.__posts.some(value=>value.path==='/api/messages/save')")
-                page.screenshot(path=str(ARTIFACTS/f"text-{width}.png"),full_page=True)
+                page.screenshot(path=str(ARTIFACTS/f"text-{shot}.png"),full_page=True)
 
                 page.locator(".lex-tab-label-text",has_text="Areas").click()
                 page.locator("#main").get_by_text("PC WORD", exact=True).wait_for()
@@ -727,7 +736,12 @@ def main():
                 assert layout["mainBottom"]<=height+2,layout
                 assert layout["bodyWidth"]<=width+2,layout
                 page.screenshot(path=str(ARTIFACTS/f"datamap-{width}.png"),full_page=True)
-                results.append({"width":width,"height":height,"metrics":layout,"status":"passed"})
+                results.append({
+                    "cssWidth": width, "cssHeight": height,
+                    "deviceScaleFactor": scale,
+                    "physicalEquivalent": [round(width * scale), round(height * scale)],
+                    "label": shot, "metrics": layout, "status": "passed",
+                })
                 page.close()
         finally:
             browser.close()
