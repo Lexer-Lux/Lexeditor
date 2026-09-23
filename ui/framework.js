@@ -1691,6 +1691,7 @@
       // label fitter down to its six-pixel floor.
     }, element("div", {class: "lex-detail-field-label"},
       element("span", {class: "lex-detail-field-label-text"}, options.label),
+      helpMarker ? element("span", {class:"lex-field-help"}, helpMarker) : null,
       // The arrow used to live inside the label, which forced a boolean's
       // label column to span the whole row so the arrow had somewhere to run -
       // and that is why a boolean's name started at the far left while every
@@ -1701,8 +1702,7 @@
     booleanField ? arrow : null,
     element("div", {class: "lex-detail-field-control"}, control,
       pin && pin.parentElement !== control ? pin : null),
-    options.showType === false ? null : typeRail,
-    helpMarker ? element("div", {class:"lex-field-help"}, helpMarker) : null);
+    options.showType === false ? null : typeRail);
     // The leader arrow shares the checkbox's grid row, so it points at the
     // middle of the box whatever else the row is carrying and however tall the
     // row turns out to be. Anchored to the row instead, it tracked the row's
@@ -8471,10 +8471,14 @@ ${contents.path}`});
   // the whole sweep from one layout.
   const fitted = new WeakMap();
   const LABEL_MIN_PX = 9;
+  const labelLeftOverflow = label => {
+    const left=label.getBoundingClientRect().left;
+    return Math.max(0,...[...label.children].map(child=>left-child.getBoundingClientRect().left));
+  };
   const widenLabelLane = label => {
     const lane = label.closest('.lex-tweak-card-grid,.lex-detail-panel,.lex-detail,.lex-detail-section') || label.parentElement?.parentElement || label.parentElement;
     if (!lane) return;
-    const needed = Math.ceil(label.scrollWidth + 2);
+    const needed = Math.ceil(label.scrollWidth + labelLeftOverflow(label) + 2);
     const current = parseFloat(lane.style.getPropertyValue('--lex-detail-label-min')) || 0;
     if (needed > current) lane.style.setProperty('--lex-detail-label-min', `${needed}px`);
   };
@@ -8483,7 +8487,7 @@ ${contents.path}`});
     if (!(label instanceof HTMLElement)) return;
     // The name lane has a fixed width. Fit the font inside it.
     const key = fitKey(label);
-    if (fitted.get(label) === key && label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight + 1) return;
+    if (fitted.get(label) === key && label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight + 1 && labelLeftOverflow(label)<1) return;
     label.style.fontSize = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
     if(label.classList.contains('lex-tab-label-text')) {
@@ -8500,11 +8504,11 @@ ${contents.path}`});
     // and a long property name in a narrow lane came out as a smear. A name
     // that still does not fit at the floor widens the lane instead - for its
     // whole panel, so the names in it keep one edge.
-    const overflows = () => label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth;
+    const overflows = () => label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1;
     // A word wider than the lane widens the lane before anything shrinks, so
     // one long name does not come out smaller than the names around it. The
     // lane settles on the next pass, when the observer sees it resize.
-    if (label.classList.contains('lex-detail-field-label') && label.scrollWidth > label.clientWidth) widenLabelLane(label);
+    if (label.classList.contains('lex-detail-field-label') && (label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1)) widenLabelLane(label);
     while (size > LABEL_MIN_PX && overflows()) {
       size -= .5;
       label.style.fontSize = `${size}px`;

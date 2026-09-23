@@ -944,8 +944,8 @@ details.lex-detail-section[open] > summary::before { content:"▾"; }
 .lex-detail-field-control.lex-has-readonly-lock { --lex-readonly-lock-inset:10px; }
 /* A nameless field gives its name lane to the control - unless the lane holds
    the field's help, which would otherwise vanish with it. */
-.lex-detail-field:has(> .lex-detail-field-label > .lex-detail-field-label-text:empty):not(:has(> .lex-detail-field-label > .lex-info-help)) { grid-template-columns:minmax(0,1fr); }
-.lex-detail-field-label:has(> .lex-detail-field-label-text:empty):not(:has(> .lex-info-help)) { display:none; }
+.lex-detail-field:has(> .lex-detail-field-label > .lex-detail-field-label-text:empty):not(:has(> .lex-detail-field-label .lex-info-help)) { grid-template-columns:minmax(0,1fr); }
+.lex-detail-field-label:has(> .lex-detail-field-label-text:empty):not(:has(.lex-info-help)) { display:none; }
 .lex-tile-grid > .lex-detail-field:has(.lex-toggle-row) { grid-column:1/-1; }
 .lex-detail-field-control > .lex-source-control:has(> .lex-toggle-row) { grid-template-columns:minmax(0,1fr); }
 .lex-detail-field-control > .lex-source-control:has(> .lex-toggle-row) > .lex-reference-values { grid-column:1; justify-self:end; }
@@ -7329,13 +7329,11 @@ body { text-shadow: var(--lex-text-shadow, none); }
 [hidden] { display:none !important; }
 }
 
-/* Property help has its own right gutter; the left rail stays metadata. */
-.lex-detail-field:has(> .lex-field-help) { padding-inline-end:30px; }
+/* Help follows the property name; the left type rail stays metadata. */
+.lex-detail-field-label:has(> .lex-field-help) > .lex-detail-field-label-text { min-width:min-content; }
 .lex-field-help {
-  position:absolute;
-  inset-inline-end:4px;
-  top:50%;
-  transform:translateY(-50%);
+  position:relative;
+  flex:0 0 22px;
   display:grid;
   place-items:center;
   width:22px;

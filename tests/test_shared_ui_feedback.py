@@ -60,8 +60,11 @@ def test_data_map_header_location_and_state(page):
     page.locator('.lex-data-map-detail').screenshot(path=str(Path(tempfile.gettempdir())/'lex-data-map-header.png'))
 
 
-def test_property_help_is_always_on_right(page):
+@pytest.mark.parametrize('theme',['blank','ff8'])
+def test_property_help_is_always_beside_name(page,theme):
     import tempfile
+    if theme=='ff8':
+        page.add_style_tag(path=str(ROOT/'games/ff8/editor.css'))
     framework(page)
     page.evaluate('''()=>{
       const U=LexeditorUI, main=document.querySelector('main');
@@ -79,7 +82,12 @@ def test_property_help_is_always_on_right(page):
         assert help.is_visible()
         assert help.evaluate('n=>getComputedStyle(n).opacity')=='1'
         control=field.locator('.lex-detail-field-control').bounding_box()
-        assert help.bounding_box()['x']>=control['x']+control['width']
+        label=field.locator('.lex-detail-field-label-text').bounding_box()
+        assert help.bounding_box()['x']>=label['x']+label['width']-1
+        assert help.bounding_box()['x']+help.bounding_box()['width']<=control['x']+1
+        assert field.locator('.lex-detail-field-label .lex-field-help').count()==1
+        text_right=field.locator('.lex-detail-field-label-text').evaluate('n=>{const r=document.createRange();r.selectNodeContents(n);return r.getBoundingClientRect().right}')
+        assert help.bounding_box()['x']>=text_right+2
     rail=page.locator('.lex-field-type-rail').first
     rail.hover()
     assert rail.locator('.lex-field-type-name').evaluate('n=>getComputedStyle(n).opacity')=='1'
