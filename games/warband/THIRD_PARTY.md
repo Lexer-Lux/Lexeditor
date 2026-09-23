@@ -44,6 +44,37 @@ helper/wrapper-generated records as source-only and refuses structured writes
 instead of treating helper arguments as tuple fields. No Persistent World code
 or data is bundled.
 
+## Native++ compatibility reference
+
+- Repository: https://github.com/Batyan/MnB-Nativepp-mod
+- Reference revision: `995afc62159d63ed08b369283c8924703ef11e1b`
+- Repository terms: custom README terms permit private modification and require
+  credit to the authors credited by the project for published reuse; no standard
+  open-source LICENSE file was present at the inspected revision.
+- Scope inspected: the 20 Module System source families exposed by Lexeditor's
+  Misc. editor.
+
+This is read-only compatibility evidence only; no Native++ code or data is
+bundled or copied. A top-level tuple-shape audit matched Lexeditor's current
+schema expectations for every inspected family except two legacy particle-system
+records (`torch_smoke` and `pistol_smoke`), which use 22 fields rather than
+the current 24-field shape. Lexeditor must keep those records source-only rather
+than guessing missing rotation fields.
+
+## Rome at War compatibility reference
+
+- Repository: https://github.com/sndtaleworlds/RaW---Module-System
+- Reference revision: `f4da7d5d242647506d8209e6f5fd22489c7fcabd`
+- License stated by upstream README: NPOSL-3.0.
+- Scope inspected: the 20 Module System source families exposed by Lexeditor's
+  Misc. editor.
+
+This is read-only compatibility evidence only; no Rome at War code or data is
+bundled or copied. Its top-level tuple shapes match Lexeditor's current
+expectations for every inspected family except the same two legacy 22-field
+particle-system records. Those records are intentionally refused by structured
+saving and remain available through source editing.
+
 ## Installed Warband assets
 
 Warband's bitmap font remains proprietary installed-game data. Lexeditor does
