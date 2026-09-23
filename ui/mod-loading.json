@@ -2,7 +2,7 @@
   "schema": 1,
   "plugins": {
     "blank": {
-      "loader": "Template only \u2014 not implemented.",
+      "loader": "Template only — not implemented.",
       "structure": "Template only. A shipping plugin must declare its mod root or package format and the file layout users should install or edit.",
       "overriding": "Template only. A shipping plugin must declare whether mods stack, replace whole files, merge semantic records, or are mutually exclusive."
     },
@@ -56,5 +56,10 @@
       "structure": "A Rebirth project holds a reshade/ folder with the preset .ini and any shaders its author wrote. Shader Injector ships inside Lexeditor as upstream's pinned release archive and is extracted into the game folder on request; ShaderInjector.ini beside the executable holds its settings, and the ShaderInjector folder holds the shaders people edit.",
       "overriding": "ReShade applies one preset at a time over the finished frame. Shader Injector changes shaders before that, so the two stack rather than compete. Files the player has edited in the ShaderInjector folder are kept on reinstall and removal, and a PAK mod from elsewhere is untouched."
     }
+  },
+  "ff9": {
+    "loader": "Memoria. Its Mod Manager installs, enables and removes external FF9 mods; Lexeditor deploys only its marker-owned Lexeditor mod folder and hands external-mod management to Memoria's launcher.",
+    "structure": "Lexeditor projects contain game-relative overrides under StreamingAssets/ plus Lexeditor-owned feature configuration. Deploy copies only those overrides and the Lexeditor runtime into <FF9>/Lexeditor. Other Memoria mod folders and installed p0data archives are not rewritten.",
+    "overriding": "Memoria runtime priority is FolderNames order, highest priority first. Lexeditor deploy keeps Lexeditor first in both FolderNames and the launcher's Priorities list, so exact-path collisions are whole-file Lexeditor-wins. Separate mods are not semantically merged by Lexeditor. Memoria's MergeScripts setting is preserved unchanged; its script merge mode is experimental and is not enabled or claimed by Lexeditor."
   }
 }
