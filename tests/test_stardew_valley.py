@@ -294,4 +294,41 @@ class StardewContentPackTests(unittest.TestCase):
             self.assertTrue(any("project changed" in value.casefold() for value in stale["blockers"]))
 
 
+    def test_typed_data_family_edits_preserve_foreign_content_patcher_blocks(self):
+        content = json.loads((self.project / "content.json").read_text(encoding="utf-8"))
+        foreign = [
+            {"LogName": "Public-style entries", "Action": "EditData", "Target": "Data/BigCraftables",
+             "Entries": {"OtherMod_Item": {"Price": 999}}, "Priority": "Early"},
+            {"LogName": "Conditional foreign fields", "Action": "EditData", "Target": "Data/BigCraftables",
+             "When": {"Season": "spring"}, "Fields": {"130": {"Price": 1}}},
+        ]
+        content["Changes"].extend(foreign)
+        (self.project / "content.json").write_text(json.dumps(content, indent=2) + "\n", encoding="utf-8")
+        store = ContentPackStore(self.project)
+        opened = store.dataset("big-craftables")
+        self.assertEqual(opened["rows"], [])
+        saved = store.save_dataset("big-craftables", opened["sha256"], [
+            {"id": "130", "fields": {"Price": 25, "IsLamp": True, "Fragility": 2}}
+        ])
+        self.assertEqual(saved["rows"][0]["fields"], {"Price": 25, "IsLamp": True, "Fragility": 2})
+        raw = json.loads((self.project / "content.json").read_text(encoding="utf-8"))
+        self.assertEqual(raw["Changes"][:2], foreign)
+        self.assertEqual(raw["Changes"][2]["LogName"], "Lexeditor Data/BigCraftables overrides")
+        self.assertEqual(raw["Changes"][2]["Fields"]["130"]["Price"], 25)
+
+    def test_all_typed_data_map_families_are_structured_partial_not_full_claims(self):
+        game = self.root / "empty-game"; game.mkdir()
+        with patch.object(server.paths, "PROJECT_ROOT", self.project), patch.object(server.paths, "GAME_ROOT", game):
+            rows = server.data_map()["rows"]
+        editable = {row["datasetKey"]: row for row in rows if row.get("datasetKey")}
+        self.assertEqual(set(editable), {
+            "objects", "big-craftables", "crops", "fences", "floors-paths", "machines", "weapons",
+        })
+        self.assertTrue(all(row["status"] == "partial" and row["coverage"] == "structured" for row in editable.values()))
+        self.assertTrue(all(row["openable"] for row in editable.values()))
+        shops = next(row for row in rows if row["filename"] == "Content/Data/Shops.xnb")
+        self.assertEqual(shops["status"], "not-integrated")
+
+
+
 if __name__ == "__main__": unittest.main()
