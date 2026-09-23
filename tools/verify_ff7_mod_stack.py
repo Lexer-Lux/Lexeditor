@@ -70,7 +70,7 @@ class SeventhHeavenCompatibilityTests(unittest.TestCase):
             "kernel/kernel.bin.chunk.1", "battle/scene.bin.chunk.0", "world_us.lgp/enc_w.bin"])
         self.assertEqual([row["modId"] for row in report["active"]], ["a", "b"])
         self.assertEqual([row["path"] for row in report["overlaps"]], [
-            "direct/kernel/kernel.bin.chunk.1", "direct/battle/scene.bin.chunk.0"])
+            "direct/battle/scene.bin.chunk.0", "direct/kernel/kernel.bin.chunk.1"])
         self.assertTrue(report["complete"])
         self.assertFalse(report["clear"])
 
