@@ -215,3 +215,12 @@ def test_dashboard_exposes_read_only_mod_compatibility_snapshot(service):
     report = dashboard["modCompatibility"]
     assert report["pinnedMemoria"] == "v2025.07.04"
     assert report["mods"] == [] and report["overlaps"] == []
+
+
+def test_mod_compat_endpoint_is_read_only(service):
+    status, report = request(service, "/api/mod-compat", method="GET")
+    assert status == 200
+    assert report["pinnedMemoria"] == "v2025.07.04"
+    before = list(service[2])
+    assert request(service, "/api/mod-compat", method="POST")[0] == 404
+    assert service[2] == before
