@@ -23,3 +23,10 @@ Find the menu slider handler and the SFX vs music gain application points
 in FF8_EN.exe (capstone+pefile available in .venv), then propose a
 Hext/native patch. Acceptance needs audible in-game checks (each slider
 isolated, persistence across restart) — that part will need Lexer.
+
+## 2026-09-23 misc-fixes: flipped to waiting with concrete checklist
+
+Per Lexer's rule (needs concrete Lexer-side work means waiting), posted the
+exact game-session/decision checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

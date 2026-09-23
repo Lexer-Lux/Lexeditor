@@ -19,3 +19,10 @@ Healing and accuracy runtimes stand (tests green). Melee, magic-damage, and stat
 
 ## 2026-09-23 misc-fixes status
 Scroll report resolved and fixed: the Formulae tab mounted a bare detailPanel while the FF8 plugin clips #main (`--lex-main-overflow:hidden`), so stacked cards below the fold were unreachable (reproduced headless: last card bottom 819px at 800px viewport, no scroll path). Fix wraps the panel in the shared `.lex-tweaks-scroll` container in `renderFormulae` (games/ff8/boot.js). Verified by new `tests/ff8_formulae_scroll_browser_check.py` (stubbed data, no game, no writes; wired into native-regressions.yml): scroller scrolls and last card lands inside the window. Melee, magic-damage, status-infliction and Mug-comparison runtime patches still need the game; issue stays actionable.
+
+## 2026-09-23 misc-fixes: flipped to waiting with concrete checklist
+
+Per Lexer's rule (needs concrete Lexer-side work means waiting), posted the
+exact game-session/decision checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

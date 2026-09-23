@@ -24,3 +24,10 @@ Existing-card saving previously wrote manifest and Hext separately, then attempt
 
 ## 2026-09-22 misc-fixes evidence
 Ran card suites on current tree: test_ff8_card_elements.py, test_ff8_card_save_recovery.py plus enemy-ai tests, 23 passed with 69 subtests. Existing-card edits (names, ranks, elements, selection power) hold in source. Card-type creation and deletion need engine, artwork (#300), deck, reward, and save support that does not exist here; existing-card edits still need in-game validation. Issue stays actionable.
+
+## 2026-09-23 misc-fixes: flipped to waiting with concrete checklist
+
+Per Lexer's rule (needs concrete Lexer-side work means waiting), posted the
+exact game-session/decision checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

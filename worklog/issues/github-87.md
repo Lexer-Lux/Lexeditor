@@ -28,3 +28,10 @@ Public research path, no local saves exist (no Square Enix savedata found):
 Next agent work: map side-quest flags against real saves (request a Lexer
 save set spanning story points if none can be generated headlessly), then
 design the Journal data model. Record provenance in Credits as used.
+
+## 2026-09-23 misc-fixes: flipped to waiting with concrete checklist
+
+Per Lexer's rule (needs concrete Lexer-side work means waiting), posted the
+exact game-session/decision checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

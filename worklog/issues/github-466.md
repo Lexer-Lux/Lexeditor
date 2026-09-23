@@ -23,3 +23,10 @@ modded descriptions render; confirm awards exactly once.
 Locate the battle-results draw code (pinned FFNx source or FF8_EN.exe
 static analysis), prototype the three-column layout, then hand the four
 acceptance renders plus the award-once check to Lexer with a save/fixture.
+
+## 2026-09-23 misc-fixes: flipped to waiting with concrete checklist
+
+Per Lexer's rule (needs concrete Lexer-side work means waiting), posted the
+exact game-session/decision checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.
