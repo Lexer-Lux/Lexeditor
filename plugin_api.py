@@ -191,6 +191,21 @@ def validate_plugin(plugin: GamePlugin) -> None:
     for field in (plugin.name, plugin.subtitle, plugin.description, plugin.accent):
         if not field:
             raise ValueError(f"{plugin.plugin_id} has an empty descriptor field")
+    if plugin.helpers and any((
+        plugin.helper_name, plugin.helper_status, plugin.helper_install, plugin.helper_upstream,
+        plugin.helper_status_for_root, plugin.helper_install_for_root, plugin.helper_pinned,
+    )):
+        raise ValueError(f"{plugin.plugin_id} mixes legacy and multi-helper descriptors")
+    helper_keys: set[str] = set()
+    for helper in plugin_helpers(plugin):
+        if (not helper.key or not helper.key.replace("-", "").isalnum()
+                or helper.key in helper_keys or not helper.name):
+            raise ValueError(f"{plugin.plugin_id} has an invalid or duplicate helper descriptor")
+        if not (helper.status or helper.status_for_root):
+            raise ValueError(f"{plugin.plugin_id}/{helper.key} has no helper status provider")
+        if helper.install and helper.install_for_root:
+            raise ValueError(f"{plugin.plugin_id}/{helper.key} declares two helper installers")
+        helper_keys.add(helper.key)
     if plugin.cover_art is not None:
         if (not plugin.cover_art.is_absolute() or not plugin.cover_art.is_file()
                 or plugin.cover_art.suffix.casefold() not in {".jpg", ".jpeg", ".png", ".webp", ".svg"}):
