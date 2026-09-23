@@ -20,7 +20,7 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import parse_qs, urlparse
 
 from . import (camera_features, input_remaps, loot_script, map_icon_features,
-               mission_rewards, paths, script_features)
+               mission_rewards, paths, rbf, script_features, string_tables)
 from .archive_deployment import (
     ArchiveSpec, deploy_archives, deployment_status, revert_archives,
 )
@@ -67,6 +67,20 @@ INVENTORY_SOURCES = {
     "dlc": {
         "label": "Undead Nightmare DLC",
         "relative": PurePosixPath("content/init/inventory/dlc_inventory.xml"),
+    },
+}
+STRING_TABLE_SOURCES = {
+    "tuning": {
+        "label": "Tuning",
+        "prepared": PREPARED_ROOT,
+        "project": OVERRIDE_ROOT,
+        "prefix": "tune",
+    },
+    "content": {
+        "label": "Content",
+        "prepared": CONTENT_PREPARED_ROOT,
+        "project": CONTENT_OVERRIDE_ROOT,
+        "prefix": "content",
     },
 }
 PORT = int(os.environ.get("LEXEDITOR_PORT", "8767"))
@@ -181,7 +195,15 @@ def override_file(relative: PurePosixPath) -> Path:
 
 
 def is_editable(path: Path) -> bool:
-    return path.suffix.casefold() in TEXT_EXTENSIONS and path.stat().st_size <= MAX_TEXT_BYTES
+    if path.suffix.casefold() not in TEXT_EXTENSIONS or path.stat().st_size > MAX_TEXT_BYTES:
+        return False
+    try:
+        with path.open("rb") as stream:
+            if stream.read(4) == rbf.MAGIC:
+                return False
+    except OSError:
+        return False
+    return True
 
 
 def decode_text(path: Path) -> tuple[str, str]:
@@ -285,6 +307,324 @@ def save_file(value: str, text: str, encoding: str) -> dict:
         "projectPath": str(target),
         "backup": str(backup) if backup else "",
         "bytes": len(encoded),
+    }
+
+
+def _rbf_paths(relative_value: str, vanilla_only: bool = False) -> tuple[PurePosixPath, Path, Path, Path]:
+    relative = safe_relative(relative_value)
+    vanilla = under(PREPARED_ROOT, relative)
+    project = under(OVERRIDE_ROOT, relative)
+    if not vanilla.is_file():
+        raise FileNotFoundError(f"Prepared RDR RBF0 file not found: {relative.as_posix()}")
+    if vanilla.read_bytes()[:4] != rbf.MAGIC:
+        raise ValueError("Prepared file is not an RBF0 resource")
+    active = vanilla if vanilla_only or not project.is_file() else project
+    return relative, vanilla, project, active
+
+
+def _rbf_resource_rows(relative: PurePosixPath, vanilla: Path, project: Path, active: Path) -> tuple[list[dict], dict]:
+    document = rbf.parse(active.read_bytes())
+    result = []
+    for row in document["scalars"]:
+        current = dict(row)
+        current.update({
+            "id": f"{relative.as_posix()}:{row['recordOffset']}",
+            "resourcePath": relative.as_posix(),
+            "sourcePath": str(vanilla),
+            "projectPath": str(project),
+            "project": project.is_file() and active == project,
+        })
+        result.append(current)
+    return result, document
+
+
+def rbf_scalars_payload(vanilla_only: bool = False) -> dict:
+    rows = []
+    resources = []
+    if PREPARED_ROOT.is_dir():
+        for vanilla in sorted(path for path in PREPARED_ROOT.rglob("*") if path.is_file()):
+            try:
+                with vanilla.open("rb") as stream:
+                    if stream.read(4) != rbf.MAGIC:
+                        continue
+                relative = PurePosixPath(vanilla.relative_to(PREPARED_ROOT).as_posix())
+                relative, vanilla, project, active = _rbf_paths(relative.as_posix(), vanilla_only)
+                resource_rows, document = _rbf_resource_rows(relative, vanilla, project, active)
+            except (OSError, ValueError, struct.error):
+                continue
+            if not resource_rows:
+                continue
+            rows.extend(resource_rows)
+            resources.append({
+                "path": relative.as_posix(),
+                "scalarCount": len(resource_rows),
+                "descriptorCount": document["descriptorCount"],
+                "trailingBytes": document["trailingBytes"],
+                "skipped": document["skipped"],
+                "project": project.is_file() and not vanilla_only,
+            })
+    rows.sort(key=lambda row: (row["resourcePath"].casefold(), row["recordOffset"]))
+    return {
+        "rows": rows,
+        "resources": resources,
+        "counts": {
+            "resources": len(resources),
+            "scalars": len(rows),
+            "project": sum(bool(row["project"]) for row in resources),
+        },
+    }
+
+
+def save_rbf_scalars(relative_value: str, edits: list[dict]) -> dict:
+    relative, vanilla, project, active = _rbf_paths(relative_value)
+    source_hash = sha256_file(vanilla)
+    candidate, changed = rbf.apply_scalar_edits(active.read_bytes(), edits)
+    if not changed:
+        return {
+            "saved": 0, "path": relative.as_posix(), "projectPath": str(project),
+            "backup": "", "sourceUnchanged": source_hash,
+        }
+    backup = backup_file(project)
+    atomic_bytes(project, candidate)
+    reread = project.read_bytes()
+    rbf.parse(reread)
+    if reread != candidate:
+        raise RuntimeError("RBF0 project override did not read back byte-identically")
+    if sha256_file(vanilla) != source_hash:
+        raise RuntimeError("Prepared RBF0 source changed during save")
+    return {
+        "saved": changed, "path": relative.as_posix(), "projectPath": str(project),
+        "backup": str(backup) if backup else "", "sourceUnchanged": source_hash,
+    }
+
+
+def _string_table_supported(relative: PurePosixPath) -> bool:
+    return (
+        relative.suffix.casefold() == ".strtbl"
+        and not relative.name.casefold().endswith("_ps3.strtbl")
+    )
+
+
+def _string_table_paths(
+        source_id: str, relative_value: str, vanilla_only: bool = False,
+) -> tuple[dict, PurePosixPath, Path, Path, Path]:
+    source = STRING_TABLE_SOURCES.get(source_id)
+    if source is None:
+        raise ValueError(f"Unknown string-table source: {source_id}")
+    relative = safe_relative(relative_value)
+    if (not _string_table_supported(relative) or not relative.parts
+            or relative.parts[0].casefold() != source["prefix"]):
+        raise ValueError("String-table path is not supported by the RDR1 PC editor")
+    vanilla = under(source["prepared"], relative)
+    project = under(source["project"], relative)
+    if not vanilla.is_file():
+        raise FileNotFoundError(
+            f"Prepared RDR string table not found: {relative.as_posix()}"
+        )
+    active = project if project.is_file() and not vanilla_only else vanilla
+    return source, relative, vanilla, project, active
+
+
+def _string_table_metadata(
+        source_id: str, relative: PurePosixPath, vanilla_only: bool = False,
+) -> dict:
+    source, relative, vanilla, project, active = _string_table_paths(
+        source_id, relative.as_posix(), vanilla_only)
+    try:
+        table = string_tables.parse(active.read_bytes())
+    except (OSError, ValueError, struct.error) as error:
+        return {
+            "id": f"{source_id}:{relative.as_posix()}",
+            "source": source_id,
+            "sourceLabel": source["label"],
+            "path": relative.as_posix(),
+            "label": relative.stem,
+            "available": False,
+            "reason": str(error),
+            "sourcePath": str(vanilla),
+            "projectPath": str(project),
+            "project": project.is_file() and not vanilla_only,
+            "rowCount": 0,
+            "languageCount": 0,
+            "languages": [],
+        }
+    language_rows = []
+    for index, offset in enumerate(table.positions):
+        if offset not in table.blocks:
+            continue
+        label = (
+            string_tables.LANGUAGE_NAMES[index]
+            if index < len(string_tables.LANGUAGE_NAMES)
+            else f"Language {index + 1}"
+        )
+        language_rows.append({
+            "id": str(index),
+            "index": index,
+            "label": label,
+        })
+    return {
+        "id": f"{source_id}:{relative.as_posix()}",
+        "source": source_id,
+        "sourceLabel": source["label"],
+        "path": relative.as_posix(),
+        "label": relative.stem,
+        "available": True,
+        "reason": "",
+        "sourcePath": str(vanilla),
+        "projectPath": str(project),
+        "project": project.is_file() and not vanilla_only,
+        "rowCount": sum(len(block.entries) for block in table.blocks.values()),
+        "languageCount": len(language_rows),
+        "languages": language_rows,
+        "version": table.version,
+        "identifierCount": len(table.identifiers),
+    }
+
+
+def string_tables_index(vanilla_only: bool = False) -> dict:
+    tables = []
+    for source_id, definition in STRING_TABLE_SOURCES.items():
+        prepared_root = definition["prepared"]
+        if not prepared_root.is_dir():
+            continue
+        for target in sorted(prepared_root.rglob("*.strtbl")):
+            relative = PurePosixPath(target.relative_to(prepared_root).as_posix())
+            if not _string_table_supported(relative):
+                continue
+            tables.append(_string_table_metadata(source_id, relative, vanilla_only))
+    languages = {}
+    for table in tables:
+        if not table.get("available"):
+            continue
+        for language in table.get("languages", []):
+            languages[(int(language["index"]), str(language["label"]))] = dict(language)
+    return {
+        "tables": tables,
+        "languages": [
+            languages[key]
+            for key in sorted(languages, key=lambda item: (item[0], item[1]))
+        ],
+        "counts": {
+            "tables": len(tables),
+            "available": sum(bool(row["available"]) for row in tables),
+            "records": sum(int(row.get("rowCount", 0)) for row in tables),
+            "project": sum(bool(row.get("project")) for row in tables),
+        },
+    }
+
+
+def string_table_payload(
+        source_id: str, relative_value: str, vanilla_only: bool = False,
+) -> dict:
+    source, relative, vanilla, project, active = _string_table_paths(
+        source_id, relative_value, vanilla_only)
+    table = string_tables.parse(active.read_bytes())
+    table_id = f"{source_id}:{relative.as_posix()}"
+    rows = []
+    for row in string_tables.rows(table):
+        current = dict(row)
+        current.update({
+            "id": (
+                f"{table_id}:{row['languageIndex']}:{row['entryIndex']}:"
+                f"{row['hashValue']:08X}"
+            ),
+            "tableId": table_id,
+            "source": source_id,
+            "sourceLabel": source["label"],
+            "path": relative.as_posix(),
+            "sourcePath": str(vanilla),
+            "projectPath": str(project),
+            "project": project.is_file() and not vanilla_only,
+        })
+        rows.append(current)
+    return {
+        "table": _string_table_metadata(source_id, relative, vanilla_only),
+        "rows": rows,
+        "counts": {
+            "records": len(rows),
+            "languages": len(_string_table_metadata(source_id, relative, vanilla_only)["languages"]),
+            "identifiers": len(table.identifiers),
+        },
+    }
+
+
+def strings_payload(language_index: int | None = None, vanilla_only: bool = False) -> dict:
+    index = string_tables_index(vanilla_only)
+    languages = index.get("languages", [])
+    if language_index is None:
+        language_index = languages[0]["index"] if languages else None
+    if isinstance(language_index, bool) or (
+            language_index is not None and not isinstance(language_index, int)):
+        raise ValueError("String-table language index must be an integer")
+    selected = next(
+        (row for row in languages if row["index"] == language_index),
+        None,
+    )
+    if language_index is not None and selected is None:
+        raise ValueError("String-table language is not available")
+
+    rows = []
+    table_ids = set()
+    if selected is not None:
+        for metadata in index["tables"]:
+            if not metadata.get("available"):
+                continue
+            if not any(
+                    language.get("index") == language_index
+                    for language in metadata.get("languages", [])):
+                continue
+            payload = string_table_payload(
+                metadata["source"], metadata["path"], vanilla_only)
+            for row in payload["rows"]:
+                if language_index not in row.get("languageIndexes", [row["languageIndex"]]):
+                    continue
+                current = dict(row)
+                current["languageIndex"] = language_index
+                current["language"] = selected["label"]
+                rows.append(current)
+                table_ids.add(current["tableId"])
+    return {
+        "language": selected,
+        "languages": languages,
+        "rows": rows,
+        "counts": {
+            "records": len(rows),
+            "tables": len(table_ids),
+            "availableTables": index["counts"]["available"],
+        },
+    }
+
+
+def save_string_table(source_id: str, relative_value: str, edits: list[dict]) -> dict:
+    _source, relative, vanilla, project, active = _string_table_paths(
+        source_id, relative_value)
+    if not isinstance(edits, list):
+        raise ValueError("String-table edits must be a list")
+    source_bytes = active.read_bytes()
+    candidate, changed = string_tables.apply_text_edits(source_bytes, edits)
+    if not changed:
+        return {
+            "saved": 0,
+            "path": relative.as_posix(),
+            "projectPath": str(project),
+            "backup": "",
+        }
+    if len(candidate) > MAX_TEXT_BYTES:
+        raise ValueError("Edited string table is too large")
+    string_tables.parse(candidate)
+    backup = backup_file(project)
+    atomic_bytes(project, candidate)
+    written = project.read_bytes()
+    if written != candidate:
+        raise RuntimeError("Saved string table did not read back exactly")
+    string_tables.parse(written)
+    return {
+        "saved": changed,
+        "path": relative.as_posix(),
+        "projectPath": str(project),
+        "backup": str(backup) if backup else "",
+        "bytes": len(candidate),
+        "sourceUnchanged": sha256_file(vanilla),
     }
 
 
@@ -1476,9 +1816,13 @@ def _normalize_data_map_rows(rows, *, trusted: bool = False, interfaces=None) ->
         notes = str(source.get("notes") or source.get("description") or "").strip()
         if not trusted:
             notes = capability.get("notes", "No verified format-specific interface is connected to this source. " + notes)
+        controls = str(
+            (capability.get("controls") if not trusted else "")
+            or source.get("controls") or source.get("system") or ""
+        ).strip()
         normalized.append({
             "filename": filename,
-            "controls": str(source.get("controls") or source.get("system") or "").strip(),
+            "controls": controls,
             "notes": notes, "coverage": coverage,
             "status": status,
             "target": target,
@@ -1500,17 +1844,105 @@ def _provisional_data_map_rows() -> list[dict]:
     rows = []
     if PREPARED_ROOT.is_dir():
         for source in PREPARED_ROOT.rglob("*"):
-            if source.is_file():
+            if not source.is_file():
+                continue
+            relative = PurePosixPath(source.relative_to(PREPARED_ROOT).as_posix())
+            if _string_table_supported(relative):
+                try:
+                    string_tables.parse(source.read_bytes())
+                    supported = True
+                except (OSError, ValueError, struct.error):
+                    supported = False
                 rows.append({
-                    "filename": source.relative_to(PREPARED_ROOT).as_posix(),
-                    "controls": "Prepared tuning data",
-                    "notes": "Prepared from tune_d11generic.rpf; a format-specific editor is not mapped yet.",
-                    "status": "not-integrated", "coverage": "unavailable",
+                    "filename": f"game/tune_d11generic.rpf:/{relative.as_posix()}",
+                    "controls": "Localized string-table entries",
+                    "notes": (
+                        "String Tables edits only displayed UTF-16 text; identifiers, "
+                        "hashes, glyph metrics and layout metadata stay read-only."
+                        if supported else
+                        "The prepared string table did not pass the structured STRTBL parser."
+                    ),
+                    "status": "partial" if supported else "not-integrated",
+                    "coverage": "structured" if supported else "unavailable",
+                    "target": "strings" if supported else "",
+                    "openable": supported,
                 })
+            else:
+                try:
+                    with source.open("rb") as stream:
+                        rbf_magic = stream.read(4) == rbf.MAGIC
+                    rbf_supported = rbf_magic and rbf.supports(source.read_bytes())
+                except (OSError, ValueError, struct.error):
+                    rbf_magic = False
+                    rbf_supported = False
+                if rbf_supported:
+                    rows.append({
+                        "filename": f"game/tune_d11generic.rpf:/{relative.as_posix()}",
+                        "controls": "RBF0 fixed-width scalar fields",
+                        "notes": (
+                            "RBF Scalars exposes only bool, uint32 and float leaves proved by the "
+                            "RBF0 parser. Writes patch the original byte span in place; strings, "
+                            "vectors, byte blocks and unknown records remain opaque."
+                        ),
+                        "status": "partial", "coverage": "structured",
+                        "target": "rbf", "openable": True,
+                    })
+                else:
+                    rows.append({
+                        "filename": f"game/tune_d11generic.rpf:/{relative.as_posix()}",
+                        "controls": "RBF0 tuning data" if rbf_magic else "Prepared tuning data",
+                        "notes": (
+                            "This file has an RBF0 header but no safely editable fixed-width scalar "
+                            "set passed the protected parser." if rbf_magic else
+                            "Prepared from tune_d11generic.rpf; a format-specific editor is not mapped yet."
+                        ),
+                        "status": "not-integrated", "coverage": "unavailable",
+                    })
+    if CONTENT_PREPARED_ROOT.is_dir():
+        for source in CONTENT_PREPARED_ROOT.rglob("*.strtbl"):
+            relative = PurePosixPath(source.relative_to(CONTENT_PREPARED_ROOT).as_posix())
+            pc_table = _string_table_supported(relative)
+            if pc_table:
+                try:
+                    string_tables.parse(source.read_bytes())
+                    supported = True
+                except (OSError, ValueError, struct.error):
+                    supported = False
+            else:
+                supported = False
+            rows.append({
+                "filename": f"game/content.rpf:/{relative.as_posix()}",
+                "controls": "Localized string-table entries",
+                "notes": (
+                    "String Tables edits only displayed UTF-16 text; identifiers, "
+                    "hashes, glyph metrics and layout metadata stay read-only."
+                    if supported else
+                    "This PS3-targeted string-table duplicate is indexed but intentionally "
+                    "not exposed by the RDR1 PC editor."
+                    if not pc_table else
+                    "The prepared string table did not pass the structured STRTBL parser."
+                ),
+                "status": "partial" if supported else "not-integrated",
+                "coverage": "structured" if supported else "unavailable",
+                "target": "strings" if supported else "",
+                "openable": supported,
+            })
+    rows.append({
+        "filename": f"game/content.rpf:/{loot_script.ARCHIVE_PATH}",
+        "controls": "Corpse loot script item-enum switch",
+        "notes": (
+            "Loot Tables exposes only the verified item-enum call sites and writes "
+            "a length-preserving WSC override; the rest of the script stays read-only."
+        ),
+        "status": "partial",
+        "coverage": "structured",
+        "target": "loot",
+        "openable": True,
+    })
     for source_id, definition in INVENTORY_SOURCES.items():
         available = (CONTENT_PREPARED_ROOT / definition["relative"]).is_file()
         rows.append({
-            "filename": definition["relative"].as_posix(),
+            "filename": f"game/content.rpf:/{definition['relative'].as_posix()}",
             "controls": f'{definition["label"]} inventory records',
             "notes": "Only direct scalar item fields are editable in Items; nested XML structure is preserved." if available else "Prepared inventory XML is missing.",
             "status": "partial" if available else "not-integrated",
@@ -1528,7 +1960,7 @@ def _provisional_data_map_rows() -> list[dict]:
                 supported = False
             writable = supported and paths.RPF6_TOOL.is_file() and (GRINGO_PACKED_ROOT / relative).is_file()
             rows.append({
-                "filename": "gringores/" + relative.as_posix(),
+                "filename": "game/gringores.rpf:/" + relative.as_posix(),
                 "controls": "ShopInventory records" if supported else "Gringo interaction resource",
                 "notes": ("Only the proved ShopInventory price, quantity and stock fields are exposed."
                           if writable else "Shop records can be viewed; the packed source or resource writer is missing."
@@ -1705,7 +2137,7 @@ class Handler(PluginRequestHandler):
                     "editorRoot": str(PLUGIN_ROOT),
                     "capabilities": [
                         "prepared-files", "project-overrides", "source-editor",
-                        "items", "shops", "missions", "loot-asi-override", "settings",
+                        "items", "shops", "string-tables", "rbf0-scalars", "missions", "loot-asi-override", "settings",
                         "data-map", "redhook-prerequisite", "github-workspace",
                         "archive-copy-deployment",
                     ],
@@ -1722,6 +2154,25 @@ class Handler(PluginRequestHandler):
                 self.json_response(items_payload(query.get("dataset", ["current"])[0] == "vanilla"))
             elif path == "/api/shops":
                 self.json_response(shops_payload(query.get("dataset", ["current"])[0] == "vanilla"))
+            elif path == "/api/string-tables":
+                self.json_response(string_tables_index(
+                    query.get("dataset", ["current"])[0] == "vanilla"))
+            elif path == "/api/string-table":
+                self.json_response(string_table_payload(
+                    query.get("source", [""])[0],
+                    query.get("path", [""])[0],
+                    query.get("dataset", ["current"])[0] == "vanilla",
+                ))
+            elif path == "/api/strings":
+                raw_language = query.get("language", [""])[0]
+                language_index = None if raw_language == "" else int(raw_language)
+                self.json_response(strings_payload(
+                    language_index,
+                    query.get("dataset", ["current"])[0] == "vanilla",
+                ))
+            elif path == "/api/rbf-scalars":
+                self.json_response(rbf_scalars_payload(
+                    query.get("dataset", ["current"])[0] == "vanilla"))
             elif path == "/api/loot":
                 self.json_response(loot_payload())
             elif path == "/api/loot/script":
@@ -1762,6 +2213,15 @@ class Handler(PluginRequestHandler):
                     str(body.get("expectedName", "")),
                     body.get("edits", []),
                 ))
+            elif path == "/api/string-table/save":
+                self.json_response(save_string_table(
+                    str(body.get("source", "")),
+                    str(body.get("path", "")),
+                    body.get("edits", []),
+                ))
+            elif path == "/api/rbf/save":
+                self.json_response(save_rbf_scalars(
+                    str(body.get("path", "")), body.get("edits", [])))
             elif path == "/api/loot/save":
                 self.json_response(save_loot(body.get("document")))
             elif path == "/api/loot/script/save":
