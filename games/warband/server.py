@@ -372,6 +372,9 @@ def save_item_edits(edits: list[dict], expected_sha256: str | None = None) -> di
             raise ValueError("Saving changed the number of item records; refusing the write")
         if [record["id"] for record in candidate_records] != identities:
             raise ValueError("Saving changed item record identities; refusing the write")
+        if any(ord(char) > 127 for char in candidate) and not re.search(
+                r"coding[:=]\s*[-\w.]+", "\n".join(candidate.splitlines()[:2])):
+            candidate = f"# coding: {encoding}\n" + candidate
         encoded = _validate_module_items_candidate(candidate, encoding)
         if source.read_bytes() != raw:
             raise ValueError("module_items.py changed while validating; reload before saving")
