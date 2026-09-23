@@ -1,0 +1,19 @@
+# #445 — Chapter 5 subway encounter, remove one turret
+
+## State (2026-09-23 per-game-ff7r pass)
+
+- Source already present: `games/ff7r/encounter_tweaks.py` plus
+  `games/ff7r/encounter_dataobject.py` (authoritative spawn-data edit
+  preferred, narrow reversible runtime suppression otherwise, project overlay
+  only).
+- Tests: `tests/test_ff7r_encounter_tweaks.py` passes (full ff7r selection:
+  519 passed). No code change needed on this branch.
+
+## Needs Lexer (installed game)
+
+- Identify the exact Chapter 5 subway battle-scene/encounter ID and confirm
+  the four authored spawns (2 Flametroopers + 2 turrets) and whether the
+  turrets are separate rows or a shared count field.
+- Verify in game: encounter shows 2 Flametroopers + 1 turret, fight
+  begins/ends normally with no script waiting on a fourth enemy, nearby
+  Chapter 5 encounters unchanged, tweak removal restores vanilla.

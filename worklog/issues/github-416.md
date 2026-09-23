@@ -1,0 +1,17 @@
+# #416 — Editable enemy drops and drop chances
+
+## State (2026-09-23 per-game-ff7r pass)
+
+- Source already present: `games/ff7r/semantics.py` loot surface over
+  `BattleItemPossession` (normal/rare/steal slots with item and percent/weight
+  controls, quantities where stored separately, text IDs resolved to
+  installed-game names, unsupported fields preserved, project-overlay writes;
+  steal presented as the percent it is, not as a quantity).
+- Tests: `tests/test_ff7r_semantics.py` and `tests/test_ff7r_editor_semantics.py`
+  pass (full ff7r selection: 519 passed). No code change needed on this branch.
+
+## Needs Lexer (installed game)
+
+- Cover at least one multi-drop enemy in game and confirm both the dropped
+  item and the probability change take effect; keep drops separate from
+  steal/morph/reward tables unless the data shares them.

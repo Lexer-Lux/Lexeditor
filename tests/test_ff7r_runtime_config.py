@@ -272,7 +272,16 @@ def test_runtime_tweaks_are_editable_through_standard_game_data_contract_without
     properties = {prop["name"]: prop for prop in payload["properties"]}
     assert properties["CutsceneEnabled"]["editable"] is True
     assert properties["CutsceneBaseMultiplier"]["type"] == "FLOAT"
-    assert not any(name.startswith("Minimap") for name in properties)
+    # The retired #414 tap/hold minimap tweak must stay gone; the #475
+    # field-minimap zoom surface is the only Minimap* exception.
+    assert not any(
+        name.startswith("Minimap") and not name.startswith("MinimapZoom")
+        for name in properties
+    )
+    assert properties["MinimapZoomEnabled"]["editable"] is True
+    assert properties["MinimapZoomMultiplier"]["type"] == "FLOAT"
+    assert properties["FieldCastEnabled"]["editable"] is True
+    assert properties["FieldCastSchools"]["editable"] is False
     assert "minimap" not in payload["records"][0]["values"]
     assert properties["RuntimeReady"]["editable"] is False
     assert payload["records"][0]["values"]["HooksValidated"] is False
@@ -294,6 +303,30 @@ def test_runtime_tweaks_are_editable_through_standard_game_data_contract_without
         "r2Behavior": "multiply-native",
     }
     assert "minimap" not in saved
+
+
+def test_runtime_tweaks_edit_zoom_and_field_cast_through_standard_contract(tmp_path):
+    game = tmp_path / "game"
+    project = tmp_path / "project"
+    package, source_sha, using_project = runtime_settings_package(game, project)
+    payload = package.api_payload(source_sha256=source_sha, using_project=using_project)
+    assert payload["records"][0]["values"]["MinimapZoomMultiplier"] == 1.0
+    assert payload["records"][0]["values"]["FieldCastSchools"] == "healing, cleansing, buffs"
+
+    result = save_runtime_edits(
+        project,
+        source_sha256=payload["sourceSha256"],
+        active_sha256=payload["activeSha256"],
+        edits=[
+            {"entry": 0, "property": "MinimapZoomEnabled", "value": True},
+            {"entry": 0, "property": "MinimapZoomMultiplier", "value": 1.5},
+            {"entry": 0, "property": "FieldCastEnabled", "value": True},
+        ],
+    )
+    assert result["saved"] == 3
+    saved = load_runtime_config(project)
+    assert saved["minimapZoom"]["zoomMultiplier"] == 1.5
+    assert saved["fieldCast"]["enabled"] is True
 
     with pytest.raises(ValueError, match="read-only or unknown"):
         save_runtime_edits(
@@ -357,3 +390,76 @@ def test_no_more_cheats_probe_virtual_resource_is_read_only(tmp_path):
             active_sha256="unused",
             edits=[{"entry": 0, "property": "TextMatchCount", "value": 1}],
         )
+
+
+def test_minimap_zoom_defaults_to_vanilla_and_persists():
+    config = validate_runtime_config(json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG)))
+    assert config["minimapZoom"] == {
+        "enabled": False,
+        "zoomMultiplier": 1.0,
+        "persistAcrossAreas": True,
+    }
+
+
+def test_minimap_zoom_multiplier_must_be_positive_and_finite():
+    for invalid in (0.0, -1.0, float("inf"), float("nan"), True, "1.5"):
+        value = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
+        value["minimapZoom"]["zoomMultiplier"] = invalid
+        with pytest.raises(ValueError):
+            validate_runtime_config(value)
+
+
+def test_minimap_zoom_rejects_unknown_fields_and_non_boolean_flags():
+    value = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
+    value["minimapZoom"]["fullMapToo"] = True
+    with pytest.raises(ValueError, match="unsupported fields"):
+        validate_runtime_config(value)
+    value = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
+    value["minimapZoom"]["enabled"] = "yes"
+    with pytest.raises(ValueError, match="must be boolean"):
+        validate_runtime_config(value)
+
+
+def test_field_cast_defaults_to_opt_in_schools_only():
+    config = validate_runtime_config(json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG)))
+    assert config["fieldCast"] == {
+        "enabled": False,
+        "schools": ["healing", "cleansing", "buffs"],
+    }
+
+
+def test_field_cast_schools_must_stay_within_healing_cleansing_buffs():
+    for invalid in ([], ["damage"], ["healing", "summon"], "healing", [True]):
+        value = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
+        value["fieldCast"]["schools"] = invalid
+        with pytest.raises(ValueError):
+            validate_runtime_config(value)
+    value = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
+    value["fieldCast"] = {
+        "enabled": True,
+        "schools": ["healing", "buffs"],
+    }
+    assert validate_runtime_config(value)["fieldCast"]["schools"] == ["healing", "buffs"]
+
+
+def test_requested_zoom_and_field_cast_hooks_gate_deployment(tmp_path):
+    game = tmp_path / "game"
+    project = tmp_path / "project"
+    binaries = game / "End" / "Binaries" / "Win64"
+    binaries.mkdir(parents=True)
+    (binaries / "dxgi.dll").write_bytes(b"fixture-proxy")
+    write_fixture_exe(game)
+    (project / "runtime").mkdir(parents=True, exist_ok=True)
+    (project / "runtime" / RUNTIME_DLL_NAME).write_bytes(b"dll")
+    write_manifest(project)
+    save_runtime_config(project, {
+        **DEFAULT_RUNTIME_CONFIG,
+        "minimapZoom": {"enabled": True, "zoomMultiplier": 1.5, "persistAcrossAreas": True},
+        "fieldCast": {"enabled": True, "schools": ["healing"]},
+    })
+    status = runtime_status(game, project)
+    assert status["minimapZoomRequested"] is True
+    assert status["fieldCastRequested"] is True
+    assert set(status["missingRequestedHooks"]) == {"minimapZoom", "fieldCast"}
+    with pytest.raises(RuntimeError, match="not validated"):
+        deploy_runtime(game, project)

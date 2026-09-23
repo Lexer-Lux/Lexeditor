@@ -120,6 +120,12 @@ def _runtime_properties() -> list[VirtualProperty]:
         VirtualProperty("BetterSprintEnabled", "Better Sprint Enabled", "BOOL", True, 0, 1),
         VirtualProperty("SprintSpeedMultiplier", "Sprint Speed Multiplier", "FLOAT", True, 0.000001, None),
         VirtualProperty("BetterSprintHookValidated", "Better Sprint Hook Validated", "BOOL"),
+        VirtualProperty("MinimapZoomEnabled", "Field Minimap Zoom Enabled", "BOOL", True, 0, 1),
+        VirtualProperty("MinimapZoomMultiplier", "Field Minimap Zoom Multiplier", "FLOAT", True, 0.000001, None),
+        VirtualProperty("MinimapZoomHookValidated", "Field Minimap Zoom Hook Validated", "BOOL"),
+        VirtualProperty("FieldCastEnabled", "Field Spell Casting Enabled", "BOOL", True, 0, 1),
+        VirtualProperty("FieldCastSchools", "Field Casting Schools", "STRING"),
+        VirtualProperty("FieldCastHookValidated", "Field Casting Hook Validated", "BOOL"),
         VirtualProperty("LoaderCandidatePresent", "Native Loader Detected", "BOOL"),
         VirtualProperty("ProjectDllPresent", "Runtime DLL Built", "BOOL"),
         VirtualProperty("ManifestPresent", "Validation Manifest Present", "BOOL"),
@@ -148,6 +154,8 @@ def runtime_settings_package(game_root: Path, project_root: Path, *, vanilla: bo
     cutscene = config["cutsceneSpeed"]
     hp_rebalance = config["hpRebalance"]
     better_sprint = config["betterSprint"]
+    minimap_zoom = config["minimapZoom"]
+    field_cast = config["fieldCast"]
     values = {
         "CutsceneEnabled": cutscene["enabled"],
         "CutsceneBaseMultiplier": cutscene["baseMultiplier"],
@@ -158,6 +166,12 @@ def runtime_settings_package(game_root: Path, project_root: Path, *, vanilla: bo
         "BetterSprintEnabled": better_sprint["enabled"],
         "SprintSpeedMultiplier": better_sprint["speedMultiplier"],
         "BetterSprintHookValidated": status["betterSprintHookValidated"],
+        "MinimapZoomEnabled": minimap_zoom["enabled"],
+        "MinimapZoomMultiplier": minimap_zoom["zoomMultiplier"],
+        "MinimapZoomHookValidated": status["minimapZoomHookValidated"],
+        "FieldCastEnabled": field_cast["enabled"],
+        "FieldCastSchools": ", ".join(field_cast["schools"]),
+        "FieldCastHookValidated": status["fieldCastHookValidated"],
         "LoaderCandidatePresent": status["loaderCandidatePresent"],
         "ProjectDllPresent": status["projectDllPresent"],
         "ManifestPresent": status["manifestPresent"],
@@ -340,6 +354,9 @@ _EDIT_PATHS = {
     "HPMultiplier": ("hpRebalance", "hpMultiplier"),
     "BetterSprintEnabled": ("betterSprint", "enabled"),
     "SprintSpeedMultiplier": ("betterSprint", "speedMultiplier"),
+    "MinimapZoomEnabled": ("minimapZoom", "enabled"),
+    "MinimapZoomMultiplier": ("minimapZoom", "zoomMultiplier"),
+    "FieldCastEnabled": ("fieldCast", "enabled"),
 }
 
 
