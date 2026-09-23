@@ -148,7 +148,7 @@ def workspace_payload() -> dict:
                     "The FF7R2 fork documents UE4.26 packaging. Lexeditor's candidate "
                     "builder refuses to run without explicit local UnrealReZen and Oodle "
                     "paths plus the known CUE4Parse/1.1.1 dependency manifest; the supplied Oodle "
-                    "exists before process start so that release short-circuits its downloader. "
+                    "must already be oo2core_9_win64.dll beside UnrealReZen before process start. "
                     "Output stays under the project and still needs real-game acceptance/shared ownership."
                 ),
             },
@@ -240,7 +240,7 @@ def data_map_payload() -> dict:
             "controls": "None", "coverage": "unavailable",
             "notes": (
                 "A dependency-explicit UnrealReZen candidate builder is available only when "
-                "local tool and Oodle paths are supplied. It writes under the project and never "
+                "the local tool and its adjacent explicit Oodle path are supplied. It writes under the project and never "
                 "installs; shared-helper ownership and real-game load acceptance are still pending."
             ), "status": "not-integrated",
         },
