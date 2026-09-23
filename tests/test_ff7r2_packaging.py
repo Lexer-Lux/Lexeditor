@@ -128,6 +128,13 @@ def test_candidate_builder_is_isolated_and_never_installs():
         assert manifest["tooling"]["unrealReZen"]["requiredCUE4Parse"] == packaging.CUE4PARSE_VERSION
         assert manifest["tooling"]["oodle"]["requiredName"] == packaging.OODLE_NAME
         assert manifest["tooling"]["oodle"]["alreadyInToolDirectory"] is True
+        assert manifest["loadOrder"]["candidate"] == {
+            "package": "Lexeditor-FF7R2_P.pak",
+            "patchLevel": 0,
+            "effectiveOrder": 100,
+        }
+        assert manifest["loadOrder"]["contentsCompared"] is False
+        assert manifest["loadOrder"]["observedNativeMods"]["ranked"] == []
         assert {item["file"] for item in manifest["outputs"]} == {
             "Lexeditor-FF7R2_P.utoc",
             "Lexeditor-FF7R2_P.ucas",
