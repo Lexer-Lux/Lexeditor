@@ -29,7 +29,10 @@
         ...['x','y','z'].map(key=>({key,label:key.toUpperCase(),grow:1,render:slot=>source(slot,key,numberControl(slot[key],-32768,32767,1,value=>{slot[key]=value;shell.refresh()},{'aria-label':`Slot ${slot.slot+1} ${key}`}))})),
         {key:'level',label:'Level rule',grow:2,render:slot=>source(slot,'level',encounterLevelControl(slot))}
       ]});
-    return detailPanel({heading:false,body:[formation,table]});
+    return LexeditorUI.stack(
+      detailPanel({heading:false,body:[formation]}),
+      detailPanel({heading:false,body:[table]})
+    );
   }
   function renderEncounters(){const rows=filtered('encounters',['name','id','stageId']);showPaged('encounters',rows,[{key:'id',label:'ID'},{key:'name',label:'Encounter'},{key:'stageId',label:'Stage',pinned:false}],encounterDetail,'74px minmax(180px,1fr)',{defaultSplit:26,minLeft:220,minRight:600})}
 
