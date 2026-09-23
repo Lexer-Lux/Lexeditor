@@ -9,6 +9,8 @@ import shutil
 import tempfile
 from pathlib import Path
 
+from .datasets import dataset_spec, schema as dataset_schema, validate_field_value
+
 OBJECT_TARGET = "Data/Objects"
 OBJECT_FIELDS = {"Price", "Edibility", "IsDrink"}
 OBJECT_PATCH_LOG_NAME = "Lexeditor Data/Objects overrides"
