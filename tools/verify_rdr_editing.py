@@ -273,6 +273,8 @@ class EditingTests(unittest.TestCase):
     def test_string_language_view_combines_resources_without_fake_record_ids(self):
         index = server.string_tables_index()
         english = next(row for row in index["languages"] if row["label"] == "English")
+        self.assertIn("Spanish", {row["label"] for row in index["languages"]})
+        self.assertIn("French", {row["label"] for row in index["languages"]})
         payload = server.strings_payload(english["index"])
         self.assertEqual(payload["language"]["label"], "English")
         self.assertGreaterEqual(payload["counts"]["tables"], 2)
@@ -280,6 +282,31 @@ class EditingTests(unittest.TestCase):
         self.assertIn("tune/stringtable/global.strtbl", paths)
         self.assertIn("content/dlc/zombiepack/zombiepack_standalone.strtbl", paths)
         self.assertTrue(all(row["language"] == "English" for row in payload["rows"]))
+
+    def test_shared_string_block_has_separate_logical_language_tabs(self):
+        index = server.string_tables_index()
+        french = next(row for row in index["languages"] if row["label"] == "French")
+        payload = server.strings_payload(french["index"])
+        self.assertTrue(payload["rows"])
+        self.assertTrue(all(row["language"] == "French" for row in payload["rows"]))
+        self.assertTrue(all(french["index"] in row["languageIndexes"] for row in payload["rows"]))
+        row = payload["rows"][0]
+        self.assertNotEqual(row["languageIndex"], row["languageIndexes"][0])
+        candidate, changed = string_tables.apply_text_edits(
+            Path(row["sourcePath"]).read_bytes(),
+            [{
+                "languageIndex": row["languageIndex"],
+                "entryIndex": row["entryIndex"],
+                "expectedHash": row["hash"],
+                "expectedText": row["text"],
+                "value": row["text"] + " FR",
+            }],
+        )
+        self.assertEqual(changed, 1)
+        reparsed = string_tables.rows(string_tables.parse(candidate))
+        shared = next(item for item in reparsed if row["entryIndex"] == item["entryIndex"]
+                      and french["index"] in item["languageIndexes"])
+        self.assertEqual(shared["text"], row["text"] + " FR")
 
     def test_string_table_stale_identity_does_not_write(self):
         path = "content/dlc/zombiepack/zombiepack_standalone.strtbl"
