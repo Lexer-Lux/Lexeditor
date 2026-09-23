@@ -35,3 +35,12 @@ tests/test_rdr2_viking_comb_criteria.py (10 hermetic tests). No gameplay
 claim: the interception hook and the measurable game session are still
 owed.
 
+## 2026-09-23 agent slice (per-game-rdr2): verified, no new code
+
+Re-read the live issue plus comments. The measurability contract still
+matches the request (eligible small social gains, missions/losses/large
+gains excluded, named interaction with readable before/after values).
+Re-ran tests/test_rdr2_viking_comb_criteria.py: 10 green. Stays
+actionable: the interception hook and the measurable session are still
+owed.
+

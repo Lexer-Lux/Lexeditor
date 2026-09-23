@@ -31,3 +31,13 @@ needs: RDR2 session preparing a concrete working interface approach with
 its save/progress behavior, then a Lexer design decision. No code written;
 recording the needs here instead of inventing a menu hook.
 
+## 2026-09-23 agent slice (per-game-rdr2): strand contract
+
+games/rdr2/challenge_strands.py (shared with #232) pins the nine-link
+menu limit plus validate_strand_plan(), which rejects data-only link
+additions and split-root duplicates, requires one visible strand with
+correct progress, and requires the interface/save/progress behavior as
+owned unknowns. Covered by tests/test_rdr2_challenge_strands.py
+(9 hermetic tests). No gameplay claim: interface investigation, design
+decision, and proof are still owed.
+

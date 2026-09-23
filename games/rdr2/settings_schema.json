@@ -429,6 +429,7 @@
     "Prone|TurnDegreesPerSecond": "How fast the prone body turns on the spot.",
     "Prone|PitchSign": "Flip between 1 and -1 if AlignToGround pitches him the wrong way on slopes.",
     "Prone|RollSign": "Flip between 1 and -1 if AlignToGround rolls him the wrong way on slopes.",
+    "Prone|GroundedAimMode": "One-handed prone test mode. Runs the authored grounded aim loop so the weapon wheel opens while prone. Reload stays blocked, longarms and binoculars are unsupported, and shots still need in-game validation against the reticle.",
     "Climbing|IdleStaminaPerSecond": "Stamina drained per second while hanging on a surface without moving.",
     "Climbing|MoveStaminaPerSecond": "Stamina drained per second while climbing at normal speed.",
     "Climbing|SprintStaminaPerSecond": "Stamina drained per second while climbing at sprint speed.",
