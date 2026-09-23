@@ -23,6 +23,7 @@ CONFIG_NAME = "lexeditor-ff9.ini"
 # For the Lexeditor mod folder its required assembly name is Memoria.Scripts.Lexeditor.dll.
 RUNTIME_NAME = "Memoria.Scripts.Lexeditor.dll"
 MARKER_NAME = ".lexeditor-ff9-owned"
+DESCRIPTION_NAME = "ModDescription.xml"
 PROJECT_CONFIG = paths.PROJECT_ROOT / CONFIG_NAME
 RUNTIME_SOURCE = paths.PLUGIN_ROOT / "runtime" / RUNTIME_NAME
 DEPLOY_ROOT = paths.GAME_ROOT / MOD_NAME
@@ -42,6 +43,21 @@ def _encode(values: dict[str, bool]) -> bytes:
         f"{key} = {'1' if values.get(key, False) else '0'}\r\n" for key in FEATURE_KEYS
     )
     return text.encode("utf-8")
+
+
+def _mod_description() -> bytes:
+    # Memoria's launcher auto-creates this file inside unidentified mod folders.
+    # Shipping our own minimal metadata keeps the Lexeditor-owned deployment
+    # deterministic and prevents the launcher from writing into it.
+    return (
+        "<Mod>\r\n"
+        "  <Name>Lexeditor</Name>\r\n"
+        "  <Author>Lexer</Author>\r\n"
+        "  <InstallationPath>Lexeditor</InstallationPath>\r\n"
+        "  <Category>Editor</Category>\r\n"
+        "  <Description>Lexeditor-owned Final Fantasy IX project overrides.</Description>\r\n"
+        "</Mod>\r\n"
+    ).encode("utf-8")
 
 
 def load(project_root: Path | None = None) -> dict:
@@ -231,6 +247,7 @@ def deploy(game_root: Path | None = None, project_root: Path | None = None,
             scripts.mkdir(parents=True, exist_ok=True)
             shutil.copy2(runtime, scripts / RUNTIME_NAME)
             atomic_write(staging / CONFIG_NAME, _encode(config["features"]))
+            atomic_write(staging / DESCRIPTION_NAME, _mod_description())
             atomic_write(staging / MARKER_NAME,
                           ("Lexeditor FF9 managed mod\n" + _digest(runtime) + "\n").encode("ascii"))
             if target.exists():
