@@ -44,3 +44,14 @@ absent as required. Re-ran tests/test_rdr2_honor_action_amounts.py:
 4 green. Stays actionable: native interception research plus the game
 session are still owed.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): interception design contract
+
+New plugins/rdr2/honor_interception.py pins the unproven hook's required
+properties (fires before tier application, preserves event identity,
+bounty-dog-only blocking) plus the UI honesty rules (no per-action
+amount fields, shared-tier scope note kept), with
+validate_interception_plan() rejecting post-tier rewrites and invented
+amount fields. Covered by tests/test_rdr2_honor_interception.py (7
+hermetic tests, green). No gameplay claim: the native hook and the game
+session still need the game.
+

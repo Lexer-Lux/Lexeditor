@@ -75,3 +75,41 @@ def validate_display_plan(plan: Mapping) -> list[str]:
                     f"Display manager must still prove {required}."
                 )
     return errors
+
+
+# Fields of one representative layout template. A template binds one shop
+# type to its display slots (category-level consistency plus limited
+# signature items) and states its limits openly, so the game-side layout
+# work has a checkable shape instead of an open brief.
+LAYOUT_TEMPLATE_FIELDS = (
+    "shop_type",
+    "display_slots",
+    "category_assignment",
+    "signature_items",
+    "stated_limits",
+)
+
+
+def layout_template_fields() -> list[str]:
+    """Return the fields a representative layout template must carry."""
+    return list(LAYOUT_TEMPLATE_FIELDS)
+
+
+def validate_layout_template(template: Mapping) -> list[str]:
+    """Check one representative layout template for completeness."""
+    errors: list[str] = []
+    if not isinstance(template, Mapping):
+        return ["Layout template must be a mapping."]
+    for field in LAYOUT_TEMPLATE_FIELDS:
+        if not template.get(field):
+            errors.append(f"Layout template must state {field}.")
+    slots = template.get("display_slots")
+    if isinstance(slots, list) and not slots:
+        errors.append("Layout template needs at least one display slot.")
+    claim = str(template.get("claim", ""))
+    for rejected in REJECTED_CLAIMS:
+        if rejected in claim:
+            errors.append(
+                f"Layout template reuses the rejected claim {rejected}."
+            )
+    return errors

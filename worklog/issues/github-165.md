@@ -44,3 +44,12 @@ melee/throwable filter. Covered by tests/test_rdr2_locker_recovery.py
 (9 hermetic tests). No gameplay claim: the filter solution and the game
 session are still owed.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): filter acceptance criteria
+
+plugins/rdr2/locker_recovery.py gains FILTER_ACCEPTANCE_CRITERIA
+(ordinary-list visibility, non-unique exclusion, unequipped return, no
+duplication on revisits) plus validate_locker_filter(), which rejects
+any plan that assumes the native filter solved. Covered by 6 new tests
+in tests/test_rdr2_locker_recovery.py (15 total, green). No gameplay
+claim: the filter solution and the game session are still owed.
+

@@ -74,5 +74,48 @@ class LockerRecoveryTests(unittest.TestCase):
         self.assertTrue(any("filter" in e for e in errors))
 
 
+def valid_filter_plan():
+    return {
+        "results": {
+            "lost_unique_visible_as_ordinary_locker_entry": True,
+            "non_unique_melee_throwables_kept_out": True,
+            "return_unequipped": True,
+            "no_duplication_on_repeated_visits": True,
+        }
+    }
+
+
+class LockerFilterTests(unittest.TestCase):
+    def test_criteria_recorded(self):
+        self.assertIn("non_unique_melee_throwables_kept_out",
+                      lr.filter_acceptance_criteria())
+
+    def test_valid_filter_plan_passes(self):
+        self.assertEqual(lr.validate_locker_filter(valid_filter_plan()), [])
+
+    def test_assumed_solution_is_rejected(self):
+        plan = valid_filter_plan()
+        plan["assumes_filter_solved"] = True
+        errors = lr.validate_locker_filter(plan)
+        self.assertTrue(any("assume" in e for e in errors))
+
+    def test_leaking_non_uniques_is_rejected(self):
+        plan = valid_filter_plan()
+        plan["results"]["non_unique_melee_throwables_kept_out"] = False
+        errors = lr.validate_locker_filter(plan)
+        self.assertTrue(any("non_unique_melee_throwables_kept_out" in e
+                            for e in errors))
+
+    def test_duplicating_filter_is_rejected(self):
+        plan = valid_filter_plan()
+        plan["results"]["no_duplication_on_repeated_visits"] = False
+        errors = lr.validate_locker_filter(plan)
+        self.assertTrue(any("no_duplication_on_repeated_visits" in e
+                            for e in errors))
+
+    def test_non_mapping_plan_is_rejected(self):
+        self.assertTrue(lr.validate_locker_filter("filter"))
+
+
 if __name__ == "__main__":
     unittest.main()

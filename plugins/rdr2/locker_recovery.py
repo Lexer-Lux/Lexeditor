@@ -100,3 +100,40 @@ def validate_recovery_plan(plan: Mapping) -> list[str]:
             "as an open unknown instead of assuming it fixed."
         )
     return errors
+
+
+# Acceptance criteria for the unresolved native melee/throwable
+# locker-list filter. The filter is the #165 blocker: lost uniques must
+# become visible as ordinary locker-list entries without dragging
+# non-unique melee/throwables along, and the return stays unequipped and
+# duplication-free.
+FILTER_ACCEPTANCE_CRITERIA = (
+    "lost_unique_visible_as_ordinary_locker_entry",
+    "non_unique_melee_throwables_kept_out",
+    "return_unequipped",
+    "no_duplication_on_repeated_visits",
+)
+
+
+def filter_acceptance_criteria() -> list[str]:
+    """Return the filter acceptance criteria."""
+    return list(FILTER_ACCEPTANCE_CRITERIA)
+
+
+def validate_locker_filter(plan: Mapping) -> list[str]:
+    """Check a filter proposal against the locker-list acceptance criteria."""
+    errors: list[str] = []
+    if not isinstance(plan, Mapping):
+        return ["Filter plan must be a mapping."]
+    if plan.get("assumes_filter_solved") is True:
+        errors.append(
+            "Filter plan must not assume the native filter solved; "
+            "own it as the open unknown."
+        )
+    results = plan.get("results") or {}
+    for required in FILTER_ACCEPTANCE_CRITERIA:
+        if results.get(required) is not True:
+            errors.append(
+                f"Filter must prove {required}."
+            )
+    return errors

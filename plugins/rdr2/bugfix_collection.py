@@ -70,3 +70,52 @@ def validate_bugfix_collection(plan: Mapping) -> list[str]:
     if not plan.get("ships_independently"):
         errors.append("Fixes must ship as independently verified entries.")
     return errors
+
+
+# Game-side fix manifests for the two first targets. Each manifest states
+# the exact problem, how it is verified against current files, and the
+# permission basis, so the game-side delivery has a checkable record per
+# fix instead of a shared note.
+FIRST_TARGET_MANIFESTS = (
+    {
+        "entry": "wickiup_map_artwork",
+        "problem": "Misnamed Wickiup minimap YTD (Nexus 2953).",
+        "verification": "Corrected YTD name checked against current files.",
+        "permission": "Credited reuse explicitly allowed.",
+    },
+    {
+        "entry": "dreamcatcher_cleanup",
+        "problem": "Completed Dreamcatchers entry lingers (Nexus 9006).",
+        "verification": "Entry removed through a standalone ASI check.",
+        "permission": "Recreated from vanilla/current assets or permitted.",
+    },
+)
+
+
+def first_target_manifests() -> list[dict]:
+    """Return independent copies of the first-target fix manifests."""
+    return [dict(entry) for entry in FIRST_TARGET_MANIFESTS]
+
+
+def validate_first_target_manifests(manifests) -> list[str]:
+    """Check the game-side manifests for the two first targets."""
+    errors: list[str] = []
+    if not isinstance(manifests, Mapping):
+        return ["First-target manifests must be a mapping."]
+    for target in FIRST_TARGETS:
+        entry = manifests.get(target)
+        if not isinstance(entry, Mapping):
+            errors.append(f"First target {target} needs a fix manifest.")
+            continue
+        for required in ("problem", "verification", "permission"):
+            if not entry.get(required):
+                errors.append(
+                    f"Manifest {target} must record {required}."
+                )
+    for name in manifests:
+        if name not in FIRST_TARGETS:
+            errors.append(
+                f"Manifest {name} is not a first target; "
+                "later fixes ship under the collection schema."
+            )
+    return errors

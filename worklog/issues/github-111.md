@@ -35,3 +35,13 @@ No art claim: quality and Lexer approval still need the art toolchain and
 a game check (pickup plus acquisition card). Hull artwork has no
 checked-in source yet and stays a Lexer art question.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): preview gate
+
+New plugins/rdr2/replacement_previews.py records the nine replacement
+families with artwork states (shotgun hulls stay vanilla_fallback) and
+validate_replacement_plan(), which requires a shown preview per family
+and explicit approval before any YTD ships. Covered by
+tests/test_rdr2_replacement_previews.py (7 hermetic tests, green). No
+art claim: quality, approval, and the pickup/acquisition-card check
+still need the art toolchain and a game session.
+

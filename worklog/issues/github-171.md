@@ -41,3 +41,6 @@ control), recovery checks, and rejects zero-second and trough proposals.
 Covered by tests/test_rdr2_drowning_prototype.py (9 hermetic tests).
 No gameplay claim: building the prototype still needs the game.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): verified, no new code
+
+Re-ran tests/test_rdr2_drowning_prototype.py: 9 green. No new agent-side slice was owed beyond the existing contract; building the prototype and its recovery checks still need the game.

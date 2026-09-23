@@ -98,3 +98,6 @@ never alongside kill gains). Re-ran
 tests/test_rdr2_dead_eye_replacement.py: 9 green. Stays actionable:
 engine research, the comparison, and the game session are still owed.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): verified, no new code
+
+Re-ran tests/test_rdr2_dead_eye_replacement.py: 9 green. No new agent-side slice was owed beyond the existing contract; selective suppression proof and the replacement session are still owed.

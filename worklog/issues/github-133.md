@@ -41,3 +41,6 @@ choices and vanilla tracks under near-zero density. Covered by
 tests/test_rdr2_hunting_tracks.py (8 hermetic tests). No gameplay
 claim: the probe and the design choice still need the game.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): verified, no new code
+
+Re-ran tests/test_rdr2_hunting_tracks.py: 8 green. No new agent-side slice was owed beyond the existing contract; the probe run and the design choice still need the game.

@@ -46,3 +46,6 @@ requires ownership of the unbuilt shop-modifier correction. Covered by
 tests/test_rdr2_fence_price_check.py (8 hermetic tests). No gameplay
 claim: the correction and the comparison session are still owed.
 
+## 2026-09-23 agent slice (impl/rdr2-wave2): verified, no new code
+
+Re-ran tests/test_rdr2_fence_price_check.py: 8 green. No new agent-side slice was owed beyond the existing contract; the per-shop price hook and the comparison session are still owed.
