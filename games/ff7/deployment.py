@@ -296,7 +296,12 @@ def build_plan(game_root: Path, project_root: Path) -> dict:
     direct_root, config = _direct_root(game_root)
     rows = [{"path": path, "bytes": len(data), "sha256": _digest(data)}
             for path, data in sorted(files.items())]
-    external_mods = mod_stack.configured_stack(files)
+    ffnx_values = {
+        field.get("key"): field.get("value")
+        for section in config.get("sections", [])
+        for field in section.get("fields", []) if field.get("key")
+    }
+    external_mods = mod_stack.configured_stack(files, ffnx_values=ffnx_values)
     return {
         "contract": "Lexeditor.ff7-ffnx-direct",
         "sourceRevision": FFNX_SOURCE_REVISION,
