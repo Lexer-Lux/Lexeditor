@@ -12,6 +12,8 @@ const state = {
   tab: "objects", dashboard: null, dataMap: null, objects: null, rows: [], savedRows: [],
   selected: null, page: 0, pageSize: 30, query: "", sort: {key: "id", dir: 1},
   mapPage: 0, mapQuery: "", mapStatus: "", mapSort: ["filename", 1], busy: false, error: "",
+  datasetKey: "objects", dataset: null, datasetRows: [], datasetSavedRows: [], datasetSelected: null,
+  datasetPage: 0, datasetQuery: "", datasetSort: {key: "id", dir: 1},
 };
 
 async function api(path, body) {
@@ -35,7 +37,9 @@ function rowSignature(rows) {
     .map(row => ({id: row.id, fields: row.fields || {}})));
 }
 function dirtyCount() {
-  return state.objects && rowSignature(state.rows) !== rowSignature(state.savedRows) ? 1 : 0;
+  const objectsDirty = state.objects && rowSignature(state.rows) !== rowSignature(state.savedRows);
+  const datasetDirty = state.dataset && rowSignature(state.datasetRows) !== rowSignature(state.datasetSavedRows);
+  return objectsDirty || datasetDirty ? 1 : 0;
 }
 function sortedRows() {
   const query = state.query.trim().toLocaleLowerCase();
