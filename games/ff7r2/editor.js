@@ -575,8 +575,9 @@
     const packaging=delivery.packaging||{};
     const retoc=ws.tooling?.retoc||{};
     const rezen=ws.tooling?.unrealReZen||{};
+    const stagedCount=Number(packaging.stagedFileCount||0);
     const packageState=packaging.ready
-      ?"Explicit dependencies and game archives are ready; build stays inside this project."
+      ?(stagedCount+" audited staged file"+(stagedCount===1?"":"s")+"; explicit dependencies and game archives are ready.")
       :("Not ready: "+((packaging.missing||["explicit dependencies"]).join("; ")));
     const packageActions=el("div",{class:"lex-reshade-actions"},
       el("button",{type:"button",class:"lex-dialog-action primary",
@@ -591,11 +592,15 @@
       detailSection({title:"PROJECT",body:[
         detailField({label:"ROOT",control:readonlyField(ws.projectRoot||"No project selected")}),
         detailField({label:"SOURCE",control:readonlyField(pp.sourcePresent?(pp.sourceRelative+" — ready"):(pp.sourceRelative||"Missing"))}),
-        detailField({label:"STAGED OUTPUT",control:readonlyField(pp.outputPresent?(pp.outputRelative+" — present"):(pp.outputRelative||"Not written"))}),
+        detailField({label:"PLAYERPARAMETER OUTPUT",control:readonlyField(pp.outputPresent?(pp.outputRelative+" — present"):(pp.outputRelative||"Not written"))}),
+        detailField({label:"PACKAGE INPUTS",control:readonlyField(
+          delivery.staged
+            ?((delivery.stagedFileCount||0)+" audited staged file"+((delivery.stagedFileCount||0)===1?"":"s")+" under content/End/Content")
+            :"No staged gameplay output.")}),
         detailField({label:"DELIVERY",control:readonlyField(
           delivery.packaged
             ?"Isolated package candidate exists; it is not installed or accepted in-game."
-            :delivery.staged?"Staged DataObject only; not packaged or installed.":"No staged gameplay output.")}),
+            :delivery.staged?"Staged project output only; not packaged or installed.":"No staged gameplay output.")}),
         detailField({label:"SAFETY",control:readonlyField(delivery.reason||"The installed game is never overwritten by the DataObject editor.")}),
       ]}),
       detailSection({title:"IOSTORE TOOLING",body:[
@@ -610,9 +615,9 @@
       ]}),
       LexeditorUI.modLoaderSection({
         loader:"Rebirth gameplay assets are loaded from IoStore. A candidate can be packed with explicitly supplied UnrealReZen + Oodle; ReShade uses dxgi.dll and Shader Injector uses dsound.dll.",
-        output:"Gameplay Save stages content/End/Content/DataObject/Resident/PlayerParameter.uasset. Build Candidate writes a three-file IoStore package only under <project>/build/.",
+        output:"Gameplay Save currently stages PlayerParameter under content/End/Content. Build Candidate audits every staged regular file under that content root and writes a three-file IoStore package only under <project>/build/.",
         order:"The game natively loads accepted .pak/.utoc/.ucas triples from End/Content/Paks/~mods, but Lexeditor does not install this unaccepted candidate or claim a collision winner yet.",
-        safety:"The candidate process requires explicit local dependencies and CUE4Parse/1.1.1 metadata. The user-supplied oo2core_9_win64.dll must already sit beside UnrealReZen; Lexeditor does not download, copy or relocate it and never writes the installed game. Presentation helpers retain their DLL ownership checks.",
+        safety:"The candidate process rejects staged symlinks, hashes every staged input before packing, rechecks the complete file set and hashes after packing, and requires explicit local dependencies plus CUE4Parse/1.1.1 metadata. The user-supplied oo2core_9_win64.dll must already sit beside UnrealReZen; Lexeditor does not download, copy or relocate it and never writes the installed game. Presentation helpers retain their DLL ownership checks.",
         removal:"Revert/delete the staged project file or delete an isolated project build candidate. No gameplay package is installed by this integration yet."
       }),
     ]});
