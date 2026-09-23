@@ -235,13 +235,13 @@ test('semantic CSV controls and source identity stay truthful', async () => {
 });
 
 
-test('Mod Loading explains real Memoria priority and whole-file overlap', async () => {
+test('Mod Loading explains real Memoria priority and format-specific overlap', async () => {
   const e = await editor();
   e.run('info()');
   const info = JSON.stringify(e.targets['#main']);
   assert.match(info, /highest-priority first/);
-  assert.match(info, /whole-file Lexeditor-wins/);
-  assert.match(info, /does not semantically merge files from separate mods/);
+  assert.match(info, /CSV and battle raw16 replacements are first-hit whole-file overrides/);
+  assert.match(info, /patch files may compose low-to-high/);
   assert.match(info, /MergeScripts/);
   assert.doesNotMatch(info, /later one wins/);
 });
