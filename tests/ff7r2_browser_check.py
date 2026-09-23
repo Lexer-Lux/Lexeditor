@@ -126,8 +126,13 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-browser-") as temp_name
                 assert formula_values.evaluate_all(
                     "els=>els.some(el=>el.value.includes('0: Potion')&&el.value.includes('1: Ether'))"
                 )
-                expect(page.get_by_display_value("Generated runtime types include StealSuccessRateAdd; its arithmetic/order is not exposed.")).to_be_visible()
-                expect(page.get_by_display_value("Generated runtime types distinguish StealFailed, AlreadyStolen and NothingToSteal; their branch conditions are not exposed.")).to_be_visible()
+                formula_readonly_values = page.locator(".ff7r2-formulae-detail input.lex-readonly-field")
+                assert formula_readonly_values.evaluate_all(
+                    "els=>els.some(el=>el.value==='Generated runtime types include StealSuccessRateAdd; its arithmetic/order is not exposed.')"
+                )
+                assert formula_readonly_values.evaluate_all(
+                    "els=>els.some(el=>el.value==='Generated runtime types distinguish StealFailed, AlreadyStolen and NothingToSteal; their branch conditions are not exposed.')"
+                )
                 assert page.locator(".ff7r2-formulae-detail input:not([readonly])").count() == 0
                 page.screenshot(path=str(OUT / "formulae.png"), full_page=True)
 
