@@ -25,13 +25,20 @@ def test_portrait_strip(page,view,count):
     '''+fn)
     page.evaluate('''({view,count})=>{
       document.body.dataset.lexPlugin='ff8';
+      const toolbar=document.createElement('div');toolbar.id='toolbar';
+      document.querySelector('main').before(toolbar);
       const rows=Array.from({length:count},(_,id)=>({id,name:`Portrait ${String(id).padStart(2,'0')}`,fields:[]}));
-      window.draw=id=>document.querySelector('main').replaceChildren(portraitTabs(view,rows,id,'detail',draw));draw(0);
+      window.draw=id=>toolbar.replaceChildren(portraitTabs(view,rows,id,'detail',draw));draw(0);
     }''',dict(view=view,count=count))
     for width in [700,1500,2560]:
         page.set_viewport_size(dict(width=width,height=400))
         page.wait_for_timeout(80)
         bar=page.locator('.lex-subtab-bar-images')
+        surface=page.locator('.lex-toolbar')
+        assert surface.bounding_box()['height']==80
+        assert surface.evaluate('n=>getComputedStyle(n).borderTopWidth')=='3px'
+        assert surface.evaluate('n=>getComputedStyle(n).boxShadow')!='none'
+        assert surface.evaluate('n=>getComputedStyle(n).backgroundColor')!='rgba(0, 0, 0, 0)' or surface.evaluate('n=>getComputedStyle(n).backgroundImage')!='none'
         bounds=bar.bounding_box()
         buttons=bar.locator('button')
         boxes=[button.bounding_box() for button in buttons.all()]
