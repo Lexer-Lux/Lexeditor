@@ -3,10 +3,13 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
 from games.rdr2.plugin import Rdr2Session
 from tools.verify_panel_layout_visual_46 import browser_session,close_browser,wait_eval,screenshot
+SOURCE_INI=Path(r'C:\RDR2Mod\GameplayTweaks\GameplayTweaks.ini')
+if not SOURCE_INI.is_file():
+ raise FileNotFoundError(f'Missing RDR2 project fixture: {SOURCE_INI}')
 p=b=c=None
 try:
  with tempfile.TemporaryDirectory(prefix='rdr2-shared-save-') as tmp:
-  ini=Path(tmp)/'GameplayTweaks.ini';shutil.copy2('C:/RDR2Mod/GameplayTweaks/GameplayTweaks.ini',ini)
+  ini=Path(tmp)/'GameplayTweaks.ini';shutil.copy2(SOURCE_INI,ini)
   p,b,c=browser_session()
   with Rdr2Session({'LEXEDITOR_GAMEPLAY_INI':str(ini),'RDR2_GAME_ROOT':str(Path(tmp)/'empty-game-root')}) as session:
    c.call('Page.addScriptToEvaluateOnNewDocument',{'source':"window.pywebview={api:{transition_snapshot:async()=>({}),lexeditor_settings:async()=>({})}}"})

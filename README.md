@@ -10,6 +10,7 @@ Currently supports:
 * Mount & Blade: Warband
 * Red Dead Redemption
 * Red Dead Redemption 2
+* Stardew Valley
 
 Coming soon:
 * Final Fantasy IV

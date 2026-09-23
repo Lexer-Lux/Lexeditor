@@ -69,7 +69,7 @@ def main() -> int:
     editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
     for marker in (
         "enemyGeneratedScanDetails", "UPDATE DETAILS", "UPDATE ALL",
-        "choices.devour", "Tier level cut-offs vary",
+        "choices.devour", "cut-offs differ for a few vanilla enemies",
     ):
         assert marker in editor, marker
     assert "Stored Devour ID" not in editor

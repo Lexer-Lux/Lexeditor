@@ -80,19 +80,23 @@ def main() -> int:
               tabs:[...document.querySelectorAll('.lex-nav-frame button')].map((node=>[...node.childNodes].filter(part=>!(part.nodeType===1&&part.classList.contains('lex-tab-shortcut'))).map(part=>part.textContent).join('').trim())),
               heading:document.querySelector('.lex-detail-panel-title').textContent.trim(),
               rows:document.querySelectorAll('.ff9-table .lex-column-list-row:not(.lex-filler-row)').length,
-              inputs:[...document.querySelectorAll('.ff9-detail input')].map(node=>({type:node.type,value:node.value,checked:node.checked})),
+              inputs:[...document.querySelectorAll('.ff9-detail input')].map(node=>({type:node.type,value:node.value,checked:node.checked,disabled:node.disabled})),
               saveDisabled:document.querySelector('#global-save').disabled,
               errors:window.__testErrors,
             }))()""")
             assert result["title"] == "Lexeditor - Final Fantasy 9", result
-            assert result["tabs"][-1] == "Tweaks" and len(result["tabs"]) > 1, result
+            # New top-level surfaces have been added after Tweaks. This contract
+            # is about a real multi-tab FF9 editor, not about freezing one tab at
+            # the final navigation position forever.
+            assert "Tweaks" in result["tabs"] and len(result["tabs"]) > 1, result
             assert {"Accessories", "Abilities", "Armor", "Items", "Magic", "Synthesis", "Weapons"}.issubset(result["tabs"]), result
             assert result["heading"] == "Dagger" or result["heading"] == "Hammer", result
             assert result["rows"] == 2, result
-            assert any(value["type"] == "number" and value["value"] in {"250", "320"} for value in result["inputs"]), result
+            price = next((value for value in result["inputs"] if value["value"] in {"250", "320"}), None)
+            assert price is not None and not price["disabled"], result
             assert any(value["type"] == "checkbox" for value in result["inputs"]), result
             assert result["saveDisabled"] and not result["errors"], result
-            cdp.eval("""(()=>{const input=document.querySelector('.ff9-detail input[type=number]');input.value='333';input.dispatchEvent(new Event('input',{bubbles:true}));return dirtyCount()})()""")
+            cdp.eval("""(()=>{const input=[...document.querySelectorAll('.ff9-detail input')].find(node=>node.value==='250'||node.value==='320');input.value='333';input.dispatchEvent(new Event('input',{bubbles:true}));return dirtyCount()})()""")
             wait_eval(cdp, "dirtyCount()===1&&!document.querySelector('#global-save').disabled", 10)
             cdp.eval("save()")
             wait_eval(cdp, "dirtyCount()===0&&document.querySelector('#global-save').disabled", 10)

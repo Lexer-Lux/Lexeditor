@@ -49,7 +49,8 @@ def raw_entries(data: bytes, count: int) -> list[bytes]:
 
 
 def verify_primary_contracts() -> dict:
-    assert EXE.is_file()
+    if not EXE.is_file():
+        raise FileNotFoundError(f"Expected supported installed FF8 executable: {EXE}")
     digest = sha256(EXE.read_bytes()).hexdigest()
     assert digest == executable_text.SUPPORTED_EXE_SHA256
     ffnx = FFNX_EXE_DATA.read_text(encoding="utf-8")

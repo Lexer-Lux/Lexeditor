@@ -29,11 +29,12 @@ ROWS=[{'id':str(i),'filename':f'file-{i:03}.dat','controls':f'Interface {i:03}',
 ROWS[0]['filename']='same-file.dat';ROWS[4]['filename']='same-file.dat'  # IDs must not collapse sections.
 # The injected row must name a target the plugin's real Data Map adapter supports.
 # Most plugins route generic item rows; Bannerlord has explicit editor targets.
-OPEN_TARGETS={'bannerlord':'skills'}
+OPEN_TARGETS={'bannerlord':'skills','stardew_valley':'objects'}
 
 def html_for(game):
     source_game='ff7' if game=='ff7_2013' else game
-    html=(ROOT/'games'/source_game/'editor.html').read_text(encoding='utf-8')
+    game_root=ROOT/'games'/source_game
+    html=(game_root/'editor.html').read_text(encoding='utf-8')
     # Synthetic set_content() documents otherwise use about:blank, which cannot
     # resolve the shared framework's optional relative assets or push fragment URLs.
     html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
@@ -87,6 +88,8 @@ with sync_playwright() as p:
                     'typeof state !== "undefined" || typeof mapRows !== "undefined"')
                 if not booted and game != 'blank':
                     raise AssertionError((game,width,height,'plugin state missing',errors,page.locator('body').inner_text()[:1200]))
+                target=OPEN_TARGETS.get(game,'items')
+                fixture_rows=[{**row,'target':target} for row in ROWS]
                 if game=='blank':
                     page.evaluate('navigate("datamap")')
                 elif game=='palworld':
@@ -99,7 +102,11 @@ with sync_playwright() as p:
                     open_target=OPEN_TARGETS.get(game,'items')
                     fixture_rows=[{**row,'target':open_target} for row in ROWS]
                     page.evaluate('''rows=>{
-                      state.dataMap={rows};state.datamap={rows};state.booting=false;
+                      const mapPayload={rows};
+                      window.fetch=input=>/\/api\/data-?map/.test(String(input))
+                        ? Promise.resolve({ok:true,status:200,json:async()=>mapPayload})
+                        : new Promise(()=>{});
+                      state.dataMap=mapPayload;state.datamap=mapPayload;state.booting=false;
                       if(Object.hasOwn(state,"loaded"))state.loaded=true;
                       state.dashboard={runtime:{installed:true},baseline:{},game:{},manifest:{},paths:{},problems:[]};
                       if(typeof state.data!=="object" || !state.data)state.data={};
@@ -118,6 +125,22 @@ with sync_playwright() as p:
                 page.evaluate('LexeditorUI.finishPluginLoading()')
                 page.wait_for_function('!document.documentElement.classList.contains("lex-loading-live")',timeout=15000)
                 page.wait_for_timeout(600)
+                shared=page.locator('.lex-data-map-table').count()>0
+                if not shared:
+                    # Chrono Trigger predates the shared Data Map component but
+                    # is still a real map and must remain covered by the derived
+                    # all-plugin sweep. Exercise its actual renderer/open callback
+                    # rather than pretending it has shared filter controls.
+                    assert game=='chrono_trigger',(game,'unexpected bespoke Data Map')
+                    table=page.locator('.ct-view table').first
+                    assert table.locator('tbody tr').count()==len(fixture_rows),(game,'fixture rows missing')
+                    page.evaluate('navigate=(target,filters)=>{window.mapOpened={target,filters}}')
+                    table.locator('tbody tr').first.click()
+                    assert page.evaluate('mapOpened.target')==target,game
+                    page.screenshot(path=str(OUT/f'{game}-{width}.png'),full_page=True)
+                    assert not errors,(game,errors)
+                    results.append({'game':game,'width':width,'height':height,'layout':'plugin-native','status':'passed'})
+                    page.close();continue
                 # A preview/source/parser does not produce an editable badge.
                 page.get_by_role('combobox',name='Filter files by integration',exact=True).select_option('not-integrated')
                 page.wait_for_timeout(250)
