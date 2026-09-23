@@ -207,6 +207,8 @@
         <div class="lexer-dev-table-wrap"><table id="lexer-dev-budget" class="lexer-dev-table"></table></div>
         <h3>COPIED CODE</h3>
         <div class="lexer-dev-table-wrap"><table id="lexer-dev-code" class="lexer-dev-table"></table></div>
+        <h3>LOADING QUOTES</h3>
+        <div class="lexer-dev-table-wrap"><table id="lexer-dev-quotes" class="lexer-dev-table"></table></div>
       </section>
       <section class="lexer-dev-helpers">
         <h3>HELPERS</h3>
@@ -346,6 +348,7 @@
         const overview=await window.pywebview.api.developer_overview();
         renderBudget(overview?.sharedUi||[]);
         renderCodeBudget(overview?.sharedCode||[]);
+        renderQuotes(overview?.quotes);
         const rows=overview?.games||[];
         const head=document.createElement("tr");
         for(const name of ["GAME","MOD LOADING","HOW","TASKS"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
@@ -404,6 +407,23 @@
       total.append(cell(`${body.length} plugins`),
         cell(String((rows||[]).reduce((sum,row)=>sum+row.copiedLines,0)),"num"));
       table.replaceChildren(head,...body,total);
+    }
+    // Loading lines per plugin plus the shared pool they fall back to.
+    function renderQuotes(quotes){
+      const table=document.querySelector("#lexer-dev-quotes");
+      const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
+      const head=document.createElement("tr");
+      for(const name of ["PLUGIN","QUOTES"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
+      const plugins=(quotes&&quotes.plugins)||{};
+      const names=Object.keys(plugins).sort();
+      const globalRow=document.createElement("tr");
+      globalRow.append(cell("Global (shared)"),cell(String((quotes&&quotes.global)||0),"num"));
+      const body=names.map(name=>{const tr=document.createElement("tr");
+        tr.append(cell(name),cell(String(plugins[name]),"num"));return tr;});
+      const total=document.createElement("tr");total.className="total";
+      total.append(cell(`${names.length} plugins + shared`),
+        cell(String(names.reduce((sum,name)=>sum+plugins[name],0)+((quotes&&quotes.global)||0)),"num"));
+      table.replaceChildren(head,globalRow,...body,total);
     }
     function setLexerPanel(open){
       if(open){lexerPanel.hidden=false;requestAnimationFrame(()=>lexerPanel.classList.add("open"));loadHelperVersions(false);loadDeveloperOverview();}

@@ -142,6 +142,29 @@ class DeveloperModeUiContractTests(unittest.TestCase):
         self.assertIn("if(resident&&Number(resident.dirtyCount)>0)", source)
         self.assertIn("await window.pywebview.api.restart_lexeditor()", source)
 
+    def test_loading_quote_counts_cover_every_plugin_and_the_shared_pool(self):
+        from desktop_host import HostApi
+        counts = HostApi.loading_quote_counts(object.__new__(HostApi))
+        games = sorted(path.name for path in (ROOT / "games").iterdir()
+                       if path.is_dir() and not path.name.startswith(("_", ".")))
+        self.assertEqual(sorted(counts["plugins"]), games)
+        for name, count in counts["plugins"].items():
+            own = ROOT / "games" / name / "loading_quotes.json"
+            if own.is_file():
+                import json
+                self.assertEqual(count, len(json.loads(own.read_text(encoding="utf-8"))))
+            else:
+                self.assertEqual(count, 0)
+        import json
+        shared = json.loads((ROOT / "ui" / "loading_quotes.json").read_text(encoding="utf-8"))
+        self.assertEqual(counts["global"], len(shared["global"]))
+        self.assertGreater(counts["global"], 0)
+
+    def test_developer_page_renders_a_loading_quotes_table(self):
+        source = (ROOT / "ui" / "chooser.html").read_text(encoding="utf-8")
+        self.assertIn("renderQuotes(overview?.quotes)", source)
+        self.assertIn('id="lexer-dev-quotes"', source)
+        self.assertIn("Global (shared)", source)
     def test_plugin_restart_and_shortcut_are_developer_only(self):
         source = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
         self.assertIn("restart.hidden = !developerMode", source)
