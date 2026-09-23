@@ -18,10 +18,10 @@ EXPECTED_HOOK_COUNT = 28
 # The integration lane fills these from the final reviewed runtime-on package.
 # Empty values keep the package unavailable; a manifest cannot authorize itself.
 PINNED_ARTIFACT_SHA256 = {
-    "driver": "398062ac3da8c632bcb75410dd51406792c11bafa85108fe5f4913f553c68663",
+    "driver": "cf8aa19d233aa6cc69965ac8961759f5aadb7a1670926547e2ca07d052ad9621",
     "license": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
-    "sourcePatch": "4df3dc248d58bbc1887b538561893eb8eb04414eb2fb97f6785ec832f2c2a9d5",
-    "buildReport": "5b871c6bc6cac83847dff2e88f97129c2ba67dcce25079dc54fcd8c2f09b8156",
+    "sourcePatch": "537e6e294813b4377912fb5986f77275938578ff356a81e13b966c97f1dcaf0e",
+    "buildReport": "f25cd7998f5f71b72570429d871333e610b46b5d5630d054e1ce344b5ff2a463",
     # Steamworks redistributable, shipped verbatim under the name FFNx loads
     # it by. FFNx refuses to run unless this file is signed or matches its
     # own pinned SHA-1 03bd9f3e352553a0af41f5fe006f6249a168c243.

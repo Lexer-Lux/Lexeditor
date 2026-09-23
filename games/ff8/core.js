@@ -48,21 +48,13 @@
     const noun=view==="gfs"?"GFs":view;
     const normalized=columns.map(column=>({...column,sortable:true,numberedId:column.numberedId??column.key==="id"}));
     const prefs=state.columnPrefs[view]||=columnPreferences(`ff8-${view}`,normalized,()=>render());
-    const root=pagedListDetail({bulkChanged:()=>shell.refresh(),modOnly:modOnlySpec(view),rows,key:row=>row.id,slots:true,empty:emptySlotTest(view),page:state.pages[view],pageSize:state.pageSizes[view],selected:state.selected[view],noun:view==="gfs"?"GFs":view,splitKey:`ff8-${view}`,defaultSplit:layout.defaultSplit??42,minLeft:layout.minLeft??340,minRight:layout.minRight??420,maxBarrels:layout.maxBarrels,leadingPanel:layout.leadingPanel,minLeading:layout.minLeading,defaultLeadingWidth:layout.defaultLeadingWidth,trailingPanel:layout.trailingPanel,minTrailing:layout.minTrailing,panelSizes:layout.panelSizes,
+    const root=pagedListDetail({bulkChanged:()=>shell.refresh(),modOnly:modOnlySpec(view),rows,key:row=>row.id,slots:true,page:state.pages[view],pageSize:state.pageSizes[view],selected:state.selected[view],noun:view==="gfs"?"GFs":view,splitKey:`ff8-${view}`,defaultSplit:layout.defaultSplit??42,minLeft:layout.minLeft??340,minRight:layout.minRight??420,maxBarrels:layout.maxBarrels,leadingPanel:layout.leadingPanel,minLeading:layout.minLeading,defaultLeadingWidth:layout.defaultLeadingWidth,trailingPanel:layout.trailingPanel,minTrailing:layout.minTrailing,panelSizes:layout.panelSizes,
       search:{key:`ff8-${view}`,value:state.filters[view],delay:110,placeholder:`Search ${noun.toLocaleLowerCase()}…`,label:`Search ${noun}`,change:value=>{state.filters[view]=value;state.pages[view]=0;render()}},
       sync:value=>{state.pages[view]=value.page;state.pageSizes[view]=value.pageSize;state.selected[view]=value.selected},
-      change:value=>{state.pages[view]=value.page;state.pageSizes[view]=value.pageSize;state.selected[view]=value.selected;render()},
+      change:async value=>{if(view==="enemies"&&!(await enemyAiBeforeLeave()))return;state.pages[view]=value.page;state.pageSizes[view]=value.pageSize;state.selected[view]=value.selected;render()},
       master:listColumns(view,normalized,template,prefs,layout.fixedTemplate===true),detail:row=>detail(row,prefs)});
     if(mount)$("#main").replaceChildren(root);
     return root;
-  }
-  // Every FF8 record is a fixed kernel, DAT or scene slot, so these tables
-  // never grow. Where the data itself proves a slot is unused, the bottom bar
-  // can hide those slots.
-  function emptySlotTest(view){
-    if(view==="encounters")return row=>!(row.slots||[]).some(slot=>slot.enabled);
-    if(view==="enemies")return row=>row.available===false;
-    return null;
   }
   // The heading's icon box is for a record that has a 3D view, and FF8 has none.
   // A record's icon goes before its name instead, the same way it is shown in
@@ -99,7 +91,7 @@
         const next=abilityIcon(entries.find(entry=>String(key(entry))===control.value));
         icon.replaceWith(next);icon=next;
       });
-      return LexeditorUI.controlGroup([LexeditorUI.inlineLabel(icon),autoFitControlText(control)]);
+      return LexeditorUI.inlineLabel(icon,autoFitControlText(control));
     }
     return autoFitControlText(control);
   }
@@ -112,13 +104,13 @@
   function itemDisplay(item,text=item?.name||`Item ${item?.id??"?"}`){return LexeditorUI.inlineLabel(itemIcon(item),el("span",{},text))}
   function itemLabel(item,text=item?.name||`Item ${item?.id??"?"}`){return hoverable({content:itemDisplay(item,text),targetType:"item",targetId:item?.id,targetLabel:text,activate:()=>openItem(item?.id)})}
   function itemIconLink(item){return hoverable({content:itemIcon(item),targetType:"item",targetId:item?.id,targetLabel:item?.name||`Item ${item?.id??"?"}`,activate:()=>openItem(item?.id)})}
-  function itemSelectControl(value,entries,onchange){let current=itemIconLink(entries.find(entry=>Number(entry.id??entry.value)===Number(value))||itemById(value));const select=selectControl(value,entries,next=>{onchange(next);const replacement=itemIconLink(entries.find(entry=>Number(entry.id??entry.value)===Number(next))||itemById(next));current.replaceWith(replacement);current=replacement});return LexeditorUI.controlGroup([current,select])}
-  function itemSearchControl(value,prompt,accept,origin){const item=itemById(value)||{id:value,name:`Item ${value}`},link=hoverable({content:itemDisplay(item,item.name),targetType:"items",targetId:item.id,targetLabel:item.name,activate:()=>{state.selected.items=Number(item.id);navigate("items")}}),finder=el("button",{type:"button",title:"Choose an item","aria-label":`Choose an item for ${item.name}`,onclick:event=>{event.preventDefault();event.stopPropagation();beginSearcher({type:"items",prompt,target:()=>navigate("items"),origin,accept})}},searchIcon());return LexeditorUI.choiceField(link,finder)}
+  function itemSelectControl(value,entries,onchange){let current=itemIconLink(entries.find(entry=>Number(entry.id??entry.value)===Number(value))||itemById(value));const select=selectControl(value,entries,next=>{onchange(next);const replacement=itemIconLink(entries.find(entry=>Number(entry.id??entry.value)===Number(next))||itemById(next));current.replaceWith(replacement);current=replacement});return LexeditorUI.inlineLabel(current,select)}
+  function itemSearchControl(value,prompt,accept,origin){const item=itemById(value)||{id:value,name:`Item ${value}`},link=hoverable({content:itemDisplay(item,item.name),targetType:"items",targetId:item.id,targetLabel:item.name,activate:()=>{state.selected.items=Number(item.id);navigate("items")}}),finder=el("button",{type:"button",title:"Choose an item","aria-label":`Choose an item for ${item.name}`,onclick:event=>{event.preventDefault();event.stopPropagation();beginSearcher({type:"items",prompt,target:()=>navigate("items"),origin,accept})}},LexeditorUI.selectionIcon());return LexeditorUI.choiceField(link,finder)}
   function enemyById(enemyId){return state.data.enemies?.rows?.find(enemy=>Number(enemy.id)===Number(enemyId))||{id:enemyId,name:`Enemy ${enemyId}`}}
-  function enemySearchControl(value,prompt,accept,origin){const enemy=enemyById(value),name=hoverable({content:enemyDisplayName(enemy.name),targetType:"enemies",targetId:enemy.id,targetLabel:enemy.name,activate:()=>{state.selected.enemies=enemy.id;navigate("enemies")}}),finder=el("button",{type:"button",title:"Choose an enemy","aria-label":"Choose an enemy",onclick:event=>{event.stopPropagation();beginSearcher({type:"enemies",prompt,target:()=>navigate("enemies"),origin,accept})}},searchIcon());return LexeditorUI.choiceField(name,finder)}
+  function enemySearchControl(value,prompt,accept,origin){const enemy=enemyById(value),name=hoverable({content:enemyDisplayName(enemy.name),targetType:"enemies",targetId:enemy.id,targetLabel:enemy.name,activate:()=>{state.selected.enemies=enemy.id;navigate("enemies")}}),finder=el("button",{type:"button",title:"Choose an enemy","aria-label":"Choose an enemy",onclick:event=>{event.stopPropagation();beginSearcher({type:"enemies",prompt,target:()=>navigate("enemies"),origin,accept})}},LexeditorUI.selectionIcon());return LexeditorUI.choiceField(name,finder)}
   function rowOf(dataset,view,id){return dataset?.[view]?.rows?.find(row=>row.id===id)}
   function sameValue(left,right){return signature(left)===signature(right)}
-  function sourceControl(control,current,vanilla,references,apply,format,options={}){return LexeditorUI.provenanceControl({control,current,vanilla,references,format,same:sameValue,internal:options.internal===true,apply:value=>{apply(value);render();shell.refresh()}})}
+  function sourceControl(control,current,vanilla,references,apply,format,options={}){return LexeditorUI.provenanceControl({control,current,vanilla,references,format,same:sameValue,internal:options.internal,apply:value=>{apply(value);render();shell.refresh()}})}
   function pinLabel(prefs,key,label){return el("span",{class:"lex-pinnable-property"},label,prefs?.pinButton(key,label))}
   function referenceValues(view,id,read){return state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:read(rowOf(state.referenceData[reference.id],view,id))})).filter(entry=>entry.value!==undefined)}
   function auxiliaryReferences(view,id,read){return state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:read(rowOf(state.referenceData[reference.id],view,id))})).filter(entry=>entry.value!==undefined)}
@@ -128,7 +120,7 @@
   function menuItemSection(itemId){const row=rowOf(state.data,"menuItems",itemId),vanilla=rowOf(state.vanilla,"menuItems",itemId);if(!row||!vanilla)return null;const typeEntries=state.data.menuItems.types.map(entry=>({value:entry.id,name:entry.name})),setType=value=>{const type=state.data.menuItems.types.find(entry=>Number(entry.id)===Number(value));row.typeId=Number(value);row.typeName=type.name;row.description=type.description;row.param1Type=type.param1;row.param2Type=type.param2;renderItems();shell.refresh()};const refs=read=>auxiliaryReferences("menuItems",itemId,read);return detailSection({className:"item-menu-section",title:"MENU BEHAVIOR",body:[
     detailField({label:"TYPE",help:row.description?infoHelp(row.description):null,control:sourceControl(selectControl(row.typeId,typeEntries,setType),()=>row.typeId,vanilla.typeId,refs(value=>value?.typeId),setType,value=>typeEntries.find(entry=>entry.value===Number(value))?.name||value)}),
     detailField({label:"USE FLAGS",control:sourceControl(bitFlagsControl(row.flags,state.data.menuItems.flagDefinitions,value=>row.flags=value,"Item use flags"),()=>row.flags,vanilla.flags,refs(value=>value?.flags),value=>row.flags=Number(value),value=>`0x${Number(value).toString(16).padStart(2,"0").toLocaleUpperCase()}`)}),
-    detailField({className:"item-parameter-field",label:"PARAMETER 1",help:(help=>help?infoHelp(help):null)(state.data.menuItems.parameterTypes.find(entry=>entry.name===row.param1Type)?.description||""),control:sourceControl(menuParameterControl(row,"param1"),()=>row.param1,vanilla.param1,refs(value=>value?.param1),value=>row.param1=Number(value))}),
-    detailField({className:"item-parameter-field",label:"PARAMETER 2",help:(help=>help?infoHelp(help):null)(state.data.menuItems.parameterTypes.find(entry=>entry.name===row.param2Type)?.description||""),control:sourceControl(menuParameterControl(row,"param2"),()=>row.param2,vanilla.param2,refs(value=>value?.param2),value=>row.param2=Number(value))})]})}
+    detailField({className:"item-parameter-field",label:"Param 1",help:(help=>help?infoHelp(help):null)(state.data.menuItems.parameterTypes.find(entry=>entry.name===row.param1Type)?.description||""),control:sourceControl(menuParameterControl(row,"param1"),()=>row.param1,vanilla.param1,refs(value=>value?.param1),value=>row.param1=Number(value))}),
+    detailField({className:"item-parameter-field",label:"Param 2",help:(help=>help?infoHelp(help):null)(state.data.menuItems.parameterTypes.find(entry=>entry.name===row.param2Type)?.description||""),control:sourceControl(menuParameterControl(row,"param2"),()=>row.param2,vanilla.param2,refs(value=>value?.param2),value=>row.param2=Number(value))})]})}
 
   function gilValue(value){return unitField(numberValue(value),"G",{unitClass:"ff8-gil-unit"})}

@@ -16,7 +16,7 @@ def main():
   p.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
   p.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
   p.add_style_tag(content='main{display:block!important;padding:0!important}.lex-detail-panel{width:100%}')
-  p.add_script_tag(content="""const {el,detailField,detailSection,infoHelp}=LexeditorUI;
+  p.add_script_tag(content="""const {el,detailField,detailSection,infoHelp,detailPanel,readonlyField}=LexeditorUI;
  const state={references:[],vanilla:{}},shell={refresh(){}};
  function matchingTextRow(){return {value:'Drain'}}
  function sourceControl(control,current,vanilla,references,apply,format,options){return LexeditorUI.provenanceControl({control,current,vanilla,references,apply,internal:options.internal})}
@@ -27,7 +27,8 @@ def main():
    p.evaluate('w=>document.querySelector("main").style.width=w+"px"',width)
    p.wait_for_timeout(60)
    assert p.locator('textarea').evaluate('(e)=>e.offsetWidth/e.closest(".lex-detail-field").clientWidth>.9'),width
-  assert p.locator('.lex-detail-field-label').evaluate('(e)=>e.offsetHeight>=30')
+  # The editor has no name but keeps its help about tokens and save limits.
+  assert p.locator('.lex-text-editor .lex-info-help').count()==1
   p.locator('textarea').fill('New text')
   assert p.evaluate('row.value')=='New text'
   b.close()

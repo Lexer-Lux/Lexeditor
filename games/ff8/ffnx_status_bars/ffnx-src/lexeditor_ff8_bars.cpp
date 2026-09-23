@@ -1,4 +1,5 @@
 #include "lexeditor_ff8_bars.h"
+#include "lexeditor_ff8_hp_colors.h"
 
 #include <algorithm>
 #include <array>
@@ -6,6 +7,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <ctime>
+#include <vector>
 
 #include <imgui.h>
 
@@ -64,6 +66,81 @@ struct HpCapture {
 std::array<HpCapture, 3> g_hp_rows;
 HpCapture *g_hp_row = nullptr;
 
+
+struct HpTintState {
+    bool active = false;
+    std::uint16_t current = 0;
+    std::uint16_t maximum = 0;
+};
+HpTintState g_hp_tint;
+HpTintState g_hp_number_previous;
+bool g_hp_number_scope = false;
+struct MenuHpContext {
+    bool active = false;
+    std::uint32_t packed_position = 0;
+    std::uint16_t current = 0;
+    std::uint16_t maximum = 0;
+};
+MenuHpContext g_menu_hp;
+HpTintState g_main_menu_hp;
+const std::uint8_t *g_reserve_menu_state = nullptr;
+bool g_better_hp_runtime_ready = false;
+constexpr std::uint32_t kCharacterWidget = 0x004C0780;
+constexpr std::uint32_t kHpNumberRenderer = 0x004A3530;
+std::uint32_t g_hp_number_renderer = kHpNumberRenderer;
+std::uint32_t g_hp_number_replace_id = 0;
+std::uint32_t g_hp_number_return = 0;
+
+void hp_number_begin(const std::uint32_t *stack)
+{
+    g_hp_number_scope = false;
+    if (stack == nullptr) return;
+    g_hp_number_return = stack[0];
+    if (!g_better_hp_runtime_ready || !enable_ff8_better_hp_colors ||
+        !g_menu_hp.active || stack[3] != g_menu_hp.packed_position) return;
+    g_hp_number_previous = g_hp_tint;
+    g_hp_tint = {lexeditor_ff8_hp_should_tint(g_menu_hp.current, g_menu_hp.maximum),
+        g_menu_hp.current, g_menu_hp.maximum};
+    g_hp_number_scope = true;
+}
+void hp_number_end()
+{
+    if (!g_hp_number_scope) return;
+    g_hp_tint = g_hp_number_previous;
+    g_hp_number_scope = false;
+}
+void __declspec(naked) __cdecl hp_number_hook()
+{
+    __asm {
+        pushad
+        lea eax, [esp + 32]
+        push eax
+        call hp_number_begin
+        add esp, 4
+        popad
+        pushfd
+        pushad
+        push g_hp_number_replace_id
+        call unreplace_function
+        add esp, 4
+        popad
+        popfd
+        mov dword ptr [esp], offset hp_number_after_native
+        jmp dword ptr [g_hp_number_renderer]
+hp_number_after_native:
+        pushfd
+        pushad
+        push g_hp_number_replace_id
+        call rereplace_function
+        add esp, 4
+        call hp_number_end
+        popad
+        popfd
+        push dword ptr [g_hp_number_return]
+        ret
+    }
+}
+
 // Native 004B77F9 reads the menu sprite table. Each entry encodes a count
 // and offset; each 8-byte sprite has width, signed x, height, signed y.
 void capture_glyph(int x, int y, bool hp)
@@ -97,7 +174,13 @@ void capture_glyph(int x, int y, bool hp)
 std::uint32_t __cdecl hp_glyph_hook(std::uint32_t a, std::uint32_t b, int x, int y)
 {
     capture_glyph(x, y, true);
-    return g_hp_glyph_renderer(a, b, x, y);
+    const auto previous = g_hp_tint;
+    if (g_better_hp_runtime_ready && enable_ff8_better_hp_colors && g_hp_row != nullptr)
+        g_hp_tint = {lexeditor_ff8_hp_should_tint(g_hp_row->current, g_hp_row->maximum),
+            g_hp_row->current, g_hp_row->maximum};
+    const auto result = g_hp_glyph_renderer(a, b, x, y);
+    g_hp_tint = previous;
+    return result;
 }
 std::uint32_t __cdecl atb_glyph_hook(std::uint32_t a, std::uint32_t b, int x, int y)
 {
@@ -354,12 +437,29 @@ std::uint32_t __cdecl character_widget_hook(unsigned display,unsigned cursor,int
 {
     const auto base=reinterpret_cast<std::uintptr_t>(&ff8_externals.savemap->chars[0]);
     const auto address=reinterpret_cast<std::uintptr_t>(saved);
+    MenuHpContext previous_hp = g_menu_hp;
+    bool number_detour = false;
     if(address>=base && (address-base)%sizeof(savemap_ff8_character)==0) {
         const auto id=(address-base)/sizeof(savemap_ff8_character);
-        if(id<CHAR_NUM) capture_menu_xp(x+79,y+88,70,
-            xp_fraction(ff8_externals.savemap->chars[id].exp,static_cast<std::uint8_t>(id)));
+        if(id<CHAR_NUM) {
+            if (enable_ff8_xp_bars) capture_menu_xp(x+79,y+88,70,
+                xp_fraction(ff8_externals.savemap->chars[id].exp,static_cast<std::uint8_t>(id)));
+            if (g_better_hp_runtime_ready && enable_ff8_better_hp_colors && stats != nullptr) {
+                const auto *computed = reinterpret_cast<const std::uint16_t *>(stats);
+                g_menu_hp = {true,
+                    (static_cast<std::uint32_t>(static_cast<std::uint16_t>(y + 75)) << 16) |
+                        static_cast<std::uint16_t>(x + 141),
+                    computed[4], computed[5]};
+                rereplace_function(g_hp_number_replace_id);
+                number_detour = true;
+            }
+        }
     }
-    return reinterpret_cast<CharacterWidget>(0x004C0780)(display,cursor,x,y,saved,stats,flags);
+    const auto result = reinterpret_cast<CharacterWidget>(kCharacterWidget)(
+        display,cursor,x,y,saved,stats,flags);
+    if (number_detour) unreplace_function(g_hp_number_replace_id);
+    g_menu_hp = previous_hp;
+    return result;
 }
 using MainRowWidget = std::uint32_t(__cdecl *)(const std::uint8_t *,unsigned,unsigned,int);
 template<unsigned Address, int Spacing>
@@ -383,14 +483,60 @@ std::uint32_t __cdecl main_row_hook(const std::uint8_t *state,unsigned display,u
     return reinterpret_cast<MainRowWidget>(Address)(state,display,cursor,slot);
 }
 using ReserveWidget = std::uint32_t(__cdecl *)(const std::uint8_t *,unsigned,unsigned);
+using MainHpWidget = std::uint32_t(__cdecl *)(int,int,unsigned,unsigned,int,int,unsigned);
+using MenuText = std::uint32_t(__cdecl *)(unsigned,unsigned,int,int,const void *,unsigned);
+
+// These three calls draw only the current HP digits. The HP label, slash,
+// maximum and other numbers retain their native palette.
+std::uint32_t __cdecl main_hp_widget_hook(int current,int maximum,unsigned display,
+    unsigned cursor,int x,int y,unsigned palette)
+{
+    const auto previous=g_main_menu_hp;
+    g_main_menu_hp={current>0 && maximum>current,
+        static_cast<std::uint16_t>(std::max(0,current)),
+        static_cast<std::uint16_t>(std::max(0,maximum))};
+    const auto result=reinterpret_cast<MainHpWidget>(0x004BF380)(
+        current,maximum,display,cursor,x,y,palette);
+    g_main_menu_hp=previous;
+    return result;
+}
+
+HpTintState reserve_hp_at(int x,int y)
+{
+    // 004C2090: x=32+120*column+59+16, y=112+24*row+12.
+    if(!g_reserve_menu_state || x<107 || y<124 || (x-107)%120 || (y-124)%24)
+        return {};
+    const int column=(x-107)/120,row=(y-124)/24;
+    if(column>1 || row>3)return {};
+    const auto id=g_reserve_menu_state[0x38+row*2+column];
+    if(id>=CHAR_NUM)return {};
+    const auto *stats=reinterpret_cast<const std::uint16_t *>(0x01D771B0+32*id);
+    return {lexeditor_ff8_hp_should_tint(stats[4],stats[5]),stats[4],stats[5]};
+}
+
+template<bool Reserve> std::uint32_t __cdecl main_hp_text_hook(unsigned display,
+    unsigned cursor,int x,int y,const void *text,unsigned palette)
+{
+    const auto previous=g_hp_tint;
+    if(g_better_hp_runtime_ready && enable_ff8_better_hp_colors)
+        g_hp_tint=Reserve?reserve_hp_at(x,y):g_main_menu_hp;
+    const auto result=reinterpret_cast<MenuText>(0x0049F850)(display,cursor,x,y,text,palette);
+    g_hp_tint=previous;
+    return result;
+}
+
 std::uint32_t __cdecl reserve_widget_hook(const std::uint8_t *state,unsigned display,unsigned cursor)
 {
     for(unsigned slot=0;slot<8;++slot) {
         const auto id=state[0x38+slot];
-        if(id<CHAR_NUM) capture_menu_xp(44+120*(slot%2),138+24*(slot/2),48,
+        if(enable_ff8_xp_bars && id<CHAR_NUM) capture_menu_xp(44+120*(slot%2),138+24*(slot/2),48,
             xp_fraction(ff8_externals.savemap->chars[id].exp,id));
     }
-    return reinterpret_cast<ReserveWidget>(0x004C2090)(state,display,cursor);
+    const auto *previous=g_reserve_menu_state;
+    g_reserve_menu_state=state;
+    const auto result=reinterpret_cast<ReserveWidget>(0x004C2090)(state,display,cursor);
+    g_reserve_menu_state=previous;
+    return result;
 }
 using GfListWidget = std::uint32_t(__cdecl *)(unsigned,unsigned,int,int,unsigned,unsigned);
 std::uint32_t __cdecl gf_list_hook(unsigned display,unsigned cursor,int x,int y,unsigned gf,unsigned level)
@@ -489,6 +635,50 @@ void draw_battle_hp()
 
 } // namespace
 
+bool lexeditor_ff8_hp_colors_requested()
+{
+    return ff8 && enable_ff8_better_hp_colors;
+}
+
+void lexeditor_ff8_hp_colors_draw_paletted2D(
+    struct polygon_set *polygon_set, struct indexed_vertices *iv, struct game_obj *game_object)
+{
+    if (!g_better_hp_runtime_ready || !enable_ff8_better_hp_colors ||
+        !g_hp_tint.active || iv == nullptr) {
+        common_draw_paletted2D(polygon_set, iv, game_object);
+        return;
+    }
+    auto *ff8_iv = reinterpret_cast<ff8_indexed_vertices *>(iv);
+    if (ff8_iv->vertices == nullptr || ff8_iv->palettes == nullptr ||
+        ff8_iv->count == 0 || ff8_iv->vertexcount == 0) {
+        common_draw_paletted2D(polygon_set, iv, game_object);
+        return;
+    }
+    const auto white = static_cast<unsigned char>(text_colors[TEXTCOLOR_WHITE]);
+    const auto yellow = static_cast<unsigned char>(text_colors[TEXTCOLOR_YELLOW]);
+    for (std::uint32_t i=0;i<ff8_iv->count;++i)
+        if (ff8_iv->palettes[i] != white && ff8_iv->palettes[i] != yellow) {
+            common_draw_paletted2D(polygon_set, iv, game_object); return;
+        }
+    for (std::uint32_t i=0;i<ff8_iv->vertexcount;++i) {
+        const auto &v=ff8_iv->vertices[i].color;
+        if (v.r != 255 || v.g != 255 || v.b != 255) {
+            common_draw_paletted2D(polygon_set, iv, game_object); return;
+        }
+    }
+    std::vector<unsigned char> palettes(ff8_iv->palettes,ff8_iv->palettes+ff8_iv->count);
+    std::vector<std::uint32_t> colors; colors.reserve(ff8_iv->vertexcount);
+    for(std::uint32_t i=0;i<ff8_iv->vertexcount;++i) colors.push_back(ff8_iv->vertices[i].color.color);
+    const auto rgb=lexeditor_ff8_hp_rgb(g_hp_tint.current,g_hp_tint.maximum);
+    std::fill_n(ff8_iv->palettes,ff8_iv->count,white);
+    for(std::uint32_t i=0;i<ff8_iv->vertexcount;++i) {
+        ff8_iv->vertices[i].color.r=rgb.r;ff8_iv->vertices[i].color.g=rgb.g;ff8_iv->vertices[i].color.b=rgb.b;
+    }
+    common_draw_paletted2D(polygon_set, iv, game_object);
+    std::copy(palettes.begin(),palettes.end(),ff8_iv->palettes);
+    for(std::uint32_t i=0;i<ff8_iv->vertexcount;++i) ff8_iv->vertices[i].color.color=colors[i];
+}
+
 bool lexeditor_ff8_bars_enabled()
 {
     return ff8 && (enable_ff8_xp_bars || enable_ff8_hp_bars || enable_ff8_gf_hp_bars || enable_ff8_ingame_time);
@@ -496,68 +686,87 @@ bool lexeditor_ff8_bars_enabled()
 
 void lexeditor_ff8_bars_install()
 {
-    if (!ff8 || (!enable_ff8_xp_bars && !enable_ff8_hp_bars && !enable_ff8_gf_hp_bars && !enable_ff8_ingame_time)) {
-        return;
-    }
-
-    g_active_viewport = reinterpret_cast<sprite_viewport **>(get_absolute_value(
-        ff8_externals.engine_reset_viewport_sub_4972D0, 0x12));
-    const auto original_call = [](std::uintptr_t address, std::uintptr_t target) {
-        return *reinterpret_cast<const std::uint8_t *>(address) == 0xE8 &&
-            get_relative_call(address, 0) == target;
+    if (!ff8 || (!enable_ff8_xp_bars && !enable_ff8_hp_bars && !enable_ff8_gf_hp_bars &&
+        !enable_ff8_ingame_time && !enable_ff8_better_hp_colors)) return;
+    g_better_hp_runtime_ready=false;
+    g_active_viewport=reinterpret_cast<sprite_viewport **>(get_absolute_value(
+        ff8_externals.engine_reset_viewport_sub_4972D0,0x12));
+    const auto original_call=[](std::uintptr_t address,std::uintptr_t target) {
+        return *reinterpret_cast<const std::uint8_t *>(address)==0xE8 && get_relative_call(address,0)==target;
     };
-    if ((enable_ff8_hp_bars || enable_ff8_gf_hp_bars) && FF8_US_VERSION &&
-        original_call(0x004B17D5, 0x004B0F10) &&
-        original_call(0x004B1100, 0x004A7210) &&
-        original_call(0x004B127B, 0x004A7210)) {
-        // Row call runs only after native HUD visibility and participant gates.
-        g_battle_row_renderer = reinterpret_cast<BattleRowRenderer>(get_relative_call(0x004B17D5, 0));
-        g_hp_glyph_renderer = reinterpret_cast<GlyphRenderer>(get_relative_call(0x004B1100, 0));
-        g_atb_glyph_renderer = reinterpret_cast<GlyphRenderer>(get_relative_call(0x004B127B, 0));
-        replace_call(0x004B17D5, reinterpret_cast<void *>(&battle_row_hook));
-        replace_call(0x004B1100, reinterpret_cast<void *>(&hp_glyph_hook));
-        replace_call(0x004B127B, reinterpret_cast<void *>(&atb_glyph_hook));
+    const std::array<std::uint32_t,7> character_widget_calls={
+        0x4C08F4U,0x4CB66CU,0x4CC846U,0x4F6E8EU,0x4F6F17U,0x4F7361U,0x4F73EEU};
+    const bool battle_hp_supported=FF8_US_VERSION &&
+        original_call(0x004B17D5,0x004B0F10) &&
+        original_call(0x004B1100,0x004A7210) &&
+        original_call(0x004B127B,0x004A7210);
+    bool menu_hp_supported=FF8_US_VERSION;
+    for(const auto call:character_widget_calls)
+        menu_hp_supported=menu_hp_supported && original_call(call,kCharacterWidget);
+    const bool main_hp_supported=original_call(0x004C1DF6,0x004BF380) &&
+        original_call(0x004C1F78,0x004BF380) && original_call(0x004BF407,0x0049F850) &&
+        original_call(0x004C22CD,0x0049F850) && original_call(0x004C1AED,0x004C2090);
+    const bool better_hp_supported=battle_hp_supported && menu_hp_supported && main_hp_supported;
+    if ((enable_ff8_hp_bars || enable_ff8_gf_hp_bars ||
+        (enable_ff8_better_hp_colors && better_hp_supported)) && battle_hp_supported) {
+        g_battle_row_renderer=reinterpret_cast<BattleRowRenderer>(get_relative_call(0x004B17D5,0));
+        g_hp_glyph_renderer=reinterpret_cast<GlyphRenderer>(get_relative_call(0x004B1100,0));
+        g_atb_glyph_renderer=reinterpret_cast<GlyphRenderer>(get_relative_call(0x004B127B,0));
+        replace_call(0x004B17D5,reinterpret_cast<void *>(&battle_row_hook));
+        replace_call(0x004B1100,reinterpret_cast<void *>(&hp_glyph_hook));
+        replace_call(0x004B127B,reinterpret_cast<void *>(&atb_glyph_hook));
+    }
+    if(enable_ff8_better_hp_colors) {
+        if(!better_hp_supported) ffnx_error("Better HP Colors: unsupported FF8 executable layout; leaving vanilla HP colors.\n");
+        else {
+            g_hp_number_replace_id=replace_function(kHpNumberRenderer,reinterpret_cast<void *>(&hp_number_hook));
+            unreplace_function(g_hp_number_replace_id);g_better_hp_runtime_ready=true;
+            replace_call(0x004C1DF6,reinterpret_cast<void *>(&main_hp_widget_hook));
+            replace_call(0x004C1F78,reinterpret_cast<void *>(&main_hp_widget_hook));
+            replace_call(0x004BF407,reinterpret_cast<void *>(&main_hp_text_hook<false>));
+            replace_call(0x004C22CD,reinterpret_cast<void *>(&main_hp_text_hook<true>));
+        }
     }
     if (enable_ff8_ingame_time && FF8_US_VERSION &&
-        original_call(0x004C1C6E, 0x004BF020) &&
-        original_call(0x004BF099, 0x004B77C0)) {
-        g_clock_renderer = reinterpret_cast<ClockRenderer>(get_relative_call(0x004C1C6E, 0));
-        g_clock_label_renderer = reinterpret_cast<ClockLabelRenderer>(get_relative_call(0x004BF099, 0));
-        replace_call(0x004BF099, reinterpret_cast<void *>(&clock_label_hook));
-        replace_call(0x004C1C6E, reinterpret_cast<void *>(&main_menu_clock_hook));
+        original_call(0x004C1C6E,0x004BF020) && original_call(0x004BF099,0x004B77C0)) {
+        g_clock_renderer=reinterpret_cast<ClockRenderer>(get_relative_call(0x004C1C6E,0));
+        g_clock_label_renderer=reinterpret_cast<ClockLabelRenderer>(get_relative_call(0x004BF099,0));
+        replace_call(0x004BF099,reinterpret_cast<void *>(&clock_label_hook));
+        replace_call(0x004C1C6E,reinterpret_cast<void *>(&main_menu_clock_hook));
     }
-    // Main-menu HP also needs the active-party row hooks when XP is off.
-    if (FF8_US_VERSION && (enable_ff8_xp_bars || enable_ff8_hp_bars)) {
-        if(original_call(0x4C1ADA,0x4C1D50))
-            replace_call(0x4C1ADA,reinterpret_cast<void *>(&main_row_hook<0x4C1D50,26>));
-        if(original_call(0x4C1AC2,0x4C1ED0))
-            replace_call(0x4C1AC2,reinterpret_cast<void *>(&main_row_hook<0x4C1ED0,52>));
+    if(FF8_US_VERSION && (enable_ff8_xp_bars || enable_ff8_hp_bars)) {
+        if(original_call(0x4C1ADA,0x4C1D50)) replace_call(0x4C1ADA,reinterpret_cast<void *>(&main_row_hook<0x4C1D50,26>));
+        if(original_call(0x4C1AC2,0x4C1ED0)) replace_call(0x4C1AC2,reinterpret_cast<void *>(&main_row_hook<0x4C1ED0,52>));
     }
+    if(FF8_US_VERSION && (enable_ff8_xp_bars || g_better_hp_runtime_ready)) {
+        const auto hook=[&](unsigned address,unsigned target,void *replacement) {
+            if(original_call(address,target)) replace_call(address,replacement);
+            else if(enable_ff8_xp_bars) ffnx_error("XP Bars: unsupported widget call at %08X\n",address);
+        };
+        for(const unsigned call:character_widget_calls) hook(call,kCharacterWidget,reinterpret_cast<void *>(&character_widget_hook));
+    }
+    if(FF8_US_VERSION && (enable_ff8_xp_bars || g_better_hp_runtime_ready) &&
+        original_call(0x4C1AED,0x4C2090))
+        replace_call(0x4C1AED,reinterpret_cast<void *>(&reserve_widget_hook));
     if (!enable_ff8_xp_bars) return;
-
-    if (FF8_US_VERSION) {
-        const auto hook = [&](unsigned address,unsigned target,void *replacement) {
+    if(FF8_US_VERSION) {
+        const auto hook=[&](unsigned address,unsigned target,void *replacement) {
             if(original_call(address,target)) replace_call(address,replacement);
             else ffnx_error("XP Bars: unsupported widget call at %08X\n",address);
         };
-        for(const unsigned call : {0x4C08F4U,0x4CB66CU,0x4CC846U,0x4F6E8EU,0x4F6F17U,0x4F7361U,0x4F73EEU})
-            hook(call,0x4C0780,reinterpret_cast<void *>(&character_widget_hook));
-        hook(0x4C1AED,0x4C2090,reinterpret_cast<void *>(&reserve_widget_hook));
         hook(0x4D3DB5,0x4D3E40,reinterpret_cast<void *>(&gf_list_hook));
-        for(const unsigned call : {0x4D3D34U,0x4D3D4AU})
-            hook(call,0x4D41B0,reinterpret_cast<void *>(&gf_detail_hook));
+        for(const unsigned call:{0x4D3D34U,0x4D3D4AU}) hook(call,0x4D41B0,reinterpret_cast<void *>(&gf_detail_hook));
     }
-    g_after_battle_renderer = reinterpret_cast<AfterBattleRenderer>(
-        get_relative_call(ff8_externals.battle_menu_sub_4A3D20, 0x139));
-    g_result_state = reinterpret_cast<ResultState>(get_relative_call(
-        reinterpret_cast<std::uintptr_t>(g_after_battle_renderer), 0x9));
-    g_active_viewport = reinterpret_cast<sprite_viewport **>(get_absolute_value(
-        ff8_externals.engine_reset_viewport_sub_4972D0, 0x12));
-    const auto row_call = reinterpret_cast<std::uintptr_t>(g_after_battle_renderer) + 0x2BD;
-    g_result_row_renderer = reinterpret_cast<ResultRowRenderer>(get_relative_call(row_call, 0));
-    replace_call(row_call, reinterpret_cast<void *>(&result_row_renderer_hook));
-    replace_call(ff8_externals.battle_menu_sub_4A3D20 + 0x139,
-        reinterpret_cast<void *>(&after_battle_renderer_hook));
+    g_after_battle_renderer=reinterpret_cast<AfterBattleRenderer>(
+        get_relative_call(ff8_externals.battle_menu_sub_4A3D20,0x139));
+    g_result_state=reinterpret_cast<ResultState>(get_relative_call(
+        reinterpret_cast<std::uintptr_t>(g_after_battle_renderer),0x9));
+    g_active_viewport=reinterpret_cast<sprite_viewport **>(get_absolute_value(
+        ff8_externals.engine_reset_viewport_sub_4972D0,0x12));
+    const auto row_call=reinterpret_cast<std::uintptr_t>(g_after_battle_renderer)+0x2BD;
+    g_result_row_renderer=reinterpret_cast<ResultRowRenderer>(get_relative_call(row_call,0));
+    replace_call(row_call,reinterpret_cast<void *>(&result_row_renderer_hook));
+    replace_call(ff8_externals.battle_menu_sub_4A3D20+0x139,reinterpret_cast<void *>(&after_battle_renderer_hook));
 }
 
 void lexeditor_ff8_bars_draw()

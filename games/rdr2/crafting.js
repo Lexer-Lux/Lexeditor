@@ -190,7 +190,7 @@ function renderCrafting() {
 function priceQtyInput(it, section, cost, part) {
   const editKey = [it.key, section, cost.key, part.item].join("|");
   const cur = isRO() ? part.qty : (state.priceEdits[editKey] ?? part.qty);
-  return el("input", { type: "number", min: "0", step: "1", value: cur, style: "width:52px",
+  return el("input", { type: "number", min: "0", step: "1", value: cur,
     class: editKey in state.priceEdits ? "edited" : "",
     onchange: ev => {
       const v = Math.round(parseFloat(ev.target.value || "0"));

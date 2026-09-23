@@ -139,14 +139,11 @@
     .lexer-dev-task.todo { color:var(--lex-text); font-weight:600; }
     .lexer-dev-table td.good { color:#7fc08a; font-weight:600; }
     .lexer-dev-table td.todo { color:var(--lex-muted); }
-    .lexer-dev-table tr.over td { color:#e08a80; }
-    .lexer-dev-table tr.total td { border-top:2px solid var(--lex-border); font-weight:700; }
     .lexer-panel-list { display:flex; overflow:auto; flex:1 1 auto; flex-direction:column; gap:9px; margin:0; padding:0; list-style:none; }
     .lexer-helper { display:grid; gap:3px; padding:10px 11px; border:1px solid var(--lex-border); border-radius:5px; background:var(--lex-panel-2); }
-    .lexer-helper.behind { border-color:var(--lex-highlight); }
+    .lexer-helper[class*="state-"] { border-color:var(--state-color); }
     .lexer-helper-name { display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-weight:700; }
-    .lexer-helper-state { color:var(--lex-muted); font-size:10px; letter-spacing:.06em; }
-    .lexer-helper.behind .lexer-helper-state { color:var(--lex-highlight); }
+    .lexer-helper-state { color:var(--state-color,var(--lex-muted)); font-size:10px; letter-spacing:.06em; }
     .lexer-helper-versions { color:var(--lex-text); font-size:12px; overflow-wrap:anywhere; line-height:1.5; }
     button.lexer-helper-source { justify-self:start; padding:3px 0; background:none; border:0; text-decoration:underline; cursor:pointer; }
     .lexer-helper-source,.lexer-helper-error { overflow-wrap:anywhere; color:var(--lex-muted); font-size:11px; }
@@ -203,10 +200,6 @@
       <section class="lexer-dev-games">
         <h3>GAMES</h3>
         <div class="lexer-dev-table-wrap"><table id="lexer-dev-games" class="lexer-dev-table"></table></div>
-        <h3>SHARED UI BUDGET</h3>
-        <div class="lexer-dev-table-wrap"><table id="lexer-dev-budget" class="lexer-dev-table"></table></div>
-        <h3>COPIED CODE</h3>
-        <div class="lexer-dev-table-wrap"><table id="lexer-dev-code" class="lexer-dev-table"></table></div>
       </section>
       <section class="lexer-dev-helpers">
         <h3>HELPERS</h3>
@@ -266,11 +259,12 @@
     document.querySelector("#chooser-window-controls").replaceChildren(lexerButton,restartButton,settingsButton,windowControls.root);
     const lexerPanel=document.querySelector("#lexer-panel"),lexerList=document.querySelector("#lexer-panel-list");
     function lexerHelperRow(helper){
-      const row=document.createElement("li");row.className=`lexer-helper${helper.behind?" behind":""}`;
+      const unavailable=!!helper.error||!helper.latest;
+      const row=document.createElement("li");row.className=`lexer-helper state-${unavailable?"not-added":helper.behind?"warning":"added"}`;
       const name=document.createElement("div");name.className="lexer-helper-name";
       const label=document.createElement("span");label.textContent=`${helper.helper||helper.runtime||"Helper"} — ${helper.plugin||helper.pluginId||""}`;
       const state=document.createElement("span");state.className="lexer-helper-state";
-      state.textContent=helper.error?"UNAVAILABLE":helper.behind?"NEWER RELEASE":"UP TO DATE";
+      state.textContent=unavailable?"UNAVAILABLE":helper.behind?"UPDATE AVAILABLE":"UP TO DATE";
       name.append(label,state);row.append(name);
       const versions=document.createElement("div");versions.className="lexer-helper-versions";
       for(const text of [
@@ -344,8 +338,6 @@
       const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
       try{
         const overview=await window.pywebview.api.developer_overview();
-        renderBudget(overview?.sharedUi||[]);
-        renderCodeBudget(overview?.sharedCode||[]);
         const rows=overview?.games||[];
         const head=document.createElement("tr");
         for(const name of ["GAME","MOD LOADING","HOW","TASKS"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
@@ -363,47 +355,6 @@
       }catch(error){
         const tr=document.createElement("tr");tr.append(cell(String(error?.message||error)));table.replaceChildren(tr);
       }
-    }
-    // What each plugin still writes for itself instead of asking the shared UI.
-    // Recorded counts may fall, never rise; a file over its recorded count is
-    // what fails the tests, and it is marked here.
-    function renderBudget(rows){
-      const table=document.querySelector("#lexer-dev-budget");
-      const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
-      const head=document.createElement("tr");
-      for(const name of ["FILE","SHARED SELECTORS","HAND-BUILT ROWS"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
-      const count=(now,was)=>now===was?String(now):`${now} (was ${was})`;
-      const body=(rows||[]).map(row=>{
-        const tr=document.createElement("tr");
-        tr.append(cell(row.file),cell(count(row.sharedSelectors,row.recordedSelectors),"num"),
-          cell(count(row.handBuiltRows,row.recordedRows),"num"));
-        if(row.over)tr.classList.add("over");
-        return tr;
-      });
-      const totals=document.createElement("tr");totals.className="total";
-      totals.append(cell(`${(rows||[]).length} files`),
-        cell(String((rows||[]).reduce((sum,row)=>sum+row.sharedSelectors,0)),"num"),
-        cell(String((rows||[]).reduce((sum,row)=>sum+row.handBuiltRows,0)),"num"));
-      table.replaceChildren(head,...body,totals);
-    }
-    // Plugin Python that is a second copy of another plugin's function. Same
-    // ratchet as the UI budget: it may fall, never rise.
-    function renderCodeBudget(rows){
-      const table=document.querySelector("#lexer-dev-code");
-      const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
-      const head=document.createElement("tr");
-      for(const name of ["PLUGIN","COPIED LINES"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
-      const body=(rows||[]).filter(row=>row.copiedLines||row.recorded).map(row=>{
-        const tr=document.createElement("tr");
-        tr.append(cell(row.plugin),cell(row.copiedLines===row.recorded?String(row.copiedLines)
-          :`${row.copiedLines} (was ${row.recorded})`,"num"));
-        if(row.over)tr.classList.add("over");
-        return tr;
-      });
-      const total=document.createElement("tr");total.className="total";
-      total.append(cell(`${body.length} plugins`),
-        cell(String((rows||[]).reduce((sum,row)=>sum+row.copiedLines,0)),"num"));
-      table.replaceChildren(head,...body,total);
     }
     function setLexerPanel(open){
       if(open){lexerPanel.hidden=false;requestAnimationFrame(()=>lexerPanel.classList.add("open"));loadHelperVersions(false);loadDeveloperOverview();}
@@ -486,7 +437,8 @@
     async function storeTransitionSnapshot(){await window.pywebview.api.set_transition_snapshot(await transitionSnapshot())}
     async function resumeResident(plugin){
       if(chooser.opening)return;chooser.opening=true;
-      try{const opened=await window.pywebview.api.resume_plugin(plugin.id);await LexeditorHost.open(opened.url);}catch(error){surface.getAnimations().forEach(animation=>animation.cancel());setDialog(plugin.name,String(error),[button("CLOSE",closeDialog,true)]);}finally{chooser.opening=false;}
+      closeDialog();residentHandle.disabled=true;residentHandle.setAttribute('aria-busy','true');
+      try{const opened=await window.pywebview.api.resume_plugin(plugin.id);await LexeditorHost.open(opened.url);loadingScreen.hidden=true;}catch(error){surface.getAnimations().forEach(animation=>animation.cancel());setDialog(plugin.name,String(error),[button("CLOSE",closeDialog,true)]);}finally{chooser.opening=false;residentHandle.disabled=false;residentHandle.removeAttribute('aria-busy');}
     }
     async function restartLexeditor(){const resident=chooser.plugins.find(plugin=>plugin.resident);if(resident&&Number(resident.dirtyCount)>0){setDialog("Unsaved changes",`Return to ${resident.name} and save or discard its changes before restarting Lexeditor.`,[button("RETURN TO EDITOR",()=>resumeResident(resident)),button("CANCEL",closeDialog,true)]);return}if(restartButton.disabled)return;restartButton.disabled=true;restartButton.setAttribute("aria-busy","true");try{const result=await window.pywebview.api.restart_lexeditor();if(!result?.restarting)throw new Error("The desktop host did not confirm the restart. Try again.");}catch(error){setDialog("Restart failed",String(error?.message||error),[button("CLOSE",closeDialog,true)]);}finally{restartButton.disabled=false;restartButton.removeAttribute("aria-busy");}}
     restartButton.onclick=restartLexeditor;

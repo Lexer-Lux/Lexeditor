@@ -38,6 +38,10 @@ from desktop_host import HostApi  # noqa: E402
 
 SIZE = {"width": 1600, "height": 900}
 STYLES = False
+# The smallest text a reader is expected to read, in CSS pixels.
+MIN_TEXT_PX = 9
+TEXT_AUDIT = (Path(__file__).resolve().parent / "text_audit.js").read_text(encoding="utf-8")
+TEXT_AUDIT = TEXT_AUDIT[TEXT_AUDIT.index("(minimum) =>"):]
 TABS_FILTER = set()
 
 # The properties that decide how an element looks and where it sits.
@@ -163,6 +167,11 @@ def capture(page, out: Path, name: str) -> None:
     page.mouse.move(2, SIZE["height"] - 2)
     settle(page, 200)
     page.screenshot(path=str(out / f"{name}.png"))
+    # Every view is also read for text a person cannot read: cut off by a box
+    # that does not scroll, or drawn too small. tools/text_audit_report.py
+    # lists them; a view with none writes an empty list.
+    issues = page.evaluate(TEXT_AUDIT, MIN_TEXT_PX)
+    (out / f"{name}.text.json").write_text(json.dumps(issues, indent=1), encoding="utf-8")
     if STYLES:
         styles = page.evaluate(CAPTURE, PROPERTIES)
         (out / f"{name}.styles.json").write_text(

@@ -66,16 +66,15 @@ def main():
   assert p.locator('#magic .lex-detail-field-label').filter(has_text='TARGET INFO').count()==0
   assert p.locator('#magic .lex-detail-field-label').filter(has_text='JUNCTION (STATS)').count()==1
   assert p.locator('#magic .lex-subtab-bar').bounding_box()['width']>650
-  # The tabs end at the bottom of their panel, and the panel reaches the
-  # bottom of the detail body it sits in - its content edge, inside the body's
-  # own padding - so the bar is on the panel's bottom edge, not floating above it.
+  # Tabs stay at the top. Their panel fills the detail body's content box.
   edges=p.evaluate("""()=>{const bar=document.querySelector('#magic .lex-subtab-bar').getBoundingClientRect();
     const panel=document.querySelector('#magic .lex-tabbed-panel');const body=panel.parentElement;
     const b=body.getBoundingClientRect(),s=getComputedStyle(body);
-    return {bar:bar.bottom,panel:panel.getBoundingClientRect().bottom,
+    return {bar:bar.top,panelTop:panel.getBoundingClientRect().top,panel:panel.getBoundingClientRect().bottom,
             content:b.bottom-parseFloat(s.paddingBottom)-parseFloat(s.borderBottomWidth)}}""")
-  assert abs(edges['bar']-edges['panel'])<1 and abs(edges['panel']-edges['content'])<2,edges
+  assert abs(edges['bar']-edges['panelTop'])<1,edges
+  assert abs(edges['panel']-edges['content'])<2,edges
   p.locator('#magic').screenshot(path='C:/Users/Lexer/AppData/Local/Temp/lexeditor-magic-tabs.png')
   b.close()
- print('Bottom panel tabs, hovered/focused routing, forward/reverse wrap, redraw focus, dialog navigation and setting persistence passed.')
+ print('Top panel tabs, full-height content, hovered/focused routing, forward/reverse wrap, redraw focus, dialog navigation and setting persistence passed.')
 if __name__=='__main__':main()

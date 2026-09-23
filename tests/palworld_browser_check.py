@@ -122,16 +122,16 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     page.wait_for_function("typeof navigate === 'function' && typeof model === 'object' && model !== null && typeof shell === 'object' && shell !== null")
 
                     page.evaluate('navigate("palschema")')
-                    page.wait_for_selector(".pal-schema-root")
-                    assert page.locator(".pal-schema-state").inner_text() == "SCHEMA-AWARE"
-                    selector = page.locator(".pal-patch-toolbar select")
+                    page.wait_for_selector("#main .lex-paged-list-detail")
+                    assert page.get_by_text("Schema-aware", exact=True).is_visible()
+                    selector = page.locator("select[aria-label='Raw patch']")
                     assert selector.count() == 1
                     values = selector.locator("option").evaluate_all("nodes=>nodes.map(n=>({value:n.value,text:n.textContent}))")
                     assert values[0]["value"].endswith("aaa_bad.json"), values
                     assert "1 error" in values[0]["text"], values
                     assert selector.input_value().replace(",", "").endswith("balance.json"), selector.input_value().replace(",", "")
 
-                    numeric = page.locator('.pal-schema-columns .pal-detail input:is([type="number"],[inputmode="decimal"])')
+                    numeric = page.locator('.pal-detail input:is([type="number"],[inputmode="decimal"])')
                     assert numeric.count() >= 1
                     schema_record = page.evaluate("selectedPatchRecord()")
                     assert schema_record["schemaState"] == "matched"
@@ -146,17 +146,17 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert row["NestedPreserved"] == {"keep": [1, 2, 3]}, row
                     assert good.with_name(good.name + ".lexeditor.bak").is_file()
 
-                    page.locator(".pal-patch-row").filter(has_text="Mode").click()
+                    page.locator(".lex-list-row").filter(has_text="Mode").click()
                     page.wait_for_timeout(100)
-                    enum_select = page.locator(".pal-schema-columns .pal-detail select").filter(has_text="ModeA")
+                    enum_select = page.locator(".pal-detail select").filter(has_text="ModeA")
                     assert enum_select.count() >= 1
                     enum_select.first.select_option("ModeB")
                     page.evaluate("save()")
                     page.wait_for_function("!patchDirty()")
                     assert json.loads(good.read_text("utf-8"))["DT_PalMonsterParameter"]["Kitsunebi"]["Mode"] == "ModeB"
 
-                    page.locator(".pal-patch-row").filter(has_text="WorkSuitability_EmitFlame").click()
-                    page.wait_for_function("palFieldChoices.some(field => field.name === 'AddedCount') && document.querySelector('.pal-patch-row.selected')?.textContent.includes('WorkSuitability_EmitFlame')")
+                    page.locator(".lex-list-row").filter(has_text="WorkSuitability_EmitFlame").click()
+                    page.wait_for_function("palFieldChoices.some(field => field.name === 'AddedCount') && document.querySelector('.lex-list-row.selected')?.textContent.includes('WorkSuitability_EmitFlame')")
                     add_select = page.locator(".pal-add-field-select")
                     assert "AddedCount" in add_select.locator("option").all_text_contents()
                     add_select.select_option("AddedCount")
@@ -171,15 +171,15 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert json.loads(good.read_text("utf-8"))["DT_PalMonsterParameter"]["Kitsunebi"]["AddedCount"] == 11
 
                     selector.select_option(values[0]["value"])
-                    page.wait_for_selector(".pal-patch-toolbar .pal-issue.error")
-                    assert "Invalid PalSchema" in page.locator(".pal-patch-toolbar .pal-issue.error").inner_text()
-                    assert page.locator(".pal-schema-root").count() == 1
+                    page.wait_for_selector("#main .lex-notice")
+                    assert "Invalid PalSchema" in page.locator("#main .lex-notice").inner_text()
+                    assert page.locator("#main .lex-paged-list-detail").count() == 1
 
                     jsonc_value = next(row["value"] for row in values if row["value"].endswith("notes.jsonc"))
                     selector.select_option(jsonc_value)
                     page.wait_for_function("palPatch !== null && palPatch.writable === false")
                     assert "keep me" in commented.read_text("utf-8")
-                    assert page.locator('.pal-schema-columns .pal-detail input:is([type="number"],[inputmode="decimal"])').count() == 0
+                    assert page.locator('.pal-detail input:is([type="number"],[inputmode="decimal"])').count() == 0
 
                     page.evaluate('navigate("build")')
                     page.wait_for_function("typeof palBuildState === 'object' && palBuildState !== null && !palBuildLoading")

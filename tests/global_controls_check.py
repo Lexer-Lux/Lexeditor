@@ -57,12 +57,17 @@ def main() -> None:
         # Hold the disposer on window so the MutationObserver remains strongly
         # reachable for the lifetime of this page, matching mountShell's behavior.
         page.evaluate('window.__removeControlHelp=LexeditorUI.installControlHelp(document.body)')
-        assert page.locator('#add').get_attribute('title') == 'Add record'
+        # Native hover boxes are removed; the words stay for assistive tools.
+        assert page.locator('#add').get_attribute('title') is None
+        assert page.locator('#add').get_attribute('aria-description') == 'Add record'
+        assert page.locator('#add').get_attribute('data-lex-title') == 'Add record'
         # Exercise the same annotator on a dynamically mounted subtree. This is
         # deterministic in headless Chromium while the body-level observer remains
         # active for the real application mount lifecycle.
         page.evaluate("""()=>{const U=LexeditorUI,e=U.el;const wrap=e('label',{},'Opacity',e('input',{id:'auto-help',type:'number',min:0,max:100,step:5}));document.querySelector('#main').append(wrap);U.installControlHelp(wrap)}""")
-        assert page.locator('#auto-help').get_attribute('title') == 'Set Opacity. Range: 0 to 100. Step: 5.'
+        # Bare controls are no longer given generated hover text; a field's
+        # range shows in its type rail instead (checked below).
+        assert page.locator('#auto-help').get_attribute('title') is None
         page.locator('#add').click()
         assert page.evaluate('__adds') == 1
         head = page.locator('[role=columnheader][data-column-key=name]')
@@ -159,6 +164,16 @@ def main() -> None:
         number.fill('-20')
         number.blur()
         assert number.input_value() == '-20'
+        # A programmatic restore must repaint the number's fill without a
+        # second user input event.
+        page.evaluate('''()=>{
+          const U=LexeditorUI,e=U.el;window.__resetAmount=80;
+          const input=e('input',{id:'reset-number',type:'number',min:0,max:100,value:80,oninput:event=>__resetAmount=Number(event.target.value)});
+          const source=U.provenanceControl({control:input,current:()=>__resetAmount,vanilla:20,apply:value=>{__resetAmount=value;input.value=String(value)}});
+          document.querySelector('#main').replaceChildren(U.detailField({label:'Amount',dataType:'INT',min:0,max:100,control:source}));
+        }''')
+        page.locator('#reset-number').click(button='right')
+        page.wait_for_function('document.querySelector("#reset-number").value === "20" && Math.abs(Number(document.querySelector(".lex-value-fill").style.getPropertyValue("--lex-value-ratio"))-.2)<.001')
         assert not errors, errors
         results={'new_button':'pass','whole_header_sort':'pass','selection_retained':'pass',
           'divider_keyboard_persistence_doubleclick_contextmenu_stack':'pass','units_integer_bounds':'pass',

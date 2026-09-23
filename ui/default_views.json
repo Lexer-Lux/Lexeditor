@@ -6,6 +6,9 @@
       "lexeditor:list-detail:ff8-enemies": "66",
       "lexeditor:rows:ff8-enemies": "48"
     },
+    "refine": {
+      "lexeditor:columns:ff8-refine": "[\"enabled\",\"id\",\"groupName\",\"name\"]"
+    },
     "weapons": {
       "lexeditor:list-detail:ff8-weapons": "42.00000000000001",
       "lexeditor:rows:ff8-weapons": "33"

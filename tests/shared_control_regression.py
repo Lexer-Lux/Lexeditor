@@ -83,7 +83,8 @@ def main():
    divider.click(button='right');page.wait_for_timeout(200)
    field=page.locator('.lex-boolean-field').first;checkbox=field.locator('input[type=checkbox]')
    geometry=field.evaluate("""e=>{const box=e.querySelector('input[type=checkbox]').getBoundingClientRect(),arrow=e.querySelector('.lex-field-boolean-arrow').getBoundingClientRect();return{height:e.getBoundingClientRect().height,boxY:box.y+box.height/2,arrowY:arrow.y+arrow.height/2}}""")
-   assert geometry['height']<=40 and abs(geometry['boxY']-geometry['arrowY'])<=1,geometry
+   # Include the reserved reference row beneath the checkbox.
+   assert geometry['height']<=48 and abs(geometry['boxY']-geometry['arrowY'])<=1,geometry
    before=field.bounding_box();checkbox.set_checked(not checkbox.is_checked());page.wait_for_timeout(250)
    assert abs(field.bounding_box()['height']-before['height'])<.5
    marks=field.locator('.lex-reference-values')
@@ -92,7 +93,7 @@ def main():
    assert field.locator('.lex-column-pin').bounding_box()['y']<checkbox.bounding_box()['y']
    text=field.locator('.lex-detail-field-label-text').bounding_box();arrow=field.locator('.lex-field-boolean-arrow').bounding_box();box=checkbox.bounding_box()
    assert arrow['x']-text['x']-text['width']>=12
-   assert 0 <= box['x']-arrow['x']-arrow['width'] <= 5
+   assert abs(box['x']-arrow['x']-arrow['width']-10)<.6
    page.screenshot(path=str(OUT/'three-panels.png'),animations='disabled')
    for width in (900,1600):
     page.set_viewport_size({'width':width,'height':900});page.wait_for_timeout(250)
@@ -112,7 +113,7 @@ def main():
    page.locator('.blank-table input[type=checkbox]').first.click()
    assert page.locator('.blank-table .lex-column-list-row').evaluate_all('(rows)=>rows.every(r=>getComputedStyle(r).visibility!=="hidden")')
    page.keyboard.down('Control')
-   assert page.locator('.lex-shell-header').evaluate('(e)=>e.classList.contains("lex-control-held")')
+   assert page.locator('html').evaluate('(e)=>e.classList.contains("lex-control-held")')
    assert page.locator('#global-save').get_attribute('data-shortcut-key')=='S'
    assert page.locator('#plugin-data-map').get_attribute('data-shortcut-key')=='M'
    assert page.locator('#global-save svg').evaluate('(e)=>getComputedStyle(e).visibility')=='hidden'

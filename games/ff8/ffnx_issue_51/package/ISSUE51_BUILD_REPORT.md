@@ -3,14 +3,14 @@
 ## Artifact and source
 
 - FFNx base: `c056db2783f376a340fcefa6a48cc33618998876`
-- Editor build revision: `19273fc05556a282dbf206b51b25a654967ab0a4`
-- Local MSVC x86 build from the uncommitted editor worktree; the complete derivative patch identifies the compiled source.
+- Editor build revision: `f12a03d5e2c8f9bf791b343f6c1817b0f19a650c`
+- Actions build run: `35798579648`
 - Supported private game SHA-256: `064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570`
 - Identity: `Lexeditor issue 51 shared magic core; base=c056db2783f376a340fcefa6a48cc33618998876; runtime=on; hooks=28`
-- Driver SHA-256: `398062ac3da8c632bcb75410dd51406792c11bafa85108fe5f4913f553c68663`
-- Driver size: 38588928 bytes; PE32 x86 DLL
-- PDB SHA-256: `715866235a81ed26514c8dd9a9229e91feb64b5752d559ba6c51ebb790b3a5fa` (build artifact, not installed)
-- Complete source patch SHA-256: `4df3dc248d58bbc1887b538561893eb8eb04414eb2fb97f6785ec832f2c2a9d5`
+- Driver SHA-256: `cf8aa19d233aa6cc69965ac8961759f5aadb7a1670926547e2ca07d052ad9621`
+- Driver size: 38859264 bytes; PE32 x86 DLL
+- PDB SHA-256: `55487cb04166371b137288548e721cc0ebd768b3f6c251a8f5a768be2fd6dc2c` (build artifact, not installed)
+- Complete source patch SHA-256: `537e6e294813b4377912fb5986f77275938578ff356a81e13b966c97f1dcaf0e`
 - GPL licence SHA-256: `230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809`
 - Steamworks library unchanged: `abfedd473b3f4a9597bbdc90d20f4b6f696bb2ebb937a03177461df695430ad6`
 - Existing matching-base shader set retained: 163 files;
@@ -36,6 +36,11 @@ suppresses native camera-left/right input and the overhead-view toggle at their
 consumers. Battle camera elevation uses FF8's downward-positive Y axis, so
 the floor blocks underground movement and the upper limit allows elevation.
 In-game Time uses the native TIME label instead of PLAY.
+Better HP Colors adds optional smooth HP-number colour in battle, shared
+character panels and active/reserve main-menu rows. Native KO and status
+palettes take priority. Interaction Indicators observes the native field target
+and adds a CARD cue for Talk scripts that directly contain CARDGAME. Both
+settings default off; neither changes input or starts a field interaction.
 Party Switch explicitly relinquishes and re-registers the replaced
 actor's shared-stock mirror, rather than copying its private record over the
 canonical pool. Shared Magic works with the configured stock cap (1–255);

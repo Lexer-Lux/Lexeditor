@@ -151,6 +151,38 @@
     if (event.ctrlKey) { event.preventDefault(); event.stopImmediatePropagation(); }
   }, {capture:true, passive:false});
 
+  // The title is navigation chrome, including after returning to the chooser.
+  // Handle pointer input before the browser starts a text-selection gesture.
+  const protectBrandText = event => {
+    const brand=event.target.closest?.(".lex-brand-button,.chooser-title");
+    if (!brand || (event.type==="pointerdown" && event.button!==0)) return;
+    event.preventDefault();
+    const selection=window.getSelection();
+    if (selection && (brand.contains(selection.anchorNode) || brand.contains(selection.focusNode)))
+      selection.removeAllRanges();
+  };
+  document.addEventListener("pointerdown", protectBrandText, {capture:true});
+  document.addEventListener("selectstart", protectBrandText, {capture:true});
+  for (const name of ['mousedown','mouseup','dblclick'])
+    window.addEventListener(name,protectBrandText,{capture:true});
+  document.addEventListener('selectionchange',()=>{
+    const selection=window.getSelection();
+    if (selection && [selection.anchorNode,selection.focusNode].some(node=>
+      node?.parentElement?.closest('.lex-brand-button,.chooser-title')))
+      selection.removeAllRanges();
+  });
+
+  // Spelling marks belong to the active editor, never a read-only value.
+  document.documentElement.spellcheck=false;
+  document.addEventListener('focusin',event=>{
+    const field=event.target;
+    if(field.matches?.('textarea,input[type="text"],[contenteditable="true"]') && !field.readOnly)
+      field.spellcheck=field.inputMode!=='decimal' && !field.closest('.lex-code-editor');
+  });
+  document.addEventListener('focusout',event=>{
+    if(event.target.matches?.('textarea,input,[contenteditable="true"]'))event.target.spellcheck=false;
+  });
+
   const element = (tag, attrs = {}, ...children) => {
     const node = document.createElement(tag);
     // A textarea or a select has no value attribute: setting one left every
@@ -236,6 +268,14 @@
       return true;
     } catch (_error) { return false; }
   };
+  // The loading quote is remembered for the next page in this window. A page
+  // whose storage is refused (a sandboxed or embedded document, a browser
+  // set to block it) threw on the first read, and the throw stopped the whole
+  // framework from loading: every game came up blank.
+  const sessionQuote = {
+    get: () => { try { return sessionStorage.getItem("lex-loading-quote"); } catch (_error) { return null; } },
+    set: value => { try { sessionStorage.setItem("lex-loading-quote", value); } catch (_error) {} },
+  };
   const loadingParameters = new URLSearchParams(location.search);
   const loadingStartedAt = (() => {
     const supplied = Number(loadingParameters.get("lexLoadStarted"));
@@ -248,12 +288,12 @@
       role: "status", "aria-live": "polite",
       "aria-label": "Loading game editor",
     }, element("blockquote", {class: "lex-plugin-loading-quote"},
-      loadingParameters.get("lexQuote") || sessionStorage.getItem("lex-loading-quote") || "Loading editor…"),
+      loadingParameters.get("lexQuote") || sessionQuote.get() || "Loading editor…"),
     element("span", {class: "lex-plugin-loading-pulse", "aria-hidden": "true"}));
     document.body.append(pluginLoadingScreen);
     // The root already painted an identical screen; hand over without a blink.
     document.documentElement.classList.add("lex-loading-live");
-    if(loadingParameters.get("lexQuote"))sessionStorage.setItem("lex-loading-quote",loadingParameters.get("lexQuote"));
+    if(loadingParameters.get("lexQuote"))sessionQuote.set(loadingParameters.get("lexQuote"));
     for(const type of ["keydown","pointerdown","click"])document.addEventListener(type,event=>{
       if(document.documentElement.classList.contains("lex-loading-live")){event.preventDefault();event.stopImmediatePropagation();}
     },true);
@@ -879,6 +919,7 @@
       active,
       label: options.label || "Panel views",
       className: "lex-tabbed-panel-tabs",
+      shortcuts: false,
       change: options.change,
     }), element("div", {
       class: ["lex-tabbed-panel-content", options.contentClassName || ""].filter(Boolean).join(" "),
@@ -948,7 +989,12 @@
       // tiny, so pagination measured a shorter card than the one later shown.
       if (!control.getClientRects().length || control.clientWidth <= 0) return "";
       const style = getComputedStyle(control);
-      const maximum = Number.parseFloat(style.fontSize) || 16;
+      // A table cell's value is the table's text: it may shrink to fit a
+      // narrow column but never grows past the rows around it, which a box
+      // the height of the row otherwise invited.
+      const maximum = control instanceof HTMLTextAreaElement || control.closest(".lex-column-list")
+        ? Number.parseFloat(style.fontSize) || 16
+        : Math.max(minimum,Math.min(28,control.clientHeight*.78));
       const horizontal = (Number.parseFloat(style.paddingLeft) || 0) +
         (Number.parseFloat(style.paddingRight) || 0) +
         (Number.parseFloat(style.borderLeftWidth) || 0) +
@@ -963,7 +1009,7 @@
       if (!context || !value) return "";
       context.font = `${style.fontStyle} ${style.fontWeight} ${maximum}px ${style.fontFamily}`;
       const measured = context.measureText(value).width;
-      return measured > available ? `${Math.max(minimum, maximum * available / measured)}px` : "";
+      return `${Math.max(minimum,Math.min(maximum,maximum*available/Math.max(1,measured)))}px`;
     };
     const update = () => {
       control.style.fontSize = "";
@@ -1135,24 +1181,26 @@
       body.replaceChildren(...rows.slice(page * pageSize, (page + 1) * pageSize).map((row, offset) => {
         const index = page * pageSize + offset;
         const editable = options.editable !== false && row.editable !== false;
-        const handle = element("button", {type:"button", class:"lex-instruction-handle",
-          draggable:String(editable), disabled:!editable, "aria-label":`Move instruction ${index + 1}`,
+        let controlGesture=false;
+        const dragAttrs = {
+          draggable:String(editable), tabindex:editable?0:-1, "aria-label":`Instruction ${index + 1}`,
           "aria-description":"Drag to reorder. With keyboard focus, press Alt and an arrow key.",
-          ondragstart:event=>{dragged=index;event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",String(index));},
+          onpointerdown:event=>{controlGesture=!!event.target.closest("input,select,textarea,button,[contenteditable=true]");},
+          ondragstart:event=>{if(!editable||controlGesture){event.preventDefault();return;}dragged=index;event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",String(index));},
           ondragend:()=>{dragged=null;clearTimeout(pageTimer);},
           onkeydown:event=>{
-            if (!event.altKey || !["ArrowUp","ArrowDown"].includes(event.key)) return;
+            if (!editable || event.target!==event.currentTarget || !event.altKey || !["ArrowUp","ArrowDown"].includes(event.key)) return;
             event.preventDefault();
             const target=index+(event.key==="ArrowUp"?-1:1);
             if(target>=0&&target<rows.length)options.move?.(index,target);
-          }}, "⠿");
+          }};
         const description=element("div",{class:"lex-instruction-description"},options.describe?.(row,index));
-        return element("div", {class:"lex-instruction-row",role:"listitem",
+        return element("div", {class:"lex-instruction-row",role:"listitem",...dragAttrs,
           oninput:()=>{description.textContent=options.describe?.(row,index)||'';},
           "data-instruction-index":index,"data-offset":row.offset,
           ondragover:event=>{if(dragged!==null&&editable){event.preventDefault();event.dataTransfer.dropEffect="move";}},
           ondrop:event=>{if(dragged===null||!editable)return;event.preventDefault();const from=dragged;dragged=null;if(from!==index)options.move?.(from,index);}},
-          handle, element("span",{class:"lex-instruction-index","aria-hidden":"true"},index+1),
+          element("span",{class:"lex-instruction-index","aria-hidden":"true"},index+1),
           element("div",{class:"lex-instruction-controls"},options.controls?.(row,index)),
           description,
           element("div",{class:"lex-instruction-actions"},
@@ -1180,7 +1228,7 @@
     const resize = new ResizeObserver(() => {
       if(!root.isConnected)return;
       const available=root.querySelector('.lex-paged-pane-content').clientHeight;
-      const height=Math.max(96,...[...body.children].map(node=>node.offsetHeight));
+      const height=96;
       const count=Math.max(1,Math.floor(available / height));
       if(available>0&&count!==pageSize){page=Math.floor(page*pageSize/count);pageSize=count;repaint();}
     });
@@ -1223,6 +1271,11 @@
   const toolbar = (...children) => element("div", {class:"lex-toolbar"}, ...children);
   const inlineLabel = (...children) => element("span", {class:"lex-inline-label"}, ...children);
   const choiceField = (value, action) => element("span", {class:"lex-choice-field"}, value, action);
+  const quantityChoice = (choice, quantity) => element("div", {class:"lex-quantity-choice"},
+    choice, element("span", {class:"lex-quantity-mark","aria-hidden":"true"}, "×"), quantity);
+  const iconValue = ({icon,label,toggle,control}) => element("div",{class:"lex-icon-value"},
+    element("label",{class:"lex-icon-value-toggle",title:`${label}: toggle immunity`},toggle,element("span",{class:"lex-icon-value-art"},icon),
+      element("span",{},label),element("span",{class:"lex-icon-value-state","aria-hidden":"true"},"Immune")),control);
   const textArea = (options = {}) => element("textarea", {rows:4, ...options,
     class:["lex-text-area", options.class || ""].filter(Boolean).join(" ")});
 
@@ -1297,7 +1350,8 @@
       const box=stage.getBoundingClientRect();
       options.place({x:Math.max(0,Math.min(1,(event.clientX-box.left)/box.width)),y:Math.max(0,Math.min(1,(event.clientY-box.top)/box.height))});
     });
-    const root=element("div",{class:options.fill===false?"lex-image-map lex-image-map-natural":"lex-image-map","aria-label":options.label||"Map"},stage);
+    // A region, so its label is announced; a bare div's aria-label is not.
+    const root=element("div",{class:options.fill===false?"lex-image-map lex-image-map-natural":"lex-image-map",role:"region","aria-label":options.label||"Map"},stage);
     root.style.setProperty("--lex-map-ratio", String(Number(options.ratio)||4/3));
     root.lexStage=stage;
     return root;
@@ -1427,7 +1481,7 @@
         pin.style.setProperty("right", "auto", "important");
         return;
       }
-      const inset = target.height * .1;
+      const inset = Math.min(3, target.height * .1);
       // The Boxicons pin tip is at 3.71,21.71 in its 24-by-24 view box.
       const tipX = icon.width * 3.71 / 24;
       const tipY = icon.height * 21.71 / 24;
@@ -1465,6 +1519,12 @@
       class: "lex-detail-part lex-multi-number-item",
       title: (part instanceof Element ? "" : part.title) || undefined,
     }, caption, element("span", {class: "lex-detail-part-control lex-multi-number-control"}, control));
+    if (part.pin) {
+      item.classList.add('lex-pinnable-property');
+      const owner=item.querySelector('.lex-detail-part-control');
+      owner.append(part.pin);
+      anchorDetailPin(part.pin,owner,owner.querySelector('input,select,textarea'));
+    }
     // The part is a plain box, not a label: as a <label> it adopted its first
     // labelable descendant, which became the copy button once there was one.
     const field = item.querySelector("input,select,textarea");
@@ -1635,7 +1695,10 @@
       booleanField ? null : arrow),
     booleanField ? arrow : null,
     element("div", {class: "lex-detail-field-control"}, control,
-      pin && pin.parentElement !== control ? pin : null), typeRail);
+      pin && pin.parentElement !== control ? pin : null),
+    // Hiding the type hides the type, not the help that shares its rail: a
+    // field that asked for no type lost its only explanation with it.
+    options.showType === false ? (helpMarker ? element("div", {class: "lex-field-type-rail"}, helpMarker) : null) : typeRail);
     // The leader arrow shares the checkbox's grid row, so it points at the
     // middle of the box whatever else the row is carrying and however tall the
     // row turns out to be. Anchored to the row instead, it tracked the row's
@@ -1704,6 +1767,7 @@
         return Math.max(0, Math.min(1, (value - lowBound) / (highBound - lowBound)));
       };
       const paint = () => fill.style.setProperty("--lex-value-ratio", String(ratio()));
+      input.__lexValueSliderPaint = paint;
       input.addEventListener("input", paint);
       input.addEventListener("change", paint);
       const box = () => (control instanceof Element && control.matches(".lex-unit-field")
@@ -1811,6 +1875,7 @@
       if (!source?.lexRevert) return;
       event.preventDefault();
       source.lexRevert(event);
+      input?.__lexValueSliderPaint?.();
       showToast("Restored the vanilla value");
     });
 
@@ -1916,7 +1981,7 @@
   // stacked over boxes, which is what every other property in the editor does.
   const multiNumberRow = (entries = [], options = {}) => detailParts(
     entries.filter(Boolean).map(entry => ({label: entry.label, control: entry.control, title: entry.title})),
-    {columns: options.columns, copy: true,
+    {columns: options.columns, stacked: options.stacked, copy: !options.stacked,
      className: ["lex-multi-number", options.className || ""].filter(Boolean).join(" ")});
 
   // Nested navigation is a shared control. Plugins provide only labels,
@@ -3045,10 +3110,81 @@
     const columnCount = length => {
       const width=content.clientWidth||scroll.clientWidth;
       const gap=parseFloat(getComputedStyle(content).columnGap)||12;
-      const target=parseFloat(getComputedStyle(content).getPropertyValue("--lex-tweak-card-width"))||320;
-      return Number.isInteger(options.columns)&&options.columns>0?options.columns:Math.max(1,Math.min(length,Math.floor((width+gap)/(target+gap))||1));
+      // Allow room for the shared name, copy button, value and help lanes.
+      // Narrower cards clipped flag names and could abort strict pagination.
+      // A caller can supply a measured minimum for a simpler card.
+      const asked=parseFloat(getComputedStyle(content).getPropertyValue("--lex-tweak-card-width"));
+      const target=asked||400;
+      const fit=Math.max(1,Math.min(length,Math.floor((width+gap)/(target+gap))||1));
+      // `columns` is a ceiling, not a count: six fixed columns made three
+      // cards a sixth of the window each, truncating every value in them,
+      // beside three empty columns. A page never has more columns than cards.
+      if(Number.isInteger(options.columns)&&options.columns>0)return Math.max(1,Math.min(options.columns,fit));
+      return fit;
     };
-    const paginate = visible => {
+    // A section taller than a page goes on in the next column, its title
+    // repeated. Each fit starts from the whole sections again, so a larger
+    // window joins them back up.
+    let pieces = [];
+    const joinSections = () => {
+      // Newest first, each back into the section it was cut from, so a
+      // section cut twice gets its rows back in order.
+      for (const {source, piece} of pieces.reverse()) {
+        const body = source.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body)");
+        const rest = piece.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body)");
+        if (body && rest) body.append(...rest.children);
+        piece.remove();
+        const at = cards.indexOf(piece);
+        if (at >= 0) cards.splice(at, 1);
+      }
+      pieces = [];
+    };
+    // A section splits between its rows; a panel between its sections.
+    const splitSection = (card, available) => {
+      const panel = card.matches(".lex-detail-panel");
+      if (!panel && !card.matches(".lex-detail-section")) return false;
+      const title = panel ? card.querySelector(":scope > .lex-detail-panel-heading") : card.querySelector(":scope > .lex-detail-section-title");
+      const body = card.querySelector(panel ? ":scope > .lex-detail-panel-body" : ":scope > .lex-detail-section-content");
+      const rows = body ? [...body.children] : [];
+      if (rows.length < 2) return false;
+      const outer = card.getBoundingClientRect(), inner = body.getBoundingClientRect();
+      const scale = outer.height / Math.max(1, card.offsetHeight) || 1;
+      const above = (inner.top - outer.top) / scale, below = (outer.bottom - inner.bottom) / scale;
+      let keep = 0;
+      for (let index = 0; index < rows.length; index++) {
+        const through = (rows[index].getBoundingClientRect().bottom - inner.top) / scale;
+        if (above + through + below > available - 1) break;
+        keep = index + 1;
+      }
+      // One row taller than the page cannot be helped by splitting.
+      if (keep < 1 || keep >= rows.length) return false;
+      const named = panel ? title?.querySelector(".lex-detail-panel-title") : title;
+      const name = (panel ? named?.textContent || "" : [...(title?.childNodes || [])].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join(""))
+        .trim().replace(/ \(continued\)$/, "");
+      const piece = card.cloneNode(false);
+      piece.classList.add("lex-detail-section-continued");
+      const rest = body.cloneNode(false);
+      rest.append(...rows.slice(keep));
+      let head = null;
+      if (panel && title) {
+        head = title.cloneNode(true);
+        const copy = head.querySelector(".lex-detail-panel-title");
+        if (copy) copy.textContent = `${name} (continued)`;
+        head.querySelectorAll(".lex-detail-panel-icon,.lex-detail-panel-actions,.lex-detail-panel-id,.lex-detail-panel-meta").forEach(node => node.remove());
+      } else if (title) {
+        head = element("h3", {class: title.className}, `${name} (continued)`);
+      }
+      piece.append(...(head ? [head] : []), rest);
+      card.after(piece);
+      cards.splice(cards.indexOf(card) + 1, 0, piece);
+      pieces.push({source: card, piece});
+      return true;
+    };
+    const paginate = (visible, keepPieces = false) => {
+      if (pieces.length && !keepPieces) {
+        joinSections();
+        visible = cards.filter(card => !card.hidden);
+      }
       pagedCount = visible.length;
       if (size || !scroll.isConnected || scroll.clientHeight <= 0) {
         const per = size || visible.length || 1;
@@ -3066,8 +3202,18 @@
         const box=card.getBoundingClientRect();
         const scale=box.width/Math.max(1,card.offsetWidth);
         cardHeights.set(card,Math.ceil(box.height/scale)+1);
-        if(options.strictColumns && (card.scrollWidth>card.clientWidth+1 || card.offsetWidth>card.parentElement.clientWidth+1 || card.offsetHeight>scroll.clientHeight+1))
-          throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title')?.textContent||card.textContent.slice(0,80)}`);
+        if(options.strictColumns){
+          // Say which way it does not fit: a section too tall for the page
+          // is split by its game; one too wide has a control that will not
+          // shrink.
+          const why=card.scrollWidth>card.clientWidth+1?`its content is ${card.scrollWidth}px wide in ${card.clientWidth}px`
+            :card.offsetWidth>card.parentElement.clientWidth+1?`it is ${card.offsetWidth}px wide in a ${card.parentElement.clientWidth}px column`
+            :card.offsetHeight>scroll.clientHeight+1?`it is ${card.offsetHeight}px tall on a ${scroll.clientHeight}px page`:"";
+          // Too tall is fixed here: the section goes on in the next column.
+          if(why&&card.offsetHeight>scroll.clientHeight+1&&card.scrollWidth<=card.clientWidth+1&&splitSection(card,scroll.clientHeight))
+            return paginate(cards.filter(entry=>!entry.hidden),true);
+          if(why)throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title')?.textContent||card.textContent.slice(0,80)} - ${why}`);
+        }
       }
       const count=columnCount(visible.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
       const available=scroll.clientHeight,loads=Array(count).fill(0),next=[0];
@@ -3089,10 +3235,30 @@
       const count=columnCount(onPage.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
       const columns=Array.from({length:count},()=>element("div",{class:"lex-tweak-column"})),loads=Array(count).fill(0);
       let orderedLane=0;
+      // Column-major order used to fill the first column to the foot of the
+      // page before starting the next, so a page of three cards was one
+      // column beside empty ones. The cards are spread instead: each column
+      // holds about its share of the page's total height, in reading order,
+      // unless that share would run past the foot.
+      const heights=onPage.map(card=>cardHeights.get(card));
+      let lanesFor=null;
+      if(options.columnMajor&&heights.every(height=>height!==undefined)&&count>1){
+        const total=heights.reduce((sum,height)=>sum+height,0)+gap*Math.max(0,onPage.length-count);
+        const share=Math.max(Math.max(...heights),total/count);
+        const lanes=[],sums=Array(count).fill(0);
+        let at=0;
+        heights.forEach((height,index)=>{
+          const left=onPage.length-index;
+          if(sums[at]>0&&at<count-1&&(sums[at]+gap+height>share+1||left<=count-1-at))at++;
+          lanes.push(at);sums[at]+=(sums[at]?gap:0)+height;
+        });
+        if(sums.every(sum=>sum<=scroll.clientHeight+1))lanesFor=lanes;
+      }
       onPage.forEach((card,index)=>{
         const measured=cardHeights.get(card);
         let lane=measured===undefined?index%count:loads.indexOf(Math.min(...loads));
-        if(options.columnMajor&&measured!==undefined){
+        if(lanesFor)lane=lanesFor[index];
+        else if(options.columnMajor&&measured!==undefined){
           if(loads[orderedLane]>0&&loads[orderedLane]+gap+measured>scroll.clientHeight+1)orderedLane=Math.min(count-1,orderedLane+1);
           lane=orderedLane;
         }
@@ -3104,8 +3270,10 @@
     };
 
     const render = () => {
-      const visible = cards.filter(card => !card.hidden);
-      if (visible.length !== pagedCount) paginate(visible);
+      let visible = cards.filter(card => !card.hidden);
+      // Paginating can split a tall section into pieces, so read the cards
+      // again afterwards.
+      if (visible.length !== pagedCount) { paginate(visible); visible = cards.filter(card => !card.hidden); }
       const pages = starts.length;
       page = Math.max(0, Math.min(page, pages - 1));
       const from = starts[page], to = starts[page + 1] ?? visible.length;
@@ -3126,10 +3294,11 @@
     // Re-break the pages for the box as it is now, keeping the first card on
     // screen on screen.
     const refit = () => {
-      const visible = cards.filter(card => !card.hidden);
+      let visible = cards.filter(card => !card.hidden);
       const anchor = visible[starts[page]] || null;
       paginate(visible);
-      const at = anchor ? visible.indexOf(anchor) : 0;
+      visible = cards.filter(card => !card.hidden);
+      const at = anchor ? Math.max(0, visible.indexOf(anchor)) : 0;
       page = Math.max(0, starts.findLastIndex(start => start <= at));
       render();
     };
@@ -3138,6 +3307,9 @@
       if (target >= 0 && target < starts.length) turn(target);
     }, overflows);
     root.refreshPages = () => {page=0;pagedCount=-1;refit();};
+    // What the pager decided, for checks and for debugging a page break.
+    root.lexPaging = () => ({starts:[...starts],page,
+      cards:cards.filter(card=>!card.hidden).map(card=>({title:(card.querySelector(".lex-detail-panel-title,.lex-detail-section-title")?.textContent||"").trim(),height:cardHeights.get(card)??null}))});
     root.lexFitPage = refit;
     render();
     if (options.notice) root.prepend(options.notice);
@@ -4066,6 +4238,7 @@ ${contents.path}`});
           element("span",{class:"lex-project-menu-name"},row.label),
           element("span",{class:"lex-project-menu-path"},row.path||"Read-only reference"));
         const actions=element("span",{class:"lex-project-menu-item-actions"});
+        const dragAttrs={};
         const run=async operation=>{try{await operation();render(snapshot)}catch(error){showAlert({title:"Could not update mods",message:error.message})}};
         const sourceStatus=row.managed && options.changeProjectSource
           ? element("input",{type:"checkbox",checked:row.enabled!==false,
@@ -4073,13 +4246,15 @@ ${contents.path}`});
             "aria-label":`Enable ${row.label}`,onchange:event=>run(()=>options.changeProjectSource(row.key,{enabled:event.target.checked}))})
           : null;
         if(row.managed && options.changeProjectSource){
-          actions.append(element("button",{type:"button",class:"lex-mod-drag-handle",draggable:"true",
-            "aria-label":`Reorder ${row.label}`,"aria-description":"Drag onto another mod. Alt+Up or Alt+Down moves one place.",
-            ondragstart:event=>{event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("application/x-lex-mod",String(index));},
-            onkeydown:event=>{if(event.altKey&&["ArrowUp","ArrowDown"].includes(event.key)){
+          let controlGesture=false;
+          Object.assign(dragAttrs,{draggable:"true",tabindex:0,
+            "aria-description":"Drag onto another mod. Alt+Up or Alt+Down moves one place.",
+            onpointerdown:event=>{controlGesture=!!event.target.closest('input,.lex-project-menu-item-actions');},
+            ondragstart:event=>{if(controlGesture){event.preventDefault();return;}event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("application/x-lex-mod",String(index));},
+            onkeydown:event=>{if(event.target===event.currentTarget&&event.altKey&&["ArrowUp","ArrowDown"].includes(event.key)){
               event.preventDefault();const delta=event.key==="ArrowUp"?-1:1;
               if(sources[index+delta]?.managed)run(()=>options.changeProjectSource(row.key,{move:delta}));
-            }}},"⠿"));
+            }}});
           if(row.removable)actions.append(element("button",{type:"button","aria-label":`Remove ${row.label}`,
             onclick:async()=>{if(await confirmAction({title:`Remove ${row.label}?`,message:"Remove this managed mod from the library?",confirmLabel:"Remove"}))run(()=>options.changeProjectSource(row.key,{remove:true}))}},"×"));
           if(row.settings?.length || row.notes?.length)actions.append(element("button",{
@@ -4100,7 +4275,7 @@ ${contents.path}`});
               document.body.append(backdrop);backdrop.querySelector("select,button")?.focus();
             }},"⚙"));
         }
-        return element("div",{class:`lex-project-menu-item lex-project-reference${String(row.key)===activeSource?" active":""}`,
+        return element("div",{class:`lex-project-menu-item lex-project-reference${String(row.key)===activeSource?" active":""}`,...dragAttrs,
           ondragover:event=>{if(row.managed&&event.dataTransfer.types.includes("application/x-lex-mod")){event.preventDefault();event.dataTransfer.dropEffect="move";}},
           ondrop:event=>{const from=Number(event.dataTransfer.getData("application/x-lex-mod"));
             if(!row.managed||!sources[from]?.managed)return;event.preventDefault();
@@ -5083,7 +5258,7 @@ ${contents.path}`});
     applyTheme(options.plugin.theme);
     if (pluginLoadingScreen) callWindow("loading_quote", options.plugin.id).then(result => {
       if (!result?.quote) return;
-      sessionStorage.setItem("lex-loading-quote", result.quote);
+      sessionQuote.set(result.quote);
       const quote = document.querySelector(".lex-plugin-loading-quote");
       if (quote) quote.textContent = result.quote;
     }).catch(() => {});
@@ -5570,7 +5745,7 @@ ${contents.path}`});
         },
         tab: () => document.querySelectorAll("nav button[data-tab]")[
           Number(shortcutDigit(event)) - 1]?.click(),
-        subtab: () => document.querySelectorAll(".lex-subtab-button")[
+        subtab: () => document.querySelectorAll(".lex-subtab-bar:not(.lex-tabbed-panel-tabs) > .lex-subtab-button")[
           Number(shortcutDigit(event)) - 1]?.click(),
       }[action];
       if (!run) return;
@@ -5583,10 +5758,10 @@ ${contents.path}`});
       if(!button)continue;
       button.dataset.shortcutKey=SHORTCUTS.find(row=>row.id===action)?.keys.filter(key=>key!=="Ctrl").join("+").replace("Shift+","⇧").replace("Enter","↵")||"";
     }
-    const showShortcutKeys=event=>header.classList.toggle("lex-control-held",!!event.ctrlKey);
+    const showShortcutKeys=event=>document.documentElement.classList.toggle("lex-control-held",!!event.ctrlKey);
     document.addEventListener("keydown",showShortcutKeys);
     document.addEventListener("keyup",showShortcutKeys);
-    window.addEventListener("blur",()=>header.classList.remove("lex-control-held"));
+    window.addEventListener("blur",()=>document.documentElement.classList.remove("lex-control-held"));
     header.addEventListener("click",event=>{
       const button=event.target.closest("button");if(!button||button.disabled)return;
       button.classList.add("lex-command-pressed");setTimeout(()=>button.classList.remove("lex-command-pressed"),180);
@@ -6422,7 +6597,9 @@ ${contents.path}`});
         widths[donor]-=taken;remaining-=taken;applied+=taken;
         if(remaining<.25)break;
       }
-      if(applied<.25)return false;
+      // A drag is measured from its starting widths. Returning to the start
+      // must restore those widths, even though this move transfers nothing.
+      if(applied<.25){if(initialWidths)setSizes(widths,persist);return false;}
       widths[delta>0?index:index+1]+=applied;
       setSizes(widths, persist);
       return true;
@@ -6671,6 +6848,13 @@ ${contents.path}`});
     return listNode;
   };
 
+  const selectionIcon = () => {
+    const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
+    for(const [key,value] of Object.entries({viewBox:"0 0 24 24","aria-hidden":"true",fill:"none",stroke:"currentColor","stroke-width":"2","stroke-linecap":"round","stroke-linejoin":"round"}))svg.setAttribute(key,value);
+    const path=document.createElementNS(ns,"path");
+    path.setAttribute("d","M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4");
+    svg.append(path);return svg;
+  };
   const searchIcon = () => {
     const namespace = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(namespace, "svg");
@@ -7658,11 +7842,34 @@ ${contents.path}`});
     // that wants the outside pillar asks for it with internal:false; a control
     // with no box to put a reference in - a checkbox - never gets one.
     const boxed = options.control instanceof Element &&
-      options.control.matches?.("input:not([type=checkbox]):not([type=range]),select,textarea,output,.lex-unit-field,.lex-readonly-field");
+      options.control.matches?.("input:not([type=checkbox]):not([type=range]),select,textarea,output,.lex-unit-field,.lex-readonly-field,.lex-inline-label:has(> select)");
     const internal = options.internal === undefined ? boxed : options.internal !== false;
+    const stacked = !internal && options.control?.matches?.(".lex-choice-field,.lex-stack");
     const root = element("div", {
-      class: ["lex-source-control", internal ? "lex-source-control-internal" : ""].filter(Boolean).join(" "),
+      class: ["lex-source-control", internal ? "lex-source-control-internal" : "", stacked ? "lex-source-control-stacked" : ""].filter(Boolean).join(" "),
     }, options.control);
+    // A number sharing its box with a reference gets its own up and down at
+    // the box's right edge. The browser's arrows sit at the end of the text,
+    // so the space kept for the reference showed as an empty band to the
+    // right of them, and the arrows jumped left whenever a reference appeared.
+    const numberBox = internal && options.control instanceof Element
+      ? (options.control.matches("input[type=number]") ? options.control : options.control.querySelector(":scope > input[type=number]"))
+      : null;
+    if (numberBox) {
+      root.classList.add("lex-has-stepper");
+      const step = direction => event => {
+        event.preventDefault();
+        if (numberBox.disabled || numberBox.readOnly) return;
+        try { direction > 0 ? numberBox.stepUp() : numberBox.stepDown(); }
+        catch (_error) { numberBox.value = String((Number(numberBox.value) || 0) + direction); }
+        numberBox.dispatchEvent(new Event("input", {bubbles: true}));
+        numberBox.dispatchEvent(new Event("change", {bubbles: true}));
+      };
+      const arrow = (direction, label) => element("button", {type: "button", tabindex: "-1", "aria-hidden": "true",
+        class: direction > 0 ? "lex-stepper-up" : "lex-stepper-down", title: label,
+        onpointerdown: event => event.preventDefault(), onclick: step(direction)});
+      root.append(element("span", {class: "lex-stepper"}, arrow(1, "Increase"), arrow(-1, "Decrease")));
+    }
     // What the rail must hold is decided by the sources, which do not change
     // while a value is edited - not by which of them happen to differ from the
     // value right now. Measuring the visible entries instead made the rail
@@ -7974,7 +8181,10 @@ ${contents.path}`});
       return fields;
     });
     let paged;
+    const searchOptions={key:`platform-${config.runtime || "settings"}`,value:options.query || "",label:`Search ${config.runtime} settings`};
     const applySearch = value => {
+      // Page rebuilding must keep the current input, including its caret.
+      searchOptions.value=value;
       options.search(value);
       const normalized = String(value).toLocaleLowerCase();
       const root = document.querySelector(".lex-platform-config");
@@ -7990,7 +8200,7 @@ ${contents.path}`});
       // rather than drawing a second one above this view.
       tabs: options.tabs, activeTab: options.activeTab,
       tabsLabel: options.tabsLabel, changeTab: options.changeTab,
-      search:{key:`platform-${config.runtime || "settings"}`,value:options.query || "",label:`Search ${config.runtime} settings`,change:applySearch},
+      search:Object.assign(searchOptions,{change:applySearch}),
     });
     return element("section", {class: "lex-platform-config"},
       options.showHeader === false ? null : element("header", {class: "lex-platform-config-head"},
@@ -7998,7 +8208,7 @@ ${contents.path}`});
       paged)
   };
 
-  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 
@@ -8218,15 +8428,55 @@ ${contents.path}`});
     }));
   }, true);
 
-  // Every tab stays in one row. Equal lanes give the label fitter a bound.
-  const tabLabelObserver=new ResizeObserver(()=>scheduleFit());
+  // Tabs share one row of equal lanes while every name fits in its lane at
+  // full size. When one does not, the bar takes another row rather than
+  // shrinking the names: one row at any cost put PROPERTIES at seven pixels
+  // beside LOOT at fifteen. The names are measured at their own size, so a
+  // bar that has room again goes back to one row.
+  const tabLabelObserver=new ResizeObserver(()=>scheduleBalance());
   const balanceTabRows = () => {
     for (const bar of document.querySelectorAll('.lex-shell-header nav, .lex-subtab-bar')) {
       const tabs=[...bar.children].filter(node=>node instanceof HTMLElement && !node.hidden);
       bar.dataset.lexTabRows='1';
       bar.dataset.lexTabTight='';
-      bar.style.setProperty('--lex-tab-columns',String(Math.max(1,tabs.length)));
       tabs.forEach(tab=>tab.style.removeProperty('--lex-tab-span'));
+      const width=bar.clientWidth;
+      let columns=Math.max(1,tabs.length);
+      // A bar of pictures (GF portraits) scales its pictures to the lanes and
+      // stays one row; only names are measured.
+      if(width>0&&tabs.length>1&&!bar.matches('.lex-subtab-bar-images')){
+        const needs=tabs.map(tab=>{
+          const label=tab.querySelector('.lex-tab-label-text');
+          if(!label)return 0;
+          label.style.fontSize='';
+          // The whole name, the tab's padding and border, and whatever else
+          // sits beside the name in the flow (a help mark). Read from those
+          // parts, not from the tab: a tab is as wide as its lane, so the
+          // lane would feed back into what it is measured to need.
+          const px=(style,...names)=>names.reduce((sum,name)=>sum+(parseFloat(style[name])||0),0);
+          const own=getComputedStyle(tab);
+          // The text's own width: a Range, since the label box is as wide as its lane.
+          const text=document.createRange();text.selectNodeContents(label);
+          let need=text.getBoundingClientRect().width+px(own,'paddingLeft','paddingRight','borderLeftWidth','borderRightWidth');
+          for(let wrap=label.parentElement;wrap&&wrap!==tab;wrap=wrap.parentElement)need+=px(getComputedStyle(wrap),'paddingLeft','paddingRight');
+          for(const child of tab.children){
+            if(child.contains(label))continue;
+            const style=getComputedStyle(child);
+            if(style.position==='absolute'||style.position==='fixed'||style.display==='none')continue;
+            need+=child.offsetWidth+px(style,'marginLeft','marginRight');
+          }
+          // Letter spacing trails the last glyph and is not in the text box.
+          return Math.ceil(need+(parseFloat(getComputedStyle(label).letterSpacing)||0)*2)+6;
+        });
+        const widest=Math.max(...needs);
+        if(widest*tabs.length>width){
+          const perRow=Math.max(1,Math.floor(width/Math.max(1,widest)));
+          const rows=Math.ceil(tabs.length/perRow);
+          columns=Math.ceil(tabs.length/rows);
+        }
+      }
+      bar.style.setProperty('--lex-tab-columns',String(columns));
+      bar.dataset.lexTabRows=String(Math.ceil(Math.max(1,tabs.length)/columns));
       bar.querySelectorAll('.lex-tab-label-text').forEach(label=>tabLabelObserver.observe(label));
     }
   };
@@ -8270,42 +8520,60 @@ ${contents.path}`});
   // reads without writing, so nothing is invalidated and the browser answers
   // the whole sweep from one layout.
   const fitted = new WeakMap();
+  const LABEL_MIN_PX = 9;
+  const widenLabelLane = label => {
+    const lane = label.closest('.lex-tweak-card-grid,.lex-detail-panel,.lex-detail,.lex-detail-section') || label.parentElement?.parentElement || label.parentElement;
+    if (!lane) return;
+    const needed = Math.ceil(label.scrollWidth + 2);
+    const current = parseFloat(lane.style.getPropertyValue('--lex-detail-label-min')) || 0;
+    if (needed > current) lane.style.setProperty('--lex-detail-label-min', `${needed}px`);
+  };
   const fitKey = label => `${label.clientWidth}x${label.clientHeight}|${label.textContent}`;
   const fitLabel = label => {
     if (!(label instanceof HTMLElement)) return;
-    // Some rows give the name its own line and let it wrap, so there is no
-    // fixed lane to shrink into. Shrinking anyway is how the platform page
-    // ended up with six-pixel labels beside full-size controls.
-    if (label.closest(".lex-platform-config-field")) {
-      if (label.style.fontSize) label.style.fontSize = "";
-      return;
-    }
+    // The name lane has a fixed width. Fit the font inside it.
     const key = fitKey(label);
     if (fitted.get(label) === key && label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight + 1) return;
     label.style.fontSize = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
     if(label.classList.contains('lex-tab-label-text')) {
+      // A subtab keeps its name at full size and its bar wraps onto another
+      // row when the names no longer fit. Shrinking came first and made
+      // wrapping unreachable: a seven-tab panel read PROPERTIES at seven
+      // pixels beside LOOT at fifteen.
+      if(label.closest('.lex-subtab-button')){fitted.set(label,fitKey(label));return;}
       const range=document.createRange();range.selectNodeContents(label);
       const fits=()=>{const css=getComputedStyle(label);return range.getBoundingClientRect().width <= label.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight)-3;};
-      while(size>1&&!fits()){size-=.5;label.style.fontSize=`${size}px`;}
+      while(size>LABEL_MIN_PX&&!fits()){size-=.5;label.style.fontSize=`${size}px`;}
       fitted.set(label,fitKey(label));
       return;
     }
     // Width gets no slack: a word may no longer wrap mid-way, so a name one
     // pixel too wide pokes past the label edge every other name ends on.
-    const minimum=label.classList.contains('lex-tab-label-text')?1:6;
-    while (size > minimum && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth)) {
+    // A name is never shrunk past what can be read. The floor was one pixel,
+    // and a long property name in a narrow lane came out as a smear. A name
+    // that still does not fit at the floor widens the lane instead - for its
+    // whole panel, so the names in it keep one edge.
+    const overflows = () => label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth;
+    // A word wider than the lane widens the lane before anything shrinks, so
+    // one long name does not come out smaller than the names around it. The
+    // lane settles on the next pass, when the observer sees it resize.
+    if (label.classList.contains('lex-detail-field-label') && label.scrollWidth > label.clientWidth) widenLabelLane(label);
+    while (size > LABEL_MIN_PX && overflows()) {
       size -= .5;
       label.style.fontSize = `${size}px`;
     }
+
     // `contain:size` keeps the font size out of the box's own measurements, so
     // the key is the same one computed above and the label settles in one pass.
     fitted.set(label, key);
   };
   const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text';
+  const labelSizeObserver = new ResizeObserver(entries => scheduleFit(entries.map(entry=>entry.target)));
   const fitAllLabels = root => {
-    if (root instanceof Element && root.matches?.(LABEL_SELECTOR)) fitLabel(root);
-    root.querySelectorAll?.(LABEL_SELECTOR).forEach(fitLabel);
+    const fit = label => { labelSizeObserver.observe(label); fitLabel(label); };
+    if (root instanceof Element && root.matches?.(LABEL_SELECTOR)) fit(root);
+    root.querySelectorAll?.(LABEL_SELECTOR).forEach(fit);
   };
   // Measuring inside the mutation callback reads a layout that is not final:
   // the label's own height comes from the row, and the row is sized by a
@@ -8355,6 +8623,40 @@ ${contents.path}`});
     scheduleBalance();
   });
   scheduleFit();
+})();
+
+// Selection marks follow the first visible glyph, without joining its layout.
+(() => {
+  let pending=false;
+  const sizes=new ResizeObserver(()=>schedule());
+  const place=()=>{
+    pending=false;
+    for(const host of document.querySelectorAll('.lex-shell-header nav button.active,.lex-column-list-row.selected .lex-column-pointer-cell > .lex-column-cell-content')){
+      const tab=host.matches('button');
+      const label=tab?host.querySelector('.lex-tab-label-text'):host;
+      if(!label)continue;
+      sizes.observe(label);
+      const walker=document.createTreeWalker(label,NodeFilter.SHOW_TEXT,{acceptNode:node=>node.textContent.trim()&&!node.parentElement.closest('.lex-reference-values,.lex-tab-shortcut,button,select')?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_SKIP});
+      let node=tab?label.firstChild:walker.nextNode();
+      while(node&&node.nodeType!==Node.TEXT_NODE)node=node.firstChild;
+      if(!node||!node.textContent.trim())continue;
+      const range=document.createRange();range.selectNodeContents(node);
+      const text=range.getBoundingClientRect(),box=host.getBoundingClientRect(),css=getComputedStyle(host);
+      if(!text.width)continue;
+      const width=parseFloat(css.getPropertyValue(tab?'--lex-tab-marker-width':'--lex-row-marker-width'))||24;
+      const gap=6;
+      const scale=box.width/host.offsetWidth||1;
+      const left=(text.left-box.left)/scale-width-gap-(parseFloat(css.borderLeftWidth)||0);
+      host.style.setProperty('--lex-marker-left',`${left}px`);
+    }
+  };
+  const schedule=()=>{if(!pending){pending=true;requestAnimationFrame(place);}};
+  new MutationObserver(schedule).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
+  new ResizeObserver(schedule).observe(document.documentElement);
+  window.addEventListener('resize',schedule);
+  document.addEventListener('pointerup',schedule);
+  document.fonts?.ready?.then(schedule);
+  schedule();
 })();
 
 
@@ -8433,6 +8735,7 @@ ${contents.path}`});
     const inputs = [...scope.querySelectorAll('input[type="number"]')];
     if (scope instanceof Element && scope.matches?.('input[type="number"]')) inputs.push(scope);
     for (const input of inputs) {
+      window.LexeditorUI.autoFitControlText(input,{minimum:8});
       if (groupedBoxes.has(input) || !wantsGrouping(input)) continue;
       groupedBoxes.add(input);
       const plain = () => String(input.value ?? "").replace(/,/g, "");

@@ -86,6 +86,11 @@ with sync_playwright() as p:
                     }''',ROWS)
                     page.evaluate('state.busy=false;render();if(typeof refreshShell==="function")refreshShell();else if(typeof shell!=="undefined"&&shell.refresh)shell.refresh();')
                 page.wait_for_selector('.lex-data-map-table')
+                # Boot never finishes here (its fetches never resolve), so the
+                # loading screen would stay over the page and take every click.
+                # End it the way a finished boot does.
+                page.evaluate('LexeditorUI.finishPluginLoading()')
+                page.wait_for_function('!document.documentElement.classList.contains("lex-loading-live")',timeout=15000)
                 page.wait_for_timeout(600)
                 # A preview/source/parser does not produce an editable badge.
                 page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('unavailable' if game=='blank' else 'view')

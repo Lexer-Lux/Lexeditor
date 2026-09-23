@@ -25,7 +25,8 @@ def main():
     p.evaluate('([w,s])=>{document.querySelector(".weapon-detail").style.width=w+"px";document.body.style.zoom=s}',[width,scale]);p.wait_for_timeout(80)
     result=p.evaluate("""()=>{const row=document.querySelector('.lex-boolean-field'),r=e=>e.getBoundingClientRect(),labels=document.querySelectorAll('.lex-detail-field-label'),arrow=row.querySelector('.lex-field-boolean-arrow'),box=row.querySelector('input'),pin=row.querySelector('.lex-column-pin');return {labelDelta:Math.abs(r(labels[0]).right-r(labels[1]).right),gap:r(box).left-r(arrow).right,line:r(arrow).width,pinOverflow:getComputedStyle(pin).overflow,pinInside:r(pin).right<=r(row).right-4&&r(pin).left>=r(row).left}}""")
     assert result['labelDelta']<2,(width,scale,result)
-    assert 0<=result['gap']<=7,(width,scale,result)
+    # The requested arrow-to-box gap is ten CSS pixels, including at UI zoom.
+    assert abs(result['gap']/scale-10)<.6,(width,scale,result)
     assert result['line']>60,(width,scale,result)
     assert result['pinOverflow']=='visible' and result['pinInside'],result
   p.locator('.lex-boolean-field').hover()

@@ -84,9 +84,9 @@ def run(output: Path, executable: str | None):
                 html=document(unavailable=case=='unavailable').replace(
                     '<head>','<head><base href="https://lexeditor.test/">',1)
                 page.set_content(html,wait_until='domcontentloaded')
-                control=page.locator('.alcohol-strength input')
+                control=page.locator('.lex-inline-label').filter(has_text='Drunkenness').locator('input')
                 expect(control).to_have_count(1)
-                expect(page.locator('.loot-item')).to_have_count(3)
+                expect(page.locator('.lex-list-row')).to_have_count(3)
                 page.wait_for_timeout(150)
                 assert not errors,errors
                 if case=='unavailable':
@@ -97,9 +97,9 @@ def run(output: Path, executable: str | None):
                     page.screenshot(path=str(output/'unavailable.png'),full_page=True)
                 else:
                     expect(control).to_have_value('0.17')
-                    page.locator('.loot-item').filter(has_text='CONSUMABLE_MOONSHINE').click()
+                    page.locator('.lex-list-row').filter(has_text='CONSUMABLE_MOONSHINE').click()
                     expect(control).to_have_value('1')
-                    page.locator('.loot-item').filter(has_text='CONSUMABLE_BRANDY').click()
+                    page.locator('.lex-list-row').filter(has_text='CONSUMABLE_BRANDY').click()
                     expect(control).to_have_value('0.17')
                     control.scroll_into_view_if_needed()
                     page.screenshot(path=str(output/'baseline.png'),full_page=True)
