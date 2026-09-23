@@ -115,3 +115,13 @@ resolved 2759 of 8280 hashed catalog identifiers, +2294 insertions into
 games/rdr2/labels.json. RDR2 hermetic suite green (24 passed), contract
 audit passed. Remaining for the audit: the tag198 extraction path itself
 and the cap-policy design, then game-side proof. Left actionable.
+
+## 2026-09-23 agent review (per-game-rdr2): resolver slice already on master, stays actionable
+
+Re-read the live issue plus comments. The label-resolution slice for the
+audit path already landed on master (2294 insertions into
+games/rdr2/labels.json via games/rdr2/resolve_hash_labels.py); verified
+present on this branch. Exact remaining needs: the tag198 decryption path
+for short_update, the guarded cap-policy design, then game-side proof.
+No new code written.
+
