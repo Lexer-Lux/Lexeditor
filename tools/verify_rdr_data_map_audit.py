@@ -129,7 +129,7 @@ def main() -> int:
         ).items())),
         "unrelatedWscNotIntegrated": len(non_loot_wsc),
         "ps3StringTablesNotIntegrated": len(ps3_strings),
-        "dynamicCapabilitiesTestedElsewhere": ["parsed PC STRTBL", "ShopInventory WGD"],
+        "dynamicCapabilitiesTestedElsewhere": ["parsed PC STRTBL", "ShopInventory WGD", "protected RBF0 scalars"],
     }
     print(json.dumps(summary, indent=2, sort_keys=True))
     print("RDR1 generated Data Map audit passed: every row requires explicit runtime capability evidence")
