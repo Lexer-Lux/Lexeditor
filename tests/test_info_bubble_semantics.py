@@ -19,12 +19,6 @@ def test_detail_field_never_fabricates_info_bubbles_from_metadata():
     for forbidden in ('Allowed range:', 'Minimum:', 'Maximum:', 'Whole numbers only.', 'Step:', 'Unit:', 'Edit the stored', 'Enable or disable', 'Choose ${labelText}'):
         assert forbidden not in semantic_block
 
-def test_manual_defines_semantic_only_contract():
-    manual = text("docs/UI-MANUAL.md")
-    assert "Info-bubble text explains **meaning and consequences**" in manual
-    assert "Never put the property's data type, allowed/storage numeric range, step size, displayed unit" in manual
-    assert "If no useful semantic explanation is known, omit the info" in manual
-
 def test_known_metadata_filler_is_gone_from_plugins():
     sources = "\n".join(plugin_ui(name) for name in plugins_with_ui())
     for forbidden in (

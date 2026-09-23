@@ -24,7 +24,6 @@ def require(condition: bool, message: str) -> None:
 
 framework = text("ui/framework.js")
 css = text("ui/framework.css")
-manual = text("docs/UI-MANUAL.md")
 host = text("desktop_host.py")
 github = text("github_integration.py")
 def plugin_ui(plugin):
@@ -94,10 +93,8 @@ require('repository.issue_label' in github and '"--label"' in github,
         "GitHub issue listing must apply the game label filter")
 
 # There is one owner-authenticated Developer Mode and no legacy Lexer Mode.
-for path in ("desktop_host.py", "settings_manager.py", "ui/framework.js", "docs/UI-MANUAL.md"):
+for path in ("desktop_host.py", "settings_manager.py", "ui/framework.js"):
     require("lexerMode" not in text(path), f"legacy lexerMode remains in {path}")
-require("There is no separate Lexer Mode." in manual,
-        "manual must explicitly retire Lexer Mode")
 require("developerAuthorized" in host,
         "host must expose owner authorization for automatic Developer Mode")
 
@@ -126,10 +123,6 @@ require("detailField" in warband and "/api/items/save" in warband,
         "Warband Items is not using structured editable Detail properties")
 require("warband-item-preview-action" not in warband,
         "Warband still owns its old separate model-preview action")
-
-# Shared semantic-control rules and terminology.
-for phrase in ("most human-friendly semantic control", "checkless toggle", "Bitflags", "info bubble", "ref rail"):
-    require(phrase.casefold() in manual.casefold(), f"UI manual is missing: {phrase}")
 
 # Every plugin explains its mod loader, in the same five fields, in the same
 # words. Five of the eight editors previously said nothing about how their

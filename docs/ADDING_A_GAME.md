@@ -284,7 +284,7 @@ stop it cleanly.
 
 Start with `games/blank` as the shared-control gallery, not as markup to copy.
 Load `/shared/framework.css` and `/shared/framework.js` and use the common controls
-in `docs/UI-MANUAL.md`.
+listed in `ui/component-catalog.js` and demonstrated by the gallery.
 
 Use the shell's **Info button** for setup, deployment, runtime status, Credits and
 project-file management. Use its **Data Map button** for the shared Data Map.
