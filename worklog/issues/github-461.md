@@ -168,3 +168,12 @@ Do not close #461 or mark PR #462 ready from synthetic/API/CI evidence alone. Re
   reversible structured round trip per game, then verifier compare proving
   both installed VBFs byte-identical. Report `baseline.json`/`after.json`
   plus pass/fail per checklist item on #461.
+
+## 2026-09-23 impl/misc-games verification (no code change)
+
+- Re-ran the FFX-X2 suite at `origin/master` `7bf81c04`:
+  `test_ffx_x2_vbf/ffx_commands/ffx_player_stats/ffx_auto_abilities/ffx2_abilities/ffx2_accessories/ffx2_jobs`
+  plus `ctb_base/mix_table/treasures/item_prices/auto_ability_prices/item_shops/gear_shops/deployment/launch/play_api/paths/theme/verify_install/ui_focus`
+  — 115 passed, 1 skipped. No repair needed.
+- No agent slice remains: the real-Steam-install checklist on #461 is Lexer
+  work. Issue stays `actionable`.

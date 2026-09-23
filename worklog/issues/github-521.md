@@ -28,3 +28,11 @@ completion.
 - Full agent-side verification green (see `github-74.md` for the exact list).
 - #522, #523, #74 stay actionable: per-family Lexer decisions and
   installed-game proof remain human work. Do not infer merge permission.
+
+## 2026-09-23 --- impl/misc-games: rename repairs verified, tracker unchanged
+
+- The #525/#74 repair (`tests/test_ff9_datamap_gui.py` games-to-plugins port)
+  is verified green; see `github-74.md`. No scope change for #522 (`waiting`,
+  Lexer per-family decisions) or #523/#524/#525 (`untested`, human checklists
+  stand). FFX-X2-adjacent files are untouched by this branch.
+- Parent stays `actionable`; merging the misc-games PR must not close it.
