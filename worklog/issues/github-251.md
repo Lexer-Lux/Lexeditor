@@ -15,3 +15,7 @@ Reconcile live code, PRs and existing topic/session worklogs. Do not infer build
 Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
 
 - [Original Lexer-Lux/Lexers-Mod-For-RDR2 #159 worklog](github-251/imports/Lexer-Lux--Lexers-Mod-For-RDR2/4fe6c76d17cc9c526cbb208e7d28f26e6395ca60/github-159.md) — verified transferred issue identity; historical evidence, not a replacement for newer central progress.
+
+## 2026-09-22 misc-fixes disposition
+Sequenced behind #193, which now carries a delivered entry/surface candidate with a live checklist (vertical wall grab, cluttered/angled geometry, safe release, normal jumps unchanged). Re-ran tools/verify_rdr2_climb_transitions.py on current tree: PASS production, four regressions rejected (fall-called-grounded, fall-velocity-cleared, cooldown-bypassed, timeout-called-grounded).
+Human test, needs built ASI on a game machine after #193 entry passes: climb, release movement, confirm the cycle stops into idle; releasing Sprint while still moving must keep climbing. Report stop behavior per input. Issue stays actionable.
