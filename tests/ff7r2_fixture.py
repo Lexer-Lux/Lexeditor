@@ -109,7 +109,13 @@ def fixture() -> bytes:
 
 
 def battle_item_possession_fixture() -> bytes:
-    """Synthetic array fixture; property storage types are test-only, not live schema claims."""
+    """Synthetic #471 fixture matching the public Rebirth BattleItemPossession schema.
+
+    Element types are cross-checked against narknon/FF7R2UProj commit
+    ae73efa89db7e48fc7f425dec0847a0208c15b80: item arrays are TArray<FName>,
+    percent/quantity arrays are TArray<uint8>, and StealFaildCountArrayIndex is int32.
+    Values and row identity remain synthetic and contain no proprietary game data.
+    """
     record = "EnemyTest"
     properties = [
         ("NormalItemName_Array", 11),
