@@ -47,7 +47,7 @@ def main() -> int:
             """})
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
-            cdp.eval("state.selectedItem='ankle_boots';renderItems()")
+            cdp.eval("(()=>{const item=state.items.rows.find(row=>row.id==='ankle_boots');if(!item)throw new Error('ankle_boots fixture item is missing');state.selectedItem=itemRowKey(item);renderItems();})()")
             wait_eval(cdp, "document.querySelector('.warband-item-thumbnail img')?.naturalWidth>0", 90)
             cdp.eval("document.querySelector('.warband-item-detail .lex-detail-panel-icon').click()")
             wait_eval(cdp, "document.querySelector('.warband-item-detail.lex-model-preview-open')&&document.querySelectorAll('.lex-model-preview-drawer canvas').length===1&&window.__warbandPreview?.length===1", 90)
@@ -83,7 +83,7 @@ def main() -> int:
             assert all(b["badges"] == 1 for b in badges), badges
             badge_geometry = cdp.eval("[...document.querySelectorAll('nav .lex-tab-shortcut')].map(n=>{const a=n.getBoundingClientRect(),b=n.closest('button').getBoundingClientRect();return Math.abs((a.top+a.bottom-b.top-b.bottom)/2)})")
             assert all(delta <= 1 for delta in badge_geometry), badge_geometry
-            output = ROOT / "worklog" / "issues" / "rendered" / "github-20-warband-detail-icon-font.png"
+            output = ROOT / "worklog" / "acceptance" / "warband" / "github-20-warband-detail-icon-font.png"
             output.parent.mkdir(parents=True, exist_ok=True)
             shot = cdp.call("Page.captureScreenshot", {
                 "format": "png", "captureBeyondViewport": False, "fromSurface": True,
