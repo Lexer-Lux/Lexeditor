@@ -191,10 +191,12 @@ def audit(game_root: Path | None = None, project_root: Path | None = None) -> di
                     if value not in overlap_paths:
                         overlap_paths.append(value)
         minimum = str(meta.get("minimumMemoriaVersion", ""))
-        supported = not minimum or not _newer_than(minimum, pinned)
+        minimum_valid = not minimum or bool(_version(minimum))
+        supported = not minimum or (minimum_valid and not _newer_than(minimum, pinned))
         row = {
             **meta,
             "activePaths": list(active_paths[key]),
+            "minimumMemoriaVersionValid": minimum_valid,
             "supportedByPinnedMemoria": supported,
             "overlapPaths": overlap_paths,
         }
@@ -218,7 +220,10 @@ def audit(game_root: Path | None = None, project_root: Path | None = None) -> di
 
     unsupported = [
         {"name": mod["name"], "folder": mod["folder"],
-         "minimumMemoriaVersion": mod.get("minimumMemoriaVersion", "")}
+         "minimumMemoriaVersion": mod.get("minimumMemoriaVersion", ""),
+         "reason": ("invalid MinimumMemoriaVersion metadata"
+                    if not mod.get("minimumMemoriaVersionValid", True)
+                    else "requires newer Memoria")}
         for mod in mods if not mod["supportedByPinnedMemoria"]
     ]
 
