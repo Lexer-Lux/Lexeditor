@@ -17,6 +17,11 @@ keeping the installed game archives read-only.
   physical language blocks remain one underlying write. Only displayed UTF-16
   text is editable; identifier bytes, hashes, glyph metrics, layout metadata,
   padding, and `_ps3.strtbl` duplicates remain structural/read-only.
+- **RBF Scalars** — prepared tuning resources whose *bytes*, not filename, prove
+  the `RBF0` record format. A clean-room bounded parser exposes only boolean,
+  uint32, and float32 leaves. Saves patch the original fixed-width byte spans in
+  place and reject stale identity; strings, vectors, byte blocks, unknown tags,
+  trailing bytes, and all unedited data remain opaque and byte-preserved.
 - **Loot Tables** — the schema-versioned `LexerRDR.loot.json` runtime override,
   plus the exact verified item-enum call sites in
   `lootcorpsegenericnoanim.wsc`. Other WSC bytecode is not presented as editable.
@@ -50,17 +55,69 @@ project workspace.
 
 ## External mod compatibility
 
-Lexeditor does not treat every RDR1 mod as one stack. RedHook `.red` plugins are
-separate game-root files and Lexeditor leaves them alone. Archive replacement
-mods use a different namespace: Ultimate ASI Loader can overload, for example,
-`update/game/content.rpf`, which is also where Lexeditor deploys its rebuilt
-content archive. Only one file can own that exact path, so Lexeditor does not
-claim semantic composition with another whole-`content.rpf` mod and refuses to
-overwrite a deployed archive that changed outside Lexeditor.
+The compatibility model is based on public PC loader/mod packaging and synthetic
+filesystem tests; it is not a claim that third-party loaders executed in this
+worker environment.
 
-Community patch loaders that use `patch0.rpf`, `patch1.rpf`, and similar files
-are separate third-party systems. Lexeditor neither imports nor reorders those
-patches and does not claim their load-order semantics as its own.
+- **Ultimate ASI Loader update-folder replacements.** Its public documentation
+  defines `update/` as an overload-from-folder path. Public RDR1 mods including
+  No War Horse, Save Anywhere Workaround, and Instant Loot Anims distribute a
+  whole `update/game/content.rpf` option and/or loose files for manual MagicRDR
+  merging. Lexeditor also owns `update/game/<archive>.rpf` while deployed. A
+  synthetic pre-existing whole `content.rpf` collision proves Lexeditor does
+  **not** silently semantic-merge that archive: it records the original,
+  replaces it only while Lexeditor owns the path, restores it byte-identically,
+  and refuses redeploy/revert after an external post-deploy mutation.
+- **Loose archive-relative replacements.** The same synthetic deployment puts
+  an inventory XML and a public-mod-shaped loose WSC into one project content
+  archive and proves both replacements reach the rebuilt copy while the stock
+  `game/content.rpf` hash remains unchanged. This exercises Lexeditor's own
+  composition boundary; it does not prove two independently built RPF archives
+  can be merged safely.
+- **ASI / RedHook plugins.** Public Ultimate ASI Loader documentation supports
+  root/scripts/plugins ASI loading; RDRFix is a public RDR1 ASI example. Official
+  RedHook documentation says modern RedHook plugins use `.red` and its install
+  example places `RedTrainer.red` in the game root. Lexeditor neither imports
+  nor rewrites root `.asi`/`.red` files, and synthetic deployment proves their
+  bytes remain untouched. RedHook explicitly does not officially support other
+  mods, so actual `.red` coexistence remains a retail/runtime acceptance item.
+- **`patchN.rpf`.** The public `rpf_patch.asi` page documents `game/patch0.rpf`,
+  `patch1.rpf`, ... and says higher patch numbers override lower ones. Lexeditor
+  does not import, create, reorder, or modify those files; synthetic checks prove
+  existing `patch0.rpf`/`patch9.rpf` bytes survive Lexeditor deploy/revert. The
+  stated priority is third-party loader documentation, not a Lexeditor runtime
+  result. CodeX's public RDR1 file manager also deliberately excludes patch0..
+  patch998 archives from its ordinary archive scan, so its research code is not
+  independent proof of the newer PC loader's execution order.
+
+These tests establish filesystem ownership and restoration only. They do not
+establish live loader precedence between `update/game/*.rpf`, `patchN.rpf`, ASI,
+or `.red` plugins.
+
+## Data Map format audit
+
+A public CodeX.Games.RDR1 survey was used as format evidence only; the repository
+has no declared redistribution license, so its implementation is not copied.
+The new RBF0 slice uses only independently reimplemented record facts and
+in-place writes. Other families remain protected:
+
+- WGD, WTL and WNM expose public readers but their file-level `Save()` paths are
+  null/incomplete; WSF similarly never returns built bytes. Only the already
+  verified ShopInventory WGD substructure has a bounded Lexeditor writer.
+- Audio DAT has a public reader but its save/read/write methods are explicitly
+  unimplemented.
+- WSI/WSP/WSG/WFT/WFD/WVD/WTD have public RSC6 writers, but safe editing depends
+  on broad pointer/resource-graph serialization, resource type/version flags,
+  and representative PC files. No retail resources are available here to prove
+  byte preservation or roundtrip compatibility, so no editor is exposed.
+- Unrelated WSC bytecode remains opaque except for the already verified corpse
+  loot call sites; `_ps3.strtbl` remains intentionally excluded from the PC
+  editor.
+
+A Data Map row is promoted for RBF0 only after its prepared bytes contain the
+`RBF0` header, the protected parser validates the structure, and at least one
+safe fixed-width scalar exists. Same-extension non-RBF files remain Not
+integrated, so filename/index research alone still cannot grant editability.
 
 ## First-time runtime setup
 
