@@ -2717,7 +2717,8 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
   accent-color:var(--lex-accent);
 }
 
-.lex-pager-right .lex-new-button.lex-pager-add {
+.lex-pager-left .lex-new-button {
+  flex:0 0 auto;
   min-height:32px;
 }
 

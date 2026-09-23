@@ -7115,7 +7115,10 @@ ${contents.path}`});
         element("span", {class: "lex-page-total", text: pages})),
       button(">", page + 1, page + 1 >= pages, "Next page"),
       button(">>", pages - 1, page + 1 >= pages, "Last page"));
+    const filters=options.filters || [];
+    const createControls=filters.filter(control=>control?.matches?.('.lex-new-button'));
     const left = element("div", {class: "lex-pager-left"},
+      ...createControls,
       options.search ? bottomSearch(options.search) : null);
     let rowControl = null;
     if (options.rowControl) {
@@ -7146,7 +7149,7 @@ ${contents.path}`});
     }
     const right = element("div", {class: "lex-pager-right"},
       rowControl,
-      ...(options.filters || []),
+      ...filters.filter(control=>!createControls.includes(control)),
       element("span", {class: "lex-page-summary", text: `${formatNumber(first)}-${formatNumber(last)}/${formatNumber(total)}`}));
     return element("div", {
       class: `lex-pager${pages === 1 ? " single-page" : ""}${inline ? " lex-pager-inline" : ""}`,

@@ -24,6 +24,21 @@ def framework(page):
     page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
 
 
+def test_create_button_precedes_pager_search(page):
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;window.created=0;
+      document.querySelector('main').append(U.pager({page:0,pages:2,pageSize:10,total:20,
+        search:{key:'create-position',change(){}},filters:[U.newButton({onclick:()=>created++})]}));
+    }''')
+    button=page.locator('.lex-pager-left .lex-new-button')
+    search=page.locator('.lex-pager-left input')
+    assert button.bounding_box()['x']+button.bounding_box()['width']<=search.bounding_box()['x']
+    assert page.locator('.lex-pager-right .lex-new-button').count()==0
+    button.click()
+    assert page.evaluate('created')==1
+
+
 def test_data_map_header_location_and_state(page):
     import tempfile
     framework(page)
