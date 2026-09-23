@@ -85,6 +85,13 @@ def status(project: Path | None, game: Path | None,
     packer_present = bool(packer and packer.is_file())
     packer_dependency_ok = _packer_dependency_ok(packer)
     oodle_present = bool(oodle and oodle.is_file())
+    expected_oodle = packer.with_name(OODLE_NAME) if packer_present and packer is not None else None
+    oodle_in_tool_directory = bool(
+        oodle_present
+        and expected_oodle is not None
+        and expected_oodle.is_file()
+        and oodle.resolve() == expected_oodle.resolve()
+    )
     staged_present = bool(staged and staged.is_file())
     paks_present = bool(paks and paks.is_dir())
     archives_present = bool(
@@ -110,6 +117,11 @@ def status(project: Path | None, game: Path | None,
         )
     if not oodle_present:
         missing.append(f"explicit {OODLE_ENV} DLL")
+    elif not oodle_in_tool_directory:
+        missing.append(
+            f"{OODLE_NAME} beside the explicit UnrealReZen executable "
+            f"(set {OODLE_ENV} to that exact file)"
+        )
 
     manifests = _candidate_manifests(project)
     return {
@@ -121,6 +133,7 @@ def status(project: Path | None, game: Path | None,
         "packerPath": str(packer) if packer else "",
         "oodleExplicit": oodle is not None,
         "oodlePresent": oodle_present,
+        "oodleInToolDirectory": oodle_in_tool_directory,
         "oodlePath": str(oodle) if oodle else "",
         "stagedPresent": staged_present,
         "gameArchivesPresent": archives_present,
@@ -134,7 +147,7 @@ def status(project: Path | None, game: Path | None,
 
 
 def _plan(project: Path | None, game: Path | None,
-          environment: Mapping[str, str]) -> tuple[Path, Path, Path, Path]:
+          environment: Mapping[str, str]) -> tuple[Path, Path, Path, Path, Path]:
     state = status(project, game, environment)
     if not state["ready"]:
         raise PackagingError(
@@ -143,9 +156,10 @@ def _plan(project: Path | None, game: Path | None,
     assert project is not None and game is not None
     packer = Path(state["packerPath"]).resolve()
     oodle = Path(state["oodlePath"]).resolve()
+    deps = _expected_deps_path(packer).resolve()
     content_root = (project / "content/End/Content").resolve()
     paks = (game / "End/Content/Paks").resolve()
-    return packer, oodle, content_root, paks
+    return packer, oodle, deps, content_root, paks
 
 
 def build_candidate(project: Path | None, game: Path | None,
@@ -156,12 +170,14 @@ def build_candidate(project: Path | None, game: Path | None,
     UnrealReZen's FF7R2 release loads CUE4Parse Oodle at startup even when
     package compression is Zlib.  Its CUE4Parse/1.1.1 helper returns immediately
     when oo2core_9_win64.dll already exists and otherwise enters its downloader.
-    Lexeditor therefore requires that exact dependency manifest and places only
-    the explicitly supplied DLL in an isolated working directory before process
-    start.  No Lexeditor code calls or implements the downloader.
+    Lexeditor therefore requires that exact dependency manifest and requires
+    the explicitly supplied DLL to already be named oo2core_9_win64.dll beside
+    UnrealReZen.exe before process start. Lexeditor does not copy, download or
+    relocate Oodle, and runs the tool from that directory so both documented
+    local-DLL lookup interpretations resolve to the supplied file.
     """
     env = dict(os.environ if environment is None else environment)
-    packer, oodle, content_root, game_paks = _plan(project, game, env)
+    packer, oodle, deps, content_root, game_paks = _plan(project, game, env)
     assert project is not None
 
     build_root = project / "build"
@@ -171,49 +187,44 @@ def build_candidate(project: Path | None, game: Path | None,
     staged = project / STAGED_PLAYER
     staged_sha256 = _sha256(staged)
     packer_sha256 = _sha256(packer)
+    deps_sha256 = _sha256(deps)
     oodle_sha256 = _sha256(oodle)
 
     try:
-        with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packer-") as runtime_name:
-            runtime = Path(runtime_name)
-            runtime_oodle = runtime / OODLE_NAME
-            shutil.copy2(oodle, runtime_oodle)
-            expected_oodle = _sha256(runtime_oodle)
-
-            command = [
-                str(packer),
-                "--game-dir", str(game_paks),
-                "--content-path", str(content_root),
-                "--engine-version", ENGINE_VERSION,
-                "--output-path", str(output_utoc),
-                "--compression-format", "Zlib",
-                "--mount-point", MOUNT_POINT,
-                "--game-dir-top-only",
-            ]
-            completed = runner(
-                command,
-                cwd=str(runtime),
-                env=dict(env),
-                capture_output=True,
-                text=True,
-                timeout=300,
-                check=False,
+        command = [
+            str(packer),
+            "--game-dir", str(game_paks),
+            "--content-path", str(content_root),
+            "--engine-version", ENGINE_VERSION,
+            "--output-path", str(output_utoc),
+            "--compression-format", "Zlib",
+            "--mount-point", MOUNT_POINT,
+            "--game-dir-top-only",
+        ]
+        completed = runner(
+            command,
+            cwd=str(packer.parent),
+            env=dict(env),
+            capture_output=True,
+            text=True,
+            timeout=300,
+            check=False,
+        )
+        if completed.returncode != 0:
+            detail = (completed.stderr or completed.stdout or "").strip()
+            if len(detail) > 800:
+                detail = detail[-800:]
+            raise PackagingError(
+                f"UnrealReZen exited with {completed.returncode}"
+                + (f": {detail}" if detail else "")
             )
-            if completed.returncode != 0:
-                detail = (completed.stderr or completed.stdout or "").strip()
-                if len(detail) > 800:
-                    detail = detail[-800:]
-                raise PackagingError(
-                    f"UnrealReZen exited with {completed.returncode}"
-                    + (f": {detail}" if detail else "")
-                )
-            if not runtime_oodle.is_file() or _sha256(runtime_oodle) != expected_oodle:
-                raise PackagingError("UnrealReZen modified the supplied Oodle runtime copy")
 
         if _sha256(staged) != staged_sha256:
             raise PackagingError("Staged PlayerParameter changed while the package was being built")
         if _sha256(packer) != packer_sha256:
             raise PackagingError("UnrealReZen executable changed while the package was being built")
+        if _sha256(deps) != deps_sha256:
+            raise PackagingError("UnrealReZen dependency manifest changed while the package was being built")
         if _sha256(oodle) != oodle_sha256:
             raise PackagingError("Supplied Oodle DLL changed while the package was being built")
 
@@ -242,9 +253,15 @@ def build_candidate(project: Path | None, game: Path | None,
             "tooling": {
                 "unrealReZen": {
                     "sha256": packer_sha256,
+                    "depsSha256": deps_sha256,
                     "requiredCUE4Parse": CUE4PARSE_VERSION,
                 },
-                "oodle": {"sha256": oodle_sha256, "copiedAs": OODLE_NAME},
+                "oodle": {
+                    "sha256": oodle_sha256,
+                    "path": str(oodle),
+                    "requiredName": OODLE_NAME,
+                    "alreadyInToolDirectory": True,
+                },
                 "engine": ENGINE_VERSION,
                 "compression": "Zlib",
                 "mountPoint": MOUNT_POINT,
