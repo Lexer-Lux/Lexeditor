@@ -545,9 +545,9 @@ function recordsPanel(kind) {
     className: "factorio-layout",
     splitKey: `factorio-${kind}`,
     rowsKey: `factorio-${kind}`,
-    defaultSplit: 44,
-    minLeft: 320,
-    minRight: 380,
+    defaultSplit: 50,
+    minLeft: 380,
+    minRight: 360,
     search: {
       key: `factorio-${kind}`,
       value: state.query[kind],
@@ -644,7 +644,6 @@ function infoPanel() {
 async function exportCurrent() {
   try {
     state.exportResult = await jsonPost("/api/export", {});
-    LexeditorUI.showToast?.(`Exported ${state.exportResult.filename}`);
     render();
   } catch (error) {
     LexeditorUI.showToast?.(error.message, true);
