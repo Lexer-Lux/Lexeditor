@@ -134,7 +134,14 @@ def main():
                     page.evaluate('navigate("loot")')
                     assert page.get_by_text('Loot ASI override is unavailable', exact=True).count()
                     page.evaluate('navigate("settings")')
-                    assert page.locator('.settings-section').count() == 2
+                    settings = page.locator('.lex-settings-columns')
+                    assert settings.count() == 1
+                    for section in ('WeaponRadial', 'DevelopmentCamera'):
+                        card = settings.locator('.lex-detail-section').filter(has_text=section).first
+                        assert card.count() == 1 and card.is_visible()
+                        assert card.get_attribute('aria-label') == section
+                    active_settings = page.locator('nav button[data-tab="settings"].active')
+                    assert active_settings.count() == 1
                     page.evaluate('navigate("project")')
                     assert page.get_by_text('Saved files and game delivery', exact=True).count()
                     assert page.get_by_role('button', name='Deploy Project').count()
