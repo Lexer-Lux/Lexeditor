@@ -52,3 +52,23 @@ Recurrence audit:
 ## Local delivery, 2026-09-08
 
 Development build passed. Installed ASI and matching release manifest with RDR2 closed; SHA-256 `EC0ECC477BE9089E3C17C25816580FD85D597A113236C94B3041E0E3504819E2`. Previous ASI retained as a small hash-named rollback copy. No catalog or settings changed. Production executable tests pass; rejected four train regressions and three card-conversion regressions. No game launch or rendered acceptance claimed. Full issue remains actionable.
+
+## 2026-09-22 misc-fixes evidence
+
+Re-ran `tools/verify_rdr2_duplicate_card_transactions.py` on current tree:
+PASS production; three mutations rejected (skip-rollback-barrier,
+ignore-mailing, trust-return-flag). All 12 sets and 144 cards hold the mailed
+lockout with rollback-safe conversion. Repo-wide search shows only
+`duplicate_cigarette_cards.cpp` references the `LEX_DUPLICATE` sale records,
+so the fence-routing half still rests on the #57 data path and is unverified
+in game. No code change.
+
+Human test, needs built ASI on a game machine with a disposable pre/post-mail
+save:
+1. Pre-mail: hold a duplicate of an unmailed set. It stays an original and the
+   fence offers nothing for it.
+2. Mail the set at the post office. Duplicates convert; the mailed set is not
+   restored.
+3. The fence buys the converted duplicates.
+Report fence offers with before/after inventory counts. Issue stays
+`actionable`.
