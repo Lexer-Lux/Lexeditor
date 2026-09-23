@@ -119,7 +119,8 @@ def _split_folder_names(raw_value: str) -> list[str]:
         return [value for value in quoted if value]
     # Memoria's launcher also accepts one unquoted path because its parser
     # trims outer quotes and then splits only on the quoted comma separator.
-    return [value.strip() for value in raw_value.split(",") if value.strip()]
+    value = raw_value.strip().strip('"')
+    return [value] if value else []
 
 
 def _folder_line(names: Iterable[str], prefix: str = "FolderNames = ") -> str:
