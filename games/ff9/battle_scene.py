@@ -316,7 +316,11 @@ class BattleSceneStore:
 
     @staticmethod
     def relative(scene: str) -> Path:
-        return Path("BattleMap") / "BattleScene" / f"EVT_BATTLE_{scene}" / "dbfile0000.raw16"
+        # Memoria AssetManager resolves battle-scene TextAssets through the
+        # StreamingAssets/Assets/Resources loose-override tree. Hades Workshop
+        # and ff9mapkit emit the same path with the serialized TextAsset suffix.
+        return (Path("StreamingAssets") / "Assets" / "Resources" / "BattleMap" /
+                "BattleScene" / f"EVT_BATTLE_{scene}" / "dbfile0000.raw16.bytes")
 
     def _source(self, scene: str) -> tuple[bytes, str, Path | None]:
         project = self.project_root / self.relative(scene)
@@ -329,10 +333,10 @@ class BattleSceneStore:
 
     def status_rows(self) -> list[dict[str, Any]]:
         available = self.archive_path.is_file()
-        note = "Reads vanilla battle-scene TextAssets from p0data2; saves Memoria raw16 project overlays."
+        note = "Reads vanilla battle-scene TextAssets from p0data2; saves canonical Memoria loose raw16 project overlays under StreamingAssets/Assets/Resources, which Deploy Project copies into the Lexeditor mod folder."
         return [
-            {"key": "enemies", "tab": "enemies", "label": "Enemies", "relativePath": "StreamingAssets/p0data2.bin → BattleMap/BattleScene/*/dbfile0000.raw16", "controls": "Enemy HP/MP, rewards, stats, elements, defences, Blue Magic, geometry, SFX, card and shadow fields", "available": available, "source": "vanilla" if available else None, "sourcePath": str(self.archive_path) if available else None, "projectPath": str(self.project_root / "BattleMap/BattleScene"), "notes": note},
-            {"key": "encounters", "tab": "encounters", "label": "Encounters", "relativePath": "StreamingAssets/p0data2.bin → BattleMap/BattleScene/*/dbfile0000.raw16", "controls": "Pattern rate, monster count, camera, AP and four enemy placements", "available": available, "source": "vanilla" if available else None, "sourcePath": str(self.archive_path) if available else None, "projectPath": str(self.project_root / "BattleMap/BattleScene"), "notes": note},
+            {"key": "enemies", "tab": "enemies", "label": "Enemies", "relativePath": "StreamingAssets/p0data2.bin → StreamingAssets/Assets/Resources/BattleMap/BattleScene/*/dbfile0000.raw16.bytes", "controls": "Enemy HP/MP, rewards, stats, elements, defences, Blue Magic, geometry, SFX, card and shadow fields", "available": available, "source": "vanilla" if available else None, "sourcePath": str(self.archive_path) if available else None, "projectPath": str(self.project_root / "StreamingAssets/Assets/Resources/BattleMap/BattleScene"), "notes": note},
+            {"key": "encounters", "tab": "encounters", "label": "Encounters", "relativePath": "StreamingAssets/p0data2.bin → StreamingAssets/Assets/Resources/BattleMap/BattleScene/*/dbfile0000.raw16.bytes", "controls": "Pattern rate, monster count, camera, AP and four enemy placements", "available": available, "source": "vanilla" if available else None, "sourcePath": str(self.archive_path) if available else None, "projectPath": str(self.project_root / "StreamingAssets/Assets/Resources/BattleMap/BattleScene"), "notes": note},
         ]
 
     @staticmethod
