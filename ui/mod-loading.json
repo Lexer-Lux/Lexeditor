@@ -2,7 +2,7 @@
   "schema": 1,
   "plugins": {
     "blank": {
-      "loader": "Template only — not implemented.",
+      "loader": "Template only \u2014 not implemented.",
       "structure": "Template only. A shipping plugin must declare its mod root or package format and the file layout users should install or edit.",
       "overriding": "Template only. A shipping plugin must declare whether mods stack, replace whole files, merge semantic records, or are mutually exclusive."
     },

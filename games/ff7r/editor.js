@@ -765,9 +765,9 @@
       LexeditorUI.modLoaderSection({
         loader:"Unreal reads loose PAK archives from End/Content/Paks/~mods. No external loader or script hook is required.",
         output:"Lexeditor packs your project's content folder into Lexeditor-FF7R_P.pak and, on an explicit Deploy, copies that one file into ~mods.",
-        order:"Unreal mounts ~mods PAKs after the base game, and later-mounted archives win. A _P suffix raises priority; two mods editing the same asset still conflict.",
-        safety:"Installed base PAKs are never written. Direct deployment also refuses to replace an existing Lexeditor-FF7R_P.pak unless its Lexeditor sidecar and SHA-256 still prove ownership.",
-        removal:"Use Remove deployed PAK. Lexeditor deletes only an archive whose sidecar and SHA-256 still prove ownership; unmanaged or externally changed files are preserved.",
+        order:"Before direct deployment Lexeditor lists active ~mods PAK indexes and refuses an exact game-asset collision instead of guessing an Unreal load-order winner. Non-overlapping PAKs coexist.",
+        safety:"Installed base PAKs are never written. Direct deployment preserves every third-party PAK and refuses to replace or remove Lexeditor-FF7R_P.pak unless its sidecar and SHA-256 still prove ownership.",
+        removal:"Use Remove deployed PAK. Lexeditor deletes only its ownership-verified archive and marker; unrelated PAKs remain untouched.",
       })]})}
 
   function render(){let content;const curated=curatedSpec(state.tab);if(curated)content=curatedPanel(curated);else if(state.tab==="datamap")content=dataMapPanel();else if(state.tab==="tweaks")content=tweaksPanel();else if(state.tab==="info")content=infoPanel();else if(state.tab==="text")content=textPanel();else if(isEconomyTab(state.tab))content=economyPanel();else if(state.tab==="loot")content=lootPanel();else content=dataPanel();$("#main").replaceChildren(content);refreshShell()}
