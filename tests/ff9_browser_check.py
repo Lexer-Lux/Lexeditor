@@ -222,9 +222,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.wait_for_selector(".lex-paged-list-detail")
             metrics = page.evaluate("()=>({body:document.body.scrollWidth,viewport:innerWidth,main:document.querySelector('main').scrollWidth,width:document.querySelector('main').clientWidth})")
             assert metrics["body"] <= metrics["viewport"] + 2 and metrics["main"] <= metrics["width"] + 2, metrics
-            last_field = field(page, "EQUIPPABLE BY")
-            last_field.scroll_into_view_if_needed()
-            expect(last_field).to_be_visible()
+            # Responsive paging can rerender once after the viewport change.
+            # Wait for that fit pass, then resolve fresh locators against the settled DOM.
+            page.wait_for_timeout(150)
+            field(page, "EQUIPPABLE BY").scroll_into_view_if_needed()
+            expect(field(page, "EQUIPPABLE BY")).to_be_visible()
             field(page, "WEAPON ID").scroll_into_view_if_needed()
             page.screenshot(path=str(OUT / "ff9-narrow.png"), full_page=True)
 
