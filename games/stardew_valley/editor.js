@@ -512,7 +512,7 @@ async function openDataset(key) {
 function dataMapPanel() {
   const view = LexeditorUI.dataMap({
     rows: state.dataMap.rows, query: state.mapQuery, status: state.mapStatus, page: state.mapPage,
-    sort: state.mapSort, pageSize: 100, open: row => { if (row.target === "objects") navigate("objects"); },
+    sort: state.mapSort, pageSize: 100, open: row => { if (row.datasetKey) openDataset(row.datasetKey); },
     changeQuery: value => { state.mapQuery = value; state.mapPage = 0; render(); },
     changeStatus: value => { state.mapStatus = value; state.mapPage = 0; render(); },
     changePage: page => { state.mapPage = page; render(); },
@@ -623,20 +623,39 @@ async function acceptanceVerify() {
   finally { state.busy = false; render(); }
 }
 async function save() {
-  if (state.busy || !state.objects) return;
-  const edits = diffEdits();
+  if (state.busy) return;
+  const editingTyped = state.datasetKey !== "objects" && state.dataset;
+  const edits = editingTyped ? datasetDiffEdits() : diffEdits();
   if (!edits.length) return;
   state.busy = true; shell.refresh();
-  try { installObjects(await api("/api/objects/save", {sha256: state.objects.sha256, edits})); state.error = ""; }
-  catch (error) { state.error = error.message; LexeditorUI.showAlert({title: "Could not save Stardew project", message: state.error}); }
-  finally { state.busy = false; render(); }
+  try {
+    if (editingTyped) {
+      installDataset(await api("/api/datasets/"+encodeURIComponent(state.datasetKey)+"/save", {
+        sha256: state.dataset.sha256, edits,
+      }));
+    } else {
+      installObjects(await api("/api/objects/save", {sha256: state.objects.sha256, edits}));
+    }
+    state.error = "";
+  } catch (error) {
+    state.error = error.message;
+    LexeditorUI.showAlert({title: "Could not save Stardew project", message: state.error});
+  } finally { state.busy = false; render(); }
 }
 async function discard() {
-  installObjects(await api("/api/objects")); state.error = ""; render();
+  if (state.datasetKey !== "objects" && state.dataset) {
+    installDataset(await api("/api/datasets/"+encodeURIComponent(state.datasetKey)));
+  } else {
+    installObjects(await api("/api/objects"));
+  }
+  state.error = ""; render();
 }
 async function refresh() {
-  const [dashboard, map, objects] = await Promise.all([api("/api/dashboard"), api("/api/datamap"), api("/api/objects")]);
-  state.dashboard = dashboard; state.dataMap = map; installObjects(objects);
+  const requests = [api("/api/dashboard"), api("/api/datamap"), api("/api/objects")];
+  if (state.datasetKey !== "objects") requests.push(api("/api/datasets/"+encodeURIComponent(state.datasetKey)));
+  const values = await Promise.all(requests);
+  state.dashboard = values[0]; state.dataMap = values[1]; installObjects(values[2]);
+  if (values[3]) installDataset(values[3]);
 }
 function mainState(message, error = false) {
   $("#main").replaceChildren(el("p", {class: "sv-state", role: error ? "alert" : "status"}, message));
@@ -646,13 +665,13 @@ function render() {
   let content;
   if (state.tab === "datamap") content = dataMapPanel();
   else if (state.tab === "info") content = infoPanel();
-  else content = objectsPanel();
+  else content = state.datasetKey === "objects" ? objectsPanel() : datasetPanel();
   $("#main").replaceChildren(content);
   shell.refresh();
 }
 function navigate(tab) {
   state.tab = tab;
-  mainState(tab === "datamap" ? "Loading Data Map…" : tab === "info" ? "Loading plugin information…" : "Loading objects…");
+  mainState(tab === "datamap" ? "Loading Data Map…" : tab === "info" ? "Loading plugin information…" : "Loading game data…");
   shell.refresh();
   requestAnimationFrame(render);
 }
@@ -660,7 +679,7 @@ function navigate(tab) {
 const shell = LexeditorUI.mountShell({
   host: "#lexeditor-shell", brand: "LEXEDITOR",
   plugin: {id: "stardew-valley", name: "Stardew Valley", themeName: "stardew-valley", theme: {accent: "#6cae43"}},
-  tabs: [{id: "objects", label: "Objects"}], activeTab: () => state.tab, navigate,
+  tabs: [{id: "objects", label: "Data"}], activeTab: () => state.tab, navigate,
   help: () => navigate("datamap"), helpActive: () => state.tab === "datamap", helpTitle: "Open the Stardew Valley Data Map",
   info: () => navigate("info"), infoActive: () => state.tab === "info", infoTitle: "Open Stardew Valley plugin information",
   dirtyCount, readonly: () => state.busy, save, discard,
