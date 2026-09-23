@@ -305,8 +305,10 @@ def data_map_payload() -> dict:
                 "array elements read-only. Public constants identify NormalItemPercent_Array, "
                 "RareItemPercent_Array, StealItemName_Array, StealItemQuantity_Array and "
                 "StealFaildCountArrayIndex; public mod evidence says the 25% rate data is shared "
-                "between steal/drop. Writes, the complete formula, failure branch and message hook "
-                "remain unproved."
+                "between steal/drop. Generated runtime enums separately identify StealFailed, "
+                "AlreadyStolen and NothingToSteal messages plus a StealSuccessRateAdd skill effect, "
+                "but do not expose the condition/arithmetic connecting them. Writes and the complete "
+                "formula remain unproved."
             ), "status": "partial", "target": "formulae",
         },
         {
