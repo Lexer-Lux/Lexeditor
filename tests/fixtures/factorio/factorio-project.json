@@ -1,0 +1,11 @@
+{
+  "format": 1,
+  "mod": {
+    "name": "lexeditor-factorio-fixture",
+    "version": "0.1.0",
+    "title": "Lexeditor Factorio Fixture",
+    "author": "Lexeditor tests",
+    "description": "Synthetic Factorio 2.1 acceptance fixture.",
+    "dependencies": ["base >= 2.1.0", "? fixture-source"]
+  }
+}

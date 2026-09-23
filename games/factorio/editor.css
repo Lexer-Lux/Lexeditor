@@ -1,0 +1,46 @@
+@font-face{font-family:"Factorio UI";src:url("/game-assets/TitilliumWeb-Regular.ttf") format("truetype");font-style:normal;font-weight:400;font-display:swap}
+@font-face{font-family:"Factorio UI";src:url("/game-assets/TitilliumWeb-SemiBold.ttf") format("truetype");font-style:normal;font-weight:600;font-display:swap}
+@font-face{font-family:"Factorio UI";src:url("/game-assets/TitilliumWeb-Bold.ttf") format("truetype");font-style:normal;font-weight:700;font-display:swap}
+:root{
+  --lex-font:"Factorio UI","Titillium Web","Segoe UI",sans-serif;
+  --lex-font-size-adjust:none;
+  --lex-text-nudge:0px;
+  --lex-heading-font:"Factorio UI","Titillium Web","Segoe UI",sans-serif;
+  --lex-font-synthesis:none;
+  --lex-bg:#171717;
+  --lex-panel:#292929;
+  --lex-panel-2:#202020;
+  --lex-border:#545454;
+  --lex-text:#efefef;
+  --lex-muted:#b7b7b7;
+  --lex-input-bg:#1c1c1c;
+  --lex-accent:#e69b36;
+  --lex-accent-text:#20170b;
+  --lex-highlight:#f6bf66;
+  --lex-radius:2px;
+  --lex-main-overflow:hidden;
+}
+.factorio-layout{height:100%;min-height:0}
+.factorio-table,.factorio-detail{height:100%;min-height:0}
+.factorio-detail{overflow:visible}
+.factorio-reference-list{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:31px;padding:4px 6px;border:1px solid var(--lex-border);background:var(--lex-input-bg,var(--lex-panel-2))}
+.factorio-reference{display:inline-flex;align-items:center;max-width:100%;padding:2px 6px;border:1px solid var(--lex-border);border-radius:var(--lex-radius);background:var(--lex-panel-2);font-size:.9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.factorio-reference button{all:unset;cursor:pointer;color:var(--lex-accent);text-decoration:underline;text-underline-offset:2px}
+.factorio-empty-ref{color:var(--lex-muted)}
+.factorio-state{display:grid;place-items:center;height:100%;min-height:240px;padding:30px}
+.factorio-state-card{width:min(760px,100%);padding:20px;border:1px solid var(--lex-border);background:var(--lex-panel)}
+.factorio-state-card h2{margin:0 0 8px;font:600 1.3rem/1.2 var(--lex-heading-font,var(--lex-font))}
+.factorio-state-card p{margin:8px 0;color:var(--lex-muted)}
+.factorio-state-card code{user-select:text}
+.factorio-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.factorio-actions button{min-height:34px;padding:6px 12px}
+.factorio-map{display:grid;grid-template-rows:auto minmax(0,1fr);height:100%;min-height:0;gap:var(--lex-panel-gap)}
+.factorio-map-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.factorio-diagnostic{padding:7px 9px;border:1px solid var(--lex-border);background:var(--lex-panel-2);word-break:break-word}
+.factorio-diagnostic[data-severity="error"]{font-weight:600}
+.factorio-multi{width:100%;min-height:110px}
+.factorio-chip-count{font-variant-numeric:tabular-nums}
+.factorio-export-result{overflow-wrap:anywhere}
+@media(max-width:760px){
+  .factorio-reference-list{max-height:140px;overflow:auto}
+}

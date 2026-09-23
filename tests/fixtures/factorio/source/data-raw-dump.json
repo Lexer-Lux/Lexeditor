@@ -1,0 +1,220 @@
+{
+  "recipe-category": {
+    "crafting": {
+      "type": "recipe-category",
+      "name": "crafting"
+    },
+    "smelting": {
+      "type": "recipe-category",
+      "name": "smelting"
+    }
+  },
+  "fluid": {
+    "water": {
+      "type": "fluid",
+      "name": "water"
+    }
+  },
+  "item": {
+    "iron-plate": {
+      "type": "item",
+      "name": "iron-plate",
+      "stack_size": 100
+    },
+    "iron-gear-wheel": {
+      "type": "item",
+      "name": "iron-gear-wheel",
+      "stack_size": 100
+    },
+    "automation-science-pack": {
+      "type": "item",
+      "name": "automation-science-pack",
+      "stack_size": 200
+    },
+    "single-token": {
+      "type": "item",
+      "name": "single-token",
+      "stack_size": 1,
+      "flags": [
+        "not-stackable"
+      ]
+    }
+  },
+  "tool": {
+    "fixture-tool": {
+      "type": "tool",
+      "name": "fixture-tool",
+      "stack_size": 1
+    }
+  },
+  "recipe": {
+    "iron-gear-wheel": {
+      "type": "recipe",
+      "name": "iron-gear-wheel",
+      "enabled": true,
+      "energy_required": 0.5,
+      "maximum_productivity": 3,
+      "categories": [
+        "crafting"
+      ],
+      "ingredients": [
+        {
+          "type": "item",
+          "name": "iron-plate",
+          "amount": 2
+        }
+      ],
+      "results": [
+        {
+          "type": "item",
+          "name": "iron-gear-wheel",
+          "amount": 1
+        }
+      ]
+    },
+    "fixture-water": {
+      "type": "recipe",
+      "name": "fixture-water",
+      "enabled": false,
+      "energy_required": 1,
+      "categories": [
+        "crafting"
+      ],
+      "ingredients": [
+        {
+          "type": "fluid",
+          "name": "water",
+          "amount": 10
+        }
+      ],
+      "results": [
+        {
+          "type": "item",
+          "name": "iron-plate",
+          "amount": 1
+        }
+      ]
+    }
+  },
+  "assembling-machine": {
+    "assembling-machine-1": {
+      "type": "assembling-machine",
+      "name": "assembling-machine-1",
+      "crafting_speed": 0.5,
+      "crafting_categories": [
+        "crafting"
+      ],
+      "energy_usage": "75kW",
+      "module_slots": 0
+    }
+  },
+  "furnace": {
+    "stone-furnace": {
+      "type": "furnace",
+      "name": "stone-furnace",
+      "crafting_speed": 1,
+      "crafting_categories": [
+        "smelting"
+      ],
+      "energy_usage": "90kW"
+    }
+  },
+  "technology": {
+    "automation": {
+      "type": "technology",
+      "name": "automation",
+      "enabled": true,
+      "prerequisites": [],
+      "effects": [
+        {
+          "type": "unlock-recipe",
+          "recipe": "iron-gear-wheel"
+        }
+      ],
+      "unit": {
+        "count": 10,
+        "time": 15,
+        "ingredients": [
+          {
+            "name": "automation-science-pack",
+            "amount": 1
+          }
+        ]
+      }
+    },
+    "automation-2": {
+      "type": "technology",
+      "name": "automation-2",
+      "enabled": true,
+      "prerequisites": [
+        "automation"
+      ],
+      "effects": [],
+      "unit": {
+        "count_formula": "100*L",
+        "time": 30,
+        "ingredients": [
+          {
+            "name": "automation-science-pack",
+            "amount": 1
+          }
+        ]
+      }
+    }
+  },
+  "gun": {
+    "pistol": {
+      "type": "gun",
+      "name": "pistol",
+      "stack_size": 5,
+      "attack_parameters": {
+        "type": "projectile",
+        "ammo_category": "bullet",
+        "cooldown": 15,
+        "range": 15
+      }
+    }
+  },
+  "item-with-label": {
+    "labeled-box": {
+      "type": "item-with-label",
+      "name": "labeled-box",
+      "stack_size": 10
+    }
+  },
+  "item-with-tags": {
+    "tagged-box": {
+      "type": "item-with-tags",
+      "name": "tagged-box",
+      "stack_size": 20
+    }
+  },
+  "blueprint": {
+    "fixture-blueprint": {
+      "type": "blueprint",
+      "name": "fixture-blueprint",
+      "stack_size": 1
+    }
+  },
+  "space-platform-starter-pack": {
+    "fixture-platform-pack": {
+      "type": "space-platform-starter-pack",
+      "name": "fixture-platform-pack",
+      "stack_size": 10,
+      "tiles": [],
+      "initial_items": []
+    }
+  },
+  "rocket-silo": {
+    "fixture-silo": {
+      "type": "rocket-silo",
+      "name": "fixture-silo",
+      "crafting_speed": 1,
+      "crafting_categories": [
+        "crafting"
+      ],
+      "energy_usage": "4MW",
+      "module_slots": 4
+    }
+  }
+}

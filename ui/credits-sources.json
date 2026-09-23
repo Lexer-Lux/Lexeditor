@@ -95,16 +95,6 @@
           "name": "Christian Bauer / ff7tools",
           "role": "Reference for FF7 archive and kernel formats.",
           "url": "https://github.com/cebix/ff7tools"
-        },
-        {
-          "name": "petfriendamy / Scarlet",
-          "role": "Reference for FF7 formation layouts, battle restrictions, and initial-condition flags.",
-          "url": "https://github.com/petfriendamy/ff7-scarlet"
-        },
-        {
-          "name": "FF7 modding community / ff7-flat-wiki",
-          "role": "Reference for battle arena names and formation layout.",
-          "url": "https://ff7-mods.github.io/ff7-flat-wiki/FF7/Battle/Battle_Scenes.html"
         }
       ],
       "thanks": [],
@@ -317,6 +307,37 @@
           "sourcePath": "games/rdr2/native_runtime/GameplayTweaks/third_party/minhook/LICENSE.txt"
         }
       ]
+    },
+    "factorio": {
+      "contributions": [
+        {
+          "name": "Wube Software / Factorio API documentation",
+          "role": "Official Factorio 2.1 prototype schemas, prototype-stage lifecycle and mod interoperability contract.",
+          "url": "https://lua-api.factorio.com/latest/"
+        },
+        {
+          "name": "Factorio Wiki contributors",
+          "role": "Official modding tutorial, mod structure and --dump-data workflow reference.",
+          "url": "https://wiki.factorio.com/Tutorial:Modding_tutorial"
+        },
+        {
+          "name": "Wube Software / factorio-data",
+          "role": "Official prototype data and examples used as a read-only implementation reference.",
+          "url": "https://github.com/wube/factorio-data"
+        },
+        {
+          "name": "jacquev6 / factorio-data-raw-json-schema",
+          "role": "Reference-only research for Factorio JSON dump edge cases. No code or schema is bundled because no repository license file was found.",
+          "url": "https://github.com/jacquev6/factorio-data-raw-json-schema"
+        },
+        {
+          "name": "Factorio community font documentation",
+          "role": "Installed core-font path and Titillium Web mapping used for the local-only Factorio UI font route; Lexeditor does not bundle the game font.",
+          "url": "https://forums.factorio.com/viewtopic.php?t=31891"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
     }
   }
 }

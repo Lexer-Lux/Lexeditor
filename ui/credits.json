@@ -99,16 +99,6 @@
           "name": "Christian Bauer / ff7tools",
           "role": "Reference for FF7 archive and kernel formats.",
           "url": "https://github.com/cebix/ff7tools"
-        },
-        {
-          "name": "petfriendamy / Scarlet",
-          "role": "Reference for FF7 formation layouts, battle restrictions, and initial-condition flags.",
-          "url": "https://github.com/petfriendamy/ff7-scarlet"
-        },
-        {
-          "name": "FF7 modding community / ff7-flat-wiki",
-          "role": "Reference for battle arena names and formation layout.",
-          "url": "https://ff7-mods.github.io/ff7-flat-wiki/FF7/Battle/Battle_Scenes.html"
         }
       ],
       "thanks": [],
@@ -131,16 +121,6 @@
           "name": "Christian Bauer / ff7tools",
           "role": "Reference for FF7 archive and kernel formats.",
           "url": "https://github.com/cebix/ff7tools"
-        },
-        {
-          "name": "petfriendamy / Scarlet",
-          "role": "Reference for FF7 formation layouts, battle restrictions, and initial-condition flags.",
-          "url": "https://github.com/petfriendamy/ff7-scarlet"
-        },
-        {
-          "name": "FF7 modding community / ff7-flat-wiki",
-          "role": "Reference for battle arena names and formation layout.",
-          "url": "https://ff7-mods.github.io/ff7-flat-wiki/FF7/Battle/Battle_Scenes.html"
         }
       ],
       "thanks": [],
@@ -607,6 +587,37 @@
           "text": "MinHook - The Minimalistic API Hooking Library for x64/x86\nCopyright (C) 2009-2017 Tsuda Kageyu.\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions\nare met:\n\n 1. Redistributions of source code must retain the above copyright\n    notice, this list of conditions and the following disclaimer.\n 2. Redistributions in binary form must reproduce the above copyright\n    notice, this list of conditions and the following disclaimer in the\n    documentation and/or other materials provided with the distribution.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS\n\"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED\nTO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A\nPARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER\nOR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\nEXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,\nPROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR\nPROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF\nLIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING\nNEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\nSOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\n================================================================================\nPortions of this software are Copyright (c) 2008-2009, Vyacheslav Patkov.\n================================================================================\nHacker Disassembler Engine 32 C\nCopyright (c) 2008-2009, Vyacheslav Patkov.\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions\nare met:\n\n 1. Redistributions of source code must retain the above copyright\n    notice, this list of conditions and the following disclaimer.\n 2. Redistributions in binary form must reproduce the above copyright\n    notice, this list of conditions and the following disclaimer in the\n    documentation and/or other materials provided with the distribution.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS\n\"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED\nTO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A\nPARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR\nCONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\nEXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,\nPROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR\nPROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF\nLIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING\nNEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\nSOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\n-------------------------------------------------------------------------------\nHacker Disassembler Engine 64 C\nCopyright (c) 2008-2009, Vyacheslav Patkov.\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions\nare met:\n\n 1. Redistributions of source code must retain the above copyright\n    notice, this list of conditions and the following disclaimer.\n 2. Redistributions in binary form must reproduce the above copyright\n    notice, this list of conditions and the following disclaimer in the\n    documentation and/or other materials provided with the distribution.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS\n\"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED\nTO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A\nPARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR\nCONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,\nEXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,\nPROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR\nPROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF\nLIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING\nNEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS\nSOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
         }
       ]
+    },
+    "factorio": {
+      "contributions": [
+        {
+          "name": "Wube Software / Factorio API documentation",
+          "role": "Official Factorio 2.1 prototype schemas, prototype-stage lifecycle and mod interoperability contract.",
+          "url": "https://lua-api.factorio.com/latest/"
+        },
+        {
+          "name": "Factorio Wiki contributors",
+          "role": "Official modding tutorial, mod structure and --dump-data workflow reference.",
+          "url": "https://wiki.factorio.com/Tutorial:Modding_tutorial"
+        },
+        {
+          "name": "Wube Software / factorio-data",
+          "role": "Official prototype data and examples used as a read-only implementation reference.",
+          "url": "https://github.com/wube/factorio-data"
+        },
+        {
+          "name": "jacquev6 / factorio-data-raw-json-schema",
+          "role": "Reference-only research for Factorio JSON dump edge cases. No code or schema is bundled because no repository license file was found.",
+          "url": "https://github.com/jacquev6/factorio-data-raw-json-schema"
+        },
+        {
+          "name": "Factorio community font documentation",
+          "role": "Installed core-font path and Titillium Web mapping used for the local-only Factorio UI font route; Lexeditor does not bundle the game font.",
+          "url": "https://forums.factorio.com/viewtopic.php?t=31891"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
     }
   }
 }
