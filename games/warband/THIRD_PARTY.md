@@ -48,8 +48,13 @@ field forms and no duplicate item IDs. The Troops audit exposed a 13-entry
 quoted equipment list that matched the old line-based troop heuristic even
 though it is nested data, not a troop. Structured troop discovery now limits
 records to the top level of `troops = [...]`; this revision yields 50 true
-top-level troop records and no `itm_*` false records. No Persistent World code
-or data is bundled.
+top-level troop records and no `itm_*` false records.
+ Its flat source
+layout is also accepted by Lexeditor's non-destructive project importer:
+`module_info.py` has one literal `export_dir` and `build_module.bat` reduces
+to the allowlisted one-shot step `python -tt build_module.py`. The managed copy
+redirects the export locally and never executes the interactive `pause`.
+No Persistent World code or data is bundled.
 
 ## Native++ compatibility reference
 
@@ -74,6 +79,11 @@ share four IDs. Lexeditor keeps item IDs fixed and keys Items/Troops edits by
 source record index, so those pre-existing identities can be preserved rather
 than making the whole source unsavable.
 
+Its pinned `build_module.bat` contains only the documented Python process
+scripts plus display/cleanup/pause commands. Every referenced Python script is
+present at the pinned revision, so the safe importer accepts the build plan and
+redirects the copied `module_info.py` away from its hard-coded game path.
+
 ## Rome at War compatibility reference
 
 - Repository: https://github.com/sndtaleworlds/RaW---Module-System
@@ -92,6 +102,12 @@ Rome at War contains 1,901 literal item records in supported 8-10 field forms,
 including two pre-existing duplicate IDs, and an active/cut `woman_walker`
 troop pair sharing one ID. The same source-record identity rules preserve these
 records without rewriting game IDs or conflating the two source entries.
+
+Its pinned build plan is also accepted: the importer keeps the one-pass Python
+process sequence (including `flora_kinds.py`, resolved case-insensitively for
+Warband's Windows runtime) while dropping the batch label, `pause`, and restart
+loop. The copied `module_info.py` export is redirected locally rather than
+writing to the upstream hard-coded Steam path.
 
 ## Installed Warband assets
 
