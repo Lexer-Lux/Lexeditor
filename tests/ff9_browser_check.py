@@ -125,6 +125,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
     target.parent.mkdir(parents=True)
     target.write_bytes(archive())
     (game / "StreamingAssets/p0data11.bin").write_bytes(walkmesh_archive())
+    (game / "StreamingAssets/p0data12.bin").write_bytes(walkmesh_archive("FBG_N21_TEST_MAP001_TEST_1"))
     (project / "StreamingAssets/Data").mkdir(parents=True)
 
     hashes = {}
@@ -256,6 +257,30 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             expect(field(page, "FLOOR ACTIVE").locator('input[type="checkbox"]')).not_to_be_checked()
             page.screenshot(path=str(OUT / "ff9-walkmesh-save-reopen.png"), full_page=True)
 
+            page.evaluate("state.datasetChoice.world='field-walkmesh-triangles';loadDataset('field-walkmesh-triangles').then(render)")
+            page.wait_for_function("state.datasets['field-walkmesh-triangles']?.rows?.length===2")
+            chooser = page.get_by_label("Field walkmesh")
+            expect(chooser.locator("option")).to_have_count(2)
+            tri_active = field(page, "TRIANGLE ACTIVE").locator('input[type="checkbox"]')
+            expect(tri_active).to_be_checked()
+            expect(field(page, "OTHER FLAG BITS").locator("input")).to_have_value("32")
+            tri_active.uncheck()
+            expect(chooser).to_be_disabled()
+            page.locator("#global-save").click()
+            page.wait_for_function("state.datasets['field-walkmesh-triangles']?.rows?.[0]?.source==='project'")
+            expect(field(page, "TRIANGLE ACTIVE").locator('input[type="checkbox"]')).not_to_be_checked()
+            expect(page.get_by_text("Field walkmesh triangles · project BGI", exact=True)).to_be_visible()
+            expect(chooser).to_be_enabled()
+            first_scene = page.evaluate("state.datasets['field-walkmesh-triangles'].activeScene")
+            second_scene = page.evaluate("state.datasets['field-walkmesh-triangles'].scenes.find(row=>row.value!==state.datasets['field-walkmesh-triangles'].activeScene).value")
+            chooser.select_option(second_scene)
+            page.wait_for_function("scene=>state.datasets['field-walkmesh-triangles']?.activeScene===scene", second_scene)
+            chooser = page.get_by_label("Field walkmesh")
+            chooser.select_option(first_scene)
+            page.wait_for_function("scene=>state.datasets['field-walkmesh-triangles']?.activeScene===scene", first_scene)
+            expect(field(page, "TRIANGLE ACTIVE").locator('input[type="checkbox"]')).not_to_be_checked()
+            page.screenshot(path=str(OUT / "ff9-walkmesh-triangle-save-reopen.png"), full_page=True)
+
             page.evaluate("navigate('encounters')")
             page.wait_for_function("state.datasets.encounters?.rows?.length===1")
             expect(numeric_field(page, "MONSTER COUNT")).to_have_attribute("max", "4")
@@ -273,6 +298,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             partial_row = page.locator(".lex-column-list-row").filter(has_text="BGI_FLOOR_ACTIVE").first
             expect(partial_row).to_be_visible()
             expect(partial_row.locator('.lex-integration-status[aria-label="Partial"]')).to_be_visible()
+            triangle_row = page.locator(".lex-column-list-row").filter(has_text="BGI_TRI_ACTIVE").first
+            expect(triangle_row).to_be_visible()
+            expect(triangle_row.locator('.lex-integration-status[aria-label="Partial"]')).to_be_visible()
             map_search.fill("p0data4.bin")
             page.wait_for_function("state.mapQuery==='p0data4.bin'")
             map_text = page.locator(".lex-data-map-view").inner_text()
