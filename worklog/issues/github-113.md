@@ -18,3 +18,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes evidence
 Movement and noise research done. Cover, lantern, and weather comparisons remain; they need #105 manual lantern control plus the follow-up probe install, then the short F9-gated sequence. Indicator harness verified today: verify_rdr2_stealth_indicators.py PASS with ten mutations rejected. Do not repeat completed movement trials. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

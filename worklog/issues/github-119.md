@@ -33,3 +33,9 @@ Root built and hash-verified this source, SHA-256 `B00DD107566D4680D371EEACCF5A0
 
 ## 2026-09-22 misc-fixes disposition
 Discrete-state prototype installed in dev build only; indicator harness passes (see github-113.md). Remaining: finish the #113 evidence and run the controlled observer test (stance, line of sight, suppression, four-target cap) before the behavior counts as ready. Issue stays actionable.
+
+## 2026-09-23 master: flipped to waiting with concrete checklist
+
+Posted the exact game-session checklist as a comment and swapped actionable
+for waiting. A failed session returns it to actionable with evidence; a
+passed session closes it subject to the merge workflow.

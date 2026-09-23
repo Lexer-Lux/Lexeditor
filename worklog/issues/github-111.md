@@ -18,3 +18,9 @@ Read the live issue and comments and preserve the latest explicit human correcti
 
 ## 2026-09-22 misc-fixes disposition
 Icons appear but look poor: artwork-quality task, not missing images. Replacement previews come before any approval ask, then a pickup and acquisition-card check with the art toolchain. Unapproved YTD must not ship. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side previews/prototype
+still owed), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.

@@ -22,3 +22,9 @@ Next: read-only request/completion observer and proved idempotent consequence ha
 
 ## 2026-09-22 misc-fixes note
 Design doc exists (docs/rdr2-continuous-saving-design.md) with engine boundaries and a known gap (crash during a save-blocked mission). Next: read-only request and completion observer plus proved idempotent consequence handling. No saves touched, no runtime installed. Issue stays actionable.
+
+## 2026-09-23 master: reviewed for waiting flip, stays actionable
+
+No concrete Lexer-side session exists yet (agent-side previews/prototype
+still owed), so flipping to waiting would be a fake checklist. Left
+actionable until a real session can be written.
