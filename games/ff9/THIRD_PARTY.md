@@ -26,3 +26,12 @@ No proprietary game data is included here.
 - License: GNU GPL v3 (`LICENSE` in the Hades Workshop repository).
 - Use: additional FF9-specific reverse-engineering provenance for Steam Unity archive structure.
 - No Hades Workshop source file or binary is vendored or invoked by Lexeditor.
+
+## Dream World IX / ff9mapkit
+
+- Project: https://github.com/GameJawnsInc/Dream-World-IX
+- Reference revision audited: `8c7a5b48e9041110dad9e06b69d47c0eecc7b010`
+- License: MIT for toolkit source code; FF9-derived game bytes are explicitly excluded from that grant.
+- Use: public interoperability evidence for FF9 field-scene bundles, compiled event scripts, p0data4 model prefabs, p0data5 animation clips, world-map authoring and Memoria loose-override paths.
+- No Dream World IX source, binary, generated game asset, or FF9-derived byte is bundled or invoked by Lexeditor.
+
