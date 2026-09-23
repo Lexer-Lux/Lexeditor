@@ -28,6 +28,7 @@ RDR_TEST_TOOLS = {
     "tools/verify_rdr_editing.py",
     "tools/verify_rdr_cache_reuse_71.py",
     "tools/verify_rdr_items_split_issue_19.py",
+    "tools/verify_rdr_data_map_audit.py",
     "tests/test_rdr_string_tables.py",
     "tools/magic-rdr/README.md",
 }
