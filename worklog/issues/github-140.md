@@ -31,3 +31,13 @@ representative display layouts with their limits prepared with the game,
 then a Lexer choice. No code written; recording the needs here instead of
 inventing a display manager.
 
+## 2026-09-23 agent slice (impl/rdr2-actionables): representative scope contract
+
+plugins/rdr2/shop_displays.py records the representative-stock scope as
+data (representative layouts, stated limits, category-level consistency,
+signature-item binding) with validate_display_plan(), which rejects
+automatic full mirroring and one-to-one shelving claims, and requires
+the five per-interior checks for any runtime display manager. Covered
+by tests/test_rdr2_shop_displays.py (7 hermetic tests). No gameplay
+claim: the layouts and the Lexer choice still need the game.
+

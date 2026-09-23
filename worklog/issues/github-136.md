@@ -61,3 +61,14 @@ probe with the game (or a native-looking mod page proposal), then a
 Lexer presentation choice. No code written; recording the needs here
 instead of pretending catalog metadata can add a tab.
 
+## 2026-09-23 agent slice (impl/rdr2-actionables): presentation contract
+
+plugins/rdr2/trinket_view.py records the two-route contract as data
+(mod-owned read-only owned-only page with selection plus Back, or a
+native tab proved by the isolated injection probe with
+filter/focus/sizing proof) with validate_trinket_proposal(), which
+rejects catalog-adds-tab and native-category-supported claims.
+Covered by tests/test_rdr2_trinket_view.py (8 hermetic tests). No
+gameplay claim: the probe and the Lexer presentation choice still need
+the game.
+

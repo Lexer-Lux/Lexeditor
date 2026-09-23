@@ -40,3 +40,14 @@ separate fixes, starting with wickiup map artwork and
 completed-Dreamcatcher cleanup as independently verified,
 permission-compatible changes. No code written here.
 
+## 2026-09-23 agent slice (impl/rdr2-actionables): manifest schema contract
+
+plugins/rdr2/bugfix_collection.py records the modular manifest schema
+as data (per-entry problem, verification, and permission records; the
+wickiup and Dreamcatcher first targets) with
+validate_bugfix_collection(), which rejects the run/walk preference
+and monolithic patches, and requires asset regression comparisons for
+the clothing/carry candidates. Covered by
+tests/test_rdr2_bugfix_collection.py (8 hermetic tests). No gameplay
+claim: delivering the separate verified fixes still needs the game.
+

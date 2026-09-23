@@ -39,3 +39,14 @@ needs: validate the item-aware dispatcher hook with the game, then
 per-item feed/bond configuration. No code written; the rejected watcher
 must not return.
 
+## 2026-09-23 agent slice (impl/rdr2-actionables): mapping shape contract
+
+plugins/rdr2/horse_feeding.py records the mapped path as data (bond
+event bases 15/5/1 plus event16 base 5; required func_739, func_454,
+func_724, func_789 surfaces) with validate_feed_mapping(), which
+rejects the after-consumption watcher, fixed-amount substitution, and
+generic attribute hooks, and requires the item hash kept through
+func_739 with magnitude-only substitution. Covered by
+tests/test_rdr2_horse_feeding.py (8 hermetic tests). No gameplay claim:
+hook validation and per-item configuration still need the game.
+

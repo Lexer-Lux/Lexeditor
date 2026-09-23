@@ -35,6 +35,17 @@ Re-read the live issue plus comments. The design exists
 (docs/rdr2-continuous-saving-design.md) with engine boundaries and the
 known save-blocked-mission crash gap. Exact needs: Lexer design approval,
 then a read-only request/completion observer plus proved idempotent
-consequence handling, with no save mutation until then. No code written
-here.
+consequence handling, with no save mutation until then. No code written here.
+
+## 2026-09-23 agent slice (impl/rdr2-actionables): design acceptance contract
+
+plugins/rdr2/continuous_saving.py records the design's acceptance
+checklist as data (six design sections plus the seven consequence rows
+from the design table) with validate_saving_plan(), which rejects
+periodic-autosave-only, generic inventory-difference replay, and
+uncorrelated SAVE_COMPLETE acknowledgement, and blocks real-save
+mutation before design approval. Covered by
+tests/test_rdr2_continuous_saving.py (8 hermetic tests). No gameplay
+claim: design approval, the read-only observer, and the
+save-blocked-mission crash gap still need the game.
 
