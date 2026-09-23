@@ -105,13 +105,21 @@ def _folder_line(names: Iterable[str], prefix: str = "FolderNames = ") -> str:
     return prefix + ", ".join(f'"{name}"' for name in names)
 
 
-def _edit_folder_names(raw: bytes, *, add: bool) -> bytes:
+def _edit_mod_order(raw: bytes, *, add: bool) -> bytes:
+    """Keep Lexeditor first in Memoria runtime and launcher ordering.
+
+    FolderNames is the runtime load order: Memoria reads mod INIs in reverse so
+    the first folder overwrites later folders. Priorities is the launcher's
+    persisted installed-mod ordering. If Priorities already exists, keeping the
+    same Lexeditor entry first prevents the launcher from moving Lexeditor to
+    the end the next time it saves the mod list.
+    """
     text, encoding, bom = _decode_ini(raw)
     newline = "\r\n" if "\r\n" in text else "\n"
     had_final = text.endswith(("\n", "\r"))
     lines = text.splitlines()
     in_mod = False
-    found = False
+    found_folder_names = False
     for index, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith("[") and stripped.endswith("]"):
@@ -119,17 +127,18 @@ def _edit_folder_names(raw: bytes, *, add: bool) -> bytes:
             continue
         if not in_mod:
             continue
-        match = re.match(r"^(\s*FolderNames\s*=\s*)(.*)$", line, flags=re.I)
+        match = re.match(r"^(\s*(FolderNames|Priorities)\s*=\s*)(.*)$", line, flags=re.I)
         if not match:
             continue
-        found = True
-        names = _split_folder_names(match.group(2))
+        setting = match.group(2).casefold()
+        if setting == "foldernames":
+            found_folder_names = True
+        names = _split_folder_names(match.group(3))
         names = [name for name in names if name.casefold() != MOD_NAME.casefold()]
         if add:
             names.insert(0, MOD_NAME)
         lines[index] = _folder_line(names, match.group(1))
-        break
-    if not found:
+    if not found_folder_names:
         raise RuntimeError("Memoria.ini has no [Mod] FolderNames setting")
     updated = newline.join(lines) + (newline if had_final else "")
     return bom + updated.encode(encoding)
@@ -220,7 +229,7 @@ def deploy(game_root: Path | None = None, project_root: Path | None = None,
                 backup.rmdir()
                 os.replace(target, backup)
             os.replace(staging, target)
-            atomic_write(ini, _edit_folder_names(original_ini, add=True))
+            atomic_write(ini, _edit_mod_order(original_ini, add=True))
             if backup and backup.exists():
                 shutil.rmtree(backup)
         except Exception:
@@ -252,7 +261,7 @@ def revert(game_root: Path | None = None, project_root: Path | None = None,
             if target.exists():
                 shutil.rmtree(target)
             if original_ini:
-                atomic_write(ini, _edit_folder_names(original_ini, add=False))
+                atomic_write(ini, _edit_mod_order(original_ini, add=False))
         except Exception:
             if original_ini and ini.exists():
                 atomic_write(ini, original_ini)
