@@ -52,7 +52,14 @@ jobs:
         env:
           LEXEDITOR_NATIVE_WINDOW_TESTS: '1'
       - run: python -m unittest discover -s tests -p test_data_map_coverage.py -v
-      - run: node --check ui/framework.js
+      - name: JavaScript syntax
+        run: |
+          node --check ui/framework.js
+          node --check games/warband/editor.js
+          node --check games/warband/module_records.js
+          node --check games/warband/troop_editor.js
+          node --check games/warband/troop_trees.js
+          node --check games/warband/boot.js
       - run: node tests/test_warband_trees.js
       - name: Check the one-click Windows diagnostic launcher
         if: runner.os == 'Windows'
