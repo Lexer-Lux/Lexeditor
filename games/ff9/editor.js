@@ -276,7 +276,7 @@
         ...(state.runtimeError?[el("p",{role:"alert"},state.runtimeError)]:[]),
       ]}),
       LexeditorUI.modLoaderSection({
-        loader:"Memoria's Mod Manager installs, enables and removes external FF9 mods. Lexeditor owns only its separate Lexeditor mod folder and opens Memoria's launcher for the external-mod UI.",
+        loader:"Memoria's Mod Manager installs, enables and removes external FF9 mods. Lexeditor owns only its separate Lexeditor mod folder and opens Memoria's launcher for the external-mod UI. Mods that require a Memoria version newer than Lexeditor's pinned v2025.07.04 are outside the current supported loader boundary.",
         output:"Save writes the selected Lexeditor project. Deploy copies only that project's StreamingAssets overrides plus the Lexeditor runtime into <FF9>/Lexeditor; installed game archives and other mod folders stay untouched.",
         order:"Memoria's FolderNames list is highest-priority first. Lexeditor deploy keeps Lexeditor first in both FolderNames and the launcher's Priorities list, so an exact-path collision is whole-file Lexeditor-wins. Lexeditor does not semantically merge files from separate mods. Memoria's optional MergeScripts mode is left unchanged and remains Memoria's experimental script behavior.",
         safety:"Installed game data and external mod folders are read only to Lexeditor. Memoria installation keeps a recovery copy, and deploy/revert preserve unrelated Memoria.ini settings and mod-order entries.",
