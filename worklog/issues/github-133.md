@@ -30,3 +30,14 @@ persist without a live animal. Exact needs: a controlled trail/streaming
 experiment with the game before choosing native trails or custom hunting
 signs. No code written here.
 
+## 2026-09-23 agent slice (impl/rdr2-actionables): controlled probe protocol
+
+plugins/rdr2/hunting_tracks.py records the required probe as data
+(trail lifetime after stream-out versus explicit deletion, tagged
+identity, streaming conditions) and the two viable designs
+(hidden/distant target ped, custom signs with later spawn) with
+validate_track_experiment(), which rejects unevidenced native/custom
+choices and vanilla tracks under near-zero density. Covered by
+tests/test_rdr2_hunting_tracks.py (8 hermetic tests). No gameplay
+claim: the probe and the design choice still need the game.
+

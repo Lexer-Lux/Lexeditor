@@ -30,3 +30,13 @@ supplied. Exact needs: prepare candidate map-icon artwork, revise from
 Lexer feedback, and replace existing artwork only after Lexer approval.
 No code written here.
 
+## 2026-09-23 agent slice (impl/rdr2-actionables): review flow contract
+
+plugins/rdr2/map_icons.py records the required review order as data
+(variants, presentation, feedback revision, explicit approval, then
+replacement) with validate_icon_review(), which rejects unseen-artwork
+approval and unapproved shipping, including replacement ordered before
+approval. Covered by tests/test_rdr2_map_icons.py (7 hermetic tests).
+No art claim: candidate variants and the approval session are still
+owed.
+
