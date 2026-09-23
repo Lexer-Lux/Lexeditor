@@ -6140,7 +6140,9 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   align-items:stretch;
   display:flex;
 }
-.lex-tweaks-scroll { flex:1 1 0; min-height:0; overflow:hidden; overscroll-behavior:contain; }
+/* Pagination avoids scrolling when cards fit. A failed fit must still leave
+   every setting reachable; clipping is not a substitute for fitting. */
+.lex-tweaks-scroll { flex:1 1 0; min-height:0; overflow:auto; overscroll-behavior:contain; }
 .lex-tweaks-pages { flex:0 0 auto; min-width:0; }
 /* Dealt columns, not a grid: a grid row takes the height of its tallest
    card and opens a band of empty panel across the rest of that row. Each
