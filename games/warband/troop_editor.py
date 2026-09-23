@@ -21,13 +21,13 @@ def _source(path):
         except UnicodeDecodeError:pass
 
 
-_TROOP_START = re.compile(r'(?m)^[ \\t]*(#*)[ \\t]*\\[\\s*["\\'][^"\\']+["\\']\\s*,\\s*["\\']')
+_TROOP_START = re.compile(r'(?m)^[ \t]*(#*)[ \t]*\[\s*["\'][^"\']+["\']\s*,\s*["\']')
 
 
 def _top_level_troop_starts(text):
     """Return only literal/cut troop entries directly inside troops = [...]."""
     from .server import _skip_python_string
-    assignment = re.search(r'(?m)^[ \\t]*troops[ \\t]*=[ \\t]*\\[', text)
+    assignment = re.search(r'(?m)^[ \t]*troops[ \t]*=[ \t]*\[', text)
     if not assignment:
         return [], len(text)
     outer = text.find('[', assignment.start(), assignment.end())
@@ -36,11 +36,11 @@ def _top_level_troop_starts(text):
     outer_end = len(text)
     while cursor < len(text):
         char = text[cursor]
-        if char in '"\\'':
+        if char in '"\'':
             cursor = _skip_python_string(text, cursor)
             continue
         if char == '#':
-            newline = text.find('\\n', cursor)
+            newline = text.find('\n', cursor)
             cursor = len(text) if newline < 0 else newline + 1
             continue
         if char == '[':
@@ -61,11 +61,11 @@ def _top_level_troop_starts(text):
         target = match.start()
         while cursor < target:
             char = text[cursor]
-            if char in '"\\'':
+            if char in '"\'':
                 cursor = _skip_python_string(text, cursor)
                 continue
             if char == '#':
-                newline = text.find('\\n', cursor, target)
+                newline = text.find('\n', cursor, target)
                 cursor = target if newline < 0 else newline + 1
                 continue
             if char == '[':
@@ -83,18 +83,18 @@ def _top_level_troop_starts(text):
         accepted.append(match)
         block = text[match.start():outer_end]
         cut = bool(match[1])
-        normalized = re.sub(r'(?m)^([ \\t]*)#+',
+        normalized = re.sub(r'(?m)^([ \t]*)#+',
                             lambda marker: ' ' * len(marker[0]), block) if cut else block
         record_start = normalized.find('[')
         record_depth = 0
         cursor = record_start
         while 0 <= cursor < len(normalized):
             char = normalized[cursor]
-            if char in '"\\'':
+            if char in '"\'':
                 cursor = _skip_python_string(normalized, cursor)
                 continue
             if char == '#':
-                newline = normalized.find('\\n', cursor)
+                newline = normalized.find('\n', cursor)
                 cursor = len(normalized) if newline < 0 else newline + 1
                 continue
             if char == '[':
@@ -116,14 +116,14 @@ def _records(text):
         stop=starts[record_index+1].start() if record_index+1<len(starts) else outer_end
         block=text[match.start():stop]
         cut=bool(match[1])
-        normalized=re.sub(r'(?m)^([ \\t]*)#+',lambda m:' '*len(m[0]),block) if cut else block
+        normalized=re.sub(r'(?m)^([ \t]*)#+',lambda m:' '*len(m[0]),block) if cut else block
         start=normalized.index('[');cursor=start;depth=0
         while cursor<len(normalized):
             char=normalized[cursor]
-            if char in '"\\'':
+            if char in '"\'':
                 cursor=_skip_python_string(normalized,cursor);continue
             if char=='#':
-                cursor=normalized.find('\\n',cursor)
+                cursor=normalized.find('\n',cursor)
                 if cursor<0:break
                 continue
             if char=='[':depth+=1
@@ -132,9 +132,9 @@ def _records(text):
                 if depth==0:break
             cursor+=1
         if depth:
-            names=re.match(r"\\[\\s*[\"']([^\"']+)[\"']\\s*,\\s*[\"']([^\"']*)[\"']",normalized[start:])
+            names=re.match(r"\[\s*[\"']([^\"']+)[\"']\s*,\s*[\"']([^\"']*)[\"']",normalized[start:])
             rows.append({'recordIndex':record_index,'id':names[1],'name':names[2],'plural':'','status':'CUT' if cut else 'active',
-                         'line':text.count('\\n',0,match.start())+1,'fields':{},'_spans':[],
+                         'line':text.count('\n',0,match.start())+1,'fields':{},'_spans':[],
                          'problem':'This source record has unbalanced brackets. Repair its source before editing.'})
             continue
         spans=_split_item_fields(normalized,start,cursor+1)
@@ -144,7 +144,7 @@ def _records(text):
         for key in ('id','name','plural'):
             values[key]=ast.literal_eval(values[key])
         rows.append({'recordIndex':record_index,'id':values['id'],'name':values['name'],'plural':values['plural'],
-                     'status':'CUT' if cut else 'active','line':text.count('\\n',0,match.start())+1,
+                     'status':'CUT' if cut else 'active','line':text.count('\n',0,match.start())+1,
                      'fields':values,'_spans':[(a+match.start(),b+match.start()) for a,b in spans]})
     return rows
 
