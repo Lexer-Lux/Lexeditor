@@ -1,4 +1,4 @@
-"""Reject FF7 presentation drift from the Blank/shared neutral UI contract."""
+"""Reject FF7 presentation drift from the current Blank/shared neutral UI contract."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,6 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 FF7 = ROOT / "games" / "ff7" / "editor.html"
 FF7_JS = ROOT / "games" / "ff7" / "editor.js"
 BLANK = ROOT / "games" / "blank" / "editor.html"
+BLANK_CSS = ROOT / "games" / "blank" / "editor.css"
+BLANK_JS = ROOT / "games" / "blank" / "editor.js"
 NEUTRAL = ROOT / "ui" / "neutral.css"
 
 
@@ -19,69 +21,73 @@ def main() -> None:
     ff7_js = FF7_JS.read_text(encoding="utf-8")
     ff7_code = ff7 + "\n" + ff7_js
     blank = BLANK.read_text(encoding="utf-8")
+    blank_css = BLANK_CSS.read_text(encoding="utf-8")
+    blank_js = BLANK_JS.read_text(encoding="utf-8")
     neutral = NEUTRAL.read_text(encoding="utf-8")
 
-    # "Blank UI, no overrides" is literal for FF7: it may supply data/classes
-    # for semantics/testing, but it owns no CSS at all.
+    # FF7 consumes the shared neutral presentation and owns no stylesheet.
     if "<style" in ff7.casefold() or "style=" in ff7.casefold() or "style=" in ff7_js.casefold():
         raise AssertionError("FF7 contains local CSS/style overrides")
-    if '<script src="editor.js"></script>' not in ff7:
-        raise AssertionError("FF7 page logic is not modularized into editor.js")
     for marker in (
         '<link rel="stylesheet" href="/shared/framework.css">',
         '<link rel="stylesheet" href="/shared/neutral.css">',
         '<body class="lex-neutral-ui">',
+        '<script src="editor.js"></script>',
     ):
         if marker not in ff7:
-            raise AssertionError(f"FF7 is not consuming the shared neutral UI: {marker}")
+            raise AssertionError(f"FF7 is not consuming the shared neutral/module contract: {marker}")
 
-    # neutral.css is shared infrastructure, never a disguised FF7/Blank patch.
+    # Blank is now modular too. Keep the benchmark tied to its current files,
+    # not to stale CSS that used to live inline in editor.html.
+    for marker in (
+        '<link rel="stylesheet" href="/shared/framework.css">',
+        '<link rel="stylesheet" href="editor.css">',
+        '<script src="/shared/framework.js"></script>',
+        '<script src="/shared/component-catalog.js"></script>',
+        '<script src="editor.js"></script>',
+    ):
+        if marker not in blank:
+            raise AssertionError(f"Blank benchmark module contract changed: {marker}")
+
     lower_neutral = neutral.casefold()
     for token in (".ff7-", "#ff7-", ".blank-", "#blank-"):
         if token in lower_neutral:
             raise AssertionError(f"Shared neutral stylesheet contains plugin-specific selector {token}")
 
-    # These declarations are the existing Blank visual baseline promoted into
-    # shared neutral.css. If Blank's benchmark changes, this guard forces the
-    # shared neutral contract to be updated rather than letting FF7 drift.
-    blank_compact = compact(blank)
-    neutral_compact = compact(neutral)
-    blank_baseline_declarations = (
-        "--lex-accent:#72ff1e;--lex-accent-text:#102008;--lex-highlight:#405247",
-        "padding:4px 18px 4px 4px;border-bottom:1px solid var(--lex-border);background:#f1f3f5",
-        "display:grid;width:auto;height:100%;aspect-ratio:1;place-items:center;color:var(--lex-accent);border:1px solid var(--lex-border);background:#fff",
-        "width:64%;height:64%;fill:none;stroke:currentColor;stroke-width:1.7",
-        "width:1em;min-width:1em;height:1em;min-height:1em;flex-basis:1em",
-        "width:.95em;height:.95em",
-        "right:.35em",
-        "margin-right:.08em",
-        "padding:10px;gap:10px",
-        "flex:1 1 auto",
-        "padding:12px",
-        "display:flex;flex-direction:column;height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel)",
-        "display:block;font-size:1.45em;text-align:center",
-    )
-    for declaration in blank_baseline_declarations:
-        normalized = compact(declaration)
-        if normalized not in blank_compact:
-            raise AssertionError(f"Blank benchmark changed without updating the shared neutral contract: {declaration}")
-        if normalized not in neutral_compact:
-            raise AssertionError(f"neutral.css does not reproduce Blank's benchmark declaration: {declaration}")
+    # Blank's tiny stylesheet is its theme-token benchmark. neutral.css must
+    # still carry those same tokens so FF7's shared-neutral surface does not
+    # drift from the gallery presentation.
+    blank_theme = compact(blank_css)
+    if not blank_theme.startswith(":root{") or not blank_theme.endswith("}"):
+        raise AssertionError("Blank theme stylesheet is no longer a simple token declaration")
+    theme_declarations = blank_theme[len(":root{"):-1]
+    if theme_declarations not in compact(neutral):
+        raise AssertionError("neutral.css no longer carries Blank's current theme-token baseline")
 
-    # FF7's master/detail geometry uses Blank's own paged two-panel defaults.
-    layout_contract = (
+    # Compare both callers to the current shared two-panel benchmark rather
+    # than hard-coding obsolete inline Blank markup.
+    blank_layout = (
+        "slots:false",
+        "pageSize=12",
+        "defaultSplit:50",
+        "minLeft:320",
+        "minRight:360",
+    )
+    missing_blank = [value for value in blank_layout if value not in compact(blank_js)]
+    if missing_blank:
+        raise AssertionError("Blank two-panel benchmark changed: " + ", ".join(missing_blank))
+
+    ff7_layout = (
         "slots:false",
         "pageSize:state.pageSize[group]||12",
         "defaultSplit:50",
         "minLeft:320",
         "minRight:360",
     )
-    missing_layout = [value for value in layout_contract if value not in ff7_code]
-    if missing_layout:
-        raise AssertionError("FF7 master/detail geometry drifted from Blank: " + ", ".join(missing_layout))
+    missing_ff7 = [value for value in ff7_layout if value not in compact(ff7_code)]
+    if missing_ff7:
+        raise AssertionError("FF7 master/detail geometry drifted from Blank: " + ", ".join(missing_ff7))
 
-    # Nested navigation and ordinary content must be shared helpers, not local
-    # approximations with subtly different DOM/keyboard behavior.
     for legacy in (
         'class:"lex-subtab-bar ff7-subtabs"',
         'class:"lex-subtab-button"',
@@ -90,15 +96,19 @@ def main() -> None:
     ):
         if legacy in ff7_code:
             raise AssertionError(f"FF7 still hand-builds shared UI markup: {legacy}")
+
     required_helpers = (
         "subtabBar", "tabbedPanel", "detailPanel", "detailSection", "detailField",
         "columnList", "pagedListDetail", "readonlyField", "infoIcon",
     )
-    missing_helpers = [name for name in required_helpers if name not in ff7_code]
-    if missing_helpers:
-        raise AssertionError("FF7 stopped using required shared UI helpers: " + ", ".join(missing_helpers))
+    missing_blank_helpers = [name for name in required_helpers if name not in blank_js]
+    if missing_blank_helpers:
+        raise AssertionError("Blank stopped demonstrating required shared helpers: " + ", ".join(missing_blank_helpers))
+    missing_ff7_helpers = [name for name in required_helpers if name not in ff7_code]
+    if missing_ff7_helpers:
+        raise AssertionError("FF7 stopped using required shared UI helpers: " + ", ".join(missing_ff7_helpers))
 
-    print("FF7 Blank UI contract: zero local CSS, shared neutral presentation, Blank geometry")
+    print("FF7 Blank UI contract: zero local CSS, shared neutral presentation, current Blank geometry")
 
 
 if __name__ == "__main__":
