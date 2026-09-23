@@ -20,13 +20,15 @@ def _fixture(root: Path):
     paks.mkdir(parents=True)
     (paks / "pakchunk3-WindowsNoEditor.utoc").write_bytes(b"utoc")
     (paks / "pakchunk3-WindowsNoEditor.ucas").write_bytes(b"ucas")
-    packer = root / "UnrealReZen.exe"
+    tool = root / "tool"
+    tool.mkdir()
+    packer = tool / "UnrealReZen.exe"
     packer.write_bytes(b"explicit-packer")
     packer.with_name("UnrealReZen.deps.json").write_text(
         json.dumps({"libraries": {f"CUE4Parse/{packaging.CUE4PARSE_VERSION}": {}}}),
         encoding="utf-8",
     )
-    oodle = root / "user-supplied-oodle.dll"
+    oodle = tool / packaging.OODLE_NAME
     oodle.write_bytes(b"explicit-oodle")
     env = {
         packaging.UNREALREZEN_ENV: str(packer),
@@ -69,7 +71,9 @@ def test_candidate_builder_is_isolated_and_never_installs():
             observed["command"] = list(command)
             observed["cwd"] = kwargs["cwd"]
             observed["env"] = dict(kwargs["env"])
+            assert Path(kwargs["cwd"]).resolve() == packer.parent.resolve()
             runtime_oodle = Path(kwargs["cwd"]) / packaging.OODLE_NAME
+            assert runtime_oodle.resolve() == oodle.resolve()
             assert runtime_oodle.read_bytes() == oodle.read_bytes()
             output = Path(command[command.index("--output-path") + 1])
             output.write_bytes(b"candidate-utoc")
@@ -101,7 +105,8 @@ def test_candidate_builder_is_isolated_and_never_installs():
         assert manifest["installed"] is False
         assert manifest["tooling"]["dependencyDownloadInvokedByLexeditor"] is False
         assert manifest["tooling"]["unrealReZen"]["requiredCUE4Parse"] == packaging.CUE4PARSE_VERSION
-        assert manifest["tooling"]["oodle"]["copiedAs"] == packaging.OODLE_NAME
+        assert manifest["tooling"]["oodle"]["requiredName"] == packaging.OODLE_NAME
+        assert manifest["tooling"]["oodle"]["alreadyInToolDirectory"] is True
         assert {item["file"] for item in manifest["outputs"]} == {
             "Lexeditor-FF7R2_P.utoc",
             "Lexeditor-FF7R2_P.ucas",
@@ -109,7 +114,7 @@ def test_candidate_builder_is_isolated_and_never_installs():
         }
 
 
-def test_candidate_builder_rejects_runtime_oodle_mutation_and_cleans_output():
+def test_candidate_builder_rejects_oodle_mutation_and_cleans_output():
     with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-packaging-mutation-") as temp_name:
         project, game, _packer, _oodle, env = _fixture(Path(temp_name))
 
@@ -122,7 +127,7 @@ def test_candidate_builder_rejects_runtime_oodle_mutation_and_cleans_output():
             output.with_suffix(".pak").write_bytes(b"candidate-pak")
             return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
-        with pytest.raises(packaging.PackagingError, match="modified the supplied Oodle"):
+        with pytest.raises(packaging.PackagingError, match="Supplied Oodle DLL changed"):
             packaging.build_candidate(project, game, env, runner=mutating_runner)
         assert not list((project / "build").glob("ff7r2-candidate-*"))
 
