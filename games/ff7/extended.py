@@ -28,6 +28,15 @@ TEXT_SECTIONS = (
     'Key item names', 'Battle text', 'Summon attack names',
 )
 
+KEY_ITEM_HELP_SECTION = 7
+KEY_ITEM_NAME_SECTION = 15
+KEY_ITEM_SECTIONS = frozenset((KEY_ITEM_HELP_SECTION, KEY_ITEM_NAME_SECTION))
+KEY_ITEM_FIELDS = [
+    text('name', 'Name', size=65535, group='Text'),
+    text('description', 'Description', size=65535, group='Text'),
+]
+
+
 
 class KernelText:
     def __init__(self, data):
@@ -45,23 +54,44 @@ class KernelText:
         self.initial = deepcopy(self.strings)
 
     def records(self, category='texts'):
+        if category == 'keyItems':
+            names = self.strings[KEY_ITEM_NAME_SECTION]
+            descriptions = self.strings[KEY_ITEM_HELP_SECTION]
+            if len(names) != len(descriptions):
+                raise ValueError('Key item name/help tables have different record counts')
+            return [{'id':index, 'name':name or f'Key item {index}',
+                     'description':'Semantic KERNEL2 key-item name and help text; other text sections remain unchanged.',
+                     'values':{'name':name, 'description':descriptions[index]}}
+                    for index, name in enumerate(names)]
+        if category != 'texts':
+            raise ValueError(f'Unsupported KERNEL2 category: {category}')
         return [{'id':section * 65536 + index, 'name':f'{label} {index}',
                  'description':'English kernel2 text. Backslash byte escapes preserve game control codes.',
                  'values':{'text':value}}
-                for section, label in enumerate(TEXT_SECTIONS)
+                for section, label in enumerate(TEXT_SECTIONS) if section not in KEY_ITEM_SECTIONS
                 for index, value in enumerate(self.strings[section])]
 
     def apply(self, category, rows):
-        validate_rows(rows, self.records())
+        validate_rows(rows, self.records(category))
         replacement = deepcopy(self.strings)
-        for row in rows:
-            if not isinstance(row.get('values'), dict) or set(row['values']) != {'text'}:
-                raise ValueError('Text record must contain exactly its text field')
-            section, index = divmod(row['id'], 65536)
-            value = row['values']['text']
-            if type(value) is not str:
-                raise ValueError('Text must be a string')
-            replacement[section][index] = value
+        if category == 'keyItems':
+            for row in rows:
+                values = row.get('values')
+                if not isinstance(values, dict) or set(values) != {'name', 'description'}:
+                    raise ValueError('Key item record must contain exactly name and description')
+                if type(values['name']) is not str or type(values['description']) is not str:
+                    raise ValueError('Key item name and description must be strings')
+                replacement[KEY_ITEM_NAME_SECTION][row['id']] = values['name']
+                replacement[KEY_ITEM_HELP_SECTION][row['id']] = values['description']
+        else:
+            for row in rows:
+                if not isinstance(row.get('values'), dict) or set(row['values']) != {'text'}:
+                    raise ValueError('Text record must contain exactly its text field')
+                section, index = divmod(row['id'], 65536)
+                value = row['values']['text']
+                if type(value) is not str:
+                    raise ValueError('Text must be a string')
+                replacement[section][index] = value
         self.strings = replacement
 
     def to_bytes(self):
@@ -120,6 +150,38 @@ EXE_TEXT_FIELDS = [text('text','Text',size=65535)]
 PRICE_TABLES = [('Items', 0, 128), ('Weapons', 128, 128), ('Armor', 256, 32),
                 ('Accessories', 288, 32), ('Materia', 384, 96)]
 
+WORLD_MODELS = ('Player', 'Highwind', 'Wild Chocobo', 'Tiny Bronco', 'Buggy', 'Submarine',
+                'Yellow Chocobo', 'Green Chocobo', 'Blue Chocobo', 'Black Chocobo',
+                'Gold Chocobo', 'Cargo Ship')
+WORLD_WALK_POS = (0x34BF56, 0, 0x34BF83, 0x34C0CC, 0x34C17E, 0x34C1C9,
+                  0x568040, 0x568044, 0x568048, 0x56804C, 0x568050, 0x34B7DB)
+WORLD_DISEMBARK_POS = (0, 0x34C05F, 0x34BFC1, 0x34C118, 0x34C14C, 0x34C19A,
+                       0x34BFEC, 0x34BFEC, 0x34BFEC, 0x34BFEC, 0x34BFEC, 0)
+TINY_BRONCO_WALK_MIRRORS = (0x34C0F3, 0x34C12D)
+WORLD_MOVEMENT_FIELDS = [number('terrainMask', 'Terrain eligibility mask', 0, 4,
+                                maximum=0xFFFFFFFF, group='World movement')]
+
+
+def _world_movement_specs():
+    result = []
+    for index, offset in enumerate(WORLD_WALK_POS):
+        if offset:
+            result.append({'id':index, 'name':f'{WORLD_MODELS[index]} — traverse terrain',
+                           'offset':offset,
+                           'mirrors':TINY_BRONCO_WALK_MIRRORS if index == 3 else ()})
+    # Scarlet reads independent disembark masks only for the six pre-Chocobo
+    # models. Chocobo entries share Wild Chocobo storage and are intentionally
+    # not exposed as independent controls.
+    for index in range(6):
+        offset = WORLD_DISEMBARK_POS[index]
+        if offset:
+            result.append({'id':100 + index, 'name':f'{WORLD_MODELS[index]} — disembark terrain',
+                           'offset':offset, 'mirrors':()})
+    return tuple(result)
+
+
+WORLD_MOVEMENT_SPECS = _world_movement_specs()
+
 
 def _exe_text_records():
     records = []
@@ -168,7 +230,9 @@ EXE_EDIT_RANGES = [
     (0x5202B8,120), (0x520810,264), (0x521A18,80*84), (0x523458,320*4), (0x523A58,96*4),
     (0x51DCD4,71*28), (0x4FD4C8,21*16), (0x51FB48,320*2), (0x51FDC8,96),
     (0x565C60,128*4), (0x565E60,128*4), (0x31ED4F,1), (0x31ED9E,1),
-] + [(row['offset'], row['size']) for row in EXE_TEXT_RECORDS]
+] + [(row['offset'], row['size']) for row in EXE_TEXT_RECORDS] \
+  + [(spec['offset'], 4) for spec in WORLD_MOVEMENT_SPECS] \
+  + [(offset, 4) for offset in TINY_BRONCO_WALK_MIRRORS]
 
 
 class ShopExecutable:
@@ -222,6 +286,11 @@ class ShopExecutable:
                              'description':f'Fixed executable text field; maximum encoded storage is {spec["size"]} bytes. Unchanged padding/control bytes are preserved.',
                              'values':read_values(self.data[at:at+spec['size']], fields)})
             return rows
+        if category == 'worldMovement':
+            return [{'id':spec['id'], 'name':spec['name'],
+                     'description':'Scarlet-proved FF7 world-map 32-bit terrain eligibility mask. Shared Chocobo disembark storage is protected rather than presented as independent data.',
+                     'values':{'terrainMask':read_int(self.data, spec['offset'] + self.shift, 4)}}
+                    for spec in WORLD_MOVEMENT_SPECS]
         if category == 'itemSortOrder':
             return [{'id':i, 'name':f'Inventory item ID {i}',
                      'description':'Position used by FF7 when sorting the 320 item/equipment IDs by name.',
@@ -267,6 +336,21 @@ class ShopExecutable:
                 spec = EXE_TEXT_RECORDS[row['id']]; at = spec['offset'] + self.shift
                 fields = [text('text','Text',0,spec['size'])]
                 replacement[at:at+spec['size']] = write_values(self.data[at:at+spec['size']],fields,row.get('values'))
+            self.data = replacement
+            return
+        if category == 'worldMovement':
+            replacement = bytearray(self.data)
+            specs = {spec['id']:spec for spec in WORLD_MOVEMENT_SPECS}
+            for row in rows:
+                spec = specs[row['id']]
+                at = spec['offset'] + self.shift
+                written = write_values(self.data[at:at+4], WORLD_MOVEMENT_FIELDS, row.get('values'))
+                if written == self.data[at:at+4]:
+                    continue
+                replacement[at:at+4] = written
+                for mirror in spec['mirrors']:
+                    mirror_at = mirror + self.shift
+                    replacement[mirror_at:mirror_at+4] = written
             self.data = replacement
             return
         if category in ('itemSortOrder','materiaPriority'):
@@ -322,8 +406,11 @@ class ShopExecutable:
 FAMILIES = {
     'scene': {'categories':SCENE_CATEGORIES, 'source':'scene.bin',
               'note':'Enemies, attacks and four formations per scene. AI and field/world encounter placement are preserved. Original block membership is retained; an overflowing edit is refused.'},
-    'text': {'categories':{'texts':{'label':'Text', 'fields':[text('text','Text',size=65535)]}}, 'source':'kernel2.bin',
-             'note':'All 18 English kernel2 text sections, with preserved game-byte escapes and a bounded game buffer. KERNEL.BIN embedded text is not rewritten.'},
+    'text': {'categories':{
+                 'texts':{'label':'Text', 'fields':[text('text','Text',size=65535)]},
+                 'keyItems':{'label':'Key items', 'fields':KEY_ITEM_FIELDS}},
+             'source':'kernel2.bin',
+             'note':'All 18 English KERNEL2 text sections are preserved. Key-item names/help are paired semantically; the remaining 16 sections stay in the generic text editor with game-byte escapes and the bounded game buffer.'},
     'shop': {'categories':{
                  'shops':{'label':'Shops','fields':SHOP_FIELDS}, 'prices':{'label':'Prices','fields':PRICE_FIELDS},
                  'recruits':{'label':'Recruits','fields':RECRUIT_FIELDS}, 'defaultNames':{'label':'Default names','fields':DEFAULT_NAME_FIELDS},
@@ -333,7 +420,8 @@ FAMILIES = {
                  'itemSortOrder':{'label':'Item name sort','fields':ITEM_SORT_FIELDS},
                  'materiaPriority':{'label':'Materia priority','fields':MATERIA_PRIORITY_FIELDS},
                  'audioMixing':{'label':'Audio mixing','fields':AUDIO_FIELDS},
-                 'apMultiplier':{'label':'Master Materia sale price','fields':AP_MULTIPLIER_FIELDS}},
+                 'apMultiplier':{'label':'Master Materia sale price','fields':AP_MULTIPLIER_FIELDS},
+                 'worldMovement':{'label':'World movement','fields':WORLD_MOVEMENT_FIELDS}},
              'source':'Supported English game executable',
              'note':'Scarlet-proved executable data: shops/prices, initialization, Limit attacks, Materia equip effects, fixed UI/battle text, menu ordering, audio mix values and the mastered-Materia sale multiplier. Saves write a project copy, never the installed executable.'},
 }
@@ -344,7 +432,7 @@ FAMILIES['world'] = {'categories':{'worldEncounters':{'label':'World encounters'
                                  'chocoboRatings':{'label':'Chocobo ratings','fields':CHOCOBO_FIELDS}},
                      'source':'world_us.lgp / enc_w.bin','note':'All 64 region/terrain tables, eight Yuffie thresholds and 32 Chocobo ratings. Terrain assignments remain in the executable.'}
 FAMILIES['scene']['note']='Enemies, attacks, formations and their AI scripts. Scene block membership is retained; overflow is refused rather than invalidating KERNEL lookup.'
-FAMILIES['shop']['note']='Named, fixed-layout data proved by Scarlet in a recognized English executable; saves replace project copies only and reject changes outside explicitly modeled ranges.'
+FAMILIES['shop']['note']='Named, fixed-layout data proved by Scarlet in a recognized English executable, including independent world movement/disembark terrain masks. Saves replace project copies only and reject changes outside explicitly modeled ranges.'
 ERRORS = (OSError, ValueError, EOFError, struct.error, zlib.error)
 LOCK = RLock()
 
