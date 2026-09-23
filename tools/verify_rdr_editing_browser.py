@@ -143,10 +143,15 @@ def main():
                     active_settings = page.locator('nav button[data-tab="settings"].active')
                     assert active_settings.count() == 1
                     page.evaluate('navigate("project")')
-                    assert page.get_by_text('Saved files and game delivery', exact=True).count()
+                    information_button = page.get_by_role('button', name='Open RDR setup information')
+                    assert information_button.count() == 1
+                    assert 'active' in (information_button.get_attribute('class') or '').split()
+                    delivery = page.locator('.lex-detail-section[aria-label="SAVED FILES AND GAME DELIVERY"]')
+                    assert delivery.count() == 1 and delivery.is_visible()
                     assert page.get_by_role('button', name='Deploy Project').count()
                     assert page.get_by_role('button', name='Revert Deployment').count()
-                    assert page.get_by_text('Shop edit test', exact=True).count()
+                    shop_test = page.locator('.lex-detail-section[aria-label="SHOP EDIT TEST"]')
+                    assert shop_test.count() == 1 and shop_test.is_visible()
                     assert page.get_by_role('button', name='Stage Shop Test').count()
                     plan = server.shop_test_plan()
                     assert plan['available'] and plan['status'] == 'baseline'
@@ -157,7 +162,8 @@ def main():
                     page.get_by_role('button', name='Restore Shop Test').click()
                     page.wait_for_function('state.dashboard.shopTest.status === "baseline"')
                     assert server.shop_test_plan()['currentPriceModifier'] == plan['baselinePriceModifier']
-                    assert page.get_by_text('Mission reward test', exact=True).count()
+                    mission_test = page.locator('.lex-detail-section[aria-label="MISSION REWARD TEST"]')
+                    assert mission_test.count() == 1 and mission_test.is_visible()
                     mission_plan = server.mission_test_plan()
                     assert mission_plan['missionId'] == 2 and mission_plan['status'] == 'baseline'
                     page.get_by_role('button', name='Stage Mission Test').click()
