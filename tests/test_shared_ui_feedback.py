@@ -24,6 +24,27 @@ def framework(page):
     page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
 
 
+def test_data_map_header_location_and_state(page):
+    import tempfile
+    framework(page)
+    page.evaluate('''()=>{
+      document.body.dataset.lexPlugin='ff8';
+      window.revealed=[];
+      window.pywebview={api:{game_data_location:async()=>({path:'C:/Game/data/kernel.bin'}),
+        open_game_data_location:async(...args)=>{revealed=args;return {path:'C:/Game/data/kernel.bin'}}}};
+      const map=LexeditorUI.dataMap({coverage:'unavailable',rows:[{filename:'kernel.bin',status:'partial',coverage:'structured',controls:'Battle data'}]});
+      document.querySelector('main').append(map.content);
+    }''')
+    page.wait_for_function("document.querySelector('.lex-data-map-path')?.textContent==='C:/Game/data/kernel.bin'")
+    assert page.get_by_label('Filter files by coverage').count()==0
+    assert page.get_by_label('Filter files by integration').count()==1
+    assert page.locator('.lex-detail-panel-id .lex-integration-status.partial').count()==1
+    assert page.locator('.lex-detail-panel-body .lex-data-map-location').count()==0
+    page.get_by_role('button',name='Open file location',exact=True).click()
+    assert page.evaluate('revealed')==['ff8','kernel.bin']
+    page.locator('.lex-data-map-detail').screenshot(path=str(Path(tempfile.gettempdir())/'lex-data-map-header.png'))
+
+
 def test_property_help_is_always_on_right(page):
     import tempfile
     framework(page)

@@ -738,7 +738,7 @@ class HostApi:
             "installation": self._installations.configure_directory(plugin_id, selected),
         }
 
-    def open_game_data_location(self, plugin_id: str, filename: str) -> dict:
+    def game_data_location(self, plugin_id: str, filename: str) -> dict:
         from game_data_location import find_original_location
         if plugin_id not in self._plugins:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
@@ -747,6 +747,10 @@ class HostApi:
         roots = []
         roots.append(Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Lexeditor" / "game-data" / plugin_id)
         target = find_original_location(filename, roots, Path(configured) if configured else None)
+        return {"path": str(target)}
+
+    def open_game_data_location(self, plugin_id: str, filename: str) -> dict:
+        target = Path(self.game_data_location(plugin_id, filename)["path"])
         subprocess.Popen(["explorer.exe", str(target)] if target.is_dir() else
                          ["explorer.exe", "/select,", str(target)])
         return {"path": str(target)}
