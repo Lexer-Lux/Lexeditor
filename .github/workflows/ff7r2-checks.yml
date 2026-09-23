@@ -52,7 +52,7 @@ jobs:
       - name: Plugin descriptor
         run: python -c "from games.ff7r2.plugin import PLUGIN; from plugin_api import validate_plugin; validate_plugin(PLUGIN); assert PLUGIN.projects is not None; print(PLUGIN.name)"
       - name: Rebirth DataObject and service regressions
-        run: python -m pytest -q tests/test_ff7r2_dataobject.py tests/test_ff7r2_server.py
+        run: python -m pytest -q tests/test_ff7r2_dataobject.py tests/test_ff7r2_server.py tests/test_ff7r2_packaging.py
       - name: Managed service smoke
         run: python -c "from games.ff7r2.plugin import smoke; [print('PASS:', line) for line in smoke()]"
 
