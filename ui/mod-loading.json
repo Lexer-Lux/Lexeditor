@@ -57,9 +57,9 @@
       "overriding": "ReShade applies one preset at a time over the finished frame. Shader Injector changes shaders before that, so the two stack rather than compete. Files the player has edited in the ShaderInjector folder are kept on reinstall and removal, and a PAK mod from elsewhere is untouched."
     },
     "chrono-trigger": {
-      "loader": "Lexeditor exports standard Chrono Trigger .ctp packages. It does not bundle or install a runtime loader. CTExt is a known Steam consumer, but its audited upstream repository has no clear top-level redistribution license.",
-      "structure": "One selected project stores archive-relative Game/... and Localize/... overrides outside the installed game. Export creates build/<project>.ctp containing only changed resources; resources.bin stays read-only.",
-      "overriding": "CTP members replace the matching resources.bin resource as a whole in the external loader. Runtime load order belongs to that loader; Lexeditor does not claim semantic merging across separate CTP packages."
+      "loader": "Lexeditor exports standard Chrono Trigger .ctp packages and has an unverified author-test Mod Library adapter for an already-installed CTExt. Lexeditor does not bundle or install CTExt because the audited upstream repository has no clear top-level redistribution license; in-game loading remains unproved.",
+      "structure": "Editable projects and imported CTPs live outside the installed game as Game/... and Localize/... overrides. Export creates a replacement-only CTP. Author-test activation stages selected packages under <Chrono Trigger>/mods/LexeditorLibrary/ and updates only Lexeditor-owned CTExt load-order entries; resources.bin remains read-only.",
+      "overriding": "CTExt CTPs are ordered low to high; later selected Lexeditor packages win whole-resource conflicts. Lexeditor reports overlapping resource paths, preserves external CTExt load-order entries, appends its owned entries in the selected order, and does not claim semantic merging across separate CTP packages."
     }
   }
 }
