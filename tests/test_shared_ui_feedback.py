@@ -24,6 +24,17 @@ def framework(page):
     page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
 
 
+def test_readonly_fields_keep_numeric_types(page):
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      document.querySelector('main').append(...[12500,2.5,'0123'].map(value=>
+        U.detailField({label:'Value',control:U.unitField(U.readonlyField(value),'G')})));
+    }''')
+    assert page.locator('.lex-field-type-name').all_text_contents()==['INT','FLT','STR']
+    assert page.locator('input').first.input_value()=='12,500'
+
+
 def test_grouped_number_keeps_commas_during_editing(page):
     framework(page)
     page.evaluate('''()=>{

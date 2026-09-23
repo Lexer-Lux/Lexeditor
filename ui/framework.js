@@ -801,6 +801,7 @@
       : (format ? formatNumber(value) : String(value ?? ""));
     return element("input", {
       type: "text", value: display, disabled: true, readonly: true,
+      "data-lex-value-type": typeof value === "number" && Number.isFinite(value) ? (Number.isInteger(value) ? "INT" : "FLOAT") : "STRING",
       tabindex: "-1", "aria-readonly": "true", ...rest,
       class: ["lex-readonly-field", className].filter(Boolean).join(" "),
     });
@@ -1583,14 +1584,14 @@
     const checkboxCount = control instanceof Element
       ? (control.matches("input[type=checkbox]") ? 1 : control.querySelectorAll("input[type=checkbox]").length)
       : 0;
-    const inferredType = inputType === "checkbox" ? (checkboxCount > 1 ? "FLAGS" : "BOOL")
+    const inferredType = input?.dataset?.lexValueType || (inputType === "checkbox" ? (checkboxCount > 1 ? "FLAGS" : "BOOL")
       : numericLike && (step === null || step === "" || (step !== "any" && Number.isInteger(Number(step)))) ? "INT"
       : numericLike ? "FLOAT"
       : input?.tagName === "SELECT" ? "ENUM"
       : input?.tagName === "TEXTAREA" ? "TEXT"
       // No control to read a type from. "VALUE" said nothing except that the
       // guess failed, so the rail carries no type name instead.
-      : input ? "STRING" : "";
+      : input ? "STRING" : "");
     const declaredType = String(options.dataType || "").toLocaleUpperCase();
     const dataType = declaredType && declaredType !== "READ ONLY" ? declaredType : inferredType;
     const min = options.min ?? input?.getAttribute?.("min") ?? input?.dataset?.min;
@@ -1598,7 +1599,7 @@
     const rangeText = options.range || ((min !== null && min !== undefined && min !== "") ||
       (max !== null && max !== undefined && max !== "")
       ? `(${min ?? "…"}-${max ?? "…"})` : "");
-    if (input && dataType === "INT") {
+    if (input && !readOnly && dataType === "INT") {
       if (!input.hasAttribute("step")) input.step = "1";
       input.inputMode = "numeric";
       let lastValid = /^-?\d+$/.test(String(input.value)) ? String(input.value) : "0";
