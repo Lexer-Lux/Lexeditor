@@ -237,6 +237,12 @@
   let selectedRecord=null, recordPage=0, recordPageSize=12, recordQuery="";
   let recordSort={key:"key",dir:1};
 
+  // BattlePlayerParameter has a public storage schema, but the gameplay meaning
+  // and safe ranges of its fields remain unproved. Keep it source-only.
+  let battlePlayer=null, battlePlayerError="", battlePlayerBusy=false;
+  let selectedBattlePlayerRecord=null, battlePlayerPage=0, battlePlayerPageSize=12, battlePlayerQuery="";
+  let battlePlayerSort={key:"key",dir:1};
+
   // #471 is deliberately source-only until array writes and the actual Steal
   // formula have native acceptance. The view exposes proved serialized data.
   let battleItem=null, battleItemError="", battleItemBusy=false;
@@ -270,6 +276,17 @@
     {key:"StealFaildCountArrayIndex",label:"Fail index",numeric:true,sortable:true},
   ];
   const battlePrefs=columnPreferences("ff7r2-battle-item-possession",BATTLE_COLUMNS,()=>render());
+  const BATTLE_PLAYER_COLUMNS=[
+    {key:"key",label:"Record",sortable:true},
+    {key:"CommandAbilityID_Array",label:"Commands",numeric:true,sortable:true},
+    {key:"EnableAerialShortCut",label:"Aerial flag (raw)",numeric:true,sortable:true},
+    {key:"UniqueAbilityType0",label:"Unique type (raw)",numeric:true,sortable:true},
+    {key:"KeyDownTime",label:"Key-down time (raw)",numeric:true,sortable:true},
+    {key:"GuardParameterValue_Array",label:"Guard params",numeric:true,sortable:true},
+    {key:"DodgeType_Array",label:"Dodge types",numeric:true,sortable:true},
+    {key:"LimitAbilityID_Array",label:"Limits",numeric:true,sortable:true},
+  ];
+  const battlePlayerPrefs=columnPreferences("ff7r2-battle-player-parameter",BATTLE_PLAYER_COLUMNS,()=>render());
 
   const FIELD_HELP={
     HPMax:"Base maximum HP stored by this PlayerParameter record.",
@@ -351,6 +368,31 @@
       battleItem=null;battleItemError=error.message;
       if(error.payload?.workspace)workspace=error.payload.workspace;
     }finally{battleItemBusy=false}
+  }
+
+  function installBattlePlayer(value){
+    battlePlayer=value;
+    battlePlayerError="";
+    if(battlePlayer?.records){
+      for(const row of battlePlayer.records){
+        row.id=String(row.nameIndex)+":"+String(row.nameNumber);
+        for(const field of row.fields||[]){
+          row[field.name]=field.kind==="array"?Number(field.arrayCount||0):field.value;
+        }
+      }
+      if(battlePlayer.records.length&&!battlePlayer.records.some(row=>row.id===selectedBattlePlayerRecord)){
+        selectedBattlePlayerRecord=battlePlayer.records[0].id;
+      }
+    }
+  }
+
+  async function loadBattlePlayer(){
+    battlePlayerBusy=true;
+    try{installBattlePlayer(await api("/api/battle-player-parameter"))}
+    catch(error){
+      battlePlayer=null;battlePlayerError=error.message;
+      if(error.payload?.workspace)workspace=error.payload.workspace;
+    }finally{battlePlayerBusy=false}
   }
 
   function fieldOf(row,name){return (row?.fields||[]).find(field=>field.name===name)}
