@@ -201,3 +201,28 @@ def test_battle_item_possession_service_is_read_only():
             assert fields["NormalItemPercent_Array"]["editable"] is False
             assert source.read_bytes() == original
 
+def test_requested_gameplay_datamap_states_are_explicit():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-datamap-") as temp_name:
+        project = Path(temp_name)
+        (project / "lexeditor-project.json").write_text(
+            '{"format":1,"game":"ff7r2"}\n', encoding="utf-8")
+        environment = {"LEXEDITOR_FF7R2_PROJECT": str(project)}
+        with Ff7r2Session(environment) as session:
+            rows = _json(session.url + "api/datamap")["rows"]
+
+    by_issue = {}
+    for row in rows:
+        for issue in (470, 471, 472, 473, 477):
+            if f"#{issue}" in row["filename"]:
+                by_issue[issue] = row
+
+    assert set(by_issue) == {470, 471, 472, 473, 477}
+    assert by_issue[471]["status"] == "partial"
+    assert by_issue[471]["coverage"] == "view"
+    assert by_issue[471]["target"] == "formulae"
+    assert "read-only" in by_issue[471]["controls"].lower()
+    for issue in (470, 472, 473, 477):
+        assert by_issue[issue]["status"] == "not-integrated"
+        assert by_issue[issue]["coverage"] == "unavailable"
+        assert "None" in by_issue[issue]["controls"]
+
