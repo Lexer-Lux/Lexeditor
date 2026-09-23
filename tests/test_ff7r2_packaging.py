@@ -339,3 +339,25 @@ def test_native_mod_precedence_reports_numeric_patch_levels_and_path_order():
             "Broken_P.utoc", "Broken_P.ucas"
         }
         assert "package contents are not inspected" in state["scope"].lower()
+
+
+def test_native_mod_precedence_rejects_symlinked_sidecars():
+    with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r2-load-order-link-") as temp_name:
+        project, game, _packer, _oodle, env = _fixture(Path(temp_name))
+        mods = game / "End/Content/Paks/~mods"
+        mods.mkdir()
+        (mods / "Linked_P.pak").write_bytes(b"pak")
+        target = mods / "real.utoc"
+        target.write_bytes(b"utoc")
+        try:
+            (mods / "Linked_P.utoc").symlink_to(target)
+        except OSError:
+            pytest.skip("File symlinks are unavailable in this test environment")
+        (mods / "Linked_P.ucas").write_bytes(b"ucas")
+
+        state = packaging.status(project, game, env)["loadOrder"]
+        assert state["ranked"] == []
+        assert state["incomplete"] == [{
+            "package": "Linked_P.pak",
+            "missing": ["Linked_P.utoc"],
+        }]
