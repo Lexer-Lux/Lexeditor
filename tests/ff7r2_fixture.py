@@ -108,7 +108,7 @@ def fixture() -> bytes:
     return bytes(blob)
 
 
-def battle_item_possession_fixture() -> bytes:
+def battle_item_possession_fixture(*, omit_first_array_name_mapping: bool = False) -> bytes:
     """Synthetic #471 fixture matching the public Rebirth BattleItemPossession schema.
 
     Element types are cross-checked against narknon/FF7R2UProj commit
@@ -242,7 +242,9 @@ def battle_item_possession_fixture() -> bytes:
     add_name_offset(name_index[record], key_position)
     for (property_name, _type_id), offset in zip(properties, prop_positions):
         add_name_offset(name_index[property_name], offset)
-    for value, offset in array_name_offsets:
+    for array_name_index, (value, offset) in enumerate(array_name_offsets):
+        if omit_first_array_name_mapping and array_name_index == 0:
+            continue
         add_name_offset(name_index[value], offset)
 
     blob += struct.pack("<iii", 0, 0, len(offset_groups))
