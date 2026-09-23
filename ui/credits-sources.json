@@ -115,6 +115,11 @@
           "name": "7th Heaven contributors",
           "role": "Reference for ordered active profiles, installed mod locations, mod.xml folder roots, and read-only external-stack compatibility.",
           "url": "https://github.com/tsunamods-codes/7th-Heaven"
+        },
+        {
+          "name": "tangtang95 / 60/30 FPS Gameplay",
+          "role": "Public 7th Heaven mod.xml compatibility fixture for profile-option ModFolder activation.",
+          "url": "https://github.com/tangtang95/ff7-60fps-mod"
         }
       ],
       "thanks": [],
