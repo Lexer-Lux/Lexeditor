@@ -199,6 +199,8 @@ def test_battle_player_parameter_service_is_schema_validated_and_read_only():
             assert fields["CommandAbilityID_Array"]["value"] == ["AbilityTest"]
             assert fields["UniqueAbilityParameterValue_Array"]["value"] == pytest.approx([1.25, 2.5])
             assert fields["KeyDownTime"]["value"] == pytest.approx(0.4)
+            assert all(field["editable"] is False for field in fields.values())
+            assert "semantics and safe ranges" in fields["KeyDownTime"]["note"]
 
             request = Request(
                 session.url + "api/battle-player-parameter/save",
@@ -254,7 +256,8 @@ def test_battle_item_possession_service_is_read_only():
             assert fields["StealItemName_Array"]["value"] == ["Potion", "Ether"]
             assert fields["StealItemName_Array"]["arrayCount"] == 2
             assert fields["NormalItemPercent_Array"]["value"] == [25, 75]
-            assert fields["NormalItemPercent_Array"]["editable"] is False
+            assert all(field["editable"] is False for field in fields.values())
+            assert "array-write acceptance" in fields["StealFaildCountArrayIndex"]["note"]
 
             request = Request(
                 session.url + "api/battle-item-possession/save",
