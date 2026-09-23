@@ -604,7 +604,7 @@
         detailField({label:"UNREALREZEN",control:readonlyField((rezen.reference||"FF7R2 fork")+" — dependency-explicit candidate route"),
           help:infoHelp(rezen.reason||"Real-game package acceptance is pending.")}),
         detailField({label:"PACKAGING PREFLIGHT",control:readonlyField(packageState),
-          help:infoHelp("Lexeditor does not download UnrealReZen or Oodle here. The candidate route requires explicit LEXEDITOR_FF7R2_UNREALREZEN and LEXEDITOR_FF7R2_OODLE paths, the FF7R2 release's CUE4Parse/1.1.1 dependency manifest, and the installed game's local IoStore archives.")}),
+          help:infoHelp("Lexeditor does not download, copy or relocate UnrealReZen or Oodle here. LEXEDITOR_FF7R2_OODLE must point to oo2core_9_win64.dll already beside the explicit LEXEDITOR_FF7R2_UNREALREZEN executable; the FF7R2 release's CUE4Parse/1.1.1 dependency manifest and installed game's local IoStore archives are also required.")}),
         detailField({label:"BUILD CANDIDATE",control:packageActions,
           help:infoHelp("Builds .pak/.utoc/.ucas only under this project's build folder. Nothing is copied to End/Content/Paks/~mods.")}),
       ]}),
@@ -612,7 +612,7 @@
         loader:"Rebirth gameplay assets are loaded from IoStore. A candidate can be packed with explicitly supplied UnrealReZen + Oodle; ReShade uses dxgi.dll and Shader Injector uses dsound.dll.",
         output:"Gameplay Save stages content/End/Content/DataObject/Resident/PlayerParameter.uasset. Build Candidate writes a three-file IoStore package only under <project>/build/.",
         order:"The game natively loads accepted .pak/.utoc/.ucas triples from End/Content/Paks/~mods, but Lexeditor does not install this unaccepted candidate or claim a collision winner yet.",
-        safety:"The candidate process requires explicit local dependencies and CUE4Parse/1.1.1 metadata, places the supplied Oodle DLL before UnrealReZen starts so that release does not enter its downloader, and never writes the installed game. Presentation helpers retain their DLL ownership checks.",
+        safety:"The candidate process requires explicit local dependencies and CUE4Parse/1.1.1 metadata. The user-supplied oo2core_9_win64.dll must already sit beside UnrealReZen; Lexeditor does not download, copy or relocate it and never writes the installed game. Presentation helpers retain their DLL ownership checks.",
         removal:"Revert/delete the staged project file or delete an isolated project build candidate. No gameplay package is installed by this integration yet."
       }),
     ]});
