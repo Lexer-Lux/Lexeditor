@@ -2658,9 +2658,9 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
 
 .lex-page-row-override input {
   box-sizing:border-box;
-  width:4.5em;
+  width:calc(2ch + 24px);
   min-height:32px;
-  padding:4px 6px;
+  padding:4px 2px;
   color:var(--lex-text);
   border:1px solid var(--lex-border);
   border-radius:var(--lex-radius);
@@ -2729,6 +2729,7 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
   max-width: 100%;
   color: var(--lex-text);
   font-weight: 700;
+  font-size:1.35em;
   white-space: nowrap;
   padding-inline:2px;
 }
