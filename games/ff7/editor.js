@@ -750,14 +750,22 @@
   }
   async function setupFFNx(){
     if(identity.id!=="ff7")return;
-    const ok=await LexeditorUI.confirmAction({title:"Install pinned FFNx?",message:"Lexeditor will download the pinned upstream FFNx stable archive, verify its SHA-256, and install it into ff7/workingdir. Existing manual or 7th Heaven FFNx files will not be replaced.",confirmLabel:"Install FFNx",cancelLabel:"Cancel"});
+    const owned=!!state.deployment?.setup?.owned;
+    const ok=await LexeditorUI.confirmAction({
+      title:owned?"Verify/update pinned FFNx?":"Install pinned FFNx?",
+      message:owned
+        ?"Lexeditor will verify the pinned upstream FFNx archive and update only files recorded in its setup manifest. Externally changed owned files are refused, not overwritten."
+        :"Lexeditor will download the pinned upstream FFNx stable archive, verify its SHA-256, and install it into ff7/workingdir. Existing manual or 7th Heaven FFNx files will not be replaced.",
+      confirmLabel:owned?"Verify/update FFNx":"Install FFNx",cancelLabel:"Cancel"
+    });
     if(ok)await deploymentAction("setup");
   }
   function deploymentView(){
     const plan=state.deployment||{files:[],blocked:[],ffnx:{}};
     const disabled=state.deploymentLoading||state.saving||state.activeSource!=="mine";
     const external=plan.externalMods||{overlaps:[],conditionalOverlaps:[],opaque:[],missing:[]};
-    const setupButton=el("button",{type:"button",disabled:disabled||identity.id!=="ff7"||!!plan.ffnx?.available,onclick:()=>setupFFNx()},"Install pinned FFNx");
+    const setupOwned=!!plan.setup?.owned;
+    const setupButton=el("button",{type:"button",disabled:disabled||identity.id!=="ff7"||(!!plan.ffnx?.available&&!setupOwned),onclick:()=>setupFFNx()},setupOwned?"Verify/update pinned FFNx":"Install pinned FFNx");
     const exportButton=el("button",{type:"button",disabled,onclick:()=>deploymentAction("export")},"Export Direct Mode");
     const deployButton=el("button",{type:"button",disabled:disabled||!plan.ffnx?.available||!!(external.overlaps||[]).length,onclick:()=>deploymentAction("deploy")},"Deploy to FFNx");
     const removeButton=el("button",{type:"button",disabled:state.deploymentLoading||state.saving||!plan.ffnx?.available,onclick:()=>deploymentAction("remove")},"Remove Lexeditor deployment");
@@ -780,7 +788,7 @@
           detailField({label:"Generated",control:readonlyField(String((plan.files||[]).length)+" file(s)")}),
         ]}),
         detailSection({title:"ACTIONS",body:[
-          ...(identity.id==="ff7"?[detailField({label:"First-time runtime setup",control:setupButton})]:[]),
+          ...(identity.id==="ff7"?[detailField({label:setupOwned?"Runtime maintenance":"First-time runtime setup",control:setupButton})]:[]),
           detailField({label:"Build isolated project export",control:exportButton}),
           detailField({label:"Apply owned Direct Mode files",control:deployButton}),
           detailField({label:"Remove owned Direct Mode files",control:removeButton}),
