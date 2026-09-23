@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
+from http.server import ThreadingHTTPServer
 import io
 import json
 from pathlib import Path
 import shutil
 import tempfile
+import threading
 import unittest
 from unittest import mock
+import urllib.error
+import urllib.request
 import zipfile
 
 from plugins.factorio.data_map import build_data_map
@@ -489,6 +494,94 @@ class FactorioModelTests(unittest.TestCase):
             self.assertEqual(rows["data.raw.character"]["records"], 1)
             self.assertFalse(rows["control.lua / runtime scripts"]["openable"])
             self.assertTrue(rows["data.raw.recipe"]["openable"])
+
+
+class FactorioEditEndpointTests(unittest.TestCase):
+    """The /api/edit route must fail closed exactly like save/export do."""
+
+    def project(self, temp: Path) -> Path:
+        target = temp / "project"
+        shutil.copytree(FIXTURE, target)
+        return target
+
+    def serve(self, project: Path) -> tuple[contextlib.ExitStack, str]:
+        stack = contextlib.ExitStack()
+        stack.enter_context(mock.patch.object(factorio_server, "PROJECT_ROOT", project))
+        stack.enter_context(mock.patch.object(factorio_server, "GAME_ROOT", None))
+        stack.enter_context(mock.patch.object(factorio_server, "_store", None))
+        stack.enter_context(mock.patch.object(factorio_server, "_saved_edits", {}))
+        stack.enter_context(mock.patch.object(factorio_server, "_dirty", 0))
+        stack.enter_context(mock.patch.object(factorio_server, "_source_fingerprint", ""))
+        server = ThreadingHTTPServer(("127.0.0.1", 0), factorio_server.Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        stack.callback(server.server_close)
+        stack.callback(thread.join, 10)
+        stack.callback(server.shutdown)
+        return stack, f"http://127.0.0.1:{server.server_address[1]}/"
+
+    def post_edit(self, base_url: str, payload: dict) -> tuple[int, dict]:
+        request = urllib.request.Request(
+            base_url + "api/edit",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=5) as response:
+                return response.status, json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            return error.code, json.loads(error.read().decode("utf-8"))
+
+    def test_edit_roundtrip_through_http(self):
+        with tempfile.TemporaryDirectory() as name:
+            stack, base_url = self.serve(self.project(Path(name)))
+            with stack:
+                status, body = self.post_edit(base_url, {
+                    "kind": "recipes", "name": "iron-gear-wheel",
+                    "changes": {"energy_required": 0.75},
+                })
+            self.assertEqual(status, 200)
+            self.assertTrue(body["changed"])
+            self.assertEqual(body["dirty"], 1)
+            self.assertEqual(body["row"]["energyRequired"], 0.75)
+
+    def test_edit_rejects_invalid_manifest(self):
+        with tempfile.TemporaryDirectory() as name:
+            project = self.project(Path(name))
+            manifest = json.loads(
+                (project / "factorio-project.json").read_text(encoding="utf-8"))
+            manifest["mod"]["version"] = "2.1"
+            (project / "factorio-project.json").write_text(
+                json.dumps(manifest), encoding="utf-8")
+            stack, base_url = self.serve(project)
+            with stack:
+                status, body = self.post_edit(base_url, {
+                    "kind": "recipes", "name": "iron-gear-wheel",
+                    "changes": {"energy_required": 0.75},
+                })
+            self.assertEqual(status, 400)
+            self.assertIn("number.number.number", body["error"])
+
+    def test_edit_rejects_stale_source_snapshot(self):
+        with tempfile.TemporaryDirectory() as name:
+            project = self.project(Path(name))
+            source = project / "source" / "data-raw-dump.json"
+            stack, base_url = self.serve(project)
+            with stack:
+                status, _body = self.post_edit(base_url, {
+                    "kind": "recipes", "name": "iron-gear-wheel",
+                    "changes": {"energy_required": 0.75},
+                })
+                self.assertEqual(status, 200)
+                with source.open("ab") as handle:
+                    handle.write(b"\n")
+                status, body = self.post_edit(base_url, {
+                    "kind": "items", "name": "iron-plate",
+                    "changes": {"stack_size": 250},
+                })
+            self.assertEqual(status, 400)
+            self.assertIn("changed after this editor opened", body["error"])
 
 
 if __name__ == "__main__":
