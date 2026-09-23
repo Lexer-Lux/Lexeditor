@@ -11,7 +11,7 @@
 
   async function api(path,options){const response=await fetch(path,options);const data=await response.json();if(!response.ok)throw new Error(data.error||`HTTP ${response.status}`);return data;}
   function signature(value){return JSON.stringify(value)}
-  const editableDatasets=["cards","items","menuItems","shops","weapons","magic","gfs","characters","abilityJunction","abilityCommand","abilityStat","abilityCharacter","abilityParty","abilityGf","abilityMenu","text","enemies","enemyTables","enemyAi","enemyBattleText","refine","encounters","world","fields"];
+  const editableDatasets=["battleItems","ammoEffects","cards","items","menuItems","shops","weapons","magic","gfs","characters","abilityJunction","abilityCommand","abilityStat","abilityCharacter","abilityParty","abilityGf","abilityMenu","text","enemies","enemyTables","enemyAi","enemyBattleText","refine","encounters","world","fields"];
   const platformFields=config=>Object.fromEntries((config?.sections||[]).flatMap(section=>section.fields).map(field=>[field.id,field.value]));
   function platformChanges(){const current=platformFields(state.platformConfig),saved=platformFields(state.savedPlatformConfig),changes={};for(const [id,value] of Object.entries(current))if(signature(value)!==signature(saved[id]))changes[id]=value;return changes}
   // "Mod contents only" keeps the rows this project has actually changed.
@@ -31,8 +31,12 @@
   }
   function modOnlySpec(view){
     const changed=(name,row)=>{const before=(state.vanilla[name]?.rows||[]).find(entry=>name==="fields"?entry.key===row.key:entry.id===row.id);return before===undefined||signature(row)!==signature(before)};
+    const itemEffectsChanged=row=>view==='items'&&[
+      ['battleItems',(state.data.battleItems?.rows||[]).filter(entry=>Number(row.id)!==0&&entry.id===row.id)],
+      ['ammoEffects',(state.data.ammoEffects?.rows||[]).filter(entry=>Number(entry.fields.find(field=>field.field==='used_item_index')?.value)===Number(row.id))],
+    ].some(([name,rows])=>rows.some(entry=>changed(name,entry)));
     return {available:state.activeSource==="mine",value:state.modOnly===true,
-      changed:row=>changed(editableDatasets.find(name=>state.data[name]?.rows?.includes(row))||view,row)||(view==="enemies"&&["enemyTables","enemyAi","enemyBattleText"].some(name=>{const linked=state.data[name]?.rows?.find(entry=>entry.id===row.id);return linked&&changed(name,linked)})),
+      changed:row=>changed(editableDatasets.find(name=>state.data[name]?.rows?.includes(row))||view,row)||itemEffectsChanged(row)||(view==="enemies"&&["enemyTables","enemyAi","enemyBattleText"].some(name=>{const linked=state.data[name]?.rows?.find(entry=>entry.id===row.id);return linked&&changed(name,linked)})),
       change:value=>{state.modOnly=value;state.pages[view]=0;render()}};
   }
   function dirtyCount(){if(state.activeSource!=="mine")return 0;let count=Object.keys(platformChanges()).length+(window.ff8SpellbookDrafts?.size||0);for(const name of editableDatasets){if(!state.data[name])continue;const current=state.data[name].rows,base=state.base[name]||[];for(let i=0;i<current.length;i++){const before=name==="fields"?base.find(row=>row.key===current[i].key):base[i];if(signature(current[i])!==signature(before))count++;}}if(state.data.init&&signature(state.data.init)!==signature(state.base.init))count++;if(state.data.settings&&signature(state.data.settings)!==signature(state.base.settings))count++;return count}

@@ -1,10 +1,23 @@
+  function itemBattleSections(itemId){
+    if(Number(itemId)===0)return [];
+    const matches=[];
+    const battle=state.data.battleItems?.rows.find(row=>Number(row.id)===Number(itemId));
+    if(battle)matches.push(['battleItems',battle,'BATTLE EFFECT']);
+    for(const row of state.data.ammoEffects?.rows||[]){
+      if(Number(row.fields.find(field=>field.field==='used_item_index')?.value)===Number(itemId))
+        matches.push(['ammoEffects',row,'SHOT EFFECT']);
+    }
+    return matches.map(([view,row,title])=>detailSection({title,body:row.fields.map(field=>
+      detailField({label:field.label,help:field.help?infoHelp(field.help):null,
+        control:fieldSourceControl(field,view,row.id),min:field.minimum,max:field.maximum}))}));
+  }
   function renderItems(){const rows=filtered("items",["name","id"]),columns=[{key:"id",label:"ID"},{key:"name",label:"Item",render:row=>itemLabel(row)},{key:"buyPrice",label:"Buy",render:row=>gilValue(row.buyPrice)},{key:"sellPrice",label:"Sell",render:row=>gilValue(row.sellPrice)},{key:"sellMultiplier",label:"Sell %",pinned:false,render:row=>unitField(numberValue(row.sellMultiplier*5),"%")},{key:"iconId",label:"Menu icon",pinned:false,render:row=>itemIcon(row)}];showPaged("items",rows,columns,itemDetail,"70px minmax(210px,2fr) 90px 90px")}
   function itemDetail(row,prefs){const vanilla=rowOf(state.vanilla,"items",row.id),sell=readonlyField(row.sellPrice);const updateSell=()=>{row.sellPrice=Math.round((row.buyPrice/20)*row.sellMultiplier);sell.value=formatNumber(row.sellPrice);shell.refresh()},setSellMultiplier=value=>{row.sellMultiplier=Math.max(0,Math.min(255,Math.round(Number(value)||0)));updateSell()},buy=sourceControl(unitField(numberControl(row.buyPrice,0,655350,10,value=>{row.buyPrice=value;updateSell()}),"G",{unitClass:"ff8-gil-unit"}),()=>row.buyPrice,vanilla.buyPrice,referenceValues("items",row.id,value=>value?.buyPrice),value=>{row.buyPrice=value;updateSell()},value=>`${formatNumber(value)} G`,{internal:true}),sellRate=sourceControl(unitField(numberControl(row.sellMultiplier*5,0,1275,5,value=>setSellMultiplier(value/5)),"%"),()=>row.sellMultiplier,vanilla.sellMultiplier,referenceValues("items",row.id,value=>value?.sellMultiplier),setSellMultiplier,value=>`${formatNumber(Number(value)*5)}%`,{internal:true});return sharedDetail(row,prefs,[detailSection({className:"item-price-section",title:"PRICES",body:[
       detailField({label:"Buy",control:buy,pin:prefs?.pinButton("buyPrice","Buy price")}),
       detailField({label:"Sell %",control:sellRate,pin:prefs?.pinButton("sellMultiplier","Sell percentage"),help:infoHelp("The shop pays this percentage of the buy price when you sell this item.")}),
       detailField({label:"Sell",control:unitField(sell,"G"),pin:prefs?.pinButton("sellPrice","Sell price")})]}),
     menuItemSection(row.id),
-    row.id<33?LexeditorUI.detailNote("This item also has battle behavior in kernel.bin. Those fields are not editable here until cross-file saving is validated."):null],"","",itemIcon(row))}
+    ...itemBattleSections(row.id)],"","",itemIcon(row))}
 
   function renderShops(){const rows=filtered("shops",["name","id"]);showPaged("shops",rows,[{key:"id",label:"ID"},{key:"name",label:"Shop"}],shopDetail,"74px minmax(260px,1fr)")}
   function removeShopSlot(row,slot){slot.itemId=0;slot.itemName=state.data.shops.items.find(item=>item.id===0)?.name||"Nothing";slot.rare=false;renderShops();shell.refresh()}
