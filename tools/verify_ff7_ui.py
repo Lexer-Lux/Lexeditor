@@ -35,13 +35,23 @@ function el(tag, attrs={}, ...children){
 }
 const panel=o=>el("section",{},el("h2",{},o.title),o.identity||null,o.body);
 const stub={el,clone:structuredClone,columnPreferences:()=>({}),recordId:id=>String(id),infoHelp:t=>t,
-  detailPanel:panel,detailSection:panel,detailField:o=>el("label",{},o.label,o.control),
+  detailPanel:panel,detailSection:panel,detailField:o=>{const control=o.control;
+    if(control instanceof Element&&["INPUT","SELECT","TEXTAREA","OUTPUT"].includes(control.tagName)
+      &&!control.getAttribute("aria-label")&&o.label)control.setAttribute("aria-label",String(o.label));
+    return el("div",{class:"lex-field "+(o.className||"")},el("span",{class:"lex-field-label"},o.label),control);},
   provenanceControl:o=>el("span",{},o.control,el("button",{type:"button",class:"test-restore",onclick:()=>o.apply(o.vanilla)},"Restore vanilla")),
-  columnList:o=>el("div",{},...o.rows.map(row=>el("button",{type:"button","data-row":row.id,onclick:()=>o.select(row.id)},row.name))),
+  columnList:o=>el("div",{role:"table","aria-label":o["aria-label"]||""},...o.rows.map(row=>{
+    const id=row.id??(typeof o.key==="function"?o.key(row):row.key);
+    const cells=(o.columns||[]).map(col=>{try{const value=col.render?col.render(row):row[col.key];return value instanceof Node?value:document.createTextNode(String(value??""));}catch(e){return document.createTextNode("");}});
+    const label=row.name??cells.map(cell=>cell.textContent).join(" ");
+    if(typeof o.select!=="function")return el("div",{class:"lex-column-row","data-key":id},...cells.length?cells:[document.createTextNode(String(label??""))]);
+    return el("button",{type:"button","data-row":id,onclick:()=>o.select(row)},
+      ...cells.length?cells:[document.createTextNode(String(label??""))]);})),
   pagedListDetail:o=>{
-    const selected=o.rows.find(row=>row.id===o.selected)||o.rows[0];
+    const wanted=o.selected&&typeof o.selected==="object"?o.selected.id:o.selected;
+    const selected=o.rows.find(row=>row.id===wanted)||o.rows[0];
     return el("div",{},el("input",{"aria-label":o.search.label,value:o.search.value,oninput:e=>o.search.change(e.target.value)}),
-      o.master({rows:o.rows.slice(0,o.pageSize||16),selected:selected?.id,select:id=>o.change({page:0,pageSize:16,selected:id})}),selected?o.detail(selected):null);
+      o.master({rows:o.rows.slice(0,o.pageSize||16),selected:selected?.id,select:row=>o.change({page:0,pageSize:16,selected:row&&typeof row==="object"?row.id:row})}),selected?o.detail(selected):null);
   },
   platformConfigView:o=>{
     if(!o.config?.available)return el("div",{},o.config?.message,o.config?.path);
@@ -67,7 +77,7 @@ const stub={el,clone:structuredClone,columnPreferences:()=>({}),recordId:id=>Str
     // The shared component names this option "content". Reading only "body"
     // meant every tabbed panel rendered its tabs and dropped what was in them,
     // so tests looked for content that the double had silently discarded.
-    el("div",{class:"lex-tabbed-panel-content"},...(()=>{const v=o.content!==undefined?o.content:o.body;return (Array.isArray(v)?v:[v]).filter(Boolean)})())),
+    (()=>{const selected=(o.tabs||[]).find(tab=>tab.id===o.active)||(o.tabs||[])[0];return el("div",{class:"lex-tabbed-panel-content",role:"tabpanel","aria-label":selected&&(selected.label||selected.id)||""},...(()=>{const v=o.content!==undefined?o.content:o.body;return (Array.isArray(v)?v:[v]).filter(Boolean)})())})()),
   integrationStatus:state=>el("span",{class:"lex-integration-status "+String(state||"")},String(state||"")),
   readonlyField:value=>{const f=el("output",{class:"lex-readonly-field"},String(value??"—"));return f;},
   infoIcon:()=>el("span",{class:"test-info-icon"}),
@@ -79,6 +89,7 @@ const stub={el,clone:structuredClone,columnPreferences:()=>({}),recordId:id=>Str
   soundCoverageTable:rows=>el("div",{class:"test-sound-coverage"},String((rows||[]).length)),
   sharedSettings:()=>({developerMode:false}),configureThemeSounds:()=>{},finishPluginLoading:()=>{window.testLoaded=true},
   EditHistory:class{constructor(o){this.options=o}observe(){}clear(){}},
+  listDetail:(listNode,detail,className)=>el("div",{class:"lex-list-detail "+(className||"")},listNode,detail),
   mountShell:o=>{
     window.testShell=o;
     const error=el("div",{id:"test-error"});
@@ -143,7 +154,12 @@ class PageTests(unittest.TestCase):
         bridge = "window.fetch=async(path,options={})=>{const r=await window.testRequest(path,options);return new Response(r.body,{status:r.status})};"
         identity = {"id": server.PLUGIN_ID, "name": server.PLUGIN_NAME, "edition": server.PLUGIN_EDITION}
         html = html.replace('<script src="/shared/framework.js"></script>', '<script>' + FRAMEWORK + bridge + 'window.__lexeditorPlugin=' + json.dumps(identity) + ';</script>')
-        html = html.replace('<script src="editor.js"></script>', '<script>' + (server.PLUGIN_ROOT / "editor.js").read_text(encoding="utf-8") + '</script>')
+        scripts = "".join(
+            '<script>' + (server.PLUGIN_ROOT / name).read_text(encoding="utf-8") + '</script>'
+            for name in ("editor.js", "controls.js", "details.js", "workspace.js"))
+        html = html.replace('<script src="editor.js"></script>', scripts)
+        for extra in ("controls.js", "details.js", "workspace.js"):
+            html = html.replace('<script src="%s"></script>' % extra, '')
         html = html.replace('<link rel="stylesheet" href="/shared/framework.css">', '')
         self.page.set_content(html)
         self.page.wait_for_function("window.testLoaded === true")
