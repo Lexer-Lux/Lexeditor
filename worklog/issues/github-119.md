@@ -30,3 +30,6 @@ The existing runtime `tools/reverse-engineering/verify_stealth_indicators_issue_
 Keep this issue actionable. Parent must build and deliver the source repair when the current experiment permits it. Prepare the remaining #113 sequence with the specified probe and manual lantern prerequisites. Then check warning direction and color against known observer states, ordinary neutral observers, standing/crouching/movement, story/cinematic suppression and resumption, and four-observer priority/fade in the rendered game. Do not claim detection thresholds, scene behavior or visual acceptance from the harness.
 
 Root built and hash-verified this source, SHA-256 `B00DD107566D4680D371EEACCF5A0BCE24B38CD1D585FBB44A2BEB88AD98556B`. Candidate and matching release manifest are held under `out/rdr2-after-duration`; not installed while #151 is active. The build is not gameplay or visual acceptance.
+
+## 2026-09-22 misc-fixes disposition
+Discrete-state prototype installed in dev build only; indicator harness passes (see github-113.md). Remaining: finish the #113 evidence and run the controlled observer test (stance, line of sight, suppression, four-target cap) before the behavior counts as ready. Issue stays actionable.
