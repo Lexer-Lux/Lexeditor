@@ -209,7 +209,13 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
 
             page.evaluate("navigate('info')")
             expect(page.get_by_text("EXTERNAL MOD COMPATIBILITY", exact=True)).to_be_visible()
-            assert page.get_by_text("None detected", exact=True).count() >= 1
+            expect(page.get_by_label("ENABLED", exact=True)).to_have_value("None detected")
+            expect(page.get_by_label("RUNTIME ORDER", exact=True)).to_have_value("No active mod folders")
+            expect(page.get_by_label("METADATA WARNINGS", exact=True)).to_have_value("None detected")
+            expect(page.get_by_label("UNSUPPORTED RUNTIME", exact=True)).to_have_value("None detected")
+            expect(page.get_by_label("RUNTIME UNKNOWN", exact=True)).to_have_value("None detected")
+            expect(page.get_by_label("DECLARED CONFLICTS", exact=True)).to_have_value("None declared")
+            expect(page.get_by_label("EXACT PATH OVERLAPS", exact=True)).to_have_value("None detected")
             page.screenshot(path=str(OUT / "ff9-info-mod-compat.png"), full_page=True)
 
             page.evaluate("navigate('magic')")
