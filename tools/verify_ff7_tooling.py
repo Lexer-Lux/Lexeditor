@@ -4,10 +4,15 @@ from __future__ import annotations
 import hashlib
 import io
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from unittest import mock
 import zipfile
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from games.ff7 import tooling
 
