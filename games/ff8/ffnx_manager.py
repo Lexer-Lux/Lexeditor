@@ -288,6 +288,44 @@ def _set_project_paths(config: Path, direct_root: Path) -> None:
     temporary.replace(config)
 
 
+AUDIO_VOLUME_KEYS = ("external_sfx_volume", "external_music_volume")
+
+
+def set_audio_volumes(config: Path, *, sfx: int | None = None,
+                      music: int | None = None) -> dict:
+    """Write FFNx audio-layer gains (0..100) into FFNx.toml.
+
+    A side left as None keeps its existing key, so the FFNx -1
+    auto-detect default survives when that layer is unmanaged.
+    Returns the gains written, keyed by FFNx.toml name.
+    """
+    wanted = {"external_sfx_volume": sfx, "external_music_volume": music}
+    for key, value in wanted.items():
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) \
+                or not 0 <= value <= 100:
+            raise ValueError(f"{key} must be an int from 0 to 100")
+    text = config.read_text(encoding="utf-8", errors="strict")
+    written = {}
+    for key, value in wanted.items():
+        if value is None:
+            continue
+        pattern = re.compile(
+            rf'(?m)^[ \t]*{re.escape(key)}[ \t]*=[ \t]*-?\d+[ \t]*$')
+        replacement = f"{key} = {value}"
+        if pattern.search(text):
+            text = pattern.sub(replacement, text, count=1)
+        else:
+            text += f"\n{replacement}\n"
+        written[key] = value
+    if written:
+        temporary = config.with_suffix(config.suffix + ".tmp")
+        temporary.write_text(text, encoding="utf-8", newline="\n")
+        temporary.replace(config)
+    return written
+
+
 def _configured_direct_root(config: Path) -> Path:
     """Resolve the Direct Mode root exactly as FFNx resolves it."""
     try:
