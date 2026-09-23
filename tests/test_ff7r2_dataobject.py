@@ -137,3 +137,8 @@ def test_array_data_pointer_outside_asset_is_rejected():
     with pytest.raises(DataObjectError):
         DataObjectPackage.from_bytes(bytes(damaged))
 
+def test_name_array_element_without_minimal_name_is_rejected():
+    source = battle_item_possession_fixture(omit_first_array_name_mapping=True)
+    with pytest.raises(DataObjectError, match="has no minimal-name identity"):
+        DataObjectPackage.from_bytes(source)
+
