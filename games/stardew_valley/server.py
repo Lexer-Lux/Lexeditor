@@ -97,36 +97,26 @@ def dataset_payload(key: str) -> dict:
 
 def data_map() -> dict:
     project_ready = (paths.PROJECT_ROOT / "manifest.json").is_file() and (paths.PROJECT_ROOT / "content.json").is_file()
-    _base, source = load_base_objects(paths.GAME_ROOT)
-    if source.get("available"):
-        notes = (
-            "Lexeditor reads vanilla Data/Objects values from the read-only StardewXnbHack JSON export and writes only "
-            "field-level Content Patcher overrides into the selected project. Coverage is partial because only Price, "
-            "Edibility, and IsDrink are editable so far."
-        )
-    else:
-        notes = (
-            "Lexeditor edits field-level Content Patcher overrides in the selected project. Vanilla values become visible "
-            "when StardewXnbHack's Content (unpacked)/Data/Objects.json export is present; Lexeditor does not modify the XNB."
-        )
-    rows = [{
-        "filename": "Content/Data/Objects.xnb",
-        "controls": "Content Patcher Data/Objects fields: Price, Edibility, IsDrink",
-        "notes": notes,
-        "status": "partial", "coverage": "structured", "openable": project_ready,
-        "sourceAvailable": bool(source.get("available")), "target": "objects", "dataset": "objects", "datasetKey": "objects",
-    }]
-    for target, label in (
-        ("Data/BigCraftables", "Big craftables"), ("Data/Crops", "Crops"),
-        ("Data/Machines", "Machines"), ("Data/Weapons", "Weapons"),
-        ("Data/Shops", "Shops"),
-    ):
+    rows = []
+    for key, spec in DATASET_SPECS.items():
+        _base, source = load_base_dataset(paths.GAME_ROOT, key)
+        controls = ", ".join(field["label"] for field in dataset_schema(key)["fields"])
         rows.append({
-            "filename": target,
-            "controls": label,
-            "notes": "Stardew Valley 1.6 exposes this as structured data, but Lexeditor has not integrated a schema/editor for it yet.",
-            "status": "not-integrated", "coverage": "unavailable", "openable": False,
+            "filename": f"Content/Data/{spec['source']}.xnb",
+            "controls": controls,
+            "notes": (
+                f"Typed field-level {spec['target']} editing. Nested/list-heavy or otherwise unmodeled fields stay "
+                "preserved and read-only; installed XNB files are never written."
+            ),
+            "status": "partial", "coverage": "structured", "openable": project_ready,
+            "sourceAvailable": bool(source.get("available")), "target": key,
+            "dataset": key, "datasetKey": key,
         })
+    rows.append({
+        "filename": "Content/Data/Shops.xnb", "controls": "Shops",
+        "notes": "Recognized structured data; inventory and condition semantics stay protected until a dedicated shop editor is modeled.",
+        "status": "not-integrated", "coverage": "unavailable", "openable": False,
+    })
     return {"contract": "Lexeditor.data-map", "rows": rows}
 
 
