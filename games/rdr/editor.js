@@ -32,6 +32,10 @@
   // every other plugin's fields carry. RDR's rows had neither, so nothing on
   // the page explained what any of it edits.
   function detailField(label,value,help="",bubble=""){const control=value instanceof Node?value:el("span",{},String(value??"—"));return LexeditorUI.detailField({label,control,description:help||"",help:bubble?LexeditorUI.infoHelp(bubble):null});}
+  function detailText(text){return LexeditorUI.detailNote(String(text??""));}
+  function notice(options={}){const title=String(options.title||"").trim(),message=String(options.message||"").trim();return LexeditorUI.detailNote([title,message].filter(Boolean).join(" — "));}
+  function logView(text){return LexeditorUI.detailNote(String(text??""));}
+  function actionRow(...buttons){return LexeditorUI.detailField({label:"Actions",control:el("span",{},...buttons)});}
   function applyControlValue(control,value){if(control.type==="checkbox")control.checked=String(value).toLowerCase()==="true";else control.value=String(value);control.dispatchEvent(new Event(control.type==="checkbox"||control.tagName==="SELECT"?"change":"input",{bubbles:true}));}
   function sourceControl(control,current,vanilla,apply,format){if(state.activeSource!=="mine"||vanilla===undefined)return control;return provenanceControl({control,current,vanilla,internal:true,format,apply:value=>{apply(value);applyControlValue(control,value);shell.refresh()}})}
   const stringsUI=RDRStringTablesUI({state,api,el,columnList,pagedListDetail,cell,shown,detailField,sourceControl,modOnlySpec,setStatus,shell:()=>shell});
@@ -124,7 +128,7 @@
       detailField("Root",shown(item.rootHash)),
       detailField("Source",shown(item.sourcePath)),
       detailField("Override",shown(item.projectPath)),
-      LexeditorUI.notice({title:"Live ShopInventory fields.",message:"The save preserves the other Gringo components and packs a verified resource override."}),
+      notice({title:"Live ShopInventory fields.",message:"The save preserves the other Gringo components and packs a verified resource override."}),
       ...SHOP_FIELDS.map(field=>{const control=el("input",{type:"number",step:field.step,min:field.min,max:field.max,value:shopValue(item,field),disabled:state.activeSource!=="mine",oninput:event=>editShop(item,field,event.target.value)}),vanilla=state.vanilla.shops?.rows?.find(row=>row.id===item.id)?.[field.key];return detailField(field.label,sourceControl(control,()=>shopValue(item,field),vanilla===undefined?undefined:String(vanilla),value=>editShop(item,field,String(value))),field.help)})
     ]});
   }
@@ -164,7 +168,7 @@
       detailField("ID",shown(String(mission.id))),detailField("Script",shown(mission.scriptName)),detailField("Area",shown(missionArea(mission))),
       detailField("Text key",shown(mission.localizationKey)),detailField("Source",shown(mission.archivePath)),
       detailField("Evidence",shown(`${mission.rewardSource.function} / ${mission.rewardSource.case}`)),
-      LexeditorUI.notice({title:"The extracted mission table stays read-only.",message:"Save writes only cash, fame, or honor values that differ from the base into LexerRDR.missions.json."}),
+      notice({title:"The extracted mission table stays read-only.",message:"Save writes only cash, fame, or honor values that differ from the base into LexerRDR.missions.json."}),
       ...MISSION_REWARDS.map(reward=>{const rewardLimits=limits.rewards[reward.key],control=el("input",{type:"number",inputmode:"numeric",min:String(rewardLimits.minimum),max:String(rewardLimits.maximum),step:String(limits.step),value:missionValue(mission,reward.key),disabled:state.activeSource!=="mine",oninput:event=>editMission(mission,reward.key,event.target.value)});return detailField(reward.label,
         sourceControl(control,()=>missionValue(mission,reward.key),String(mission.baseRewards[reward.key]),value=>editMission(mission,reward.key,String(value))),
         reward.help);})
@@ -227,7 +231,7 @@
     if(!script)return LexeditorUI.detailSection({title,body:[LexeditorUI.detailNote("Reading the script that holds it…")]});
     if(!script.available)return LexeditorUI.detailSection({title,
       help:infoHelp("The table lives in a compiled script inside content.rpf. Lexeditor reads it through the same RPF6 bridge it uses everywhere else; this is what stopped it."),
-      body:[LexeditorUI.notice({tone:"warning",message:script.reason||"The loot script could not be read."})]});
+      body:[notice({tone:"warning",message:script.reason||"The loot script could not be read."})]});
     const fields=script.slots.map(slot=>{
       const input=el("input",{type:"number",min:0,max:slot.maximum,step:1,
         value:String(lootScriptItem(slot)),"aria-label":`Loot branch ${slot.index+1} item`,
@@ -248,7 +252,7 @@
     return LexeditorUI.detailSection({title,
       help:infoHelp("Each branch of the game's LootType switch and the item enum it hands over, read straight out of the script's bytecode. Saving writes a patched copy of the script into the mod folder; the game loads that instead of the archived one, and the original archive is never touched."),
       body:[fact("Script",script.path),fact("Override",script.overrideExists?`Override in place: ${script.override}`:"No override written yet."),
-        ...fields,LexeditorUI.actionRow(saveButton)]});
+        ...fields,actionRow(saveButton)]});
   }
   async function loadLootScript(){
     try{state.lootScript=await api("/api/loot/script")}
@@ -285,14 +289,14 @@
       help:infoHelp("Not an RPF replacement: LexerRDR.asi owns this schema-versioned project file, and it accepts only the five item IDs proven in Function_117."),
       body:[lootNumber(bonus,"chancePercent","Bonus roll chance (%)","1","0","100","How often looting a body rolls for a bonus item at all. At 0 no body ever yields one; at 100 every body rolls, and the table below then decides which item comes up."),bonusTable]});
     const moneyCard=LexeditorUI.detailSection({title:"Money paths (ASI override)",body:[LexeditorUI.detailNote(`Function_123: ${money.decoratorPaths.map(path=>`${path.decorator} = ${path.operation}`).join(" · ")}`),lootNumber(base.range,"minimum","Base minimum","0.01",undefined,undefined,"The low end of the money a body carries before any multiplier below is applied. The game picks a value between this and the maximum."),lootNumber(base.range,"maximum","Base maximum","0.01",undefined,undefined,"The high end of that same range. Set it equal to the minimum to give every body the same amount."),lootFlag(base,"applyStatScale","Apply stat scale","Multiply the rolled amount by the game's own difficulty and progression scale, so late-game bodies carry more. Off pays the raw roll everywhere."),lootFlag(base,"applyItem17Multiplier","Apply item 17 multiplier","Honour the multiplier the game attaches to item slot 17, which is how it grants a player bonus to money found. Off ignores that bonus."),lootFlag(base,"applyFinalMultiplier","Apply final multiplier","Apply the last multiplier in the chain, after the other two. This is the one to turn off to see the raw roll.")]});
-    const evidence=LexeditorUI.detailSection({title:"Which script this is reading",body:[fact("Archive",doc.source?.archive||"Not supplied"),fact("Script",doc.source?.script||"Not supplied"),LexeditorUI.logView((doc.source?.functions||[]).map(fn=>`${fn.name} @ ${fn.positionHex} / ${fn.positionDecimal}\n${fn.role}`).join("\n\n"))]});
+    const evidence=LexeditorUI.detailSection({title:"Which script this is reading",body:[fact("Archive",doc.source?.archive||"Not supplied"),fact("Script",doc.source?.script||"Not supplied"),logView((doc.source?.functions||[]).map(fn=>`${fn.name} @ ${fn.positionHex} / ${fn.positionDecimal}\n${fn.role}`).join("\n\n"))]});
     // Two questions come up on this page every time: where the ordinary
     // per-enemy drop list is edited, and whether enemies carry drop tables of
     // their own somewhere else. Both are answered here rather than left for
     // the reader to conclude from the absence of a table.
     const scope=LexeditorUI.detailSection({title:"What this tab covers",
       help:infoHelp("Searched, not assumed. content.rpf holds the corpse loot logic at content/release64/scripting/gringo/commonscripts/lootcorpsegenericnoanim.wsc, and Lexeditor's RPF6 bridge decompiles it. What a body yields is a switch on a LootType decorator carried by the ped: each branch adds a fixed item enum, written into the script rather than looked up from a table, in Function_90 at bytecode offset 0x36F4. None of the 183 XML files in the archive is a drops table. Editing the script itself is possible and not yet built: the game already loads loose overrides by archive path for non-XML files, so a modified copy of that script would be picked up, and what is missing is writing the item enums back into its bytecode. Until then the two cards below patch the running functions, which is the seam that exists today."),
-      body:[LexeditorUI.detailText("Loot here is compiled script, not a data table. A body's items come from a switch on its LootType inside lootcorpsegenericnoanim.wsc in content.rpf, and no XML in the archive holds a drops table. The table below is that switch, read out of the script's bytecode and written back as a loose override; the two cards under it patch the running functions instead, which is how the bonus roll and the money are reached.")]});
+      body:[detailText("Loot here is compiled script, not a data table. A body's items come from a switch on its LootType inside lootcorpsegenericnoanim.wsc in content.rpf, and no XML in the archive holds a drops table. The table below is that switch, read out of the script's bytecode and written back as a loose override; the two cards under it patch the running functions instead, which is how the bonus roll and the money are reached.")]});
     $("#main").replaceChildren(LexeditorUI.settingsColumns([scope,lootScriptCard(),source,moneyCard,evidence]));shell.refresh();
     if(!state.lootScript)loadLootScript().then(()=>renderLoot());
   }
@@ -318,14 +322,14 @@
     // No "read only" banner. Every read-only value already carries the shared
     // lock mark, so the banner restated in words what the controls show.
     $("#toolbar").replaceChildren();
-    const {detailSection,detailText,notice,actionRow}=LexeditorUI;
+    const {detailSection}=LexeditorUI;
     const status=(tone,message)=>notice({tone,message});
     const button=(label,onclick,disabled,primary)=>el("button",{type:"button",class:primary?"primary":null,onclick,disabled},label);
     const sources=state.dashboard.manifest?.sources||{};
     const preparation=detailSection({title:"PREPARATION",body:[
       ...(state.dashboard.problems.length?state.dashboard.problems.map(problem=>status("warning",problem))
         :[status("success",`${state.files.counts.all||0} tuning files, ${state.items?.counts?.all||0} items, ${state.shops?.counts?.items||0} shop entries, and ${state.strings?.counts?.records||0} localized strings prepared. Installed archives are read-only.`)]),
-      LexeditorUI.logView(Object.keys(sources).length?`${Object.entries(sources).map(([label,source])=>`${label}: ${source.path}\nSHA-256: ${source.sha256}`).join("\n\n")}\n\nPrepared: ${state.dashboard.manifest.preparedAt}\nInventory files: ${state.dashboard.manifest.fileCounts?.inventory||0}\nString tables: ${state.dashboard.manifest.fileCounts?.stringTables||0}\nShop dictionaries: ${state.dashboard.manifest.fileCounts?.gringoUnpacked||0}`:"Preparation manifest is not available.")]});
+      logView(Object.keys(sources).length?`${Object.entries(sources).map(([label,source])=>`${label}: ${source.path}\nSHA-256: ${source.sha256}`).join("\n\n")}\n\nPrepared: ${state.dashboard.manifest.preparedAt}\nInventory files: ${state.dashboard.manifest.fileCounts?.inventory||0}\nString tables: ${state.dashboard.manifest.fileCounts?.stringTables||0}\nShop dictionaries: ${state.dashboard.manifest.fileCounts?.gringoUnpacked||0}`:"Preparation manifest is not available.")]});
     const redHook=state.dashboard.redHook;
     const intro=redHook.skipIntroLogos;
     const redHookSection=detailSection({title:"REDHOOK",body:[
@@ -511,7 +515,7 @@
 
   function navigate(tab){state.tab=tab;render();}
   function renderVanillaOnly(){$("#toolbar").replaceChildren();$("#main").replaceChildren(LexeditorUI.detailPanel({className:"lex-information-panel",title:"Vanilla",body:[LexeditorUI.detailSection({body:[
-    LexeditorUI.detailText("This page contains LexerRDR mod data and has no Vanilla game-file equivalent."),LexeditorUI.detailText("Select a mod to edit this page.")]})]}));shell.refresh()}
+    detailText("This page contains LexerRDR mod data and has no Vanilla game-file equivalent."),detailText("Select a mod to edit this page.")]})]}));shell.refresh()}
   function render(){document.querySelectorAll("nav button").forEach(button=>button.classList.toggle("active",button.dataset.tab===state.tab));if(state.booting)return;if(state.activeSource!=="mine"&&["loot","settings"].includes(state.tab))renderVanillaOnly();else if(state.tab==="items")renderItems();else if(state.tab==="shops")renderShops();else if(state.tab==="strings")stringsUI.render();else if(state.tab==="loot")renderLoot();else if(state.tab==="missions")renderMissions();else if(state.tab==="settings")renderSettings();else if(state.tab==="datamap")renderDataMap();else renderProject();}
   async function switchProjectSource(value){const next=String(value||"mine")==="vanilla"?"vanilla":"mine";if(next===state.activeSource)return;state.activeSource=next;state.itemEdits={};state.shopEdits={};stringsUI.clearEdits();state.missionEdits={};state.settingEdits={};state.lootDocument=clone(state.loot?.document);state.lootDirty=false;if(next==="vanilla"){state.items=clone(state.vanilla.items);state.shops=clone(state.vanilla.shops);state.strings=clone(state.vanilla.strings);state.missions=clone(state.vanilla.missions)}else[state.items,state.shops,state.strings,state.missions]=await Promise.all([api("/api/items"),api("/api/shops"),api("/api/string-tables"),api("/api/missions")]);if(state.stringLanguage)await stringsUI.load(state.stringLanguage,false);shell.history?.clear();render()}
   const shell=LexeditorUI.mountShell({
