@@ -111,6 +111,15 @@ def _validate_schema(package: DataObjectPackage, table: str,
             )
 
 
+def _source_only_payload(package: DataObjectPackage, reason: str) -> dict:
+    payload = package.payload()
+    for record in payload.get("records", []):
+        for field in record.get("fields", []):
+            field["editable"] = False
+            field["note"] = reason
+    return payload
+
+
 def battle_player_payload() -> dict:
     root = project_root()
     path = battle_player_source_path()
@@ -123,7 +132,11 @@ def battle_player_payload() -> dict:
         )
     package = DataObjectPackage.from_bytes(path.read_bytes())
     _validate_schema(package, "BattlePlayerParameter", _BATTLE_PLAYER_SCHEMA)
-    payload = package.payload()
+    payload = _source_only_payload(
+        package,
+        "Decoded source value; BattlePlayerParameter editing is disabled until "
+        "gameplay semantics and safe ranges are proved.",
+    )
     payload.update({
         "source": "source",
         "path": str(path),
@@ -149,7 +162,11 @@ def battle_item_payload() -> dict:
         )
     package = DataObjectPackage.from_bytes(path.read_bytes())
     _validate_schema(package, "BattleItemPossession", _BATTLE_ITEM_SCHEMA)
-    payload = package.payload()
+    payload = _source_only_payload(
+        package,
+        "Decoded source value; BattleItemPossession editing is disabled until "
+        "the Steal/drop semantics and array-write acceptance are proved.",
+    )
     payload.update({
         "source": "source",
         "path": str(path),
