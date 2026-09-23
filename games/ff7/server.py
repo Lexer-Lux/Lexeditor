@@ -150,7 +150,7 @@ def data_map() -> dict:
         if key == "characters" and not error:
             notes += " Starting stats, equipment, materia and growth/limit fields; use Characters subtabs for names, curves, AI and executable-only recruits."
         rows.append({"filename": source_label, "controls": category.label,
-            "notes": notes, "status": "blocked" if error else "integrated",
+            "notes": notes, "status": "blocked" if error else "partial",
             "openable": not bool(error), "category": key,
             "sourcePath": str(GAME_ROOT / data["sourceRelativePath"]) if data["sourceRelativePath"] else ""})
     for family, info in FAMILIES.items():
@@ -159,7 +159,7 @@ def data_map() -> dict:
             error = data['errors'].get(key)
             rows.append({'filename':report.get('sourceRelativePath') or info['source'],
                 'controls':metadata['label'], 'notes':(error + ' ' if error else '') + info['note'] + ((' Unreadable archive members left unchanged: ' + '; '.join(f'{name}: {reason}' for name,reason in report['memberErrors'].items())) if report.get('memberErrors') else ''),
-                'status':'not-integrated' if error else 'integrated', 'openable':not bool(error),
+                'status':'not-integrated' if error else 'partial', 'openable':not bool(error),
                 'category':key, 'sourcePath':str(GAME_ROOT / report['sourceRelativePath']) if report.get('sourceRelativePath') else ''})
     config = GAME_ROOT / "FFNx.toml"
     try:
