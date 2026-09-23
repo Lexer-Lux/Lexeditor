@@ -118,6 +118,41 @@ def _object_change(payload: dict, *, create: bool) -> dict | None:
     return change
 
 
+def _dataset_change(payload: dict, key: str, *, create: bool) -> dict | None:
+    """Return Lexeditor's owned EditData/Fields block for one typed data family."""
+    spec = dataset_spec(key)
+    target = spec["target"]
+    log_name = f"Lexeditor {target} overrides"
+    changes = payload.get("Changes")
+    if changes is None and create:
+        changes = []
+        payload["Changes"] = changes
+    if not isinstance(changes, list):
+        raise ValueError("content.json Changes must be an array")
+    matches = [
+        change for change in changes
+        if isinstance(change, dict)
+        and str(change.get("Action", "")).casefold() == "editdata"
+        and change.get("Target") == target
+        and isinstance(change.get("Fields", {}), dict)
+    ]
+    for change in matches:
+        if change.get("LogName") == log_name:
+            change.setdefault("Fields", {})
+            return change
+    simple = [change for change in matches if set(change).issubset({"Action", "Target", "Fields"})]
+    if len(matches) == 1 and len(simple) == 1:
+        change = simple[0]
+        if create:
+            change["LogName"] = log_name
+        return change
+    if not create:
+        return None
+    change = {"LogName": log_name, "Action": "EditData", "Target": target, "Fields": {}}
+    changes.append(change)
+    return change
+
+
 class ContentPackStore:
     """Edit only Lexeditor-supported fields while preserving the rest of content.json."""
 
