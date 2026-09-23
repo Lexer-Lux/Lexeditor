@@ -106,6 +106,30 @@ class FormulaeReworkTests(unittest.TestCase):
         self.assertNotIn("formulae_rework.available()", settings)
         self.assertNotIn("formulae_rework.rows()", settings)
 
+    def test_melee_base_damage_mirror(self):
+        self.assertEqual(formulae_rework.melee_base_damage(100, 20, 10), 1200)
+        self.assertEqual(formulae_rework.melee_base_damage(0, 0, 0), 0)
+        self.assertEqual(formulae_rework.melee_base_damage(255, 255, 255), 130050)
+        with self.assertRaises(ValueError):
+            formulae_rework.melee_base_damage(256, 0, 0)
+        with self.assertRaises(ValueError):
+            formulae_rework.melee_base_damage(True, 0, 0)
+
+    def test_magic_base_damage_mirror(self):
+        self.assertEqual(formulae_rework.magic_base_damage(12, 40), 480)
+        self.assertEqual(formulae_rework.magic_base_damage(0, 255), 0)
+        self.assertEqual(formulae_rework.magic_base_damage(255, 255), 65025)
+        with self.assertRaises(ValueError):
+            formulae_rework.magic_base_damage(-1, 0)
+
+    def test_status_infliction_chance_mirror_and_clamp(self):
+        self.assertEqual(formulae_rework.status_infliction_chance(50, 60, 30), 80)
+        self.assertEqual(formulae_rework.status_infliction_chance(255, 255, 0), 100)
+        self.assertEqual(formulae_rework.status_infliction_chance(0, 0, 255), 0)
+        self.assertEqual(formulae_rework.status_infliction_chance(10, 10, 10), 10)
+        with self.assertRaises(ValueError):
+            formulae_rework.status_infliction_chance(0, 0, True)
+
 
 if __name__ == "__main__":
     unittest.main()
