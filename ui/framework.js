@@ -506,6 +506,7 @@
   };
 
   const infoHelp = (text, attrs = {}) => {
+    if (text instanceof Element && text.matches('.lex-info-help') && !Object.keys(attrs).length) return text;
     const {
       class: className = "", title = text, "aria-label": ariaLabel = text,
       onclick = null, ...rest
@@ -8200,7 +8201,7 @@ ${contents.path}`});
         const control = controlFor(field);
         const node = detailPanel({
           className: "lex-platform-config-field lex-platform-config-section", title: field.label,
-          help: field.description ? infoHelp(field.description) : null,
+          help: field.description || null,
           actions: field.kind === "boolean" ? control : null,
           body: field.kind === "boolean" ? [] : control,
         });
