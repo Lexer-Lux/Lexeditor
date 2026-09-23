@@ -144,6 +144,23 @@ class WarbandFlatProjectTests(unittest.TestCase):
             (imported / project_import.MANIFEST).read_text(encoding="utf-8"),
         )
 
+    def test_source_change_during_import_is_rejected_without_partial_project(self):
+        source = self.make_flat(self.root / "changing")
+        original_copy = project_import._copy_source
+
+        def copy_then_change(source_root, destination):
+            original_copy(source_root, destination)
+            items = source_root / "module_items.py"
+            items.write_text(items.read_text(encoding="utf-8") + "# concurrent source change\n", encoding="utf-8")
+
+        manager = ProjectManager({"warband": PLUGIN}, path=self.projects_json)
+        with patch.object(project_import, "_copy_source", side_effect=copy_then_change):
+            with self.assertRaisesRegex(ValueError, "changed while it was being imported"):
+                manager.select("warband", str(source))
+        if self.imports.exists():
+            self.assertFalse(any(path for path in self.imports.iterdir() if not path.name.startswith(".")))
+            self.assertFalse(any(self.imports.glob(".*-*")))
+
     def test_unknown_build_command_is_rejected_before_copy(self):
         source = self.make_flat(self.root / "unsafe")
         (source / "build_module.bat").write_text(
