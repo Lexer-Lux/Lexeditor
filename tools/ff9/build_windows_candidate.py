@@ -102,8 +102,21 @@ def main() -> None:
         "8. Reach the affected battle and confirm the edited behavior/value is active in game.\n"
         "9. Return to Lexeditor and Revert/remove the deployed project. Confirm unrelated Memoria settings "
         "and other mods remain intact, then relaunch and confirm the edited behavior is gone.\n\n"
-        "Report: whether helper install/repair succeeded, whether save survived reopen, whether deployment "
-        "loaded in battle, whether revert restored vanilla behavior, and any error text shown.\n",
+        "EXTERNAL MOD COMPATIBILITY (run on a disposable/backup profile if external mods are present)\n"
+        "- Open Information -> External Mod Compatibility. Record enabled mods, unsupported-runtime entries, "
+        "declared conflicts, and exact-path overlaps before deployment.\n"
+        "- With an already-installed compatible Memoria mod enabled, record its FolderNames/Priorities position "
+        "and hash or copy one representative file. Deploy Lexeditor: Lexeditor must become first while the other "
+        "mod's folder and bytes remain unchanged. Revert: only Lexeditor must disappear and the prior external "
+        "order/bytes must remain.\n"
+        "- If a safe test profile intentionally contains the same loose path in Lexeditor and an external mod, "
+        "the deployed Lexeditor file must win because FolderNames is highest-priority first. Revert must expose "
+        "the external file again. This is whole-file priority, not semantic merging between separate mods.\n"
+        "- Do not count mods whose ModDescription.xml requires a Memoria version newer than the candidate's pinned "
+        "v2025.07.04 as supported. The 2026-09-22 catalog audit found Ferny Fantasy IX, MistwakeUI - English "
+        "Version, CostumePack 2.1, and Extra Equipment Menu 1.2 beyond that pin.\n\n"
+        "Report separately: helper install/repair, save/reopen, baseline deployment, native battle behavior, "
+        "revert, compatible-mod coexistence, exact-path overlap (if tested), and any error text shown.\n",
         encoding="utf-8",
     )
 
