@@ -44,6 +44,52 @@ class CoverageTests(unittest.TestCase):
         self.assertFalse(rows['module_quests.py']['openable'])
         self.assertEqual(rows['module_quests.py']['coverage'],'unavailable')
 
+    def test_every_data_map_row_has_audited_capability(self):
+        # Materialize every source-backed catalog row so this checks the
+        # intended capability of all 33 rows rather than availability accidents.
+        for records in server.DATA_CATALOG.values():
+            for filename,_description in records:
+                if filename.endswith('.py'):
+                    (self.root/'ModuleSystem'/filename).touch(exist_ok=True)
+        result=server.data_map_rows();rows={row['filename']:row for row in result['rows']}
+        catalog={filename for records in server.DATA_CATALOG.values() for filename,_description in records}
+        self.assertEqual(set(rows),catalog);self.assertEqual(len(rows),33)
+
+        expected_integrated={
+            'settings.ini':('structured','integrated','tweaks'),
+            'module_items.py':('structured','integrated','items'),
+            'module_strings.py':('structured','integrated','misc'),
+            'module_info_pages.py':('structured','integrated','misc'),
+        }
+        expected_structured_partial={'module_troops.py':'troops'}
+        expected_structured_partial.update({
+            schema['filename']:'misc' for schema in server.MODULE_RECORD_SCHEMAS.values()
+            if schema['filename'] not in {'module_strings.py','module_info_pages.py'}
+        })
+        expected_source_only={
+            'module.ini','module_animations.py','module_scripts.py','module_triggers.py',
+            'module_simple_triggers.py','module_dialogs.py',
+        }
+        expected_read_only={'Resource/*.brf','Textures/*.dds'}
+        expected_unavailable={'*.txt','SceneObj/*.sco'}
+
+        self.assertEqual(set(expected_integrated)|set(expected_structured_partial)|expected_source_only|expected_read_only|expected_unavailable,catalog)
+        for filename,capability in expected_integrated.items():
+            self.assertEqual((rows[filename]['coverage'],rows[filename]['status'],rows[filename]['view']),capability,filename)
+        for filename,view in expected_structured_partial.items():
+            self.assertEqual((rows[filename]['coverage'],rows[filename]['status'],rows[filename]['view']),('structured','partial',view),filename)
+        for filename in expected_source_only:
+            self.assertEqual((rows[filename]['coverage'],rows[filename]['status'],rows[filename]['view']),('source','not-integrated',''),filename)
+            self.assertTrue(rows[filename]['sourceOpenable'],filename)
+            self.assertIn('not a structured editor',rows[filename]['openLabel'].lower(),filename)
+        for filename in expected_read_only:
+            self.assertEqual((rows[filename]['coverage'],rows[filename]['status'],rows[filename]['view']),('view','partial','items'),filename)
+            self.assertFalse(rows[filename]['sourceOpenable'],filename)
+        for filename in expected_unavailable:
+            self.assertEqual((rows[filename]['coverage'],rows[filename]['status'],rows[filename]['view']),('unavailable','not-integrated',''),filename)
+            self.assertFalse(rows[filename]['sourceOpenable'],filename)
+        self.assertEqual(result['counts'],{'integrated':4,'partial':21,'not-integrated':8})
+
     def test_installed_module_ini_resolves_without_source(self):
         (self.root/'module.ini').write_text('module_name = Installed')
         self.assertEqual(server.resolve_catalog_file('module.ini'),self.root/'module.ini')
