@@ -377,7 +377,7 @@ def _assert_detail_owns_vertical_scroll(page, label: str):
     geometry = page.evaluate("""() => {
       const shell = document.querySelector('.lex-shell-header')?.getBoundingClientRect();
       const main = document.querySelector('#main')?.getBoundingClientRect();
-      const detail = document.querySelector('.ffxx2-content .lex-detail-panel-body');
+      const detail = document.querySelector('#main .lex-detail-panel-body');
       return {
         documentTop: document.scrollingElement?.scrollTop || 0,
         shellBottom: shell?.bottom || 0,
@@ -402,12 +402,12 @@ def _open_dataset(page, group: str, dataset: str):
     tab.focus()
     tab.press("Enter")
     expect(tab).to_have_attribute("aria-selected", "true")
-    expect(page.locator(".ffxx2-content .lex-master-detail")).to_be_visible()
+    expect(page.locator("#main .lex-master-detail")).to_be_visible()
     # Let list auto-fit settle: it can re-render (detaching inputs) shortly
     # after the first paint on short viewports.
     page.wait_for_function(
         """() => new Promise(resolve => {
-          const selector = ".ffxx2-content .lex-column-list-row";
+          const selector = "#main .lex-column-list-row";
           let last = document.querySelectorAll(selector).length;
           let stable = 0;
           const timer = setInterval(() => {
@@ -419,31 +419,31 @@ def _open_dataset(page, group: str, dataset: str):
           }, 250);
           setTimeout(() => { clearInterval(timer); resolve(true); }, 10000);
         })""")
-    expect(page.locator(".ffxx2-content .lex-column-list")).to_be_visible()
-    expect(page.locator(".ffxx2-content .lex-detail-panel")).to_be_visible()
+    expect(page.locator("#main .lex-column-list")).to_be_visible()
+    expect(page.locator("#main .lex-detail-panel")).to_be_visible()
 
 
 def _exercise_shared_table(page):
     _open_dataset(page, "FFX Economy", "Treasure Rewards")
-    pager = page.locator(".ffxx2-content .lex-pager")
+    pager = page.locator("#main .lex-pager")
     expect(pager.get_by_role("button", name="Next page")).to_be_enabled()
     pager.get_by_role("button", name="Next page").click()
     expect(pager.locator(".lex-page-number")).to_have_value("2")
     pager.get_by_role("button", name="Previous page").click()
     expect(pager.locator(".lex-page-number")).to_have_value("1")
 
-    page.locator(".ffxx2-content .lex-column-list-head-cell[data-column-key='quantity']").click()
-    rows = page.locator(".ffxx2-content .lex-column-list-row")
+    page.locator("#main .lex-column-list-head-cell[data-column-key='quantity']").click()
+    rows = page.locator("#main .lex-column-list-row")
     rows.nth(1).click()
-    expect(page.locator(".ffxx2-content .lex-detail-panel")).to_be_visible()
+    expect(page.locator("#main .lex-detail-panel")).to_be_visible()
 
-    search = page.locator(".ffxx2-content input[type='search']")
+    search = page.locator("#main input[type='search']")
     search.fill("Reward 35")
-    expect(page.locator(".ffxx2-content .lex-column-list-row")).to_have_count(1)
+    expect(page.locator("#main .lex-column-list-row")).to_have_count(1)
     search.fill("")
-    expect(page.locator(".ffxx2-content .lex-column-list-row").first).to_be_visible()
+    expect(page.locator("#main .lex-column-list-row").first).to_be_visible()
 
-    cell = page.locator(".ffxx2-content .lex-column-list-row").first.locator("[data-column-key='quantity']")
+    cell = page.locator("#main .lex-column-list-row").first.locator("[data-column-key='quantity']")
     cell.dblclick()
     editor = cell.locator("input")
     editor.fill("77")
@@ -455,7 +455,7 @@ def _exercise_shared_table(page):
     page.get_by_role("button", name="Discard Changes").click()
     expect(page.locator("#global-save")).to_be_disabled()
 
-    cell = page.locator(".ffxx2-content .lex-column-list-row").first.locator("[data-column-key='quantity']")
+    cell = page.locator("#main .lex-column-list-row").first.locator("[data-column-key='quantity']")
     cell.dblclick()
     editor = cell.locator("input")
     editor.fill("78")
@@ -469,7 +469,7 @@ def _exercise_keyboard_help(page):
     expect(page.locator(".lex-data-map")).to_be_visible()
     expect(page.locator(".lex-column-list-row .lex-integration-status")).to_have_count(3)
     page.keyboard.press("F1")
-    expect(page.locator(".ffxx2-info-grid")).to_be_visible()
+    expect(page.locator("#main > .lex-panel-layout")).to_be_visible()
     expect(page.locator(".lex-detail-section").filter(has_text="MOD LOADER")).to_be_visible()
     page.get_by_role("button", name="FFX Battle", exact=True).click()
     page.get_by_role("tab").filter(has_text="Player Base Stats").click()
@@ -508,7 +508,7 @@ def _screenshot_all(page, output: Path, suffix: str):
     expect(page.locator(".lex-data-map")).to_be_visible()
     page.screenshot(path=str(output / f"data-map-{suffix}.png"))
     page.locator("#plugin-info").click()
-    expect(page.locator(".ffxx2-info-grid")).to_be_visible()
+    expect(page.locator("#main > .lex-panel-layout")).to_be_visible()
     page.screenshot(path=str(output / f"info-{suffix}.png"))
 
 

@@ -4,7 +4,8 @@ const {
   el, clone, mountShell, finishPluginLoading, showAlert, showToast, confirmAction,
   pagedListDetail, columnList, columnPreferences, detailPanel, detailSection,
   detailField, detailNote, multiNumberRow, toggleRow, subtabBar, readonlyField,
-  recordId, infoHelp, integrationStatus, dataMap, modLoaderSection, formatNumber
+  recordId, infoHelp, integrationStatus, dataMap, modLoaderSection, formatNumber,
+  stack, actionRow, badge, panelLayout
 }=LexeditorUI;
 
 const $=selector=>document.querySelector(selector);
@@ -191,10 +192,10 @@ function pendingChanges(){
 function refreshShell(){shell?.refresh?.()}
 function markChanged(){refreshShell()}
 function setLoading(message){
-  $("#main").replaceChildren(el("div",{class:"ffxx2-loading"},message||"Loading FFX/X-2 data…"));
+  $("#main").replaceChildren(el("div",{class:"lex-notice",role:"status"},message||"Loading FFX/X-2 data…"));
 }
 function setError(message){
-  $("#main").replaceChildren(el("div",{class:"ffxx2-error",role:"alert"},message));
+  $("#main").replaceChildren(el("div",{class:"lex-notice lex-tone-warning",role:"alert"},message));
 }
 
 async function ensureDataset(key,force){
@@ -360,7 +361,6 @@ function simpleDetail(key,ds,row){
     }));
   }
   return detailPanel({
-    className:"ffxx2-record-detail"+(isRowDirty(ds,row)?" ffxx2-detail-dirty":""),
     title:spec.label.replace(/s$/,""),identity:recordId(row.id),
     meta:ds.data.source==="project"?"Project overlay":"Installed archive baseline",
     body:[detailSection({title:"EDITABLE DATA",body:fields})]
@@ -393,7 +393,6 @@ function elementDetail(key,ds,row){
     }));
   }
   return detailPanel({
-    className:isRowDirty(ds,row)?"ffxx2-detail-dirty":"",
     title:"Auto-ability elements",identity:recordId(row.id),meta:"Ability "+hex16(row.abilityId),
     body:[detailSection({title:"ELEMENT BEHAVIOUR",body:sections}),
       detailSection({title:"PRESERVED DATA",body:[detailNote("Unknown upper element bits and every non-element field remain untouched by this editor.")]})]
@@ -419,7 +418,6 @@ function mixDetail(key,ds,row){
     ]}));
   }
   return detailPanel({
-    className:isRowDirty(ds,row)?"ffxx2-detail-dirty":"",
     title:"Mix first ingredient",identity:recordId(row.id),meta:"Command "+hex16(row.originCommandId),
     body:groups
   });
@@ -442,7 +440,6 @@ function slotsDetail(key,ds,row){
     detailField({label:"LEGACY RATE",control:readonlyField(String(row.legacyRate)),help:infoHelp("Existing leading shop rate is shown for context and is not part of the proved writable inventory surface.")})
   ]}));
   return detailPanel({
-    className:isRowDirty(ds,row)?"ffxx2-detail-dirty":"",
     title:spec.label.replace(/s$/,""),identity:recordId(row.id),meta:"16 proved inventory slots",body:groups
   });
 }
@@ -456,7 +453,6 @@ function accessoryDetail(key,ds,row){
   const price=el("input",{type:"number",min:0,max:4294967295,step:1,value:row.price,"aria-label":"Accessory price",
     oninput:event=>{if(event.target.value!==""){row.price=Number(event.target.value);markChanged()}},onchange:()=>render()});
   return detailPanel({
-    className:isRowDirty(ds,row)?"ffxx2-detail-dirty":"",
     title:"Accessory",identity:recordId(row.id),meta:"Name key "+hex16(row.nameKey),
     body:[
       detailSection({title:"CONTEXT",body:[
@@ -491,15 +487,10 @@ function jobDetail(key,ds,row){
     detailField({label:"BERSERK ACTION",control:readonlyField(hex16(row.berserkAction)),help:infoHelp("Existing automatic action identifier; it is shown for context and not edited here.")})
   ]}));
   return detailPanel({
-    className:isRowDirty(ds,row)?"ffxx2-detail-dirty":"",
     title:"Dressphere",identity:recordId(row.id),meta:"16 requirement / learned-ability pairs",body:groups
   });
 }
 
-function isRowDirty(ds,row){
-  const before=ds.baseline?.rows?.find(value=>rowKey(value)===rowKey(row));
-  return !!before&&!equal(before,row);
-}
 function detailFor(key,ds,row){
   const kind=SPECS[key].kind;
   if(kind==="simple")return simpleDetail(key,ds,row);
@@ -514,7 +505,7 @@ function detailFor(key,ds,row){
 function renderRecordDataset(key,host){
   const spec=SPECS[key],ds=datasetState(key),rows=filteredRows(key,ds),columns=columnsFor(key);
   if(!rows.length){
-    host.replaceChildren(el("div",{class:"ffxx2-empty"},"No records match this search."));
+    host.replaceChildren(el("div",{class:"lex-notice"},"No records match this search."));
     return;
   }
   if(ds.selected==null||!ds.data.rows.some(row=>rowKey(row)===ds.selected))ds.selected=rowKey(rows[0]);
@@ -523,12 +514,11 @@ function renderRecordDataset(key,host){
     splitKey:"ffxx2-"+key,defaultSplit:46,minLeft:300,minRight:330,
     search:{key:"ffxx2-"+key,value:ds.query,label:"Search "+spec.label,placeholder:"Search "+spec.label.toLocaleLowerCase()+"…",
       change:value=>{ds.query=value;ds.page=0;render()}},
-    className:"ffxx2-table",paneClass:"ffxx2-pane",fit:{minRowHeight:38},
+    fit:{minRowHeight:38},
     master:({rows:shown,selected,select})=>columnList({
       rows:shown,key:row=>rowKey(row),selected:selected,select:row=>select(row),sortState:ds.sort,
       sort:column=>changeSort(ds,column),columnPreferences:ds.prefs,columns:columns,
-      refresh:()=>render(),class:"ffxx2-column-list",rowClass:"ffxx2-record-row","aria-label":spec.label+" Table",
-      decorateRow:(node,row)=>node.dataset.dirty=String(isRowDirty(ds,row))
+      refresh:()=>render(),"aria-label":spec.label+" Table"
     }),
     detail:row=>detailFor(key,ds,row),
     emptyDetail:()=>detailPanel({title:spec.label,body:[detailNote("Select a record to edit it.")]}),
@@ -567,7 +557,7 @@ function archiveDetail(key,ds,row){
         detailField({label:"BLOCKS",control:readonlyField(String(row.blocks))}),
         detailField({label:"PROJECT COPY",control:readonlyField(row.staged?"Present":"Not extracted")})
       ]}),
-      detailSection({title:"ACTION",body:[el("div",{class:"ffxx2-actions"},extract)]})
+      detailSection({title:"ACTION",body:[actionRow(extract)]})
     ]
   });
 }
@@ -583,13 +573,13 @@ function renderArchive(key,host){
   if(ds.selected==null||!rows.some(row=>row.path===ds.selected))ds.selected=rows[0]?.path||null;
   const view=pagedListDetail({
     rows:rows,key:row=>row.path,slots:false,page:ds.page,pageSize:ds.pageSize,selected:ds.selected,noun:"files",
-    splitKey:"ffxx2-"+key,defaultSplit:56,minLeft:360,minRight:300,className:"ffxx2-table",paneClass:"ffxx2-pane",fit:{minRowHeight:38},
+    splitKey:"ffxx2-"+key,defaultSplit:56,minLeft:360,minRight:300,fit:{minRowHeight:38},
     search:{key:"ffxx2-"+key,value:state.archiveQueries[spec.game]||"",label:"Search "+spec.label,
       placeholder:"Search the complete "+spec.label.toLocaleLowerCase()+"…",change:value=>{state.archiveQueries[spec.game]=value;ds.page=0;ds.loaded=false;render()}},
     master:({rows:shown,selected,select})=>columnList({
       rows:shown,key:row=>row.path,selected:selected,select:row=>select(row),sortState:sort,
       sort:column=>{ds.sort=sort.key===column?{key:column,dir:-sort.dir}:{key:column,dir:1};ds.page=0;render()},
-      columns:archiveColumns(),class:"ffxx2-column-list","aria-label":spec.label+" Table"
+      columns:archiveColumns(),"aria-label":spec.label+" Table"
     }),
     detail:row=>archiveDetail(key,ds,row),
     emptyDetail:()=>detailPanel({title:spec.label,body:[detailNote("No archive files match this search.")]}),
@@ -601,17 +591,16 @@ function renderArchive(key,host){
 
 async function renderGroup(){
   const group=GROUPS[state.tab],key=currentDatasetKey(),spec=SPECS[key];
-  const page=el("section",{class:"ffxx2-page"});
   const tabs=group.datasets.map(dataset=>({id:dataset,label:SPECS[dataset].label,help:SPECS[dataset].kind==="archive"?"Browse and extract the installed archive without rewriting it.":"Open the proved structured editor for this table."}));
-  const content=el("div",{class:"ffxx2-content"});
-  page.append(subtabBar({tabs:tabs,active:key,label:group.label+" datasets",change:value=>{state.subtabs[state.tab]=value;render()}}),content);
+  const content=el("div",{});
+  const page=stack(subtabBar({tabs:tabs,active:key,label:group.label+" datasets",change:value=>{state.subtabs[state.tab]=value;render()}}),content);
   $("#main").replaceChildren(page);
-  content.replaceChildren(el("div",{class:"ffxx2-loading"},"Loading "+spec.label+"…"));
+  content.replaceChildren(el("div",{class:"lex-notice",role:"status"},"Loading "+spec.label+"…"));
   try{
     const ds=await ensureDataset(key,false);
     if(state.tab!==Object.keys(GROUPS).find(groupKey=>GROUPS[groupKey].datasets.includes(key))&&currentDatasetKey()!==key)return;
     if(spec.kind==="archive")renderArchive(key,content);else renderRecordDataset(key,content);
-  }catch(error){content.replaceChildren(el("div",{class:"ffxx2-error",role:"alert"},"Could not load "+spec.label+": "+error.message))}
+  }catch(error){content.replaceChildren(el("div",{class:"lex-notice lex-tone-warning",role:"alert"},"Could not load "+spec.label+": "+error.message))}
   refreshShell();
 }
 
@@ -639,7 +628,7 @@ function mapView(){
 }
 
 function statusText(ready,readyText,missingText){
-  return el("span",{class:ready?"ffxx2-status-ready":"ffxx2-status-missing"},ready?readyText:missingText);
+  return badge(ready?readyText:missingText,ready?{tone:"success"}:{});
 }
 async function deploymentAction(action){
   if(state.busy)return;
@@ -669,7 +658,7 @@ function infoView(){
       detailField({label:"FFX",control:statusText(!!games.x?.ready,"Executable ready","Executable missing"),help:infoHelp("Lexeditor starts FFX through Fahrenheit Stage 0, not through the Square Enix collection launcher.")}),
       detailField({label:"FFX-2",control:statusText(!!games.x2?.ready,"Executable ready","Executable missing"),help:infoHelp("Lexeditor starts FFX-2 through Fahrenheit Stage 0, not through the collection launcher.")})
     ]}),
-    detailSection({title:"PLAY",body:[el("div",{class:"ffxx2-actions"},
+    detailSection({title:"PLAY",body:[actionRow(
       el("button",{type:"button",disabled:!games.x?.ready||!launch.ready,onclick:()=>play("x")},"Play FFX"),
       el("button",{type:"button",disabled:!games.x2?.ready||!launch.ready,onclick:()=>play("x2")},"Play FFX-2")
     )]})
@@ -686,7 +675,7 @@ function infoView(){
       detailField({label:"FILES",control:readonlyField(String(dash.project?.fileCount||0))}),
       detailField({label:"DEPLOYED",control:readonlyField(deploy.deployed?"Yes":"No")})
     ]}),
-    detailSection({title:"ACTIONS",body:[el("div",{class:"ffxx2-actions"},
+    detailSection({title:"ACTIONS",body:[actionRow(
       el("button",{type:"button",disabled:state.busy||!deploy.fahrenheitReady,onclick:()=>deploymentAction("deploy")},"Deploy Project"),
       el("button",{type:"button",disabled:state.busy||!deploy.deployed,onclick:()=>deploymentAction("revert")},"Revert")
     )]}),
@@ -698,7 +687,7 @@ function infoView(){
       removal:"Revert removes only the unchanged Lexeditor-owned deployment and its exact loadorder entry."
     })
   ]});
-  $("#main").replaceChildren(el("section",{class:"ffxx2-info-grid"},gamePanel,helperPanel,deploymentPanel));
+  $("#main").replaceChildren(panelLayout([gamePanel,helperPanel,deploymentPanel],{layoutKey:"ffx-x2-info"}));
 }
 
 async function buildEdits(key,ds){
