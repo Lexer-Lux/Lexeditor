@@ -5955,6 +5955,13 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
     height:30px;
     min-height:30px;
   }
+  #global-save.lex-command-primary,
+  #global-game-process.lex-command-primary {
+    width:30px;
+    min-width:30px;
+    height:30px;
+    min-height:30px;
+  }
   .lex-shell-command-row :is(.lex-settings-button,.lex-help-button,
     .lex-developer-button,.lex-shortcuts-button,.lex-info-button,.lex-github-tab) {
     --lex-menu-icon:28px;
