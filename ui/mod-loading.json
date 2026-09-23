@@ -57,4 +57,4 @@
       "overriding": "ReShade applies one preset at a time over the finished frame. Shader Injector changes shaders before that, so the two stack rather than compete. Files the player has edited in the ShaderInjector folder are kept on reinstall and removal, and a PAK mod from elsewhere is untouched."
     }
   }
-}\n
+}
