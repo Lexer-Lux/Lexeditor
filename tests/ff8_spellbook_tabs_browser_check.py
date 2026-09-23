@@ -18,11 +18,24 @@ def main():
   # The GF page gives its detail host a way to swap one of its panels; the
   # spellbook uses it to put the abilities panel inside its tabs.
   page.evaluate("()=>{document.querySelector('#gf-detail').lexReplacePanel=(old,next)=>old.replaceWith(next)}")
+  page.evaluate('''()=>{
+    const content=document.querySelector('.lex-detail-section-content');
+    const input=content.querySelector('input');
+    content.replaceChildren(LexeditorUI.columnList({rows:Array.from({length:22},(_,id)=>({id})),
+      columns:[{key:'id',label:'Slot',render:r=>r.id},{key:'ability',label:'Ability',render:r=>r.id===0?input:'Ability '+r.id}]}));
+  }''')
+  page.add_style_tag(content='#gf-detail {display:flex} #gf-detail > .lex-tabbed-panel {flex:1;min-height:0}')
   page.add_script_tag(content=(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8'))
   page.get_by_role('tab',name='SPELLBOOK').wait_for()
   # The abilities panel is replaced by one tabbed panel holding both views.
   assert page.locator('.lex-tabbed-panel .lexeditor-gf-spellbook').count()==1
   assert page.get_by_label('Native ability').is_visible()
+  table=page.locator('.lex-tabbed-panel-content > .lex-column-list')
+  table_box=table.bounding_box()
+  content_box=page.locator('.lex-tabbed-panel-content').bounding_box()
+  for key in ('x','y','width','height'):
+    assert abs(table_box[key]-content_box[key])<2,(table_box,content_box)
+  page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-gf-abilities-table.png'))
   page.get_by_role('tab',name='SPELLBOOK').click()
   page.get_by_role('button',name='ADD PAGE').wait_for(state='visible')
   assert not page.get_by_label('Native ability').is_visible()

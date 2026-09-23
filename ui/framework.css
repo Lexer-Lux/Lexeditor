@@ -6476,6 +6476,20 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
    min-width:0;min-height:0;flex:1 1 auto;overflow:auto;
  padding: 12px;
 }
+.lex-tabbed-panel-content:has(> .lex-column-list:not([hidden])) {
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  padding:0;
+}
+.lex-tabbed-panel-content > .lex-column-list:not([hidden]) {
+  flex:1 1 0;
+  min-height:0;
+  width:100%;
+  margin:0;
+  border:0;
+  box-shadow:none;
+}
 .lex-boolean-mark {
    font:800 1.08em/1 "Lexend", "Segoe UI Symbol", sans-serif;
  display: block; font-size: 1.45em; text-align: center;
