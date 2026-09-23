@@ -137,7 +137,7 @@ class SemanticSurfaceTests(unittest.TestCase):
             for field in fields:
                 self.assertNotIn("Numeric game value",str(field.get("help", "")),field)
         root=Path(__file__).resolve().parents[1]/"plugins/ff7"
-        editor=(root/"editor.html").read_text(encoding="utf-8") + "\n" + (root/"editor.js").read_text(encoding="utf-8")
+        editor=(root/"editor.html").read_text(encoding="utf-8") + "\n" + "\n".join((root/name).read_text(encoding="utf-8") for name in ("editor.js","controls.js","details.js","workspace.js"))
         self.assertIn('return "";',editor)
         self.assertNotIn("help:infoHelp(semanticHelp(field))",editor)
 

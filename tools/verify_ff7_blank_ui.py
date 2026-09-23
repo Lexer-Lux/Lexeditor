@@ -5,10 +5,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FF7 = ROOT / "plugins" / "ff7" / "editor.html"
-FF7_JS = ROOT / "plugins" / "ff7" / "editor.js"
-BLANK = ROOT / "plugins" / "blank" / "editor.html"
-BLANK_CSS = ROOT / "plugins" / "blank" / "editor.css"
-BLANK_JS = ROOT / "plugins" / "blank" / "editor.js"
+FF7_JS_MODULES = ("editor.js", "controls.js", "details.js", "workspace.js")
+BLANK = ROOT / "games" / "blank" / "editor.html"
+BLANK_CSS = ROOT / "games" / "blank" / "editor.css"
+BLANK_JS = ROOT / "games" / "blank" / "editor.js"
 NEUTRAL = ROOT / "ui" / "neutral.css"
 
 
@@ -18,7 +18,7 @@ def compact(value: str) -> str:
 
 def main() -> None:
     ff7 = FF7.read_text(encoding="utf-8")
-    ff7_js = FF7_JS.read_text(encoding="utf-8")
+    ff7_js = "\n".join((ROOT / "plugins" / "ff7" / name).read_text(encoding="utf-8") for name in FF7_JS_MODULES)
     ff7_code = ff7 + "\n" + ff7_js
     blank = BLANK.read_text(encoding="utf-8")
     blank_css = BLANK_CSS.read_text(encoding="utf-8")

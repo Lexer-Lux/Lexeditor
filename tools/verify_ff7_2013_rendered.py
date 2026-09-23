@@ -16,7 +16,7 @@ OUT = ROOT / "out" / "ff7-2013-acceptance"
 
 
 def open_current_modules(self, edition: str = "ff7") -> None:
-    """Load the same FF7 page code as production, including the split editor.js module."""
+    """Load the same FF7 page code as production, including the split editor.js modules."""
     self.page.goto("about:blank")
     html = (ROOT / "plugins" / "ff7" / "editor.html").read_text(encoding="utf-8")
     html = html.replace("<head>", '<head><base href="http://127.0.0.1:9/">', 1)
@@ -41,11 +41,11 @@ def open_current_modules(self, edition: str = "ff7") -> None:
         '<script src="/shared/framework.js"></script>',
         "<script>" + bootstrap + "</script>",
     )
-    html = html.replace('<script src="editor.js"></script>', "")
+    scripts = "".join("<script>" + (ROOT / "plugins" / "ff7" / name).read_text(encoding="utf-8") + "</script>" for name in ("editor.js", "controls.js", "details.js", "workspace.js"))
+    html = html.replace('<script src="editor.js"></script>', scripts)
+    for extra in ("controls.js", "details.js", "workspace.js"):
+        html = html.replace('<script src="%s"></script>' % extra, "")
     self.page.set_content(html, wait_until="domcontentloaded")
-    self.page.add_script_tag(
-        content=(ROOT / "plugins" / "ff7" / "editor.js").read_text(encoding="utf-8")
-    )
     self.page.wait_for_function("typeof state !== 'undefined' && state.loaded === true")
     self.assertEqual(self.errors, [])
 
@@ -63,8 +63,8 @@ class FF72013Discard(target.RenderedTests):
         self.page.evaluate('navigate("datamap")')
         self.page.wait_for_function("state.tab === 'datamap'")
         self.assertTrue(self.page.locator(".lex-data-map-view").is_visible())
-        coverage = self.page.get_by_label("Filter files by coverage", exact=True)
-        self.assertIn("Structured editable", coverage.locator("option").all_inner_texts())
+        coverage = self.page.get_by_label("Filter files by integration", exact=True)
+        self.assertIn("Partial", coverage.locator("option").all_inner_texts())
 
         self.navigate("armor")
         control = self.control("armor", "defense")

@@ -38,6 +38,39 @@ Live issue #79 and its comments were reread. PR #434 is merged/closed, so it can
 
 Existing durable references remain Elena, ff7tools, Scarlet and the FF7 format wikis in `codex/ff7-data.md`. Re-check current FFNx / 7th Heaven / Makou Reactor / Scarlet / ff7tk source and licensing before materially relying on them. Record any materially used source/license in FF7 Credits/third-party notices as implementation lands.
 
+## Worker session 2026-09-23 (per-game-ff7 @ e0e15a63)
+
+PR #434 is merged; per-game-ff7 contained no unique commits, so the branch was
+fast-forwarded to origin/master e0e15a63. Issue #79 stays open: remaining scope
+is installed-game acceptance (Lexer's `tools\FF7-checks.cmd` on both editions,
+disposable-mod edit/save/reopen, native deployment/gameplay proof).
+
+Found and fixed stale FF7 verifier scope after split d2711bbe (editor.js ->
+editor.js/controls.js/details.js/workspace.js), matching the pattern already
+used by verify_ff7_ui.py:159:
+- tools/verify_ff7_semantic_surface.py: scan all four page modules.
+- tools/verify_ff7_blank_ui.py: scan all four page modules.
+- tools/verify_ff7_rendered.py, tools/verify_ff7_rendered_neutral.py,
+  tools/verify_ff7_2013_rendered.py: inline all four page modules in page order
+  (harness previously loaded editor.js only, so every rendered test timed out
+  on `state.loaded`; this matches CI run 35915917245's TimeoutError set and its
+  `return "";` binary failure).
+- tools/verify_ff7_2013_rendered.py: follow shared Data Map simplification
+  87f53379 ("Filter files by coverage"/"Structured editable" ->
+  "Filter files by integration"/"Partial").
+
+Evidence (Windows, worktree C:\Lexeditor\_worktrees\ff7): all 12 FF7 python
+verifiers exit 0; all 7 ui_neutral browser scenarios pass; rendered_neutral
+8/14 pass; exe_rendered 1/1; 2013_rendered 1/1. Residual: 6 narrow-viewport
+subtests (dense-custom-views characters/encounters, master-headers
+items/armor/materia/encounters) fail locally with 6-12px header/control
+overflow at 900px width and zero overflow at 1200px; shared columnList sizing
+is font-metric sensitive, so Ubuntu CI must adjudicate. CI never evaluated
+these subtests (all 14 errored on load).
+
+Next: watch FF7 CI on the pushed branch; installed-game acceptance remains
+with Lexer (checklist in live issue #79). No game-code changes were made.
+
 ## Next agent work
 
 1. Audit every Data Map row against the current parser field set and current public documentation/tooling; keep unsupported semantics explicit.
