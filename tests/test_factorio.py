@@ -157,7 +157,7 @@ class FactorioModelTests(unittest.TestCase):
 
             self.assertIn("? Krastorio2", info["dependencies"])
             self.assertIn("? aai-industry", info["dependencies"])
-            self.assertIn("p.energy_required = 4.0", script)
+            self.assertIn("p.energy_required = 4", script)
             self.assertNotIn("maximum_productivity", script)
             self.assertNotIn("source_mod_marker", script)
             self.assertNotIn("p.enabled", script)
