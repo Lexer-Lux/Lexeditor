@@ -151,3 +151,18 @@ binary or extracted game data is bundled.
   `verify_tweaks_pagination` (harness `TypeError` before any game is reached).
 - Exact needs below are unchanged: p0data codecs or Lexer exclusions, then the
   installed-game battle proof.
+
+## 2026-09-23 --- impl/misc-games rename repair + verification (issues 74/521/525)
+
+- Repaired `tests/test_ff9_datamap_gui.py`: it still imported `games.ff9` and
+  read `games/ff9/editor.js`, but the plugins/shaders rename removed `games/`
+  entirely, so both #525 contract tests failed on master (`ModuleNotFoundError`).
+  Ported to `plugins.ff9`; the contract itself (openable rows resolve to real
+  tabs including enemies/world; `UNRESOLVED_AREAS` visible-but-closed) passes
+  unmodified.
+- Evidence, worktree at `origin/master` `7bf81c04`: FF9 pytest files
+  `test_ff9_csv/battle_scene/datamap_gui/features/field_walkmesh/http/mod_compat/runtime/runtime_source`
+  — 158 passed; `node --test tests/ff9_editor.test.cjs` — 18 passed;
+  `tools/ff9/patch_features_ui.py` determinism — PASS with no `editor.html` diff.
+- No p0data codec added. Per-family pursue-or-exclude decisions (#522) and the
+  installed-game battle proof remain Lexer work. Issue stays `actionable`.

@@ -78,3 +78,18 @@ with Lexer (checklist in live issue #79). No game-code changes were made.
 3. Establish a documented, reversible project-to-game export/deployment path only where current FFNx/current-release behavior is authoritative; fail closed elsewhere.
 4. Add/refresh synthetic round-trip and plugin-scoped rendered interaction evidence, inspect retained screenshots, then package an isolated candidate without touching an existing Lexeditor installation.
 5. Update the draft PR with exact requirement/gap/evidence/remaining-real-game acceptance. Keep issue status actionable while agent-side work remains.
+
+## Worker session 2026-09-23 (impl/misc-games @ 7bf81c04)
+
+- Repaired `tools/verify_ff7_blank_ui.py`: its `BLANK*` paths still pointed at
+  `games/blank/*`, removed by the plugins rename, so the verifier died with
+  `FileNotFoundError` before any check. Ported to `plugins/blank/*`; the
+  contract (zero local CSS, shared neutral presentation, current Blank
+  geometry) passes unmodified.
+- Evidence, same head: all 12 FF7 python verifiers exit 0
+  (`verify_ff7_datasets`, `kernel_layout_contract`, `accessories`,
+  `semantic_surface`, `extended`, `completion`, `deployment` 6 tests,
+  `tooling` 6 tests, `mod_stack` 6 tests, `installed_contract` 3 tests,
+  `edition_parity`, `blank_ui`). Rendered browser scenarios are left to CI.
+- No game-code changes. Remaining scope is installed-game acceptance with Lexer
+  (checklist in live issue #79). Issue stays `actionable`.
