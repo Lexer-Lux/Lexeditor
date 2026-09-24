@@ -9,7 +9,7 @@ import os
 import subprocess
 import tempfile
 ROOT=Path(__file__).resolve().parents[1]
-FIXTURES=ROOT/'tools/fixtures/ff8_native'
+FIXTURES=ROOT/'tests/fixtures/ff8_native'
 
 
 def party_source():

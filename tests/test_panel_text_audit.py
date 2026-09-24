@@ -4,7 +4,7 @@ import base64
 from test_shared_ui_feedback import ROOT, framework, page  # noqa: F401  (pytest fixture)
 
 
-AUDIT = (ROOT / "tools/panel_text_audit.js").read_text(encoding="utf-8")
+AUDIT = (ROOT / "tests/panel_text_audit.js").read_text(encoding="utf-8")
 FONT_B64 = base64.b64encode(
     (ROOT / "ui/assets/fonts/Lexend-Variable.ttf").read_bytes()).decode("ascii")
 

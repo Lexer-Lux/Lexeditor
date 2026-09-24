@@ -83,7 +83,7 @@ void fail_closed_to_canonical(const char *) { assert(false && "Unexpected canoni
 
 
 def run() -> None:
-    source = native_layer() + (ROOT/'tools/fixtures/ff8_native/shared_party_cases.cpp').read_text(encoding='utf-8')
+    source = native_layer() + (ROOT/'tests/fixtures/ff8_native/shared_party_cases.cpp').read_text(encoding='utf-8')
     with tempfile.TemporaryDirectory(prefix='ff8-shared-party-') as folder:
         cpp=Path(folder)/'test.cpp';exe=Path(folder)/'test'
         cpp.write_text(source, encoding='utf-8')

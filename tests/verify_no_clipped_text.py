@@ -63,7 +63,7 @@ from shot import EDGE, STUB, session_for  # noqa: E402
 import browser_guard  # noqa: E402
 
 # Share the exact detector with the fast browser regression gate.
-PROBE = (ROOT / "tools/text_clipping_probe.js").read_text(encoding="utf-8")
+PROBE = (ROOT / "tests/text_clipping_probe.js").read_text(encoding="utf-8")
 
 
 # A list of records without a pager is a list the user cannot page or search.

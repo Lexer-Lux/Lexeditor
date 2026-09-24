@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from test_shared_ui_feedback import ROOT, page, framework
 
-PROBE = (ROOT / 'tools/text_clipping_probe.js').read_text(encoding='utf-8')
+PROBE = (ROOT / 'tests/text_clipping_probe.js').read_text(encoding='utf-8')
 
 
 def test_probe_detects_parent_clip_and_vertical_ellipsis(page):
