@@ -160,6 +160,21 @@
     },{key:"singleGf->gfHpBars",dependency:singleGf,dependent:gfHpBars},{key:"singleGf->gfHpCasting",dependency:singleGf,dependent:gfHpCasting},{key:"noMagicConsumption->gfHpCasting",dependency:noMagicConsumption,dependent:gfHpCasting}]);
   }
 
+  async function loadReshade(){
+    try{const value=await LexeditorUI.callWindow?.("mod_reshade","ff8");if(value)state.reshade=value}
+    catch(_error){/* browser preview has no desktop host; the page names it below */}
+  }
+  async function actReshade(method,...args){
+    try{const value=await LexeditorUI.callWindow?.(method,"ff8",...args);if(value)state.reshade=value;else await loadReshade()}
+    catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
+    renderSettings();
+  }
+  async function renderReshade(){
+    if(!state.reshade)await loadReshade();
+    const section=LexeditorUI.reshadeSection({snapshot:state.reshade,act:actReshade});
+    const body=section||LexeditorUI.notice({message:"Open this page in the Lexeditor desktop app to manage ReShade."});
+    $("#main").replaceChildren(LexeditorUI.settingsColumns([body],tweakTabProps()));
+  }
   function renderPlatformSettings(){
     $("#main").replaceChildren(platformConfigView({config:state.platformConfig,showHeader:false,query:state.platformQuery,...tweakTabProps(),disabled:state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}}));
   }
@@ -177,7 +192,7 @@
           {key:"normal",label:"Normal",render:entry=>change(vanilla.normal[entry.slot-1],rework.normal[entry.slot-1])},
           {key:"rare",label:"Rare Item",render:entry=>change(vanilla.rare[entry.slot-1],rework.rare[entry.slot-1])}]}));
   }
-  const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"formulae",label:"Formulae"},{id:"platform",label:"FFNx"}];
+  const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"formulae",label:"Formulae"},{id:"platform",label:"FFNx"},{id:"reshade",label:"ReShade"}];
   const tweakTabProps=()=>({tabs:TWEAK_TABS.map(tab=>tab.id==="formulae"?{...tab,disabled:!state.data.settings.formulaeRework}:tab),activeTab:state.settingsTab,
     tabsLabel:"Tweak settings",
     changeTab:value=>{state.settingsTab=value;renderSettings()}});
@@ -185,7 +200,7 @@
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
     // The Formulae subtab unlocks only while its owning tweak is enabled; without it, fall back to the Gameplay list that owns the toggle.
     if(state.settingsTab==="formulae"&&!state.data.settings.formulaeRework)state.settingsTab="gameplay";
-    if(state.settingsTab==="platform")renderPlatformSettings();else if(state.settingsTab==="formulae")renderFormulae();else renderGameplaySettings();
+    if(state.settingsTab==="platform")renderPlatformSettings();else if(state.settingsTab==="formulae")renderFormulae();else if(state.settingsTab==="reshade")renderReshade();else renderGameplaySettings();
   }
 
   const DEFAULT_FLYING_EVA_BONUS=25;
