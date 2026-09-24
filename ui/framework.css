@@ -251,6 +251,24 @@ html.lex-transition-entry body > .lex-plugin-loading-screen, html.lex-transition
   background:var(--lex-accent);
 }
 
+/* The Settings menu save button is doubled; the shared control keeps its
+   compact size for toolbar callers such as the RDR settings page. */
+.lex-global-settings .lex-settings-save-control {
+  width:76px;
+  min-width:76px;
+  height:72px;
+}
+
+.lex-global-settings .lex-settings-save-control svg {
+  width:44px;
+  height:44px;
+}
+
+.lex-global-settings .lex-settings-save-control .lex-save-throbber {
+  width:38px;
+  height:38px;
+}
+
 .lex-save-icon:disabled {
   opacity: .32;
   filter: grayscale(1);
