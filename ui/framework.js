@@ -5574,25 +5574,17 @@ ${contents.path}`});
     restart.classList.add("lex-window-button", "lex-window-restart");
     const developerActions = element("div", {class: "lex-developer-actions"}, github);
     windowControls.root?.prepend?.(restart);
+    // Three cells: the two sides share the leftover width equally, so the
+    // centre group sits in the middle of the window, and neither side can be
+    // squeezed below its controls, so the centre group moves over instead of
+    // being drawn on top of them (it used to be positioned outside the row's
+    // layout and covered the zoom slider in small windows).
+    const startSide = element("div", {class: "lex-shell-start"}, brandSlot, leftActions);
+    const endSide = element("div", {class: "lex-shell-end"}, rightActions, developerActions, windowControls.root);
     const commandRow = element("div", {class: "lex-shell-command-row"},
-      brandSlot, leftActions, centerActions, rightActions, developerActions, windowControls.root);
+      startSide, centerActions, endSide);
     const header = element("header", {class: "lex-shell-header"}, commandRow, navFrame);
     host.replaceWith(header);
-
-    // The centre commands are deliberately pinned to the viewport centre.
-    // Bound the project region to their measured left edge so its 100%-wide
-    // dropdown cannot continue behind Save and Play toward the right rail.
-    const fitProjectRegion = () => {
-      const left = leftActions.getBoundingClientRect().left;
-      const centre = centerActions.getBoundingClientRect().left;
-      leftActions.style.width = `${Math.max(0, Math.floor(centre - left - 7))}px`;
-    };
-    const projectRegionObserver = new ResizeObserver(fitProjectRegion);
-    projectRegionObserver.observe(commandRow);
-    projectRegionObserver.observe(centerActions);
-    commandRow.lexProjectRegionObserver = projectRegionObserver;
-    window.addEventListener("resize", fitProjectRegion);
-    requestAnimationFrame(fitProjectRegion);
 
     const initializeGitHub = async () => {
       if (!developerMode) return;

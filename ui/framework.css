@@ -324,7 +324,7 @@ body.lex-save-busy .lex-save-icon.saving {
 
 .lex-game-process.running { color:#e24a43; }
 
-.lex-searcher-active .lex-shell-command-row > :not(.lex-window-actions):not(.lex-searcher-bar),
+.lex-searcher-active .lex-shell-command-row :is(.lex-brand-slot, .lex-shell-left-actions, .lex-shell-center-actions, .lex-shell-right-actions, .lex-developer-actions),
 .lex-searcher-active .lex-nav-frame {
   opacity:.34;
   filter:grayscale(1);
@@ -590,12 +590,32 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   align-items: center;
   gap: 7px;
 
-  position: absolute;
-  left: 50%;
+  position: relative;
   z-index: 2;
-  transform: translateX(-50%);
 
 }
+
+.lex-shell-start,
+.lex-shell-end {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  align-self: stretch;
+  min-width: 0;
+}
+.lex-shell-start > .lex-brand-slot { flex: 0 0 auto; width: auto; height: 100%; }
+/* The project area takes what is left after the brand and gives it up
+   before anything overlaps. It keeps a slot for the picker's menu button,
+   and when its own width runs short the picker drops its label. */
+.lex-shell-start > .lex-shell-left-actions { flex: 1 1 auto; container-type: inline-size; min-width: 40px; }
+@container (max-width: 130px) {
+  .lex-project-select { padding: 4px 26px 4px 4px; }
+  .lex-project-select > :is(.lex-project-name, .lex-project-path) { display: none; }
+}
+/* The end cell's controls sit against the window's right edge. */
+.lex-shell-end > .lex-shell-right-actions { margin-left: auto; }
+/* Developer tools are hidden for players; an empty group must not keep a gap. */
+.lex-shell-end > .lex-developer-actions:not(:has(> :not([hidden]))) { display: none; }
 
 .lex-shell-right-actions {
 
@@ -6027,6 +6047,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    150% UI scale), keep the centred history/save/play group clear of the right
    settings/help rail. Controls remain usable; only their chrome compacts. */
 @media (max-width:850px) {
+  .lex-shell-command-row,
+  .lex-shell-start,
+  .lex-shell-end,
   .lex-shell-center-actions,
   .lex-shell-right-actions { gap:4px; }
   .lex-shell-command-row :is(.lex-history-button,.lex-save-icon,.lex-game-process) {
@@ -6049,6 +6072,12 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   .lex-ui-scale { gap:2px; margin-right:2px; }
   .lex-ui-scale input[type="range"] { width:36px; max-width:36px; }
   .lex-window-button { width:32px; min-width:32px; }
+  .lex-shell-start > .lex-brand-slot { zoom:.75; }
+}
+/* A 900 px window at 150% UI scale is 600 CSS px: the three groups need
+   about 620 even compacted, so the wordmark scales down with the row. */
+@media (max-width:650px) {
+  .lex-shell-start > .lex-brand-slot { zoom:.6; }
 }
 
 @media (max-width:700px) {
@@ -7025,7 +7054,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   position: relative;
   display: grid;
   box-sizing: border-box;
-  grid-template-columns: max-content minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(min-content, 1fr) auto minmax(max-content, 1fr);
   height: var(--lex-command-row-height);
   min-height: var(--lex-command-row-height);
   /* The row has to honour the height the setting asks for, so its contents

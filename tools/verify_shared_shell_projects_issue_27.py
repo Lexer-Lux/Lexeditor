@@ -35,7 +35,10 @@ assert 'id: "global-game-process"' in framework and 'callWindow("game_process_st
 assert 'document.createElementNS(namespace, running ? "rect" : "path")' in framework
 assert 'class: "lex-shell-left-actions"}, context)' in framework
 assert 'class: "lex-shell-center-actions"}, undo, save, game, redo)' in framework
-assert "fitProjectRegion" in framework and "centre - left - 7" in framework
+# The command row is three cells (start | centre | end); the grid bounds the
+# project region, so no script measures and pins its width.
+assert 'class: "lex-shell-start"}, brandSlot, leftActions)' in framework
+assert "fitProjectRegion" not in framework
 assert 'class: "lex-project-source-mode"' in framework
 assert 'class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`' in framework
 assert '}, mode, name, path, status);' in framework
@@ -51,8 +54,7 @@ assert re.search(r"\.lex-project-menu\s*\{[^}]*width:\s*100%", css, re.DOTALL)
 assert 'id:"plugin-status"' not in editors["ff8"]
 assert ".lex-project-action" not in framework
 assert "grid-template-columns: 12.5%" not in css
-assert re.search(r"\.lex-shell-command-row\s*\{[^}]*grid-template-columns:\s*clamp\(", css, re.DOTALL)
-assert "left: 50%" in css
+assert re.search(r"\.lex-shell-command-row\s*\{[^}]*grid-template-columns:\s*minmax\(min-content, 1fr\) auto minmax\(max-content, 1fr\)", css, re.DOTALL)
 assert '["dashboard","Setup"]' not in editors["ff8"]
 assert '["dashboard","Settings"]' not in editors["warband"]
 assert 'id:"project",label:"Project"' not in editors["rdr"]
