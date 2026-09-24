@@ -89,6 +89,16 @@ def _read_ff7_entries(fmt_path: Path) -> list[dict]:
     return entries
 
 
+def read_ff8_entries(fmt_path: Path) -> list[dict]:
+    """Parse every audio.fmt record for the FF8 SFX tab."""
+    return _read_ff8_entries(fmt_path)
+
+
+def entry_wav(entry: dict, dat_path: Path) -> bytes:
+    """Render one audio.dat entry as browser-playable WAV bytes."""
+    return _wav(entry, dat_path)
+
+
 def _wav(entry: dict, dat_path: Path) -> bytes:
     length = int(entry["length"])
     if length <= 0:
