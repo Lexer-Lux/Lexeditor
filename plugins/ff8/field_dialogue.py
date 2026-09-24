@@ -103,3 +103,43 @@ def apply_edits(raw: bytes, edits: list[dict], *, map_name: str = "") -> tuple[b
     if len(reparsed["lines"]) != len(lines):
         raise ValueError("Field dialogue line count changed during save")
     return rebuilt, changed
+
+
+def merge(vanilla: bytes, mods: list[tuple[str, bytes]], path: str, *,
+          map_name: str = "") -> tuple[bytes | None, list[dict], str]:
+    """Merge dialogue lines, or return a visible whole-file fallback."""
+    try:
+        baseline = read(vanilla, map_name=map_name)["lines"]
+    except ValueError as error:
+        return None, [], f"vanilla {path} is unsupported: {error}"
+    claims: dict[int, list[tuple[str, str]]] = {}
+    for mod_id, source in mods:
+        try:
+            lines = read(source, map_name=map_name)["lines"]
+        except ValueError as error:
+            return None, [], f"{mod_id} is not a supported {path}: {error}"
+        if len(lines) != len(baseline):
+            return None, [], f"{mod_id} changes the dialogue line count of {path}"
+        changed = [{"id": line["id"], "text": line["text"]}
+                   for line, base in zip(lines, baseline)
+                   if line["text"] != base["text"]]
+        for edit in changed:
+            claims.setdefault(edit["id"], []).append((mod_id, edit["text"]))
+        try:
+            reconstructed, _ = apply_edits(vanilla, changed, map_name=map_name)
+        except ValueError as error:
+            return None, [], f"{mod_id} is not a supported {path}: {error}"
+        if reconstructed != source:
+            return None, [], f"{mod_id} contains changes outside proved dialogue lines"
+    winners = {line_id: values[-1][1] for line_id, values in claims.items()}
+    output, _ = apply_edits(
+        vanilla, [{"id": line_id, "text": text} for line_id, text in winners.items()],
+        map_name=map_name)
+    conflicts = [
+        {"unit": f"{path}:line:{line_id}", "winner": values[-1][0],
+         "claimants": [mod_id for mod_id, _ in values]}
+        for line_id, values in claims.items()
+        if len(values) > 1 and len({value for _, value in values}) > 1
+    ]
+    read(output, map_name=map_name)
+    return output, conflicts, ""

@@ -373,7 +373,7 @@
     const rows=[{key:"vanilla",label:"Vanilla",path:state.dashboard?.baseline?.root||"Extracted unchanged FF8 data",readOnly:true,enabled:true}];
     for(const mod of state.mods?.rows||[])rows.push({key:mod.selected?"mine":`mod:${mod.id}`,label:displayModName(mod.name),path:mod.path,readOnly:!mod.selected,enabled:mod.enabled,managed:true,removable:!mod.selected,
       settings:(mod.folderConfig||[]).map(option=>({...option,value:mod.folderOptions?.[option.id]??option.default})),
-      notes:[mod.error,mod.folderError,...(state.mods?.composition?.conflicts||[]).filter(conflict=>conflict.claimants?.includes(mod.id)).map(conflict=>`${conflict.path}: ${conflict.winner||"Higher priority mod takes precedence"}`)].filter(Boolean)});
+      notes:[mod.error,mod.folderError,...(state.mods?.composition?.conflicts||[]).filter(conflict=>conflict.claimants?.includes(mod.id)).map(conflict=>conflict.warning||`${conflict.path}: ${conflict.winner||"Higher priority mod takes precedence"}`)].filter(Boolean)});
     return rows;
   }
   async function changeProjectSource(key,change){

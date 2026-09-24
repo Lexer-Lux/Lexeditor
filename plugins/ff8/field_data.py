@@ -800,10 +800,8 @@ def _write_batch(prepared: list[tuple[Path, bytes]]) -> None:
         raise
 
 
-def _edit_inf_bytes(source: bytes, edits: list[dict]) -> bytes:
-    raw = bytearray(source)
-    parsed = _parse_inf(raw)
-    seen = set()
+def _inf_scalar_offsets(parsed: dict) -> dict[tuple, tuple[int, str, int, int]]:
+    """Every editable INF scalar by identity: offset, struct format, min, max."""
     scalar_offsets: dict[tuple, tuple[int, str, int, int]] = {}
     for gateway in parsed["gateways"]:
         scalar_offsets[("gateway", gateway["id"], "fieldId")] = (
@@ -819,6 +817,56 @@ def _edit_inf_bytes(source: bytes, edits: list[dict]) -> bytes:
             for axis_index, axis in enumerate(VERTEX_AXES):
                 scalar_offsets[("trigger", trigger["id"], point, axis)] = (
                     trigger[point]["offset"] + axis_index * 2, "h", -32768, 32767)
+    return scalar_offsets
+
+
+def merge_inf(vanilla: bytes, mods: list[tuple[str, bytes]], path: str
+              ) -> tuple[bytes | None, list[dict], str]:
+    """Merge entrance scalars, or return a visible whole-file fallback."""
+    try:
+        baseline = _parse_inf(vanilla)
+    except ValueError as error:
+        return None, [], f"vanilla {path} is unsupported: {error}"
+    units = _inf_scalar_offsets(baseline)
+    claims: dict[tuple, list[tuple[str, bytes]]] = {}
+    for mod_id, source in mods:
+        try:
+            parsed = _parse_inf(source)
+        except ValueError as error:
+            return None, [], f"{mod_id} is not a supported {path}: {error}"
+        if parsed["size"] != baseline["size"] or parsed["variant"] != baseline["variant"]:
+            return None, [], f"{mod_id} changes the entrance structure of {path}"
+        reconstructed = bytearray(vanilla)
+        for identity, (offset, fmt, _minimum, _maximum) in units.items():
+            size = struct.calcsize("<" + fmt)
+            value = source[offset:offset + size]
+            if value != vanilla[offset:offset + size]:
+                claims.setdefault(identity, []).append((mod_id, value))
+                reconstructed[offset:offset + size] = value
+        if bytes(reconstructed) != source:
+            return None, [], f"{mod_id} contains changes outside proved entrance units"
+    output = bytearray(vanilla)
+    conflicts = []
+    for identity, values in claims.items():
+        offset, fmt, _minimum, _maximum = units[identity]
+        size = struct.calcsize("<" + fmt)
+        output[offset:offset + size] = values[-1][1]
+        if len(values) > 1 and len({value for _, value in values}) > 1:
+            conflicts.append({"unit": f"{path}:{':'.join(map(str, identity))}",
+                              "winner": values[-1][0],
+                              "claimants": [mod_id for mod_id, _ in values]})
+    merged = bytes(output)
+    reparsed = _parse_inf(merged)
+    if reparsed["size"] != baseline["size"] or reparsed["variant"] != baseline["variant"]:
+        return None, [], f"merged {path} changed the entrance structure"
+    return merged, conflicts, ""
+
+
+def _edit_inf_bytes(source: bytes, edits: list[dict]) -> bytes:
+    raw = bytearray(source)
+    parsed = _parse_inf(raw)
+    seen = set()
+    scalar_offsets = _inf_scalar_offsets(parsed)
     for edit in edits:
         kind = str(edit.get("kind", ""))
         slot = int(edit.get("slot", -1))
