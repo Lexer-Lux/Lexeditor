@@ -2231,7 +2231,7 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   white-space:nowrap;
 }
 
-.lex-column-pointer-cell,
+.lex-column-list-cell.lex-column-pointer-cell,
 .lex-column-pointer-cell > .lex-column-cell-content {
   overflow:visible;
 }
@@ -4048,6 +4048,8 @@ body:has(.lex-data-map-table) #main {
 /* What fills a detail heading's icon box: a picture, a small stage, or a
    line saying why there is neither yet. */
 .lex-icon-slot { position:relative; width:100%; height:100%; overflow:hidden; }
+.lex-icon-slot.lex-icon-slot-square { width:min(100%,200px); height:auto; aspect-ratio:1; }
+.lex-icon-slot-square > img { position:absolute; inset:0; }
 .lex-detail-panel-icon > .lex-icon-slot { position:absolute; inset:0; }
 .lex-icon-slot img { display:block; width:100%; height:100%; object-fit:contain; }
 .lex-icon-slot canvas { display:block; width:100%; height:100%; pointer-events:none; }
@@ -6114,6 +6116,8 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 }
 .lex-hoverable-label { display:block;box-sizing:border-box;padding:.2em .15em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .lex-hoverable > :is(img,svg) { flex-shrink:0; }
+.lex-hoverable:has(> .lex-stack) { display:flex; width:100%; }
+.lex-hoverable > .lex-stack { width:100%; }
 
 .lex-value-modified > :is(input,select,textarea,output), .lex-value-modified > .lex-unit-field > :is(input,select,output), .lex-value-modified > :not(.lex-reference-values):not(.lex-reference-placeholder) .lex-hoverable {
   color:var(--lex-accent-ink);

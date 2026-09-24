@@ -41,6 +41,7 @@ def test_pointer_tip_tracks_icon_and_text_at_each_ui_scale(page,zoom):
       document.querySelector('main').append(U.columnList({rows:[{id:1,name:'Fuel'}],key:r=>r.id,selected:1,
         columns:[{key:'name',label:'Item',render:r=>U.inlineLabel(U.el('img',{style:'width:20px;height:20px'}),U.el('span',{},r.name))}]}));}''',zoom)
     page.wait_for_timeout(200)
+    assert page.locator('.lex-column-pointer-cell').evaluate('n=>getComputedStyle(n).overflowX')=='visible'
     assert page.locator('.selected .lex-column-cell-content').evaluate('''n=>{
       const icon=n.querySelector('.lex-inline-label > img');
       const rect=n.getBoundingClientRect(),scale=rect.width/n.offsetWidth,p=getComputedStyle(n,'::before');

@@ -1868,6 +1868,9 @@ def run_host(plugins: dict[str, GamePlugin], initial_plugin: str | None = None,
             "Lexeditor's embedded runtime is missing. Run install.ps1."
         ) from error
 
+    # Asset export links use WebView2 downloads and its Save File dialog.
+    # The runtime cancels them silently unless downloads are enabled.
+    webview.settings["ALLOW_DOWNLOADS"] = True
     geometry = load_window_geometry()
     api = HostApi(plugins)
     api.migrate_user_data()

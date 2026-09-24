@@ -82,7 +82,22 @@
   }
   function modelDetail(row,prefs){
     const sections=[];
-    if(row.note)sections.push(LexeditorUI.detailNote(row.note));
+    if(row.counts)sections.push(detailSection({title:"GEOMETRY",body:LexeditorUI.controlGroup([
+      {label:"OBJECTS",control:readonlyField(formatNumber(row.counts.objects))},
+      {label:"VERTICES",control:readonlyField(formatNumber(row.counts.vertices))},
+      {label:"TRIANGLES",control:readonlyField(formatNumber(row.counts.triangles))},
+      {label:"QUADS",control:readonlyField(formatNumber(row.counts.quads))}],{columns:4,stacked:true})}));
+    if(row.tims?.length)sections.push(detailSection({title:"TEXTURES",body:LexeditorUI.tileGrid(row.tims.map(tim=>{
+      const key=`${row.id}#${tim.index}`,palette=Math.max(0,Math.min((tim.paletteCount||1)-1,Number(assetPalettes[key]??0)));
+      const targetId=`battle/${row.file}#${tim.index}`,targetLabel=`Texture ${tim.index+1}`;
+      const preview=el("img",{src:`/assets/texture.png?id=${encodeURIComponent(targetId)}&palette=${palette}&dataset=${encodeURIComponent(assetDataset())}`,alt:`${row.name}, texture ${tim.index+1}`});
+      const link=hoverable({content:LexeditorUI.stack({fill:false},el("span",{},targetLabel),LexeditorUI.iconSlot({content:preview,shape:'square'})),targetType:"texture",targetId,targetLabel,activate:()=>{state.selected.textures=targetId;navigate("textures")}});
+      const paletteSelect=tim.paletteCount>1?selectControl(palette,Array.from({length:tim.paletteCount},(_,id)=>({value:id,name:`Palette ${id+1}`})),value=>{assetPalettes[key]=value;renderModels()}):null;
+      if(paletteSelect)paletteSelect.setAttribute("aria-label",`${row.name} texture ${tim.index+1} palette`);
+      const card=[link];
+      if(paletteSelect)card.push(detailField({label:"PALETTE",help:infoHelp("Palette selection only changes this preview; the game chooses palettes while rendering."),control:paletteSelect}));
+      return LexeditorUI.stack({fill:false},...card);
+    }),{minWidth:160})}));
     if(row.sections?.length){
       const table=columnList({fill:true,rows:row.sections,key:section=>section.index,localSort:false,class:"ff8-model-sections",template:"52px minmax(150px,1fr) 110px 110px",columns:[
         {key:"index",label:"#",render:section=>String(section.index)},
@@ -91,24 +106,6 @@
         {key:"size",label:"Size",render:section=>assetFileSize(section.size)}]});
       sections.push(detailSection({title:"SECTIONS",body:[table],
         help:infoHelp("The model's building blocks in file order. Only whole-file replacement is supported; no section is editable.")}));
-    }
-    if(row.counts)sections.push(detailSection({title:"GEOMETRY",body:[
-      detailField({label:"OBJECTS",control:readonlyField(formatNumber(row.counts.objects))}),
-      detailField({label:"VERTICES",control:readonlyField(formatNumber(row.counts.vertices))}),
-      detailField({label:"TRIANGLES",control:readonlyField(formatNumber(row.counts.triangles))}),
-      detailField({label:"QUADS",control:readonlyField(formatNumber(row.counts.quads))})]}));
-    for(const tim of row.tims||[]){
-      const key=`${row.id}#${tim.index}`,palette=Math.max(0,Math.min((tim.paletteCount||1)-1,Number(assetPalettes[key]??0)));
-      const preview=el("img",{src:`/assets/texture.png?id=${encodeURIComponent(`battle/${row.file}#${tim.index}`)}&palette=${palette}&dataset=${encodeURIComponent(assetDataset())}`,alt:`${row.name}, texture ${tim.index+1}`});
-      const paletteSelect=tim.paletteCount>1?selectControl(palette,Array.from({length:tim.paletteCount},(_,id)=>({value:id,name:`Palette ${id+1}`})),value=>{assetPalettes[key]=value;renderModels()}):null;
-      if(paletteSelect)paletteSelect.setAttribute("aria-label",`${row.name} texture ${tim.index+1} palette`);
-      const openTexture=el("button",{type:"button",onclick:()=>{state.selected.textures=`battle/${row.file}#${tim.index}`;navigate("textures")}},"Open in Textures");
-      const textureBody=[
-        detailField({label:"",control:preview}),
-        detailField({label:"SIZE",control:readonlyField(`${tim.width} × ${tim.height} · ${tim.depth}-bit`)})];
-      if(paletteSelect)textureBody.push(detailField({label:"PALETTE",help:infoHelp("Palette selection only changes this preview; the game chooses palettes while rendering."),control:paletteSelect}));
-      textureBody.push(detailField({label:"",control:LexeditorUI.actionRow(openTexture)}));
-      sections.push(detailSection({title:`TEXTURE ${tim.index+1}`,body:textureBody}));
     }
     const links=[];
     if(row.enemyId!=null)links.push(el("button",{type:"button",onclick:()=>{state.selected.enemies=row.enemyId;navigate("enemies")}},"Open in Enemies"));
@@ -126,12 +123,11 @@
       pending=assetPendingNote(row,"datBase64","Replacement"),
       actions=LexeditorUI.actionRow(...[replace,revert,exportLink].filter(Boolean));
     sections.push(detailSection({title:"FILE",body:[
-      detailField({label:"SIZE",control:readonlyField(assetFileSize(row.sizeBytes))}),
       detailField({label:"OVERRIDE",control:readonlyField(row.override||"None — shipped file")}),
       detailField({label:"",control:actions}),
       detailField({label:"",control:pending})],
-      help:infoHelp("Replace writes this battle file into the project's direct/ folder; FFNx loads it instead of the archive copy. Revert deletes the project copy.")}));
-    return sharedDetail(row,prefs,sections);
+      help:infoHelp([row.note,"Replace writes this battle file into the project's direct/ folder; FFNx loads it instead of the archive copy. Revert deletes the project copy."].filter(Boolean).join(' '))}));
+    return detailPanel({title:row.name,meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections});
   }
 
   function renderTextures(){
@@ -172,5 +168,5 @@
     if(row.editor==="models"&&row.modelFile)links.push(el("button",{type:"button",onclick:()=>{state.selected.models=row.modelFile;navigate("models")}},`Open ${row.modelFile} in Models`));
     if(row.editor==="world")links.push(el("button",{type:"button",onclick:()=>{state.selected.world=row.timIndex;state.worldTab="textures";navigate("world")}},`Open World Texture ${row.timIndex+1} in Maps`));
     if(links.length)sections.push(detailSection({title:"EDIT",body:[detailField({label:"",control:LexeditorUI.actionRow(...links)})]}));
-    return sharedDetail(row,prefs,sections);
+    return detailPanel({title:row.name,meta:row.id,body:sections});
   }

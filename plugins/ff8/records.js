@@ -32,7 +32,7 @@
     }));
     state.shopSlotSort||=["slot",1];const [sortKey,sortDir]=state.shopSlotSort,sorted=[...row.slots].sort((a,b)=>sortDir*String(sortKey==="item"?a.itemName:a[sortKey]??"").localeCompare(String(sortKey==="item"?b.itemName:b[sortKey]??""),undefined,{numeric:true}));
     const table=columnList({fill:true,rows:sorted,key:slot=>slot.slot,class:"ff8-shop-table ff8-record-list",template:"80px minmax(150px,1fr) 110px",sortState:{key:sortKey,dir:sortDir},sort:key=>{state.shopSlotSort=[key,sortKey===key?-sortDir:1];renderShops()},columns:[{key:"slot",label:"Slot",sortable:true,render:slot=>controls.get(slot.slot).slotControl},{key:"item",label:"Item",sortable:true,render:slot=>controls.get(slot.slot).item},{key:"rare",label:el("span",{},"Rare",infoHelp("Rare stock is hidden until the player has Tonberry's Familiar menu ability.")),sortable:true,cellClass:"rare",render:slot=>controls.get(slot.slot).rare}]});
-    return sharedDetail(row,prefs,table);
+    return table;
   }
 
   function displayFieldValue(field){if(!field)return "";if(field.lookup?.type==="enum")return field.lookup.entries.find(entry=>Number(entry.value??entry.id)===Number(field.value))?.name??field.value;if(field.control==="boolean")return field.value?"✓":"×";return field.value}

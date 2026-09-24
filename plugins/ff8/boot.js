@@ -192,7 +192,7 @@
           {key:"normal",label:"Normal",render:entry=>change(vanilla.normal[entry.slot-1],rework.normal[entry.slot-1])},
           {key:"rare",label:"Rare Item",render:entry=>change(vanilla.rare[entry.slot-1],rework.rare[entry.slot-1])}]}));
   }
-  const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"formulae",label:"Formulae"},{id:"platform",label:"FFNx"},{id:"reshade",label:"ReShade"}];
+  const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"formulae",label:"Formulae",help:"Enable Formulae Rework on Gameplay to open this page. The rework is currently unavailable: melee damage, magic damage, status infliction and Mug still need runtime patches. A preview alone does not change the game."},{id:"platform",label:"FFNx"},{id:"reshade",label:"ReShade"}];
   const tweakTabProps=()=>({tabs:TWEAK_TABS.map(tab=>tab.id==="formulae"?{...tab,disabled:!state.data.settings.formulaeRework}:tab),activeTab:state.settingsTab,
     tabsLabel:"Tweak settings",
     changeTab:value=>{state.settingsTab=value;renderSettings()}});

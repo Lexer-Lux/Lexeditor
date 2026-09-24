@@ -1359,7 +1359,7 @@
   const iconSlot = (options = {}) => {
     const message = options.content ? null
       : element("div", {class: "lex-icon-slot-message"}, options.message ?? "");
-    const slot = element("div", {class: ["lex-icon-slot", options.className || ""].filter(Boolean).join(" ")},
+    const slot = element("div", {class: ["lex-icon-slot", options.shape === 'square' ? 'lex-icon-slot-square' : '', options.className || ""].filter(Boolean).join(" ")},
       options.content || message);
     slot.lexMessage = message;
     return slot;
