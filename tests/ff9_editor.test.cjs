@@ -293,6 +293,45 @@ test('battle scene detail labels raw16 instead of CSV', async () => {
   assert.doesNotMatch(rendered, /Enemies · vanilla CSV/);
 });
 
+test('enemy attack detail offers the verified target enum and keeps legacy bits stored', async () => {
+  const e = await editor();
+  e.run(`installData({key:"enemy-attacks",label:"Enemy attacks",source:"vanilla",fields:[
+    {key:"Target",label:"Target",kind:"enum",editable:true,declaredType:"TargetType",choices:["SingleAny(0)","SingleAlly(1)","SingleEnemy(2)","ManyAny(3)","ManyAlly(4)","ManyEnemy(5)","All(6)","AllAlly(7)","AllEnemy(8)","Random(9)","RandomAlly(10)","RandomEnemy(11)","Everyone(12)","Self(13)","Automatic(14)","Special(15)"]},
+    {key:"Power",label:"Power",kind:"integer",editable:true,declaredType:"B",min:0,max:255},
+    {key:"LegacySfx",label:"Legacy sound bits",kind:"stored",editable:false,declaredType:"UInt32"}
+  ],rows:[{line:0,id:"B3_002:0",name:"B3_002 · Attack 1",source:"vanilla",values:{Target:"SingleEnemy(2)",Power:80,LegacySfx:2748}}]})`);
+  const panel = e.run('detail(state.datasets["enemy-attacks"],state.datasets["enemy-attacks"].rows[0])');
+  const rendered = JSON.stringify(panel);
+  assert.match(rendered, /Enemy attacks · vanilla BattleScene raw16/);
+  assert.match(rendered, /SingleEnemy\(2\)/);
+  assert.match(rendered, /STORED DATA/);
+  const target = e.run('fieldControl(state.datasets["enemy-attacks"],state.datasets["enemy-attacks"].rows[0],state.datasets["enemy-attacks"].fields[0])');
+  assert.equal(target.attrs.control.tag, 'select');
+  assert.equal(target.attrs.control.children.length, 16);
+});
+
+test('battle scene flag detail exposes verified Memoria rules as editable toggles', async () => {
+  const e = await editor();
+  e.run(`installData({key:"scene-flags",label:"Battle scene flags",source:"vanilla",fields:[
+    {key:"BackAttack",label:"Back attack",kind:"boolean",editable:true,declaredType:"Boolean"},
+    {key:"OtherFlags",label:"Other flag bits",kind:"stored",editable:false,declaredType:"UInt16"}
+  ],rows:[{line:0,id:"B3_002:0",name:"B3_002 · Scene 1",source:"vanilla",values:{BackAttack:true,OtherFlags:5}}]})`);
+  const panel = e.run('detail(state.datasets["scene-flags"],state.datasets["scene-flags"].rows[0])');
+  const rendered = JSON.stringify(panel);
+  assert.match(rendered, /Battle scene flags · vanilla BattleScene raw16/);
+  assert.match(rendered, /SB2_FLG_BACKATK/);
+  assert.match(rendered, /STORED DATA/);
+  const toggle = e.run('fieldControl(state.datasets["scene-flags"],state.datasets["scene-flags"].rows[0],state.datasets["scene-flags"].fields[0])');
+  assert.equal(toggle.attrs.control.attrs.type, 'checkbox');
+});
+
+test('battle dataset navigation covers attacks and scene flags', async () => {
+  const e = await editor();
+  e.run('state.catalog=[{key:"enemies",tab:"enemies"},{key:"enemy-attacks",tab:"enemies"},{key:"encounters",tab:"encounters"},{key:"scene-flags",tab:"encounters"}]');
+  assert.deepEqual(Array.from(e.run('choices("enemies")')), ['enemies','enemy-attacks']);
+  assert.deepEqual(Array.from(e.run('choices("encounters")')), ['encounters','scene-flags']);
+});
+
 test('FF9 shell carries a fitting system-font theme with no bundled proprietary assets', async () => {
   const e = await editor();
   const plugin = e.shell().plugin;

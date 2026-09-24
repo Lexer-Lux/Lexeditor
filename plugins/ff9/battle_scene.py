@@ -4,6 +4,21 @@ The Unity serialized-file/container facts used here were cross-checked against
 the permissively licensed UnityPy reader and Hades Workshop's published FF9
 research. No third-party parser or binary is bundled or invoked. Lexeditor only
 reads the installed archive; saves are standalone raw16 project overlays.
+
+Battle-record layouts mirror Memoria v2025.07.04
+(``d8df6e69ddb618adc753a27d9424409d66216a35``): enemy and pattern records follow
+``BTL_SCENE.cs`` ``ReadBattleScene``; the 16-byte enemy-attack (``AA_DATA``)
+records and the scene-header battle flags follow that same reader plus
+``AA_DATA.cs``, ``BTL_REF.cs``, ``BattleCommandInfo.cs``, ``BitUtil.cs``,
+``SB2_HEAD.cs`` and ``BTL_SCENE_INFO.cs``. Target,
+display-mode and status-set names come from Memoria's verified ``TargetType``,
+``TargetDisplay`` and ``StatusSetId`` enums. Hades Workshop ``Source/Enemies.h``
+was audited for enemy-attack category/type semantics; its abstracted spell
+model does not map onto the Steam ``AA_DATA`` record, so no Hades-derived
+attack semantics were adopted and no Hades source was copied. Bytes without
+verified semantics -- the attack sound bits Memoria reads and discards, header
+version/counts, scene-flag bits 12-15, enemy pads -- are preserved verbatim and
+never offered as editable fields.
 """
 from __future__ import annotations
 
@@ -271,6 +286,88 @@ PATTERN_FIELDS = (
 )
 
 
+@dataclass(frozen=True)
+class BitField:
+    key: str
+    label: str
+    offset: int  # word offset within the record
+    shift: int
+    width: int
+    size: int  # word size in bytes (2 or 4, little-endian)
+    kind: str  # "boolean" | "integer" | "enum" | "stored" (read-only)
+    choices: tuple[str, ...] = ()
+
+
+# Verified Memoria TargetType enum (TargetType.cs). All 16 values of the 4-bit
+# field are named, so the whole range is a closed enum.
+TARGET_NAMES = (
+    "SingleAny", "SingleAlly", "SingleEnemy", "ManyAny",
+    "ManyAlly", "ManyEnemy", "All", "AllAlly",
+    "AllEnemy", "Random", "RandomAlly", "RandomEnemy",
+    "Everyone", "Self", "Automatic", "Special",
+)
+TARGET_CHOICES = tuple(f"{name}({index})" for index, name in enumerate(TARGET_NAMES))
+
+
+# Memoria v2025.07.04, Assembly-CSharp/Global/BTL_SCENE.cs ReadBattleScene:
+# each attack record is 16 bytes: a UInt32 targeting/VFX bitfield (bit order
+# per BitUtil.ReadBits, LSB first), four BTL_REF bytes, category, status set,
+# MP, type, Vfx2 and the numeric name reference.
+ATTACK_INFO_BITS = (
+    BitField("Target", "Target", 0, 0, 4, 4, "enum", TARGET_CHOICES),
+    BitField("DefaultAlly", "Default ally", 0, 4, 1, 4, "boolean"),
+    # Memoria names TargetDisplay 0-4 (None, Hp, Mp, Debuffs, Buffs); 5-7 are
+    # representable but unnamed, so the field stays a bounded integer.
+    BitField("DisplayStats", "Display stats", 0, 5, 3, 4, "integer"),
+    BitField("VfxIndex", "VFX index", 0, 8, 9, 4, "integer"),
+    # Bits 17-28: Memoria reads twelve sound bits and discards them. Shown
+    # read-only so the preserved value stays visible; never writable.
+    BitField("LegacySfx", "Legacy sound bits", 0, 17, 12, 4, "stored"),
+    BitField("ForDead", "For dead", 0, 29, 1, 4, "boolean"),
+    BitField("DefaultCamera", "Default camera", 0, 30, 1, 4, "boolean"),
+    BitField("DefaultOnDead", "Default on dead", 0, 31, 1, 4, "boolean"),
+)
+ATTACK_FIELDS = (
+    _field("ScriptId", "Script ID", 4, "<B"),
+    _field("Power", "Power", 5, "<B"),
+    _field("Elements", "Elements", 6, "<B"),
+    _field("Rate", "Rate", 7, "<B"),
+    # Memoria loads Category/Type without documenting their values; the stored
+    # bytes stay editable but carry no invented enum.
+    _field("Category", "Category", 8, "<B"),
+    # StatusSetId: 0-38 verified (None..LesserBadBreath); the byte range stays
+    # open because higher values are representable but unnamed.
+    _field("AddStatusNo", "Added status set", 9, "<B"),
+    _field("MP", "MP", 10, "<B"),
+    _field("Type", "Type", 11, "<B"),
+    _field("Vfx2", "VFX 2", 12, "<H"),
+    # Memoria keeps AA_DATA.Name as the decimal text of this UInt16.
+    _field("Name", "Name reference", 14, "<H"),
+)
+
+
+# Scene-header battle flags (SB2_HEAD.Flags, SetupSceneInfo + BTL_SCENE_INFO).
+# Memoria inverts NOWINPOSE/NORUNAWAY into WinPose/Runaway for its own API; the
+# on-disk bits mean "no pose"/"no escape", so those honest names are used.
+# Bits 12-15 have named constants but no consuming code path in the pinned
+# revision; they stay read-only and preserved.
+SCENE_FLAG_BITS = (
+    BitField("SpecialStart", "Scripted start", 4, 0, 1, 2, "boolean"),
+    BitField("BackAttack", "Back attack", 4, 1, 1, 2, "boolean"),
+    BitField("NoGameOver", "No game over", 4, 2, 1, 2, "boolean"),
+    BitField("NoExp", "No EXP", 4, 3, 1, 2, "boolean"),
+    BitField("NoWinPose", "No victory pose", 4, 4, 1, 2, "boolean"),
+    BitField("NoRunaway", "No escape", 4, 5, 1, 2, "boolean"),
+    BitField("NoNeighboring", "No neighboring", 4, 6, 1, 2, "boolean"),
+    BitField("NoMagical", "No magic", 4, 7, 1, 2, "boolean"),
+    BitField("ReverseAttack", "Reverse attack", 4, 8, 1, 2, "boolean"),
+    BitField("FixedCamera1", "Fixed camera 1", 4, 9, 1, 2, "boolean"),
+    BitField("FixedCamera2", "Fixed camera 2", 4, 10, 1, 2, "boolean"),
+    BitField("AfterEvent", "After event", 4, 11, 1, 2, "boolean"),
+    BitField("OtherFlags", "Other flag bits", 4, 12, 4, 2, "stored"),
+)
+
+
 class BattleScene:
     def __init__(self, name: str, data: bytes):
         self.name, self.data = name, bytearray(data)
@@ -287,8 +384,44 @@ class BattleScene:
     def enemy_start(self) -> int:
         return 8 + 56 * self.pattern_count
 
+    @property
+    def attack_start(self) -> int:
+        return 8 + 56 * self.pattern_count + 116 * self.type_count
+
     def read(self, base: int, field: Field) -> int:
         return struct.unpack_from(field.fmt, self.data, base + field.offset)[0]
+
+    def read_bits(self, base: int, bit: BitField) -> Any:
+        fmt = "<I" if bit.size == 4 else "<H"
+        word = struct.unpack_from(fmt, self.data, base + bit.offset)[0]
+        raw = (word >> bit.shift) & ((1 << bit.width) - 1)
+        if bit.kind == "boolean":
+            return bool(raw)
+        if bit.kind == "enum":
+            return bit.choices[raw]
+        return raw
+
+    def write_bits(self, base: int, bit: BitField, value: Any) -> None:
+        if bit.kind == "stored":
+            raise ValueError(f"{bit.label} is read-only and preserved verbatim")
+        if bit.kind == "boolean":
+            if type(value) is not bool:
+                raise ValueError(f"{bit.label} must be true or false")
+            raw = 1 if value else 0
+        elif bit.kind == "enum":
+            if not isinstance(value, str) or value not in bit.choices:
+                raise ValueError(f"{bit.label} must be one of its named values")
+            raw = bit.choices.index(value)
+        else:
+            maximum = (1 << bit.width) - 1
+            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= maximum:
+                raise ValueError(f"{bit.label} must be a whole number from 0 through {maximum}")
+            raw = value
+        fmt = "<I" if bit.size == 4 else "<H"
+        address = base + bit.offset
+        word = struct.unpack_from(fmt, self.data, address)[0]
+        mask = ((1 << bit.width) - 1) << bit.shift
+        struct.pack_into(fmt, self.data, address, (word & ~mask) | (raw << bit.shift))
 
     def write(self, base: int, field: Field, value: Any) -> None:
         if isinstance(value, bool) or not isinstance(value, int) or not field.min <= value <= field.max:
@@ -301,6 +434,8 @@ class BattleScene:
 
 
 class BattleSceneStore:
+    KEYS = frozenset({"enemies", "encounters", "enemy-attacks", "scene-flags"})
+
     def __init__(self):
         self.archive_path = paths.GAME_ROOT / "StreamingAssets" / "p0data2.bin"
         self.project_root = paths.PROJECT_ROOT
@@ -334,37 +469,77 @@ class BattleSceneStore:
     def status_rows(self) -> list[dict[str, Any]]:
         available = self.archive_path.is_file()
         note = "Reads vanilla battle-scene TextAssets from p0data2; saves canonical Memoria loose raw16 project overlays under StreamingAssets/Assets/Resources, which Deploy Project copies into the Lexeditor mod folder."
+        common = {
+            "relativePath": "StreamingAssets/p0data2.bin → StreamingAssets/Assets/Resources/BattleMap/BattleScene/*/dbfile0000.raw16.bytes",
+            "available": available, "source": "vanilla" if available else None,
+            "sourcePath": str(self.archive_path) if available else None,
+            "projectPath": str(self.project_root / "StreamingAssets/Assets/Resources/BattleMap/BattleScene"),
+        }
         return [
-            {"key": "enemies", "tab": "enemies", "label": "Enemies", "relativePath": "StreamingAssets/p0data2.bin → StreamingAssets/Assets/Resources/BattleMap/BattleScene/*/dbfile0000.raw16.bytes", "controls": "Enemy HP/MP, rewards, stats, elements, defences, Blue Magic, geometry, SFX, card and shadow fields", "available": available, "source": "vanilla" if available else None, "sourcePath": str(self.archive_path) if available else None, "projectPath": str(self.project_root / "StreamingAssets/Assets/Resources/BattleMap/BattleScene"), "notes": note},
-            {"key": "encounters", "tab": "encounters", "label": "Encounters", "relativePath": "StreamingAssets/p0data2.bin → StreamingAssets/Assets/Resources/BattleMap/BattleScene/*/dbfile0000.raw16.bytes", "controls": "Pattern rate, monster count, camera, AP and four enemy placements", "available": available, "source": "vanilla" if available else None, "sourcePath": str(self.archive_path) if available else None, "projectPath": str(self.project_root / "StreamingAssets/Assets/Resources/BattleMap/BattleScene"), "notes": note},
+            {**common, "key": "enemies", "tab": "enemies", "label": "Enemies", "controls": "Enemy HP/MP, rewards, stats, elements, defences, Blue Magic, geometry, SFX, card and shadow fields", "notes": note},
+            {**common, "key": "encounters", "tab": "encounters", "label": "Encounters", "controls": "Pattern rate, monster count, camera, AP and four enemy placements", "notes": note},
+            {**common, "key": "enemy-attacks", "tab": "enemies", "label": "Enemy attacks", "controls": "Attack targeting, VFX, script, power, elements, rate, category, status set, MP, type and name reference", "notes": note + " The twelve legacy sound bits Memoria reads and discards are shown read-only and preserved verbatim."},
+            {**common, "key": "scene-flags", "tab": "encounters", "label": "Battle scene flags", "controls": "Scripted start, back attack, game-over/EXP/pose/escape rules, neighboring, magic, reverse attack, fixed cameras and post-battle event", "notes": note + " Header version, record counts and flag bits 12-15 have no verified gameplay semantics and stay preserved, never editable."},
         ]
 
     @staticmethod
-    def _descriptors(fields: tuple[Field, ...]) -> list[dict[str, Any]]:
+    def _descriptors(fields: tuple[Field, ...], bits: tuple[BitField, ...] = ()) -> list[dict[str, Any]]:
         result = []
+        for bit in bits:
+            if bit.kind == "boolean":
+                result.append({"key": bit.key, "label": bit.label, "declaredType": "Boolean",
+                               "editable": True, "kind": "boolean"})
+            elif bit.kind == "enum":
+                result.append({"key": bit.key, "label": bit.label, "declaredType": "TargetType",
+                               "editable": True, "kind": "enum", "choices": list(bit.choices)})
+            elif bit.kind == "stored":
+                result.append({"key": bit.key, "label": bit.label,
+                               "declaredType": "UInt32" if bit.size == 4 else "UInt16",
+                               "editable": False, "kind": "stored"})
+            else:
+                result.append({"key": bit.key, "label": bit.label,
+                               "declaredType": "UInt32" if bit.size == 4 else "UInt16",
+                               "editable": True, "kind": "integer",
+                               "min": 0, "max": (1 << bit.width) - 1})
         for field in fields:
             maximum = 4 if field.key == "MonsterCount" else field.max
             result.append({"key": field.key, "label": field.label, "declaredType": field.fmt[-1],
                            "editable": True, "kind": "integer", "min": field.min, "max": maximum})
         return result
 
+    LAYOUT_FIELDS = {"enemies": ENEMY_FIELDS, "encounters": PATTERN_FIELDS,
+                     "enemy-attacks": ATTACK_FIELDS, "scene-flags": ()}
+    LAYOUT_BITS: dict[str, tuple[BitField, ...]] = {"enemies": (), "encounters": (),
+                     "enemy-attacks": ATTACK_INFO_BITS, "scene-flags": SCENE_FLAG_BITS}
+
+    @staticmethod
+    def _layout(key: str, scene: BattleScene) -> tuple[int, int, int, str]:
+        if key == "enemies":
+            return scene.enemy_start, 116, scene.type_count, "Enemy"
+        if key == "encounters":
+            return 8, 56, scene.pattern_count, "Pattern"
+        if key == "enemy-attacks":
+            return scene.attack_start, 16, scene.attack_count, "Attack"
+        if key == "scene-flags":
+            return 0, 0, 1, "Scene"
+        raise KeyError("Unknown FF9 battle-scene dataset")
+
     def load(self, key: str) -> dict[str, Any]:
-        if key not in {"enemies", "encounters"}:
+        if key not in self.KEYS:
             raise KeyError("Unknown FF9 battle-scene dataset")
         rows = []
         scene_hashes = {}
-        fields = ENEMY_FIELDS if key == "enemies" else PATTERN_FIELDS
+        fields, bits = self.LAYOUT_FIELDS[key], self.LAYOUT_BITS[key]
         for scene_name in sorted(self._scenes()):
             data, source_kind, _ = self._source(scene_name)
             scene = BattleScene(scene_name, data)
             scene_hashes[scene_name] = _sha256(data)
-            count = scene.type_count if key == "enemies" else scene.pattern_count
-            stride = 116 if key == "enemies" else 56
-            start = scene.enemy_start if key == "enemies" else 8
+            start, stride, count, noun = self._layout(key, scene)
             for index in range(count):
                 base = start + index * stride
-                values = {field.key: scene.read(base, field) for field in fields}
-                label = f"{scene_name} · {'Enemy' if key == 'enemies' else 'Pattern'} {index + 1}"
+                values = {bit.key: scene.read_bits(base, bit) for bit in bits}
+                values.update({field.key: scene.read(base, field) for field in fields})
+                label = f"{scene_name} · {noun} {index + 1}"
                 bounds = {}
                 if key == "encounters":
                     bounds["MonsterCount"] = {"min": 0, "max": 4}
@@ -376,12 +551,13 @@ class BattleSceneStore:
                              "fieldBounds": bounds, "values": values})
         status = next(row for row in self.status_rows() if row["key"] == key)
         return {**status, "sha256": _sha256(self.archive_path.read_bytes()) if self.archive_path.is_file() else "",
-                "sceneHashes": scene_hashes, "fields": self._descriptors(fields), "rows": rows}
+                "sceneHashes": scene_hashes, "fields": self._descriptors(fields, bits), "rows": rows}
 
     def save(self, key: str, expected_scene_hashes: dict[str, str], changes: list[dict[str, Any]]) -> dict[str, Any]:
-        if key not in {"enemies", "encounters"} or not isinstance(changes, list):
+        if key not in self.KEYS or not isinstance(changes, list):
             raise ValueError("Invalid FF9 battle-scene save")
-        fields = {field.key: field for field in (ENEMY_FIELDS if key == "enemies" else PATTERN_FIELDS)}
+        fields = {field.key: field for field in self.LAYOUT_FIELDS[key]}
+        bits = {bit.key: bit for bit in self.LAYOUT_BITS[key]}
         grouped: dict[str, list[dict[str, Any]]] = {}
         for change in changes:
             if not isinstance(change, dict) or not isinstance(change.get("scene"), str):
@@ -392,9 +568,7 @@ class BattleSceneStore:
             if expected_scene_hashes.get(name) != _sha256(raw):
                 raise RuntimeError(f"Battle scene {name} changed outside Lexeditor. Reload before saving.")
             scene = BattleScene(name, raw)
-            start = scene.enemy_start if key == "enemies" else 8
-            stride = 116 if key == "enemies" else 56
-            limit = scene.type_count if key == "enemies" else scene.pattern_count
+            start, stride, limit, _noun = self._layout(key, scene)
             for change in scene_changes:
                 index = change.get("record")
                 values = change.get("values")
@@ -403,9 +577,13 @@ class BattleSceneStore:
                 base = start + index * stride
                 for field_key, value in values.items():
                     field = fields.get(field_key)
-                    if field is None:
+                    if field is not None:
+                        scene.write(base, field, value)
+                        continue
+                    bit = bits.get(field_key)
+                    if bit is None:
                         raise ValueError(f"{field_key} is not editable")
-                    scene.write(base, field, value)
+                    scene.write_bits(base, bit, value)
             target = self.project_root / self.relative(name)
             if project is None and target.exists():
                 raise RuntimeError(f"Battle scene {name} appeared in the project. Reload before saving.")

@@ -51,6 +51,39 @@ class FF9DataMapGuiTests(unittest.TestCase):
             self.assertIn((filename, "not-integrated", "unavailable", False), rows,
                           f"{filename!r} must stay visible and non-openable")
 
+    def test_rows_distinguish_editable_from_placeholders(self):
+        for row in self.rows():
+            self.assertIn(row["status"], {"integrated", "partial", "not-integrated"},
+                          f"Data Map row {row['filename']!r} has no honest status")
+            self.assertIn("coverage", row)
+            self.assertIsInstance(row["openable"], bool)
+            if row["openable"]:
+                self.assertIn(row["status"], {"integrated", "partial"},
+                              f"Openable row {row['filename']!r} must be an editable area")
+                self.assertTrue(row.get("target"),
+                                f"Openable row {row['filename']!r} must resolve to a tab")
+            else:
+                self.assertEqual(row["status"], "not-integrated",
+                                 f"Closed row {row['filename']!r} must be an explicit gap")
+
+    def test_battle_datasets_are_openable_structured_rows(self):
+        from plugins.ff9 import server
+        from plugins.ff9.battle_scene import BattleSceneStore
+        with tempfile.TemporaryDirectory() as name, \
+                patch.object(server, "catalog", return_value=[]), \
+                patch.object(server.paths, "GAME_ROOT", Path(name)):
+            rows = {row["datasetKey"]: row for row in server.data_map()["rows"]
+                    if row.get("datasetKey") in BattleSceneStore.KEYS}
+        self.assertEqual(set(rows), {"enemies", "encounters", "enemy-attacks", "scene-flags"})
+        self.assertEqual({rows["enemies"]["target"], rows["enemy-attacks"]["target"]},
+                         {"enemies"})
+        self.assertEqual({rows["encounters"]["target"], rows["scene-flags"]["target"]},
+                         {"encounters"})
+        for key, row in rows.items():
+            self.assertEqual((row["status"], row["coverage"], row["openable"]),
+                             ("integrated", "structured", True), key)
+            self.assertTrue(row["controls"], key)
+
 
 if __name__ == "__main__":
     unittest.main()

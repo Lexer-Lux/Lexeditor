@@ -41,3 +41,8 @@ completion.
 
 - Exact-head audit at origin/master 89f7f532 (branch agents/actionables-ff9): FF9 pytest 158 passed, node 18 passed, ff9 smoke/check/credits/features-determinism/rendered browser all pass; see github-74.md for the full list.
 - No code change: #522 still waits on Lexer per-family pursue-or-exclude decisions, and #523/#524/#525 remain pending their human checklists. Parent stays actionable and must not be merge-closed.
+
+## 2026-09-23 --- agents/actionables-ff9: implementation, tracker unchanged
+
+- Implemented enemy-attack + battle-flag structured editing on this branch (see github-74.md); Data Map editable/placeholder distinction extended and contract-tested. `ui/credits.json` regenerated (it embeds the updated THIRD_PARTY.md citations).
+- No scope change for #522 (still waiting on Lexer per-family decisions for battle geometry/assets and other p0data gaps) or #523/#524/#525 (human checklists stand). Parent stays actionable and must not be merge-closed.
