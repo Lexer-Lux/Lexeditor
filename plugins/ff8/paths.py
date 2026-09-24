@@ -48,7 +48,7 @@ def check() -> list[str]:
     """Check plugin support files. The launcher checks the game installation."""
     problems: list[str] = []
     for relative in (
-        "editor.html", "server.py", "formats.py", "extractor.py", "game_font.py",
+        "editor.html", "server.py", "formats.py", "extractor.py", "game_font.py", "editor_settings.py",
         "gameplay_settings.py", "flat_stat_abilities.py", "max_spell.py", "mug_drops.py",
         "single_gf.py", "game_icons.py",
         "ffnx_issue_51/runtime_config.py", "ffnx_issue_51/runtime_package.py",

@@ -10,7 +10,7 @@ from pathlib import Path
 import tempfile
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import card_art, cards, field_data, featured_mods, formats, gameplay_settings, paths, runtime_layout, world_geometry, world_map, world_textures
+from . import card_art, cards, editor_settings, field_data, featured_mods, formats, gameplay_settings, paths, runtime_layout, world_geometry, world_map, world_textures
 from .game_icons import icon_path, portrait_path
 from .extractor import baseline_ready, manifest_path
 from .ffnx_manager import status as ffnx_status
@@ -243,6 +243,8 @@ class Handler(PluginRequestHandler):
                 self.json_response(formats.init_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/settings":
                 self.json_response(gameplay_settings.payload())
+            elif path == "/api/editor-settings":
+                self.json_response(editor_settings.load())
             elif path == "/api/settings/runtime":
                 self.json_response(gameplay_settings.runtime_status())
             elif path == "/api/platform-config":
@@ -326,6 +328,8 @@ class Handler(PluginRequestHandler):
                 self.json_response(formats.save_init(body.get("edits", [])))
             elif path == "/api/settings/save":
                 self.json_response(gameplay_settings.save(body))
+            elif path == "/api/editor-settings/save":
+                self.json_response(editor_settings.save(body))
             elif path == "/api/mods/configure":
                 rows = runtime_layout.configure(
                     paths.PROJECT_ROOT, paths.MODS_ROOT,
