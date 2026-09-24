@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import re
 import shutil
 import tempfile
 from typing import Callable
@@ -24,9 +23,7 @@ BASE_TARGETS = {
     ),
     "battle": ("scene.out",),
 }
-BASELINE_FORMAT = 4
-# Playable-character battle bodies (dXc) and weapons (dXw) for the Models tab.
-CHARACTER_MODEL = re.compile(r"d[0-9a-f][cw][0-9]{3}\.dat")
+BASELINE_FORMAT = 3
 SOURCE_COMMIT = "343d97e9e15023b15b2956b30c1c80cd93969164"
 
 
@@ -104,8 +101,6 @@ def prepare(game_root: Path | None = None, data_root: Path | None = None,
         archives[archive_name] = archive
         targets.extend((archive_name, archive.find(name)) for name in names)
     targets.extend(("battle", entry) for entry in archives["battle"].matching("c0m", ".dat"))
-    targets.extend(("battle", entry) for entry in archives["battle"].entries
-                   if CHARACTER_MODEL.fullmatch(entry.basename))
     total = len(targets)
     with tempfile.TemporaryDirectory(prefix="lexeditor-ff8-baseline-", dir=str(root.parent)) as temp_name:
         temp_root = Path(temp_name) / "baseline"

@@ -32,6 +32,7 @@ from PIL import Image
 from theme_sounds import entry_wav, read_ff8_entries
 
 from . import formats, paths, runtime_layout, world_textures
+from .fs_archive import FsArchive
 
 try:
     import tomllib
@@ -79,6 +80,7 @@ REDUCED_WEAPON_SECTIONS = (
     "Textures",
 )
 MODEL_FILENAME = re.compile(r"[a-z0-9][a-z0-9_.-]*\.(dat|x)", re.IGNORECASE)
+CHARACTER_MODEL = re.compile(r"d[0-9a-f][cw][0-9]{3}\.dat")
 BODY_FILENAME = re.compile(r"d([0-9a-f])c(\d{3})\.dat", re.IGNORECASE)
 WEAPON_FILENAME = re.compile(r"d([0-9a-f])w(\d{3})\.dat", re.IGNORECASE)
 MONSTER_FILENAME = re.compile(r"c0m(\d{3})\.dat", re.IGNORECASE)
@@ -184,6 +186,37 @@ def _field_names() -> set[str]:
         return set()
     return {str(row.get("name", "")).casefold()
             for row in rows if row.get("name")}
+
+
+def ensure_character_models() -> int:
+    """Extract battle character/weapon models into the baseline on demand.
+
+    The bulk extractor skips these so existing baselines keep working; the
+    first Models visit pays one small extraction instead. Returns how many
+    files were extracted.
+    """
+    folder = paths.BASELINE_ROOT / "battle"
+    prefix = paths.GAME_ROOT / "Data" / "lang-en" / "battle"
+    if not prefix.with_suffix(".fl").is_file():
+        return 0
+    archive = FsArchive(prefix)
+    missing = [entry for entry in archive.entries
+               if CHARACTER_MODEL.fullmatch(entry.basename)
+               and not (folder / entry.basename).is_file()]
+    if not missing:
+        return 0
+    folder.mkdir(parents=True, exist_ok=True)
+    for entry in missing:
+        data = archive.extract(entry)
+        handle, temporary = tempfile.mkstemp(
+            prefix=".model-", suffix=".dat", dir=folder)
+        try:
+            with os.fdopen(handle, "wb") as stream:
+                stream.write(data)
+            Path(temporary).replace(folder / entry.basename)
+        finally:
+            Path(temporary).unlink(missing_ok=True)
+    return len(missing)
 
 
 def _audio_paths() -> tuple[Path, Path]:
@@ -662,6 +695,9 @@ def sfx_rows(dataset: str = "current") -> dict:
             "rate": int(entry["rate"]),
             "bits": int(entry["bits"]),
             "bytes": int(entry["length"]),
+            "codec": ("ADPCM" if int(entry["tag"]) == 2
+                      else "PCM" if int(entry["tag"]) == 1
+                      else f"format {int(entry['tag'])}"),
             "loop": valid and int(entry["flags"]) == 1,
             "durationMs": _sfx_duration_ms(entry) if valid else None,
             "usedBy": ACTOR_SOUNDS.get(str(sound_id), []),
@@ -669,8 +705,24 @@ def sfx_rows(dataset: str = "current") -> dict:
             "config": config.get(str(sound_id), {}) if isinstance(config, dict) else {},
             "note": "" if valid else "Unused placeholder entry in audio.fmt.",
         })
-    payload: dict = {"rows": rows, "unrecognized": unrecognized,
-                     "externalSfx": _external_sfx_enabled()}
+    for entry in unrecognized:
+        rows.append({
+            "id": f"file:{entry['file']}",
+            "kind": "sfx",
+            "name": Path(entry["file"]).name,
+            "valid": False,
+            "channels": None,
+            "rate": None,
+            "bits": None,
+            "bytes": entry["sizeBytes"],
+            "loop": False,
+            "durationMs": None,
+            "usedBy": [],
+            "modFiles": [entry],
+            "config": {},
+            "note": entry["note"],
+        })
+    payload: dict = {"rows": rows, "externalSfx": _external_sfx_enabled()}
     if isinstance(config, dict) and config.get("error"):
         payload["configError"] = config["error"]
     return payload
@@ -836,14 +888,17 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
             "cover only the verified parts.")
     if filename in mod_only_files:
         note = row["note"] + (f" {note}" if note else "")
+    counts = info["counts"] or {}
     row.update(modelKind=kind, name=name, sections=info["sections"],
                counts=info["counts"], tims=info["tims"],
+               vertices=counts.get("vertices"), timCount=len(info["tims"]),
                sizeBytes=info["sizeBytes"], sha256=info["sha256"],
                enemyId=enemy_id, note=note)
     return row
 
 
 def model_rows(dataset: str = "current") -> dict:
+    ensure_character_models()
     archive = _battle_archive_index()
     archive_sizes = {entry["file"]: entry["sizeBytes"] for entry in archive}
     filenames = [entry["file"] for entry in archive]
@@ -880,6 +935,7 @@ def model_rows(dataset: str = "current") -> dict:
 def model_dat_bytes(filename: str, dataset: str = "current") -> bytes:
     if not MODEL_FILENAME.fullmatch(filename) or "/" in filename or "\\" in filename:
         raise ValueError("Model export needs a battle archive filename")
+    ensure_character_models()
     data, _override = _model_bytes(filename.casefold(), dataset)
     return data
 
@@ -978,9 +1034,11 @@ def texture_rows(dataset: str = "current") -> dict:
         else:
             claims.setdefault(asset_id, []).append(entry)
     rows: list[dict] = []
+    matched: set[str] = set()
     for entry in texl:
         texture_id = int(entry["id"])
         asset_id = f"texl:{texture_id}"
+        matched.add(asset_id)
         rows.append({
             "id": f"texl/{texture_id}",
             "kind": "texture",
@@ -1001,6 +1059,7 @@ def texture_rows(dataset: str = "current") -> dict:
     for row in models:
         for tim in row.get("tims") or []:
             asset_id = f"model:{row['file']}"
+            matched.add(asset_id)
             rows.append({
                 "id": f"battle/{row['file']}#{tim['index']}",
                 "kind": "texture",
@@ -1018,6 +1077,30 @@ def texture_rows(dataset: str = "current") -> dict:
                 "editor": "models",
                 "note": ("Replace the whole model file on the Models tab; "
                          "in-place texture swaps inside a model are not supported."),
+            })
+    for asset_id, entries in sorted(claims.items()):
+        if asset_id in matched:
+            continue
+        base = asset_id.partition(":")[2]
+        for entry in entries:
+            rows.append({
+                "id": f"file:{entry['file']}",
+                "kind": "texture",
+                "name": Path(entry["file"]).name,
+                "source": "Mod file",
+                "modelFile": None,
+                "timIndex": None,
+                "width": None,
+                "height": None,
+                "depth": None,
+                "paletteCount": None,
+                "ffnxBase": f"battle/{base}" if asset_id.startswith("model:") else (
+                    f"world/dat/texl/{base}"),
+                "modFiles": [entry],
+                "mapped": False,
+                "editor": None,
+                "note": (f"Targets {base}, whose textures are not decoded in "
+                         "this dataset; kept visible so no mod file is lost."),
             })
     for entry in unmapped:
         rows.append({
@@ -1059,6 +1142,7 @@ def texture_png_bytes(texture_id: str, palette: int = 0,
             tim_index = int(index_text)
         except (TypeError, ValueError) as error:
             raise ValueError("Battle texture needs a numeric TIM index") from error
+        ensure_character_models()
         data, _override = _model_bytes(inner.casefold(), dataset)
         info = _model_file_info_from_bytes(inner.casefold(), data)
         tims = info.get("tims") or []
