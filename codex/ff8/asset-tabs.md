@@ -132,3 +132,47 @@ The 20 world texl TIMs keep their existing validated editor under
 Maps > World; the Textures tab previews them and links there instead of
 growing a second editor. Field backgrounds likewise stay edited under
 Maps > Field.
+
+## Research 8-8: Deling's "Additional characters" tab (not implemented)
+
+Deling's "Additional characters" tab is `TdwWidget`
+(`src/widgets/TdwWidget.h`, `tabName() == "Additional characters"`). It
+edits the per-field-map `.tdw` additional-font file
+(`TdwFile::filterText() == "Field additionnal fonts PC file (*.tdw)"`),
+not NPC or playable-character placement. Lexeditor's script-label-only
+view of field entities is unrelated to this tab.
+
+Format, proved by Deling `src/files/TdwFile.cpp` (GPL-3.0-or-later):
+
+- u32 `posHeader` (always 8), u32 `posData`, then packed 4-bit
+  character widths (112 bytes per 224-character table, low nibble
+  first), then a standard 4-bit TIM with 8, 16, or 32 palettes (8 text
+  colours: dark grey, grey, yellow, red, green, blue, purple, white).
+- Glyphs are 12x12 pixel cells in a 21-column grid. Deling paints
+  individual glyph pixels, edits one width nibble per character, and
+  imports whole sheets; the tab previews the sheet in each colour.
+
+Retail facts, probed from the installed `Data/lang-en/field.fs`:
+
+- 879 of 896 field-map triplets ship a `<map>.tdw` (about 2 KB each).
+- Every shipped file is small: 635 carry one partial table (up to a
+  few dozen characters), 244 carry palettes only (empty header, zero
+  tables). None uses more than one table.
+- Decoded samples render Japanese kanji: these are the extra glyphs a
+  field's dialogue needs beyond the main menu font.
+
+Safety and scope proposal (implementation explicitly out of scope):
+
+- Same-count pixel and width edits are the safe core: the format is
+  fully mapped, cell geometry is fixed, and the file would save
+  through the existing per-asset field pipeline
+  (`direct/field/mapdata/<group>/<name>/<map>.tdw`), next to the
+  dialogue and script overrides. In-game verification is still needed.
+- Count-changing edits (new glyphs or tables) wait until MSD
+  table/character references are mapped; Lexeditor's MSD decoder does
+  not document table-switch codes yet, so nothing may renumber the
+  characters existing lines reference.
+- Proposed slice: per-map read-only glyph-grid preview first, then
+  pixel/width editing at a fixed character count with no-op-exact
+  saves, reusing the TIM decoder behind the Textures tab. Deling
+  stays the reference implementation; no Deling code is vendored.
