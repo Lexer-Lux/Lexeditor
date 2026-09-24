@@ -77,7 +77,7 @@
       /* Every value sits in the same recessed slab the game uses. */
       --lex-input-fg:#fff;--lex-input-border:2px solid;
       --lex-input-border-color:#292929 #a5a5a5 #a5a5a5 #292929;--lex-input-radius:0;
-      --lex-input-bg:#3b3b3b;--lex-input-shadow:none;--lex-input-text-shadow:inherit;
+      --lex-input-bg:#3b3b3b;--lex-input-shadow:none;--lex-input-text-shadow:var(--lex-text-shadow);
       --lex-field-padding:6px 8px;
 
       /* Section titles keep the game lettering and separate content with a line. */
