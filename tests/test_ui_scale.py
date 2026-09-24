@@ -6,9 +6,9 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from settings_manager import SettingsStore
-from desktop_host import HostApi
-from windows_host import set_ui_scale
+from core.settings_manager import SettingsStore
+from core.desktop_host import HostApi
+from core.windows_host import set_ui_scale
 
 class ScaleTests(unittest.TestCase):
     def test_saved_range_and_native_policy(self):
@@ -17,7 +17,7 @@ class ScaleTests(unittest.TestCase):
             api=HostApi.__new__(HostApi)
             api._settings=store
             api._bound_window=lambda: "window"
-            with patch("desktop_host.set_ui_scale") as apply:
+            with patch("core.desktop_host.set_ui_scale") as apply:
                 for percent in (50,100,150):
                     self.assertEqual(api.ui_scale(percent),{"percent":percent})
                     apply.assert_called_with("window",percent)
@@ -28,7 +28,7 @@ class ScaleTests(unittest.TestCase):
         settings=SimpleNamespace(IsZoomControlEnabled=True,IsPinchZoomEnabled=True)
         view=SimpleNamespace(CoreWebView2=SimpleNamespace(Settings=settings),ZoomFactor=1)
         native=SimpleNamespace(webview=view)
-        with patch("windows_host._invoke",side_effect=lambda _,fn:fn()):
+        with patch("core.windows_host._invoke",side_effect=lambda _,fn:fn()):
             set_ui_scale(SimpleNamespace(native=native),125)
         self.assertEqual(view.ZoomFactor,1.25)
         self.assertFalse(settings.IsZoomControlEnabled)

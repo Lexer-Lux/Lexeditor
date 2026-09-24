@@ -9,9 +9,9 @@ from pathlib import Path
 import threading
 
 
-ROOT = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parent / "out")) / "Lexeditor"
+ROOT = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parents[1] / "out")) / "Lexeditor"
 DEFAULT_PATH = ROOT / "settings.json"
-PACKAGED_DEFAULTS_PATH = Path(__file__).resolve().parent / "ui" / "default_settings.json"
+PACKAGED_DEFAULTS_PATH = Path(__file__).resolve().parents[1] / "ui" / "default_settings.json"
 UPDATE_FREQUENCIES = {
     "every-launch": ("Every launch", 0),
     "daily": ("Daily", 24 * 60 * 60),

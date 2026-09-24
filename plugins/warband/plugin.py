@@ -9,8 +9,8 @@ import urllib.request
 import urllib.parse
 from pathlib import Path
 
-from plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProjectSpec
-from service_session import LocalPluginSession, request_json
+from core.plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProjectSpec
+from core.service_session import LocalPluginSession, request_json
 
 from . import paths, wse2_manager
 from .project_import import prepare_existing_project
@@ -42,7 +42,7 @@ class WarbandSession(LocalPluginSession):
 
 
 def launch() -> int:
-    from desktop_host import run_host
+    from core.desktop_host import run_host
     return run_host({"warband": PLUGIN}, "warband")
 
 

@@ -86,7 +86,7 @@ def build_app() -> Path:
     datas.append((str(notices),'ui'))
     modules=['plugins.'+p.parent.name+'.plugin' for p in (ROOT/'plugins').glob('*/plugin.py')]
     sys.path.insert(0,str(ROOT))
-    from runtime_bootstrap import SERVICE_MODULES
+    from core.runtime_bootstrap import SERVICE_MODULES
     modules+=sorted(SERVICE_MODULES)
     modules+=['webview.platforms.cocoa'] if sys.platform=='darwin' else ['webview.platforms.winforms','webview.platforms.edgechromium'] if os.name=='nt' else ['webview.platforms.qt']
     # Include text/license provenance, not executables, game DLLs or private exports.
@@ -105,6 +105,7 @@ def build_app() -> Path:
 from PyInstaller.utils.hooks import collect_submodules
 hiddenimports={modules!r}
 hiddenimports += collect_submodules("plugins")
+hiddenimports += collect_submodules("core")
 a=Analysis([{str(ROOT/'app.py')!r}], pathex=[{str(ROOT)!r}], binaries=[], datas={datas!r},
  hiddenimports=hiddenimports, hookspath=[], runtime_hooks=[], excludes=["pytest","playwright","tkinter"], noarchive=False)
 pyz=PYZ(a.pure)

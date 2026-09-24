@@ -1,7 +1,7 @@
 from pathlib import Path
 import sys,tempfile,ast,math,re
 sys.path.insert(0,str(Path.cwd()))
-from game_data_location import find_original_location
+from core.game_data_location import find_original_location
 with tempfile.TemporaryDirectory() as td:
  root=Path(td);cache=root/'cache';cache.mkdir();game=root/'game';game.mkdir();(cache/'menu').mkdir();target=cache/'menu'/'a.bin';target.write_bytes(b'original');(game/'lml').mkdir();(game/'lml'/'a.bin').write_bytes(b'mod')
  assert find_original_location('menu/a.bin',[cache],game)==target.resolve()

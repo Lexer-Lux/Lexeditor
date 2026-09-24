@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import hashlib
 import pytest
 
-import reshade_projects as rp
+from core import reshade_projects as rp
 
 
 
@@ -248,7 +248,7 @@ def test_the_hud_addon_matches_the_build_and_leaves_with_reshade(tmp_path):
 
 def test_every_lexerian_effect_ships():
     from tools.build_distribution import VENDORED_HELPERS
-    root = Path(rp.__file__).resolve().parent
+    root = Path(rp.__file__).resolve().parents[1]
     shipped = {(root/path).resolve() for path in VENDORED_HELPERS}
     for effect in rp.BUNDLED_SHADERS.iterdir():
         assert effect.resolve() in shipped, effect.name

@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from plugins.ff7.plugin import DISPLAY_NAME, FF7Session, kernel_save_payload
 from plugins.ff7_2013.plugin import FF7LegacySession, PLUGIN as LEGACY_PLUGIN
-from service_session import request_json
+from core.service_session import request_json
 
 import verify_ff7_completion as complete
 import verify_ff7_datasets as fixtures

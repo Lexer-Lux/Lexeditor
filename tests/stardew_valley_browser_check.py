@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from plugins.stardew_valley.content_pack import initialize_project  # noqa: E402
 from plugins.stardew_valley.plugin import StardewValleySession  # noqa: E402
-from service_session import request_json  # noqa: E402
+from core.service_session import request_json  # noqa: E402
 from plugins.stardew_valley.source_data import objects_source_path  # noqa: E402
 
 

@@ -22,7 +22,7 @@ from pathlib import Path
 
 # The client itself lives in tools/, which is not on the path of a verifier
 # that only adds the repository root.
-sys.path.insert(0, str(Path(__file__).resolve().parent / "tools"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 from cdp import (  # noqa: E402,F401
     OUT,

@@ -35,8 +35,8 @@ def page_source(plugin):
 
 framework = text("ui/framework.js")
 css = text("ui/framework.css")
-host = text("desktop_host.py")
-github = text("github_integration.py")
+host = text("core/desktop_host.py")
+github = text("core/github_integration.py")
 blank = page_source("plugins/blank")
 warband = page_source("plugins/warband")
 
@@ -96,7 +96,7 @@ require('repository.issue_label' in github and '"--label"' in github,
         "GitHub issue listing must apply the game label filter")
 
 # There is one owner-authenticated Developer Mode and no legacy Lexer Mode.
-for path in ("desktop_host.py", "settings_manager.py", "ui/framework.js"):
+for path in ("core/desktop_host.py", "core/settings_manager.py", "ui/framework.js"):
     require("lexerMode" not in text(path), f"legacy lexerMode remains in {path}")
 require("developerAuthorized" in host,
         "host must expose owner authorization for automatic Developer Mode")

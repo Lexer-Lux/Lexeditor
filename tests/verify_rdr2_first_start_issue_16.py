@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 from plugins.rdr2 import extractor  # noqa: E402
 from plugins.rdr2 import server as rdr2_server  # noqa: E402
 from plugins.rdr2.plugin import PLUGIN, Rdr2Session  # noqa: E402
-from game_installation import GameInstallationManager  # noqa: E402
+from core.game_installation import GameInstallationManager  # noqa: E402
 
 
 DEFAULT_GAME = Path(
@@ -75,8 +75,8 @@ def verify_copied_clean_install() -> None:
         # service_session imports runtime_bootstrap, so a "minimum install"
         # without it is not one: the probe died on the import rather than on
         # anything this check is about.
-        for relative in ("plugin_api.py", "service_session.py", "game_installation.py",
-                         "runtime_bootstrap.py"):
+        for relative in ("core/plugin_api.py", "core/service_session.py", "core/game_installation.py",
+                         "core/runtime_bootstrap.py"):
             shutil.copy2(ROOT / relative, copied_root / relative)
         (copied_root / "plugins").mkdir(exist_ok=True)
         shutil.copy2(ROOT / "plugins" / "__init__.py", copied_root / "plugins" / "__init__.py")

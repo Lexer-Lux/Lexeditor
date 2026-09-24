@@ -10,8 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import desktop_host
-from desktop_host import HostApi
+from core import desktop_host
+from core.desktop_host import HostApi
 from plugins.ff8.plugin import PLUGIN
 
 

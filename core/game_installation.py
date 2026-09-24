@@ -13,10 +13,10 @@ except ImportError:
     winreg = None
 from pathlib import Path
 
-from plugin_api import GamePlugin, plugin_helpers
+from core.plugin_api import GamePlugin, plugin_helpers
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 LOCAL_DATA = Path(os.environ.get("LOCALAPPDATA", ROOT / "out")) / "Lexeditor"
 DEFAULT_CONFIG = LOCAL_DATA / "game-installations.json"
 DEFAULT_DATA_ROOT = LOCAL_DATA / "game-data"

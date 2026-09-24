@@ -8,8 +8,8 @@ shows the actual first problem instead of a generic sentence.
 """
 from pathlib import Path
 
-from plugin_api import GamePlugin, ModProjectSpec
-from project_manager import ProjectManager
+from core.plugin_api import GamePlugin, ModProjectSpec
+from core.project_manager import ProjectManager
 
 
 def _plugin(default_root: Path) -> GamePlugin:
@@ -51,7 +51,7 @@ def test_incomplete_project_keeps_per_file_lines(tmp_path):
 
 
 def test_support_check_failure_names_its_problem(tmp_path):
-    from game_installation import GameInstallationManager
+    from core.game_installation import GameInstallationManager
 
     plugin = GamePlugin(
         plugin_id="probe-broken",

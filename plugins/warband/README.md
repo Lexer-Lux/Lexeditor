@@ -80,7 +80,7 @@ From an isolated Lexeditor checkout:
 .\.venv\Scripts\python.exe app.py --game warband
 .\.venv\Scripts\python.exe app.py --game warband --check
 .\.venv\Scripts\python.exe app.py --game warband --smoke
-tools\Warband-checks.cmd --checks-only
+.\.venv\Scripts\python.exe tools\check_plugin.py warband
 ```
 
 The smoke/fixture checks use temporary data and do not establish actual

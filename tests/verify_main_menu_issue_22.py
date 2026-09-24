@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app import discover_plugins  # noqa: E402
-from cover_art import CoverArtCache  # noqa: E402
+from core.cover_art import CoverArtCache  # noqa: E402
 
 
 def jpeg() -> bytes:
@@ -26,7 +26,7 @@ def jpeg() -> bytes:
 def main() -> int:
     plugins = discover_plugins()
     chooser = (ROOT / "ui" / "chooser.html").read_text(encoding="utf-8")
-    desktop = (ROOT / "desktop_host.py").read_text(encoding="utf-8")
+    desktop = (ROOT / "core/desktop_host.py").read_text(encoding="utf-8")
 
     for required in (
         "aspect-ratio:2/3", 'class="state-indicator"',

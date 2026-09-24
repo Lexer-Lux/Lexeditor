@@ -9,8 +9,8 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from github_integration import GitHubIntegration
-from plugin_api import GitHubRepository
+from core.github_integration import GitHubIntegration
+from core.plugin_api import GitHubRepository
 
 REPOSITORY = GitHubRepository(full_name="Lexer-Lux/Lexeditor",
                               authorized_logins=("Lexer-Lux",))

@@ -16,10 +16,10 @@ import urllib.request
 import zipfile
 from typing import Callable
 
-import process_probe
-from settings_manager import SettingsStore
+from core import process_probe
+from core.settings_manager import SettingsStore
 from .ffnx_issue_51 import runtime_package
-from plugin_files import fetch_file
+from core.plugin_files import fetch_file
 
 
 LOCAL_DATA = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parents[2] / "out")) / "Lexeditor"

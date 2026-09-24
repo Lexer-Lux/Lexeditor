@@ -10,7 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from settings_manager import SettingsStore  # noqa: E402
+from core.settings_manager import SettingsStore  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:
@@ -21,8 +21,8 @@ def require(condition: bool, message: str) -> None:
 def main() -> int:
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
     css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-    desktop = (ROOT / "desktop_host.py").read_text(encoding="utf-8")
-    settings_source = (ROOT / "settings_manager.py").read_text(encoding="utf-8")
+    desktop = (ROOT / "core/desktop_host.py").read_text(encoding="utf-8")
+    settings_source = (ROOT / "core/settings_manager.py").read_text(encoding="utf-8")
     ff8 = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
     require("const hoverable = options =>" in framework and "hoverable," in framework,
             "the shared framework must own and export hoverables")

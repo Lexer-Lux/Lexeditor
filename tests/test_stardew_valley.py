@@ -86,7 +86,7 @@ class StardewContentPackTests(unittest.TestCase):
             'label: "Sell price"', 'label: "Edibility"', 'label: "Drink"',
         ):
             self.assertIn(token, javascript)
-        self.assertIn("from plugin_http import PluginRequestHandler", server_source)
+        self.assertIn("from core.plugin_http import PluginRequestHandler", server_source)
         self.assertIn("self.send_page_module(PLUGIN_ROOT, path)", server_source)
 
     def test_project_identity_is_stable_and_distinguishes_same_named_projects(self):

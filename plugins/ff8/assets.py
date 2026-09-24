@@ -29,7 +29,7 @@ import tempfile
 
 from PIL import Image
 
-from theme_sounds import entry_wav, read_ff8_entries
+from core.theme_sounds import entry_wav, read_ff8_entries
 
 from . import formats, paths, runtime_layout, world_textures
 from .fs_archive import FsArchive

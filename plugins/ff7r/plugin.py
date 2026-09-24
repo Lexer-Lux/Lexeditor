@@ -7,13 +7,13 @@ import tempfile
 from pathlib import Path
 from urllib.parse import quote
 
-from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
-from runtime_bootstrap import user_data_dir
-from service_session import project_session, request_json
+from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.runtime_bootstrap import user_data_dir
+from core.service_session import project_session, request_json
 
 from .tooling import REPAK_TAG, helper_install, helper_status, upstream_release
 from .mod_support import PakModAdapter
-from managed_mods import ManagedModSpec
+from core.managed_mods import ManagedModSpec
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,7 +41,7 @@ class FF7RSession(project_session(
 
 
 def launch() -> int:
-    from desktop_host import run_host
+    from core.desktop_host import run_host
     return run_host({"ff7r": PLUGIN}, "ff7r")
 
 

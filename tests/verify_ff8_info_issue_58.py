@@ -11,7 +11,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from desktop_host import HostApi  # noqa: E402
+from core.desktop_host import HostApi  # noqa: E402
 from plugins.ff8 import extractor, paths, server  # noqa: E402
 
 

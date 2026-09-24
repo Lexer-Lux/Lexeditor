@@ -6,8 +6,8 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
-from service_session import LocalPluginSession, request_json
+from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.service_session import LocalPluginSession, request_json
 
 from . import paths
 from .content_pack import ContentPackStore, deploy, initialize_project
@@ -35,7 +35,7 @@ class StardewValleySession(LocalPluginSession):
 
 
 def launch() -> int:
-    from desktop_host import run_host
+    from core.desktop_host import run_host
     return run_host({"stardew-valley": PLUGIN}, "stardew-valley")
 
 

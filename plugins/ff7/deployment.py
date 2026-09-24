@@ -21,7 +21,7 @@ import shutil
 import struct
 import tempfile
 
-from platform_config import load_config
+from core.platform_config import load_config
 
 from . import datasets, mod_stack, tooling
 from .archives import LGP

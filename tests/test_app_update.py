@@ -5,8 +5,8 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-import app_update as update
-from desktop_host import HostApi
+from core import app_update as update
+from core.desktop_host import HostApi
 
 
 class ReleaseUpdateTests(unittest.TestCase):

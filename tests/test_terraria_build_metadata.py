@@ -10,7 +10,7 @@ import unittest
 from plugins.terraria.build_metadata import parse_build_text, update_build_text
 from plugins.terraria import plugin as terraria_plugin
 from plugins.terraria import server
-from project_manager import ProjectManager
+from core.project_manager import ProjectManager
 
 
 class TerrariaBuildMetadataTests(unittest.TestCase):

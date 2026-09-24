@@ -17,7 +17,7 @@ import tempfile
 from typing import Any
 
 from . import build as package_build
-from plugin_files import atomic_write
+from core.plugin_files import atomic_write
 
 
 STEAM_APP_ID = "1623730"

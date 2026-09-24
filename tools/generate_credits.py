@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from plugin_metadata import static_plugin_ids, validate_credits_bundle
+from core.plugin_metadata import static_plugin_ids, validate_credits_bundle
 
 
 def read(relative: str) -> str:

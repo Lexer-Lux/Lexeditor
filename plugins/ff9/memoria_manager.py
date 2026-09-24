@@ -22,7 +22,7 @@ from typing import Callable
 
 from .memoria_patcher import PayloadFile, inspect_payload, installation_files
 from .memoria_recovery import Recovery, atomic_json, digest, install_lock, root_key, verify_install
-from plugin_files import atomic_write, fetch_file
+from core.plugin_files import atomic_write, fetch_file
 
 LOCAL_DATA = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parents[2] / "out")) / "Lexeditor"
 STATE_PATH = LOCAL_DATA / "helpers" / "memoria.json"

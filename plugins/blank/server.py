@@ -10,7 +10,7 @@ import tempfile
 import threading
 from pathlib import Path
 from urllib.parse import urlparse
-from plugin_http import PluginRequestHandler
+from core.plugin_http import PluginRequestHandler
 
 
 ROOT = Path(__file__).resolve().parents[2]

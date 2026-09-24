@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 
-from plugin_http import PluginRequestHandler
+from core.plugin_http import PluginRequestHandler
 from urllib.parse import urlparse
 
 from . import animationsmesh, core, craftrecipe, datamap, evolvedrecipe, fixing, fluid, mannequin, model, sound, timedaction, vehicle, zedscript

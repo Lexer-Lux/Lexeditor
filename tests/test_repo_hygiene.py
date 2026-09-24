@@ -32,6 +32,20 @@ def tracked() -> list[str]:
     return [p for p in out.decode("utf-8").split("\0") if p]
 
 
+ROOT_ENTRIES = {
+    ".gitattributes", ".gitignore", ".gitmodules", ".github", "AGENTS.md", "README.md",
+    "Lexeditor.cmd", "install.ps1", "app.py", "pytest.ini", "requirements.txt",
+    "requirements-test.txt", "assets", "codex", "core", "docs", "plugins", "shaders",
+    "tests", "tools", "ui", "worklog",
+}
+
+
+def test_repository_root_stays_small():
+    # Application modules belong in core/, checks in tests/, utilities in tools/.
+    top = {p.split("/", 1)[0] for p in tracked()}
+    assert top <= ROOT_ENTRIES, sorted(top - ROOT_ENTRIES)
+
+
 def test_no_working_folders_in_the_checkout():
     present = [name for name in FORBIDDEN if (ROOT / name).exists()]
     assert not present, f"remove {present}; keep working files in your scratchpad or %TEMP%/lexeditor-dev"

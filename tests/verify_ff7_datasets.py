@@ -33,7 +33,7 @@ from plugins.ff7.datasets import (
 # coexist and isinstance checks inside fontTools fail). Tests needing doubles
 # patch at test time instead.
 from plugins.ff7 import server
-import platform_config
+from core import platform_config
 
 PATHS = (Path("data/lang-en/kernel/KERNEL.BIN"), Path("ff7/workingdir/data/lang-en/kernel/kernel.bin"))
 COUNTS = {"commands": 32, "playerAttacks": 128, "items": 128, "weapons": 128, "armor": 32, "accessories": 32, "materia": 96}

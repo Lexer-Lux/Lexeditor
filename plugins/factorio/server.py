@@ -11,7 +11,7 @@ from pathlib import Path
 import threading
 from urllib.parse import parse_qs, urlparse
 
-from plugin_http import PluginRequestHandler
+from core.plugin_http import PluginRequestHandler
 
 from .data_map import build_data_map
 from .model import (

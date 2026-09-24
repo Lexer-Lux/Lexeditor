@@ -63,7 +63,7 @@ STUB = """
 def session_for(plugin_id: str, project: str | None):
     """Return the plugin's own session class, not the shared base class."""
     module = __import__(f"plugins.{plugin_id}.plugin", fromlist=["PLUGIN"])
-    from service_session import LocalPluginSession
+    from core.service_session import LocalPluginSession
     candidates = [getattr(module, name) for name in dir(module)]
     session_class = next(
         (value for value in candidates

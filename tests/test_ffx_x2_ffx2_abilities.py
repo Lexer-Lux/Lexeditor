@@ -11,7 +11,7 @@ from plugins.ffx_x2.ffx2_abilities import (
 )
 from plugins.ffx_x2.ffx2_table import FFX2TableError, parse_table
 from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
-from service_session import request_json
+from core.service_session import request_json
 
 
 def _record(name_offset: int, name_key: int, desc_offset: int, desc_key: int,

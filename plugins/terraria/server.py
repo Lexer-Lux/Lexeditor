@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 import threading
 from urllib.parse import parse_qs, urlparse
-from plugin_http import PluginRequestHandler
+from core.plugin_http import PluginRequestHandler
 
 from .assets import (
     ASSET_TYPES,

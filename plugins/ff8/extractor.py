@@ -157,7 +157,7 @@ def plugin_prepare(game_root: Path, data_root: Path, progress: Progress) -> dict
         paths.BASELINE_ROOT, formats.SECTIONS,
     )
     helper = ensure_ffnx(game_root, paths.RUNTIME_DIRECT_ROOT, progress)
-    from theme_sounds import ensure_theme_sounds
+    from core.theme_sounds import ensure_theme_sounds
     sounds = ensure_theme_sounds(game_root, data_root, ("Data/Sound",), {
         "confirm": 1, "move": 1, "back": 9, "exit": 9,
         "launch": 29, "save": 37,

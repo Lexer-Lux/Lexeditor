@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from mod_library import default_user_library_root
+from core.mod_library import default_user_library_root
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parent

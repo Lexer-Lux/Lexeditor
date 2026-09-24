@@ -2,7 +2,7 @@
 import threading
 import unittest
 from unittest.mock import Mock
-from desktop_host import HostApi
+from core.desktop_host import HostApi
 
 
 class HomeRestartTests(unittest.TestCase):

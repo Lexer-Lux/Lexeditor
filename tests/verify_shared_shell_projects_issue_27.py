@@ -9,8 +9,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from plugin_api import GamePlugin, ModProjectSpec  # noqa: E402
-from project_manager import ProjectManager  # noqa: E402
+from core.plugin_api import GamePlugin, ModProjectSpec  # noqa: E402
+from core.project_manager import ProjectManager  # noqa: E402
 
 
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")

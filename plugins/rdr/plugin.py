@@ -10,8 +10,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProjectSpec, PluginFont
-from service_session import project_session, request_json
+from core.plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProjectSpec, PluginFont
+from core.service_session import project_session, request_json
 from .extractor import ensure_rdr_data
 from .paths import LEXEDITOR_ROOT, MOD_ROOT, PLUGIN_ROOT, PROJECT_ROOT, RDR2_FONT_ROOT, check as check_paths
 
@@ -32,7 +32,7 @@ class RdrSession(project_session(
 
 
 def launch() -> int:
-    from desktop_host import run_host
+    from core.desktop_host import run_host
     return run_host({"rdr": PLUGIN}, "rdr")
 
 

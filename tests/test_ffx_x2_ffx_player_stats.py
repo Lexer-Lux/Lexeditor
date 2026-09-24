@@ -10,7 +10,7 @@ from plugins.ffx_x2.ffx_player_stats import (
     ARCHIVE_PATH, FFXPlayerStatsError, RECORD_SIZE, apply_edits, parse_player_stats, payload,
 )
 from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
-from service_session import request_json
+from core.service_session import request_json
 
 
 def _record(*, hp: int, mp: int, stats: tuple[int, ...], fill: int = 0xCC) -> bytes:

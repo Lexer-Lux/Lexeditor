@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from project_manager import ProjectManager
+from core.project_manager import ProjectManager
 
 
 class ProjectCreateRollbackTests(unittest.TestCase):

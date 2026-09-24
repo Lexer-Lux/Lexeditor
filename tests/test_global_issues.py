@@ -13,10 +13,10 @@ from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-import runtime_bootstrap as boot
+from core import runtime_bootstrap as boot
 boot.bootstrap_environment()
-from desktop_host import HostApi, choose_loading_quote, EXHAUSTED_QUOTE
-from plugin_api import GamePlugin, validate_plugin
+from core.desktop_host import HostApi, choose_loading_quote, EXHAUSTED_QUOTE
+from core.plugin_api import GamePlugin, validate_plugin
 
 
 class Quotes(unittest.TestCase):

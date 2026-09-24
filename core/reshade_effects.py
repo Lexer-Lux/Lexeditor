@@ -17,7 +17,7 @@ import re
 import shutil
 from pathlib import Path
 
-import reshade_projects
+from core import reshade_projects
 
 DEFAULTS_NAME = "reshade-defaults.ini"
 DEFAULT_PRESET = "ReShadePreset.ini"

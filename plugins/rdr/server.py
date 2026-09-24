@@ -24,7 +24,7 @@ from . import (camera_features, input_remaps, loot_script, map_icon_features,
 from .archive_deployment import (
     ArchiveSpec, deploy_archives, deployment_status, revert_archives,
 )
-from plugin_http import PluginRequestHandler
+from core.plugin_http import PluginRequestHandler
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parent

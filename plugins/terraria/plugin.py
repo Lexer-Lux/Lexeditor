@@ -8,8 +8,8 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
-from service_session import LocalPluginSession
+from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.service_session import LocalPluginSession
 from .runtime import inspect_runtime
 
 
@@ -166,7 +166,7 @@ def smoke() -> list[str]:
 
 
 def launch() -> int:
-    from desktop_host import run_host
+    from core.desktop_host import run_host
     return run_host({"terraria": PLUGIN}, "terraria")
 
 

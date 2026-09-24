@@ -9,7 +9,7 @@ from plugins.ffx_x2.gear_shops import (
     ARCHIVE_PATH, GearShopError, apply_edits, parse_gear_shops, payload,
 )
 from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
-from service_session import request_json
+from core.service_session import request_json
 
 
 def _record(rate: int, gear: list[int]) -> bytes:

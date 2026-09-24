@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from plugin_ui import plugin_ui
 sys.path.insert(0,str(ROOT))
-from settings_manager import SettingsStore
+from core.settings_manager import SettingsStore
 
 def main():
  with tempfile.TemporaryDirectory() as tmp:

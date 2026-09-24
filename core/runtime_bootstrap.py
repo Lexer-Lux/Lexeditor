@@ -53,7 +53,7 @@ def service_command(module: str, *, owned: bool = False) -> list[str]:
     if getattr(sys, 'frozen', False):
         return [sys.executable, '--plugin-service', module]
     if owned:
-        return [sys.executable, '-m', 'runtime_bootstrap', '--plugin-service', module]
+        return [sys.executable, '-m', 'core.runtime_bootstrap', '--plugin-service', module]
     return [sys.executable, '-m', module]
 
 
@@ -64,7 +64,7 @@ def dispatch_service(argv: list[str]) -> bool:
         raise ValueError('A bundled plugin service must name an allowed module')
     module = argv[1]
     if os.environ.get('LEXEDITOR_SERVICE_PIPE') == '1':
-        from service_lifetime import watch_host
+        from core.service_lifetime import watch_host
         watch_host()
     sys.argv = [module]
     runpy.run_module(module, run_name='__main__')

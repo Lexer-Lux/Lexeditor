@@ -302,7 +302,7 @@ class LaunchTests(unittest.TestCase):
 @unittest.skipUnless(os.name=="nt", "Windows host imports winreg")
 class HostControllerTests(unittest.TestCase):
     def test_warband_delegation_does_not_change_other_game_processes(self):
-        from desktop_host import HostApi
+        from core.desktop_host import HostApi
         import threading
         host=HostApi.__new__(HostApi)
         controller=SimpleNamespace(status=lambda:{'running':True,'pid':11},launch=lambda root,project:{'running':True,'module':project.name},stop=lambda:{'running':False})
@@ -317,7 +317,7 @@ class HostControllerTests(unittest.TestCase):
             self.assertFalse(host.stop_game('warband')['running'])
             self.assertFalse(host.game_process_status('other')['running'])
             process=SimpleNamespace(pid=22,poll=lambda:None)
-            with patch('desktop_host.subprocess.Popen',return_value=process) as spawn:
+            with patch('core.desktop_host.subprocess.Popen',return_value=process) as spawn:
                 self.assertEqual(host.launch_game('other')['pid'],22)
                 self.assertEqual(spawn.call_count,1)
 

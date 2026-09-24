@@ -4,8 +4,8 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from desktop_host import HostApi
-from game_installation import GameInstallationManager
+from core.desktop_host import HostApi
+from core.game_installation import GameInstallationManager
 from plugins.palworld.plugin import PLUGIN
 
 
@@ -28,7 +28,7 @@ class AbsentGameTests(unittest.TestCase):
             host._plugin_id = None
             host._font_errors = {}
             host._cover_art = Mock()
-            with patch("desktop_host.game_version", return_value=""), patch("desktop_host.font_status", return_value={}):
+            with patch("core.desktop_host.game_version", return_value=""), patch("core.desktop_host.font_status", return_value={}):
                 row = host.plugins()[0]
             self.assertEqual(row["status"], "not-added")
             self.assertFalse(row["canOpen"])

@@ -9,7 +9,7 @@ from plugins.ffx_x2.ffx2_accessories import (
     ARCHIVE_PATH, FFX2AccessoryError, apply_edits, parse_accessories, payload,
 )
 from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
-from service_session import request_json
+from core.service_session import request_json
 
 
 def _record(name_offset: int, name_key: int, help_offset: int, help_key: int,

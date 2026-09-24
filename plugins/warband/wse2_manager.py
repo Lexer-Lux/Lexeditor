@@ -21,8 +21,8 @@ import uuid
 import zipfile
 
 from functools import partial
-from game_version import game_version
-from upstream_fetch import fetch_json
+from core.game_version import game_version
+from core.upstream_fetch import fetch_json
 
 PINNED_RELEASE = "v1.1.5.1"
 PACKAGE_VERSION = "1.1.5.1-lex1"
@@ -155,7 +155,7 @@ def _assert_closed(root: Path) -> None:
     import ctypes
     from ctypes import wintypes
     # Use the shared structure but keep the query fail-closed for file writes.
-    from process_probe import PROCESSENTRY32W
+    from core.process_probe import PROCESSENTRY32W
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
     kernel.CreateToolhelp32Snapshot.restype = wintypes.HANDLE

@@ -7,7 +7,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from platform_config import load_config, save_config
+from core.platform_config import load_config, save_config
 
 
 FFNX = """# FFNx config file\n\n## DISPLAY\n#[FULLSCREEN]\n# If off, it will run in window mode.\nfullscreen = false\n\n#[RENDERING BACKEND]\n# Available choices are:\n# - 0: Auto\n# - 3: Direct3D11\nrenderer_backend = 0\n\n#[RESOLUTION]\n# Valid range: 0..7680\nwindow_size_x = 0\n\n#[MOD EXTENSIONS]\nmod_ext = [\"dds\", \"png\"]\n"""

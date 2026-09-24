@@ -17,8 +17,8 @@ from urllib.parse import parse_qs, urlparse
 
 from plugins.ff7r2 import packaging, shader_injector
 from plugins.ff7r2.dataobject import DataObjectError, DataObjectPackage
-from plugin_http import PluginRequestHandler
-import unreal_config  # shared Unreal Engine config editor (issue 478)
+from core.plugin_http import PluginRequestHandler
+from core import unreal_config  # shared Unreal Engine config editor (issue 478)
 
 
 ROOT = Path(__file__).resolve().parents[2]

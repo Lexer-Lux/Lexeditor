@@ -15,9 +15,9 @@ from .game_icons import icon_path, portrait_path
 from .extractor import baseline_ready, manifest_path
 from .ffnx_manager import status as ffnx_status
 from .game_font import ensure_font
-from theme_sounds import ensure_theme_sounds, sound_file
-from platform_config import load_config, save_config
-from plugin_http import PluginRequestHandler
+from core.theme_sounds import ensure_theme_sounds, sound_file
+from core.platform_config import load_config, save_config
+from core.plugin_http import PluginRequestHandler
 
 
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]

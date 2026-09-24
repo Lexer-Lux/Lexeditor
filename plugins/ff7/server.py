@@ -13,9 +13,9 @@ from .game_font import ensure_font
 from .extended import FAMILIES, ERRORS as EXTENDED_ERRORS, load_extended, save_extended, resolve_source, model
 from .datasets import CATEGORIES, UNRESOLVED, READ_ERRORS, load_datasets, save_datasets
 from .storage import target_path
-from platform_config import load_config, save_config
-from theme_sounds import ensure_theme_sounds, sound_file
-from plugin_http import PluginRequestHandler
+from core.platform_config import load_config, save_config
+from core.theme_sounds import ensure_theme_sounds, sound_file
+from core.plugin_http import PluginRequestHandler
 
 
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
@@ -294,7 +294,7 @@ class Handler(PluginRequestHandler):
                 if path == "/api/deployment/setup":
                     if PLUGIN_ID != "ff7":
                         raise ValueError("Pinned FFNx 2026 setup is available only for the classic FF7 rerelease plugin")
-                    import process_probe
+                    from core import process_probe
                     if os.name == "nt" and process_probe.live_processes(deployment.PROCESS_NAMES):
                         raise RuntimeError("Close Final Fantasy VII before installing FFNx")
                     tooling.install_pinned(GAME_ROOT)
@@ -303,7 +303,7 @@ class Handler(PluginRequestHandler):
                 elif path == "/api/deployment/export":
                     self.json_response(deployment.export_project(GAME_ROOT, PROJECT_ROOT))
                 elif path == "/api/deployment/deploy":
-                    import process_probe
+                    from core import process_probe
                     self.json_response(deployment.deploy_project(GAME_ROOT, PROJECT_ROOT,
                         running_check=lambda: os.name == "nt" and bool(process_probe.live_processes(deployment.PROCESS_NAMES))))
                 else:

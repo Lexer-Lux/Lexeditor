@@ -16,8 +16,8 @@ import urllib.request
 import zipfile
 
 from functools import partial
-from runtime_bootstrap import user_data_dir
-from upstream_fetch import fetch_json
+from core.runtime_bootstrap import user_data_dir
+from core.upstream_fetch import fetch_json
 
 
 REPAK_VERSION = "0.2.3"

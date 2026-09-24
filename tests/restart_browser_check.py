@@ -10,7 +10,7 @@ from unittest.mock import Mock
 from playwright.sync_api import sync_playwright
 from global_browser_check import STUB,ROOT
 sys.path.insert(0,str(ROOT))
-from desktop_host import HostApi
+from core.desktop_host import HostApi
 from plugins.blank.plugin import PLUGIN, BlankSession
 
 class Bridge(BaseHTTPRequestHandler):

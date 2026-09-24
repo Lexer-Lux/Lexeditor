@@ -10,12 +10,12 @@ import json
 import sys
 from pathlib import Path
 
-from runtime_bootstrap import bootstrap_environment, dispatch_service
+from core.runtime_bootstrap import bootstrap_environment, dispatch_service
 bootstrap_environment()
 
-from desktop_host import run_host, smoke_host_switch
-from plugin_api import GamePlugin, validate_plugin
-from plugin_metadata import validate_repository_metadata
+from core.desktop_host import run_host, smoke_host_switch
+from core.plugin_api import GamePlugin, validate_plugin
+from core.plugin_metadata import validate_repository_metadata
 
 
 ROOT = Path(__file__).resolve().parent

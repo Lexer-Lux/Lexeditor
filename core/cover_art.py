@@ -14,10 +14,10 @@ from typing import Callable
 
 from PIL import Image
 
-from plugin_api import GamePlugin
+from core.plugin_api import GamePlugin
 
 
-ROOT = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parent / "out")) / "Lexeditor" / "cover-art"
+ROOT = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parents[1] / "out")) / "Lexeditor" / "cover-art"
 MAX_COVER_BYTES = 5 * 1024 * 1024
 TRANSITION_COVER_SIZE = (320, 480)
 TRANSITION_JPEG_QUALITY = 72

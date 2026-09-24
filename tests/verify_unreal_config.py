@@ -6,8 +6,8 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import unreal_config
-from unreal_config import (
+from core import unreal_config
+from core.unreal_config import (
     ConfigError,
     ExternalEditError,
     apply_settings,
@@ -128,7 +128,7 @@ class SharedWiringTests(unittest.TestCase):
             editor = (root / "plugins" / plugin / "editor.js").read_text(encoding="utf-8")
             self.assertIn("LexeditorUnrealConfig.createPanel", editor)
             self.assertNotIn("ENGINE CONFIG", editor)
-            self.assertFalse((root / "plugins" / plugin / "unreal_config.py").exists())
+            self.assertFalse((root / "plugins" / plugin / "core/unreal_config.py").exists())
 
     def test_both_services_reuse_the_shared_editor(self):
         root = Path(__file__).resolve().parents[1]

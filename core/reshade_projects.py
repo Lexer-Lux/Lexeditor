@@ -154,7 +154,7 @@ STORE_DLL = "ReShade64.dll"
 # point in the game's rendering, such as just before the HUD is drawn, so depth
 # of field and friends leave the HUD alone. Pinned and bundled like ReShade.
 HUD_ADDON_VERSION = "1.3.23.633"
-HUD_ADDON_ARCHIVE = (Path(__file__).resolve().parent / "tools" / "reshade" / "addons"
+HUD_ADDON_ARCHIVE = (Path(__file__).resolve().parents[1] / "tools" / "reshade" / "addons"
                      / f"REST-{HUD_ADDON_VERSION}" / f"ReshadeEffectShaderToggler-{HUD_ADDON_VERSION}.zip")
 HUD_ADDON_SHA256 = "79aaf38002e103034527eeb09553cbc422b44989d22258e905652131904afa6d"
 HUD_ADDON_FILES = {64: "ReshadeEffectShaderToggler.addon64", 32: "ReshadeEffectShaderToggler.addon32"}
@@ -224,7 +224,7 @@ STORE_DLL32 = "ReShade32.dll"
 # installed without touching the network, and a release build carries them
 # (tools/build_distribution.py names them explicitly). A setup is the exact
 # file reshade.me publishes; its hash and each loader's inside it are pinned.
-VENDORED_RESHADE = Path(__file__).resolve().parent / "tools" / "reshade" / PINNED_LOADER
+VENDORED_RESHADE = Path(__file__).resolve().parents[1] / "tools" / "reshade" / PINNED_LOADER
 VENDORED_SETUPS = {
     "addon": f"ReShade_Setup_{PINNED_LOADER}_Addon.exe",
     "plain": f"ReShade_Setup_{PINNED_LOADER}.exe",
@@ -397,7 +397,7 @@ def install_loader(version: str = "", *, variant: str = DEFAULT_LOADER_VARIANT,
 NEWLINE = chr(10)
 
 # Lexeditor's own effects, shipped with the app rather than downloaded.
-BUNDLED_SHADERS = Path(__file__).resolve().parent / "shaders"
+BUNDLED_SHADERS = Path(__file__).resolve().parents[1] / "shaders"
 # Where a mod keeps a copy of them, so a by-hand install has everything.
 # Exported mods already carry this folder name; keep it stable.
 BUNDLED_FOLDER_NAME = "Lexerian"

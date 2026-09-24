@@ -15,7 +15,7 @@ from .datasets import DATASET_SPECS, schema as dataset_schema
 from .source_data import load_base_dataset, load_base_objects
 
 try:
-    from plugin_http import PluginRequestHandler
+    from core.plugin_http import PluginRequestHandler
 except ImportError:
     class PluginRequestHandler(BaseHTTPRequestHandler):
         """Branch fallback until the shared plugin_http helper lands here."""

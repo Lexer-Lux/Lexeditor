@@ -34,7 +34,7 @@ sys.path.insert(0, str(ROOT))
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 from app import discover_plugins  # noqa: E402
-from desktop_host import HostApi  # noqa: E402
+from core.desktop_host import HostApi  # noqa: E402
 
 SIZE = {"width": 1600, "height": 900}
 STYLES = False

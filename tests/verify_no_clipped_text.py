@@ -44,7 +44,7 @@ def use_installed_games() -> list[str]:
         games = (json.loads(config.read_text(encoding="utf-8")).get("games") or {})
     except (OSError, ValueError):
         return []
-    import plugin_api  # noqa: F401  (imported for its side-effect-free specs)
+    from core import plugin_api  # noqa: F401  (imported for its side-effect-free specs)
     from app import discover_plugins
     plugins = discover_plugins()
     used = []

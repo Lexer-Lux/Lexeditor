@@ -21,7 +21,7 @@ from plugins.ff7_2013.plugin import (  # noqa: E402
     FF7LegacySession, PLUGIN as LEGACY_PLUGIN,
 )
 from plugins.ff7.kernel import Kernel, resolve_kernel  # noqa: E402
-from project_manager import ProjectManager  # noqa: E402
+from core.project_manager import ProjectManager  # noqa: E402
 
 
 PRODUCTS = (

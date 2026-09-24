@@ -10,7 +10,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-from process_probe import live_processes
+from core.process_probe import live_processes
 
 
 STATE_NAME = ".lexeditor-rdr-archives.json"

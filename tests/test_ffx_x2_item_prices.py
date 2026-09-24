@@ -7,7 +7,7 @@ import pytest
 
 from plugins.ffx_x2.item_prices import ARCHIVE_PATH, ItemPriceError, apply_edits, parse_item_prices, payload
 from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
-from service_session import request_json
+from core.service_session import request_json
 
 
 def _table(prices: list[int], min_index: int = 0, trailing: bytes = b"TAIL") -> bytes:

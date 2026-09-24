@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT))
 from app import discover_plugins  # noqa: E402
 from plugins.ff8 import paths  # noqa: E402
 from plugins.ff8.plugin import FF8Session  # noqa: E402
-from service_session import request_json  # noqa: E402
+from core.service_session import request_json  # noqa: E402
 
 
 def digest(path: Path) -> str:

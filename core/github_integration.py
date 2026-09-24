@@ -11,7 +11,7 @@ import threading
 from pathlib import Path
 from typing import Callable
 
-from plugin_api import GitHubRepository
+from core.plugin_api import GitHubRepository
 
 
 _AUTO = object()

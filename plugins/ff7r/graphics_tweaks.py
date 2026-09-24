@@ -16,7 +16,7 @@ from pathlib import Path
 import re
 from typing import Any
 
-import unreal_config  # shared Documents resolution (issue 478)
+from core import unreal_config  # shared Documents resolution (issue 478)
 
 
 GRAPHICS_SCHEMA_VERSION = 1

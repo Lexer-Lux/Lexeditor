@@ -9,9 +9,9 @@ import shutil
 import urllib.request
 from pathlib import Path
 
-from mod_library import default_user_library_root
-from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
-from service_session import LocalPluginSession, request_json
+from core.mod_library import default_user_library_root
+from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.service_session import LocalPluginSession, request_json
 from plugins.ff7.plugin import prepare_product, kernel_save_payload
 from plugins.ff7.plugin import PLUGIN as SHARED_PLUGIN
 from plugins.ff7.kernel import Kernel, resolve_kernel
@@ -70,7 +70,7 @@ class FF7LegacySession(LocalPluginSession):
 
 
 def launch() -> int:
-    from desktop_host import run_host
+    from core.desktop_host import run_host
     return run_host({"ff7-2013": PLUGIN}, "ff7-2013")
 
 

@@ -7,11 +7,11 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from settings_manager import SettingsStore  # noqa: E402
+from core.settings_manager import SettingsStore  # noqa: E402
 FRAMEWORK = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-SETTINGS = (ROOT / "settings_manager.py").read_text(encoding="utf-8")
-DESKTOP = (ROOT / "desktop_host.py").read_text(encoding="utf-8")
+SETTINGS = (ROOT / "core/settings_manager.py").read_text(encoding="utf-8")
+DESKTOP = (ROOT / "core/desktop_host.py").read_text(encoding="utf-8")
 
 
 def require(condition: bool, message: str) -> None:

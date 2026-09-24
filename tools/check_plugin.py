@@ -88,10 +88,11 @@ def commands(target: str | None) -> list[list[str]]:
     steps: list[list[str]] = []
     if target:
         steps.append([py, "-m", "compileall", "-q", f"plugins/{target}"])
-        steps.append([py, "app.py", "--game", target, "--check"])
+        # Plugin ids are the folder name with hyphens (chrono_trigger -> chrono-trigger).
+        steps.append([py, "app.py", "--game", target.replace("_", "-"), "--check"])
     else:
-        steps.append([py, "-m", "compileall", "-q", "app.py", "tools"])
-        steps.append([py, "plugin_metadata.py"])
+        steps.append([py, "-m", "compileall", "-q", "app.py", "core", "tools"])
+        steps.append([py, "-m", "core.plugin_metadata"])
         steps.append([py, "tools/generate_credits.py", "--check"])
         steps.append([py, "app.py", "--list"])
     node = shutil.which("node")

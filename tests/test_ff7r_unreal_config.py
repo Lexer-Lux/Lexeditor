@@ -8,7 +8,7 @@ from urllib.error import HTTPError
 import pytest
 
 from plugins.ff7r.plugin import FF7RSession
-from service_session import request_json
+from core.service_session import request_json
 
 
 def _session_env(root: Path, ini: Path) -> dict[str, str]:
@@ -125,7 +125,7 @@ def test_legacy_ini_path_follows_redirected_documents(monkeypatch, tmp_path):
 
     docs = tmp_path / "Docs"
     monkeypatch.delenv("LEXEDITOR_FF7R_ENGINE_INI", raising=False)
-    monkeypatch.setattr("unreal_config._shell_personal", lambda: docs)
+    monkeypatch.setattr("core.unreal_config._shell_personal", lambda: docs)
     assert graphics_tweaks.engine_ini_path() == (
         docs / "My Games" / "FINAL FANTASY VII REMAKE" / "Saved"
         / "Config" / "WindowsNoEditor" / "Engine.ini")

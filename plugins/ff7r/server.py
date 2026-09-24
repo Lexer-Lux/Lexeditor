@@ -60,8 +60,8 @@ from .semantics import (
 from .storage import load_package, save_edits
 from .text_storage import load_text_package, resident_text_map, save_text_edits
 from .tooling import FF7R_MOUNT_POINT, helper_status, pack_directory
-from plugin_http import PluginRequestHandler
-import unreal_config  # shared Unreal Engine config editor (issue 478)
+from core.plugin_http import PluginRequestHandler
+from core import unreal_config  # shared Unreal Engine config editor (issue 478)
 
 
 ROOT = Path(__file__).resolve().parents[2]

@@ -13,7 +13,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_ID_PATTERN = re.compile(r"\bplugin_id\s*=\s*['\"]([^'\"]+)['\"]")
 CREDIT_GROUPS = ("contributions", "thanks", "licenses")
 MOD_LOADING_FIELDS = ("loader", "structure", "overriding")

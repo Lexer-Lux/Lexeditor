@@ -11,7 +11,7 @@ import importlib
 from pathlib import Path
 import unittest
 
-from plugin_api import validate_plugin
+from core.plugin_api import validate_plugin
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,7 +48,7 @@ class Startup(unittest.TestCase):
         is too late to find out.
         """
         import app
-        from runtime_bootstrap import SERVICE_MODULES
+        from core.runtime_bootstrap import SERVICE_MODULES
 
         for plugin_id, plugin in sorted(app.discover_plugins().items()):
             with self.subTest(plugin=plugin_id):
@@ -67,7 +67,7 @@ class PluginDescriptors(unittest.TestCase):
         from unittest.mock import patch
         from plugins.ff7r.plugin import PLUGIN
 
-        with patch('plugin_api.os', SimpleNamespace(name='posix')):
+        with patch('core.plugin_api.os', SimpleNamespace(name='posix')):
             for path in ('C:/FF7RMod', '/home/player/FF7RMod'):
                 validate_plugin(replace(PLUGIN, projects=replace(
                     PLUGIN.projects, default_root=PurePosixPath(path))))

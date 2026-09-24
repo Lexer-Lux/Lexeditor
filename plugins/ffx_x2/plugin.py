@@ -10,8 +10,8 @@ import urllib.request
 from pathlib import Path
 import zlib
 
-from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
-from service_session import LocalPluginSession, request_json
+from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.service_session import LocalPluginSession, request_json
 
 from . import item_shops, paths, treasures
 from .vbf import BLOCK_SIZE
@@ -46,7 +46,7 @@ class FFXX2Session(LocalPluginSession):
 
 
 def launch() -> int:
-    from desktop_host import run_host
+    from core.desktop_host import run_host
     return run_host({"ffx-x2": PLUGIN}, "ffx-x2")
 
 

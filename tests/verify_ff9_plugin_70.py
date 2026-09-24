@@ -14,7 +14,7 @@ from plugins.ff9 import paths  # noqa: E402
 from plugins.ff9.memoria_csv import MemoriaCsvDocument, MemoriaDataStore  # noqa: E402
 from plugins.ff9.plugin import PLUGIN, smoke  # noqa: E402
 from app import discover_plugins  # noqa: E402
-from project_manager import ProjectManager  # noqa: E402
+from core.project_manager import ProjectManager  # noqa: E402
 
 
 FIXTURE = """#! IncludeId

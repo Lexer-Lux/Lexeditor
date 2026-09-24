@@ -13,7 +13,7 @@ import shutil
 import tempfile
 import zipfile
 
-from mod_library import digest, file_tree, metadata
+from core.mod_library import digest, file_tree, metadata
 from .archive import ResourcesBin
 from .project import PROJECT_MARKER, initialize_project, validate_resource_path
 

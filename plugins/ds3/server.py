@@ -9,8 +9,8 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from plugin_files import atomic_write
-from plugin_http import PluginRequestHandler
+from core.plugin_files import atomic_write
+from core.plugin_http import PluginRequestHandler
 
 from .formats import DS3FormatError, RegulationDocument, TARGET_TABLES
 

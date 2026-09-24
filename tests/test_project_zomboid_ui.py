@@ -32,7 +32,7 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
 
     def test_service_uses_shared_page_module_handler(self):
         source = SERVER.read_text(encoding="utf-8")
-        self.assertIn("from plugin_http import PluginRequestHandler", source)
+        self.assertIn("from core.plugin_http import PluginRequestHandler", source)
         self.assertIn("class Handler(PluginRequestHandler):", source)
         self.assertIn("self.send_page_module(PLUGIN_ROOT, path)", source)
         self.assertNotIn("def send_page_module(", source)

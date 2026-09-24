@@ -9,8 +9,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import reshade_effects
-import reshade_projects
+from core import reshade_effects
+from core import reshade_projects
 from plugins.ff8.plugin import PLUGIN
 
 

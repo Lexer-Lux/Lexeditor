@@ -14,7 +14,7 @@ from plugins.terraria.localization import (
 )
 from plugins.terraria import plugin as terraria_plugin
 from plugins.terraria import server
-from project_manager import ProjectManager
+from core.project_manager import ProjectManager
 
 
 class TerrariaLocalizationTests(unittest.TestCase):

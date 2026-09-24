@@ -15,7 +15,7 @@ import tempfile
 from typing import Iterable
 
 from . import memoria_manager, paths
-from plugin_files import atomic_write
+from core.plugin_files import atomic_write
 
 MOD_NAME = "Lexeditor"
 CONFIG_NAME = "lexeditor-ff9.ini"

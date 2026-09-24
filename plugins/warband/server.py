@@ -23,7 +23,7 @@ from .troop_editor import troop_data, save_troops
 from .module_records import SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME, dataset_data, save_dataset
 from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
 from .model_preview import PreviewUnavailable, preview as item_preview, texture_path as preview_texture_path
-from plugin_http import PluginRequestHandler
+from core.plugin_http import PluginRequestHandler
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parent

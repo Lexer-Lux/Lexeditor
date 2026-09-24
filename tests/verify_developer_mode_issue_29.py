@@ -10,15 +10,15 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from desktop_host import HostApi  # noqa: E402
-from plugin_api import GamePlugin  # noqa: E402
-from settings_manager import SettingsStore  # noqa: E402
+from core.desktop_host import HostApi  # noqa: E402
+from core.plugin_api import GamePlugin  # noqa: E402
+from core.settings_manager import SettingsStore  # noqa: E402
 
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-desktop = (ROOT / "desktop_host.py").read_text(encoding="utf-8")
+desktop = (ROOT / "core/desktop_host.py").read_text(encoding="utf-8")
 chooser = (ROOT / "ui" / "chooser.html").read_text(encoding="utf-8")
-settings_source = (ROOT / "settings_manager.py").read_text(encoding="utf-8")
+settings_source = (ROOT / "core/settings_manager.py").read_text(encoding="utf-8")
 
 for forbidden in (
     "lexerMode", "lex-lexer-mode", "I am Lexer", "I AM LEXER",

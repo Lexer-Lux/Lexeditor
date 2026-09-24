@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from runtime_bootstrap import user_data_dir
+from core.runtime_bootstrap import user_data_dir
 
 from .package import InfoDocument, PackageValidationError, StaleInfoError
 from .palschema import (
@@ -24,7 +24,7 @@ from .palschema import (
     resolve_discovered_patch,
 )
 from .palschema_fields import available_fields, coerce_new_value, schema_scalar_writable
-from plugin_http import PluginRequestHandler
+from core.plugin_http import PluginRequestHandler
 
 
 ROOT = Path(__file__).resolve().parents[2]

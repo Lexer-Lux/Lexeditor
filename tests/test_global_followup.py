@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from plugin_api import GamePlugin, ModProjectSpec, validate_plugin
+from core.plugin_api import GamePlugin, ModProjectSpec, validate_plugin
 from tools import generate_credits
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from plugin_ui import plugin_ui

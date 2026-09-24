@@ -16,13 +16,13 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import mod_library
-from mod_library import (
+from core import mod_library
+from core.mod_library import (
     default_user_library_root,
     legacy_appdata_library_root,
     migrate_appdata_user_data,
 )
-from project_manager import ProjectManager
+from core.project_manager import ProjectManager
 
 
 @pytest.fixture

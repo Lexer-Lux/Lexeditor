@@ -1,7 +1,7 @@
 """Tweak categories stay in one column and reject oversized content."""
 import pytest
 from test_shared_ui_feedback import page, framework
-from settings_manager import SettingsStore
+from core.settings_manager import SettingsStore
 
 
 def test_developer_column_default_round_trip(tmp_path):

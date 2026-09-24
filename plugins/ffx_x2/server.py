@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from plugin_http import PluginRequestHandler
+from core.plugin_http import PluginRequestHandler
 
 from . import (
     auto_ability_prices, ctb_base, deployment, ffx_auto_abilities, ffx_commands,

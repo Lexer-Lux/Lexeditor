@@ -11,10 +11,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from plugin_api import GamePlugin, PluginFont
+from core.plugin_api import GamePlugin, PluginFont
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 FONT_LOG = ROOT / "logs" / "font-download.log"
 MAX_FONT_BYTES = 8 * 1024 * 1024
 _LOG_LOCK = threading.Lock()

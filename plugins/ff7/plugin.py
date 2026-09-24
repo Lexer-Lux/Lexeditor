@@ -8,8 +8,8 @@ import shutil
 import urllib.request
 from pathlib import Path
 
-from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
-from service_session import LocalPluginSession, request_json
+from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.service_session import LocalPluginSession, request_json
 
 from . import paths
 from .kernel import Kernel, resolve_kernel
@@ -67,7 +67,7 @@ def seed_project_template(game_root: Path, template_root: Path) -> dict:
 def prepare_product(game_root: Path, data_root: Path, progress,
                     template_root: Path) -> dict:
     """Prepare proved theme sounds and the starter template (no project)."""
-    from theme_sounds import ensure_theme_sounds
+    from core.theme_sounds import ensure_theme_sounds
     progress(0, 2, "Preparing the Final Fantasy VII mod template")
     project = seed_project_template(game_root, template_root)
     progress(1, 2, "Preparing Final Fantasy VII interface sounds")
@@ -111,7 +111,7 @@ class FF7Session(LocalPluginSession):
 
 
 def launch() -> int:
-    from desktop_host import run_host
+    from core.desktop_host import run_host
     return run_host({"ff7": PLUGIN}, "ff7")
 
 

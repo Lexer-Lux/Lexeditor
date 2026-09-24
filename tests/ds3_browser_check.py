@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
 from plugins.ds3.formats import encrypt_regulation
-from service_session import LocalPluginSession, request_json
+from core.service_session import LocalPluginSession, request_json
 from test_ds3_plugin import _bnd4, _row_ids
 
 

@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Callable
-from runtime_bootstrap import service_command
+from core.runtime_bootstrap import service_command
 
 
 def free_port(configured_name: str | None = None) -> int:

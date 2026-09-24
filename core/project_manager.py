@@ -8,11 +8,11 @@ from pathlib import Path
 import shutil
 import threading
 
-from plugin_api import GamePlugin
-from mod_library import metadata
+from core.plugin_api import GamePlugin
+from core.mod_library import metadata
 
 
-ROOT = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parent / "out")) / "Lexeditor"
+ROOT = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parents[1] / "out")) / "Lexeditor"
 DEFAULT_PATH = ROOT / "projects.json"
 IGNORED_NAMES = {".git", ".pytest_cache", "__pycache__", "out"}
 _INVALID_FOLDER_CHARS = '<>:"/\\|?*'

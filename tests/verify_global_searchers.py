@@ -7,7 +7,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from settings_manager import SettingsStore  # noqa: E402
+from core.settings_manager import SettingsStore  # noqa: E402
 
 
 FRAMEWORK = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")

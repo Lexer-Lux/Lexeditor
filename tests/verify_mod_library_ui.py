@@ -9,11 +9,11 @@ from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from desktop_host import HostApi
+from core.desktop_host import HostApi
 from plugins.ff7r.mod_support import PakModAdapter
 from plugins.ff7r.tooling import pack_directory, get_file
-from mod_library import metadata
-from settings_manager import SettingsStore
+from core.mod_library import metadata
+from core.settings_manager import SettingsStore
 from playwright.sync_api import sync_playwright
 
 

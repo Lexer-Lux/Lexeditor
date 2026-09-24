@@ -11,7 +11,7 @@ from plugins.ffx_x2.ffx_auto_abilities import (
     apply_edits, parse_auto_abilities, payload,
 )
 from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
-from service_session import request_json
+from core.service_session import request_json
 
 
 def _record(*, strike: int, absorb: int, immune: int, resist: int, weak: int,

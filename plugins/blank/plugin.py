@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from plugin_api import GamePlugin
-from service_session import LocalPluginSession
+from core.plugin_api import GamePlugin
+from core.service_session import LocalPluginSession
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,7 +22,7 @@ class BlankSession(LocalPluginSession):
 
 
 def launch() -> int:
-    from desktop_host import run_host
+    from core.desktop_host import run_host
     return run_host({"blank": PLUGIN}, "blank")
 
 

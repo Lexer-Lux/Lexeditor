@@ -357,7 +357,7 @@ def test_ff8_dropdown_preserves_options_when_reordering(page):
 
 def test_find_project_does_not_require_package_adapter():
     from unittest.mock import Mock
-    from desktop_host import HostApi
+    from core.desktop_host import HostApi
     api=object.__new__(HostApi)
     api._projects=Mock()
     api._projects.snapshot.return_value={'current':'C:/old'}

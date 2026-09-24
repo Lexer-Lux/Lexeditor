@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app import discover_plugins
-from desktop_host import HostApi
+from core.desktop_host import HostApi
 
 
 class Handler(SimpleHTTPRequestHandler):

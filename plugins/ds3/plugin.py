@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
-from service_session import LocalPluginSession
+from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.service_session import LocalPluginSession
 
 from .formats import DS3FormatError, TARGET_TABLES, load_schema
 
@@ -59,7 +59,7 @@ class DS3Session(LocalPluginSession):
 
 
 def launch() -> int:
-    from desktop_host import run_host
+    from core.desktop_host import run_host
     return run_host({"ds3": PLUGIN}, "ds3")
 
 

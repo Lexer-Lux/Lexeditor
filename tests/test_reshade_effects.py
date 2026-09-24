@@ -7,8 +7,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest
 
-import reshade_effects as fx
-import reshade_projects as rp
+from core import reshade_effects as fx
+from core import reshade_projects as rp
 
 
 def test_every_bundled_effect_exposes_its_controls():

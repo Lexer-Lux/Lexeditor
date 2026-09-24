@@ -10,7 +10,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from service_session import LocalPluginSession
+from core.service_session import LocalPluginSession
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -23,7 +23,7 @@ def session():
 class ServiceLifetimeTests(unittest.TestCase):
     @unittest.skipUnless(os.name == 'nt', 'Windows GUI interpreter')
     def test_pythonw_service_stops_without_console_stream_objects(self):
-        import service_session
+        from core import service_session
         original = service_session.service_command
         def command(module, **kwargs):
             result = original(module, **kwargs)
@@ -54,7 +54,7 @@ class ServiceLifetimeTests(unittest.TestCase):
         code = '''
 import json,os,time
 from pathlib import Path
-from service_session import LocalPluginSession
+from core.service_session import LocalPluginSession
 s=LocalPluginSession(module='plugins.blank.server',plugin_id='blank',app_root=Path.cwd(),check=lambda:[])
 s.start()
 print(json.dumps({'pid':os.getpid(),'port':s.port}),flush=True)

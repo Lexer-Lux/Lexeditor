@@ -10,12 +10,12 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from desktop_host import HostApi, load_window_geometry, save_window_geometry  # noqa: E402
-from windows_host import _resized_rectangle  # noqa: E402
+from core.desktop_host import HostApi, load_window_geometry, save_window_geometry  # noqa: E402
+from core.windows_host import _resized_rectangle  # noqa: E402
 
 
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
-desktop = (ROOT / "desktop_host.py").read_text(encoding="utf-8")
+desktop = (ROOT / "core/desktop_host.py").read_text(encoding="utf-8")
 
 assert 'region.classList.toggle("pywebview-drag-region", !maximized)' in framework
 assert 'region.classList.add("lex-window-drag-region", "pywebview-drag-region")' not in framework
@@ -50,7 +50,7 @@ assert api.window_resize_by("right", 12, 0) == {"started": False, "reason": "max
 api._maximized = False
 api._begin_nonclient_drag = lambda hit_test: {"started": True, "hitTest": hit_test}
 assert api.window_begin_move() == {"started": True, "hitTest": 2}
-with patch("desktop_host.begin_window_resize", return_value={"started": True, "edge": "right"}):
+with patch("core.desktop_host.begin_window_resize", return_value={"started": True, "edge": "right"}):
     api._bound_window = lambda: object()
     assert api.window_begin_resize("right") == {"started": True, "edge": "right"}
 

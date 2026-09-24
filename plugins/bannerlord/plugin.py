@@ -7,8 +7,8 @@ import shutil
 import tempfile
 import urllib.request
 
-from plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProjectSpec
-from service_session import LocalPluginSession, request_json
+from core.plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProjectSpec
+from core.service_session import LocalPluginSession, request_json
 
 from . import paths
 from .game_launch import BannerlordGameController
@@ -39,7 +39,7 @@ class BannerlordSession(LocalPluginSession):
 
 
 def launch() -> int:
-    from desktop_host import run_host
+    from core.desktop_host import run_host
 
     return run_host({"bannerlord": PLUGIN}, "bannerlord")
 

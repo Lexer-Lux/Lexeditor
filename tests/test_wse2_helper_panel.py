@@ -15,11 +15,11 @@ from unittest.mock import Mock, patch
 # imports the real module; Linux supplies only the unavailable import boundary.
 if os.name != 'nt':
     with patch.dict(sys.modules, {'winreg': ModuleType('winreg')}):
-        from desktop_host import HostApi
-        from game_installation import GameInstallationManager
+        from core.desktop_host import HostApi
+        from core.game_installation import GameInstallationManager
 else:
-    from desktop_host import HostApi
-    from game_installation import GameInstallationManager
+    from core.desktop_host import HostApi
+    from core.game_installation import GameInstallationManager
 from plugins.warband.plugin import PLUGIN
 from plugins.warband import wse2_manager as wse2
 

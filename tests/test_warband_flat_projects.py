@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from plugins.warband import project_import, server
 from plugins.warband.plugin import PLUGIN
-from project_manager import ProjectManager
+from core.project_manager import ProjectManager
 
 
 # Pinned Persistent World a35fd5d89cbb4e684ddf2fe4a6de9fe5066b9988

@@ -8,8 +8,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
-from service_session import LocalPluginSession, request_json
+from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.service_session import LocalPluginSession, request_json
 
 from . import memoria_manager, paths
 
@@ -42,7 +42,7 @@ class FF9Session(LocalPluginSession):
 
 
 def launch() -> int:
-    from desktop_host import run_host
+    from core.desktop_host import run_host
     return run_host({"ff9": PLUGIN}, "ff9")
 
 

@@ -9,14 +9,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from github_integration import GitHubIntegration
-from plugin_api import GitHubRepository
+from core.github_integration import GitHubIntegration
+from core.plugin_api import GitHubRepository
 
 
 FRAMEWORK_JS = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 FRAMEWORK_CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-DESKTOP = (ROOT / "desktop_host.py").read_text(encoding="utf-8")
-GITHUB = (ROOT / "github_integration.py").read_text(encoding="utf-8")
+DESKTOP = (ROOT / "core/desktop_host.py").read_text(encoding="utf-8")
+GITHUB = (ROOT / "core/github_integration.py").read_text(encoding="utf-8")
 
 
 def require(condition: bool, message: str) -> None:

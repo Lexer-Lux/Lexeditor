@@ -11,12 +11,12 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from windows_host import (  # noqa: E402
+from core.windows_host import (  # noqa: E402
     APPCOMMAND_BROWSER_BACKWARD, APPCOMMAND_BROWSER_FORWARD, WM_APPCOMMAND,
     WM_XBUTTONDBLCLK, WM_XBUTTONDOWN, WM_XBUTTONUP, XBUTTON1, XBUTTON2,
     appcommand_navigation_event, xbutton_navigation_direction, xbutton_navigation_event,
 )
-from desktop_host import CHOOSER, HostApi  # noqa: E402
+from core.desktop_host import CHOOSER, HostApi  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:
@@ -26,8 +26,8 @@ def require(condition: bool, message: str) -> None:
 
 def main() -> int:
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
-    host = (ROOT / "desktop_host.py").read_text(encoding="utf-8")
-    native = (ROOT / "windows_host.py").read_text(encoding="utf-8")
+    host = (ROOT / "core/desktop_host.py").read_text(encoding="utf-8")
+    native = (ROOT / "core/windows_host.py").read_text(encoding="utf-8")
     worklog = (ROOT / "worklog" / "34.md").read_text(encoding="utf-8")
 
     for heading in (

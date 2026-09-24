@@ -9,7 +9,7 @@ from pathlib import Path
 import plugins.ds3.server as ds3_server
 from plugins.ds3.plugin import PLUGIN, check as plugin_check
 from plugins.ds3.server import _data_map, _path_within
-from plugin_api import validate_plugin
+from core.plugin_api import validate_plugin
 from plugins.ds3.formats import (
     BND4View,
     DS3FormatError,

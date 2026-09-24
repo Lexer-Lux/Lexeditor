@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-import unreal_config
-from unreal_config import (
+from core import unreal_config
+from core.unreal_config import (
     ConfigError,
     ExternalEditError,
     apply_settings,
@@ -75,7 +75,7 @@ def test_ff7r2_config_location_verified(project, monkeypatch):
         "Documents/My Games/FINAL FANTASY VII REBIRTH/Saved/Config/WindowsNoEditor/Engine.ini",
     )
     monkeypatch.delenv("LEXEDITOR_FF7R2_ENGINE_INI")
-    monkeypatch.setattr("unreal_config._documents", lambda: Path("/nonexistent-lexeditor"))
+    monkeypatch.setattr("core.unreal_config._documents", lambda: Path("/nonexistent-lexeditor"))
     assert discover_config_file("ff7r2") is None
     report = status("ff7r2", root)
     assert report["configDiscovered"] is False
@@ -254,13 +254,13 @@ def test_documents_follows_redirected_shell_folder(project, monkeypatch, tmp_pat
     engine_ini = target / "Engine.ini"
     engine_ini.write_text("[Core.System]\n", encoding="utf-8")
     monkeypatch.delenv("LEXEDITOR_FF7R2_ENGINE_INI")
-    monkeypatch.setattr("unreal_config._shell_personal", lambda: docs)
+    monkeypatch.setattr("core.unreal_config._shell_personal", lambda: docs)
     assert unreal_config._documents() == docs
     assert discover_config_file("ff7r2") == engine_ini
 
 
 def test_documents_falls_back_without_shell_folder(monkeypatch):
-    monkeypatch.setattr("unreal_config._shell_personal", lambda: None)
+    monkeypatch.setattr("core.unreal_config._shell_personal", lambda: None)
     assert unreal_config._documents() == Path.home() / "Documents"
 
 

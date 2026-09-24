@@ -10,8 +10,8 @@ import tempfile
 import urllib.request
 import zipfile
 
-from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
-from service_session import LocalPluginSession
+from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.service_session import LocalPluginSession
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -154,7 +154,7 @@ def smoke() -> list[str]:
     ]
 
 def launch() -> int:
-    from desktop_host import run_host
+    from core.desktop_host import run_host
     return run_host({"factorio": PLUGIN}, "factorio")
 
 

@@ -13,7 +13,7 @@ from plugins.chrono_trigger.archive import ArchiveError, ResourcesBin, _decode
 from plugins.chrono_trigger.animation_data import load_chip_animations, save_chip_animations
 from plugins.chrono_trigger.field_data import load_exits, load_treasure, save_exits, save_treasure
 from plugins.chrono_trigger.mod_support import ChronoCtpAdapter, OWNED_NAMESPACE
-from mod_library import ModLibrary, file_tree
+from core.mod_library import ModLibrary, file_tree
 from plugins.chrono_trigger.palette_data import load_palette, save_palette
 from plugins.chrono_trigger.project import OverlayStore
 from plugins.chrono_trigger.scene_data import load_scenes, save_scene
@@ -634,7 +634,7 @@ class FreshChronoTriggerTests(unittest.TestCase):
                 ], "en")
 
     def test_shared_mod_library_reads_chrono_adapter_active_ids(self):
-        from desktop_host import HostApi
+        from core.desktop_host import HostApi
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             library_root = root / "library"

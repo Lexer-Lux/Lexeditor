@@ -18,7 +18,7 @@ import tempfile
 from typing import Any
 
 from .package import InfoDocument, PackageValidationError
-from plugin_files import atomic_write
+from core.plugin_files import atomic_write
 
 
 BUILD_DIRNAME = "build"

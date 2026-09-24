@@ -9,7 +9,7 @@ from plugins.ffx_x2.auto_ability_prices import (
     ARCHIVE_PATH, AutoAbilityPriceError, apply_edits, parse_auto_ability_prices, payload,
 )
 from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
-from service_session import request_json
+from core.service_session import request_json
 
 
 def _table(prices: list[int], min_index: int = 0, trailing: bytes = b"TAIL") -> bytes:

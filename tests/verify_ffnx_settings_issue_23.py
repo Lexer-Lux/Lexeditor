@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from plugins.ff8.ffnx_manager import ensure_ffnx, status  # noqa: E402
-from settings_manager import SettingsStore  # noqa: E402
+from core.settings_manager import SettingsStore  # noqa: E402
 
 
 def make_archive(path: Path, marker: bytes) -> str:
@@ -43,7 +43,7 @@ def release(version: str, digest: str) -> dict:
 def main() -> int:
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
     chooser = (ROOT / "ui" / "chooser.html").read_text(encoding="utf-8")
-    desktop = (ROOT / "desktop_host.py").read_text(encoding="utf-8")
+    desktop = (ROOT / "core/desktop_host.py").read_text(encoding="utf-8")
     assert "Update check frequency" in framework
     assert "Menu bar height" in framework
     assert "lex-setting-default-control" in framework

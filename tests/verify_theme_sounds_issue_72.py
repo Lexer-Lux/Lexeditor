@@ -16,8 +16,8 @@ sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 from plugins.ff7.plugin import FF7Session  # noqa: E402
 from plugins.ff8.plugin import FF8Session  # noqa: E402
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
-from service_session import request_json  # noqa: E402
-from theme_sounds import SOUND_SLOTS  # noqa: E402
+from core.service_session import request_json  # noqa: E402
+from core.theme_sounds import SOUND_SLOTS  # noqa: E402
 
 
 def decode_session(session_type, expected: dict[str, int | None]) -> dict:
@@ -74,7 +74,7 @@ def decode_session(session_type, expected: dict[str, int | None]) -> dict:
 
 def main() -> int:
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
-    settings = (ROOT / "settings_manager.py").read_text(encoding="utf-8")
+    settings = (ROOT / "core/settings_manager.py").read_text(encoding="utf-8")
     manual = Path(r"C:\RDR2Mod\codex\lexeditor.md").read_text(encoding="utf-8")
     for slot in SOUND_SLOTS:
         assert f'"{slot}"' in framework, slot

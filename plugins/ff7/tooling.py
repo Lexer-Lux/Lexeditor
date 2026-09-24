@@ -16,7 +16,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-from runtime_bootstrap import user_data_dir
+from core.runtime_bootstrap import user_data_dir
 
 
 FFNX_VERSION = "1.24.3"

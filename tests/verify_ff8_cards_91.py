@@ -99,7 +99,7 @@ def integration(path):
 
 def http_integration():
     from plugins.ff8.plugin import FF8Session
-    from service_session import request_json
+    from core.service_session import request_json
     with tempfile.TemporaryDirectory(prefix="lexeditor-cards-http-91-") as temporary:
         with FF8Session({"LEXEDITOR_FF8_PROJECT": temporary}) as session:
             original = request_json(session.url + "api/cards")

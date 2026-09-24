@@ -21,7 +21,7 @@ from typing import Any
 from . import build as package_build
 from . import loader_state
 from . import workshop as client_workshop
-from plugin_files import atomic_write
+from core.plugin_files import atomic_write
 
 
 SERVER_APP_ID = "2394010"

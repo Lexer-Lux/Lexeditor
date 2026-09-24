@@ -24,7 +24,7 @@ class DistributionHygieneTests(unittest.TestCase):
     def test_bundled_helpers_ship_and_are_the_pinned_files(self):
         """A vendored helper that is not in the installer is not vendored."""
         import hashlib
-        import reshade_projects
+        from core import reshade_projects
         from plugins.ff7r2 import shader_injector
         from tools.build_distribution import VENDORED_HELPERS
 

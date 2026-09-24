@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from plugins.ff7.kernel import Kernel, resolve_kernel  # noqa: E402
 from plugins.ff7.plugin import PLUGIN, seed_project_template  # noqa: E402
-from project_manager import ProjectManager  # noqa: E402
+from core.project_manager import ProjectManager  # noqa: E402
 from tests.verify_ff7_datasets import write_kernel  # noqa: E402
 
 

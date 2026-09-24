@@ -18,7 +18,7 @@ from .field_walkmesh import FieldWalkmeshStore
 from .memoria_baseline import ensure as ensure_baseline
 from . import memoria_manager, features, mod_compat
 from . import game_font
-from plugin_http import PluginRequestHandler
+from core.plugin_http import PluginRequestHandler
 
 
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]

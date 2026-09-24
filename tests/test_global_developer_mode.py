@@ -11,7 +11,7 @@ import threading
 import unittest
 from unittest.mock import Mock, call, patch
 
-from desktop_host import HostApi, LEXEDITOR_REPOSITORY
+from core.desktop_host import HostApi, LEXEDITOR_REPOSITORY
 from plugins.blank.plugin import PLUGIN as BLANK_PLUGIN
 
 
@@ -95,8 +95,8 @@ class DeveloperModeHostTests(unittest.TestCase):
             host._cover_art.snapshot.return_value = {"state": "ready", "uri": ""}
             return host
 
-        with patch("desktop_host.game_version", return_value=""), \
-             patch("desktop_host.font_status", return_value={}):
+        with patch("core.desktop_host.game_version", return_value=""), \
+             patch("core.desktop_host.font_status", return_value={}):
             self.assertEqual(configured(None).plugins(), [])
             rows = configured({"repository": "Lexer-Lux/Lexeditor", "login": "Lexer-Lux"}).plugins()
 
@@ -143,7 +143,7 @@ class DeveloperModeUiContractTests(unittest.TestCase):
         self.assertIn("await window.pywebview.api.restart_lexeditor()", source)
 
     def test_loading_quote_counts_cover_every_plugin_and_the_shared_pool(self):
-        from desktop_host import HostApi
+        from core.desktop_host import HostApi
         counts = HostApi.loading_quote_counts(object.__new__(HostApi))
         games = sorted(path.name for path in (ROOT / "plugins").iterdir()
                        if path.is_dir() and not path.name.startswith(("_", ".")))

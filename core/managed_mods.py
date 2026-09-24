@@ -12,7 +12,7 @@ import tempfile
 import urllib.request
 import urllib.error
 
-from mod_library import ModLibrary, digest, file_tree, relative_path
+from core.mod_library import ModLibrary, digest, file_tree, relative_path
 
 
 @dataclass(frozen=True)

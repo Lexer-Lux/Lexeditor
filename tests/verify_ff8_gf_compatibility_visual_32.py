@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 
 from plugins.ff8.plugin import FF8Session  # noqa: E402
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
-from service_session import request_json  # noqa: E402
+from core.service_session import request_json  # noqa: E402
 
 
 def main() -> int:

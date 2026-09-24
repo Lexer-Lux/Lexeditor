@@ -1,7 +1,7 @@
 from plugins.ff7r import theme
 from plugins.ff7r.plugin import FF7RSession
 from plugins.ff7r.themed_server import themed_editor_html
-from service_session import request_json
+from core.service_session import request_json
 
 
 def test_theme_fallback_is_proprietary_free_and_semantically_complete(tmp_path):

@@ -11,12 +11,12 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from desktop_host import choose_loading_quote  # noqa: E402
-HOST = (ROOT / "desktop_host.py").read_text(encoding="utf-8")
+from core.desktop_host import choose_loading_quote  # noqa: E402
+HOST = (ROOT / "core/desktop_host.py").read_text(encoding="utf-8")
 CHOOSER = (ROOT / "ui" / "chooser.html").read_text(encoding="utf-8")
 FRAMEWORK = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 FRAMEWORK_CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-SETTINGS = (ROOT / "settings_manager.py").read_text(encoding="utf-8")
+SETTINGS = (ROOT / "core/settings_manager.py").read_text(encoding="utf-8")
 DEFAULT_SETTINGS = json.loads((ROOT / "ui" / "default_settings.json").read_text(encoding="utf-8"))
 QUOTES = json.loads((ROOT / "ui" / "loading_quotes.json").read_text(encoding="utf-8"))
 

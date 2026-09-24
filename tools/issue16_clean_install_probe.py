@@ -46,7 +46,7 @@ def main() -> int:
 
     from plugins.rdr2 import extractor  # pylint: disable=import-outside-toplevel
     from plugins.rdr2 import plugin as rdr2_plugin  # pylint: disable=import-outside-toplevel
-    from game_installation import GameInstallationManager  # pylint: disable=import-outside-toplevel
+    from core.game_installation import GameInstallationManager  # pylint: disable=import-outside-toplevel
 
     PLUGIN = rdr2_plugin.PLUGIN
     assert Path(extractor.__file__).resolve().is_relative_to(copied_root), extractor.__file__

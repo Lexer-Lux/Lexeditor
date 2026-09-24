@@ -53,7 +53,7 @@ def main() -> int:
     if "Managed helpers" in framework or "lex-helper-status" in framework:
         raise AssertionError("Game-managed helpers do not belong in global Settings")
 
-    host_path = ROOT / "desktop_host.py"
+    host_path = ROOT / "core/desktop_host.py"
     host = host_path.read_text(encoding="utf-8")
     if 'payload["helpers"]' in host:
         raise AssertionError("The global settings payload must not collect game helper status")
@@ -99,7 +99,7 @@ def main() -> int:
     ):
         require(chooser, token, chooser_path)
 
-    manager_path = ROOT / "settings_manager.py"
+    manager_path = ROOT / "core/settings_manager.py"
     manager = manager_path.read_text(encoding="utf-8")
     require(manager, '"residentHandleWidthPercent": 5.0', manager_path)
     require(manager, "max(2.5, min(12.0, resident_handle_width_percent))", manager_path)

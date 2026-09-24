@@ -7,7 +7,7 @@ import pytest
 
 from plugins.ffx_x2.mix_table import ARCHIVE_PATH, MixTableError, apply_edits, parse_mix_table, payload
 from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
-from service_session import request_json
+from core.service_session import request_json
 
 
 def _record(values: dict[int, int]) -> bytes:

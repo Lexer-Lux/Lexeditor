@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from plugins.ff7 import game_font  # noqa: E402
-from theme_sounds import SOUND_SLOTS, ensure_theme_sounds, sound_file  # noqa: E402
+from core.theme_sounds import SOUND_SLOTS, ensure_theme_sounds, sound_file  # noqa: E402
 from tests.verify_ff7_completion import lgp_fixture  # noqa: E402
 
 FF7 = ROOT / "plugins" / "ff7"

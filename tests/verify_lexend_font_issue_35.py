@@ -34,7 +34,7 @@ def main() -> int:
     chooser = (ROOT / "ui" / "chooser.html").read_text(encoding="utf-8")
     source = (FONT.parent / "SOURCE.md").read_text(encoding="utf-8")
     license_text = (FONT.parent / "OFL.txt").read_text(encoding="utf-8")
-    host = (ROOT / "desktop_host.py").read_text(encoding="utf-8")
+    host = (ROOT / "core/desktop_host.py").read_text(encoding="utf-8")
 
     assert '@font-face' in css and 'font-family: "Lexend"' in css
     assert 'url("assets/fonts/Lexend-Variable.ttf")' in css

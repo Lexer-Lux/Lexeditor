@@ -3,7 +3,7 @@ from pathlib import Path
 import json
 import shutil
 import tempfile
-from mod_library import digest, file_tree, metadata
+from core.mod_library import digest, file_tree, metadata
 from .tooling import list_pak, get_file, pack_directory
 
 
@@ -53,7 +53,7 @@ class PakModAdapter:
 
     def prepare_editable(self, root: Path) -> None:
         """Materialize a copied PAK as editable project content."""
-        from mod_library import relative_path, MAX_BYTES
+        from core.mod_library import relative_path, MAX_BYTES
         report = self.inspect(root, file_tree(root))
         if not report["valid"]:
             raise ValueError("; ".join(report["problems"]))

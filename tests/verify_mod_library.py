@@ -15,9 +15,9 @@ import urllib.request
 import urllib.error
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from mod_library import ModLibrary, documents_folder, package_root, relative_path
+from core.mod_library import ModLibrary, documents_folder, package_root, relative_path
 from plugins.ff7r.mod_support import PakModAdapter
-from managed_mods import ManagedModSpec, update_mod, recover_update, refresh_active_mod, check_release
+from core.managed_mods import ManagedModSpec, update_mod, recover_update, refresh_active_mod, check_release
 
 
 class ImportTests(unittest.TestCase):
@@ -71,7 +71,7 @@ class ImportTests(unittest.TestCase):
             self.assertNotEqual(unchanged.entries[0].values["Power"], 99)
 
     def test_move_recovery_reopens_editor_after_commit(self):
-        from desktop_host import HostApi
+        from core.desktop_host import HostApi
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             source, destination = root / "old", root / "new"
@@ -100,7 +100,7 @@ class ImportTests(unittest.TestCase):
             host.open_plugin.assert_not_called()
 
     def test_missing_release_explains_unavailable(self):
-        with patch("managed_mods.release_request", side_effect=urllib.error.HTTPError(
+        with patch("core.managed_mods.release_request", side_effect=urllib.error.HTTPError(
                 "https://api.github.com", 404, "Not Found", {}, None)):
             with self.assertRaisesRegex(ValueError, "No stable managed mod release"):
                 check_release(ManagedModSpec("owner/mod", "mod.zip"))
@@ -173,7 +173,7 @@ class ImportTests(unittest.TestCase):
             self.assertFalse(state.with_suffix(".tmp").exists())
 
     def test_managed_author_skips_network(self):
-        with patch("managed_mods.check_release") as check:
+        with patch("core.managed_mods.check_release") as check:
             result = update_mod(ModLibrary(Path("unused")), "ff7r", PakModAdapter(),
                 ManagedModSpec("owner/repo", "mod.zip"), Path("unused-state"), author=True)
             self.assertFalse(result["updated"])
@@ -194,8 +194,8 @@ class ImportTests(unittest.TestCase):
                 release = {"tag": version, "asset": {"id": version, "size": len(payload),
                     "digest": "sha256:" + hashlib.sha256(payload).hexdigest(),
                     "browser_download_url": "https://github.com/owner/repo/releases/download/v/mod.zip"}}
-                with patch("managed_mods.check_release", return_value=release), patch(
-                        "managed_mods.release_request", return_value=io.BytesIO(payload[:-1] if corrupt else payload)):
+                with patch("core.managed_mods.check_release", return_value=release), patch(
+                        "core.managed_mods.release_request", return_value=io.BytesIO(payload[:-1] if corrupt else payload)):
                     return update_mod(library, "ff7r", PakModAdapter(), policy, state_path, author=False)
             first = install("1")
             target = Path(first["path"])

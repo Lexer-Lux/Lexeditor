@@ -14,7 +14,7 @@ from plugins.ffx_x2.ffx_commands import (
     parse_commands, payload, payload_for, table_spec,
 )
 from plugins.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
-from service_session import request_json
+from core.service_session import request_json
 
 
 def _record(anim1: int, anim2: int, record_size: int = 0x60, fill: int = 0xCC) -> bytes:

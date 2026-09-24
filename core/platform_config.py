@@ -12,7 +12,7 @@ import re
 import shutil
 import subprocess
 
-import process_probe
+from core import process_probe
 import tempfile
 
 

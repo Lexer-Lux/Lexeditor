@@ -54,7 +54,7 @@ One shape, checked by `tests/verify_shared_ui_contract.py`:
   one global scope, so a value one module reads at load time must be defined by
   a module the page lists earlier.
 - The plugin's service routes them with `self.send_page_module(PLUGIN_ROOT,
-  path)` from `plugin_http.py`; `tests/plugin_module_routes_check.py` starts
+  path)` from `core/plugin_http.py`; `tests/plugin_module_routes_check.py` starts
   every service, asks it for each module its page names, and loads the page to
   see that the modules can still see each other.
 - No theme file. A theme is tokens handed to `mountShell`. A stylesheet may set
@@ -437,7 +437,7 @@ edits, external source modification, atomic-write failure and reopen after save.
 Run at minimum:
 
 ```text
-python plugin_metadata.py
+python -m core.plugin_metadata
 python tools/generate_credits.py --check
 python app.py --list
 python app.py --game <id> --check

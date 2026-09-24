@@ -14,7 +14,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import unittest
 
-import desktop_host
+from core import desktop_host
 
 
 class LoaderLocation(unittest.TestCase):
@@ -63,7 +63,7 @@ class LoaderLocation(unittest.TestCase):
 
     def test_every_installed_plugin_resolves_somewhere_real(self):
         import app
-        from game_installation import GameInstallationManager
+        from core.game_installation import GameInstallationManager
 
         plugins = app.discover_plugins()
         host = desktop_host.HostApi.__new__(desktop_host.HostApi)

@@ -8,8 +8,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PRODUCTION_ROOTS = (
-    ROOT / "service_session.py",
-    ROOT / "github_integration.py",
+    ROOT / "core/service_session.py",
+    ROOT / "core/github_integration.py",
     ROOT / "plugins",
 )
 

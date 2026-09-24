@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from test_shared_ui_feedback import page, framework
-from settings_manager import SettingsStore
+from core.settings_manager import SettingsStore
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = json.loads((ROOT / 'ui/default_settings.json').read_text(encoding='utf-8'))
