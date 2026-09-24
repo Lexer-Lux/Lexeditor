@@ -113,3 +113,42 @@ def validate_layout_template(template: Mapping) -> list[str]:
                 f"Layout template reuses the rejected claim {rejected}."
             )
     return errors
+
+def validate_shop_layout(layout: Mapping) -> list[str]:
+    """Check one completed representative shop layout instance.
+
+    Beyond the template fields, every slot needs a category or signature
+    assignment and the layout must confirm displays for unsold categories
+    were removed.
+    """
+    errors: list[str] = []
+    if not isinstance(layout, Mapping):
+        return ["Shop layout must be a mapping."]
+    for field in LAYOUT_TEMPLATE_FIELDS:
+        if not layout.get(field):
+            errors.append(f"Shop layout must state {field}.")
+    slots = layout.get("display_slots")
+    if isinstance(slots, list):
+        if not slots:
+            errors.append("Shop layout needs at least one display slot.")
+        for index, slot in enumerate(slots):
+            where = f"display_slots[{index}]"
+            if not isinstance(slot, Mapping):
+                errors.append(f"{where} must be a mapping.")
+                continue
+            if not slot.get("category") and not slot.get("signature_item"):
+                errors.append(
+                    f"{where} needs a category or signature_item assignment."
+                )
+    if layout.get("removed_unsold_displays") is not True:
+        errors.append(
+            "Shop layout must confirm displays for unsold categories "
+            "were removed."
+        )
+    claim = str(layout.get("claim", ""))
+    for rejected in REJECTED_CLAIMS:
+        if rejected in claim:
+            errors.append(
+                f"Shop layout reuses the rejected claim {rejected}."
+            )
+    return errors

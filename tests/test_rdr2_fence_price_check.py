@@ -62,5 +62,53 @@ class FencePriceCheckTests(unittest.TestCase):
         self.assertTrue(fp.validate_price_check("cheap fence"))
 
 
+def valid_session_result():
+    return {
+        "shop_kind": "fence",
+        "legs": {
+            "low_honor": {"shop": "Emerald fence", "item": "gold watch", "price": 45},
+            "high_honor": {"shop": "Emerald fence", "item": "gold watch", "price": 30},
+        },
+    }
+
+
+class FenceSessionResultTests(unittest.TestCase):
+    def test_valid_session_result_passes(self):
+        self.assertEqual(fp.validate_session_result(valid_session_result()), [])
+
+    def test_baseline_repeat_is_rejected(self):
+        result = valid_session_result()
+        result["legs"]["low_honor"]["price"] = 30
+        errors = fp.validate_session_result(result)
+        self.assertTrue(any("must beat" in e for e in errors))
+
+    def test_inverted_legs_are_rejected(self):
+        result = valid_session_result()
+        result["legs"]["low_honor"]["price"] = 20
+        errors = fp.validate_session_result(result)
+        self.assertTrue(any("baseline failure" in e for e in errors))
+
+    def test_missing_leg_is_rejected(self):
+        result = valid_session_result()
+        del result["legs"]["high_honor"]
+        errors = fp.validate_session_result(result)
+        self.assertTrue(any("high_honor" in e for e in errors))
+
+    def test_non_fence_session_is_rejected(self):
+        result = valid_session_result()
+        result["shop_kind"] = "general_store"
+        errors = fp.validate_session_result(result)
+        self.assertTrue(any("fence" in e for e in errors))
+
+    def test_unreadable_price_is_rejected(self):
+        result = valid_session_result()
+        result["legs"]["low_honor"]["price"] = "lots"
+        errors = fp.validate_session_result(result)
+        self.assertTrue(any("readable numeric price" in e for e in errors))
+
+    def test_non_mapping_result_is_rejected(self):
+        self.assertTrue(fp.validate_session_result("cheap at the fence"))
+
+
 if __name__ == "__main__":
     unittest.main()

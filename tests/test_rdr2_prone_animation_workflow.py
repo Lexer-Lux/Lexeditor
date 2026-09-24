@@ -86,5 +86,52 @@ class ProneAnimationWorkflowTests(unittest.TestCase):
         self.assertTrue(paw.validate_animation_plan("prone"))
 
 
+def valid_clip_record():
+    return {
+        "clip": "one-handed prone aim v2",
+        "unchanged_vanilla_clip": False,
+        "stages": {
+            stage: {"passed": True, "artifact": f"{stage} signoff"}
+            for stage in paw.pipeline_stages()
+        },
+    }
+
+
+class ClipRecordTests(unittest.TestCase):
+    def test_valid_clip_record_passes(self):
+        self.assertEqual(paw.validate_clip_record(valid_clip_record()), [])
+
+    def test_failed_stage_with_artifact_passes(self):
+        record = valid_clip_record()
+        record["stages"]["visual_qa"] = {"passed": False, "artifact": "jitter note"}
+        self.assertEqual(paw.validate_clip_record(record), [])
+
+    def test_unchanged_clip_is_rejected(self):
+        record = valid_clip_record()
+        record["unchanged_vanilla_clip"] = True
+        errors = paw.validate_clip_record(record)
+        self.assertTrue(any("unchanged" in e for e in errors))
+
+    def test_missing_stage_is_rejected(self):
+        record = valid_clip_record()
+        del record["stages"]["visual_qa"]
+        errors = paw.validate_clip_record(record)
+        self.assertTrue(any("visual_qa" in e for e in errors))
+
+    def test_stage_without_artifact_is_rejected(self):
+        record = valid_clip_record()
+        del record["stages"]["export"]["artifact"]
+        errors = paw.validate_clip_record(record)
+        self.assertTrue(any("artifact" in e for e in errors))
+
+    def test_unnamed_clip_is_rejected(self):
+        record = valid_clip_record()
+        del record["clip"]
+        self.assertTrue(paw.validate_clip_record(record))
+
+    def test_non_mapping_record_is_rejected(self):
+        self.assertTrue(paw.validate_clip_record("clip played"))
+
+
 if __name__ == "__main__":
     unittest.main()

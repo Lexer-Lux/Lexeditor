@@ -82,5 +82,51 @@ class ProtocolTests(unittest.TestCase):
         self.assertTrue(any("open_unknowns" in e for e in errors))
 
 
+def valid_comparison_result():
+    return {
+        "multiplier_restored": True,
+        "readings": {
+            "body_kill": {"baseline": 20, "candidate": 0},
+            "headshot_kill": {"baseline": 25, "candidate": 0},
+            "consumable_refill": {"baseline": 30, "candidate": 30},
+            "mission_refill": {"baseline": 40, "candidate": 40},
+            "active_dead_eye_drain": {"baseline": 10, "candidate": 10},
+            "eagle_eye": {"baseline": 5, "candidate": 5},
+        },
+    }
+
+
+class ComparisonResultTests(unittest.TestCase):
+    def test_valid_comparison_result_passes(self):
+        self.assertEqual(der.validate_comparison_result(valid_comparison_result()), [])
+
+    def test_unsuppressed_kill_gain_is_rejected(self):
+        result = valid_comparison_result()
+        result["readings"]["headshot_kill"]["candidate"] = 25
+        errors = der.validate_comparison_result(result)
+        self.assertTrue(any("headshot_kill" in e for e in errors))
+
+    def test_missing_situation_is_rejected(self):
+        result = valid_comparison_result()
+        del result["readings"]["eagle_eye"]
+        errors = der.validate_comparison_result(result)
+        self.assertTrue(any("eagle_eye" in e for e in errors))
+
+    def test_unreadable_meter_is_rejected(self):
+        result = valid_comparison_result()
+        result["readings"]["body_kill"]["baseline"] = "some"
+        errors = der.validate_comparison_result(result)
+        self.assertTrue(any("readable meter value" in e for e in errors))
+
+    def test_unrestored_multiplier_is_rejected(self):
+        result = valid_comparison_result()
+        result["multiplier_restored"] = False
+        errors = der.validate_comparison_result(result)
+        self.assertTrue(any("restore the previous multiplier" in e for e in errors))
+
+    def test_non_mapping_result_is_rejected(self):
+        self.assertTrue(der.validate_comparison_result("kills give nothing"))
+
+
 if __name__ == "__main__":
     unittest.main()

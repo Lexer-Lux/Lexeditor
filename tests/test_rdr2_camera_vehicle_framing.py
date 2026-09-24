@@ -75,5 +75,49 @@ class CameraVehicleFramingTests(unittest.TestCase):
         self.assertTrue(cvf.validate_framing_plan("low"))
 
 
+def valid_preset_apply():
+    return {
+        "profile": "horseback",
+        "values": {"offset": 0.4, "distance": 2.5},
+        "requires_developer_mode": False,
+    }
+
+
+class PresetApplyTests(unittest.TestCase):
+    def test_valid_preset_apply_passes(self):
+        self.assertEqual(cvf.validate_preset_apply(valid_preset_apply()), [])
+
+    def test_every_kept_profile_applies(self):
+        for profile in cvf.profiles():
+            request = valid_preset_apply()
+            request["profile"] = profile
+            self.assertEqual(cvf.validate_preset_apply(request), [], profile)
+
+    def test_unknown_profile_is_rejected(self):
+        request = valid_preset_apply()
+        request["profile"] = "submarine"
+        self.assertTrue(cvf.validate_preset_apply(request))
+
+    def test_apply_must_not_require_developer_mode(self):
+        request = valid_preset_apply()
+        request["requires_developer_mode"] = True
+        errors = cvf.validate_preset_apply(request)
+        self.assertTrue(any("developer mode" in e for e in errors))
+
+    def test_apply_without_values_is_rejected(self):
+        request = valid_preset_apply()
+        request["values"] = {}
+        self.assertTrue(cvf.validate_preset_apply(request))
+
+    def test_rejected_claim_is_rejected(self):
+        request = valid_preset_apply()
+        request["claim"] = "continuous_y_positioning preset"
+        errors = cvf.validate_preset_apply(request)
+        self.assertTrue(any("continuous_y_positioning" in e for e in errors))
+
+    def test_non_mapping_request_is_rejected(self):
+        self.assertTrue(cvf.validate_preset_apply("apply"))
+
+
 if __name__ == "__main__":
     unittest.main()

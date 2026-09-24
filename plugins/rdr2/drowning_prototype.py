@@ -82,3 +82,43 @@ def validate_drowning_plan(plan: Mapping) -> list[str]:
             "Prototype must list recovery checks before any drowning test."
         )
     return errors
+
+# Conditions the controlled session must script, each with its expected
+# outcome (presentation attempt or immediate death).
+SESSION_CONDITIONS = (
+    "deep_water",
+    "shallow_water",
+    "current",
+    "first_person",
+    "ragdoll",
+    "shore_edge",
+    "active_mission",
+)
+
+SESSION_OUTCOMES = ("presentation_attempt", "immediate_death")
+
+
+def validate_session_script(script: Mapping) -> list[str]:
+    """Check the controlled drowning-session script matrix."""
+    errors: list[str] = []
+    if not isinstance(script, Mapping):
+        return ["Session script must be a mapping."]
+    if not script.get("recovery_checks"):
+        errors.append("Session script must list recovery checks first.")
+    matrix = script.get("matrix")
+    if not isinstance(matrix, Mapping) or not matrix:
+        return errors + ["Session script must cover every condition."]
+    for condition in SESSION_CONDITIONS:
+        leg = matrix.get(condition)
+        if not isinstance(leg, Mapping):
+            errors.append(f"Session script must cover {condition}.")
+            continue
+        if leg.get("expected") not in SESSION_OUTCOMES:
+            errors.append(f"Condition {condition} needs an expected outcome.")
+    for condition in ("shallow_water", "ragdoll"):
+        leg = matrix.get(condition)
+        if isinstance(leg, Mapping) and leg.get("expected") != "immediate_death":
+            errors.append(
+                f"Condition {condition} must expect immediate death."
+            )
+    return errors

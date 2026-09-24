@@ -75,3 +75,41 @@ def validate_replacement_plan(plan: Mapping) -> list[str]:
                     "its YTD ships."
                 )
     return errors
+
+# Observations the in-game pickup check must record per family: the satchel
+# icon, the acquisition card, and whether the rendered art matches the
+# approved preview. Families on a vanilla fallback cannot pass the match.
+PICKUP_OBSERVATIONS = (
+    "satchel_icon_visible",
+    "acquisition_card_visible",
+    "matches_preview",
+)
+
+
+def validate_pickup_check(check: Mapping) -> list[str]:
+    """Check an in-game pickup/acquisition-card record per family."""
+    errors: list[str] = []
+    if not isinstance(check, Mapping):
+        return ["Pickup check must be a mapping."]
+    known = {entry["family"]: entry["state"] for entry in REPLACEMENT_FAMILIES}
+    families = check.get("families")
+    if not isinstance(families, Mapping) or not families:
+        return ["Pickup check must record at least one family."]
+    for family, record in families.items():
+        if family not in known:
+            errors.append(f"Family {family!r} is not a tracked replacement.")
+            continue
+        if not isinstance(record, Mapping):
+            errors.append(f"Family {family} must be a mapping.")
+            continue
+        for observation in PICKUP_OBSERVATIONS:
+            if record.get(observation) is not True:
+                errors.append(f"Family {family} must show {observation}.")
+        if known[family] in UNFINISHED_STATES and record.get("matches_preview") is True:
+            errors.append(
+                f"Family {family} is still {known[family]}: it cannot "
+                "match a preview it does not have."
+            )
+    if check.get("full_restart") is not True:
+        errors.append("Pickup check must run after a full restart.")
+    return errors

@@ -306,3 +306,31 @@ def validate_installation_plan(plan: Mapping) -> list[str]:
         if required not in covered:
             errors.append(f"session must cover {required}")
     return errors
+
+# Verdicts a completed in-game session may record per verification.
+RESULT_VERDICTS = ("pass", "fail")
+
+
+def validate_session_result(result: Mapping) -> list[str]:
+    """Check a completed session's per-verification outcomes and evidence."""
+    errors: list[str] = []
+    if not isinstance(result, Mapping):
+        return ["Session result must be a mapping."]
+    outcomes = result.get("outcomes")
+    if not isinstance(outcomes, Mapping) or not outcomes:
+        return ["Session result must record one outcome per verification."]
+    for required in REQUIRED_VERIFICATIONS:
+        record = outcomes.get(required)
+        if not isinstance(record, Mapping):
+            errors.append(f"Session result must record {required}.")
+            continue
+        if record.get("verdict") not in RESULT_VERDICTS:
+            errors.append(f"Outcome {required} needs a pass or fail verdict.")
+        if not _non_empty_string(record.get("evidence")):
+            errors.append(
+                f"Outcome {required} must cite its evidence; "
+                "a verdict without evidence proves nothing."
+            )
+    if result.get("build") in (None, ""):
+        errors.append("Session result must name the tested build.")
+    return errors

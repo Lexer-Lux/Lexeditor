@@ -103,3 +103,48 @@ def validate_replacement(plan: Mapping) -> list[str]:
 def is_valid(plan: Mapping) -> bool:
     """Return True when the replacement plan passes every structural check."""
     return not validate_replacement(plan)
+
+# Situations where candidate multiplier 0 must suppress gains, versus
+# situations whose refills and drains must behave as at baseline.
+SUPPRESSED_SITUATIONS = ("body_kill", "headshot_kill")
+PRESERVED_SITUATIONS = (
+    "consumable_refill",
+    "mission_refill",
+    "active_dead_eye_drain",
+    "eagle_eye",
+)
+
+
+def validate_comparison_result(result: Mapping) -> list[str]:
+    """Check the recorded causal suppression comparison readings."""
+    errors: list[str] = []
+    if not isinstance(result, Mapping):
+        return ["result must be a mapping"]
+    readings = result.get("readings")
+    if not isinstance(readings, Mapping) or not readings:
+        return ["readings must map every comparison situation to its meter values"]
+    for required in COMPARISON_SITUATIONS:
+        record = readings.get(required)
+        if not isinstance(record, Mapping):
+            errors.append(f"readings must measure {required}")
+            continue
+        for side in ("baseline", "candidate"):
+            value = record.get(side)
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                errors.append(f"{required}.{side} must be a readable meter value")
+    for situation in SUPPRESSED_SITUATIONS:
+        record = readings.get(situation)
+        if not isinstance(record, Mapping):
+            continue
+        baseline, candidate = record.get("baseline"), record.get("candidate")
+        if (
+            isinstance(baseline, (int, float)) and not isinstance(baseline, bool)
+            and isinstance(candidate, (int, float)) and not isinstance(candidate, bool)
+            and candidate >= baseline
+        ):
+            errors.append(
+                f"{situation} must gain less at candidate 0 than at baseline 1"
+            )
+    if not result.get("multiplier_restored"):
+        errors.append("comparison must restore the previous multiplier afterwards")
+    return errors

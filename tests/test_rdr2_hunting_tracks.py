@@ -61,5 +61,66 @@ class HuntingTracksTests(unittest.TestCase):
         self.assertTrue(ht.validate_track_experiment("tracks"))
 
 
+def valid_probe_result():
+    return {
+        "measurements": {
+            "trail_lifetime_after_stream_out": {
+                "value": "180s",
+                "conditions": "tagged buck, walked beyond range",
+            },
+            "trail_lifetime_after_explicit_deletion": {
+                "value": "0s",
+                "conditions": "tagged doe, deleted via native",
+            },
+            "tagged_animal_identity": {
+                "value": "buck-1/doe-2",
+                "conditions": "tagged before observation",
+            },
+            "streaming_conditions": {
+                "value": "range + delete",
+                "conditions": "same weather/time",
+            },
+        },
+        "design_decision": "hidden_distant_target_ped",
+    }
+
+
+class ProbeResultTests(unittest.TestCase):
+    def test_valid_probe_result_passes(self):
+        self.assertEqual(ht.validate_probe_result(valid_probe_result()), [])
+
+    def test_result_without_decision_passes(self):
+        result = valid_probe_result()
+        del result["design_decision"]
+        self.assertEqual(ht.validate_probe_result(result), [])
+
+    def test_missing_measurement_is_rejected(self):
+        result = valid_probe_result()
+        del result["measurements"]["trail_lifetime_after_stream_out"]
+        errors = ht.validate_probe_result(result)
+        self.assertTrue(any("trail_lifetime_after_stream_out" in e for e in errors))
+
+    def test_measurement_without_conditions_is_rejected(self):
+        result = valid_probe_result()
+        del result["measurements"]["streaming_conditions"]["conditions"]
+        errors = ht.validate_probe_result(result)
+        self.assertTrue(any("conditions" in e for e in errors))
+
+    def test_rejected_decision_is_rejected(self):
+        result = valid_probe_result()
+        result["design_decision"] = "vanilla_tracks_under_near_zero_density"
+        errors = ht.validate_probe_result(result)
+        self.assertTrue(any("rejected" in e for e in errors))
+
+    def test_unknown_decision_is_rejected(self):
+        result = valid_probe_result()
+        result["design_decision"] = "scent_hounds"
+        errors = ht.validate_probe_result(result)
+        self.assertTrue(any("not one of the viable designs" in e for e in errors))
+
+    def test_non_mapping_result_is_rejected(self):
+        self.assertTrue(ht.validate_probe_result("trails last"))
+
+
 if __name__ == "__main__":
     unittest.main()

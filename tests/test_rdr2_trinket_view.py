@@ -70,5 +70,52 @@ class TrinketViewTests(unittest.TestCase):
         self.assertTrue(tv.validate_trinket_proposal("trinkets"))
 
 
+def valid_probe_result():
+    return {
+        "checks": {
+            "isolated_datastore_injection_probe": True,
+            "category_filter_selection_proof": True,
+            "focus_and_back_handling": True,
+            "sizing_proof": True,
+        },
+        "verdict": "pass",
+        "route": "native_tab",
+    }
+
+
+class InjectionProbeResultTests(unittest.TestCase):
+    def test_passing_probe_keeps_native_tab(self):
+        self.assertEqual(tv.validate_probe_result(valid_probe_result()), [])
+
+    def test_failing_probe_selects_mod_owned_page(self):
+        result = valid_probe_result()
+        result["checks"]["sizing_proof"] = False
+        result["verdict"] = "fail"
+        result["route"] = "mod_owned_page"
+        self.assertEqual(tv.validate_probe_result(result), [])
+
+    def test_pass_with_failed_check_is_rejected(self):
+        result = valid_probe_result()
+        result["checks"]["focus_and_back_handling"] = False
+        errors = tv.validate_probe_result(result)
+        self.assertTrue(any("cannot pass" in e for e in errors))
+
+    def test_fail_keeping_native_tab_is_rejected(self):
+        result = valid_probe_result()
+        result["checks"]["sizing_proof"] = False
+        result["verdict"] = "fail"
+        errors = tv.validate_probe_result(result)
+        self.assertTrue(any("mod_owned_page" in e for e in errors))
+
+    def test_unrecorded_check_is_rejected(self):
+        result = valid_probe_result()
+        del result["checks"]["sizing_proof"]
+        errors = tv.validate_probe_result(result)
+        self.assertTrue(any("sizing_proof" in e for e in errors))
+
+    def test_non_mapping_result_is_rejected(self):
+        self.assertTrue(tv.validate_probe_result("injected"))
+
+
 if __name__ == "__main__":
     unittest.main()

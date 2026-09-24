@@ -78,5 +78,58 @@ class DrowningPrototypeTests(unittest.TestCase):
         self.assertTrue(dp.validate_drowning_plan("swim"))
 
 
+def valid_session_script():
+    return {
+        "recovery_checks": ["shore exit bound", "mission state clean"],
+        "matrix": {
+            "deep_water": {"expected": "presentation_attempt"},
+            "shallow_water": {"expected": "immediate_death"},
+            "current": {"expected": "presentation_attempt"},
+            "first_person": {"expected": "presentation_attempt"},
+            "ragdoll": {"expected": "immediate_death"},
+            "shore_edge": {"expected": "presentation_attempt"},
+            "active_mission": {"expected": "immediate_death"},
+        },
+    }
+
+
+class SessionScriptTests(unittest.TestCase):
+    def test_valid_session_script_passes(self):
+        self.assertEqual(dp.validate_session_script(valid_session_script()), [])
+
+    def test_missing_condition_is_rejected(self):
+        script = valid_session_script()
+        del script["matrix"]["shore_edge"]
+        errors = dp.validate_session_script(script)
+        self.assertTrue(any("shore_edge" in e for e in errors))
+
+    def test_missing_recovery_checks_is_rejected(self):
+        script = valid_session_script()
+        script["recovery_checks"] = []
+        errors = dp.validate_session_script(script)
+        self.assertTrue(any("recovery checks" in e for e in errors))
+
+    def test_shallow_water_must_expect_immediate_death(self):
+        script = valid_session_script()
+        script["matrix"]["shallow_water"]["expected"] = "presentation_attempt"
+        errors = dp.validate_session_script(script)
+        self.assertTrue(any("shallow_water" in e for e in errors))
+
+    def test_ragdoll_must_expect_immediate_death(self):
+        script = valid_session_script()
+        script["matrix"]["ragdoll"]["expected"] = "presentation_attempt"
+        errors = dp.validate_session_script(script)
+        self.assertTrue(any("ragdoll" in e for e in errors))
+
+    def test_unknown_outcome_is_rejected(self):
+        script = valid_session_script()
+        script["matrix"]["current"]["expected"] = "maybe struggle"
+        errors = dp.validate_session_script(script)
+        self.assertTrue(any("expected outcome" in e for e in errors))
+
+    def test_non_mapping_script_is_rejected(self):
+        self.assertTrue(dp.validate_session_script("swim test"))
+
+
 if __name__ == "__main__":
     unittest.main()

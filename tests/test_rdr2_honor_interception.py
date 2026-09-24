@@ -59,5 +59,58 @@ class HonorInterceptionTests(unittest.TestCase):
         self.assertTrue(hi.validate_interception_plan("honor"))
 
 
+def valid_hook_candidate():
+    return {
+        "native": "HONOR::_APPLY_HONOR_EVENT",
+        "build_fingerprint": "1491.50",
+        "evidence": {
+            "fires_before_tier_application": {
+                "interception_point": "event dispatch hook",
+                "observation": "hook fires before tier write in trace",
+            },
+            "preserves_event_identity": {
+                "interception_point": "event dispatch hook",
+                "observation": "event hash readable at hook time",
+            },
+            "bounty_dog_only_blocking": {
+                "interception_point": "event dispatch hook",
+                "observation": "PoliceDog ped blocked, farm animals pass",
+            },
+        },
+    }
+
+
+class HookCandidateTests(unittest.TestCase):
+    def test_valid_hook_candidate_passes(self):
+        self.assertEqual(hi.validate_hook_candidate(valid_hook_candidate()), [])
+
+    def test_unnamed_native_is_rejected(self):
+        candidate = valid_hook_candidate()
+        del candidate["native"]
+        errors = hi.validate_hook_candidate(candidate)
+        self.assertTrue(any("researched native" in e for e in errors))
+
+    def test_missing_fingerprint_is_rejected(self):
+        candidate = valid_hook_candidate()
+        del candidate["build_fingerprint"]
+        errors = hi.validate_hook_candidate(candidate)
+        self.assertTrue(any("fingerprint" in e for e in errors))
+
+    def test_missing_property_evidence_is_rejected(self):
+        candidate = valid_hook_candidate()
+        del candidate["evidence"]["preserves_event_identity"]
+        errors = hi.validate_hook_candidate(candidate)
+        self.assertTrue(any("preserves_event_identity" in e for e in errors))
+
+    def test_evidence_without_observation_is_rejected(self):
+        candidate = valid_hook_candidate()
+        del candidate["evidence"]["bounty_dog_only_blocking"]["observation"]
+        errors = hi.validate_hook_candidate(candidate)
+        self.assertTrue(any("observation" in e for e in errors))
+
+    def test_non_mapping_candidate_is_rejected(self):
+        self.assertTrue(hi.validate_hook_candidate("some native"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -133,3 +133,39 @@ def validate_lantern_test(plan: Mapping) -> list[str]:
 def is_valid(plan: Mapping) -> bool:
     """Return True when the lantern-test plan passes every structural check."""
     return not validate_lantern_test(plan)
+
+def validate_session_result(result: Mapping) -> list[str]:
+    """Check a saddle-lantern session's per-step outcomes."""
+    errors: list[str] = []
+    if not isinstance(result, Mapping):
+        return ["result must be a mapping"]
+    steps = result.get("steps")
+    if not isinstance(steps, list) or not steps:
+        return ["steps must be a non-empty list of observed test steps"]
+    by_role = {
+        entry["record"]: entry["role"] for entry in LANTERN_RECORDS
+        if isinstance(entry, Mapping)
+    }
+    for index, step in enumerate(steps):
+        where = f"steps[{index}]"
+        if not isinstance(step, Mapping):
+            errors.append(f"{where} must be a mapping")
+            continue
+        if step.get("record") not in by_role:
+            errors.append(f"{where} must name a recorded lantern record")
+            continue
+        if step.get("observed") not in (True, False):
+            errors.append(f"{where} must record whether the step was observed")
+            continue
+        if step.get("observed") is True:
+            if not _non_empty_string(step.get("note")):
+                errors.append(f"{where} must note what was observed")
+            role = by_role[step["record"]]
+            if role == "belt_handheld":
+                if step.get("belt_hidden_while_mounted") not in (True, False):
+                    errors.append(f"{where} must record belt_hidden_while_mounted")
+            if role == "horse_lantern":
+                for field in ("horse_lantern_attached", "light_correct"):
+                    if step.get(field) not in (True, False):
+                        errors.append(f"{where} must record {field}")
+    return errors

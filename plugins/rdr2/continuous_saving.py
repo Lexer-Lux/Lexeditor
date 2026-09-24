@@ -86,3 +86,42 @@ def validate_saving_plan(plan: Mapping) -> list[str]:
             "Real saves must not be touched before the design is approved."
         )
     return errors
+
+# Fields every observed save request/completion pair must carry. The
+# observer is read-only: it correlates the game's own completions with
+# their requests by sequence number and never mutates a save.
+OBSERVER_PAIR_FIELDS = ("sequence", "request", "completion")
+
+
+def validate_observer_report(report: Mapping) -> list[str]:
+    """Check a read-only save request/completion observer report."""
+    errors: list[str] = []
+    if not isinstance(report, Mapping):
+        return ["Observer report must be a mapping."]
+    if report.get("read_only") is not True:
+        errors.append("The observer must be read-only; it mutates no save.")
+    pairs = report.get("pairs")
+    if not isinstance(pairs, list) or not pairs:
+        return ["Observer report must list at least one request/completion pair."]
+    seen: set = set()
+    for index, pair in enumerate(pairs):
+        where = f"pairs[{index}]"
+        if not isinstance(pair, Mapping):
+            errors.append(f"{where} must be a mapping.")
+            continue
+        for field in OBSERVER_PAIR_FIELDS:
+            if pair.get(field) in (None, ""):
+                errors.append(f"{where} must carry {field}.")
+        sequence = pair.get("sequence")
+        if sequence in seen:
+            errors.append(
+                f"{where} reuses sequence {sequence!r}; completions must "
+                "correlate one-to-one."
+            )
+        seen.add(sequence)
+        if pair.get("correlated") is not True:
+            errors.append(
+                f"{where} must correlate its completion with its request; "
+                "an uncorrelated SAVE_COMPLETE proves nothing."
+            )
+    return errors
