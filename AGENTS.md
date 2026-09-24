@@ -8,8 +8,10 @@
   research-first workflow. Survey existing open-source tools/loaders, documentation
   and format knowledge before writing new parsers, and record material sources in
   Credits as they are used rather than reconstructing provenance later.
-- Work directly on master: no branches, worktrees, stashes or pull requests.
-  Commit in coherent steps and leave nothing parked. Pushing needs Lexer's
+- Branches are fine; leftovers are not. When a task is done and verified, merge
+  its branch into master and delete the branch, its worktree and any stash in
+  the same session. Never leave finished work parked where Lexer has to find
+  it, and say plainly if you stop with unmerged work. Pushing needs Lexer's
   explicit go-ahead.
 - Every game plugin must expose a Data Map screen. Do not use a generic Files
   tab as the player-facing editor for data that needs a format-specific view.
