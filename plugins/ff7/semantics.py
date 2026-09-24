@@ -279,7 +279,7 @@ CORE = {
     },
     "playerAttacks": {
         "targetData": _field(label="Targeting", dataType="flags", flags=flags(*TARGET_FLAGS), group="Targeting", help="Who this player attack/spell can target and how its battle cursor behaves."),
-        "damageCalculationId": _field(label="Damage / healing formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Damage", help="Formula, damage type, accuracy behavior and critical capability encoded in the calculation byte."),
+        "damageCalculationId": _field(label="DMG/Heal Formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Damage", help="Formula, damage type, accuracy behavior and critical capability encoded in the calculation byte."),
         "conditionSubmenu": _field(label="Condition submenu", dataType="enum", choices=choices(*ATTACK_CONDITIONS), group="Status / condition", help="Conditional submenu mode used by the attack."),
         "statusChange": _field(label="Status change", dataType="statusChange", group="Status / condition", help="Inflict/cure/swap mode and chance encoded in one byte."),
         "additionalEffects": _field(label="Additional behavior", dataType="enum", choices=choices(*ADDITIONAL_EFFECTS), group="Extra behavior", help="Hard-coded behavior beyond ordinary damage/status processing."),
@@ -289,7 +289,7 @@ CORE = {
         "specialAttackFlags": _field(label="Special attack properties", dataType="flags", flags=flags(*SPECIAL_ATTACK_FLAGS), invertBits=True, bitWidth=16, group="Extra behavior", help="Named special properties. KERNEL.BIN stores these bits inverted; the editor presents their logical meaning."),
         "accuracyRate": _field(label="Accuracy", group="Damage", help="Base accuracy parameter used by formulas that perform an accuracy check."),
         "mpCost": _field(label="MP cost", group="Cost", help="MP consumed when this attack is used normally."),
-        "attackPower": _field(label="Power", group="Damage", help="Base power consumed by the selected damage/healing formula."),
+        "attackPower": _field(label="Power", group="Damage", help="Base power consumed by the selected DMG/Heal Formula."),
         "impactEffectId": advanced("Impact effect ID", "Raw impact visual-effect ID."),
         "targetHurtActionIndex": advanced("Target hurt action ID", "Raw target reaction/animation index."),
         "impactSound": advanced("Impact sound ID", "Raw battle sound-effect ID."),
@@ -299,7 +299,7 @@ CORE = {
     },
     "items": {
         "targetData": _field(label="Targeting", dataType="flags", flags=flags(*TARGET_FLAGS), group="Targeting", help="Who this item can target and how the battle cursor behaves."),
-        "damageCalculationId": _field(label="Damage / healing formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Effect", help="The battle formula and accuracy mode used by the item. The raw byte combines formula, physical/magical mode, accuracy and critical-hit behavior."),
+        "damageCalculationId": _field(label="DMG/Heal Formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Effect", help="The battle formula and accuracy mode used by the item. The raw byte combines formula, physical/magical mode, accuracy and critical-hit behavior."),
         "conditionSubmenu": _field(label="Condition submenu", dataType="enum", choices=choices(*ATTACK_CONDITIONS), group="Effect", help="Which conditional submenu the battle UI uses: HP, MP, Status, or none."),
         "statusChange": _field(label="Status change", dataType="statusChange", group="Status", help="Whether this item inflicts, cures or swaps the selected status set, plus its encoded chance/amount."),
         "additionalEffects": _field(label="Additional behavior", dataType="enum", choices=choices(*ADDITIONAL_EFFECTS), group="Effect", help="Extra hard-coded battle behavior beyond the normal damage/status calculation."),
@@ -313,7 +313,7 @@ CORE = {
     },
     "weapons": {
         "targetData": _field(label="Targeting", dataType="flags", flags=flags(*TARGET_FLAGS), group="Combat", help="Who the basic weapon attack can target and how the cursor behaves."),
-        "damageCalculationId": _field(label="Damage formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Combat", help="Formula/accuracy byte used for this weapon's basic attack."),
+        "damageCalculationId": _field(label="DMG/Heal Formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Combat", help="Formula/accuracy byte used for this weapon's basic attack."),
         "status": _field(label="Granted status", dataType="enum", choices=choices(*STATUS_INDEX), group="Equipped effects", help="Single status granted by the equipment, or None."),
         "growthRate": _field(label="Materia AP growth", dataType="enum", choices=choices(*GROWTH_RATES), group="Materia slots", help="AP growth multiplier for Materia installed in this weapon."),
         "equipableBy": _field(label="Usable by", dataType="flags", flags=flags(*EQUIPABLE), group="Equipment", help="Characters allowed to equip this weapon."),
@@ -391,7 +391,7 @@ SCENE = {
     },
     "enemyAttacks": {
         "target": _field(label="Targeting", dataType="flags", flags=flags(*TARGET_FLAGS), group="Targeting", help="Who this attack can target and how its battle cursor/selection behaves."),
-        "formula": _field(label="Damage / healing formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Damage", help="Formula, damage type, accuracy behavior and critical capability encoded in the calculation byte."),
+        "formula": _field(label="DMG/Heal Formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Damage", help="Formula, damage type, accuracy behavior and critical capability encoded in the calculation byte."),
         "condition": _field(label="Condition submenu", dataType="enum", choices=choices(*ATTACK_CONDITIONS), group="Status / condition", help="Conditional submenu mode used by the attack."),
         "statusChance": _field(label="Status change", dataType="statusChange", group="Status / condition", help="Inflict/cure/swap mode and chance encoded in one byte."),
         "additionalEffect": _field(label="Additional behavior", dataType="enum", choices=choices(*ADDITIONAL_EFFECTS), group="Extra behavior", help="Hard-coded behavior beyond ordinary damage/status processing."),
@@ -486,7 +486,7 @@ def apply(category: str, fields_in):
 # Scalar fields that are genuinely numeric but still need domain language.
 for key, label, help_text in (
     ("attackPower", "Power", "Base power consumed by the selected item formula."),
-    ("attackStrength", "Attack power", "Base power used by this weapon's damage formula."),
+    ("attackStrength", "Attack power", "Base power used by this weapon's DMG/Heal Formula."),
     ("criticalRate", "Critical rate", "Weapon critical-hit rate parameter."),
     ("accuracyRate", "Accuracy", "Weapon accuracy rate parameter."),
 ):

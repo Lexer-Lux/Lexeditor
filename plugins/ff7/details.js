@@ -189,7 +189,7 @@
     const body=[];
     if(keys.name&&fieldByKey(keys.name))body.push(detailSection({title:"ATTACK NAME",attrs:{"data-concept":"attack-name"},body:el("div",{style:"padding:10px;min-width:0"},semanticControl(row,fieldByKey(keys.name)))}));
     body.push(detailSection({title:"COST & DAMAGE",attrs:{"data-concept":"attack-core"},body:settingsConcept(row,[
-      [keys.accuracy,"Accuracy"],[keys.cost,"MP cost"],[keys.formula,"Damage / healing formula"],[keys.power,"Power"],
+      [keys.accuracy,"Accuracy"],[keys.cost,"MP cost"],[keys.formula,"DMG/Heal Formula"],[keys.power,"Power"],
     ],"Attack cost and damage")}));
     body.push(detailSection({title:"TARGETING & STATUS",attrs:{"data-concept":"attack-effects"},body:settingsConcept(row,[
       [keys.target,"Targeting"],[keys.condition,"Condition"],[keys.status,"Status change"],[keys.statuses,"Statuses affected"],[keys.elements,"Elements"],
