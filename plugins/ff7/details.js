@@ -11,7 +11,14 @@
     body.push(...groups.map(group=>detailSection({title:group.toUpperCase(),body:fields.filter(field=>(field.group||"Kernel data")===group).map(field=>fieldDetail(row,field))})));
     return body;
   }
-  function conceptTable(rows,template,columns,label){return columnList({rows,key:entry=>entry.key,class:"ff7-concept-table",editable:true,template,columns,"aria-label":label})}
+  function conceptTable(rows,template,columns,label){
+    // Slot numbers render padded to the page's whole-set id floor (#01), so a
+    // fixed 44px/36px identity track shears them. Floor those tracks at the
+    // ink: 44px where short ids fit, wider where padding needs it.
+    const tracks=template.match(/minmax\((?:[^()]*|\([^()]*\))*\)|[^\s]+/g)||[template];
+    const floored=tracks.map((track,index)=>columns[index]?.numberedId&&/^\d+px$/.test(track)?`minmax(${track},max-content)`:track).join(" ");
+    return columnList({rows,key:entry=>entry.key,class:"ff7-concept-table",editable:true,template:floored,columns,"aria-label":label});
+  }
   function conceptPanel(row,body){return detailPanel({className:"ff7-detail",title:displayRowName(row),identity:recordId(row.id),meta:null,body})}
   function growthCurveKind(row){return row.id<37?"primary":row.id<46?"hp":row.id<55?"mp":"exp"}
   function growthBracket(level){return level<12?0:level<22?1:level<32?2:level<42?3:level<52?4:level<62?5:level<82?6:7}
