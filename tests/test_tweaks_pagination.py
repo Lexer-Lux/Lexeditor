@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_harness_reads_real_css_files():
-    harness = (ROOT / 'tools/verify_tweaks_pagination.py').read_text(encoding='utf-8')
+    harness = (ROOT / 'tests/verify_tweaks_pagination.py').read_text(encoding='utf-8')
     assert 'editor.css' in harness
     assert 're.search' not in harness
     assert '<style>' not in (ROOT / 'plugins/rdr2/editor.html').read_text(encoding='utf-8')

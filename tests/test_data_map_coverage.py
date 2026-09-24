@@ -10,7 +10,7 @@ from unittest.mock import patch
 class CoverageTests(unittest.TestCase):
     def test_ff7_same_file_different_editors_and_missing_config(self):
         from plugins.ff7 import server
-        from tools.verify_ff7_datasets import write_kernel
+        from tests.verify_ff7_datasets import write_kernel
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);game=root/'game';project=root/'project'
             source=game/'data/lang-en/kernel/KERNEL.BIN'

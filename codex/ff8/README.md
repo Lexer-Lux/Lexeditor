@@ -4,6 +4,7 @@ Canonical game-specific knowledge. No standalone source has been imported for th
 
 - [Triple Triad field opponents](triple-triad.md): entity identity, setup variants, and documented argument meanings.
 
+- [Rebuilding the FFNx runtime](native-runtime-build.md): pinned FFNx revision, toolchain, compile gates and artifact checks.
 - [Smooth HP-number colours](hp-colours.md): FFNx RGB seam, verified native HP scopes, and acceptance boundary.
 
 - [Audio volumes](audio-volumes.md): vanilla Sound slider scope, FFNx SFX/Music layer gains, and the #498 split.

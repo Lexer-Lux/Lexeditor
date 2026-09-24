@@ -4,11 +4,13 @@ Usage:
     python tools/shot.py <plugin> <name> [--step "<js>"]... [--size WxH]
 
 Each --step runs in the page and is awaited for 400ms before the next one.
-The PNG lands in _scratch/shots/<name>.png.
+The PNG lands in %TEMP%/lexeditor-dev/shots/<name>.png.
 """
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import argparse
 import base64
 import os
@@ -28,7 +30,7 @@ from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # n
 import browser_guard  # noqa: E402
 
 EDGE = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-SHOTS = ROOT / "_scratch" / "shots"
+SHOTS = DEV_CACHE / "shots"
 
 STUB = """
   window.__testErrors=[];

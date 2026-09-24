@@ -1,4 +1,6 @@
 """Signal Flare definition overlay tests. No game files or windows are used."""
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 from pathlib import Path
 import os
 import json
@@ -340,7 +342,7 @@ print(json.dumps({'cases':count}))
             (folder/"emulate.py").write_text(worker)
             from plugins.ff8 import paths
             private_exe=paths.GAME_ROOT/"FF8_EN.exe"
-            command=[str(ROOT/".venv/Scripts/python.exe"),str(folder/"emulate.py"),str(folder/"check.dll"),str(ROOT/"_scratch/gf-spellbooks-test-deps")]
+            command=[str(ROOT/".venv/Scripts/python.exe"),str(folder/"emulate.py"),str(folder/"check.dll"),str(DEV_CACHE / "gf-spellbooks-test-deps")]
             if private_exe.is_file():command.append(str(private_exe))
             result=subprocess.run(command,capture_output=True,text=True,timeout=30,creationflags=subprocess.CREATE_NO_WINDOW)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)

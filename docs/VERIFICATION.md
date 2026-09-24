@@ -10,7 +10,7 @@ Install the test packages in the editor's Python environment:
 Node.js must also be on PATH. Run the baseline checks with:
 
 ```powershell
-.venv/Scripts/python.exe tools/verify_all.py verify_regressions.py verify_browser_regressions.py frontend_syntax shared_ui_contract no_clipped_text --jobs 2 --timeout 300 --retries 0
+.venv/Scripts/python.exe tests/verify_all.py verify_regressions.py verify_browser_regressions.py frontend_syntax shared_ui_contract no_clipped_text --jobs 2 --timeout 300 --retries 0
 ```
 
 `verify_no_clipped_text.py` sweeps every plugin's tabs at two widths and fails
@@ -26,7 +26,7 @@ host exit. Visible Windows launcher fixtures are disabled by default. Run them
 only after explicit approval by setting `LEXEDITOR_NATIVE_WINDOW_TESTS=1`.
 The Windows CI job opts in on its own test machine.
 
-Full output for each attempt and `report.json` are in `_scratch/verify-results`.
+Full output for each attempt and `report.json` are in `%TEMP%/lexeditor-dev/verify-results`.
 Use `--output <folder>` to keep a separate run. Failures return a nonzero exit
 code. Each log is limited to 8 MiB. A timeout or excess output is a failure and
 is not retried. With `--retries 1`, a pass on
@@ -46,7 +46,7 @@ boundary. Keep temporary work in a directory that is removed after the job;
 retain only the needed patches and reports. Do not auto-delete mod projects,
 saves, recovery backups, or required extracted game data as temporary waste.
 
-Run the local RDR2 audit with `tools/verify_rdr2_runtime.py`. It includes executable
+Run the local RDR2 audit with `tests/verify_rdr2_runtime.py`. It includes executable
 C++ checks for climbing transitions, minimap restoration, shoulder switching,
 vehicle camera ownership, and independent core/bar rendering. These use controlled
 native readbacks and temporary compiler output; they do not open the game.

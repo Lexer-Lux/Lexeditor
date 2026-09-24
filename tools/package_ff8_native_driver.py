@@ -21,14 +21,14 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.prepare_ff8_native_build import BASE, prepare
-from tools.verify_ff8_linked_runtime import verify as verify_linked
+from tests.verify_ff8_linked_runtime import verify as verify_linked
 from plugins.ff8.ffnx_issue_51 import runtime_package
 
 SUPPORT_FILES = {
     'tests/lexeditor_live_conditions_test.cpp',
     'tests/lexeditor_shared_magic_config_test.cpp',
-    'tools/verify_issue51_runtime_artifact.py',
-    'tools/verify_issue51_shared_magic_runtime.py',
+    'tests/verify_issue51_runtime_artifact.py',
+    'tests/verify_issue51_shared_magic_runtime.py',
     'verify-issue51-build.ps1',
 }
 NEW_DRIVER_MARKERS = (
@@ -113,7 +113,7 @@ def package(candidate: Path, ffnx_source: Path, *, driver_sha256: str,
         if sections((candidate / complete_patch.name).read_bytes()).keys() == sections(complete_patch.read_bytes()).keys():
             # Keep the exact complete build patch, including its line endings.
             complete_patch.write_bytes((candidate / complete_patch.name).read_bytes())
-        verify_linked(ffnx_source / 'tools/verify_issue51_runtime_artifact.py', driver)
+        verify_linked(ffnx_source / 'tests/verify_issue51_runtime_artifact.py', driver)
         image, _ = runtime_package._pe_exports(driver)
         runtime_package._reject_unloadable_manifest(image)
         require(all(marker in image for marker in NEW_DRIVER_MARKERS),
@@ -201,7 +201,7 @@ CMake 4.2.0, Ninja, Release, and the
 Configure with `FFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON`,
 `FFNX_LEXEDITOR_LIVE_CONDITIONS=ON`, and `FFNX_DEPLOY_TO_GAME_DIRS=OFF`,
 then run `cmake --build .build --parallel 4`.
-The full command sequence is in `.github/workflows/ff8-stock-build.yml`.
+The full command sequence is in `codex/ff8/native-runtime-build.md`.
 The complete patch restores test/verifier support omitted by the earlier
 preparation helper; every candidate patch section was compared unchanged.
 No production compilation inputs differ from the reviewed build artifact.

@@ -33,18 +33,3 @@ Final installed-game acceptance still requires:
 5. Treat a missing mod, script load error, or incorrect edited behavior as a failed installed-game acceptance.
 
 This separation is deliberate: Lexeditor can prove the files it owns and the structure it emitted, but only Project Zomboid can prove that the live game accepted and executed those files.
-
-
-## Packaged PR candidate
-
-For PR #463, installed-distribution acceptance uses the Windows artifact produced by
-the `windows-candidate` job in **Project Zomboid checks**. That job checks out the
-exact PR head (not GitHub's synthetic merge ref), builds the native installer,
-silently installs it on the runner, runs the installed bundled-service smoke and
-installed Project Zomboid smoke, then uploads the installer together with the
-synthetic Build 42 acceptance project and the human checklist from
-`docs/acceptance/project-zomboid.md`.
-
-This provides a delivered binary candidate without asking the tester to build
-Lexeditor. The candidate job still does not substitute for launching a real Build 42
-installation and performing the checklist's in-game content test.

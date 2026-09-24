@@ -1,4 +1,6 @@
 """Signal Flare encounter backend tests; no game process or existing save is changed."""
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 from pathlib import Path
 import os
 import re
@@ -88,7 +90,7 @@ class NativeWorldSelectorTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Reuse existing local verifier dependency, if available. No install.
-        dependency = ROOT / "_scratch/gf-spellbooks-test-deps"
+        dependency = DEV_CACHE / "gf-spellbooks-test-deps"
         if dependency.is_dir():
             sys.path.insert(0, str(dependency))
         try:

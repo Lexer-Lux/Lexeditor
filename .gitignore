@@ -3,7 +3,6 @@ out/
 logs/
 .venv/
 $out/
-_scratch/
 artifacts/
 /FFNx.log
 # One flat <issue>.md per issue; no subfolders, mirrors or attachments.

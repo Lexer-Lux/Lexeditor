@@ -23,7 +23,7 @@ class FF7NameSortTests(unittest.TestCase):
 
     def test_data_map_points_sort_table_at_items(self):
         from plugins.ff7 import server
-        from tools.verify_ff7_datasets import write_kernel
+        from tests.verify_ff7_datasets import write_kernel
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
             write_kernel(root / "game/data/lang-en/kernel/KERNEL.BIN")

@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools import verify_all
+from tests import verify_all
 
 
 class RunnerTests(unittest.TestCase):
@@ -23,15 +23,15 @@ class RunnerTests(unittest.TestCase):
 
     def test_legacy_console_encoding_cannot_drop_the_report(self):
         with tempfile.TemporaryDirectory() as name:
-            root = Path(name); (root / 'tools').mkdir()
-            (root / 'tools/verify_unicode.py').write_text("print('\\u2139 complete')", encoding='utf-8')
-            code = "from tools import verify_all as v; from pathlib import Path; import sys; v.ROOT=Path(sys.argv.pop(1)); sys.exit(v.main())"
-            result = subprocess.run([sys.executable, '-c', code, str(root), '--jobs', '1', '--retries', '0'],
+            root = Path(name); (root / 'tests').mkdir()
+            (root / 'tests/verify_unicode.py').write_text("print('\\u2139 complete')", encoding='utf-8')
+            code = "from tests import verify_all as v; from pathlib import Path; import sys; v.ROOT=Path(sys.argv.pop(1)); sys.exit(v.main())"
+            result = subprocess.run([sys.executable, '-c', code, str(root), '--jobs', '1', '--retries', '0', '--output', str(root / 'results')],
                                     cwd=verify_all.ROOT, env=dict(os.environ, PYTHONIOENCODING='ascii'),
                                     capture_output=True, timeout=15)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('\u2139 complete', result.stdout.decode('utf-8'))
-            self.assertTrue((root / '_scratch/verify-results/report.json').is_file())
+            self.assertTrue((root / 'results/report.json').is_file())
 
     def test_failure_retains_full_utf8_output(self):
         with tempfile.TemporaryDirectory() as name:
@@ -113,7 +113,7 @@ class RunnerTests(unittest.TestCase):
 
     def test_missing_prepared_reverse_engineering_tree_is_skipped(self):
         tail = ("FileNotFoundError: [Errno 2] No such file or directory: "
-                "'D:\\\\a\\\\Lexeditor\\\\Lexeditor\\\\_scratch\\\\ffnx-upstream\\\\src\\\\cfg.cpp'")
+                "'C:\\\\Users\\\\x\\\\AppData\\\\Local\\\\Temp\\\\lexeditor-dev\\\\ffnx-upstream\\\\src\\\\cfg.cpp'")
         with patch.object(verify_all, "_once", return_value=(1, tail, tail)) as once:
             _tool, code, _seconds, report = verify_all.run(Path("fixture.py"))
         self.assertEqual(code, 0)

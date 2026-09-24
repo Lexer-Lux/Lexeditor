@@ -100,5 +100,5 @@ each game, at a recorded game version, in representative gameplay:
 `tests/test_unreal_config_ui.py` (one shared panel serves both pages),
 `tests/unreal_config_browser_check.py` (rendered save round trip plus
 small-window and 150% UI-scale readability on both Tweaks pages) and
-`tools/verify_unreal_config.py` (13 checks, verifier sweep).
+`tests/verify_unreal_config.py` (13 checks, verifier sweep).
 In-game effect acceptance for both games is open (issue 478).

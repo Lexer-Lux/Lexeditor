@@ -59,12 +59,12 @@ class SharedUiCatalogTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_plugins_do_not_copy_more_of_each_other(self):
-        result = subprocess.run([sys.executable, str(ROOT / "tools/verify_shared_code_budget.py")],
+        result = subprocess.run([sys.executable, str(ROOT / "tests/verify_shared_code_budget.py")],
                                 capture_output=True, text=True, cwd=ROOT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_plugins_do_not_reach_further_into_the_shared_ui(self):
-        result = subprocess.run([sys.executable, str(ROOT / "tools/verify_shared_ui_budget.py")],
+        result = subprocess.run([sys.executable, str(ROOT / "tests/verify_shared_ui_budget.py")],
                                 capture_output=True, text=True, cwd=ROOT)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

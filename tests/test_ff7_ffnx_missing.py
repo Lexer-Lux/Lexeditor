@@ -23,7 +23,7 @@ class FFNxMissingTests(unittest.TestCase):
         self.assertTrue(config["path"].endswith("FFNx.toml"))
 
     def test_missing_ffnx_is_flagged_not_a_plan_blocker(self):
-        from tools.verify_ff7_datasets import write_kernel
+        from tests.verify_ff7_datasets import write_kernel
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
             write_kernel(root / "game/data/lang-en/kernel/KERNEL.BIN")

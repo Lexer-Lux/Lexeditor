@@ -5,7 +5,7 @@
 Steam English `FF8_EN.exe`, SHA-256
 `064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570`.
 The addresses below are specific to this executable. Source: disassembly and
-execution checks in `tools/verify_ff8_native_battle_regressions.py`.
+execution checks in `tests/verify_ff8_native_battle_regressions.py`.
 Keep the game executable private; pass its local path through `--exe`.
 
 ## Model ownership

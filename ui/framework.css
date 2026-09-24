@@ -6956,7 +6956,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
      --lex-text-line         the line box text-bearing boxes use
 
    A game that sets --lex-font without these is the game that files a bug about
-   clipped text, so tools/verify_shared_ui_contract.py asks for them. */
+   clipped text, so tests/verify_shared_ui_contract.py asks for them. */
 :root {
 
   --lex-bg: #e3e7eb;

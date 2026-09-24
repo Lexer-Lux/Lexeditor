@@ -34,7 +34,7 @@ def build_payload(bonus: int) -> bytes:
 # These caves give all three the same penalty. A helper decides whether it
 # applies: an enemy target with intrinsic Float, a melee attacker (battle bit
 # 0x1000, set at 0048B670 from the weapon's melee flag), and no Float on the
-# attacker. Assembled at PHYSICAL_CAVE by tools/verify_ff8_flying_physical.py,
+# attacker. Assembled at PHYSICAL_CAVE by tests/verify_ff8_flying_physical.py,
 # which also checks these bytes against a fresh assembly.
 PHYSICAL_CAVE = 0x027A2880
 PHYSICAL_BONUS_OFFSETS = (159, 266)

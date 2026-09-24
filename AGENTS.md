@@ -159,14 +159,16 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
 
 ## Temporary storage and local checks
 
-- Do not include `_scratch`, build trees, compiler caches, browser profiles,
-  downloaded dependencies, or generated test output in a source backup.
+- The checkout holds source only. Never create `_scratch/`, `.pytest_cache`,
+  `artifacts/` or other working folders in it; `tests/test_repo_hygiene.py`
+  fails when one appears. Use your own session scratchpad, or
+  `%TEMP%/lexeditor-dev` for dev caches shared between checks (upstream
+  source clones, verifier results, screenshots).
 - Use temporary directories with guaranteed cleanup for disposable build and
   browser work. Keep final source patches and small reports outside those trees.
 - Never build, clone upstream sources or keep browser profiles inside the
-  repository. `_scratch/` is for small throwaway files only and must stay under
-  1 GB; an abandoned 16 GB FFNx build tree once made the checkout 18 GB. Delete
-  whatever you put there before you finish.
+  repository; an abandoned 16 GB FFNx build tree once made the checkout 18 GB.
+  Delete what you put in temp folders before you finish.
 - Anything the app writes to a player's disk (backups, caches, previous
   copies) needs a bound: keep the original plus the newest, or cap the size and
   evict. An unbounded timestamped copy per action is a bug.
