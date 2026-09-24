@@ -156,6 +156,13 @@ class ProjectManager:
             if key in forgotten and key != os.path.normcase(str(current)):
                 continue
             problems = self._problems(root, spec.required_paths, spec.required_any)
+            if not root.exists() and key == os.path.normcase(str(current)):
+                # A folder that was never created is not a damaged project.
+                # Say so directly instead of listing files missing from it.
+                if entry.get("current"):
+                    problems = [f"Project folder not found: {root}. Reselect or recreate it."]
+                else:
+                    problems = [f"No {plugin.name} project yet at {root}. Create one to open the editor."]
             try:
                 info = metadata(root)
             except (OSError, ValueError):

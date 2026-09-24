@@ -41,7 +41,7 @@ class GameInstallationManager:
                 problems = plugin.check()
                 self._states[plugin_id] = self._state(
                     "warning" if problems else "added",
-                    "Plugin support files are missing." if problems else "Ready",
+                    problems[0] if problems else "Ready",
                     problems=problems,
                     root=None,
                 )
@@ -155,7 +155,7 @@ class GameInstallationManager:
                 problems = plugin.check()
                 state = self._state(
                     "warning" if problems else "added",
-                    "Plugin support files are missing." if problems else "Ready",
+                    problems[0] if problems else "Ready",
                     problems=problems,
                     root=None,
                 )
