@@ -63,3 +63,24 @@ def test_tab_text_readable_in_every_state(page):
       return ({RATIO_FN})(getComputedStyle(t).color, getComputedStyle(t).backgroundColor);
     }}''')
     assert hovered >= 4.5, hovered
+
+
+def test_preview_thumbnail_sits_left(page):
+    mount_warband(page)
+    page.evaluate('''() => {
+      const U = LexeditorUI;
+      const icon = () => U.iconSlot({content: U.element('div', {style: 'width:60px;height:60px'})});
+      document.querySelector('main').append(U.detailPanel({icon: icon(), title: 'A',
+        meta: 'sub', modelPreview: {label: 'model', content: () => U.element('div', {}, 'p')}}));
+      document.querySelector('main').append(U.detailPanel({icon: icon(), title: 'B', meta: 'sub'}));
+    }''')
+    page.wait_for_selector('.lex-model-preview-heading .lex-detail-panel-icon')
+    sides = page.evaluate('''() => [...document.querySelectorAll('.lex-detail-panel')].map(p => {
+      const h = p.querySelector('.lex-detail-panel-heading');
+      const icon = h.querySelector('.lex-detail-panel-icon').getBoundingClientRect();
+      const idn = h.querySelector('.lex-detail-panel-identity').getBoundingClientRect();
+      return {iconLeft: icon.left, identityLeft: idn.left};
+    })''')
+    assert len(sides) == 2, sides
+    for row in sides:
+        assert row['iconLeft'] < row['identityLeft'], sides
