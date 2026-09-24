@@ -29,11 +29,37 @@
   function growthBonusDetail(row){const unit=row.id===0?"Stat gain":row.id===1?"HP factor (%)":"MP factor (%)",entries=Array.from({length:12},(_,i)=>({key:i,index:i,field:fieldByKey(`bonus${i}`)})),table=conceptTable(entries,"72px minmax(120px,1fr)",[{key:"index",label:"Difference",render:entry=>entry.index},{key:"value",label:unit,render:entry=>semanticControl(row,entry.field)}],"Growth bonus brackets");return conceptPanel(row,[detailSection({title:"RANDOMIZED LEVEL GAIN",attrs:{"data-concept":"growth-bonuses"},help:infoHelp("The game compares the current stat to the selected growth curve, adds a random 1–8 modifier, clamps the result to bracket 0–11, then uses this table for the final gain/factor."),body:table})])}
   function equipmentDetail(row){
     const count=state.tab==="accessories"?2:4,slots=state.tab==="weapons"||state.tab==="armor"?8:0,omit=new Set();for(let i=1;i<=count;i++){omit.add(`boostedStat${i}`);omit.add(`boostedStat${i}Bonus`)}for(let i=1;i<=slots;i++)omit.add(`materiaSlot${i}`);
-    const body=ordinarySections(row,omit),bonuses=Array.from({length:count},(_,i)=>({key:i+1,stat:fieldByKey(`boostedStat${i+1}`),amount:fieldByKey(`boostedStat${i+1}Bonus`)}));
+    const body=[menuOrderingSection(row),...ordinarySections(row,omit)],bonuses=Array.from({length:count},(_,i)=>({key:i+1,stat:fieldByKey(`boostedStat${i+1}`),amount:fieldByKey(`boostedStat${i+1}Bonus`)}));
     body.push(detailSection({title:"STAT BONUSES",attrs:{"data-concept":"equipment-stat-bonuses"},body:conceptTable(bonuses,"44px minmax(120px,1fr) minmax(90px,.8fr)",[{key:"slot",label:"#",numberedId:true,render:e=>e.key},{key:"stat",label:"Stat",render:e=>semanticControl(row,e.stat)},{key:"amount",label:"Amount",render:e=>semanticControl(row,e.amount)}],"Equipment stat bonuses")}));
     if(slots){const entries=Array.from({length:8},(_,i)=>({key:i+1,field:fieldByKey(`materiaSlot${i+1}`)}));body.push(detailSection({title:"MATERIA SLOTS",attrs:{"data-concept":"equipment-materia-slots"},body:conceptTable(entries,"44px minmax(150px,1fr)",[{key:"slot",label:"Slot",numberedId:true,render:e=>e.key},{key:"kind",label:"Layout / growth",render:e=>semanticControl(row,e.field)}],"Equipment Materia slots")}))}
     return conceptPanel(row,body);
   }
+  const NAME_SORT_BASE={items:0,weapons:128,armor:256,accessories:288};
+  function nameSortRow(row){const base=NAME_SORT_BASE[state.tab];if(base===undefined)return null;return (state.records.itemSortOrder||[]).find(candidate=>candidate.id===base+row.id)||null}
+  function nameSortControl(row){
+    const sortRow=nameSortRow(row);
+    const field=((state.data.categories||[]).find(entry=>entry.id==="itemSortOrder")||{}).fields?.find(entry=>entry.key==="position");
+    if(!sortRow||!field)return readonlyField("Unavailable");
+    const vanilla=(state.data.vanilla.itemSortOrder||[]).find(candidate=>candidate.id===sortRow.id)?.values.position;
+    const key=`itemSortOrder/${sortRow.id}/position`;
+    const input=el("input",{type:"number",min:field.minimum,max:field.maximum,step:1,
+      value:state.invalid[key]??sortRow.values.position,disabled:readonly(),
+      "aria-label":`Name-sort position for ${row.name}`,oninput:event=>{
+        if(readonly())return;
+        const raw=event.target.value,value=Number(raw);
+        if(raw===""||!Number.isInteger(value)||!event.target.checkValidity())state.invalid[key]=raw;
+        else{delete state.invalid[key];sortRow.values.position=value}
+        shellRefresh();
+      }});
+    return provenanceControl({control:input,current:()=>sortRow.values.position,vanilla,internal:true,
+      apply:value=>{if(readonly())return;delete state.invalid[key];sortRow.values.position=Number(value);input.value=String(value);shellRefresh()}});
+  }
+  function menuOrderingSection(row){
+    return detailSection({title:"MENU ORDERING",attrs:{"data-concept":"item-name-sort"},
+      help:infoHelp("Where this item lands when FF7 sorts the item and equipment list by name. Lower numbers come first."),
+      body:detailField({label:"Name-sort position",control:nameSortControl(row)})});
+  }
+  function itemsDetail(row){return conceptPanel(row,[menuOrderingSection(row),...ordinarySections(row)])}
   function characterDetail(row){
     const settingsTable=(keys,label)=>conceptTable(keys.map((key,index)=>({key:index,field:fieldByKey(key)})),"minmax(140px,.9fr) minmax(170px,1.3fr)",[
       {key:"setting",label:"Setting",render:e=>e.field.label},
@@ -262,6 +288,7 @@
     if(state.tab==="recruits")return recruitDetail(row);
     if(state.tab==="initialState")return newGameStateDetail(row);
     if(["playerAttacks","limitBreaks","enemyAttacks"].includes(state.tab))return attackDetail(row);
+    if(state.tab==="items")return itemsDetail(row);
     if(["weapons","armor","accessories"].includes(state.tab))return equipmentDetail(row);
     if(state.tab==="enemies")return enemyDetail(row);
     if(state.tab==="encounters")return formationDetail(row);
@@ -291,7 +318,6 @@
     initialMateria:[["ap","AP"]],
     stolenMateria:[["ap","AP"]],
     magicOrder:[["menuGroup","MENU"],["position","POS"]],
-    itemSortOrder:[["position","SORT"]],
     materiaPriority:[["priority","ORDER"]],
     audioMixing:[["volume","VOL"],["pan","PAN"]],
     apMultiplier:[["multiplier","RATE"]],
@@ -305,9 +331,6 @@
   function displayRowName(row){
     if(state.tab==="prices"){
       const hit=globalInventoryRecord(row.id,true);if(hit)return`${candidateLabel(hit.record)} — ${labels[hit.group]||hit.group}`;
-    }
-    if(state.tab==="itemSortOrder"){
-      const hit=globalInventoryRecord(row.id,false);if(hit)return`${candidateLabel(hit.record)} — ${labels[hit.group]||hit.group}`;
     }
     if(state.tab==="materiaPriority"){
       const record=rowById("materia",row.id);if(record)return candidateLabel(record);

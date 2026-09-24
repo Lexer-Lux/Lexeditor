@@ -182,6 +182,11 @@ def data_map() -> dict:
         row["coverage"] = "structured" if row["openable"] else "unavailable"
         row["target"] = row["category"]
         row["id"] = row["category"]
+    for row in rows:
+        if row.get("category") == "itemSortOrder":
+            row["target"] = "items"
+            row["notes"] = (row.get("notes") or "") + (" " if row.get("notes") else "") + (
+                "Edited as Name-sort position on each item, weapon, armor and accessory record.")
     return {"contract": "Lexeditor.data-map", "rows": rows}
 
 
