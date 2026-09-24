@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+import shutil
 import threading
 from pathlib import Path
 
@@ -30,6 +31,51 @@ LOCAL_DATA = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Loca
 CACHE_ROOT = LOCAL_DATA / "Lexeditor" / "game-data" / "warband" / "model-previews"
 _LOCK = threading.RLock()
 _RESOURCE_RE = re.compile(r"^\s*(load_resource|load_mod_resource)\s*=\s*([^#;\s]+)", re.I)
+
+
+# Previews are keyed by content hash, so every changed model or texture
+# added entries and nothing was ever removed (4,867 files, 525 MB on one
+# machine). Everything here can be rebuilt from the game on demand, so past
+# this size the least recently used entries go. Item icons are not previews
+# and are left alone.
+CACHE_LIMIT_BYTES = 256 * 1024 * 1024
+
+
+def _cache_entries(root: Path) -> list[tuple[float, int, Path]]:
+    entries = []
+    for path in list(root.glob("*.json")) + list((root / "textures").glob("*.png")):
+        stat = path.stat()
+        entries.append((stat.st_mtime, stat.st_size, path))
+    for folder in (root / "brf-export").glob("*"):
+        if folder.is_dir():
+            size = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file())
+            entries.append((folder.stat().st_mtime, size, folder))
+    return entries
+
+
+def trim_cache(root: Path | None = None, limit: int = CACHE_LIMIT_BYTES,
+               protected: tuple[Path, ...] = ()) -> int:
+    """Delete least-recently-used previews until the cache fits ``limit``."""
+    root = Path(root or CACHE_ROOT)
+    if not root.is_dir():
+        return 0
+    entries = sorted(_cache_entries(root))
+    total = sum(size for _, size, _ in entries)
+    keep = {Path(p).resolve() for p in protected}
+    removed = 0
+    for _, size, path in entries:
+        if total <= limit:
+            break
+        if path.resolve() in keep:
+            continue
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            path.unlink(missing_ok=True)
+        if not path.exists():
+            total -= size
+            removed += 1
+    return removed
 
 
 class PreviewUnavailable(RuntimeError):
@@ -220,12 +266,17 @@ def preview(mesh: str) -> dict:
         key, resource = resolved["key"], resolved["resource"]
         cached = CACHE_ROOT / f"{key}.json"
         _png_texture(resolved["diffuse"], key)
+        texture = CACHE_ROOT / "textures" / f"{key}.png"
         if cached.is_file():
             geometry = json.loads(cached.read_text(encoding="utf-8"))
+            for used in (cached, texture):
+                if used.is_file():
+                    os.utime(used)
         else:
             geometry = _parse_obj(_export_mesh(resource, str(resolved["record"].get("name", mesh))))
             cached.parent.mkdir(parents=True, exist_ok=True)
             cached.write_text(json.dumps(geometry, separators=(",", ":")), encoding="utf-8")
+            trim_cache(CACHE_ROOT, protected=(cached, texture))
         return {
             "cacheKey": key, "mesh": resolved["mesh"], "material": resolved["material"],
             "resource": resource.name, "texture": f"/api/item-preview/texture?key={key}",
