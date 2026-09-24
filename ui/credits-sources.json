@@ -318,7 +318,7 @@
         },
         {
           "name": "Jérôme Arzel (myst6re) and Deling contributors",
-          "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, camera setups, movie camera, INF header and camera ranges, encounters and world-map format references; walkmesh-over-background projection from src/3d/WalkmeshGLWidget.cpp; special-text toolbar design and control-byte reference from src/FF8Text.cpp; Japanese glyph mapping from src/qt/fonts/sysfnt_jp.txt (GPL v3 or later).",
+          "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, camera setups, movie camera, INF header and camera ranges, encounters and world-map format references; world terrain placement from src/3d/WorldmapGLWidget.cpp and topology from src/game/worldmap/WmxFile.cpp; walkmesh-over-background projection from src/3d/WalkmeshGLWidget.cpp; special-text toolbar design and control-byte reference from src/FF8Text.cpp; Japanese glyph mapping from src/qt/fonts/sysfnt_jp.txt (GPL v3 or later).",
           "url": "https://github.com/myst6re/deling"
         },
         {

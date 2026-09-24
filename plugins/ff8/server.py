@@ -250,6 +250,10 @@ class Handler(PluginRequestHandler):
                 self.json_response(formats.encounter_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/world-map":
                 self.json_response(world_map.rows(query.get("dataset", ["current"])[0]))
+            elif path == "/api/world-mesh":
+                source = world_geometry.source_path(query.get("dataset", ["current"])[0])
+                self.json_response(world_geometry.segment_mesh(
+                    source.read_bytes(), int(query.get("segment", ["0"])[0])))
             elif path == "/api/fields":
                 self.json_response(field_data.index_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/card-players":

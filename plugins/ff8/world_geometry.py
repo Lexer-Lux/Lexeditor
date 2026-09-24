@@ -166,6 +166,51 @@ def rows(dataset: str = "current") -> dict:
     }
 
 
+def segment_mesh(data: bytes | bytearray, segment_id: int) -> dict:
+    """Read indexed terrain for one segment without changing game data.
+
+    Placement follows Deling's WorldmapGLWidget::importVertices: four blocks
+    per segment axis, 2048 units per block, negative Z, and unsigned 16-bit
+    height ``128 - y``. UVs and material bytes remain attached to each face.
+    """
+    if isinstance(segment_id, bool) or not isinstance(segment_id, int):
+        raise ValueError("World segment ID must be an integer")
+    if not data or len(data) % SEGMENT_SIZE:
+        raise ValueError("wmx.obj is not made of complete 0x9000-byte segments")
+    if not 0 <= segment_id < len(data) // SEGMENT_SIZE:
+        raise ValueError("World segment ID is outside the map")
+    record = _segment(data, segment_id)
+    segment = memoryview(data)[segment_id * SEGMENT_SIZE:(segment_id + 1) * SEGMENT_SIZE]
+    offsets = struct.unpack_from(f"<{BLOCK_COUNT}I", segment, 4)
+    vertices, faces = [], []
+    for block_id, offset in enumerate(offsets):
+        polygon_count, vertex_count, _, _ = struct.unpack_from("<BBBB", segment, offset)
+        polygon_start = offset + 4
+        vertex_start = polygon_start + polygon_count * POLYGON_SIZE
+        first_vertex = len(vertices)
+        block_x = record["x"] * 4 + block_id % 4
+        block_z = record["y"] * 4 + block_id // 4
+        for index in range(vertex_count):
+            x, y, z, _ = struct.unpack_from("<hhhh", segment, vertex_start + index * VECTOR_SIZE)
+            vertices.append([block_x + x / 2048, ((128 - y) & 0xFFFF) / 2048,
+                             block_z - z / 2048])
+        for polygon_id in range(polygon_count):
+            start = polygon_start + polygon_id * POLYGON_SIZE
+            polygon = segment[start:start + POLYGON_SIZE]
+            faces.append({
+                "indices": [first_vertex + index for index in polygon[:3]],
+                "uv": [list(polygon[index:index + 2]) for index in (6, 8, 10)],
+                "texturePage": polygon[12] >> 4,
+                "palette": polygon[12] & 15,
+                "groundType": polygon[13],
+                "flags": list(polygon[14:16]),
+                "block": block_id,
+                "polygon": polygon_id,
+            })
+    return {"id": segment_id, "groupId": record["groupId"],
+            "vertices": vertices, "faces": faces}
+
+
 def _bounded(value, minimum: int, maximum: int, label: str) -> int:
     try:
         number = int(value)
