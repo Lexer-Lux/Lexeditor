@@ -905,10 +905,12 @@
   };
 
   const tabbedPanel = (options = {}) => {
-    const tabs = options.tabs || [];
+    const suppliedTabs = options.tabs || [];
+    const title = tab => String(tab.label instanceof Node ? tab.label.textContent : tab.label ?? tab.id);
+    const tabs = [...suppliedTabs].sort((a,b)=>title(a).localeCompare(title(b),undefined,{numeric:true,sensitivity:"base"}));
     const active = tabs.some(tab => tab.id === options.active)
       ? options.active
-      : tabs[0]?.id;
+      : suppliedTabs[0]?.id;
     const selected = tabs.find(tab => tab.id === active);
     const content = typeof options.content === "function"
       ? options.content(active, selected)

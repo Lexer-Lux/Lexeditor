@@ -24,6 +24,25 @@ def framework(page):
     page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
 
 
+def test_panel_tabs_sort_names_and_numbers_without_changing_selection(page):
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      window.tabChanges=[];
+      window.sourceTabs=[{id:'level',label:'Leveling'},{id:'attack',label:'Attack'},{id:'defaults',label:'Defaults'}];
+      document.querySelector('main').append(U.tabbedPanel({tabs:sourceTabs,
+        content:id=>U.el('p',{},id),change:id=>tabChanges.push(id)}),
+        U.tabbedPanel({tabs:[{id:10,label:'Door 10'},{id:2,label:'Door 2'},{id:1,label:'Door 1'}],active:2,content:'Door editor'}));
+    }''')
+    panels=page.locator('.lex-tabbed-panel')
+    assert panels.nth(0).locator('.lex-tab-label-text').all_text_contents()==['Attack','Defaults','Leveling']
+    assert panels.nth(1).locator('.lex-tab-label-text').all_text_contents()==['Door 1','Door 2','Door 10']
+    assert panels.nth(0).locator('[role=tabpanel]').inner_text()=='level'
+    assert page.evaluate('sourceTabs.map(t=>t.id)')==['level','attack','defaults']
+    panels.nth(0).get_by_role('tab',name='Attack',exact=True).click()
+    assert page.evaluate('tabChanges')==['attack']
+
+
 def test_wrapped_property_labels_keep_vertical_space(page):
     framework(page)
     page.evaluate('''()=>{
