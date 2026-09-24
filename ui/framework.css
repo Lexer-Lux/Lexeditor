@@ -938,7 +938,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 /* A body that is one tabbed panel fills the detail panel, so its tabs sit at
    the panel's foot. Sized to its content, the body ended wherever the
    content did and the tabs floated partway down a tall window. */
-.lex-detail-panel-body:has(> .lex-tabbed-panel:only-child) { flex:1 1 auto; }
+.lex-detail-panel-body:has(> .lex-tabbed-panel:only-child) { flex:1 1 auto; padding:0; }
 .lex-detail-panel-body > .lex-tabbed-panel:only-child { flex:1 1 auto; }
 .lex-detail-panel-media { position:relative; overflow:hidden; grid-template-rows:minmax(0,1fr); }
 .lex-detail-panel-media > .lex-detail-panel-heading { position:absolute; inset:0 0 auto; z-index:4; background:transparent; border:0; pointer-events:none; transition:opacity .15s; }
@@ -6580,12 +6580,12 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
      this the panel grew a horizontal scrollbar for that overhang alone. */
   overflow-x:clip;
 
- padding: 10px; gap: var(--lex-panel-body-gap, 10px);
+ padding: var(--lex-detail-heading-padding, 4px); gap: var(--lex-panel-body-gap, 10px);
 }
 .lex-detail-panel-body > .lex-detail-section { flex: var(--lex-section-flex, 0 0 auto); }
 .lex-tabbed-panel-content {
    min-width:0;min-height:0;flex:1 1 auto;overflow:auto;
- padding: 12px;
+ padding: var(--lex-detail-heading-padding, 4px);
 }
 .lex-tabbed-panel-content:has(> .lex-column-list:not([hidden])) {
   display:flex;

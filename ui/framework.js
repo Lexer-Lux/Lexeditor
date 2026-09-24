@@ -8684,7 +8684,15 @@ ${contents.path}`});
     // and a long property name in a narrow lane came out as a smear. A name
     // that still does not fit at the floor widens the lane instead - for its
     // whole panel, so the names in it keep one edge.
-    const overflows = () => label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1;
+    const overflows = () => {
+      const box=label.getBoundingClientRect(),css=getComputedStyle(label);
+      const top=box.top+parseFloat(css.paddingTop),bottom=box.bottom-parseFloat(css.paddingBottom);
+      const outsidePadding=[...label.children].some(child=>{
+        const bounds=child.getBoundingClientRect();
+        return bounds.height>0&&(bounds.top<top-1||bounds.bottom>bottom+1);
+      });
+      return outsidePadding || label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1;
+    };
     // A word wider than the lane widens the lane before anything shrinks, so
     // one long name does not come out smaller than the names around it. The
     // lane settles on the next pass, when the observer sees it resize.
@@ -8692,6 +8700,13 @@ ${contents.path}`});
     while (size > LABEL_MIN_PX && overflows()) {
       size -= .5;
       label.style.fontSize = `${size}px`;
+    }
+    if (label.classList.contains('lex-detail-field-label') && overflows()) {
+      // At the readable font floor, give wrapped labels space rather than
+      // letting their text consume the gap between adjacent properties.
+      const css=getComputedStyle(label);
+      const height=Math.max(0,...[...label.children].map(child=>child.getBoundingClientRect().height));
+      label.parentElement.style.minHeight=`${Math.ceil(height+parseFloat(css.paddingTop)+parseFloat(css.paddingBottom))}px`;
     }
 
     // `contain:size` keeps the font size out of the box's own measurements, so

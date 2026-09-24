@@ -24,6 +24,28 @@ def framework(page):
     page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
 
 
+def test_wrapped_property_labels_keep_vertical_space(page):
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      document.querySelector('main').style.width='400px';
+      document.querySelector('main').append(U.detailPanel({title:'GF',body:[
+        'Boost phase 1 length (x15)','Boost total window (x15)'
+      ].map(label=>U.detailField({label,help:U.infoHelp('Time available for Boost.'),
+        control:U.el('input',{type:'number',min:0,max:255,value:22})}))}));
+    }''')
+    page.wait_for_timeout(250)
+    for label in page.locator('.lex-detail-field-label').all():
+        assert label.evaluate('''n=>{
+          const r=n.getBoundingClientRect(),s=getComputedStyle(n),t=n.firstElementChild.getBoundingClientRect();
+          return t.top>=r.top+parseFloat(s.paddingTop)-1 && t.bottom<=r.bottom-parseFloat(s.paddingBottom)+1;
+        }''')
+    assert page.locator('.lex-detail-panel').evaluate('''n=>{
+      const heading=n.querySelector('.lex-detail-panel-heading'),field=n.querySelector('.lex-detail-field');
+      return Math.abs(heading.getBoundingClientRect().left+parseFloat(getComputedStyle(heading).paddingLeft)-field.getBoundingClientRect().left)<1;
+    }''')
+
+
 def test_field_range_uses_grouped_numbers(page):
     framework(page)
     page.evaluate('''()=>{
