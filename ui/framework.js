@@ -3619,7 +3619,7 @@
     // The pagination bar is one height on every page, and that height is a
     // setting rather than a number buried in the stylesheet.
     document.documentElement.style.setProperty("--lex-pager-bar-height",
-      `${Math.max(36, Math.min(80, Number(settings.pagerBarHeight) || 52))}px`);
+      `${Math.max(3, Math.min(12, Number(settings.pagerBarHeightPercent) || 6))}vh`);
     document.documentElement.style.setProperty("--lex-command-row-height", `${Math.max(3, Math.min(20, Number(settings.mainMenuHeightPercent) || 9))}vh`);
     window.dispatchEvent(new CustomEvent("lexeditor-view-preferences-ready", {detail: settings.viewPreferences || {}}));
     window.dispatchEvent(new CustomEvent("lexeditor-settings-ready", {detail: settings}));
@@ -4620,7 +4620,7 @@ ${contents.path}`});
         {key:"panelTabTarget", scope:"user", title:"Tab key panel", description:"Tab opens the next panel tab. Shift+Tab opens the previous tab. Choose the panel under the mouse or the panel with keyboard focus.", type:"select", choices:[{value:"hover",label:"Hovered panel"},{value:"focus",label:"Focused panel"}]},
         {key:"tableRowsPerPage", scope:"user", title:"Table rows per page", description:"A full table page stretches this many rows to use the exact available panel height.", type:"number", min:5, max:40, step:1},
         {key:"panelGapPercent", scope:"user", title:"Panel spacing", description:"The same responsive gap surrounds panels and separates adjacent panels.", type:"number", min:.25, max:4, step:.05, unit:"%"},
-        {key:"pagerBarHeight", scope:"user", title:"Pagination bar height", description:"How tall the bar along the bottom of a table page is. One height on every page, whether or not that page's bar carries a search box.", type:"number", min:36, max:80, step:1, unit:"px"},
+        {key:"pagerBarHeightPercent", scope:"user", title:"Pagination bar height", description:"How tall the bar along the bottom of a table page is, as a percentage of the screen height. One height on every page, whether or not that page's bar carries a search box.", type:"number", min:3, max:12, step:.5, unit:"%"},
         {key:"mainMenuHeightPercent", scope:"user", title:"Menu bar height", description:"Height of the menu bar in the Home screen and every game plugin, as a percentage of the screen.", type:"number", min:3, max:20, step:.25, unit:"%"},
         {key:"soundEnabled", scope:"user", title:"Sound", description:"Play game-themed interface sounds when the active plugin supplies them.", type:"checkbox"},
         {key:"soundVolumePercent", scope:"packaged", title:"Volume level", description:"Attenuates all menu sound effects for every user.", type:"number", min:0, max:100, step:1, unit:"%"},

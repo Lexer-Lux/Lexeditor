@@ -608,6 +608,7 @@ class HostApi:
             payload.get("soundVolumePercent"),
             None if "pageWrapAround" not in payload else bool(payload["pageWrapAround"]),
             payload.get("panelTabTarget"),
+            payload.get("pagerBarHeightPercent"),
         )
         return self.lexeditor_settings()
 

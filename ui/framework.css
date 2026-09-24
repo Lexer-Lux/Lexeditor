@@ -5711,7 +5711,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   box-shadow: none;
 
   box-sizing:border-box;
-  min-height:var(--lex-pager-bar-height, 52px);
+  min-height:var(--lex-pager-bar-height, 6vh);
   height:auto;
 
 }
