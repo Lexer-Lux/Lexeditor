@@ -16,6 +16,8 @@ from pathlib import Path
 import re
 from typing import Any
 
+import unreal_config  # shared Documents resolution (issue 478)
+
 
 GRAPHICS_SCHEMA_VERSION = 1
 GRAPHICS_CONFIG_NAME = "LexeditorFF7RGraphicsTweaks.json"
@@ -63,9 +65,10 @@ def engine_ini_path() -> Path:
     override = os.environ.get("LEXEDITOR_FF7R_ENGINE_INI")
     if override:
         return Path(override).expanduser().resolve()
+    # The shared editor resolves Documents through the Windows shell, so a
+    # redirected Documents folder (e.g. D:\Documents) lands on the same file.
     return (
-        Path.home()
-        / "Documents"
+        unreal_config.documents_dir()
         / "My Games"
         / "FINAL FANTASY VII REMAKE"
         / "Saved"

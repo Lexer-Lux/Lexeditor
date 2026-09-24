@@ -273,8 +273,13 @@ def _shell_personal() -> Path | None:
     return candidate if candidate.is_absolute() else None
 
 
-def _documents() -> Path:
+def documents_dir() -> Path:
+    """Return the user's Documents folder, honoring Windows redirection."""
     return _shell_personal() or Path.home() / "Documents"
+
+
+def _documents() -> Path:
+    return documents_dir()
 
 
 GAMES: dict[str, dict[str, Any]] = {
@@ -715,8 +720,12 @@ def apply_settings(game_id: str, project_root: Path,
 
 def use_game_default(game_id: str, project_root: Path, key: str) -> dict[str, Any]:
     """Remove one override so the game's own configuration applies again."""
-    game_definition(game_id)
+    definition = game_definition(game_id)
     setting(key)
+    if key in definition["legacy_managed_keys"]:
+        raise ConfigError(
+            f"{setting(key)['name']} is managed by the existing game "
+            f"tweaks group ({definition['legacy_note']})")
     path = default_config_path(game_id)
     state = load_state(project_root, game_id)
     check_snapshot(path, state["snapshot"])
@@ -737,12 +746,19 @@ def use_game_default(game_id: str, project_root: Path, key: str) -> dict[str, An
 
 
 def reset_all(game_id: str, project_root: Path) -> dict[str, Any]:
-    """Remove every managed override and restore journaled user values."""
+    """Remove every managed override and restore journaled user values.
+
+    Keys owned by a sibling tweaks group keep their managed entries: reset
+    clears this editor's overrides, not another group's.
+    """
     definition = game_definition(game_id)
     path = default_config_path(game_id)
     state = load_state(project_root, game_id)
     check_snapshot(path, state["snapshot"])
     document = read_document(path)
+    legacy_keep = {key: value for key, value in
+                   managed_overrides(document, game_id).items()
+                   if key in definition["legacy_managed_keys"]}
     backup = backup_config(path)
     remove_managed_block(document, game_id)
     remaining = observed_values(document, game_id)
@@ -758,6 +774,8 @@ def reset_all(game_id: str, project_root: Path) -> dict[str, Any]:
         for key in sorted(missing):
             document.append_line(f"{key}={missing[key]['value']}")
             restored.append(key)
+    if legacy_keep:
+        apply_managed_block(document, game_id, legacy_keep)
     write_document(path, document)
     save_state(project_root, game_id,
                {"journal": {}, "snapshot": snapshot_of(path)})

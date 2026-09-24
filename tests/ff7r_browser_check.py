@@ -304,6 +304,12 @@ window.fetch = async function(input, options={}) {
         "<script>" + stub + "</script><script>"
         + (ROOT / "ui/framework.js").read_text(encoding="utf-8") + "</script>",
     )
+    html = html.replace(
+        '<script src="/shared/unreal-config.js"></script>',
+        "<script>"
+        + (ROOT / "ui/unreal-config.js").read_text(encoding="utf-8").replace("</script", "<\\/script")
+        + "</script>",
+    )
     # Match the repository-wide rendered harness: after the shared framework is
     # inlined, replace every plugin-local module exactly where production loads
     # it. This keeps editor.js after LexeditorUI has been defined.

@@ -198,98 +198,10 @@
   }
 
   // ---- Engine Config (shared Unreal editor, issue 478) ------------------------
-  let engineConfig=null, engineDraft=null, engineConfigBusy=false;
-  async function loadEngineConfig(){
-    try{
-      const response=await fetch("/api/unreal-config");
-      const value=await response.json();
-      if(!response.ok)throw new Error(value.error||"Could not read Engine Config");
-      engineConfig=value;
-      engineDraft=clone(value.overrides||{});
-    }catch(error){engineConfig={error:error.message||String(error)};engineDraft=null}
-  }
-  async function engineConfigAction(route,body,done){
-    if(engineConfigBusy)return;
-    engineConfigBusy=true;render();
-    try{
-      const response=await fetch(`/api/unreal-config/${route}`,{method:"POST",
-        headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
-      const value=await response.json();
-      if(!response.ok)throw new Error(value.error||"Engine Config refused that");
-      engineConfig=value.result;
-      engineDraft=clone(value.result.overrides||{});
-      if(done)LexeditorUI.showToast?.(typeof done==="function"?done(value.result):done);
-    }catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
-    finally{engineConfigBusy=false;render()}
-  }
-  function engineSettingControl(item){
-    const key=item.key, disabled=engineConfigBusy;
-    const shown=engineDraft[key]!==undefined?engineDraft[key]
-      :engineConfig.observed&&engineConfig.observed[key]!==undefined?engineConfig.observed[key]:"";
-    const set=next=>{engineDraft[key]=next;render()};
-    if(item.type==="choice"){
-      const options=(item.choices||[]).map(choice=>[choice,String(choice)]);
-      if(shown!==""&&!options.some(([code])=>code===Number(shown)))options.push([Number(shown),`Current ${shown}`]);
-      return el("select",{disabled,"aria-label":item.name,onchange:event=>set(Number(event.target.value))},
-        ...options.map(([code,name])=>{const option=el("option",{value:String(code)},name);option.selected=code===Number(shown);return option}));
-    }
-    const step=item.type==="float"?0.01:1;
-    return el("input",{type:"number",value:String(shown),step,disabled,"aria-label":item.name,
-      ...(item.minimum!==null&&item.minimum!==undefined?{min:item.minimum}:{}),
-      ...(item.maximum!==null&&item.maximum!==undefined?{max:item.maximum}:{}),
-      onchange:event=>{const next=Number(event.target.value);if(Number.isFinite(next))set(item.type==="float"?next:Math.round(next))}});
-  }
-  function engineConfigCard(){
-    const config=engineConfig;
-    if(!config||config.error){
-      return LexeditorUI.detailPanel({title:"ENGINE CONFIG",body:[
-        detailSection({title:"STATUS",body:[
-          detailField({label:"STATUS",control:readonlyField(config?.error||"Reading Engine Config…")}),
-        ]}),
-      ]});
-    }
-    const fileRows=[
-      detailField({label:"FILE",control:readonlyField(config.configExists?config.configPath
-        :`${config.configPath} — not created yet. Saving here creates it with a Lexeditor block.`)}),
-      detailField({label:"ENGINE",control:readonlyField(config.engine||"")}),
-    ];
-    if(config.notes)fileRows.push(detailField({label:"NOTES",control:readonlyField(config.notes)}));
-    if(config.externalChange)fileRows.push(detailField({label:"EXTERNAL CHANGE",tone:"warning",
-      control:el("div",{class:"lex-reshade-actions"},
-        el("button",{type:"button",class:"lex-dialog-action",disabled:engineConfigBusy,
-          onclick:()=>engineConfigAction("refresh",{},"Rebased on the current file.")},"Reload status"))}));
-    const fields=(config.advanced||[]).map(item=>{
-      const managed=config.overrides&&Object.prototype.hasOwnProperty.call(config.overrides,item.key);
-      const help=[item.unverified_note||"",item.description,
-        item.restart_required?"Restart the game after changing it.":"Takes effect without a restart on most builds.",
-        item.dependencies&&item.dependencies.length?`Related: ${item.dependencies.join(", ")}.`:""
-      ].filter(Boolean).join(" ");
-      const controls=[engineSettingControl(item)];
-      if(managed)controls.push(el("button",{type:"button",class:"lex-dialog-action",disabled:engineConfigBusy,
-        onclick:()=>engineConfigAction("default",{key:item.key},"Back to the game default.")},"Use game default"));
-      return detailField({label:(managed?"* ":"")+item.name.toUpperCase()+(item.unverified_note?" (UNVERIFIED)":""),
-        dataType:item.type==="float"?"FLOAT":item.type==="choice"?"ENUM":"INT",
-        control:el("div",{class:"lex-reshade-actions"},...controls),
-        help:infoHelp((managed?"Managed by Lexeditor. ":"")+help)});
-    });
-    const saved=config.overrides||{};
-    const dirty=JSON.stringify(saved)!==JSON.stringify(engineDraft||{});
-    const saveRows=[detailField({label:"SAVE",control:el("div",{class:"lex-reshade-actions"},
-      el("button",{type:"button",class:"lex-dialog-action primary",disabled:!dirty||engineConfigBusy,
-        onclick:()=>engineConfigAction("apply",{values:engineDraft||{}},"Saved Engine.ini. Restart the game where noted.")},"Save settings"),
-      el("button",{type:"button",class:"lex-dialog-action",disabled:!dirty||engineConfigBusy,
-        onclick:()=>{engineDraft=clone(saved);render()}},"Revert"),
-      el("button",{type:"button",class:"lex-dialog-action",disabled:engineConfigBusy||!Object.keys(saved).length,
-        onclick:async()=>{const ok=await LexeditorUI.confirmAction({title:"Remove all Engine Config overrides?",
-          message:"Removes the Lexeditor block and restores values you had before, where recorded.",confirmLabel:"Remove all"});
-          if(ok)engineConfigAction("reset",{},"All overrides removed.")}},"Reset all"))})];
-    if(config.backup)saveRows.push(detailField({label:"BACKUP",control:readonlyField(config.backup)}));
-    return LexeditorUI.detailPanel({title:"ENGINE CONFIG",body:[
-      detailSection({title:"CONFIG FILE",body:fileRows}),
-      detailSection({title:"SETTINGS",body:fields}),
-      detailSection({title:"SAVE",body:saveRows}),
-    ]});
-  }
+  // The panel lives in /shared/unreal-config.js so Remake and Rebirth share
+  // one implementation; this page only mounts it and loads it at boot.
+  const enginePanel=LexeditorUnrealConfig.createPanel({route:"/api/unreal-config",rerender:()=>render()});
+  async function loadEngineConfig(){await enginePanel.load()}
   // Every plugin names its loaders in the same five fields.
   function loaderCard(){
     return LexeditorUI.modLoaderSection({
@@ -306,7 +218,7 @@
     const cards=tweakTab==="injector"
       ? [injectorStatusCard(),injectorSettingsCard(),loaderCard()].filter(Boolean)
       : tweakTab==="engine"
-      ? [engineConfigCard()]
+      ? [enginePanel.element()]
       : [section||LexeditorUI.detailNote("ReShade is not set up for this game yet.")];
     // Setup is not finished while the shader cache predates the injector, so
     // the step and its button sit above both subtabs until it is done.

@@ -267,3 +267,25 @@ def test_documents_falls_back_without_shell_folder(monkeypatch):
 def test_shell_personal_ignores_non_windows(monkeypatch):
     monkeypatch.setattr(os, "name", "posix")
     assert unreal_config._shell_personal() is None
+
+
+def test_ff7r_eye_adaptation_default_stays_with_legacy_group(project):
+    root, _ini = project
+    with pytest.raises(ConfigError, match="existing game tweaks group"):
+        use_game_default("ff7r", root, "r.EyeAdaptationQuality")
+
+
+def test_reset_keeps_sibling_group_managed_keys(project):
+    from plugins.ff7r import graphics_tweaks
+
+    root, _ini = project
+    ini = Path(os.environ["LEXEDITOR_FF7R_ENGINE_INI"])
+    ini.write_text("[SystemSettings]\n", encoding="utf-8")
+    ini.write_text(graphics_tweaks.apply_managed_block(
+        ini.read_text(encoding="utf-8")), encoding="utf-8")
+    apply_settings("ff7r", root, {"r.BloomQuality": 3})
+    result = reset_all("ff7r", root)
+    text = ini.read_text(encoding="utf-8")
+    assert "r.EyeAdaptationQuality=0" in text
+    assert "r.BloomQuality=3" not in text
+    assert result["overrides"] == {"r.EyeAdaptationQuality": "0"}
