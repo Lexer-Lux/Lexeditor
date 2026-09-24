@@ -6741,6 +6741,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   isolation:isolate;
 
  color: var(--lex-brand-fg, inherit);
+ text-shadow: var(--lex-text-shadow, none);
 }
 .lex-brand-button::before {
   content:"";

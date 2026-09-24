@@ -187,6 +187,13 @@ PLUGIN = GamePlugin(
             "Data/lang-en/battle.fs", "Data/lang-en/battle.fi", "Data/lang-en/battle.fl",
             "Data/lang-en/world.fs", "Data/lang-en/world.fi", "Data/lang-en/world.fl",
         ),
+        # FFNx renders through bgfx, whose Auto backend picks Direct3D 11 or
+        # 12 on Windows; ReShade hooks both through dxgi. The loader sits
+        # beside FF8_EN.exe at the root. FFNx's own loader is AF3DN.P, so the
+        # names never clash. (An FFNx.toml renderer_backend of OpenGL or
+        # Vulkan would need a different loader; Auto and Direct3D use this.)
+        reshade_root="",
+        reshade_renderer="dxgi",
         # Use normal startup. Skipping the warning is a separate opt-in tweak.
         launch_path="FF8_Launcher.exe",
         steam_app_id="39150",

@@ -204,6 +204,72 @@ def _definition_map(*, weapons: list[dict], magic: list[dict], gfs: list[dict], 
     return definitions
 
 
+def _merge_units() -> dict[tuple, tuple[int, int]]:
+    """Every proved init.out scalar by identity: offset and size.
+
+    The offsets come from the same field builders the editor saves through;
+    the lookup contents do not move a field, so placeholders fill the lists.
+    """
+    placeholders = [{"id": index, "name": f"placeholder-{index}"}
+                    for index in range(GF_COUNT)]
+    units: dict[tuple, tuple[int, int]] = {}
+    for definition in GENERAL_FIELDS:
+        units[("general", 0, definition["field"])] = (
+            int(definition["offset"]), int(definition["size"]))
+    for definition in CONFIG_FIELDS:
+        units[("config", 0, definition["field"])] = (
+            int(definition["offset"]), int(definition["size"]))
+    for gf_id in range(GF_COUNT):
+        for definition in _gf_fields(gf_id * GF_SIZE):
+            units[("gf", gf_id, definition["field"])] = (
+                int(definition["offset"]), int(definition["size"]))
+    for character_id in range(CHARACTER_COUNT):
+        base = CHARACTER_OFFSET + character_id * CHARACTER_SIZE
+        for definition in _character_fields(base, [], [], placeholders, []):
+            units[("character", character_id, definition["field"])] = (
+                int(definition["offset"]), int(definition["size"]))
+        for slot in range(32):
+            units[("magic", character_id, slot)] = (base + 16 + slot * 2, 2)
+    for slot in range(ITEM_COUNT):
+        units[("inventory", slot)] = (ITEMS_OFFSET + slot * 2, 2)
+    return units
+
+
+def merge(vanilla: bytes, mods: list[tuple[str, bytes]], path: str
+          ) -> tuple[bytes | None, list[dict], str]:
+    """Merge starting-data fields, or return a visible whole-file fallback."""
+    # The shipped file is shorter than the proved layout; the editor pads it
+    # to FULL_SIZE on save, so the merge pads the same way before comparing.
+    # A mod that runs past the padded baseline truncates or extends data the
+    # merge cannot place, and falls back instead.
+    total = max(len(vanilla), FULL_SIZE)
+    vanilla = vanilla + b"\0" * (total - len(vanilla))
+    units = _merge_units()
+    claims: dict[tuple, list[tuple[str, bytes]]] = {}
+    for mod_id, source in mods:
+        if len(source) > total:
+            return None, [], f"{mod_id} changes the size of {path}"
+        source = source + b"\0" * (total - len(source))
+        reconstructed = bytearray(vanilla)
+        for identity, (offset, width) in units.items():
+            value = source[offset:offset + width]
+            if value != vanilla[offset:offset + width]:
+                claims.setdefault(identity, []).append((mod_id, value))
+                reconstructed[offset:offset + width] = value
+        if bytes(reconstructed) != source:
+            return None, [], f"{mod_id} contains changes outside proved starting-data units"
+    output = bytearray(vanilla)
+    conflicts = []
+    for identity, values in claims.items():
+        offset, width = units[identity]
+        output[offset:offset + width] = values[-1][1]
+        if len(values) > 1 and len({value for _, value in values}) > 1:
+            conflicts.append({"unit": f"{path}:{':'.join(map(str, identity))}",
+                              "winner": values[-1][0],
+                              "claimants": [mod_id for mod_id, _ in values]})
+    return bytes(output), conflicts, ""
+
+
 def apply(data: bytes, edits: list[dict], *, item_ids: set[int], weapon_ids: set[int], magic_ids: set[int],
           weapons: list[dict], magic: list[dict], gfs: list[dict], abilities: list[dict]) -> tuple[bytes, int]:
     result = bytearray(data)

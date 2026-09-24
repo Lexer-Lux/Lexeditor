@@ -244,6 +244,68 @@ def compile_source(source: str, method_id: int, label_id: int | None = None) -> 
     return words
 
 
+def merge(vanilla: bytes, mods: list[tuple[str, bytes]], path: str
+          ) -> tuple[bytes | None, list[dict], str]:
+    """Merge field-script methods, or return a visible whole-file fallback.
+
+    Methods are independent change units: every branch the reader proves is
+    method-local, and the writer recompiles each method on its own. Method
+    names come from the SYM sidecar, which carries no bytes, so the merge
+    reads with an empty table.
+    """
+    try:
+        baseline = read(vanilla)
+    except ValueError as error:
+        return None, [], f"vanilla {path} is unsupported: {error}"
+    base_methods = {method["id"]: method for method in baseline["methods"]}
+    base_header = (baseline["header"]["doors"], baseline["header"]["lines"],
+                   baseline["header"]["backgrounds"], baseline["header"]["others"])
+    claims: dict[int, list[tuple[str, str]]] = {}
+    for mod_id, source in mods:
+        try:
+            parsed = read(source)
+        except ValueError as error:
+            return None, [], f"{mod_id} is not a supported {path}: {error}"
+        header = (parsed["header"]["doors"], parsed["header"]["lines"],
+                  parsed["header"]["backgrounds"], parsed["header"]["others"])
+        if header != base_header or len(parsed["methods"]) != len(base_methods):
+            return None, [], f"{mod_id} changes the script method table of {path}"
+        changed = []
+        for method in parsed["methods"]:
+            base = base_methods[method["id"]]
+            if method["flagged"] != base["flagged"] or method["labelId"] != base["labelId"]:
+                return None, [], f"{mod_id} changes the script structure of {path}"
+            if not base["editable"] or not method["editable"]:
+                if method["raw"] != base["raw"]:
+                    return None, [], (
+                        f"{mod_id} changes an unparseable script method of {path}")
+                continue
+            if method["source"] != base["source"]:
+                changed.append({"id": method["id"], "source": method["source"]})
+                claims.setdefault(method["id"], []).append((mod_id, method["source"]))
+        try:
+            reconstructed, _ = rebuild(vanilla, b"", changed)
+        except ValueError as error:
+            return None, [], f"{mod_id} is not a supported {path}: {error}"
+        if reconstructed != source:
+            return None, [], f"{mod_id} contains changes outside proved script methods"
+    winners = {method_id: values[-1][1] for method_id, values in claims.items()}
+    try:
+        output, _ = rebuild(
+            vanilla, b"",
+            [{"id": method_id, "source": source} for method_id, source in winners.items()])
+    except ValueError as error:
+        return None, [], f"merged {path} failed validation: {error}"
+    conflicts = [
+        {"unit": f"{path}:method:{method_id}", "winner": values[-1][0],
+         "claimants": [mod_id for mod_id, _ in values]}
+        for method_id, values in claims.items()
+        if len(values) > 1 and len({value for _, value in values}) > 1
+    ]
+    read(output)
+    return output, conflicts, ""
+
+
 def rebuild(raw: bytes, sym: bytes, documents: list[dict]) -> tuple[bytes, int]:
     parsed = read(raw, sym)
     by_id = {method["id"]: method for method in parsed["methods"]}

@@ -19,8 +19,8 @@ import struct
 import tempfile
 import threading
 
-from . import (field_background, field_dialogue, field_encounters, field_scripts,
-               field_walkmesh, paths, runtime_layout)
+from . import (field_background, field_camera, field_dialogue, field_encounters,
+               field_movie, field_scripts, field_walkmesh, paths, runtime_layout)
 from .fs_archive import FsArchive
 from .vendor.ff8ue.lzs import Lzs
 
@@ -37,8 +37,13 @@ LITERAL_OPCODE = 0x07
 VARIABLE_OPCODES = {0x0A, 0x0C, 0x0E, 0x10, 0x11, 0x12}
 EDITABLE_OPCODES = {LITERAL_OPCODE, *VARIABLE_OPCODES}
 VERTEX_AXES = ("x", "y", "z")
-MAP_ASSET_EXTENSIONS = ("jsm", "sym", "inf", "msd", "id", "map", "mim", "mrt", "rat")
-MAP_CACHE_VERSION = 6
+MAP_ASSET_EXTENSIONS = ("jsm", "sym", "inf", "msd", "id", "map", "mim", "mrt", "rat",
+                        "ca", "msk")
+MAP_CACHE_VERSION = 7
+# Deling InfFile constructor defaults for fields absent from short variants.
+DEFAULT_CAMERA_RANGE = {"top": -112, "bottom": 112, "right": 160, "left": -160}
+DEFAULT_SCREEN_RANGE = {"top": 0, "bottom": 224, "right": 320, "left": 0}
+DEFAULT_PVP = 12
 
 
 def _prefix() -> Path:
@@ -247,6 +252,10 @@ def ensure_map_baseline(key: str) -> tuple[Path | None, Path | None, Path | None
                     if not rate["canonical"]:
                         raise ValueError(
                             f"Field map {key} RAT does not contain four matching rate bytes")
+                if "ca" in assets:
+                    field_camera.read((directory / f"{row['name']}.ca").read_bytes())
+                if "msk" in assets:
+                    field_movie.read((directory / f"{row['name']}.msk").read_bytes())
                 return (jsm_path if "jsm" in assets else None,
                         sym_path if "sym" in assets else None,
                         inf_path if "inf" in assets else None)
@@ -279,6 +288,10 @@ def ensure_map_baseline(key: str) -> tuple[Path | None, Path | None, Path | None
         rate = field_encounters.read_rat(extracted["rat"])
         if not rate["canonical"]:
             raise ValueError(f"Field map {key} RAT does not contain four matching rate bytes")
+    if "ca" in extracted:
+        field_camera.read(extracted["ca"])
+    if "msk" in extracted:
+        field_movie.read(extracted["msk"])
     directory.mkdir(parents=True, exist_ok=True)
     destinations = {
         extension: directory / f"{row['name']}.{extension}"
@@ -300,13 +313,21 @@ def _inf_layout(size: int) -> dict:
     """Return offsets proved by Deling InfFile::open and OpenVIII INF.ReadData."""
     layouts = {
         676: {"variant": 0, "gatewayOffset": 100, "gatewaySize": 32,
-              "triggerOffset": 484},
+              "triggerOffset": 484, "pvpOffset": 16, "focusOffset": 18,
+              "rangeOffset": 20, "rangeCount": 8, "screenOffset": 84,
+              "screenCount": 2},
         672: {"variant": 1, "gatewayOffset": 96, "gatewaySize": 32,
-              "triggerOffset": 480},
+              "triggerOffset": 480, "pvpOffset": None, "focusOffset": 14,
+              "rangeOffset": 16, "rangeCount": 8, "screenOffset": 80,
+              "screenCount": 2},
         576: {"variant": 2, "gatewayOffset": 96, "gatewaySize": 24,
-              "triggerOffset": 384},
+              "triggerOffset": 384, "pvpOffset": None, "focusOffset": 14,
+              "rangeOffset": 16, "rangeCount": 8, "screenOffset": 80,
+              "screenCount": 2},
         504: {"variant": 3, "gatewayOffset": 24, "gatewaySize": 24,
-              "triggerOffset": 312},
+              "triggerOffset": 312, "pvpOffset": None, "focusOffset": 14,
+              "rangeOffset": 16, "rangeCount": 1, "screenOffset": None,
+              "screenCount": 0},
     }
     try:
         return layouts[size]
@@ -339,7 +360,40 @@ def _parse_inf(raw: bytes) -> dict:
             "lineA": _vertex(raw, offset), "lineB": _vertex(raw, offset + 6),
             "offset": offset,
         })
-    return {"variant": layout["variant"], "size": len(raw),
+    name = bytes(raw[0:9]).split(b"\x00")[0].decode("ascii", errors="replace")
+    unknown = (bytes(raw[10:16]).hex() if layout["variant"] == 0
+               else bytes(raw[10:14]).hex() + "0000")
+    header = {
+        "name": name,
+        "control": raw[9],
+        "unknown": unknown,
+        "pvp": (struct.unpack_from("<H", raw, layout["pvpOffset"])[0]
+                if layout["pvpOffset"] is not None else None),
+        "pvpDefault": DEFAULT_PVP,
+        "focus": struct.unpack_from("<h", raw, layout["focusOffset"])[0],
+    }
+    camera_ranges = []
+    for slot in range(8):
+        if slot < layout["rangeCount"]:
+            top, bottom, right, left = struct.unpack_from(
+                "<hhhh", raw, layout["rangeOffset"] + slot * 8)
+            camera_ranges.append({"id": slot, "present": True, "top": top,
+                                  "bottom": bottom, "right": right, "left": left})
+        else:
+            camera_ranges.append({"id": slot, "present": False,
+                                  **dict(DEFAULT_CAMERA_RANGE)})
+    screen_ranges = []
+    for slot in range(2):
+        if slot < layout["screenCount"]:
+            top, bottom, right, left = struct.unpack_from(
+                "<hhhh", raw, layout["screenOffset"] + slot * 8)
+            screen_ranges.append({"id": slot, "present": True, "top": top,
+                                  "bottom": bottom, "right": right, "left": left})
+        else:
+            screen_ranges.append({"id": slot, "present": False,
+                                  **dict(DEFAULT_SCREEN_RANGE)})
+    return {"variant": layout["variant"], "size": len(raw), "header": header,
+            "cameraRanges": camera_ranges, "screenRanges": screen_ranges,
             "gateways": gateways, "triggers": triggers}
 
 
@@ -553,6 +607,40 @@ def _encounter_source_paths(key: str, dataset: str) -> tuple[Path | None, Path |
     return resolved[0], resolved[1]
 
 
+def _asset_source_path(key: str, dataset: str, extension: str) -> Path | None:
+    ensure_map_baseline(key)
+    row = _map_row(key)
+    baseline = (paths.BASELINE_ROOT / BASELINE_SUBDIR / row["group"] / row["name"] /
+                f"{row['name']}.{extension}")
+    baseline = baseline if baseline.is_file() else None
+    relative = DIRECT_SUBDIR / row["group"] / row["name"] / f"{row['name']}.{extension}"
+    if dataset == "vanilla":
+        return baseline
+    if dataset == "current":
+        override = paths.DIRECT_ROOT / relative
+        return override if override.is_file() else baseline
+    if dataset.startswith("reference:"):
+        reference = paths.PROJECT_ROOT / "references" / dataset.partition(":")[2]
+        return next((candidate for candidate in
+                     (reference / "direct" / relative, reference / relative)
+                     if candidate.is_file()), baseline)
+    if dataset.startswith("mod:"):
+        root = runtime_layout.root_for_mod(
+            paths.PROJECT_ROOT, paths.MODS_ROOT, dataset.partition(":")[2])
+        return next((candidate for candidate in
+                     (root / "direct" / relative, root / relative)
+                     if candidate.is_file()), baseline)
+    raise ValueError(f"Unknown dataset: {dataset}")
+
+
+def _camera_source_path(key: str, dataset: str) -> Path | None:
+    return _asset_source_path(key, dataset, "ca")
+
+
+def _movie_source_path(key: str, dataset: str) -> Path | None:
+    return _asset_source_path(key, dataset, "msk")
+
+
 _card_scan = {"thread": None, "keys": None, "players": [], "scanned": 0, "total": 0, "error": None}
 _card_scan_lock = threading.Lock()
 
@@ -636,6 +724,10 @@ def map_rows(key: str, dataset: str = "current") -> dict:
                          if encounter_mrt_path is not None else None)
     encounter_rat_raw = (encounter_rat_path.read_bytes()
                          if encounter_rat_path is not None else None)
+    camera_path = _camera_source_path(key, dataset)
+    camera_raw = camera_path.read_bytes() if camera_path is not None else None
+    movie_path = _movie_source_path(key, dataset)
+    movie_raw = movie_path.read_bytes() if movie_path is not None else None
     entrances = (_parse_inf(inf_raw) if inf_raw is not None else
                  {"variant": None, "size": 0, "gateways": [], "triggers": []})
     script_error = None
@@ -660,6 +752,20 @@ def map_rows(key: str, dataset: str = "current") -> dict:
     for triangle in walkmesh["triangles"]:
         for vertex in triangle["vertices"]:
             vertex.pop("reserved", None)
+    camera_error = None
+    try:
+        camera = (field_camera.read(camera_raw) if camera_raw is not None else
+                  {"cameraCount": 0, "cameras": []})
+    except ValueError as error:
+        camera_error = str(error)
+        camera = {"cameraCount": 0, "cameras": [], "error": camera_error}
+    movie_error = None
+    try:
+        movie = (field_movie.read(movie_raw) if movie_raw is not None else
+                 {"frameCount": 0, "frames": []})
+    except ValueError as error:
+        movie_error = str(error)
+        movie = {"frameCount": 0, "frames": [], "error": movie_error}
     background_error = None
     try:
         background = (field_background.read(background_map_raw, background_mim_raw)
@@ -702,6 +808,14 @@ def map_rows(key: str, dataset: str = "current") -> dict:
             "walkmeshSource": str(walkmesh_path) if walkmesh_path is not None else None,
              "walkmeshSha256": hashlib.sha256(walkmesh_raw).hexdigest()
              if walkmesh_raw is not None else None,
+            "camera": camera,
+            "cameraSource": str(camera_path) if camera_path is not None else None,
+            "cameraSha256": hashlib.sha256(camera_raw).hexdigest()
+             if camera_raw is not None else None,
+            "movie": movie,
+            "movieSource": str(movie_path) if movie_path is not None else None,
+            "movieSha256": hashlib.sha256(movie_raw).hexdigest()
+             if movie_raw is not None else None,
             "background": background,
             "backgroundMapSource": (str(background_map_path)
                                     if background_map_path is not None else None),
@@ -724,16 +838,17 @@ def map_rows(key: str, dataset: str = "current") -> dict:
                              if script_error else []) +
                             (["Walkmesh: " + walkmesh_error]
                              if walkmesh_error else []) +
+                            (["Camera: " + camera_error]
+                             if camera_error else []) +
+                            (["Movie camera: " + movie_error]
+                             if movie_error else []) +
                             (["Background: " + background_error]
                              if background_error else []) +
                             ["Models", "Media"]}
 
 
-def background_png(key: str, dataset: str = "current", edits: list[dict] | None = None,
-                   active_states: list[dict] | None = None,
-                   enabled_layers: list[int] | None = None,
-                   hide_background: bool = False,
-                   highlight_tile: int | None = None) -> bytes:
+def _preview_map_raw(key: str, dataset: str,
+                     edits: list[dict] | None) -> tuple[bytes, bytes]:
     map_path, mim_path = _background_source_paths(key, dataset)
     if map_path is None or mim_path is None:
         raise ValueError(f"Field map {key} has no background")
@@ -745,12 +860,37 @@ def background_png(key: str, dataset: str = "current", edits: list[dict] | None 
         normalized.append({name: value for name, value in edit.items()})
     if normalized:
         map_raw, _ = field_background.apply_edits(map_raw, mim_raw, normalized)
+    return map_raw, mim_raw
+
+
+def background_png(key: str, dataset: str = "current", edits: list[dict] | None = None,
+                   active_states: list[dict] | None = None,
+                   enabled_layers: list[int] | None = None,
+                   hide_background: bool = False,
+                   highlight_tile: int | None = None) -> bytes:
+    map_raw, mim_raw = _preview_map_raw(key, dataset, edits)
     states = (None if active_states is None else
               {(int(entry["parameter"]), int(entry["state"])) for entry in active_states})
     layers = None if enabled_layers is None else {int(value) for value in enabled_layers}
     return field_background.render_png(
         map_raw, mim_raw, active_states=states, enabled_layers=layers,
         hide_background=hide_background, highlight_tile=highlight_tile)
+
+
+def background_geometry(key: str, dataset: str = "current",
+                        edits: list[dict] | None = None) -> dict:
+    """Return the composed preview's origin and size in game-screen pixels.
+
+    Deling draws tile (x, y) at canvas pixel (bounds.left + x, bounds.top + y),
+    so the Field tab's walkmesh overlay adds this origin to its projected
+    320x224 screen points. Tile edits move the bounds, which is why the
+    overlay asks per preview instead of reusing the unedited payload.
+    """
+    map_raw, mim_raw = _preview_map_raw(key, dataset, edits)
+    bounds = field_background.read(map_raw, mim_raw)["bounds"]
+    return {"left": bounds["left"], "top": bounds["top"],
+            "width": bounds["left"] + bounds["right"] + 16,
+            "height": bounds["top"] + bounds["bottom"] + 16}
 
 
 def _write_atomic(destination: Path, raw: bytes, *, backup: bool = True) -> None:
@@ -800,10 +940,8 @@ def _write_batch(prepared: list[tuple[Path, bytes]]) -> None:
         raise
 
 
-def _edit_inf_bytes(source: bytes, edits: list[dict]) -> bytes:
-    raw = bytearray(source)
-    parsed = _parse_inf(raw)
-    seen = set()
+def _inf_scalar_offsets(parsed: dict) -> dict[tuple, tuple[int, str, int, int]]:
+    """Every editable INF scalar by identity: offset, struct format, min, max."""
     scalar_offsets: dict[tuple, tuple[int, str, int, int]] = {}
     for gateway in parsed["gateways"]:
         scalar_offsets[("gateway", gateway["id"], "fieldId")] = (
@@ -819,12 +957,83 @@ def _edit_inf_bytes(source: bytes, edits: list[dict]) -> bytes:
             for axis_index, axis in enumerate(VERTEX_AXES):
                 scalar_offsets[("trigger", trigger["id"], point, axis)] = (
                     trigger[point]["offset"] + axis_index * 2, "h", -32768, 32767)
+    layout = _inf_layout(parsed["size"])
+    scalar_offsets[("misc", "control")] = (9, "B", 0, 255)
+    if layout["pvpOffset"] is not None:
+        scalar_offsets[("misc", "pvp")] = (layout["pvpOffset"], "H", 0, 0xFFFF)
+    scalar_offsets[("misc", "focus")] = (layout["focusOffset"], "h", -32768, 32767)
+    for slot in range(layout["rangeCount"]):
+        for field_index, field in enumerate(("top", "bottom", "right", "left")):
+            scalar_offsets[("cameraRange", slot, field)] = (
+                layout["rangeOffset"] + slot * 8 + field_index * 2,
+                "h", -32768, 32767)
+    for slot in range(layout["screenCount"]):
+        for field_index, field in enumerate(("top", "bottom", "right", "left")):
+            scalar_offsets[("screenRange", slot, field)] = (
+                layout["screenOffset"] + slot * 8 + field_index * 2,
+                "h", -32768, 32767)
+    return scalar_offsets
+
+
+def merge_inf(vanilla: bytes, mods: list[tuple[str, bytes]], path: str
+              ) -> tuple[bytes | None, list[dict], str]:
+    """Merge entrance scalars, or return a visible whole-file fallback."""
+    try:
+        baseline = _parse_inf(vanilla)
+    except ValueError as error:
+        return None, [], f"vanilla {path} is unsupported: {error}"
+    units = _inf_scalar_offsets(baseline)
+    claims: dict[tuple, list[tuple[str, bytes]]] = {}
+    for mod_id, source in mods:
+        try:
+            parsed = _parse_inf(source)
+        except ValueError as error:
+            return None, [], f"{mod_id} is not a supported {path}: {error}"
+        if parsed["size"] != baseline["size"] or parsed["variant"] != baseline["variant"]:
+            return None, [], f"{mod_id} changes the entrance structure of {path}"
+        reconstructed = bytearray(vanilla)
+        for identity, (offset, fmt, _minimum, _maximum) in units.items():
+            size = struct.calcsize("<" + fmt)
+            value = source[offset:offset + size]
+            if value != vanilla[offset:offset + size]:
+                claims.setdefault(identity, []).append((mod_id, value))
+                reconstructed[offset:offset + size] = value
+        if bytes(reconstructed) != source:
+            return None, [], f"{mod_id} contains changes outside proved entrance units"
+    output = bytearray(vanilla)
+    conflicts = []
+    for identity, values in claims.items():
+        offset, fmt, _minimum, _maximum = units[identity]
+        size = struct.calcsize("<" + fmt)
+        output[offset:offset + size] = values[-1][1]
+        if len(values) > 1 and len({value for _, value in values}) > 1:
+            conflicts.append({"unit": f"{path}:{':'.join(map(str, identity))}",
+                              "winner": values[-1][0],
+                              "claimants": [mod_id for mod_id, _ in values]})
+    merged = bytes(output)
+    reparsed = _parse_inf(merged)
+    if reparsed["size"] != baseline["size"] or reparsed["variant"] != baseline["variant"]:
+        return None, [], f"merged {path} changed the entrance structure"
+    return merged, conflicts, ""
+
+
+def _edit_inf_bytes(source: bytes, edits: list[dict]) -> bytes:
+    raw = bytearray(source)
+    parsed = _parse_inf(raw)
+    seen = set()
+    scalar_offsets = _inf_scalar_offsets(parsed)
     for edit in edits:
         kind = str(edit.get("kind", ""))
         slot = int(edit.get("slot", -1))
         field = str(edit.get("field", ""))
-        identity = (kind, slot, field) if field in {"fieldId", "doorId"} else (
-            kind, slot, field, str(edit.get("axis", "")))
+        if kind == "misc":
+            identity = (kind, field)
+        elif kind in {"cameraRange", "screenRange"}:
+            identity = (kind, slot, field)
+        elif field in {"fieldId", "doorId"}:
+            identity = (kind, slot, field)
+        else:
+            identity = (kind, slot, field, str(edit.get("axis", "")))
         if identity in seen or identity not in scalar_offsets:
             raise ValueError("Invalid or duplicate field entrance edit")
         seen.add(identity)
@@ -942,12 +1151,46 @@ def _prepare_encounter_edits(key: str, edits: list[dict]
     return prepared
 
 
+def _prepare_camera_edits(key: str, edits: list[dict]) -> tuple[Path, bytes, int]:
+    row = _map_row(key)
+    source = _camera_source_path(key, "current")
+    if source is None:
+        raise ValueError(f"Field map {key} has no camera setups")
+    normalized = []
+    for edit in edits:
+        normalized.append({"camera": int(edit.get("camera", -1)),
+                           "field": str(edit.get("field", "")),
+                           "axis": str(edit.get("axis", "")),
+                           "value": int(edit.get("value"))})
+    raw, changed = field_camera.apply_edits(source.read_bytes(), normalized)
+    destination = (paths.DIRECT_ROOT / DIRECT_SUBDIR / row["group"] / row["name"] /
+                   f"{row['name']}.ca")
+    return destination, raw, changed
+
+
+def _prepare_movie_edits(key: str, edits: list[dict]) -> tuple[Path, bytes, int]:
+    row = _map_row(key)
+    source = _movie_source_path(key, "current")
+    if source is None:
+        raise ValueError(f"Field map {key} has no movie camera frames")
+    normalized = []
+    for edit in edits:
+        normalized.append({"frame": int(edit.get("frame", -1)),
+                           "point": int(edit.get("point", -1)),
+                           "axis": str(edit.get("axis", "")),
+                           "value": int(edit.get("value"))})
+    raw, changed = field_movie.apply_edits(source.read_bytes(), normalized)
+    destination = (paths.DIRECT_ROOT / DIRECT_SUBDIR / row["group"] / row["name"] /
+                   f"{row['name']}.msk")
+    return destination, raw, changed
+
+
 def save(edits: list[dict]) -> dict:
     by_map: dict[str, list[dict]] = {}
     for edit in edits:
         if edit.get("type", "card") not in {
                 "card", "entrance", "dialogue", "script", "walkmesh", "background",
-                "fieldEncounter"}:
+                "fieldEncounter", "camera", "movie"}:
             raise ValueError("Unsupported field edit type")
         by_map.setdefault(str(edit.get("map", "")), []).append(edit)
     written = 0
@@ -962,6 +1205,8 @@ def save(edits: list[dict]) -> dict:
         background_edits = [edit for edit in map_edits if edit.get("type") == "background"]
         encounter_edits = [edit for edit in map_edits
                            if edit.get("type") == "fieldEncounter"]
+        camera_edits = [edit for edit in map_edits if edit.get("type") == "camera"]
+        movie_edits = [edit for edit in map_edits if edit.get("type") == "movie"]
         prepared_inf = None
         prepared_dialogue = None
         if entrance_edits:
@@ -980,6 +1225,10 @@ def save(edits: list[dict]) -> dict:
                                if background_edits else None)
         prepared_encounters = (_prepare_encounter_edits(key, encounter_edits)
                                if encounter_edits else [])
+        prepared_camera = (_prepare_camera_edits(key, camera_edits)
+                           if camera_edits else None)
+        prepared_movie = (_prepare_movie_edits(key, movie_edits)
+                          if movie_edits else None)
         prepared_scripts = None
         if script_documents:
             prepared_scripts = _prepare_script_documents(key, [
@@ -1039,5 +1288,11 @@ def save(edits: list[dict]) -> dict:
         for destination, raw, changed in prepared_encounters:
             prepared_files.append((destination, raw))
             written += changed
+        if prepared_camera:
+            prepared_files.append(prepared_camera[:2])
+            written += prepared_camera[2]
+        if prepared_movie:
+            prepared_files.append(prepared_movie[:2])
+            written += prepared_movie[2]
     _write_batch(prepared_files)
     return {"saved": written + inf_written, "maps": len(by_map)}

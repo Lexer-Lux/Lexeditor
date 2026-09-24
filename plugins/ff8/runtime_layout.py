@@ -15,7 +15,8 @@ try:
 except ModuleNotFoundError:  # Python 3.10 in Lexeditor's bundled environment.
     import tomli as tomllib
 
-from . import (field_background, field_encounters, field_walkmesh, fixed_data_merge,
+from . import (field_background, field_camera, field_dialogue, field_encounters,
+               field_movie, field_scripts, field_walkmesh, fixed_data_merge, init_data,
                iroj_archive, kernel_merge, mngrp_merge, mod_folders, world_data_merge)
 
 
@@ -43,6 +44,7 @@ MAX_LIVE_CONDITIONS_PER_PATH = 12
 MAX_LIVE_VARIANTS_PER_PATH = 4096
 MAX_LIVE_VARIANTS_TOTAL = 65536
 LIVE_CONDITIONAL_ROOTS = {"direct", "sfx", "voice", "ambient"}
+MEDIA_OPAQUE_ROOTS = {"textures", "sfx", "voice", "ambient"}
 WORLD_MERGE_SPECS = {
     "direct/world/dat/wmx.obj": ("world/wmx.obj", "geometry"),
     "direct/world/dat/wmsetus.obj": ("world/wmsetus.obj", "wmset"),
@@ -55,6 +57,16 @@ FIELD_BACKGROUND_PATH = re.compile(
     r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.map$", re.IGNORECASE)
 FIELD_ENCOUNTER_PATH = re.compile(
     r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.(mrt|rat)$", re.IGNORECASE)
+FIELD_DIALOGUE_PATH = re.compile(
+    r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.msd$", re.IGNORECASE)
+FIELD_ENTRANCE_PATH = re.compile(
+    r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.inf$", re.IGNORECASE)
+FIELD_SCRIPT_PATH = re.compile(
+    r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.jsm$", re.IGNORECASE)
+FIELD_CAMERA_PATH = re.compile(
+    r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.ca$", re.IGNORECASE)
+FIELD_MOVIE_PATH = re.compile(
+    r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.msk$", re.IGNORECASE)
 
 
 def _field_walkmesh_baseline(logical_path: str,
@@ -81,6 +93,26 @@ def _field_encounter_baseline(logical_path: str,
         return None
     candidate = Path(baseline_root) / Path(*_path_parts(logical_path)[1:])
     return (candidate, match.group(2).casefold()) if candidate.is_file() else None
+
+
+def _field_asset_baseline(logical_path: str, baseline_root: Path | None,
+                            pattern: "re.Pattern[str]") -> Path | None:
+    if baseline_root is None or pattern.fullmatch(logical_path) is None:
+        return None
+    candidate = Path(baseline_root) / Path(*_path_parts(logical_path)[1:])
+    return candidate if candidate.is_file() else None
+
+
+def _field_dialogue_baseline(logical_path: str, baseline_root: Path | None
+                             ) -> tuple[Path, str] | None:
+    match = FIELD_DIALOGUE_PATH.fullmatch(logical_path)
+    if baseline_root is None or match is None:
+        return None
+    candidate = Path(baseline_root) / Path(*_path_parts(logical_path)[1:])
+    if not candidate.is_file():
+        return None
+    # Claims are casefolded; the codec only needs the map name.
+    return candidate, match.group(1)
 
 
 def prelaunch_condition_state(config: Path | None = None,
@@ -799,6 +831,55 @@ def _compose_logical_payload(logical_path: str,
         if merged is not None:
             return merged, "semantic merge", conflicts
         return inputs[-1][1], f"opaque winner: {reason}", []
+    dialogue_baseline = _field_dialogue_baseline(logical_path, baseline_root)
+    if dialogue_baseline is not None:
+        baseline, map_name = dialogue_baseline
+        merged, conflicts, reason = field_dialogue.merge(
+            baseline.read_bytes(), inputs, logical_path, map_name=map_name)
+        if merged is not None:
+            return merged, "semantic merge", conflicts
+        return inputs[-1][1], f"opaque winner: {reason}", []
+    entrance_baseline = _field_asset_baseline(
+        logical_path, baseline_root, FIELD_ENTRANCE_PATH)
+    if entrance_baseline is not None:
+        from . import field_data as _field_data
+        merged, conflicts, reason = _field_data.merge_inf(
+            entrance_baseline.read_bytes(), inputs, logical_path)
+        if merged is not None:
+            return merged, "semantic merge", conflicts
+        return inputs[-1][1], f"opaque winner: {reason}", []
+    script_baseline = _field_asset_baseline(
+        logical_path, baseline_root, FIELD_SCRIPT_PATH)
+    if script_baseline is not None:
+        merged, conflicts, reason = field_scripts.merge(
+            script_baseline.read_bytes(), inputs, logical_path)
+        if merged is not None:
+            return merged, "semantic merge", conflicts
+        return inputs[-1][1], f"opaque winner: {reason}", []
+    camera_baseline = _field_asset_baseline(
+        logical_path, baseline_root, FIELD_CAMERA_PATH)
+    if camera_baseline is not None:
+        merged, conflicts, reason = field_camera.merge(
+            camera_baseline.read_bytes(), inputs, logical_path)
+        if merged is not None:
+            return merged, "semantic merge", conflicts
+        return inputs[-1][1], f"opaque winner: {reason}", []
+    movie_baseline = _field_asset_baseline(
+        logical_path, baseline_root, FIELD_MOVIE_PATH)
+    if movie_baseline is not None:
+        merged, conflicts, reason = field_movie.merge(
+            movie_baseline.read_bytes(), inputs, logical_path)
+        if merged is not None:
+            return merged, "semantic merge", conflicts
+        return inputs[-1][1], f"opaque winner: {reason}", []
+    if logical_path == "direct/init.out" and baseline_root is not None:
+        baseline = Path(baseline_root) / "main" / "init.out"
+        if baseline.is_file():
+            merged, conflicts, reason = init_data.merge(
+                baseline.read_bytes(), inputs, logical_path)
+            if merged is not None:
+                return merged, "semantic merge", conflicts
+            return inputs[-1][1], f"opaque winner: {reason}", []
     return inputs[-1][1], "opaque winner", []
 
 
@@ -1190,21 +1271,149 @@ def compose(project_root: Path, runtime_root: Path,
                     semantic_conflicts_by_path[walkmesh_key] = unit_conflicts
                 else:
                     semantic_fallback_by_path[walkmesh_key] = fallback
+            for dialogue_key, dialogue_claimants in claims.items():
+                dialogue_baseline = _field_dialogue_baseline(
+                    dialogue_key, baseline_root)
+                if len(dialogue_claimants) < 2 or dialogue_baseline is None:
+                    continue
+                inputs = []
+                for mod in enabled:
+                    source = resolved_by_mod[mod["id"]].get(dialogue_key)
+                    if source is not None:
+                        inputs.append((mod["id"], source[0]()))
+                baseline, map_name = dialogue_baseline
+                merged, unit_conflicts, fallback = field_dialogue.merge(
+                    baseline.read_bytes(), inputs, dialogue_key, map_name=map_name)
+                if merged is not None:
+                    (staging / dialogue_key).write_bytes(merged)
+                    semantic_merged.add(dialogue_key)
+                    semantic_conflicts_by_path[dialogue_key] = unit_conflicts
+                else:
+                    semantic_fallback_by_path[dialogue_key] = fallback
+            for entrance_key, entrance_claimants in claims.items():
+                entrance_baseline = _field_asset_baseline(
+                    entrance_key, baseline_root, FIELD_ENTRANCE_PATH)
+                if len(entrance_claimants) < 2 or entrance_baseline is None:
+                    continue
+                inputs = []
+                for mod in enabled:
+                    source = resolved_by_mod[mod["id"]].get(entrance_key)
+                    if source is not None:
+                        inputs.append((mod["id"], source[0]()))
+                from . import field_data as _field_data
+                merged, unit_conflicts, fallback = _field_data.merge_inf(
+                    entrance_baseline.read_bytes(), inputs, entrance_key)
+                if merged is not None:
+                    (staging / entrance_key).write_bytes(merged)
+                    semantic_merged.add(entrance_key)
+                    semantic_conflicts_by_path[entrance_key] = unit_conflicts
+                else:
+                    semantic_fallback_by_path[entrance_key] = fallback
+            for script_key, script_claimants in claims.items():
+                script_baseline = _field_asset_baseline(
+                    script_key, baseline_root, FIELD_SCRIPT_PATH)
+                if len(script_claimants) < 2 or script_baseline is None:
+                    continue
+                inputs = []
+                for mod in enabled:
+                    source = resolved_by_mod[mod["id"]].get(script_key)
+                    if source is not None:
+                        inputs.append((mod["id"], source[0]()))
+                merged, unit_conflicts, fallback = field_scripts.merge(
+                    script_baseline.read_bytes(), inputs, script_key)
+                if merged is not None:
+                    (staging / script_key).write_bytes(merged)
+                    semantic_merged.add(script_key)
+                    semantic_conflicts_by_path[script_key] = unit_conflicts
+                else:
+                    semantic_fallback_by_path[script_key] = fallback
+            for camera_key, camera_claimants in claims.items():
+                camera_baseline = _field_asset_baseline(
+                    camera_key, baseline_root, FIELD_CAMERA_PATH)
+                if len(camera_claimants) < 2 or camera_baseline is None:
+                    continue
+                inputs = []
+                for mod in enabled:
+                    source = resolved_by_mod[mod["id"]].get(camera_key)
+                    if source is not None:
+                        inputs.append((mod["id"], source[0]()))
+                merged, unit_conflicts, fallback = field_camera.merge(
+                    camera_baseline.read_bytes(), inputs, camera_key)
+                if merged is not None:
+                    (staging / camera_key).write_bytes(merged)
+                    semantic_merged.add(camera_key)
+                    semantic_conflicts_by_path[camera_key] = unit_conflicts
+                else:
+                    semantic_fallback_by_path[camera_key] = fallback
+            for movie_key, movie_claimants in claims.items():
+                movie_baseline = _field_asset_baseline(
+                    movie_key, baseline_root, FIELD_MOVIE_PATH)
+                if len(movie_claimants) < 2 or movie_baseline is None:
+                    continue
+                inputs = []
+                for mod in enabled:
+                    source = resolved_by_mod[mod["id"]].get(movie_key)
+                    if source is not None:
+                        inputs.append((mod["id"], source[0]()))
+                merged, unit_conflicts, fallback = field_movie.merge(
+                    movie_baseline.read_bytes(), inputs, movie_key)
+                if merged is not None:
+                    (staging / movie_key).write_bytes(merged)
+                    semantic_merged.add(movie_key)
+                    semantic_conflicts_by_path[movie_key] = unit_conflicts
+                else:
+                    semantic_fallback_by_path[movie_key] = fallback
+            init_key = "direct/init.out"
+            init_claimants = claims.get(init_key, [])
+            init_baseline = Path(baseline_root) / "main" / "init.out"
+            if len(init_claimants) > 1 and init_baseline.is_file():
+                inputs = []
+                for mod in enabled:
+                    source = resolved_by_mod[mod["id"]].get(init_key)
+                    if source is not None:
+                        inputs.append((mod["id"], source[0]()))
+                merged, unit_conflicts, fallback = init_data.merge(
+                    init_baseline.read_bytes(), inputs, init_key)
+                if merged is not None:
+                    (staging / init_key).write_bytes(merged)
+                    semantic_merged.add(init_key)
+                    semantic_conflicts_by_path[init_key] = unit_conflicts
+                else:
+                    semantic_fallback_by_path[init_key] = fallback
         files = _files(staging)
-        conflicts = [
-            {"path": path, "winner": ("ordered runtime patches"
-                                        if path.casefold().startswith("hext/")
-                                        else "semantic merge" if path in semantic_merged
-                                        else claimants[-1]),
-             "claimants": claimants,
-             **({"mode": "low-to-high patch stream"}
-                if path.casefold().startswith("hext/") else {}),
-             **({"units": semantic_conflicts_by_path[path]}
-                if semantic_conflicts_by_path.get(path) else {}),
-             **({"semanticFallback": semantic_fallback_by_path[path]}
-                if path in semantic_fallback_by_path else {})}
-            for path, claimants in sorted(claims.items()) if len(claimants) > 1
-        ]
+        conflicts = []
+        for path, claimants in sorted(claims.items()):
+            if len(claimants) < 2:
+                continue
+            if path.casefold().startswith("hext/"):
+                conflicts.append({
+                    "path": path, "winner": "ordered runtime patches",
+                    "claimants": claimants, "mode": "low-to-high patch stream"})
+                continue
+            if path in semantic_merged:
+                record = {"path": path, "winner": "semantic merge",
+                          "claimants": claimants, "mode": "semantic merge"}
+                if semantic_conflicts_by_path.get(path):
+                    record["units"] = semantic_conflicts_by_path[path]
+                conflicts.append(record)
+                continue
+            winner = claimants[-1]
+            dropped = [name for name in claimants if name != winner]
+            record = {"path": path, "winner": winner,
+                      "claimants": claimants, "mode": "opaque winner"}
+            if path in semantic_fallback_by_path:
+                record["semanticFallback"] = semantic_fallback_by_path[path]
+                record["warning"] = (
+                    f"{semantic_fallback_by_path[path]}; "
+                    f"only {winner}'s version is used")
+            elif path.split("/", 1)[0].casefold() not in MEDIA_OPAQUE_ROOTS:
+                owned = [f"{name}'s" for name in dropped]
+                dropped_text = (owned[0] if len(owned) == 1
+                                else ", ".join(owned[:-1]) + f" and {owned[-1]}")
+                record["warning"] = (
+                    f"Only {winner}'s {path} is used; "
+                    f"{dropped_text} changes to this file are dropped")
+            conflicts.append(record)
         manifest = {
             "version": 1,
             "composedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),

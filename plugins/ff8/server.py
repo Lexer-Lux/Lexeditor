@@ -10,7 +10,7 @@ from pathlib import Path
 import tempfile
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import card_art, cards, field_data, featured_mods, formats, gameplay_settings, paths, runtime_layout, world_geometry, world_map, world_textures
+from . import card_art, cards, editor_settings, field_data, featured_mods, formats, gameplay_settings, paths, runtime_layout, world_geometry, world_map, world_textures
 from .game_icons import icon_path, portrait_path
 from .extractor import baseline_ready, manifest_path
 from .ffnx_manager import status as ffnx_status
@@ -83,14 +83,17 @@ class Handler(PluginRequestHandler):
     server_version = "LexeditorFF8/1"
 
     def binary_response(self, data: bytes, content_type: str, filename: str | None = None):
-        self.send_response(200)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        if filename:
-            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            if filename:
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        except ConnectionError:
+            pass
 
     def body(self) -> dict:
         length = int(self.headers.get("Content-Length", "0"))
@@ -243,6 +246,8 @@ class Handler(PluginRequestHandler):
                 self.json_response(formats.init_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/settings":
                 self.json_response(gameplay_settings.payload())
+            elif path == "/api/editor-settings":
+                self.json_response(editor_settings.load())
             elif path == "/api/settings/runtime":
                 self.json_response(gameplay_settings.runtime_status())
             elif path == "/api/platform-config":
@@ -322,10 +327,16 @@ class Handler(PluginRequestHandler):
                     body.get("enabledLayers"), body.get("hideBackground") is True,
                     (None if body.get("highlightTile") is None
                      else int(body["highlightTile"]))), "image/png")
+            elif path == "/api/field/background-geometry":
+                self.json_response(field_data.background_geometry(
+                    str(body.get("map", "")), str(body.get("dataset", "current")),
+                    body.get("edits", [])))
             elif path == "/api/init/save":
                 self.json_response(formats.save_init(body.get("edits", [])))
             elif path == "/api/settings/save":
                 self.json_response(gameplay_settings.save(body))
+            elif path == "/api/editor-settings/save":
+                self.json_response(editor_settings.save(body))
             elif path == "/api/mods/configure":
                 rows = runtime_layout.configure(
                     paths.PROJECT_ROOT, paths.MODS_ROOT,

@@ -156,7 +156,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       name:known.get(entry.entity.toLowerCase())||entry.entity}))
       .filter(row=>`${row.name} ${row.map}`.toLowerCase().includes(query));
     const help=[
-      "Selects the opponent's deck. It does not select a single card. The deck catalogue is not decoded here yet.",
+      "Selects the opponent's deck, not a single card. The deck list itself is not editable.",
       "The card rules you bring from previous regions. The game uses these when it offers to mix rules.",
       "The card rules used in this opponent's region. These are separate from the rules you bring with you.",
       "Percentage chance, from 0 to 100, that this opponent uses an available rare card.",
@@ -183,7 +183,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
             const input=numberControl(param.value,0,maximum,1,update,{'aria-label':`${entry.name} ${param.name}`});
             input.disabled=!param.editable||state.activeSource!=='mine';
             return detailField({label:param.name+(variable?' variable':''),dataType:'INT',min:0,max:maximum,
-              help:infoHelp(help[param.id]+(variable?' This field holds a game-variable reference, not the value used in the match. Changing it selects a different variable.':'')),
+              help:infoHelp(help[param.id]+(variable?' Holds a game-variable reference; changing it selects a different variable.':'')),
               control:sourceControl(input,()=>param.value,before?.value,[],update)});
           });
           body.push(calls.length===1?LexeditorUI.stack({fill:false},...fields):detailSection({title:`Setup ${index+1}`,body:fields}));
@@ -197,7 +197,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       search:{key:'ff8-card-players',value:playerView.query,label:'Search card players',change:value=>{playerView.query=value;playerView.page=0;render()}},
       sync:next=>Object.assign(playerView,next),change:next=>{Object.assign(playerView,next);render()},
       master:({rows,selected,select})=>columnList({rows,key:row=>row.key,selected,select,
-        columns:[{key:'name',label:'Player',help:'Shows the character name when known. Otherwise this is the player identifier stored by the game, such as queen_est.'}]}),detail,
+        columns:[{key:'name',label:'Player',help:'Character name when known, else the game identifier.'}]}),detail,
       emptyDetail:()=>detailPanel({title:'Card players',body:[LexeditorUI.detailNote('No players match this search.')]})});
   };
   render = () => {

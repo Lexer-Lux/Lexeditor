@@ -45,6 +45,8 @@ class FieldAssetTests(unittest.TestCase):
                  patch.object(field_data, "_walkmesh_source_path", return_value=None), \
                  patch.object(field_data, "_background_source_paths", return_value=(None, None)), \
                  patch.object(field_data, "_encounter_source_paths", return_value=(None, None)), \
+                 patch.object(field_data, "_camera_source_path", return_value=None), \
+                 patch.object(field_data, "_movie_source_path", return_value=None), \
                  patch.object(field_data.field_scripts, "read", return_value=scripts) as read_scripts, \
                  patch.object(field_data, "_parse_card_players", return_value=[{"id": 0}]) as players:
                 result = field_data.map_rows(key)
