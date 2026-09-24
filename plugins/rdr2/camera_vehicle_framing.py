@@ -89,3 +89,30 @@ def validate_framing_plan(plan: Mapping) -> list[str]:
             "The two-mode vehicle handoff stays owned by #220."
         )
     return errors
+
+# Fields a saved-preset apply record must name. Applying a saved preset is
+# the ungated path: developer mode gates authoring, never application.
+APPLY_FIELDS = ("profile", "values")
+
+
+def validate_preset_apply(request: Mapping) -> list[str]:
+    """Check a saved-preset apply request against the contract."""
+    errors: list[str] = []
+    if not isinstance(request, Mapping):
+        return ["Preset apply request must be a mapping."]
+    if request.get("profile") not in PROFILES:
+        errors.append("Preset apply must name one of the kept profiles.")
+    if not isinstance(request.get("values"), Mapping) or not request["values"]:
+        errors.append("Preset apply must carry the saved profile values.")
+    if request.get("requires_developer_mode") is True:
+        errors.append(
+            "Applying a saved preset must not require developer mode; "
+            "the gate covers authoring only."
+        )
+    claim = str(request.get("claim", ""))
+    for rejected in REJECTED_CLAIMS:
+        if rejected in claim:
+            errors.append(
+                f"Preset apply reuses the rejected claim {rejected}."
+            )
+    return errors

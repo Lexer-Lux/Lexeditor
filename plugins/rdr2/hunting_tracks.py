@@ -80,3 +80,36 @@ def validate_track_experiment(plan: Mapping) -> list[str]:
             "A design choice requires the completed stream-out probe first."
         )
     return errors
+
+# Fields a completed probe run must record per measurement: the observed
+# value plus the conditions under which it was observed.
+PROBE_RECORD_FIELDS = ("value", "conditions")
+
+
+def validate_probe_result(result: Mapping) -> list[str]:
+    """Check a completed trail-lifetime probe run and its design read."""
+    errors: list[str] = []
+    if not isinstance(result, Mapping):
+        return ["Probe result must be a mapping."]
+    measurements = result.get("measurements")
+    if not isinstance(measurements, Mapping) or not measurements:
+        return ["Probe result must record the controlled measurements."]
+    for required in REQUIRED_MEASUREMENTS:
+        record = measurements.get(required)
+        if not isinstance(record, Mapping):
+            errors.append(f"Probe result must record {required}.")
+            continue
+        for field in PROBE_RECORD_FIELDS:
+            if record.get(field) in (None, ""):
+                errors.append(f"Measurement {required} must state {field}.")
+    decision = str(result.get("design_decision", ""))
+    if decision:
+        if decision in REJECTED_CHOICES:
+            errors.append(
+                f"Decision {decision!r} reuses a rejected position."
+            )
+        elif decision not in VIABLE_DESIGNS:
+            errors.append(
+                f"Decision {decision!r} is not one of the viable designs."
+            )
+    return errors

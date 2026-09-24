@@ -95,3 +95,29 @@ def validate_variant_brief(brief: Mapping) -> list[str]:
             "not an approval claim for unseen artwork."
         )
     return errors
+
+def validate_review_session(session: Mapping) -> list[str]:
+    """Check a review session: briefs, feedback, revisions, approval gate."""
+    errors: list[str] = []
+    if not isinstance(session, Mapping):
+        return ["Review session must be a mapping."]
+    briefs = session.get("briefs")
+    if not isinstance(briefs, list) or not briefs:
+        return ["Review session must present at least one variant brief."]
+    for index, brief in enumerate(briefs):
+        where = f"briefs[{index}]"
+        if not isinstance(brief, Mapping):
+            errors.append(f"{where} must be a mapping.")
+            continue
+        for field in VARIANT_BRIEF_FIELDS:
+            if not brief.get(field):
+                errors.append(f"{where} must state {field}.")
+        feedback = brief.get("feedback") or []
+        revisions = brief.get("revisions") or []
+        if len(revisions) < len(feedback):
+            errors.append(
+                f"{where} must revise every feedback item before approval."
+            )
+        if brief.get("replace") is True and brief.get("presentation_state") != "approved":
+            errors.append(f"{where} must be approved before replacement.")
+    return errors

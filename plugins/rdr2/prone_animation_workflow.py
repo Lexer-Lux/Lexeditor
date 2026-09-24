@@ -97,3 +97,31 @@ def validate_animation_plan(plan: Mapping) -> list[str]:
                     f"Set {required} must meet {requirement}."
                 )
     return errors
+
+def validate_clip_record(record: Mapping) -> list[str]:
+    """Check one modified clip's end-to-end pipeline record."""
+    errors: list[str] = []
+    if not isinstance(record, Mapping):
+        return ["Clip record must be a mapping."]
+    if record.get("clip") in (None, ""):
+        errors.append("Clip record must name its modified clip.")
+    if record.get("unchanged_vanilla_clip") is True:
+        errors.append(
+            "Arbitrary existing clips cannot be played unchanged; "
+            "the clip must be retargeted and modified."
+        )
+    stages = record.get("stages")
+    if not isinstance(stages, Mapping) or not stages:
+        return errors + ["Clip record must record every pipeline stage."]
+    for required in PIPELINE_STAGES:
+        stage = stages.get(required)
+        if not isinstance(stage, Mapping):
+            errors.append(f"Clip record must record {required}.")
+            continue
+        if stage.get("passed") not in (True, False):
+            errors.append(f"Stage {required} must record passed or failed.")
+        if not stage.get("artifact"):
+            errors.append(
+                f"Stage {required} must cite its artifact or signoff."
+            )
+    return errors

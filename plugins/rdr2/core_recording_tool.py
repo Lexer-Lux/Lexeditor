@@ -116,3 +116,29 @@ def validate_trace_records(
                 f"{CORE_MIN}-{CORE_MAX}."
             )
     return errors
+
+def summarize_trace(samples: Sequence[Mapping]) -> dict:
+    """Summarize a validated trace's producer-cadence behavior.
+
+    Returns step statistics plus a cadence read: "single_step_only" when
+    every change crosses exactly one integer boundary, "multi_point_batching"
+    when any change jumps more than one point, or "no_change_observed" when
+    the value never moves. The read covers the producer side only; whether
+    the HUD art steps or tweens still needs the paired video.
+    """
+    rows = [dict(sample) for sample in (samples or [])]
+    values = [row["core_value"] for row in rows]
+    steps = [abs(b - a) for a, b in zip(values, values[1:])]
+    changes = [step for step in steps if step > 0]
+    if not changes:
+        read = "no_change_observed"
+    elif max(changes) == 1:
+        read = "single_step_only"
+    else:
+        read = "multi_point_batching"
+    return {
+        "samples": len(rows),
+        "changes": len(changes),
+        "max_step": max(changes) if changes else 0,
+        "cadence_read": read,
+    }

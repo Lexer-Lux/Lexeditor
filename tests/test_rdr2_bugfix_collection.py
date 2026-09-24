@@ -124,5 +124,46 @@ class FirstTargetManifestTests(unittest.TestCase):
         self.assertTrue(bc.validate_first_target_manifests("manifests"))
 
 
+def valid_delivery_record():
+    return {
+        "entry": "wickiup_map_artwork",
+        "built_from": "credited Nexus 2953 fix",
+        "verification": "corrected YTD name checked against current files",
+        "ships_independently": True,
+    }
+
+
+class DeliveryRecordTests(unittest.TestCase):
+    def test_valid_delivery_record_passes(self):
+        self.assertEqual(bc.validate_delivery_record(valid_delivery_record()), [])
+
+    def test_excluded_entry_is_rejected(self):
+        record = valid_delivery_record()
+        record["entry"] = "run_walk_toggle_preference"
+        errors = bc.validate_delivery_record(record)
+        self.assertTrue(any("must not ship" in e for e in errors))
+
+    def test_missing_verification_is_rejected(self):
+        record = valid_delivery_record()
+        del record["verification"]
+        errors = bc.validate_delivery_record(record)
+        self.assertTrue(any("verification" in e for e in errors))
+
+    def test_comparison_candidate_needs_comparison(self):
+        record = valid_delivery_record()
+        record["entry"] = "nexus_4909_clothing_physics"
+        errors = bc.validate_delivery_record(record)
+        self.assertTrue(any("asset regression comparison" in e for e in errors))
+
+    def test_unnamed_entry_is_rejected(self):
+        record = valid_delivery_record()
+        del record["entry"]
+        errors = bc.validate_delivery_record(record)
+        self.assertTrue(any("name its collection entry" in e for e in errors))
+
+    def test_non_mapping_record_is_rejected(self):
+        self.assertTrue(bc.validate_delivery_record("wickiup fixed"))
+
+
 if __name__ == "__main__":
     unittest.main()

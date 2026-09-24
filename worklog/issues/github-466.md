@@ -41,6 +41,19 @@ passed session closes it subject to the merge workflow.
   reward, several rewards, long description, modded description) and the
   award-once confirm check with save/fixture details, reported on #466.
 
+## 2026-09-23 agents/actionables-ff8: layout model plus gated tweak
+
+New `plugins/ff8/battle_results_issue_466.py`: help lookup from kernel text
+sections 39/40 slot 1 (current mod edits; Shear Feather 147 verified at
+section 40 record 114), word-wrapping three-column layout with cumulative row
+offsets (no overlap/cutoff), exactly-once award model, and fail-closed
+gating. Registered the `battleResultsHelp` tweak (off, unavailable with
+blocker) in `gameplay_settings.py` plus the Tweaks-list row in `boot.js`, so
+the issue is now visible in the tweaks list. Exe sweep re-confirmed reward
+text lives in data files. Still needs: results-screen drawing hooks plus
+available-space analysis, and the four acceptance renders with award-once
+proof from a game session.
+
 ## 2026-09-23 impl/ff8-actionables: game confirmed FF8, labeled
 
 Verified from the issue body: `Shear Feather` is FF8 item id 147

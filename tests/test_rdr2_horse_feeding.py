@@ -66,5 +66,44 @@ class HorseFeedingTests(unittest.TestCase):
         self.assertTrue(hf.validate_feed_mapping("oats"))
 
 
+def valid_feed_config():
+    return {
+        "substitution_point": "func_454_magnitude_only",
+        "allowlist_extension": ["HASH_OAT_CAKES", "HASH_HERB_SAGE"],
+        "items": {"HASH_OAT_CAKES": 10, "HASH_HERB_SAGE": 5},
+    }
+
+
+class FeedConfigTests(unittest.TestCase):
+    def test_valid_feed_config_passes(self):
+        self.assertEqual(hf.validate_feed_config(valid_feed_config()), [])
+
+    def test_unlisted_item_is_rejected(self):
+        config = valid_feed_config()
+        config["items"]["HASH_APPLE"] = 8
+        errors = hf.validate_feed_config(config)
+        self.assertTrue(any("allowlist" in e for e in errors))
+
+    def test_non_positive_magnitude_is_rejected(self):
+        config = valid_feed_config()
+        config["items"]["HASH_OAT_CAKES"] = 0
+        errors = hf.validate_feed_config(config)
+        self.assertTrue(any("positive integer" in e for e in errors))
+
+    def test_wrong_substitution_point_is_rejected(self):
+        config = valid_feed_config()
+        config["substitution_point"] = "after_consumption_watcher"
+        errors = hf.validate_feed_config(config)
+        self.assertTrue(any("func_454" in e for e in errors))
+
+    def test_empty_items_are_rejected(self):
+        config = valid_feed_config()
+        config["items"] = {}
+        self.assertTrue(hf.validate_feed_config(config))
+
+    def test_non_mapping_config_is_rejected(self):
+        self.assertTrue(hf.validate_feed_config("oats"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -63,5 +63,48 @@ class CoreModifierTests(unittest.TestCase):
         self.assertTrue(cm.validate_removal_proposal("zero it all"))
 
 
+def valid_routine_candidate():
+    return {
+        "routine": "engine_decrement_0x1A2B",
+        "binary_fingerprint": "RDR2-1491.50",
+        "decrement_behavior": "per-tick core drain",
+        "term_inputs": ["weight term", "mounted term"],
+        "targets": ["weight term", "mounted term"],
+        "open_unknowns": ["ownership proof owed", "cadence proof owed"],
+    }
+
+
+class RoutineCandidateTests(unittest.TestCase):
+    def test_valid_routine_candidate_passes(self):
+        self.assertEqual(cm.validate_routine_candidate(valid_routine_candidate()), [])
+
+    def test_forecast_routine_is_rejected(self):
+        candidate = valid_routine_candidate()
+        candidate["routine"] = "func_2976"
+        errors = cm.validate_routine_candidate(candidate)
+        self.assertTrue(any("forecast-only" in e for e in errors))
+
+    def test_shared_field_target_is_rejected(self):
+        candidate = valid_routine_candidate()
+        candidate["targets"] = ["Global_49"]
+        errors = cm.validate_routine_candidate(candidate)
+        self.assertTrue(any("shared with trinket/outfit" in e for e in errors))
+
+    def test_missing_term_inputs_is_rejected(self):
+        candidate = valid_routine_candidate()
+        del candidate["term_inputs"]
+        errors = cm.validate_routine_candidate(candidate)
+        self.assertTrue(any("term_inputs" in e for e in errors))
+
+    def test_unowned_cadence_is_rejected(self):
+        candidate = valid_routine_candidate()
+        candidate["open_unknowns"] = ["ownership proof owed"]
+        errors = cm.validate_routine_candidate(candidate)
+        self.assertTrue(any("cadence" in e for e in errors))
+
+    def test_non_mapping_candidate_is_rejected(self):
+        self.assertTrue(cm.validate_routine_candidate("the drain function"))
+
+
 if __name__ == "__main__":
     unittest.main()

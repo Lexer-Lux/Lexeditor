@@ -269,3 +269,124 @@ def build_hext(enabled: bool, modern_controls: bool = False) -> str:
     if not enabled:
         return ""
     return "# Full-screen World Map uses the proved overlay hooks; no guess bytes.\n"
+
+
+# Marker filters and viewport math. These are pure overlay behaviors from the
+# approved interaction policy (shoulder-button filter cycling, free pan/zoom,
+# Center snaps to the player, Confirm describes the selection). They need no
+# native hooks, so they are implemented and tested here.
+MARKER_FILTERS = ("all", "location", "drawPoint", "quest", "vehicle")
+DEFAULT_MARKER_FILTER = "all"
+
+MIN_ZOOM = 1.0
+MAX_ZOOM = 8.0
+DEFAULT_ZOOM = 1.0
+
+
+def cycle_filter(current: str) -> str:
+    """Advance the shoulder-button filter category, wrapping to all."""
+    if current not in MARKER_FILTERS:
+        raise ValueError(
+            f"Full-screen map filter must be one of {', '.join(MARKER_FILTERS)}")
+    return MARKER_FILTERS[
+        (MARKER_FILTERS.index(current) + 1) % len(MARKER_FILTERS)]
+
+
+def filter_markers(markers: list[dict],
+                   active_filter: str = DEFAULT_MARKER_FILTER) -> list[dict]:
+    """Keep markers in the active category; the waypoint always stays visible."""
+    if not isinstance(markers, list):
+        raise ValueError("Full-screen map markers must be a list")
+    if active_filter not in MARKER_FILTERS:
+        raise ValueError(
+            f"Full-screen map filter must be one of {', '.join(MARKER_FILTERS)}")
+    if active_filter == "all":
+        return list(markers)
+    return [marker for marker in markers
+            if marker.get("kind") in (active_filter, "waypoint")]
+
+
+def blank_viewport() -> dict:
+    """Unbiased initial view: origin center, minimum zoom."""
+    return {"centerX": 0.0, "centerY": 0.0, "zoom": DEFAULT_ZOOM}
+
+
+def _clean_number(value, label: str) -> float:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise ValueError(f"Full-screen map {label} must be a number")
+    return float(value)
+
+
+def _clean_viewport(viewport: dict) -> dict:
+    if not isinstance(viewport, dict):
+        raise ValueError("Full-screen map viewport must be an object")
+    zoom = _clean_number(viewport.get("zoom"), "viewport zoom")
+    if not MIN_ZOOM <= zoom <= MAX_ZOOM:
+        raise ValueError(
+            f"Full-screen map viewport zoom must be from {MIN_ZOOM} to {MAX_ZOOM}")
+    return {
+        "centerX": _clean_number(viewport.get("centerX"), "viewport centerX"),
+        "centerY": _clean_number(viewport.get("centerY"), "viewport centerY"),
+        "zoom": zoom,
+    }
+
+
+def pan_viewport(viewport: dict, dx: float, dy: float) -> dict:
+    """Move the view by a world-space delta; panning is free and unbounded."""
+    cleaned = _clean_viewport(viewport)
+    cleaned["centerX"] += _clean_number(dx, "viewport pan dx")
+    cleaned["centerY"] += _clean_number(dy, "viewport pan dy")
+    return cleaned
+
+
+def zoom_viewport(viewport: dict, factor: float,
+                  focus_x: float, focus_y: float) -> dict:
+    """Zoom continuously around a focus point, clamped to the zoom range.
+
+    The world point under the focus stays under the focus; only the zoom
+    level and the center move.
+    """
+    cleaned = _clean_viewport(viewport)
+    scale = _clean_number(factor, "viewport zoom factor")
+    if scale <= 0:
+        raise ValueError("Full-screen map viewport zoom factor must be positive")
+    focus = (_clean_number(focus_x, "viewport focus x"),
+             _clean_number(focus_y, "viewport focus y"))
+    old_zoom = cleaned["zoom"]
+    new_zoom = max(MIN_ZOOM, min(MAX_ZOOM, old_zoom * scale))
+    ratio = old_zoom / new_zoom
+    cleaned["centerX"] = focus[0] - (focus[0] - cleaned["centerX"]) * ratio
+    cleaned["centerY"] = focus[1] - (focus[1] - cleaned["centerY"]) * ratio
+    cleaned["zoom"] = new_zoom
+    return cleaned
+
+
+def center_on_player(viewport: dict, x: float, y: float) -> dict:
+    """Snap the view back to the player's current position; zoom is kept."""
+    cleaned = _clean_viewport(viewport)
+    cleaned["centerX"] = _clean_number(x, "player x")
+    cleaned["centerY"] = _clean_number(y, "player y")
+    return cleaned
+
+
+def describe_marker(marker: dict, quest_stage: str | None = None) -> dict:
+    """Confirm-selection text: the marker name plus concise context.
+
+    Context is the marker kind, with the active Journal quest stage appended
+    when one is relevant.
+    """
+    if not isinstance(marker, dict):
+        raise ValueError("Full-screen map marker must be an object")
+    name = marker.get("name")
+    kind = marker.get("kind")
+    if not isinstance(name, str) or not name:
+        raise ValueError("Full-screen map marker needs a non-empty name")
+    if kind not in MARKER_KINDS:
+        raise ValueError(
+            f"Full-screen map marker kind must be one of {', '.join(MARKER_KINDS)}")
+    detail = kind
+    if quest_stage is not None:
+        if not isinstance(quest_stage, str) or not quest_stage:
+            raise ValueError("Full-screen map quest stage must be a non-empty string")
+        detail = f"{kind}; {quest_stage}"
+    return {"title": name, "detail": detail}

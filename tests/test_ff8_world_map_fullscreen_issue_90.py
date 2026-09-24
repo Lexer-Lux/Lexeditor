@@ -60,6 +60,66 @@ class WorldMapFullscreenTests(unittest.TestCase):
                              "location:7")
             self.assertEqual(world_map_fullscreen.load_state(path), state)
 
+    def test_filter_cycles_categories_and_keeps_waypoint(self):
+        order = ["all"]
+        for _ in range(len(world_map_fullscreen.MARKER_FILTERS)):
+            order.append(world_map_fullscreen.cycle_filter(order[-1]))
+        self.assertEqual(order, ["all", "location", "drawPoint", "quest",
+                                 "vehicle", "all"])
+        markers = [
+            {"id": "location:0", "kind": "location"},
+            {"id": "drawPoint:0", "kind": "drawPoint"},
+            {"id": "waypoint", "kind": "waypoint"},
+        ]
+        self.assertEqual(len(world_map_fullscreen.filter_markers(markers)), 3)
+        filtered = world_map_fullscreen.filter_markers(markers, "drawPoint")
+        self.assertEqual([entry["id"] for entry in filtered],
+                         ["drawPoint:0", "waypoint"])
+        with self.assertRaises(ValueError):
+            world_map_fullscreen.cycle_filter("camp")
+        with self.assertRaises(ValueError):
+            world_map_fullscreen.filter_markers(markers, "camp")
+
+    def test_viewport_pan_zoom_and_center(self):
+        viewport = world_map_fullscreen.blank_viewport()
+        moved = world_map_fullscreen.pan_viewport(viewport, 10, -4)
+        self.assertEqual((moved["centerX"], moved["centerY"]), (10.0, -4.0))
+        self.assertEqual(moved["zoom"], world_map_fullscreen.DEFAULT_ZOOM)
+        # The input is untouched: helpers return a new viewport.
+        self.assertEqual(viewport["centerX"], 0.0)
+        zoomed = world_map_fullscreen.zoom_viewport(moved, 2.0, 10.0, -4.0)
+        self.assertEqual(zoomed["zoom"], 2.0)
+        # Zooming around the current center keeps the center fixed.
+        self.assertEqual((zoomed["centerX"], zoomed["centerY"]), (10.0, -4.0))
+        off_center = world_map_fullscreen.zoom_viewport(
+            world_map_fullscreen.blank_viewport(), 2.0, 8.0, 0.0)
+        self.assertEqual((off_center["centerX"], off_center["centerY"]), (4.0, 0.0))
+        clamped = world_map_fullscreen.zoom_viewport(
+            world_map_fullscreen.blank_viewport(), 100.0, 0.0, 0.0)
+        self.assertEqual(clamped["zoom"], world_map_fullscreen.MAX_ZOOM)
+        centered = world_map_fullscreen.center_on_player(zoomed, 3.0, 5.0)
+        self.assertEqual((centered["centerX"], centered["centerY"]), (3.0, 5.0))
+        self.assertEqual(centered["zoom"], 2.0)
+        with self.assertRaises(ValueError):
+            world_map_fullscreen.zoom_viewport(viewport, 0.0, 0.0, 0.0)
+        with self.assertRaises(ValueError):
+            world_map_fullscreen.pan_viewport(viewport, True, 0.0)
+
+    def test_confirm_selection_describes_marker(self):
+        marker = {"id": "location:0", "kind": "location",
+                  "name": "Field return 0", "x": 100, "y": 200}
+        plain = world_map_fullscreen.describe_marker(marker)
+        self.assertEqual(plain, {"title": "Field return 0", "detail": "location"})
+        quest = world_map_fullscreen.describe_marker(
+            marker, quest_stage="White Seed ship: find Edea's house")
+        self.assertEqual(quest["title"], "Field return 0")
+        self.assertIn("location", quest["detail"])
+        self.assertIn("Edea's house", quest["detail"])
+        with self.assertRaises(ValueError):
+            world_map_fullscreen.describe_marker({"kind": "camp", "name": "x"})
+        with self.assertRaises(ValueError):
+            world_map_fullscreen.describe_marker(marker, quest_stage="")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -147,5 +147,53 @@ class InstallationChecklistTests(unittest.TestCase):
         self.assertTrue(ugp.validate_installation_plan("session"))
 
 
+def valid_session_result():
+    return {
+        "build": "dev-9703EA02",
+        "outcomes": {
+            verification: {"verdict": "pass", "evidence": "capture reel A"}
+            for verification in ugp.REQUIRED_VERIFICATIONS
+        },
+    }
+
+
+class SessionResultTests(unittest.TestCase):
+    def test_valid_session_result_passes(self):
+        self.assertEqual(ugp.validate_session_result(valid_session_result()), [])
+
+    def test_failed_verdict_with_evidence_passes(self):
+        result = valid_session_result()
+        result["outcomes"]["dual_wield"] = {
+            "verdict": "fail", "evidence": "missing mesh capture",
+        }
+        self.assertEqual(ugp.validate_session_result(result), [])
+
+    def test_missing_verification_is_rejected(self):
+        result = valid_session_result()
+        del result["outcomes"]["compendium_credit"]
+        errors = ugp.validate_session_result(result)
+        self.assertTrue(any("compendium_credit" in e for e in errors))
+
+    def test_verdict_without_evidence_is_rejected(self):
+        result = valid_session_result()
+        result["outcomes"]["installation"] = {"verdict": "pass", "evidence": "  "}
+        errors = ugp.validate_session_result(result)
+        self.assertTrue(any("evidence" in e for e in errors))
+
+    def test_unknown_verdict_is_rejected(self):
+        result = valid_session_result()
+        result["outcomes"]["installation"]["verdict"] = "mostly"
+        errors = ugp.validate_session_result(result)
+        self.assertTrue(any("pass or fail" in e for e in errors))
+
+    def test_missing_build_is_rejected(self):
+        result = valid_session_result()
+        del result["build"]
+        self.assertTrue(ugp.validate_session_result(result))
+
+    def test_non_mapping_result_is_rejected(self):
+        self.assertTrue(ugp.validate_session_result("done"))
+
+
 if __name__ == "__main__":
     unittest.main()

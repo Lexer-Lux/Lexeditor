@@ -137,3 +137,35 @@ def validate_locker_filter(plan: Mapping) -> list[str]:
                 f"Filter must prove {required}."
             )
     return errors
+
+# Verdicts a completed recovery session may record per case.
+RESULT_VERDICTS = ("pass", "fail")
+
+
+def validate_session_result(result: Mapping) -> list[str]:
+    """Check a completed locker-recovery session's per-case outcomes."""
+    errors: list[str] = []
+    if not isinstance(result, Mapping):
+        return ["Session result must be a mapping."]
+    outcomes = result.get("outcomes")
+    if not isinstance(outcomes, list) or not outcomes:
+        return ["Session result must list one outcome per lost-weapon case."]
+    known = {case["case"] for case in KNOWN_LOST_CASES}
+    for index, outcome in enumerate(outcomes):
+        where = f"outcomes[{index}]"
+        if not isinstance(outcome, Mapping):
+            errors.append(f"{where} must be a mapping.")
+            continue
+        if outcome.get("case") not in known:
+            errors.append(f"{where} must name an evidenced lost-weapon case.")
+        if outcome.get("route") != ACCEPTANCE_ROUTE:
+            errors.append(
+                f"{where} must return through the ordinary locker list."
+            )
+        if outcome.get("verdict") not in RESULT_VERDICTS:
+            errors.append(f"{where} needs a pass or fail verdict.")
+        if outcome.get("verdict") == "pass":
+            for field in ("unequipped", "no_duplication", "evidence"):
+                if not outcome.get(field):
+                    errors.append(f"{where} must record {field}.")
+    return errors

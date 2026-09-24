@@ -73,3 +73,33 @@ def validate_interception_plan(plan: Mapping) -> list[str]:
                 f"Editor UI must keep {rule} until a hook is proven."
             )
     return errors
+
+# Evidence fields a researched native hook candidate must carry per hook
+# property: where the interception point sits and what observation proves
+# the property holds.
+CANDIDATE_EVIDENCE_FIELDS = ("interception_point", "observation")
+
+
+def validate_hook_candidate(candidate: Mapping) -> list[str]:
+    """Check a researched native hook candidate's evidence record."""
+    errors: list[str] = []
+    if not isinstance(candidate, Mapping):
+        return ["Hook candidate must be a mapping."]
+    if candidate.get("native") in (None, ""):
+        errors.append("Hook candidate must name its researched native.")
+    if candidate.get("build_fingerprint") in (None, ""):
+        errors.append(
+            "Hook candidate must name the researched build fingerprint."
+        )
+    evidence = candidate.get("evidence")
+    if not isinstance(evidence, Mapping) or not evidence:
+        return errors + ["Hook candidate must evidence every hook property."]
+    for required in REQUIRED_HOOK_PROPERTIES:
+        record = evidence.get(required)
+        if not isinstance(record, Mapping):
+            errors.append(f"Hook candidate must evidence {required}.")
+            continue
+        for field in CANDIDATE_EVIDENCE_FIELDS:
+            if not record.get(field):
+                errors.append(f"Evidence for {required} must state {field}.")
+    return errors

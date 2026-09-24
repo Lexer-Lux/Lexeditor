@@ -62,3 +62,31 @@ def validate_strand_plan(plan: Mapping) -> list[str]:
                 f"Plan must own the {owned} behavior as an open unknown."
             )
     return errors
+
+# Behaviors a runtime-interface probe must observe and record.
+PROBE_OBSERVATIONS = ("menu_behavior", "progress_behavior", "save_behavior")
+
+
+def validate_interface_probe(probe: Mapping) -> list[str]:
+    """Check a runtime-interface investigation record (#231, #232)."""
+    errors: list[str] = []
+    if not isinstance(probe, Mapping):
+        return ["Interface probe must be a mapping."]
+    if probe.get("interface") in (None, ""):
+        errors.append("Probe must name its runtime-interface approach.")
+    approach = str(probe.get("approach", ""))
+    for rejected in REJECTED_APPROACHES:
+        if rejected in approach:
+            errors.append(
+                f"Approach {approach!r} reuses the rejected {rejected} path."
+            )
+    for observation in PROBE_OBSERVATIONS:
+        if not probe.get(observation):
+            errors.append(f"Probe must record observed {observation}.")
+    if probe.get("visible_strands") != 1:
+        errors.append(
+            "Probe must keep exactly one visible strand per challenge line."
+        )
+    if probe.get("duplicate_entries") is True:
+        errors.append("Duplicate menu entries stay rejected.")
+    return errors

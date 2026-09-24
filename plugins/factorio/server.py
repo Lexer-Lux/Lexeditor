@@ -310,12 +310,13 @@ class Handler(PluginRequestHandler):
                 return
             body = self._body()
             if path == "/api/edit":
-                _require_supported_install()
+                _require_edit_context()
                 kind = body.get("kind")
                 name = body.get("name")
                 if kind not in KINDS or not isinstance(name, str):
                     raise FactorioDataError("Edit must identify one supported prototype")
                 store = _load_store()
+                _require_source_unchanged()
                 changes = store.set_edit(kind, name, body.get("changes", {}))
                 _dirty = _dirty_records(store)
                 self.send_json({

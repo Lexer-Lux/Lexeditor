@@ -106,3 +106,40 @@ def validate_measurement(plan: Mapping) -> list[str]:
 def is_valid(plan: Mapping) -> bool:
     """Return True when the measurement plan passes every structural check."""
     return not validate_measurement(plan)
+
+def validate_session_result(result: Mapping) -> list[str]:
+    """Check a Viking Comb session's recorded before/after readings."""
+    errors: list[str] = []
+    if not isinstance(result, Mapping):
+        return ["result must be a mapping"]
+    interaction = result.get("interaction")
+    if not _non_empty_string(interaction):
+        errors.append("interaction must name the known repeatable interaction")
+    cases = result.get("cases")
+    if not isinstance(cases, list) or not cases:
+        return errors + ["cases must list at least one measured gain"]
+    for index, case in enumerate(cases):
+        where = f"cases[{index}]"
+        if not isinstance(case, Mapping):
+            errors.append(f"{where} must be a mapping")
+            continue
+        amount, social, mission = case.get("amount"), case.get("social"), case.get("mission")
+        if (
+            not isinstance(amount, (int, float))
+            or isinstance(amount, bool)
+            or not isinstance(social, bool)
+            or not isinstance(mission, bool)
+        ):
+            errors.append(f"{where} needs amount, social, and mission flags")
+            continue
+        before, after = case.get("before"), case.get("after")
+        if (
+            not isinstance(before, (int, float)) or isinstance(before, bool)
+            or not isinstance(after, (int, float)) or isinstance(after, bool)
+        ):
+            errors.append(f"{where} must record readable before/after Honor values")
+            continue
+        expected = amount * 2 if is_eligible_gain(amount, social, mission) else amount
+        if after - before != expected:
+            errors.append(f"{where} observed {after - before}, expected {expected}")
+    return errors

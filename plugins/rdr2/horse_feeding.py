@@ -77,3 +77,34 @@ def validate_feed_mapping(plan: Mapping) -> list[str]:
     if magnitudes.get("keeps_item_hash_through_func_739") is not True:
         errors.append("Mapping must keep the item hash through func_739.")
     return errors
+
+def validate_feed_config(config: Mapping) -> list[str]:
+    """Check a per-item feed/bond configuration table.
+
+    Every configured item must join the func_724 allowlist extension, and
+    every magnitude must be a positive integer substituted inside the
+    func_454 checks only.
+    """
+    errors: list[str] = []
+    if not isinstance(config, Mapping):
+        return ["Feed configuration must be a mapping."]
+    items = config.get("items")
+    if not isinstance(items, Mapping) or not items:
+        return ["Feed configuration must map at least one item hash to a magnitude."]
+    allowlist = config.get("allowlist_extension") or []
+    for item_hash, magnitude in items.items():
+        if not isinstance(item_hash, str) or not item_hash.strip():
+            errors.append("Feed items must be named by item hash.")
+            continue
+        if not isinstance(magnitude, int) or isinstance(magnitude, bool) or magnitude <= 0:
+            errors.append(
+                f"Item {item_hash} needs a positive integer bond magnitude."
+            )
+        if item_hash not in allowlist:
+            errors.append(
+                f"Item {item_hash} must join the func_724 allowlist extension; "
+                "a catalog tag alone cannot enroll it."
+            )
+    if config.get("substitution_point") != "func_454_magnitude_only":
+        errors.append("Magnitudes substitute inside func_454 checks only.")
+    return errors

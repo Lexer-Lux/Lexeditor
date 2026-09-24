@@ -78,3 +78,33 @@ def validate_trinket_proposal(plan: Mapping) -> list[str]:
     else:
         errors.append("Proposal must select mod_owned_page or native_tab.")
     return errors
+
+# Verdicts the isolated datastore-injection probe may return. Only a clean
+# pass keeps the native-tab route alive; any failure selects the mod-owned
+# page.
+PROBE_VERDICTS = ("pass", "fail")
+
+
+def validate_probe_result(result: Mapping) -> list[str]:
+    """Check an isolated injection-probe run and its route verdict."""
+    errors: list[str] = []
+    if not isinstance(result, Mapping):
+        return ["Probe result must be a mapping."]
+    checks = result.get("checks") or {}
+    for required in NATIVE_TAB_REQUIREMENTS:
+        if checks.get(required) not in (True, False):
+            errors.append(f"Probe must record {required} as pass or fail.")
+    verdict = result.get("verdict")
+    if verdict not in PROBE_VERDICTS:
+        errors.append("Probe result needs a pass or fail verdict.")
+    elif verdict == "pass":
+        failed = [name for name in NATIVE_TAB_REQUIREMENTS if checks.get(name) is not True]
+        if failed:
+            errors.append(
+                f"Probe cannot pass with failed checks: {', '.join(failed)}."
+            )
+        if result.get("route") != "native_tab":
+            errors.append("A passing probe keeps the native_tab route.")
+    elif result.get("route") != "mod_owned_page":
+        errors.append("A failing probe selects the mod_owned_page route.")
+    return errors
