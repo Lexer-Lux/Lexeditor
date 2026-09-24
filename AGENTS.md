@@ -27,6 +27,27 @@
   File offsets and parser details are not a substitute for user instructions.
 - Do not claim visual acceptance from source, API, or smoke checks.
 
+## Muse for bounded code edits
+
+- Prefer the installed `muse` CLI for small, well-defined code edits to reduce
+  the primary agent's usage. The primary agent owns diagnosis, design, task
+  scope, integration, and final verification. Split complex work into simple
+  edit tasks before giving it to Muse.
+- Use headless execution: `muse exec --workspace C:\Lexeditor --prompt-file
+  <prompt-path> --max-model-steps 20`. Put temporary prompts and output outside
+  the checkout. Use the current checkout path if it differs from this example.
+- Give each task the exact files it may edit, the required behavior, the shared
+  components it must reuse, and the checks it must pass. State what it must
+  preserve. Do not send the whole issue backlog as one task.
+- Muse must not delegate again, widen the task, change unrelated files, commit,
+  merge, push, or change issue status. Avoid concurrent edits to the same files.
+- Review every changed line and run the relevant checks yourself. For UI work,
+  inspect the rendered result and test the interaction. Muse's report is not
+  proof that the task is complete.
+- If Muse stalls or misses the requirement, give it one precise correction or
+  take over the edit. Use direct edits when delegation would cost more work
+  than the change itself. Do not repeat failed attempts without new evidence.
+
 ## GitHub issues are the source of truth
 
 ### Standard plugin issue structure
