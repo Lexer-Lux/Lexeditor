@@ -3158,9 +3158,16 @@
     const joinSections = () => {
       // Newest first, each back into the section it was cut from, so a
       // section cut twice gets its rows back in order.
-      for (const {source, piece} of pieces.reverse()) {
-        const body = source.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body)");
-        const rest = piece.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body)");
+      for (const {source, piece, subSplit} of pieces.reverse()) {
+        const body = source.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body,.settings-subs)");
+        const rest = piece.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body,.settings-subs)");
+        if (subSplit && body && rest) {
+          const continued = rest.querySelector(':scope > [data-lex-continued="true"]');
+          const fields = subSplit.querySelector(":scope > .settings-fields");
+          const moved = continued?.querySelector(":scope > .settings-fields");
+          if (fields && moved) fields.append(...moved.children);
+          continued?.remove();
+        }
         if (body && rest) body.append(...rest.children);
         piece.remove();
         const at = cards.indexOf(piece);
@@ -3168,12 +3175,14 @@
       }
       pieces = [];
     };
-    // A section splits between its rows; a panel between its sections.
+    // A section splits between its rows; a panel between its sections; a
+    // settings card between its subs.
     const splitSection = (card, available) => {
       const panel = card.matches(".lex-detail-panel");
-      if (!panel && !card.matches(".lex-detail-section")) return false;
-      const title = panel ? card.querySelector(":scope > .lex-detail-panel-heading") : card.querySelector(":scope > .lex-detail-section-title");
-      const body = card.querySelector(panel ? ":scope > .lex-detail-panel-body" : ":scope > .lex-detail-section-content");
+      const settings = !panel && card.matches(".settings-section");
+      if (!panel && !settings && !card.matches(".lex-detail-section")) return false;
+      const title = panel ? card.querySelector(":scope > .lex-detail-panel-heading") : settings ? card.querySelector(":scope > h2") : card.querySelector(":scope > .lex-detail-section-title");
+      const body = card.querySelector(panel ? ":scope > .lex-detail-panel-body" : settings ? ":scope > .settings-subs" : ":scope > .lex-detail-section-content");
       const rows = body ? [...body.children] : [];
       if (rows.length < 2) return false;
       const outer = card.getBoundingClientRect(), inner = body.getBoundingClientRect();
@@ -3185,8 +3194,14 @@
         if (above + through + below > available - 1) break;
         keep = index + 1;
       }
-      // One row taller than the page cannot be helped by splitting.
-      if (keep < 1 || keep >= rows.length) return false;
+      // One row taller than the page cannot be helped by splitting between
+      // rows. A settings sub taller than the page splits between its own
+      // fields instead, so one long sub never fails a small window.
+      if (keep >= rows.length) return false;
+      if (keep < 1) {
+        if (!settings) return false;
+        return splitSettingsSub(card, body, rows[0], available, above, below, scale, inner.top);
+      }
       const named = panel ? title?.querySelector(".lex-detail-panel-title") : title;
       const name = (panel ? named?.textContent || "" : [...(title?.childNodes || [])].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join(""))
         .trim().replace(/ \(continued\)$/, "");
@@ -3201,12 +3216,49 @@
         if (copy) copy.textContent = `${name} (continued)`;
         head.querySelectorAll(".lex-detail-panel-icon,.lex-detail-panel-actions,.lex-detail-panel-id,.lex-detail-panel-meta").forEach(node => node.remove());
       } else if (title) {
-        head = element("h3", {class: title.className}, `${name} (continued)`);
+        head = element(title.tagName.toLowerCase(), {class: title.className}, `${name} (continued)`);
       }
       piece.append(...(head ? [head] : []), rest);
       card.after(piece);
       cards.splice(cards.indexOf(card) + 1, 0, piece);
       pieces.push({source: card, piece});
+      return true;
+    };
+    // A settings sub taller than the page keeps its first fields and hands
+    // the rest to a continued sub on the next column, repeating both titles.
+    const splitSettingsSub = (card, body, sub, available, above, below, scale, innerTop) => {
+      const fieldsBox = sub.querySelector(":scope > .settings-fields");
+      const fields = fieldsBox ? [...fieldsBox.children] : [];
+      if (fields.length < 2) return false;
+      const base = (fieldsBox.getBoundingClientRect().top - innerTop) / scale;
+      let keep = 0;
+      for (let index = 0; index < fields.length; index++) {
+        const through = (fields[index].getBoundingClientRect().bottom - fieldsBox.getBoundingClientRect().top) / scale;
+        if (above + base + through + below > available - 1) break;
+        keep = index + 1;
+      }
+      if (keep < 1 || keep >= fields.length) return false;
+      const plain = node => [...(node?.childNodes || [])].filter(entry => entry.nodeType === Node.TEXT_NODE)
+        .map(entry => entry.textContent).join("").trim().replace(/ \(continued\)$/, "");
+      const piece = card.cloneNode(false);
+      piece.classList.add("lex-detail-section-continued");
+      const rest = body.cloneNode(false);
+      const continued = sub.cloneNode(false);
+      continued.dataset.lexContinued = "true";
+      const subHead = sub.querySelector(":scope > h3");
+      if (subHead) continued.append(element(subHead.tagName.toLowerCase(), {class: subHead.className},
+        `${plain(subHead)} (continued)`));
+      const restFields = fieldsBox.cloneNode(false);
+      restFields.append(...fields.slice(keep));
+      continued.append(restFields);
+      rest.append(continued, ...[...body.children].slice(1));
+      const title = card.querySelector(":scope > h2");
+      const head = title ? element(title.tagName.toLowerCase(), {class: title.className},
+        `${plain(title)} (continued)`) : null;
+      piece.append(...(head ? [head] : []), rest);
+      card.after(piece);
+      cards.splice(cards.indexOf(card) + 1, 0, piece);
+      pieces.push({source: card, piece, subSplit: sub});
       return true;
     };
     const paginate = (visible, keepPieces = false) => {
@@ -3241,7 +3293,9 @@
           // Too tall is fixed here: the section goes on in the next column.
           if(why&&options.splitOversized!==false&&card.offsetHeight>scroll.clientHeight+1&&card.scrollWidth<=card.clientWidth+1&&splitSection(card,scroll.clientHeight))
             return paginate(cards.filter(entry=>!entry.hidden),true);
-          if(why)throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title,h2')?.textContent||card.textContent.slice(0,80)} - ${why}`);
+          // A failed fit must still leave every setting reachable: the page
+          // falls back to one scrolling column behind the thrown guard.
+          if(why){scroll.style.overflowY="auto";throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title,h2')?.textContent||card.textContent.slice(0,80)} - ${why}`);}
         }
       }
       const count=columnCount(visible.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
@@ -3317,6 +3371,7 @@
         replacement?.focus();
         if (selection && selection[0] !== null) replacement?.setSelectionRange(...selection);
       }
+      scroll.style.overflowY = overflows() ? "auto" : "hidden";
     };
 
     const turn = value => {page = value; render(); scroll.scrollTop = 0;};
