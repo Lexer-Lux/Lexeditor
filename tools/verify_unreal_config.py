@@ -115,5 +115,57 @@ class LifecycleTests(unittest.TestCase):
             apply_settings("ff7r", self.project, {"r.EyeAdaptationQuality": 0})
 
 
+class SharedWiringTests(unittest.TestCase):
+    def test_one_shared_panel_serves_both_pages(self):
+        root = Path(__file__).resolve().parents[1]
+        shared = root / "ui" / "unreal-config.js"
+        self.assertTrue(shared.is_file())
+        self.assertIn("window.LexeditorUnrealConfig={createPanel}",
+                      shared.read_text(encoding="utf-8"))
+        for plugin in ("ff7r", "ff7r2"):
+            page = (root / "plugins" / plugin / "editor.html").read_text(encoding="utf-8")
+            self.assertEqual(page.count("/shared/unreal-config.js"), 1)
+            editor = (root / "plugins" / plugin / "editor.js").read_text(encoding="utf-8")
+            self.assertIn("LexeditorUnrealConfig.createPanel", editor)
+            self.assertNotIn("ENGINE CONFIG", editor)
+            self.assertFalse((root / "plugins" / plugin / "unreal_config.py").exists())
+
+    def test_both_services_reuse_the_shared_editor(self):
+        root = Path(__file__).resolve().parents[1]
+        for plugin in ("ff7r", "ff7r2"):
+            server = (root / "plugins" / plugin / "server.py").read_text(encoding="utf-8")
+            self.assertIn("import unreal_config", server)
+            for route in ("/api/unreal-config", "/api/unreal-config/apply",
+                          "/api/unreal-config/default", "/api/unreal-config/reset",
+                          "/api/unreal-config/refresh"):
+                self.assertIn(route, server)
+
+    def test_remake_reports_its_unlocker_exception(self):
+        server = (Path(__file__).resolve().parents[1]
+                  / "plugins" / "ff7r" / "server.py").read_text(encoding="utf-8")
+        self.assertIn("iniUnlocker", server)
+        self.assertIn("detect_ini_unlocker", server)
+        self.assertIn('"unreal-config"', server)
+
+    def test_reset_keeps_sibling_group_entries(self):
+        from plugins.ff7r import graphics_tweaks
+
+        with tempfile.TemporaryDirectory() as temp_name:
+            root = Path(temp_name)
+            project = root / "project"
+            ini = root / "ff7r.ini"
+            os.environ["LEXEDITOR_FF7R_ENGINE_INI"] = str(ini)
+            self.addCleanup(os.environ.pop, "LEXEDITOR_FF7R_ENGINE_INI")
+            ini.write_text("[SystemSettings]\n", encoding="utf-8")
+            ini.write_text(graphics_tweaks.apply_managed_block(
+                ini.read_text(encoding="utf-8")), encoding="utf-8")
+            apply_settings("ff7r", project, {"r.BloomQuality": 3})
+            result = reset_all("ff7r", project)
+            text = ini.read_text(encoding="utf-8")
+            self.assertIn("r.EyeAdaptationQuality=0", text)
+            self.assertNotIn("r.BloomQuality=3", text)
+            self.assertEqual(result["overrides"], {"r.EyeAdaptationQuality": "0"})
+
+
 if __name__ == "__main__":
     unittest.main()

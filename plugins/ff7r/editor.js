@@ -313,9 +313,16 @@
   // in as many columns as the window allows, which is the shape RDR2 uses. No
   // subtab bar to walk, no dropdown to pick a group from, and no load between
   // reading one switch and the next.
+  // Engine Config (shared Unreal editor, issue 478): the panel lives in
+  // /shared/unreal-config.js; this page only mounts it beside the tweak cards.
+  const enginePanel=LexeditorUnrealConfig.createPanel({route:"/api/unreal-config",rerender:()=>render()});
   function tweaksPanel(){
     const list=tweakAssets();
-    if(!list.length)return loadingPanel("Tweaks","No Lexeditor tweak groups were found in the catalog.");
+    // Engine Config edits Engine.ini directly and needs no catalog entry, so
+    // it stays usable even when the catalog yields no tweak groups.
+    if(!list.length)return LexeditorUI.stack(
+      loadingPanel("Tweaks","No Lexeditor tweak groups were found in the catalog."),
+      enginePanel.element());
     if(!state.tweaks||(!Object.keys(state.tweaks).length&&state.tweaksPending))
       return loadingPanel("Loading tweaks",`Reading ${state.tweaksPending} tweak group${state.tweaksPending===1?"":"s"}…`);
     if(state.tweaksError&&!Object.keys(state.tweaks).length)return errorPanel(state.tweaksError);
@@ -324,6 +331,7 @@
       el("h3",{},`${state.tweaksPending} more group${state.tweaksPending===1?"":"s"} still reading`),
       el("p",{},"These take longer to read than the rest and will appear here when they arrive.")));
     cards.push(LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade,act:actReshade}));
+    cards.push(enginePanel.element());
     return LexeditorUI.stack(
       LexeditorUI.settingsColumns(cards,{className:"ff7r-tweaks"}));
   }
@@ -758,6 +766,7 @@
     }
     else if(tab==="tweaks"){
       if(!state.reshade)await loadReshade();
+      await enginePanel.ensure();
       if(!state.tweaks)await loadAllTweaks();else render();
     }
     else if(tab==="misc"){

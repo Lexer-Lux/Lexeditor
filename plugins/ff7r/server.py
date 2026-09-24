@@ -21,6 +21,7 @@ from .encounter_tweaks import (
 from .graphics_tweaks import (
     config_path as graphics_config_path,
     deploy_graphics_tweaks,
+    detect_ini_unlocker,
     graphics_status,
 )
 from .lockon_tweaks import (
@@ -60,6 +61,7 @@ from .storage import load_package, save_edits
 from .text_storage import load_text_package, resident_text_map, save_text_edits
 from .tooling import FF7R_MOUNT_POINT, helper_status, pack_directory
 from plugin_http import PluginRequestHandler
+import unreal_config  # shared Unreal Engine config editor (issue 478)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -80,6 +82,14 @@ for _kind, _item_prop, _chance_prop, _quantity_prop in LOOT_FIELD_PAIRS:
         LOOT_GENERIC_FIELDS[_chance_prop] = (_kind, "chance")
     if _quantity_prop:
         LOOT_GENERIC_FIELDS[_quantity_prop] = (_kind, "quantity")
+
+
+def unreal_with_unlocker(report: dict) -> dict:
+    """Attach live INI-unlocker evidence to a shared-editor status report."""
+    unlocker = detect_ini_unlocker(GAME_ROOT)
+    report["iniUnlocker"] = {"verified": unlocker["verified"],
+                             "candidatePresent": unlocker["candidatePresent"]}
+    return report
 
 
 def catalog(*, refresh: bool = False) -> dict:
@@ -266,6 +276,21 @@ def data_map_payload() -> dict:
             "config is accepted only for migration and stripped from canonical runtime configuration."
         ),
         "coverage": "view",
+        "status": "partial",
+    })
+    rows.append({
+        "filename": "Documents/My Games/FINAL FANTASY VII REMAKE/Saved/Config/WindowsNoEditor/Engine.ini",
+        "target": "tweaks",
+        "controls": (
+            "Shared Unreal Engine config settings as typed controls, with Use game default and reset-all. "
+            "Eye adaptation stays owned by the Graphics Tweaks group."
+        ),
+        "notes": (
+            "Overrides load only with a verified INI unlocker next to ff7remake_.exe; every setting stays "
+            "marked unverified until in-game effect proof. Values read from the file are observed values, "
+            "never effective game values. (#478)"
+        ),
+        "coverage": "structured",
         "status": "partial",
     })
     return {"rows": rows}
@@ -500,7 +525,7 @@ class Handler(PluginRequestHandler):
                     "capabilities": [
                         "data-map", "dataobject", "text-resource", "economy",
                         "enemy-loot", "minimap-visibility", "runtime-config", "native-probe",
-                        "encounter-tweaks", "graphics-tweaks", "no-more-cheats", "better-lockon", "save", "economy-save",
+                        "encounter-tweaks", "graphics-tweaks", "unreal-config", "no-more-cheats", "better-lockon", "save", "economy-save",
                         "enemy-loot-save", "minimap-visibility-save", "text-save", "build",
                         "deploy", "deploy-remove", "runtime-deploy", "graphics-deploy",
                     ],
@@ -519,6 +544,9 @@ class Handler(PluginRequestHandler):
                 return self.send_json(probe_installed_exe(GAME_ROOT))
             if path == "/api/graphics":
                 return self.send_json(graphics_status(GAME_ROOT, PROJECT_ROOT))
+            if path == "/api/unreal-config":
+                return self.send_json(unreal_with_unlocker(
+                    unreal_config.status("ff7r", PROJECT_ROOT)))
             if path == "/api/data":
                 asset = (query.get("asset") or [""])[0]
                 if not asset:
@@ -560,7 +588,8 @@ class Handler(PluginRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         try:
-            if os.environ.get("LEXEDITOR_MOD_READ_ONLY") == "1" and (path == "/api/save" or path.endswith("/save")):
+            if os.environ.get("LEXEDITOR_MOD_READ_ONLY") == "1" and (path == "/api/save" or path.endswith("/save")
+                    or path.startswith("/api/unreal-config/")):
                 return self.send_json({"error": "This mod updates automatically. Make an editable copy to keep your changes."}, status=403)
             payload = self.read_json()
             if path == "/api/save":
@@ -626,6 +655,24 @@ class Handler(PluginRequestHandler):
                 return self.send_json(deploy_runtime(GAME_ROOT, PROJECT_ROOT))
             if path == "/api/graphics/deploy":
                 return self.send_json(deploy_graphics_tweaks(GAME_ROOT, PROJECT_ROOT))
+            if path == "/api/unreal-config/apply":
+                values = payload.get("values")
+                if not isinstance(values, dict):
+                    raise ValueError("values must be an object")
+                return self.send_json({"result": unreal_with_unlocker(
+                    unreal_config.apply_settings("ff7r", PROJECT_ROOT, values))})
+            if path == "/api/unreal-config/default":
+                key = payload.get("key")
+                if not isinstance(key, str) or not key:
+                    raise ValueError("key must be a non-empty string")
+                return self.send_json({"result": unreal_with_unlocker(
+                    unreal_config.use_game_default("ff7r", PROJECT_ROOT, key))})
+            if path == "/api/unreal-config/reset":
+                return self.send_json({"result": unreal_with_unlocker(
+                    unreal_config.reset_all("ff7r", PROJECT_ROOT))})
+            if path == "/api/unreal-config/refresh":
+                return self.send_json({"result": unreal_with_unlocker(
+                    unreal_config.refresh_snapshot("ff7r", PROJECT_ROOT))})
             if path == "/api/text/save":
                 asset = str(payload.get("asset", ""))
                 edits = payload.get("edits", [])
@@ -646,7 +693,8 @@ class Handler(PluginRequestHandler):
             if path == "/api/deploy/remove":
                 return self.send_json(remove_deployed_pak(GAME_ROOT))
             return self.send_json({"error": "Not found"}, 404)
-        except (ValueError, KeyError, IndexError, TypeError, FileNotFoundError) as error:
+        except (ValueError, KeyError, IndexError, TypeError, FileNotFoundError,
+                unreal_config.ExternalEditError) as error:
             return self.send_json({"error": str(error)}, 400)
         except Exception as error:
             return self.send_json({"error": str(error)}, 500)
