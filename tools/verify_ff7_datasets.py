@@ -13,7 +13,6 @@ import struct
 import sys
 import tempfile
 import threading
-import types
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
@@ -26,14 +25,15 @@ from plugins.ff7.datasets import (
     CATEGORIES, INITIAL_FIELDS, LIMIT_FIELDS, Kernel, load_datasets, save_datasets,
 )
 
-# Isolate unrelated host/game services; the real configuration parser/writer
-# and the real FF7 HTTP handler run below.
-with patch.dict(sys.modules, {
-    "theme_sounds": types.SimpleNamespace(ensure_theme_sounds=lambda *a, **k: {"rows": []}, sound_file=lambda *a: None),
-    "process_probe": types.SimpleNamespace(live_processes=lambda *a: []),
-}):
-    from plugins.ff7 import server
-    import platform_config
+# Import the real configuration parser/writer and the real FF7 HTTP handler.
+# Do not fake modules at import time: patch.dict(sys.modules) deletes every
+# module added inside its block on exit, orphaning server/game_font/fontTools
+# (later `from plugins.ff7 import game_font` binds the orphan via the package
+# attribute without re-registering it, so two fontTools class universes
+# coexist and isinstance checks inside fontTools fail). Tests needing doubles
+# patch at test time instead.
+from plugins.ff7 import server
+import platform_config
 
 PATHS = (Path("data/lang-en/kernel/KERNEL.BIN"), Path("ff7/workingdir/data/lang-en/kernel/kernel.bin"))
 COUNTS = {"commands": 32, "playerAttacks": 128, "items": 128, "weapons": 128, "armor": 32, "accessories": 32, "materia": 96}
