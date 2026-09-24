@@ -181,3 +181,13 @@ binary or extracted game data is bundled.
 - Hades Workshop `Source/Enemies.h` (audited rev `7bd24784`) researched for attack category/type semantics: its abstracted spell model does not map onto the Steam AA_DATA record, so nothing was adopted; no Hades source copied (GPL). Pinned Memoria Data dir audited: Battle/ holds only the 4 already-integrated CSVs, so no further agent-derivable enemy/encounter sources exist outside raw16.
 - Data Map: new rows integrated/openable under Enemies/Encounters tabs; p0data2 gap note updated; openable/editable-vs-closed/gap distinction locked by new contract tests. Battle geometry/mesh/effect gap remains and still needs Lexer's pursue-or-exclude call (#522).
 - Verification: FF9 pytest 167 passed, node 21 passed, smoke/check/credits/features/browser all green. Installed-game battle proof still needs Lexer (unchanged checklist).
+
+## 2026-09-24 --- agents/actionables-ff9 merged (PR #563), flipped to waiting
+
+- Branch verified green in its own area before merge: 167 FF9 pytest passed,
+  21 node passed; Source/contract/integration/regression pass on the PR.
+  Shard + Shared-UI-visual failures are the pre-existing set failing identically
+  on master and merged PRs #561/#562 (verified: zero FF9 verifiers among them,
+  no dangling references from the unreal-config removal).
+- Posted the Lexer checklist (per-family pursue-or-exclude + installed-game
+  battle proof) and swapped `actionable` for `waiting`.

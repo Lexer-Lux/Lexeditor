@@ -44,3 +44,11 @@ Exact Lexer needs per issue:
 - #515 (Theme): inspect the theme in the running game once a candidate is ready.
 - #516 (GUI): confirm desktop, 900x620, and 150 percent-scale rendering against exact-head screenshots on the real setup.
 - #307 (Plugin): full real-install acceptance checklist above, including one reversible Runtime Override change verified in the running game and then reverted.
+
+## 2026-09-23 bannerlord implementer session (PR #552)
+
+- Branch `impl/bannerlord-plugin` from master at `5de3c63c`; plugin code itself needed no changes (merged via #453).
+- Found the Bannerlord UI audit red on master (run 35925722290, `exercise_table` timeout on gauntlet-widgets search-clear). Root cause: `fill("")` straddles the pager search's synchronous node replacement and delivers no input event. Fixed the audit to clear via click + select-all + Backspace; no product code touched.
+- Verified at `156c9412`: audit 57 checks zero errors (twice), 6/6 direct-nav clear stress, 208 pytest pass, browser + scoped Data Map + coverage checks pass.
+- Opened PR #552 (test-only). All five issues left `actionable` with exact blockers commented: installed game needed for acceptance (#307), safe-editing proof (#513), real public mods (#514), in-game theme look (#515), real-setup layout confirmation (#516).
+- Side observation: the current-master UI compatibility job fails fetching origin/master (non-fast-forward); CI harness state, not Bannerlord code.

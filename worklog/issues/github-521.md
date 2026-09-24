@@ -46,3 +46,10 @@ completion.
 
 - Implemented enemy-attack + battle-flag structured editing on this branch (see github-74.md); Data Map editable/placeholder distinction extended and contract-tested. `ui/credits.json` regenerated (it embeds the updated THIRD_PARTY.md citations).
 - No scope change for #522 (still waiting on Lexer per-family decisions for battle geometry/assets and other p0data gaps) or #523/#524/#525 (human checklists stand). Parent stays actionable and must not be merge-closed.
+
+## 2026-09-24 --- agents/actionables-ff9 merged (PR #563), parent flipped to waiting
+
+- Last per-game branch merged after own-area verification (see github-74.md).
+- Subissues: #522 `waiting`, #523/#524/#525 `untested`. Posted the parent
+  checklist (all four subissue verifications, then the parent can close) and
+  swapped `actionable` for `waiting`. 0 actionable / 0 open PRs repo-wide.
