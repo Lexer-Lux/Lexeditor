@@ -34,7 +34,12 @@ def test_descenders_fit_list_cells(page):
     lexend(page)
     page.evaluate("""() => {
       document.querySelector('main').append(LexeditorUI.columnList({
-        columns: [{key: 'id', label: 'ID', numberedId: true}, {key: 'name', label: 'Name'}],
+        // FF7's master list renders names as bare custom spans, not the
+        // padded .lex-column-cell-text wrapper bare strings get. That is
+        // the cell that sheared Tiger Fang's g's.
+        columns: [{key: 'id', label: 'ID', numberedId: true},
+                  {key: 'name', label: 'Name',
+                   render: row => LexeditorUI.el('span', {title: row.name}, row.name)}],
         rows: [{id: 20, name: 'Tiger Fang'}, {id: 14, name: 'Ragnarok'},
                {id: 22, name: 'Dragon Claw'}, {id: 8, name: 'Mythril Claw'}],
       }));

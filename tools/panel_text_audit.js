@@ -54,6 +54,19 @@
         ink: Math.round(ink.height * 10) / 10, box: height,
       });
     }
+    // Canvas ink misses tight-line-box clipping: Tiger Fang's glyphs clear
+    // the 1em line box on paper while pixels shear off in the real page. The
+    // scroll box is the ground truth for text-only holders; form controls
+    // size their own boxes and are excluded.
+    const plain = !run.box.querySelector("input,select,textarea,.lex-source-control")
+      && !run.box.matches("input,select,textarea,.lex-source-control");
+    if (plain && run.box.scrollHeight - run.box.clientHeight > 1
+        && !findings.some(finding => finding.axis === "vertical")) {
+      findings.push({
+        axis: "vertical", text: run.text.slice(0, 40),
+        ink: run.box.scrollHeight, box: run.box.clientHeight,
+      });
+    }
     if (horizontal) {
       const width = run.box.clientWidth
         - parseFloat(run.style.paddingLeft) - parseFloat(run.style.paddingRight);

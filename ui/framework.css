@@ -2212,6 +2212,14 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   white-space:nowrap;
 }
 
+/* The 1em line box hugs the glyphs for cross-font centring, so a bare
+   custom span shears descenders (Tiger Fang's g's) against its own clip
+   box. Same .14em of descender room the wrapped .lex-column-cell-text
+   already carries; controls size their own boxes and are excluded. */
+.lex-column-list-cell .lex-column-cell-content > span:not(.lex-source-control) {
+  padding-block:.14em;
+}
+
 .lex-column-list-cell:has(input[type="checkbox"]) .lex-source-control > input[type="checkbox"] {
   justify-self:center;
 }
