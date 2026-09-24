@@ -2163,6 +2163,29 @@
     formulaText.setAttribute("dy", "-7");
     const mathematical = options.formula?.classList?.contains("lex-math-formula");
     const mathOverlay = mathematical ? options.formula.cloneNode(true) : null;
+    const mathSource = mathOverlay?.querySelector(":scope > math");
+    const mathAtoms = [];
+    if (mathSource) {
+      mathOverlay.classList.add("lex-curve-math-follow");
+      mathOverlay.setAttribute("role", "img");
+      mathOverlay.setAttribute("aria-label", options.formula.title || mathSource.getAttribute("aria-label") || mathSource.textContent);
+      mathSource.classList.add("lex-curve-math-source");
+      mathSource.setAttribute("aria-hidden", "true");
+      const addAtom = source => {
+        if (source.localName === "mrow") {
+          [...source.children].forEach(addAtom);
+          return;
+        }
+        // Fractions and powers stay whole; splitting their descendants would
+        // lose the mathematical grouping. Ordinary terms turn independently.
+        const math = document.createElementNS(mathSource.namespaceURI, "math");
+        math.append(source.cloneNode(true));
+        const visual = element("span", {class:"lex-curve-math-atom", "aria-hidden":"true"}, math);
+        mathOverlay.append(visual);
+        mathAtoms.push({source, visual});
+      };
+      [...mathSource.children].forEach(addAtom);
+    }
     if (mathematical) formulaText.style.display = "none";
     const formulaPath = document.createElementNS(svgNamespace, "textPath");
     // Glyphs on a textPath rotate to the LOCAL segment slope. On a nearly
@@ -2540,13 +2563,42 @@
       if (!mathOverlay || !root.isConnected || !line.getAttribute("d")) return;
       const length = line.getTotalLength(), matrix = svg.getScreenCTM();
       if (!length || !matrix) return;
+      const bounds = plot.getBoundingClientRect(), scale = bounds.width / plot.offsetWidth || 1;
+      if (mathSource) {
+        const overlayBounds = mathOverlay.getBoundingClientRect();
+        const unit = Math.hypot(matrix.a, matrix.b) / scale;
+        if (!unit) return;
+        mathOverlay.style.removeProperty("font-size");
+        const available = length * unit * .8;
+        const naturalWidth = mathSource.getBoundingClientRect().width / scale;
+        if (naturalWidth > available) {
+          const size = parseFloat(getComputedStyle(mathOverlay).fontSize);
+          mathOverlay.style.fontSize = `${size * available / naturalWidth}px`;
+        }
+        const sourceBounds = mathSource.getBoundingClientRect();
+        for (const {source, visual} of mathAtoms) {
+          const box = source.getBoundingClientRect();
+          const offset = (box.left + box.width / 2 - sourceBounds.left - sourceBounds.width / 2) / scale;
+          const distance = Math.max(0, Math.min(length, length / 2 + offset / unit));
+          const delta = Math.max(.1, Math.min(2, box.width / scale / unit / 4));
+          const sample = at => {
+            const point = line.getPointAtLength(Math.max(0, Math.min(length, at)));
+            return new DOMPoint(point.x, point.y).matrixTransform(matrix);
+          };
+          const center = sample(distance), before = sample(distance - delta), after = sample(distance + delta);
+          const angle = Math.atan2(after.y - before.y, after.x - before.x);
+          visual.style.left = `${(center.x - overlayBounds.left) / scale + Math.sin(angle) * 7}px`;
+          visual.style.top = `${(center.y - overlayBounds.top) / scale - Math.cos(angle) * 7}px`;
+          visual.style.setProperty("--lex-formula-angle", `${angle * 180 / Math.PI}deg`);
+        }
+        return;
+      }
       const point = ratio => {
         const value = line.getPointAtLength(length * ratio);
         return new DOMPoint(value.x,value.y).matrixTransform(matrix);
       };
       const center = point(.5), before = point(.47), after = point(.53);
       const angle = Math.max(-40,Math.min(40,Math.atan2(after.y-before.y,after.x-before.x)*180/Math.PI));
-      const bounds = plot.getBoundingClientRect(), scale = bounds.width / plot.offsetWidth || 1;
       mathOverlay.style.left = `${(center.x-bounds.left)/scale}px`;
       mathOverlay.style.top = `${(center.y-bounds.top)/scale-7}px`;
       mathOverlay.style.setProperty("--lex-formula-angle",`${angle}deg`);
@@ -2561,6 +2613,7 @@
       const observer = new ResizeObserver(positionMath);
       observer.observe(plot);
     }
+    if (mathOverlay) document.fonts?.ready.then(positionMath);
 
     const draw = () => {
       const bounds=svg.getBoundingClientRect();

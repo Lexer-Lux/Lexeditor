@@ -3795,6 +3795,11 @@ body:has(.lex-data-map-table) #main {
 .lex-math-formula > math { font-family:inherit; font-size:inherit; }
 .lex-math-formula > small { font-size:10px; text-align:center; }
 .lex-curve-plot > .lex-math-formula { position:absolute; z-index:3; max-width:calc(100% - 42px); transform:translate(-50%,-100%) rotate(var(--lex-formula-angle,0deg)); transform-origin:center bottom; color:var(--lex-text); filter:drop-shadow(1px 1px 1px var(--lex-panel)); pointer-events:none; }
+.lex-curve-plot > .lex-curve-math-follow { inset:0; display:block; max-width:none; transform:none; overflow:clip; }
+.lex-curve-math-source { position:absolute; left:0; top:0; width:max-content; visibility:hidden; }
+.lex-curve-math-atom { position:absolute; display:block; width:max-content; transform:translate(-50%,-100%) rotate(var(--lex-formula-angle)); transform-origin:center bottom; }
+.lex-curve-math-atom > math { font:inherit; }
+.lex-curve-math-follow > small { position:absolute; top:6px; left:50%; transform:translateX(-50%); max-width:90%; }
 .lex-curve-formula { display:none; }
 .lex-curve-guide { stroke:var(--lex-accent); stroke-width:1.5; stroke-dasharray:3 3; pointer-events:none; }
 .lex-curve-guide:not([x1]),.lex-curve-point-marker:not([d]) { display:none; }
