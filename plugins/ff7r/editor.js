@@ -371,7 +371,13 @@
     state.tweaksBusy=false;
     state.tweaksPending=list.length;
     render();
-    await Promise.all(list.map(async item=>{
+    // Two groups at a time. Every group used to fire at once, and the slow
+    // ones each re-scan the installed game, so one Tweaks open ran seventeen
+    // concurrent full-game scans, peaked past 5GB, and starved the host until
+    // the whole program looked frozen. Groups still appear as they arrive and
+    // the pending card counts down as before; the server additionally caches
+    // each installed-input scan, so repeat opens do not rescan at all.
+    const loadOne=async item=>{
       try{
         const data=await api(`/api/data?asset=${encodeURIComponent(item.asset)}${sourceSuffix()}&language=${encodeURIComponent(state.textLanguage||"US")}`);
         state.tweaks[item.asset]={item,data,baseline:clone(data)};
@@ -380,7 +386,12 @@
         state.tweaksPending=Math.max(0,(state.tweaksPending||1)-1);
         if(state.tab==="tweaks")render();
       }
-    }));
+    };
+    let next=0;
+    const workers=Array.from({length:Math.min(2,list.length)},async()=>{
+      while(next<list.length){const item=list[next++];await loadOne(item)}
+    });
+    await Promise.all(workers);
     state.tweaksPending=0;render();refreshShell()
   }
   function tweakEditGroups(){

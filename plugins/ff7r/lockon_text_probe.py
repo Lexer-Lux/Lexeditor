@@ -65,6 +65,31 @@ def discover_lockon_prompt_texts(
     anchor_language: str = ANCHOR_LANGUAGE,
 ) -> dict[str, Any]:
     """Find one English prompt ID, then correlate that ID across languages."""
+    from .scan_cache import cached, index_fingerprint
+
+    # The Better Lock-on group and its save path each re-correlated prompt IDs
+    # across every installed Resident text language. Vanilla inputs are fixed
+    # per index signature, so the evidence is cached on it.
+    wanted = str(anchor_language).upper()
+    if not index.get("signatureId"):
+        return _discover_lockon_prompt_texts(
+            game_root, data_root, project_root, index,
+            anchor_language=wanted)
+    return cached(("lockon-prompt-texts", index.get("signatureId"),
+                   index_fingerprint(index, text=True), wanted),
+                  lambda: _discover_lockon_prompt_texts(
+                      game_root, data_root, project_root, index,
+                      anchor_language=wanted))
+
+
+def _discover_lockon_prompt_texts(
+    game_root,
+    data_root,
+    project_root,
+    index: dict,
+    *,
+    anchor_language: str = ANCHOR_LANGUAGE,
+) -> dict[str, Any]:
     anchor_language = str(anchor_language).upper()
     resources = [
         row for row in index.get("textAssets", ())

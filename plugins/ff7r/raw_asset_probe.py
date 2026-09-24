@@ -220,6 +220,13 @@ def extract_object_evidence(
     }
 
 
+def _pak_signature(game_root: Path) -> tuple:
+    return tuple(sorted(
+        (pak.name, pak.stat().st_size, pak.stat().st_mtime_ns)
+        for pak in installed_paks(game_root)
+    ))
+
+
 def probe_installed_assets(
     game_root: Path,
     *,
@@ -227,6 +234,28 @@ def probe_installed_assets(
     interesting_tokens: Iterable[str] = DEFAULT_INTERESTING_TOKENS,
 ) -> dict:
     """Find and inspect installed matching cooked assets without modifying them."""
+    from .scan_cache import cached
+
+    root = Path(game_root).resolve()
+    wanted_terms = tuple(terms)
+    wanted_tokens = tuple(interesting_tokens)
+    # Every probe re-listed and re-scanned every installed PAK. The installed
+    # archives do not change under a running editor; the per-PAK size/mtime
+    # signature invalidates the entry if one ever does.
+    return cached(
+        ("installed-assets", str(root), _pak_signature(root),
+         wanted_terms, wanted_tokens),
+        lambda: _scan_installed_assets(
+            root, terms=wanted_terms, interesting_tokens=wanted_tokens),
+    )
+
+
+def _scan_installed_assets(
+    game_root: Path,
+    *,
+    terms: Iterable[str],
+    interesting_tokens: Iterable[str] = DEFAULT_INTERESTING_TOKENS,
+) -> dict:
     game_root = Path(game_root).resolve()
     listings: list[tuple[str, list[str]]] = []
     pak_paths: dict[str, Path] = {}

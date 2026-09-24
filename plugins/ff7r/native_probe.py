@@ -670,9 +670,19 @@ def probe_bytes(data: bytes, *, needles: Iterable[str] = DEFAULT_NEEDLES) -> dic
 
 
 def probe_installed_exe(game_root: Path, *, needles: Iterable[str] = DEFAULT_NEEDLES) -> dict:
+    from .scan_cache import cached
+
     exe = Path(game_root) / EXE_RELATIVE_PATH
     if not exe.is_file():
         raise FileNotFoundError(f"FF7R executable was not found: {exe}")
-    data = exe.read_bytes()
-    result = probe_bytes(data, needles=needles)
-    return {"path": str(exe), "size": len(data), **result}
+    stat = exe.stat()
+    wanted = tuple(needles)
+
+    def compute() -> dict:
+        data = exe.read_bytes()
+        return {"path": str(exe), "size": len(data), **probe_bytes(data, needles=wanted)}
+
+    # Every native probe re-scanned the installed executable (ten-plus seconds
+    # each). The executable does not change under a running editor.
+    return cached(("installed-exe", str(exe.resolve()), stat.st_size,
+                   stat.st_mtime_ns, wanted), compute)

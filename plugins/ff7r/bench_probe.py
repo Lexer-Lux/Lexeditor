@@ -269,7 +269,22 @@ def _object_table_evidence(data: bytes, path: str) -> dict:
     }
 
 
+def _pak_signature(game_root: Path) -> tuple:
+    return tuple(sorted(
+        (pak.name, pak.stat().st_size, pak.stat().st_mtime_ns)
+        for pak in installed_paks(game_root)
+    ))
+
+
 def probe_chapter3_bench(game_root: Path) -> dict:
+    from .scan_cache import cached
+
+    root = Path(game_root).resolve()
+    return cached(("chapter3-bench-report", str(root), _pak_signature(root)),
+                  lambda: _probe_chapter3_bench(root))
+
+
+def _probe_chapter3_bench(game_root: Path) -> dict:
     game_root = Path(game_root).resolve()
     selected: dict[str, dict] = {}
     errors: list[str] = []

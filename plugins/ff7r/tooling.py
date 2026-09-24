@@ -262,8 +262,26 @@ def _command(*args: str, binary: bool = False) -> subprocess.CompletedProcess:
 
 
 def list_pak(pak: Path) -> list[str]:
-    result = _command("list", "--strip-prefix", FF7R_MOUNT_POINT, str(Path(pak)))
-    return [line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()]
+    from .scan_cache import cached
+
+    target = Path(pak)
+    try:
+        stat = target.stat()
+    except OSError:
+        stat = None
+    key = ("list-pak", str(target.resolve()) if stat else str(target),
+           stat.st_size if stat else -1,
+           stat.st_mtime_ns if stat else -1)
+
+    def compute() -> list[str]:
+        result = _command("list", "--strip-prefix", FF7R_MOUNT_POINT, str(target))
+        return [line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()]
+
+    # Every probe lists every installed PAK; without this one Tweaks open
+    # spawned hundreds of repak subprocesses. Installed archives do not change
+    # under a running editor, and size/mtime in the key invalidate the entry
+    # if one ever does.
+    return cached(key, compute)
 
 
 def get_file(pak: Path, internal_path: str) -> bytes:

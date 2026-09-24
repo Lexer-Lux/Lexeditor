@@ -280,41 +280,15 @@ def _lines(rows: list[dict], keys: tuple[str, ...]) -> str:
 
 def no_more_cheats_probe_package(game_root: Path, data_root: Path, project_root: Path,
                                  index: dict, *, language: str = "US") -> tuple[VirtualPackage, str, bool]:
-    # Local imports avoid a module cycle: archive decorates its catalog with the
-    # virtual rows defined in this module.
-    from .archive import extract_pair
-    from .cheat_probe import scan_installed_menu_candidates
-    from .dataobject import DataObjectPackage
-    from .text_storage import load_text_package
+    # Local import avoids a module cycle: no_more_cheats_tweaks builds the
+    # VirtualPackage rows defined in this module.
+    from .no_more_cheats_tweaks import collect_report
 
-    text_sources = []
-    data_sources = []
-    errors: list[str] = []
-    wanted_language = language.upper()
-
-    for row in index.get("textAssets", []):
-        if str(row.get("language", "")).upper() != wanted_language:
-            continue
-        asset = str(row.get("asset", ""))
-        try:
-            package, _source_uasset, _source_uexp, _using_project = load_text_package(
-                game_root, data_root, project_root, index, asset, vanilla=True)
-            text_sources.append((asset, package))
-        except Exception as error:
-            errors.append(f"{asset}: {error}")
-
-    for row in index.get("assets", []):
-        if row.get("synthetic"):
-            continue
-        asset = str(row.get("asset", ""))
-        try:
-            uasset, uexp = extract_pair(game_root, data_root, index, asset)
-            data_sources.append((asset, DataObjectPackage(uasset, uexp, asset=asset)))
-        except Exception as error:
-            errors.append(f"{asset}: {error}")
-
-    result = scan_installed_menu_candidates(
-        text_sources, data_sources, language=wanted_language, scan_errors=errors)
+    # This probe used to duplicate collect_report's full-corpus scan line for
+    # line, so one Tweaks open parsed every installed package twice. It shares
+    # the one cached report now; only the read-only presentation differs.
+    result = collect_report(game_root, data_root, project_root, index,
+                            language=language.upper())
     entries: list[Entry] = []
     notes = " ".join(result.get("notes", []))
     for entry_index, target in enumerate(result["targets"]):

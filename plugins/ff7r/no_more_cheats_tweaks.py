@@ -85,6 +85,26 @@ def _canonical_hash(value: Any) -> str:
 def collect_report(game_root: Path, data_root: Path, project_root: Path, index: dict,
                    *, language: str = "US") -> dict[str, Any]:
     """Scan installed vanilla resources only; project overlays never establish ownership."""
+    from .scan_cache import cached, index_fingerprint
+
+    wanted = language.upper()
+    # Parsing every installed text/DataObject package takes the better part of
+    # a minute and used to re-run on every Tweaks open (twice: the tweak and
+    # its research probe each scanned the whole corpus). Installed resources
+    # are fixed per index signature, so the report is cached on it. Without an
+    # install identity there is nothing safe to key on, so compute directly.
+    if not index.get("signatureId"):
+        return _collect_report(game_root, data_root, project_root,
+                               index, language=wanted)
+    return cached(("no-more-cheats-report", index.get("signatureId"),
+                   index_fingerprint(index, text=True),
+                   index_fingerprint(index), wanted),
+                  lambda: _collect_report(game_root, data_root, project_root,
+                                          index, language=wanted))
+
+
+def _collect_report(game_root: Path, data_root: Path, project_root: Path, index: dict,
+                    *, language: str = "US") -> dict[str, Any]:
     from .archive import extract_pair
     from .text_storage import load_text_package
 
