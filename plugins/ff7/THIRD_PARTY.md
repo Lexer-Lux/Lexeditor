@@ -99,3 +99,13 @@ The public v1.15 `mod.xml` was used as an interoperability fixture for 7th
 Heaven `ModFolder` / `ActiveWhen` profile-option behavior. Lexeditor does not
 bundle this mod or its assets; the test builds a tiny synthetic folder tree
 using only the proved metadata shape.
+
+## Cover art
+
+`assets/covers/ff7-remaster.png` is a custom composite stored in-tree because
+it cannot be re-fetched. Photo source: Ersh_Zenith_01,
+<https://www.reddit.com/r/FFVIIRemake/comments/1ex2kkp/what_bro_gonna_do/>
+(image <https://i.redd.it/75syvh630vjd1.jpeg>). Logo and layout reference:
+anidais, SteamGridDB grid 84563, <https://www.steamgriddb.com/grid/84563>
+(image <https://cdn2.steamgriddb.com/grid/aeaa4605027b5a06c9113495302370d2.png>).
+That reference cover is not stored; fetch it from SteamGridDB as needed.
