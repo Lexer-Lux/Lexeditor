@@ -5450,12 +5450,17 @@ ${contents.path}`});
     const help = options.help ? element("button", {
       id: "plugin-data-map", class: "lex-help-button lex-ui-symbol", title: options.helpTitle || `Open ${options.plugin.id} Data Map`,
       "aria-label": options.helpTitle || `Open ${options.plugin.id} Data Map`,
-      "data-lex-history-control": true, onclick: options.help,
+      "data-lex-history-control": true,
+      // Tab buttons hide the GitHub workspace before navigating; without
+      // the same step these two navigated underneath a workspace that
+      // stayed open, so they lit up and nothing happened.
+      onclick: () => { githubWorkspace?.hide(); options.help(); },
     }, mapIcon()) : null;
     const info = options.info ? element("button", {
       id: "plugin-info", class: "lex-help-button", title: options.infoTitle || `Open ${options.plugin.id} information`,
       "aria-label": options.infoTitle || `Open ${options.plugin.id} information`,
-      "data-lex-history-control": true, onclick: options.info,
+      "data-lex-history-control": true,
+      onclick: () => { githubWorkspace?.hide(); options.info(); },
     }, infoIcon()) : null;
     const github = element("button", {
       id: "plugin-github", class: "lex-developer-button lex-github-tab", hidden: true,
