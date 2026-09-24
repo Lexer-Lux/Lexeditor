@@ -3804,17 +3804,11 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-axis-name { position:absolute; color:var(--lex-muted); font:10px/1 var(--lex-font); pointer-events:none; }
 .lex-curve-axis-name-x { bottom:3px; left:50%; transform:translateX(-50%); }
 .lex-curve-axis-name-y { top:50%; left:2px; writing-mode:vertical-rl; transform:translateY(-50%) rotate(180deg); }
-.lex-curve-variables { position:absolute; z-index:6; left:0; right:0; bottom:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,84px),1fr)); gap:4px 8px; padding:6px; color:var(--lex-text); background:color-mix(in srgb,var(--lex-panel) 90%,var(--lex-text) 10%); border:1px solid var(--lex-border); border-color:color-mix(in srgb,var(--lex-border) 65%,var(--lex-text) 35%); box-shadow:0 -4px 12px rgb(0 0 0 / 28%),inset 0 1px rgb(255 255 255 / 18%); opacity:0; pointer-events:none; transform:translateY(100%); transition:opacity .15s,transform .15s; }
-.lex-curve-editor:is(:hover,:focus-within) > .lex-curve-variables { opacity:1; pointer-events:auto; transform:none; }
+.lex-curve-variables { position:absolute; z-index:6; left:0; right:0; bottom:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,84px),1fr)); gap:4px 8px; padding:6px; color:var(--lex-text); background:color-mix(in srgb,var(--lex-panel) 90%,var(--lex-text) 10%); border:1px solid var(--lex-border); border-color:color-mix(in srgb,var(--lex-border) 65%,var(--lex-text) 35%); box-shadow:0 -4px 12px rgb(0 0 0 / 28%),inset 0 1px rgb(255 255 255 / 18%); opacity:0; pointer-events:none; clip-path:inset(100% 0 0); transition:opacity .15s,clip-path .15s; }
+.lex-curve-editor:is(:hover,:focus-within) > .lex-curve-variables { opacity:1; pointer-events:auto; clip-path:inset(0); }
 
 .lex-curve-variable { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:4px; min-width:0; }
 .lex-curve-variable :is(input,select) { width:100%; min-width:0; }
-/* A variable whose box carries its vanilla reference needs the reference
-   lane plus editable room. In an 84px drawer column the box was almost all
-   padding, so autofit shrank the value to its 8px floor and the rail spilled
-   past the box. Such variables take a full drawer row instead; plain inputs
-   keep the shared columns. */
-.lex-curve-variables > .lex-curve-variable:has(.lex-source-control-internal) { grid-column:1/-1; }
 .lex-curve-variable-a { color:#f05b5b; fill:#f05b5b; }
 .lex-curve-variable-b { color:#63a8ff; fill:#63a8ff; }
 .lex-curve-variable-c { color:#f1d34f; fill:#f1d34f; }
@@ -5639,20 +5633,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-panel-layout-divider:hover::before,
 .lex-panel-layout-divider:focus-visible::before,
 .lex-panel-layout-divider.dragging::before {color:var(--lex-highlight);}
-/* The divider track is transparent over the body background, so at the real
-   panel-gap setting the split between list and detail read as no separation:
-   only the small centered grip marked it. A one-pixel rule in the theme's
-   border color runs the track's full length, the same delineation language
-   as table gridlines and tab edges everywhere else. */
-.lex-panel-layout-divider::after {
-  content:"";
-  position:absolute;
-  top:0;bottom:0;left:50%;
-  width:1px;
-  background:var(--lex-border);
-  transform:translateX(-50%);
-  pointer-events:none;
-}
 /* A stacked layout drags up and down, so its grip is the same arrows turned a
    quarter: the earlier stacked rule reshaped the box to 24x10, which squashed
    the upright artwork into a smear instead of turning it. */
@@ -5663,11 +5643,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   width:16px;height:32px;
   transform:translate(-50%,-50%) rotate(90deg);
 
-}
-.lex-panel-layout-vertical > .lex-panel-layout-divider::after {
-  top:50%;bottom:auto;left:0;right:0;
-  width:auto;height:1px;
-  transform:translateY(-50%);
 }
 
 /* Shortcut badges are overlays. Hover never changes the label lane. */

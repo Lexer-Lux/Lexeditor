@@ -15,7 +15,7 @@
     const formation=LexeditorUI.controlGroup(['stageId','flags','cameraMain','cameraSecondary'].map((key,index)=>({
       label:['Stage','Flags','Main camera','Secondary camera'][index],
       control:encounterSource(numberControl(row[key],0,255,1,value=>{row[key]=value;shell.refresh()}),row,value=>value?.[key],value=>{row[key]=Number(value);shell.refresh()})
-    })),{columns:4});
+    })),{columns:4,stacked:true});
     const source=(slot,key,control)=>{
       if(!slot.enabled&&key!=='enabled')for(const input of [control,...control.querySelectorAll('input,select,button')])
         if(input.matches('input,select,button'))input.disabled=true;
@@ -31,7 +31,7 @@
       ]});
     return LexeditorUI.stack(
       detailPanel({heading:false,body:[formation]}),
-      detailPanel({heading:false,body:[table]})
+      table
     );
   }
   function renderEncounters(){const rows=filtered('encounters',['name','id','stageId']);showPaged('encounters',rows,[{key:'id',label:'ID'},{key:'name',label:'Encounter'},{key:'stageId',label:'Stage',pinned:false}],encounterDetail,'74px minmax(180px,1fr)',{defaultSplit:26,minLeft:220,minRight:600})}

@@ -252,8 +252,6 @@ def ensure_map_baseline(key: str) -> tuple[Path | None, Path | None, Path | None
                     if not rate["canonical"]:
                         raise ValueError(
                             f"Field map {key} RAT does not contain four matching rate bytes")
-                if "ca" in assets:
-                    field_camera.read((directory / f"{row['name']}.ca").read_bytes())
                 if "msk" in assets:
                     field_movie.read((directory / f"{row['name']}.msk").read_bytes())
                 return (jsm_path if "jsm" in assets else None,
@@ -288,8 +286,8 @@ def ensure_map_baseline(key: str) -> tuple[Path | None, Path | None, Path | None
         rate = field_encounters.read_rat(extracted["rat"])
         if not rate["canonical"]:
             raise ValueError(f"Field map {key} RAT does not contain four matching rate bytes")
-    if "ca" in extracted:
-        field_camera.read(extracted["ca"])
+    # Preserve camera bytes during extraction. The camera view reports unsupported
+    # layouts and camera writes still validate them; card scripts do not use them.
     if "msk" in extracted:
         field_movie.read(extracted["msk"])
     directory.mkdir(parents=True, exist_ok=True)

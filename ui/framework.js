@@ -1190,8 +1190,15 @@
   const actionRow = (...children) => element("div", {class: "lex-action-row"}, ...children);
 
   // A table that is its own pane, with its pager under it.
-  const pagedPane = (content, pagerNode) => element("div", {class: "lex-paged-pane"},
-    element("div", {class: "lex-paged-pane-content"}, content), pagerNode);
+  const pagedPane = (content, pagerNode) => {
+    const body = element("div", {class: "lex-paged-pane-content"}, content);
+    const root = element("div", {class: "lex-paged-pane"}, body, pagerNode);
+    wheelPages(root, direction => {
+      const label = direction > 0 ? "Next page" : "Previous page";
+      pagerNode?.querySelector(`button[aria-label="${label}"]`)?.click();
+    }, () => body.scrollHeight > body.clientHeight + 1);
+    return root;
+  };
 
   // One instruction per row, with a stable footer outside the page content.
   // Callers supply controls and meaning; sizing and reordering are shared.
@@ -1248,11 +1255,6 @@
       }
     };
     repaint();
-    wheelPages(root, direction => {
-      const pages = Math.max(1, Math.ceil(rows.length / pageSize));
-      page = (page + direction + pages) % pages;
-      repaint();
-    });
     const resize = new ResizeObserver(() => {
       if(!root.isConnected)return;
       const available=root.querySelector('.lex-paged-pane-content').clientHeight;
