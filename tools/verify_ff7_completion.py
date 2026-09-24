@@ -308,7 +308,7 @@ class IntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);game=root/'game';source=game/PATHS[0];write_kernel(source)
             before=source.read_bytes()
-            with self.assertRaises(ValueError):plugin.seed_project_layout(game,game,root/'mod')
+            with self.assertRaises(ValueError):plugin.seed_project_template(game,game)
             self.assertEqual(source.read_bytes(),before)
 
 

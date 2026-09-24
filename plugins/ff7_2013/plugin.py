@@ -43,7 +43,7 @@ def check() -> list[str]:
 def prepare(game_root: Path, data_root: Path, progress) -> dict:
     return prepare_product(
         game_root, data_root, progress,
-        PROJECT_TEMPLATE, DEFAULT_PROJECT,
+        PROJECT_TEMPLATE,
     )
 
 
