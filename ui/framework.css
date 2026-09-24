@@ -3890,7 +3890,7 @@ body:has(.lex-data-map-table) #main {
 /* Property controls also carry copy, pin and reference controls. Give their
    quantity enough space for these controls instead of a bare three-digit box. */
 .lex-quantity-choice:has(> .lex-detail-field) {
-  grid-template-columns:minmax(0,1fr) auto minmax(8em,.5fr);
+  grid-template-columns:minmax(0,1fr) auto minmax(9em,.5fr);
 }
 .lex-quantity-choice > .lex-detail-field {
   padding:0;
