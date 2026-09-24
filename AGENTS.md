@@ -134,8 +134,9 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
 
 ## Central knowledge and parallel work
 
-- Lexeditor owns the canonical game knowledge: `codex/<game>/README.md` plus
-  topic files under `codex/<game>/`. Shared editor knowledge uses `codex/shared/`.
+- Lexeditor owns the canonical game knowledge under `codex/<game>/`. Write a
+  page only for something proven and expensive to rediscover; never create
+  placeholder pages. Shared editor knowledge uses `codex/shared/`.
 - Lexeditor also owns the canonical implementation worklogs under `worklog/`.
   Standalone `Lexers-Mod-*` repositories are storage/distribution repositories;
   they must not recreate independent Codex, Worklog, project-memory, or issue-history

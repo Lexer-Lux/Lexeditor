@@ -1,6 +1,6 @@
 """Independent, snapshot-checked FF7 scene, text and shop project datasets.
 
-Binary layout references and limits are recorded in codex/ff7-data.md.
+Binary layout references and limits are recorded in codex/ff7/data.md.
 No game assets are bundled; unknown executable builds are never patched.
 """
 from __future__ import annotations

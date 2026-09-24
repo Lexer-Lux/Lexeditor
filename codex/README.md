@@ -1,23 +1,33 @@
-# Central game knowledge
+# Codex
 
-Lexeditor is the **only canonical development home** for game mechanics, formats, proven engine limits, editor knowledge, research notes and maintained Codex material. Full requests, attempts, test evidence and discussion belong in the matching per-issue Worklog rather than being duplicated into Codex pages.
+Settled, hard-won knowledge that the code cannot tell you: what a format field
+actually means, proven engine limits, and approaches that were tried in-game
+and failed. It is not a manual and not a progress log. Per-issue work belongs
+in `worklog/<issue>.md`; the live GitHub issue is the canonical request.
 
-## Game indexes
+Add a page only when something is proven and would be expensive to rediscover.
+A game with nothing settled yet has no folder; do not create placeholder pages.
+
+## Games
 
 - [Bannerlord](bannerlord/README.md)
+- [Chrono Trigger](chrono_trigger/README.md)
+- [Dark Souls III](ds3/README.md)
+- [Factorio](factorio/README.md)
 - [Final Fantasy VII](ff7/README.md)
+- [Final Fantasy VII Remake Intergrade](ff7r/README.md)
+- [Final Fantasy VII Rebirth](ff7r2/README.md)
 - [Final Fantasy VIII](ff8/README.md)
 - [Final Fantasy IX](ff9/README.md)
-- [Red Dead Redemption](rdr1/README.md)
+- [Final Fantasy X/X-2](ffx-x2/README.md)
+- [Palworld](palworld/README.md)
+- [Project Zomboid](project-zomboid/README.md)
 - [Red Dead Redemption 2](rdr2/README.md)
-- [Termina](termina/README.md)
+- [Stardew Valley](stardew-valley/README.md)
+- [Terraria](terraria/README.md)
 - [Warband](warband/README.md)
-- [Shared Lexeditor knowledge](shared/README.md)
+- [Shared editor knowledge](shared/README.md)
 
-## Organization rules
-
-Game folders contain durable, reconciled knowledge. Focused top-level documents such as `ff7-data.md`, `ff8-*.md` and `ff9-memoria-integration.md` are retained when they are useful implementation references; their game's README is the stable entry point.
-
-Imported historical claims must be reconciled when newer code, tests or player evidence differs. The 1.1 migration's provenance records and imported source mirrors were retired from the tree; they remain in git history.
-
-The standalone `Lexers-Mod-For-*` repositories are **distribution/storage mirrors, not knowledge stores**. Do not create or recreate Codex, Worklog, project-memory or issue-history files there. Agents looking for historical material should come back to this repository instead.
+The standalone `Lexers-Mod-For-*` repositories are distribution mirrors, not
+knowledge stores. Their imported originals were retired from this tree and
+remain in git history.
