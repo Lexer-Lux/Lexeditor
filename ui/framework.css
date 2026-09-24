@@ -518,9 +518,9 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   content: "";
 
   top: 14px;
-  left: 8px;
-  width: 12px;
-  border-top: 1.5px solid currentColor;
+  left: 7px;
+  width: 16px;
+  border-top: 2px solid currentColor;
 
  transform: rotate(45deg);
 }
@@ -531,9 +531,9 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   content: "";
 
   top: 14px;
-  left: 8px;
-  width: 12px;
-  border-top: 1.5px solid currentColor;
+  left: 7px;
+  width: 16px;
+  border-top: 2px solid currentColor;
 
  transform: rotate(-45deg);
 }
@@ -2751,7 +2751,6 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
 
 .lex-pager-left .lex-new-button {
   flex:0 0 auto;
-  min-height:32px;
 }
 
 /* A property made of several numbers. Each pair reads label-then-box like an
@@ -6859,11 +6858,12 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   box-shadow: var(--lex-hoverable-hover-shadow, none);
 
 }
+/* One square add button: a single size token, so a pager add and a detail
+   add can never drift apart again. */
 .lex-new-button {
 
   display: inline-grid;
   place-items: center;
-  min-height: 30px;
   padding: 0;
   color: var(--lex-muted);
   border: 1px solid var(--lex-border);
@@ -6871,9 +6871,10 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   background: var(--lex-panel-2);
   cursor: pointer;
 
-  width: var(--lex-new-button-width, 32px);
-  min-width: var(--lex-new-button-width, 32px);
-  height: var(--lex-new-button-height, 30px);
+  width: var(--lex-new-button-size, 32px);
+  min-width: var(--lex-new-button-size, 32px);
+  height: var(--lex-new-button-size, 32px);
+  min-height: var(--lex-new-button-size, 32px);
 
 }
 .lex-settings-dialog { width: var(--lex-settings-dialog-width, min(720px, 96vw)); }

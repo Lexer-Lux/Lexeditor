@@ -374,7 +374,7 @@ function lootEntryGrid(t, file, depth, seen) {
     const numeric=(field,attrs)=>{const control=inp(field,attrs);return refField(control,refPairs(field,e.name,i),e[field],value=>applyToControl(control,value))};
     grid.append(LexeditorUI.detailSection({title:`Entry ${i+1}`,body:[
       LexeditorUI.actionRow(expander,mention,typeTag,nameBtn,refStack(refPairs("name",e.name,i),e.name,v=>{e.name=v;markLootDirty(t.key,file);renderLoot()}),
-        el("button",{title:"Remove entry",onclick:()=>{t.entries.splice(i,1);markLootDirty(t.key,file);renderLoot()}},"×")),
+        closeButton({title:"Remove entry",onclick:()=>{t.entries.splice(i,1);markLootDirty(t.key,file);renderLoot()}})),
       LexeditorUI.tileGrid([
         {label:"Rate",control:numeric("rate",{type:"number",step:"0.05",min:0})},
         {label:"Min",control:numeric("min",{type:"number",step:1,placeholder:"default",title:"Blank = do not override quantity."})},
@@ -521,7 +521,7 @@ async function renderMatrix() {
       yields.append(LexeditorUI.stack({fill:false},LexeditorUI.controlGroup([
         {label:"Item",control:linkedCatalogKeyEditor(yieldRow.item,value=>{yieldRow.item=value;state.matrixDirty.add(a.key);renderMatrix()})},
         {label:"Quantity",control:quantity},
-        el("button",{title:"Remove yield",onclick:()=>{a.rows.splice(a.rows.indexOf(yieldRow),1);state.matrixDirty.add(a.key);renderMatrix()}},"×")]),
+        closeButton({title:"Remove yield",onclick:()=>{a.rows.splice(a.rows.indexOf(yieldRow),1);state.matrixDirty.add(a.key);renderMatrix()}})]),
         refLine([["V","vtag",vr?`${vr.item} ×${vr.qty??1}`:null],["K","ktag",kr?`${kr.item} ×${kr.qty??1}`:null]],v=>v,
           value=>applyYieldReference(vr&&value===`${vr.item} ×${vr.qty??1}`?vr:kr))));
     });

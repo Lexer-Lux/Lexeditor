@@ -20,7 +20,7 @@
     descent-override:10%;
     line-gap-override:20%;
   }
-  :root {--lex-shell-header-bg:var(--bg);--lex-command-row-bg:var(--panel);--lex-nav-bg:var(--panel);--lex-new-button-width:34px;--lex-new-button-height:30px;--lex-hoverable-hover-border:1px solid var(--accent2);--lex-hoverable-hover-shadow:inset 0 0 0 1px var(--accent2);--lex-settings-dialog-width:min(680px,96vw);
+  :root {--lex-shell-header-bg:var(--bg);--lex-command-row-bg:var(--panel);--lex-nav-bg:var(--panel);--lex-hoverable-hover-border:1px solid var(--accent2);--lex-hoverable-hover-shadow:inset 0 0 0 1px var(--accent2);--lex-settings-dialog-width:min(680px,96vw);
     --bg: #100f0d; --panel: #191714; --panel2: #24211c; --border: #4a4439;
     --text: #e8e1d4; --dim: #918a7e; --accent: #a92b20; --accent2: #d7b65d; --lex-highlight:var(--accent2);
     --green: #667b50;

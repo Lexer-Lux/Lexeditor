@@ -2,6 +2,7 @@
 const $ = s => document.querySelector(s);
 const el = window.LexeditorUI.el;
 const newButton=window.LexeditorUI.newButton;
+const closeButton=window.LexeditorUI.closeButton;
 const columnList=window.LexeditorUI.columnList;
 function showSaveFailure(error){const message=error?.message||String(error);toast("Save failed",true);LexeditorUI.showAlert({title:"Save failed",items:[{item:"Save",issue:message}],closeLabel:"Confirm and Close"});return error instanceof Error?error:new Error(message)}
 

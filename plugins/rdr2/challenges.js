@@ -69,7 +69,7 @@ async function renderChallenges() {
         req.sources.forEach((source,sourceIndex)=>{const sk=`${goal.name}|${req.index}|${sourceIndex}`,edited=state.challengeSourceEdits[sk]||source;if(edited.remove)return;const current=`${edited.base||""}::${edited.permutation||""}`;
           const sel=el("select",{class:"key",onchange:ev=>{const [base,permutation]=ev.target.value.split("::");state.challengeSourceEdits[sk]={index:sourceIndex,base,permutation};renderChallenges();}},
             ...sourceValues.map(v=>{const value=`${v.base||""}::${v.permutation||""}`,label=v.label||[v.base,v.permutation].filter(Boolean).join(" + "),o=el("option",{value,title:value},label);if(value===current)o.selected=true;return o;}));
-          const vsource=vreq?.sources?.[sourceIndex],controls=LexeditorUI.actionRow(sel);if(activeSourceCount>1&&!isRO())controls.append(el("button",{class:"lex-ui-symbol icon-link",title:"Remove this counter from the summed requirement",onclick:()=>{state.challengeSourceEdits[sk]={index:sourceIndex,remove:true};renderChallenges();}},"×"));sourceCell.append(LexeditorUI.stack({fill:false},controls,vsource&&current!==`${vsource.base||""}::${vsource.permutation||""}`?refLine([["V","vtag",vsource.label||[vsource.base,vsource.permutation].filter(Boolean).join(" + ")]],String):""));});
+          const vsource=vreq?.sources?.[sourceIndex],controls=LexeditorUI.actionRow(sel);if(activeSourceCount>1&&!isRO())controls.append(closeButton({title:"Remove this counter from the summed requirement",onclick:()=>{state.challengeSourceEdits[sk]={index:sourceIndex,remove:true};renderChallenges();}}));sourceCell.append(LexeditorUI.stack({fill:false},controls,vsource&&current!==`${vsource.base||""}::${vsource.permutation||""}`?refLine([["V","vtag",vsource.label||[vsource.base,vsource.permutation].filter(Boolean).join(" + ")]],String):""));});
         const amount=LexeditorUI.stack({fill:false},el("input",{type:"number",step:"any",value:cur,class:ek in state.challengeEdits?"edited":"",onchange:ev=>{state.challengeEdits[ek]=ev.target.value;renderChallenges();}}));
         if(vreq&&Number(cur)!==Number(vreq.value)){const vr=el("span",{title:"Vanilla target — click to apply",onclick:()=>{state.challengeEdits[ek]=vreq.value;renderChallenges();}},el("b",{class:"vtag"},"V "),vreq.value);amount.append(el("div",{class:"ref"},vr));}
         conditionsBox.append(LexeditorUI.controlGroup([sourceCell,{label:"Target",control:amount}]));});
@@ -92,9 +92,9 @@ async function renderChallenges() {
         mutateChallengeRewards(rewardKey,rank.rewards,next=>{next[index]={type,value:parts.join("::")};});renderChallenges();
       }},...choices.map(row=>{const value=challengeRewardId(row),option=el("option",{value},challengeRewardLabel(row));if(value===current)option.selected=true;return option;}));
       if(!editable)select.disabled=true;
-      return LexeditorUI.actionRow(select,editable?el("button",{type:"button",title:"Remove reward",onclick:()=>{
+      return LexeditorUI.actionRow(select,editable?closeButton({title:"Remove reward",onclick:()=>{
         mutateChallengeRewards(rewardKey,rank.rewards,next=>next.splice(index,1));renderChallenges();
-      }},"×"):el("span"));
+      }}):el("span"));
     };
     const addReward=isRO()?"":newButton({title:"Add reward",onclick:()=>{
       const fallback=allowedRewards.find(row=>row.type==="CUnlockReward")||allowedRewards[0];
