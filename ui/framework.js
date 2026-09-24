@@ -4627,7 +4627,7 @@ ${contents.path}`});
         {key:"residentHandleWidthPercent", scope:"packaged", title:"Home editor handle width", description:"Width of the Back to Editor handle as a percentage of the main-menu window.", type:"number", min:2.5, max:12, step:.25, unit:"%"},
         {key:"absentGameDesaturationPercent", scope:"packaged", title:"Absent game desaturation", description:"Amount of color removed from Absent game cover art on the Home screen.", type:"number", min:0, max:100, step:5, unit:"%"},
         {key:"globalMessageRarity", scope:"packaged", title:"Global message rarity", description:"Makes each global loading message this many times less likely than each game-specific message.", type:"number", min:1, max:100, step:1, unit:"× rarer"},
-        {key:"loadingTransitionMinimumSeconds", scope:"packaged", title:"Loading screen minimum", description:"Keeps the loading screen visible for at least this long. Actual loading can take longer.", type:"number", min:0, max:10, step:.25, unit:"s", fallback:1.5},
+        {key:"loadingTransitionMinimumSeconds", scope:"packaged", title:"Loading screen transition", type:"number", min:0, max:10, step:.25, unit:"s", fallback:1.5},
         {key:"tweakColumnsPerPage", scope:"packaged", title:"Tweak columns per page", description:"Maximum columns on one Tweaks page. Each tweak stays in one column.", type:"number", min:1, max:12, step:1, fallback:6},
       ];
       const ordinaryDefinitions = definitions.filter(definition => definition.scope !== "packaged");
@@ -4731,7 +4731,7 @@ ${contents.path}`});
             class:"lex-global-setting lex-developer-setting lex-packaged-setting", hidden:true,
           }, element("div", {class:"lex-setting-copy"},
             element("label", {for:`lex-default-${definition.key}`}, definition.title),
-            element("p", {}, definition.description)), wrapped);
+            definition.description ? element("p", {}, definition.description) : null), wrapped);
           if(!supported)controlNode(wrapped).title="Restart Lexeditor to make this setting available.";
           card.dataset.lexSettingSupported = String(supported);
           developerLane.append(card);
@@ -4746,7 +4746,7 @@ ${contents.path}`});
         currentControls.set(definition.key, wrapped);
         const copy = element("div", {class:"lex-setting-copy"},
           element("label", {for:`lex-${definition.key}`}, definition.title),
-          element("p", {}, definition.description));
+          definition.description ? element("p", {}, definition.description) : null);
         const defaultWrapped = makeControl(definition, initialValue(definition, true), `lex-default-${definition.key}`);
         defaultControls.set(definition.key, defaultWrapped);
         const defaultControl = element("label", {
