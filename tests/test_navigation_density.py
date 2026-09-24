@@ -1,3 +1,5 @@
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import pytest
 import tempfile
 from pathlib import Path
@@ -9,7 +11,7 @@ from test_shared_ui_feedback import ROOT, page, framework
 @pytest.mark.parametrize('with_icon',[False,True])
 def test_row_pointer_follows_clickable_label(page,with_icon):
     import os
-    marker=Path(os.environ.get('LOCALAPPDATA',str(ROOT/'out')))/'Lexeditor/game-data/ff8/generated/icons/0.png'
+    marker=Path(os.environ.get('LOCALAPPDATA',str(DEV_CACHE)))/'Lexeditor/game-data/ff8/generated/icons/0.png'
     if marker.exists():
         page.route('**/assets/icons/0.png',lambda r:r.fulfill(path=str(marker)))
     framework(page)

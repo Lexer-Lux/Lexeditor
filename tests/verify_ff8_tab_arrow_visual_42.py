@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import os
 from pathlib import Path
@@ -41,7 +43,7 @@ def inspect(cdp: Cdp, width: int, height: int) -> dict:
         raise AssertionError(result)
     if result["overflow"] > 0 or result["errors"]:
         raise AssertionError(result)
-    output = ROOT / "out" / "rendered" / f"github-42-ff8-tab-arrow-{width}x{height}.png"
+    output = DEV_CACHE / "rendered" / f"github-42-ff8-tab-arrow-{width}x{height}.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     screenshot = cdp.call("Page.captureScreenshot", {
         "format": "png", "captureBeyondViewport": False, "fromSurface": True,

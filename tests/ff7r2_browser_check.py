@@ -5,6 +5,8 @@ No proprietary game data and no installed Rebirth copy are required.
 """
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 from pathlib import Path
 import shutil
 import sys
@@ -20,7 +22,7 @@ from ff7r2_fixture import battle_item_possession_fixture, battle_player_paramete
 from plugins.ff7r2.plugin import Ff7r2Session
 
 
-OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "ff7r2-browser"
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "ff7r2-browser"
 OUT.mkdir(parents=True, exist_ok=True)
 PLAYER = Path("End/Content/DataObject/Resident/PlayerParameter.uasset")
 BATTLE_PLAYER = Path("End/Content/DataObject/Resident/BattlePlayerParameter.uasset")

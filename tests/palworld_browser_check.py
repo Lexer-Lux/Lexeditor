@@ -4,6 +4,8 @@ Uses only synthetic package/Patch/schema JSON. No installed game or proprietary 
 """
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import json
 from pathlib import Path
 import shutil
@@ -19,7 +21,7 @@ if str(ROOT) not in sys.path:
 from plugins.palworld.plugin import PalworldSession
 from plugins.palworld.package import default_info
 
-OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "palworld-browser"
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "palworld-browser"
 OUT.mkdir(parents=True, exist_ok=True)
 
 with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_name:

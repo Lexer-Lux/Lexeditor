@@ -1,5 +1,7 @@
 """Rendered fixture checks. No installed game assets or personal mod data used."""
 from __future__ import annotations
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import io
 import os
@@ -18,7 +20,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from plugins.warband import server
 
-ARTIFACTS=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/'out'/'warband-browser'
+ARTIFACTS=Path(sys.argv[1]) if len(sys.argv)>1 else DEV_CACHE /'warband-browser'
 ARTIFACTS.mkdir(parents=True,exist_ok=True)
 
 def png(color):

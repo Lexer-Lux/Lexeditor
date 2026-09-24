@@ -6,6 +6,8 @@ with in-memory API fixtures, then writes screenshots for human inspection.
 """
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import argparse
 import copy
 import json
@@ -664,7 +666,7 @@ def run(output: Path, executable: str | None) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--screenshots", type=Path, default=ROOT / "out" / "ff7r-browser")
+    parser.add_argument("--screenshots", type=Path, default=DEV_CACHE / "ff7r-browser")
     parser.add_argument("--chromium", default=None)
     args = parser.parse_args()
     run(args.screenshots, args.chromium)

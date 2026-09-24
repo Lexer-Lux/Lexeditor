@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import os
 from pathlib import Path
@@ -87,7 +89,7 @@ def main() -> int:
             item_shot = cdp.call("Page.captureScreenshot", {
                 "format": "png", "captureBeyondViewport": False, "fromSurface": True,
             })
-            item_rendered = ROOT / "out" / "rendered" / "github-63-ff8-item-parameters.png"
+            item_rendered = DEV_CACHE / "rendered" / "github-63-ff8-item-parameters.png"
             item_rendered.parent.mkdir(parents=True, exist_ok=True)
             item_rendered.write_bytes(base64.b64decode(item_shot["data"]))
 
@@ -116,7 +118,7 @@ def main() -> int:
             ai_shot = cdp.call("Page.captureScreenshot", {
                 "format": "png", "captureBeyondViewport": False, "fromSurface": True,
             })
-            ai_rendered = ROOT / "out" / "rendered" / "github-64-ff8-enemy-ai.png"
+            ai_rendered = DEV_CACHE / "rendered" / "github-64-ff8-enemy-ai.png"
             ai_rendered.parent.mkdir(parents=True, exist_ok=True)
             ai_rendered.write_bytes(base64.b64decode(ai_shot["data"]))
 
@@ -157,7 +159,7 @@ def main() -> int:
             screenshot = cdp.call("Page.captureScreenshot", {
                 "format": "png", "captureBeyondViewport": False, "fromSurface": True,
             })
-            rendered = ROOT / "out" / "rendered" / "github-39-ff8-encounters.png"
+            rendered = DEV_CACHE / "rendered" / "github-39-ff8-encounters.png"
             rendered.parent.mkdir(parents=True, exist_ok=True)
             rendered.write_bytes(base64.b64decode(screenshot["data"]))
             data_map = cdp.eval("""(()=>Object.fromEntries(state.datamap.rows

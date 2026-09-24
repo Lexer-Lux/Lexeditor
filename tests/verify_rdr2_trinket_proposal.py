@@ -1,4 +1,6 @@
 """Headless interaction check for the #136 presentation proposal, not game acceptance."""
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[1]
@@ -13,7 +15,7 @@ def main():
    page.get_by_role('searchbox').fill('fox');expect(page.get_by_role('option')).to_have_count(1)
    page.get_by_role('searchbox').fill('');page.get_by_role('button',name='Show empty example').click();expect(page.get_by_role('heading',name='No trinkets yet')).to_be_visible()
    page.get_by_role('button',name='Show owned example').click();page.keyboard.press('Escape');assert page.evaluate('closed')
-   output=ROOT/'out/rdr2-trinket-proposal';output.mkdir(parents=True,exist_ok=True)
+   output=DEV_CACHE / 'rdr2-trinket-proposal';output.mkdir(parents=True,exist_ok=True)
    for width in (1200,600):
     page.set_viewport_size({'width':width,'height':800});assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     page.screenshot(path=str(output/f'trinkets-{width}.png'),full_page=True)

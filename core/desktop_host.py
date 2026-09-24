@@ -6,6 +6,7 @@ import json
 import math
 import os
 import random
+import shutil
 import subprocess
 import sys
 import threading
@@ -32,7 +33,10 @@ from core.windows_host import (
 ROOT = Path(__file__).resolve().parents[1]
 CHOOSER = ROOT / "ui" / "chooser.html"
 ICON = ROOT / "assets" / "lexeditor.ico"
-STORAGE = ROOT / "out" / "webview2"
+# The WebView2 profile (browser cache and UI storage) belongs with the rest
+# of the user data, not in the program folder, where it grew with use.
+STORAGE = Path(os.environ.get("LOCALAPPDATA", ROOT / "out")) / "Lexeditor" / "webview2"
+LEGACY_STORAGE = ROOT / "out" / "webview2"
 WINDOW_STATE_PATH = Path(os.environ.get("LOCALAPPDATA", ROOT / "out")) / "Lexeditor" / "window-state.json"
 DEFAULT_WINDOW_BOUNDS = [80, 80, 1440, 900]
 LOADING_QUOTES = ROOT / "ui" / "loading_quotes.json"
@@ -1873,6 +1877,10 @@ def run_host(plugins: dict[str, GamePlugin], initial_plugin: str | None = None,
             initial_url = api.open_plugin(initial_plugin)["url"]
         except RuntimeError:
             initial_url = CHOOSER.as_uri()
+    if LEGACY_STORAGE.is_dir() and not STORAGE.exists():
+        # Keep saved UI preferences from the old in-program profile.
+        STORAGE.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(LEGACY_STORAGE), str(STORAGE))
     STORAGE.mkdir(parents=True, exist_ok=True)
     left, top, width, height = geometry["bounds"]
     window = webview.create_window(

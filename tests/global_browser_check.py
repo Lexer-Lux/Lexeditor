@@ -1,5 +1,7 @@
 """Portable rendered fixtures for shared controls, helper versions and offline credits."""
 from __future__ import annotations
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import functools
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -13,7 +15,7 @@ from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 ROOT=Path(__file__).resolve().parents[1]
-OUT=Path(os.environ.get('LEXEDITOR_TEST_OUTPUT',str(ROOT/'out/global-browser')))
+OUT=Path(os.environ.get('LEXEDITOR_TEST_OUTPUT',str(DEV_CACHE / 'global-browser')))
 SETTINGS=json.loads((ROOT/'ui/default_settings.json').read_text(encoding='utf-8'))|{'developerMode':True,'developerAuthorized':True,'developerLogin':'Lexer-Lux','viewPreferences':{},'defaultValues':{},'updateCheckChoices':[], 'loadingTransitionMinimumSeconds':0}
 HELPERS=[{'pluginId':'ff8','plugin':'Final Fantasy 8','helper':'FFNx','pinned':'1.0','installed':True,'installedVersion':'1.1','latest':'1.2','behind':True,'published':'2026-09-01T00:00:00Z','releaseNotes':'https://github.com/julianxhokaxhiu/FFNx/releases/tag/example'},
 {'pluginId':'ff9','plugin':'Final Fantasy 9','helper':'Memoria','installed':False,'error':'Offline: cannot read the upstream release'}]

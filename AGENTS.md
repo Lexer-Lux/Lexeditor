@@ -160,7 +160,7 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
 ## Temporary storage and local checks
 
 - The checkout holds source only. Never create `_scratch/`, `.pytest_cache`,
-  `artifacts/` or other working folders in it; `tests/test_repo_hygiene.py`
+  `artifacts/`, `out/` or other working folders in it; `tests/test_repo_hygiene.py`
   fails when one appears. Use your own session scratchpad, or
   `%TEMP%/lexeditor-dev` for dev caches shared between checks (upstream
   source clones, verifier results, screenshots).

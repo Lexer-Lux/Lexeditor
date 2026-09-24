@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import json
 import os
@@ -154,7 +156,7 @@ def main() -> int:
 
     # The dedicated endpoint writes a selected-mod override, and the rendered
     # Enemies subtab exposes each existing line as a provenance-aware textarea.
-    output = ROOT / "out" / "rendered" / "goal-ff8-enemy-battle-text.png"
+    output = DEV_CACHE / "rendered" / "goal-ff8-enemy-battle-text.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     project = tempfile.TemporaryDirectory(
         prefix="lexeditor-ff8-battle-text-project-", ignore_cleanup_errors=True)

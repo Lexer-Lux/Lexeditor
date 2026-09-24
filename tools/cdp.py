@@ -13,6 +13,8 @@ how these verifiers behave on that machine changes; see
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import json
 import os
@@ -26,7 +28,7 @@ from urllib.request import urlopen
 import websocket
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "out" / "rendered"
+OUT = DEV_CACHE / "rendered"
 
 # Every verifier spawns its own browser. Popen only ever kills the process it
 # was handed, orphaning the browser's child renderers, and a `finally` does not

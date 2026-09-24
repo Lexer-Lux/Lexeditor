@@ -46,7 +46,7 @@ def main():
             assert listing.evaluate('(el)=>el.scrollHeight>el.clientHeight')
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
             assert not errors,errors
-            output=Path(__file__).resolve().parents[1]/'out/loot-sounds';output.mkdir(parents=True,exist_ok=True)
+            output=Path(__import__("tempfile").gettempdir()) / "lexeditor-dev" / 'loot-sounds';output.mkdir(parents=True,exist_ok=True)
             page.screenshot(path=str(output/'routing.png'))
         finally:browser.close()
     print('PASS: routing controls, global dirty count, failed-save retention, save/reload and read-only reference')

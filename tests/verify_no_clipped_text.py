@@ -7,6 +7,8 @@ separately tests dense shared tables, scaling and the detector itself.
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import sys as _lex_sys
 from pathlib import Path as _LexPath
 _lex_sys.path.insert(1, str(_LexPath(__file__).resolve().parents[1] / "tools"))
@@ -368,7 +370,7 @@ def main() -> int:
                                             "probe-failed")]
     # Twenty printed lines hid most of a failure, so every entry is also
     # written out; grouping there is what makes a shared cause obvious.
-    report = ROOT / "out" / "no-clipped-text.json"
+    report = DEV_CACHE / "no-clipped-text.json"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(
         {"plugins": plugins, "clipped": clipped, "pagerless": pagerless,

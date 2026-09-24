@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import json
 import os
@@ -52,7 +54,7 @@ def inspect(cdp: Cdp, width: int, height: int) -> dict:
             or probe["technical"] != ["▲Name", "ID"] or probe["technicalValues"] != ["Alpha", "itm_alpha"] or probe["technicalIds"] != 0):
         raise AssertionError(probe)
     cdp.eval("navigate('items')")
-    output = ROOT / "out" / "rendered" / f"github-43-numbered-id-{width}x{height}.png"
+    output = DEV_CACHE / "rendered" / f"github-43-numbered-id-{width}x{height}.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     screenshot = cdp.call("Page.captureScreenshot", {
         "format": "png", "captureBeyondViewport": False, "fromSurface": True,

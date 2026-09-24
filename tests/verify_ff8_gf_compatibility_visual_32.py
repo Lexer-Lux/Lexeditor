@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import os
 from pathlib import Path
@@ -21,7 +23,7 @@ from core.service_session import request_json  # noqa: E402
 
 def main() -> int:
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "out" / "rendered" / "github-32-ff8-gf-signed-compatibility.png"
+    output = DEV_CACHE / "rendered" / "github-32-ff8-gf-signed-compatibility.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-gf-compat-edge-", ignore_cleanup_errors=True)
     project = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-gf-compat-project-", ignore_cleanup_errors=True)

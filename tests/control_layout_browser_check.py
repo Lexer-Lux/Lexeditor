@@ -1,4 +1,6 @@
 """Rendered regression checks for the reported shared-control spacing and hover defects."""
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 from pathlib import Path
 import functools
 import threading
@@ -6,7 +8,7 @@ from http.server import ThreadingHTTPServer
 from playwright.sync_api import sync_playwright
 from global_browser_check import ROOT, Handler, STUB, load_page
 
-OUT=ROOT/'out/control-layout'
+OUT=DEV_CACHE / 'control-layout'
 
 def main():
     OUT.mkdir(parents=True,exist_ok=True)

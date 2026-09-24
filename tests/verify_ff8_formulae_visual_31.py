@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import json
 import os
@@ -33,7 +35,7 @@ def main() -> int:
         raise FileNotFoundError(f"Installed FF8 extracted baseline is missing: {missing}")
 
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "out" / "rendered" / "github-31-ff8-formulae.png"
+    output = DEV_CACHE / "rendered" / "github-31-ff8-formulae.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-formulae-edge-", ignore_cleanup_errors=True)
     project = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-formulae-project-", ignore_cleanup_errors=True)

@@ -1,6 +1,8 @@
 """Rendered FF9 acceptance using the real loopback service and synthetic fixtures only."""
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import hashlib
 from pathlib import Path
 import runpy
@@ -17,7 +19,7 @@ if str(ROOT) not in sys.path:
 from plugins.ff9 import memoria_baseline
 from plugins.ff9.plugin import FF9Session
 
-OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "ff9-browser"
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "ff9-browser"
 OUT.mkdir(parents=True, exist_ok=True)
 archive = runpy.run_path(str(ROOT / "tests" / "test_ff9_battle_scene.py"))["archive"]
 walkmesh_archive = runpy.run_path(str(ROOT / "tests" / "test_ff9_field_walkmesh.py"))["archive"]

@@ -68,8 +68,11 @@ ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 PORT = int(os.environ.get("LEXEDITOR_PORT", os.environ.get("LEXEDITOR_FF7R_PORT", "0")))
 GAME_ROOT = Path(os.environ.get("LEXEDITOR_FF7R_ROOT", ".")).expanduser().resolve()
-DATA_ROOT = Path(os.environ.get("LEXEDITOR_FF7R_DATA_ROOT", ROOT / "out" / "ff7r-data")).expanduser().resolve()
-PROJECT_ROOT = Path(os.environ.get("LEXEDITOR_FF7R_PROJECT", ROOT / "out" / "ff7r-project")).expanduser().resolve()
+# Extracted game data and the fallback project live with the user data, as
+# every other plugin's do; they used to land in the program folder.
+_USER_DATA = Path(os.environ.get("LOCALAPPDATA", ROOT / "out")) / "Lexeditor"
+DATA_ROOT = Path(os.environ.get("LEXEDITOR_FF7R_DATA_ROOT", _USER_DATA / "game-data" / "ff7r")).expanduser().resolve()
+PROJECT_ROOT = Path(os.environ.get("LEXEDITOR_FF7R_PROJECT", _USER_DATA / "projects" / "ff7r")).expanduser().resolve()
 MAX_BODY = 16 * 1024 * 1024
 _catalog_lock = threading.RLock()
 _catalog_cache: dict | None = None

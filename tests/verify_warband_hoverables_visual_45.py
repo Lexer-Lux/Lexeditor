@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 from pathlib import Path
 import sys
 
@@ -90,7 +92,7 @@ def main() -> int:
             assert "recruit" in selected.inner_text().lower()
             assert not errors, errors
 
-            output = ROOT / "out" / "rendered" / "github-45-warband-relationship.png"
+            output = DEV_CACHE / "rendered" / "github-45-warband-relationship.png"
             page.screenshot(path=str(output), full_page=True)
             print({
                 "treeTarget": "veteran",

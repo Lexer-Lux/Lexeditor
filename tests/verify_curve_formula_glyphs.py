@@ -10,6 +10,8 @@ measures the same boxes independently and fails on any real penetration.
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import json
 import os
@@ -139,7 +141,7 @@ def main() -> int:
     # measurement can be taken against a deliberately broken framework to show
     # what the search is worth.
     baseline = bool(os.environ.get("LEX_GLYPH_BASELINE"))
-    output = ROOT / "out" / "rendered" / (
+    output = DEV_CACHE / "rendered" / (
         "curve-formula-glyphs-before.png" if baseline else "curve-formula-glyphs.png")
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-glyphs-edge-", ignore_cleanup_errors=True)

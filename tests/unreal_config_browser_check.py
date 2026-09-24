@@ -7,6 +7,8 @@ a large UI scale.
 """
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import shutil
 import sys
 import tempfile
@@ -28,7 +30,7 @@ from ff7r2_fixture import (  # noqa: E402
 from plugins.ff7r.plugin import FF7RSession  # noqa: E402
 from plugins.ff7r2.plugin import Ff7r2Session  # noqa: E402
 
-OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "unreal-config-browser"
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "unreal-config-browser"
 OUT.mkdir(parents=True, exist_ok=True)
 
 PLAYER = Path("End/Content/DataObject/Resident/PlayerParameter.uasset")

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import json
 import os
@@ -76,7 +78,7 @@ def main() -> int:
         raise AssertionError("unsupported mngrp.bin text-box section was accepted")
 
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "out" / "rendered" / "goal-ff8-mngrp-text.png"
+    output = DEV_CACHE / "rendered" / "goal-ff8-mngrp-text.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     project = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-mngrp-project-", ignore_cleanup_errors=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-mngrp-edge-", ignore_cleanup_errors=True)

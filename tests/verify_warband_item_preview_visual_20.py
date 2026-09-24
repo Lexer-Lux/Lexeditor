@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import os
 from pathlib import Path
@@ -102,7 +104,7 @@ def main() -> int:
             assert all(b["badges"] == 1 for b in badges), badges
             badge_geometry = cdp.eval("[...document.querySelectorAll('nav .lex-tab-shortcut')].map(n=>{const a=n.getBoundingClientRect(),b=n.closest('button').getBoundingClientRect();return Math.abs((a.top+a.bottom-b.top-b.bottom)/2)})")
             assert all(delta <= 1 for delta in badge_geometry), badge_geometry
-            output = ROOT / "out" / "rendered" / "github-20-warband-detail-icon-font.png"
+            output = DEV_CACHE / "rendered" / "github-20-warband-detail-icon-font.png"
             output.parent.mkdir(parents=True, exist_ok=True)
             shot = cdp.call("Page.captureScreenshot", {
                 "format": "png", "captureBeyondViewport": False, "fromSurface": True,

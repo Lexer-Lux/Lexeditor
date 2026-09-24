@@ -1,5 +1,7 @@
 """Behavioral shared-control regressions without installed games or machine-local tools."""
 from __future__ import annotations
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import json
 import os
 from pathlib import Path
@@ -9,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'out/global-controls'
+OUT = DEV_CACHE / 'global-controls'
 
 
 class FixtureServer(BaseHTTPRequestHandler):

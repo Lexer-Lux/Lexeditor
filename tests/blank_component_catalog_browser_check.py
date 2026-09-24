@@ -1,4 +1,6 @@
 """Blank shows every shared component, at its level, and every sample renders."""
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import json
 import sys
 from pathlib import Path
@@ -6,7 +8,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-SHOT = ROOT / "out" / "blank-components.png"
+SHOT = DEV_CACHE / "blank-components.png"
 TYPES = {".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json"}
 
 

@@ -1,4 +1,6 @@
 """Render production UI with disposable data; never open an installed game."""
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 from pathlib import Path
 import subprocess
 import sys
@@ -27,7 +29,7 @@ def main():
         print(f'Running {check}', flush=True)
         args = []
         if check in ('tests/rdr_browser_check.py', 'tests/rdr2_browser_check.py'):
-            args = ['--screenshots', str(ROOT / 'out' / Path(check).stem)]
+            args = ['--screenshots', str(DEV_CACHE / Path(check).stem)]
         result = subprocess.run([sys.executable, "-X", "utf8", str(ROOT / check), *args], cwd=ROOT)
         if result.returncode:
             failed.append(check)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import json
 from urllib.request import Request, urlopen
@@ -25,7 +27,7 @@ def capture(cdp: Cdp, name: str) -> None:
     shot = cdp.call("Page.captureScreenshot", {
         "format": "png", "captureBeyondViewport": False, "fromSurface": True,
     })
-    target = ROOT / "out" / "rendered" / name
+    target = DEV_CACHE / "rendered" / name
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(base64.b64decode(shot["data"]))
 

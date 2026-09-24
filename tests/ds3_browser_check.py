@@ -33,7 +33,7 @@ def field_value(row: dict, key: str):
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    output = Path(argv[0] if argv else "out/ds3-browser").resolve()
+    output = Path(argv[0]).resolve() if argv else Path(__import__("tempfile").gettempdir()) / "lexeditor-dev" / "ds3-browser"
     output.mkdir(parents=True, exist_ok=True)
     errors: list[str] = []
     response_failures: list[str] = []

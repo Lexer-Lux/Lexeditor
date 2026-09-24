@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import json
 import os
@@ -39,7 +41,7 @@ def make_mod(root: Path, mod_id: str, name: str, order: int, enabled: bool,
 
 def main() -> int:
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "out" / "rendered" / "goal-ff8-mod-load-order.png"
+    output = DEV_CACHE / "rendered" / "goal-ff8-mod-load-order.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-mod-order-edge-", ignore_cleanup_errors=True)
     scratch = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-mod-order-render-", ignore_cleanup_errors=True)

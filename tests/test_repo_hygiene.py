@@ -17,7 +17,7 @@ import check_plugin  # noqa: E402
 
 # Working folders that have no business in the checkout: use your session
 # scratchpad or %TEMP%/lexeditor-dev instead.
-FORBIDDEN = ["_scratch", ".pytest_cache", "artifacts", "$out", "_worktrees", "games"]
+FORBIDDEN = ["_scratch", ".pytest_cache", "artifacts", "out", "$out", "_worktrees", "games"]
 # Shipped runtime payloads; every other tracked file stays small.
 LARGE_ALLOWED = {
     "plugins/ff8/ffnx_issue_51/package/AF3DN.P",

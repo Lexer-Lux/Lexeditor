@@ -1,4 +1,6 @@
 """FF8's hand cursor sits just left of the selected row's text, not at the column edge."""
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -7,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from plugin_ui import plugin_ui
-SHOT = ROOT / "out" / "ff8_row_pointer.png"
+SHOT = DEV_CACHE / "ff8_row_pointer.png"
 
 
 def main():

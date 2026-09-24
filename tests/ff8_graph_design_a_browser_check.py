@@ -1,6 +1,8 @@
 """Rendered browser acceptance for approved FF8 graph formula design A (#299)."""
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import json
 from pathlib import Path
 import shutil
@@ -9,7 +11,7 @@ import sys
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "ff8-graph-design-a"
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "ff8-graph-design-a"
 OUT.mkdir(parents=True, exist_ok=True)
 
 FRAMEWORK_CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")

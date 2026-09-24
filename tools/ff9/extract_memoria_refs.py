@@ -67,4 +67,4 @@ def extract(destination: Path) -> dict[str, Path]:
 
 
 if __name__ == "__main__":
-    extract(Path(sys.argv[1] if len(sys.argv) > 1 else "out/ff9-memoria-refs"))
+    extract(Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__import__("tempfile").gettempdir()) / "lexeditor-dev" / "ff9-memoria-refs")

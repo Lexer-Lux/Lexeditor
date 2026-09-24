@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import json
 import os
@@ -48,8 +50,8 @@ def main() -> int:
             "fonts": {"total": len(font_items), "installed": len(font_items), "items": font_items},
         })
 
-    output = ROOT / "out" / "rendered" / "github-22-main-menu-box-art-current.png"
-    settings_output = ROOT / "out" / "rendered" / "github-23-settings-current.png"
+    output = DEV_CACHE / "rendered" / "github-22-main-menu-box-art-current.png"
+    settings_output = DEV_CACHE / "rendered" / "github-23-settings-current.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-menu-edge-", ignore_cleanup_errors=True)
     browser = None

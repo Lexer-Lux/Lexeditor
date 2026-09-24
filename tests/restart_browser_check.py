@@ -1,4 +1,6 @@
 """Restart the real Blank child from its rendered unsaved-changes dialog."""
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 import json
@@ -31,7 +33,7 @@ def main():
     host.download_fonts=Mock(return_value={'errors':[]})
     Bridge.host=host;bridge=ThreadingHTTPServer(('127.0.0.1',0),Bridge)
     threading.Thread(target=bridge.serve_forever,daemon=True).start()
-    out=ROOT/'out/restart';out.mkdir(parents=True,exist_ok=True)
+    out=DEV_CACHE / 'restart';out.mkdir(parents=True,exist_ok=True)
     try:
       opened=host.open_plugin('blank');previous=host._session
       with sync_playwright() as pw:

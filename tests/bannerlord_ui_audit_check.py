@@ -6,6 +6,8 @@ in-game acceptance.
 """
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import json
 import os
 from pathlib import Path
@@ -18,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
 from bannerlord_browser_check import inline_editor  # noqa: E402
 
-OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "bannerlord-ui-audit"
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "bannerlord-ui-audit"
 OUT.mkdir(parents=True, exist_ok=True)
 _SHARED_UI_ENV = os.environ.get("LEXEDITOR_SHARED_UI_ROOT", "").strip()
 SHARED_UI_ROOT = Path(_SHARED_UI_ENV).resolve() if _SHARED_UI_ENV else ROOT

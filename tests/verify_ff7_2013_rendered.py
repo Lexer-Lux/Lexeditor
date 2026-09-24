@@ -1,6 +1,8 @@
 """Rendered FF7 2013 save/discard acceptance against the current shared page modules."""
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import json
 from pathlib import Path
 import sys
@@ -12,7 +14,7 @@ sys.path.insert(0, str((ROOT / "tools").resolve()))
 import verify_ff7_rendered_neutral as neutral
 
 target = neutral.target
-OUT = ROOT / "out" / "ff7-2013-acceptance"
+OUT = DEV_CACHE / "ff7-2013-acceptance"
 
 
 def open_current_modules(self, edition: str = "ff7") -> None:

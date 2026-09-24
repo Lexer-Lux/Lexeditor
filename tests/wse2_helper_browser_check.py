@@ -1,4 +1,6 @@
 """Render the real Home page; bridge calls use disposable fixture responses."""
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 from pathlib import Path
 import json
 import shutil
@@ -6,7 +8,7 @@ import sys
 from playwright.sync_api import sync_playwright
 
 ROOT=Path(__file__).resolve().parents[1]
-OUTPUT=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/'out/wse2-helper-browser'
+OUTPUT=Path(sys.argv[1]) if len(sys.argv)>1 else DEV_CACHE / 'wse2-helper-browser'
 SETTINGS={'developerMode':True,'developerAuthorized':True,'developerLogin':'Lexer-Lux','loadingTransitionMinimumSeconds':0,'soundEnabled':False,'viewPreferences':{}}
 HELPERS=[
  {'pluginId':'ff8','plugin':'Final Fantasy 8','helper':'FFNx','pinned':'1.24.3','installedVersion':'1.24.3','installedStatus':'installed','latest':'1.25.0','published':'2026-09-01T00:00:00Z','behind':True,'releaseNotes':'https://github.com/julianxhokaxhiu/FFNx/releases/tag/1.25.0'},

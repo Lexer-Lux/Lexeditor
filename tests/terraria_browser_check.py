@@ -1,6 +1,8 @@
 """Rendered browser acceptance for the Terraria plugin using synthetic tModLoader source data."""
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import json
 import os
 from pathlib import Path
@@ -14,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "terraria-browser"
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "terraria-browser"
 OUT.mkdir(parents=True, exist_ok=True)
 
 

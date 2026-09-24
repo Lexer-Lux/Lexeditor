@@ -2,6 +2,8 @@
 """Rendered acceptance for Stardew Valley using only synthetic game/project fixtures."""
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import json
 import os
 import shutil
@@ -12,7 +14,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "stardew-valley-browser"
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else DEV_CACHE / "stardew-valley-browser"
 OUT.mkdir(parents=True, exist_ok=True)
 SHARED_UI_MODE = os.environ.get("LEXEDITOR_SHARED_UI_MODE", "branch")
 LAYOUT_FAILURES: list[dict] = []

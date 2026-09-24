@@ -15,7 +15,7 @@ MANUAL = {
 
 def main():
  p=argparse.ArgumentParser();p.add_argument('--runtime-root',type=Path,default=Path('C:/RDR2Mod'));p.add_argument('--timeout',type=int,default=60);args=p.parse_args()
- root=args.runtime_root.resolve();out=Path(__file__).resolve().parents[1]/'out/rdr2-runtime-audit';out.mkdir(parents=True,exist_ok=True)
+ root=args.runtime_root.resolve();out=Path(__import__("tempfile").gettempdir()) / "lexeditor-dev" / 'rdr2-runtime-audit';out.mkdir(parents=True,exist_ok=True)
  sys.path.insert(0,str(root/'tools'))
  from verifier_status import classify
  results=[]

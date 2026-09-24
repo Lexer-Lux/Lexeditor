@@ -3,6 +3,8 @@
 Boot fetches stay unresolved so no installed game or mod filesystem is touched.
 The real HTML, plugin CSS, scripts, shell and map callbacks are exercised.
 """
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 from pathlib import Path
 import json
 import os
@@ -13,7 +15,7 @@ from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 _SHARED_UI_ENV=os.environ.get('LEXEDITOR_SHARED_UI_ROOT','').strip()
 SHARED_UI_ROOT=Path(_SHARED_UI_ENV).resolve() if _SHARED_UI_ENV else ROOT
-OUT=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/'out'/'data-map-browser'
+OUT=Path(sys.argv[1]) if len(sys.argv)>1 else DEV_CACHE /'data-map-browser'
 OUT.mkdir(parents=True,exist_ok=True)
 # Derived, never hand-listed: a hardcoded tuple silently skipped ff7r, so its
 # Data Map went unchecked from the day the plugin landed. New plugins are

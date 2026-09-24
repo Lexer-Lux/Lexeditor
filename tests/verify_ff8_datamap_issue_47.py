@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import os
 from pathlib import Path
@@ -31,7 +33,7 @@ def main() -> int:
     assert ".lex-data-map-table code,.lex-data-map-link{font-family:var(--lex-font)" in source
 
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "out" / "rendered" / "github-47-ff8-datamap.png"
+    output = DEV_CACHE / "rendered" / "github-47-ff8-datamap.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(
         prefix="lexeditor-ff8-datamap-edge-", ignore_cleanup_errors=True)

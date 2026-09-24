@@ -4,6 +4,8 @@ Only OS host functions and Audio playback are doubles. The actual DOM helpers,
 controls, list/detail, history, save actions, settings, and HTTP handlers run.
 This is not an installed-game or audio-selection listening test.
 """
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 from pathlib import Path
 import hashlib
 import json
@@ -19,7 +21,7 @@ import verify_ff7_completion as complete
 import verify_ff7_extended as extended_fixtures
 from plugins.ff7 import extended as ex, ai
 ROOT=Path(__file__).resolve().parents[1]
-OUT=Path(os.environ.get('FF7_SCREENSHOTS',str(ROOT/'out/ff7-rendered')))
+OUT=Path(os.environ.get('FF7_SCREENSHOTS',str(DEV_CACHE / 'ff7-rendered')))
 
 HOST = r'''
 window.audioPlayed=[];window.audioPaused=[];

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import base64
 import os
 from pathlib import Path
@@ -20,7 +22,7 @@ from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # n
 
 def main() -> int:
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "out" / "rendered" / "github-26-rdr2-numeric-references.png"
+    output = DEV_CACHE / "rendered" / "github-26-rdr2-numeric-references.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-rdr2-ref-edge-", ignore_cleanup_errors=True)
     hidden = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0

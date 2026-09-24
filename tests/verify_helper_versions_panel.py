@@ -8,6 +8,8 @@ of the main menu.
 
 from __future__ import annotations
 
+# Dev caches and outputs live in the temp folder, never in the checkout.
+DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import json
 import os
 from pathlib import Path
@@ -96,7 +98,7 @@ def main() -> int:
         wait_eval(cdp, "!document.querySelector('#lexer-handle').hidden", 20)
         import base64
         closed_shot = cdp.call("Page.captureScreenshot", {"format": "png", "fromSurface": True})
-        closed_target = ROOT / "out" / "rendered" / "helper-versions-handle.png"
+        closed_target = DEV_CACHE / "rendered" / "helper-versions-handle.png"
         closed_target.parent.mkdir(parents=True, exist_ok=True)
         closed_target.write_bytes(base64.b64decode(closed_shot["data"]))
         button = json.loads(cdp.eval("""JSON.stringify((()=>{const node=document.querySelector('#lexer-handle'),
@@ -128,7 +130,7 @@ def main() -> int:
         assert opened["removedTables"] == 0, opened
         # Capture it open, which is the state worth looking at.
         shot = cdp.call("Page.captureScreenshot", {"format": "png", "fromSurface": True})
-        target = ROOT / "out" / "rendered" / "helper-versions-panel.png"
+        target = DEV_CACHE / "rendered" / "helper-versions-panel.png"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(base64.b64decode(shot["data"]))
         # Nothing in this panel may install: it is a report, not an updater.
