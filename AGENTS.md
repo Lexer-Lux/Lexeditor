@@ -27,12 +27,12 @@
   File offsets and parser details are not a substitute for user instructions.
 - Do not claim visual acceptance from source, API, or smoke checks.
 
-## Muse for bounded code edits
+## Muse use
 
-- Prefer the installed `muse` CLI for small, well-defined code edits to reduce
-  the primary agent's usage. The primary agent owns diagnosis, design, task
-  scope, integration, and final verification. Split complex work into simple
-  edit tasks before giving it to Muse.
+- Do not use Muse by default. Lexer withdrew that preference because its
+  delays and repair work did not save enough time. Make edits directly unless
+  Lexer asks to try Muse again. The instructions below apply only to such a
+  requested trial; the primary agent still owns diagnosis and verification.
 - Use headless execution: `muse exec --workspace C:\Lexeditor --prompt-file
   <prompt-path> --max-model-steps 20`. Put temporary prompts and output outside
   the checkout. Use the current checkout path if it differs from this example.
