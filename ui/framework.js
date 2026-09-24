@@ -1624,7 +1624,7 @@
     const max = options.max ?? input?.getAttribute?.("max") ?? input?.dataset?.max;
     const rangeText = options.range || ((min !== null && min !== undefined && min !== "") ||
       (max !== null && max !== undefined && max !== "")
-      ? `(${min ?? "…"}-${max ?? "…"})` : "");
+      ? `(${min === null || min === undefined || min === "" ? "…" : formatNumber(min)}-${max === null || max === undefined || max === "" ? "…" : formatNumber(max)})` : "");
     if (input && !readOnly && dataType === "INT") {
       if (!input.hasAttribute("step")) input.step = "1";
       input.inputMode = "numeric";

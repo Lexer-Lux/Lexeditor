@@ -24,6 +24,23 @@ def framework(page):
     page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
 
 
+def test_field_range_uses_grouped_numbers(page):
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      for(const [min,max] of [[0,65535],[-100000,1000000],[0.125,10000.5],[null,9999]]) {
+        const attrs={type:'number',value:0};
+        if(min!==null)attrs.min=min;
+        attrs.max=max;
+        document.querySelector('main').append(U.detailField({label:'Amount',control:U.el('input',attrs)}));
+      }
+    }''')
+    assert page.locator('.lex-field-type-range').all_text_contents()==[
+        '(0-65,535)','(-100,000-1,000,000)','(0.125-10,000.5)','(…-9,999)']
+    page.locator('input').first.focus()
+    assert page.locator('input').first.get_attribute('max')=='65535'
+
+
 def test_create_button_precedes_pager_search(page):
     framework(page)
     page.evaluate('''()=>{
