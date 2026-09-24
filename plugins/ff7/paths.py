@@ -28,7 +28,7 @@ PROJECT_KERNEL_PATH = Path("ff7/workingdir/data/lang-en/kernel/kernel.bin")
 def check() -> list[str]:
     """Check the plugin-owned implementation files."""
     problems: list[str] = []
-    for relative in ("editor.html", "editor.js", "deployment.py", "kernel.py", "server.py", "plugin.py", "paths.py", "THIRD_PARTY.md"):
+    for relative in ("editor.html", "editor.js", "editor.css", "deployment.py", "kernel.py", "server.py", "plugin.py", "paths.py", "game_font.py", "THIRD_PARTY.md"):
         target = PLUGIN_ROOT / relative
         if not target.is_file():
             problems.append(f"FF7 plugin file is missing: {target}")

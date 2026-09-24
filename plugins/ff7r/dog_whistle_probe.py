@@ -189,6 +189,25 @@ def _ability_summary(entry) -> dict[str, Any]:
 
 def probe_dog_whistle_sources(game_root: Path, data_root: Path, project_root: Path,
                               index: dict, *, language: str = "US") -> dict:
+    from .scan_cache import cached, index_fingerprint
+
+    wanted = str(language).upper()
+    # Loading every installed text package takes ten-plus seconds and used to
+    # re-run on every Tweaks open. Vanilla inputs are fixed per index
+    # signature, so the report is cached on it. Without an install identity
+    # there is nothing safe to key on, so compute directly.
+    if not index.get("signatureId"):
+        return _probe_dog_whistle_sources(
+            game_root, data_root, project_root, index, language=wanted)
+    return cached(("dog-whistle-report", index.get("signatureId"),
+                   index_fingerprint(index, text=True),
+                   index_fingerprint(index), wanted),
+                  lambda: _probe_dog_whistle_sources(
+                      game_root, data_root, project_root, index, language=wanted))
+
+
+def _probe_dog_whistle_sources(game_root: Path, data_root: Path, project_root: Path,
+                               index: dict, *, language: str = "US") -> dict:
     text, text_owners, errors = _all_text_map(
         game_root, data_root, project_root, index, language)
     item = _load_data(game_root, data_root, index, ITEM_TABLE)

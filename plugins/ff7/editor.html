@@ -7,6 +7,7 @@
   <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
   <link rel="stylesheet" href="/shared/framework.css">
   <link rel="stylesheet" href="/shared/neutral.css">
+  <link rel="stylesheet" href="editor.css">
 </head>
 <body class="lex-neutral-ui">
   <header id="lexeditor-shell"></header>

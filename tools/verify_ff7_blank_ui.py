@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FF7 = ROOT / "plugins" / "ff7" / "editor.html"
+FF7_CSS = ROOT / "plugins" / "ff7" / "editor.css"
 FF7_JS_MODULES = ("editor.js", "controls.js", "details.js", "workspace.js")
 BLANK = ROOT / "plugins" / "blank" / "editor.html"
 BLANK_CSS = ROOT / "plugins" / "blank" / "editor.css"
@@ -25,17 +26,28 @@ def main() -> None:
     blank_js = BLANK_JS.read_text(encoding="utf-8")
     neutral = NEUTRAL.read_text(encoding="utf-8")
 
-    # FF7 consumes the shared neutral presentation and owns no stylesheet.
+    # FF7 consumes the shared neutral presentation plus its own theme layer.
     if "<style" in ff7.casefold() or "style=" in ff7.casefold() or "style=" in ff7_js.casefold():
         raise AssertionError("FF7 contains local CSS/style overrides")
     for marker in (
         '<link rel="stylesheet" href="/shared/framework.css">',
         '<link rel="stylesheet" href="/shared/neutral.css">',
+        '<link rel="stylesheet" href="editor.css">',
         '<body class="lex-neutral-ui">',
         '<script src="editor.js"></script>',
     ):
         if marker not in ff7:
             raise AssertionError(f"FF7 is not consuming the shared neutral/module contract: {marker}")
+
+    # The theme layers the game's menu font and window tokens over neutral;
+    # layout and helpers stay shared.
+    ff7_css = FF7_CSS.read_text(encoding="utf-8")
+    for theme_marker in ('@font-face', '"FF7 Menu"', "/assets/ff7-menu.ttf", "--lex-skin"):
+        if theme_marker not in ff7_css:
+            raise AssertionError(f"FF7 theme stylesheet lost its contract: {theme_marker}")
+    ff7_server = (ROOT / "plugins" / "ff7" / "server.py").read_text(encoding="utf-8")
+    if "/assets/ff7-menu.ttf" not in ff7_server:
+        raise AssertionError("FF7 server stopped routing its menu font")
 
     # Blank is now modular too. Keep the benchmark tied to its current files,
     # not to stale CSS that used to live inline in editor.html.
@@ -114,7 +126,7 @@ def main() -> None:
     if missing_ff7_helpers:
         raise AssertionError("FF7 stopped using required shared UI helpers: " + ", ".join(missing_ff7_helpers))
 
-    print("FF7 Blank UI contract: zero local CSS, shared neutral presentation, current Blank geometry")
+    print("FF7 Blank UI contract: shared neutral presentation plus theme layer, current Blank geometry")
 
 
 if __name__ == "__main__":

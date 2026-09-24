@@ -186,6 +186,19 @@ def _load_source_package(game_root: Path, data_root: Path, index: dict, row: dic
 
 def discover_atb_sources(game_root: Path, data_root: Path, index: dict) -> dict:
     """Discover authoritative installed ATB DataObject rows without project overlays."""
+    from .scan_cache import cached, index_fingerprint
+
+    # Four ATB groups plus the ATB runtime probe each rediscovered these rows
+    # on every Tweaks open. Installed inputs are fixed per index signature.
+    # Without an install identity there is nothing safe to key on.
+    if not index.get("signatureId"):
+        return _discover_atb_sources(game_root, data_root, index)
+    return cached(("atb-discovery", index.get("signatureId"),
+                   index_fingerprint(index)),
+                  lambda: _discover_atb_sources(game_root, data_root, index))
+
+
+def _discover_atb_sources(game_root: Path, data_root: Path, index: dict) -> dict:
     result = {
         "resident": [],
         "guard": [],

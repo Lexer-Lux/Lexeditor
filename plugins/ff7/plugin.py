@@ -25,9 +25,14 @@ def check() -> list[str]:
     return paths.check()
 
 
-def seed_project_layout(game_root: Path, template_root: Path,
-                        default_root: Path) -> dict:
-    """Seed safe editable projects from the installed product's proved kernel."""
+def seed_project_template(game_root: Path, template_root: Path) -> dict:
+    """Seed the starter template from the installed product's proved kernel.
+
+    This deliberately creates no editable project. Opening the game used to
+    materialize a "My Mod" folder the player never asked for; a project now
+    appears only through the explicit Add a Mod / Find a Mod actions (or an
+    explicit save to the selected project path).
+    """
     source, relative = resolve_kernel(game_root)
     expected = relative.as_posix().casefold()
     supported = {
@@ -53,25 +58,18 @@ def seed_project_layout(game_root: Path, template_root: Path,
         "The installed game remains unchanged. Saving is not deployment; the Deployment screen can build a verified FFNx Direct Mode overlay for supported project data.\n",
         encoding="utf-8",
     )
-
-    default_kernel = target_path(game_root, default_root, source, relative)
-    if not default_kernel.is_file():
-        default_kernel.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(template_kernel, default_kernel)
-    Kernel(default_kernel)
     return {
         "template": str(template_root),
-        "defaultProject": str(default_root),
         "relativePath": relative.as_posix(),
     }
 
 
 def prepare_product(game_root: Path, data_root: Path, progress,
-                    template_root: Path, default_root: Path) -> dict:
-    """Prepare proved theme sounds and an editable baseline project."""
+                    template_root: Path) -> dict:
+    """Prepare proved theme sounds and the starter template (no project)."""
     from theme_sounds import ensure_theme_sounds
     progress(0, 2, "Preparing the Final Fantasy VII mod template")
-    project = seed_project_layout(game_root, template_root, default_root)
+    project = seed_project_template(game_root, template_root)
     progress(1, 2, "Preparing Final Fantasy VII interface sounds")
     result = ensure_theme_sounds(game_root, data_root,
         ("data/sound", "ff7/workingdir/data/sound"), {
@@ -85,7 +83,7 @@ def prepare_product(game_root: Path, data_root: Path, progress,
 def prepare(game_root: Path, data_root: Path, progress) -> dict:
     return prepare_product(
         game_root, data_root, progress,
-        paths.PROJECT_TEMPLATE_ROOT, paths.PROJECT_ROOT,
+        paths.PROJECT_TEMPLATE_ROOT,
     )
 
 

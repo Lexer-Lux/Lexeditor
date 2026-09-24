@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from plugins.ff7.plugin import (  # noqa: E402
-    FF7Session, PLUGIN as CURRENT_PLUGIN, seed_project_layout,
+    FF7Session, PLUGIN as CURRENT_PLUGIN, seed_project_template,
 )
 from plugins.ff7_2013.plugin import (  # noqa: E402
     FF7LegacySession, PLUGIN as LEGACY_PLUGIN,
@@ -65,10 +65,13 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7-projects-", ignore_cleanu
         default = product / "default"
         source, relative = resolve_kernel(game_root)
         assert relative.as_posix().casefold() == required_path.casefold(), relative
-        seeded = seed_project_layout(game_root, template, default)
+        seeded = seed_project_template(game_root, template)
         assert seeded["relativePath"].casefold() == required_path.casefold(), seeded
         assert Kernel(template / relative).sha256 == Kernel(source).sha256
-        assert Kernel(default / relative).sha256 == Kernel(source).sha256
+        # Preparing the game seeds only the starter template. The default
+        # project folder must not exist until the player explicitly creates,
+        # finds, or saves one: no phantom "My Mod".
+        assert not default.exists(), default
 
         test_spec = replace(
             plugin.projects,
@@ -82,7 +85,10 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff7-projects-", ignore_cleanu
         )
         initial = manager.snapshot(plugin.plugin_id)
         assert initial["current"] == str(default.resolve()), initial
-        assert initial["canCreate"] and initial["projects"][0]["valid"], initial
+        assert initial["canCreate"], initial
+        current_row = next(row for row in initial["projects"]
+                           if row["current"])
+        assert not current_row["valid"], initial
 
         created = manager.create(plugin.plugin_id, str(product), "New Mod")
         new_mod = product / "New Mod"

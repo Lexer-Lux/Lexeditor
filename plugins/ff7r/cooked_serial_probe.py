@@ -435,6 +435,13 @@ def extract_serialized_name_refs(
     }
 
 
+def _pak_signature(game_root: Path) -> tuple:
+    return tuple(sorted(
+        (pak.name, pak.stat().st_size, pak.stat().st_mtime_ns)
+        for pak in installed_paks(game_root)
+    ))
+
+
 def probe_installed_serialized_exports(
     game_root: Path,
     *,
@@ -442,6 +449,27 @@ def probe_installed_serialized_exports(
     tokens: Iterable[str],
 ) -> dict[str, Any]:
     """Find matching installed .uasset/.uexp pairs and scan export evidence."""
+    from .scan_cache import cached
+
+    root = Path(game_root).resolve()
+    wanted_terms = tuple(terms)
+    wanted_tokens = tuple(tokens)
+    # Shares the installed-asset scan cache rationale with raw_asset_probe:
+    # one Tweaks open ran this full-PAK scan once per probe.
+    return cached(
+        ("installed-serialized-exports", str(root), _pak_signature(root),
+         wanted_terms, wanted_tokens),
+        lambda: _scan_installed_serialized_exports(
+            root, terms=wanted_terms, tokens=wanted_tokens),
+    )
+
+
+def _scan_installed_serialized_exports(
+    game_root: Path,
+    *,
+    terms: Iterable[str],
+    tokens: Iterable[str],
+) -> dict[str, Any]:
     game_root = Path(game_root).resolve()
     listings: list[tuple[str, list[str]]] = []
     paks: dict[str, Path] = {}

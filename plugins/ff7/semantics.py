@@ -13,7 +13,13 @@ def choices(*pairs):
 
 
 def flags(*pairs):
-    return [{"value": value, "label": label} for value, label in pairs]
+    rows = []
+    for pair in pairs:
+        row = {"value": pair[0], "label": pair[1]}
+        if len(pair) > 2 and pair[2]:
+            row["help"] = pair[2]
+        rows.append(row)
+    return rows
 
 
 STATUSES = (
@@ -40,7 +46,7 @@ ELEMENTS = (
 TARGET_FLAGS = (
     (0x01, "Choose target"), (0x02, "Start cursor on enemies"),
     (0x04, "Start with multiple targets"), (0x08, "Allow single/all toggle"),
-    (0x10, "Lock to one side"), (0x20, "Short range"),
+    (0x10, "Lock to one side", "Stays on one side of the battle: the cursor cannot move between your party and the enemies, so the attack can never cross sides."), (0x20, "Short range"),
     (0x40, "Target all rows"), (0x80, "Random target"),
 )
 EQUIPABLE = (
@@ -76,8 +82,8 @@ COMMAND_ACTIONS = (
 MAGIC_MENU_GROUPS = ((0, "Restore"), (1, "Attack"), (2, "Indirect"), (3, "Special"), (0xFF, "Not listed"))
 
 RESTRICTION_FLAGS = (
-    (0x0001, "Can be sold"), (0x0002, "Can be used in battle"),
-    (0x0004, "Can be used from the menu"), (0x0008, "Can be thrown"),
+    (0x0001, "Sellable"), (0x0002, "Usable in battle"),
+    (0x0004, "Usable in menu"), (0x0008, "Throwable"),
 )
 MATERIA_SLOTS = (
     (0, "No slot"), (1, "Unlinked — no AP growth"),
@@ -273,7 +279,7 @@ CORE = {
     },
     "playerAttacks": {
         "targetData": _field(label="Targeting", dataType="flags", flags=flags(*TARGET_FLAGS), group="Targeting", help="Who this player attack/spell can target and how its battle cursor behaves."),
-        "damageCalculationId": _field(label="Damage / healing formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Damage", help="Formula, damage type, accuracy behavior and critical capability encoded in the calculation byte."),
+        "damageCalculationId": _field(label="DMG/Heal Formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Damage", help="Formula, damage type, accuracy behavior and critical capability encoded in the calculation byte."),
         "conditionSubmenu": _field(label="Condition submenu", dataType="enum", choices=choices(*ATTACK_CONDITIONS), group="Status / condition", help="Conditional submenu mode used by the attack."),
         "statusChange": _field(label="Status change", dataType="statusChange", group="Status / condition", help="Inflict/cure/swap mode and chance encoded in one byte."),
         "additionalEffects": _field(label="Additional behavior", dataType="enum", choices=choices(*ADDITIONAL_EFFECTS), group="Extra behavior", help="Hard-coded behavior beyond ordinary damage/status processing."),
@@ -283,7 +289,7 @@ CORE = {
         "specialAttackFlags": _field(label="Special attack properties", dataType="flags", flags=flags(*SPECIAL_ATTACK_FLAGS), invertBits=True, bitWidth=16, group="Extra behavior", help="Named special properties. KERNEL.BIN stores these bits inverted; the editor presents their logical meaning."),
         "accuracyRate": _field(label="Accuracy", group="Damage", help="Base accuracy parameter used by formulas that perform an accuracy check."),
         "mpCost": _field(label="MP cost", group="Cost", help="MP consumed when this attack is used normally."),
-        "attackPower": _field(label="Power", group="Damage", help="Base power consumed by the selected damage/healing formula."),
+        "attackPower": _field(label="Power", group="Damage", help="Base power consumed by the selected DMG/Heal Formula."),
         "impactEffectId": advanced("Impact effect ID", "Raw impact visual-effect ID."),
         "targetHurtActionIndex": advanced("Target hurt action ID", "Raw target reaction/animation index."),
         "impactSound": advanced("Impact sound ID", "Raw battle sound-effect ID."),
@@ -293,26 +299,26 @@ CORE = {
     },
     "items": {
         "targetData": _field(label="Targeting", dataType="flags", flags=flags(*TARGET_FLAGS), group="Targeting", help="Who this item can target and how the battle cursor behaves."),
-        "damageCalculationId": _field(label="Damage / healing formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Effect", help="The battle formula and accuracy mode used by the item. The raw byte combines formula, physical/magical mode, accuracy and critical-hit behavior."),
+        "damageCalculationId": _field(label="DMG/Heal Formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Effect", help="The battle formula and accuracy mode used by the item. The raw byte combines formula, physical/magical mode, accuracy and critical-hit behavior."),
         "conditionSubmenu": _field(label="Condition submenu", dataType="enum", choices=choices(*ATTACK_CONDITIONS), group="Effect", help="Which conditional submenu the battle UI uses: HP, MP, Status, or none."),
         "statusChange": _field(label="Status change", dataType="statusChange", group="Status", help="Whether this item inflicts, cures or swaps the selected status set, plus its encoded chance/amount."),
         "additionalEffects": _field(label="Additional behavior", dataType="enum", choices=choices(*ADDITIONAL_EFFECTS), group="Effect", help="Extra hard-coded battle behavior beyond the normal damage/status calculation."),
         "additionalEffectsModifier": _field(label="Additional-behavior modifier", group="Effect", help="Parameter consumed only by additional behaviors that require one; otherwise ignored."),
         "statusFlags": _field(label="Statuses affected", dataType="flags", flags=flags(*STATUSES), group="Status", help="Named statuses this item can inflict/cure/swap according to Status change."),
         "elementFlags": _field(label="Elements", dataType="flags", flags=flags(*ELEMENTS), group="Effect", help="Elemental tags used by the battle engine."),
-        "restrictions": _field(label="Availability / permissions", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Availability", help="Where this item is allowed to be sold or used. KERNEL.BIN stores these permission bits inverted."),
+        "restrictions": _field(label="Perms", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Perms", help="Whether this item may be sold, used in battle or from the menu, or thrown. KERNEL.BIN stores these permission bits inverted."),
         "specialAttackFlags": _field(label="Special attack properties", dataType="flags", flags=flags(*SPECIAL_ATTACK_FLAGS), invertBits=True, bitWidth=16, group="Effect", help="Special battle properties such as reflection, defense bypass or MP damage. KERNEL.BIN stores these bits inverted."),
         "cameraMovementId": advanced("Camera movement ID", "Raw battle-camera program ID. No stable semantic name table is exposed by this plugin yet."),
         "attackEffectId": advanced("Visual attack effect ID", "Raw visual-effect program ID. Kept in Advanced because the current plugin has no authoritative effect-name table."),
     },
     "weapons": {
         "targetData": _field(label="Targeting", dataType="flags", flags=flags(*TARGET_FLAGS), group="Combat", help="Who the basic weapon attack can target and how the cursor behaves."),
-        "damageCalculationId": _field(label="Damage formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Combat", help="Formula/accuracy byte used for this weapon's basic attack."),
+        "damageCalculationId": _field(label="DMG/Heal Formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Combat", help="Formula/accuracy byte used for this weapon's basic attack."),
         "status": _field(label="Granted status", dataType="enum", choices=choices(*STATUS_INDEX), group="Equipped effects", help="Single status granted by the equipment, or None."),
         "growthRate": _field(label="Materia AP growth", dataType="enum", choices=choices(*GROWTH_RATES), group="Materia slots", help="AP growth multiplier for Materia installed in this weapon."),
         "equipableBy": _field(label="Usable by", dataType="flags", flags=flags(*EQUIPABLE), group="Equipment", help="Characters allowed to equip this weapon."),
         "attackElements": _field(label="Attack elements", dataType="flags", flags=flags(*ELEMENTS), group="Combat", help="Elements applied by the weapon's basic attack."),
-        "restrictions": _field(label="Availability / permissions", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Availability", help="Whether this weapon may be sold, used in battle/menu contexts, or thrown. KERNEL.BIN stores these permission bits inverted."),
+        "restrictions": _field(label="Perms", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Perms", help="Whether this weapon may be sold, used in battle or from the menu, or thrown. KERNEL.BIN stores these permission bits inverted."),
         "weaponModelId": advanced("Weapon model ID", "Raw model index used by the battle renderer; no authoritative model-name table is currently exposed."),
         "highSoundIdMask": advanced("Sound ID high-bit mask", "Raw high-bit selector used with this weapon's hit/miss sound IDs."),
         "normalHitSoundId": advanced("Normal hit sound ID", "Raw sound-effect selector for a normal weapon hit."),
@@ -329,7 +335,7 @@ CORE = {
         "growthRate": _field(label="Materia AP growth", dataType="enum", choices=choices(*GROWTH_RATES), group="Materia slots", help="AP growth multiplier for Materia installed in this armor."),
         "equipableBy": _field(label="Usable by", dataType="flags", flags=flags(*EQUIPABLE), group="Equipment", help="Characters allowed to equip this armor."),
         "elementalDefense": _field(label="Affected elements", dataType="flags", flags=flags(*ELEMENTS), group="Elemental defense", help="Elements affected by Elemental response."),
-        "restrictions": _field(label="Availability / permissions", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Availability", help="Whether this armor may be sold, used in battle/menu contexts, or thrown. KERNEL.BIN stores these permission bits inverted."),
+        "restrictions": _field(label="Perms", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Perms", help="Whether this armor may be sold, used in battle or from the menu, or thrown. KERNEL.BIN stores these permission bits inverted."),
         **{f"boostedStat{i}": _field(label=f"Stat bonus {i}", dataType="enum", choices=choices(*CHARACTER_STATS), group="Stat bonuses", help=f"Character stat modified by equipment bonus slot {i}.") for i in range(1,5)},
         **{f"boostedStat{i}Bonus": _field(label=f"Stat bonus {i} amount", group="Stat bonuses", help=f"Amount added to equipment stat bonus slot {i}.") for i in range(1,5)},
         **{f"materiaSlot{i}": _field(label=f"Materia slot {i}", dataType="enum", choices=choices(*MATERIA_SLOTS), group="Materia slots", help="Whether this position exists, links to its neighbor, and supports AP growth.") for i in range(1,9)},
@@ -344,7 +350,7 @@ CORE = {
         "elementalDefense": _field(label="Affected elements", dataType="flags", flags=flags(*ELEMENTS), group="Elemental defense", help="Elements affected by Elemental response."),
         "statusDefense": _field(label="Protected statuses", dataType="flags", flags=flags(*STATUSES), group="Status defense", help="Statuses this accessory protects against."),
         "equipableBy": _field(label="Usable by", dataType="flags", flags=flags(*EQUIPABLE), group="Equipment", help="Characters allowed to equip this accessory."),
-        "restrictions": _field(label="Availability / permissions", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Availability", help="Whether this accessory may be sold, used in battle/menu contexts, or thrown. KERNEL.BIN stores these permission bits inverted."),
+        "restrictions": _field(label="Perms", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Perms", help="Whether this accessory may be sold, used in battle or from the menu, or thrown. KERNEL.BIN stores these permission bits inverted."),
     },
 }
 
@@ -385,7 +391,7 @@ SCENE = {
     },
     "enemyAttacks": {
         "target": _field(label="Targeting", dataType="flags", flags=flags(*TARGET_FLAGS), group="Targeting", help="Who this attack can target and how its battle cursor/selection behaves."),
-        "formula": _field(label="Damage / healing formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Damage", help="Formula, damage type, accuracy behavior and critical capability encoded in the calculation byte."),
+        "formula": _field(label="DMG/Heal Formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Damage", help="Formula, damage type, accuracy behavior and critical capability encoded in the calculation byte."),
         "condition": _field(label="Condition submenu", dataType="enum", choices=choices(*ATTACK_CONDITIONS), group="Status / condition", help="Conditional submenu mode used by the attack."),
         "statusChance": _field(label="Status change", dataType="statusChange", group="Status / condition", help="Inflict/cure/swap mode and chance encoded in one byte."),
         "additionalEffect": _field(label="Additional behavior", dataType="enum", choices=choices(*ADDITIONAL_EFFECTS), group="Extra behavior", help="Hard-coded behavior beyond ordinary damage/status processing."),
@@ -480,7 +486,7 @@ def apply(category: str, fields_in):
 # Scalar fields that are genuinely numeric but still need domain language.
 for key, label, help_text in (
     ("attackPower", "Power", "Base power consumed by the selected item formula."),
-    ("attackStrength", "Attack power", "Base power used by this weapon's damage formula."),
+    ("attackStrength", "Attack power", "Base power used by this weapon's DMG/Heal Formula."),
     ("criticalRate", "Critical rate", "Weapon critical-hit rate parameter."),
     ("accuracyRate", "Accuracy", "Weapon accuracy rate parameter."),
 ):

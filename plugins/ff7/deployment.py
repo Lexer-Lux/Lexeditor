@@ -68,8 +68,9 @@ def ffnx_config(game_root: Path) -> dict:
             "available": False, "runtime": "FFNx", "format": "toml",
             "path": str(expected), "sha256": None, "sections": [],
             "message": (
-                "FFNx.toml was not found at the game root or ff7/workingdir. "
-                "Lexeditor can still save and export the project, but cannot deploy it."
+                "FFNx has not created FFNx.toml yet. Lexeditor checks the game root "
+                "and ff7/workingdir. Saving and exporting keep working; "
+                "deploying waits for that file."
             ),
         }
     result = load_config(path, "FFNx", "toml", game="FF7")

@@ -357,6 +357,16 @@ def assess_sprint_evidence(
 
 def probe_better_sprint_sources(game_root: Path, data_root: Path, index: dict) -> dict[str, Any]:
     """Collect bounded native plus likely authored-data evidence from an installed build."""
+    from .scan_cache import cached, index_fingerprint
+
+    if not index.get("signatureId"):
+        return _probe_better_sprint_sources(game_root, data_root, index)
+    return cached(("better-sprint-report", index.get("signatureId"),
+                   index_fingerprint(index)),
+                  lambda: _probe_better_sprint_sources(game_root, data_root, index))
+
+
+def _probe_better_sprint_sources(game_root: Path, data_root: Path, index: dict) -> dict[str, Any]:
     from .archive import extract_pair
 
     native = probe_installed_exe(game_root, needles=SPRINT_NATIVE_NEEDLES)

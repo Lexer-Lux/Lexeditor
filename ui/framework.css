@@ -2212,6 +2212,14 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   white-space:nowrap;
 }
 
+/* The 1em line box hugs the glyphs for cross-font centring, so a bare
+   custom span shears descenders (Tiger Fang's g's) against its own clip
+   box. Same .14em of descender room the wrapped .lex-column-cell-text
+   already carries; controls size their own boxes and are excluded. */
+.lex-column-list-cell .lex-column-cell-content > span:not(.lex-source-control) {
+  padding-block:.14em;
+}
+
 .lex-column-list-cell:has(input[type="checkbox"]) .lex-source-control > input[type="checkbox"] {
   justify-self:center;
 }
@@ -5161,10 +5169,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   display:none;
 }
 .lex-toggle > .lex-toggle-rail:is(:hover,:has(:focus-visible)) > .lex-info-help {
-  width:18px;
-  min-width:18px;
-  height:18px;
-  min-height:18px;
   display:inline-grid;
 }
 
@@ -5439,17 +5443,18 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-info-help {
   -webkit-text-stroke:0;
   -webkit-text-fill-color:currentColor;
-  width: 1.15em;
-  min-width: 1.15em;
-  height: 1.15em;
-  min-height: 1.15em;
+  /* One size in every context; the ring keeps the white disc readable on light grounds. */
+  width: var(--lex-help-size,16px);
+  min-width: var(--lex-help-size,16px);
+  height: var(--lex-help-size,16px);
+  min-height: var(--lex-help-size,16px);
   margin-left: 6px;
   color: var(--lex-help-fg,#111);
-  border: 0;
+  border: 1px solid var(--lex-help-ring,var(--lex-muted,#68717a));
   border-radius: 50%;
   background: #fff;
   cursor: help;
-  font-size: inherit;
+  font-size: 14px;
   vertical-align: middle;
   font-variant-numeric: normal;
   display:inline-grid;
@@ -5475,7 +5480,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 .lex-detail-field-label > .lex-info-help {
   font-family: var(--lex-symbol-font);
-  font-size: 11px;
   font-weight: 700;
   line-height: 1;
 }
@@ -5484,7 +5488,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   flex:0 0 auto;
   margin-left:0;
   font-family: var(--lex-symbol-font);
-  font-size: 11px;
   font-weight: 700;
   line-height: 1;
 }
@@ -5573,7 +5576,20 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-panel-layout-divider:hover::before,
 .lex-panel-layout-divider:focus-visible::before,
 .lex-panel-layout-divider.dragging::before {color:var(--lex-highlight);}
-.lex-panel-layout-divider::after {content:none;}
+/* The divider track is transparent over the body background, so at the real
+   panel-gap setting the split between list and detail read as no separation:
+   only the small centered grip marked it. A one-pixel rule in the theme's
+   border color runs the track's full length, the same delineation language
+   as table gridlines and tab edges everywhere else. */
+.lex-panel-layout-divider::after {
+  content:"";
+  position:absolute;
+  top:0;bottom:0;left:50%;
+  width:1px;
+  background:var(--lex-border);
+  transform:translateX(-50%);
+  pointer-events:none;
+}
 /* A stacked layout drags up and down, so its grip is the same arrows turned a
    quarter: the earlier stacked rule reshaped the box to 24x10, which squashed
    the upright artwork into a smear instead of turning it. */
@@ -5584,6 +5600,11 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   width:16px;height:32px;
   transform:translate(-50%,-50%) rotate(90deg);
 
+}
+.lex-panel-layout-vertical > .lex-panel-layout-divider::after {
+  top:50%;bottom:auto;left:0;right:0;
+  width:auto;height:1px;
+  transform:translateY(-50%);
 }
 
 /* Shortcut badges are overlays. Hover never changes the label lane. */
@@ -5649,18 +5670,12 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
  font-size:8px;
 }
 .lex-toggle > .lex-toggle-rail > .lex-info-help {
-  --lex-help-pip-size:14px;
   display:none;
 }
 .lex-toggle-rail > .lex-info-help {
   margin:0;
-  width:14px;
-  min-width:14px;
-  height:14px;
-  min-height:14px;
   display:none;
   font-family: var(--lex-symbol-font);
-  font-size: 11px;
   font-weight: 700;
   line-height: 1;
 }
@@ -6526,7 +6541,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 
 /* Help inside a tab sits beside the label rather than floating over it. */
 [role="tab"] .lex-info-help { position: relative; inset: auto; margin-left: 8px; }
-.lex-tabbed-panel-tabs [role="tab"] > .lex-info-help { font-size:.85em; margin-left:3px; }
+.lex-tabbed-panel-tabs [role="tab"] > .lex-info-help { margin-left:3px; }
 
 /* Colours a game restyles through tokens rather than by naming shared classes:
    the window bar, its buttons, a list's header and cell rules, a panel's

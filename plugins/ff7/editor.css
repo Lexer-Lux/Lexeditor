@@ -1,0 +1,55 @@
+    @font-face {font-family:"FF7 Menu";src:url("/assets/ff7-menu.ttf?v=1") format("truetype");font-display:swap;ascent-override:88%;descent-override:12%;line-gap-override:0}
+    /* The FF7 window, as values: menu blue under white lettering with a dark
+       drop, white window borders, and the game's own red for warnings. This
+       layers over the shared neutral presentation; layout stays shared. */
+    :root {--lex-font-synthesis:none;--lex-number-font:var(--lex-font);--lex-font-size:17px;--lex-line-height:1.28;--lex-bg:#06063c;--lex-panel:#10106a;--lex-panel-2:#0b0b52;--lex-border:#8a8ac8;
+      --lex-text:#fff;--lex-muted:#c6c6ee;--lex-accent:#d02020;--lex-accent-text:#fff;
+      --lex-highlight:#f0f0ff;--lex-success:#d0d0d0;--lex-font:"FF7 Menu","Arial Narrow",sans-serif;--lex-font-size-adjust:none;--lex-text-nudge:0px;--lex-text-line:1.25;
+      --lex-skin:on;--lex-font-metrics:on;
+      --lex-text-shadow:2px 2px 0 #06061e;
+      --lex-shell-header-bg:#04042c;--lex-shell-header-gap:var(--lex-panel-gap);--lex-shell-header-padding:0;
+      --lex-command-row-padding:0 10px;--lex-command-row-bg:linear-gradient(180deg,#1c1c9e,#0c0c5e);
+      --lex-command-row-border:2px solid;--lex-command-row-border-color:#e8e8f8;
+      --lex-nav-bg:#04042c;--lex-nav-padding-inline:var(--lex-panel-gap);
+      --lex-tab-min-height:40px;--lex-tab-padding-inline:clamp(4px,.4vw,10px);
+      /* Fifteen tabs in the menu's wide pitch: the labels scale to one row. */
+      --lex-tab-font-size:clamp(9px,.83vw,16px);--lex-tab-fg:#e8e8f8;
+      --lex-tab-bg:linear-gradient(180deg,#2323a8,#12126e);
+      --lex-tab-border:2px solid;--lex-tab-border-color:#e8e8f8;
+      --lex-tab-hover-bg:linear-gradient(180deg,#2e2ec2,#1a1a80);
+      --lex-tab-active-fg:#fff;--lex-tab-active-bg:linear-gradient(180deg,#3434cc,#1e1e88);
+      --lex-tab-active-border-color:#fff;
+      --lex-tab-lift:0px;
+      /* Panels, lists and the marked row. */
+      --lex-surface-bg:linear-gradient(180deg,#1a1aa0,#0e0e60);--lex-surface-border:2px solid;
+      --lex-surface-border-color:#e8e8f8;
+      --lex-list-header-bg:#2323a8;--lex-list-cell-border:#ffffff2b;
+      --lex-sort-header-bg:#0c0c5e;--lex-sort-header-fg:#fff;
+      --lex-row-hover-bg:#2a2ab0;--lex-row-selected-bg:#3434c0;--lex-row-selected-fg:#fff;
+      --lex-cell-padding:5px 8px;--lex-head-cell-padding:5px 8px;
+      --lex-pager-fg:#fff;--lex-pager-bg:#0c0c5e;--lex-pager-border:2px solid;
+      --lex-pager-border-color:#e8e8f8;--lex-pager-button-fg:#fff;
+      --lex-pager-button-bg:#2323a8;--lex-pager-button-border:2px solid;
+      --lex-pager-button-border-color:#e8e8f8;--lex-pager-button-radius:4px;
+      /* Every value sits in the window's darker inset. */
+      --lex-input-fg:#fff;--lex-input-border:2px solid;
+      --lex-input-border-color:#e8e8f8;--lex-input-radius:4px;
+      --lex-input-bg:#080844;--lex-input-shadow:none;--lex-input-text-shadow:inherit;
+      --lex-field-padding:6px 8px;
+      --lex-section-title-fg:#fff;--lex-section-title-font:20px/1 var(--lex-heading-font);
+      --lex-section-title-shadow:2px 2px 0 #06061e;
+      --lex-section-title-border:1px solid #8a8ac8;
+      --lex-detail-heading-bg:transparent;--lex-detail-heading-border:0;
+      --lex-detail-title-size:clamp(28px,3.5vw,46px);--lex-detail-title-fg:#fff;--lex-detail-id-fg:#c6c6ee;
+      --lex-heading-font:"FF7 Menu","Arial Narrow",sans-serif;--lex-radius:6px;
+      --ff7-menu-surface:linear-gradient(180deg,#1a1aa0,#0e0e60);}
+    /* Neutral hardcodes light grounds that outrank the token layer; the menu
+       repaints them while layout stays shared. */
+    body.lex-neutral-ui .lex-shell-command-row {background:var(--lex-command-row-bg);}
+    body.lex-neutral-ui .lex-nav-frame,body.lex-neutral-ui .lex-shell-header nav {background:var(--lex-nav-bg);}
+    body.lex-neutral-ui .lex-detail-panel-heading {background:transparent;border-color:var(--lex-border);}
+    body.lex-neutral-ui .lex-detail-panel-icon {background:var(--lex-surface-bg);border-color:var(--lex-border);color:#fff;}
+    /* Fifteen equal-share tabs starve ACCESSORIES in the menu's wide pitch.
+       Content-sized tabs fit one row; narrow windows scroll the strip. */
+    body.lex-neutral-ui .lex-shell-header nav {grid-auto-columns:auto;justify-content:center;}
+    body.lex-neutral-ui .lex-nav-frame {overflow-x:auto;}
