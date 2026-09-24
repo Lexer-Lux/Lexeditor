@@ -967,9 +967,9 @@
   const flushAutoFit = () => {
     const controls = [...autoFitQueue].filter(control => control.isConnected);
     autoFitQueue.clear();
-    controls.forEach(control => { control.style.fontSize = ""; });
+    controls.forEach(control => control.__lexAutoFitReset());
     const sizes = controls.map(control => control.__lexAutoFitMeasure());
-    controls.forEach((control, index) => { if (sizes[index]) control.style.fontSize = sizes[index]; });
+    controls.forEach((control, index) => control.__lexAutoFitApply(sizes[index]));
   };
   const queueAutoFit = control => {
     if (!autoFitQueue.size) requestAnimationFrame(flushAutoFit);
@@ -994,7 +994,7 @@
     const measure = () => {
       // Off-page controls have no width. Fitting them to zero made their font
       // tiny, so pagination measured a shorter card than the one later shown.
-      if (!control.getClientRects().length || control.clientWidth <= 0) return "";
+      if (!control.getClientRects().length || control.clientWidth <= 0) return null;
       const style = getComputedStyle(control);
       // A table cell's value is the table's text: it may shrink to fit a
       // narrow column but never grows past the rows around it, which a box
@@ -1013,20 +1013,41 @@
         : control.value || control.placeholder || "";
       const canvas = autoFitControlText.canvas ||= document.createElement("canvas");
       const context = canvas.getContext("2d");
-      if (!context || !value) return "";
+      if (!context || !value) return null;
       context.font = `${style.fontStyle} ${style.fontWeight} ${maximum}px ${style.fontFamily}`;
       const measured = context.measureText(value).width;
-      return `${Math.max(minimum,Math.min(maximum,maximum*available/Math.max(1,measured)))}px`;
+      const size = Math.max(minimum,Math.min(maximum,maximum*available/Math.max(1,measured)));
+      // The ceiling above is read from the box's natural height, and that
+      // height comes from the text. Enlarged digits would make the box taller,
+      // the next fit would read a taller box, and every numeric property grew
+      // instead of filling. Text larger than the natural font therefore keeps
+      // the natural box: the digits fill it, the box stays where it was.
+      const natural = Number.parseFloat(style.fontSize) || 0;
+      return {size, height: size > natural ? control.getBoundingClientRect().height : 0};
+    };
+    const reset = () => {
+      control.style.fontSize = "";
+      control.style.height = "";
+      control.style.boxSizing = "";
+    };
+    const apply = fit => {
+      if (!fit) return;
+      if (fit.height) {
+        control.style.boxSizing = "border-box";
+        control.style.height = `${fit.height}px`;
+      }
+      control.style.fontSize = `${fit.size}px`;
     };
     const update = () => {
-      control.style.fontSize = "";
-      const size = measure();
-      if (size) control.style.fontSize = size;
+      reset();
+      apply(measure());
     };
     control.addEventListener("input", update);
     control.addEventListener("change", update);
     control.__lexAutoFitUpdate = update;
     control.__lexAutoFitMeasure = measure;
+    control.__lexAutoFitReset = reset;
+    control.__lexAutoFitApply = apply;
     autoFitObserver?.observe(control);
     document.fonts?.ready?.then(() => queueAutoFit(control));
     queueAutoFit(control);
