@@ -332,7 +332,7 @@ test('battle dataset navigation covers attacks and scene flags', async () => {
   assert.deepEqual(Array.from(e.run('choices("encounters")')), ['encounters','scene-flags']);
 });
 
-test('FF9 shell carries a fitting system-font theme with no bundled proprietary assets', async () => {
+test('FF9 shell carries the game-window theme with no bundled proprietary assets', async () => {
   const e = await editor();
   const plugin = e.shell().plugin;
   assert.equal(plugin.id, 'ff9');
@@ -342,14 +342,19 @@ test('FF9 shell carries a fitting system-font theme with no bundled proprietary 
                      'accent', 'accent-text', 'highlight', 'success',
                      'font', 'heading-font'])
     assert.ok(typeof theme[key] === 'string' && theme[key].length > 0, key);
-  // Provenance boundary: the theme is CSS values plus system fonts only.
-  // No bundled, downloaded, or game-ripped font/image/audio asset reference.
+  // Provenance boundary: the theme names faces, it never points at a file.
+  // The faces are served privately from the player's install (game_font.py),
+  // and each stack ends in a system font for when there is no install.
   for (const value of Object.values(theme))
     assert.doesNotMatch(value, /url\(|https?:|data:|\.ttf|\.woff|\.otf/i);
-  assert.match(theme.font, /Trebuchet MS|Segoe UI|Georgia|Palatino|sans-serif|serif/);
-  assert.match(theme['heading-font'], /Palatino|Book Antiqua|Georgia|serif/);
-  // FF9 identity lock: deep-navy menu surface with parchment-gold highlight.
-  assert.equal(theme.bg, '#090d1a');
-  assert.equal(theme.panel, '#171f38');
-  assert.equal(theme.highlight, '#d7c47a');
+  assert.match(theme.font, /^"FF9 Menu",.*sans-serif$/);
+  assert.match(theme['heading-font'], /^"FF9 Heading",.*sans-serif$/);
+  // FF9 identity lock: the Gray Atlas window stone and the Blue Atlas bevel.
+  assert.equal(theme.panel, '#575a59');
+  assert.equal(theme.border, '#707878');
+  assert.equal(theme.accent, '#4060b0');
+  // The shell theme and the stylesheet tokens are one palette.
+  const css = readFileSync(join(__dirname, '..', 'plugins', 'ff9', 'editor.css'), 'utf8');
+  for (const key of ['bg', 'panel', 'panel-2', 'border', 'text', 'muted', 'accent', 'font', 'heading-font'])
+    assert.ok(css.includes(`--lex-${key}:${theme[key]};`), key);
 });

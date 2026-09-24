@@ -39,9 +39,27 @@ No proprietary game data is included here.
 
 ## Theme provenance
 
-- The FF9 page theme is CSS values plus system font stacks only (deep-navy
-  menu surfaces, parchment-gold highlights, serif storybook headings).
-- No proprietary FF9 font, image, or audio asset is bundled, downloaded, or
-  referenced. Game-derived interface sounds are never shipped: they require
-  local extraction from an installed copy when redistribution is not permitted.
+- Colours are CSS values sampled locally from the game's own window atlases
+  ("Gray Atlas", the default window colour, and "Blue Atlas") in the installed
+  `x64/FF9_Data/sharedassets2.assets`: stone fill `#575a59`, bevel `#707878` /
+  `#383840`, outline `#202830`, slot `#383c3c`, cursor bar `#cccccc` at about
+  60% alpha, and the blue window bevel `#4060b0` as the accent. The atlases
+  were read once for research; no texture is bundled or extracted at runtime,
+  and the stone grain is approximated with CSS gradients.
+- Fonts are copied at serve time from the player's installed Memoria bundle
+  `FF9_Data/EmbeddedAsset/FA/p_fa.mpc` into the private game-data cache
+  (`plugins/ff9/game_font.py`). The bundle is decrypted with Memoria's
+  block swap (`Assembly-CSharp/Global/Byte/ByteEncryption.cs`, MIT): the last
+  1024 bytes move to the front and the first 1024 are dropped, leaving an
+  uncompressed UnityRaw bundle whose embedded TrueType fonts are located by
+  their table directories. No Memoria source is vendored.
+  - "Alexandria" by Teaito (2019, FontStruct Non-Commercial License,
+    https://fontstruct.com/fontstructions/show/1666931/alexandria-2), a
+    recreation of the PlayStation FF9 lettering, is the body and tab face.
+  - "Garnet", the heavier pixel face bundled beside it, is the heading face.
+  - The bundle's "TBUDGothic Std B" (Morisawa, commercial) is not used.
+- No FF9 font, image, or audio asset is bundled, downloaded, or redistributed.
+  Without an install the editor falls back to system fonts. Game-derived
+  interface sounds are never shipped: they require local extraction from an
+  installed copy when redistribution is not permitted.
 

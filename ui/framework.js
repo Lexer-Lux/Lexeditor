@@ -5391,6 +5391,20 @@ ${contents.path}`});
       "aria-label":options.brand || "LEXEDITOR"}));
     const nav = element("nav", {"aria-label": `${options.plugin.name || options.plugin.id} sections`});
     const navFrame = element("div", {class: "lex-nav-frame"}, nav);
+    // A strip that scrolls (--lex-nav-overflow-x) keeps its active tab in
+    // view: when the tab changes, and when fonts or the window resize it.
+    // Between those, the reader's own scrolling is left alone.
+    let shownNavTab = null;
+    const revealActiveTab = () => {
+      const activeNavTab = nav.querySelector("button.active");
+      shownNavTab = activeNavTab;
+      if (!activeNavTab || navFrame.scrollWidth <= navFrame.clientWidth + 1) return;
+      const frameBox = navFrame.getBoundingClientRect(), tabBox = activeNavTab.getBoundingClientRect();
+      if (tabBox.left < frameBox.left) navFrame.scrollLeft -= frameBox.left - tabBox.left;
+      else if (tabBox.right > frameBox.right) navFrame.scrollLeft += tabBox.right - frameBox.right;
+    };
+    window.addEventListener("resize", revealActiveTab);
+    document.fonts?.addEventListener?.("loadingdone", revealActiveTab);
     let githubWorkspace = null;
     let navigationHistory = null;
     let developerMode = false;
@@ -5820,6 +5834,7 @@ ${contents.path}`});
       }
       nav.querySelectorAll("button").forEach(button => button.classList.toggle("active",
         !githubWorkspace?.state.open && button.dataset.tab === options.activeTab()));
+      if (nav.querySelector("button.active") !== shownNavTab) revealActiveTab();
       github.classList.toggle("active", !!githubWorkspace?.state.open);
       help?.classList.toggle("active", !!options.helpActive?.());
       info?.classList.toggle("active", !!options.infoActive?.());
@@ -8602,6 +8617,11 @@ ${contents.path}`});
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
     if(label.classList.contains('lex-tab-label-text')) {
       // Main tabs and subtabs fit their labels inside a single row.
+      // Main tabs sized to their text (--lex-nav-tab-columns:max-content)
+      // already are their label's width; shrinking one only narrows the tab
+      // with it, down to the floor. Their strip scrolls instead.
+      const nav=label.closest('.lex-shell-header nav');
+      if(nav&&getComputedStyle(nav).getPropertyValue('--lex-nav-tab-columns').trim()==='max-content'){fitted.set(label,fitKey(label));return;}
       const range=document.createRange();range.selectNodeContents(label);
       const fits=()=>{const css=getComputedStyle(label);return range.getBoundingClientRect().width <= label.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight)-3;};
       while(size>LABEL_MIN_PX&&!fits()){size-=.5;label.style.fontSize=`${size}px`;}

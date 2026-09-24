@@ -64,6 +64,13 @@ def service(tmp_path, monkeypatch):
     def revert(): deployed["value"] = False; return deployment_status()
     dependency("features", load=feature_load, save=feature_save, status=deployment_status,
                deploy=deploy, revert=revert)
+    font_file = tmp_path / "generated" / "ff9-menu.ttf"
+    def ensure_font(name="ff9-menu.ttf"):
+        if name != "ff9-menu.ttf" or not font_file.is_file():
+            raise FileNotFoundError("The installed FF9 font bundle (Memoria p_fa.mpc) was not found")
+        return font_file
+    dependency("game_font", FACES={"ff9-menu.ttf": "Alexandria", "ff9-heading.ttf": "Garnet"},
+               ensure_font=ensure_font, FONT_FILE=font_file)
     file = Path(__file__).parents[1] / "plugins/ff9/server.py"
     spec = importlib.util.spec_from_file_location(f"{package_name}.server", file)
     module = importlib.util.module_from_spec(spec)
@@ -104,6 +111,23 @@ def test_untrusted_or_invalid_requests_cannot_start_patcher(service, headers, st
     # races the early close on Windows and can hide the response behind a reset.
     assert request(service, "/api/runtime/install", body=None, headers=headers)[0] == status
     assert not service[2]
+
+
+def test_theme_font_is_served_privately_or_answers_404(service):
+    module, port, _ = service
+    status, payload = request(service, "/assets/ff9-menu.ttf", body=None, method="GET")
+    assert status == 404 and "p_fa.mpc" in payload["error"]
+    target = module.game_font.FONT_FILE
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"\x00\x01\x00\x00fixture")
+    connection = HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        connection.request("GET", "/assets/ff9-menu.ttf")
+        response = connection.getresponse()
+        assert response.status == 200 and response.read() == b"\x00\x01\x00\x00fixture"
+    finally:
+        connection.close()
+    assert request(service, "/assets/other.ttf", body=None, method="GET")[0] == 404
 
 
 def test_same_origin_post(service):

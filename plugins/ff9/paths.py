@@ -28,7 +28,7 @@ DEFAULT_PROJECT_ROOT = (
 def check() -> list[str]:
     """Check the plugin-owned implementation files."""
     problems: list[str] = []
-    for relative in ("editor.html", "server.py", "plugin.py", "paths.py", "memoria_csv.py"):
+    for relative in ("editor.html", "server.py", "plugin.py", "paths.py", "memoria_csv.py", "game_font.py"):
         target = PLUGIN_ROOT / relative
         if not target.is_file():
             problems.append(f"FF9 plugin file is missing: {target}")

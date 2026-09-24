@@ -547,6 +547,15 @@
           "name": "GameJawnsInc / Dream World IX / ff9mapkit",
           "role": "MIT-licensed public FF9 p0data interoperability research for fields, event scripts, models, animations, world-map assets and Memoria loose overrides.",
           "url": "https://github.com/GameJawnsInc/Dream-World-IX"
+        },
+        {
+          "name": "Teaito (Alexandria font)",
+          "role": "Recreation of the PlayStation FF9 lettering, bundled by Memoria (FontStruct Non-Commercial License). Copied from the player's installed Memoria p_fa.mpc into a private ff9-menu.ttf in the game-data cache at serve time; never redistributed.",
+          "url": "https://fontstruct.com/fontstructions/show/1666931/alexandria-2"
+        },
+        {
+          "name": "Installed Memoria font bundle (Garnet font)",
+          "role": "Heading face copied from the player's installed Memoria p_fa.mpc into a private ff9-heading.ttf in the game-data cache at serve time; never redistributed."
         }
       ],
       "thanks": [],

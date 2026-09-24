@@ -7053,7 +7053,9 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   min-width: 0;
   width: 100%;
   max-width: 100%;
-  justify-content: center;
+  /* Safe: max-content tabs wider than the strip start at its left edge and
+     scroll, rather than overflowing both ends past reach. */
+  justify-content: safe center;
   align-items: stretch;
   gap: 0;
   overflow: visible;

@@ -17,6 +17,7 @@ from .battle_scene import BattleSceneStore
 from .field_walkmesh import FieldWalkmeshStore
 from .memoria_baseline import ensure as ensure_baseline
 from . import memoria_manager, features, mod_compat
+from . import game_font
 from plugin_http import PluginRequestHandler
 
 
@@ -166,6 +167,15 @@ class Handler(PluginRequestHandler):
                     self.json_response({"error": "Shared UI asset not found"}, 404)
                 else:
                     self.file_response(target)
+            elif path.startswith("/assets/") and path.removeprefix("/assets/") in game_font.FACES:
+                # Private copies of the installed fonts; a missing install
+                # answers 404 and the page keeps its fallback font stack.
+                try:
+                    font = game_font.ensure_font(path.removeprefix("/assets/"))
+                except (OSError, ValueError) as error:
+                    self.json_response({"error": str(error)}, 404)
+                else:
+                    self.file_response(font)
             elif path == "/api/plugin":
                 self.json_response({"apiVersion": 1, "pluginId": "ff9", "name": "Final Fantasy IX",
                     "edition": "Steam Unity / Memoria CSV", "hosted": HOSTED, "windowHost": WINDOW_HOST,
