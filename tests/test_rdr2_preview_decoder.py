@@ -11,9 +11,12 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "plugins" / "rdr2"))
+sys.path.insert(0, str(ROOT))
 
-import model_preview
+# Imported as a package module: a bare import put RDR2's paths.py into
+# sys.modules as "paths", and later plugins that import their own bare
+# paths module (Warband) then failed to collect.
+from plugins.rdr2 import model_preview  # noqa: E402
 
 
 @pytest.fixture
