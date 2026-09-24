@@ -5568,7 +5568,20 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-panel-layout-divider:hover::before,
 .lex-panel-layout-divider:focus-visible::before,
 .lex-panel-layout-divider.dragging::before {color:var(--lex-highlight);}
-.lex-panel-layout-divider::after {content:none;}
+/* The divider track is transparent over the body background, so at the real
+   panel-gap setting the split between list and detail read as no separation:
+   only the small centered grip marked it. A one-pixel rule in the theme's
+   border color runs the track's full length, the same delineation language
+   as table gridlines and tab edges everywhere else. */
+.lex-panel-layout-divider::after {
+  content:"";
+  position:absolute;
+  top:0;bottom:0;left:50%;
+  width:1px;
+  background:var(--lex-border);
+  transform:translateX(-50%);
+  pointer-events:none;
+}
 /* A stacked layout drags up and down, so its grip is the same arrows turned a
    quarter: the earlier stacked rule reshaped the box to 24x10, which squashed
    the upright artwork into a smear instead of turning it. */
@@ -5579,6 +5592,11 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   width:16px;height:32px;
   transform:translate(-50%,-50%) rotate(90deg);
 
+}
+.lex-panel-layout-vertical > .lex-panel-layout-divider::after {
+  top:50%;bottom:auto;left:0;right:0;
+  width:auto;height:1px;
+  transform:translateY(-50%);
 }
 
 /* Shortcut badges are overlays. Hover never changes the label lane. */
