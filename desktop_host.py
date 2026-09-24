@@ -1273,10 +1273,10 @@ class HostApi:
         return self._restart_for_project(plugin_id, project)
 
     def mod_library_status(self, plugin_id: str) -> dict:
-        from mod_library import documents_folder
+        from mod_library import default_user_library_root
         plugin = self._plugins[plugin_id]
         adapter = plugin.mod_adapter
-        root = self._settings.snapshot().get("modLibraryPath") or str(documents_folder() / "Mods")
+        root = self._settings.snapshot().get("modLibraryPath") or str(default_user_library_root())
         author = bool(adapter and self._github.visible_repository(LEXEDITOR_REPOSITORY))
         return {"root": root, "verified": bool(adapter and adapter.verified),
                 "canManage": bool(adapter and (adapter.verified or author)),
@@ -1285,11 +1285,25 @@ class HostApi:
                 "packageTypes": list(getattr(adapter, "package_types", ()))}
 
     def mod_library_location(self) -> dict:
-        from mod_library import documents_folder
+        from mod_library import default_user_library_root
         journal = self._settings.path.parent / "mod-library-move.json"
         move = json.loads(journal.read_text(encoding="utf-8")) if journal.is_file() else None
-        return {"root": self._settings.snapshot().get("modLibraryPath") or str(documents_folder() / "Mods"),
+        return {"root": self._settings.snapshot().get("modLibraryPath") or str(default_user_library_root()),
                 "move": move}
+
+    def migrate_user_data(self) -> dict:
+        """Copy legacy AppData mod trees to Documents once, then report.
+
+        Runs at desktop startup, before any plugin session opens. A failed
+        move never fails startup: the failure is recorded and returned.
+        """
+        try:
+            from mod_library import migrate_appdata_user_data
+            result = migrate_appdata_user_data(self._projects, self._settings.path.parent)
+        except Exception as error:
+            result = {"moved": [], "skipped": [{"game": "*", "reason": str(error)[:200]}]}
+        self._user_data_migration = result
+        return result
 
     def _save_library_move(self, move: dict) -> None:
         target = self._settings.path.parent / "mod-library-move.json"
@@ -1819,6 +1833,7 @@ def run_host(plugins: dict[str, GamePlugin], initial_plugin: str | None = None,
 
     geometry = load_window_geometry()
     api = HostApi(plugins)
+    api.migrate_user_data()
     initial_url = CHOOSER.as_uri()
     if initial_plugin:
         try:

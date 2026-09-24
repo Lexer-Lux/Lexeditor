@@ -100,6 +100,31 @@ class ProjectManager:
                 self._write(before)
                 raise
 
+    def remap_prefix(self, old: Path, new: Path) -> bool:
+        """Point every registry entry under OLD at the same spot under NEW."""
+        def remap(value):
+            if not isinstance(value, str):
+                return value
+            try:
+                return str(new / Path(value).resolve().relative_to(old.resolve()))
+            except ValueError:
+                return value
+        with self._lock:
+            before = self._read()
+            after = json.loads(json.dumps(before))
+            for entry in after.values():
+                if not isinstance(entry, dict):
+                    continue
+                if "current" in entry:
+                    entry["current"] = remap(entry["current"])
+                for key in ("known", "forgotten"):
+                    if isinstance(entry.get(key), list):
+                        entry[key] = [remap(value) for value in entry[key]]
+            if after != before:
+                self._write(after)
+                return True
+            return False
+
     @staticmethod
     def _problems(root: Path, required_paths: tuple[str, ...],
                   required_any: tuple[tuple[str, ...], ...] = ()) -> list[str]:

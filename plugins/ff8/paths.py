@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from mod_library import default_user_library_root
+
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
 LEXEDITOR_ROOT = PLUGIN_ROOT.parents[1]
@@ -34,7 +36,7 @@ RUNTIME_DIRECT_ROOT = RUNTIME_ROOT / "direct"
 RUNTIME_HEXT_ROOT = RUNTIME_ROOT / "hext"
 MODS_ROOT = Path(os.environ.get(
     "LEXEDITOR_FF8_MODS_ROOT",
-    str(LOCAL_DATA_ROOT / "mods" / "ff8"),
+    str(default_user_library_root() / "ff8"),
 ))
 
 ARCHIVES = {
