@@ -1,8 +1,8 @@
   function renderCharacters(){const rows=[...state.data.characters.rows].sort((a,b)=>a.name.localeCompare(b.name,undefined,{sensitivity:"base"}));if(!rows.some(row=>row.id===state.selected.characters))state.selected.characters=rows[0]?.id??null;const row=rows.find(candidate=>candidate.id===state.selected.characters);if(!row){$("#toolbar").replaceChildren();$("#main").replaceChildren(LexeditorUI.notice({message:"No character records were found."}));return}const detailId="character-detail";$("#toolbar").replaceChildren(portraitTabs("characters",rows,row.id,detailId,id=>{state.selected.characters=id;renderCharacters();shell.refresh()}));$("#main").replaceChildren(detailPanel({heading:false,className:"lex-detail detail character-detail",attrs:{id:detailId,role:"tabpanel","aria-labelledby":`characters-tab-${row.id}`,"data-character":row.id},body:characterDetail(row)}))}
-  const GF_ATTACK_FIELDS=new Set(['attack_animation','attack_type','gf_power','status_window_flags','target_info','attack_flags_type','attack_flags','target_animation','hit_count','element','status_1','status_2','status_attack_enabler','power_mod','level_mod','ability1_unlocker']);
+  const GF_ATTACK_FIELDS=new Set(['attack_animation','attack_type','gf_power','status_window_flags','target_info','attack_flags_type','attack_flags','target_animation','hit_count','element','status_1','status_2','status_attack_enabler','power_mod','level_mod','boost_param_1','boost_param_2','ability1_unlocker']);
   const gfPanelOrder=["GF Compatibility","General","Attack","Abilities"];
   function gfFieldsByPanel(row){const routed=new Map(gfPanelOrder.map(group=>[group,[]])),seen=new Set();for(const field of row.fields){const group=GF_ATTACK_FIELDS.has(field.field)?'Attack':field.group;if(seen.has(field.field)||!routed.has(group))throw new Error(`GF field routing failed: ${field.field}`);seen.add(field.field);routed.get(group).push(field)}if(seen.size!==row.fields.length)throw new Error("GF field routing omitted a field");return routed}
-  function gfEntityLabel(field){const target=gfByName(field.label);return target?hoverable({content:LexeditorUI.inlineLabel(el("img",{src:`/assets/portraits/gfs/${target.id}.png`,alt:""}),el("span",{},field.label)),targetType:"gf",targetId:target.id,targetLabel:`${field.label} GF`,activate:()=>openGFByName(field.label)}):field.label}
+  function gfEntityLabel(field){const target=gfByName(field.label);return target?hoverable({content:LexeditorUI.inlineLabel({imageFit:'row'},el("img",{src:`/assets/portraits/gfs/${target.id}.png`,alt:""}),el("span",{},field.label)),targetType:"gf",targetId:target.id,targetLabel:`${field.label} GF`,activate:()=>openGFByName(field.label)}):field.label}
   function gfFieldRow(field,row){return detailField({attrs:{"data-field":field.field},label:gfEntityLabel(field),help:field.help?infoHelp(field.help):null,control:fieldSourceControl(field,"gfs",row.id)})}
   function gfCompatibilityLabel(field){return gfEntityLabel(field)}
   function sortGfTable(kind,key){const [active,direction]=state.gfSorts[kind];state.gfSorts[kind]=[key,active===key?-direction:1];renderGFs()}
@@ -70,11 +70,18 @@
     const active=state.gfDetailTab||'properties';
     const content=active==='attack'?gfPanel('',routed.get('Attack'),row,'attack'):
       active==='defaults'?(defaults?startingFields(defaults.fields,'gf',defaults.id):LexeditorUI.detailNote('No initial state for this GF.')):
-      gfPanel('',routed.get('General'),row,'general');
-    return tabbedPanel({tabs:[{id:'properties',label:'Properties'},
+      gfLevelingPanel(routed.get('General'),row.id);
+    return tabbedPanel({tabs:[{id:'properties',label:'Leveling',help:'The HP graph controls maximum HP as this GF levels up. The XP graph controls the total experience needed for each level. Edit the graph variables to change these curves.'},
       {id:'attack',label:'Attack',help:'Set the GF summon’s power, animation, targets, damage, elements and status effects.'},
       {id:'defaults',label:'Defaults',help:'Initial GF state used when a new game begins. Changes do not alter an existing save.'}],
       active,label:'GF details',change:id=>{state.gfDetailTab=id;renderGFs()},content});
+  }
+  // The shared curve grid owns graph sizing and the one-column layout.
+  function gfLevelingPanel(fields,rowId){
+    const curveFields=fields.filter(field=>GF_CURVE_FIELDS.includes(field.field));
+    const growth=gfStatGrowth(curveFields,rowId);
+    if(growth)growth.dataset.gfPanel="general";
+    return growth;
   }
   function fieldGroups(fields,view,rowId,collapsible=true,prefs=null){
     const groups=new Map();
@@ -95,11 +102,11 @@
   }
   const booleanGlyph=value=>value?"\u2713":"\u00d7";
   const booleanMark=value=>el("span",{class:"lex-boolean-mark lex-ui-symbol"},booleanGlyph(value));
-  function flagSourceControl(field,view,rowId){
+  function flagSourceControl(field,view,rowId,options={}){
     const lookup=field.lookup,word=value=>Number(value??0);
     const vanillaField=rowOf(state.vanilla,view,rowId)?.fields?.find(value=>value.field===field.field);
     const references=referenceValues(view,rowId,value=>value?.fields?.find(entry=>entry.field===field.field)?.value);
-    const switches=toggleRow({label:field.label,value:()=>word(field.value),toggles:lookup.entries.map(entry=>{
+    const switches=toggleRow({label:field.label,leading:options.leading,value:()=>word(field.value),toggles:lookup.entries.map(entry=>{
       const bit=Number(entry.mask??entry.value);
       return {key:String(bit),label:entry.name,icon:LexeditorUI.inlineLabel(conceptIcon(lookup.name,entry.name)),
         help:entry.description||null,checked:(word(field.value)&bit)===bit,

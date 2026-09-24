@@ -1272,7 +1272,8 @@
     style:`--lex-tile-min-width:${Math.max(80,Number(options.minWidth)||320)}px;${options.columns ? `--lex-tile-columns:repeat(${Math.max(1,Math.floor(options.columns))},minmax(0,1fr))` : ""}`,
   }, ...cards);
   const curveGrid = (...cards) => {
-    const grid=tileGrid(cards);
+    const options=cards[0] && !(cards[0] instanceof Node) ? cards.shift() : {};
+    const grid=tileGrid(cards,options);
     grid.classList.add("lex-curve-grid");
     return grid;
   };
@@ -1299,7 +1300,10 @@
   // A bar over the content it switches: the bar keeps its height and the
   // content takes the rest of the page.
   const toolbar = (...children) => element("div", {class:"lex-toolbar"}, ...children);
-  const inlineLabel = (...children) => element("span", {class:"lex-inline-label"}, ...children);
+  const inlineLabel = (...children) => {
+    const options=children[0] && typeof children[0]==='object' && !(children[0] instanceof Node) ? children.shift() : {};
+    return element("span", {class:`lex-inline-label${options.imageFit==='row'?' lex-inline-label-row-image':''}`}, ...children);
+  };
   const choiceField = (value, action) => element("span", {class:"lex-choice-field"}, value, action);
   const quantityChoice = (choice, quantity) => element("div", {class:"lex-quantity-choice"},
     choice, element("span", {class:"lex-quantity-mark","aria-hidden":"true"}, "×"), quantity);
@@ -1368,7 +1372,7 @@
   // Map coordinates are fractions of the image, independent of UI zoom.
   const imageMap = (options = {}) => {
     const stage=element("div",{class:"lex-image-map-stage",style:`aspect-ratio:${Number(options.ratio)||4/3};--lex-map-columns:${Number(options.columns)||1};--lex-map-rows:${Number(options.rows)||1}`},
-      options.image?element("img",{src:options.image,alt:options.label||"Map",draggable:false}):null);
+      options.media || (options.image?element("img",{src:options.image,alt:options.label||"Map",draggable:false}):null));
     if(options.cells?.length)stage.append(element("div",{class:"lex-image-map-cells"},...options.cells.map(cell=>
       element("button",{type:"button",class:cell.selected?"selected":"",title:cell.title||cell.label,
         "aria-label":cell.label,"aria-pressed":!!cell.selected,onclick:()=>options.select?.(cell.id)}))));
@@ -1383,6 +1387,8 @@
     // A region, so its label is announced; a bare div's aria-label is not.
     const root=element("div",{class:options.fill===false?"lex-image-map lex-image-map-natural":"lex-image-map",role:"region","aria-label":options.label||"Map"},stage);
     root.style.setProperty("--lex-map-ratio", String(Number(options.ratio)||4/3));
+    const image=stage.querySelector('img');
+    if(image&&!options.ratio){const fit=()=>{if(!image.naturalWidth||!image.naturalHeight)return;const ratio=image.naturalWidth/image.naturalHeight;root.style.setProperty('--lex-map-ratio',String(ratio));stage.style.aspectRatio=String(ratio)};image.addEventListener('load',fit);fit();}
     root.lexStage=stage;
     return root;
   };
@@ -1957,16 +1963,15 @@
         "aria-label": toggle.label,
         onchange: event => toggle.change?.(event.target.checked, event),
       });
-      // Each switch carries its own type rail, matching every other property:
-      // BOOL until pointed at, then the help marker for that flag.
+      // The type rail stays fixed; help belongs beside the property name.
       const rail = element("span", {class: "lex-toggle-rail"},
         element("span", {class: "lex-toggle-type"}, "BOOL"));
       const label = element("label", {
         class: ["lex-toggle", toggle.className || ""].filter(Boolean).join(" "),
         "data-lex-toggle": toggle.key || toggle.label || "",
       }, rail, toggle.decorateControl ? toggle.decorateControl(input) : input,
-      toggle.icon || null, element("span", {class: "lex-toggle-name"}, toggle.label));
-      if (toggle.help) rail.append(infoHelp(toggle.help));
+      toggle.icon || null, element("span", {class: "lex-toggle-name"}, toggle.label,
+        toggle.help ? infoHelp(toggle.help) : null));
       // A switch that is also a table column carries its pin in its corner,
       // the same place every other pinnable property keeps one.
       if (toggle.pin) {
@@ -1975,8 +1980,9 @@
       }
       return label;
     });
-    const root = detailParts(toggles, {
-      className: ["lex-toggle-row", options.className || ""].filter(Boolean).join(" "),
+    const root = detailParts([...(options.leading || []),...toggles], {
+      stacked: !!options.leading?.length,
+      className: ["lex-toggle-row", "lex-detail-parts-switches", options.className || ""].filter(Boolean).join(" "),
       role: "group",
       label: options.label || "Toggles",
     });

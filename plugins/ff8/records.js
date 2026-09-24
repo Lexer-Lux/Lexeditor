@@ -72,6 +72,7 @@
     return "INT";
   }
   function magicComposite(valueField,flagsField,rowId,className=""){
+    if(className.includes("attack-flags")&&flagsField)return flagSourceControl(flagsField,"magic",rowId,{leading:valueField?[{label:"TYPE",help:valueField.help,control:fieldSourceControl(valueField,"magic",rowId)}]:[]});
     return LexeditorUI.controlGroup([
       valueField?{label:className.includes("attack-flags")?"TYPE":"VALUE",help:valueField.help,control:fieldSourceControl(valueField,"magic",rowId)}:null,
       flagsField?{control:fieldSourceControl(flagsField,"magic",rowId)}:null].filter(Boolean));
@@ -276,9 +277,7 @@
       evaluate:level=>gfCurveValue("XP",fields,level),
       formula:coloredCurveFormula("XP(L) = 10 * L * A + floor(L^2 * B / 256)")}));
     if(!cards.length)return null;
-    return detailSection({title:"LEVEL CURVES",
-      help:infoHelp("The HP curve controls this GF's maximum HP as it levels; the XP curve controls the cumulative experience thresholds for GF levels. Both use FF8's verified game routines."),
-      body:LexeditorUI.curveGrid(...cards)});
+    return LexeditorUI.curveGrid({columns:1},...cards);
   }
   function characterDetail(row){
     const visible=row.fields.filter(field=>field.field!=="gender"&&field.name!=="gender"&&field.label!=="Gender"),growth=visible.filter(field=>field.group==="Stat coefficients"),exp=visible.filter(field=>["exp_linear","exp_quadratic"].includes(field.field)),other=visible.filter(field=>field.group!=="Stat coefficients"&&!exp.includes(field));

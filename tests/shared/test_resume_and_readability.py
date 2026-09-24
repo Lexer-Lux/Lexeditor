@@ -34,7 +34,7 @@ def test_resident_handle_blocks_repeat_clicks_and_clears_cover(page):
 
 
 @pytest.mark.parametrize('zoom',[.75,1,1.25])
-def test_pointer_tip_tracks_text_at_each_ui_scale(page,zoom):
+def test_pointer_tip_tracks_icon_and_text_at_each_ui_scale(page,zoom):
     framework(page)
     page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
     page.evaluate('''zoom=>{const U=LexeditorUI;document.body.style.zoom=zoom;
@@ -42,10 +42,10 @@ def test_pointer_tip_tracks_text_at_each_ui_scale(page,zoom):
         columns:[{key:'name',label:'Item',render:r=>U.inlineLabel(U.el('img',{style:'width:20px;height:20px'}),U.el('span',{},r.name))}]}));}''',zoom)
     page.wait_for_timeout(200)
     assert page.locator('.selected .lex-column-cell-content').evaluate('''n=>{
-      const walker=document.createTreeWalker(n,NodeFilter.SHOW_TEXT),range=document.createRange();range.selectNodeContents(walker.nextNode());
+      const icon=n.querySelector('.lex-inline-label > img');
       const rect=n.getBoundingClientRect(),scale=rect.width/n.offsetWidth,p=getComputedStyle(n,'::before');
       const tip=rect.left+(parseFloat(p.left)+parseFloat(p.width))*scale;
-      return Math.abs(range.getBoundingClientRect().left-tip-6*scale)<2;}''')
+      return Math.abs(icon.getBoundingClientRect().left-tip-6*scale)<2;}''')
 
 
 def test_control_text_grows_into_available_height_without_overflow(page):

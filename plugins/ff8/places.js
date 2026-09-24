@@ -91,7 +91,7 @@
   function refreshFieldOverlay(){for(const canvas of document.querySelectorAll("canvas.field-overlay-canvas"))if(canvas.lexRow)drawFieldOverlay(canvas.lexRow,canvas,canvas.lexGeometry)}
   function fieldPreviewPanel(row){
     const background=row.background;
-    if(!background?.tiles?.length)return detailSection({title:"Background",body:LexeditorUI.detailNote(background?.error?`This background is read-only: ${background.error}`:"This field map has no MAP/MIM background.")});
+    if(!background?.tiles?.length){const message=background?.error?`This background is read-only: ${background.error}`:"This field map has no MAP/MIM background.";return {preview:LexeditorUI.detailNote(message),editor:LexeditorUI.detailNote(message)}}
     const tileId=Math.max(0,Math.min(background.tileCount-1,Number(state.fieldBackgroundSelection[row.key])||0));
     state.fieldBackgroundSelection[row.key]=tileId;
     const preview=fieldBackgroundPreviewState(row),tile=background.tiles[tileId];
@@ -121,8 +121,7 @@
       LexeditorUI.toggleRow({toggles:[{label:"Hide unconditional background",checked:preview.hide,help:"Hide tiles with parameter 255 to inspect conditional tiles. This changes only the preview.",change:checked=>{preview.hide=checked;redraw()}}]}),
       LexeditorUI.tileGrid(fields)].filter(Boolean));
     requestAnimationFrame(redraw);
-    return detailSection({title:"Background",help:infoHelp("The background is built from small image tiles. The overlay projects walkable triangles, exits, and triggers through the selected camera. Select a tile below, then change where it is drawn or which texture pixels it uses."),
-      body:LexeditorUI.tileGrid([LexeditorUI.figureGrid([{media,caption:status}]),editor])});
+    return {preview:LexeditorUI.stack(status,LexeditorUI.imageMap({media,label:`${row.name} background and walkmesh`})),editor};
   }
   function fieldWalkmeshVertex(dataset,row,triangleId,vertexId){return fieldMapRow(dataset,row.key)?.walkmesh?.triangles?.[triangleId]?.vertices?.[vertexId]}
   function fieldWalkmeshControl(row,triangle,vertex,field){const vanilla=fieldWalkmeshVertex(state.vanilla,row,triangle.id,vertex.id),references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:fieldWalkmeshVertex(state.referenceData[reference.id],row,triangle.id,vertex.id)?.[field]})).filter(entry=>entry.value!==undefined),minimum=field==="adjacent"?-1:-32768,maximum=field==="adjacent"?row.walkmesh.triangleCount-1:32767,apply=value=>{vertex[field]=Number(value);refreshFieldOverlay()};return sourceControl(numberControl(vertex[field],minimum,maximum,1,apply,{"aria-label":`${row.name} triangle ${triangle.id} vertex ${vertex.id} ${field}`}),()=>vertex[field],vanilla?.[field],references,apply)}
@@ -252,10 +251,13 @@
   }
   function fieldDetail(row,prefs){
     if(!row._loaded){ensureFieldDetail(row);return sharedDetail(row,prefs,[el("div",{class:"field-empty"},row._error?`This map could not be opened: ${row._error}`:"Reading this field map...")],"field-map-detail",row.key)}
-    const active=fieldDetailTabs.some(tab=>tab.id===state.fieldDetailTab)?state.fieldDetailTab:"camera";
+    const tabs=[{id:"background",label:"Background",help:"The background is built from image tiles. Select a tile to change its position or texture. Preview filters and the walkmesh overlay do not change the game."},...fieldDetailTabs];
+    const active=tabs.some(tab=>tab.id===state.fieldDetailTab)?state.fieldDetailTab:"background";
     state.fieldDetailTab=active;
-    const bar=subtabBar({className:"ff8-field-tabs",tabs:fieldDetailTabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()}});
-    return sharedDetail({...row,id:row.mapId??row.id,name:row.name.toLocaleUpperCase()},prefs,[fieldPreviewPanel(row),bar,fieldDetailSubtab(row,active)],"field-map-detail",`${row.key}${row.mapId==null?" - not in maplist":` - map ${row.mapId}`}`)
+    const background=fieldPreviewPanel(row);
+    const preview=sharedDetail({...row,id:row.mapId??row.id,name:row.name.toLocaleUpperCase()},prefs,[background.preview],"field-map-detail",`${row.key}${row.mapId==null?" - not in maplist":` - map ${row.mapId}`}`);
+    const editor=LexeditorUI.tabbedPanel({tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:LexeditorUI.detailPanel({heading:false,body:active==="background"?background.editor:fieldDetailSubtab(row,active)})});
+    return LexeditorUI.panelLayout([preview,editor],{orientation:"vertical",layoutKey:"ff8-field-detail",defaultSizes:[1,1]});
   }
   function buildFields(){const rows=filtered("fields",["name","key","group","mapId"]);return showPaged("fields",rows,[{key:"mapId",label:"MAP ID",help:"Number used to identify this field in MAPLIST. A dash means the archive is not listed; it may contain unused or test content.",numeric:true,numberedId:true,render:row=>row.mapId??"—"},{key:"name",label:"FIELD MAP",help:"Internal field archive name. Select a row to edit that location."},{key:"group",label:"GROUP",help:"Archive folder prefix used to organise fields. This is not an encounter group."},{key:"listed",label:"MAPLIST",help:"Whether this field appears in the game map list. A cross means it is not listed; it does not mean the archive is missing.",render:row=>row.listed?"✓":"×"}],fieldDetail,"90px minmax(180px,1fr) 90px 90px",{defaultSplit:34,minLeft:330,minRight:680},false)}
   function renderFields(){const root=buildFields();$("#main").replaceChildren(root);return root}
