@@ -59,7 +59,7 @@ def test_items_render_and_save_battle_and_ammo(page,game_files):
       const signature=JSON.stringify,post=body=>({body:JSON.stringify(body)});
       const api=async(url,options)=>{calls.push({url,...JSON.parse(options.body)});return {saved:1}};
       const reloadEditable=async()=>{},shell={history:{clear(){}}},setStatus=()=>{},render=()=>{},platformChanges=()=>({});
-      const showAlert=()=>{};
+      const showAlert=()=>{},syncEnemyScanDetails=()=>{};
       function fieldSourceControl(field){return LexeditorUI.el('input',{type:'number',value:field.value,'aria-label':field.label,oninput:e=>field.value=Number(e.target.value)})}
     ''')
     records=(ROOT/'plugins/ff8/records.js').read_text()

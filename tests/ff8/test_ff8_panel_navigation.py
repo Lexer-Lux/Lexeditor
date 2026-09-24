@@ -52,7 +52,7 @@ def test_ai_compile_failure_blocks_navigation_and_keeps_source(page):
       const row={id:1,name:'Enemy'},documentData={scripts:[{id:0,source:'bad draft'}]};
       const state={tab:'enemies',data:{},enemyAiDirtyRow:row};
       const enemyAiRow=()=>documentData,post=x=>x,enemyAiNormalizeScript=()=>{};
-      const shell={refresh:()=>{}},setStatus=()=>{},showAlert=()=>{};
+      const shell={refresh:()=>{}},setStatus=()=>{},showAlert=()=>{},syncEnemyScanDetails=()=>{};
       let fail=true,requests=0,renders=0;
       const api=async()=>{requests++;if(fail)throw Error('Invalid instruction');
         return {scripts:[{id:0}],sources:['valid code']}};

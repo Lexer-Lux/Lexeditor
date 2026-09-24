@@ -274,7 +274,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
   const enemyDefencePrevious=new WeakMap();
   function enemyDefenceSection(row,kind,title){
     const element=kind==='elementDefence',names=['Fire','Ice','Thunder','Earth','Poison','Wind','Water','Holy'];
-    const aliases={Blind:'Darkness',Mute:'Silence','Sub-petrify':'Petrify'};
+    const aliases={Blind:'Darkness',Mute:'Silence','Sub-petrify':'Petrify','Delayed petrify':'Petrify'};
     const neutral=element?100:0,immune=element?0:155;
     const help=infoHelp(element?
       'The stored byte is shown as 900 − 10 × byte. 100% is neutral; exactly 0% is immune. Negative values remain distinct and editable. Toggle an icon for full immunity; toggle again to restore the previous value.':
@@ -302,11 +302,11 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
         const fallback=()=>el('span',{class:'enemy-status-fallback','aria-hidden':'true'},'▧');
         const icon=conceptIcon(element?'element':'status',aliases[name]||name)||fallback();
         icon.querySelector?.('img')?.addEventListener('error',()=>icon.replaceWith(fallback()),{once:true});
-        const tile=LexeditorUI.iconValue({icon,label:name,toggle:checkbox,control:enemyTableSource(unitField(input,'%'),row,read,setPercent,value=>`${value}%`)});tile.dataset.defence=name;
+        const tile=LexeditorUI.iconValue({icon,label:name,toggle:checkbox,control:enemyTableSource(unitField(input,'%'),row,read,value=>{setPercent(value);sync()},value=>Number(value)===immune?'Immune':`${value}%`)});tile.dataset.defence=name;
         const sync=()=>{const checked=isImmune();checkbox.checked=checked;checkbox.disabled=state.activeSource!=='mine';
-          input.disabled=checked||state.activeSource!=='mine';tile.classList.toggle('immune',checked)};
+          input.disabled=checked||state.activeSource!=='mine';input.placeholder=checked?'Immune':'';input.value=checked?'':entry.percent;tile.classList.toggle('immune',checked)};
         sync();return tile;
-      }),{minWidth:95});
+      }),{minWidth:180});
     return detailSection({title,help,body:grid});
   }
   const enemyScanElementNames=['Fire','Ice','Thunder','Earth','Poison','Wind','Water','Holy'];
@@ -319,13 +319,21 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     const tiers=['Low','Mid','High'];for(const entry of table.tables.devour||[]){const found=choices.find(value=>Number(value.id)===Number(entry.devourId));lines.push(`Devour ${tiers[entry.slot]||entry.slot+1}: ${found?.name||`Unknown ${entry.devourId}`}`)}
     return lines.join('\n');
   }
-  function enemyScanWithDetails(description,details){const text=String(description??''),marker='{NewPage}DETAILS',index=text.indexOf(marker),base=(index>=0?text.slice(0,index):text).replace(/\s+$/,'');return `${base}${base?'{NewPage}':''}${details}`}
+  function enemyScanWithDetails(description,details){const text=String(description??''),marker='{NewPage}DETAILS',index=text.startsWith('DETAILS\n')?0:text.indexOf(marker),base=(index>=0?text.slice(0,index):text).replace(/\s+$/,'');return `${base}${base?'{NewPage}':''}${details}`}
   function applyEnemyScanDetails(row){row.scanDescription=enemyScanWithDetails(row.scanDescription,enemyGeneratedScanDetails(row))}
+  function syncEnemyScanDetails(){
+    if(state.activeSource!=='mine')return;
+    const summary=table=>({elementDefence:table?.tables?.elementDefence,devour:table?.tables?.devour});
+    for(const row of state.data.enemies?.rows||[]){
+      if(!row.available)continue;
+      const base=state.base.enemies?.find(entry=>entry.id===row.id),table=enemyTableRow(state.data,row.id),before=state.base.enemyTables?.find(entry=>entry.id===row.id);
+      if(!base||!table||!before)continue;
+      if(row.scanDescription!==base.scanDescription||signature(summary(table))!==signature(summary(before)))applyEnemyScanDetails(row);
+    }
+  }
   function enemyScanSection(row,prefs){
     const input=LexeditorUI.textArea({rows:6,"aria-label":`Scan description for ${row.name}`,oninput:event=>{row.scanDescription=event.target.value;shell.refresh()}});input.value=row.scanDescription??"";
-    const details=enemyGeneratedScanDetails(row),apply=el('button',{type:'button',class:'secondary-action',disabled:state.activeSource!=='mine',onclick:()=>{applyEnemyScanDetails(row);renderEnemies();shell.refresh()}},'UPDATE DETAILS');
-    const applyAll=el('button',{type:'button',class:'secondary-action',disabled:state.activeSource!=='mine',onclick:()=>{for(const enemy of state.data.enemies.rows)if(enemy.available)applyEnemyScanDetails(enemy);renderEnemies();shell.refresh()}},'UPDATE ALL');
-    return detailSection({className:"enemy-scan-section",title:"SCAN",body:[detailField({label:"DESCRIPTION",control:sourceControl(input,()=>row.scanDescription,rowOf(state.vanilla,"enemies",row.id)?.scanDescription,referenceValues("enemies",row.id,value=>value?.scanDescription),value=>row.scanDescription=String(value??"")),pin:prefs?.pinButton("scanDescription","Scan description")}),LexeditorUI.actionRow(apply,applyAll),LexeditorUI.detailNote(details)]})
+    return detailSection({className:"enemy-scan-section",title:"SCAN",help:infoHelp("The Scan spell shows this description. When you edit it, elemental resistance, or Devour rewards, the Details page updates when you leave the enemy view or save."),body:detailField({label:"DESCRIPTION",control:sourceControl(input,()=>row.scanDescription,rowOf(state.vanilla,"enemies",row.id)?.scanDescription,referenceValues("enemies",row.id,value=>value?.scanDescription),value=>row.scanDescription=String(value??"")),pin:prefs?.pinButton("scanDescription","Scan description")})});
   }
   function enemyPropertyLabel(field){const labels={"Medium level starts":"MED LV","High level starts":"HIGH LV","Auto-Reflect":"REFLECT","Auto-Shell":"SHELL","Auto-Protect":"PROTECT","Surprise immunity":"NO SURPRISE","Diablos misses":"NO DIABLOS","Always yields a card":"ALWAYS CARD","Extra XP":"EXTRA XP","Mug rate":"MUG %","Drop rate":"DROP %"};return labels[field.label]||field.label}
   // Each enemy flag is its own field in the data, but on screen they are one
@@ -444,6 +452,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     }
   }
   async function enemyAiBeforeLeave(){
+    syncEnemyScanDetails();
     if(!state.enemyAiDirtyRow)return true;
     if(state.enemyAiCompilePending)return false;
     state.enemyAiCompilePending=true;
@@ -466,7 +475,17 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     const content=raw?enemyAiSourceScript(row,script):enemyAiScript(row,script);
     return tabbedPanel({tabs,active:script.id,label:'Enemy AI scripts',change:async id=>{if(!(await enemyAiBeforeLeave()))return;state.enemyAiScriptTab=id;renderEnemies()},content});
   }
-  function enemyBattleTextPanel(row,prefs){const scan=enemyScanSection(row,prefs);const document=enemyBattleTextRow(state.data,row.id),help=message=>LexeditorUI.detailNote(message);if(!document?.available)return LexeditorUI.stack({fill:false},scan,help("This enemy has no battle-script section."));if(!document.lines.length)return LexeditorUI.stack({fill:false},scan,help("This enemy has no local battle dialogue."));const vanilla=enemyBattleTextRow(state.vanilla,row.id),referenceLine=(dataset,id)=>enemyBattleTextRow(dataset,row.id)?.lines?.find(value=>value.id===id)?.text;return LexeditorUI.stack({fill:false},scan,help("These lines are used by this enemy during battle. Each line number matches a Show Text instruction in the AI view."),...document.lines.map(line=>{const input=LexeditorUI.textArea({rows:4,maxlength:400,"aria-label":`Battle text line ${line.id} for ${row.name}`,oninput:event=>{line.text=event.target.value;shell.refresh()}});input.value=line.text;const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:referenceLine(state.referenceData[reference.id],line.id)})).filter(value=>value.value!==undefined);return detailSection({className:"enemy-battle-text-line",title:`LINE ${line.id}`,body:sourceControl(input,()=>line.text,vanilla?.lines?.find(value=>value.id===line.id)?.text,references,value=>line.text=String(value??""))})}))}
+  function enemyBattleTextPanel(row,prefs){
+    const scan=enemyScanSection(row,prefs),document=enemyBattleTextRow(state.data,row.id);
+    if(!document?.available)return LexeditorUI.stack({fill:false},scan,LexeditorUI.detailNote("This enemy has no battle-script section."));
+    if(!document.lines.length)return LexeditorUI.stack({fill:false},scan,LexeditorUI.detailNote("This enemy has no local battle dialogue."));
+    const vanilla=enemyBattleTextRow(state.vanilla,row.id),referenceLine=(dataset,id)=>enemyBattleTextRow(dataset,row.id)?.lines?.find(value=>value.id===id)?.text;
+    return LexeditorUI.stack({fill:false},scan,...document.lines.map(line=>{
+      const input=LexeditorUI.textArea({rows:4,maxlength:400,"aria-label":`Battle text line ${line.id} for ${row.name}`,oninput:event=>{line.text=event.target.value;shell.refresh()}});input.value=line.text;
+      const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:referenceLine(state.referenceData[reference.id],line.id)})).filter(value=>value.value!==undefined);
+      return detailSection({className:"enemy-battle-text-line",title:`LINE ${line.id}`,help:infoHelp("This enemy uses this line during battle. Its number matches a Show Text instruction in the AI view."),body:sourceControl(input,()=>line.text,vanilla?.lines?.find(value=>value.id===line.id)?.text,references,value=>line.text=String(value??""))});
+    }));
+  }
   function enemyDetail(row,prefs){
     const table=enemyTableRow(state.data,row.id),tab=state.enemyDetailTab||'properties';
     const tabs=[{id:'properties',label:'Properties'},{id:'actions',label:'Actions',help:'The AI uses these action slots. Each level tier can use a different ability in the same slot.'},{id:'loot',label:'Loot'},

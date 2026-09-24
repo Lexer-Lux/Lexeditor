@@ -269,6 +269,7 @@
 
   async function saveAll(){
     try{
+      syncEnemyScanDetails();
       const jobs=[],kernelEdits=[];let textEdits=[],enemyAiDocuments=[],enemyBattleTextEdits=[];
       const cardEdits=state.data.cards.rows.flatMap(row=>{const base=state.base.cards.find(value=>value.id===row.id);return ["top","bottom","left","right","element","power"].filter(field=>row[field]!==base[field]).map(field=>({id:row.id,field,value:row[field]}))});
       if(cardEdits.length)jobs.push(api("/api/cards/save",post({edits:cardEdits})));

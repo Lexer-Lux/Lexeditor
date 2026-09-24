@@ -3877,10 +3877,12 @@ body:has(.lex-data-map-table) #main {
 .lex-icon-value-toggle { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; cursor:pointer; min-width:0; padding:4px; }
 .lex-icon-value-toggle > input { position:absolute; opacity:0; width:100%; height:100%; inset:0; margin:0; }
 .lex-icon-value-art { display:grid; place-items:center; width:32px; height:32px; }
+.lex-icon-value-toggle > :not(input) { pointer-events:none; }
 .lex-icon-value-art img { width:32px; height:32px; object-fit:contain; image-rendering:pixelated; }
 .lex-icon-value-toggle:has(:focus-visible) { outline:2px solid var(--lex-highlight); }
-.lex-icon-value-state { font-size:.7em; visibility:hidden; }
-.lex-icon-value-toggle:has(:checked) .lex-icon-value-state { visibility:visible; }
+.lex-icon-value-toggle { flex:1; }
+.lex-icon-value-toggle:has(:checked) .lex-icon-value-art { filter:grayscale(1); opacity:.45; }
+.lex-unit-field:has(> input:placeholder-shown) > .lex-unit { visibility:hidden; }
 .lex-paged-pane:has(> .lex-paged-pane-content > .lex-curve-editor) { flex:1; height:100%; }
 .lex-paged-pane-content > .lex-curve-editor { height:100%; display:flex; flex-direction:column; }
 .lex-paged-pane-content > .lex-curve-editor > .lex-curve-plot { flex:1; min-height:0; }
@@ -4106,7 +4108,7 @@ body:has(.lex-data-map-table) #main {
 
 /* ---- Section prose ----------------------------------------------------- */
 .lex-detail-text { margin:0; padding:6px 10px; white-space:pre-wrap; overflow-wrap:anywhere; }
-.lex-text-area { display:block; width:100%; min-width:0; resize:vertical; font:inherit; line-height:1.35; }
+.lex-text-area { display:block; width:100%; min-width:0; resize:vertical; font:inherit; line-height:1.35; field-sizing:content; min-height:4lh; }
 
 /* ---- Logs -------------------------------------------------------------- */
 .lex-log {

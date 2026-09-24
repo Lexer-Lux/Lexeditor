@@ -66,13 +66,13 @@ def main() -> int:
     assert "Devour High: Unknown 42" in neutral
     scan_text.encode_text(neutral)
 
-    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    editor = (ROOT / "plugins" / "ff8" / "party.js").read_text(encoding="utf-8")
     for marker in (
-        "enemyGeneratedScanDetails", "UPDATE DETAILS", "UPDATE ALL",
-        "choices.devour", "cut-offs differ for a few vanilla enemies",
+        "enemyGeneratedScanDetails", "syncEnemyScanDetails", "choices.devour",
     ):
         assert marker in editor, marker
     assert "Stored Devour ID" not in editor
+    assert "UPDATE DETAILS" not in editor and "UPDATE ALL" not in editor
 
     print("PASS: FF8 issue #324 uses proven Devour names and encodable data-driven Scan details")
     return 0

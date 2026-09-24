@@ -1309,7 +1309,7 @@
     choice, element("span", {class:"lex-quantity-mark","aria-hidden":"true"}, "×"), quantity);
   const iconValue = ({icon,label,toggle,control}) => element("div",{class:"lex-icon-value"},
     element("label",{class:"lex-icon-value-toggle",title:`${label}: toggle immunity`},toggle,element("span",{class:"lex-icon-value-art"},icon),
-      element("span",{},label),element("span",{class:"lex-icon-value-state","aria-hidden":"true"},"Immune")),control);
+      element("span",{},label)),control);
   const textArea = (options = {}) => element("textarea", {rows:4, ...options,
     class:["lex-text-area", options.class || ""].filter(Boolean).join(" ")});
 
@@ -8018,8 +8018,9 @@ ${contents.path}`});
     // with no box to put a reference in - a checkbox - never gets one.
     const boxed = options.control instanceof Element &&
       options.control.matches?.("input:not([type=checkbox]):not([type=range]),select,textarea,output,.lex-unit-field,.lex-readonly-field,.lex-inline-label:has(> select)");
-    const internal = options.internal === undefined ? boxed : options.internal !== false;
-    const stacked = !internal && options.control?.matches?.(".lex-choice-field,.lex-stack");
+    const multiline = options.control?.matches?.('textarea:not(.lex-code-field)');
+    const internal = !multiline && (options.internal === undefined ? boxed : options.internal !== false);
+    const stacked = !internal && options.control?.matches?.("textarea,.lex-choice-field,.lex-stack");
     const root = element("div", {
       class: ["lex-source-control", internal ? "lex-source-control-internal" : "", stacked ? "lex-source-control-stacked" : ""].filter(Boolean).join(" "),
     }, options.control);
