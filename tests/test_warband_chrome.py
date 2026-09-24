@@ -32,6 +32,7 @@ def mount_warband(page):
       plugin: {id: 'warband', name: 'Warband'},
       tabs: [{id: 'troops', label: 'Troops'}, {id: 'items', label: 'Items'}],
       activeTab: () => 'troops', navigate: () => {}})''')
+    page.evaluate('LexeditorUI.finishPluginLoading()')
     page.wait_for_selector('.lex-shell-header nav button')
 
 
