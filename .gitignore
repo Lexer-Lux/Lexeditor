@@ -31,3 +31,7 @@ plugins/rdr2/assets/fonts/*.otf
 plugins/rdr2/assets/fonts/*.woff
 plugins/rdr2/assets/fonts/*.woff2
 !plugins/rdr2/assets/fonts/README.md
+
+# Fonts the RDR plugin fetches or extracts at run time; never redistributed.
+plugins/rdr/assets/fonts/*.woff
+plugins/rdr/assets/fonts/*.woff2
