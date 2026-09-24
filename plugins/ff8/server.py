@@ -83,14 +83,17 @@ class Handler(PluginRequestHandler):
     server_version = "LexeditorFF8/1"
 
     def binary_response(self, data: bytes, content_type: str, filename: str | None = None):
-        self.send_response(200)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        if filename:
-            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            if filename:
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        except ConnectionError:
+            pass
 
     def body(self) -> dict:
         length = int(self.headers.get("Content-Length", "0"))

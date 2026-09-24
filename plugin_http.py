@@ -29,11 +29,17 @@ class PluginRequestHandler(BaseHTTPRequestHandler):
 
     def send_json(self, payload, status: int = 200) -> None:
         data = json.dumps(payload).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
+        # A slow render outlives its page whenever the window closes or a
+        # check tears down mid-reply. The client is gone; there is nothing
+        # to report to, so a dead connection ends the reply quietly.
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        except ConnectionError:
+            pass
 
     def send_file(self, target: Path, status: int = 200) -> None:
         data = Path(target).read_bytes()
@@ -41,12 +47,15 @@ class PluginRequestHandler(BaseHTTPRequestHandler):
                         or "application/octet-stream", status)
 
     def send_bytes(self, data: bytes, content_type: str, status: int = 200) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Cache-Control", NO_STORE)
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Cache-Control", NO_STORE)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        except ConnectionError:
+            pass
 
     def send_page_module(self, root: Path, path: str) -> bool:
         """Serve /<name>.js or /<name>.css from the plugin's own folder.

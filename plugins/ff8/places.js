@@ -25,7 +25,7 @@
       const current=await api(`/api/field?map=${encodeURIComponent(row.key)}&dataset=${encodeURIComponent(dataset)}`),vanilla=state.activeSource==="mine"?await api(`/api/field?map=${encodeURIComponent(row.key)}&dataset=vanilla`):current;
       Object.assign(row,current,{_loaded:true,_loading:false});
       const vanillaRow=fieldMapRow(state.vanilla,row.key);if(vanillaRow)Object.assign(vanillaRow,clone(vanilla),{_loaded:true,_loading:false});
-      const baseIndex=state.base.fields?.findIndex(value=>value.key===row.key)??-1;if(baseIndex>=0)state.base.fields[baseIndex]=clone(row);
+      const baseIndex=state.base.fields?.findIndex(value=>value.key===row.key)??-1;if(baseIndex>=0)state.base.fields[baseIndex]=clone(row);touchHistoryBaseRow("fields",row.key);
       await Promise.all(state.references.map(async reference=>{const referenceRow=fieldMapRow(state.referenceData[reference.id],row.key);if(!referenceRow)return;try{const value=await api(`/api/field?map=${encodeURIComponent(row.key)}&dataset=${encodeURIComponent(`reference:${reference.id}`)}`);Object.assign(referenceRow,clone(value),{_loaded:true,_loading:false})}catch(error){referenceRow._error=error.message||String(error)}}));
     }catch(error){row._loading=false;row._error=error.message||String(error)}
     if(state.tab==="maps"&&state.mapsTab==="field")renderMaps();else if(state.tab==="fields")renderFields();shell.refresh();

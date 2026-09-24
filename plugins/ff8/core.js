@@ -40,8 +40,62 @@
       change:value=>{state.modOnly=value;state.pages[view]=0;render()}};
   }
   function dirtyCount(){if(state.activeSource!=="mine")return 0;let count=Object.keys(platformChanges()).length+(window.ff8SpellbookDrafts?.size||0);for(const name of editableDatasets){if(!state.data[name])continue;const current=state.data[name].rows,base=state.base[name]||[];for(let i=0;i<current.length;i++){const before=name==="fields"?base.find(row=>row.key===current[i].key):base[i];if(signature(current[i])!==signature(before))count++;}}if(state.data.init&&signature(state.data.init)!==signature(state.base.init))count++;if(state.data.settings&&signature(state.data.settings)!==signature(state.base.settings))count++;return count}
-  function historyCapture(){return {...Object.fromEntries(editableDatasets.map(name=>[name,clone(state.data[name]?.rows||[])])),init:clone(state.data.init||{}),settings:clone(state.data.settings||{})}}
-  function historyRestore(snapshot){for(const [name,value] of Object.entries(snapshot)){if(!state.data[name])continue;if(name==="settings"||name==="init")state.data[name]=clone(value);else state.data[name].rows=clone(value)}}
+  // Undo snapshots hold only rows that differ from the last saved state. A
+  // full clone of every dataset costs ~20MB and ~224ms per keystroke, and the
+  // 50-deep stack held before+after pairs past 2GB until the tab died. Each
+  // snapshot carries the base generation it was taken against; restoring
+  // against a newer base is refused, and every base rebuild clears the stack.
+  let historyBaseGen=0,historyBaseSigs=null;
+  function historyRowKey(name,row,index){return name==="fields"?row.key:index}
+  function resetHistoryBaseSigs(){
+    historyBaseGen++;
+    historyBaseSigs={init:signature(state.base.init||{}),settings:signature(state.base.settings||{})};
+    for(const name of editableDatasets){
+      const sigs=new Map(),base=state.base[name]||[];
+      for(let i=0;i<base.length;i++)sigs.set(historyRowKey(name,base[i],i),signature(base[i]));
+      historyBaseSigs[name]=sigs;
+    }
+  }
+  function touchHistoryBaseRow(name,key){
+    if(!historyBaseSigs||!(historyBaseSigs[name] instanceof Map))return;
+    const base=state.base[name]||[];
+    const row=name==="fields"?base.find(candidate=>candidate.key===key):base[Number(key)];
+    if(row!==undefined)historyBaseSigs[name].set(key,signature(row));
+  }
+  function historyFullCapture(){return {...Object.fromEntries(editableDatasets.map(name=>[name,clone(state.data[name]?.rows||[])])),init:clone(state.data.init||{}),settings:clone(state.data.settings||{})}}
+  function historyCapture(){
+    if(!historyBaseSigs)resetHistoryBaseSigs();
+    const snap={gen:historyBaseGen};
+    for(const name of editableDatasets){
+      const rows=state.data[name]?.rows||[],base=state.base[name]||[],sigs=historyBaseSigs[name];
+      if(!(sigs instanceof Map)||rows.length!==base.length){snap[name]={full:clone(rows)};continue}
+      if(name==="fields"&&rows.some(row=>!sigs.has(row.key))){snap[name]={full:clone(rows)};continue}
+      const changed=[];
+      for(let i=0;i<rows.length;i++){
+        const key=historyRowKey(name,rows[i],i);
+        if(signature(rows[i])!==sigs.get(key))changed.push([key,clone(rows[i])]);
+      }
+      snap[name]=changed.length?{changed}:{clean:true};
+    }
+    snap.init=signature(state.data.init||{})!==historyBaseSigs.init?{value:clone(state.data.init||{})}:{clean:true};
+    snap.settings=signature(state.data.settings||{})!==historyBaseSigs.settings?{value:clone(state.data.settings||{})}:{clean:true};
+    return snap;
+  }
+  function historyRestore(snapshot){
+    if(!snapshot||snapshot.gen!==historyBaseGen)return;
+    for(const [name,entry] of Object.entries(snapshot)){
+      if(name==="gen"||!state.data[name]||!entry)continue;
+      if(name==="settings"||name==="init"){state.data[name]=clone(entry.clean?(state.base[name]??{}):entry.value);continue}
+      if(entry.full){state.data[name].rows=clone(entry.full);continue}
+      if(state.base[name]===undefined)continue;
+      const rows=clone(state.base[name]);
+      for(const [key,row] of entry.changed||[]){
+        if(name==="fields"){const index=rows.findIndex(candidate=>candidate.key===key);if(index>=0)rows[index]=clone(row)}
+        else if(rows[Number(key)]!==undefined)rows[Number(key)]=clone(row);
+      }
+      state.data[name].rows=rows;
+    }
+  }
   function setStatus(text){state.status=text}
   function rowSortValue(row,key){if(String(key).startsWith("field:"))return row.fields?.find(field=>field.field===String(key).slice(6))?.value??"";return row?.[key]??""}
   function filtered(view,fields){const query=state.filters[view].trim().toLocaleLowerCase();let rows=state.data[view].rows.filter(row=>!query||fields.some(field=>String(row[field]??"").toLocaleLowerCase().includes(query)));const [key,direction]=state.sorts[view];return [...rows].sort((a,b)=>direction*String(rowSortValue(a,key)).localeCompare(String(rowSortValue(b,key)),undefined,{numeric:true,sensitivity:"base"}))}
