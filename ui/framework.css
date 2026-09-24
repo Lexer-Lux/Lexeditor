@@ -3809,6 +3809,12 @@ body:has(.lex-data-map-table) #main {
 
 .lex-curve-variable { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:4px; min-width:0; }
 .lex-curve-variable :is(input,select) { width:100%; min-width:0; }
+/* A variable whose box carries its vanilla reference needs the reference
+   lane plus editable room. In an 84px drawer column the box was almost all
+   padding, so autofit shrank the value to its 8px floor and the rail spilled
+   past the box. Such variables take a full drawer row instead; plain inputs
+   keep the shared columns. */
+.lex-curve-variables > .lex-curve-variable:has(.lex-source-control-internal) { grid-column:1/-1; }
 .lex-curve-variable-a { color:#f05b5b; fill:#f05b5b; }
 .lex-curve-variable-b { color:#63a8ff; fill:#63a8ff; }
 .lex-curve-variable-c { color:#f1d34f; fill:#f1d34f; }
