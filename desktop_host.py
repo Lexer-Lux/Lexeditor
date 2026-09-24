@@ -835,6 +835,15 @@ class HostApi:
         return {"result": result, "helperNotice": helper.get("setupNotice"),
                 "status": snapshot.get("status"), "canOpen": snapshot.get("canOpen")}
 
+    @staticmethod
+    def _plugin_dir(plugin_id: str, plugin) -> str:
+        """The plugins/ directory for one game, for joining dir-keyed budgets."""
+        module = getattr(getattr(plugin, "session_factory", None), "__module__", "") or ""
+        parts = module.split(".")
+        if len(parts) >= 3 and parts[0] == "plugins":
+            return parts[1]
+        return plugin_id.replace("-", "_")
+
     def developer_overview(self) -> dict:
         """Every game and what is still left to set up for it. Developer Mode only."""
         if not self._developer():
@@ -849,14 +858,38 @@ class HostApi:
             if plugin.installation is not None:
                 tasks.append({"label": "ReShade defaults set",
                               "done": self._reshade_defaults(plugin.plugin_id).is_file()})
+            loading = self._mod_loading_state(plugin)
+            status = installation.get("statusText") or installation.get("status", "")
+            rest = " · ".join(part for part in (status, loading["loader"]) if part)
             games.append({"id": plugin.plugin_id, "name": plugin.name,
-                          "status": installation.get("statusText") or installation.get("status", ""),
-                          "modLoading": self._mod_loading_state(plugin),
-                          "tasks": tasks})
-        return {"games": sorted(games, key=lambda row: row["name"].lower()),
-                "sharedUi": self._shared_ui_budget(),
-                "sharedCode": self._shared_code_budget(),
-                "quotes": self.loading_quote_counts()}
+                          "directory": self._plugin_dir(plugin.plugin_id, plugin),
+                          "modState": loading["state"], "modWorks": loading["works"],
+                          "tasks": tasks, "rest": rest})
+        codes = {row["plugin"]: row for row in self._shared_code_budget()}
+        ui_rows = self._shared_ui_budget()
+        quote_counts = self.loading_quote_counts()
+        quote_by_dir = quote_counts["plugins"]
+        rows = []
+        for game in games:
+            directory = game.pop("directory")
+            code = codes.get(directory, {})
+            rows.append({"id": game["id"], "game": game["name"],
+                         "modState": game["modState"], "modWorks": game["modWorks"],
+                         "tasks": game["tasks"],
+                         "quotes": quote_by_dir.get(directory),
+                         "copiedLines": code.get("copiedLines") if code else None,
+                         "copiedRecorded": code.get("recorded") if code else None,
+                         "copiedOver": bool(code.get("over")) if code else False,
+                         "rest": game["rest"]})
+        return {"table": {
+            "rows": sorted(rows, key=lambda row: row["game"].lower()),
+            "quotesTotal": quote_counts["global"] + sum(quote_by_dir.values()),
+            "globalQuotes": quote_counts["global"],
+            "quotedPlugins": len(quote_by_dir),
+            "sharedUi": {"files": ui_rows,
+                         "totalShared": sum(row["sharedSelectors"] for row in ui_rows),
+                         "totalHand": sum(row["handBuiltRows"] for row in ui_rows)},
+        }}
 
     def _shared_code_budget(self) -> list[dict]:
         """Plugin Python that is a second copy of another plugin's function."""

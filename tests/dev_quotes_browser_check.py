@@ -19,19 +19,25 @@ def main():
             load_page(page, f'http://127.0.0.1:{server.server_port}', '/ui/chooser.html')
             dev = page.get_by_role('button', name='Open helper versions', exact=True)
             dev.wait_for()
-            page.evaluate("""window.pywebview.api.developer_overview=async()=>({
-              games: [], sharedUi: [], sharedCode: [],
-              quotes: {global: 2, plugins: {ff8: 10, ff9: 0}},
-            });void 0""")
+            page.evaluate("""window.pywebview.api.developer_overview=async()=>({table:{
+              rows: [
+                {id: 'ff8', game: 'Final Fantasy 8', modState: 'Loads mods', modWorks: true,
+                 tasks: [], quotes: 10, copiedLines: 0, copiedRecorded: 0, copiedOver: false, rest: 'Ready'},
+                {id: 'ff9', game: 'Final Fantasy 9', modState: 'Not yet', modWorks: false,
+                 tasks: [], quotes: 0, copiedLines: null, copiedRecorded: null, copiedOver: false, rest: 'Ready'},
+              ],
+              quotesTotal: 12, globalQuotes: 2, quotedPlugins: 2,
+              sharedUi: {files: [], totalShared: 0, totalHand: 0},
+            }});void 0""")
             dev.click()
-            table = page.locator('#lexer-dev-quotes')
+            table = page.locator('#lexer-dev-table .lex-column-list')
             table.wait_for()
             body = table.inner_text()
-            assert 'PLUGIN' in body and 'QUOTES' in body, body
-            assert 'Global (shared)' in body, body
-            assert 'ff8' in body and 'ff9' in body, body
-            assert '2 plugins + shared' in body, body
-            assert '12' in body.split('2 plugins + shared')[1], body
+            assert 'GAME' in body and 'QUOTES' in body and 'COPIED LINES' in body, body
+            assert 'Final Fantasy 8' in body and 'Final Fantasy 9' in body, body
+            summary = page.locator('#lexer-dev-summary').inner_text()
+            assert 'Global (shared)' in summary, summary
+            assert '12' in summary and '2 games' in summary, summary
             assert not errors, errors
             browser.close()
     finally:
