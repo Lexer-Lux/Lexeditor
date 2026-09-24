@@ -41,7 +41,7 @@ UNRESOLVED_AREAS = (
     ("StreamingAssets/p0data1*.bin (outside integrated BGI pathing flags)", "Field backgrounds, cameras, walkmesh geometry/topology and animations",
      "Lexeditor has preservation-safe editors for BGI_FLOOR_ACTIVE plus Memoria Field Creator's documented triangle Active, Alternate footstep, Prevent NPC pathing and Prevent PC pathing flags. Background art, cameras, walkmesh geometry/topology, edge semantics, transforms, remaining/internal flag semantics and moving-platform animation data remain protected and unintegrated rather than being routed through a lossy generic editor."),
     ("StreamingAssets/p0data2.bin (outside BattleScene raw16)", "Battle geometry, scene assets and effects",
-     "Enemy and encounter BattleScene raw16 records are integrated separately. Public tooling also reads battle meshes/background assets, SPS/effect data and related scene resources from p0data2; Lexeditor has no safe structured editor for those assets yet."),
+     "Enemy, encounter, enemy-attack and battle-flag BattleScene raw16 records are integrated separately. Public tooling also reads battle meshes/background assets, SPS/effect data and related scene resources from p0data2; Lexeditor has no safe structured editor for those assets yet."),
     ("StreamingAssets/p0data3.bin", "World-map geometry, materials and effects",
      "Public FF9 tooling reads and overrides world-map assets from p0data3. Lexeditor's World tab currently edits only documented Memoria CSV controls, not the packed world geometry/material/effect data."),
     ("StreamingAssets/p0data4.bin", "Field and character 3D models",
@@ -178,7 +178,7 @@ class Handler(PluginRequestHandler):
                 query = parse_qs(parsed.query)
                 key = query.get("key", [""])[0]
                 scene = query.get("scene", [None])[0]
-                self.json_response(BattleSceneStore().load(key) if key in {"enemies", "encounters"} else FIELD_WALKMESH.load(key, scene) if key in FIELD_WALKMESH.KEYS else MemoriaDataStore().load(key))
+                self.json_response(BattleSceneStore().load(key) if key in BattleSceneStore.KEYS else FIELD_WALKMESH.load(key, scene) if key in FIELD_WALKMESH.KEYS else MemoriaDataStore().load(key))
             elif path == "/api/runtime": self.json_response(memoria_manager.status(paths.GAME_ROOT))
             elif path == "/api/runtime/available": self.json_response(memoria_manager.available())
             elif path == "/api/mod-compat": self.json_response(mod_compat.audit())
@@ -216,7 +216,7 @@ class Handler(PluginRequestHandler):
             else:
                 key = str(payload.get("key", ""))
                 result = (BattleSceneStore().save(key, payload.get("sceneHashes", {}), payload.get("changes", []))
-                          if key in {"enemies", "encounters"} else
+                          if key in BattleSceneStore.KEYS else
                           FIELD_WALKMESH.save(key, payload.get("sceneHashes", {}), payload.get("changes", []))
                           if key in FIELD_WALKMESH.KEYS else
                           MemoriaDataStore().save(key, str(payload.get("sha256", "")), payload.get("changes", [])))

@@ -27,6 +27,7 @@ def service(tmp_path, monkeypatch):
     paths.GAME_ROOT.mkdir()
     dependency("memoria_csv", MemoriaDataStore=lambda: None, catalog=lambda: [])
     class FakeBattleSceneStore:
+        KEYS = frozenset({"enemies", "encounters", "enemy-attacks", "scene-flags"})
         def status_rows(self): return []
     dependency("battle_scene", BattleSceneStore=FakeBattleSceneStore)
     class FakeFieldWalkmeshStore:

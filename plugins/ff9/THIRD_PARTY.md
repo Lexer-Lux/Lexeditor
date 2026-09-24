@@ -10,6 +10,7 @@ No proprietary game data is included here.
 - Pinned source revision used for format/runtime verification: `d8df6e69ddb618adc753a27d9424409d66216a35`
 - License: MIT (`LICENSE` in the Memoria repository).
 - Use: FF9 runtime/helper, CSV schemas and serialization behavior, battle-scene field semantics, BGI field-walkmesh layout/runtime floor-active semantics, launcher update-setting behavior.
+- Battle-attack and scene-flag layouts additionally verified against these pinned-revision files: `Assembly-CSharp/Global/BTL_SCENE.cs` (`a6e9e21e`), `AA_DATA.cs` (`e8a081ec`), `BTL_REF.cs` (`ef2a164b`), `BattleCommandInfo.cs` (`53f7a989`), `BitUtil.cs` (`88928800`), `BTL_SCENE_INFO.cs` (`9bf6ccb2`), `SB2/SB2_HEAD.cs` (`b8af40db`), `Memoria/Data/Battle/TargetType.cs` (`9128a3c0`), `TargetDisplay.cs` (`673b80b2`), `StatusSetId.cs` (`c4409fa6`). No Memoria source file is vendored; Lexeditor's reader is a clean-room struct codec citing those offsets.
 - Lexeditor verifies the official `Memoria.Patcher.exe` SHA-256 published by that release before execution.
 
 ## UnityPy
@@ -25,6 +26,7 @@ No proprietary game data is included here.
 - Reference revision audited: `7bd24784cbb5099f678a78275af366104efb386d`
 - License: GNU GPL v3 (`LICENSE` in the Hades Workshop repository).
 - Use: additional FF9-specific reverse-engineering provenance for Steam Unity archive structure.
+- `Source/Enemies.h` was audited for enemy-attack category/type semantics at the reference revision; its abstracted spell model does not map onto the Steam `AA_DATA` battle record, so no Hades-derived attack semantics were adopted.
 - No Hades Workshop source file or binary is vendored or invoked by Lexeditor.
 
 ## Dream World IX / ff9mapkit

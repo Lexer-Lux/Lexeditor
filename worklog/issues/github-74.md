@@ -166,3 +166,18 @@ binary or extracted game data is bundled.
   `tools/ff9/patch_features_ui.py` determinism — PASS with no `editor.html` diff.
 - No p0data codec added. Per-family pursue-or-exclude decisions (#522) and the
   installed-game battle proof remain Lexer work. Issue stays `actionable`.
+
+## 2026-09-23 --- agents/actionables-ff9 audit (issues 74/521, no scope change)
+
+- Branch agents/actionables-ff9 reset to origin/master 89f7f532; worktree clean before and after. No live games/ff9 references remain outside historical worklog prose; plugins/ff9/plugin.py keeps the root-aware helper hooks only.
+- Agent-side verification at this head, all green: FF9 pytest files (test_ff9_csv/battle_scene/datamap_gui/features/field_walkmesh/http/mod_compat/runtime/runtime_source) - 158 passed; node --test tests/ff9_editor.test.cjs - 18 passed; app.py --list / --game ff9 --check (ff9: ready) / --game ff9 --smoke (5 PASS); tools/generate_credits.py --check pass; tools/ff9/patch_features_ui.py --check PASS; tests/ff9_browser_check.py rendered acceptance passed. Catalog still reports all 42 pinned Memoria CSV datasets.
+- No new p0data codec: each remaining family still needs a preservation-tested player-facing editor (not truthfully buildable from memory without format specs, game bytes, or in-game verification) or an explicit Lexer exclusion, and only Lexer can exclude a Data Map area.
+- Unchanged blockers: (1) per-family pursue-or-exclude decisions on #522; (2) installed-game battle proof from this issue's checklist (edit a visible enemy/encounter value, Deploy Project, launch through Memoria, confirm in battle, revert to vanilla). Issue stays actionable.
+
+## 2026-09-23 --- agents/actionables-ff9: enemy attacks + scene flags implemented
+
+- New structured BattleScene coverage from pinned Memoria `d8df6e69` specs (no vendored code, no invented codecs): `enemy-attacks` dataset (16-byte AA_DATA records: verified 16-value Target enum, DefaultAlly/DisplayStats/VfxIndex/ForDead/DefaultCamera/DefaultOnDead bits, ScriptId/Power/Elements/Rate/Category/AddStatusNo/MP/Type/Vfx2/Name bytes) and `scene-flags` dataset (12 verified SB2_HEAD battle-rule bits as toggles).
+- Unknown semantics stay protected: legacy sound bits (read and discarded by Memoria), header version/counts, flag bits 12-15 (named constants, no consuming pinned code path), enemy pads -- all preserved verbatim, shown read-only or unexposed, never editable.
+- Hades Workshop `Source/Enemies.h` (audited rev `7bd24784`) researched for attack category/type semantics: its abstracted spell model does not map onto the Steam AA_DATA record, so nothing was adopted; no Hades source copied (GPL). Pinned Memoria Data dir audited: Battle/ holds only the 4 already-integrated CSVs, so no further agent-derivable enemy/encounter sources exist outside raw16.
+- Data Map: new rows integrated/openable under Enemies/Encounters tabs; p0data2 gap note updated; openable/editable-vs-closed/gap distinction locked by new contract tests. Battle geometry/mesh/effect gap remains and still needs Lexer's pursue-or-exclude call (#522).
+- Verification: FF9 pytest 167 passed, node 21 passed, smoke/check/credits/features/browser all green. Installed-game battle proof still needs Lexer (unchanged checklist).
