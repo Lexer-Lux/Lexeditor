@@ -42,14 +42,8 @@
       --lex-detail-heading-bg:transparent;--lex-detail-heading-border:0;
       --lex-detail-title-size:clamp(28px,3.5vw,46px);--lex-detail-title-fg:#fff;--lex-detail-id-fg:#c6c6ee;
       --lex-heading-font:"FF7 Menu","Arial Narrow",sans-serif;--lex-radius:6px;
+      --lex-detail-icon-bg:var(--lex-surface-bg);--lex-detail-icon-fg:#fff;
+      /* Fifteen equal-share tabs starve ACCESSORIES in the menu's wide pitch.
+         Content-sized tabs fit one row; narrow windows scroll the strip. */
+      --lex-nav-tab-columns:auto;--lex-nav-overflow-x:auto;
       --ff7-menu-surface:linear-gradient(180deg,#1a1aa0,#0e0e60);}
-    /* Neutral hardcodes light grounds that outrank the token layer; the menu
-       repaints them while layout stays shared. */
-    body.lex-neutral-ui .lex-shell-command-row {background:var(--lex-command-row-bg);}
-    body.lex-neutral-ui .lex-nav-frame,body.lex-neutral-ui .lex-shell-header nav {background:var(--lex-nav-bg);}
-    body.lex-neutral-ui .lex-detail-panel-heading {background:transparent;border-color:var(--lex-border);}
-    body.lex-neutral-ui .lex-detail-panel-icon {background:var(--lex-surface-bg);border-color:var(--lex-border);color:#fff;}
-    /* Fifteen equal-share tabs starve ACCESSORIES in the menu's wide pitch.
-       Content-sized tabs fit one row; narrow windows scroll the strip. */
-    body.lex-neutral-ui .lex-shell-header nav {grid-auto-columns:auto;justify-content:center;}
-    body.lex-neutral-ui .lex-nav-frame {overflow-x:auto;}

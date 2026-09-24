@@ -17,11 +17,11 @@ import css_audit  # noqa: E402
 
 # Non-token rules per plugin; the target for every one is 0.
 PLUGIN_RULES = {
-    "bannerlord": 1, "blank": 0, "factorio": 0, "ff7r": 0, "ff7r2": 0, "ff8": 0, "ff9": 0,
+    "bannerlord": 1, "blank": 0, "factorio": 0, "ff7": 0, "ff7r": 0, "ff7r2": 0, "ff8": 0, "ff9": 0,
     "palworld": 0, "project_zomboid": 0, "rdr": 0, "rdr2": 0, "terraria": 0, "warband": 0, "ds3": 0, "ffx_x2": 0, "stardew_valley": 0, "chrono_trigger": 0,
 }
 PLUGIN_IMPORTANT = {
-    "bannerlord": 0, "blank": 0, "factorio": 0, "ff7r": 0, "ff7r2": 0, "ff8": 0, "ff9": 0,
+    "bannerlord": 0, "blank": 0, "factorio": 0, "ff7": 0, "ff7r": 0, "ff7r2": 0, "ff8": 0, "ff9": 0,
     "palworld": 0, "project_zomboid": 0, "rdr": 0, "rdr2": 0, "terraria": 0, "warband": 0, "ds3": 0, "ffx_x2": 0, "stardew_valley": 0, "chrono_trigger": 0,
 }
 FRAMEWORK_DUPLICATES = 0

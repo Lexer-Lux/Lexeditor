@@ -95,10 +95,10 @@
     const tileId=Math.max(0,Math.min(background.tileCount-1,Number(state.fieldBackgroundSelection[row.key])||0));
     state.fieldBackgroundSelection[row.key]=tileId;
     const preview=fieldBackgroundPreviewState(row),tile=background.tiles[tileId];
-    const image=el("img",{class:"field-background-image","data-field-key":row.key,alt:`${row.name} composed background`});
-    const overlay=el("canvas",{class:"field-overlay-canvas","aria-hidden":"true"});
+    const image=el("img",{class:"field-background-image lex-overlay-base","data-field-key":row.key,alt:`${row.name} composed background`});
+    const overlay=el("canvas",{class:"field-overlay-canvas lex-overlay-layer","aria-hidden":"true"});
     image.lexOverlay=overlay;
-    const media=el("div",{class:"field-preview-stack"},image,overlay);
+    const media=el("div",{class:"field-preview-stack lex-overlay-stack"},image,overlay);
     const status=LexeditorUI.detailNote("Rendering field background...");image.lexStatus=status;
     const redraw=()=>refreshFieldBackgroundPreview(row,image,status);
     const picker=numberControl(tileId,0,background.tileCount-1,1,value=>{state.fieldBackgroundSelection[row.key]=Number(value);rerenderFields()},{"aria-label":`${row.name} selected background tile`});

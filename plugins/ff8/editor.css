@@ -130,9 +130,6 @@
     .field-trigger-table {--lex-column-list-template:86px minmax(98px,.55fr) repeat(2,minmax(160px,1fr));}
 
     /* The walkmesh overlay canvas covers the background preview exactly. */
-    .field-preview-stack{position:relative;display:inline-block;max-width:100%}
-    .field-preview-stack .field-background-image{display:block;max-width:100%;height:auto}
-    .field-overlay-canvas{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
 
     /* The column is exactly its pane's height so its content scrolls under the tabs, not the tabs with it. */
 
