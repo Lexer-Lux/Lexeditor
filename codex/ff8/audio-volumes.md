@@ -33,7 +33,7 @@ existing key so `-1` auto-detect survives when a side is unmanaged).
 - Gains persist per mod as `sfxVolume`/`musicVolume` in
   `lexeditor-settings.json` (`None` = unmanaged) and are applied to
   `FFNx.toml` on launch via `gameplay_settings.save(..., install_runtime=True)`.
-- Covered by `tests/test_ff8_audio_volumes_issue_498.py` (validation,
+- Covered by `tests/ff8/test_ff8_audio_volumes_issue_498.py` (validation,
   load round-trip, save persistence, per-key FFNx.toml writes, editor
   slider presence).
 - Still game-side: the in-game Config-menu slider replacement and audible

@@ -21,7 +21,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.prepare_ff8_native_build import BASE, prepare
-from tests.verify_ff8_linked_runtime import verify as verify_linked
+from tests.ff8.verify_ff8_linked_runtime import verify as verify_linked
 from plugins.ff8.ffnx_issue_51 import runtime_package
 
 SUPPORT_FILES = {

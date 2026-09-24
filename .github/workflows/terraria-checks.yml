@@ -5,19 +5,19 @@ on:
     branches: [master]
     paths:
       - 'plugins/terraria/**'
-      - 'tests/*terraria*'
+      - 'tests/terraria/**'
       - 'tests/plugin_checks.json'
       - 'tools/check_plugin.py'
-      - 'tests/verify_all.py'
+      - 'tests/shared/verify_all.py'
       - 'requirements-test.txt'
       - '.github/workflows/terraria-checks.yml'
   pull_request:
     paths:
       - 'plugins/terraria/**'
-      - 'tests/*terraria*'
+      - 'tests/terraria/**'
       - 'tests/plugin_checks.json'
       - 'tools/check_plugin.py'
-      - 'tests/verify_all.py'
+      - 'tests/shared/verify_all.py'
       - 'requirements-test.txt'
       - '.github/workflows/terraria-checks.yml'
   workflow_dispatch:

@@ -68,7 +68,7 @@ Stardew-side conformance/evidence:
 - Plugin CSS styles only Stardew-owned classes/tokens and stays below its local budget; no `.lex-*` selector clone is added.
 - The shared shell owns Information, Data Map, save/discard, and page navigation. Data Map uses the shared integration-status UI on the current-master rendered pass.
 - Objects is a shared paged Table + Detail view with 96+ synthetic records during browser acceptance, searchable/sortable identity columns, shared cell editors, semantic BOOL/INT controls, grouped detail sections, and gameplay-facing help for sell price, edibility/energy/health, and drink behavior.
-- Loading, empty-search, stale-save error, dirty/save/discard/reopen, keyboard help, keyboard divider resize, pagination, sorting, selection, table editing, Data Map routing, and the final controls of the tall Information panel are exercised by `tests/stardew_valley_browser_check.py`.
+- Loading, empty-search, stale-save error, dirty/save/discard/reopen, keyboard help, keyboard divider resize, pagination, sorting, selection, table editing, Data Map routing, and the final controls of the tall Information panel are exercised by `tests/stardew_valley/stardew_valley_browser_check.py`.
 - The rendered workflow tests both this branch's shared UI and an exact current-master `framework.js/framework.css` overlay at 1440x900, 900x620, and 1100x760 at 135% scale. Passing source/API/smoke checks are not substituted for this rendered evidence.
 - No Tweaks page is added: this vertical slice has no separate supported settings dataset to expose, so inventing one would violate the scope/semantics rule.
 - Credits and Mod Loading already contain the Stardew sources, loader structure, and cross-mod conflict model.

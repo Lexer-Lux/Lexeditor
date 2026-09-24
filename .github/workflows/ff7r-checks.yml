@@ -5,19 +5,19 @@ on:
     branches: [master]
     paths:
       - 'plugins/ff7r/**'
-      - 'tests/*ff7r*'
+      - 'tests/ff7r/**'
       - 'tests/plugin_checks.json'
       - 'tools/check_plugin.py'
-      - 'tests/verify_all.py'
+      - 'tests/shared/verify_all.py'
       - 'requirements-test.txt'
       - '.github/workflows/ff7r-checks.yml'
   pull_request:
     paths:
       - 'plugins/ff7r/**'
-      - 'tests/*ff7r*'
+      - 'tests/ff7r/**'
       - 'tests/plugin_checks.json'
       - 'tools/check_plugin.py'
-      - 'tests/verify_all.py'
+      - 'tests/shared/verify_all.py'
       - 'requirements-test.txt'
       - '.github/workflows/ff7r-checks.yml'
   workflow_dispatch:

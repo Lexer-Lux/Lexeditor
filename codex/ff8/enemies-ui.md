@@ -17,7 +17,7 @@
   The executable hash is checked before interpreting fixed offsets. Neither
   the EXE nor generated art should be committed or distributed.
 
-Regression entry points: `tests/verify_ff8_enemy_compact_ui.py` (real UI with
-synthetic data), `tests/verify_ff8_card_art.py` (decoder and HTTP route).
+Regression entry points: `tests/ff8/verify_ff8_enemy_compact_ui.py` (real UI with
+synthetic data), `tests/ff8/verify_ff8_card_art.py` (decoder and HTTP route).
 Both optionally accept `--exe` for privately checking installed card art.
 These tests do not replace acceptance in the user's running editor.

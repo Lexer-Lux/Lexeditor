@@ -5,19 +5,19 @@ on:
     branches: [master]
     paths:
       - 'plugins/rdr2/**'
-      - 'tests/*rdr2*'
+      - 'tests/rdr2/**'
       - 'tests/plugin_checks.json'
       - 'tools/check_plugin.py'
-      - 'tests/verify_all.py'
+      - 'tests/shared/verify_all.py'
       - 'requirements-test.txt'
       - '.github/workflows/rdr2-checks.yml'
   pull_request:
     paths:
       - 'plugins/rdr2/**'
-      - 'tests/*rdr2*'
+      - 'tests/rdr2/**'
       - 'tests/plugin_checks.json'
       - 'tools/check_plugin.py'
-      - 'tests/verify_all.py'
+      - 'tests/shared/verify_all.py'
       - 'requirements-test.txt'
       - '.github/workflows/rdr2-checks.yml'
   workflow_dispatch:

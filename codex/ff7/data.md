@@ -43,7 +43,7 @@ The synthetic suite now includes 58 binary/HTTP tests in the recorded completion
 
 ## Installed-data check and remaining acceptance
 
-Run `python tests/verify_ff7_installed.py` (also part of `python tools/check_plugin.py ff7`) from a normal Lexeditor checkout. It uses saved/default FF7 installation paths, or accepts `--game "path"` (repeat for both editions). It reads installed files, writes only a disposable temporary project, verifies no-op binary readback, hashes the installed sources before/after, and writes a JSON report outside the game directories. Missing/unreadable datasets remain errors; a partial check does not report full success. No game launch, deployment or upload occurs.
+Run `python tests/ff7/verify_ff7_installed.py` (also part of `python tools/check_plugin.py ff7`) from a normal Lexeditor checkout. It uses saved/default FF7 installation paths, or accepts `--game "path"` (repeat for both editions). It reads installed files, writes only a disposable temporary project, verifies no-op binary readback, hashes the installed sources before/after, and writes a JSON report outside the game directories. Missing/unreadable datasets remain errors; a partial check does not report full success. No game launch, deployment or upload occurs.
 
 Actual installed-build compatibility, native desktop behavior, gameplay acceptance of deployed edits and the user's judgment of sound selection remain unverified by the synthetic suite. These checks must not be marked passed by inference. #73 includes other games and #72 includes listening acceptance; an FF7 implementation does not close their unrelated portions.
 

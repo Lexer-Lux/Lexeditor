@@ -77,7 +77,7 @@ identity.
 
 ## Coverage invariants
 
-`tests/test_rdr2_inventory_icons.py` enforces the historical accounting:
+`tests/rdr2/test_rdr2_inventory_icons.py` enforces the historical accounting:
 
 - `ITEM_TEXTURES`: 347 bundled static PNGs.
 - `UI_ITEMVIEWER`: 235 bundled raw values + 7 installed-game raw values + 41

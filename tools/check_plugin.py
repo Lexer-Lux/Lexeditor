@@ -5,15 +5,14 @@
     python tools/check_plugin.py ff8 --list   show what would run
 
 Each `.github/workflows/<plugin>-checks.yml` and `global-checks.yml` is this
-command and nothing else, so every game gets the same treatment. A file in
-tests/ belongs to the plugin whose id (or alias in tests/plugin_checks.json)
-is the longest prefix of its name after `test_`/`verify_`; for example
-`test_ff7_2013_*.py` is ff7_2013's and `verify_ff7_*.py` is ff7's. Anything
-unclaimed is global.
+command and nothing else, so every game gets the same treatment. Checks
+live in one folder per plugin, tests/<plugin>/, named after the plugin's
+folder in plugins/; tests/shared/ holds everything that belongs to no plugin
+and is what --global runs.
 
 Standard steps, in order: compile the Python, syntax-check the JavaScript,
 `app.py --game <id> --check`, pytest on the owned test_*.py files, node tests,
-then the owned verifier and browser-check scripts through tests/verify_all.py,
+then the owned verifier and browser-check scripts through tests/shared/verify_all.py,
 which reports a check that needs an installed game as SKIPPED rather than
 failed. Extra commands a plugin genuinely needs (a native build) are listed in
 tests/plugin_checks.json.
@@ -35,33 +34,20 @@ TESTS = ROOT / "tests"
 CONFIG = json.loads((TESTS / "plugin_checks.json").read_text(encoding="utf-8"))
 PLUGINS = sorted(p.name for p in (ROOT / "plugins").iterdir()
                  if p.is_dir() and (p / "plugin.py").is_file())
+SHARED = "shared"
 SCRIPT_SKIP = {"verify_all.py"}
 
 
-def plugin_prefixes() -> list[tuple[str, str]]:
-    pairs = [(plugin, plugin) for plugin in PLUGINS]
-    for plugin, aliases in CONFIG.get("aliases", {}).items():
-        pairs += [(alias, plugin) for alias in aliases]
-    return sorted(pairs, key=lambda pair: -len(pair[0]))
-
-
-def owner(path: Path) -> str | None:
-    name = path.name
-    for lead in ("test_", "verify_"):
-        if name.startswith(lead):
-            name = name[len(lead):]
-            break
-    stem = name.split(".", 1)[0]
-    for prefix, plugin in plugin_prefixes():
-        if stem == prefix or stem.startswith(prefix + "_"):
-            return plugin
-    return None
+def checks_folder(target: str | None) -> Path:
+    """tests/<plugin>/ for a plugin, tests/shared/ for the global checks."""
+    return TESTS / (target or SHARED)
 
 
 def owned(target: str | None) -> dict[str, list[Path]]:
     files = {"pytest": [], "node": [], "scripts": [], "powershell": []}
-    for path in sorted(TESTS.iterdir()):
-        if not path.is_file() or owner(path) != target:
+    folder = checks_folder(target)
+    for path in sorted(folder.iterdir()) if folder.is_dir() else ():
+        if not path.is_file():
             continue
         name = path.name
         if name.startswith("test_") and name.endswith(".py"):
@@ -108,7 +94,7 @@ def commands(target: str | None) -> list[list[str]]:
 
 def run_scripts(scripts: list[Path], jobs: int) -> list[tuple[Path, int, str]]:
     sys.path.insert(0, str(ROOT))
-    from tests import verify_all
+    from tests.shared import verify_all
     output = verify_all.DEV_CACHE / "check-results"
     with ThreadPoolExecutor(max_workers=jobs) as pool:
         results = list(pool.map(lambda tool: verify_all.run(tool, output=output), scripts))
@@ -148,12 +134,11 @@ jobs:
 
 def workflow_files() -> dict[str, str]:
     """The complete, expected contents of .github/workflows/."""
-    shared = ["tests/plugin_checks.json", "tools/check_plugin.py", "tests/verify_all.py",
+    shared = ["tests/plugin_checks.json", "tools/check_plugin.py", "tests/shared/verify_all.py",
               "requirements-test.txt"]
     files = {}
     for plugin in PLUGINS:
-        prefixes = [plugin] + CONFIG.get("aliases", {}).get(plugin, [])
-        paths = [f"plugins/{plugin}/**"] + [f"tests/*{prefix}*" for prefix in prefixes] + shared
+        paths = [f"plugins/{plugin}/**", f"tests/{plugin}/**"] + shared
         paths.append(f".github/workflows/{plugin}-checks.yml")
         files[f"{plugin}-checks.yml"] = WORKFLOW.format(
             title=f"{plugin} checks", filter="paths", argument=plugin,

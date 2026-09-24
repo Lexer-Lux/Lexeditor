@@ -5,19 +5,19 @@ on:
     branches: [master]
     paths:
       - 'plugins/project_zomboid/**'
-      - 'tests/*project_zomboid*'
+      - 'tests/project_zomboid/**'
       - 'tests/plugin_checks.json'
       - 'tools/check_plugin.py'
-      - 'tests/verify_all.py'
+      - 'tests/shared/verify_all.py'
       - 'requirements-test.txt'
       - '.github/workflows/project_zomboid-checks.yml'
   pull_request:
     paths:
       - 'plugins/project_zomboid/**'
-      - 'tests/*project_zomboid*'
+      - 'tests/project_zomboid/**'
       - 'tests/plugin_checks.json'
       - 'tools/check_plugin.py'
-      - 'tests/verify_all.py'
+      - 'tests/shared/verify_all.py'
       - 'requirements-test.txt'
       - '.github/workflows/project_zomboid-checks.yml'
   workflow_dispatch:

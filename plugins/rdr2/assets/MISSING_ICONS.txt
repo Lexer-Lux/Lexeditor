@@ -54,4 +54,4 @@ specific renderable asset. Do not manufacture similarity-based aliases.
 The executable classification used by tests lives in
   plugins/rdr2/inventory_icons.py
 and the accounting regression lives in
-  tests/test_rdr2_inventory_icons.py
+  tests/rdr2/test_rdr2_inventory_icons.py

@@ -1,4 +1,4 @@
 {
-  "note": "Copied lines per plugin. May fall, never rise. See tests/verify_shared_code_budget.py.",
+  "note": "Copied lines per plugin. May fall, never rise. See tests/shared/verify_shared_code_budget.py.",
   "plugins": {}
 }

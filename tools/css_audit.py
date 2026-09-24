@@ -8,7 +8,7 @@ property - is layout or styling the framework should own, and is counted
 here. ui/framework.css is counted too: selectors defined more than once in
 the same context, and !important declarations.
 
-tests/test_css_budget.py holds these counts to a budget that may only fall.
+tests/shared/test_css_budget.py holds these counts to a budget that may only fall.
 """
 from __future__ import annotations
 

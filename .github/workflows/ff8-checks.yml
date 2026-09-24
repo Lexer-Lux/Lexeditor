@@ -5,19 +5,19 @@ on:
     branches: [master]
     paths:
       - 'plugins/ff8/**'
-      - 'tests/*ff8*'
+      - 'tests/ff8/**'
       - 'tests/plugin_checks.json'
       - 'tools/check_plugin.py'
-      - 'tests/verify_all.py'
+      - 'tests/shared/verify_all.py'
       - 'requirements-test.txt'
       - '.github/workflows/ff8-checks.yml'
   pull_request:
     paths:
       - 'plugins/ff8/**'
-      - 'tests/*ff8*'
+      - 'tests/ff8/**'
       - 'tests/plugin_checks.json'
       - 'tools/check_plugin.py'
-      - 'tests/verify_all.py'
+      - 'tests/shared/verify_all.py'
       - 'requirements-test.txt'
       - '.github/workflows/ff8-checks.yml'
   workflow_dispatch:

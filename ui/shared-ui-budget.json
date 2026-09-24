@@ -1,4 +1,4 @@
 {
-  "note": "Counts may fall, never rise. See tests/verify_shared_ui_budget.py.",
+  "note": "Counts may fall, never rise. See tests/shared/verify_shared_ui_budget.py.",
   "files": {}
 }

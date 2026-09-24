@@ -41,7 +41,7 @@ deployment and in-game acceptance are different evidence levels.
 
 ## The plugin's UI files
 
-One shape, checked by `tests/verify_shared_ui_contract.py`:
+One shape, checked by `tests/shared/verify_shared_ui_contract.py`:
 
 - `editor.html` — the page. Every plugin with a UI has exactly this file, under
   exactly this name, and it holds **markup only**: no inline `<script>` beyond
@@ -54,12 +54,12 @@ One shape, checked by `tests/verify_shared_ui_contract.py`:
   one global scope, so a value one module reads at load time must be defined by
   a module the page lists earlier.
 - The plugin's service routes them with `self.send_page_module(PLUGIN_ROOT,
-  path)` from `core/plugin_http.py`; `tests/plugin_module_routes_check.py` starts
+  path)` from `core/plugin_http.py`; `tests/shared/plugin_module_routes_check.py` starts
   every service, asks it for each module its page names, and loads the page to
   see that the modules can still see each other.
 - No theme file. A theme is tokens handed to `mountShell`. A stylesheet may set
   tokens and style the game's own classes; a selector naming a shared class
-  (`.lex-…`) is counted by `tests/verify_shared_ui_budget.py`, and that count
+  (`.lex-…`) is counted by `tests/shared/verify_shared_ui_budget.py`, and that count
   may fall but never rise.
 
 Every shared component is listed in `ui/component-catalog.js` and shown in
@@ -367,7 +367,7 @@ keeps six groups per page and provides an inner scroll area for tall groups.
 Keep the pager outside that scroll area. Never rely on the outer window to
 scroll: the desktop shell can prevent it. Check every page, the last control in
 a tall group, and edit retention at small window sizes and large UI scales.
-Run `python tests/verify_tweaks_pagination.py` for the shared reachability check.
+Run `python tests/shared/verify_tweaks_pagination.py` for the shared reachability check.
 
 Credits and Mod Loading are shared Info-page sections; do not hand-build per-game
 copies. A plugin still has to supply their data, and discovery will reject it if it
@@ -445,7 +445,8 @@ python app.py --game <id> --smoke
 ```
 
 Then run the plugin-specific and shared browser/distribution suites relevant to the
-changed files.
+changed files. A plugin's checks, helpers and fixtures live in `tests/<plugin>/`
+(the plugin's folder name); `python tools/check_plugin.py <plugin>` runs all of them.
 
 ## 9. Definition of done
 

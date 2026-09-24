@@ -94,11 +94,11 @@ each game, at a recorded game version, in representative gameplay:
 
 ## Verification state
 
-`tests/test_unreal_config.py` (24 tests),
-`tests/test_ff7r_unreal_config.py` and `tests/test_ff7r2_unreal_config.py`
+`tests/shared/test_unreal_config.py` (24 tests),
+`tests/ff7r/test_ff7r_unreal_config.py` and `tests/ff7r2/test_ff7r2_unreal_config.py`
 (service endpoints plus editor/server wiring),
-`tests/test_unreal_config_ui.py` (one shared panel serves both pages),
-`tests/unreal_config_browser_check.py` (rendered save round trip plus
+`tests/shared/test_unreal_config_ui.py` (one shared panel serves both pages),
+`tests/shared/unreal_config_browser_check.py` (rendered save round trip plus
 small-window and 150% UI-scale readability on both Tweaks pages) and
-`tests/verify_unreal_config.py` (13 checks, verifier sweep).
+`tests/shared/verify_unreal_config.py` (13 checks, verifier sweep).
 In-game effect acceptance for both games is open (issue 478).

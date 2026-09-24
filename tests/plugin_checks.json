@@ -1,9 +1,5 @@
 {
-  "_about": "Read by tools/check_plugin.py. Test files belong to a plugin by name prefix; aliases add extra prefixes. 'extra' lists commands a plugin genuinely needs beyond the standard steps ({python} = the running interpreter, {devcache} = %TEMP%/lexeditor-dev).",
-  "aliases": {
-    "rdr": ["rdr1"],
-    "warband": ["wse2"]
-  },
+  "_about": "Read by tools/check_plugin.py. Test files belong to a plugin by folder: tests/<plugin>/, with tests/shared/ for the global checks. 'extra' lists commands a plugin genuinely needs beyond the standard steps ({python} = the running interpreter, {devcache} = %TEMP%/lexeditor-dev).",
   "extra": {
     "ff7r": [
       {"platform": "win32", "run": ["cmake", "-S", "plugins/ff7r/native_runtime", "-B", "{devcache}/ff7r-native-runtime", "-A", "x64"]},

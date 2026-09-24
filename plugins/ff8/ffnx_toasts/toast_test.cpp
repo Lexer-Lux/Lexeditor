@@ -1,6 +1,6 @@
 // The parts of Lexeditor's in-game message that need no device: what is
 // queued, how long it holds, how it wraps, where the box sits and how it
-// fades. Built and run by tests/ff8_toast_check.py.
+// fades. Built and run by tests/ff8/test_ff8_toast.py.
 
 #include <cassert>
 #include <cstdio>

@@ -164,9 +164,13 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
 
 - Every plugin's checks run with `python tools/check_plugin.py <plugin>`, and
   shared ones with `--global`; CI runs exactly these, one generated
-  `<plugin>-checks.yml` per plugin plus `global-checks.yml`. Name a new test
-  `test_<plugin>_*.py` (pytest) or `verify_<plugin>_*.py` (script) in `tests/`
-  so it is picked up. Do not hand-write workflows; after adding a plugin run
+  `<plugin>-checks.yml` per plugin plus `global-checks.yml`. Put a new test in
+  `tests/<plugin>/` (the plugin's folder name) as `test_*.py` (pytest),
+  `verify_*.py` or `*_check.py` (script); checks that belong to no plugin go
+  in `tests/shared/`. Nothing else sits loose in `tests/`, and file names stay
+  unique across its folders. A file that imports a helper from another
+  `tests/` folder puts that folder on `sys.path` itself. Do not hand-write
+  workflows; after adding a plugin run
   `python tools/check_plugin.py --write-workflows`.
 - `tools/` holds project utilities people run. Checks, verifiers and their
   helpers belong in `tests/`; one-off probes are deleted when their issue
@@ -175,7 +179,7 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
 ## Temporary storage and local checks
 
 - The checkout holds source only. Never create `_scratch/`, `.pytest_cache`,
-  `artifacts/`, `out/` or other working folders in it; `tests/test_repo_hygiene.py`
+  `artifacts/`, `out/` or other working folders in it; `tests/shared/test_repo_hygiene.py`
   fails when one appears. Use your own session scratchpad, or
   `%TEMP%/lexeditor-dev` for dev caches shared between checks (upstream
   source clones, verifier results, screenshots).

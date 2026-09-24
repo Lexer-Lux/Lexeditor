@@ -5,19 +5,19 @@ on:
     branches: [master]
     paths:
       - 'plugins/palworld/**'
-      - 'tests/*palworld*'
+      - 'tests/palworld/**'
       - 'tests/plugin_checks.json'
       - 'tools/check_plugin.py'
-      - 'tests/verify_all.py'
+      - 'tests/shared/verify_all.py'
       - 'requirements-test.txt'
       - '.github/workflows/palworld-checks.yml'
   pull_request:
     paths:
       - 'plugins/palworld/**'
-      - 'tests/*palworld*'
+      - 'tests/palworld/**'
       - 'tests/plugin_checks.json'
       - 'tools/check_plugin.py'
-      - 'tests/verify_all.py'
+      - 'tests/shared/verify_all.py'
       - 'requirements-test.txt'
       - '.github/workflows/palworld-checks.yml'
   workflow_dispatch:

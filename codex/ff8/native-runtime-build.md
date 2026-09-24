@@ -29,11 +29,11 @@ bundled `ISSUE51_BUILD_REPORT.md` still names that retired workflow).
 4. Build with `cmake --build ffnx/.build --config Release --parallel 4`.
    `ffnx/.build/bin/FFNx.dll` is `AF3DN.P`.
 5. Verify the artifact before packaging it:
-   `tests/verify_ff8_linked_runtime.py --verifier ffnx/tools/verify_issue51_runtime_artifact.py --driver AF3DN.P`,
-   `tests/verify_ff8_no_magic_consumption.py`, `tests/verify_ff8_modern_controls_binary.py`,
-   `tests/verify_ff8_reptile_atb_binary.py` (each `--driver AF3DN.P`),
-   `tests/verify_ff8_hp_colors_issue_481.py --compile` and
-   `tests/verify_ff8_interaction_indicators_302.py --compile --compiler cl`.
+   `tests/ff8/verify_ff8_linked_runtime.py --verifier ffnx/tools/verify_issue51_runtime_artifact.py --driver AF3DN.P`,
+   `tests/ff8/verify_ff8_no_magic_consumption.py`, `tests/ff8/verify_ff8_modern_controls_binary.py`,
+   `tests/ff8/verify_ff8_reptile_atb_binary.py` (each `--driver AF3DN.P`),
+   `tests/ff8/verify_ff8_hp_colors_issue_481.py --compile` and
+   `tests/ff8/verify_ff8_interaction_indicators_302.py --compile --compiler cl`.
 6. Package with `tools/package_ff8_native_driver.py`, which rewrites the pinned
    manifest hashes.
 
