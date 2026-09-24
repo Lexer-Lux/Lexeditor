@@ -525,7 +525,16 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(deployment_row["coverage"], "structured")
         self.assertTrue(deployment_row["openable"])
         self.assertEqual(deployment_row["status"], "partial")
-        self.assertTrue(all(row["target"] == row["category"] == row["id"] for row in rows))
+        for row in rows:
+            self.assertEqual(row["id"], row["category"])
+            if row["category"] == "itemSortOrder":
+                # Name-sort order is edited as a per-item property inside
+                # the items tab, so the row points there instead of itself.
+                self.assertEqual(row["target"], "items")
+            else:
+                self.assertEqual(row["target"], row["category"])
+        targets = {row["category"] for row in rows}
+        self.assertTrue(all(row["target"] in targets for row in rows))
         for row in rows:
             if row["category"] in ("enemies", "encounters", "shops"):
                 self.assertEqual(row["status"], "not-integrated")
