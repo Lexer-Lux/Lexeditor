@@ -20,7 +20,13 @@
       await Promise.race([Promise.all(animations.map(animation => animation.finished)),
         new Promise(resolve=>setTimeout(resolve,500))]);
     } finally {
-      nodes.forEach((node, index) => { node.style.transform = `translateX(${positions[index][1]})`; });
+      nodes.forEach((node, index) => {
+        // A resting node keeps no transform: even translateX(0%) would cage
+        // the fixed edge handles inside the menu surface so they scroll away
+        // with the page instead of staying at the viewport edge.
+        if (positions[index][1] === "0%") node.style.removeProperty("transform");
+        else node.style.transform = `translateX(${positions[index][1]})`;
+      });
       animations.forEach(animation => animation.cancel());
       nodes[entering ? 1 : 0].inert = false;
     }

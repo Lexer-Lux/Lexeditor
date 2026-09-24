@@ -97,6 +97,25 @@ class PreviewUnavailable(RuntimeError):
     """The item does not have a model in a format that this viewer supports."""
 
 
+_DECODER_PROBE: tuple[bool, str] | None = None
+
+
+def _decoder_probe() -> tuple[bool, str]:
+    """Import the bundled decoder once per process.
+
+    A present-but-unloadable .pyd (built for another CPython ABI) must read
+    as not-ready here, not as available-then-error at decode time.
+    """
+    global _DECODER_PROBE
+    if _DECODER_PROBE is None:
+        try:
+            _decoder_module()
+            _DECODER_PROBE = (True, "")
+        except Exception as error:
+            _DECODER_PROBE = (False, str(error) or type(error).__name__)
+    return _DECODER_PROBE
+
+
 def model_preview_availability(model: str) -> dict:
     """Check the installed archive index without extracting or decoding a model."""
     model = (model or "").strip()
@@ -114,6 +133,12 @@ def model_preview_availability(model: str) -> dict:
         return {
             "available": False,
             "reason": "The installed-game model tools are not ready.",
+        }
+    decoder_ok, decoder_error = _decoder_probe()
+    if not decoder_ok:
+        return {
+            "available": False,
+            "reason": f"The bundled model decoder cannot load: {decoder_error}",
         }
     for location in ASSET_LOCATIONS:
         entry = _entry_map(_archive_entries(location)).get(

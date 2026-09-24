@@ -608,6 +608,7 @@ class HostApi:
             payload.get("soundVolumePercent"),
             None if "pageWrapAround" not in payload else bool(payload["pageWrapAround"]),
             payload.get("panelTabTarget"),
+            payload.get("pagerBarHeightPercent"),
         )
         return self.lexeditor_settings()
 
@@ -834,6 +835,15 @@ class HostApi:
         return {"result": result, "helperNotice": helper.get("setupNotice"),
                 "status": snapshot.get("status"), "canOpen": snapshot.get("canOpen")}
 
+    @staticmethod
+    def _plugin_dir(plugin_id: str, plugin) -> str:
+        """The plugins/ directory for one game, for joining dir-keyed budgets."""
+        module = getattr(getattr(plugin, "session_factory", None), "__module__", "") or ""
+        parts = module.split(".")
+        if len(parts) >= 3 and parts[0] == "plugins":
+            return parts[1]
+        return plugin_id.replace("-", "_")
+
     def developer_overview(self) -> dict:
         """Every game and what is still left to set up for it. Developer Mode only."""
         if not self._developer():
@@ -848,14 +858,38 @@ class HostApi:
             if plugin.installation is not None:
                 tasks.append({"label": "ReShade defaults set",
                               "done": self._reshade_defaults(plugin.plugin_id).is_file()})
+            loading = self._mod_loading_state(plugin)
+            status = installation.get("statusText") or installation.get("status", "")
+            rest = " · ".join(part for part in (status, loading["loader"]) if part)
             games.append({"id": plugin.plugin_id, "name": plugin.name,
-                          "status": installation.get("statusText") or installation.get("status", ""),
-                          "modLoading": self._mod_loading_state(plugin),
-                          "tasks": tasks})
-        return {"games": sorted(games, key=lambda row: row["name"].lower()),
-                "sharedUi": self._shared_ui_budget(),
-                "sharedCode": self._shared_code_budget(),
-                "quotes": self.loading_quote_counts()}
+                          "directory": self._plugin_dir(plugin.plugin_id, plugin),
+                          "modState": loading["state"], "modWorks": loading["works"],
+                          "tasks": tasks, "rest": rest})
+        codes = {row["plugin"]: row for row in self._shared_code_budget()}
+        ui_rows = self._shared_ui_budget()
+        quote_counts = self.loading_quote_counts()
+        quote_by_dir = quote_counts["plugins"]
+        rows = []
+        for game in games:
+            directory = game.pop("directory")
+            code = codes.get(directory, {})
+            rows.append({"id": game["id"], "game": game["name"],
+                         "modState": game["modState"], "modWorks": game["modWorks"],
+                         "tasks": game["tasks"],
+                         "quotes": quote_by_dir.get(directory),
+                         "copiedLines": code.get("copiedLines") if code else None,
+                         "copiedRecorded": code.get("recorded") if code else None,
+                         "copiedOver": bool(code.get("over")) if code else False,
+                         "rest": game["rest"]})
+        return {"table": {
+            "rows": sorted(rows, key=lambda row: row["game"].lower()),
+            "quotesTotal": quote_counts["global"] + sum(quote_by_dir.values()),
+            "globalQuotes": quote_counts["global"],
+            "quotedPlugins": len(quote_by_dir),
+            "sharedUi": {"files": ui_rows,
+                         "totalShared": sum(row["sharedSelectors"] for row in ui_rows),
+                         "totalHand": sum(row["handBuiltRows"] for row in ui_rows)},
+        }}
 
     def _shared_code_budget(self) -> list[dict]:
         """Plugin Python that is a second copy of another plugin's function."""
@@ -1272,10 +1306,10 @@ class HostApi:
         return self._restart_for_project(plugin_id, project)
 
     def mod_library_status(self, plugin_id: str) -> dict:
-        from mod_library import documents_folder
+        from mod_library import default_user_library_root
         plugin = self._plugins[plugin_id]
         adapter = plugin.mod_adapter
-        root = self._settings.snapshot().get("modLibraryPath") or str(documents_folder() / "Mods")
+        root = self._settings.snapshot().get("modLibraryPath") or str(default_user_library_root())
         author = bool(adapter and self._github.visible_repository(LEXEDITOR_REPOSITORY))
         return {"root": root, "verified": bool(adapter and adapter.verified),
                 "canManage": bool(adapter and (adapter.verified or author)),
@@ -1284,11 +1318,25 @@ class HostApi:
                 "packageTypes": list(getattr(adapter, "package_types", ()))}
 
     def mod_library_location(self) -> dict:
-        from mod_library import documents_folder
+        from mod_library import default_user_library_root
         journal = self._settings.path.parent / "mod-library-move.json"
         move = json.loads(journal.read_text(encoding="utf-8")) if journal.is_file() else None
-        return {"root": self._settings.snapshot().get("modLibraryPath") or str(documents_folder() / "Mods"),
+        return {"root": self._settings.snapshot().get("modLibraryPath") or str(default_user_library_root()),
                 "move": move}
+
+    def migrate_user_data(self) -> dict:
+        """Copy legacy AppData mod trees to Documents once, then report.
+
+        Runs at desktop startup, before any plugin session opens. A failed
+        move never fails startup: the failure is recorded and returned.
+        """
+        try:
+            from mod_library import migrate_appdata_user_data
+            result = migrate_appdata_user_data(self._projects, self._settings.path.parent)
+        except Exception as error:
+            result = {"moved": [], "skipped": [{"game": "*", "reason": str(error)[:200]}]}
+        self._user_data_migration = result
+        return result
 
     def _save_library_move(self, move: dict) -> None:
         target = self._settings.path.parent / "mod-library-move.json"
@@ -1818,6 +1866,7 @@ def run_host(plugins: dict[str, GamePlugin], initial_plugin: str | None = None,
 
     geometry = load_window_geometry()
     api = HostApi(plugins)
+    api.migrate_user_data()
     initial_url = CHOOSER.as_uri()
     if initial_plugin:
         try:

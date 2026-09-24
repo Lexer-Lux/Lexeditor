@@ -9,6 +9,7 @@ import shutil
 import urllib.request
 from pathlib import Path
 
+from mod_library import default_user_library_root
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from service_session import LocalPluginSession, request_json
 from plugins.ff7.plugin import prepare_product, kernel_save_payload
@@ -23,7 +24,7 @@ LOCAL_DATA = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Lexeditor
 DEFAULT_DATA = LOCAL_DATA / "game-data" / "ff7-2013"
 DEFAULT_PROJECT = Path(os.environ.get(
     "LEXEDITOR_FF7_2013_PROJECT",
-    str(LOCAL_DATA / "mods" / "ff7-2013" / "My Mod"),
+    str(default_user_library_root() / "ff7-2013" / "My Mod"),
 ))
 PROJECT_TEMPLATE = DEFAULT_DATA / "project-template"
 PROJECT_KERNEL_PATH = Path("data/lang-en/kernel/KERNEL.BIN")

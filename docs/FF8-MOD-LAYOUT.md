@@ -16,5 +16,5 @@ multi-mod composer must list every claimant for a path and show the winning mod.
 It must not silently copy two versions of the same file.
 
 `C:\FF8Mod` remains an ordinary editable mod. Lexeditor-owned downloaded mods
-belong under `%LOCALAPPDATA%\Lexeditor\mods\ff8\<mod-id>` and must use the same
+belong under `Documents\Mods\ff8\<mod-id>` (the Documents library) and must use the same
 `direct\`, `hext\`, and `mod.json` shape.

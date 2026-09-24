@@ -251,6 +251,24 @@ html.lex-transition-entry body > .lex-plugin-loading-screen, html.lex-transition
   background:var(--lex-accent);
 }
 
+/* The Settings menu save button is doubled; the shared control keeps its
+   compact size for toolbar callers such as the RDR settings page. */
+.lex-global-settings .lex-settings-save-control {
+  width:76px;
+  min-width:76px;
+  height:72px;
+}
+
+.lex-global-settings .lex-settings-save-control svg {
+  width:44px;
+  height:44px;
+}
+
+.lex-global-settings .lex-settings-save-control .lex-save-throbber {
+  width:38px;
+  height:38px;
+}
+
 .lex-save-icon:disabled {
   opacity: .32;
   filter: grayscale(1);
@@ -500,9 +518,9 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   content: "";
 
   top: 14px;
-  left: 8px;
-  width: 12px;
-  border-top: 1.5px solid currentColor;
+  left: 7px;
+  width: 16px;
+  border-top: 2px solid currentColor;
 
  transform: rotate(45deg);
 }
@@ -513,9 +531,9 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   content: "";
 
   top: 14px;
-  left: 8px;
-  width: 12px;
-  border-top: 1.5px solid currentColor;
+  left: 7px;
+  width: 16px;
+  border-top: 2px solid currentColor;
 
  transform: rotate(-45deg);
 }
@@ -2741,7 +2759,6 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
 
 .lex-pager-left .lex-new-button {
   flex:0 0 auto;
-  min-height:32px;
 }
 
 /* A property made of several numbers. Each pair reads label-then-box like an
@@ -4980,7 +4997,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   transition:opacity .15s ease;
   box-sizing:border-box;
   padding:0;
-  color:inherit;
+  /* The ring reads on any thumbnail in any theme: white stroke with a dark
+     halo, instead of inheriting a theme accent that vanishes on dark art. */
+  color:#fff;
+  filter:drop-shadow(0 1px 2px #000c) drop-shadow(0 0 1px #000);
   background:transparent;
   font:700 1.6em/1 var(--lex-symbol-font);
   pointer-events:none;
@@ -5002,6 +5022,14 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-model-preview-heading > .lex-detail-panel-identity { grid-area:1/1; }
 .lex-model-preview-heading > .lex-detail-panel-actions { grid-area:1/2; }
 .lex-model-preview-heading > .lex-detail-panel-icon { grid-area:1/3; }
+/* A game whose detail headers keep the icon with the record opts the
+   preview trigger back to the left, matching panels without a preview. */
+@container style(--lex-preview-icon-side: left) {
+.lex-detail-panel-heading.lex-model-preview-heading { grid-template-columns:auto minmax(0,1fr) auto; }
+.lex-model-preview-heading > .lex-detail-panel-icon { grid-area:1/1; }
+.lex-model-preview-heading > .lex-detail-panel-identity { grid-area:1/2; }
+.lex-model-preview-heading > .lex-detail-panel-actions { grid-area:1/3; }
+}
 .lex-panel-tone-success { --lex-panel-tone:var(--lex-success,#8fbd78); }
 .lex-panel-tone-danger { --lex-panel-tone:var(--lex-danger,#d66b60); }
 .lex-detail-panel:where(.lex-panel-tone-success,.lex-panel-tone-danger) {
@@ -5422,9 +5450,11 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-detail-panel-rename { display:block;min-width:0; }
 .lex-detail-panel-rename :is(input, .lex-source-control) {
   box-sizing:border-box;
-  width:100%;
+  width:calc(100% + 6px + 1px);
   min-width:0;
-  margin:0;
+  /* The field's own padding and border would start its text 7px right of
+     the subtitle. Hang the box left by exactly that so both texts align. */
+  margin:0 0 0 calc(-6px - 1px);
   padding:2px 6px;
   border:1px solid transparent;
   border-radius:var(--lex-radius);
@@ -5708,7 +5738,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   box-shadow: none;
 
   box-sizing:border-box;
-  min-height:var(--lex-pager-bar-height, 52px);
+  min-height:var(--lex-pager-bar-height, 6vh);
   height:auto;
 
 }
@@ -6847,11 +6877,12 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   box-shadow: var(--lex-hoverable-hover-shadow, none);
 
 }
+/* One square add button: a single size token, so a pager add and a detail
+   add can never drift apart again. */
 .lex-new-button {
 
   display: inline-grid;
   place-items: center;
-  min-height: 30px;
   padding: 0;
   color: var(--lex-muted);
   border: 1px solid var(--lex-border);
@@ -6859,9 +6890,10 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   background: var(--lex-panel-2);
   cursor: pointer;
 
-  width: var(--lex-new-button-width, 32px);
-  min-width: var(--lex-new-button-width, 32px);
-  height: var(--lex-new-button-height, 30px);
+  width: var(--lex-new-button-size, 32px);
+  min-width: var(--lex-new-button-size, 32px);
+  height: var(--lex-new-button-size, 32px);
+  min-height: var(--lex-new-button-size, 32px);
 
 }
 .lex-settings-dialog { width: var(--lex-settings-dialog-width, min(720px, 96vw)); }
@@ -7046,7 +7078,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   margin: 0;
   padding: 8px 14px;
   white-space: nowrap;
-  border-radius: 0;
+  border-radius:var(--lex-tab-hover-radius,8px 8px 0 0);
   cursor: pointer;
 
  position:relative;

@@ -28,7 +28,7 @@
     },
     "ff8": {
       "loader": "De novo Lexeditor pre-launch compositor targeting FFNx. It reads Junction VIII-compatible mod.xml folder metadata and imports .iroj packages, but does not adopt Junction's live load model.",
-      "structure": "Managed mods go in %LOCALAPPDATA%\\Lexeditor\\mods\\ff8\\<mod>\\ or can be imported as .iroj packages. Folder mods use mod.json for Lexeditor metadata and may contain direct/, hext/, textures/, sfx/, voice/, ambient/, override/, and save/ roots; optional mod.xml supplies Junction-style folder options.",
+      "structure": "Managed mods go in Documents\\Mods\\ff8\\<mod>\\ (the Documents library) or can be imported as .iroj packages. Folder mods use mod.json for Lexeditor metadata and may contain direct/, hext/, textures/, sfx/, voice/, ambient/, override/, and save/ roots; optional mod.xml supplies Junction-style folder options.",
       "overriding": "Enabled mods compose from low to high priority. Same-path ordinary files are higher-priority-wins and Hext patches are ordered; supported packed gameplay data such as kernel.bin is semantically merged against vanilla so non-overlapping record or field edits coexist, while overlapping semantic edits conflict and the higher-priority edit wins."
     },
     "ff9": {

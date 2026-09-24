@@ -105,9 +105,8 @@
     body:has(.resident-handle:not([hidden])) .chooser-window-controls>.lex-window-actions:hover{opacity:1}
     .chooser-window-controls>.lex-window-actions>.lex-window-button:hover{border-color:var(--lex-highlight);background:color-mix(in srgb,var(--lex-panel-2) 78%,var(--lex-highlight))}
     .chooser-window-controls>.lex-window-actions>.lex-window-close:hover{border-color:#c42b1c;background:#c42b1c}
-    .resident-handle::before { position:absolute; inset:-10px; background:inherit; background-position:center; background-size:cover; filter:blur(8px) brightness(.42); content:""; }
-    .resident-handle::after { position:absolute; inset:0; background:#080a0d6e; content:""; }
-    .resident-arrow { position:absolute; z-index:1; top:50%; left:50%; display:grid; place-items:center; transform:translate(-50%,-50%); }
+    .resident-handle::before { position:absolute; inset:0; background:inherit; background-position:left center; background-size:auto 100%; content:""; }
+    .resident-arrow { position:absolute; z-index:1; top:50%; left:50%; display:grid; place-items:center; transform:translate(-50%,-50%); filter:drop-shadow(0 1px 3px #000); }
     .resident-arrow svg { width:auto; height:var(--lex-resident-arrow-height,33vh); fill:none; stroke:currentColor; stroke-width:6.5; stroke-linecap:butt; stroke-linejoin:miter; }
     .resident-save { position:absolute; z-index:2; top:var(--lex-resident-safe-inset,15%); left:50%; display:grid; width:var(--lex-resident-save-size,30px); height:var(--lex-resident-save-size,30px); place-items:center; transform:translateX(-50%); }
     .resident-save>svg { width:100%; height:100%; }
@@ -138,15 +137,18 @@
     .lexer-dev-body > section { display:flex; flex-direction:column; gap:10px; min-height:0; }
     .lexer-dev-body h3 { margin:0; font:800 12px/1 var(--lex-heading-font,var(--lex-font)); letter-spacing:.1em; color:var(--lex-muted); }
     .lexer-dev-table-wrap { overflow:auto; min-height:0; }
-    .lexer-dev-table { width:100%; border-collapse:collapse; font-size:13px; }
-    .lexer-dev-table th { position:sticky; top:0; text-align:left; padding:6px 10px; color:var(--lex-muted); background:var(--lex-panel); font-size:10px; letter-spacing:.08em; }
-    .lexer-dev-table td { padding:7px 10px; border-top:1px solid var(--lex-border); vertical-align:top; }
-    .lexer-dev-table td.num { font-variant-numeric:tabular-nums; white-space:nowrap; }
+    #lexer-dev-table .lex-column-list { font-size:13px; }
+    .lexer-dev-summary { margin:0; font-size:12px; color:var(--lex-muted); }
+    .lexer-dev-files { font-size:12px; color:var(--lex-muted); }
+    .lexer-dev-files ul { margin:6px 0 0; padding-left:18px; display:grid; gap:2px; }
+    .lexer-dev-files li.over { color:var(--lex-text); font-weight:600; }
+    .lexer-dev-error { color:var(--lex-warning,#d7b65d); font-size:13px; }
     .lexer-dev-task { display:block; white-space:nowrap; }
     .lexer-dev-task.done { color:var(--lex-muted); }
     .lexer-dev-task.todo { color:var(--lex-text); font-weight:600; }
-    .lexer-dev-table td.good { color:#7fc08a; font-weight:600; }
-    .lexer-dev-table td.todo { color:var(--lex-muted); }
+    .lex-dev-good { color:#7fc08a; font-weight:600; }
+    .lex-dev-todo { color:var(--lex-muted); }
+    .lex-dev-over { color:var(--lex-warning,#d7b65d); font-weight:600; }
     .lexer-panel-list { display:flex; overflow:auto; flex:1 1 auto; flex-direction:column; gap:9px; margin:0; padding:0; list-style:none; }
     .lexer-helper { display:grid; gap:3px; padding:10px 11px; border:1px solid var(--lex-border); border-radius:5px; background:var(--lex-panel-2); }
     .lexer-helper[class*="state-"] { border-color:var(--state-color); }
@@ -208,13 +210,12 @@
     <div class="lexer-dev-body">
       <section class="lexer-dev-games">
         <h3>GAMES</h3>
-        <div class="lexer-dev-table-wrap"><table id="lexer-dev-games" class="lexer-dev-table"></table></div>
-        <h3>SHARED UI BUDGET</h3>
-        <div class="lexer-dev-table-wrap"><table id="lexer-dev-budget" class="lexer-dev-table"></table></div>
-        <h3>COPIED CODE</h3>
-        <div class="lexer-dev-table-wrap"><table id="lexer-dev-code" class="lexer-dev-table"></table></div>
-        <h3>LOADING QUOTES</h3>
-        <div class="lexer-dev-table-wrap"><table id="lexer-dev-quotes" class="lexer-dev-table"></table></div>
+        <div class="lexer-dev-table-wrap"><div id="lexer-dev-table"></div></div>
+        <p id="lexer-dev-summary" class="lexer-dev-summary"></p>
+        <details id="lexer-dev-files-wrap" class="lexer-dev-files">
+          <summary>Shared UI by file</summary>
+          <ul id="lexer-dev-files"></ul>
+        </details>
       </section>
       <section class="lexer-dev-helpers">
         <h3>HELPERS</h3>
@@ -347,90 +348,55 @@
           {className:"lexer-helper",textContent:String(error?.message||error)}));
       }
     }
-    // Every game, what is left to do for it, and how far along it is.
+    // One row per game through the shared table: mod loading, tasks, quotes,
+    // copied lines, and everything else. The shared pools live in the summary
+    // line and the file disclosure below, not in separate tables.
     async function loadDeveloperOverview(){
-      const table=document.querySelector("#lexer-dev-games");
-      const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
+      const mount=document.querySelector("#lexer-dev-table");
+      const summary=document.querySelector("#lexer-dev-summary");
+      const files=document.querySelector("#lexer-dev-files");
+      const taskSpans=row=>(row.tasks||[]).map(task=>Object.assign(document.createElement("span"),
+        {className:`lexer-dev-task ${task.done?"done":"todo"}`,textContent:`${task.done?"✓":"○"} ${task.label}`}));
+      const copiedText=row=>row.copiedLines==null?"—"
+        :row.copiedLines===row.copiedRecorded?String(row.copiedLines)
+        :`${row.copiedLines} (was ${row.copiedRecorded})`;
       try{
-        const overview=await window.pywebview.api.developer_overview();
-        renderBudget(overview?.sharedUi||[]);
-        renderCodeBudget(overview?.sharedCode||[]);
-        renderQuotes(overview?.quotes);
-        const rows=overview?.games||[];
-        const head=document.createElement("tr");
-        for(const name of ["GAME","MOD LOADING","HOW","TASKS"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
-        table.replaceChildren(head,...rows.map(row=>{
-          const tr=document.createElement("tr");
-          const tasks=document.createElement("td");
-          tasks.append(...row.tasks.map(task=>Object.assign(document.createElement("span"),
-            {className:`lexer-dev-task ${task.done?"done":"todo"}`,textContent:`${task.done?"✓":"○"} ${task.label}`})));
-          const loading=row.modLoading||{};
-          const state=Object.assign(document.createElement("td"),
-            {textContent:loading.state||"Unknown",className:loading.works?"good":"todo"});
-          tr.append(cell(row.name),state,cell(loading.loader||""),tasks);
-          return tr;
+        const table=(await window.pywebview.api.developer_overview())?.table||{};
+        const rows=table.rows||[];
+        mount.replaceChildren(LexeditorUI.columnList({
+          "aria-label":"Developer overview by game",
+          columns:[
+            {key:"game",label:"GAME",align:"start"},
+            {key:"modState",label:"MOD LOADING",cellClass:row=>row.modWorks?"lex-dev-good":"lex-dev-todo"},
+            {key:"tasks",label:"TASKS",align:"start",sortable:false,
+              render:row=>{const wrap=document.createElement("span");wrap.append(...taskSpans(row));return wrap;}},
+            {key:"quotes",label:"QUOTES",numeric:true,
+              render:row=>row.quotes??"—",sortValue:row=>row.quotes??-1},
+            {key:"copiedLines",label:"COPIED LINES",numeric:true,
+              render:row=>copiedText(row),
+              cellClass:row=>row.copiedOver?"lex-dev-over":"",
+              sortValue:row=>row.copiedLines??-1},
+            {key:"rest",label:"REST",align:"start"},
+          ],
+          rows,
+        }));
+        const ui=table.sharedUi||{files:[],totalShared:0,totalHand:0};
+        summary.textContent=`${rows.length} games · ${table.quotesTotal||0} loading quotes`
+          +` (Global (shared): ${table.globalQuotes||0}) · shared UI ${ui.totalShared||0} selectors,`
+          +` ${ui.totalHand||0} hand-built rows across ${(ui.files||[]).length} files`;
+        const count=(now,was)=>now===was?String(now):`${now} (was ${was})`;
+        files.replaceChildren(...(ui.files||[]).map(row=>{
+          const item=document.createElement("li");
+          if(row.over)item.classList.add("over");
+          item.textContent=`${row.file}: ${count(row.sharedSelectors,row.recordedSelectors)} shared,`
+            +` ${count(row.handBuiltRows,row.recordedRows)} hand-built`;
+          return item;
         }));
       }catch(error){
-        const tr=document.createElement("tr");tr.append(cell(String(error?.message||error)));table.replaceChildren(tr);
+        mount.replaceChildren(Object.assign(document.createElement("div"),
+          {className:"lexer-dev-error",textContent:String(error?.message||error)}));
+        summary.textContent="";files.replaceChildren();
       }
-    }
-    // What each plugin still writes for itself instead of asking the shared UI.
-    // Recorded counts may fall, never rise; a file over its recorded count is
-    // what fails the tests, and it is marked here.
-    function renderBudget(rows){
-      const table=document.querySelector("#lexer-dev-budget");
-      const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
-      const head=document.createElement("tr");
-      for(const name of ["FILE","SHARED SELECTORS","HAND-BUILT ROWS"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
-      const count=(now,was)=>now===was?String(now):`${now} (was ${was})`;
-      const body=(rows||[]).map(row=>{
-        const tr=document.createElement("tr");
-        tr.append(cell(row.file),cell(count(row.sharedSelectors,row.recordedSelectors),"num"),
-          cell(count(row.handBuiltRows,row.recordedRows),"num"));
-        if(row.over)tr.classList.add("over");
-        return tr;
-      });
-      const totals=document.createElement("tr");totals.className="total";
-      totals.append(cell(`${(rows||[]).length} files`),
-        cell(String((rows||[]).reduce((sum,row)=>sum+row.sharedSelectors,0)),"num"),
-        cell(String((rows||[]).reduce((sum,row)=>sum+row.handBuiltRows,0)),"num"));
-      table.replaceChildren(head,...body,totals);
-    }
-    // Plugin Python that is a second copy of another plugin's function. Same
-    // ratchet as the UI budget: it may fall, never rise.
-    function renderCodeBudget(rows){
-      const table=document.querySelector("#lexer-dev-code");
-      const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
-      const head=document.createElement("tr");
-      for(const name of ["PLUGIN","COPIED LINES"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
-      const body=(rows||[]).filter(row=>row.copiedLines||row.recorded).map(row=>{
-        const tr=document.createElement("tr");
-        tr.append(cell(row.plugin),cell(row.copiedLines===row.recorded?String(row.copiedLines)
-          :`${row.copiedLines} (was ${row.recorded})`,"num"));
-        if(row.over)tr.classList.add("over");
-        return tr;
-      });
-      const total=document.createElement("tr");total.className="total";
-      total.append(cell(`${body.length} plugins`),
-        cell(String((rows||[]).reduce((sum,row)=>sum+row.copiedLines,0)),"num"));
-      table.replaceChildren(head,...body,total);
-    }
-    // Loading lines per plugin plus the shared pool they fall back to.
-    function renderQuotes(quotes){
-      const table=document.querySelector("#lexer-dev-quotes");
-      const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
-      const head=document.createElement("tr");
-      for(const name of ["PLUGIN","QUOTES"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
-      const plugins=(quotes&&quotes.plugins)||{};
-      const names=Object.keys(plugins).sort();
-      const globalRow=document.createElement("tr");
-      globalRow.append(cell("Global (shared)"),cell(String((quotes&&quotes.global)||0),"num"));
-      const body=names.map(name=>{const tr=document.createElement("tr");
-        tr.append(cell(name),cell(String(plugins[name]),"num"));return tr;});
-      const total=document.createElement("tr");total.className="total";
-      total.append(cell(`${names.length} plugins + shared`),
-        cell(String(names.reduce((sum,name)=>sum+plugins[name],0)+((quotes&&quotes.global)||0)),"num"));
-      table.replaceChildren(head,globalRow,...body,total);
     }
     function setLexerPanel(open){
       if(open){lexerPanel.hidden=false;requestAnimationFrame(()=>lexerPanel.classList.add("open"));loadHelperVersions(false);loadDeveloperOverview();}

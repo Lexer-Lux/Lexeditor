@@ -123,7 +123,7 @@ function customCraftingRecipe(entry,group,position,validation){
   const ingredients=columnList({rows:(recipe.ingredients||[]).map((part,partIndex)=>({part,partIndex})),key:row=>row.partIndex,editable:true,
     columns:[{key:"item",label:"Ingredient",grow:1,render:({part})=>linkedCatalogKeyEditor(part.item,value=>{part.item=value;customCraftingTouch();renderCrafting()})},
       {key:"quantity",label:"Quantity",width:"100px",render:({part})=>el("input",{type:"number",min:1,step:1,value:part.quantity??1,onchange:ev=>{part.quantity=Math.max(1,Math.round(+ev.target.value||1));customCraftingTouch()}})},
-      {key:"remove",label:"",width:"45px",render:({partIndex})=>el("button",{title:"Remove ingredient",onclick:()=>{recipe.ingredients.splice(partIndex,1);customCraftingTouch();renderCrafting()}},"×")}]});
+      {key:"remove",label:"",width:"45px",render:({partIndex})=>closeButton({title:"Remove ingredient",onclick:()=>{recipe.ingredients.splice(partIndex,1);customCraftingTouch();renderCrafting()}})}]});
   const name=el("input",{value:recipe.title||"",onchange:ev=>{update("title",ev.target.value.trim());renderCrafting()}});
   const quantity=el("input",{type:"number",min:1,step:1,value:recipe.output_quantity??1,onchange:ev=>update("output_quantity",Math.max(1,Math.round(+ev.target.value||1)))});
   const unlock=validatedKeyEditor("Recipe unlock",recipe.unlock||"ALWAYS KNOWN",recipeUnlockKeys(),value=>{update("unlock",value==="ALWAYS KNOWN"?"":value);renderCrafting()});
@@ -428,7 +428,7 @@ function itemTagsCell(it){
       const chip=LexeditorUI.inlineLabel(
         el("span",{class:"tag-label"},tagDisplayLabel(tag)),unresolved?LexeditorUI.badge("Unresolved",{tone:"warning"}):null);chip.title=tagDisplayTitle(tag);
       if(!isRO()&&removable){
-        const remove=el("button",{type:"button",title:"Remove tag"},"×");
+        const remove=closeButton({title:"Remove tag"});
         remove.addEventListener("click",event=>{
           event.stopPropagation();event.preventDefault();
           setItemTags(it,itemTagsOf(it).filter(entry=>entry.key!==normalizeTag(tag).key));draw();renderToolbarOnly();

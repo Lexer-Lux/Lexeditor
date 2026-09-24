@@ -229,6 +229,6 @@ async function renderSettings(){
   // verify_rdr2_tweaks_shared_save exists to prevent.
   const m=$("#main");m.querySelector(".settings-layout")?.__settingsColumnsObserver?.disconnect();m.innerHTML="";
   if(!state.settings.available){m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},"GameplayTweaks.ini is not installed for this editor profile. Catalog, loot, crafting, and other data editing remain available."));installTabContext();return;}
-  m.append(LexeditorUI.settingsColumns(buildSettingsCategories().filter(category=>category.subs.length).map(renderSettingCategory),{columnMajor:true,strictColumns:true,splitOversized:false}));
+  m.append(LexeditorUI.settingsColumns(buildSettingsCategories().filter(category=>category.subs.length).map(renderSettingCategory),{columnMajor:true,strictColumns:true}));
   installTabContext();
 }

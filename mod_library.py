@@ -40,6 +40,129 @@ def documents_folder() -> Path:
         ctypes.windll.ole32.CoTaskMemFree(result)
 
 
+def legacy_appdata_library_root() -> Path:
+    """Where per-game mod folders lived before the Documents move."""
+    return Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Lexeditor" / "mods"
+
+
+def default_user_library_root() -> Path:
+    """Documents/Mods, falling back to the legacy AppData library."""
+    try:
+        return documents_folder() / "Mods"
+    except (OSError, RuntimeError):
+        return legacy_appdata_library_root()
+
+
+# Per-game user-data trees that moved from AppData to Documents: the
+# environment override that keeps winning, and the game folder under both
+# libraries. Whole trees move so custom projects move with the defaults.
+USER_DATA_MOVES = (
+    {"env": "LEXEDITOR_FF7_PROJECT", "game": "ff7"},
+    {"env": "LEXEDITOR_FF7_2013_PROJECT", "game": "ff7-2013"},
+    {"env": "LEXEDITOR_FF8_MODS_ROOT", "game": "ff8"},
+)
+
+MIGRATION_JOURNAL = "user-data-migration.json"
+SKIP_MIGRATION_ENV = "LEXEDITOR_SKIP_USER_DATA_MIGRATION"
+
+
+def _read_migration_journal(path: Path) -> dict:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def migrate_appdata_user_data(projects=None, journal_dir=None) -> dict:
+    """Copy legacy AppData mod trees to Documents once.
+
+    Each move is verified file by file and the AppData source is kept as
+    recovery, so a failed or interrupted move loses nothing. A game is
+    skipped when its environment override is set, when the AppData tree is
+    missing or empty, when Documents already holds that game, or when the
+    journal records a finished move. Returns {"moved": [...], "skipped": [...]}.
+    """
+    report: dict[str, list] = {"moved": [], "skipped": []}
+    if os.environ.get(SKIP_MIGRATION_ENV):
+        report["skipped"].append({"game": "*", "reason": "disabled"})
+        return report
+    old_library = legacy_appdata_library_root()
+    new_library = default_user_library_root()
+    if old_library == new_library:
+        report["skipped"].append({"game": "*", "reason": "same library"})
+        return report
+    base = Path(journal_dir) if journal_dir else old_library.parent
+    journal_path = base / MIGRATION_JOURNAL
+    journal = _read_migration_journal(journal_path)
+    moves = journal.setdefault("moves", {})
+
+    def record() -> None:
+        try:
+            journal_path.parent.mkdir(parents=True, exist_ok=True)
+            journal_path.write_text(json.dumps(journal, indent=2), encoding="utf-8")
+        except OSError:
+            pass
+
+    for spec in USER_DATA_MOVES:
+        game = spec["game"]
+        if os.environ.get(spec["env"]):
+            report["skipped"].append({"game": game, "reason": "environment override set"})
+            continue
+        if moves.get(game, {}).get("phase") == "done":
+            report["skipped"].append({"game": game, "reason": "already migrated"})
+            continue
+        source, dest = old_library / game, new_library / game
+        if not source.is_dir() or not any(source.iterdir()):
+            report["skipped"].append({"game": game, "reason": "nothing to migrate"})
+            continue
+        if dest.exists() and any(dest.iterdir()):
+            moves[game] = {"source": str(source), "dest": str(dest), "phase": "settled"}
+            record()
+            report["skipped"].append({"game": game, "reason": "Documents copy already settled"})
+            continue
+        try:
+            files = [path for path in file_tree(source) if (source / path).is_file()]
+            total = sum((source / path).stat().st_size for path in files)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if total > shutil.disk_usage(dest.parent).free:
+                raise OSError("There is not enough space to migrate this library")
+            staged = dest.parent / f".migrate-{game}"
+            if staged.exists():
+                shutil.rmtree(staged, ignore_errors=True)
+            staged.mkdir(parents=True, exist_ok=True)
+            try:
+                for path in files:
+                    target = staged / path
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(source / path, target)
+                    if digest(source / path) != digest(target):
+                        raise OSError(f"Copy verification failed: {path}")
+                if dest.is_dir() and not any(dest.iterdir()):
+                    dest.rmdir()
+                staged.rename(dest)
+            except BaseException:
+                shutil.rmtree(staged, ignore_errors=True)
+                raise
+        except (OSError, ValueError) as error:
+            moves[game] = {"source": str(source), "dest": str(dest), "phase": "failed",
+                           "error": str(error)[:200]}
+            record()
+            report["skipped"].append({"game": game, "reason": f"move failed: {error}"})
+            continue
+        if projects is not None:
+            try:
+                projects.remap_prefix(source, dest)
+            except OSError:
+                pass
+        moves[game] = {"source": str(source), "dest": str(dest), "files": len(files),
+                       "bytes": total, "phase": "done"}
+        record()
+        report["moved"].append({"game": game, "source": str(source), "dest": str(dest),
+                               "files": len(files), "bytes": total})
+    return report
+
+
 def relative_path(value: str) -> Path:
     """Reject traversal, alternate streams and Windows name aliases."""
     value = value.replace("\\", "/")

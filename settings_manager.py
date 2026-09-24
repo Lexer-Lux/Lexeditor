@@ -30,6 +30,7 @@ DEFAULTS = {
     "panelGapPercent": 1.0,
     "residentHandleWidthPercent": 5.0,
     "mainMenuHeightPercent": 9.0,
+    "pagerBarHeightPercent": 6.0,
     "soundEnabled": True,
     "soundVolumePercent": 50.0,
     "absentGameDesaturationPercent": 40.0,
@@ -105,6 +106,12 @@ class SettingsStore:
         except (TypeError, ValueError):
             main_menu_height_percent = defaults["mainMenuHeightPercent"]
         try:
+            pager_bar_height_percent = float(payload.get(
+                "pagerBarHeightPercent", defaults["pagerBarHeightPercent"]
+            ))
+        except (TypeError, ValueError):
+            pager_bar_height_percent = defaults["pagerBarHeightPercent"]
+        try:
             absent_game_desaturation_percent = float(payload.get(
                 "absentGameDesaturationPercent", defaults["absentGameDesaturationPercent"]
             ))
@@ -149,6 +156,7 @@ class SettingsStore:
             "panelGapPercent": max(0.25, min(4.0, panel_gap_percent)),
             "residentHandleWidthPercent": max(2.5, min(12.0, resident_handle_width_percent)),
             "mainMenuHeightPercent": max(3.0, min(20.0, main_menu_height_percent)),
+            "pagerBarHeightPercent": max(3.0, min(12.0, pager_bar_height_percent)),
             "soundEnabled": payload.get("soundEnabled", defaults["soundEnabled"]) is True,
             "soundVolumePercent": max(0.0, min(100.0, sound_volume_percent)),
             "absentGameDesaturationPercent": max(
@@ -188,7 +196,8 @@ class SettingsStore:
              sound_enabled: bool | None = None,
              sound_volume_percent: float | None = None,
              page_wrap_around: bool | None = None,
-             panel_tab_target: str | None = None) -> dict:
+             panel_tab_target: str | None = None,
+             pager_bar_height_percent: float | None = None) -> dict:
         """Save per-user preferences. Authenticated authoring state is never persisted."""
         if update_check_frequency not in UPDATE_FREQUENCIES:
             raise ValueError("Choose a listed update-check frequency")
@@ -211,10 +220,13 @@ class SettingsStore:
             main_menu_height_percent = current["mainMenuHeightPercent"]
         if sound_enabled is None:
             sound_enabled = current["soundEnabled"]
+        if pager_bar_height_percent is None:
+            pager_bar_height_percent = current["pagerBarHeightPercent"]
         selection_hold_ms = max(150, min(2000, int(selection_hold_ms)))
         table_rows_per_page = max(5, min(40, int(table_rows_per_page)))
         panel_gap_percent = max(0.25, min(4.0, float(panel_gap_percent)))
         main_menu_height_percent = max(3.0, min(20.0, float(main_menu_height_percent)))
+        pager_bar_height_percent = max(3.0, min(12.0, float(pager_bar_height_percent)))
         with self._lock:
             stored = self._read()
             payload = {
@@ -227,6 +239,7 @@ class SettingsStore:
                 "tableRowsPerPage": table_rows_per_page,
                 "panelGapPercent": panel_gap_percent,
                 "mainMenuHeightPercent": main_menu_height_percent,
+                "pagerBarHeightPercent": pager_bar_height_percent,
                 "soundEnabled": bool(sound_enabled),
                 "viewPreferences": stored["viewPreferences"],
                 "modLibraryPath": stored["modLibraryPath"],
@@ -270,6 +283,7 @@ class SettingsStore:
             "panelGapPercent": max(0.25, min(4.0, float(current["panelGapPercent"]))),
             "residentHandleWidthPercent": max(2.5, min(12.0, float(current["residentHandleWidthPercent"]))),
             "mainMenuHeightPercent": max(3.0, min(20.0, float(current["mainMenuHeightPercent"]))),
+            "pagerBarHeightPercent": max(3.0, min(12.0, float(current["pagerBarHeightPercent"]))),
             "soundEnabled": bool(current["soundEnabled"]),
             "soundVolumePercent": max(0.0, min(100.0, float(current["soundVolumePercent"]))),
             "absentGameDesaturationPercent": max(

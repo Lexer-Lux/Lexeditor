@@ -160,11 +160,18 @@ class DeveloperModeUiContractTests(unittest.TestCase):
         self.assertEqual(counts["global"], len(shared["global"]))
         self.assertGreater(counts["global"], 0)
 
-    def test_developer_page_renders_a_loading_quotes_table(self):
+    def test_developer_page_renders_a_per_game_table(self):
         source = (ROOT / "ui" / "chooser.html").read_text(encoding="utf-8")
-        self.assertIn("renderQuotes(overview?.quotes)", source)
-        self.assertIn('id="lexer-dev-quotes"', source)
+        self.assertIn('id="lexer-dev-table"', source)
+        self.assertIn("Developer overview by game", source)
+        for header in ("GAME", "MOD LOADING", "TASKS", "QUOTES", "COPIED LINES", "REST"):
+            self.assertIn(header, source)
         self.assertIn("Global (shared)", source)
+        self.assertNotIn('id="lexer-dev-games"', source)
+        self.assertNotIn('id="lexer-dev-quotes"', source)
+        self.assertNotIn('id="lexer-dev-budget"', source)
+        self.assertNotIn('id="lexer-dev-code"', source)
+        self.assertNotIn("renderQuotes", source)
     def test_plugin_restart_and_shortcut_are_developer_only(self):
         source = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
         self.assertIn("restart.hidden = !developerMode", source)

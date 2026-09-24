@@ -3158,9 +3158,16 @@
     const joinSections = () => {
       // Newest first, each back into the section it was cut from, so a
       // section cut twice gets its rows back in order.
-      for (const {source, piece} of pieces.reverse()) {
-        const body = source.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body)");
-        const rest = piece.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body)");
+      for (const {source, piece, subSplit} of pieces.reverse()) {
+        const body = source.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body,.settings-subs)");
+        const rest = piece.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body,.settings-subs)");
+        if (subSplit && body && rest) {
+          const continued = rest.querySelector(':scope > [data-lex-continued="true"]');
+          const fields = subSplit.querySelector(":scope > .settings-fields");
+          const moved = continued?.querySelector(":scope > .settings-fields");
+          if (fields && moved) fields.append(...moved.children);
+          continued?.remove();
+        }
         if (body && rest) body.append(...rest.children);
         piece.remove();
         const at = cards.indexOf(piece);
@@ -3168,12 +3175,14 @@
       }
       pieces = [];
     };
-    // A section splits between its rows; a panel between its sections.
+    // A section splits between its rows; a panel between its sections; a
+    // settings card between its subs.
     const splitSection = (card, available) => {
       const panel = card.matches(".lex-detail-panel");
-      if (!panel && !card.matches(".lex-detail-section")) return false;
-      const title = panel ? card.querySelector(":scope > .lex-detail-panel-heading") : card.querySelector(":scope > .lex-detail-section-title");
-      const body = card.querySelector(panel ? ":scope > .lex-detail-panel-body" : ":scope > .lex-detail-section-content");
+      const settings = !panel && card.matches(".settings-section");
+      if (!panel && !settings && !card.matches(".lex-detail-section")) return false;
+      const title = panel ? card.querySelector(":scope > .lex-detail-panel-heading") : settings ? card.querySelector(":scope > h2") : card.querySelector(":scope > .lex-detail-section-title");
+      const body = card.querySelector(panel ? ":scope > .lex-detail-panel-body" : settings ? ":scope > .settings-subs" : ":scope > .lex-detail-section-content");
       const rows = body ? [...body.children] : [];
       if (rows.length < 2) return false;
       const outer = card.getBoundingClientRect(), inner = body.getBoundingClientRect();
@@ -3185,8 +3194,14 @@
         if (above + through + below > available - 1) break;
         keep = index + 1;
       }
-      // One row taller than the page cannot be helped by splitting.
-      if (keep < 1 || keep >= rows.length) return false;
+      // One row taller than the page cannot be helped by splitting between
+      // rows. A settings sub taller than the page splits between its own
+      // fields instead, so one long sub never fails a small window.
+      if (keep >= rows.length) return false;
+      if (keep < 1) {
+        if (!settings) return false;
+        return splitSettingsSub(card, body, rows[0], available, above, below, scale, inner.top);
+      }
       const named = panel ? title?.querySelector(".lex-detail-panel-title") : title;
       const name = (panel ? named?.textContent || "" : [...(title?.childNodes || [])].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join(""))
         .trim().replace(/ \(continued\)$/, "");
@@ -3201,12 +3216,49 @@
         if (copy) copy.textContent = `${name} (continued)`;
         head.querySelectorAll(".lex-detail-panel-icon,.lex-detail-panel-actions,.lex-detail-panel-id,.lex-detail-panel-meta").forEach(node => node.remove());
       } else if (title) {
-        head = element("h3", {class: title.className}, `${name} (continued)`);
+        head = element(title.tagName.toLowerCase(), {class: title.className}, `${name} (continued)`);
       }
       piece.append(...(head ? [head] : []), rest);
       card.after(piece);
       cards.splice(cards.indexOf(card) + 1, 0, piece);
       pieces.push({source: card, piece});
+      return true;
+    };
+    // A settings sub taller than the page keeps its first fields and hands
+    // the rest to a continued sub on the next column, repeating both titles.
+    const splitSettingsSub = (card, body, sub, available, above, below, scale, innerTop) => {
+      const fieldsBox = sub.querySelector(":scope > .settings-fields");
+      const fields = fieldsBox ? [...fieldsBox.children] : [];
+      if (fields.length < 2) return false;
+      const base = (fieldsBox.getBoundingClientRect().top - innerTop) / scale;
+      let keep = 0;
+      for (let index = 0; index < fields.length; index++) {
+        const through = (fields[index].getBoundingClientRect().bottom - fieldsBox.getBoundingClientRect().top) / scale;
+        if (above + base + through + below > available - 1) break;
+        keep = index + 1;
+      }
+      if (keep < 1 || keep >= fields.length) return false;
+      const plain = node => [...(node?.childNodes || [])].filter(entry => entry.nodeType === Node.TEXT_NODE)
+        .map(entry => entry.textContent).join("").trim().replace(/ \(continued\)$/, "");
+      const piece = card.cloneNode(false);
+      piece.classList.add("lex-detail-section-continued");
+      const rest = body.cloneNode(false);
+      const continued = sub.cloneNode(false);
+      continued.dataset.lexContinued = "true";
+      const subHead = sub.querySelector(":scope > h3");
+      if (subHead) continued.append(element(subHead.tagName.toLowerCase(), {class: subHead.className},
+        `${plain(subHead)} (continued)`));
+      const restFields = fieldsBox.cloneNode(false);
+      restFields.append(...fields.slice(keep));
+      continued.append(restFields);
+      rest.append(continued, ...[...body.children].slice(1));
+      const title = card.querySelector(":scope > h2");
+      const head = title ? element(title.tagName.toLowerCase(), {class: title.className},
+        `${plain(title)} (continued)`) : null;
+      piece.append(...(head ? [head] : []), rest);
+      card.after(piece);
+      cards.splice(cards.indexOf(card) + 1, 0, piece);
+      pieces.push({source: card, piece, subSplit: sub});
       return true;
     };
     const paginate = (visible, keepPieces = false) => {
@@ -3241,7 +3293,9 @@
           // Too tall is fixed here: the section goes on in the next column.
           if(why&&options.splitOversized!==false&&card.offsetHeight>scroll.clientHeight+1&&card.scrollWidth<=card.clientWidth+1&&splitSection(card,scroll.clientHeight))
             return paginate(cards.filter(entry=>!entry.hidden),true);
-          if(why)throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title,h2')?.textContent||card.textContent.slice(0,80)} - ${why}`);
+          // A failed fit must still leave every setting reachable: the page
+          // falls back to one scrolling column behind the thrown guard.
+          if(why){scroll.style.overflowY="auto";throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title,h2')?.textContent||card.textContent.slice(0,80)} - ${why}`);}
         }
       }
       const count=columnCount(visible.length),gap=parseFloat(getComputedStyle(content.querySelector('.lex-tweak-column') || content).rowGap)||12;
@@ -3317,6 +3371,7 @@
         replacement?.focus();
         if (selection && selection[0] !== null) replacement?.setSelectionRange(...selection);
       }
+      scroll.style.overflowY = overflows() ? "auto" : "hidden";
     };
 
     const turn = value => {page = value; render(); scroll.scrollTop = 0;};
@@ -3619,7 +3674,7 @@
     // The pagination bar is one height on every page, and that height is a
     // setting rather than a number buried in the stylesheet.
     document.documentElement.style.setProperty("--lex-pager-bar-height",
-      `${Math.max(36, Math.min(80, Number(settings.pagerBarHeight) || 52))}px`);
+      `${Math.max(3, Math.min(12, Number(settings.pagerBarHeightPercent) || 6))}vh`);
     document.documentElement.style.setProperty("--lex-command-row-height", `${Math.max(3, Math.min(20, Number(settings.mainMenuHeightPercent) || 9))}vh`);
     window.dispatchEvent(new CustomEvent("lexeditor-view-preferences-ready", {detail: settings.viewPreferences || {}}));
     window.dispatchEvent(new CustomEvent("lexeditor-settings-ready", {detail: settings}));
@@ -4620,14 +4675,14 @@ ${contents.path}`});
         {key:"panelTabTarget", scope:"user", title:"Tab key panel", description:"Tab opens the next panel tab. Shift+Tab opens the previous tab. Choose the panel under the mouse or the panel with keyboard focus.", type:"select", choices:[{value:"hover",label:"Hovered panel"},{value:"focus",label:"Focused panel"}]},
         {key:"tableRowsPerPage", scope:"user", title:"Table rows per page", description:"A full table page stretches this many rows to use the exact available panel height.", type:"number", min:5, max:40, step:1},
         {key:"panelGapPercent", scope:"user", title:"Panel spacing", description:"The same responsive gap surrounds panels and separates adjacent panels.", type:"number", min:.25, max:4, step:.05, unit:"%"},
-        {key:"pagerBarHeight", scope:"user", title:"Pagination bar height", description:"How tall the bar along the bottom of a table page is. One height on every page, whether or not that page's bar carries a search box.", type:"number", min:36, max:80, step:1, unit:"px"},
+        {key:"pagerBarHeightPercent", scope:"user", title:"Pagination bar height", description:"How tall the bar along the bottom of a table page is, as a percentage of the screen height. One height on every page, whether or not that page's bar carries a search box.", type:"number", min:3, max:12, step:.5, unit:"%"},
         {key:"mainMenuHeightPercent", scope:"user", title:"Menu bar height", description:"Height of the menu bar in the Home screen and every game plugin, as a percentage of the screen.", type:"number", min:3, max:20, step:.25, unit:"%"},
         {key:"soundEnabled", scope:"user", title:"Sound", description:"Play game-themed interface sounds when the active plugin supplies them.", type:"checkbox"},
         {key:"soundVolumePercent", scope:"packaged", title:"Volume level", description:"Attenuates all menu sound effects for every user.", type:"number", min:0, max:100, step:1, unit:"%"},
         {key:"residentHandleWidthPercent", scope:"packaged", title:"Home editor handle width", description:"Width of the Back to Editor handle as a percentage of the main-menu window.", type:"number", min:2.5, max:12, step:.25, unit:"%"},
         {key:"absentGameDesaturationPercent", scope:"packaged", title:"Absent game desaturation", description:"Amount of color removed from Absent game cover art on the Home screen.", type:"number", min:0, max:100, step:5, unit:"%"},
         {key:"globalMessageRarity", scope:"packaged", title:"Global message rarity", description:"Makes each global loading message this many times less likely than each game-specific message.", type:"number", min:1, max:100, step:1, unit:"× rarer"},
-        {key:"loadingTransitionMinimumSeconds", scope:"packaged", title:"Loading screen minimum", description:"Keeps the loading screen visible for at least this long. Actual loading can take longer.", type:"number", min:0, max:10, step:.25, unit:"s", fallback:1.5},
+        {key:"loadingTransitionMinimumSeconds", scope:"packaged", title:"Loading screen transition", type:"number", min:0, max:10, step:.25, unit:"s", fallback:1.5},
         {key:"tweakColumnsPerPage", scope:"packaged", title:"Tweak columns per page", description:"Maximum columns on one Tweaks page. Each tweak stays in one column.", type:"number", min:1, max:12, step:1, fallback:6},
       ];
       const ordinaryDefinitions = definitions.filter(definition => definition.scope !== "packaged");
@@ -4731,7 +4786,7 @@ ${contents.path}`});
             class:"lex-global-setting lex-developer-setting lex-packaged-setting", hidden:true,
           }, element("div", {class:"lex-setting-copy"},
             element("label", {for:`lex-default-${definition.key}`}, definition.title),
-            element("p", {}, definition.description)), wrapped);
+            definition.description ? element("p", {}, definition.description) : null), wrapped);
           if(!supported)controlNode(wrapped).title="Restart Lexeditor to make this setting available.";
           card.dataset.lexSettingSupported = String(supported);
           developerLane.append(card);
@@ -4746,7 +4801,7 @@ ${contents.path}`});
         currentControls.set(definition.key, wrapped);
         const copy = element("div", {class:"lex-setting-copy"},
           element("label", {for:`lex-${definition.key}`}, definition.title),
-          element("p", {}, definition.description));
+          definition.description ? element("p", {}, definition.description) : null);
         const defaultWrapped = makeControl(definition, initialValue(definition, true), `lex-default-${definition.key}`);
         defaultControls.set(definition.key, defaultWrapped);
         const defaultControl = element("label", {

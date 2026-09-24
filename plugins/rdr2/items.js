@@ -163,7 +163,7 @@ function sellPriceCell(it,sellCash,sellRef){
     const rows=sellCash.length?sellCash:[[null,{qty:edited?.cents??100,item:"CURRENCY_CASH"}]];
     for(const [c,p] of rows) controls.append(c?priceInput(it,"sell",c,p):LexeditorUI.inlineLabel("$",el("input",{type:"number",step:"0.01",min:"0",value:fmtMoney(p.qty),onchange:e=>{state.sellabilityEdits[it.key]={sellable:true,cents:Math.round((+e.target.value||0)*100)};renderToolbarOnly();}})));
     controls.append(el("button",{class:"lex-ui-symbol icon-link",title:"Open Shops filtered to this item's resale information",onclick:()=>goToItemShops(it,"sell")},"⌕"));
-    controls.append(!isRO()?el("button",{class:"lex-ui-symbol icon-link",title:"Make unsellable",onclick:()=>{state.sellabilityEdits[it.key]={sellable:false};render();}},"×"):el("span"));
+    controls.append(!isRO()?closeButton({title:"Make unsellable",onclick:()=>{state.sellabilityEdits[it.key]={sellable:false};render();}}):el("span"));
   }else{
     controls.append(el("input",{class:"na-price",value:"N/A",readonly:"",title:"No cash sell price is defined."}),!isRO()?newButton({title:"Add a generic SELL_SHOP_DEFAULT payout. This does not choose which merchants accept the item.",onclick:()=>{state.sellabilityEdits[it.key]={sellable:true,cents:100};render();}}):el("span"),el("span"));
   }
@@ -178,7 +178,7 @@ function buyPriceCell(it,buyCash,buyRef){
     const rows=buyCash.length?buyCash:[[null,{qty:edited?.cents??100,item:"CURRENCY_CASH"}]];
     for(const [cost,part] of rows)controls.append(cost?priceInput(it,"buy",cost,part):LexeditorUI.inlineLabel("$",el("input",{type:"number",step:"0.01",min:"0",value:fmtMoney(part.qty),onchange:e=>{state.buyabilityEdits[it.key]={buyable:true,cents:Math.round((+e.target.value||0)*100)};renderToolbarOnly();}})));
     controls.append(el("button",{class:"lex-ui-symbol icon-link",title:"Open Shops and show which inventories sell this item",onclick:()=>goToItemShops(it,"buy")},"⌕"));
-    controls.append(!isRO()?el("button",{class:"lex-ui-symbol icon-link",title:"Remove cash purchase price; shop membership is unchanged",onclick:()=>{state.buyabilityEdits[it.key]={buyable:false};renderItems();}},"×"):el("span"));
+    controls.append(!isRO()?closeButton({title:"Remove cash purchase price; shop membership is unchanged",onclick:()=>{state.buyabilityEdits[it.key]={buyable:false};renderItems();}}):el("span"));
   }else{
     controls.append(el("input",{class:"na-price",value:"N/A",readonly:"",title:(it.shopListings||[]).length?"No cash cost; commonly a free/default option already present in a shop inventory":"No generic cash purchase cost is defined"}),!isRO()?newButton({title:"Add COST_SHOP_DEFAULT cash price; also list it in Shops if it is not already present",onclick:()=>{state.buyabilityEdits[it.key]={buyable:true,cents:100};renderItems();}}):el("span"),el("span"));
   }
@@ -375,7 +375,7 @@ function itemEffectsCell(it){
       const known=state.effectByKey[key];
       const chip=LexeditorUI.inlineLabel(effectLink(key));chip.title=(known?effectSummary(known):"Unknown effect")+"\nkey: "+key;
       if(!isRO()&&removable){
-        const remove=el("button",{type:"button",title:"Remove effect"},"×");
+        const remove=closeButton({title:"Remove effect"});
         remove.addEventListener("click",event=>{
           event.stopPropagation();event.preventDefault();
           const next=[...(state.itemEffectEdits[it.key]??it.effects)];
@@ -457,9 +457,9 @@ function quickSelectSlotsCell(it){
       wrap.append(LexeditorUI.actionRow(select,
         el("span",{class:"cat quick-select-order",title:"The file stores this sort order. Lexeditor preserves it when the slot changes."},
           row.sortOrder===null?"order: automatic":`order ${row.sortOrder}`),
-        isRO()?"":el("button",{class:"lex-ui-symbol icon-link del",title:"Remove this quick-select assignment",onclick:()=>{
+        isRO()?"":closeButton({title:"Remove this quick-select assignment",onclick:()=>{
           const next=current.slots.filter((_,slotIndex)=>slotIndex!==index).map(entry=>({...entry}));setQuickSelectSlots(it,next);draw();
-        }},"×")));
+        }})));
     });
     if(!isRO()){
       const available=known.filter(slot=>!used.has(slot)).map(slot=>({value:slot,label:quickSelectSlotLabel(slot)}));

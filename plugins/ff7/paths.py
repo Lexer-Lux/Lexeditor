@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from mod_library import default_user_library_root
+
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
 LEXEDITOR_ROOT = PLUGIN_ROOT.parents[1]
@@ -18,8 +20,7 @@ DATA_ROOT = Path(os.environ.get(
 ))
 PROJECT_ROOT = Path(os.environ.get(
     "LEXEDITOR_FF7_PROJECT",
-    str(Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
-        / "Lexeditor" / "mods" / "ff7" / "My Mod"),
+    str(default_user_library_root() / "ff7" / "My Mod"),
 ))
 PROJECT_TEMPLATE_ROOT = DATA_ROOT / "project-template"
 PROJECT_KERNEL_PATH = Path("ff7/workingdir/data/lang-en/kernel/kernel.bin")

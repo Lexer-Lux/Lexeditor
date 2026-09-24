@@ -461,7 +461,7 @@ function weaponDetail(d,section,record,f){
   if(section==="weapons")body.append(weaponBig6(record,fv));
   body.append(LexeditorUI.actionRow(el("input",{id:"weapon-field-filter",type:"text",placeholder:"Filter fields…",value:f.weaponFieldQ||"",
     oninput:ev=>{f.weaponFieldQ=ev.target.value;filterRerender(ev,renderWeapons);}}),
-    f.weaponFieldQ?el("button",{class:"lex-ui-symbol icon-link",title:"Clear field filter",onclick:()=>{f.weaponFieldQ="";renderWeapons();}},"×"):""));
+    f.weaponFieldQ?closeButton({title:"Clear field filter",onclick:()=>{f.weaponFieldQ="";renderWeapons();}}):""));
   const q=(f.weaponFieldQ||"").toUpperCase();
   const rows=sortedRows("weapons",record.fields.filter(x=>x.field!=="Name"&&(!q||x.field.toUpperCase().includes(q))),{field:x=>x.field,value:x=>x.value,references:x=>vv[x.field]??wv[x.field]??""});
   const grouped=new Map();
