@@ -81,11 +81,13 @@ def test_tabs_stay_one_row_and_tweaks_stays_attached(page,width):
     brand=page.locator('.lex-brand-button')
     assert brand.evaluate('n=>!n.dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true}))')
 
-def test_help_scales_with_its_heading(page):
+def test_help_keeps_its_one_size_beside_a_large_heading(page):
+    # G3 replaced heading-scaled help with one shared 16px size everywhere
+    # (tests/test_info_help_size.py); a large heading must not inflate it.
     framework(page)
     page.evaluate('''()=>{const U=LexeditorUI;document.querySelector('main').append(U.el('div',{style:'font-size:30px'},U.infoHelp('Help')))}''')
     help=page.locator('.lex-info-help')
-    assert help.bounding_box()['width']>=30
+    assert round(help.bounding_box()['width'])==16
     assert help.evaluate('n=>getComputedStyle(n).backgroundColor')=='rgb(255, 255, 255)'
 
 

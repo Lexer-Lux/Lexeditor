@@ -2233,8 +2233,10 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 /* The 1em line box hugs the glyphs for cross-font centring, so a bare
    custom span shears descenders (Tiger Fang's g's) against its own clip
    box. Same .14em of descender room the wrapped .lex-column-cell-text
-   already carries; controls size their own boxes and are excluded. */
-.lex-column-list-cell .lex-column-cell-content > span:not(.lex-source-control) {
+   already carries; controls size their own boxes and are excluded. So is a
+   hoverable label: it carries a larger .2em of its own, and cutting that to
+   .14em sheared the drop shadow under FF8's descenders. */
+.lex-column-list-cell .lex-column-cell-content > span:not(.lex-source-control, .lex-hoverable-label) {
   padding-block:.14em;
 }
 
