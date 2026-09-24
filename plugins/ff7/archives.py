@@ -11,12 +11,20 @@ from .format_codec import bounds, read_int, lzs_decode, lzs_encode
 
 
 LGP_TERMINATOR = b'FINAL FANTASY 7'
+# Both installed English editions terminate archives with the 14-byte
+# 'FINAL FANTASY7' footer (Ficedula's documented form). The 15-byte form
+# is retained for archives Lexeditor itself wrote before the correction.
+LGP_TERMINATORS = (b'FINAL FANTASY7', b'FINAL FANTASY 7')
 
 
 class LGP:
     def __init__(self, data: bytes):
-        if not data.startswith(b'\0\0SQUARESOFT') or not data.endswith(LGP_TERMINATOR):
+        if not data.startswith(b'\0\0SQUARESOFT'):
             raise ValueError('Not a complete PC SQUARESOFT LGP archive')
+        terminator = next((candidate for candidate in LGP_TERMINATORS if data.endswith(candidate)), None)
+        if terminator is None:
+            raise ValueError('Not a complete PC SQUARESOFT LGP archive')
+        self.terminator = terminator
         self.original=data;self.entries=[];self.changes={}
         count=read_int(data,12,4)
         if not 1<=count<=65535: raise ValueError('LGP member count is invalid')
@@ -31,7 +39,7 @@ class LGP:
             if start<table_end+3602: raise ValueError('LGP member overlaps its index')
             bounds(data,start,24)
             size=read_int(data,start+20,4);bounds(data,start+24,size)
-            if start+24+size>len(data)-len(LGP_TERMINATOR): raise ValueError('LGP member overlaps its terminator')
+            if start+24+size>len(data)-len(terminator): raise ValueError('LGP member overlaps its terminator')
             self.entries.append((name,start,size))
         # Exact aliases are permitted, partial data overlaps are not.
         spans=sorted(set((start,start+24+size) for _,start,size in self.entries))
@@ -44,7 +52,7 @@ class LGP:
 
     def to_bytes(self):
         if not self.changes:return self.original
-        result=bytearray(self.original[:-len(LGP_TERMINATOR)])
+        result=bytearray(self.original[:-len(self.terminator)])
         refs=Counter(at for _,at,_ in self.entries)
         for index,raw in sorted(self.changes.items()):
             name,old,size=self.entries[index]
@@ -59,7 +67,7 @@ class LGP:
                 result.extend(self.original[old:old+20])
                 result.extend(struct.pack('<I',len(raw)));result.extend(raw)
                 struct.pack_into('<I',result,16+index*27+20,at)
-        result.extend(LGP_TERMINATOR)
+        result.extend(self.terminator)
         return bytes(result)
 
 
@@ -111,19 +119,27 @@ def field_encounter_offset(raw):
     if raw[:2]!=b'\0\0' or read_int(raw,2,4)!=9:raise ValueError('Expected a nine-section PC field')
     pointers=list(struct.unpack_from('<9I',raw,6))
     if pointers!=sorted(set(pointers)) or pointers[0]<42:raise ValueError('Invalid field section pointers')
-    for i,start in enumerate(pointers):
-        size=read_int(raw,start,4);bounds(raw,start+4,size)
-        if i<8 and start+4+size>pointers[i+1]:raise ValueError('Overlapping field sections')
+    for start in pointers:
+        bounds(raw,start+4,read_int(raw,start,4))
+    # Only the encounter section is edited, so only its slot must be tight:
+    # vanilla 2013 fields (blackbgb, fship_4, las0_8) carry a loose size on
+    # other sections and the engine navigates by pointers.
     start=pointers[6]
     if read_int(raw,start,4)!=48:raise ValueError('Field encounter section must contain two 24-byte tables')
+    if start+52>pointers[7]:raise ValueError('Field encounter section overlaps its following section')
     return start+4
 
 
 class FieldArchive:
     def __init__(self,data):
-        self.lgp=LGP(data);self.fields={};self.errors={}
+        self.lgp=LGP(data);self.fields={};self.errors={};self.skipped={}
         for index,(name,_,_) in enumerate(self.lgp.entries):
             if name.casefold()=='maplist':continue
+            if '.' in name:
+                # Preserved textures, tutorial data and console-port field
+                # variants; only extensionless members are PC field files.
+                self.skipped[name]='Not a PC field file'
+                continue
             try:
                 raw=lzs_decode(self.lgp.member(index));offset=field_encounter_offset(raw)
                 self.fields[index]=(raw,offset)

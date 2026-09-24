@@ -406,6 +406,18 @@ class DatasetTests(unittest.TestCase):
         self.assertEqual(result.sections[19], sections[19])
         self.assertEqual(result.records("characters")[8]["values"]["strength"], 77)
 
+    def test_commands_accept_vanilla_odd_description_pointer(self):
+        sections = fixture_sections()
+        table = bytearray(sections[9])
+        table[0] = 63
+        sections[9] = table
+        write_kernel(self.source, sections)
+        data = load_datasets(self.game, self.project)
+        self.assertNotIn("commands", data["errors"])
+        self.assertEqual(len(data["records"]["commands"]), 32)
+        saved = save_datasets(self.game, self.project, data)
+        self.assertEqual(Path(saved["path"]).read_bytes(), self.source.read_bytes())
+
     def test_save_readback_backup_and_source_unchanged(self):
         source_bytes = self.source.read_bytes()
         data = load_datasets(self.game, self.project)

@@ -16,14 +16,14 @@ from verify_ff7_datasets import write_kernel, PATHS
 from verify_ff7_extended import scene_fixture,exe_fixture,text_fixture
 
 
-def lgp_fixture(members):
+def lgp_fixture(members,terminator=b'FINAL FANTASY 7'):
     count=len(members);out=bytearray(b'\0\0SQUARESOFT'+struct.pack('<I',count))
     out.extend(b'\0'*(27*count+3602))
     for index,(name,raw) in enumerate(members):
         name=name.encode('ascii').ljust(20,b'\0');at=len(out)
         out[16+27*index:16+27*index+27]=name+struct.pack('<IBH',at,14,0)
         out.extend(name+struct.pack('<I',len(raw))+raw)
-    return bytes(out)+b'FINAL FANTASY 7'
+    return bytes(out)+terminator
 
 
 def table_fixture(count):
@@ -128,6 +128,16 @@ class ArchiveTests(unittest.TestCase):
         bad=bytearray(raw);struct.pack_into('<I',bad,36,16)
         with self.assertRaises(ValueError):archives.LGP(bytes(bad))
 
+    def test_lgp_accepts_installed_footer_and_preserves_it_on_edit(self):
+        raw=lgp_fixture([('one',b'alpha'),('two',b'beta')],terminator=b'FINAL FANTASY7')
+        obj=archives.LGP(raw);self.assertEqual(obj.to_bytes(),raw)
+        obj.changes[1]=b'gamma!'
+        out=obj.to_bytes();saved=archives.LGP(out)
+        self.assertTrue(out.endswith(b'FINAL FANTASY7'));self.assertFalse(out.endswith(b'FINAL FANTASY 7'))
+        self.assertEqual(saved.member(0),b'alpha');self.assertEqual(saved.member(1),b'gamma!')
+        legacy=lgp_fixture([('one',b'alpha')]);edited=archives.LGP(legacy)
+        edited.changes[0]=b'aleph';self.assertTrue(edited.to_bytes().endswith(b'FINAL FANTASY 7'))
+
     def test_field_table_edit_preserves_every_other_decoded_byte(self):
         compressed=field_fixture();source=lgp_fixture([('maplist',b'map list'),('field1',compressed),('field2',compressed)])
         obj=archives.FieldArchive(source);self.assertEqual(len(obj.records()),4)
@@ -135,6 +145,21 @@ class ArchiveTests(unittest.TestCase):
         out=archives.LGP(obj.to_bytes());before=lzs_decode(compressed);after=lzs_decode(out.member(1));at=archives.field_encounter_offset(before)+24+2
         self.assertEqual(after[:at],before[:at]);self.assertEqual(after[at+2:],before[at+2:]);self.assertEqual(out.member(2),compressed)
         self.assertEqual(archives.FieldArchive(obj.to_bytes()).records(),obj.records())
+
+    def test_field_accepts_vanilla_loose_sizes_and_skips_non_pc_members(self):
+        decoded=lzs_decode(field_fixture());pointers=struct.unpack_from('<9I',decoded,6)
+        loose=bytearray(decoded);struct.pack_into('<I',loose,pointers[0],10**6)
+        with self.assertRaises(ValueError):archives.field_encounter_offset(bytes(loose))
+        loose=bytearray(decoded);struct.pack_into('<I',loose,pointers[0],pointers[1]-pointers[0]-4+100)
+        self.assertEqual(archives.field_encounter_offset(bytes(loose)),pointers[6]+4)
+        source=lgp_fixture([('maplist',b'map list'),('eyes.tex',b'raw texture bytes'),('port.NX',field_fixture()),('field1',lzs_encode(bytes(loose)))])
+        obj=archives.FieldArchive(source)
+        self.assertEqual(obj.errors,{});self.assertEqual(set(obj.skipped),{'eyes.tex','port.NX'})
+        self.assertEqual(len(obj.records()),2)
+        rows=obj.records();rows[0]['values']['rate']=61;obj.apply('fieldEncounters',rows)
+        self.assertEqual(archives.FieldArchive(obj.to_bytes()).records(),obj.records())
+        bad=bytearray(decoded);struct.pack_into('<I',bad,pointers[6],49)
+        with self.assertRaises(ValueError):archives.field_encounter_offset(bytes(bad))
 
     def test_field_invalid_member_is_reported_without_hiding_other_fields(self):
         source=lgp_fixture([('bad',b'broken'),('good',field_fixture())]);obj=archives.FieldArchive(source)
