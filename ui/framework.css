@@ -4989,7 +4989,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   transition:opacity .15s ease;
   box-sizing:border-box;
   padding:0;
-  color:inherit;
+  /* The ring reads on any thumbnail in any theme: white stroke with a dark
+     halo, instead of inheriting a theme accent that vanishes on dark art. */
+  color:#fff;
+  filter:drop-shadow(0 1px 2px #000c) drop-shadow(0 0 1px #000);
   background:transparent;
   font:700 1.6em/1 var(--lex-symbol-font);
   pointer-events:none;
