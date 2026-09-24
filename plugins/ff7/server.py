@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from . import paths, deployment, tooling
+from .game_font import ensure_font
 from .extended import FAMILIES, ERRORS as EXTENDED_ERRORS, load_extended, save_extended, resolve_source, model
 from .datasets import CATEGORIES, UNRESOLVED, READ_ERRORS, load_datasets, save_datasets
 from .storage import target_path
@@ -248,6 +249,8 @@ class Handler(PluginRequestHandler):
                     self.json_response({"error": "Shared UI asset not found"}, 404)
                 else:
                     self.file_response(target)
+            elif path == "/assets/ff7-menu.ttf":
+                self.file_response(ensure_font())
             elif path.startswith("/assets/theme-sfx/") and path.endswith(".wav"):
                 target = sound_file(DATA_ROOT, Path(path).stem)
                 self.file_response(target) if target else self.json_response({"error": "Theme sound not found"}, 404)

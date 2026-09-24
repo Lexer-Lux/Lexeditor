@@ -109,3 +109,16 @@ it cannot be re-fetched. Photo source: Ersh_Zenith_01,
 anidais, SteamGridDB grid 84563, <https://www.steamgriddb.com/grid/84563>
 (image <https://cdn2.steamgriddb.com/grid/aeaa4605027b5a06c9113495302370d2.png>).
 That reference cover is not stored; fetch it from SteamGridDB as needed.
+
+## Theme assets (extracted locally, never redistributed)
+
+The FF7 menu lettering and interface sounds come from the player's own
+installation at prepare/serve time. Nothing below ships with Lexeditor:
+
+- Menu font: `menu_us.lgp` member `usfont_h.tex` (12-pixel fixed grid,
+  21 columns, FF7 text-code order). `game_font.py` builds a private
+  `ff7-menu.ttf` in the game-data cache.
+- Interface sounds: numeric records from the installed `audio.fmt` /
+  `audio.dat` pair, decoded to the private `theme-sfx` cache by the shared
+  `theme_sounds` module (FF7 format). The slot mapping (confirm/move 1,
+  save 2, back/exit 4) is the mapping `server.py` serves.

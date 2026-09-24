@@ -146,6 +146,14 @@
           "name": "tangtang95 / 60/30 FPS Gameplay",
           "role": "Public 7th Heaven mod.xml compatibility fixture for profile-option ModFolder activation.",
           "url": "https://github.com/tangtang95/ff7-60fps-mod"
+        },
+        {
+          "name": "Installed Final Fantasy VII (menu font)",
+          "role": "Menu lettering from the installed menu_us.lgp member usfont_h.tex, built into a private ff7-menu.ttf in the game-data cache at serve time; never redistributed."
+        },
+        {
+          "name": "Installed Final Fantasy VII (interface sounds)",
+          "role": "Numeric records from the installed audio.fmt/audio.dat pair, decoded into the private theme-sfx cache by the shared theme_sounds module (FF7 format); never redistributed."
         }
       ],
       "thanks": [],

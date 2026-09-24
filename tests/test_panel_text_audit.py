@@ -135,3 +135,33 @@ def test_audit_catches_a_narrow_id_column(page):
     audit = page.evaluate(
         "window.__lexPanelTextAudit(document, ['.lex-numbered-id-cell'])")
     assert any(finding["axis"] == "horizontal" for finding in audit), audit
+
+
+def test_grow_columns_keep_declared_width_floor(page):
+    # Grow tracks default to minmax(0, Nfr): a narrow panel crushes the
+    # summary numbers instead of the name. A declared width floors them.
+    framework(page)
+    page.evaluate("""() => {
+      const main = document.querySelector('main');
+      main.style.width = '420px';
+      main.append(LexeditorUI.columnList({
+        columns: [{key: 'id', label: 'ID', numberedId: true},
+                  {key: 'name', label: 'Name', grow: 2},
+                  {key: 'foes', label: 'FOES', grow: .42,
+                   width: 'minmax(80px,.42fr)'}],
+        rows: [{id: 1, name: 'A very long formation name here', foes: 6}],
+      }));
+    }""")
+    widths = page.evaluate("""() => {
+      const row = document.querySelector('.lex-column-list-row');
+      return [...row.children].map(
+        cell => Math.round(cell.getBoundingClientRect().width));
+    }""")
+    assert widths[2] >= 80, widths
+
+
+def test_ff7_summary_columns_declare_width_floors():
+    source = (ROOT / "plugins/ff7/workspace.js").read_text(encoding="utf-8")
+    assert 'width:"minmax(80px,.42fr)"' in source
+    assert 'width:"minmax(80px,.48fr)"' in source
+
