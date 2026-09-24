@@ -8,10 +8,9 @@
   research-first workflow. Survey existing open-source tools/loaders, documentation
   and format knowledge before writing new parsers, and record material sources in
   Credits as they are used rather than reconstructing provenance later.
-- Default to one implementation branch/PR for a new game plugin from initial
-  integration through acceptance. Do not fragment one new plugin into PRs for each
-  parser, screen or subsystem unless genuinely shared infrastructure has an
-  independent reason to land first.
+- Work directly on master: no branches, worktrees, stashes or pull requests.
+  Commit in coherent steps and leave nothing parked. Pushing needs Lexer's
+  explicit go-ahead.
 - Every game plugin must expose a Data Map screen. Do not use a generic Files
   tab as the player-facing editor for data that needs a format-specific view.
 - Always use the most appropriate HTML control for the value. Use checkboxes
@@ -53,7 +52,7 @@ four actual subissues in this order, with the same game label on each:
    repair UI defects, and check small windows and large UI scales.
 
 Reuse existing matching issues and preserve their discussion. These four
-subissues track one plugin branch/PR, not four separate implementation PRs.
+subissues track one plugin, not four separate efforts.
 Keep game names out of issue titles. Each open issue needs its own truthful
 workflow label. Source, rendered UI, mod compatibility, delivered candidate and
 in-game acceptance are separate checks; the parent is not complete while required
@@ -119,8 +118,10 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
   candidate, setup, controls/steps, expected result, and what to report. Supply
   needed fixtures, saves, tools and diagnostics first. Lexer does not build code
   or invent acceptance tests on the agent's behalf.
-- A source patch, passing CI, draft PR, queued build, or unconfirmed installation
-  is not a delivered candidate. Missing preparation/delivery stays `actionable`.
+- A candidate is a pushed master commit that Lexer runs with `Lexeditor.cmd`
+  (the app updates itself from master). A local commit, passing CI, or an
+  unconfirmed installation is not a delivered candidate. Missing
+  preparation/delivery stays `actionable`. Do not build packaged test bundles.
 - A failed human test returns to `actionable`. Do not repeat it without a relevant
   change or a genuinely new prepared diagnostic.
 - If work remains within the requested scope, retain `actionable` and identify
@@ -157,6 +158,18 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
   personal data. A public repository is not private merely because agents use it.
 - These stores are searched when needed, not loaded in full every turn.
 
+## Checks
+
+- Every plugin's checks run with `python tools/check_plugin.py <plugin>`, and
+  shared ones with `--global`; CI runs exactly these, one generated
+  `<plugin>-checks.yml` per plugin plus `global-checks.yml`. Name a new test
+  `test_<plugin>_*.py` (pytest) or `verify_<plugin>_*.py` (script) in `tests/`
+  so it is picked up. Do not hand-write workflows; after adding a plugin run
+  `python tools/check_plugin.py --write-workflows`.
+- `tools/` holds project utilities people run. Checks, verifiers and their
+  helpers belong in `tests/`; one-off probes are deleted when their issue
+  closes.
+
 ## Temporary storage and local checks
 
 - The checkout holds source only. Never create `_scratch/`, `.pytest_cache`,
@@ -188,7 +201,7 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
 - A patch script asserts what it expects to find before replacing it, so a
   changed file fails loudly instead of silently matching nothing.
 
-## Actionable-to-waiting handoff on plugin PRs
+## Actionable-to-waiting handoff
 
-- Work every open actionable issue you can on the PR: verify the code, re-run executable checks, and record evidence plus human test plans (or blocked findings with proof) in the per-issue handoff. Close nothing without a delivered candidate; merge auto-flips closed issues to untested.
+- Work every open actionable issue you can: verify the code, run `python tools/check_plugin.py <plugin>`, and record evidence plus human test plans (or blocked findings with proof) in the per-issue handoff. Close nothing without a delivered candidate; once one is pushed, move the issue to `untested` yourself.
 - When agent work is done and only a specific Lexer action blocks the next step, flip the issue to waiting: append an unchecked checklist of the exact actions or answers needed from Lexer and swap the actionable label for waiting. Everything else keeps actionable.
