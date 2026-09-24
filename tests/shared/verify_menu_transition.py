@@ -9,6 +9,9 @@ import sys
 import tempfile
 import time
 import traceback
+if os.environ.get('LEXEDITOR_ALLOW_VISIBLE_TESTS') != '1':
+    print('SKIPPED: native window test requires explicit approval and LEXEDITOR_ALLOW_VISIBLE_TESTS=1')
+    raise SystemExit(0)
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
 sys.path.insert(0,r'C:\RDR2Mod\tools\reverse-engineering')
