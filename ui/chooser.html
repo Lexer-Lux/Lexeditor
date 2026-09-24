@@ -240,6 +240,10 @@
     const games=document.querySelector("#games"),surface=document.querySelector("#chooser-surface"),residentHandle=document.querySelector("#resident-handle"),loadingScreen=document.querySelector("#loading-screen"),loadingQuote=document.querySelector("#loading-quote");
     const modal=document.querySelector("#modal"),dialogTitle=document.querySelector("#dialog-title"),dialogMessage=document.querySelector("#dialog-message"),dialogProblems=document.querySelector("#dialog-problems"),dialogProgress=document.querySelector("#dialog-progress"),dialogActions=document.querySelector("#dialog-actions");
     document.querySelector("#chooser-window-controls").before(LexeditorUI.uiScaleControl());
+    // The loading screen waits for pending covers so the menu does not pop
+    // in half-drawn, but never longer than this: a cover stuck "loading"
+    // held the whole menu behind a black screen. Late covers draw in place.
+    const COVER_WAIT_MS=6000;
     const chooser={plugins:[],active:null,timer:null,loading:false,deferredRender:false,settingsLoaded:false,menuReady:false,menuStarted:Date.now(),quoteRequested:false};
     const updateButton=document.querySelector("#app-update");
     async function refreshAppUpdate(){
@@ -624,7 +628,7 @@
     }
     async function load(){
       if(chooser.loading)return;chooser.loading=true;
-      try{await loadSharedSettings();if(!chooser.quoteRequested){chooser.quoteRequested=true;const value=await window.pywebview.api.loading_quote("__home__").catch(()=>null);loadingQuote.textContent=value?.quote||"";}chooser.plugins=await window.pywebview.api.plugins();render(chooser.plugins);if(!chooser.menuReady&&!chooser.plugins.some(plugin=>plugin.coverArt?.state==="loading")){await Promise.all([...games.querySelectorAll("img")].map(image=>image.decode().catch(()=>{})));const minimum=Math.max(0,Math.min(10,Number(chooser.settings?.loadingTransitionMinimumSeconds??1.5)||0))*1000;await new Promise(resolve=>setTimeout(resolve,Math.max(0,minimum-(Date.now()-chooser.menuStarted))));chooser.menuReady=true;games.setAttribute("aria-busy","false");loadingScreen.hidden=true;}await finishHomeTransition();if(chooser.active){const active=chooser.plugins.find(plugin=>plugin.id===chooser.active);if(active)statusDialog(active);}}
+      try{await loadSharedSettings();if(!chooser.quoteRequested){chooser.quoteRequested=true;const value=await window.pywebview.api.loading_quote("__home__").catch(()=>null);loadingQuote.textContent=value?.quote||"";}chooser.plugins=await window.pywebview.api.plugins();render(chooser.plugins);if(!chooser.menuReady&&(!chooser.plugins.some(plugin=>plugin.coverArt?.state==="loading")||Date.now()-chooser.menuStarted>=COVER_WAIT_MS)){await Promise.all([...games.querySelectorAll("img")].map(image=>image.decode().catch(()=>{})));const minimum=Math.max(0,Math.min(10,Number(chooser.settings?.loadingTransitionMinimumSeconds??1.5)||0))*1000;await new Promise(resolve=>setTimeout(resolve,Math.max(0,minimum-(Date.now()-chooser.menuStarted))));chooser.menuReady=true;games.setAttribute("aria-busy","false");loadingScreen.hidden=true;}await finishHomeTransition();if(chooser.active){const active=chooser.plugins.find(plugin=>plugin.id===chooser.active);if(active)statusDialog(active);}}
       catch(error){loadingScreen.hidden=true;games.setAttribute("aria-busy","false");setDialog("Could not load games",String(error),[button("RETRY",()=>{closeDialog();if(!chooser.menuReady)loadingScreen.hidden=false;load();},true)]);document.documentElement.classList.remove("lex-transition-entry");}
       finally{chooser.loading=false;clearTimeout(chooser.timer);const scanning=chooser.plugins.some(plugin=>plugin.scanInProgress),artLoading=chooser.plugins.some(plugin=>plugin.coverArt?.state==="loading");chooser.timer=scanning||artLoading?setTimeout(load,scanning?350:500):null;}
     }

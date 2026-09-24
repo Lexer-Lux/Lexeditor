@@ -21,7 +21,7 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, *_): pass
 
 
-def test_menu_renders_cards_covers_and_fallbacks():
+def test_menu_renders_cards_covers_and_fallbacks(plugins_override=None, loading_timeout=8000):
     settings = dict(BASE, developerMode=True, developerAuthorized=True,
                     developerLogin='Lexer-Lux', viewPreferences={},
                     defaultValues=dict(BASE), loadingTransitionMinimumSeconds=0,
@@ -31,7 +31,7 @@ def test_menu_renders_cards_covers_and_fallbacks():
     thread.start()
     try:
         base = f'http://127.0.0.1:{server.server_port}'
-        plugins = [
+        plugins = plugins_override or [
             {'id': 'with-cover', 'name': 'With Cover', 'status': 'added', 'canOpen': True,
              'coverArt': {'state': 'ready', 'uri': base + '/ui/assets/blank-game-cover.png'}},
             {'id': 'no-cover', 'name': 'No Cover Game', 'status': 'warning', 'canOpen': False,
@@ -54,8 +54,10 @@ def test_menu_renders_cards_covers_and_fallbacks():
                 page.goto(base + '/ui/chooser.html')
                 page.evaluate("dispatchEvent(new Event('pywebviewready'))")
                 page.wait_for_selector('.game', timeout=8000)
-                page.wait_for_selector('#loading-screen', state='hidden', timeout=8000)
+                page.wait_for_selector('#loading-screen', state='hidden', timeout=loading_timeout)
                 assert not errors, errors
+                if plugins_override:
+                    return
                 assert page.locator('.game').count() == 2
                 assert page.locator('#modal').is_hidden()
                 # The ready cover paints real pixels.
@@ -77,3 +79,11 @@ def test_menu_renders_cards_covers_and_fallbacks():
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_menu_lifts_loading_screen_when_a_cover_never_settles():
+    """G2 root cause: one cover stuck "loading" held the black loading screen
+    forever. The menu must reveal after its cover-wait cap regardless."""
+    stuck = [{'id': 'stuck', 'name': 'Stuck Cover', 'status': 'added', 'canOpen': True,
+              'coverArt': {'state': 'loading', 'uri': '', 'error': ''}}]
+    test_menu_renders_cards_covers_and_fallbacks(plugins_override=stuck, loading_timeout=10000)

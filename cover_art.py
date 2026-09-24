@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import tempfile
 import threading
+import time
 import urllib.request
 from typing import Callable
 
@@ -20,6 +21,12 @@ ROOT = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parent / "ou
 MAX_COVER_BYTES = 5 * 1024 * 1024
 TRANSITION_COVER_SIZE = (320, 480)
 TRANSITION_JPEG_QUALITY = 72
+# urlopen's timeout bounds each socket operation, not the whole download, and
+# DNS lookup is not covered at all. A hung fetch left the cover "loading"
+# forever, and the chooser held its loading screen until every cover settled.
+# Past this deadline a pending cover reports missing; a late success still
+# replaces it.
+LOADING_DEADLINE_SECONDS = 25.0
 CoverFetcher = Callable[[str], bytes]
 
 
@@ -150,7 +157,8 @@ class CoverArtCache:
 
     def __init__(self, plugins: dict[str, GamePlugin], root: Path | None = None,
                  fetcher: CoverFetcher = _fetch, auto_download: bool = True,
-                 steam_roots: tuple[Path, ...] | None = None):
+                 steam_roots: tuple[Path, ...] | None = None,
+                 loading_deadline: float = LOADING_DEADLINE_SECONDS):
         self.root = Path(root or ROOT)
         self._plugins = plugins
         self._fetcher = fetcher
@@ -158,6 +166,8 @@ class CoverArtCache:
         self._states: dict[str, dict] = {}
         self._paths: dict[str, Path] = {}
         self._threads: list[threading.Thread] = []
+        self._deadlines: dict[str, float] = {}
+        self._loading_deadline = max(0.0, float(loading_deadline))
         local_roots = _steam_roots() if steam_roots is None else tuple(steam_roots)
         for plugin_id, plugin in plugins.items():
             if plugin.cover_art is not None:
@@ -184,16 +194,12 @@ class CoverArtCache:
                 self._states[plugin_id] = self._state(
                     "ready", target.as_uri(), _url(app_id), dimensions,
                 )
-            elif local_cover := _local_steam_cover(app_id, local_roots):
-                payload = local_cover.read_bytes()
-                dimensions = _validate(payload)
-                _save_payload(target, payload)
+            elif local_state := self._adopt_local(target, app_id, local_roots):
                 self._paths[plugin_id] = target
-                self._states[plugin_id] = self._state(
-                    "ready", target.as_uri(), local_cover.as_uri(), dimensions,
-                )
+                self._states[plugin_id] = local_state
             elif auto_download:
                 self._states[plugin_id] = self._state("loading", "", _url(app_id))
+                self._deadlines[plugin_id] = time.monotonic() + self._loading_deadline
                 thread = threading.Thread(
                     target=self._download,
                     args=(plugin_id, target, _url(app_id)),
@@ -204,6 +210,19 @@ class CoverArtCache:
                 thread.start()
             else:
                 self._states[plugin_id] = self._state("missing", "", _url(app_id))
+
+    def _adopt_local(self, target: Path, app_id: str, roots: tuple[Path, ...]) -> dict | None:
+        """Copy a valid Steam library capsule; a bad one falls through to download."""
+        try:
+            local_cover = _local_steam_cover(app_id, roots)
+            if local_cover is None:
+                return None
+            payload = local_cover.read_bytes()
+            dimensions = _validate(payload)
+            _save_payload(target, payload)
+        except (OSError, ValueError):
+            return None
+        return self._state("ready", target.as_uri(), local_cover.as_uri(), dimensions)
 
     @staticmethod
     def _state(state: str, uri: str, source: str,
@@ -229,10 +248,17 @@ class CoverArtCache:
             if state["state"] == "ready":
                 self._paths[plugin_id] = target
             self._states[plugin_id] = state
+            self._deadlines.pop(plugin_id, None)
 
     def snapshot(self, plugin_id: str) -> dict:
         with self._lock:
-            return dict(self._states.get(plugin_id, self._state("unavailable", "", "")))
+            state = self._states.get(plugin_id, self._state("unavailable", "", ""))
+            deadline = self._deadlines.get(plugin_id)
+            if state["state"] == "loading" and deadline is not None and time.monotonic() >= deadline:
+                state = self._state("missing", "", state["source"], error="Cover download timed out")
+                self._states[plugin_id] = state
+                self._deadlines.pop(plugin_id, None)
+            return dict(state)
 
     def data_uri(self, plugin_id: str) -> str:
         """Return one ready cached cover for a self-contained UI transition."""
