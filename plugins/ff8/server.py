@@ -10,7 +10,7 @@ from pathlib import Path
 import tempfile
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import card_art, cards, editor_settings, field_data, featured_mods, formats, gameplay_settings, paths, runtime_layout, world_geometry, world_map, world_textures
+from . import assets, card_art, cards, editor_settings, field_data, featured_mods, formats, gameplay_settings, paths, runtime_layout, world_geometry, world_map, world_textures
 from .game_icons import icon_path, portrait_path
 from .extractor import baseline_ready, manifest_path
 from .ffnx_manager import status as ffnx_status
@@ -160,6 +160,23 @@ class Handler(PluginRequestHandler):
                 self.binary_response(field_data.background_png(
                     query.get("map", [""])[0], query.get("dataset", ["current"])[0],
                     highlight_tile=None if selected is None else int(selected)), "image/png")
+            elif path.startswith("/assets/sfx/"):
+                sound_id = int(path.rsplit("/", 1)[-1])
+                dataset = query.get("dataset", ["current"])[0]
+                data, mime = assets.sfx_audio(sound_id, dataset)
+                self.binary_response(data, mime)
+            elif path == "/assets/texture.png":
+                self.binary_response(
+                    assets.texture_png_bytes(
+                        query.get("id", [""])[0],
+                        int(query.get("palette", ["0"])[0]),
+                        query.get("dataset", ["current"])[0]), "image/png")
+            elif path.startswith("/assets/models/"):
+                filename = path.rsplit("/", 1)[-1]
+                dataset = query.get("dataset", ["current"])[0]
+                self.binary_response(
+                    assets.model_dat_bytes(filename, dataset),
+                    "application/octet-stream", filename.casefold())
             elif path.startswith("/assets/theme-sfx/") and path.endswith(".wav"):
                 target = sound_file(paths.DATA_ROOT, Path(path).stem)
                 if target is None:
@@ -184,7 +201,8 @@ class Handler(PluginRequestHandler):
                     "projectRoot": str(paths.PROJECT_ROOT),
                     "editorRoot": str(PLUGIN_ROOT),
                     "capabilities": ["cards", "characters", "data-map", "encounters", "enemies", "gfs", "items",
-                                     "magic", "menu-items", "settings", "shops", "starting-data", "weapons",
+                                     "magic", "menu-items", "models", "settings", "sfx", "shops", "starting-data",
+                                     "textures", "weapons",
                                      "text", "world-map", "fields"],
                 })
             elif path == "/api/dashboard":
@@ -244,6 +262,12 @@ class Handler(PluginRequestHandler):
                     query.get("map", [""])[0], query.get("dataset", ["current"])[0]))
             elif path == "/api/init":
                 self.json_response(formats.init_rows(query.get("dataset", ["current"])[0]))
+            elif path == "/api/sfx":
+                self.json_response(assets.sfx_rows(query.get("dataset", ["current"])[0]))
+            elif path == "/api/models":
+                self.json_response(assets.model_rows(query.get("dataset", ["current"])[0]))
+            elif path == "/api/textures":
+                self.json_response(assets.texture_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/settings":
                 self.json_response(gameplay_settings.payload())
             elif path == "/api/editor-settings":
@@ -333,6 +357,10 @@ class Handler(PluginRequestHandler):
                     body.get("edits", [])))
             elif path == "/api/init/save":
                 self.json_response(formats.save_init(body.get("edits", [])))
+            elif path == "/api/sfx/save":
+                self.json_response(assets.save_sfx(body.get("edits", [])))
+            elif path == "/api/models/save":
+                self.json_response(assets.save_models(body.get("edits", [])))
             elif path == "/api/settings/save":
                 self.json_response(gameplay_settings.save(body))
             elif path == "/api/editor-settings/save":

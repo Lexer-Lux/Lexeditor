@@ -1105,7 +1105,7 @@ def data_map_rows() -> dict:
         {"filename": "init.out", "controls": "Starting party, inventory, GFs, junction and config", "notes": "Editable: named starting fields. Locked: unknown and runtime-only bytes.", "status": "integrated"},
         {"filename": "menu/mitem.bin", "controls": "Menu item types, use flags and parameters", "notes": "Editable: every meaningful field in each record.", "status": "integrated"},
         {"filename": "menu/mngrp.bin", "controls": "Tutorial text and all 377 refine/card-mod recipes", "notes": "Editable: proved text and recipe tables. Locked: scripts, text-box maps, images.", "status": "partial"},
-        {"filename": "battle/c0m*.dat", "controls": "Enemy stats, actions, battle AI and battle text", "notes": "Editable: proved AI scripts and dialogue lines. Locked: unknown or malformed tails.", "status": "partial"},
+        {"filename": "battle/c0m*.dat", "controls": "Enemy stats, actions, battle AI, battle text; battle model inventory and textures", "notes": "Editable: proved AI scripts, dialogue lines, whole-model replacement. Locked: unknown tails, undecoded battle files.", "status": "partial"},
         {"filename": "battle/scene.out", "controls": "Battle formations, stages, cameras, enemy slots and levels", "notes": "Editable: all supported record fields. Locked: unresolved special level bytes.", "status": "integrated"},
         {"filename": "world.fs / world/dat/wmx.obj + wmsetus.obj + rail.obj + texl.obj", "controls": "World map segments, encounters, draw points, sky colors, rails and textures", "notes": "Editable: proved map and texture fields. Locked: draw-point magic data (lives in the exe).", "status": "partial"},
         {"filename": "FF8_EN.exe", "controls": "Scan text, card names and properties, draw-point and card UI text", "notes": "Editable via FFNx overrides; the exe itself is never modified. Locked: other text and code.", "status": "partial"},
@@ -1115,6 +1115,8 @@ def data_map_rows() -> dict:
         {"filename": "ff8/en/exe/card_texts.msd", "controls": "All 29 card-menu messages", "notes": "Editable: all entries.", "status": "integrated"},
         {"filename": "hext/ff8/en_nv/Lexeditor.FLYING_EVA.txt", "controls": "Flying-enemy EVA bonus and exceptions", "notes": "Editable: all fields.", "status": "integrated"},
         {"filename": "FFNx.toml", "controls": "FFNx display, audio, rendering and runtime settings", "notes": "Editable: typed values in place. Comments and order preserved.", "status": "integrated" if (paths.GAME_ROOT / "FFNx.toml").is_file() else "partial"},
+        {"filename": "Data/Sound/audio.dat + audio.fmt", "controls": "All 2,791 sound effects: preview, battle usage, per-sound replacement", "notes": "Editable: replacement sounds (needs FFNx external SFX on). Locked: placeholder entries.", "status": "partial"},
+        {"filename": "textures/ (FFNx external texture overrides)", "controls": "World and battle-model texture previews with mod-file attribution", "notes": "Preview only; replace world textures in Maps > World and models in Models. Unmapped mod files stay listed.", "status": "partial"},
         {"filename": "field.fs", "controls": "Field maps: encounters, backgrounds, dialogue, scripts, walkmesh, exits, cameras, card players", "notes": "Editable: encounters, backgrounds, dialogue, scripts, walkmesh, gateways, INF header, cameras and movie frames. Locked: models and media.", "status": "partial"},
     ]
     targets = {
@@ -1122,7 +1124,7 @@ def data_map_rows() -> dict:
         "menu/price.bin": ["items"], "menu/shop.bin": ["shops"],
         "menu/mwepon.bin": ["weapons"], "init.out": ["starting"],
         "menu/mitem.bin": ["items"], "menu/mngrp.bin": ["text", "refine"],
-        "battle/c0m*.dat": ["enemies"], "battle/scene.out": ["encounters"],
+        "battle/c0m*.dat": ["enemies", "models"], "battle/scene.out": ["encounters"],
         "FF8_EN.exe": ["cards", "text", "enemies"],
         "ff8/en/exe/battle_scans.msd": ["enemies"],
         "ff8/en/exe/card_names.msd": ["text"],
@@ -1130,6 +1132,9 @@ def data_map_rows() -> dict:
         "ff8/en/exe/card_texts.msd": ["text"],
         "hext/ff8/en_nv/Lexeditor.FLYING_EVA.txt": ["settings"],
         "FFNx.toml": ["settings"], "field.fs": ["fields"],
+        "Data/Sound/audio.dat + audio.fmt": ["sfx"],
+        "textures/ (FFNx external texture overrides)": ["textures"],
+        "world.fs / world/dat/wmx.obj + wmsetus.obj + rail.obj + texl.obj": ["world", "textures"],
     }
     for row in rows:
         row["targets"] = targets.get(row["filename"], ["world"] if row["filename"].startswith("world.fs /") else [])

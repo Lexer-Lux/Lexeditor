@@ -1,0 +1,1000 @@
+{
+ "sounds": {
+  "151": [
+   "Zell - battle slot 0"
+  ],
+  "152": [
+   "Zell - battle slot 1"
+  ],
+  "153": [
+   "Zell - battle slot 2"
+  ],
+  "154": [
+   "Zell - battle slot 3"
+  ],
+  "155": [
+   "Rinoa - battle slot 0"
+  ],
+  "156": [
+   "Rinoa - battle slot 1"
+  ],
+  "157": [
+   "Rinoa - battle slot 2"
+  ],
+  "158": [
+   "Squall - battle slot 0"
+  ],
+  "159": [
+   "Squall - battle slot 1"
+  ],
+  "160": [
+   "Quistis - battle slot 0"
+  ],
+  "161": [
+   "Quistis - battle slot 1"
+  ],
+  "162": [
+   "Quistis - battle slot 2"
+  ],
+  "163": [
+   "Seifer - battle slot 0"
+  ],
+  "164": [
+   "Seifer - battle slot 1"
+  ],
+  "165": [
+   "Selphie - battle slot 0"
+  ],
+  "166": [
+   "Selphie - battle slot 1"
+  ],
+  "167": [
+   "Selphie - battle slot 2"
+  ],
+  "168": [
+   "Irvine - battle slot 0"
+  ],
+  "169": [
+   "Kiros - battle slot 0"
+  ],
+  "170": [
+   "Ward - battle slot 0"
+  ],
+  "171": [
+   "Ward - battle slot 1"
+  ],
+  "172": [
+   "Kiros - battle slot 1"
+  ],
+  "173": [
+   "Ward - battle slot 2"
+  ],
+  "174": [
+   "Laguna - battle slot 0"
+  ],
+  "175": [
+   "Laguna - battle slot 1"
+  ],
+  "176": [
+   "Edea - battle slot 0"
+  ],
+  "179": [
+   "Edea - battle slot 1"
+  ],
+  "181": [
+   "Buel - battle slot 0"
+  ],
+  "182": [
+   "Buel - battle slot 1"
+  ],
+  "183": [
+   "Elvoret - battle slot 0"
+  ],
+  "184": [
+   "Elvoret - battle slot 1"
+  ],
+  "185": [
+   "Mesmerize - battle slot 0"
+  ],
+  "186": [
+   "Mesmerize - battle slot 1"
+  ],
+  "187": [
+   "Anacondaur - battle slot 0"
+  ],
+  "188": [
+   "Anacondaur - battle slot 1"
+  ],
+  "189": [
+   "X-ATM092 - battle slot 0"
+  ],
+  "190": [
+   "X-ATM092 - battle slot 1"
+  ],
+  "191": [
+   "Geezard - battle slot 0"
+  ],
+  "192": [
+   "Geezard - battle slot 1"
+  ],
+  "193": [
+   "Snow Lion - battle slot 0"
+  ],
+  "194": [
+   "Snow Lion - battle slot 1"
+  ],
+  "195": [
+   "Grat - battle slot 0"
+  ],
+  "196": [
+   "Grat - battle slot 1"
+  ],
+  "197": [
+   "Cockatrice - battle slot 0"
+  ],
+  "198": [
+   "Cockatrice - battle slot 1"
+  ],
+  "199": [
+   "Red Bat - battle slot 0"
+  ],
+  "200": [
+   "Red Bat - battle slot 1"
+  ],
+  "201": [
+   "Hexadragon - battle slot 0"
+  ],
+  "202": [
+   "Hexadragon - battle slot 1"
+  ],
+  "203": [
+   "Fastitocalon - battle slot 0"
+  ],
+  "204": [
+   "Fastitocalon - battle slot 1"
+  ],
+  "205": [
+   "Gesper - battle slot 0"
+  ],
+  "206": [
+   "Gesper - battle slot 1"
+  ],
+  "207": [
+   "Glacial Eye - battle slot 0"
+  ],
+  "208": [
+   "Glacial Eye - battle slot 1"
+  ],
+  "209": [
+   "Creeps - battle slot 0"
+  ],
+  "210": [
+   "Creeps - battle slot 1"
+  ],
+  "211": [
+   "Thrustaevis - battle slot 0"
+  ],
+  "212": [
+   "Thrustaevis - battle slot 1"
+  ],
+  "213": [
+   "Belhelmel - battle slot 0"
+  ],
+  "214": [
+   "Belhelmel - battle slot 1"
+  ],
+  "215": [
+   "Caterchipillar - battle slot 0"
+  ],
+  "216": [
+   "Caterchipillar - battle slot 1"
+  ],
+  "217": [
+   "GIM52A - battle slot 0"
+  ],
+  "218": [
+   "GIM52A - battle slot 1"
+  ],
+  "219": [
+   "Elastoid - battle slot 0"
+  ],
+  "220": [
+   "Elastoid - battle slot 1"
+  ],
+  "221": [
+   "Wendigo - battle slot 0"
+  ],
+  "222": [
+   "Wendigo - battle slot 1"
+  ],
+  "223": [
+   "Death Claw - battle slot 0"
+  ],
+  "224": [
+   "Death Claw - battle slot 1"
+  ],
+  "225": [
+   "Armadodo - battle slot 0"
+  ],
+  "226": [
+   "Armadodo - battle slot 1"
+  ],
+  "227": [
+   "Blue Dragon - battle slot 0"
+  ],
+  "228": [
+   "Blue Dragon - battle slot 1"
+  ],
+  "229": [
+   "SAM08G - battle slot 0"
+  ],
+  "230": [
+   "SAM08G - battle slot 1"
+  ],
+  "231": [
+   "Fastitocalon-F - battle slot 0"
+  ],
+  "232": [
+   "Fastitocalon-F - battle slot 1"
+  ],
+  "233": [
+   "Gayla - battle slot 0"
+  ],
+  "234": [
+   "Gayla - battle slot 1"
+  ],
+  "235": [
+   "Abyss Worm - battle slot 0"
+  ],
+  "236": [
+   "Abyss Worm - battle slot 1"
+  ],
+  "237": [
+   "Ochu - battle slot 0"
+  ],
+  "238": [
+   "Ochu - battle slot 1"
+  ],
+  "239": [
+   "Iron Giant - battle slot 0"
+  ],
+  "240": [
+   "Iron Giant - battle slot 1"
+  ],
+  "241": [
+   "Ruby Dragon - battle slot 0"
+  ],
+  "242": [
+   "Ruby Dragon - battle slot 1"
+  ],
+  "243": [
+   "Tri-Point - battle slot 0"
+  ],
+  "244": [
+   "Tri-Point - battle slot 1"
+  ],
+  "245": [
+   "Grand Mantis - battle slot 0"
+  ],
+  "246": [
+   "Grand Mantis - battle slot 1"
+  ],
+  "247": [
+   "Jelleye - battle slot 0"
+  ],
+  "248": [
+   "Jelleye - battle slot 1"
+  ],
+  "249": [
+   "Bite Bug - battle slot 0"
+  ],
+  "250": [
+   "Bite Bug - battle slot 1"
+  ],
+  "251": [
+   "Blood Soul - battle slot 0"
+  ],
+  "252": [
+   "Blood Soul - battle slot 1"
+  ],
+  "253": [
+   "Sphinxaur - battle slot 0",
+   "Sphinxara - battle slot 0"
+  ],
+  "254": [
+   "Sphinxaur - battle slot 1",
+   "Sphinxara - battle slot 1"
+  ],
+  "255": [
+   "GIM47N - battle slot 0"
+  ],
+  "256": [
+   "GIM47N - battle slot 1"
+  ],
+  "257": [
+   "Propagator (Purple) - battle slot 0",
+   "Propagator (Green) - battle slot 0",
+   "Propagator (Yellow) - battle slot 0",
+   "Propagator (Red) - battle slot 0"
+  ],
+  "258": [
+   "Propagator (Purple) - battle slot 1",
+   "Propagator (Green) - battle slot 1",
+   "Propagator (Yellow) - battle slot 1",
+   "Propagator (Red) - battle slot 1"
+  ],
+  "259": [
+   "Oilboyle - battle slot 0"
+  ],
+  "260": [
+   "Oilboyle - battle slot 1"
+  ],
+  "261": [
+   "Iguion - battle slot 0"
+  ],
+  "262": [
+   "Iguion - battle slot 1"
+  ],
+  "263": [
+   "Forbidden - battle slot 0"
+  ],
+  "264": [
+   "Forbidden - battle slot 1"
+  ],
+  "265": [
+   "Lefty - battle slot 0",
+   "Righty - battle slot 0",
+   "Vysage - battle slot 0"
+  ],
+  "266": [
+   "Lefty - battle slot 1",
+   "Righty - battle slot 1",
+   "Vysage - battle slot 1"
+  ],
+  "267": [
+   "Blitz - battle slot 0"
+  ],
+  "268": [
+   "Blitz - battle slot 1"
+  ],
+  "269": [
+   "Tri-Face - battle slot 0"
+  ],
+  "270": [
+   "Tri-Face - battle slot 1"
+  ],
+  "271": [
+   "Bomb - battle slot 0"
+  ],
+  "272": [
+   "Bomb - battle slot 1"
+  ],
+  "273": [
+   "Krysta - battle slot 0"
+  ],
+  "274": [
+   "Krysta - battle slot 1"
+  ],
+  "275": [
+   "T-Rexaur - battle slot 0"
+  ],
+  "276": [
+   "T-Rexaur - battle slot 1"
+  ],
+  "277": [
+   "Ifrit - battle slot 0"
+  ],
+  "278": [
+   "Cactuar - battle slot 0"
+  ],
+  "279": [
+   "Cactuar - battle slot 1"
+  ],
+  "280": [
+   "Jumbo Cactuar - battle slot 0"
+  ],
+  "281": [
+   "Jumbo Cactuar - battle slot 1"
+  ],
+  "282": [
+   "Tonberry - battle slot 0"
+  ],
+  "283": [
+   "Tonberry - battle slot 1"
+  ],
+  "284": [
+   "Red Giant - battle slot 0"
+  ],
+  "285": [
+   "Red Giant - battle slot 1"
+  ],
+  "286": [
+   "Funguar - battle slot 0"
+  ],
+  "287": [
+   "Funguar - battle slot 1"
+  ],
+  "288": [
+   "Blobra - battle slot 0"
+  ],
+  "289": [
+   "Blobra - battle slot 1"
+  ],
+  "290": [
+   "Adamantoise - battle slot 0"
+  ],
+  "291": [
+   "Adamantoise - battle slot 1"
+  ],
+  "292": [
+   "Grendel - battle slot 0"
+  ],
+  "293": [
+   "Grendel - battle slot 1"
+  ],
+  "294": [
+   "BGH251F2 - battle slot 0",
+   "BGH251F2 (Damaged) - battle slot 0"
+  ],
+  "295": [
+   "BGH251F2 - battle slot 1",
+   "BGH251F2 (Damaged) - battle slot 1"
+  ],
+  "296": [
+   "Malboro - battle slot 0"
+  ],
+  "297": [
+   "Malboro - battle slot 1"
+  ],
+  "298": [
+   "Trauma - battle slot 0"
+  ],
+  "299": [
+   "Trauma - battle slot 1"
+  ],
+  "300": [
+   "Bahamut - battle slot 0"
+  ],
+  "301": [
+   "Bahamut - battle slot 1"
+  ],
+  "302": [
+   "Behemoth - battle slot 0"
+  ],
+  "303": [
+   "Behemoth - battle slot 1"
+  ],
+  "304": [
+   "Turtapod - battle slot 0"
+  ],
+  "305": [
+   "Turtapod - battle slot 1"
+  ],
+  "306": [
+   "Gerogero - battle slot 0"
+  ],
+  "307": [
+   "Gerogero - battle slot 1"
+  ],
+  "308": [
+   "Chimera - battle slot 0"
+  ],
+  "309": [
+   "Chimera - battle slot 1"
+  ],
+  "310": [
+   "Torama - battle slot 0"
+  ],
+  "311": [
+   "Torama - battle slot 1"
+  ],
+  "312": [
+   "Gargantua - battle slot 0"
+  ],
+  "313": [
+   "Gargantua - battle slot 1"
+  ],
+  "314": [
+   "Imp - battle slot 0"
+  ],
+  "315": [
+   "Imp - battle slot 1"
+  ],
+  "316": [
+   "Granaldo - battle slot 0"
+  ],
+  "317": [
+   "Granaldo - battle slot 1"
+  ],
+  "318": [
+   "Raldo - battle slot 0"
+  ],
+  "319": [
+   "Raldo - battle slot 1"
+  ],
+  "320": [
+   "Abadon - battle slot 0"
+  ],
+  "321": [
+   "Abadon - battle slot 1"
+  ],
+  "322": [
+   "Mobile Type 8 - battle slot 0"
+  ],
+  "323": [
+   "Mobile Type 8 - battle slot 1"
+  ],
+  "324": [
+   "Tonberry King - battle slot 0"
+  ],
+  "325": [
+   "Tonberry King - battle slot 1"
+  ],
+  "326": [
+   "Droma - battle slot 0"
+  ],
+  "327": [
+   "Droma - battle slot 1"
+  ],
+  "328": [
+   "Tiamat - battle slot 0"
+  ],
+  "329": [
+   "Tiamat - battle slot 1"
+  ],
+  "330": [
+   "Catoblepas - battle slot 0"
+  ],
+  "331": [
+   "Catoblepas - battle slot 1"
+  ],
+  "332": [
+   "Cerberus - battle slot 0"
+  ],
+  "334": [
+   "Gunblade (Seifer's Hyperion battle prop) - battle slot 0",
+   "Seifer 1st encounter - battle slot 0",
+   "Gunblade (battle prop) - battle slot 0"
+  ],
+  "335": [
+   "Minotaur - battle slot 0"
+  ],
+  "336": [
+   "Sacred - battle slot 0"
+  ],
+  "337": [
+   "Elnoyle - battle slot 0"
+  ],
+  "338": [
+   "Elnoyle - battle slot 1"
+  ],
+  "339": [
+   "Esthar Soldier (Terminator) - battle slot 0"
+  ],
+  "340": [
+   "Esthar Soldier (Terminator) - battle slot 1"
+  ],
+  "341": [
+   "NORG - battle slot 0"
+  ],
+  "342": [
+   "NORG - battle slot 1"
+  ],
+  "343": [
+   "Diablos - battle slot 0"
+  ],
+  "344": [
+   "Odin - battle slot 0"
+  ],
+  "345": [
+   "Fake President - battle slot 0"
+  ],
+  "346": [
+   "Edea 1st encounter - battle slot 0",
+   "Edea 2nd encounter - battle slot 0"
+  ],
+  "347": [
+   "\u201cSorceress\u201d (Wormlike) - battle slot 0"
+  ],
+  "348": [
+   "\u201cSorceress\u201d (1st) - battle slot 0"
+  ],
+  "349": [
+   "\u201cSorceress\u201d (1st) - battle slot 1"
+  ],
+  "350": [
+   "\u201cSorceress\u201d (2nd) - battle slot 0"
+  ],
+  "351": [
+   "\u201cSorceress\u201d (2nd) - battle slot 1"
+  ],
+  "352": [
+   "Ultima Weapon - battle slot 0"
+  ],
+  "353": [
+   "Omega Weapon - battle slot 0"
+  ],
+  "354": [
+   "Adel - battle slot 0"
+  ],
+  "355": [
+   "Granaldo - battle slot 2"
+  ],
+  "356": [
+   "Gayla - battle slot 2"
+  ],
+  "357": [
+   "Ultimecia (1st phase) - battle slot 0"
+  ],
+  "358": [
+   "PuPu - battle slot 0"
+  ],
+  "359": [
+   "UFO? (Breakable) - battle slot 0"
+  ],
+  "360": [
+   "PuPu - battle slot 1"
+  ],
+  "361": [
+   "PuPu - battle slot 2"
+  ],
+  "362": [
+   "Ultimecia+Griever - battle slot 0"
+  ],
+  "363": [
+   "Ultimecia+Griever - battle slot 1"
+  ],
+  "364": [
+   "UFO? (Moai) - battle slot 0",
+   "UFO? (Cow) - battle slot 0",
+   "UFO? (Lines) - battle slot 0",
+   "UFO? (Pyramid) - battle slot 0"
+  ],
+  "365": [
+   "Minotaur - battle slot 1"
+  ],
+  "366": [
+   "Sacred - battle slot 1"
+  ],
+  "367": [
+   "Ultimecia (Final) - battle slot 0"
+  ],
+  "1230": [
+   "Blitz - battle slot 2",
+   "Forbidden - battle slot 2",
+   "G-Soldier - battle slot 0",
+   "Wedge 1st encounter - battle slot 0",
+   "Guard - battle slot 0",
+   "Esthar Soldier - battle slot 0",
+   "Esthar Soldier (Terminator) - battle slot 2",
+   "Propagator (Purple) - battle slot 2",
+   "Propagator (Green) - battle slot 2",
+   "Propagator (Yellow) - battle slot 2",
+   "Paratrooper - battle slot 0",
+   "Propagator (Red) - battle slot 2",
+   "Fujin - battle slot 0",
+   "Wedge 2nd encounter - battle slot 0",
+   "Fujin - battle slot 0",
+   "Base Soldier - battle slot 0"
+  ],
+  "1233": [
+   "Anacondaur - battle slot 2"
+  ],
+  "1245": [
+   "X-ATM092 - battle slot 2"
+  ],
+  "1250": [
+   "Mesmerize - battle slot 2"
+  ],
+  "1255": [
+   "Base Leader - battle slot 0",
+   "Elite Soldier - battle slot 0",
+   "Biggs 1st encounter - battle slot 0",
+   "Propagator (Purple) - battle slot 3",
+   "Propagator (Green) - battle slot 3",
+   "Propagator (Yellow) - battle slot 3",
+   "Propagator (Red) - battle slot 3",
+   "Biggs 2nd encounter - battle slot 0"
+  ],
+  "1257": [
+   "Buel - battle slot 2"
+  ],
+  "1259": [
+   "Mesmerize - battle slot 3"
+  ],
+  "1261": [
+   "Wendigo - battle slot 2",
+   "Base Leader - battle slot 1",
+   "Elite Soldier - battle slot 1",
+   "Biggs 1st encounter - battle slot 1",
+   "Propagator (Purple) - battle slot 4",
+   "Propagator (Green) - battle slot 4",
+   "Propagator (Yellow) - battle slot 4",
+   "Propagator (Red) - battle slot 4",
+   "Biggs 2nd encounter - battle slot 1"
+  ],
+  "1277": [
+   "Mesmerize - battle slot 4"
+  ],
+  "1285": [
+   "Glacial Eye - battle slot 2"
+  ],
+  "1294": [
+   "Hexadragon - battle slot 2"
+  ],
+  "1303": [
+   "Tri-Face - battle slot 2",
+   "Adamantoise - battle slot 2"
+  ],
+  "1309": [
+   "Snow Lion - battle slot 2"
+  ],
+  "1311": [
+   "Creeps - battle slot 2",
+   "Hexadragon - battle slot 3",
+   "Adamantoise - battle slot 3"
+  ],
+  "1325": [
+   "Gesper - battle slot 2"
+  ],
+  "1328": [
+   "Cockatrice - battle slot 2"
+  ],
+  "1346": [
+   "Thrustaevis - battle slot 2",
+   "Geezard - battle slot 2",
+   "Belhelmel - battle slot 2",
+   "Caterchipillar - battle slot 2",
+   "Red Bat - battle slot 2",
+   "Fastitocalon - battle slot 2",
+   "Fastitocalon-F - battle slot 2",
+   "Blood Soul - battle slot 2",
+   "Bite Bug - battle slot 2",
+   "Jelleye - battle slot 2",
+   "Chimera - battle slot 2",
+   "Torama - battle slot 2",
+   "Fake President - battle slot 1"
+  ],
+  "1348": [
+   "Glacial Eye - battle slot 3",
+   "Bite Bug - battle slot 3",
+   "Forbidden - battle slot 3",
+   "Elvoret - battle slot 2",
+   "Abadon - battle slot 2"
+  ],
+  "1350": [
+   "Belhelmel - battle slot 3"
+  ],
+  "1356": [
+   "Geezard - battle slot 3",
+   "SAM08G - battle slot 2",
+   "Armadodo - battle slot 2",
+   "Tri-Point - battle slot 2",
+   "Ruby Dragon - battle slot 2",
+   "Grendel - battle slot 2",
+   "Imp - battle slot 2",
+   "Elvoret - battle slot 3",
+   "Iguion - battle slot 2",
+   "Granaldo - battle slot 3",
+   "Raldo - battle slot 2"
+  ],
+  "1366": [
+   "T-Rexaur - battle slot 2"
+  ],
+  "1367": [
+   "T-Rexaur - battle slot 3"
+  ],
+  "1370": [
+   "T-Rexaur - battle slot 4"
+  ],
+  "1376": [
+   "Red Bat - battle slot 3"
+  ],
+  "1381": [
+   "X-ATM092 - battle slot 3"
+  ],
+  "1384": [
+   "Vysage - battle slot 2"
+  ],
+  "1385": [
+   "Ifrit - battle slot 1"
+  ],
+  "1393": [
+   "Grendel - battle slot 3"
+  ],
+  "1394": [
+   "Blue Dragon - battle slot 2"
+  ],
+  "1395": [
+   "Blobra - battle slot 2"
+  ],
+  "1401": [
+   "Armadodo - battle slot 3",
+   "Wendigo - battle slot 3"
+  ],
+  "1407": [
+   "Wendigo - battle slot 4"
+  ],
+  "1409": [
+   "Righty - battle slot 2"
+  ],
+  "1411": [
+   "Righty - battle slot 3"
+  ],
+  "1423": [
+   "Grat - battle slot 2"
+  ],
+  "1425": [
+   "Fastitocalon-F - battle slot 3"
+  ],
+  "1453": [
+   "Snow Lion - battle slot 3"
+  ],
+  "1476": [
+   "Hexadragon - battle slot 4"
+  ],
+  "1500": [
+   "Adamantoise - battle slot 4"
+  ],
+  "1532": [
+   "Iron Giant - battle slot 2",
+   "Minotaur - battle slot 2",
+   "Red Giant - battle slot 2"
+  ],
+  "1559": [
+   "Death Claw - battle slot 2"
+  ],
+  "1561": [
+   "Death Claw - battle slot 3"
+  ],
+  "1572": [
+   "Cerberus - battle slot 1"
+  ],
+  "1679": [
+   "Behemoth - battle slot 2",
+   "Catoblepas - battle slot 2"
+  ],
+  "1682": [
+   "Behemoth - battle slot 3",
+   "Ruby Dragon - battle slot 3",
+   "Diablos - battle slot 1",
+   "Bahamut - battle slot 2",
+   "Tiamat - battle slot 2",
+   "Catoblepas - battle slot 3"
+  ],
+  "1684": [
+   "Minotaur - battle slot 3",
+   "Sacred - battle slot 2"
+  ],
+  "1686": [
+   "NORG Pod - battle slot 0"
+  ],
+  "1689": [
+   "Gargantua - battle slot 2"
+  ],
+  "1691": [
+   "GIM52A - battle slot 2",
+   "Propagator (Purple) - battle slot 5",
+   "Propagator (Green) - battle slot 5",
+   "Propagator (Yellow) - battle slot 5",
+   "Abadon - battle slot 3",
+   "Propagator (Red) - battle slot 5",
+   "Ultimecia (1st phase) - battle slot 1",
+   "Elnoyle - battle slot 2"
+  ],
+  "1693": [
+   "Propagator (Purple) - battle slot 6",
+   "Propagator (Green) - battle slot 6",
+   "Propagator (Yellow) - battle slot 6",
+   "Propagator (Red) - battle slot 6"
+  ],
+  "1697": [
+   "Fujin - battle slot 1",
+   "Fujin - battle slot 1"
+  ],
+  "1699": [
+   "Iron Giant - battle slot 3",
+   "Red Giant - battle slot 3"
+  ],
+  "1701": [
+   "Grendel - battle slot 4",
+   "Red Giant - battle slot 4"
+  ],
+  "1703": [
+   "Bahamut - battle slot 3",
+   "Tiamat - battle slot 3"
+  ],
+  "1706": [
+   "Granaldo - battle slot 4"
+  ],
+  "1708": [
+   "Granaldo - battle slot 5"
+  ],
+  "1710": [
+   "Jumbo Cactuar - battle slot 2"
+  ],
+  "1713": [
+   "Tonberry - battle slot 2",
+   "Tonberry King - battle slot 2"
+  ],
+  "1714": [
+   "Tonberry King - battle slot 3"
+  ],
+  "1723": [
+   "Esthar Soldier (Terminator) - battle slot 3"
+  ],
+  "1783": [
+   "Edea - battle slot 2",
+   "Edea 1st encounter - battle slot 1",
+   "Edea 1st encounter - battle slot 2"
+  ],
+  "1786": [
+   "Tonberry - battle slot 3"
+  ],
+  "1789": [
+   "Raijin - battle slot 0",
+   "Raijin - battle slot 0"
+  ],
+  "1792": [
+   "Left Probe - battle slot 0",
+   "Right Probe - battle slot 0",
+   "Elnoyle - battle slot 3"
+  ],
+  "1794": [
+   "Mobile Type 8 - battle slot 2"
+  ],
+  "1796": [
+   "Right Orb - battle slot 0",
+   "Left Orb - battle slot 0"
+  ],
+  "1799": [
+   "Fastitocalon - battle slot 3"
+  ],
+  "1844": [
+   "Krysta - battle slot 2"
+  ],
+  "1850": [
+   "Krysta - battle slot 3"
+  ],
+  "1894": [
+   "\u201cSorceress\u201d (1st) - battle slot 2",
+   "\u201cSorceress\u201d (2nd) - battle slot 2"
+  ],
+  "1897": [
+   "Omega Weapon - battle slot 1"
+  ],
+  "1900": [
+   "Ultima Weapon - battle slot 1"
+  ],
+  "1914": [
+   "\u201cSorceress\u201d (Wormlike) - battle slot 1"
+  ],
+  "1957": [
+   "Mobile Type 8 - battle slot 3"
+  ],
+  "1959": [
+   "Mobile Type 8 - battle slot 4"
+  ],
+  "1964": [
+   "Oilboyle - battle slot 2"
+  ],
+  "1967": [
+   "Red Giant - battle slot 5"
+  ],
+  "2011": [
+   "Abyss Worm - battle slot 2"
+  ],
+  "2036": [
+   "Helix - battle slot 0"
+  ],
+  "2038": [
+   "{Griever} - battle slot 0"
+  ],
+  "2041": [
+   "Ultimecia+Griever - battle slot 2"
+  ],
+  "2044": [
+   "Ultimecia (Final) - battle slot 1"
+  ]
+ }
+}
