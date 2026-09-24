@@ -13,7 +13,13 @@ def choices(*pairs):
 
 
 def flags(*pairs):
-    return [{"value": value, "label": label} for value, label in pairs]
+    rows = []
+    for pair in pairs:
+        row = {"value": pair[0], "label": pair[1]}
+        if len(pair) > 2 and pair[2]:
+            row["help"] = pair[2]
+        rows.append(row)
+    return rows
 
 
 STATUSES = (
@@ -40,7 +46,7 @@ ELEMENTS = (
 TARGET_FLAGS = (
     (0x01, "Choose target"), (0x02, "Start cursor on enemies"),
     (0x04, "Start with multiple targets"), (0x08, "Allow single/all toggle"),
-    (0x10, "Lock to one side"), (0x20, "Short range"),
+    (0x10, "Lock to one side", "Stays on one side of the battle: the cursor cannot move between your party and the enemies, so the attack can never cross sides."), (0x20, "Short range"),
     (0x40, "Target all rows"), (0x80, "Random target"),
 )
 EQUIPABLE = (
