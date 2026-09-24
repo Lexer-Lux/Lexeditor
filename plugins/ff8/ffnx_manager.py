@@ -108,6 +108,37 @@ def _save_state(state: dict, path: Path = STATE_PATH) -> None:
     temporary.replace(path)
 
 
+# Every install that replaces files used to leave a timestamped backup
+# (about 38 MB for the driver) and none was ever removed: one FF8 player had
+# forty of them. Restores within an install use in-memory copies, so a backup
+# folder only matters for manual recovery. The oldest holds the files as they
+# were before Lexeditor touched the game; the newest holds the last
+# replaced version. Those two, plus whatever the state file points at, stay.
+_BACKUP_STAMP = re.compile(r"\d{8}-\d{6}(?:-\d{6})?")
+BACKUPS_KEPT_RECENT = 1
+
+
+def prune_backups(backup_root: Path, keep: Path | str | None = None,
+                  keep_recent: int = BACKUPS_KEPT_RECENT) -> list[Path]:
+    """Remove all but the oldest and newest timestamped backups."""
+    root = Path(backup_root)
+    if not root.is_dir():
+        return []
+    stamped = sorted(child for child in root.iterdir()
+                     if child.is_dir() and _BACKUP_STAMP.fullmatch(child.name))
+    protected = set(stamped[:1]) | set(stamped[-keep_recent:] if keep_recent > 0 else [])
+    if keep:
+        protected.add(Path(keep))
+    removed = []
+    for folder in stamped:
+        if folder in protected or any(folder.resolve() == Path(k).resolve() for k in protected):
+            continue
+        shutil.rmtree(folder, ignore_errors=True)
+        if not folder.exists():
+            removed.append(folder)
+    return removed
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -565,6 +596,7 @@ def _install(archive_path: Path, release: dict, game_root: Path, direct_root: Pa
         "hextRoot": str((direct_root.parent / "hext").resolve()),
     }
     _save_state(state, state_path)
+    prune_backups(backup_root, state["backup"] or None)
     return state
 
 
@@ -742,6 +774,7 @@ def install_derivative(game_root: Path, *, state_path: Path = STATE_PATH,
         if not verified["sharedMagicInventoryRuntime"]:
             raise RuntimeError("The installed Lexeditor FFNx derivative did not verify")
         clear_runtime_failure(state_path)
+        prune_backups(backup_root, state["backup"] or None)
         return verified
     except Exception as error:
         temporary.unlink(missing_ok=True)
