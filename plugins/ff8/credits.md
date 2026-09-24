@@ -1,7 +1,72 @@
-                    GNU GENERAL PUBLIC LICENSE
+# Final Fantasy VIII third-party credits
+
+Lexeditor's Final Fantasy VIII plugin stands on years of community reverse-engineering. Everything below informed the implementation; the Thanks list additionally preserves the contributor chains passed down by FF8 Ultimate Editor and FFNx.
+
+## Attributions
+
+- **Final Fantasy Inside contributors** — CARDGAME opcode research: deck, carried rules, region rules, rare-card probability, and three arguments whose effects remain unknown. <https://wiki.ffrtt.ru/index.php/FF8/Field/Script/Opcodes/13A_CARDGAME>
+- **HobbitDur** — FF8 Ultimate Editor and FF8GameData: LZS code, format schemas, Ifrit AI instruction-row design and ai_cronos target/condition reference, and Cid packed world Draw Point coordinate conversion. <https://github.com/HobbitDur/FF8UltimateEditor>
+- **HobbitDur and the FF8 modding wiki contributors** — wmset Section 34 reference: the sub-ID location discriminator, the five record-range blocks, and how the game resolves a standing position to a draw-point record. Also the audio.dat/audio.fmt layout, battle actor sound table, battle .dat section inventory, model geometry counts, and TIM texture format behind the SFX, Models, and Textures tabs. <https://github.com/hobbitdur/ff8moddingwiki/blob/HEAD/FF8/TechnicalReference/WorldMap/WorldMap_wmsetxx.md>
+- **Julian Xhokaxhiu (TrueOdin), Tang-Tang Zhou (vertex2995), Jérôme Arzel (myst6re), CosmosXIII and FFNx contributors** — FFNx runtime, game hooks and reverse-engineering references, including the embedded Triple Triad card and icon TIM locations, the external SFX file naming in src/sfx.cpp, and the external texture base paths in src/ff8/vram.cpp. <https://github.com/julianxhokaxhiu/FFNx>
+- **Robin Engström and ff8-decomp contributors** — FF8 decompilation used to check game behavior and ability categories. <https://github.com/roengstrom/ff8-decomp>
+- **Jérôme Arzel (myst6re) and Deling contributors** — Deling field archives, background rendering, dialogue, scripts, walkmesh, camera setups, movie camera, INF header and camera ranges, encounters and world-map format references; walkmesh-over-background projection from src/3d/WalkmeshGLWidget.cpp; special-text toolbar design and control-byte reference from src/FF8Text.cpp; Japanese glyph mapping from src/qt/fonts/sysfnt_jp.txt (GPL v3 or later). <https://github.com/myst6re/deling>
+- **MaKiPL (Maki), Sebanisu and the OpenVIII team** — OpenVIII text encoding, field formats, world-map records, rail data and texture format references. <https://github.com/MaKiPL/OpenVIII>
+- **Aali132, quantumpencil, Maxime Bacoux, myst6re, Chris Rizzitello, John Pritchard and Julian Xhokaxhiu** — Authors credited in FFNx exe_data.cpp, used for executable text and card-name overrides. <https://github.com/julianxhokaxhiu/FFNx/blob/master/src/exe_data.cpp>
+
+## Thanks
+
+- **Nihil** — FF8 Ultimate Editor: beta testing, unknown values and Jumbo Cactuar. <https://github.com/HobbitDur/FF8UltimateEditor/blob/master/Ifrit/IfritAI/ifritaiwidget.py>
+- **myst6re** — FF8 Ultimate Editor: reverse engineering; Deling, Hyne and VincentTim. Also acknowledged by FFNx. <https://github.com/HobbitDur/FF8UltimateEditor/blob/master/ToolUpdate/list.json>
+- **Riccardo** — Shumi Translator beta testing. <https://github.com/HobbitDur/FF8UltimateEditor/blob/master/ShumiTranslator/shumitranslator.py>
+- **Qhimm** — FF8SND / ff8-sound-remixed sound decoding reference used by Julia. <https://github.com/HobbitDur/FF8UltimateEditor/blob/master/Julia/juliamanager.py>
+- **Mcindus** — Tripod card art acknowledged by CCGroup. <https://github.com/HobbitDur/FF8UltimateEditor/blob/master/CCGroup/ccgroup.py>
+- **ducladoncladon** — Xylomod card art acknowledged by CCGroup. <https://github.com/HobbitDur/FF8UltimateEditor/blob/master/CCGroup/ccgroup.py>
+- **JumboCactuar** — External tool referenced by FF8 Ultimate Editor. <https://github.com/Nihil-1/JumboCactuar>
+- **Junkshop** — External tool referenced by FF8 Ultimate Editor. <https://github.com/HobbitDur/junkshop-enhanced>
+- **Quezacotl** — External tool referenced by FF8 Ultimate Editor. <https://github.com/HobbitDur/quezacotl-enhanced>
+- **Siren** — External tool referenced by FF8 Ultimate Editor. <https://github.com/HobbitDur/Siren-enhanced>
+- **DarkShinryu and Doomtrain contributors** — External tool referenced by FF8 Ultimate Editor. <https://github.com/DarkShinryu/doomtrain>
+- **IfritGui** — External tool referenced by FF8 Ultimate Editor. <https://github.com/HobbitDur/IfritGui>
+- **Hyne** — External tool referenced by FF8 Ultimate Editor. <https://github.com/myst6re/hyne>
+- **DelingCli** — External tool referenced by FF8 Ultimate Editor. <https://github.com/myst6re/deling>
+- **Deling** — External tool referenced by FF8 Ultimate Editor. <https://github.com/myst6re/deling>
+- **VincentTim** — External tool referenced by FF8 Ultimate Editor. <https://github.com/myst6re/vincent-tim>
+- **Aali** — Acknowledged by FFNx, whose runtime and source this plugin uses. <http://forums.qhimm.com/index.php?action=profile;u=2862>
+- **Chrysalis** — Acknowledged by FFNx, whose runtime and source this plugin uses. <http://forums.qhimm.com/index.php?action=profile;u=674>
+- **CosmosXIII** — Acknowledged by FFNx, whose runtime and source this plugin uses. <https://github.com/CosmosXIII>
+- **DLPB** — Acknowledged by FFNx, whose runtime and source this plugin uses. <https://forums.qhimm.com/index.php?action=profile;u=6439>
+- **dziugo** — Acknowledged by FFNx, whose runtime and source this plugin uses. <http://forums.qhimm.com/index.php?action=profile;u=1660>
+- **ficedula** — Acknowledged by FFNx, whose runtime and source this plugin uses. <http://forums.qhimm.com/index.php?action=profile;u=68>
+- **Iros** — Acknowledged by FFNx, whose runtime and source this plugin uses. <https://forums.qhimm.com/index.php?action=profile;u=21785>
+- **JWP** — Acknowledged by FFNx, whose runtime and source this plugin uses. <http://forums.qhimm.com/index.php?action=profile;u=3772>
+- **Kranmer** — Acknowledged by FFNx, whose runtime and source this plugin uses. <http://forums.qhimm.com/index.php?action=profile;u=4909>
+- **Maki** — Acknowledged by FFNx, whose runtime and source this plugin uses. <http://forums.qhimm.com/index.php?action=profile;u=23937>
+- **quantumpencil** — Acknowledged by FFNx, whose runtime and source this plugin uses. <http://forums.qhimm.com/index.php?action=profile;u=23810>
+- **Nax** — Acknowledged by FFNx, whose runtime and source this plugin uses. <https://github.com/nax>
+- **Satsuki** — Acknowledged by FFNx, whose runtime and source this plugin uses. <http://forums.qhimm.com/index.php?action=profile;u=24647>
+- **Sebanisu** — Acknowledged by FFNx, whose runtime and source this plugin uses. <http://forums.qhimm.com/index.php?action=profile;u=22866>
+- **sithlord48** — Acknowledged by FFNx, whose runtime and source this plugin uses. <http://forums.qhimm.com/index.php?action=profile;u=6501>
+- **TurBoss** — Acknowledged by FFNx, whose runtime and source this plugin uses. <https://github.com/TurBoss>
+- **unab0mb** — Acknowledged by FFNx, whose runtime and source this plugin uses. <https://forums.qhimm.com/index.php?action=profile;u=31071>
+- **tangtang95** — Acknowledged by FFNx, whose runtime and source this plugin uses. <https://github.com/tangtang95>
+- **Lord UrQuan** — Acknowledged by FFNx, whose runtime and source this plugin uses. <https://github.com/eve-atum>
+- **LaZar00** — Acknowledged by FFNx, whose runtime and source this plugin uses. <https://github.com/LaZar00>
+- **ChthonVII** — Acknowledged by FFNx, whose runtime and source this plugin uses. <https://github.com/ChthonVII>
+
+## License notices
+
+### FFNx, FF8 Ultimate Editor, and Deling — GNU General Public License v3.0
+
+- **FFNx contributors** — runtime, game hooks, and reverse-engineering references. <https://github.com/julianxhokaxhiu/FFNx>
+- **HobbitDur / FF8UltimateEditor** — editor, format, and AI references. <https://github.com/HobbitDur/FF8UltimateEditor>
+- **Jérôme Arzel (myst6re) / Deling** — field, dialogue, script, walkmesh, encounter, world-map, and font references. <https://github.com/myst6re/deling>
+
+The full license text follows. (Deling's upstream copy of this text uses `http://` FSF URLs where this copy uses `https://`; the terms are identical.)
+
+GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 
- Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>
+ Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
  Everyone is permitted to copy and distribute verbatim copies
  of this license document, but changing it is not allowed.
 
@@ -645,7 +710,7 @@ the "copyright" line and a pointer to where the full notice is found.
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 Also add information on how to contact you by electronic and paper mail.
 
@@ -664,11 +729,39 @@ might be different; for a GUI interface, you would use an "about box".
   You should also get your employer (if you work as a programmer) or school,
 if any, to sign a "copyright disclaimer" for the program, if necessary.
 For more information on this, and how to apply and follow the GNU GPL, see
-<http://www.gnu.org/licenses/>.
+<https://www.gnu.org/licenses/>.
 
   The GNU General Public License does not permit incorporating your program
 into proprietary programs.  If your program is a subroutine library, you
 may consider it more useful to permit linking proprietary applications with
 the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
-<http://www.gnu.org/philosophy/why-not-lgpl.html>.
+<https://www.gnu.org/licenses/why-not-lgpl.html>.
+
+### OpenVIII — MIT License
+
+MIT License
+
+Copyright (c) 2019 OpenVIII team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+### Packaged FFNx derivative (issue 51)
+
+The verified runtime package under `ffnx_issue_51/package/` carries its own `COPYING.TXT` (the same GPL-3.0 text as above). That copy is pinned by hash in `ffnx_issue_51/package/runtime-manifest.json` and required by package verification, so it stays with the shippable package.

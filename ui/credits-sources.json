@@ -160,7 +160,7 @@
       "licenses": [
         {
           "name": "FF7 format/runtime reference notices",
-          "sourcePath": "plugins/ff7/THIRD_PARTY.md"
+          "sourcePath": "plugins/ff7/credits.md"
         }
       ]
     },
@@ -214,15 +214,7 @@
       "licenses": [
         {
           "name": "FF7R references and tools — source/license notices",
-          "sourcePath": "plugins/ff7r/THIRD_PARTY.md"
-        },
-        {
-          "name": "repak — MIT License",
-          "sourcePath": "plugins/ff7r/runtime/repak/v0.2.3/LICENSE-MIT"
-        },
-        {
-          "name": "repak — Apache License 2.0",
-          "sourcePath": "plugins/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE"
+          "sourcePath": "plugins/ff7r/credits.md"
         }
       ]
     },
@@ -292,14 +284,247 @@
       "thanks": [],
       "licenses": [
         {
-          "name": "Shader Injector — MIT License",
-          "sourcePath": "plugins/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt"
+          "name": "Rebirth credits and Shader Injector — MIT License",
+          "sourcePath": "plugins/ff7r2/credits.md"
         }
       ]
     },
     "ff8": {
-      "source": "plugins/ff8/credits.json",
-      "licenseRoot": "plugins/ff8"
+      "contributions": [
+        {
+          "name": "Final Fantasy Inside contributors",
+          "role": "CARDGAME opcode research: deck, carried rules, region rules, rare-card probability, and three arguments whose effects remain unknown.",
+          "url": "https://wiki.ffrtt.ru/index.php/FF8/Field/Script/Opcodes/13A_CARDGAME"
+        },
+        {
+          "name": "HobbitDur",
+          "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas, Ifrit AI instruction-row design and ai_cronos target/condition reference, and Cid packed world Draw Point coordinate conversion.",
+          "url": "https://github.com/HobbitDur/FF8UltimateEditor"
+        },
+        {
+          "name": "HobbitDur and the FF8 modding wiki contributors",
+          "role": "wmset Section 34 reference: the sub-ID location discriminator, the five record-range blocks, and how the game resolves a standing position to a draw-point record. Also the audio.dat/audio.fmt layout, battle actor sound table, battle .dat section inventory, model geometry counts, and TIM texture format behind the SFX, Models, and Textures tabs.",
+          "url": "https://github.com/hobbitdur/ff8moddingwiki/blob/HEAD/FF8/TechnicalReference/WorldMap/WorldMap_wmsetxx.md"
+        },
+        {
+          "name": "Julian Xhokaxhiu (TrueOdin), Tang-Tang Zhou (vertex2995), Jérôme Arzel (myst6re), CosmosXIII and FFNx contributors",
+          "role": "FFNx runtime, game hooks and reverse-engineering references, including the embedded Triple Triad card and icon TIM locations, the external SFX file naming in src/sfx.cpp, and the external texture base paths in src/ff8/vram.cpp.",
+          "url": "https://github.com/julianxhokaxhiu/FFNx"
+        },
+        {
+          "name": "Robin Engström and ff8-decomp contributors",
+          "role": "FF8 decompilation used to check game behavior and ability categories.",
+          "url": "https://github.com/roengstrom/ff8-decomp"
+        },
+        {
+          "name": "Jérôme Arzel (myst6re) and Deling contributors",
+          "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, camera setups, movie camera, INF header and camera ranges, encounters and world-map format references; walkmesh-over-background projection from src/3d/WalkmeshGLWidget.cpp; special-text toolbar design and control-byte reference from src/FF8Text.cpp; Japanese glyph mapping from src/qt/fonts/sysfnt_jp.txt (GPL v3 or later).",
+          "url": "https://github.com/myst6re/deling"
+        },
+        {
+          "name": "MaKiPL (Maki), Sebanisu and the OpenVIII team",
+          "role": "OpenVIII text encoding, field formats, world-map records, rail data and texture format references.",
+          "url": "https://github.com/MaKiPL/OpenVIII"
+        },
+        {
+          "name": "Aali132, quantumpencil, Maxime Bacoux, myst6re, Chris Rizzitello, John Pritchard and Julian Xhokaxhiu",
+          "role": "Authors credited in FFNx exe_data.cpp, used for executable text and card-name overrides.",
+          "url": "https://github.com/julianxhokaxhiu/FFNx/blob/master/src/exe_data.cpp"
+        }
+      ],
+      "thanks": [
+        {
+          "name": "Nihil",
+          "role": "FF8 Ultimate Editor: beta testing, unknown values and Jumbo Cactuar.",
+          "url": "https://github.com/HobbitDur/FF8UltimateEditor/blob/master/Ifrit/IfritAI/ifritaiwidget.py"
+        },
+        {
+          "name": "myst6re",
+          "role": "FF8 Ultimate Editor: reverse engineering; Deling, Hyne and VincentTim. Also acknowledged by FFNx.",
+          "url": "https://github.com/HobbitDur/FF8UltimateEditor/blob/master/ToolUpdate/list.json"
+        },
+        {
+          "name": "Riccardo",
+          "role": "Shumi Translator beta testing.",
+          "url": "https://github.com/HobbitDur/FF8UltimateEditor/blob/master/ShumiTranslator/shumitranslator.py"
+        },
+        {
+          "name": "Qhimm",
+          "role": "FF8SND / ff8-sound-remixed sound decoding reference used by Julia.",
+          "url": "https://github.com/HobbitDur/FF8UltimateEditor/blob/master/Julia/juliamanager.py"
+        },
+        {
+          "name": "Mcindus",
+          "role": "Tripod card art acknowledged by CCGroup.",
+          "url": "https://github.com/HobbitDur/FF8UltimateEditor/blob/master/CCGroup/ccgroup.py"
+        },
+        {
+          "name": "ducladoncladon",
+          "role": "Xylomod card art acknowledged by CCGroup.",
+          "url": "https://github.com/HobbitDur/FF8UltimateEditor/blob/master/CCGroup/ccgroup.py"
+        },
+        {
+          "name": "JumboCactuar",
+          "role": "External tool referenced by FF8 Ultimate Editor.",
+          "url": "https://github.com/Nihil-1/JumboCactuar"
+        },
+        {
+          "name": "Junkshop",
+          "role": "External tool referenced by FF8 Ultimate Editor.",
+          "url": "https://github.com/HobbitDur/junkshop-enhanced"
+        },
+        {
+          "name": "Quezacotl",
+          "role": "External tool referenced by FF8 Ultimate Editor.",
+          "url": "https://github.com/HobbitDur/quezacotl-enhanced"
+        },
+        {
+          "name": "Siren",
+          "role": "External tool referenced by FF8 Ultimate Editor.",
+          "url": "https://github.com/HobbitDur/Siren-enhanced"
+        },
+        {
+          "name": "DarkShinryu and Doomtrain contributors",
+          "role": "External tool referenced by FF8 Ultimate Editor.",
+          "url": "https://github.com/DarkShinryu/doomtrain"
+        },
+        {
+          "name": "IfritGui",
+          "role": "External tool referenced by FF8 Ultimate Editor.",
+          "url": "https://github.com/HobbitDur/IfritGui"
+        },
+        {
+          "name": "Hyne",
+          "role": "External tool referenced by FF8 Ultimate Editor.",
+          "url": "https://github.com/myst6re/hyne"
+        },
+        {
+          "name": "DelingCli",
+          "role": "External tool referenced by FF8 Ultimate Editor.",
+          "url": "https://github.com/myst6re/deling"
+        },
+        {
+          "name": "Deling",
+          "role": "External tool referenced by FF8 Ultimate Editor.",
+          "url": "https://github.com/myst6re/deling"
+        },
+        {
+          "name": "VincentTim",
+          "role": "External tool referenced by FF8 Ultimate Editor.",
+          "url": "https://github.com/myst6re/vincent-tim"
+        },
+        {
+          "name": "Aali",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "http://forums.qhimm.com/index.php?action=profile;u=2862"
+        },
+        {
+          "name": "Chrysalis",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "http://forums.qhimm.com/index.php?action=profile;u=674"
+        },
+        {
+          "name": "CosmosXIII",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "https://github.com/CosmosXIII"
+        },
+        {
+          "name": "DLPB",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "https://forums.qhimm.com/index.php?action=profile;u=6439"
+        },
+        {
+          "name": "dziugo",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "http://forums.qhimm.com/index.php?action=profile;u=1660"
+        },
+        {
+          "name": "ficedula",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "http://forums.qhimm.com/index.php?action=profile;u=68"
+        },
+        {
+          "name": "Iros",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "https://forums.qhimm.com/index.php?action=profile;u=21785"
+        },
+        {
+          "name": "JWP",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "http://forums.qhimm.com/index.php?action=profile;u=3772"
+        },
+        {
+          "name": "Kranmer",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "http://forums.qhimm.com/index.php?action=profile;u=4909"
+        },
+        {
+          "name": "Maki",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "http://forums.qhimm.com/index.php?action=profile;u=23937"
+        },
+        {
+          "name": "quantumpencil",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "http://forums.qhimm.com/index.php?action=profile;u=23810"
+        },
+        {
+          "name": "Nax",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "https://github.com/nax"
+        },
+        {
+          "name": "Satsuki",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "http://forums.qhimm.com/index.php?action=profile;u=24647"
+        },
+        {
+          "name": "Sebanisu",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "http://forums.qhimm.com/index.php?action=profile;u=22866"
+        },
+        {
+          "name": "sithlord48",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "http://forums.qhimm.com/index.php?action=profile;u=6501"
+        },
+        {
+          "name": "TurBoss",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "https://github.com/TurBoss"
+        },
+        {
+          "name": "unab0mb",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "https://forums.qhimm.com/index.php?action=profile;u=31071"
+        },
+        {
+          "name": "tangtang95",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "https://github.com/tangtang95"
+        },
+        {
+          "name": "Lord UrQuan",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "https://github.com/eve-atum"
+        },
+        {
+          "name": "LaZar00",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "https://github.com/LaZar00"
+        },
+        {
+          "name": "ChthonVII",
+          "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+          "url": "https://github.com/ChthonVII"
+        }
+      ],
+      "licenses": [
+        {
+          "name": "FF8 third-party credits and license notices",
+          "sourcePath": "plugins/ff8/credits.md"
+        }
+      ]
     },
     "ff9": {
       "contributions": [
@@ -328,7 +553,7 @@
       "licenses": [
         {
           "name": "FF9 references — source and license notices",
-          "sourcePath": "plugins/ff9/THIRD_PARTY.md"
+          "sourcePath": "plugins/ff9/credits.md"
         }
       ]
     },
@@ -349,13 +574,30 @@
       "licenses": [
         {
           "name": "Palworld / PalSchema references — source and license notes",
-          "sourcePath": "plugins/palworld/THIRD_PARTY.md"
+          "sourcePath": "plugins/palworld/credits.md"
         }
       ]
     },
     "project-zomboid": {
-      "source": "plugins/project_zomboid/credits.json",
-      "licenseRoot": "plugins/project_zomboid"
+      "contributions": [
+        {
+          "name": "PZ Wiki Modding / PZ API Docs",
+          "role": "Build 42 mod.info and ZedScript schema reference used to define the first structured editor boundary.",
+          "url": "https://github.com/PZ-Wiki-Modding/PZ-API-Docs"
+        },
+        {
+          "name": "PZ Wiki Modding / ZedScripts",
+          "role": "Build 42 ZedScript validation and tooling reference.",
+          "url": "https://github.com/PZ-Wiki-Modding/ZedScripts"
+        },
+        {
+          "name": "PZ Wiki Modding / pz-scripts-data",
+          "role": "Current Build 42 script parameter and type-schema research reference.",
+          "url": "https://github.com/PZ-Wiki-Modding/pz-scripts-data"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
     },
     "warband": {
       "contributions": [
@@ -382,7 +624,7 @@
         },
         {
           "name": "Warband Module System schema reference — MIT",
-          "sourcePath": "plugins/warband/THIRD_PARTY.md"
+          "sourcePath": "plugins/warband/credits.md"
         }
       ]
     },
@@ -448,12 +690,8 @@
       "thanks": [],
       "licenses": [
         {
-          "name": "PyLibDrawable — source notice",
-          "sourcePath": "plugins/rdr2/vendor/reddead2blend/NOTICE.md"
-        },
-        {
-          "name": "PyLibDrawable — MIT",
-          "sourcePath": "plugins/rdr2/vendor/reddead2blend/LICENSE"
+          "name": "RDR2 credits, PyLibDrawable and MinHook notices",
+          "sourcePath": "plugins/rdr2/credits.md"
         },
         {
           "name": "RPF tool — source notice",
@@ -466,10 +704,6 @@
         {
           "name": "RageLib — MIT",
           "sourcePath": "tools/rpf-cli/RAGELIB-LICENSE.txt"
-        },
-        {
-          "name": "MinHook — BSD 2-Clause License",
-          "sourcePath": "plugins/rdr2/native_runtime/GameplayTweaks/third_party/minhook/LICENSE.txt"
         }
       ]
     },
@@ -562,7 +796,7 @@
       "licenses": [
         {
           "name": "FFX/X-2 references — source and BSD notice",
-          "sourcePath": "plugins/ffx_x2/THIRD_PARTY.md"
+          "sourcePath": "plugins/ffx_x2/credits.md"
         }
       ]
     },
@@ -578,8 +812,31 @@
       "licenses": []
     },
     "ds3": {
-      "source": "plugins/ds3/credits.json",
-      "licenseRoot": "plugins/ds3"
+      "contributions": [
+        {
+          "name": "Vawser / Smithbox contributors",
+          "role": "Pinned Dark Souls III PARAMDEF, field-layout, annotation, enum, reference, and row-name metadata; regulation interoperability reference.",
+          "url": "https://github.com/vawser/Smithbox"
+        },
+        {
+          "name": "JKAnderson / SoulsTemplates",
+          "role": "Apache-2.0 BND4 and PARAM binary-format reference used for Lexeditor's independent byte-preserving parser.",
+          "url": "https://github.com/JKAnderson/SoulsTemplates"
+        }
+      ],
+      "thanks": [
+        {
+          "name": "JKAnderson / SoulsFormats",
+          "role": "Independent DS3 regulation behavior cross-check; GPL code is not bundled or copied.",
+          "url": "https://github.com/JKAnderson/SoulsFormats"
+        }
+      ],
+      "licenses": [
+        {
+          "name": "DS3 references and metadata — source/license notices",
+          "sourcePath": "plugins/ds3/credits.md"
+        }
+      ]
     },
     "chrono-trigger": {
       "contributions": [
@@ -613,7 +870,7 @@
       "licenses": [
         {
           "name": "Chrono Trigger research sources — licenses and evidence limits",
-          "sourcePath": "plugins/chrono_trigger/THIRD_PARTY.md"
+          "sourcePath": "plugins/chrono_trigger/credits.md"
         }
       ]
     }

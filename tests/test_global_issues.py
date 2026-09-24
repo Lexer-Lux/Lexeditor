@@ -93,10 +93,11 @@ class Credits(unittest.TestCase):
             for license in rows.get('licenses',[]):
                 self.assertEqual(license['text'],(ROOT/license['sourcePath']).read_text('utf-8-sig'))
     def test_original_ff8_attributions_are_not_dropped(self):
-        old=json.loads((ROOT/'plugins/ff8/credits.json').read_text('utf-8'))
+        credits=(ROOT/'plugins/ff8/credits.md').read_text('utf-8')
         new=json.loads((ROOT/'ui/credits.json').read_text('utf-8'))['plugins']['ff8']
-        for section in ('contributions','thanks'):self.assertEqual(old[section],new[section])
-        self.assertEqual([x['name'] for x in old['licenses']],[x['name'] for x in new['licenses']])
+        for section in ('contributions','thanks'):
+            for row in new[section]:self.assertIn(row['name'],credits)
+        self.assertIn('GNU GENERAL PUBLIC LICENSE',credits)
 
 
 class Bootstrap(unittest.TestCase):

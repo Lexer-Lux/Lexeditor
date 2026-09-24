@@ -1,5 +1,16 @@
 # Dark Souls III source and license record
 
+## Credits index
+
+Attributions:
+
+- **Vawser / Smithbox contributors** — Pinned Dark Souls III PARAMDEF, field-layout, annotation, enum, reference, and row-name metadata; regulation interoperability reference. <https://github.com/vawser/Smithbox>
+- **JKAnderson / SoulsTemplates** — Apache-2.0 BND4 and PARAM binary-format reference used for Lexeditor's independent byte-preserving parser. <https://github.com/JKAnderson/SoulsTemplates>
+
+Thanks:
+
+- **JKAnderson / SoulsFormats** — Independent DS3 regulation behavior cross-check; GPL code is not bundled or copied. <https://github.com/JKAnderson/SoulsFormats>
+
 ## Smithbox
 
 Source: https://github.com/vawser/Smithbox  

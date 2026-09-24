@@ -2,8 +2,9 @@
 # their bytes on Windows (core.autocrlf) or on Linux checkouts/build runners.
 plugins/ff8/ffnx_issue_51/package/** -text
 
-# The vendored Shader Injector release is SHA-256 locked, and its licence text
-# is compared byte for byte against the credits. Line endings must not change.
+# The vendored Shader Injector release is SHA-256 locked. Line endings must
+# not change. Its licence text lives in plugins/ff7r2/credits.md and is
+# compared byte for byte against the generated credits.
 plugins/ff7r2/runtime/** -text
 
 # ReShade setups are SHA-256 pinned and their licence is compared byte for byte.

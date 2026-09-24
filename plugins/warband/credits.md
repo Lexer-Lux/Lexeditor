@@ -116,3 +116,10 @@ not redistribute `font.dds` or `font_data.xml`; when present in the user's
 Warband installation they are read locally and an alpha-only atlas is generated
 inside the user's private application-data cache. No Warband sound effect is
 bundled by this plugin.
+
+## BRF Sync
+
+- Project: <https://github.com/markpryk/brf_sync_tools>
+- Use: separate read-only tool for converting Warband model resources.
+- Source and distribution notice: `tools/brf-sync/SOURCE.md`
+- License: GNU GPL v2 (`tools/brf-sync/LICENSE`)

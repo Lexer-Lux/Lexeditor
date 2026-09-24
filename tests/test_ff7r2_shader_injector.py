@@ -54,8 +54,9 @@ def test_the_vendored_archive_is_upstreams_release_byte_for_byte():
 
 
 def test_its_licence_travels_with_it_and_is_credited():
+    assert si.LICENSE.name == "credits.md"
     text = si.LICENSE.read_text(encoding="utf-8")
-    assert text.startswith("MIT License") and "David Matos" in text
+    assert "MIT License" in text and "David Matos" in text
     credits = json.loads((ROOT / "ui/credits.json").read_text(encoding="utf-8"))["plugins"]["ff7r2"]
     rows = [row for row in credits["licenses"] if "Shader Injector" in row["name"]]
     assert rows and rows[0]["text"] == si.LICENSE.read_text(encoding="utf-8-sig")

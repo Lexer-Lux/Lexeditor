@@ -4,7 +4,8 @@ The normal reviewed frozen application is copied into an isolated folder. The
 launcher redirects LOCALAPPDATA plus FF7R project/cache state beside the
 candidate, so it never reuses or overwrites an installed C:\\Lexeditor tree.
 The build also verifies that the redistribution-cleared repak v0.2.3 release
-archive and both upstream licence files survived freezing.
+archive and the plugin credits file, which inlines both upstream licence
+texts, survived freezing.
 """
 from __future__ import annotations
 
@@ -41,9 +42,8 @@ def digest(path: Path) -> str:
 def verify_windows_repak(bundle: Path) -> dict:
     manifest_path = bundle / "manifest.json"
     archive = bundle / "repak_cli-x86_64-pc-windows-msvc.zip"
-    mit = bundle / "LICENSE-MIT"
-    apache = bundle / "LICENSE-APACHE"
-    for path in (manifest_path, archive, mit, apache):
+    credits = bundle.parents[2] / "credits.md"
+    for path in (manifest_path, archive, credits):
         if not path.is_file():
             raise FileNotFoundError(f"Frozen FF7R helper payload is missing: {path}")
 
@@ -68,9 +68,13 @@ def verify_windows_repak(bundle: Path) -> dict:
         raise RuntimeError("Frozen repak executable does not match the pinned SHA-256")
 
     source = tooling.BUNDLE_ROOT
-    for name in ("manifest.json", "LICENSE-MIT", "LICENSE-APACHE"):
-        if (bundle / name).read_bytes() != (source / name).read_bytes():
-            raise RuntimeError(f"Frozen repak notice changed during packaging: {name}")
+    if (bundle / "manifest.json").read_bytes() != (source / "manifest.json").read_bytes():
+        raise RuntimeError("Frozen repak notice changed during packaging: manifest.json")
+    frozen_credits = credits.read_bytes()
+    if frozen_credits != (tooling.PLUGIN_ROOT / "credits.md").read_bytes():
+        raise RuntimeError("Frozen repak notice changed during packaging: credits.md")
+    if b"Truman Kilen" not in frozen_credits or b"Apache License" not in frozen_credits:
+        raise RuntimeError("Frozen FF7R credits are missing the repak licence texts")
 
     return {
         "version": manifest["tag"],
@@ -79,7 +83,7 @@ def verify_windows_repak(bundle: Path) -> dict:
         "archive": str(archive),
         "archiveSha256": archive_sha,
         "executableSha256": executable_sha,
-        "licenses": ["LICENSE-MIT", "LICENSE-APACHE"],
+        "licenses": ["plugins/ff7r/credits.md"],
     }
 
 

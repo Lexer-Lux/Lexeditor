@@ -17,9 +17,5 @@
       "member": "repak",
       "executableSha256": "fce30661c951ce56fd2507a44a1e03637e3ea06a1b7cc8035bd62c0b37dd9457"
     }
-  },
-  "licenses": [
-    "LICENSE-MIT",
-    "LICENSE-APACHE"
-  ]
+  }
 }

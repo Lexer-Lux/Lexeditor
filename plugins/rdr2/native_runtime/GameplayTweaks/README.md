@@ -21,8 +21,8 @@ The build requires the external RDR2 ScriptHook SDK. Set `RDR2_SDK_ROOT` to a
 local SDK directory containing `inc/main.h`, `inc/natives.h`, and
 `lib/ScriptHookRDR2.lib`. The SDK is not redistributed here.
 
-MinHook source is vendored under `third_party/minhook` with its upstream
-license.
+MinHook source is vendored under `third_party/minhook`; its upstream
+license is inlined in `plugins/rdr2/credits.md`.
 
 ## Build
 

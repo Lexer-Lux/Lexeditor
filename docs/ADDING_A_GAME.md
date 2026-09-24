@@ -384,6 +384,12 @@ Update `ui/credits-sources.json` while researching. Credit:
 - documentation/authors that materially resolved behavior or structure;
 - required license and source notices for redistributed code/assets.
 
+Keep the same record beside the plugin: every `plugins/<id>/` folder holds a
+top-level `credits.md` with all of its third-party attributions and license
+notices inlined (no `THIRD_PARTY.md` variants, credits subfolders, or
+scattered license files). Point that plugin's license `sourcePath` entries at
+its `credits.md` so the generated bundle embeds the same texts.
+
 Run:
 
 ```text
@@ -457,7 +463,7 @@ A new plugin is not complete until the applicable items below are true:
 - [ ] Every helper appears in the main-menu Updates drawer with distinct installed, pinned and upstream versions.
 - [ ] Helper automatic updates are disabled and remain disabled after an update or repair.
 - [ ] First-time setup works without a preinstalled helper; helper installation and update settings are verified.
-- [ ] Credits contain at least one explicit attribution/declaration and regenerate cleanly.
+- [ ] Credits contain at least one explicit attribution/declaration and regenerate cleanly; `plugins/<id>/credits.md` holds the same record.
 - [ ] Unknown/unmodeled data is preserved; no-op and changed round-trips are tested.
 - [ ] Save/deployment writes are atomic and recovery/revert behavior is defined.
 - [ ] The deployment, revert, launch and native acceptance path was designed before the endgame.

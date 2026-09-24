@@ -1,7 +1,7 @@
 """Bounded FF7 English text, LZS and binary helpers; no installed assets.
 
 Encoding and container facts: cebix/ff7tools and Shojy/Elena, credited in
-THIRD_PARTY.md. Unknown text bytes are represented reversibly as \\xHH.
+credits.md. Unknown text bytes are represented reversibly as \\xHH.
 """
 from __future__ import annotations
 

@@ -42,7 +42,10 @@ ARCHIVE = RUNTIME / "shader-injector-2-2-1-maximum-dood.zip"
 # match it exactly, which is what makes "vendored" mean "upstream's release".
 ARCHIVE_SHA256 = "ced1790992265e203e0db418203881d5570a58c5af0663e5f50c05a7996cd119"
 ARCHIVE_TOP = "shader-injector-2-2-1-maximum-dood/"
-LICENSE = RUNTIME / "SHADER-INJECTOR-LICENSE.txt"
+# The injector's MIT notice lives in the plugin credits file, not beside the
+# archive: every plugin keeps all of its attributions and license notices in
+# its own top-level credits.md.
+LICENSE = PLUGIN_ROOT / "credits.md"
 SOURCE = "https://github.com/frostbone25/ShaderInjector"
 RELEASE = SOURCE + "/releases/tag/" + VERSION
 

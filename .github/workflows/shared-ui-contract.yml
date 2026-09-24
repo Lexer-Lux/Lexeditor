@@ -6,7 +6,7 @@ on:
     paths:
       - 'ui/**'
       - 'plugins/**/plugin.py'
-      - 'plugins/**/credits.json'
+      - 'plugins/**/credits.md'
       - 'plugins/**/editor.html'
       - 'app.py'
       - 'desktop_host.py'
@@ -32,7 +32,7 @@ on:
     paths:
       - 'ui/**'
       - 'plugins/**/plugin.py'
-      - 'plugins/**/credits.json'
+      - 'plugins/**/credits.md'
       - 'plugins/**/editor.html'
       - 'app.py'
       - 'desktop_host.py'

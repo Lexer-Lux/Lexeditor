@@ -106,8 +106,9 @@ def test_bundled_repak_release_matches_published_archive_and_executable_hashes()
     )
     assert manifest["tag"] == tooling.REPAK_TAG
     assert manifest["commit"] == "e215472c51db69328b1ce77be2db24d24c1d646b"
-    assert (tooling.BUNDLE_ROOT / "LICENSE-MIT").is_file()
-    assert (tooling.BUNDLE_ROOT / "LICENSE-APACHE").is_file()
+    credits = (tooling.PLUGIN_ROOT / "credits.md").read_text(encoding="utf-8")
+    assert "Copyright 2024 Truman Kilen" in credits
+    assert "Apache License" in credits and "Version 2.0" in credits
 
     for platform, (archive, archive_sha, kind, member_name, executable_sha) in tooling.BUNDLES.items():
         assert archive.is_file(), platform
@@ -164,13 +165,11 @@ def test_modified_managed_repak_is_rejected(monkeypatch, tmp_path):
     assert status["integrity"] == "mismatch"
     assert "Install/Repair" in status["message"]
 
-def test_distribution_bundles_repak_archives_manifest_and_licenses():
+def test_distribution_bundles_repak_archives_and_manifest():
     from tools import build_distribution
 
     required = {
         "plugins/ff7r/runtime/repak/v0.2.3/manifest.json",
-        "plugins/ff7r/runtime/repak/v0.2.3/LICENSE-MIT",
-        "plugins/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE",
         "plugins/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip",
         "plugins/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-unknown-linux-gnu.tar.xz",
     }

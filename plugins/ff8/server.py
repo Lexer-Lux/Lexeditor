@@ -75,7 +75,6 @@ def dashboard() -> dict:
         "problems": problems,
         "runtime": runtime,
         "themeSounds": sounds,
-        "credits": json.loads((PLUGIN_ROOT / "credits.json").read_text(encoding="utf-8")),
     }
 
 
@@ -113,8 +112,6 @@ class Handler(PluginRequestHandler):
                     self.json_response({"error": "Not found"}, 404)
                 else:
                     self.file_response(module)
-            elif path in ("/assets/licenses/FF8UltimateEditor-GPL-3.0.txt", "/assets/licenses/FFNx-GPL-3.0.txt", "/assets/licenses/Deling-GPL-3.0.txt", "/assets/licenses/OpenVIII-MIT.txt"):
-                self.file_response(PLUGIN_ROOT / path.lstrip("/"))
             elif path == "/assets/ff8-menu.ttf":
                 self.file_response(ensure_font())
             elif path.startswith("/assets/card-elements/") and path.endswith(".png"):

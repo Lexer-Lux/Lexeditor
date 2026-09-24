@@ -121,6 +121,6 @@ def test_theme_provenance_is_recorded():
                      for entry in sources["plugins"]["ff7"]["contributions"])
     assert "usfont_h.tex" in roles
     assert "audio.fmt" in roles
-    third_party = (FF7 / "THIRD_PARTY.md").read_text(encoding="utf-8")
+    third_party = (FF7 / "credits.md").read_text(encoding="utf-8")
     assert "usfont_h.tex" in third_party
     assert "never redistributed" in third_party.lower()

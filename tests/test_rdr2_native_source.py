@@ -62,7 +62,7 @@ class Rdr2NativeSourceTests(unittest.TestCase):
         self.assertNotRegex(build.lower(), r"copy\s+.*red dead redemption|move\s+.*red dead redemption")
 
     def test_third_party_license_and_known_160_gap_are_explicit(self):
-        license_text = (SOURCE / "third_party" / "minhook" / "LICENSE.txt").read_text("utf-8")
+        license_text = (ROOT / "plugins" / "rdr2" / "credits.md").read_text("utf-8")
         self.assertIn("MinHook", license_text)
         readme = (SOURCE / "README.md").read_text("utf-8")
         self.assertIn("ccc6c4adcb9262dbd62aeea7901d5864f64680fc", readme)

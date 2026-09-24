@@ -120,8 +120,7 @@ jobs:
           if (-not (Test-Path "$root/Launch-FF7R-Candidate.cmd")) { throw 'Candidate launcher is missing' }
           if (-not (Test-Path "$root/FF7R-ACCEPTANCE.txt")) { throw 'Candidate acceptance guide is missing' }
           if (-not (Test-Path "$root/Lexeditor/_internal/plugins/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip")) { throw 'Bundled repak archive is missing' }
-          if (-not (Test-Path "$root/Lexeditor/_internal/plugins/ff7r/runtime/repak/v0.2.3/LICENSE-MIT")) { throw 'repak MIT license is missing' }
-          if (-not (Test-Path "$root/Lexeditor/_internal/plugins/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE")) { throw 'repak Apache license is missing' }
+          if (-not (Test-Path "$root/Lexeditor/_internal/plugins/ff7r/credits.md")) { throw 'FF7R plugin credits are missing' }
           if ($manifest.headSha -ne '${{ github.event.pull_request.head.sha || github.sha }}') { throw 'Candidate manifest head SHA mismatch' }
           $manifest | ConvertTo-Json -Depth 6
       - name: Upload isolated FF7R acceptance candidate

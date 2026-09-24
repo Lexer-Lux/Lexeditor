@@ -37,12 +37,9 @@ VENDORED_HELPERS=(
     'tools/reshade/addons/REST-1.3.23.633/ReshadeEffectShaderToggler-1.3.23.633.zip',
     'tools/reshade/addons/REST-1.3.23.633/LICENSE.txt',
     'plugins/ff7r/runtime/repak/v0.2.3/manifest.json',
-    'plugins/ff7r/runtime/repak/v0.2.3/LICENSE-MIT',
-    'plugins/ff7r/runtime/repak/v0.2.3/LICENSE-APACHE',
     'plugins/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-pc-windows-msvc.zip',
     'plugins/ff7r/runtime/repak/v0.2.3/repak_cli-x86_64-unknown-linux-gnu.tar.xz',
     'plugins/ff7r2/runtime/shader-injector-2-2-1-maximum-dood.zip',
-    'plugins/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt',
 )
 
 
