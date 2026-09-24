@@ -1193,7 +1193,9 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
   box-sizing:border-box;
   height:min(31px, calc(var(--lex-command-row-height) * .6667));
   min-height:min(31px, calc(var(--lex-command-row-height) * .6667));
-  padding:4px 16px;
+  /* Compact spacing follows the text scale, not the panel width. The label
+     adds its own small inset to protect font edges and shadows. */
+  padding:.12em .2em;
   color:var(--lex-muted);
   /* A subtab has its own fill and outline, so it reads as a tab on its bar. */
   border:1px solid var(--lex-border);
@@ -5162,15 +5164,8 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   /* Same em-first rule as the header tabs; the px term only clamps the badge
      into the shorter subtab row. */
   --lex-tab-badge-size:min(1.6em,calc(min(31px,var(--lex-command-row-height) * .6667) - 8px));
-  /* Reserved on BOTH sides. Two things have to be true at once: the label is
-     centred in its button, and the badge never covers it. Reserving only the
-     badge's own side satisfies the second and breaks the first, because the
-     label then centres inside an off-centre content box. The symmetric
-     reservation is the only arrangement that holds both.
-     It is because this is what keeps the badge off the label, and a
-     plugin's blanket nav-button padding must not quietly remove it - FF8 set
-     six pixels on both sides and the badge sat on top of "Abilities". */
-  padding-inline:calc(var(--lex-tab-badge-size) + var(--lex-tab-badge-gap) * 2);
+  /* Like the main tabs, show shortcut prompts as an overlay while Ctrl is
+     held. Hidden prompts must not take space away from the label. */
 }
 .lex-project-name {
    color: var(--lex-highlight); white-space: nowrap;
