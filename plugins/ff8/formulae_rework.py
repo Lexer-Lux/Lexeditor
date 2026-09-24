@@ -213,3 +213,41 @@ def mug_stored_success_chance(mug_rate: float, target_spd: int,
     if rate <= 0:
         return 0.0
     return mug_chance_percent(100.0 - rate, target_spd, mugger_spd)
+
+
+def melee_base_damage(attacker_str: int, weapon_str_bonus: int,
+                      weapon_power: int) -> int:
+    """Mirror the precise base term of the requested melee replacement.
+
+    The target-VIT % reduction rule is still unspecified, so this covers only
+    the ``(STR + bonus) x power`` base; runtime status stays incomplete.
+    """
+    strength = bounded_stat(attacker_str, "Attacker STR")
+    bonus = bounded_stat(weapon_str_bonus, "Weapon STR bonus")
+    power = bounded_stat(weapon_power, "Weapon power")
+    return (strength + bonus) * power
+
+
+def magic_base_damage(spell_power: int, attacker_mag: int) -> int:
+    """Mirror the precise base term of the requested magic replacement.
+
+    The target-SPR % reduction rule is still unspecified, so this covers only
+    the ``spell power x MAG`` base; runtime status stays incomplete.
+    """
+    power = bounded_stat(spell_power, "Spell power")
+    mag = bounded_stat(attacker_mag, "Attacker MAG")
+    return power * mag
+
+
+def status_infliction_chance(spell_power: int, attacker_mag: int,
+                             target_spr: int) -> int:
+    """Mirror the requested status replacement before native defence rules.
+
+    The vanilla status-defence rules (immunity, resistance, the 255 and
+    250..254 special cases and the random roll) would remain native; only the
+    chance term is mirrored here. Runtime status stays incomplete.
+    """
+    power = bounded_stat(spell_power, "Spell power")
+    mag = bounded_stat(attacker_mag, "Attacker MAG")
+    spr = bounded_stat(target_spr, "Target SPR")
+    return max(0, min(100, power + mag - spr))

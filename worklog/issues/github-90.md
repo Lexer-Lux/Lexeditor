@@ -39,6 +39,15 @@ Needs Lexer/game: proved native overlay injection points for the
 full-screen map (activation fails closed until then), plus the Modern
 Controls runtime layer for position/vehicle data.
 
+## 2026-09-23 agents/actionables-ff8: pure interaction helpers added
+
+Added shoulder-button filter cycling, marker filtering (waypoint always
+visible), free pan/zoom viewport math with focus-stable zoom, Center-on-player
+and Confirm-selection description to `world_map_fullscreen_issue_90.py` with
+focused tests. No vehicle/quest/Chocobo data sources exist in the plugin yet,
+so those marker kinds stay contract-only. Still needs: proved native overlay
+injection points plus the Modern Controls runtime layer.
+
 ## 2026-09-23 impl/ff8-actionables: verified, no new code
 
 Re-verified on this branch: the `world_map_fullscreen_issue_90`

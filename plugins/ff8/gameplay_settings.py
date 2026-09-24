@@ -13,6 +13,7 @@ from . import ffnx_manager
 from . import runtime_layout
 from . import inventory_auto_sort
 from . import world_map_fullscreen_issue_90
+from . import battle_results_issue_466
 from . import gf_acquisition_rework
 from . import menu_qol_issue_61
 from . import single_gf
@@ -57,6 +58,7 @@ DEFAULT_TRUE_ATB_WAIT = true_atb_wait_issue_63.DEFAULT_TRUE_ATB_WAIT
 DEFAULT_FORMULAE_REWORK = False
 DEFAULT_MODERN_CONTROLS = modern_controls_issue_65.DEFAULT_MODERN_CONTROLS
 DEFAULT_WORLD_MAP_FULLSCREEN = world_map_fullscreen_issue_90.DEFAULT_WORLD_MAP_FULLSCREEN
+DEFAULT_BATTLE_RESULTS_HELP = battle_results_issue_466.DEFAULT_BATTLE_RESULTS_HELP
 DEFAULT_GF_ACQUISITION_REWORK = gf_acquisition_rework.DEFAULT_GF_ACQUISITION_REWORK
 DEFAULT_CAMERA_SPEED = modern_controls_issue_65.DEFAULT_CAMERA_SPEED
 MINIMUM_CAMERA_SPEED = modern_controls_issue_65.MINIMUM_CAMERA_SPEED
@@ -94,7 +96,7 @@ ACCEPTED_TWEAKS = frozenset({
     "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "betterHpColors", "gfHpBars", "inGameTime",
     "interactionIndicators",
     "flatStatAbilities", "maxSpellEnabled", "noMagicConsumption", "dropsAfterMug",
-    "dropChance", "gfHpCasting",
+    "dropChance", "gfHpCasting", "battleResultsHelp",
 })
 MIN_FLYING_EVA_BONUS = 0
 MAX_FLYING_EVA_BONUS = 100
@@ -360,6 +362,12 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         world_map_fullscreen = False
     if not world_map_fullscreen_issue_90.WORLD_MAP_FULLSCREEN_AVAILABLE:
         world_map_fullscreen = False
+    battle_results_help = data.get(
+        "battleResultsHelp", DEFAULT_BATTLE_RESULTS_HELP)
+    if not isinstance(battle_results_help, bool):
+        battle_results_help = DEFAULT_BATTLE_RESULTS_HELP
+    if not battle_results_issue_466.BATTLE_RESULTS_HELP_AVAILABLE:
+        battle_results_help = False
     gf_acquisition_rework_enabled = data.get(
         "gfAcquisitionRework", DEFAULT_GF_ACQUISITION_REWORK)
     if not isinstance(gf_acquisition_rework_enabled, bool):
@@ -478,6 +486,9 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "worldMapFullscreen": world_map_fullscreen,
         "worldMapFullscreenAvailable": world_map_fullscreen_issue_90.WORLD_MAP_FULLSCREEN_AVAILABLE,
         "worldMapFullscreenBlocker": world_map_fullscreen_issue_90.WORLD_MAP_FULLSCREEN_BLOCKER,
+        "battleResultsHelp": battle_results_help,
+        "battleResultsHelpAvailable": battle_results_issue_466.BATTLE_RESULTS_HELP_AVAILABLE,
+        "battleResultsHelpBlocker": battle_results_issue_466.BATTLE_RESULTS_HELP_BLOCKER,
         "gfAcquisitionRework": gf_acquisition_rework_enabled,
         "gfAcquisitionReworkAvailable": gf_acquisition_rework.GF_ACQUISITION_AVAILABLE,
         "gfAcquisitionReworkBlocker": gf_acquisition_rework.GF_ACQUISITION_BLOCKER,
@@ -619,7 +630,8 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
                drop_chance_enabled: bool = False,
                drop_chance_plan=None,
                world_map_fullscreen: bool = DEFAULT_WORLD_MAP_FULLSCREEN,
-               gf_acquisition_rework_enabled: bool = DEFAULT_GF_ACQUISITION_REWORK) -> str:
+               gf_acquisition_rework_enabled: bool = DEFAULT_GF_ACQUISITION_REWORK,
+               battle_results_help: bool = DEFAULT_BATTLE_RESULTS_HELP) -> str:
     bonus = _bounded_bonus(bonus)
     flying_eva_enabled = _boolean(flying_eva_enabled, "Flying EVA Bonus")
     auto_sort = _boolean(auto_sort, "Auto-sort Inventory")
@@ -640,6 +652,7 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
     formulae_rework = _boolean(formulae_rework, "Formulae Rework")
     modern_controls = _boolean(modern_controls, "Modern Controls")
     world_map_fullscreen = _boolean(world_map_fullscreen, "Full-screen World Map")
+    battle_results_help = _boolean(battle_results_help, "Battle Results Item Help")
     gf_acquisition_rework_enabled = _boolean(
         gf_acquisition_rework_enabled, "GF Acquisition Rework")
     vibration_consolidation = _boolean(
@@ -771,6 +784,12 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
         lines.extend(world_map_patch.rstrip().splitlines())
     else:
         lines.append("# Full-screen World Map is disabled; world-map Back behavior is unchanged.")
+    battle_results_patch = battle_results_issue_466.build_hext(
+        battle_results_help)
+    if battle_results_patch:
+        lines.extend(battle_results_patch.rstrip().splitlines())
+    else:
+        lines.append("# Battle Results Item Help is disabled; the reward screen keeps its HELP box.")
     gf_acquisition_patch = gf_acquisition_rework.build_hext(
         gf_acquisition_rework_enabled)
     if gf_acquisition_patch:
@@ -931,6 +950,7 @@ def initialize_project(project_root: Path) -> None:
         "trueAtbWait": False,
         "modernControls": False,
         "worldMapFullscreen": False,
+        "battleResultsHelp": False,
         "gfAcquisitionRework": False,
         "vibrationConsolidation": False,
         "betterTargeting": False,
@@ -1037,6 +1057,10 @@ def save(data: dict, game_root: Path | None = None,
         data.get("gfAcquisitionRework", DEFAULT_GF_ACQUISITION_REWORK),
         "GF Acquisition Rework",
     )
+    battle_results_help = _boolean(
+        data.get("battleResultsHelp", DEFAULT_BATTLE_RESULTS_HELP),
+        "Battle Results Item Help",
+    )
     # The camera turn rate travels with the switch that uses it. A value the
     # page never sent, or one outside the usable range, becomes the shipped
     # rate rather than refusing the whole apply.
@@ -1108,6 +1132,10 @@ def save(data: dict, game_root: Path | None = None,
         enabled=world_map_fullscreen, modern_controls=modern_controls,
     ):
         raise ValueError(world_map_requirement)
+    for battle_results_requirement in battle_results_issue_466.requirement_errors(
+        enabled=battle_results_help,
+    ):
+        raise ValueError(battle_results_requirement)
     for gf_acquisition_requirement in gf_acquisition_rework.requirement_errors(
         enabled=gf_acquisition_rework_enabled,
     ):
@@ -1147,6 +1175,7 @@ def save(data: dict, game_root: Path | None = None,
         formulae_rework=formulae_rework,
         modern_controls=modern_controls,
         world_map_fullscreen=world_map_fullscreen,
+        battle_results_help=battle_results_help,
         gf_acquisition_rework_enabled=gf_acquisition_rework_enabled,
         vibration_consolidation=vibration_consolidation,
         better_targeting=better_targeting,
@@ -1182,6 +1211,7 @@ def save(data: dict, game_root: Path | None = None,
         "modernControls": modern_controls,
         "worldMapFullscreen": world_map_fullscreen,
         "gfAcquisitionRework": gf_acquisition_rework_enabled,
+        "battleResultsHelp": battle_results_help,
         # Stored with the switch it belongs to. Written only to FFNx.toml, it
         # read back as the default and the next save overwrote the reader's.
         "cameraSpeed": round(camera_speed, 2),

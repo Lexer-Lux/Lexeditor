@@ -56,6 +56,15 @@ Needs Lexer/game: in-game verification of the four runtime patches,
 Formulae scroll confirmation at an 800px viewport, and the review/mod doc
 formulae section (paste the text or grant access).
 
+## 2026-09-23 agents/actionables-ff8: preview mirrors added, still needs the game
+
+Added precise Python mirrors (`melee_base_damage`, `magic_base_damage`,
+`status_infliction_chance`) in `plugins/ff8/formulae_rework.py` with focused
+tests; contract rows stay incomplete and no blind x86 was written. Verified
+the four routine anchors exist in the installed FF8_EN.exe (supported SHA).
+No `.gdoc` review/mod doc found on C: or D: drives. Still needs: the four
+native patches, the 800px scroll confirmation, and the doc formulae text.
+
 ## 2026-09-23 impl/ff8-actionables: verified, no new code
 
 Re-verified on this branch: Formulae subtab gating, scroll fix, and
