@@ -397,7 +397,7 @@ def install_loader(version: str = "", *, variant: str = DEFAULT_LOADER_VARIANT,
 NEWLINE = chr(10)
 
 # Lexeditor's own effects, shipped with the app rather than downloaded.
-BUNDLED_SHADERS = Path(__file__).resolve().parents[1] / "shaders"
+BUNDLED_SHADERS = Path(__file__).resolve().parents[1] / "shaders" / "reshade"
 # Where a mod keeps a copy of them, so a by-hand install has everything.
 # Exported mods already carry this folder name; keep it stable.
 BUNDLED_FOLDER_NAME = "Lexerian"
