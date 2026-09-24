@@ -3887,7 +3887,24 @@ body:has(.lex-data-map-table) #main {
 .lex-detail-panel-title .lex-inline-label > span { padding-inline:.12em; }
 .lex-quantity-choice { display:grid; grid-template-columns:minmax(0,1fr) auto calc(3ch + 8px); align-items:center; gap:3px; min-width:0; width:100%; }
 .lex-quantity-choice > * { min-width:0; }
-.lex-recipe-row { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:8px; min-width:0; }
+/* Property controls also carry copy, pin and reference controls. Give their
+   quantity enough space for these controls instead of a bare three-digit box. */
+.lex-quantity-choice:has(> .lex-detail-field) {
+  grid-template-columns:minmax(0,1fr) auto minmax(8em,.5fr);
+}
+.lex-quantity-choice > .lex-detail-field {
+  padding:0;
+  margin:0;
+}
+.lex-recipe-row { container-type:inline-size; display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:8px; min-width:0; }
+@container (max-width:34em) {
+  .lex-recipe-row > .lex-quantity-choice { grid-column:1/-1; }
+  .lex-recipe-row > [aria-label="produces"] {
+    grid-column:1/-1;
+    justify-self:center;
+    transform:rotate(90deg);
+  }
+}
 .lex-quantity-choice .lex-choice-field { gap:2px; }
 .lex-quantity-choice .lex-choice-field > button:last-child { width:1.2em; min-width:1.2em; }
 .lex-quantity-choice > .lex-source-control:last-child input { text-align:left; padding-inline:3px; }

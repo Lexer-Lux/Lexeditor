@@ -24,6 +24,35 @@ def test_quantity_is_one_row_at_each_panel_width(page):
     assert len(set(gaps))==1
 
 
+def test_recipe_property_quantities_have_room_for_edits_and_references(page):
+    framework(page)
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
+    page.evaluate('''() => {
+      const U=LexeditorUI;
+      const pair=()=>{
+        const choice=U.detailField({label:'',showType:false,
+          control:U.choiceField(U.inlineLabel(U.el('span',{},'Coral Fragment')),U.el('button',{},'Select'))});
+        const input=U.el('input',{type:'number',min:0,max:255,value:255});
+        const quantity=U.detailField({label:'',showType:false,
+          control:U.provenanceControl({control:input,current:()=>Number(input.value),vanilla:20})});
+        return U.quantityChoice(choice,quantity);
+      };
+      document.querySelector('main').append(U.el('div',{class:'lex-recipe-row'},pair(),U.el('span',{'aria-label':'produces'},'→'),pair()));
+    }''')
+    for width in [460,600,750,1000]:
+        page.locator('main').evaluate('(n,w)=>n.style.width=w+"px"',width)
+        for pair in page.locator('.lex-quantity-choice').all():
+            bounds=pair.bounding_box()
+            box=pair.locator('input').bounding_box()
+            assert box['width']>80
+            assert box['x']+box['width']<=bounds['x']+bounds['width']+1
+            metrics=pair.locator('input').evaluate('''n=>{
+              const s=getComputedStyle(n),c=document.createElement('canvas').getContext('2d');
+              c.font=s.font;return {available:n.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight),
+                needed:c.measureText('255').width};}''')
+            assert metrics['available']>=metrics['needed']
+
+
 def test_help_circle_and_portrait_tabs_keep_shape(page):
     framework(page)
     page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
