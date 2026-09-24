@@ -9,3 +9,5 @@ Canonical game-specific knowledge. No standalone source has been imported for th
 - [Audio volumes](audio-volumes.md): vanilla Sound slider scope, FFNx SFX/Music layer gains, and the #498 split.
 
 - [Altered content](altered-content.md): #319 restoration targets, the nunchaku verdict, and the safe rule.
+
+- [SFX, Models, and Textures assets](asset-tabs.md): audio.fmt layout and FFNx external SFX names, battle `.dat` section inventory, and the verified FFNx external texture paths behind the asset tabs.
