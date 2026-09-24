@@ -11,6 +11,6 @@
   --lex-detail-icon-size:96px;--lex-detail-heading-padding:4px 10px 5px;--lex-detail-title-fg:#651919;--lex-detail-id-fg:var(--lex-muted);
   --lex-detail-icon-border:#8b6b39;--lex-detail-icon-bg:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09);
   --lex-model-stage-bg:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09);--lex-model-stage-fg:#ead8ac;--lex-model-stage-spinner:#d5b469;
-  --lex-input-bg:#fff5d8;
+  --lex-input-bg:#fff5d8;--lex-tab-fg:#2b2114;
   --lex-bitmap-atlas:url('/api/warband-font/atlas');
 }

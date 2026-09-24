@@ -43,3 +43,22 @@ def test_brand_readable_on_command_row(page):
       return ({RATIO_FN})(getComputedStyle(brand).color, getComputedStyle(row).backgroundColor);
     }}''')
     assert ratio >= 4.5, ratio
+
+
+def test_tab_text_readable_in_every_state(page):
+    mount_warband(page)
+    ratios = page.evaluate(f'''() => {{
+      const tabs = [...document.querySelectorAll('.lex-shell-header nav button')];
+      const ratio = {RATIO_FN};
+      return tabs.map(t => ratio(getComputedStyle(t).color, getComputedStyle(t).backgroundColor));
+    }}''')
+    assert len(ratios) == 2, ratios
+    assert all(r >= 4.5 for r in ratios), ratios
+    rest = page.locator('.lex-shell-header nav button:not(.active)')
+    rest.hover()
+    page.wait_for_timeout(300)
+    hovered = page.evaluate(f'''() => {{
+      const t = document.querySelector('.lex-shell-header nav button:not(.active)');
+      return ({RATIO_FN})(getComputedStyle(t).color, getComputedStyle(t).backgroundColor);
+    }}''')
+    assert hovered >= 4.5, hovered
