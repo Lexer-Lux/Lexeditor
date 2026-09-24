@@ -116,6 +116,23 @@ def _install_cache(source: Path, target: Path, data_root: Path) -> None:
     source.replace(target)
 
 
+def remove_previous_caches(data_root: Path) -> int:
+    """Delete caches set aside by earlier rebuilds.
+
+    A rebuild moves the old cache to <name>.previous-<stamp> so a failed
+    swap never leaves the editor with nothing, but none was ever removed:
+    each rebuild left another 33 MB tuning copy, and one install held 190.
+    Once the new manifest is written the old copies are useless, since the
+    cache can always be extracted again from the game.
+    """
+    removed = 0
+    for folder in Path(data_root).glob("*.previous-*"):
+        if folder.is_dir():
+            shutil.rmtree(folder, ignore_errors=True)
+            removed += not folder.exists()
+    return removed
+
+
 def ensure_rdr_data(game_root: Path, data_root: Path, progress) -> dict:
     """Extract RDR tuning, inventory, and shop data into Lexeditor's private cache."""
     game_root = Path(game_root).resolve()
@@ -242,6 +259,7 @@ def ensure_rdr_data(game_root: Path, data_root: Path, progress) -> dict:
             json.dumps(payload, indent=2) + "\n", encoding="utf-8"
         )
         os.replace(manifest_temporary, manifest_path)
+        remove_previous_caches(data_root)
         progress(
             8, 8,
             f"Prepared {len(tuning_files)} tuning files, 2 inventory files, "
