@@ -1115,7 +1115,7 @@ def data_map_rows() -> dict:
         {"filename": "ff8/en/exe/card_texts.msd", "controls": "All 29 card-menu messages", "notes": "Editable: all entries.", "status": "integrated"},
         {"filename": "hext/ff8/en_nv/Lexeditor.FLYING_EVA.txt", "controls": "Flying-enemy EVA bonus and exceptions", "notes": "Editable: all fields.", "status": "integrated"},
         {"filename": "FFNx.toml", "controls": "FFNx display, audio, rendering and runtime settings", "notes": "Editable: typed values in place. Comments and order preserved.", "status": "integrated" if (paths.GAME_ROOT / "FFNx.toml").is_file() else "partial"},
-        {"filename": "field.fs", "controls": "Field maps: encounters, backgrounds, dialogue, scripts, walkmesh, exits, card players", "notes": "Editable: proved encounters, backgrounds, dialogue, scripts, walkmesh and gateways. Locked: models and media.", "status": "partial"},
+        {"filename": "field.fs", "controls": "Field maps: encounters, backgrounds, dialogue, scripts, walkmesh, exits, cameras, card players", "notes": "Editable: encounters, backgrounds, dialogue, scripts, walkmesh, gateways, INF header, cameras and movie frames. Locked: models and media.", "status": "partial"},
     ]
     targets = {
         "kernel.bin": ["characters", "magic", "gfs", "weapons", "items", "abilities", "text"],

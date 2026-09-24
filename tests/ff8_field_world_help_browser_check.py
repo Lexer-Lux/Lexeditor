@@ -1,4 +1,4 @@
-"""Maps help must be reachable without selecting a different tab."""
+"""Field and World help must be reachable without selecting a different tab."""
 import re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -10,7 +10,7 @@ from plugin_ui import plugin_ui
 def main():
     source = plugin_ui('ff8')
     world = re.search(r'const tabsData=(\[.*?\]),wrap=', source).group(1)
-    maps = re.search(r'className:"ff8-maps-tabs",tabs:(\[.*?\]),active:', source).group(1)
+    field = re.search(r'const fieldDetailTabs=(\[.*?\]);', source).group(1)
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
         page = browser.new_page(viewport={'width': 1536, 'height': 900})
@@ -23,9 +23,9 @@ def main():
             window.changes = 0;
             for (const tabs of groups) document.querySelector('main').append(
                 LexeditorUI.subtabBar({tabs, active: tabs[0].id, change: () => window.changes++}));
-        }""", page.evaluate('[' + maps + ',' + world + ']'))
+        }""", page.evaluate('[' + field + ',' + world + ']'))
         markers = page.locator('.lex-subtab-bar .lex-info-help')
-        assert markers.count() == 11
+        assert markers.count() == 19
         assert page.locator('button button').count() == 0
         for i in range(markers.count()):
             marker = markers.nth(i)
@@ -40,7 +40,7 @@ def main():
         page.get_by_role('tab').nth(1).click(position={'x': 10, 'y': 10})
         assert page.evaluate('window.changes') == 1
         browser.close()
-    print('All 11 Maps tabs have usable help; keyboard and click help do not switch tabs.')
+    print('All 19 Field/World subtabs have usable help; keyboard and click help do not switch tabs.')
 
 if __name__ == '__main__':
     main()

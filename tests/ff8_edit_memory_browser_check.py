@@ -144,7 +144,7 @@ def main():
             assert page.evaluate("dirtyCount()") == 1, "redo lost the edit"
 
             # Field dialogue undo exercises the keyed row restore path.
-            page.locator('nav [data-tab="maps"]').click()
+            page.locator('nav [data-tab="fields"]').click()
             page.wait_for_function(
                 "state.data.fields.rows.some(row => row._loaded) || "
                 "document.querySelector('#main [data-field-map]')", timeout=30000)
@@ -152,9 +152,9 @@ def main():
               const row = state.data.fields.rows.find(value => value._loaded)
                 || state.data.fields.rows[0];
               state.selected.fields = row.key;
-              state.mapsTab = "field";
+              state.fieldDetailTab = "dialogue";
               await ensureFieldDetail(row);
-              renderMaps();
+              renderFields();
               return row.key;
             })()""")
             page.wait_for_function(
@@ -175,12 +175,13 @@ def main():
             # Tab cycling stays flat too.
             heap_before = heap_mb(page)
             for _ in range(3):
-                for tab in ("items", "weapons", "magic", "abilities", "enemies", "maps"):
+                for tab in ("items", "weapons", "magic", "abilities", "enemies",
+                    "fields", "world"):
                     page.locator(f'nav [data-tab="{tab}"]').click()
                     page.wait_for_timeout(150)
             growth = heap_mb(page) - heap_before
             assert growth < TAB_HEAP_BUDGET_MB, f"tab cycles grew {growth:.0f} MB"
-            print(f"tab cycles: heap +{growth:.0f} MB over 18 visits.")
+            print(f"tab cycles: heap +{growth:.0f} MB over 21 visits.")
             assert not errors, errors
             # Let slow map previews land before tearing down the server,
             # or their aborted POSTs fail the run after it has passed.

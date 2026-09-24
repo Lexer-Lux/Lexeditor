@@ -1,4 +1,4 @@
-"""Inputs and flags must fit in the shared Start/Maps property grid."""
+"""Inputs and flags must fit in the shared Start/Field property grid."""
 import re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -28,5 +28,5 @@ def main():
     assert not errors,(width,scale,errors)
     assert p.locator('.flag-list').evaluate('(e)=>e.scrollWidth<=e.clientWidth+1'),(width,scale)
   b.close()
- print('Start/Maps property layout: readable inputs and contained flags at four widths and three scales.')
+ print('Start/Field property layout: readable inputs and contained flags at four widths and three scales.')
 if __name__=='__main__':main()

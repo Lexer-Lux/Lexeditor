@@ -15,9 +15,9 @@ try:
 except ModuleNotFoundError:  # Python 3.10 in Lexeditor's bundled environment.
     import tomli as tomllib
 
-from . import (field_background, field_dialogue, field_encounters, field_scripts,
-               field_walkmesh, fixed_data_merge, init_data, iroj_archive, kernel_merge,
-               mngrp_merge, mod_folders, world_data_merge)
+from . import (field_background, field_camera, field_dialogue, field_encounters,
+               field_movie, field_scripts, field_walkmesh, fixed_data_merge, init_data,
+               iroj_archive, kernel_merge, mngrp_merge, mod_folders, world_data_merge)
 
 
 COMPOSITION_FILE = "composition.json"
@@ -63,6 +63,10 @@ FIELD_ENTRANCE_PATH = re.compile(
     r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.inf$", re.IGNORECASE)
 FIELD_SCRIPT_PATH = re.compile(
     r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.jsm$", re.IGNORECASE)
+FIELD_CAMERA_PATH = re.compile(
+    r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.ca$", re.IGNORECASE)
+FIELD_MOVIE_PATH = re.compile(
+    r"^direct/field/mapdata/[^/]+/([^/]+)/\1\.msk$", re.IGNORECASE)
 
 
 def _field_walkmesh_baseline(logical_path: str,
@@ -852,6 +856,22 @@ def _compose_logical_payload(logical_path: str,
         if merged is not None:
             return merged, "semantic merge", conflicts
         return inputs[-1][1], f"opaque winner: {reason}", []
+    camera_baseline = _field_asset_baseline(
+        logical_path, baseline_root, FIELD_CAMERA_PATH)
+    if camera_baseline is not None:
+        merged, conflicts, reason = field_camera.merge(
+            camera_baseline.read_bytes(), inputs, logical_path)
+        if merged is not None:
+            return merged, "semantic merge", conflicts
+        return inputs[-1][1], f"opaque winner: {reason}", []
+    movie_baseline = _field_asset_baseline(
+        logical_path, baseline_root, FIELD_MOVIE_PATH)
+    if movie_baseline is not None:
+        merged, conflicts, reason = field_movie.merge(
+            movie_baseline.read_bytes(), inputs, logical_path)
+        if merged is not None:
+            return merged, "semantic merge", conflicts
+        return inputs[-1][1], f"opaque winner: {reason}", []
     if logical_path == "direct/init.out" and baseline_root is not None:
         baseline = Path(baseline_root) / "main" / "init.out"
         if baseline.is_file():
@@ -1307,6 +1327,42 @@ def compose(project_root: Path, runtime_root: Path,
                     semantic_conflicts_by_path[script_key] = unit_conflicts
                 else:
                     semantic_fallback_by_path[script_key] = fallback
+            for camera_key, camera_claimants in claims.items():
+                camera_baseline = _field_asset_baseline(
+                    camera_key, baseline_root, FIELD_CAMERA_PATH)
+                if len(camera_claimants) < 2 or camera_baseline is None:
+                    continue
+                inputs = []
+                for mod in enabled:
+                    source = resolved_by_mod[mod["id"]].get(camera_key)
+                    if source is not None:
+                        inputs.append((mod["id"], source[0]()))
+                merged, unit_conflicts, fallback = field_camera.merge(
+                    camera_baseline.read_bytes(), inputs, camera_key)
+                if merged is not None:
+                    (staging / camera_key).write_bytes(merged)
+                    semantic_merged.add(camera_key)
+                    semantic_conflicts_by_path[camera_key] = unit_conflicts
+                else:
+                    semantic_fallback_by_path[camera_key] = fallback
+            for movie_key, movie_claimants in claims.items():
+                movie_baseline = _field_asset_baseline(
+                    movie_key, baseline_root, FIELD_MOVIE_PATH)
+                if len(movie_claimants) < 2 or movie_baseline is None:
+                    continue
+                inputs = []
+                for mod in enabled:
+                    source = resolved_by_mod[mod["id"]].get(movie_key)
+                    if source is not None:
+                        inputs.append((mod["id"], source[0]()))
+                merged, unit_conflicts, fallback = field_movie.merge(
+                    movie_baseline.read_bytes(), inputs, movie_key)
+                if merged is not None:
+                    (staging / movie_key).write_bytes(merged)
+                    semantic_merged.add(movie_key)
+                    semantic_conflicts_by_path[movie_key] = unit_conflicts
+                else:
+                    semantic_fallback_by_path[movie_key] = fallback
             init_key = "direct/init.out"
             init_claimants = claims.get(init_key, [])
             init_baseline = Path(baseline_root) / "main" / "init.out"

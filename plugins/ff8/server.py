@@ -327,6 +327,10 @@ class Handler(PluginRequestHandler):
                     body.get("enabledLayers"), body.get("hideBackground") is True,
                     (None if body.get("highlightTile") is None
                      else int(body["highlightTile"]))), "image/png")
+            elif path == "/api/field/background-geometry":
+                self.json_response(field_data.background_geometry(
+                    str(body.get("map", "")), str(body.get("dataset", "current")),
+                    body.get("edits", [])))
             elif path == "/api/init/save":
                 self.json_response(formats.save_init(body.get("edits", [])))
             elif path == "/api/settings/save":
