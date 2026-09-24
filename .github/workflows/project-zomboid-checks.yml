@@ -9,7 +9,7 @@ on:
       - 'tests/fixtures/project_zomboid_acceptance/**'
       - 'tools/verify_project_zomboid_ui.py'
       - 'codex/project-zomboid/acceptance.md'
-      - 'worklog/acceptance/project-zomboid/pr-463.md'
+      - 'docs/acceptance/project-zomboid.md'
       - 'runtime_bootstrap.py'
       - 'ui/credits-sources.json'
       - 'ui/credits.json'
@@ -22,7 +22,7 @@ on:
       - 'tests/fixtures/project_zomboid_acceptance/**'
       - 'tools/verify_project_zomboid_ui.py'
       - 'codex/project-zomboid/acceptance.md'
-      - 'worklog/acceptance/project-zomboid/pr-463.md'
+      - 'docs/acceptance/project-zomboid.md'
       - 'runtime_bootstrap.py'
       - 'ui/credits-sources.json'
       - 'ui/credits.json'
@@ -163,7 +163,7 @@ jobs:
           $candidateInstaller = "candidate\Lexeditor-PR463-project-zomboid-$short.exe"
           Copy-Item $sourceInstaller $candidateInstaller
           Copy-Item 'tests\fixtures\project_zomboid_acceptance' 'candidate\Project-Zomboid-Acceptance-Mod' -Recurse
-          Copy-Item 'worklog\acceptance\project-zomboid\pr-463.md' 'candidate\ACCEPTANCE.md'
+          Copy-Item 'docs\acceptance\project-zomboid.md' 'candidate\ACCEPTANCE.md'
           $hash = (Get-FileHash $candidateInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $(Split-Path $candidateInstaller -Leaf)" | Set-Content 'candidate\SHA256SUMS.txt'
           [ordered]@{

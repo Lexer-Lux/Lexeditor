@@ -6,7 +6,8 @@ on:
     paths:
       - 'plugins/ffx_x2/**'
       - 'tests/test_ffx_x2_*.py'
-      - 'worklog/acceptance/ffx-x2/**'
+      - 'tools/ffx_x2/**'
+      - 'docs/acceptance/ffx-x2.md'
       - 'runtime_bootstrap.py'
       - 'plugin_api.py'
       - 'service_session.py'
@@ -20,7 +21,8 @@ on:
     paths:
       - 'plugins/ffx_x2/**'
       - 'tests/test_ffx_x2_*.py'
-      - 'worklog/acceptance/ffx-x2/**'
+      - 'tools/ffx_x2/**'
+      - 'docs/acceptance/ffx-x2.md'
       - 'runtime_bootstrap.py'
       - 'plugin_api.py'
       - 'service_session.py'
@@ -61,7 +63,7 @@ jobs:
         run: |
           $tokens = $null
           $errors = $null
-          $path = (Resolve-Path 'worklog/acceptance/ffx-x2/run-verifier.ps1').Path
+          $path = (Resolve-Path 'tools/ffx_x2/run-verifier.ps1').Path
           [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
           if ($errors.Count) {
             $errors | Format-List
@@ -188,8 +190,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path $bundle | Out-Null
           Copy-Item -Recurse -Force .\dist\Lexeditor (Join-Path $bundle "Lexeditor")
           Copy-Item -Force .\dist\FFX-X2-Verify.exe (Join-Path $bundle "FFX-X2-Verify.exe")
-          Copy-Item -Force .\worklog\acceptance\ffx-x2\run-verifier.ps1 (Join-Path $bundle "run-verifier.ps1")
-          Copy-Item -Force .\worklog\acceptance\ffx-x2\README.md (Join-Path $bundle "ACCEPTANCE.md")
+          Copy-Item -Force .\tools\ffx_x2\run-verifier.ps1 (Join-Path $bundle "run-verifier.ps1")
+          Copy-Item -Force .\docs\acceptance\ffx-x2.md (Join-Path $bundle "ACCEPTANCE.md")
           [ordered]@{
             contract = "Lexeditor.ffx-x2-candidate"
             pr = 462

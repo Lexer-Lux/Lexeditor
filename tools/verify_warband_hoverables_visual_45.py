@@ -90,7 +90,7 @@ def main() -> int:
             assert "recruit" in selected.inner_text().lower()
             assert not errors, errors
 
-            output = ROOT / "worklog" / "acceptance" / "warband" / "github-45-warband-relationship.png"
+            output = ROOT / "out" / "rendered" / "github-45-warband-relationship.png"
             page.screenshot(path=str(output), full_page=True)
             print({
                 "treeTarget": "veteran",

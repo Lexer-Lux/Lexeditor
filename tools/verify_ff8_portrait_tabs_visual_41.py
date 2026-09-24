@@ -38,7 +38,7 @@ def snapshot(cdp: Cdp, output_stem: str, width: int, height: int) -> dict:
     gf = cdp.eval("""(()=>{const tabs=[...document.querySelectorAll('.ff8-portrait-tab')],chosen=tabs[12],expected=Number(chosen.id.replace('gfs-tab-',''));chosen.click();return{count:tabs.length,images:tabs.filter(tab=>tab.querySelector('img').complete&&tab.querySelector('img').naturalWidth===32).length,expected,selected:state.selected.gfs,panel:Number(document.querySelector('#gf-detail').dataset.gf),names:tabs.map(tab=>tab.title),selectedName:document.querySelector('.ff8-portrait-selected-name')?.textContent,selectedId:document.querySelector('.ff8-portrait-selected-id')?.textContent,repeatedId:document.querySelector('.gf-panel-id')?.textContent||'',missing:tabs.filter(tab=>tab.classList.contains('missing-portrait')).length}})()""")
     if gf["count"] != 16 or gf["images"] != 16 or gf["selected"] != gf["expected"] or gf["panel"] != gf["expected"] or gf["missing"]:
         raise AssertionError(gf)
-    capture(cdp, ROOT / "worklog" / "issues" / "rendered" / f"{output_stem}-gfs.png")
+    capture(cdp, ROOT / "out" / "rendered" / f"{output_stem}-gfs.png")
     cdp.eval("navigate('characters')")
     wait_eval(cdp, "document.querySelectorAll('.ff8-portrait-tab').length===11", 30)
     wait_eval(cdp, "[...document.querySelectorAll('.ff8-portrait-tab img')].every(img=>img.complete&&img.naturalWidth===32)", 30)
@@ -81,13 +81,13 @@ def snapshot(cdp: Cdp, output_stem: str, width: int, height: int) -> dict:
     if gender_reference["text"] not in {"V♂", "V♀"} or gender_reference["icon"] not in {"♂", "♀"} or gender_reference["iconLabel"] not in {"Male", "Female"} or any(digit in gender_reference["text"] for digit in "01") or gender_reference["border"] != "none" or gender_reference["boxShadow"] != "none" or float(gender_reference["fontSize"].removesuffix("px")) > 16 or gender_reference["errors"]:
         raise AssertionError(gender_reference)
     character["genderReference"] = gender_reference
-    capture(cdp, ROOT / "worklog" / "issues" / "rendered" / f"{output_stem}-characters.png")
+    capture(cdp, ROOT / "out" / "rendered" / f"{output_stem}-characters.png")
     return {"size": [width, height], "gfs": gf, "characters": character}
 
 
 def main() -> int:
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    rendered = ROOT / "worklog" / "issues" / "rendered"
+    rendered = ROOT / "out" / "rendered"
     profile = tempfile.TemporaryDirectory(
         prefix="lexeditor-ff8-portraits-edge-", ignore_cleanup_errors=True)
     project = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-portraits-project-", ignore_cleanup_errors=True)

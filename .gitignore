@@ -4,7 +4,8 @@ logs/
 .venv/
 $out/
 _scratch/
-worklog/
+# One flat <issue>.md per issue; no subfolders, mirrors or attachments.
+worklog/*/
 *.tsv
 *_features.txt
 

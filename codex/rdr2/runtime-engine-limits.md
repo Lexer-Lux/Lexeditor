@@ -374,7 +374,7 @@
   older zero-value `0xE6CED54E` record.
 
 For experiments, prior failures and dated implementation history, search
-`worklog/issues/` — recent work by issue number; older mixed material is in `worklog/legacy/`
+`worklog/<issue>.md` — work by issue number; older material is in git history
 section. Promote a fact up into this file only once it is settled and current.
 
 - Lateral climbing: the game DOES ship an Arthur narrow-ledge locomotion

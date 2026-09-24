@@ -39,7 +39,7 @@ def make_mod(root: Path, mod_id: str, name: str, order: int, enabled: bool,
 
 def main() -> int:
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "worklog" / "issues" / "rendered" / "goal-ff8-mod-load-order.png"
+    output = ROOT / "out" / "rendered" / "goal-ff8-mod-load-order.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-mod-order-edge-", ignore_cleanup_errors=True)
     scratch = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-mod-order-render-", ignore_cleanup_errors=True)

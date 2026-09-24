@@ -31,7 +31,7 @@ def main() -> int:
     assert ".lex-data-map-table code,.lex-data-map-link{font-family:var(--lex-font)" in source
 
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "worklog" / "issues" / "rendered" / "github-47-ff8-datamap.png"
+    output = ROOT / "out" / "rendered" / "github-47-ff8-datamap.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(
         prefix="lexeditor-ff8-datamap-edge-", ignore_cleanup_errors=True)

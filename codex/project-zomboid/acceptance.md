@@ -43,7 +43,7 @@ exact PR head (not GitHub's synthetic merge ref), builds the native installer,
 silently installs it on the runner, runs the installed bundled-service smoke and
 installed Project Zomboid smoke, then uploads the installer together with the
 synthetic Build 42 acceptance project and the human checklist from
-`worklog/acceptance/project-zomboid/pr-463.md`.
+`docs/acceptance/project-zomboid.md`.
 
 This provides a delivered binary candidate without asking the tester to build
 Lexeditor. The candidate job still does not substitute for launching a real Build 42

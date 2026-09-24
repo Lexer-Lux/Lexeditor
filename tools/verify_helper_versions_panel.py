@@ -96,7 +96,7 @@ def main() -> int:
         wait_eval(cdp, "!document.querySelector('#lexer-handle').hidden", 20)
         import base64
         closed_shot = cdp.call("Page.captureScreenshot", {"format": "png", "fromSurface": True})
-        closed_target = ROOT / "worklog" / "issues" / "rendered" / "helper-versions-handle.png"
+        closed_target = ROOT / "out" / "rendered" / "helper-versions-handle.png"
         closed_target.parent.mkdir(parents=True, exist_ok=True)
         closed_target.write_bytes(base64.b64decode(closed_shot["data"]))
         button = json.loads(cdp.eval("""JSON.stringify((()=>{const node=document.querySelector('#lexer-handle'),
@@ -128,7 +128,7 @@ def main() -> int:
         assert opened["removedTables"] == 0, opened
         # Capture it open, which is the state worth looking at.
         shot = cdp.call("Page.captureScreenshot", {"format": "png", "fromSurface": True})
-        target = ROOT / "worklog" / "issues" / "rendered" / "helper-versions-panel.png"
+        target = ROOT / "out" / "rendered" / "helper-versions-panel.png"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(base64.b64decode(shot["data"]))
         # Nothing in this panel may install: it is a report, not an updater.

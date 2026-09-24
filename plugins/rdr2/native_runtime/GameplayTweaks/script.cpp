@@ -228,7 +228,7 @@ static int   GET_CLIP_AMMO(Ped p, Hash weapon) { int ammo = -1; return invoke<BO
 // (_downloads/NativeMenuBase/.../inc/natives.h:7897) - the RAW absolute Dead Eye
 // amount, i.e. outer ring PLUS the core reserve this item exists to fence off.
 // Measured in GameplayTweaks.reserve.log at rest: `deadeye=133.56 core=77`.
-// It is therefore NOT on a 0..100 scale, and worklog/issues/github-78.md records
+// It is therefore NOT on a 0..100 scale, and worklog/78.md records
 // it bottoming at ~25-28 while the rendered ring was already empty. Any
 // comparison of this value against a PERCENT threshold, or against ~0 as
 // "empty", is unreachable by construction - which is what previous builds did in

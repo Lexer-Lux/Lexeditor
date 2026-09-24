@@ -21,7 +21,7 @@ from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # n
 
 def main() -> int:
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "worklog" / "issues" / "rendered" / "github-21-ff8-starting-data.png"
+    output = ROOT / "out" / "rendered" / "github-21-ff8-starting-data.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-init-edge-", ignore_cleanup_errors=True)
     project = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-init-project-", ignore_cleanup_errors=True)

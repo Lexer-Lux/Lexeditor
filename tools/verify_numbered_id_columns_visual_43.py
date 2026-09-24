@@ -52,7 +52,7 @@ def inspect(cdp: Cdp, width: int, height: int) -> dict:
             or probe["technical"] != ["▲Name", "ID"] or probe["technicalValues"] != ["Alpha", "itm_alpha"] or probe["technicalIds"] != 0):
         raise AssertionError(probe)
     cdp.eval("navigate('items')")
-    output = ROOT / "worklog" / "issues" / "rendered" / f"github-43-numbered-id-{width}x{height}.png"
+    output = ROOT / "out" / "rendered" / f"github-43-numbered-id-{width}x{height}.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     screenshot = cdp.call("Page.captureScreenshot", {
         "format": "png", "captureBeyondViewport": False, "fromSurface": True,

@@ -25,7 +25,7 @@ def capture(cdp: Cdp, name: str) -> None:
     shot = cdp.call("Page.captureScreenshot", {
         "format": "png", "captureBeyondViewport": False, "fromSurface": True,
     })
-    target = ROOT / "worklog" / "issues" / "rendered" / name
+    target = ROOT / "out" / "rendered" / name
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(base64.b64decode(shot["data"]))
 

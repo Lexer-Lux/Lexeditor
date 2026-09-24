@@ -272,7 +272,7 @@ def verify_api(raw: bytes) -> dict:
 
 
 def verify_rendered() -> dict:
-    output = ROOT / "worklog" / "issues" / "rendered" / "goal-ff8-refine-tables.png"
+    output = ROOT / "out" / "rendered" / "goal-ff8-refine-tables.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     project = tempfile.TemporaryDirectory(
         prefix="lexeditor-ff8-refine-ui-project-", ignore_cleanup_errors=True)

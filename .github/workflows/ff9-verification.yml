@@ -94,7 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ff9-evidence/lexeditor
-          git archive HEAD AGENTS.md '*.py' plugins/ff9 ui tests codex worklog/issues tools .github | tar -x -C ff9-evidence/lexeditor
+          git archive HEAD AGENTS.md '*.py' plugins/ff9 ui tests codex worklog tools .github | tar -x -C ff9-evidence/lexeditor
           git clone --depth 1 --filter=blob:none --sparse --branch v2025.07.04 https://github.com/Albeoris/Memoria.git ff9-evidence/memoria
           git -C ff9-evidence/memoria sparse-checkout set Assembly-CSharp Memoria.Prime Memoria.Scripts Memoria.Patcher Memoria.Compiler Memoria.Launcher/Presets
           git -C ff9-evidence/memoria rev-parse HEAD > ff9-evidence/memoria-source-commit.txt

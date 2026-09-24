@@ -48,8 +48,8 @@ def main() -> int:
             "fonts": {"total": len(font_items), "installed": len(font_items), "items": font_items},
         })
 
-    output = ROOT / "worklog" / "issues" / "rendered" / "github-22-main-menu-box-art-current.png"
-    settings_output = ROOT / "worklog" / "issues" / "rendered" / "github-23-settings-current.png"
+    output = ROOT / "out" / "rendered" / "github-22-main-menu-box-art-current.png"
+    settings_output = ROOT / "out" / "rendered" / "github-23-settings-current.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-menu-edge-", ignore_cleanup_errors=True)
     browser = None

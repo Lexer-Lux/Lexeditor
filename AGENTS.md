@@ -75,13 +75,13 @@ files, screenshots, or GitHub API metadata into this repository.
   describes only the requested work.
 - If a required game label is missing, add/apply it before treating the issue as
   correctly filed. Do not substitute a game-name title prefix for a missing label.
-- Keep one current implementation handoff at `worklog/issues/github-<number>.md`
+- Keep one current implementation handoff at `worklog/<number>.md`
   when an issue needs internal continuity. It should contain current requirements,
   implementation state, evidence, and next work; it is not a verbatim issue archive.
 - Read the live GitHub issue and comments before changing scope or status. Use
   available chat/file context and relevant codex topics when needed.
-- Never create `worklog/attachments/`, `worklog/issues/github-*/sources/`,
-  `worklog/issues/github-*/conversation.md`, or `worklog/migrations/comment-archive/`.
+- `worklog/` is flat: one `<number>.md` per issue and nothing else. Never add
+  subfolders, screenshots, attachments, imported mirrors or API dumps there.
 - Never download GitHub issue attachments into the repository merely for archival
   or provenance purposes. Project assets intentionally used by Lexeditor are a
   separate category and belong in their normal project asset paths.

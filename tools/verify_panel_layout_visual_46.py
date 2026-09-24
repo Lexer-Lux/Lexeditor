@@ -24,7 +24,7 @@ from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # n
 
 
 EDGE = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-OUTPUT = ROOT / "worklog" / "issues" / "rendered"
+OUTPUT = ROOT / "out" / "rendered"
 
 
 def browser_session():

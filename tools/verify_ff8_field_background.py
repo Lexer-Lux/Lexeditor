@@ -146,7 +146,7 @@ def main() -> int:
 
     # Render one installed map per storage variant and retain a visual artifact.
     rendered = {}
-    output_dir = ROOT / "worklog/issues/rendered"
+    output_dir = ROOT / "out/rendered"
     output_dir.mkdir(parents=True, exist_ok=True)
     for variant, (sample_key, sample_map, sample_mim, sample_parsed) in samples.items():
         image = field_background.render(sample_map, sample_mim)

@@ -36,7 +36,7 @@ def mouse(cdp: Cdp, selector: str, modifiers: int = 0, click: bool = True) -> No
 
 def main() -> int:
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "worklog" / "issues" / "rendered" / "github-45-rdr2-loot-hoverable.png"
+    output = ROOT / "out" / "rendered" / "github-45-rdr2-loot-hoverable.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-rdr2-hoverables-edge-", ignore_cleanup_errors=True)
     port = free_port()

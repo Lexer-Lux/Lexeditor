@@ -5,7 +5,6 @@ on:
     paths:
       - 'plugins/chrono_trigger/**'
       - 'codex/chrono_trigger/**'
-      - 'worklog/requests/chrono-trigger-plugin.md'
       - 'tests/test_chrono_trigger_replacement.py'
       - 'tests/chrono_trigger_browser_check.py'
       - 'desktop_host.py'

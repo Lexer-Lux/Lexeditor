@@ -28,7 +28,7 @@ def main() -> int:
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
     host = (ROOT / "desktop_host.py").read_text(encoding="utf-8")
     native = (ROOT / "windows_host.py").read_text(encoding="utf-8")
-    worklog = (ROOT / "worklog" / "issues" / "github-34.md").read_text(encoding="utf-8")
+    worklog = (ROOT / "worklog" / "34.md").read_text(encoding="utf-8")
 
     for heading in (
         "Prior failure classes that can recur", "Primary evidence",

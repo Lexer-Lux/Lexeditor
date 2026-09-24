@@ -33,7 +33,7 @@ def main() -> int:
         raise FileNotFoundError(f"Installed FF8 extracted baseline is missing: {missing}")
 
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "worklog" / "issues" / "rendered" / "github-31-ff8-formulae.png"
+    output = ROOT / "out" / "rendered" / "github-31-ff8-formulae.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-formulae-edge-", ignore_cleanup_errors=True)
     project = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-formulae-project-", ignore_cleanup_errors=True)

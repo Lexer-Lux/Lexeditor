@@ -48,7 +48,7 @@ def main() -> int:
         raise FileNotFoundError(f"Installed FF8 extracted baseline is missing: {missing}")
 
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output_dir = ROOT / "worklog" / "issues" / "rendered"
+    output_dir = ROOT / "out" / "rendered"
     output_dir.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-hoverables-edge-", ignore_cleanup_errors=True)
     project = tempfile.TemporaryDirectory(prefix="lexeditor-hoverables-project-", ignore_cleanup_errors=True)

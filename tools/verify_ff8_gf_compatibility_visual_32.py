@@ -21,7 +21,7 @@ from service_session import request_json  # noqa: E402
 
 def main() -> int:
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "worklog" / "issues" / "rendered" / "github-32-ff8-gf-signed-compatibility.png"
+    output = ROOT / "out" / "rendered" / "github-32-ff8-gf-signed-compatibility.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-gf-compat-edge-", ignore_cleanup_errors=True)
     project = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-gf-compat-project-", ignore_cleanup_errors=True)

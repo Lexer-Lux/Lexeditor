@@ -253,7 +253,7 @@ require("grayscale(1)" in css and "lex-project-source-status.disabled" in css,
 docs = {p.name for p in (ROOT / "docs").iterdir() if p.is_file()}
 require("warband-acceptance.md" not in docs and "warband-managed-wse2.md" not in docs,
         "Warband acceptance/runbook files leaked back into docs/")
-require((ROOT / "worklog/acceptance/warband/pr-361.md").is_file(),
-        "Warband acceptance material was not moved to Worklog")
+require((ROOT / "worklog/97.md").is_file(),
+        "Warband acceptance material was not moved to the #97 worklog")
 
 print("shared UI contract audit passed")

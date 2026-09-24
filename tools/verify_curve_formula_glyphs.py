@@ -139,7 +139,7 @@ def main() -> int:
     # measurement can be taken against a deliberately broken framework to show
     # what the search is worth.
     baseline = bool(os.environ.get("LEX_GLYPH_BASELINE"))
-    output = ROOT / "worklog" / "issues" / "rendered" / (
+    output = ROOT / "out" / "rendered" / (
         "curve-formula-glyphs-before.png" if baseline else "curve-formula-glyphs.png")
     output.parent.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-glyphs-edge-", ignore_cleanup_errors=True)

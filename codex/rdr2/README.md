@@ -1,6 +1,6 @@
 # RDR2 codex
 
-Canonical game knowledge belongs here; issue progress belongs in `worklog/issues/`. Root `AGENTS.md` governs over imported historical policy.
+Canonical game knowledge belongs here; issue progress belongs in `worklog/<issue>.md`. Root `AGENTS.md` governs over imported historical policy.
 
 ## Current verified topics
 
@@ -10,7 +10,7 @@ Canonical game knowledge belongs here; issue progress belongs in `worklog/issues
 
 ## Imported source knowledge
 
-Source: `Lexer-Lux/Lexers-Mod-For-RDR2` at `4fe6c76d17cc9c526cbb208e7d28f26e6395ca60`. Original files and provenance: `/worklog/imports/rdr2/Lexer-Lux--Lexers-Mod-For-RDR2/4fe6c76d17cc9c526cbb208e7d28f26e6395ca60/`. Source-local paths and historical decisions require reconciliation with current code; imported notes do not establish a newly delivered build.
+Source: `Lexer-Lux/Lexers-Mod-For-RDR2` at `4fe6c76d17cc9c526cbb208e7d28f26e6395ca60`. The imported originals were retired from the tree and remain in git history. Source-local paths and historical decisions require reconciliation with current code; imported notes do not establish a newly delivered build.
 
 - [archive-extraction.md](archive-extraction.md)
 - [build-installation.md](build-installation.md)

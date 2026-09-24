@@ -23,7 +23,7 @@ PACK_URL = (
 # LEX_CASING_225 is filed under joaat("LEX_CASING_225") = 0x9B455FDD, while the
 # game looks up joaat("lex_casing_225") = 0x3448E7D9, and the icon is blank.
 # That single mistake is why three successive dictionary rebuilds (#11) changed
-# nothing. See worklog/issues/github-11.md.
+# nothing. See worklog/11.md.
 CUSTOM = {
     "lex_casing_225": ROOT / "lex_casing_225.png",
     "lex_casing_307": ROOT / "lex_casing_307.png",

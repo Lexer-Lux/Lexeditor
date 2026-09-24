@@ -27,7 +27,7 @@ def shot(cdp: Cdp, target: Path) -> None:
 
 def main() -> int:
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "worklog" / "issues" / "rendered"
+    output = ROOT / "out" / "rendered"
     output.mkdir(parents=True, exist_ok=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-shoot-edge-", ignore_cleanup_errors=True)
     project = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-shoot-project-", ignore_cleanup_errors=True)

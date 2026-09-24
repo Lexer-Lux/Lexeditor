@@ -76,7 +76,7 @@ def main() -> int:
         raise AssertionError("unsupported mngrp.bin text-box section was accepted")
 
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
-    output = ROOT / "worklog" / "issues" / "rendered" / "goal-ff8-mngrp-text.png"
+    output = ROOT / "out" / "rendered" / "goal-ff8-mngrp-text.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     project = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-mngrp-project-", ignore_cleanup_errors=True)
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-ff8-mngrp-edge-", ignore_cleanup_errors=True)

@@ -41,7 +41,7 @@ def inspect(cdp: Cdp, width: int, height: int) -> dict:
         raise AssertionError(result)
     if result["overflow"] > 0 or result["errors"]:
         raise AssertionError(result)
-    output = ROOT / "worklog" / "issues" / "rendered" / f"github-42-ff8-tab-arrow-{width}x{height}.png"
+    output = ROOT / "out" / "rendered" / f"github-42-ff8-tab-arrow-{width}x{height}.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     screenshot = cdp.call("Page.captureScreenshot", {
         "format": "png", "captureBeyondViewport": False, "fromSurface": True,

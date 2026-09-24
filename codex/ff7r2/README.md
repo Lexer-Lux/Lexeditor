@@ -18,7 +18,7 @@ Current-master references read for this audit:
 
 Still unavailable on that master:
 - codex/ff7r2/ (this PR creates the Rebirth codex)
-- a game-specific worklog/ff7r2/ (this PR keeps its concise task handoff under worklog/requests instead)
+- a game-specific worklog/ff7r2/
 
 The component catalog did not exist at the original branch baseline; it was added on master during this PR and was re-read rather than retaining the obsolete unavailable-path note.
 

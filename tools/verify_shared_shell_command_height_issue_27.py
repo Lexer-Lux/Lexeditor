@@ -46,7 +46,7 @@ def inspect(cdp: Cdp, plugin: str, url: str) -> dict:
         "overflow": 0,
     }:
         raise AssertionError({plugin: result})
-    output = ROOT / "worklog" / "issues" / "rendered" / f"github-27-{plugin}-compact-command-row.png"
+    output = ROOT / "out" / "rendered" / f"github-27-{plugin}-compact-command-row.png"
     output.parent.mkdir(parents=True, exist_ok=True)
     screenshot = cdp.call("Page.captureScreenshot", {
         "format": "png", "captureBeyondViewport": False, "fromSurface": True,
