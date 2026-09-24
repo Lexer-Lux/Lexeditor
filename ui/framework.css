@@ -7048,7 +7048,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   margin: 0;
   padding: 8px 14px;
   white-space: nowrap;
-  border-radius: 0;
+  border-radius:var(--lex-tab-hover-radius,8px 8px 0 0);
   cursor: pointer;
 
  position:relative;
