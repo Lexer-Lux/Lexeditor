@@ -48,7 +48,7 @@ def check() -> list[str]:
     """Check plugin support files. The launcher checks the game installation."""
     problems: list[str] = []
     for relative in (
-        "editor.html", "server.py", "formats.py", "extractor.py", "game_font.py",
+        "editor.html", "server.py", "assets.py", "formats.py", "extractor.py", "game_font.py",
         "gameplay_settings.py", "flat_stat_abilities.py", "max_spell.py", "mug_drops.py",
         "single_gf.py", "game_icons.py",
         "ffnx_issue_51/runtime_config.py", "ffnx_issue_51/runtime_package.py",
@@ -60,7 +60,7 @@ def check() -> list[str]:
         "menu_items.py", "enemy_tables.py", "enemy_ai.py", "enemy_battle_text.py", "encounters.py", "scan_text.py", "init_data.py",
         "schema/item.json", "schema/kernel_bin_data.json", "schema/jsm_opcodes.json",
         "schema/kernel_section_fields.json", "schema/kernel_lookups.json",
-        "schema/mitem.json", "schema/card.json", "schema/enemy_abilities.json",
+        "schema/mitem.json", "schema/card.json", "schema/sfx_actor_sounds.json", "schema/enemy_abilities.json",
         "schema/status.json",
         "schema/limit_break.json",
         "vendor/ff8ue/lzs.py",
