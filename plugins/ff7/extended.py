@@ -18,7 +18,7 @@ from .archives import FieldArchive, WorldArchive, FIELD_FIELDS, WORLD_FIELDS, YU
 from .storage import target_path, replace_project, records_match
 from .datasets import INITIAL_FIELDS
 from .battle import SceneArchive, SCENE_CATEGORIES, number, text, read_values, write_values, validate_rows
-from .format_codec import bounds, digest, lzs_decode, lzs_encode, string_table, pack_strings, read_int
+from .format_codec import bounds, command_size, decode_text, digest, encode_text, lzs_decode, lzs_encode, string_table, pack_strings, read_int
 from . import semantics
 
 TEXT_SECTIONS = (
@@ -225,6 +225,55 @@ def _exe_text_records():
     return tuple(records)
 
 
+def read_exe_text(raw: bytes) -> str:
+    """Decode one fixed executable text field.
+
+    Most fields are 0xFF-terminated FF7 text (a 0x00 byte before the
+    terminator is a space, as in the menus). The 46 Chocobo name slots
+    and unused shop text slot 10 in both installed English editions are
+    instead NUL-terminated C strings with zero padding and no 0xFF byte;
+    those decode up to the first NUL. A field with neither terminator is
+    rejected, as before.
+    """
+    raw = bytes(raw)
+    if 0xFF in raw:
+        return decode_text(raw)
+    if 0x00 in raw:
+        body = raw[:raw.index(0x00)]
+        pos = 0
+        while pos < len(body):
+            size = command_size(body[pos])
+            if pos + size > len(body):
+                raise ValueError("Truncated FF7 text control")
+            pos += size
+        return decode_text(body + b'\xff')
+    raise ValueError("FF7 string is missing its terminator")
+
+
+def write_exe_text(raw: bytes, value: str) -> bytes:
+    """Encode one fixed executable text field, preserving its convention.
+
+    Unchanged values keep every original byte. Edited 0xFF-terminated
+    fields keep 0xFF padding; edited NUL-padded slots keep NUL padding so
+    the game still terminates the string, which reserves one byte and
+    forbids spaces (0x00 ends the string in game).
+    """
+    raw = bytes(raw)
+    if value == read_exe_text(raw):
+        return raw
+    encoded = encode_text(value)
+    if 0xFF in raw:
+        if len(encoded) > len(raw):
+            raise ValueError(f"Text exceeds {len(raw) - 1} encoded bytes")
+        return encoded.ljust(len(raw), b'\xff')
+    body = encoded[:-1]
+    if len(body) > len(raw) - 1:
+        raise ValueError(f"Text exceeds {len(raw) - 1} encoded bytes")
+    if 0x00 in body:
+        raise ValueError("NUL-padded executable text cannot contain spaces")
+    return body.ljust(len(raw), b'\x00')
+
+
 EXE_TEXT_RECORDS = _exe_text_records()
 EXE_EDIT_RANGES = [
     (0x5202B8,120), (0x520810,264), (0x521A18,80*84), (0x523458,320*4), (0x523A58,96*4),
@@ -281,10 +330,9 @@ class ShopExecutable:
             rows = []
             for i, spec in enumerate(EXE_TEXT_RECORDS):
                 at = spec['offset'] + self.shift
-                fields = [text('text','Text',0,spec['size'])]
                 rows.append({'id':i, 'name':spec['name'],
                              'description':f'Fixed executable text field; maximum encoded storage is {spec["size"]} bytes. Unchanged padding/control bytes are preserved.',
-                             'values':read_values(self.data[at:at+spec['size']], fields)})
+                             'values':{'text':read_exe_text(self.data[at:at+spec['size']])}})
             return rows
         if category == 'worldMovement':
             return [{'id':spec['id'], 'name':spec['name'],
@@ -334,8 +382,10 @@ class ShopExecutable:
             replacement = bytearray(self.data)
             for row in rows:
                 spec = EXE_TEXT_RECORDS[row['id']]; at = spec['offset'] + self.shift
-                fields = [text('text','Text',0,spec['size'])]
-                replacement[at:at+spec['size']] = write_values(self.data[at:at+spec['size']],fields,row.get('values'))
+                values = row.get('values')
+                if not isinstance(values, dict) or set(values) != {'text'}:
+                    raise ValueError("Record has an invalid field set")
+                replacement[at:at+spec['size']] = write_exe_text(self.data[at:at+spec['size']],values['text'])
             self.data = replacement
             return
         if category == 'worldMovement':

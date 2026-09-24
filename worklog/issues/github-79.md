@@ -93,3 +93,60 @@ with Lexer (checklist in live issue #79). No game-code changes were made.
   `edition_parity`, `blank_ui`). Rendered browser scenarios are left to CI.
 - No game-code changes. Remaining scope is installed-game acceptance with Lexer
   (checklist in live issue #79). Issue stays `actionable`.
+
+## Worker session 2026-09-24 (agents/actionables-ff7 @ 89f7f532)
+
+Both FF7 editions ARE installed in this environment
+(`D:\SteamLibrary\steamapps\common\FINAL FANTASY VII` and
+`...\FINAL FANTASY VII Steam Edition`), so the installed acceptance in
+issue #79 was runnable. Baseline `tools\verify_ff7_installed.py` (what
+`tools\FF7-checks.cmd` runs): 34/40 datasets, 4/6 no-op copies, 14
+problems per edition. Five real-data parser gaps found and fixed for real
+(no synthetic-only changes; no game bytes committed):
+
+- KERNEL.BIN section 10 (command descriptions): vanilla first pointer is
+  63 for 32 strings (last pointer's high byte doubles as string 0's first
+  byte). `string_table` now rounds the table up to whole pointers, as the
+  fixed-count engine read does (`plugins/ff7/format_codec.py`).
+- PC LGP footer is the 14-byte `FINAL FANTASY7`, not 15-byte
+  `FINAL FANTASY 7`. `LGP` accepts both and preserves whichever was read
+  (`plugins/ff7/archives.py`).
+- 46 Chocobo name slots + unused shop text slot 10 are NUL-padded C
+  strings with no 0xFF (verified: SAM/ELEN/BLUES/... in both editions).
+  New `read_exe_text`/`write_exe_text` decode up to NUL only when no 0xFF
+  is present (0xFF keeps precedence; ~150 passing slots contain NUL
+  before their 0xFF) and preserve each slot's padding convention on edit
+  (`plugins/ff7/extended.py`).
+- Vanilla 2013 fields blackbgb/fship_4/las0_8 carry a loose size outside
+  the encounter section. Tightness is now enforced only on the edited
+  section-6 slot; other sections keep ordering/uniqueness/full-extent
+  bounds (`field_encounter_offset`).
+- flevel.lgp holds dotted non-PC members (22 .tex + 3 .tut + 1 .siz in
+  both editions, plus 12 .NX + 12 .XOne console variants in Steam
+  Edition). Only extensionless members are PC field files now; dotted
+  members are preserved and listed in `FieldArchive.skipped`, not errors.
+
+Focused synthetic regressions added (all shaped like the real data, no
+game bytes): odd-pointer `string_table` + kernel-level commands quirk,
+14/15-byte LGP footer preservation, NUL exeText round-trip/limits at both
+shifts, loose-size field + dotted-member skip (6 new tests across
+`verify_ff7_{datasets,extended,completion}.py`). Format facts recorded in
+`codex/ff7-data.md`.
+
+Evidence (Windows worktree C:\Lexeditor\_worktrees\ff7):
+- All 12 FF7 CI python verifiers exit 0 (22 datasets, 2 layout, 13
+  accessories, 9 semantic, 19 extended, 25 completion, 6 deployment, 6
+  tooling, 6 mod-stack, 3 installed-contract, parity, blank UI).
+- `tools\verify_ff7_installed.py`: EXIT 0, both editions 40/40 datasets,
+  6/6 disposable byte-exact no-op copies, installed sources unchanged.
+- Disposable-mod probe (kept at `%TEMP%\ff7_mod79.py`, temp projects
+  only): 25 representative edits per edition (character, AI script add,
+  enemy, formation, field/world/Yuffie/Chocobo encounters, shop, price,
+  kernel2 text, command description incl. section-10 repack, Limit,
+  Materia equip effect, item sort, Materia priority, audio, AP
+  multiplier, default name, recruit, world mask, NUL + FF EXE text) all
+  save/reopen equal; installed SHA-256 hashes identical before/after.
+
+Remaining scope is human/gameplay work with Lexer: native deployment of
+a disposable mod and in-game visual/audio/gameplay validation (checklist
+item 3). Issue stays `actionable`; no status change made.

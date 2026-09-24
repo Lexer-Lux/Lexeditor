@@ -94,6 +94,12 @@ class CodecTests(unittest.TestCase):
         for text in ('bad😀',r'\xEA',r'\xFF',r'\xF900','a\\bad'):
             with self.subTest(text=text),self.assertRaises(ValueError):codec.encode_text(text)
 
+    def test_string_table_accepts_vanilla_odd_first_pointer(self):
+        raw=struct.pack('<HH',3,4)+bytes((0x42,0xFF))
+        self.assertEqual(codec.string_table(raw),[' b','b'])
+        for bad in (b'\x00\x00',b'\x01\x00',b'\x03\x00',struct.pack('<HH',3,9999)):
+            with self.assertRaises(ValueError):codec.string_table(bad)
+
 
 class BinaryTests(unittest.TestCase):
     @classmethod
@@ -223,6 +229,36 @@ class BinaryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'outside supported data'):ex.ShopExecutable(bytes(bad),source)
             rows=reread.records('exeText');rows[0]['values']['text']='x'*100
             with self.assertRaises(ValueError):reread.apply('exeText',rows)
+
+    def test_exe_text_reads_nul_padded_slots_and_preserves_convention(self):
+        for shift in (0x200,0x400):
+            with self.subTest(shift=shift):
+                data=bytearray(exe_fixture(shift))
+                specs={spec['name']:spec for spec in ex.EXE_TEXT_RECORDS}
+                chocobo=specs['Chocobo name 1'];at=chocobo['offset']+shift
+                data[at:at+7]=codec.encode_text('SAM')[:-1].ljust(7,b'\x00')
+                empty=specs['Shop text 10'];stop=empty['offset']+shift
+                data[stop:stop+empty['size']]=b'\x00'*empty['size']
+                quit1=specs['Quit menu text 1'];flat=quit1['offset']+shift
+                data[flat:flat+quit1['size']]=codec.encode_text('A B').ljust(quit1['size'],b'\xff')
+                source=bytes(data);sha=hashlib.sha1(source).hexdigest().upper()
+                with patch.dict(ex.EXE_PROFILES,{sha:shift}):
+                    obj=ex.ShopExecutable(source,source);rows=obj.records('exeText')
+                    by_id={row['id']:row for row in rows}
+                    name_id=ex.EXE_TEXT_RECORDS.index(chocobo)
+                    self.assertEqual(by_id[name_id]['values']['text'],'SAM')
+                    self.assertEqual(by_id[ex.EXE_TEXT_RECORDS.index(empty)]['values']['text'],'')
+                    self.assertEqual(by_id[ex.EXE_TEXT_RECORDS.index(quit1)]['values']['text'],'A B')
+                    obj.apply('exeText',rows);self.assertEqual(obj.to_bytes(),source)
+                    rows=obj.records('exeText');rows[name_id]['values']['text']='BOB';obj.apply('exeText',rows)
+                    saved=obj.to_bytes()
+                    self.assertEqual(saved[at:at+7],codec.encode_text('BOB')[:-1].ljust(7,b'\x00'))
+                    reread=ex.ShopExecutable(saved,source)
+                    self.assertEqual(reread.records('exeText')[name_id]['values']['text'],'BOB')
+                    rows=reread.records('exeText');rows[name_id]['values']['text']='TOOLONG'
+                    with self.assertRaises(ValueError):reread.apply('exeText',rows)
+                    rows=reread.records('exeText');rows[name_id]['values']['text']='A B'
+                    with self.assertRaises(ValueError):reread.apply('exeText',rows)
 
 
 class SaveTests(unittest.TestCase):

@@ -94,11 +94,18 @@ def string_table(data: bytes) -> list[str]:
     if not data:
         return []
     first = read_int(data, 0)
-    if first < 2 or first % 2 or first > len(data):
+    if first < 2 or first > len(data):
+        raise ValueError("Invalid FF7 string pointer table")
+    # Vanilla KERNEL.BIN command descriptions start one byte inside the
+    # pointer table (first pointer 63 for 32 strings): the last pointer's
+    # high byte doubles as the first string's first byte. Round the table
+    # up to whole pointers exactly as the fixed-count engine read does.
+    table_end = (first + 1) // 2 * 2
+    if table_end > len(data):
         raise ValueError("Invalid FF7 string pointer table")
 
     def expand(start, stop, depth=0):
-        if depth > 32 or start < first or start >= len(data):
+        if depth > 32 or start < table_end - 1 or start >= len(data):
             raise ValueError("Invalid FF7 text dictionary reference")
         out, pos = bytearray(), start
         while pos < min(stop, len(data)):
@@ -129,7 +136,7 @@ def string_table(data: bytes) -> list[str]:
         return out, False
 
     strings = []
-    for address in struct.unpack_from('<' + 'H' * (first // 2), data):
+    for address in struct.unpack_from('<' + 'H' * (table_end // 2), data):
         raw, ended = expand(address, len(data))
         if not ended:
             raise ValueError("Unterminated FF7 text")
