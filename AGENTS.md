@@ -162,6 +162,13 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
   downloaded dependencies, or generated test output in a source backup.
 - Use temporary directories with guaranteed cleanup for disposable build and
   browser work. Keep final source patches and small reports outside those trees.
+- Never build, clone upstream sources or keep browser profiles inside the
+  repository. `_scratch/` is for small throwaway files only and must stay under
+  1 GB; an abandoned 16 GB FFNx build tree once made the checkout 18 GB. Delete
+  whatever you put there before you finish.
+- Anything the app writes to a player's disk (backups, caches, previous
+  copies) needs a bound: keep the original plus the newest, or cap the size and
+  evict. An unbounded timestamped copy per action is a bug.
 - Before a large build or download, check free space and state the expected disk
   cost. After the job, remove only its generated files. Preserve source changes,
   mods, saves, required game data, and diagnostic evidence that is still needed.
