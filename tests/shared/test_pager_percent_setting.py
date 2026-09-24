@@ -40,4 +40,22 @@ def test_pager_percent_control_and_var(page):
     assert page.evaluate(
         "getComputedStyle(document.documentElement).getPropertyValue('--lex-pager-bar-height').trim()") == '8vh'
     page.evaluate("document.body.append(LexeditorUI.element('div',{class:'lex-pager'}))")
-    assert page.locator('.lex-pager').evaluate('n=>getComputedStyle(n).minHeight') == '64px'
+    assert page.locator('.lex-pager').evaluate('n=>n.getBoundingClientRect().height') == 64
+
+
+def test_populated_pager_obeys_small_height_settings(page):
+    framework(page)
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
+    page.evaluate('''()=>document.querySelector('main').append(LexeditorUI.pager({
+        page:0,pages:5,total:100,pageSize:20,change:()=>{},
+        search:{key:'height-check',change:()=>{}}}))''')
+    for percent in [3,6,9]:
+        page.evaluate("p=>document.documentElement.style.setProperty('--lex-pager-bar-height',p+'vh')",percent)
+        page.wait_for_timeout(100)
+        box=page.locator('.lex-pager').bounding_box()
+        assert abs(box['height']-800*percent/100)<1
+        assert page.locator('.lex-pager').evaluate('''bar=>{
+            const box=bar.getBoundingClientRect();
+            return [...bar.querySelectorAll('input,button,select')].filter(n=>n.offsetWidth).every(n=>{
+                const r=n.getBoundingClientRect();return r.top>=box.top-1&&r.bottom<=box.bottom+1;
+            });}''')

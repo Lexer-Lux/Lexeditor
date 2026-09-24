@@ -883,21 +883,17 @@
       options.actions ? element("div", {class: "lex-detail-panel-actions"}, options.actions) : null);
     return element("section", {
       ...(options.attrs || {}),
-      class: ["lex-detail-panel", "lex-detail", options.tone ? `lex-panel-tone-${options.tone}` : "", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
+      class: ["lex-detail-panel", "lex-detail", options.headingOverlay ? "lex-detail-panel-media" : "", options.tone ? `lex-panel-tone-${options.tone}` : "", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
     }, heading, options.paginate ? paginateSettings(element("div", {class: bodyClass}, options.body || [])) : element("div", {class: bodyClass}, options.body || []));
   };
 
   // A panel can own local navigation without turning those choices into
   // application-level tabs. Plugins provide the active key and content; this
   // shared component owns the tab semantics and stable panel geometry.
-  // Structural rule: a tabbed panel never nests inside another one. Two layers
-  // of tabs above the page is already the limit; a third asks the reader to
-  // hold three positions at once to know where they are. A plugin that needs
-  // another division uses a tabbed panel INSIDE the page, which is what this
-  // control is, and it may not contain a further one.
+  // A panel may contain a second tabbed panel for choices within that view.
+  // Each bar remains a sibling of its own content, never a child of a bar.
   const NESTED_TAB_ERROR =
-    "Lexeditor has no sub-subtabs. Put the extra division in a tabbed panel " +
-    "inside the page instead of nesting one subtab bar inside another.";
+    "Put nested panel tabs inside the panel content, not inside another tab bar.";
   const guardNestedTabs = root => {
     if (!(root instanceof Element)) return root;
     requestAnimationFrame(() => {

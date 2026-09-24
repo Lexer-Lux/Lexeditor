@@ -1,7 +1,7 @@
 """The Field tab's walkmesh overlay aligns with the background preview.
 
 Deling draws tile (x, y) at canvas pixel (bounds.left + x, bounds.top + y).
-The overlay adds the geometry origin to its projected 320x224 screen points,
+The overlay adds the geometry origin to its centred camera-projected points,
 so geometry must match the preview canvas exactly, including under tile edits.
 """
 import struct

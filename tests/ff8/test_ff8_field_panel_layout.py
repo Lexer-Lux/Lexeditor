@@ -34,5 +34,20 @@ def test_field_preview_stays_above_editor(page):
         assert image['y']+image['height']<editor['y']
         assert abs(image['width']/image['height']-.5)<.01
         assert all(abs(image[key]-overlay[key])<1 for key in image)
+        pane=page.locator('.lex-detail-panel-media').bounding_box()
+        assert abs(image['height']-pane['height'])<3
+        assert page.locator('.lex-detail-panel-media .lex-detail-panel-meta').count()==0
         assert page.locator('.lex-tabbed-panel input').count()==1
         assert page.locator('.lex-panel-layout-vertical > .lex-detail-panel input').count()==0
+
+
+def test_field_camera_projection_uses_view_translation_and_uniform_axes(page):
+    source=(ROOT/'plugins/ff8/places.js').read_text(encoding='utf-8')
+    project=source[source.index('  function fieldProject('):source.index('  function fieldOverlayCameraId(')]
+    page.add_script_tag(content=project)
+    result=page.evaluate('''()=>{const camera={axis:[{x:4096,y:0,z:0},{x:0,y:4096,z:0},{x:0,y:0,z:4096}],position:{x:0,y:0,z:100},zoom:200};
+      return [fieldProject(camera,{x:10,y:20,z:0}),fieldProject(camera,{x:0,y:0,z:-200}),
+        fieldProject({...camera,position:{x:10,y:20,z:100}},{x:-10,y:-20,z:0})];}''')
+    assert result[0]=={'x':20,'y':40}
+    assert result[1] is None
+    assert result[2]=={'x':0,'y':0}
