@@ -8,6 +8,7 @@ that exists and is damaged still warns.
 """
 import json
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -87,6 +88,7 @@ class NoModGameTests(unittest.TestCase):
         host._session_project_path = None
         host._dirty_count = 0
         host._font_errors = {}
+        host._session_no_mod = False
         host.update_managed_mod = Mock()
         host.download_fonts = Mock(return_value={})
         session = Mock()
@@ -106,6 +108,46 @@ class NoModGameTests(unittest.TestCase):
         self.assertEqual(captured.get("LEXEDITOR_MOD_READ_ONLY"), "1", captured)
         self.assertEqual(captured.get("LEXEDITOR_NO_MOD"), "1", captured)
         self.assertIn("lexNoMod=1", opened["url"], opened)
+
+
+class ProjectlessPluginTests(unittest.TestCase):
+    """A plugin with no project store opens without a read-only answer.
+
+    The no-mod flag is read for every plugin when a session opens, but it was
+    only assigned inside the projects branch, so Blank - which has no project
+    store at all - failed to open with an UnboundLocalError.
+    """
+
+    def test_a_plugin_with_no_projects_still_opens(self):
+        from plugins.blank.plugin import PLUGIN as BLANK
+
+        host = HostApi.__new__(HostApi)
+        host._lock = threading.RLock()
+        host._installations = Mock()
+        host._installations.rows.return_value = []
+        host._enforce_installations = False
+        host._projects = Mock()
+        host._github = Mock()
+        host._cover_art = Mock()
+        host._session = None
+        host._session_project_path = None
+        host._dirty_count = 0
+        host._font_errors = {}
+        host._session_no_mod = False
+        host.update_managed_mod = Mock()
+        host.download_fonts = Mock(return_value={})
+        session = Mock()
+        session.start.return_value = {"ok": True}
+        session.url = "http://127.0.0.1:9/"
+        plugin = type(BLANK)(**{**BLANK.__dict__,
+                                "session_factory": lambda environment=None: session,
+                                "check": staticmethod(lambda: [])})
+        host._plugins = {plugin.plugin_id: plugin}
+        with patch("core.desktop_host.game_version", return_value=""):
+            opened = host.open_plugin(plugin.plugin_id)
+        self.assertEqual(opened["id"], "blank")
+        self.assertNotIn("lexNoMod", opened["url"])
+        self.assertFalse(host._session_no_mod)
 
 
 class NoModProjectTests(unittest.TestCase):

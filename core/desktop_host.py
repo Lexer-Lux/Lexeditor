@@ -182,6 +182,7 @@ class HostApi:
         self._mod_uploads = {}
         self._managed_mod_results = {}
         self._session_project_path = None
+        self._session_no_mod = False
         self._library_move_progress = None
         self._window_state_path = window_state_path
         self._session: PluginSession | None = None
@@ -1836,6 +1837,10 @@ class HostApi:
                 self._installations.environment(plugin_id)
                 if self._enforce_installations and plugin.installation is not None else {}
             )
+            # A plugin without projects never opens read-only, but the answer is
+            # read below for every plugin: leaving this to the projects branch
+            # made a project-less plugin, such as Blank, fail to open at all.
+            no_mod = False
             if plugin.projects is not None:
                 project = self._projects.snapshot(plugin_id)
                 current = next((row for row in project["projects"] if row["current"]), None)
