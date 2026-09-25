@@ -11,6 +11,7 @@ Lexeditor's Final Fantasy VIII plugin stands on years of community reverse-engin
 - **Robin Engström and ff8-decomp contributors** — FF8 decompilation used to check game behavior and ability categories. <https://github.com/roengstrom/ff8-decomp>
 - **Jérôme Arzel (myst6re) and Deling contributors** — Deling field archives, background rendering, dialogue, scripts, walkmesh, camera setups, movie camera, INF header and camera ranges, encounters and world-map format references; walkmesh-over-background projection from src/3d/WalkmeshGLWidget.cpp; special-text toolbar design and control-byte reference from src/FF8Text.cpp; Japanese glyph mapping from src/qt/fonts/sysfnt_jp.txt (GPL v3 or later). <https://github.com/myst6re/deling>
 - **MaKiPL (Maki), Sebanisu and the OpenVIII team** — OpenVIII text encoding, field formats, world-map records, rail data and texture format references. <https://github.com/MaKiPL/OpenVIII>
+- **MaKiPL (Maki), FF8 Rinoa’s Toolset** — FF8 Rinoa’s Toolset, surveyed for the editability audit: its coverage of world-map vehicles, Wm2field and Namedic.bin is what the audit compares this plugin against, and its battle-stage and UV views set the bar for the Models and Textures tabs. <https://github.com/MaKiPL/FF8-Rinoa-s-Toolset>
 - **Aali132, quantumpencil, Maxime Bacoux, myst6re, Chris Rizzitello, John Pritchard and Julian Xhokaxhiu** — Authors credited in FFNx exe_data.cpp, used for executable text and card-name overrides. <https://github.com/julianxhokaxhiu/FFNx/blob/master/src/exe_data.cpp>
 
 ## Thanks
