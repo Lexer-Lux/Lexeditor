@@ -30,6 +30,13 @@
   function loadingPanel(message="Loading…"){return el("p",{class:"lex-notice",role:"status"},message)}
 
   function emptyPanel(title,message){return detailPanel({title,body:[el("p",{class:"lex-notice"},message)]})}
+  // A game with no mod yet is not a stuck editor. The service says what is
+  // missing (usually the mod source folder), and this shows that instead of a
+  // spinner that waits for a file nobody is going to create on its own.
+  function missingModPanel(title="No mod yet"){
+    return detailPanel({title,body:[
+      el("p",{class:"lex-notice lex-tone-warning",role:"alert"},error||"This game has no mod source yet."),
+      el("p",{class:"lex-notice"},"Lexeditor never creates a mod on its own. Choose Create Mod in the Mod menu, then reopen this tab.")]})}
   function cultureFlag(culture){const code=String(culture||"").toLowerCase();if(code==="en-us")return "🇺🇸";if(code==="en-gb")return "🇬🇧";if(code==="fr-fr")return "🇫🇷";if(code==="de-de")return "🇩🇪";if(code==="es-es")return "🇪🇸";if(code==="it-it")return "🇮🇹";if(code==="pt-br")return "🇧🇷";if(code==="ru-ru")return "🇷🇺";if(code==="pl-pl")return "🇵🇱";if(code==="zh-hans")return "🇨🇳";if(code==="ja-jp")return "🇯🇵";if(code==="ko-kr")return "🇰🇷";return "🌐"}
   function showNavigationLoading(label){document.querySelector("#main").replaceChildren(loadingPanel(`Loading ${label}…`))}
 
@@ -84,7 +91,7 @@
     return items;
   }
   function metadataPanel(){
-    if(!current)return loadingPanel("Loading build.txt…");
+    if(!current)return error?missingModPanel():loadingPanel("Loading build.txt…");
     const panel=detailPanel({title:"build.txt",identity:"TMOD",meta:"tModLoader package metadata",body:[
       ...warnings(),
       detailSection({title:"IDENTITY",body:[
@@ -172,7 +179,7 @@
   }
 
   function dependenciesPanel(){
-    if(!current)return loadingPanel("Loading build.txt…");
+    if(!current)return error?missingModPanel():loadingPanel("Loading build.txt…");
     const panel=detailPanel({title:"References & Build",identity:"TMOD",meta:"tModLoader dependency and package rules",body:[
       ...warnings(),
       detailSection({title:"DEPENDENCIES",body:[

@@ -77,6 +77,13 @@ def _build_file() -> Path:
 
 def _read_build() -> tuple[bytes, str]:
     target = _build_file()
+    if not target.is_file():
+        # A game with no mod yet is the ordinary state, not a broken editor:
+        # say what is missing and what to do, so the page can show it instead
+        # of waiting for a file that will never appear on its own.
+        raise ValueError(
+            f"No Terraria mod source yet: {target} does not exist. "
+            "Choose Create Mod in the Mod menu, then reopen this tab.")
     data = target.read_bytes()
     if len(data) > MAX_BODY:
         raise ValueError("build.txt is too large for structured editing")
