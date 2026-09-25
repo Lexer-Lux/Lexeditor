@@ -319,7 +319,16 @@ def scripts_in_section(data: bytes, section: int, *,
         if use_next_offset:
             # Section 9's spawn lists are action lists, not interpreter scripts:
             # the wiki records that they run to the next offset and end on END.
-            stop = table[index + 1] if index + 1 < len(table) else len(body)
+            # The span is the script plus zero padding, so the body is trimmed
+            # back to its terminator and the padding is reported, not hidden.
+            span_end = table[index + 1] if index + 1 < len(table) else len(body)
+            trimmed = span_end
+            while trimmed - 2 > offset and struct.unpack_from("<H", body, trimmed - 2)[0] == 0:
+                trimmed -= 2
+            if trimmed - 2 < offset or \
+                    struct.unpack_from("<H", body, trimmed - 2)[0] != terminator:
+                raise ValueError(f"Section {section}'s script {index} has no terminator")
+            stop = trimmed
         else:
             # Walk the 16-bit instructions to this script's own terminator.
             position = offset
@@ -330,7 +339,9 @@ def scripts_in_section(data: bytes, section: int, *,
                 position += 2
         if stop is None:
             raise ValueError(f"Section {section}'s script {index} has no terminator")
+        span_end = (table[index + 1] if index + 1 < len(table) else len(body))
         rows.append({"index": index, "offset": start + offset, "bytes": stop - offset,
+                     "padding": span_end - stop,
                      "sha256": hashlib.sha256(body[offset:stop]).hexdigest(),
                      "head": body[offset:offset + 8].hex(" ")})
     return rows
@@ -367,6 +378,26 @@ def event_scripts(dataset: str = "current") -> dict:
     backwards (4444 to 3772, 4408 to 3848).
     """
     return _script_rows(dataset, EVENT_SCRIPT_SECTION, "event scripts")
+
+
+ENTITY_SPAWN_SCRIPT_SECTION = 9
+
+
+def entity_spawn_scripts(dataset: str = "current") -> dict:
+    """The spawn lists that put entities on the world map (section 9).
+
+    Section 9 is the documented exception among the script sections: its lists
+    are action lists that end on `END` (`0xFF05`) and run to the next table
+    offset rather than to a `RETURN`. The installed file shows both: 20 offsets,
+    and every span holds its `END` with zero padding after it.
+    """
+    path = source_path(dataset)
+    data = path.read_bytes()
+    rows = scripts_in_section(data, ENTITY_SPAWN_SCRIPT_SECTION, terminator=SCRIPT_END,
+                              use_next_offset=True)
+    return {"rows": rows, "count": len(rows), "section": ENTITY_SPAWN_SCRIPT_SECTION,
+            "path": str(path), "source": dataset, "label": "entity-spawn scripts",
+            "sha256": hashlib.sha256(data).hexdigest()}
 
 # The position tables share one shape: fixed records from the start of the
 # section, then a four-byte footer. Section 8 (field landing) is read the same

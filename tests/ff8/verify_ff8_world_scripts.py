@@ -70,6 +70,21 @@ def main() -> int:
     locations = world_map.player_location_scripts("vanilla")
     assert locations["count"] == 38, locations["count"]
     assert all(row["bytes"] > 2 for row in locations["rows"])
+
+    # Section 9 is the documented exception: action lists that end on END and
+    # run to the next offset, with zero padding after the terminator.
+    spawns = world_map.entity_spawn_scripts("vanilla")
+    assert spawns["section"] == world_map.ENTITY_SPAWN_SCRIPT_SECTION == 9
+    assert spawns["count"] == 20, spawns["count"]
+    section = raw[pointers[9]:pointers[10]]
+    for row in spawns["rows"]:
+        body = section[row["offset"] - pointers[9]:row["offset"] - pointers[9] + row["bytes"]]
+        assert struct.unpack_from("<H", body, len(body) - 2)[0] == world_map.SCRIPT_END, row
+        tail = section[row["offset"] - pointers[9] + row["bytes"]:
+                       row["offset"] - pointers[9] + row["bytes"] + row["padding"]]
+        assert not tail.strip(b"\x00"), (row["index"], tail)
+        assert 0 <= row["padding"] < 8, row
+    assert [row["padding"] for row in spawns["rows"]][-1] > 2, "the last span holds its own padding"
     try:
         world_map.scripts_in_section(raw, 12)
     except ValueError as error:

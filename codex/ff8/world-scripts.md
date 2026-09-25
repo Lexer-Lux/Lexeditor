@@ -58,10 +58,12 @@ computing both ways.
   while the observed first word is `0xFF01` and the operand follows `0xFF06`.
   The word names are not proved here, so the scripts are shown as byte ranges,
   not as decoded statements.
-- **Section 9's extent rule.** The wiki calls section 9 the exception — spawn
-  lists that end on `END` (`0xFF05`) and run to the next offset — but its table
-  does not parse cleanly with section 11's rule, so nothing is claimed for it.
-  Sections 7, 9, 13 and 36 remain unread; 10 and 12 are read below.
+- **Section 9's extent rule.** Answered since this page was written: section 9
+  uses the same container (20 offsets, sentinel at 80) but its lists are action
+  lists. Each ends on `END` (`0xFF05`) and the span runs to the next offset,
+  with zero padding after the terminator — 2 bytes for most entries, 6 for the
+  last. `entity_spawn_scripts` reads them and reports the padding rather than
+  hiding it. Every script section this page names is now read.
 
 ## The position tables beside the scripts
 
