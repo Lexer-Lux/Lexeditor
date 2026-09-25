@@ -3815,7 +3815,9 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-fill { fill:var(--lex-curve-fill,color-mix(in srgb,var(--lex-accent) 22%,transparent)); stroke:none; }
 .lex-curve-line { fill:none; stroke:var(--lex-curve-stroke,var(--lex-highlight)); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; filter:var(--lex-curve-line-filter,none); }
 .lex-curve-path-formula { fill:var(--lex-text); font:600 11px/1 "Cambria Math",Cambria,serif; pointer-events:none; filter:drop-shadow(1px 1px 1px var(--lex-panel)); }
-.lex-curve-range-value { fill:var(--lex-text); font:700 10px/1 var(--lex-math-font,"Cambria Math",Cambria,serif); filter:drop-shadow(1px 1px 1px var(--lex-panel)); pointer-events:none; }
+/* The numbers at the two ends of the drawn line are the curve's own least and
+   greatest values, so they read in the accent, like the pair in the heading. */
+.lex-curve-range-value { fill:var(--lex-accent); font:700 10px/1 var(--lex-math-font,"Cambria Math",Cambria,serif); filter:drop-shadow(1px 1px 1px var(--lex-panel)); pointer-events:none; }
  .lex-math-formula { display:inline-flex; flex-direction:column; gap:3px; font:700 14px/1.2 var(--lex-math-font,"Cambria Math",Cambria,serif); text-shadow:1px 1px 2px var(--lex-panel); }
 .lex-math-formula > math { font-family:inherit; font-size:inherit; }
 .lex-math-formula > small { font-size:10px; text-align:center; }

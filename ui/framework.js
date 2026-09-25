@@ -2780,10 +2780,31 @@
         const first = points[0], last = points[points.length - 1];
         rangeLow.textContent = formatNumber(samples[0]?.value ?? range.min, {useGrouping: true});
         rangeHigh.textContent = formatNumber(samples[samples.length - 1]?.value ?? range.max, {useGrouping: true});
+        // The line's own height at a given x. A number beside the curve has to
+        // be placed against the line where the number sits, not against the
+        // endpoint it was measured from: the XP curve climbs steeply over its
+        // first few levels, so an offset from the first point alone left the
+        // minimum sitting on the line a sample later.
+        const heightAt = x => {
+          if (x <= points[0][0]) return points[0][1];
+          for (let index = 1; index < points.length; index += 1) {
+            const [x0, y0] = points[index - 1], [x1, y1] = points[index];
+            if (x <= x1) return x1 === x0 ? y1 : y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+          }
+          return points[points.length - 1][1];
+        };
         // Kept clear of the plot edges: at 4 units the first digit sat on the
-        // frame and ran into the axis caption beside it.
-        const lowX = Math.max(12, first[0] + 4), lowY = Math.max(9, first[1] - 5);
-        const highX = Math.min(308, last[0] - 4), highY = Math.max(9, last[1] - 5);
+        // frame and ran into the axis caption beside it. The 10 units off the
+        // line are vertical, and the number is turned to the slope, so the room
+        // it really gets is 10 units times that slope's cosine.
+        const lift = 10;
+        const lowX = Math.max(12, first[0] + 4), highX = Math.min(304, last[0] - 8);
+        const lowY = Math.max(9, heightAt(lowX) - lift);
+        // A curve that climbs into the top corner of the plot - the XP curve
+        // does - has no room above its own line, so its greatest value goes
+        // under the line instead of against the frame.
+        const highLift = heightAt(highX) - lift >= 9 ? -lift : lift + 10;
+        const highY = Math.max(9, heightAt(highX) + highLift);
         rangeLow.setAttribute("x", String(lowX));
         rangeLow.setAttribute("y", String(lowY));
         rangeHigh.setAttribute("x", String(highX));
@@ -2800,7 +2821,7 @@
           const degrees = Math.atan2(to[1] - from[1], run) * 180 / Math.PI;
           return Math.max(-38, Math.min(38, degrees));
         };
-        const reach = Math.max(1, Math.min(4, points.length - 1));
+        const reach = Math.max(1, Math.min(2, points.length - 1));
         const lowAngle = slopeAngle(points[0], points[reach]);
         const highAngle = slopeAngle(points[points.length - 1 - reach], points[points.length - 1]);
         rangeLow.setAttribute("transform", `rotate(${lowAngle.toFixed(2)} ${lowX} ${lowY})`);
