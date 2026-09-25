@@ -137,6 +137,11 @@
       x:"X coordinate for this record. Changing it moves the stored world position.",
       y:"Y coordinate for this record. Changing it moves the stored world position.",
       z:"Z coordinate for this record. Changing it moves the stored world position."},
+    worldToField:{
+      x:"Signed stored X of the world position this entry answers to. It is a small number because the game multiplies it by 4096 before comparing - that scale is recorded from Rinoa's Toolset, not measured here.",
+      y:"Signed stored Y of that same position. X, Y and Z are stored in that order.",
+      z:"Unsigned stored Z of that position.",
+      fieldId:"ID of the field the game loads from this position. The Field page lists the same IDs, so compare an entry against that list before changing it."},
     drawPoint:{
       drawId:"Identifier of this world draw point.",
       x:"Block column of the draw point's anchor: the low seven bits are the column and the "
@@ -302,9 +307,57 @@
     // edited on the Encounters tab; nothing on this tab selects them.
     return LexeditorUI.notice({message:`This world record kind (${row.kind}) is not edited on this page.`});
   }
+  // The world-to-field table: the entries that send a world position into a
+  // field, one per place. It is a file of its own (main.fs, wm2field.tbl), so it
+  // is read and saved through its own endpoints while sitting on this tab.
+  function worldToFieldName(fieldId){
+    const field=state.data.fields.rows.find(row=>Number(row.mapId)===Number(fieldId));
+    return field?.name||`Field ${fieldId}`;
+  }
+  function worldToFieldNumber(row,key,label,minimum,maximum){
+    const vanilla=rowOf(state.vanilla,"wm2field",row.id);
+    const rebuild=()=>{renderWorldMap();shell.refresh()};
+    const control=numberControl(row[key],minimum,maximum,1,value=>{row[key]=value;rebuild()},
+      {"aria-label":label});
+    control.addEventListener("change",rebuild);
+    return sourceControl(control,()=>row[key],vanilla?.[key],
+      referenceValues("wm2field",row.id,value=>value?.[key]),value=>{row[key]=Number(value);rebuild()},
+      value=>formatNumber(value));
+  }
+  function worldToFieldDetail(row,prefs){
+    const field=state.data.fields.rows.find(entry=>Number(entry.mapId)===Number(row.fieldId));
+    return sharedDetail({...row,name:`WORLD TO FIELD ${row.id}`},prefs,[
+      detailSection({title:"WORLD POSITION",help:infoHelp("Where the game must be standing for this entry to answer. The stored numbers are small because the game multiplies them by 4096 before comparing; that is recorded from Rinoa's Toolset, which reads the same table, and is not re-proved here."),body:[
+        detailField({label:"X",help:infoHelp(worldPropertyHelp.worldToField.x),control:worldToFieldNumber(row,"x",`World to field ${row.id} X`,-32768,32767)}),
+        detailField({label:"Y",help:infoHelp(worldPropertyHelp.worldToField.y),control:worldToFieldNumber(row,"y",`World to field ${row.id} Y`,-32768,32767)}),
+        detailField({label:"Z",help:infoHelp(worldPropertyHelp.worldToField.z),control:worldToFieldNumber(row,"z",`World to field ${row.id} Z`,0,65535)})]}),
+      detailSection({title:"FIELD",help:infoHelp("The field this position loads. The game's own code decides when to use this table; test a change in the game before relying on it."),body:[
+        detailField({label:"FIELD ID",help:infoHelp(worldPropertyHelp.worldToField.fieldId),control:worldToFieldNumber(row,"fieldId",`World to field ${row.id} field ID`,0,65535)}),
+        detailField({label:"FIELD",help:infoHelp("The field with this ID, named from the Field page's own list."),control:readonlyField(field?`${field.mapId} · ${field.name}`:"No field with this ID is in the list")}),
+        detailField({label:"PRESERVED",help:infoHelp("The byte after the field ID and the fifteen bytes after that have no established meaning, so they stay exactly as stored."),control:readonlyField(`1 byte · ${wm2fieldReserved} bytes, preserved`)}),
+        LexeditorUI.detailNote("This table names 72 positions. Rinoa's Toolset edits the same table; the meaning of the unnamed bytes is not established.")]})],
+      "world-map-detail world-to-field");
+  }
+  const wm2fieldReserved=15;
+  function renderWorldToField(){
+    const rows=state.data.wm2field.rows,query=state.filters.wm2field.trim().toLocaleLowerCase(),
+      matching=rows.filter(row=>!query||JSON.stringify(row).toLocaleLowerCase().includes(query)),
+      [sortKey,sortDirection]=state.sorts.wm2field,
+      visible=[...matching].sort((left,right)=>sortDirection*String(rowSortValue(left,sortKey)).localeCompare(String(rowSortValue(right,sortKey)),undefined,{numeric:true,sensitivity:"base"}));
+    delete state.columnPrefs.wm2field;
+    return showPaged("wm2field",visible,[
+      {key:"id",label:"ENTRY",help:"Index of this entry in the table. The game matches the stored position against these entries."},
+      {key:"fieldId",label:"FIELD",help:worldPropertyHelp.worldToField.fieldId,render:row=>worldToFieldName(row.fieldId)},
+      {key:"x",label:"X",help:worldPropertyHelp.worldToField.x},
+      {key:"y",label:"Y",help:worldPropertyHelp.worldToField.y},
+      {key:"z",label:"Z",help:worldPropertyHelp.worldToField.z}],
+      worldToFieldDetail,"74px minmax(150px,1fr) repeat(3,minmax(70px,1fr))",
+      {noun:"world to field entries"},false);
+  }
   function renderWorldMapContent(mount=true){
-    const tabsData=[{id:"map",label:"Map",help:"The world map, and nothing else on the panel. Click a cell to inspect its terrain geometry and its region code, or a red dot to inspect a draw point; the corner shows what the pointer is over. Each panel's title opens the page that owns it. Scroll to zoom, drag with the middle mouse button to pan, and double-click to fit the map."},{id:"regions",label:"Regions",help:"The same world-map cells the Map page shows, listed for the region code each one carries. The rules table on the Encounters tab matches that code with the ground type to choose a battle group. Changing a code can change which battles occur there."},{id:"fieldReturns",label:"Field → World",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"drawPoints",label:"Draw Points",help:"Move world draw points. Click the placement grid or edit the packed position bytes. What a draw point gives - its spell, whether it refills and whether it draws a high yield - is stored in FF8_EN.exe, not in this file, so this page changes only where the point is."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
+    const tabsData=[{id:"map",label:"Map",help:"The world map, and nothing else on the panel. Click a cell to inspect its terrain geometry and its region code, or a red dot to inspect a draw point; the corner shows what the pointer is over. Each panel's title opens the page that owns it. Scroll to zoom, drag with the middle mouse button to pan, and double-click to fit the map."},{id:"regions",label:"Regions",help:"The same world-map cells the Map page shows, listed for the region code each one carries. The rules table on the Encounters tab matches that code with the ground type to choose a battle group. Changing a code can change which battles occur there."},{id:"fieldReturns",label:"Field → World",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"worldToField",label:"World → Field",help:"Where each stored world position sends the player: 72 entries of X, Y, Z and a field ID, in the game's own wm2field table. Choose the same field ID the Field page lists. How the game selects an entry from a standing position is not established, so test a change in the game."},{id:"drawPoints",label:"Draw Points",help:"Move world draw points. Click the placement grid or edit the packed position bytes. What a draw point gives - its spell, whether it refills and whether it draws a high yield - is stored in FF8_EN.exe, not in this file, so this page changes only where the point is."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
     if(state.worldTab==="map"){const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;return wrap(renderWorldVisual())}
+    if(state.worldTab==="worldToField")return wrap(renderWorldToField());
     const kind={regions:"region",fieldReturns:"fieldReturn",drawPoints:"drawPoint",skyColors:"skyColor",rails:"railTrack",textures:"worldTexture"}[state.worldTab],rows=state.data.world.rows.filter(row=>row.kind===kind),query=state.filters.world.trim().toLocaleLowerCase(),matching=rows.filter(row=>!query||JSON.stringify(row).toLocaleLowerCase().includes(query)),[sortKey,sortDirection]=state.sorts.world,visible=[...matching].sort((left,right)=>sortDirection*String(rowSortValue(left,sortKey)).localeCompare(String(rowSortValue(right,sortKey)),undefined,{numeric:true,sensitivity:"base"}));
     const columns=kind==="region"?[{key:"id",label:"CELL",help:worldPropertyHelp.region.cell},{key:"x",label:"X",help:worldPropertyHelp.region.x},{key:"y",label:"Y",help:worldPropertyHelp.region.y},{key:"regionId",label:"REGION CODE",help:worldPropertyHelp.region.regionId}]:kind==="fieldReturn"?[{key:"id",label:"INDEX",help:worldPropertyHelp.fieldReturn.index},{key:"x",label:"X",help:worldPropertyHelp.fieldReturn.x},{key:"y",label:"Y",help:worldPropertyHelp.fieldReturn.y},{key:"z",label:"Z",help:worldPropertyHelp.fieldReturn.z}]:kind==="drawPoint"?[{key:"drawId",label:"DRAW ID",help:worldPropertyHelp.drawPoint.drawId},{key:"x",label:"X",help:worldPropertyHelp.drawPoint.x},{key:"y",label:"Y",help:worldPropertyHelp.drawPoint.y},{key:"subId",label:"SUB-ID",help:worldPropertyHelp.drawPoint.subId}]:kind==="skyColor"?[{key:"id",label:"RECORD",help:"Identifier of this sky colour record."},{key:"skyTop",label:"SKY GRADIENT",help:"Preview of the top, centre, and bottom sky colours.",render:worldSkySwatch}]:kind==="railTrack"?[{key:"id",label:"TRACK",help:"Identifier of the train route."},{key:"pointCount",label:"POINTS",help:"Number of points forming the route."},{key:"trainStop1",label:"STOP 1",help:"First stop point in this route."},{key:"trainStop2",label:"STOP 2",help:"Second stop point in this route."}]:[{key:"id",label:"TEXTURE",help:"Identifier of the world texture."},{key:"name",label:"ASSET",help:"Name of the texture image record."},{key:"paletteCount",label:"PALETTES",help:"Number of colour tables in this indexed image."},{key:"depth",label:"BPP",help:"Bits per pixel, which determines how pixel indices refer to palette colours."}];
     delete state.columnPrefs.world;

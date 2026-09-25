@@ -97,11 +97,11 @@ Not covered today, with what each would need:
 - **World-map vehicle records** (Rinoa's Toolset edits them). No page reads that
   table; the sky-colour record's "vehicles" colour is a colour, not the vehicle
   table.
-- **Wm2field** (Rinoa's Toolset). This plugin has Field to World (`wmset`
-  section 9); the world-to-field table now has a proved reader and writer
-  (`plugins/ff8/wm2field.py`, `codex/ff8/wm2field.md`,
-  `tests/ff8/verify_ff8_wm2field.py`), but no page edits it yet, so the Data Map
-  does not claim it.
+- **Wm2field** (Rinoa's Toolset). Covered: the World tab's World → Field subtab
+  edits the table's 72 entries (X, Y, Z and field ID) through
+  `plugins/ff8/wm2field.py`, and the Data Map lists `main.fs → wm2field.tbl` as
+  integrated. `codex/ff8/wm2field.md` records the layout, and
+  `tests/ff8/ff8_wm2field_browser_check.py` drives the page end to end.
 - **`Namedic.bin`** (Rinoa's Toolset). The Text tab inserts location, variable
   and key tokens from static tables in `kernel_text.editor_tokens()`, so the
   names behind those tokens are not editable here. The file's layout is proved
