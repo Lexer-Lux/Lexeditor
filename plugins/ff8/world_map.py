@@ -277,6 +277,79 @@ def parse(data: bytes) -> dict:
             "width": 32, "height": 24}
 
 
+def scripts_in_section(data: bytes, section: int, *,
+                       terminator: int = 0xFF16,
+                       use_next_offset: bool = False) -> list[dict]:
+    """The script bodies of one wmset script section.
+
+    The FF8 modding wiki names these sections - 7 player-location scripts, 9
+    entity-spawn scripts, 11 vehicle warp scripts, 13 side-quest dialog texts -
+    and documents their container (Appendix A of the world-map reference):
+    one 32-bit offset per script, terminated by a zero sentinel, then the
+    bytecode. A script ends at its own RETURN (0xFF16) rather than at the next
+    table offset, which the wiki notes matters in section 36 where two scripts
+    sit earlier in the file than the entry listed before them. Section 11 here
+    is 172 bytes: offsets 20, 56, 92 and 128, sentinel at 16, then four bodies.
+    """
+    pointers = _pointers(data)
+    if not 0 <= section < SECTION_COUNT - 1:
+        raise ValueError(f"wmsetus.obj has no section {section}")
+    start, end = pointers[section], pointers[section + 1]
+    body = data[start:end]
+    if len(body) < 4:
+        raise ValueError(f"Section {section} is too small for its offset table")
+    table: list[int] = []
+    cursor = 0
+    while cursor + 4 <= len(body):
+        value = struct.unpack_from("<I", body, cursor)[0]
+        if value == 0:
+            break
+        table.append(value)
+        cursor += 4
+    if not table:
+        raise ValueError(f"Section {section} has no script offsets")
+    if any(offset % 2 or offset >= len(body) for offset in table):
+        raise ValueError(f"Section {section} has an offset outside its own section")
+    sentinel = cursor + 4
+    if any(offset < sentinel for offset in table):
+        raise ValueError(f"Section {section} has a script that starts inside its table")
+    rows = []
+    for index, offset in enumerate(table):
+        stop = None
+        if use_next_offset:
+            # Section 9's spawn lists are action lists, not interpreter scripts:
+            # the wiki records that they run to the next offset and end on END.
+            stop = table[index + 1] if index + 1 < len(table) else len(body)
+        else:
+            # Walk the 16-bit instructions to this script's own terminator.
+            position = offset
+            while position + 2 <= len(body):
+                if struct.unpack_from("<H", body, position)[0] == terminator:
+                    stop = position + 2
+                    break
+                position += 2
+        if stop is None:
+            raise ValueError(f"Section {section}'s script {index} has no terminator")
+        rows.append({"index": index, "offset": start + offset, "bytes": stop - offset,
+                     "sha256": hashlib.sha256(body[offset:stop]).hexdigest(),
+                     "head": body[offset:offset + 8].hex(" ")})
+    return rows
+
+
+VEHICLE_WARP_SECTION = 11
+SCRIPT_RETURN = 0xFF16
+SCRIPT_END = 0xFF05
+
+
+def vehicle_warp_scripts(dataset: str = "current") -> dict:
+    """The five vehicle warp scripts wmsetus.obj holds (Ragnarok, Garden, train)."""
+    path = source_path(dataset)
+    data = path.read_bytes()
+    rows = scripts_in_section(data, VEHICLE_WARP_SECTION)
+    return {"rows": rows, "section": VEHICLE_WARP_SECTION, "path": str(path),
+            "source": dataset, "sha256": hashlib.sha256(data).hexdigest()}
+
+
 def parse_rail(data: bytes) -> dict:
     """Parse only the rail fields proved by OpenVIII's fixed-block reader."""
     if not data or len(data) % RAIL_BLOCK_SIZE:

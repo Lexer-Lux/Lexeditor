@@ -94,9 +94,13 @@ Covered, by the same file or the same table:
 
 Not covered today, with what each would need:
 
-- **World-map vehicle records** (Rinoa's Toolset edits them). No page reads that
-  table; the sky-colour record's "vehicles" colour is a colour, not the vehicle
-  table.
+- **World-map vehicle records** (Rinoa's Toolset). Corrected: that tool's
+  "World Map vehicles" feature is a 3D *viewer* of the vehicle models, which
+  this plugin does not do (see [asset-tabs.md](asset-tabs.md)). What the world
+  map stores is section 11, the vehicle warp scripts, and those are now read
+  (`plugins/ff8/world_map.py`, [world-scripts.md](world-scripts.md)); no page
+  shows them yet. The sky-colour record's "vehicles" colour is a colour, not
+  the vehicle table.
 - **Wm2field** (Rinoa's Toolset). Covered: the World tab's World → Field subtab
   edits the table's 72 entries (X, Y, Z and field ID) through
   `plugins/ff8/wm2field.py`, and the Data Map lists `main.fs → wm2field.tbl` as
