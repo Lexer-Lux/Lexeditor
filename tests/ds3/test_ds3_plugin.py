@@ -5,6 +5,7 @@ import os
 import struct
 import tempfile
 import unittest
+import zlib
 from unittest import mock
 from pathlib import Path
 
@@ -285,6 +286,84 @@ class DS3FormatTests(unittest.TestCase):
         reopened, was_encrypted = decrypt_regulation(encrypted)
         self.assertTrue(was_encrypted)
         self.assertEqual(reopened, plain)
+
+    def test_a_file_in_the_installed_games_own_shape_opens(self):
+        """Regression for "DS3 regulation has invalid AES-CBC PKCS#7 padding".
+
+        Every other gate here builds its fixture with this plugin's own writer,
+        so a wrong assumption shared by the reader and the writer passes them
+        both; that is how the reported failure reached a real installation.
+        This fixture is assembled from struct, zlib and AES alone, to the layout
+        measured in the installed Regulation 1.35 Game/Data0.bdt, and it needs
+        no installed game.
+        """
+        plain = _bnd4()
+        block = zlib.compress(plain, 9)
+        header = bytearray(0x4C)
+        header[0x00:0x04] = b"DCX\x00"
+        struct.pack_into(">5I", header, 0x04, 0x10000, 0x18, 0x24, 0x44, 0x4C)
+        header[0x18:0x1C] = b"DCS\x00"
+        struct.pack_into(">2I", header, 0x1C, len(plain), len(block))
+        header[0x24:0x28] = b"DCP\x00"
+        header[0x28:0x2C] = b"DFLT"
+        struct.pack_into(">I", header, 0x2C, 0x20)
+        header[0x30] = 9
+        struct.pack_into(">I", header, 0x40, 0x00010100)
+        header[0x44:0x48] = b"DCA\x00"
+        struct.pack_into(">I", header, 0x48, 8)
+        # The installed file pads the container up to the AES block size with
+        # zero bytes and encrypts under an all-zero IV. Neither is PKCS#7.
+        container = bytes(header) + block
+        container += bytes(-len(container) % 16)
+        encryptor = Cipher(algorithms.AES(DS3_REGULATION_KEY),
+                           modes.CBC(bytes(16))).encryptor()
+        encrypted = bytes(16) + encryptor.update(container) + encryptor.finalize()
+
+        reopened, was_encrypted = decrypt_regulation(encrypted)
+        self.assertTrue(was_encrypted)
+        self.assertEqual(reopened, plain)
+        document = RegulationDocument(encrypted, METADATA)
+        for table in TARGET_TABLES:
+            self.assertTrue(document.list_rows(table), table)
+
+    def test_the_written_container_header_is_the_measured_one(self):
+        # Byte-for-byte, the container header of the installed Regulation 1.35
+        # file outside the two lengths that depend on the payload. Pinning it
+        # keeps the writer on the game's shape without an installed game.
+        written = dcx_container(_bnd4())
+        self.assertEqual(
+            written[0x00:0x1C],
+            b"DCX\x00" + bytes.fromhex("000100000000001800000024000000440000004c") + b"DCS\x00",
+        )
+        self.assertEqual(
+            written[0x24:0x4C],
+            b"DCP\x00DFLT"
+            + bytes.fromhex("000000200900000000000000000000000000000000010100")
+            + b"DCA\x00"
+            + bytes.fromhex("00000008"),
+        )
+        self.assertEqual(written[0x4C:0x4E], b"\x78\xda")
+
+    def test_an_unreadable_source_is_named_with_its_size(self):
+        # A file this reader cannot open is reported as itself, not as broken.
+        with tempfile.TemporaryDirectory(prefix="lexeditor-ds3-unreadable-") as name:
+            root = Path(name).resolve()
+            source = root / "Data0.bdt"
+            source.write_bytes(b"this is not a DS3 regulation file at all")
+            saved = (ds3_server.PROJECT, ds3_server.SOURCE_OVERRIDE, ds3_server._DOCUMENT)
+            try:
+                ds3_server.PROJECT = root / "project"
+                ds3_server.SOURCE_OVERRIDE = str(source)
+                ds3_server._DOCUMENT = None
+                with self.assertRaises(DS3FormatError) as caught:
+                    ds3_server._reload()
+            finally:
+                (ds3_server.PROJECT, ds3_server.SOURCE_OVERRIDE, ds3_server._DOCUMENT) = saved
+        message = str(caught.exception)
+        self.assertIn("Data0.bdt", message)
+        self.assertIn("40 bytes", message)
+        self.assertIn("neither BND4 nor IV + AES-CBC ciphertext", message)
+        self.assertNotIn("broken", message.lower())
 
     def test_a_different_regulation_build_is_refused(self):
         source = _bnd4()

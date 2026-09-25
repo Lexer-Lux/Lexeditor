@@ -85,7 +85,15 @@ def _reload() -> RegulationDocument:
     global _DOCUMENT, _SOURCE_PATH, _SOURCE_HASH, _OUTPUT_HASH_AT_LOAD
     source = _find_source()
     raw = source.read_bytes()
-    _DOCUMENT = RegulationDocument(raw, METADATA_ROOT)
+    try:
+        _DOCUMENT = RegulationDocument(raw, METADATA_ROOT)
+    except DS3FormatError as error:
+        # Say which file was read and what it turned out to be. A file this
+        # reader does not support is not the same thing as a damaged one.
+        raise DS3FormatError(
+            f"{source.name} ({len(raw)} bytes) at {source} is not a Dark Souls III "
+            f"regulation this editor can read: {error}"
+        ) from error
     _SOURCE_PATH = source
     _SOURCE_HASH = hashlib.sha256(raw).hexdigest()
     output = _project_output()
