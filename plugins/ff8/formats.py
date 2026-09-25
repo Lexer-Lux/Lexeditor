@@ -17,6 +17,7 @@ from . import enemy_tables as enemy_table_format
 from . import executable_text
 from . import init_data as init_format
 from . import kernel_text
+from . import namedic
 from . import menu_items as menu_item_format
 from . import mngrp_text
 from . import refine_tables
@@ -273,6 +274,17 @@ def save_menu_items(edits: list[dict]) -> dict:
     destination = output_path("mitem.bin")
     _atomic_write(destination, data)
     return {"saved": changed, "file": str(destination)}
+
+
+def namedic_rows(dataset: str = "current") -> dict:
+    """The game's own name list, read from the project copy or the baseline."""
+    return namedic.rows(dataset)
+
+
+def save_namedic(edits: list[dict]) -> dict:
+    """Write the changed names and rebuild the file's offset table."""
+    payload = namedic.save(edits)
+    return {"saved": len(edits), "file": payload["path"], **payload}
 
 
 def shop_rows(dataset: str = "current") -> dict:
@@ -1152,6 +1164,7 @@ def data_map_rows() -> dict:
         {"filename": "init.out", "controls": "Starting party, inventory, GFs, junction and config", "notes": "Editable: named starting fields. Locked: unknown and runtime-only bytes.", "status": "integrated"},
         {"filename": "menu/mitem.bin", "controls": "Menu item types, use flags and parameters", "notes": "Editable: every meaningful field in each record.", "status": "integrated"},
         {"filename": "menu/mngrp.bin", "controls": "Tutorial text and all 377 refine/card-mod recipes", "notes": "Editable: proved text and recipe tables. Locked: scripts, text-box maps, images.", "status": "partial"},
+        {"filename": "main.fs → namedic.bin", "controls": "The game's own name list: world place names and the words its text inserts", "notes": "Editable: all 32 names. A name of any length up to the file's 64 KB of offsets.", "status": "integrated"},
         {"filename": "battle/c0m*.dat", "controls": "Enemy stats, actions, battle AI, battle text; battle model inventory and textures", "notes": "Editable: proved AI scripts, dialogue lines, whole-model replacement. Locked: unknown tails, undecoded battle files.", "status": "partial"},
         {"filename": "battle/scene.out", "controls": "Battle formations, stages, cameras, enemy slots and levels", "notes": "Editable: all supported record fields. Locked: unresolved special level bytes.", "status": "integrated"},
         {"filename": "world.fs / world/dat/wmx.obj + wmsetus.obj + rail.obj + texl.obj", "controls": "World map cells, encounters, draw points, sky colors, rails and textures", "notes": "Editable: proved map and texture fields. Locked: draw-point magic data (lives in the exe).", "status": "partial"},
@@ -1171,6 +1184,7 @@ def data_map_rows() -> dict:
         "menu/price.bin": ["items"], "menu/shop.bin": ["shops"],
         "menu/mwepon.bin": ["weapons"], "init.out": ["starting"],
         "menu/mitem.bin": ["items"], "menu/mngrp.bin": ["text", "refine"],
+        "main.fs → namedic.bin": ["names"],
         "battle/c0m*.dat": ["enemies", "models"], "battle/scene.out": ["encounters"],
         "FF8_EN.exe": ["cards", "text", "enemies"],
         "ff8/en/exe/battle_scans.msd": ["enemies"],

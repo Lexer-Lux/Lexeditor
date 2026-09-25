@@ -216,6 +216,8 @@ class Handler(PluginRequestHandler):
                 self.json_response(formats.item_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/menu-items":
                 self.json_response(formats.menu_item_rows(query.get("dataset", ["current"])[0]))
+            elif path == "/api/namedic":
+                self.json_response(formats.namedic_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/shops":
                 self.json_response(formats.shop_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/weapons":
@@ -323,6 +325,8 @@ class Handler(PluginRequestHandler):
                 self.json_response(formats.save_items(body.get("edits", [])))
             elif path == "/api/menu-items/save":
                 self.json_response(formats.save_menu_items(body.get("edits", [])))
+            elif path == "/api/namedic/save":
+                self.json_response(formats.save_namedic(body.get("edits", [])))
             elif path == "/api/shops/save":
                 self.json_response(formats.save_shops(body.get("edits", [])))
             elif path == "/api/weapons/save":

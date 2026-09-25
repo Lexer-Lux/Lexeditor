@@ -235,6 +235,30 @@
         activate:()=>{state.selected.text=row.id;navigate("text")}}),help:infoHelp(`${boundary} Each group in the special-text toolbar above explains what it inserts.`),control,pin:prefs?.pinButton("value","Text")})]});
   }
   function renderText(){const rows=filtered("text",["sourceLabel","section","recordId","role","value"]),columns=[{key:"sourceLabel",label:"Source",width:"95px"},{key:"sectionId",label:"Section",numeric:true,width:"70px"},{key:"recordId",label:"Record",numeric:true,width:"70px"},{key:"role",label:"Field",width:"minmax(106px,.55fr)"},{key:"value",label:"Text",grow:1}];showPaged("text",rows,columns,textDetail,"95px 70px 70px minmax(106px,.55fr) minmax(160px,1fr)")}
+
+  // The game's own name list: the world place names and the words its text
+  // inserts. Each name is one line, and the bytes it costs in the file are
+  // shown because the list is rebuilt with 16-bit offsets when a name changes
+  // length. codex/ff8/namedic.md records the layout and its evidence.
+  function renderNames(){const rows=filtered("names",["text","id"]);
+    showPaged("names",rows,[
+      {key:"id",label:"ID"},
+      {key:"text",label:"Name",grow:1},
+      {key:"bytes",label:"Bytes",numeric:true,pinned:false}],
+      nameDetail,"70px minmax(200px,2fr) 74px",{noun:"names"})}
+  function nameDetail(row,prefs){
+    const vanilla=rowOf(state.vanilla,"names",row.id);
+    const store=value=>{row.text=value;shell.refresh()};
+    const control=el("input",{type:"text",value:row.text,disabled:state.activeSource!=="mine",
+      "aria-label":`Name ${row.id}`,oninput:event=>store(event.target.value)});
+    return sharedDetail({...row,name:`NAME ${row.id}`},prefs,[
+      detailSection({title:"NAME",help:infoHelp("One of the game's own names or inserted words, stored in main.fs as namedic.bin. The Text tab writes the messages that show it; which message uses which entry is not established, so change a name only when its wording is clear."),body:[
+        detailField({label:"TEXT",help:infoHelp("The name as the game shows it. A longer or shorter name is written by rebuilding the file's offset table, so any length works."),control}),
+        detailField({label:"STORED BYTES",help:infoHelp("Bytes this name occupies in the file, without its terminator. The whole list must stay under 65536 bytes because its offsets are 16-bit."),control:readonlyField(row.bytes)}),
+        detailField({label:"FILE",help:infoHelp("The file this name is written to. The installed game is never changed."),control:readonlyField(state.data.names.path||"")}),
+        detailField({label:"LIST",help:infoHelp("How many names the file holds and how much of its 65536-byte offset space is used."),control:readonlyField(`${state.data.names.count} names, ${state.data.names.size} of ${state.data.names.capacity} bytes`)}),
+        vanilla&&vanilla.text!==row.text?detailField({label:"VANILLA",control:readonlyField(vanilla.text)}):null]})],
+      "world-map-detail ff8-name-detail")}
   const characterCurveOrder=["HP","STR","VIT","MAG","SPR","SPD","LUCK"];
   const characterCurveKind={HP:"hp",STR:"standard",VIT:"standard",MAG:"standard",SPR:"standard",SPD:"linear",LUCK:"linear"};
   function integerDivision(numerator,denominator){return denominator?Math.trunc(numerator/denominator):Number.NaN}

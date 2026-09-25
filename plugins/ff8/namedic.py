@@ -130,6 +130,9 @@ def parse(raw: bytes) -> dict:
             "index": index,
             "offset": start,
             "length": len(payload),
+            # Encoded bytes before the terminator: what the name costs in the
+            # file, which is what an editor has to show while it is typed.
+            "bytes": terminator,
             "text": kernel_text.decode(payload[:terminator]),
             "padding": len(padding),
         })
@@ -145,9 +148,16 @@ def parse(raw: bytes) -> dict:
 
 def rows(dataset: str = "current") -> dict:
     path = source_path(dataset)
-    document = parse(path.read_bytes())
+    raw = path.read_bytes()
+    document = parse(raw)
     document["path"] = str(path)
     document["source"] = dataset
+    document["size"] = len(raw)
+    document["capacity"] = MAX_FILE_SIZE
+    document["rows"] = [
+        {"id": entry["index"], "token": f"namedic:{entry['index']}", "text": entry["text"],
+         "offset": entry["offset"], "length": entry["length"], "bytes": entry["bytes"]}
+        for entry in document["entries"]]
     return document
 
 
