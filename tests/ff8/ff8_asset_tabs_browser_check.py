@@ -124,6 +124,38 @@ def main():
             assert any("custom.png" in row for row in rows), rows
             assert page.locator("#main .lex-detail-panel img").count() >= 1
             set_mod_only(page, False)
+            # The file a texture belongs to is the panel subtitle, and it is
+            # the way into the tab that edits it: no EDIT section, no button.
+            model = page.evaluate("""() => {
+              const row = state.data.textures.rows.find(
+                r => r.editor === 'models' && r.modelFile);
+              state.selected.textures = row.id;
+              render();
+              return row.modelFile;
+            }""")
+            page.wait_for_timeout(400)
+            assert page.locator("#main .lex-detail-panel-icon img").count() >= 1
+            titles = page.evaluate(
+                "() => [...document.querySelectorAll("
+                "'#main .lex-detail-panel [data-section-title]')].map("
+                "node => node.getAttribute('data-section-title'))")
+            assert not any(title == "EDIT" for title in titles), titles
+            assert page.locator(
+                "#main .lex-detail-panel button:has-text('in Models')").count() == 0
+            subtitle = page.locator("#main .lex-detail-panel-meta .lex-hoverable")
+            assert subtitle.count() >= 1
+            assert (subtitle.first.text_content() or "").strip() == model, subtitle.all_text_contents()
+            # The framework moves a native title into its own hover card, so
+            # the accessible name is what still names the destination.
+            assert subtitle.first.get_attribute("aria-label") == f"Open {model} in Models"
+            # A hoverable follows its link on a keyboard activation whatever
+            # the Alt-click preference is, so the check uses the keyboard.
+            subtitle.first.focus()
+            subtitle.first.press("Enter")
+            page.wait_for_timeout(400)
+            assert page.evaluate("state.tab") == "models"
+            page.click('nav button[data-tab="textures"]')
+            page.wait_for_timeout(300)
 
             page.evaluate("() => switchProjectSource('mod:scratch-assets')")
             assert page.evaluate("state.activeSource") == "mod:scratch-assets"

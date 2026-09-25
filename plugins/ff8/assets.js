@@ -144,29 +144,36 @@
     const paletteCount=row.paletteCount||0;
     const isFile=String(row.id).startsWith("file:");
     const previewable=row.mapped||(isFile&&String(row.name||"").toLowerCase().endsWith(".png"));
+    let icon=null;
     if(previewable){
       const key=row.id,palette=Math.max(0,Math.min(Math.max(0,paletteCount-1),Number(assetPalettes[key]??0)));
-      const preview=el("img",{src:`/assets/texture.png?id=${encodeURIComponent(row.id)}&palette=${palette}&dataset=${encodeURIComponent(assetDataset())}`,alt:row.name});
-      const paletteSelect=paletteCount>1?selectControl(palette,Array.from({length:paletteCount},(_,id)=>({value:id,name:`Palette ${id+1}`})),value=>{assetPalettes[key]=value;renderTextures()}):null;
-      if(paletteSelect)paletteSelect.setAttribute("aria-label",`${row.name} preview palette`);
-      const body=[detailField({label:"",control:preview})];
-      if(paletteSelect)body.push(detailField({label:"PALETTE",control:paletteSelect}));
-      sections.push(detailSection({title:"PREVIEW",body,
-        help:infoHelp("Palette selection only changes this preview; the game chooses palettes while rendering.")}));
+      icon=el("img",{src:`/assets/texture.png?id=${encodeURIComponent(row.id)}&palette=${palette}&dataset=${encodeURIComponent(assetDataset())}`,alt:row.name});
     }else if(isFile){
       sections.push(LexeditorUI.detailNote("Only PNG mod textures can be previewed."));
     }
     const facts=[detailField({label:"SOURCE",control:readonlyField(row.source)})];
     if(row.width!=null)facts.push(detailField({label:"SIZE",control:readonlyField(`${row.width} × ${row.height} · ${row.depth}-bit`)}));
     if(row.ffnxBase)facts.push(detailField({label:"FFNX NAME",help:infoHelp("The external texture name FFNx derives for this asset. A mod file replaces it when its path extends this name; every match is listed below as evidence."),control:readonlyField(row.ffnxBase)}));
+    if(previewable&&paletteCount>1){
+      const key=row.id,palette=Math.max(0,Math.min(Math.max(0,paletteCount-1),Number(assetPalettes[key]??0)));
+      const paletteSelect=selectControl(palette,Array.from({length:paletteCount},(_,id)=>({value:id,name:`Palette ${id+1}`})),value=>{assetPalettes[key]=value;renderTextures()});
+      paletteSelect.setAttribute("aria-label",`${row.name} preview palette`);
+      facts.push(detailField({label:"PALETTE",help:infoHelp("Palette selection only changes this preview; the game chooses palettes while rendering."),control:paletteSelect}));
+    }
     sections.push(detailSection({title:"TEXTURE",body:facts}));
     const modBody=(row.modFiles||[]).map(entry=>detailField({label:"FILE",control:readonlyField(`${entry.file} · ${assetFileSize(entry.sizeBytes)}`)}));
     if(!modBody.length)modBody.push(detailField({label:"",control:LexeditorUI.detailNote("No mod replaces this texture.")}));
     sections.push(detailSection({title:"MOD FILES",body:modBody,
       help:infoHelp("Mod files whose path extends this texture's FFNx external name. Files under any other path are listed as unmapped mod textures instead.")}));
-    const links=[];
-    if(row.editor==="models"&&row.modelFile)links.push(el("button",{type:"button",onclick:()=>{state.selected.models=row.modelFile;navigate("models")}},`Open ${row.modelFile} in Models`));
-    if(row.editor==="world")links.push(el("button",{type:"button",onclick:()=>{state.selected.world=row.timIndex;state.worldTab="textures";navigate("world")}},`Open World Texture ${row.timIndex+1} in Maps`));
-    if(links.length)sections.push(detailSection({title:"EDIT",body:[detailField({label:"",control:LexeditorUI.actionRow(...links)})]}));
-    return detailPanel({title:row.name,meta:row.id,body:sections});
+    // The subtitle is the file this texture belongs to, and it goes where the
+    // texture is edited: the Models tab for a model file, the Maps tab for a
+    // world one. The hover card names the destination, so the line stays the
+    // file's name instead of a whole button's worth of instruction.
+    let meta=row.id;
+    if(row.editor==="models"&&row.modelFile){
+      meta=hoverable({content:row.modelFile,targetType:"models",targetId:row.modelFile,targetLabel:`${row.modelFile} in Models`,activate:()=>{state.selected.models=row.modelFile;navigate("models")}});
+    }else if(row.editor==="world"){
+      meta=hoverable({content:row.id,targetType:"world",targetId:row.timIndex,targetLabel:`World Texture ${row.timIndex+1} in Maps`,activate:()=>{state.selected.world=row.timIndex;state.worldTab="textures";navigate("world")}});
+    }
+    return detailPanel({title:row.name,meta,icon,body:sections});
   }

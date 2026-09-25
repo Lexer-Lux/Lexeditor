@@ -124,6 +124,57 @@ def test_scrollbar_only_when_overflowing(base, count, expect_gutter):
             browser.close()
 
 
+def test_open_editor_covers_the_menu_scrollbar(base):
+    """The menu's own scrollbar must not stay visible beside an editor.
+
+    The editor frame is laid out in the viewport without the scrollbar gutter,
+    so a scrolling menu left its bar in a strip down the right edge of every
+    editor screen: the same bar, size and place as on the home screen. The menu
+    keeps its scroll position while it is locked.
+    """
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True, ignore_default_args=['--hide-scrollbars'])
+        try:
+            page = browser.new_page(viewport={'width': 1600, 'height': 900})
+            errors = []
+            page.on('pageerror', lambda e: errors.append(str(e)))
+            load_menu(page, base, 19)
+            page.evaluate('window.scrollTo(0, 400)')
+            page.wait_for_timeout(150)
+            assert page.evaluate('window.scrollY') == 400
+            page.evaluate(f'window.__editorUrl={json.dumps(base + "/stub-editor.html")}')
+            page.evaluate('window.__lexChooser.activate(document.querySelector(".game")._plugin)')
+            page.wait_for_selector('#lexeditor-editor', timeout=8000)
+            page.wait_for_timeout(400)
+            metrics = geometry(page)
+            assert metrics['gutter'] == 0, metrics
+            assert metrics['frameRight'] == metrics['innerWidth'], metrics
+            assert metrics['scrollY'] == 400, metrics
+            page.evaluate('(()=>{document.querySelector("#lexeditor-editor")'
+                          '.contentWindow.__goHome().catch(()=>{});})()')
+            page.wait_for_selector('#lexeditor-editor', state='detached', timeout=8000)
+            page.wait_for_timeout(400)
+            metrics = geometry(page)
+            assert metrics['gutter'] > 0, metrics
+            assert metrics['scrollY'] == 400, metrics
+            assert not errors, errors
+        finally:
+            browser.close()
+
+
+def geometry(page):
+    return page.evaluate('''()=>{
+      const doc = document.documentElement;
+      const frame = document.querySelector('#lexeditor-editor');
+      return {
+        gutter: window.innerWidth - doc.clientWidth,
+        frameRight: frame ? Math.round(frame.getBoundingClientRect().right) : null,
+        innerWidth: window.innerWidth,
+        scrollY: window.scrollY,
+      };
+    }''')
+
+
 def test_edge_handles_stay_fixed_after_home(base):
     with sync_playwright() as play:
         browser = play.chromium.launch(headless=True, ignore_default_args=['--hide-scrollbars'])

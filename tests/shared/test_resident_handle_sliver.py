@@ -1,4 +1,10 @@
-"""G8: the back-to-editor handle shows a crisp cover sliver, not blurred art."""
+"""G8: the back-to-editor handle shows the treated cover, with its affordance.
+
+The handle is the game cover as a texture behind the arrow and the save mark:
+blurred and darkened by the developer settings, not a sharp picture. Both
+amounts are covered by test_chooser_cover_treatment.py; this check holds the
+shipped treatment and the affordance itself.
+"""
 import functools
 import json
 import threading
@@ -15,7 +21,7 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, *_): pass
 
 
-def test_resident_handle_crisp_sliver():
+def test_resident_handle_cover_keeps_its_affordance():
     settings = dict(BASE, developerMode=True, developerAuthorized=True,
                     developerLogin='Lexer-Lux', viewPreferences={},
                     defaultValues=dict(BASE), loadingTransitionMinimumSeconds=0,
@@ -54,15 +60,18 @@ def test_resident_handle_crisp_sliver():
                   beforeSize: getComputedStyle(n, '::before').backgroundSize,
                   beforeImage: getComputedStyle(n, '::before').backgroundImage,
                   afterContent: getComputedStyle(n, '::after').content,
+                  afterBackground: getComputedStyle(n, '::after').backgroundColor,
                   position: getComputedStyle(n).position,
                   right: getComputedStyle(n).right,
                 })''')
-                # Crisp: no blur/darken filter, full-height sliver of the cover.
-                assert art['beforeFilter'] == 'none', art
-                assert '100%' in art['beforeSize'], art
+                # Treated cover: blurred, darkened, and covered by the film.
+                assert 'blur(8px)' in art['beforeFilter'], art
+                assert 'brightness(0.42)' in art['beforeFilter'], art
+                assert 'cover' in art['beforeSize'], art
                 assert art['beforeImage'] != 'none', art
-                # No darkening overlay anymore.
-                assert art['afterContent'] == 'none', art
+                assert art['afterContent'] == '""', art
+                film = art['afterBackground']
+                assert float(film[film.index('(') + 1:film.rindex(')')].split(',')[3]) > 0.3, art
                 # Same affordance: fixed right-edge strip, still clicks through.
                 assert art['position'] == 'fixed' and art['right'] == '0px', art
                 assert handle.get_attribute('aria-label') == 'Return to Game Zero'

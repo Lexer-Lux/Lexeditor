@@ -39,6 +39,9 @@
       await window.pywebview.api.set_dirty_count(0);
       await window.__lexChooser.load();
       await Promise.all([...menu().querySelectorAll("img")].map(image => image.decode().catch(() => {})));
+      // Restore the menu's own scrolling while it is still off-screen, so the
+      // few pixels the scrollbar takes come back before the reader sees it.
+      document.documentElement.classList.remove("lex-editor-open");
       await slide(false);
       const old = frame;
       frame = null;
@@ -100,6 +103,11 @@
       const ready = new Promise((resolve, reject) => { opening = {resolve, reject}; });
       opening.promise=ready;
       frame.src = destination.href;
+      // The frame is sized to the viewport without the scrollbar gutter, so a
+      // scrolling menu would keep its bar visible beside the editor all
+      // session. The menu is covered by the loading screen here, so locking it
+      // reflows nothing the reader can see, and it keeps its scroll position.
+      document.documentElement.classList.add("lex-editor-open");
       document.body.append(frame);
       const timeout = setTimeout(() => opening?.reject(new Error("The editor did not finish loading. Try opening it again.")), 120000);
       try {
@@ -108,6 +116,7 @@
         frame?.remove();
         frame = null;
         opening = null;
+        document.documentElement.classList.remove("lex-editor-open");
         menu().style.transform = "none";
         menu().inert = false;
         throw error;

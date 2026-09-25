@@ -29,6 +29,8 @@ DEFAULTS = {
     "panelTabTarget": "hover",
     "panelGapPercent": 1.0,
     "residentHandleWidthPercent": 5.0,
+    "residentCoverBlurPixels": 8.0,
+    "residentCoverDarkenPercent": 58.0,
     "mainMenuHeightPercent": 9.0,
     "pagerBarHeightPercent": 6.0,
     "soundEnabled": True,
@@ -106,6 +108,18 @@ class SettingsStore:
         except (TypeError, ValueError):
             main_menu_height_percent = defaults["mainMenuHeightPercent"]
         try:
+            resident_cover_blur_pixels = float(payload.get(
+                "residentCoverBlurPixels", defaults["residentCoverBlurPixels"],
+            ))
+        except (TypeError, ValueError):
+            resident_cover_blur_pixels = defaults["residentCoverBlurPixels"]
+        try:
+            resident_cover_darken_percent = float(payload.get(
+                "residentCoverDarkenPercent", defaults["residentCoverDarkenPercent"],
+            ))
+        except (TypeError, ValueError):
+            resident_cover_darken_percent = defaults["residentCoverDarkenPercent"]
+        try:
             pager_bar_height_percent = float(payload.get(
                 "pagerBarHeightPercent", defaults["pagerBarHeightPercent"]
             ))
@@ -155,6 +169,8 @@ class SettingsStore:
             "tweakColumnsPerPage": max(1, min(12, int(defaults.get("tweakColumnsPerPage", 6)))),
             "panelGapPercent": max(0.25, min(4.0, panel_gap_percent)),
             "residentHandleWidthPercent": max(2.5, min(12.0, resident_handle_width_percent)),
+            "residentCoverBlurPixels": max(0.0, min(24.0, resident_cover_blur_pixels)),
+            "residentCoverDarkenPercent": max(0.0, min(100.0, resident_cover_darken_percent)),
             "mainMenuHeightPercent": max(3.0, min(20.0, main_menu_height_percent)),
             "pagerBarHeightPercent": max(3.0, min(12.0, pager_bar_height_percent)),
             "soundEnabled": payload.get("soundEnabled", defaults["soundEnabled"]) is True,
@@ -282,6 +298,10 @@ class SettingsStore:
             "tweakColumnsPerPage": max(1, min(12, int(current["tweakColumnsPerPage"]))),
             "panelGapPercent": max(0.25, min(4.0, float(current["panelGapPercent"]))),
             "residentHandleWidthPercent": max(2.5, min(12.0, float(current["residentHandleWidthPercent"]))),
+            "residentCoverBlurPixels": max(0.0, min(24.0, float(current["residentCoverBlurPixels"]))),
+            "residentCoverDarkenPercent": max(
+                0.0, min(100.0, float(current["residentCoverDarkenPercent"]))
+            ),
             "mainMenuHeightPercent": max(3.0, min(20.0, float(current["mainMenuHeightPercent"]))),
             "pagerBarHeightPercent": max(3.0, min(12.0, float(current["pagerBarHeightPercent"]))),
             "soundEnabled": bool(current["soundEnabled"]),

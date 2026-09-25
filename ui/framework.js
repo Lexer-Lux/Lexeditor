@@ -4760,6 +4760,8 @@ ${contents.path}`});
         {key:"soundEnabled", scope:"user", title:"Sound", description:"Play game-themed interface sounds when the active plugin supplies them.", type:"checkbox"},
         {key:"soundVolumePercent", scope:"packaged", title:"Volume level", description:"Attenuates all menu sound effects for every user.", type:"number", min:0, max:100, step:1, unit:"%"},
         {key:"residentHandleWidthPercent", scope:"packaged", title:"Home editor handle width", description:"Width of the Back to Editor handle as a percentage of the main-menu window.", type:"number", min:2.5, max:12, step:.25, unit:"%"},
+        {key:"residentCoverBlurPixels", scope:"packaged", title:"Home handle cover blur", description:"How far the game cover behind the Home screen's Back to Editor handle is blurred, in pixels. The handle keeps its own arrow and save mark above the art.", type:"number", min:0, max:24, step:.5, unit:"px"},
+        {key:"residentCoverDarkenPercent", scope:"packaged", title:"Home handle cover darkening", description:"How much the game cover behind the Home screen's Back to Editor handle is darkened. This sets both the brightness of the art and the dark film over it.", type:"number", min:0, max:100, step:2, unit:"%"},
         {key:"absentGameDesaturationPercent", scope:"packaged", title:"Absent game desaturation", description:"Amount of color removed from Absent game cover art on the Home screen.", type:"number", min:0, max:100, step:5, unit:"%"},
         {key:"globalMessageRarity", scope:"packaged", title:"Global message rarity", description:"Makes each global loading message this many times less likely than each game-specific message.", type:"number", min:1, max:100, step:1, unit:"× rarer"},
         {key:"loadingTransitionMinimumSeconds", scope:"packaged", title:"Loading screen transition", type:"number", min:0, max:10, step:.25, unit:"s", fallback:1.5},
@@ -7882,14 +7884,27 @@ ${contents.path}`});
       };
       requestAnimationFrame(() => requestAnimationFrame(measurePager));
       document.fonts?.ready?.then(measurePager).catch(() => {});
+      // The reserved space is a measured number, and the bar can change height
+      // at any time: the reader picks the pagination bar height in Settings,
+      // long after a page was built. Watching the bar for its whole life - not
+      // for its first ten seconds - keeps the reserved space equal to the bar,
+      // so lowering the height resizes the page instead of leaving a band of
+      // empty space above the bar until the page is rebuilt.
       if (window.ResizeObserver) {
         const observer = new ResizeObserver(() => {
           if (!root.isConnected) { observer.disconnect(); return; }
           measurePager();
         });
         observer.observe(pagerNode);
-        setTimeout(() => observer.disconnect(), 10000);
       }
+      const remeasureOnSettings = () => {
+        if (!root.isConnected) {
+          window.removeEventListener("lexeditor-settings-changed", remeasureOnSettings);
+          return;
+        }
+        measurePager();
+      };
+      window.addEventListener("lexeditor-settings-changed", remeasureOnSettings);
     }
 
     if (sharedSettingsSnapshot === null) {

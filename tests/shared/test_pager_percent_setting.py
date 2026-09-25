@@ -59,3 +59,54 @@ def test_populated_pager_obeys_small_height_settings(page):
             return [...bar.querySelectorAll('input,button,select')].filter(n=>n.offsetWidth).every(n=>{
                 const r=n.getBoundingClientRect();return r.top>=box.top-1&&r.bottom<=box.bottom+1;
             });}''')
+
+
+def pager_gap(page):
+    return page.evaluate('''()=>{
+      const pager=document.querySelector('.lex-pager');
+      const list=document.querySelector('.lex-column-list');
+      return {bar:Math.round(pager.getBoundingClientRect().height),
+        reserved:getComputedStyle(document.documentElement)
+          .getPropertyValue('--lex-pager-height').trim(),
+        listBottom:list?Math.round(list.getBoundingClientRect().bottom):null,
+        pagerTop:Math.round(pager.getBoundingClientRect().top),
+        gap:list?Math.round(pager.getBoundingClientRect().top-
+          list.getBoundingClientRect().bottom):null};
+    }''')
+
+
+def test_lower_bar_height_resizes_the_page_above_it(page):
+    """A saved pagination-bar height must resize the page under it at once.
+
+    The space held open under a page is the measured bar height, so before this
+    a reader who lowered the bar height in Settings was left with a band of
+    empty space between the page and the bar until the page was rebuilt.
+    """
+    framework(page)
+    page.add_style_tag(content='#main{display:flex;flex-direction:column}'
+                               '.lex-paged-list-detail{flex:1 1 auto;min-height:0}')
+    page.evaluate("()=>document.documentElement.style.setProperty('--lex-pager-bar-height','9vh')")
+    page.evaluate('''()=>{
+      const U=LexeditorUI,rows=Array.from({length:80},(_,i)=>({id:i+1,name:'Row '+(i+1)}));
+      const view=U.pagedListDetail({rows,key:r=>r.id,selected:0,pageSize:15,fit:{minRowHeight:34},
+        master:v=>U.columnList({rows:v.rows,key:r=>r.id,selected:v.selected,
+          columns:[{key:'name',label:'Name'}]}),
+        detail:r=>U.detailPanel({title:r.name})});
+      document.querySelector('main').append(view);
+    }''')
+    page.wait_for_timeout(600)
+    before=pager_gap(page)
+    assert before['reserved']==f"{before['bar']}px",before
+    # A reader reaches Settings long after the page was built; the bar used to
+    # be watched for its first ten seconds only, so the wait is the defect.
+    page.wait_for_timeout(11000)
+    # Saving the pagination-bar height in Settings applies the new value and
+    # announces the change, exactly as openSettings() does.
+    page.evaluate("()=>{document.documentElement.style.setProperty('--lex-pager-bar-height','3.5vh');"
+                  "dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{}}))}")
+    page.wait_for_timeout(400)
+    after=pager_gap(page)
+    assert after['bar']<before['bar'],(before,after)
+    assert after['reserved']==f"{after['bar']}px",after
+    assert after['listBottom']>before['listBottom'],(before,after)
+    assert abs(after['gap']-before['gap'])<2,(before,after)
