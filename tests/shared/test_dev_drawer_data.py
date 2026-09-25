@@ -42,8 +42,11 @@ class DeveloperDrawerDataTests(unittest.TestCase):
         # repository really does reach zero, delete this test with the debt.
         self.assertTrue(_budget_counts("verify_shared_code_budget"),
                         "the drawer would report no copied lines for any game")
-        self.assertTrue(_budget_counts("verify_shared_ui_budget"),
-                        "the drawer would report no shared selectors for any file")
+        # The shared-UI budget reached zero on 2026-09-25: every plugin
+        # stylesheet is tokens only and no plugin builds a table, row or list by
+        # hand, so that column reads zero because the debt is paid, not because
+        # the drawer lost the verifier. The check that the verifier is still
+        # where the drawer reads it is above this one.
 
 
 if __name__ == "__main__":
