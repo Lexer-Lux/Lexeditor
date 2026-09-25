@@ -123,3 +123,57 @@ def test_renaming_a_subtab_ships_under_the_page_tab_that_owns_it(page):
     mount_subtabs(page)
     assert subtab_label(page) == "Parameters", "the saved subtab name did not come back"
     assert subtab_label(page, 1) == "Growth"
+
+
+def mount_field(page):
+    page.evaluate("""()=>{
+      document.querySelector('main').replaceChildren(
+        LexeditorUI.detailPanel({title:'Record', body:[
+          LexeditorUI.detailField({label:'Weight',
+            control:LexeditorUI.el('input',{type:'number',value:42})})]}));
+    }""")
+    page.wait_for_timeout(200)
+
+
+def field_label(page):
+    return page.locator(".lex-detail-field-label-text").first \
+        .evaluate("n=>n.textContent.trim()")
+
+
+def test_renaming_a_property_name_ships_for_that_property(page):
+    framework(page)
+    mount_shell(page)
+    mount_field(page)
+    assert field_label(page) == "Weight"
+    page.locator(".lex-detail-field-label-text").first.dblclick()
+    field = page.locator(".lex-detail-field-label .lex-label-rename").first
+    field.wait_for(timeout=3000)
+    field.fill("Mass")
+    field.press("Enter")
+    page.wait_for_timeout(250)
+    assert field_label(page) == "Mass"
+    saved = page.evaluate("window.savedCalls")
+    assert saved == [["fixture", "items", {"fixture-items.field.Weight.label": "Mass"}]], saved
+    # Every screen that draws this property reads the same name.
+    mount_field(page)
+    assert field_label(page) == "Mass", "the saved property name did not come back"
+
+
+def test_escape_keeps_a_property_name_and_an_empty_one_restores_it(page):
+    framework(page)
+    mount_shell(page)
+    mount_field(page)
+    page.locator(".lex-detail-field-label-text").first.dblclick()
+    page.locator(".lex-detail-field-label .lex-label-rename").first.fill("Half typed")
+    page.locator(".lex-detail-field-label .lex-label-rename").first.press("Escape")
+    page.wait_for_timeout(200)
+    assert field_label(page) == "Weight"
+    page.locator(".lex-detail-field-label-text").first.dblclick()
+    page.locator(".lex-detail-field-label .lex-label-rename").first.fill("Mass")
+    page.locator(".lex-detail-field-label .lex-label-rename").first.press("Enter")
+    page.wait_for_timeout(200)
+    page.locator(".lex-detail-field-label-text").first.dblclick()
+    page.locator(".lex-detail-field-label .lex-label-rename").first.fill("   ")
+    page.locator(".lex-detail-field-label .lex-label-rename").first.press("Enter")
+    page.wait_for_timeout(200)
+    assert field_label(page) == "Weight", "an empty name did not restore the shipped one"

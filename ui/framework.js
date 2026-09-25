@@ -1728,8 +1728,8 @@
       // text node it was an anonymous item the leader arrow could shrink to
       // nothing, which wrapped "CAN SELL" one letter per line and drove the
       // label fitter down to its six-pixel floor.
-    }, element("div", {class: "lex-detail-field-label"},
-      element("span", {class: "lex-detail-field-label-text"}, options.label),
+      }, element("div", {class: "lex-detail-field-label"},
+      labelNode(options),
       helpMarker ? element("span", {class:"lex-field-help"}, helpMarker) : null,
       // The arrow used to live inside the label, which forced a boolean's
       // label column to span the whole row so the arrow had somewhere to run -
@@ -5497,6 +5497,25 @@ ${contents.path}`});
     document.querySelector(".lex-shell-header nav button.active")?.dataset.tab || "";
   const savedLabel = (key, fallback) => {
     try { return localStorage.getItem(key) || fallback; } catch (_error) { return fallback; }
+  };
+  // A property's name as the developer last named it. The shipped name is the
+  // key, so an override never orphans itself: the same property, drawn on any
+  // screen, reads the same. A label that is a node rather than a name (a chip
+  // with an icon in it) is left alone.
+  const fieldLabelKey = label =>
+    `${shellPluginId()}-${activePageTab()}.field.${label}.label`;
+  const labelNode = options => {
+    const shipped = typeof options.label === "string" ? options.label : "";
+    const node = element("span", {class: "lex-detail-field-label-text"},
+      shipped ? savedLabel(fieldLabelKey(shipped), shipped) : options.label);
+    if (!shipped) return node;
+    node.addEventListener("dblclick", event => {
+      if (!sharedSettingsSnapshot?.developerMode) return;
+      event.preventDefault();
+      event.stopPropagation();
+      renameInPlace(fieldLabelKey(shipped), activePageTab(), shipped, node);
+    });
+    return node;
   };
   const renameInPlace = (key, tabId, fallback, text) => {
     const before = text.textContent;
