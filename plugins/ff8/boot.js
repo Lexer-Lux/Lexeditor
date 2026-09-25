@@ -433,7 +433,7 @@
   // The game's own archives, listed. Read-only: extraction and repacking
   // are separate jobs, and browsing never writes to the installation.
   let archivesUI;
-  function renderArchives(){archivesUI??=FF8ArchivesUI({el:LexeditorUI.el,columnList:LexeditorUI.columnList,pagedListDetail:LexeditorUI.pagedListDetail,detailPanel:LexeditorUI.detailPanel,detailSection:LexeditorUI.detailSection,detailField:LexeditorUI.detailField,readonlyField:LexeditorUI.readonlyField,infoHelp:LexeditorUI.infoHelp,notice:LexeditorUI.notice,panelLayout:LexeditorUI.panelLayout,shell,formatNumber:LexeditorUI.formatNumber});return archivesUI.render()}
+  function renderArchives(){archivesUI??=FF8ArchivesUI({el:LexeditorUI.el,columnList:LexeditorUI.columnList,pagedPane:LexeditorUI.pagedPane,pager:LexeditorUI.pager,detailPanel:LexeditorUI.detailPanel,detailSection:LexeditorUI.detailSection,detailField:LexeditorUI.detailField,readonlyField:LexeditorUI.readonlyField,infoHelp:LexeditorUI.infoHelp,notice:LexeditorUI.notice,panelLayout:LexeditorUI.panelLayout,shell,formatNumber:LexeditorUI.formatNumber});return archivesUI.render()}
   // A spreadsheet is how a modder changes many records at once, which the
   // editability audit lists as missing. The bar above the Data Map exports any
   // table that has a writer and imports the edited sheet back through that same

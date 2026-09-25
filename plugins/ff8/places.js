@@ -10,7 +10,10 @@
         ["text","Recipe text"]
       ].map(([key,label])=>({key,label,pinned:false,numeric:key.endsWith("Quantity")||key==="unknown",width:key.endsWith("Quantity")||key==="unknown"?"80px":"minmax(120px,1fr)"}))
     ];
-    delete state.columnPrefs.refine;showPaged("refine",visible,columns,refineDetail,"36px minmax(50px,.65fr) minmax(60px,1fr)",{defaultSplit:55,minLeft:210,minRight:430,maxBarrels:5});
+    // The identification column held 36px, which is narrower than the record
+    // mark plus the two digits it shows, so the id clipped itself. The name
+    // columns keep their share; the id takes the few pixels it needs.
+    delete state.columnPrefs.refine;showPaged("refine",visible,columns,refineDetail,"48px minmax(60px,.7fr) minmax(60px,1fr)",{defaultSplit:55,minLeft:210,minRight:430,maxBarrels:5});
     const content=$("#main").firstElementChild,tabs=subtabBar({className:"refine-tabs",tabs:state.data.refine.tables.map(table=>({id:table.id,label:table.name})),active:state.refineTab,label:"Refine recipe tables",change:value=>{state.refineTab=value;state.pages.refine=0;state.selected.refine=null;renderRefine()}});$("#main").replaceChildren(LexeditorUI.stack(tabs,content));
   }
 

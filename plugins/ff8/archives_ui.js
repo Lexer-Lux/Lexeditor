@@ -1,7 +1,7 @@
 // What is inside the game's archives: the entry names, their stored sizes and
 // whether they are compressed. Read-only by design - the plugin extracts what
 // it edits into the project copy, and browsing must never write to the game.
-function FF8ArchivesUI({el,columnList,pagedListDetail,detailPanel,detailSection,detailField,
+function FF8ArchivesUI({el,columnList,pagedPane,pager,detailPanel,detailSection,detailField,
                         readonlyField,infoHelp,notice,panelLayout,shell,formatNumber}){
   const local={archives:[],archive:"main",query:"",page:0,pageSize:60,data:null,
     selected:null,error:"",busy:false,loaded:false,source:""};
@@ -70,19 +70,25 @@ function FF8ArchivesUI({el,columnList,pagedListDetail,detailPanel,detailSection,
       ...local.archives.map(row=>{const option=el("option",{value:row.name},
         row.available?`${row.name} · ${row.entries} entries`:`${row.name} · not installed`);
         option.disabled=!row.available;option.selected=row.name===local.archive;return option}));
-    const left=detailPanel({heading:false,className:"ff8-archive-entries",body:[
-      pagedListDetail({rows,key:row=>row.id,page:local.page,pageSize:local.pageSize,
-        noun:"entries",splitKey:"ff8-archives",rowsKey:"ff8-archives",
-        defaultSplit:60,minLeft:320,minRight:360,
-        search:{key:"ff8-archive-search",value:local.query,delay:120,label:"Search entries",
-          placeholder:"Search stored names…",change:value=>{local.query=value;local.page=0;
-            void loadEntries().then(render)}},
-        sync:value=>{local.page=value.page;local.pageSize=value.pageSize;
-          if(value.selected!==null)local.selected=value.selected},
-        change:value=>{local.page=value.page;local.pageSize=value.pageSize;
-          if(value.selected!==null)local.selected=value.selected;render()},
-        master:()=>list,
-        detail:()=>entryDetail(rows.find(entry=>entry.id===local.selected)||null)})]});
+    // An archive holds thousands of entries, so the server sends one page and
+    // the pager asks for the next. The whole paged list-detail is built for a
+    // page, not for a pane: nested in one it kept its own page-sized height and
+    // clipped every row past the first screen. A table and its pager are two
+    // rows of one pane instead, which is how the starting inventory is built.
+    const total=Math.max(0,Number(local.data?.matched ?? local.data?.total ?? rows.length)||0);
+    const pages=Math.max(1,Math.ceil(total/Math.max(1,local.pageSize)));
+    local.page=Math.max(0,Math.min(local.page,pages-1));
+    const pageBar=pager({inline:true,page:local.page,pages,pageSize:local.pageSize,total,
+      noun:"entries",
+      search:{key:"ff8-archive-search",value:local.query,delay:120,label:"Search entries",
+        placeholder:"Search stored names…",change:value=>{local.query=value;local.page=0;
+          void loadEntries().then(render)}},
+      rowControl:{value:local.pageSize,change:value=>{const size=Number(value);
+        if(Number.isFinite(size)&&size>0){local.pageSize=size;local.page=0;
+          void loadEntries().then(render)}}},
+      change:value=>{local.page=value;void loadEntries().then(render)}});
+    const entries=detailPanel({heading:false,className:"ff8-archive-entries",body:[
+      pagedPane(list,pageBar)]});
     const status=[
       detailField({label:"ARCHIVE",help:infoHelp("The game's own FS/FI/FL triplet. Main holds kernel, init, namedic and wm2field; field holds every field map."),control:picker}),
       detailField({label:"ENTRIES",control:readonlyField(local.data?`${formatNumber(local.data.matched)} shown of ${formatNumber(local.data.total)}`:"—")}),
@@ -103,8 +109,12 @@ function FF8ArchivesUI({el,columnList,pagedListDetail,detailPanel,detailSection,
         local.repacked?detailField({label:"LAST REPACK",control:readonlyField(local.repacked)}):null]}),
       local.error?notice({message:local.error,tone:"warning"}):null,
       local.busy?notice({message:"Reading the archive list…"}):null]});
-    return panelLayout([left,right],"ff8-archives",
-      {layoutKey:"ff8-archives",defaultSizes:[1,1]});
+    const chosen=rows.find(entry=>entry.id===local.selected)||null;
+    const entry=chosen?entryDetail(chosen)
+      :detailPanel({heading:false,className:"ff8-archive-panel",
+        body:[notice({message:"Choose an entry to see where it is stored."})]});
+    return panelLayout([entries,entry,right],"ff8-archives",
+      {layoutKey:"ff8-archives",defaultSizes:[1,1,1]});
   }
   function render(){
     if(!local.loaded&&!local.busy){local.loaded=true;void loadArchives().then(()=>loadEntries()).then(render)}
