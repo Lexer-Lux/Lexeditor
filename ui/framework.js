@@ -6829,6 +6829,15 @@ ${contents.path}`});
     return node;
   };
 
+  // A paged list hands each table one page of records. A table that sorted
+  // itself would reorder the fourteen rows on screen and leave the rest of the
+  // list in its old order, which reads as "sorting sorts the page". So the
+  // paged list owns the order: it sorts the whole record set with the table's
+  // own comparison and re-renders, the table draws the mark, and this map
+  // remembers the choice across the re-render the click causes.
+  const pagedSortStates = new Map();
+  let pagedSortOwner = null;
+
   // Editing is a per-cell action, not a table mode: double-click a value and
   // the column's own editor takes over that cell until it is committed or
   // dismissed. Tables that never declare an editor stay read-only.
@@ -6952,15 +6961,15 @@ ${contents.path}`});
     if (columns.some(column => isNumberedIdColumn(column, options.rows || []))) {
       setRecordIdWidth(options.rows, {floor: options.idFloor});
     }
-    requestAnimationFrame(() => {
-      const active = Array.isArray(options.sortState)
+    // A table inside a paged list does not own its order. The paged list sorts
+    // the whole record set and tells the table which column to mark, so a page
+    // is never sorted on its own.
+    const pagedOwner = typeof options.sort === "function" ? null : pagedSortOwner;
+    const sortState = pagedOwner?.state
+      || (Array.isArray(options.sortState)
         ? {key: options.sortState[0], dir: options.sortState[1]}
-        : (options.sortState || {});
-      setColumnSort(active.key, active.dir);
-    });
-    const sortState = Array.isArray(options.sortState)
-      ? {key: options.sortState[0], dir: options.sortState[1]}
-      : (options.sortState || {});
+        : (options.sortState || {}));
+    requestAnimationFrame(() => setColumnSort(sortState.key, sortState.dir));
     const template = options.template || dynamicColumnTemplate(columns);
     const numberedColumn = column => isNumberedIdColumn(column, options.rows || []);
     const alignmentClass = column => `lex-column-align-${column.align || (numberedColumn(column) ? "start" : options.align) || "center"}`;
@@ -6983,15 +6992,24 @@ ${contents.path}`});
       }
       return [column.key, {integerDigits, fractionDigits}];
     }));
+    const compareFor = column => (left, right) => {
+      const first = valueForSort(left, column);
+      const second = valueForSort(right, column);
+      return typeof first === "number" && typeof second === "number"
+        ? first - second
+        : String(first).localeCompare(String(second), undefined, {numeric:true, sensitivity:"base"});
+    };
     const localSort = column => {
       const nextDirection = sortState.key === column.key ? -(Number(sortState.dir) || 1) : 1;
+      // The order belongs to the whole list, not to this table's page.
+      if (pagedOwner) {
+        pagedOwner.sort(column, nextDirection, compareFor(column));
+        return;
+      }
+      const compare = compareFor(column);
       const indexed = (options.rows || []).map((row, index) => ({row, index}));
       indexed.sort((left, right) => {
-        const first = valueForSort(left.row, column);
-        const second = valueForSort(right.row, column);
-        const result = typeof first === "number" && typeof second === "number"
-          ? first - second
-          : String(first).localeCompare(String(second), undefined, {numeric:true, sensitivity:"base"});
+        const result = compare(left.row, right.row);
         return result ? result * nextDirection : left.index - right.index;
       });
       const replacement = columnList({
@@ -8064,16 +8082,22 @@ ${contents.path}`});
     const modOnlyOn = Boolean(modOnly && modOnly.value && modOnly.available !== false);
     const suppliedRows = modOnlyOn
       ? allRows.filter(row => modOnly.changed(row)) : allRows;
-    const records = hideEmpty ? suppliedRows.filter(record => !emptyRow(record)) : suppliedRows;
+    let records = hideEmpty ? suppliedRows.filter(record => !emptyRow(record)) : suppliedRows;
     const emptyCount = emptyRow ? suppliedRows.reduce(
       (count, record) => count + (emptyRow(record) ? 1 : 0), 0) : 0;
+    // A column sort belongs to the list, not to the page: a table that holds
+    // one page asked for this order, so apply it before the page is cut.
+    const rowPreferenceKey = tableRowPreferenceKey(options);
+    const keptSort = pagedSortStates.get(rowPreferenceKey);
+    if (keptSort && typeof keptSort.compare === "function") {
+      records = [...records].sort((left, right) => keptSort.compare(left, right) * keptSort.dir);
+    }
     // Set the id width before either pane renders so the detail heading and
     // the table agree on padding.
     setRecordIdWidth(records, {wholeSet: true});
     const keyOf = options.key;
     // A Table page uses one global row target. Plugin-local page sizes are only
     // compatibility state until the shared settings snapshot arrives.
-    const rowPreferenceKey = tableRowPreferenceKey(options);
     // Pagination must leave enough height for readable text and controls.
     // The requested row count is a ceiling, not permission to crush rows.
     const fitMinimum = options.fit === false ? 0 : Math.max(32, Number(options.fit?.minRowHeight) || 0);
@@ -8233,33 +8257,48 @@ ${contents.path}`});
       refreshReferences(replacement);
       return true;
     };
-    masterNodes = barrelRows.map((rows, index) => {
-      const node = typeof options.master === "function"
-        ? options.master({rows, selected, select, barrel: index, barrels})
-        : list({...options.list, rows, key: keyOf, selected, select});
-      node.querySelectorAll('.lex-list-row[data-key]').forEach(row=>{
-        const active=[...selection.keys].some(key=>String(key)===row.dataset.key);
-        row.classList.toggle('selected',active);row.setAttribute('aria-selected',String(active));
+    // While the master builds its tables, tell them that this list owns the
+    // order: a click on one of their headers re-sorts the list, then the list
+    // re-renders through the plugin's own change callback.
+    const outerSortOwner = pagedSortOwner;
+    pagedSortOwner = typeof options.change === "function" ? {
+      state: keptSort ? {key: keptSort.key, dir: keptSort.dir} : null,
+      sort: (column, direction, compare) => {
+        pagedSortStates.set(rowPreferenceKey, {key: column.key, dir: direction, compare});
+        change("sort", {});
+      },
+    } : null;
+    try {
+      masterNodes = barrelRows.map((rows, index) => {
+        const node = typeof options.master === "function"
+          ? options.master({rows, selected, select, barrel: index, barrels})
+          : list({...options.list, rows, key: keyOf, selected, select});
+        node.querySelectorAll('.lex-list-row[data-key]').forEach(row=>{
+          const active=[...selection.keys].some(key=>String(key)===row.dataset.key);
+          row.classList.toggle('selected',active);row.setAttribute('aria-selected',String(active));
+        });
+        node.setAttribute('aria-multiselectable','true');
+        fitBarrelTableColumns(node);
+        // Filler rows exist to square off a growable list. A slot table shows
+        // one row per real slot, so a short last page simply ends.
+        // Pad to the track count this table actually declares. Padding to the
+        // page size instead put forty rows into a ten-track grid whenever a
+        // table held less than one page: the ten declared tracks collapsed to
+        // zero and every real record painted on top of the others in one band.
+        if (!slotBased) padBarrelTable(node, rowCapacity);
+        node.classList.add("lex-page-sized-table");
+        // The track count is read back from the rows that are really there, so
+        // a padding rule and a capacity rule can never disagree again.
+        node.style.setProperty("--lex-page-row-count",
+          String(Math.max(1, node.querySelectorAll(":scope > .lex-column-list-row").length || rowCapacity)));
+        node.style.setProperty("--lex-page-font-row-count", String(rowCapacity));
+        node.dataset.lexBarrel = String(index + 1);
+        if (index) node.classList.add("lex-fitted-page");
+        return node;
       });
-      node.setAttribute('aria-multiselectable','true');
-      fitBarrelTableColumns(node);
-      // Filler rows exist to square off a growable list. A slot table shows one
-      // row per real slot, so a short last page simply ends.
-      // Pad to the track count this table actually declares. Padding to the
-      // page size instead put forty rows into a ten-track grid whenever a
-      // table held less than one page: the ten declared tracks collapsed to
-      // zero and every real record painted on top of the others in one band.
-      if (!slotBased) padBarrelTable(node, rowCapacity);
-      node.classList.add("lex-page-sized-table");
-      // The track count is read back from the rows that are really there, so
-      // a padding rule and a capacity rule can never disagree again.
-      node.style.setProperty("--lex-page-row-count",
-        String(Math.max(1, node.querySelectorAll(":scope > .lex-column-list-row").length || rowCapacity)));
-      node.style.setProperty("--lex-page-font-row-count", String(rowCapacity));
-      node.dataset.lexBarrel = String(index + 1);
-      if (index) node.classList.add("lex-fitted-page");
-      return node;
-    });
+    } finally {
+      pagedSortOwner = outerSortOwner;
+    }
     // The floor belongs to THIS table's record set. Leaving it set made an
     // unrelated table rendered afterwards inherit the padding.
     recordIdFloor = 1;

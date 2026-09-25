@@ -4696,10 +4696,14 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
   /* A caret by default: a block of the current colour clipped to a triangle.
      A game that marks the sorted column with a picture of its own - FF8's
      pointing hand - gives the image and clears the clip. */
-  width: var(--lex-sort-marker-width, 8px);
-  height: var(--lex-sort-marker-height, 8px);
-  flex: 0 0 var(--lex-sort-marker-width, 8px);
-  margin-right: 5px;
+  width: var(--lex-sort-marker-width, 7px);
+  height: var(--lex-sort-marker-height, 7px);
+  flex: 0 0 var(--lex-sort-marker-width, 7px);
+  /* The mark hangs in the header's own left padding. The padding is 10px and
+     the mark plus its gap is 9px, so the mark stays inside it. A larger mark or
+     gap pushed the mark past the cell and the cell's overflow cut its left side
+     off; a game that wants a bigger mark gives the header more padding. */
+  margin-right: var(--lex-sort-marker-gap, 2px);
   /* font-size:0 hides the glyph without killing currentColor, which the
      clipped background depends on. */
   font-size: 0;
@@ -7697,9 +7701,6 @@ body { text-shadow: var(--lex-text-shadow, none); }
 
   filter: var(--lex-sort-marker-filter, none);
   image-rendering: pixelated;
-
-  margin-right: 2px;
-
 }
 }
 
