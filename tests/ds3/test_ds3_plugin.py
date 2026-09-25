@@ -305,6 +305,34 @@ class DS3FormatTests(unittest.TestCase):
             self.assertTrue(rows, table)
             self.assertTrue(all(row["name"] for row in rows[:5]), table)
 
+    def test_installed_regulation_edit_touches_only_the_audited_cell(self):
+        # The whole promise of this plugin is that an edit changes one audited
+        # fixed-width cell and nothing else. The installed archive is the only
+        # honest place to prove that.
+        path = _installed_regulation()
+        if path is None:
+            self.skipTest("Requires an installed Dark Souls III game")
+        table, key = "EquipParamWeapon", "atkBasePhysics"
+        document = RegulationDocument(path.read_bytes(), METADATA)
+        row_id = document.list_rows(table)[0]["id"]
+        before = document.plaintext()
+        document.edit(table, row_id, key, 321)
+        after = document.plaintext()
+        self.assertEqual(len(after), len(before))
+        schema = document.schemas[table]
+        field = schema.field(key)
+        entry = document.entries[table]
+        param_row = document.params[table].row(row_id)
+        cell_start = entry.data_offset + param_row.data_offset + field.offset
+        width = _TYPE_SIZE[field.dtype]
+        changed = [index for index, (old, new) in enumerate(zip(before, after)) if old != new]
+        self.assertTrue(changed, "the edit changed no byte")
+        self.assertTrue(all(cell_start <= index < cell_start + width for index in changed),
+                        f"bytes outside {table}.{key} changed: {changed}")
+        reopened, was_encrypted = decrypt_regulation(document.export())
+        self.assertTrue(was_encrypted)
+        self.assertEqual(reopened, after)
+
     def test_real_row_identity_uses_pinned_names(self):
         doc = RegulationDocument(_bnd4(), METADATA)
         first_id, _ = _row_ids("Magic")
