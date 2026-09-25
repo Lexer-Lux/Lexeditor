@@ -177,3 +177,25 @@ def test_escape_keeps_a_property_name_and_an_empty_one_restores_it(page):
     page.locator(".lex-detail-field-label .lex-label-rename").first.press("Enter")
     page.wait_for_timeout(200)
     assert field_label(page) == "Weight", "an empty name did not restore the shipped one"
+
+
+def test_the_shell_undo_takes_a_rename_back_and_redo_puts_it_on_again(page):
+    framework(page)
+    mount_shell(page)
+    assert page.locator("#global-undo").is_disabled()
+    assert page.locator("#global-redo").is_disabled()
+    rename(page, "items", "Gear")
+    assert label_of(page, "items") == "Gear"
+    assert not page.locator("#global-undo").is_disabled(), "a rename is not undoable"
+    page.locator("#global-undo").click()
+    page.wait_for_timeout(300)
+    assert label_of(page, "items") == "Items", "undo did not put the shipped name back"
+    assert page.evaluate('localStorage.getItem("fixture-items.label")') is None
+    # The undo is saved the same way the rename was, so everyone sees it.
+    assert page.evaluate("window.savedCalls").pop() == [
+        "fixture", "items", {"fixture-items.label": ""}]
+    assert not page.locator("#global-redo").is_disabled(), "nothing to redo"
+    page.locator("#global-redo").click()
+    page.wait_for_timeout(300)
+    assert label_of(page, "items") == "Gear", "redo did not put the name back"
+    assert page.evaluate('localStorage.getItem("fixture-items.label")') == "Gear"

@@ -549,6 +549,7 @@
         // being edited.
         popup.startEditing = () => {
           popup.classList.add("lex-help-editing");
+          const before = shown();
           const editor = element("textarea", {class: "lex-help-edit", value: shown()});
           popup.replaceChildren(editor);
           editor.focus();
@@ -578,15 +579,19 @@
             // reader with the wording that was just saved.
             closeHelpPopup();
             open();
+            // A bubble has no lasting node, so undoing a rewording puts the text
+            // back for the next time it opens rather than under the pointer.
+            labelUndo.push({key: helpKey(shipped), tabId: activePageTab(), before,
+              after: next, shipped, node: null});
+            labelRedo.length = 0;
+            await storeLabel(helpKey(shipped), activePageTab(), next, shipped);
+            labelHistoryChanged();
             try {
-              await callWindow("save_default_view", shellPluginId(), activePageTab(),
-                {[helpKey(shipped)]: next === shipped ? "" : next});
+              // storeLabel already saved it, with the same transport the rest of
+              // the renames use.
               showToast(next === shipped ? "The shipped help text is back."
                                          : "The new help text is now the shipped one.");
-            } catch (error) {
-              showAlert({title: "Could not save the help text",
-                         message: error.message || String(error)});
-            }
+            } catch (_error) {}
           };
           editor.addEventListener("keydown", keyEvent => {
             keyEvent.stopPropagation();
@@ -5581,6 +5586,40 @@ ${contents.path}`});
   };
   const helpKey = shipped =>
     `${shellPluginId()}-${activePageTab()}.help.${textDigest(shipped)}.text`;
+  // A name a developer changed is an override, not record data, so the
+  // plugin's own history never sees it. The shell keeps the last few renames
+  // itself and its undo takes them back, newest first.
+  const labelUndo = [];
+  const labelRedo = [];
+  let labelHistoryChanged = () => {};
+  const storeLabel = async (key, tabId, value, shipped) => {
+    const next = value && value !== shipped ? value : "";
+    try {
+      if (next) localStorage.setItem(key, next);
+      else localStorage.removeItem(key);
+    } catch (_error) {}
+    try {
+      await callWindow("save_default_view", shellPluginId(), tabId, {[key]: next});
+    } catch (_error) {}
+  };
+  const undoLabel = async () => {
+    const entry = labelUndo.pop();
+    if (!entry) return false;
+    if (entry.node?.isConnected) entry.node.textContent = entry.before;
+    await storeLabel(entry.key, entry.tabId, entry.before, entry.shipped);
+    labelRedo.push(entry);
+    labelHistoryChanged();
+    return true;
+  };
+  const redoLabel = async () => {
+    const entry = labelRedo.pop();
+    if (!entry) return false;
+    if (entry.node?.isConnected) entry.node.textContent = entry.after;
+    await storeLabel(entry.key, entry.tabId, entry.after, entry.shipped);
+    labelUndo.push(entry);
+    labelHistoryChanged();
+    return true;
+  };
   // A property's name as the developer last named it. The shipped name is the
   // key, so an override never orphans itself: the same property, drawn on any
   // screen, reads the same. A label that is a node rather than a name (a chip
@@ -5615,20 +5654,18 @@ ${contents.path}`});
       const label = typed && typed !== fallback ? typed : fallback;
       // Escape, or a click somewhere else, keeps the name that was there.
       if (!commit) { text.textContent = before; input.replaceWith(text); return; }
-      try {
-        if (label === fallback) localStorage.removeItem(key);
-        else localStorage.setItem(key, label);
-      } catch (_error) {}
-      text.textContent = label;
-      input.replaceWith(text);
-      try {
-        await callWindow("save_default_view", shellPluginId(), tabId,
-          {[key]: label === fallback ? "" : label});
-        showToast(label === fallback ? `${fallback} is back to its shipped name.`
-                                     : `${label} is now the shipped name.`);
-      } catch (error) {
-        showAlert({title: "Could not save the name", message: error.message || String(error)});
-      }
+          text.textContent = label;
+          input.replaceWith(text);
+          // Remember it, so the shell's undo can take the name back: the
+          // plugin's record history has no idea this happened.
+          labelUndo.push({key, tabId, before, after: label, shipped: fallback, node: text});
+          labelRedo.length = 0;
+          await storeLabel(key, tabId, label, fallback);
+          labelHistoryChanged();
+          try {
+            showToast(label === fallback ? `${fallback} is back to its shipped name.`
+                                         : `${label} is now the shipped name.`);
+          } catch (_error) {}
     };
     input.addEventListener("keydown", event => {
       if (event.key === "Enter") { event.preventDefault(); finish(true); }
@@ -6014,8 +6051,10 @@ ${contents.path}`});
 
     const history = options.history ? new EditHistory({...options.history, changed: refresh}) : null;
     if (history) history.observe(document);
-    undo.onclick = async () => history?.undo();
-    redo.onclick = async () => history?.redo();
+  // A name the developer changed is undone first, then the record history:
+  // the two are different kinds of change and the newest one wins.
+  undo.onclick = async () => { if (!(await undoLabel())) history?.undo(); };
+  redo.onclick = async () => { if (!(await redoLabel())) history?.redo(); };
     let saveBusy = false;
     const renderSaveContents = () => {
       const count = element("span", {class: "lex-save-count", hidden: true, "aria-hidden": "true"});
@@ -6110,7 +6149,10 @@ ${contents.path}`});
     let savedPreviewState;
     saveChangePreview(save,()=>options.pendingChanges?.() || pendingChangeList(savedPreviewState,options.history?.capture?.()),options.dirtyCount);
     let lastReportedDirty = null;
-    function refresh() {
+  function refresh() {
+    // A rename outside a render - the shell's own undo - still has to move the
+    // history buttons.
+    labelHistoryChanged = refresh;
       refreshReferences();
       projectControl.refresh?.();
       const dirty = options.dirtyCount?.() || 0;
@@ -6118,8 +6160,8 @@ ${contents.path}`});
       // pendingChanges would pay for a full copy of its data on every refresh.
       if (!dirty && options.history?.capture && !options.pendingChanges) savedPreviewState=clone(options.history.capture());
       navigationHistory?.visit(githubWorkspace?.state.open ? "github" : `tab:${options.activeTab()}`);
-      undo.disabled = !history?.canUndo;
-      redo.disabled = !history?.canRedo;
+      undo.disabled = !(labelUndo.length || history?.canUndo);
+      redo.disabled = !(labelRedo.length || history?.canRedo);
       // The shell's own accessor, not the plugin's, so a session the host
       // opened without a mod locks every edit even when the plugin never grew
       // a read-only notion of its own.
