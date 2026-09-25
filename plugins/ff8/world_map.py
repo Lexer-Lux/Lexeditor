@@ -339,6 +339,34 @@ def scripts_in_section(data: bytes, section: int, *,
 VEHICLE_WARP_SECTION = 11
 SCRIPT_RETURN = 0xFF16
 SCRIPT_END = 0xFF05
+PLAYER_LOCATION_SCRIPT_SECTION = 7
+EVENT_SCRIPT_SECTION = 36
+
+
+def _script_rows(dataset: str, section: int, label: str) -> dict:
+    path = source_path(dataset)
+    data = path.read_bytes()
+    rows = scripts_in_section(data, section)
+    return {"rows": rows, "count": len(rows), "section": section, "path": str(path),
+            "source": dataset, "label": label,
+            "sha256": hashlib.sha256(data).hexdigest()}
+
+
+def player_location_scripts(dataset: str = "current") -> dict:
+    """The scripts that run as the player crosses the world map (section 7)."""
+    return _script_rows(dataset, PLAYER_LOCATION_SCRIPT_SECTION, "player-location scripts")
+
+
+def event_scripts(dataset: str = "current") -> dict:
+    """The world map's top-level event scripts (section 36).
+
+    The wiki warns that two of these sit earlier in the file than the entry
+    listed before them, so reading each script to the next table offset gives a
+    negative length. Reading each one to its own RETURN does not care about the
+    order, and the installed file has exactly that: entries 46 and 54 run
+    backwards (4444 to 3772, 4408 to 3848).
+    """
+    return _script_rows(dataset, EVENT_SCRIPT_SECTION, "event scripts")
 
 # The position tables share one shape: fixed records from the start of the
 # section, then a four-byte footer. Section 8 (field landing) is read the same

@@ -44,6 +44,14 @@ table shape, the sentinel, that each body ends at `RETURN`, and that the four
 scripts carry four different values. No page shows them yet; the World tab was
 being edited by another lane while this landed.
 
+The same reader takes section 7 (player-location scripts, 38 of them) and
+section 36 (event scripts, 92). Section 36 is the section the wiki warns about,
+and the installed file confirms the warning: entries 46 and 54 sit earlier in
+the file than the entry listed before them (4444 to 3772, 4408 to 3848). Reading
+each script to its own `RETURN` handles that; reading to the next table offset
+would give those two a negative length, which the check demonstrates by
+computing both ways.
+
 ## What is not established
 
 - **Which opcode does what.** The wiki names `SET_RETURN_VALUE` as `0xFF15`

@@ -49,15 +49,39 @@ def main() -> int:
     # special-cased, and its result is reported, not asserted.
     seven = world_map.scripts_in_section(raw, 7)
     assert seven, "section 7 has no scripts"
+
+    # Section 36 is where the "read to RETURN, not to the next offset" rule
+    # matters: two of its entries sit earlier in the file than the entry before
+    # them, which the wiki records and the installed file confirms.
+    events = world_map.event_scripts("vanilla")
+    assert events["section"] == world_map.EVENT_SCRIPT_SECTION == 36
+    assert events["count"] == 92, events["count"]
+    order = [row["offset"] for row in events["rows"]]
+    backwards = [(index, order[index - 1], order[index])
+                 for index in range(1, len(order)) if order[index] < order[index - 1]]
+    assert backwards and all(previous > current for _, previous, current in backwards), backwards
+    assert all(row["bytes"] > 2 for row in events["rows"]), "a script with no body"
+    # A reader that ran each script to the next offset would give the backwards
+    # entries a negative length; that is the trap this rule avoids.
+    naive = [next_offset - offset
+             for offset, next_offset in zip(order, order[1:])]
+    assert any(length < 0 for length in naive), naive[:60]
+
+    locations = world_map.player_location_scripts("vanilla")
+    assert locations["count"] == 38, locations["count"]
+    assert all(row["bytes"] > 2 for row in locations["rows"])
     try:
         world_map.scripts_in_section(raw, 12)
     except ValueError as error:
         assert "offset" in str(error).lower() or "script" in str(error).lower(), error
     else:
         raise AssertionError("section 12 (train exits) parsed as scripts")
-    print(json.dumps({"section": 11, "scripts": len(rows),
-                      "offsets": offsets, "bodyBytes": [row["bytes"] for row in rows],
-                      "operands": operands}, ensure_ascii=True))
+    print(json.dumps({"vehicleWarps": len(rows), "offsets": offsets,
+                      "bodyBytes": [row["bytes"] for row in rows], "operands": operands,
+                      "playerLocationScripts": locations["count"],
+                      "eventScripts": events["count"],
+                      "backwardsEntries": [index for index, _, _ in backwards]},
+                     ensure_ascii=True))
     return 0
 
 
