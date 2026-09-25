@@ -152,9 +152,26 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     }
     const known=new Map((state.data.characters?.rows||[]).map(row=>[row.name.toLowerCase(),row.name]));
     const query=playerView.query.toLowerCase();
-    const rows=[...groups.values()].map(entry=>({...entry,
-      name:known.get(entry.entity.toLowerCase())||entry.entity}))
-      .filter(row=>`${row.name} ${row.map}`.toLowerCase().includes(query));
+    // A deck is what the game actually selects, and one deck is shared by
+    // several opponents. The scan already read every CARDGAME call, so the
+    // deck each opponent names is known without loading a single area here.
+    const deckOfCall=new Map();
+    for(const entry of playerAreas.players||[]){
+      if(entry.deckMode!=="literal"||entry.deckId===null||entry.deckId===undefined)continue;
+      deckOfCall.set(`${entry.map}:${entry.entity}`,Number(entry.deckId));
+    }
+    const deckMembers=new Map();
+    for(const entry of groups.values()){
+      const deck=deckOfCall.get(entry.key);
+      if(deck===undefined)continue;
+      if(!deckMembers.has(deck))deckMembers.set(deck,[]);
+      deckMembers.get(deck).push(entry.key);
+    }
+    const players=[...groups.values()].map(entry=>({...entry,
+      name:known.get(entry.entity.toLowerCase())||entry.entity,
+      deck:deckOfCall.get(entry.key)}));
+    const byKey=new Map(players.map(row=>[row.key,row]));
+    const rows=players.filter(row=>`${row.name} ${row.map}`.toLowerCase().includes(query));
     const help=[
       "Selects the opponent's deck, not a single card. The deck list itself is not editable.",
       "The card rules you bring from previous regions. The game uses these when it offers to mix rules.",
@@ -188,6 +205,23 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
           });
           body.push(calls.length===1?LexeditorUI.stack({fill:false},...fields):detailSection({title:`Setup ${index+1}`,body:fields}));
         });
+        // Which other opponents play the same deck. Editing a deck means
+        // editing every script that names it, and no other screen shows that.
+        const deck=deckOfCall.get(entry.key);
+        if(deck!==undefined){
+          const others=(deckMembers.get(deck)||[]).filter(key=>key!==entry.key)
+            .map(key=>byKey.get(key)).filter(Boolean);
+          body.push(detailSection({title:`ALSO USES DECK ${deck}`,
+            help:infoHelp(`The deck number this opponent's CARDGAME call names. Several opponents can name the same deck, and the game reads that deck's own card list.`
+              +` The card list of a deck is not stored in the files this editor reads, so it cannot be shown or edited here.`
+              +` Each opponent below has its own CARDGAME call; select one to edit the values its script passes.`),
+            body:others.length
+              ?LexeditorUI.stack({fill:false},...others.map(other=>
+                  el("button",{type:"button",style:"text-align:left",
+                    onclick:()=>{playerView.selected=other.key;playerView.page=0;render()}},
+                    `${other.name} · ${other.map}`)))
+              :LexeditorUI.detailNote(`No other CARDGAME call in the game data names deck ${deck}.`)}));
+        }
       }
       return detailPanel({title:entry.name,body});
     };
@@ -197,7 +231,9 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       search:{key:'ff8-card-players',value:playerView.query,label:'Search card players',change:value=>{playerView.query=value;playerView.page=0;render()}},
       sync:next=>Object.assign(playerView,next),change:next=>{Object.assign(playerView,next);render()},
       master:({rows,selected,select})=>columnList({rows,key:row=>row.key,selected,select,
-        columns:[{key:'name',label:'Player',help:'Character name when known, else the game identifier.'}]}),detail,
+        columns:[{key:'name',label:'Player',help:'Character name when known, else the game identifier.'},
+          {key:'deck',label:'Deck',help:'The deck number this opponent names, or a dash when the script passes a savemap variable instead of a number.',
+            render:row=>row.deck===undefined?"—":String(row.deck)}]}),detail,
       emptyDetail:()=>detailPanel({title:'Card players',body:[LexeditorUI.detailNote('No players match this search.')]})});
   };
   render = () => {

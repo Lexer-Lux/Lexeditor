@@ -641,6 +641,24 @@ def _movie_source_path(key: str, dataset: str) -> Path | None:
 
 _card_scan = {"thread": None, "keys": None, "players": [], "scanned": 0, "total": 0, "error": None}
 _card_scan_lock = threading.Lock()
+# The cached scan gained each call's deck argument, so an older cache is
+# rebuilt instead of answering with entries that have no deck.
+CARD_SCAN_VERSION = 2
+
+
+def _card_deck(player: dict) -> tuple[int | None, str]:
+    """The deck argument of one CARDGAME call, and how the script stores it.
+
+    Deck ID is the first argument. A savemap argument names a runtime variable
+    and has no deck number until the game runs, so it is reported as such
+    rather than guessed.
+    """
+    param = next((item for item in player.get("params", []) if item.get("id") == 0), None)
+    if param is None:
+        return None, ""
+    if param.get("mode") == "literal":
+        return int(param.get("value", 0)), "literal"
+    return None, str(param.get("mode") or "")
 
 
 def _card_player_scan() -> None:
@@ -656,7 +674,10 @@ def _card_player_scan() -> None:
         if destination.is_file():
             try:
                 cached = json.loads(destination.read_text(encoding="utf-8"))
-                if cached.get("source") == fingerprint and isinstance(cached.get("keys"), list) and isinstance(cached.get("players"), list):
+                if (cached.get("version") == CARD_SCAN_VERSION
+                        and cached.get("source") == fingerprint
+                        and isinstance(cached.get("keys"), list)
+                        and isinstance(cached.get("players"), list)):
                     _card_scan.update(keys=cached["keys"], players=cached["players"], scanned=len(ensure_index()["rows"]),
                                       total=len(ensure_index()["rows"]))
                     return
@@ -670,11 +691,15 @@ def _card_player_scan() -> None:
             found = _parse_card_players(jsm.read_bytes(), sym.read_bytes() if sym is not None else b"") if jsm is not None else []
             if found:
                 keys.append(row["key"])
-                players.extend({"map":row["key"], "id":player["id"],
-                                "entity":player["entity"], "script":player["script"]} for player in found)
+                for player in found:
+                    deck_id, deck_mode = _card_deck(player)
+                    players.append({"map":row["key"], "id":player["id"],
+                                    "entity":player["entity"], "script":player["script"],
+                                    "deckId":deck_id, "deckMode":deck_mode})
             _card_scan["scanned"] += 1
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(json.dumps({"source": fingerprint, "keys": keys, "players":players}, indent=2) + "\n",
+        destination.write_text(json.dumps({"version": CARD_SCAN_VERSION, "source": fingerprint,
+                                           "keys": keys, "players":players}, indent=2) + "\n",
                                encoding="utf-8")
         _card_scan.update(keys=keys, players=players)
     except Exception as error:

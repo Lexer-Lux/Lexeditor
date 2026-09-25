@@ -71,8 +71,31 @@ def test_player_index_upgrades_area_only_cache(tmp_path):
          patch.object(field,'_fingerprint',return_value='fixture'), \
          patch.object(field,'ensure_index',return_value={'rows':[{'key':'garden'}]}), \
          patch.object(field,'ensure_map_baseline',return_value=(script,None,None)), \
-         patch.object(field,'_parse_card_players',return_value=[{'id':0,'entity':'Student','script':'talk'}]):
+         patch.object(field,'_parse_card_players',return_value=[{'id':0,'entity':'Student','script':'talk',
+             'params':[{'id':0,'name':'Deck ID','mode':'literal','value':201,'editable':True}]}]):
         field._card_player_scan()
     assert state['error'] is None
-    assert state['players']==[{'map':'garden','id':0,'entity':'Student','script':'talk'}]
+    # The deck each call names travels with the scan, so a deck can be shown
+    # and grouped without loading any area in the browser.
+    assert state['players']==[{'map':'garden','id':0,'entity':'Student','script':'talk',
+                               'deckId':201,'deckMode':'literal'}]
     assert json.loads(cache.read_text())['players']==state['players']
+    assert json.loads(cache.read_text())['version']==field.CARD_SCAN_VERSION
+
+
+def test_a_variable_deck_argument_has_no_deck_number(tmp_path):
+    import json
+    from unittest.mock import patch
+    from plugins.ff8 import field_data as field
+    (tmp_path/'field').mkdir()
+    script=tmp_path/'map.jsm';script.write_bytes(b'fixture')
+    state={'thread':None,'keys':None,'players':[],'scanned':0,'total':0,'error':None}
+    with patch.object(field.paths,'BASELINE_ROOT',tmp_path), patch.object(field,'_card_scan',state), \
+         patch.object(field,'_fingerprint',return_value='fixture'), \
+         patch.object(field,'ensure_index',return_value={'rows':[{'key':'garden'}]}), \
+         patch.object(field,'ensure_map_baseline',return_value=(script,None,None)), \
+         patch.object(field,'_parse_card_players',return_value=[{'id':0,'entity':'Student','script':'talk',
+             'params':[{'id':0,'name':'Deck ID','mode':'variable','value':292,'editable':True}]}]):
+        field._card_player_scan()
+    assert state['players'][0]['deckId'] is None
+    assert state['players'][0]['deckMode']=='variable'

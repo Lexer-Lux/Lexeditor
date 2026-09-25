@@ -18,7 +18,11 @@ def main():
   # there is nothing here to check.
   page.route('**/api/card-players',lambda route:route.fulfill(
       content_type='application/json',
-      body='{"ready":true,"error":null,"keys":["garden"],"players":[{"map":"garden","id":0,"entity":"Student","script":"talk"}],"scanned":2,"total":2}'))
+      body='{"ready":true,"error":null,"keys":["garden"],"players":['
+           '{"map":"garden","id":0,"entity":"Student","script":"talk","deckId":201,"deckMode":"literal"},'
+           '{"map":"garden","id":1,"entity":"Teacher","script":"talk","deckId":201,"deckMode":"literal"},'
+           '{"map":"garden","id":2,"entity":"Ghost","script":"talk","deckId":null,"deckMode":"variable"}],'
+           '"scanned":2,"total":2}'))
   page.goto('http://fixture/')
   page.set_content('<div id="toolbar">Old character tabs</div><main id="main" style="height:800px"></main>')
   page.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
@@ -39,12 +43,26 @@ def main():
   assert page.locator('#toolbar').is_hidden()
   assert page.locator('.lex-column-list-row').filter(has_text='Student').count()==1
   assert page.locator('.lex-column-list-row').filter(has_text='Garden').count()==0
+  # The deck a call names is shown in the list, and a savemap argument has no
+  # deck number to show.
+  assert page.locator('.lex-column-list-row').filter(has_text='Student').first.inner_text().find('201')>=0
+  assert page.locator('.lex-column-list-row').filter(has_text='Ghost').first.inner_text().find('—')>=0
   control=page.get_by_label('Student Deck level',exact=True)
   control.fill('5')
   assert page.evaluate('model.data.fields.rows[1].players[0].params[0].value')==5
   assert page.evaluate('calls[0][0]')=='fields'
   styles=control.evaluate('e=>{const s=getComputedStyle(e);return [s.color,s.backgroundColor]}')
   assert styles[0]!='rgb(0, 0, 0)' and styles[1]!='rgb(255, 255, 255)',styles
+  # Which other opponents name the same deck, and a way to reach each one.
+  # The section title carries its own question-mark bubble, so match the
+  # heading's own text rather than the element's whole text.
+  assert page.locator('.lex-detail-section-title',
+                      has_text='ALSO USES DECK 201').count()==1
+  other=page.get_by_role('button',name='Teacher · garden',exact=True)
+  assert other.count()==1, 'the other opponent using deck 201 is not offered'
+  other.click()
+  page.wait_for_timeout(100)
+  assert page.locator('.lex-detail-panel').first.inner_text().find('Teacher')>=0
   import tempfile
   page.wait_for_timeout(200)
   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-ff8-players.png'))
