@@ -17,3 +17,4 @@ Canonical game-specific knowledge. No standalone source has been imported for th
 - [World draw points](world-draw-points.md): where a draw point is stored, how the game resolves a standing position to one record through its block and sub-ID, and why its spell lives in the executable.
 - [Editability and the older tools](editability.md): what each FF8 file allows here, why the locked bytes stay locked, and how this plugin's coverage compares with Deling, FF8 Ultimate Editor, Rinoa's Toolset, Jumbo Cactuar, IfritAI and Hyne.
 - [The game's own name list](namedic.md): where `namedic.bin` lives inside `main.fs`, its proved count/offset/text layout, and the evidence that a rewritten list keeps every untouched name byte-identical.
+- [World to field](wm2field.md): the 72-entry table that sends a world-map position to a field, what its four named fields are, and the bytes it must preserve.

@@ -98,7 +98,10 @@ Not covered today, with what each would need:
   table; the sky-colour record's "vehicles" colour is a colour, not the vehicle
   table.
 - **Wm2field** (Rinoa's Toolset). This plugin has Field to World (`wmset`
-  section 9) and nothing for the world-to-field direction.
+  section 9); the world-to-field table now has a proved reader and writer
+  (`plugins/ff8/wm2field.py`, `codex/ff8/wm2field.md`,
+  `tests/ff8/verify_ff8_wm2field.py`), but no page edits it yet, so the Data Map
+  does not claim it.
 - **`Namedic.bin`** (Rinoa's Toolset). The Text tab inserts location, variable
   and key tokens from static tables in `kernel_text.editor_tokens()`, so the
   names behind those tokens are not editable here. The file's layout is proved
