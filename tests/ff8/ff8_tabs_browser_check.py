@@ -54,6 +54,31 @@ def main():
                       return errors;
                     }''')
                     assert not errors, (width,scale,i,errors)
+        page.evaluate('''document.querySelectorAll('nav button').forEach((b,n)=>b.classList.toggle('active',n===0))''')
+        bgs = page.evaluate('''() => {
+          const css = sel => { const e = document.querySelector(sel); const s = getComputedStyle(e); return s.backgroundImage + '|' + s.backgroundColor; };
+          return {
+            tabActive: css('nav button.active'),
+            tabRest: css('nav button:not(.active)'),
+            subActive: css('.lex-subtab-button.active'),
+            subRest: css('.lex-subtab-button:not(.active)'),
+          };
+        }''')
+        import re as _re
+        def _lum(rgb):
+            def _lin(c):
+                c /= 255
+                return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+            r, g, b = rgb
+            return 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
+        def _brightness(bg):
+            nums = [tuple(map(int, m)) for m in _re.findall(r'rgb\(\s*(\d+),\s*(\d+),\s*(\d+)\s*\)', bg)]
+            assert nums, bg
+            return sum(_lum(c) for c in nums) / len(nums)
+        vals = {k: _brightness(v) for k, v in bgs.items()}
+        print('Relative-luminance brightness (mean of computed background gradient stops): ' + ', '.join(f'{k}={v:.4f}' for k, v in vals.items()))
+        assert vals['tabActive'] > vals['tabRest'] + 0.05, vals
+        assert vals['subActive'] > vals['subRest'] + 0.05, vals
         browser.close()
     print('All main/subtab labels: real FF8 font ink clearance, ellipsis and no active underline passed at four widths and three scales.')
 

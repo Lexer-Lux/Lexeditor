@@ -27,12 +27,12 @@
          stealing height from every list below. */
       --lex-nav-bg:#000;--lex-nav-padding-inline:var(--lex-panel-gap);
       --lex-tab-min-height:44px;--lex-tab-padding-inline:clamp(5px,.75vw,20px);
-      --lex-tab-font-size:clamp(12px,1.02vw,20px);--lex-tab-fg:#eee;
-      --lex-tab-bg:linear-gradient(135deg,#6d6d6d,#505050);
+      --lex-tab-font-size:clamp(12px,1.02vw,20px);--lex-tab-fg:#cfcfcf;
+      --lex-tab-bg:linear-gradient(135deg,#5c5c5c,#404040);
       --lex-tab-border:3px solid;--lex-tab-border-color:#a7a7a7 #292929 #292929 #a7a7a7;
       --lex-tab-hover-bg:linear-gradient(135deg,#7b7b7b,#5b5b5b);
-      --lex-tab-active-fg:#fff;--lex-tab-active-bg:linear-gradient(135deg,#888,#626262);
-      --lex-tab-active-border-color:#d0d0d0 #313131 #313131 #d0d0d0;
+      --lex-tab-active-fg:#fff;--lex-tab-active-bg:linear-gradient(135deg,#a3a3a3,#787878);
+      --lex-tab-active-border-color:#e8e8e8 #3d3d3d #3d3d3d #e8e8e8;
       --lex-tab-marker-content:"";--lex-tab-marker-image:url("/assets/icons/0.png");
       --lex-tab-marker-width:32px;--lex-tab-marker-height:22px;--lex-tab-marker-gap:10px;
       /* The hand is the marker, so the shared lift and underline go away. */
@@ -90,12 +90,12 @@
       --lex-section-title-letter-spacing:.01em;--lex-section-title-transform:uppercase;
       --lex-subsection-border:0;--lex-subsection-gap:0;
       /* Subtabs are the window's tabs, smaller: the same bevel everywhere. */
-      --lex-subtab-fg:#eee;--lex-subtab-border:3px solid;
+      --lex-subtab-fg:#cfcfcf;--lex-subtab-border:3px solid;
       --lex-subtab-border-color:#a7a7a7 #292929 #292929 #a7a7a7;
-      --lex-subtab-bg:linear-gradient(135deg,#6d6d6d,#505050);
+      --lex-subtab-bg:linear-gradient(135deg,#5c5c5c,#404040);
       --lex-subtab-hover-fg:#fff;--lex-subtab-hover-bg:linear-gradient(135deg,#7b7b7b,#5b5b5b);
-      --lex-subtab-active-fg:#fff;--lex-subtab-active-border-color:#d0d0d0 #313131 #313131 #d0d0d0;
-      --lex-subtab-active-bg:linear-gradient(135deg,#888,#626262);
+      --lex-subtab-active-fg:#fff;--lex-subtab-active-border-color:#e8e8e8 #3d3d3d #3d3d3d #e8e8e8;
+      --lex-subtab-active-bg:linear-gradient(135deg,#a3a3a3,#787878);
       --lex-subtab-active-shadow:inset 2px 2px #717171,inset -2px -2px #3d3d3d;
       --lex-tab-text-shadow:2px 2px #222;
       --lex-subtab-text-shadow:var(--lex-tab-text-shadow);
