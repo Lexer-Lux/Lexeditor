@@ -5704,6 +5704,20 @@ ${contents.path}`});
       startSide, centerActions, endSide);
     const header = element("header", {class: "lex-shell-header"}, commandRow, navFrame);
     host.replaceWith(header);
+    // The row keeps every control until it cannot hold them. In a window too
+    // narrow for the whole rail, the scale slider is the one whose job can
+    // wait - it is a preference, not an edit - and it comes back the moment
+    // there is room. Anything else would either overflow the window or take a
+    // control away in a window that has space for it.
+    const fitCommandRow = () => {
+      const scale = commandRow.querySelector(".lex-ui-scale");
+      if (!scale) return;
+      scale.hidden = false;
+      if (commandRow.scrollWidth > commandRow.clientWidth + 1) scale.hidden = true;
+    };
+    fitCommandRow();
+    window.addEventListener("resize", fitCommandRow);
+    document.fonts?.ready?.then(fitCommandRow).catch(() => {});
 
     const initializeGitHub = async () => {
       if (!developerMode) return;

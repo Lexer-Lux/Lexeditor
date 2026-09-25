@@ -83,10 +83,58 @@ def test_platform_pages_fit_below_tabs(page):
 
 def test_grouped_controls_keep_usable_width_in_a_narrow_panel(page):
     framework(page)
-    page.evaluate('''()=>{
+    page.evaluate("""()=>{
       const U=LexeditorUI,group=U.controlGroup(['Attack animation','Target hit animation','Attack type','Spell power','Draw resist','Hit count'].map(label=>({label,control:U.el('input',{type:'number',value:10})})));
       const wrapper=U.el('div',{},group);group.style.width='500px';
       document.querySelector('main').append(wrapper);
-    }''')
+    }""")
     for control in page.locator('.lex-detail-part-control input').all():
         assert control.bounding_box()['width']>=80
+
+
+@pytest.mark.parametrize('width', [600, 650, 900])
+def test_shell_header_fits_the_window(page, width):
+    """The command row keeps its controls usable in a small window.
+
+    A 900 px window at 150% UI scale is 600 CSS px, which is the smallest the
+    row has to survive. The three groups used to need about 620 there, so the
+    window grew a horizontal scrollbar and the window buttons sat off-screen.
+    """
+    framework(page)
+    page.set_viewport_size({"width": width, "height": 413})
+    page.evaluate("""()=>{
+      // The row a real plugin page builds: brand, project picker, history and
+      // save, the scale slider, the settings rail and the window buttons.
+      window.pywebview={api:{lexeditor_settings:async()=>({developerMode:true}),
+        github_repository:async()=>({repository:'Lexer-Lux/Lexeditor'}),
+        mod_library_status:async()=>({canManage:false}),
+        mod_projects:async()=>({pluginId:'fixture',current:'C:/Mods/Example',canCreate:true,
+          projects:[{path:'C:/Mods/Example',name:'Example',version:'',valid:true,current:true,
+            readOnly:false}]})}};
+      document.body.insertAdjacentHTML('afterbegin','<div id="shell"></div>');
+      window.shell=LexeditorUI.mountShell({host:'#shell',plugin:{id:'fixture',name:'Fixture'},
+        tabs:[],activeTab:()=>'',navigate(){},
+        dirtyCount:()=>1,save:async()=>{},
+        history:{capture:()=>({}),restore(){},enabled:()=>true,limit:50},
+        pendingChanges:()=>[{label:'Weight',before:1,after:2}],
+        help(){},info(){}});
+    }""")
+    page.wait_for_timeout(250)
+    fit = page.evaluate("""()=>{
+      const row=document.querySelector('.lex-shell-command-row');
+      const box=row.getBoundingClientRect();
+      const controls=[...row.querySelectorAll('button, .lex-ui-scale, input')]
+        .filter(node=>node.offsetWidth>0)
+        .map(node=>node.getBoundingClientRect().right);
+      return {right:box.right, innerWidth:innerWidth,
+        bodyWidth:document.body.scrollWidth,
+        furthest:Math.max(...controls,0),
+        groups:Object.fromEntries(['lex-shell-start','lex-shell-center-actions','lex-shell-end']
+          .map(name=>[name,Math.round(document.querySelector('.'+name).getBoundingClientRect().width)])),
+        scaleVisible:!!document.querySelector('.lex-ui-scale')?.offsetWidth};
+    }""")
+    assert fit["bodyWidth"] <= width + 2, fit
+    assert fit["furthest"] <= width + 1, fit
+    # The scale slider is kept wherever there is room for it; a window that
+    # cannot hold the whole rail drops it rather than overflowing.
+    assert fit["scaleVisible"] or width <= 650, fit

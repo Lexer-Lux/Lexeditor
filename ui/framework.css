@@ -6132,6 +6132,16 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    about 620 even compacted, so the wordmark scales down with the row. */
 @media (max-width:650px) {
   .lex-shell-start > .lex-brand-slot { zoom:.6; }
+  /* The smallest window this row has to survive still needs about twenty
+     pixels: the scale slider keeps a handle wide enough to grab and gives up
+     the rest of its track, and the percentage needs one character less. */
+  .lex-ui-scale input[type="range"] { width:18px; max-width:18px; }
+  .lex-ui-scale output { width:3ch; }
+  .lex-shell-command-row :is(.lex-settings-button,.lex-help-button,
+    .lex-developer-button,.lex-shortcuts-button,.lex-info-button,.lex-github-tab) {
+    --lex-menu-icon:26px;
+  }
+  .lex-window-button { width:30px; min-width:30px; }
 }
 
 @media (max-width:700px) {
