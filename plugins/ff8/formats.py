@@ -22,6 +22,7 @@ from . import kernel_text
 from . import namedic
 from . import wm2field
 from . import archive_index
+from . import world_map
 from . import menu_items as menu_item_format
 from . import mngrp_text
 from . import refine_tables
@@ -321,6 +322,29 @@ def repack_archive(name: str) -> dict:
     """Build an archive from the project's own replaced files."""
     return archive_index.repack(name, project_root=paths.PROJECT_ROOT,
                                 direct_root=paths.DIRECT_ROOT)
+
+
+# The world map's own sections that are read here rather than edited through
+# the World tab's record lists: the four script sections, the two position
+# tables, and the map's dialog. See codex/ff8/world-scripts.md for the evidence.
+WORLD_EXTRA = {
+    "playerScripts": lambda dataset: world_map.player_location_scripts(dataset),
+    "eventScripts": lambda dataset: world_map.event_scripts(dataset),
+    "spawnScripts": lambda dataset: world_map.entity_spawn_scripts(dataset),
+    "spawnPositions": lambda dataset: world_map.entity_spawn_positions(dataset),
+    "trainExits": lambda dataset: world_map.train_exit_positions(dataset),
+    "vehicleWarps": lambda dataset: world_map.vehicle_warp_scripts(dataset),
+    "dialog": lambda dataset: world_map.side_quest_texts(dataset),
+}
+
+
+def world_extra(kind: str, dataset: str = "current") -> dict:
+    """One world-map section's contents, for a page to show."""
+    reader = WORLD_EXTRA.get(str(kind or "").strip())
+    if reader is None:
+        raise ValueError("Unknown world section: " + str(kind))
+    payload = reader(dataset)
+    return {**payload, "kind": str(kind).strip()}
 
 
 def shop_rows(dataset: str = "current") -> dict:

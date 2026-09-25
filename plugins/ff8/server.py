@@ -228,6 +228,9 @@ class Handler(PluginRequestHandler):
                     int(query.get("page", ["0"])[0]), int(query.get("pageSize", ["60"])[0])))
             elif path == "/api/tables":
                 self.json_response(formats.table_list())
+            elif path == "/api/world-extra":
+                self.json_response(formats.world_extra(
+                    query.get("kind", [""])[0], query.get("dataset", ["current"])[0]))
             elif path == "/api/table.csv":
                 payload = formats.table_csv(query.get("name", [""])[0],
                                             query.get("dataset", ["current"])[0])
