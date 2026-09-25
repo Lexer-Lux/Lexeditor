@@ -23,7 +23,7 @@ def sheet(text: str) -> tuple[list[str], list[dict]]:
 def main() -> int:
     listing = formats.table_list()["rows"]
     names = [row["name"] for row in listing]
-    assert names == ["items", "names", "wm2field"], names
+    assert names == ["items", "names", "wm2field", "weapons"], names
     for row in listing:
         assert row["identity"] if "identity" in row else True
         assert row["editable"] and set(row["editable"]).issubset(row["columns"]), row
@@ -93,6 +93,31 @@ def main() -> int:
         result = formats.import_table_csv("wm2field", world_text)
         assert result["applied"] == 1, result
         assert wm2field.rows("current")["rows"][0]["x"] == -1
+
+        # Weapon recipes: a price and an ingredient can be changed together.
+        weapon_export = formats.table_csv("weapons")
+        weapon_header, weapon_rows_csv = sheet(weapon_export["text"])
+        assert weapon_header[:3] == ["id", "name", "upgradePrice"], weapon_header
+        assert "item0" in weapon_header and "count3" in weapon_header, weapon_header
+        weapons_before = formats.weapon_rows("current")["rows"]
+        target = next(index for index, row in enumerate(weapons_before)
+                      if row["ingredients"][0]["quantity"] > 0)
+        changed_row = weapon_rows_csv[target]
+        changed_row["upgradePrice"] = str(int(changed_row["upgradePrice"]) + 10)
+        changed_row["count0"] = str(int(changed_row["count0"]) + 1)
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=weapon_header, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(weapon_rows_csv)
+        result = formats.import_table_csv("weapons", buffer.getvalue())
+        assert result["applied"] == 1 and not result["rejected"], result
+        weapons_after = formats.weapon_rows("current")["rows"]
+        assert weapons_after[target]["upgradePrice"] == \
+            weapons_before[target]["upgradePrice"] + 10
+        assert weapons_after[target]["ingredients"][0]["quantity"] == \
+            weapons_before[target]["ingredients"][0]["quantity"] + 1
+        assert weapons_after[target + 1]["ingredients"] == \
+            weapons_before[target + 1]["ingredients"]
 
         for bad_name, expected in [("nope", "unknown table"), ("", "unknown table")]:
             try:

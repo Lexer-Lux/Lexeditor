@@ -114,8 +114,9 @@ Not covered today, with what each would need:
 - **VRAM palette animation** (Dynamic Texture). Palettes can be previewed;
   the animated-VRAM effects are not editable.
 - **Spreadsheet bulk import and export** (Xlsx). Covered for the tables that
-  have a writer: item prices, the game's own name list and the world-to-field
-  table export as CSV and import back through the same writers the pages use
+  have a writer: item prices, the game's own name list, the world-to-field
+  table and weapon upgrade recipes export as CSV and import back through the
+  same writers the pages use
   (`plugins/ff8/formats.py`, `table_csv`/`import_table_csv`; the bar above the
   Data Map). A row the writer refuses is reported with its line and the rest
   still land. Other tables can be added by naming their columns and writer.

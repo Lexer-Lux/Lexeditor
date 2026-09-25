@@ -1282,6 +1282,28 @@ def _table_specs() -> dict:
                  for edit in edits]),
             "note": "The byte after the field ID and the fifteen after it are preserved.",
         },
+        "weapons": {
+            "label": "Weapon upgrade recipes",
+            "identity": "id",
+            "columns": ("id", "name", "upgradePrice",
+                        "item0", "count0", "item1", "count1",
+                        "item2", "count2", "item3", "count3"),
+            "editable": ("upgradePrice", "item0", "count0", "item1", "count1",
+                         "item2", "count2", "item3", "count3"),
+            "rows": lambda dataset="current": [
+                {**{key: row[key] for key in ("id", "name", "upgradePrice")},
+                 **{f"{field}{slot}": row["ingredients"][slot][key]
+                    for slot in range(4)
+                    for field, key in (("item", "itemId"), ("count", "quantity"))}}
+                for row in weapon_rows(dataset)["rows"]],
+            "save": lambda edits: save_weapons([
+                {"id": edit["id"], "upgradePrice": edit["upgradePrice"],
+                 "ingredients": [{"slot": slot, "itemId": edit[f"item{slot}"],
+                                  "quantity": edit[f"count{slot}"]} for slot in range(4)]}
+                for edit in edits]),
+            "note": "Upgrade price is written in steps of 10; an ingredient slot of 0"
+                    " with a count of 0 means the slot is empty.",
+        },
     }
 
 

@@ -42,7 +42,7 @@ def main() -> int:
                     "()=>document.querySelectorAll('.ff8-spreadsheet-bar select option').length>0",
                     timeout=60000)
                 options = page.locator(".ff8-spreadsheet-bar select option").count()
-                assert options == 3, options
+                assert options == len(api(session.url, "/api/tables")["rows"]), options
                 # Export hands the browser a CSV of the chosen table.
                 with page.expect_download(timeout=60000) as download:
                     page.get_by_role("button", name="Export CSV").click()
