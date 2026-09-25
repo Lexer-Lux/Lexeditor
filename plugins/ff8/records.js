@@ -187,19 +187,30 @@
       remember();
     };
     const button=(entry,content,extra={})=>el("button",{type:"button",title:entry.caption||entry.label,"aria-label":`Insert ${entry.label}`,onmousedown:event=>event.preventDefault(),onclick:()=>insert(entry.text),...extra},content);
-    const group=(label,children)=>el("div",{class:"lex-toolbar ff8-text-token-group",role:"group","aria-label":label},...children);
+    // One bubble per group of inserting controls, instead of one long bubble on
+    // the box: the reader is pointing at the thing they want explained.
+    const group=(label,children,help)=>el("div",{class:"lex-toolbar ff8-text-token-group",role:"group","aria-label":label},...children,help?infoHelp(help):null);
     const choose=(label,entries)=>el("select",{"aria-label":`Insert ${label}`,onchange:event=>{if(event.target.value)insert(event.target.value);event.target.value=""}},el("option",{value:""},label),...entries.map(entry=>el("option",{value:entry.text},entry.label)));
     return el("div",{class:"lex-toolbar lex-toolbar-icons ff8-text-token-toolbar",role:"group","aria-label":"Special text"},
       group("Character names",tokens.characters.map(entry=>button(entry,
         entry.portrait!==undefined?el("img",{src:`/assets/portraits/characters/${entry.portrait}.png`,alt:""})
-          :el("span",{class:"lex-toolbar-tile-text"},entry.initials||entry.label),{class:"lex-toolbar-tile"}))),
+          :el("span",{class:"lex-toolbar-tile-text"},entry.initials||entry.label),{class:"lex-toolbar-tile"})),
+        "Insert a character's name. The game draws that name where the token stands. "
+        +"The three tiles without a portrait are the game's animal characters, shown "
+        +"by their initials."),
       // The colours and the two flow tokens are one row of square buttons: a
       // word beside a colour chip made that row twice as tall as the marks in it.
       group("Text colours",[...tokens.colours.map(entry=>button(entry,
         el("span",{class:`lex-toolbar-chip${entry.blink?" lex-toolbar-chip-blink":""}`,style:`--lex-toolbar-chip-bg:${entry.colour}`}),{class:"lex-toolbar-tile"})),
         ...tokens.breaks.map(entry=>button(entry,
-          el("span",{class:"lex-toolbar-tile-text"},entry.glyph||entry.caption),{class:"lex-toolbar-tile"}))]),
-      group("Insert token",[choose("Locations",tokens.locations),choose("Variables",tokens.variables),choose("Keys",tokens.keys),choose("Special characters",tokens.symbols)]));
+          el("span",{class:"lex-toolbar-tile-text"},entry.glyph||entry.caption),{class:"lex-toolbar-tile"}))],
+        "Insert a colour. Text after the token is drawn in it until another colour "
+        +"token changes it; a blinking colour alternates with the game's flash. The "
+        +"arrow starts a new message page, and the double bar pauses the message."),
+      group("Insert token",[choose("Locations",tokens.locations),choose("Variables",tokens.variables),choose("Keys",tokens.keys),choose("Special characters",tokens.symbols)],
+        "Insert a stored name, a variable, a key icon or a special character at the "
+        +"cursor. Locations, variables and keys are tokens the game resolves when the "
+        +"message is shown."));
   }
   function textDetail(row,prefs){
     const input=LexeditorUI.textArea({rows:8,"aria-label":`Text for ${row.name}`,oninput:event=>{row.value=event.target.value;shell.refresh()}});input.value=row.value;
@@ -221,7 +232,7 @@
       // box shown anywhere else can send a reader to the page that edits it properly.
       label:hoverable({content:row.name,targetType:"text",targetId:row.id,
         targetLabel:`text record ${row.name}`,
-        activate:()=>{state.selected.text=row.id;navigate("text")}}),help:infoHelp(`Use Special text to insert names, colours, page breaks, pauses, locations, variables and key icons at the cursor. A colour applies to the text that follows it; use White to restore white text. Pause inserts {Wait030}; edit its number from 000 to 223 to change the wait. Variables use values supplied by the current game message. ${boundary}`),control,pin:prefs?.pinButton("value","Text")})]});
+        activate:()=>{state.selected.text=row.id;navigate("text")}}),help:infoHelp(`${boundary} Each group in the special-text toolbar above explains what it inserts.`),control,pin:prefs?.pinButton("value","Text")})]});
   }
   function renderText(){const rows=filtered("text",["sourceLabel","section","recordId","role","value"]),columns=[{key:"sourceLabel",label:"Source",width:"95px"},{key:"sectionId",label:"Section",numeric:true,width:"70px"},{key:"recordId",label:"Record",numeric:true,width:"70px"},{key:"role",label:"Field",width:"minmax(106px,.55fr)"},{key:"value",label:"Text",grow:1}];showPaged("text",rows,columns,textDetail,"95px 70px 70px minmax(106px,.55fr) minmax(160px,1fr)")}
   const characterCurveOrder=["HP","STR","VIT","MAG","SPR","SPD","LUCK"];
