@@ -861,6 +861,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 
 .lex-numbered-id-cell .lex-column-cell-content { width:100%; }
+.lex-numbered-id-cell { min-width:max-content; }
 .lex-numbered-id-cell .lex-record-id {
    width:100%;
  justify-content:flex-start;
@@ -869,6 +870,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-record-id-prefix {
   flex:0 0 auto;
   padding-block:.15em;
+  /* The cell clips its children, and a game face paints the mark about a pixel
+     left of its own advance box - so the "#" lost its left edge. Same .08em of
+     slack the cell text carries, on the side the ink escapes. */
+  padding-inline-start:.08em;
 }
 
 .lex-detail-panel {
@@ -940,7 +945,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-detail-panel-body:has(> .lex-tabbed-panel:only-child) { flex:1 1 auto; padding:0; }
 .lex-detail-panel-body > .lex-tabbed-panel:only-child { flex:1 1 auto; }
 .lex-detail-panel-media { position:relative; overflow:hidden; grid-template-rows:minmax(0,1fr); }
-.lex-detail-panel-media > .lex-detail-panel-heading { position:absolute; inset:0 0 auto; z-index:4; background:transparent; border:0; pointer-events:none; transition:opacity .15s; }
+/* The overlay heading is shorter than what it holds once the panel is short, so
+   its own clip cut the bottom of the record's identity away. The picture box
+   below it is still a hard bound, so the heading can show its content. */
+.lex-detail-panel-media > .lex-detail-panel-heading { position:absolute; inset:0 0 auto; z-index:4; background:transparent; border:0; pointer-events:none; transition:opacity .15s; overflow:visible; }
 .lex-detail-panel-media:hover > .lex-detail-panel-heading { opacity:.15; }
 .lex-detail-panel-media > .lex-detail-panel-body { flex:1; min-height:0; padding:0; display:flex; }
 .lex-detail-panel-media > .lex-detail-panel-body > .lex-image-map { flex:1; }
@@ -1304,6 +1312,9 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
   font-feature-settings:"kern" 0,"tnum" 1;
   letter-spacing:0;
   white-space:nowrap;
+  /* A unit field clips what it holds, and the face paints the first digit just
+     outside its advance box. Reserve that pixel rather than lose it. */
+  padding-inline-start:.08em;
 }
 
 .lex-magnitude {
@@ -2269,11 +2280,22 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 .lex-numeric-cell > .lex-column-cell-content { min-width:max-content;overflow:visible; }
 .lex-numeric-cell > .lex-column-cell-content > * { overflow:visible;text-overflow:clip; }
 
-.lex-column-cell-content > :not(input):not(select):not(textarea) {
+/* The boolean mark is excluded: it is one centred glyph, and clipping it to its
+   own 25px box shaved about a pixel off the tick. A record id is excluded for
+   the same reason a number is: abbreviating it changes what it says, so it is
+   never allowed to clip itself. */
+.lex-column-cell-content > :not(input):not(select):not(textarea):not(.lex-boolean-mark):not(.lex-record-id) {
   min-width:0;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
+}
+
+/* A cell that shows a tick has nothing to truncate, and the glyph's ink is
+   about a pixel wider than the column's own box. Clipping it there shaved the
+   left side of the tick, so the cell stops clipping. */
+.lex-column-list-cell:has(.lex-boolean-mark) > .lex-column-cell-content {
+  overflow:visible;
 }
 
 /* The 1em line box hugs the glyphs for cross-font centring, so a bare
@@ -3944,6 +3966,10 @@ body:has(.lex-data-map-table) #main {
 .lex-choice-popover img { width:22px; height:22px; object-fit:contain; }
 .lex-inline-label { display:inline-flex; align-items:center; gap:.3em; min-width:0; max-width:100%; vertical-align:middle; }
 .lex-inline-label > img { width:1.35em; height:1.35em; object-fit:contain; image-rendering:pixelated; flex:none; }
+/* The wrapper clips what it holds, and a game face paints the first character
+   just outside its own advance box. Reserve that pixel where there is no
+   select to disturb; the select variant aligns its own icon instead. */
+.lex-inline-label:not(:has(> select)) { padding-inline-start:.08em; }
 .lex-table-fill .lex-column-list-cell:has(.lex-inline-label-row-image > img) { container-type:size; }
 .lex-table-fill .lex-inline-label-row-image > img { height:100cqh; width:auto; max-width:4em; }
 .lex-inline-label:has(> select) { display:block; position:relative; width:100%; text-align:left; }
@@ -5356,6 +5382,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-project-name {
    color: var(--lex-highlight); white-space: nowrap;
  flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;
+ /* It ellipsises, so the box clips; the first glyph of a game face needs the
+   same one pixel of room the other clipping text boxes carry. */
+ box-sizing:border-box; padding-inline:.08em;
 }
 @media (max-width:800px) {
   .lex-shell-command-row .lex-brand { font-size:20px; }
@@ -5649,6 +5678,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   line-height:1.05;
   text-overflow:ellipsis;
   white-space:nowrap;
+  /* It clips itself, and a game face paints the first character about a pixel
+     outside its advance box. Reserve that pixel on the side the ink escapes. */
+  padding-inline-start:.08em;
 }
 .lex-detail-part-control { position:relative; display:flex; align-items:center; gap:6px; min-width:0; }
 .lex-detail-part-control > * { flex:1 1 auto; min-width:0; width:100%; }
@@ -6047,6 +6079,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   display:block;
   line-height:1;
   padding-block:.14em;
+  /* The same room vertically, horizontally: a face whose digits and capitals
+     paint a pixel outside their advance box otherwise loses that pixel to the
+     cell's own clip box. Tab labels already reserve this for the same reason. */
+  padding-inline:.08em;
 
 }
 
@@ -6815,6 +6851,10 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 .lex-boolean-mark {
    font:800 1.08em/1 "Lexend", "Segoe UI Symbol", sans-serif;
  display: block; font-size: 1.45em; text-align: center;
+  /* A cell's content clips every span it holds, and the tick's ink is about a
+     pixel wider than the box the cell gives it - so the mark lost a sliver of
+     its left side. Nothing here needs cutting: it is one glyph, centred. */
+  overflow:visible; text-overflow:clip;
 }
 
 /* A record with a picture: the first section beside the rest, stacking when the
@@ -6956,9 +6996,12 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   gap: 12px;
   min-height:0;
   /* Clipped, but not at the edge: the ID's pin overhangs its corner by a
-     few pixels by design, and a hard clip cut its right side off. */
+     few pixels by design, and a hard clip cut its right side off. The margin
+     also has to clear the identity block: in a short panel the heading's own
+     content is about 24px taller than the row, and 16px of margin left the
+     bottom 8px of the name and its ID cut away. */
   overflow:clip;
-  overflow-clip-margin:16px;
+  overflow-clip-margin:32px;
 
   border-bottom: var(--lex-detail-heading-border, 1px solid var(--lex-border));
   background: var(--lex-detail-heading-bg, color-mix(in srgb, var(--lex-panel-2) 55%, var(--lex-panel)));

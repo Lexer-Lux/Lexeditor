@@ -145,7 +145,13 @@ def main() -> int:
             })
             cdp.call("Page.addScriptToEvaluateOnNewDocument", {"source": STUB})
             cdp.call("Page.navigate", {"url": session.url})
-            wait_eval(cdp, "typeof state==='undefined'||!state.booting", 90)
+            # The shell swallows clicks while it is loading: it sets
+            # `lex-loading-live` and a capture listener cancels every click. The
+            # old gate (`typeof state==='undefined'||!state.booting`) was a
+            # no-op for a plugin that keeps `state` to itself, so a --step click
+            # landed on a page that ignored it and the screenshot showed the tab
+            # that happened to be restored. Wait for the app's own flag.
+            wait_eval(cdp, "!document.documentElement.classList.contains('lex-loading-live')", 300)
             time.sleep(1.2)
             if args.ready:
                 wait_eval(cdp, args.ready, args.wait_seconds)
