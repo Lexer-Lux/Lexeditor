@@ -61,7 +61,7 @@
   --lex-list-header-bg:#4a4d4c;--lex-list-cell-border:#ffffff24;
   --lex-sort-header-bg:#383c3c;--lex-sort-header-fg:#fff;
   --lex-row-hover-bg:#cccccc2e;--lex-row-selected-bg:var(--ff9-cursor);--lex-row-selected-fg:#fff;
-  --lex-cell-padding:5px 8px;--lex-head-cell-padding:5px 8px;--lex-head-cell-overflow:visible;
+  --lex-cell-padding:5px 8px;--lex-cell-padding-inline:8px;--lex-head-cell-padding:5px 8px;--lex-head-cell-overflow:visible;
   --lex-pager-fg:#fff;--lex-pager-bg:var(--ff9-stone);--lex-pager-border:3px solid;
   --lex-pager-border-color:var(--ff9-bevel);--lex-pager-button-fg:#fff;
   --lex-pager-button-bg:#4a4d4c;--lex-pager-button-border:2px solid;

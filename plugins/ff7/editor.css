@@ -26,7 +26,7 @@
       --lex-list-header-bg:#2323a8;--lex-list-cell-border:#ffffff2b;
       --lex-sort-header-bg:#0c0c5e;--lex-sort-header-fg:#fff;
       --lex-row-hover-bg:#2a2ab0;--lex-row-selected-bg:#3434c0;--lex-row-selected-fg:#fff;
-      --lex-cell-padding:5px 8px;--lex-head-cell-padding:5px 8px;
+      --lex-cell-padding:5px 8px;--lex-cell-padding-inline:8px;--lex-head-cell-padding:5px 8px;
       --lex-pager-fg:#fff;--lex-pager-bg:#0c0c5e;--lex-pager-border:2px solid;
       --lex-pager-border-color:#e8e8f8;--lex-pager-button-fg:#fff;
       --lex-pager-button-bg:#2323a8;--lex-pager-button-border:2px solid;

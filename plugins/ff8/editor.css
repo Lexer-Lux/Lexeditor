@@ -57,7 +57,7 @@
       --lex-list-header-bg:#565656;--lex-list-cell-border:#ffffff2b;
       --lex-sort-header-bg:#303030;--lex-sort-header-fg:#fff;
       --lex-row-hover-bg:#6c6c6c;--lex-row-selected-bg:#777;--lex-row-selected-fg:#fff;
-      --lex-cell-padding:5px 8px;--lex-head-cell-padding:5px 8px;
+      --lex-cell-padding:5px 8px;--lex-cell-padding-inline:8px;--lex-head-cell-padding:5px 8px;
       --lex-row-marker-content:"";--lex-row-marker-image:url("/assets/icons/0.png");
       --lex-row-marker-width:28px;--lex-row-marker-height:19px;--lex-row-marker-gap:8px;
       --lex-row-marker-filter:drop-shadow(1px 1px #111);
@@ -135,17 +135,17 @@
 
     .enemy-flags {--lex-toggle-basis:9.5em;--lex-toggle-padding:5px 7px;--lex-toggle-gap:6px;}
 
-    .enemy-tier-table {--lex-cell-padding:4px 3px;--lex-head-cell-padding:3px 1px;--lex-list-cell-border:#ffffff20;--lex-surface-border:0;--lex-surface-shadow:none;--lex-surface-bg:transparent;}
+    .enemy-tier-table {--lex-cell-padding:4px 3px;--lex-cell-padding-inline:3px;--lex-head-cell-padding:3px 1px;--lex-list-cell-border:#ffffff20;--lex-surface-border:0;--lex-surface-shadow:none;--lex-surface-bg:transparent;}
 
-    .drop-chance-table {--lex-cell-padding:3px 5px;--lex-head-cell-padding:3px 5px;--lex-list-cell-border:#ffffff28;--lex-surface-border:0;--lex-surface-shadow:none;--lex-surface-bg:transparent;}
+    .drop-chance-table {--lex-cell-padding:3px 5px;--lex-cell-padding-inline:5px;--lex-head-cell-padding:3px 5px;--lex-list-cell-border:#ffffff28;--lex-surface-border:0;--lex-surface-shadow:none;--lex-surface-bg:transparent;}
 
 /* Per-view spacing, as values on the view: the tables and panels that FF8 packs
    tighter than the shared defaults. (These were rules on shared classes.) */
-.ff8-record-list {--lex-cell-padding:5px 8px;}
+.ff8-record-list {--lex-cell-padding:5px 8px;--lex-cell-padding-inline:8px;}
 
-.ff8-shop-table {--lex-cell-padding:1px 5px;}
+.ff8-shop-table {--lex-cell-padding:1px 5px;--lex-cell-padding-inline:5px;}
 
-.field-card-table {--lex-cell-padding:5px 8px;}
+.field-card-table {--lex-cell-padding:5px 8px;--lex-cell-padding-inline:8px;}
 
 /* A record's icon before its name in the panel heading. */
 .ff8-heading-label, .ff8-ability-label {--ff8-item-icon-size:1.15em;}
@@ -156,7 +156,7 @@
 
 /* The Encounters tab. Rules is a region-by-ground grid of stored rules; the
    preview boxes are one battle position each, name over the box, level under. */
-.ff8-encounter-rule-table {--lex-cell-padding:2px 4px;--lex-head-cell-padding:3px 4px;}
+.ff8-encounter-rule-table {--lex-cell-padding:2px 4px;--lex-cell-padding-inline:4px;--lex-head-cell-padding:3px 4px;}
 
 .ff8-encounter-preview-section {--lex-section-content-padding:6px 0 0;}
 

@@ -11,11 +11,24 @@
     mode.value=rule.mode;
     return LexeditorUI.stack({fill:false},mode,...(["fixed","maximum"].includes(rule.mode)?[numberControl(rule.value,1,100,1,value=>apply(rule.mode,value),{"aria-label":"Enemy level rule value"})]:[]));
   }
+  // The four header bytes of a formation, as ordinary properties: the name on
+  // the left and a help bubble beside it. This row used the stacked part of the
+  // shared row component, which puts the name over the box and, with no help
+  // passed, leaves the property with no bubble at all - so the same kind of
+  // value looked unlike every other property in the editor. Four property
+  // rows in one pair of lanes, like the field pages use, because four parts
+  // across one lane leaves the longest name - Secondary camera - clipped.
+  const encounterHeaderFields=[
+    ["Stage","Battle stage number for this formation. It selects the arena the battle is fought in, so two formations with the same stage fight in the same place."],
+    ["Flags","Flag byte stored with this formation. Its effect on the battle is not established here, so Lexeditor shows it and saves it without interpretation."],
+    ["Main camera","Main camera number stored with this formation. The game's use of this value is not established here."],
+    ["Secondary camera","Second camera number stored with this formation. The game's use of this value is not established here."]];
   function encounterDetail(row,prefs){
-    const formation=LexeditorUI.controlGroup(['stageId','flags','cameraMain','cameraSecondary'].map((key,index)=>({
-      label:['Stage','Flags','Main camera','Secondary camera'][index],
+    const formation=LexeditorUI.tileGrid(['stageId','flags','cameraMain','cameraSecondary'].map((key,index)=>detailField({
+      label:encounterHeaderFields[index][0],
+      help:infoHelp(encounterHeaderFields[index][1]),
       control:encounterSource(numberControl(row[key],0,255,1,value=>{row[key]=value;shell.refresh()}),row,value=>value?.[key],value=>{row[key]=Number(value);shell.refresh()})
-    })),{columns:4,stacked:true});
+    })),{columns:2});
     const source=(slot,key,control)=>{
       if(!slot.enabled&&key!=='enabled')for(const input of [control,...control.querySelectorAll('input,select,button')])
         if(input.matches('input,select,button'))input.disabled=true;

@@ -2097,7 +2097,11 @@
   // values - laid out as ordinary label-then-box pairs rather than captions
   // stacked over boxes, which is what every other property in the editor does.
   const multiNumberRow = (entries = [], options = {}) => detailParts(
-    entries.filter(Boolean).map(entry => ({label: entry.label, control: entry.control, title: entry.title})),
+    // The caller's help text and pin travel with the part. Dropping them here
+    // left a multi-number property unable to carry a help bubble at all, which
+    // is why one form of the same property had one and another did not.
+    entries.filter(Boolean).map(entry => ({label: entry.label, control: entry.control,
+      title: entry.title, help: entry.help, pin: entry.pin})),
     {columns: options.columns, stacked: options.stacked, copy: !options.stacked,
      className: ["lex-multi-number", options.className || ""].filter(Boolean).join(" ")});
 

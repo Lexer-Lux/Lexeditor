@@ -43,8 +43,20 @@ const render=renderEncounters;
    page.wait_for_timeout(150)
    assert page.locator('.lex-detail-panel').count()==1
    assert page.locator('.lex-stack > .lex-column-list').count()==1
-   tops=page.locator('.lex-detail-parts > .lex-detail-part').evaluate_all('nodes=>nodes.map(e=>Math.round(e.getBoundingClientRect().top))')
-   assert len(set(tops))==1,tops
+   # The formation's four header bytes are ordinary properties, as the panel
+   # below them is: a name on the left, a box on the right, a help bubble beside
+   # the name. They were drawn by the shared row component in its stacked form,
+   # which put each name over its box and, with no help passed, left the row with
+   # no bubbles at all at any width.
+   assert page.locator('.lex-detail-parts-stacked').count()==0
+   names=page.locator('.lex-tile-grid .lex-detail-field .lex-detail-field-label-text').all_text_contents()
+   assert [name.strip() for name in names]==['Stage','Flags','Main camera','Secondary camera'],names
+   assert page.locator('.lex-tile-grid .lex-detail-field .lex-info-help').count()==4
+   beside=page.evaluate("""() => [...document.querySelectorAll('.lex-tile-grid .lex-detail-field')].map(field => {
+     const label=field.querySelector('.lex-detail-field-label').getBoundingClientRect();
+     const control=field.querySelector('.lex-detail-field-control').getBoundingClientRect();
+     return label.right <= control.left + 1;})""")
+   assert all(beside),beside
   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-encounter-slots.png'))
   browser.close()
  print('Encounter slots: selection, disabled state, numeric edits, level rules and width bounds passed.')

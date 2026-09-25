@@ -2300,6 +2300,14 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   height:100%;
   padding:var(--lex-cell-padding, 4px 10px);
 }
+/* A link with a chooser button beside it is one editable cell, not a box, so
+   the padding has to sit on the pair. The numbers in the next column start
+   eight pixels from the cell edge; without this the link text started two. */
+.lex-column-list .lex-column-cell-content > .lex-choice-field,
+.lex-column-list .lex-column-cell-content > .lex-source-control > .lex-choice-field {
+  box-sizing:border-box;
+  padding-inline:var(--lex-cell-padding-inline, 10px);
+}
 
 /* Editable table controls occupy the complete cell. A cell has no room for
    the provenance rail beside its value: reserving it left a value of three
@@ -2341,6 +2349,10 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   box-sizing:border-box;
   width:100%;
 }
+/* A cell's padding is a pair, so a theme that sets --lex-cell-padding sets
+   --lex-cell-padding-inline to the same inline half. This value is that half,
+   not a second opinion about it: the two disagreed by six pixels in the
+   encounter rule table, which put every value nearer one edge than the other. */
 .lex-column-list .lex-source-control:is(.no-reference,:has(> .lex-reference-placeholder)) > :is(input:not([type="checkbox"]),textarea,.lex-readonly-field) {
   padding-right:var(--lex-cell-padding-inline, 10px);
 }
