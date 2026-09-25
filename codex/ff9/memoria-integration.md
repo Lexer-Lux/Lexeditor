@@ -98,3 +98,38 @@ history that never replays scripts or rewards, safe choice handling, battle HUD
 hooks and timing, independent failure of dialogue/battle components, and durable
 Tetra Master per-opponent victory tracking. #80 remains actionable. #83 explicitly
 says not to build Better Eat yet; no Better Eat behavior was added.
+
+## Links that only exist between two files
+
+Measured on the installed Memoria `v2025.07.04` data
+(`D:\SteamLibrary\steamapps\common\FINAL FANTASY IX\StreamingAssets\Data`).
+
+**An ability slot names a battle action.** Each per-character file under
+`Characters/Abilities/` stores only `Id` and `AP`, and its own header says "Use 0
+for a void ability, AA:X for active abilities and SA:X for passive abilities".
+Across every character file, each `AA:X` was compared with the `Battle/Actions.csv`
+row whose `id` is X: 156 ids compared, all but two naming the same thing. The two
+differences are Memoria's own spellings, `Frost` (Quina `AA:97`) against `Freeze`,
+and `Armor Break` (Steiner `AA:145`) against `Armour Break`. The action's `mp`
+column is therefore the ability's MP cost — Cure `AA:1` reads 6 MP, Cura `AA:2`
+reads 10. `SA:X` ids index the support-ability table instead and must never be
+matched to an action; `Characters/Abilities/AbilityGems.csv` stores plain numeric
+ids, so it is a different table again.
+
+A shipped ability file pads its learn list with id-0 rows (Beatrix1.csv holds 18
+real abilities and 30 such rows). They are real rows and stay visible; Lexeditor
+names each one `Empty slot N` so a list of identical `Void` rows can be read.
+
+**A shop row is a list of item ids.** `Items/ShopItems.csv` stores
+`Comment;Id;Items`, where `Items` is a comma-separated list of item ids in display
+order, and the trailing comment carries the shop's real name (`# Shop 0000 Dali
+Weapon Shop`) even though the `Comment` column itself only says `Shop 0000`. All
+32 shops resolve every stocked id to a row in `Items/Items.csv`; shops 23 and 24
+stock nothing at all. FF9 has no shop name of its own, so the comment-derived name
+is a display label the game never reads.
+
+`Items.csv` is the only table whose `Price` is what a shop charges and whose
+`SellingPrice` is what a shop pays back, so Lexeditor labels those two columns
+`Buy price` and `Sell price` for that dataset alone. `Synthesis.csv` has its own
+`Price`, meaning the recipe's charge, and keeps its name. The CSV column keys are
+unchanged in every case — only the displayed label moves.

@@ -48,7 +48,7 @@ def csv_bytes(relative: str) -> bytes:
             "# Comment;id;menuWindow;targets;defaultAlly;forDead;defaultOnDead;defaultCamera;animationId1;animationId2;scriptId;power;elements;rate;category;statusIndex;mp;type;commandTitle\n"
             "# ;Int32;UInt8;UInt8;Boolean;Boolean;Boolean;Boolean;Int16;UInt16;Int32;Int32;UInt8;Int32;UInt8;Int32;Int32;UInt8;UInt8\n"
             "Fire;1;Hp(1);SingleEnemy(2);0;0;0;0;1;2;3;16;1;100;0;0;6;1;255;# Fire\n"
-            "Cure;2;Hp(1);ManyAny(3);1;1;0;0;9;8;10;16;0;0;71;0;6;1;255;# Cure\n"
+            "Cure;2;Hp(1);ManyAny(3);1;1;0;0;9;8;10;16;0;0;71;0;10;1;255;# Cure\n"
         ).encode()
     if relative == "Battle/StatusData.csv":
         return (
@@ -63,7 +63,11 @@ def csv_bytes(relative: str) -> bytes:
     if relative == "World/WeatherColors.csv":
         return b"# light0.vx;light0.vy;light0.vz;fogAMP;offsetX;scaleY\n# Int16;Int16;Int16;UInt16;Single;Single\n100;100;100;4096;0;0;# Daylight 0\n"
     if relative == "Items/ShopItems.csv":
-        return b"# Comment;Id;Items\n# ;Int32;Int32[]\nShop 0000;0;1, 2;# Shop 0000 Test Shop\n"
+        return (b"# Comment;Id;Items\n# ;Int32;Int32[]\n"
+                b"Shop 0000;0;1, 2, 35;# Shop 0000 Test Shop\n"
+                b"Shop 0023;23;;# Shop 0023 Closed Shop\n")
+    if relative == "Characters/Abilities/Beatrix1.csv":
+        return b"# Id;AP\n# Ability;Int32\nAA:1;0;# Fire\nAA:2;0;# Cure\n0;0;# Void\n0;0;# Void\n"
     return b"# Id;Value\n# Int32;UInt8\n0;1;# Synthetic\n"
 
 
@@ -94,25 +98,30 @@ def assert_table_headers_fit(page):
     assert not overflow, overflow
 
 
-def assert_table_rows_do_not_overlap(page):
-    overlaps = page.evaluate("""()=> {
-      const rows=[...document.querySelectorAll('.lex-column-list-row')]
-        .filter(row=>row.offsetParent!==null && !row.classList.contains('lex-filler-row'));
+def assert_table_rows_do_not_overlap(page, selector=".lex-column-list"):
+    # Rows are positioned inside their own table, so each table is measured on
+    # its own: two tables in different panels are not a row order.
+    overlaps = page.evaluate("""(selector)=> {
       const bad=[];
-      for(let i=0;i<rows.length;i++){
-        const box=rows[i].getBoundingClientRect();
-        const content=[...rows[i].querySelectorAll('.lex-column-cell-content')]
-          .map(node=>node.getBoundingClientRect())
-          .filter(rect=>rect.width>0&&rect.height>0);
-        if(content.some(rect=>rect.top < box.top-1 || rect.bottom > box.bottom+1))
-          bad.push({index:i,row:{top:box.top,bottom:box.bottom},content:content.map(rect=>({top:rect.top,bottom:rect.bottom}))});
-        if(i+1<rows.length){
-          const next=rows[i+1].getBoundingClientRect();
-          if(box.bottom > next.top+1) bad.push({index:i,overlapsNext:true,bottom:box.bottom,nextTop:next.top});
+      for(const root of document.querySelectorAll(selector)){
+        if(root.offsetParent===null)continue;
+        const rows=[...root.querySelectorAll('.lex-column-list-row')]
+          .filter(row=>row.offsetParent!==null && !row.classList.contains('lex-filler-row'));
+        for(let i=0;i<rows.length;i++){
+          const box=rows[i].getBoundingClientRect();
+          const content=[...rows[i].querySelectorAll('.lex-column-cell-content')]
+            .map(node=>node.getBoundingClientRect())
+            .filter(rect=>rect.width>0&&rect.height>0);
+          if(content.some(rect=>rect.top < box.top-1 || rect.bottom > box.bottom+1))
+            bad.push({table:root.className,index:i,row:{top:box.top,bottom:box.bottom},content:content.map(rect=>({top:rect.top,bottom:rect.bottom}))});
+          if(i+1<rows.length){
+            const next=rows[i+1].getBoundingClientRect();
+            if(box.bottom > next.top+1) bad.push({table:root.className,index:i,overlapsNext:true,bottom:box.bottom,nextTop:next.top});
+          }
         }
       }
       return bad;
-    }""")
+    }""", selector)
     assert not overlaps, overlaps
 
 
@@ -165,7 +174,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             assert page.locator(".lex-column-list-row").count() >= 10
             assert_table_headers_fit(page)
 
-            price = numeric_field(page, "PRICE")
+            price = numeric_field(page, "BUY PRICE")
             expect(price).to_have_value("250")
             page.screenshot(path=str(OUT / "ff9-items-wide.png"), full_page=True)
             save = page.locator("#global-save")
@@ -184,7 +193,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             page.reload(wait_until="domcontentloaded")
             page.wait_for_selector(".lex-paged-list-detail")
             wait_loaded(page)
-            expect(numeric_field(page, "PRICE")).to_have_value("333")
+            expect(numeric_field(page, "BUY PRICE")).to_have_value("333")
 
             page.evaluate("navigate('enemies')")
             page.wait_for_function("state.datasets.enemies?.rows?.length===1")
@@ -294,6 +303,45 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             expect(numeric_field(page, "MONSTER COUNT")).to_have_attribute("max", "4")
             expect(numeric_field(page, "ENEMY 1 TYPE")).to_have_attribute("max", "0")
             page.screenshot(path=str(OUT / "ff9-encounters.png"), full_page=True)
+
+            # A shop's CSV cell is a list of item ids. The list must say how
+            # many items the shop holds, and the panel must name them.
+            page.evaluate("navigate('shops')")
+            page.wait_for_function("state.datasets.shops?.rows?.length===2")
+            shop_rows = page.locator(".ff9-table .lex-column-list-row")
+            expect(shop_rows).to_have_count(2)
+            expect(shop_rows.filter(has_text="Test Shop")).to_contain_text("3 items")
+            expect(shop_rows.filter(has_text="Closed Shop")).to_contain_text("Nothing")
+            shop_rows.filter(has_text="Test Shop").click()
+            stock = page.locator(".ff9-shop-table .lex-column-list-row")
+            expect(stock).to_have_count(3)
+            expect(stock.first).to_contain_text("Item 01")
+            expect(stock.first).to_contain_text("251 gil")
+            expect(stock.last).to_contain_text("Item 35")
+            stock_header = page.locator(".ff9-shop-table .lex-column-list-header").inner_text()
+            assert "Buy price" in stock_header and "Sell price" in stock_header, stock_header
+            assert_table_headers_fit(page)
+            assert_table_rows_do_not_overlap(page)
+            page.screenshot(path=str(OUT / "ff9-shops.png"), full_page=True)
+
+            # An ability slot carries no cost of its own: the cost belongs to
+            # the battle action the slot names, and the file pads the list with
+            # void rows that have to be told apart.
+            page.evaluate("state.datasetChoice.abilities='ability-beatrix-1'")
+            page.evaluate("navigate('abilities')")
+            page.wait_for_function("state.datasets['ability-beatrix-1']?.rows?.length===4")
+            ability_rows = page.locator(".ff9-table .lex-column-list-row")
+            expect(ability_rows).to_have_count(4)
+            expect(ability_rows.filter(has_text="Empty slot 1")).to_have_count(1)
+            expect(ability_rows.filter(has_text="Empty slot 2")).to_have_count(1)
+            assert "MP cost" in page.locator(".ff9-table .lex-column-list-header").inner_text()
+            page.locator(".ff9-table .lex-column-list-row").filter(has_text="Fire").first.click()
+            expect(page.locator(".lex-detail-panel-heading")).to_contain_text("Fire")
+            expect(page.locator(".lex-detail")).to_contain_text("BATTLE ACTION")
+            expect(field(page, "MP COST")).to_contain_text("6")
+            expect(field(page, "AP")).to_be_visible()
+            assert_table_headers_fit(page)
+            page.screenshot(path=str(OUT / "ff9-abilities.png"), full_page=True)
 
             page.locator("#plugin-data-map").click()
             page.wait_for_selector(".lex-data-map-view")

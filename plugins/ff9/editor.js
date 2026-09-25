@@ -60,12 +60,28 @@
     for(const source of columnSources(data,key)){
       source.data.fields.filter(field=>!["id","comment","name"].includes(field.key.toLocaleLowerCase())).forEach((field,index)=>{
         const value=record=>source.row(record)?.values[field.key];
-        columns.push({key:source.prefix+field.key,label:field.label,pinned:!source.prefix&&index<1,
+        // A derived column exists because the file it belongs to cannot supply
+        // that value at all — the ability lists carry no MP cost of their own.
+        // Leaving it unpinned would hide the one column the panel was built to
+        // add, so derived columns start shown.
+        columns.push({key:source.prefix+field.key,label:field.label,pinned:field.declaredType==="DERIVED"||(!source.prefix&&index<1),
           sortable:true,width:"minmax(0,1fr)",numeric:["integer","number"].includes(field.kind),sortValue:value,
           render:record=>{const linked=source.row(record);return linked?fieldValue(linked,field):"—"}});
       });
     }
+    if(key==="shops")stockColumn(columns);
     return columns;
+  }
+  // A shop's own CSV cell is a comma list of item ids, which reaches the list
+  // as a wall of numbers. The list states how many items the shop stocks, and
+  // the panel beside it resolves every id to the item's name and its prices.
+  function stockColumn(columns){
+    const column=columns.find(value=>value.key==="Items");
+    if(!column)return;
+    column.label=el("span",{},"Stock",infoHelp("How many items this shop sells, in the order the shop displays them. The panel for each shop lists those items by name. The underlying list of item ids stays editable at the bottom of that panel."));
+    column.numeric=true;
+    column.sortValue=record=>(record.stock||[]).length;
+    column.render=record=>{const count=(record.stock||[]).length;return count?`${count} item${count===1?"":"s"}`:"Nothing"};
   }
   function prefsFor(data,key,columns=columnsFor(data,key)){if(!prefCache[key])prefCache[key]=columnPreferences(`ff9-${key}`,columns,()=>render());return prefCache[key]}
   function tablePanel(data,key,rows,selected,select){const columns=columnsFor(data,key);return columnList({rows,key:row=>row.line,selected,select,sortState:state.sort[key]||{key:"name",dir:1},sort:column=>{const current=state.sort[key]||{key:"name",dir:1};state.sort[key]=current.key===column?{key:column,dir:-current.dir}:{key:column,dir:1};state.page[key]=0;render()},columnPreferences:prefsFor(data,key,columns),columns,class:"ff9-table","aria-label":`${data.label} table`})}
@@ -208,6 +224,8 @@
   function semanticFieldHelp(data,field){
     const dataKey=String(data?.key||"");
     if(dataKey.startsWith("ability-")&&field.key==="AP")return "AP this character must earn from eligible equipment to permanently learn the linked ability.";
+    if(dataKey.startsWith("ability-")&&field.key==="Id")return "Which ability this slot holds. AA: followed by a battle-action id is an active ability; SA: followed by a support-ability id is a support ability. The value 0 is the file's own void ability — an unused slot in this character's learn list, shown here as an empty slot.";
+    if(dataKey.startsWith("ability-")&&field.key==="mp")return "MP the matching battle action costs, read from Battle/Actions.csv. It is shown here and edited on that file, so that one ability cannot end up with two different costs.";
     if(dataKey==="item-stats"&&["Dexterity","Strength","Magic","Will"].includes(field.key))return `When a character levels while equipment using this bonus row is equipped, FF9 adds this ${field.key} bonus into the character's accumulated stat-growth bonus.`;
     if(dataKey==="item-stats"&&field.key==="AttackElement")return "Element added to physical attacks by equipment that references this bonus row.";
     if(dataKey==="item-stats"&&field.key==="GuardElement")return "Elements guarded against by equipment that references this bonus row.";
@@ -259,7 +277,38 @@
   const fieldRows=(data,row,exclude=[])=>{const blocked=new Set(exclude.map(String));return data&&row?data.fields.filter(field=>!blocked.has(field.key)&&field.key.toLocaleLowerCase()!=="id"&&field.key.toLocaleLowerCase()!=="comment").map(field=>fieldControl(data,row,field)):[]};
   function boolProperty(data,row,label,keys,help){const fields=new Map(data.fields.map(field=>[field.key,field]));const toggles=keys.filter(key=>fields.has(key)).map(key=>({key,label:key,pin:fieldPin(data,fields.get(key)),checked:!!row.values[key],disabled:state.activeSource!=="mine",change:value=>setValue(data,row,fields.get(key),value)}));return toggles.length?detailField({label,help:help?infoHelp(help):null,control:toggleRow({label,toggles}),dataType:"FLAGS"}):null}
   function itemSections(data,row,title="ITEM DATA"){const grouped=[...ITEM_CATEGORY_FLAGS,...ITEM_PARTY_FLAGS];const body=fieldRows(data,row,grouped);const categories=boolProperty(data,row,"CATEGORIES",ITEM_CATEGORY_FLAGS,"These switches decide which FF9 item/equipment categories this record belongs to and whether it behaves as a normal usable item. More than one category can apply to the same underlying item record.");const party=boolProperty(data,row,"EQUIPPABLE BY",ITEM_PARTY_FLAGS,"Each switch controls whether that character is allowed to equip this record. Guest-character switches matter only while that character is actually available.");if(categories)body.push(categories);if(party)body.push(party);return detailSection({title,body})}
-  function detail(data,row){const identity=sourceHasId(data)?recordId(row.id):null;if(data.key==="items")return detailPanel({className:"ff9-detail",title:row.name,identity,meta:`Items · ${data.source} CSV`,body:[itemSections(data,row)]});const visible=data.fields.filter(field=>!["id","comment"].includes(field.key.toLocaleLowerCase())),editable=visible.filter(field=>field.editable&&field.kind!=="stored"&&!readOnlyNote(data,field)),stored=visible.filter(field=>!field.editable||field.kind==="stored"||readOnlyNote(data,field));const body=[];if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));const meta=battleKeys.includes(data.key)?`${data.label} · ${row.source||data.source} BattleScene raw16`:data.key.startsWith("field-walkmesh")?`${data.label} · ${row.source||data.source} BGI`:`${data.label} · ${data.source} CSV`;return detailPanel({className:"ff9-detail",title:row.name,identity,meta,body})}
+  function detail(data,row){const identity=sourceHasId(data)?recordId(row.id):null;if(data.key==="items")return detailPanel({className:"ff9-detail",title:row.name,identity,meta:`Items · ${data.source} CSV`,body:[itemSections(data,row)]});if(data.key==="shops")return shopDetail(data,row);if(data.key.startsWith("ability-"))return abilityDetail(data,row);const visible=data.fields.filter(field=>!["id","comment"].includes(field.key.toLocaleLowerCase())),editable=visible.filter(field=>field.editable&&field.kind!=="stored"&&!readOnlyNote(data,field)),stored=visible.filter(field=>!field.editable||field.kind==="stored"||readOnlyNote(data,field));const body=[];if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));const meta=battleKeys.includes(data.key)?`${data.label} · ${row.source||data.source} BattleScene raw16`:data.key.startsWith("field-walkmesh")?`${data.label} · ${row.source||data.source} BGI`:`${data.label} · ${data.source} CSV`;return detailPanel({className:"ff9-detail",title:row.name,identity,meta,body})}
+  const gilValue=value=>value===""||value===null||value===undefined?"—":`${LexeditorUI.formatNumber(value)} gil`;
+  // A shop record is one row of item ids. The ids are the editable truth, but
+  // a reader needs the items themselves, so the panel resolves every id to the
+  // item record that owns its name and prices.
+  function shopDetail(data,row){
+    const stock=Array.isArray(row.stock)?row.stock:[],rows=stock.map((entry,index)=>({...entry,slot:index+1}));
+    const body=[];
+    body.push(stock.length?columnList({fill:true,rows,key:entry=>entry.slot,class:"ff9-shop-table ff9-record-list",columns:[
+      {key:"slot",label:"Slot",width:"54px"},
+      {key:"name",label:"Item",sortable:true,width:"minmax(120px,2fr)"},
+      {key:"buyPrice",label:"Buy price",numeric:true,sortable:true,width:"minmax(90px,1fr)",render:entry=>gilValue(entry.buyPrice)},
+      {key:"sellPrice",label:"Sell price",numeric:true,sortable:true,width:"minmax(90px,1fr)",render:entry=>gilValue(entry.sellPrice)}
+    ]}):detailSection({title:"STOCK",body:[LexeditorUI.detailNote("This shop stocks no items.")]}));
+    const visible=data.fields.filter(field=>!["id","comment"].includes(field.key.toLocaleLowerCase())),editable=visible.filter(field=>field.editable&&field.kind!=="stored"&&!readOnlyNote(data,field)),stored=visible.filter(field=>!field.editable||field.kind==="stored"||readOnlyNote(data,field));
+    if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));
+    if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));
+    return detailPanel({className:"ff9-detail",title:row.name,identity:null,meta:`Shops · ${data.source} CSV · ${stock.length} item${stock.length===1?"":"s"}`,body});
+  }
+  // An ability row is a slot in one character's learn list: the id says which
+  // ability it holds, and the file stores no cost of its own. The MP cost comes
+  // from the matching battle action, so it is shown as a derived value.
+  function abilityDetail(data,row){
+    const fieldFor=key=>{const field=data.fields.find(value=>value.key===key);return field?fieldControl(data,row,field):null};
+    const body=[],slot=fieldFor("Id");
+    if(slot)body.push(detailSection({title:"SLOT",body:[slot]}));
+    const cost=fieldFor("mp");
+    if(cost)body.push(detailSection({title:row.action?`BATTLE ACTION · ${row.action}`:"BATTLE ACTION",body:[cost]}));
+    const editable=data.fields.filter(field=>field.editable&&!["id","comment"].includes(field.key.toLocaleLowerCase()));
+    if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));
+    return detailPanel({className:"ff9-detail",title:row.name,identity:recordId(row.id),meta:`${data.label} · ${data.source} CSV`,body});
+  }
   // Missing source is an availability state, not a claim that the format is unintegrated.
   function unavailable(key){const meta=catalogRow(key),data=state.datasets[key],battle=battleKeys.includes(key),walkmesh=key.startsWith("field-walkmesh");return detailPanel({
     title:data?.label||meta?.label||tabs.find(tab=>tab.id===state.tab)?.label||"FF9 data",body:[

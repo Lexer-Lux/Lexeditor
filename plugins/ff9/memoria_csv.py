@@ -26,6 +26,12 @@ class Dataset:
     controls: str
     filter_column: str | None = None
     filter_value: str | None = None
+    # Column names that read better under this dataset's own meaning of the
+    # column than under the generic humanized form. Items.csv stores the shop
+    # purchase column as "Price" and the resale column as "SellingPrice"; the
+    # same words mean something else in other tables, so the rename stays with
+    # the dataset that means it.
+    field_labels: tuple[tuple[str, str], ...] = ()
 
 
 DATASETS = (
@@ -39,7 +45,7 @@ DATASETS = (
     Dataset("character-parameters", "characters", "Character parameters", "Characters/CharacterParameters.csv", "Starting row, victory pose, category, command and equipment sets, model formula, and name keyword"),
     Dataset("default-equipment", "characters", "Starting equipment", "Characters/DefaultEquipment.csv", "Initial weapon, headgear, wristwear, armor, and accessory for each equipment set"),
     Dataset("leveling", "characters", "Level growth", "Characters/Leveling.csv", "Experience thresholds and HP/MP growth for levels 1 through 99"),
-    Dataset("shops", "shops", "Shop inventories", "Items/ShopItems.csv", "Shop IDs and ordered item inventories"),
+    Dataset("shops", "shops", "Shop inventories", "Items/ShopItems.csv", "Shop names, each stocked item with its buy and sell price, and the ordered item ids"),
     Dataset("synthesis", "synthesis", "Synthesis recipes", "Items/Synthesis.csv", "Recipe shops, price, result, and ingredients"),
 )
 DATASET_BY_KEY = {value.key: value for value in DATASETS}
@@ -418,7 +424,18 @@ class MemoriaDataStore:
         if not status["available"]:
             raise FileNotFoundError(f"{status['relativePath']} is not present in the selected project or a Memoria/Hades data export")
         document = MemoriaCsvDocument(Path(status["sourcePath"]))
-        return {**status, "sha256": document.sha256, "fields": document.fields, "rows": document.public_rows(dataset)}
+        return {**status, "sha256": document.sha256,
+                "fields": self.labelled_fields(dataset, document.fields),
+                "rows": document.public_rows(dataset)}
+
+    @staticmethod
+    def labelled_fields(dataset: Dataset, fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The document's field descriptions under this dataset's own names."""
+        overrides = dict(dataset.field_labels)
+        if not overrides:
+            return fields
+        return [{**field, "label": overrides.get(field["key"], field["label"])}
+                for field in fields]
 
     def save(self, key: str, expected_sha256: str, changes: list[dict[str, Any]]) -> dict[str, Any]:
         dataset = DATASET_BY_KEY.get(key)
