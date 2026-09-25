@@ -298,7 +298,9 @@
     let body=active==="background"?background.editor:fieldDetailSubtab(row,active);
     // The selected tab already supplies its name and help. Keep only that
     // section's contents, while preserving headers for actual child groups.
-    if(body?.classList.contains('lex-detail-section'))body=body.querySelector(':scope > .lex-detail-section-content');
+    // Asking the framework for the parts keeps the shared class names here.
+    const parts=LexeditorUI.sectionParts(body);
+    if(parts.content)body=parts.content;
     const editor=LexeditorUI.tabbedPanel({tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:LexeditorUI.detailPanel({heading:false,body})});
     return LexeditorUI.panelLayout([preview,editor],{orientation:"vertical",layoutKey:"ff8-field-detail",defaultSizes:[1,1]});
   }
