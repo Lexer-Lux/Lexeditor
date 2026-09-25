@@ -148,6 +148,17 @@
     .lexer-dev-body > section { display:flex; flex-direction:column; gap:10px; min-height:0; }
     .lexer-dev-body h3 { margin:0; font:800 12px/1 var(--lex-heading-font,var(--lex-font)); letter-spacing:.1em; color:var(--lex-muted); }
     .lexer-dev-table-wrap { overflow:auto; min-height:0; }
+    /* The overview's own columns hold sentences and lists, not values: they
+       wrap inside their cell instead of pushing the table past its column,
+       which is what gave the drawer a horizontal scrollbar. */
+    .lexer-dev-table-wrap .lex-column-cell-content {
+      white-space:normal;
+      overflow-wrap:anywhere;
+      min-width:0;
+    }
+    /* A disclosure with nothing behind it is not a control: the shared-UI file
+       list is only there when there are files to list. */
+    .lexer-dev-files[hidden] { display:none; }
     #lexer-dev-table .lex-column-list { font-size:13px; }
     .lexer-dev-summary { margin:0; font-size:12px; color:var(--lex-muted); }
     .lexer-dev-files { font-size:12px; color:var(--lex-muted); }
@@ -394,12 +405,17 @@
             {key:"rest",label:"REST",align:"start"},
           ],
           rows,
+          // Every column can give space back, so the table fits the drawer
+          // instead of pushing a horizontal scrollbar under it.
+          template:"minmax(110px,1.1fr) minmax(70px,.7fr) minmax(120px,1.2fr) 64px 96px minmax(110px,1.3fr)",
         }));
         const ui=table.sharedUi||{files:[],totalShared:0,totalHand:0};
         summary.textContent=`${rows.length} games · ${table.quotesTotal||0} loading quotes`
           +` (Global (shared): ${table.globalQuotes||0}) · shared UI ${ui.totalShared||0} selectors,`
           +` ${ui.totalHand||0} hand-built rows across ${(ui.files||[]).length} files`;
         const count=(now,was)=>now===was?String(now):`${now} (was ${was})`;
+        // The disclosure only exists when it has something to disclose.
+        document.querySelector("#lexer-dev-files-wrap").hidden=!(ui.files||[]).length;
         files.replaceChildren(...(ui.files||[]).map(row=>{
           const item=document.createElement("li");
           if(row.over)item.classList.add("over");
