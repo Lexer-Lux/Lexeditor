@@ -31,7 +31,7 @@
   }
   function dataTableColumns(){
     return [...dataColumns,...(state.data?.properties||[]).map(prop=>({
-      key:propertyColumnKey(prop),label:prop.label,sortable:true,pinned:false,
+      key:propertyColumnKey(prop),label:displayLabel(prop),sortable:true,pinned:false,
       width:"minmax(7em,1fr)",
       numeric:!prop.array&&["INT","FLOAT"].includes(semanticType(prop)),
       render:row=>propertyCellValue(row,prop),
@@ -222,7 +222,12 @@
   function boolInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];return el("input",{type:"checkbox",checked:!!current,disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.checked);else setArrayValue(row,prop,index,event.target.checked)}})}
   function nameInput(row,prop,index=null,source=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.value);else setArrayValue(row,prop,index,event.target.value)}});for(const name of (source||state.data).names){const option=el("option",{value:name},name);option.selected=name===current;select.append(option)}return select}
   function semanticItemInput(row,prop,index){const current=row.values[prop.name]?.[index]??"";const choices=[...(state.loot?.itemChoices||[])];if(current&&!choices.some(choice=>choice.id===current))choices.unshift({id:current,name:current});const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>setArrayValue(row,prop,index,event.target.value)});for(const choice of choices){const option=el("option",{value:choice.id},choice.name&&choice.name!==choice.id?`${choice.name} (${choice.id})`:choice.id);option.selected=choice.id===current;select.append(option)}return select}
-  function readonlyResolved(value){const resolved=resolvedText(value);return resolved?el("div",{},readonlyField(resolved),detailNote(value)):readonlyField(String(value??""))}
+  // One control, one box: readonlyField is the only shape the shared
+  // read-only lock knows how to sit on. Wrapping it with a second stacked
+  // line (the raw text id) used to give the lock a taller, two-row host to
+  // centre on instead of the value's own box, which is why the lock sat low
+  // on every resolved Name/Explanation. The raw id is still one hover away.
+  function readonlyResolved(value){const resolved=resolvedText(value);return resolved?readonlyField(resolved,{title:String(value)}):readonlyField(String(value??""))}
   // A value's storage type is not always the type a person should edit. CanSale
   // is stored as a byte but only ever means yes or no, so it is presented as a
   // switch and written back as 0 or 1. Add a field here when the schema type is
@@ -232,7 +237,39 @@
   // These are the tables worth their own tab, with the columns that make the
   // list readable at a glance; everything else stays one click away in Misc.
   // Property names are the installed game's own, including Square's spelling
-  // of Spilit for Spirit.
+  // of Spilit for Spirit. That is Square's typo, not ours, but showing raw
+  // internal spelling as a column/field label reads as if we misspelled it.
+  // Display the corrected English word; propertyHelp says whose spelling it
+  // really is, and every write still targets the property's real name.
+  const LABEL_OVERRIDES={Spilit:"Spirit"};
+  function displayLabel(prop){return LABEL_OVERRIDES[prop.name]||prop.label||prop.name}
+  // Same hint list semantics.py already validates Item/Equipment/Materia
+  // names against (NAME_PROPERTY_HINTS there): a property whose installed
+  // value is a "$..." text id gets shown resolved. Reused here so Characters,
+  // Enemies and Abilities can show a real name too, when the loaded table
+  // actually carries one - never a name invented for a table that has none.
+  // BattleAbility is the curated table this reaches: its "Name" property holds
+  // the ability's own text id, "$bt_GuardScorpion_Search" -> Target Scanner.
+  const NAME_PROPERTY_HINTS=["ItemNameLabel","NameLabel","ItemName","Name",
+    "DisplayName","TextLabel","Label","EquipmentName","MateriaNameLabel"];
+  // A row whose own properties hold no name can still be named by the table
+  // that joins it, and only the server can read that second table. recordNames
+  // is that join, keyed by row key; record_name_map in semantics.py records
+  // which tables supply one and on what evidence. It is absent for an
+  // uninstalled game and empty for a table that joins nothing, so the row key
+  // stays the fallback in both cases.
+  function recordDisplayName(record){
+    const joined=state.data?.recordNames?.[record.tag];
+    if(joined)return joined;
+    for(const hint of NAME_PROPERTY_HINTS){
+      const value=record.values?.[hint];
+      if(typeof value==="string"&&value.startsWith("$")){
+        const resolved=resolvedText(value);
+        if(resolved)return resolved;
+      }
+    }
+    return null;
+  }
   const CURATED_TABLES=[
     {id:"characters",label:"Characters",basename:"playerparameter",
      noun:"stat rows",columns:["HPMax","MPMax","Strength","Magic","Vitality","Spilit"]},
@@ -294,14 +331,21 @@
   // Generic package metadata tells us storage constraints, not gameplay meaning.
   // Shared help pips are semantic only, so unknown fields deliberately get no
   // pip; first-class surfaces add authored help where the consequence is known.
-  function propertyHelp(_prop){return null}
+  function propertyHelp(prop){
+    if(prop.name==="Spilit")return infoHelp("Shown as \"Spirit\": the installed FF7R table stores this stat's own field name as \"Spilit\", Square's own spelling in the game's data, not an editing mistake. Edits still write the same DataObject field.");
+    return null;
+  }
 
   function recordPanel(row=selectedRecord()){
     if(!row)return detailPanel({className:"ff7r-detail",title:"No record",body:[detailSection({title:"DATA",body:[detailNote("This DataObject has no rows.")]})]});
     const spec=curatedSpec(state.tab);
     const prefs=spec?curatedPrefs(spec):dataPreferences();
-    const fields=state.data.properties.map(prop=>detailField({label:prop.label,control:propertyControl(row,prop),dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),min:semanticMin(prop),max:semanticMax(prop),help:propertyHelp(prop),pin:prefs.pinButton(propertyColumnKey(prop),prop.label)}));
-    return detailPanel({className:"ff7r-detail",title:row.tag||"Unnamed record",meta:currentAsset()?.name||state.asset,body:[detailSection({title:"PROPERTIES",body:fields})]});
+    const fields=state.data.properties.map(prop=>detailField({label:displayLabel(prop),control:propertyControl(row,prop),dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),min:semanticMin(prop),max:semanticMax(prop),help:propertyHelp(prop),pin:prefs.pinButton(propertyColumnKey(prop),displayLabel(prop))}));
+    // The subtitle used to repeat the loaded table's name on every record ("EnemyParameter"
+    // for every enemy), which told a reader nothing about the record they had selected. The
+    // record's own data id is specific to it, honest about what it is, and matches how the
+    // Item/Equipment/Materia panels already label their own DATA ID field.
+    return detailPanel({className:"ff7r-detail",title:recordDisplayName(row)||row.tag||"Unnamed record",meta:row.tag?`Data ID ${row.tag}`:(currentAsset()?.name||state.asset),body:[detailSection({title:"PROPERTIES",body:fields})]});
   }
   function tablePanel(){const rows=sortedRows();return columnList({rows,key:row=>row.id,selected:state.selected,select:row=>{state.selected=row.id;render()},sortState:state.sort,sort:key=>{state.sort=state.sort.key===key?{key,dir:-state.sort.dir}:{key,dir:1};render()},columnPreferences:dataPreferences(),columns:dataTableColumns(),class:"ff7r-table","aria-label":"FF7 Remake DataObject records"})}
   function assetToolbar(){const select=el("select",{"aria-label":"FF7 Remake misc data table",onchange:event=>selectAsset(event.target.value),disabled:state.busy});for(const item of (state.tab==="tweaks"?tweakAssets():gameAssets())){const label=item.group?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.asset;select.append(option)}return LexeditorUI.toolbar(el("label",{},"Table"),select)}
@@ -464,8 +508,14 @@
   }
   function curatedColumns(spec){
     const properties=state.data?.properties||[];
-    return [{key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"},
-      ...properties.map(prop=>({key:propertyColumnKey(prop),label:prop.label||prop.name,
+    // Record ID is the game's own row key (what BattleAbility, EnemyParameter
+    // etc. actually call the row, like "GuardScorpion" or a raw "Enemy10").
+    // Name is that record's real display name where the loaded table stores
+    // one - recordDisplayName resolves it the same way the Item/Equipment/
+    // Materia tables already do, never inventing one it can't find.
+    return [{key:"tag",label:"Record ID",sortable:true,width:"minmax(9em,.7fr)"},
+      {key:"name",label:"Name",sortable:true,width:"minmax(9em,.8fr)"},
+      ...properties.map(prop=>({key:propertyColumnKey(prop),label:displayLabel(prop),
         numeric:!prop.array&&["INT","FLOAT"].includes(semanticType(prop)),
         sortable:true,
         // The curated set is what the tab opens with. Every other property is
@@ -477,7 +527,10 @@
     const q=String(state.curatedQuery||"").toLocaleLowerCase();
     const properties=state.data?.properties||[];
     const rows=records().map(record=>{
-      const row={record,id:record.id,tag:record.tag};
+      // Falls back to the record ID, not a dash: an enemy stat row has no
+      // name anywhere in the installed data, and an empty-looking column is
+      // less use than the key the game does store for that row.
+      const row={record,id:record.id,tag:record.tag,name:recordDisplayName(record)||record.tag};
       for(const prop of properties){
         row[propertyColumnKey(prop)]=propertyCellValue(record,prop);
       }
@@ -566,7 +619,11 @@
     if(semantic?.descriptionId)fields.push(detailField({label:"DESCRIPTION",
       control:descriptionControl(semantic),
       help:infoHelp("An item's description is one entry in the FF7R text resource that its name also comes from. Editing it here edits that entry: the Text tab shows the same record with the same pending change, and saving writes it into the resource. When another resource is loaded with unsaved changes this stays read-only rather than replacing it, and the button opens the entry on the Text tab.")}));
-    return detailPanel({className:"ff7r-detail",title:semantic?.name||row.tag,meta:table.name||"Item settings",body:[detailSection({title:"ITEM SETTINGS",body:fields})]});
+    // The subtitle used to repeat the loaded table's name ("Materia") on every
+    // selected record, telling a reader nothing about which one they had open.
+    // The record's own data id is specific to it - the same field the DATA ID
+    // row above already shows, just surfaced where the heading is read first.
+    return detailPanel({className:"ff7r-detail",title:semantic?.name||row.tag,meta:row.tag?`Data ID ${row.tag}`:(table.name||"Item settings"),body:[detailSection({title:"ITEM SETTINGS",body:fields})]});
   }
   // Descriptions live in resident_txtres for the current language, the same
   // resource an item's name comes from. There is exactly one of those per

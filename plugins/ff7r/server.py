@@ -54,6 +54,7 @@ from .semantics import (
     LOOT_TABLE_NAME,
     economy_payload,
     loot_payload,
+    record_name_map,
     save_economy_edits,
     save_loot_edits,
 )
@@ -134,6 +135,16 @@ def data_payload(asset: str, *, vanilla: bool = False, language: str = "US") -> 
             lookup = {}
     payload["textLookup"] = lookup
     payload["textLanguage"] = language.upper()
+    # Row keys the game shows a name for, resolved from the table that joins
+    # them (see record_name_map). An empty map is the normal answer for every
+    # table that joins none, and for an uninstalled game; the editor falls
+    # back to the row key rather than showing an invented name.
+    try:
+        payload["recordNames"] = record_name_map(
+            GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset,
+            language=language, vanilla=vanilla)
+    except Exception:
+        payload["recordNames"] = {}
     return payload
 
 

@@ -22,7 +22,15 @@ def main():
     render();
    }""")
    page.get_by_role('button',name='Pin Name column',exact=True).click()
-   page.evaluate("curatedPrefs(curatedSpec('abilities')).move('p:Name','tag')")
+   # Pinning runs asynchronously, so the reorder below has to wait for the
+   # column to actually arrive. Reordering first made move() a no-op and left
+   # the order it was asserting about up to a race.
+   page.wait_for_function("()=>curatedPrefs(curatedSpec('abilities')).isPinned('p:Name')")
+   # move(value,before) inserts value BEFORE the named column, so the pinned
+   # property is placed ahead of the curated Name column to land it directly
+   # after the record key. Asking for move('p:Name','tag') put it ahead of the
+   # key instead, which is the opposite of the order this check is about.
+   page.evaluate("curatedPrefs(curatedSpec('abilities')).move('p:Name','name')")
    page.wait_for_timeout(200)
    table=page.locator('.ff7r-table')
    assert 'Target Scanner' in table.inner_text()

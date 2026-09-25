@@ -101,8 +101,13 @@ def fixtures() -> dict:
         ),
         ENEMY: table(
             ENEMY,
-            [prop(name) for name in ("HPMax", "BPMax", "Strength", "Magic", "Vitality", "Spilit")],
-            [("GuardScorpion", {"HPMax": 9000, "BPMax": 100, "Strength": 40, "Magic": 30, "Vitality": 50, "Spilit": 40})],
+            [prop("Name", "STRING")] + [prop(name) for name in ("HPMax", "BPMax", "Strength", "Magic", "Vitality", "Spilit")],
+            [
+                ("GuardScorpion", {"Name": "$Enemy_GuardScorpion_Name", "HPMax": 9000, "BPMax": 100, "Strength": 40, "Magic": 30, "Vitality": 50, "Spilit": 40}),
+                # A second row with no resolvable name: the table only ever
+                # falls back to its own raw record key, never an invented name.
+                ("Enemy10", {"Name": "", "HPMax": 500, "BPMax": 20, "Strength": 10, "Magic": 5, "Vitality": 10, "Spilit": 5}),
+            ],
         ),
         LOOT: table(
             LOOT,
@@ -126,6 +131,11 @@ def fixtures() -> dict:
             [("Runtime", {"Enabled": True, "Multiplier": 1.25})],
         ),
     }
+    # The generic /api/data reader resolves any "$..." value it finds against
+    # the loaded language's resident text, for every table - not just the
+    # economy screens. This is the same resolution the real server performs
+    # in server.py's data_payload().
+    data[ENEMY]["textLookup"] = {"$Enemy_GuardScorpion_Name": "Guard Scorpion"}
     text = {
         "asset": TEXT,
         "language": "US",
@@ -482,6 +492,22 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
                 assert "Item settings unavailable" not in text, tab
                 expect(page.locator(".ff7r-table")).to_be_visible()
                 assert page.locator(".ff7r-table .lex-column-list-row").count() > 0, tab
+            if tab == "materia":
+                # The header subtitle must show the selected materia's own
+                # data id, not just repeat the table name on every record.
+                assert "Data ID MA_001" in text, text
+            if tab == "characters":
+                # Square's own field name is "Spilit"; the display label is
+                # the corrected English word, never the raw internal spelling.
+                assert "Spirit" in text, text
+                assert "Spilit" not in text, text
+            if tab == "enemies":
+                # The record's real name where the table stores one (Guard
+                # Scorpion), not "EnemyParameter" repeated as the subtitle on
+                # every row, and not a raw table key standing in for a name.
+                assert "Guard Scorpion" in text, text
+                assert "EnemyParameter" not in text, text
+                assert "Data ID GuardScorpion" in text, text
             page.screenshot(path=str(output / f"screen-{tab}.png"), full_page=True)
 
         # Return to the explicit misc fixture.

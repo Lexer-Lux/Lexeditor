@@ -186,6 +186,90 @@ def economy_payload(game_root, data_root, project_root, index: dict,
     }
 
 
+# Curated gameplay tables name their rows in three different ways, and only one
+# of them is a property on the row itself. Verified against the installed
+# FINAL FANTASY VII REMAKE INTERGRADE archives (1128 DataObjects indexed):
+#
+# * BattleAbility carries its own display name as a "$" text id in the "Name"
+#   property (EB0000_00_Search -> "$bt_GuardScorpion_Search"). The generic
+#   /api/data payload already resolves every "$" value it sees, so the editor
+#   resolves that one without help from here.
+# * PlayerParameter rows are keyed "<character><level>" - Cloud01..Cloud99,
+#   RedXIII01..RedXIII99 - and carry no name property at all. PlayerTable is
+#   what joins them: its PlayerParameterStringFormat is the exact format the
+#   game builds those keys with ("Cloud%02d"), and its TextID is that
+#   character's name text id ("$party_red13" -> "Red XIII"). All seven
+#   installed party rows supply both, so every PlayerParameter row resolves.
+# * EnemyParameter rows carry six stat properties and nothing else, and their
+#   keys are "<category><number>" over six categories (ArtifiCreature, Autoweapon,
+#   Creature, Enemy, Human 1..99, plus Boss 1..50). A scan of all 1128 installed
+#   DataObjects found no property anywhere holding one of those 545 keys, and the
+#   .uasset name tables hold only the keys themselves, so there is no enemy name
+#   to join to. BattleCharaSpec names enemies, but it selects a stat row by
+#   category prefix (ParameterTableName is "Enemy" for 481 of 497 rows), never by
+#   row key. These rows therefore keep their key, which is what the game stores.
+PLAYER_TABLE_NAME = "playertable"
+PLAYER_PARAMETER_TABLE_NAME = "playerparameter"
+PLAYER_KEY_FORMAT_FIELD = "PlayerParameterStringFormat"
+PLAYER_TEXT_ID_FIELD = "TextID"
+
+
+def _key_prefix(key_format: str) -> str:
+    """The literal part of a PlayerParameter key format, "Cloud%02d" -> "Cloud"."""
+    return str(key_format or "").split("%")[0]
+
+
+def player_prefix_names(entries, text: dict[str, str]) -> dict[str, str]:
+    """Map each PlayerTable key prefix to the character name the game shows."""
+    prefixes: dict[str, str] = {}
+    for entry in entries:
+        prefix = _key_prefix(entry.values.get(PLAYER_KEY_FORMAT_FIELD, ""))
+        text_id = entry.values.get(PLAYER_TEXT_ID_FIELD, "")
+        name = text.get(text_id, "") if isinstance(text_id, str) else ""
+        if prefix and name:
+            prefixes[prefix] = name
+    return prefixes
+
+
+def names_by_key_prefix(tags, prefixes: dict[str, str]) -> dict[str, str]:
+    """Name each row key from the longest key prefix that starts it."""
+    order = sorted(prefixes, key=len, reverse=True)
+    names: dict[str, str] = {}
+    for tag in tags:
+        for prefix in order:
+            if str(tag).startswith(prefix):
+                names[tag] = prefixes[prefix]
+                break
+    return names
+
+
+def record_name_map(game_root, data_root, project_root, index: dict, asset: str,
+                    *, language: str = "US", vanilla: bool = False) -> dict[str, str]:
+    """Row key -> the name the game itself shows, for curated tables that join one.
+
+    Returns an empty map for every other table, and for a table whose joining
+    partner is missing. A row with no resolvable name is simply absent: the
+    editor falls back to the row key rather than showing an invented name.
+    """
+    if _basename(asset) != PLAYER_PARAMETER_TABLE_NAME:
+        return {}
+    partners = _candidate_rows(index, {PLAYER_TABLE_NAME})
+    if not partners:
+        return {}
+    try:
+        package, _sha, _using_project = load_package(
+            game_root, data_root, project_root, index, asset, vanilla=vanilla)
+        partner, _partner_sha, _partner_project = load_package(
+            game_root, data_root, project_root, index, partners[0]["asset"], vanilla=vanilla)
+    except Exception:
+        return {}
+    text = _text_lookup(game_root, data_root, project_root, index, language)
+    if not text:
+        return {}
+    prefixes = player_prefix_names(partner.entries, text)
+    return names_by_key_prefix([entry.tag for entry in package.entries], prefixes)
+
+
 def _item_name_map(game_root, data_root, project_root, index: dict,
                    *, language: str, vanilla: bool) -> dict[str, str]:
     _tables, names, _text_ids = _economy_tables(
