@@ -310,6 +310,11 @@ def archive_entries(name: str, query: str = "", page: int = 0,
     return archive_index.entries(name, query, page, page_size)
 
 
+def extract_archive_entry(name: str, index: int) -> dict:
+    """Copy one archive entry into the project, leaving the game untouched."""
+    return archive_index.extract(name, index)
+
+
 def shop_rows(dataset: str = "current") -> dict:
     raw = source_path("shop.bin", dataset).read_bytes()
     if len(raw) < 20 * 16 * 2:

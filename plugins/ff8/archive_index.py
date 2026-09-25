@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import shutil
 
 from . import paths
 from .fs_archive import FsArchive
@@ -87,3 +88,31 @@ def entries(name: str, query: str = "", page: int = 0,
             "query": pattern, "matched": len(rows), "page": current, "pageSize": size,
             "pages": pages, "total": len(archive.entries),
             "rows": rows[start:start + size]}
+
+
+def extract(name: str, index: int, project_root: Path | None = None) -> dict:
+    """Write one entry's bytes into the project's own extracted folder.
+
+    Browsing reads metadata; this is the one place entry contents are read, and
+    they are written into the project, never back into the installation. The
+    copy is bounded like every other project write: one previous copy is kept.
+    """
+    prefix = _prefix(name)
+    if not prefix.with_suffix(".fi").is_file():
+        raise ValueError(f"The {name} archive is not installed")
+    archive = FsArchive(prefix)
+    wanted = int(index)
+    entry = next((item for item in archive.entries if item.index == wanted), None)
+    if entry is None:
+        raise ValueError(f"The {name} archive has no entry {wanted}")
+    root = Path(project_root) if project_root is not None else paths.PROJECT_ROOT
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", entry.basename) or f"entry-{wanted}"
+    destination = root / EXTRACTED_ROOT / str(name).strip().lower() / safe
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.is_file():
+        shutil.copy2(destination, destination.with_name(f"{destination.name}.bak"))
+    data = archive.extract(entry)
+    destination.write_bytes(data)
+    return {"archive": str(name).strip().lower(), "index": wanted, "name": entry.name,
+            "bytes": len(data), "path": str(destination), "project": str(root)}
+EXTRACTED_ROOT = "extracted"

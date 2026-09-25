@@ -5,8 +5,8 @@ function FF8ArchivesUI({el,columnList,pagedListDetail,detailPanel,detailSection,
                         readonlyField,infoHelp,notice,panelLayout,shell,formatNumber}){
   const local={archives:[],archive:"main",query:"",page:0,pageSize:60,data:null,
     selected:null,error:"",busy:false,loaded:false,source:""};
-  async function api(path){
-    const response=await fetch(path),value=await response.json();
+  async function api(path,options){
+    const response=await fetch(path,options||{}),value=await response.json();
     if(!response.ok)throw new Error(value.error||response.statusText);
     return value;
   }
@@ -34,6 +34,15 @@ function FF8ArchivesUI({el,columnList,pagedListDetail,detailPanel,detailSection,
   }
   function entryDetail(row){
     if(!row)return notice({message:"Choose an entry to see where it is stored."});
+    const extract=el("button",{type:"button",class:"lex-dialog-action primary",
+      onclick:async event=>{event.preventDefault();
+        extract.textContent="Extracting…";
+        try{const result=await api("/api/archive/extract",{method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({name:local.archive,index:row.index})});
+          local.extracted=`${result.bytes} bytes written to ${result.path}`;}
+        catch(error){local.extracted=`Could not extract: ${error.message}`}
+        extract.textContent="Extract copy";render()}},"Extract copy");
     return detailPanel({title:row.basename,meta:row.name,body:[
       detailSection({title:"STORED",body:[
         detailField({label:"ARCHIVE",control:readonlyField(local.archive)}),
@@ -42,7 +51,9 @@ function FF8ArchivesUI({el,columnList,pagedListDetail,detailPanel,detailSection,
         detailField({label:"UNPACKED SIZE",help:infoHelp("How large the file is once its compression is undone."),control:readonlyField(readable(row.bytes))}),
         detailField({label:"COMPRESSED",help:infoHelp("Whether the archive stores this entry compressed. Lexeditor writes replacements uncompressed."),control:readonlyField(row.compressed?"Yes":"No")}),
         detailField({label:"OFFSET",help:infoHelp("Where the stored bytes begin inside the .fs file."),control:readonlyField(`0x${Number(row.offset).toString(16).toUpperCase()}`)})]}),
-      notice({message:"Browsing reads the installed archive only. Extracting an entry and repacking a whole archive are not built yet; the files this plugin edits are written to the project copy instead."})]});
+      detailSection({title:"EXTRACT",help:infoHelp("Browsing reads the archive's own list. This copies one entry into the project so it can be looked at or edited, and it keeps one previous copy of what it overwrites. The installed game is never changed, and repacking a whole archive is still not built."),body:[
+        detailField({label:"ACTION",control:extract}),
+        local.extracted?detailField({label:"LAST EXTRACT",control:readonlyField(local.extracted)}):null]})]});
   }
   function view(){
     const rows=(local.data?.rows||[]).map(row=>({...row,id:row.index}));

@@ -337,6 +337,9 @@ class Handler(PluginRequestHandler):
                 self.json_response(formats.save_namedic(body.get("edits", [])))
             elif path == "/api/wm2field/save":
                 self.json_response(formats.save_wm2field(body.get("edits", [])))
+            elif path == "/api/archive/extract":
+                self.json_response(formats.extract_archive_entry(
+                    str(body.get("name", "")), int(body.get("index", -1))))
             elif path == "/api/shops/save":
                 self.json_response(formats.save_shops(body.get("edits", [])))
             elif path == "/api/weapons/save":

@@ -53,9 +53,24 @@ def main() -> int:
                   return response.json()}""")
                 assert searched["matched"] == 1, searched
                 assert searched["rows"][0]["basename"] == "namedic.bin", searched["rows"][0]
+                # The detail panel copies one entry into the project.
+                page.locator(".ff8-archive-list .lex-list-row").first.click()
+                button = page.get_by_role("button", name="Extract copy")
+                assert button.count() == 1, button.count()
+                button.click()
+                # The written path is shown in a field the game's bitmap font
+                # draws, so the proof is the file itself.
+                extracted = []
+                for _ in range(120):
+                    extracted = sorted((Path(project.name) / "extracted" / "main").glob("*"))
+                    if extracted:
+                        break
+                    page.wait_for_timeout(500)
+                assert extracted and extracted[0].stat().st_size > 0, extracted
                 assert not errors, errors
                 print(json.dumps({"archivesListed": options, "available": len(available),
                                   "visibleRows": rows, "namedic": searched["rows"][0]["name"],
+                                  "extracted": extracted[0].name,
                                   "totals": {row["name"]: row["entries"] for row in available}},
                                  ensure_ascii=True))
                 browser.close()

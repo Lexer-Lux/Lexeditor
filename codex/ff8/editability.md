@@ -115,12 +115,14 @@ Not covered today, with what each would need:
   the animated-VRAM effects are not editable.
 - **Spreadsheet bulk import and export** (Xlsx). Every field is editable in the
   editor, but there is no spreadsheet round trip for a whole table.
-- **Archive browse, extract and repack** (Deling). Browse is covered: the
-  Archives tab lists every entry of main, menu, battle, field, world and magic
-  with its stored name, unpacked size, compression flag and offset, with search
-  and paging (`plugins/ff8/archive_index.py`, `archives_ui.js`). It reads
-  metadata only and never writes to the installation. Extracting an entry and
-  repacking an archive are still open.
+- **Archive browse, extract and repack** (Deling). Browse and single-entry
+  extract are covered: the Archives tab lists every entry of main, menu, battle,
+  field, world and magic with its stored name, unpacked size, compression flag
+  and offset, with search and paging, and copies one entry into the project's
+  own `extracted/` folder, keeping one previous copy
+  (`plugins/ff8/archive_index.py`, `archives_ui.js`). Listing reads metadata
+  only; the extract is the one place contents are read, and it never writes to
+  the installation. Repacking a whole archive is still open.
 - **Save-file editing** (Hyne). Out of scope: a save is player state, not game
   data, and writing one is a different risk from writing an override.
 
