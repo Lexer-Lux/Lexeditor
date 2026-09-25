@@ -7,10 +7,12 @@
   "pageWrapAround": true,
   "pagerBarHeightPercent": 6.0,
   "panelGapPercent": 0.5,
+  "panelTabTarget": "hover",
   "residentHandleWidthPercent": 5.0,
   "selectionHoldMs": 500,
   "soundEnabled": false,
   "soundVolumePercent": 25.0,
   "tableRowsPerPage": 40,
+  "tweakColumnsPerPage": 6,
   "updateCheckFrequency": "monthly"
 }

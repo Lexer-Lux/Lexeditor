@@ -11,6 +11,7 @@ import tempfile
 from urllib.parse import parse_qs, unquote, urlparse
 
 from . import assets, card_art, cards, editor_settings, field_data, featured_mods, formats, gameplay_settings, paths, runtime_layout, world_geometry, world_map, world_textures
+from . import world_preview
 from .game_icons import icon_path, portrait_path
 from .extractor import baseline_ready, manifest_path
 from .ffnx_manager import status as ffnx_status
@@ -254,6 +255,10 @@ class Handler(PluginRequestHandler):
                 source = world_geometry.source_path(query.get("dataset", ["current"])[0])
                 self.json_response(world_geometry.segment_mesh(
                     source.read_bytes(), int(query.get("segment", ["0"])[0])))
+            elif path == "/assets/world-mesh.bin":
+                self.binary_response(world_preview.mesh_bytes(query.get("dataset", ["current"])[0]), "application/octet-stream")
+            elif path == "/assets/world-atlas.png":
+                self.binary_response(world_preview.atlas_png(query.get("dataset", ["current"])[0]), "image/png")
             elif path == "/api/fields":
                 self.json_response(field_data.index_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/card-players":

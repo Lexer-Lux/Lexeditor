@@ -10,9 +10,11 @@ opaque until each additional field has its own proved editor contract.
 from __future__ import annotations
 
 import hashlib
+from array import array
 import json
 from pathlib import Path
 import struct
+import sys
 
 from . import paths, runtime_layout
 from .fs_archive import FsArchive
@@ -209,6 +211,30 @@ def segment_mesh(data: bytes | bytearray, segment_id: int) -> dict:
             })
     return {"id": segment_id, "groupId": record["groupId"],
             "vertices": vertices, "faces": faces}
+
+
+def preview_vertices(data: bytes) -> bytes:
+    """Little-endian float32 XYZ, atlas UV and segment ID for each triangle."""
+    if len(data) < BASE_SEGMENT_COUNT * SEGMENT_SIZE:
+        raise ValueError("wmx.obj does not contain the base world map")
+    output = array('f')
+    for segment_id in range(BASE_SEGMENT_COUNT):
+        mesh = segment_mesh(data, segment_id)
+        for face in mesh['faces']:
+            flags = face['flags'][0]
+            if flags & 0x20:
+                page_x, page_y = 4, 1
+            elif flags & 0x60 == 0x40:
+                page_x, page_y = 4, 0
+            else:
+                page_x, page_y = divmod(face['texturePage'], 5)
+            for index, uv in zip(face['indices'], face['uv']):
+                output.extend((*mesh['vertices'][index],
+                               (page_x * 256 + uv[0] + .5) / 1280,
+                               (page_y * 256 + uv[1] + .5) / 1280, segment_id))
+    if sys.byteorder != 'little':
+        output.byteswap()
+    return output.tobytes()
 
 
 def _bounded(value, minimum: int, maximum: int, label: str) -> int:
