@@ -38,6 +38,22 @@ SHARED = "shared"
 SCRIPT_SKIP = {"verify_all.py"}
 
 
+def utf8_console() -> None:
+    """Keep the runner's own output alive on a Windows code page.
+
+    A check may report a character such as the floor bracket in a formula
+    (U+230A). When the runner's output is piped or saved, Python falls back to
+    the locale code page, which cannot hold that character. The stream then
+    raises UnicodeEncodeError and the gate dies halfway with a live failure
+    list. The children already run as UTF-8; the runner must match them.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def checks_folder(target: str | None) -> Path:
     """tests/<plugin>/ for a plugin, tests/shared/ for the global checks."""
     return TESTS / (target or SHARED)
@@ -151,6 +167,7 @@ def workflow_files() -> dict[str, str]:
 
 
 def main() -> int:
+    utf8_console()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("plugin", nargs="?", choices=PLUGINS)
     parser.add_argument("--global", dest="shared", action="store_true")
