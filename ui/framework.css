@@ -6566,7 +6566,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   opacity:0;
   cursor:pointer;
 
- width: 1em; min-width: 1em; height: 1em; min-height: 1em; flex-basis: 1em;
+ width: 1.15em; min-width: 1.15em; height: 1.15em; min-height: 1.15em; flex-basis: 1.15em;
 }
 .lex-column-pin > svg {
    display:block;fill:currentColor;
@@ -6577,7 +6577,7 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   translate:2px -2px;
 
  transition: translate .16s ease, rotate .16s ease;
- width: .95em; height: .95em;
+ width: 1.1em; height: 1.1em;
 }
 .lex-source-control-internal:not(:has(> select)) > :is(.lex-reference-values, .lex-reference-placeholder) { right: .35em; }
 .lex-reference-tag {
