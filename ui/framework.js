@@ -8137,8 +8137,18 @@ ${contents.path}`});
     const currentValue = () => typeof options.current === "function" ? options.current() : options.current;
     root.lexVanillaValue = () => options.vanilla;
     root.lexRevert = event => {
-      const reference = root.querySelector(".lex-reference-values .lex-reference-value button");
-      if (reference) { reference.click(); return true; }
+      // A right-click reset must not move the reader: route through the
+      // vanilla rail entry when one is painted, so the same scroll-preserving
+      // apply runs as for a rail click. The old selector looked for a button
+      // inside the entry, but the entry IS the button, so it never matched
+      // and every reset rebuilt without restoring the reader's place.
+      const same = options.same || ((left, right) => JSON.stringify(left) === JSON.stringify(right));
+      if (options.vanilla !== undefined && same(currentValue(), options.vanilla)) {
+        refresh();
+        return true;
+      }
+      const vanillaEntry = root.querySelector('.lex-reference-values .lex-reference-value[data-reference-index="0"]');
+      if (vanillaEntry instanceof HTMLElement) { vanillaEntry.click(); return true; }
       options.apply?.(options.vanilla, event, sources[0]);
       refresh();
       return true;
@@ -8566,6 +8576,56 @@ ${contents.path}`});
     const panel = originalDetailPanel(options);
     return options?.modelPreview ? attachModelPreview(panel, options.modelPreview) : panel;
   };
+
+  // A header thumbnail that does not open the model viewer shows a floating
+  // enlargement on hover, so the record art can be previewed at a readable
+  // size. Thumbnails that open the viewer keep their magnifier instead: a
+  // zoom beside the drawer they open would fight it. The enlargement is a
+  // fixed overlay, never an in-place scale, so hovering changes no layout.
+  let headerZoom = null;
+  const closeHeaderZoom = () => { headerZoom?.remove(); headerZoom = null; };
+  const headerZoomArt = icon => {
+    const canvas = icon.querySelector('canvas');
+    if (canvas instanceof HTMLCanvasElement && canvas.width > 0 && canvas.height > 0) {
+      // A canvas clone paints blank: its bitmap lives outside the DOM.
+      const copy = document.createElement('canvas');
+      copy.width = canvas.width;
+      copy.height = canvas.height;
+      copy.getContext('2d')?.drawImage(canvas, 0, 0);
+      return copy;
+    }
+    const art = icon.querySelector('img,svg,picture');
+    return art instanceof Element ? art.cloneNode(true) : null;
+  };
+  document.addEventListener('pointerover', event => {
+    if (headerZoom) return;
+    const icon = event.target.closest?.('.lex-detail-panel-icon');
+    if (!icon || !icon.isConnected || icon.classList.contains('lex-model-preview-trigger')) return;
+    const art = headerZoomArt(icon);
+    if (!art) return;
+    const box = icon.getBoundingClientRect();
+    if (box.width <= 0 || box.height <= 0) return;
+    const zoom = document.createElement('div');
+    zoom.className = 'lex-header-thumb-zoom';
+    zoom.setAttribute('aria-hidden', 'true');
+    zoom.append(art);
+    document.body.append(zoom);
+    // Seat the enlargement beside the header icon, inside the viewport.
+    const pad = 12, cap = 320;
+    const width = Math.min(cap, zoom.offsetWidth || cap);
+    const height = Math.min(cap, zoom.offsetHeight || cap);
+    zoom.style.left = `${Math.round(Math.max(pad, Math.min(box.right + pad, window.innerWidth - width - pad)))}px`;
+    zoom.style.top = `${Math.round(Math.max(pad, Math.min(box.bottom + pad, window.innerHeight - height - pad)))}px`;
+    headerZoom = zoom;
+  });
+  document.addEventListener('pointerout', event => {
+    if (!headerZoom) return;
+    const icon = event.target.closest?.('.lex-detail-panel-icon');
+    if (icon && !icon.contains(event.relatedTarget)) closeHeaderZoom();
+  });
+  document.addEventListener('pointerdown', closeHeaderZoom, true);
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') closeHeaderZoom(); });
+  window.addEventListener('scroll', closeHeaderZoom, true);
 
   const hoverKey = node => node?.dataset?.lexProperty || node?.dataset?.columnKey || '';
   document.addEventListener('pointerover', event => {
