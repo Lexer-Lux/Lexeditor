@@ -157,6 +157,8 @@
           detailField({label:"APP VERSION",control:readonlyField(target.appVersion||"1.15.2"),
             help:infoHelp("This is the supported PC target version. Real-game acceptance of this candidate is still pending.")}),
           detailField({label:"REGULATION",control:readonlyField(target.regulationVersion||"1.35")}),
+          detailField({label:"ARCHIVE BUILD",control:readonlyField(target.archiveBuild||"—"),
+            help:infoHelp("The build string the loaded regulation archive stores in its own header, for example 01350000 for Regulation 1.35. The editor patches only the build it has audited, and it refuses another one instead of guessing at changed row layouts.")}),
           detailField({label:"PARAMDEF DATA",control:readonlyField(String(target.paramdefDataVersion||201))})]}),
         detailSection({title:"FILES",body:[
           detailField({label:"SOURCE",control:readonlyField(info.source||"Unavailable")}),

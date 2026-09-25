@@ -7,8 +7,31 @@ Lexeditor targets the Steam PC release at App Ver. 1.15.2 / Regulation Ver.
 integrated: EquipParamWeapon, EquipParamProtector, EquipParamAccessory, Magic,
 SpEffectParam, and NpcParam.
 
-The parser validates PARAM type, data version 201, and row size against pinned
-Smithbox metadata. A mismatch fails closed.
+The parser validates PARAM type, the header value each table stores, and row
+size against pinned Smithbox metadata. A mismatch fails closed.
+
+## Regulation file layout
+
+`Game/Data0.bdt` is a 16-byte IV followed by AES-256-CBC ciphertext under the
+key `ds3#jn/8_7(rsY9pg55GFN7VFL#+3n/)`. The ciphertext holds a DCX container of
+type `DCX_DFLT_10000_44_9` — one zlib block whose header starts at 0x4C — and
+that block inflates to one BND4 archive. Measured on App Ver. 1.15.2 /
+Regulation 1.35 on 2026-09-25: IV `00` × 16, block type `DFLT`, level 9,
+compressed length 815,334, and a 13,445,834-byte BND4 with 103 members whose
+header carries the text `01350000` at offset 0x18. The container compresses the
+BND4, so the DCX block length must be read from the header; the writer's
+trailing padding is not part of it.
+
+SoulsFormats writes the same DCX type for DarkSouls3 and pads the ciphertext
+with PKCS#7, while the installed build pads with zero bytes. Lexeditor reads
+both and writes the installed shape, so an export has the layout the game
+ships.
+
+The value at PARAM offset 0x08 is not the pinned paramdef version. Every pinned
+DS3 XML declares version 201, and the installed regulation stores a different
+value per table: EquipParamWeapon 3, EquipParamProtector 4, EquipParamAccessory
+1, Magic 3, SpEffectParam 4, NpcParam 9. Those measured values are the version
+check, because they identify the row layout this editor patches.
 
 ## Preservation and export
 

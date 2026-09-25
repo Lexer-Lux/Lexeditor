@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 import struct
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
+
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 import plugins.ds3.server as ds3_server
 from plugins.ds3.plugin import PLUGIN, check as plugin_check
@@ -12,11 +16,16 @@ from plugins.ds3.server import _data_map, _path_within
 from core.plugin_api import validate_plugin
 from plugins.ds3.formats import (
     BND4View,
+    DS3_REGULATION_KEY,
     DS3FormatError,
+    REGULATION_HEADER_VERSIONS,
+    REGULATION_VERSION,
     RegulationDocument,
     TARGET_TABLES,
     _TYPE_SIZE,
     decrypt_regulation,
+    dcx_container,
+    dcx_payload,
     encrypt_regulation,
     load_schema,
 )
@@ -40,6 +49,26 @@ def _row_ids(table: str) -> tuple[int, int]:
     raise AssertionError(f"{table} metadata does not contain two row IDs")
 
 
+def _installed_regulation() -> Path | None:
+    """The installed Game/Data0.bdt, found the way the desktop host finds it."""
+    roots = []
+    saved = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Lexeditor" / "game-installations.json"
+    try:
+        games = json.loads(saved.read_text(encoding="utf-8")).get("games", {})
+        if games.get("ds3", {}).get("root"):
+            roots.append(Path(games["ds3"]["root"]))
+    except (OSError, ValueError, TypeError):
+        pass
+    if os.environ.get("LEXEDITOR_DS3_ROOT"):
+        roots.append(Path(os.environ["LEXEDITOR_DS3_ROOT"]))
+    roots.extend(PLUGIN.installation.default_roots)
+    for root in roots:
+        candidate = Path(root) / "Game" / "Data0.bdt"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def _param(table: str) -> bytes:
     schema = load_schema(METADATA, table)
     first, second = _row_ids(table)
@@ -52,7 +81,7 @@ def _param(table: str) -> bytes:
     struct.pack_into("<I", out, 0x00, total)
     struct.pack_into("<H", out, 0x04, data_start)
     struct.pack_into("<h", out, 0x06, 0)
-    struct.pack_into("<h", out, 0x08, schema.data_version)
+    struct.pack_into("<h", out, 0x08, REGULATION_HEADER_VERSIONS[table])
     struct.pack_into("<H", out, 0x0A, row_count)
     encoded = schema.param_type.encode("ascii")
     if len(encoded) > 0x1F:
@@ -229,6 +258,52 @@ class DS3FormatTests(unittest.TestCase):
         reopened, was_encrypted = decrypt_regulation(encrypted)
         self.assertTrue(was_encrypted)
         self.assertEqual(reopened, plain)
+
+    def test_export_matches_the_shape_the_installed_game_ships(self):
+        plain = _bnd4()
+        exported = encrypt_regulation(plain, iv=b"\x33" * 16)
+        self.assertEqual(exported[:16], b"\x33" * 16)
+        # Read the export the way SoulsFormats' DecryptByteArray does: the IV
+        # is the first 16 bytes and the ciphertext needs no padding rule.
+        decryptor = Cipher(algorithms.AES(DS3_REGULATION_KEY),
+                           modes.CBC(exported[:16])).decryptor()
+        container = decryptor.update(exported[16:]) + decryptor.finalize()
+        self.assertTrue(container.startswith(b"DCX\x00"))
+        self.assertEqual(dcx_payload(container), plain)
+        self.assertEqual(dcx_payload(dcx_container(plain)), plain)
+
+    def test_zero_padded_regulation_is_accepted(self):
+        # The installed Game/Data0.bdt pads the container with zero bytes
+        # instead of PKCS#7, so both paddings must load.
+        plain = _bnd4()
+        container = dcx_container(plain)
+        remainder = len(container) % 16
+        padded = container + (bytes(16 - remainder) if remainder else b"")
+        encryptor = Cipher(algorithms.AES(DS3_REGULATION_KEY),
+                           modes.CBC(bytes(16))).encryptor()
+        encrypted = bytes(16) + encryptor.update(padded) + encryptor.finalize()
+        reopened, was_encrypted = decrypt_regulation(encrypted)
+        self.assertTrue(was_encrypted)
+        self.assertEqual(reopened, plain)
+
+    def test_a_different_regulation_build_is_refused(self):
+        source = _bnd4()
+        with mock.patch.dict("plugins.ds3.formats.REGULATION_HEADER_VERSIONS",
+                             {"EquipParamWeapon": 99}):
+            with self.assertRaisesRegex(DS3FormatError, "Regulation 01350000"):
+                RegulationDocument(source, METADATA)
+
+    def test_installed_regulation_loads_with_its_own_layout(self):
+        path = _installed_regulation()
+        if path is None:
+            self.skipTest("Requires an installed Dark Souls III game")
+        document = RegulationDocument(path.read_bytes(), METADATA)
+        self.assertEqual(document.regulation_version, REGULATION_VERSION)
+        self.assertGreater(document.binder.file_count, 100)
+        for table in TARGET_TABLES:
+            rows = document.list_rows(table)
+            self.assertTrue(rows, table)
+            self.assertTrue(all(row["name"] for row in rows[:5]), table)
 
     def test_real_row_identity_uses_pinned_names(self):
         doc = RegulationDocument(_bnd4(), METADATA)

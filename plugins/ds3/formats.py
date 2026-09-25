@@ -3,6 +3,14 @@
 This module deliberately patches known fixed-width PARAM cells in place. It
 never reconstructs PARAM rows or BND4 archives, so unknown bytes stay exactly
 as they were. Compressed binder members are rejected instead of guessed.
+
+The installed regulation, Game/Data0.bdt, is a 16-byte IV followed by
+AES-256-CBC ciphertext, and the ciphertext holds a DCX container with one DFLT
+(zlib) block. Measured on App Ver. 1.15.2 / Regulation 1.35 on 2026-09-25: the
+container inflates to one 13,445,834-byte BND4 whose header carries the version
+string 0135. SoulsFormats writes the same shape for its DarkSouls3 DCX type
+DCX_DFLT_10000_44_9, and it pads with PKCS#7. This module reads both paddings
+and writes that shape, so an export has the layout the installed game ships.
 """
 from __future__ import annotations
 
@@ -12,15 +20,34 @@ import math
 import os
 import re
 import struct
+import zlib
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
-from cryptography.hazmat.primitives import padding as crypto_padding
 
 
 DS3_REGULATION_KEY = b"ds3#jn/8_7(rsY9pg55GFN7VFL#+3n/)"
+DCX_MAGIC = b"DCX\x00"
+DCX_FORMAT = b"DFLT"
+# The eight characters the installed Regulation 1.35 archive stores at offset
+# 0x18 of its BND4 header. The editor shows 1.35 to a reader and keeps the
+# stored text here, so a mismatched build is reported as the file spells it.
+REGULATION_VERSION = "01350000"
+# The value the regulation stores at PARAM offset 0x08 is not the paramdef
+# version the pinned XML files declare: those declare 201 for every DS3 table.
+# Each table stores its own value instead, and these are the values measured in
+# Game/Data0.bdt of Regulation 1.35. The check stays strict, because a different
+# value means the row layout this editor patches was not audited.
+REGULATION_HEADER_VERSIONS = {
+    "EquipParamWeapon": 3,
+    "EquipParamProtector": 4,
+    "EquipParamAccessory": 1,
+    "Magic": 3,
+    "SpEffectParam": 4,
+    "NpcParam": 9,
+}
 TARGET_TABLES = (
     "EquipParamWeapon",
     "EquipParamProtector",
@@ -39,13 +66,77 @@ def _reverse_bits(value: int) -> int:
     return int(f"{value:08b}"[::-1], 2)
 
 
-def decrypt_regulation(data: bytes) -> tuple[bytes, bool]:
-    """Return BND4 bytes and whether input was encrypted.
+def dcx_payload(data: bytes) -> bytes:
+    """Return the bytes of the DFLT (zlib) block inside a DCX container.
 
-    Smithbox/SoulsFormats accepts raw BND4 for tooling and otherwise treats
-    DS3 regulation data as IV || AES-256-CBC ciphertext. Smithbox's established
-    writer uses PKCS#7; removing it here recovers the original BND4 byte-for-byte
-    instead of accumulating padding across repeated safe exports.
+    Only the single-block DFLT shape that DarkSouls3 uses is accepted. The
+    compressed length comes from the container header, so the padding a writer
+    added after the block is ignored instead of being guessed at.
+    """
+    if len(data) < 0x4C or data[:4] != DCX_MAGIC:
+        raise DS3FormatError("Expected a DCX container")
+    if data[0x18:0x1C] != b"DCS\x00" or data[0x24:0x28] != b"DCP\x00":
+        raise DS3FormatError("DCX container has no DCS/DCP section")
+    if data[0x28:0x2C] != DCX_FORMAT:
+        raise DS3FormatError(f"Unsupported DCX compression {data[0x28:0x2C]!r}")
+    if data[0x44:0x48] != b"DCA\x00":
+        raise DS3FormatError("DCX container has no DCA block")
+    data_offset = struct.unpack_from(">I", data, 0x14)[0]
+    compressed_size = struct.unpack_from(">I", data, 0x20)[0]
+    if data_offset != 0x4C:
+        raise DS3FormatError(f"Unexpected DCX block offset 0x{data_offset:X}")
+    if compressed_size < 2 or data_offset + compressed_size > len(data):
+        raise DS3FormatError("DCX block length is outside the container")
+    try:
+        return zlib.decompress(data[data_offset:data_offset + compressed_size])
+    except zlib.error as error:
+        raise DS3FormatError("DCX block is not a valid zlib stream") from error
+
+
+def dcx_container(plain: bytes) -> bytes:
+    """Wrap payload bytes in the DarkSouls3 DCX shape (DFLT, level 9)."""
+    compressed = zlib.compress(plain, 9)
+    if compressed[:2] != b"\x78\xda":
+        raise DS3FormatError("The zlib block did not use the expected 0x78DA header")
+    header = bytearray(0x4C)
+    header[0x00:0x04] = DCX_MAGIC
+    struct.pack_into(">I", header, 0x04, 0x10000)
+    struct.pack_into(">I", header, 0x08, 0x18)
+    struct.pack_into(">I", header, 0x0C, 0x24)
+    struct.pack_into(">I", header, 0x10, 0x44)
+    struct.pack_into(">I", header, 0x14, 0x4C)
+    header[0x18:0x1C] = b"DCS\x00"
+    struct.pack_into(">I", header, 0x1C, len(plain))
+    struct.pack_into(">I", header, 0x20, len(compressed))
+    header[0x24:0x28] = b"DCP\x00"
+    header[0x28:0x2C] = DCX_FORMAT
+    struct.pack_into(">I", header, 0x2C, 0x20)
+    header[0x30] = 9
+    struct.pack_into(">I", header, 0x40, 0x00010100)
+    header[0x44:0x48] = b"DCA\x00"
+    struct.pack_into(">I", header, 0x48, 8)
+    return bytes(header) + compressed
+
+
+def _strip_writer_padding(padded: bytes) -> bytes:
+    """Remove PKCS#7 padding when it is present and valid.
+
+    The installed game build pads with zero bytes, and SoulsFormats pads with
+    PKCS#7. Removing PKCS#7 here keeps repeated safe exports from accumulating
+    padding. Zero padding is left alone: a BND4 reader ignores trailing bytes,
+    and DCX payloads never reach this function.
+    """
+    if padded and 1 <= padded[-1] <= 16 and padded.endswith(bytes([padded[-1]]) * padded[-1]):
+        return padded[:-padded[-1]]
+    return padded
+
+
+def decrypt_regulation(data: bytes) -> tuple[bytes, bool]:
+    """Return BND4 bytes and whether the input was encrypted.
+
+    Raw BND4 is accepted for tooling. Everything else is IV || AES-256-CBC
+    ciphertext, and the plaintext is either a DCX container that holds the BND4
+    or the BND4 itself.
     """
     if data.startswith(b"BND4"):
         return data, False
@@ -54,24 +145,21 @@ def decrypt_regulation(data: bytes) -> tuple[bytes, bool]:
     iv, ciphertext = data[:16], data[16:]
     decryptor = Cipher(algorithms.AES(DS3_REGULATION_KEY), modes.CBC(iv)).decryptor()
     padded = decryptor.update(ciphertext) + decryptor.finalize()
-    try:
-        unpadder = crypto_padding.PKCS7(128).unpadder()
-        plain = unpadder.update(padded) + unpadder.finalize()
-    except ValueError as error:
-        raise DS3FormatError("DS3 regulation has invalid AES-CBC PKCS#7 padding") from error
+    plain = dcx_payload(padded) if padded.startswith(DCX_MAGIC) else _strip_writer_padding(padded)
     if not plain.startswith(b"BND4"):
         raise DS3FormatError("DS3 regulation decrypted, but the payload is not BND4")
     return plain, True
 
 
 def encrypt_regulation(plain: bytes, iv: bytes | None = None) -> bytes:
+    """Return the installed game's shape: IV || AES-CBC of a DCX-wrapped BND4."""
     if not plain.startswith(b"BND4"):
         raise DS3FormatError("Only audited BND4 payloads can be encrypted as DS3 regulation data")
     iv = os.urandom(16) if iv is None else iv
     if len(iv) != 16:
         raise DS3FormatError("AES-CBC IV must be 16 bytes")
     padder = PKCS7(128).padder()
-    padded = padder.update(plain) + padder.finalize()
+    padded = padder.update(dcx_container(plain)) + padder.finalize()
     encryptor = Cipher(algorithms.AES(DS3_REGULATION_KEY), modes.CBC(iv)).encryptor()
     return iv + encryptor.update(padded) + encryptor.finalize()
 
@@ -184,6 +272,15 @@ class BND4View:
             )
         return entry
 
+    @property
+    def version_string(self) -> str:
+        """The build string the archive header carries, for example 01350000.
+
+        The installed Regulation 1.35 file stores the eight characters
+        "01350000" at this offset, so the value is reported exactly as stored.
+        """
+        return self.data[0x18:0x20].split(b"\x00", 1)[0].decode("ascii", errors="replace")
+
     def member_bytes(self, entry: BinderEntry) -> bytes:
         return self.data[entry.data_offset:entry.data_offset + entry.size]
 
@@ -219,7 +316,11 @@ class ParamView:
         self.format2e = data[0x2E]
         self.paramdef_format_version = data[0x2F]
         self.strings_offset = self._unpack("I", 0)
-        self.paramdef_data_version = self._unpack("h", 8)
+        # Offset 0x08 holds a per-table value of the installed regulation. It is
+        # not the pinned paramdef version: every pinned DS3 XML declares 201,
+        # and the installed Regulation 1.35 file stores 1 to 9 depending on the
+        # table. See REGULATION_HEADER_VERSIONS for the measured values.
+        self.header_version = self._unpack("h", 8)
         self.row_count = self._unpack("H", 10)
         if self.format2d & 0x80:
             type_offset = self._unpack("q", 16)
@@ -515,6 +616,7 @@ class RegulationDocument:
     def __init__(self, source: bytes, metadata_root: Path):
         plain,self.was_encrypted=decrypt_regulation(source)
         self.binder=BND4View(plain)
+        self.regulation_version=self.binder.version_string
         self.metadata_root=metadata_root
         self.schemas={name:load_schema(metadata_root,name) for name in TARGET_TABLES}
         self.params={}
@@ -524,8 +626,13 @@ class RegulationDocument:
             param=ParamView(self.binder.member_bytes(entry))
             if param.param_type != schema.param_type:
                 raise DS3FormatError(f"{table} PARAM type {param.param_type!r} does not match metadata {schema.param_type!r}")
-            if param.paramdef_data_version != schema.data_version:
-                raise DS3FormatError(f"{table} data version {param.paramdef_data_version} does not match audited metadata {schema.data_version}")
+            expected_version=REGULATION_HEADER_VERSIONS[table]
+            if param.header_version != expected_version:
+                raise DS3FormatError(
+                    f"{table} header value {param.header_version} does not match the audited "
+                    f"Regulation {REGULATION_VERSION} value {expected_version} "
+                    f"(this archive reports version {self.regulation_version or 'unknown'!r})"
+                )
             if param.rows and param.detected_row_size is not None and param.detected_row_size != schema.row_size:
                 raise DS3FormatError(f"{table} row size {param.detected_row_size} does not match audited metadata {schema.row_size}")
             self.entries[table]=entry; self.params[table]=param

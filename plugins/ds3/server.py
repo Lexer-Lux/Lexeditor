@@ -122,6 +122,7 @@ def _state() -> dict:
             "appVersion": "1.15.2",
             "regulationVersion": "1.35",
             "paramdefDataVersion": 201,
+            "archiveBuild": document.regulation_version,
         },
         "realGameVerified": False,
     }
