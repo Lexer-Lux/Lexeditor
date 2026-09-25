@@ -85,10 +85,12 @@ def test_lock_to_one_side_renders_help_bubble(page):
       document.querySelector('main').append(LexeditorUI.toggleRow({label: 'Targeting',
         toggles: [{label: 'Lock to one side', checked: false, help}]}));
     }""", flag["help"])
-    rail = page.locator('.lex-toggle-rail .lex-info-help')
-    assert rail.count() == 1
-    page.locator('.lex-toggle-rail').hover()
-    rail.focus()
+    # The type rail stays fixed and the bubble sits beside the property name,
+    # which is where fd58fae4 moved it; this check still looked in the rail.
+    bubble = page.locator('.lex-toggle-name .lex-info-help')
+    assert bubble.count() == 1
+    page.locator('.lex-toggle').hover()
+    bubble.focus()
     page.wait_for_selector('.lex-help-popover')
     assert 'one side' in page.locator('.lex-help-popover').inner_text()
 

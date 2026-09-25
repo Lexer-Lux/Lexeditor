@@ -164,31 +164,56 @@ def pack_strings(strings: list[str]) -> bytes:
 
 
 def lzs_decode(data: bytes, limit: int = 32 * 1024 * 1024) -> bytes:
+    """Decode Square's LZS container.
+
+    The window is the 4096-byte ring the format defines, whose first 0xFEE
+    bytes start as zeros. That ring is exactly the tail of a linear buffer that
+    begins with 0xFEE zeros, so a match is a copy from `distance` bytes back
+    instead of a byte-at-a-time ring walk: FF7's field archive holds 1,406
+    members and the walk cost 558 million byteappends per load, which is why
+    the plugin spent up to three minutes on one page. A distance shorter than
+    the run repeats the bytes it just wrote, which the chunk loop below does by
+    taking one distance at a time.
+    """
     if read_int(data, 0, 4) != len(data) - 4:
         raise ValueError("LZS compressed-size header does not match its file")
-    ring, write, pos, out = bytearray(4096), 0xFEE, 4, bytearray()
-    while pos < len(data):
+    size = len(data)
+    out = bytearray(0xFEE)
+    pos = 4
+    while pos < size:
         flags = data[pos]; pos += 1
-        if pos == len(data):
+        if pos == size:
             raise ValueError("LZS flag byte has no tokens")
         for bit in range(8):
-            if pos == len(data):
+            if pos == size:
                 break
             if flags & (1 << bit):
-                if len(out) >= limit:
+                if len(out) - 0xFEE >= limit:
                     raise ValueError("LZS output exceeds its bounded buffer")
-                byte = data[pos]; pos += 1
-                out.append(byte); ring[write] = byte; write = (write + 1) & 4095
-            else:
-                bounds(data, pos, 2)
-                low, high = data[pos:pos + 2]; pos += 2
-                start, length = low | ((high & 0xF0) << 4), (high & 15) + 3
-                if len(out) + length > limit:
-                    raise ValueError("LZS output exceeds its bounded buffer")
-                for index in range(length):
-                    byte = ring[(start + index) & 4095]
-                    out.append(byte); ring[write] = byte; write = (write + 1) & 4095
-    return bytes(out)
+                out.append(data[pos]); pos += 1
+                continue
+            if pos + 2 > size:
+                raise ValueError(f"Truncated FF7 data at 0x{pos:X}, need 2 bytes")
+            low = data[pos]; high = data[pos + 1]; pos += 2
+            start = low | ((high & 0xF0) << 4)
+            run = (high & 15) + 3
+            if len(out) - 0xFEE + run > limit:
+                raise ValueError("LZS output exceeds its bounded buffer")
+            distance = (len(out) - start) & 4095 or 4096
+            source = len(out) - distance
+            if source < 0:
+                # Only before the window has filled: those window bytes are
+                # still the zeros the ring starts with.
+                zeros = min(run, -source)
+                out += bytes(zeros)
+                run -= zeros
+                source = 0
+            while run:
+                take = min(run, distance)
+                out += out[source:source + take]
+                run -= take
+                source += take
+    return bytes(out[0xFEE:])
 
 
 def lzs_encode(data: bytes) -> bytes:

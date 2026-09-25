@@ -6,6 +6,7 @@ from http.server import ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
+import threading
 from urllib.parse import urlparse
 
 from . import paths, deployment, tooling
@@ -28,6 +29,46 @@ PLUGIN_NAME = os.environ.get("LEXEDITOR_FF7_PLUGIN_NAME", "Final Fantasy 7")
 PLUGIN_EDITION = os.environ.get("LEXEDITOR_FF7_EDITION", "Shared FF7 editor")
 GAME_ROOT = Path(os.environ.get("LEXEDITOR_FF7_ROOT", str(paths.GAME_ROOT)))
 DATA_ROOT = Path(os.environ.get("LEXEDITOR_FF7_DATA_ROOT", str(paths.DATA_ROOT)))
+
+# One page asks for the data map and for the data itself, and each of those
+# walks every archive member through the Python LZS decoder: about 50 seconds
+# of work per load, done twice, which is why this plugin read as "loading
+# forever". The result only depends on the files on disk, so it is kept until
+# those files change or a save writes a new one.
+_DATA_CACHE: dict = {"key": None, "value": None}
+_DATA_CACHE_LOCK = threading.Lock()
+
+
+def _signature() -> tuple:
+    def stamp(path: Path) -> tuple:
+        try:
+            info = path.stat()
+        except OSError:
+            return (str(path), None, None)
+        return (str(path), info.st_size, info.st_mtime_ns)
+    return (str(GAME_ROOT), str(PROJECT_ROOT),
+            stamp(GAME_ROOT / "ff7" / "workingdir" / "data" / "field" / "flevel.lgp"),
+            stamp(GAME_ROOT / "ff7" / "workingdir" / "data" / "lang-en" / "kernel" / "kernel.bin"),
+            stamp(GAME_ROOT / "ff7" / "workingdir" / "data" / "lang-en" / "kernel" / "kernel2.bin"))
+
+
+def cached_editor_data() -> dict:
+    """The loaded datasets, reused while the installed and project files hold still."""
+    key = _signature()
+    with _DATA_CACHE_LOCK:
+        if _DATA_CACHE["key"] == key and _DATA_CACHE["value"] is not None:
+            return _DATA_CACHE["value"]
+    value = editor_data()
+    with _DATA_CACHE_LOCK:
+        _DATA_CACHE["key"] = key
+        _DATA_CACHE["value"] = value
+    return value
+
+
+def drop_data_cache() -> None:
+    with _DATA_CACHE_LOCK:
+        _DATA_CACHE["key"] = None
+        _DATA_CACHE["value"] = None
 PROJECT_ROOT = Path(os.environ.get("LEXEDITOR_FF7_PROJECT", str(paths.PROJECT_ROOT)))
 EXECUTABLE = os.environ.get("LEXEDITOR_FF7_EXECUTABLE", "FFVII_LAUNCHER.exe")
 
@@ -102,6 +143,7 @@ def editor_data() -> dict:
 
 def save_extended_data(payload: object) -> dict:
     result = save_extended(GAME_ROOT, PROJECT_ROOT, payload)
+    drop_data_cache()
     family = payload.get("family") if isinstance(payload, dict) else None
     if family in ("shop", "text"):
         counterpart_family = "text" if family == "shop" else "shop"
@@ -138,7 +180,7 @@ def save_platform_data(payload: object) -> dict:
 
 
 def data_map() -> dict:
-    data = editor_data()
+    data = cached_editor_data()
     rows = []
     for key, category in CATEGORIES.items():
         error = data["errors"].get(key)
@@ -212,7 +254,9 @@ def dashboard() -> dict:
 
 
 def save_editor_data(payload: object) -> dict:
-    return save_datasets(GAME_ROOT, PROJECT_ROOT, payload)
+    result = save_datasets(GAME_ROOT, PROJECT_ROOT, payload)
+    drop_data_cache()
+    return result
 
 
 class Handler(PluginRequestHandler):
@@ -266,7 +310,7 @@ class Handler(PluginRequestHandler):
             elif path == "/api/datamap":
                 self.json_response(data_map())
             elif path == "/api/data":
-                self.json_response(editor_data())
+                self.json_response(cached_editor_data())
             elif path == "/api/platform-config":
                 self.json_response(platform_data())
             elif path == "/api/deployment":
