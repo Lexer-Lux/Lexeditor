@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import sys
 import tempfile
 from urllib.request import Request, urlopen
@@ -105,18 +106,23 @@ def api_and_render() -> dict:
             target = next(row for row in api(session.url, "/api/fields")["rows"]
                           if row["key"] == FIELD_KEY)
             cdp.eval(
-                f"state.mapsTab='field';state.selected.fields={target['id']};navigate('maps')")
+                f"state.selected.fields={target['id']};navigate('fields')")
+            # The field panel is tabbed now. The random-encounter controls and
+            # the card-player table live under Misc, with the other field data
+            # that has no tab of its own.
+            wait_eval(cdp, "document.querySelector('#main .lex-subtab-button')!==null", 60)
+            cdp.eval("""(()=>{const tab=[...document.querySelectorAll('#main .lex-subtab-button')]
+              .find(node=>node.textContent.trim().replace(/\\?$/,'')==='Misc');tab.click()})()""")
             wait_eval(cdp, "document.querySelector('.field-encounter-section')!==null", 60)
             cdp.eval(
                 "new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))",
                 True)
-            rendered = cdp.eval("""(()=>{const section=document.querySelector('.field-encounter-section'),row=section.querySelector('.field-encounter-row'),formation=[...section.querySelectorAll('select[aria-label*="random encounter formation"]')],rate=section.querySelector('input[aria-label$="random encounter rate"]'),source=rate.closest('.lex-source-control'),maps=[...document.querySelectorAll('.ff8-maps-tabs [role="tab"]')];return{fields:formation.length+Number(!!rate),formation:Number(formation[0].value),rate:Number(rate.value.replaceAll(',','')),vanilla:source?.lexVanillaValue?.(),refs:source?.querySelectorAll('.lex-reference-value').length||0,columns:getComputedStyle(row).gridTemplateColumns.split(' ').length,mapTabs:maps.map(tab=>tab.textContent.trim()),active:maps.find(tab=>tab.getAttribute('aria-selected')==='true')?.textContent.trim(),rowWidth:row.clientWidth,rowScrollWidth:row.scrollWidth,childWidths:[...row.children].map(node=>({client:node.clientWidth,scroll:node.scrollWidth,min:getComputedStyle(node).minWidth})),overflow:row.scrollWidth>row.clientWidth+1}})()""")
+            rendered = cdp.eval("""(()=>{const section=document.querySelector('.field-encounter-section'),formation=[...section.querySelectorAll('select[aria-label*="random encounter formation"]')],rate=section.querySelector('input[aria-label$="random encounter rate"]'),source=rate.closest('.lex-source-control'),maps=[...document.querySelectorAll('nav button[data-tab]')],label=node=>node.querySelector('.lex-tab-label-text')?.textContent.trim()||'';return{fields:formation.length+Number(!!rate),formation:Number(formation[0].value),rate:Number(rate.value.replaceAll(',','')),vanilla:source?.lexVanillaValue?.(),refs:source?.querySelectorAll('.lex-reference-value').length||0,mapTabs:maps.map(label),active:label(maps.find(node=>node.classList.contains('active'))||document.createElement('span')),sectionWidth:section.clientWidth,sectionScrollWidth:section.scrollWidth,overflow:section.scrollWidth>section.clientWidth+1}})()""")
             assert rendered["fields"] == 5 and rendered["formation"] == next_formation
             assert rendered["rate"] == next_rate and rendered["vanilla"] == encounters["rate"]
-            assert rendered["refs"] >= 1 and rendered["columns"] == 5, rendered
-            assert len(rendered["mapTabs"]) == 2
-            assert rendered["mapTabs"][0].startswith("Field")
-            assert rendered["mapTabs"][1].startswith("World")
+            assert rendered["refs"] >= 1, rendered
+            # Field and World are main tabs now, not two halves of a Maps tab.
+            assert "Field" in rendered["mapTabs"] and "Maps" not in rendered["mapTabs"], rendered
             assert rendered["active"].startswith("Field"), rendered
             assert not rendered["overflow"], rendered
 
@@ -138,8 +144,21 @@ def api_and_render() -> dict:
         project.cleanup()
 
 
+def plugin_source() -> str:
+    """Every script the page loads, not the HTML shell alone.
+
+    The plugin is one file per page now, so editor.html holds script tags and
+    no editor code. Reading the shell alone made this check fail on a plugin
+    that works, which hides real breakage instead of reporting it.
+    """
+    folder = ROOT / "plugins/ff8"
+    shell = (folder / "editor.html").read_text(encoding="utf-8")
+    loaded = [folder / name for name in re.findall(r'<script src="([^"/]+)"', shell)]
+    return "\n".join([shell] + [path.read_text(encoding="utf-8") for path in loaded])
+
+
 def main() -> int:
-    source = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
+    source = plugin_source()
     assert "fieldEncounterSection" in source and 'type:"fieldEncounter"' in source
     print({"runtime": runtime_merge(), "rendered": api_and_render()})
     return 0

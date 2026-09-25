@@ -23,9 +23,11 @@
       --lex-command-row-padding:0 10px;--lex-command-row-bg:linear-gradient(135deg,#737373,#555 72%);
       --lex-command-row-border:3px solid;--lex-command-row-border-color:#aaa #282828 #282828 #aaa;
 
-      /* Twelve tabs, one row: the labels scale rather than wrapping and
-         stealing height from every list below. */
+      /* Twenty tabs in the game's wide lettering. Equal shares starved the
+         longer names, so the strip truncates them; content-sized tabs keep
+         every label whole and a narrow window scrolls the strip instead. */
       --lex-nav-bg:#000;--lex-nav-padding-inline:var(--lex-panel-gap);
+      --lex-nav-tab-columns:max-content;--lex-nav-overflow-x:auto;
       --lex-tab-min-height:44px;--lex-tab-padding-inline:clamp(5px,.75vw,20px);
       --lex-tab-font-size:clamp(12px,1.02vw,20px);--lex-tab-fg:#cfcfcf;
       --lex-tab-bg:linear-gradient(135deg,#5c5c5c,#404040);

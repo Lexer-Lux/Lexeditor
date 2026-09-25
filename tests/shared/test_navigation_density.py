@@ -61,18 +61,29 @@ def test_a_plugins_pages_keep_the_order_it_declares(page):
 
 @pytest.mark.parametrize('width',[700,1000,1600])
 def test_tabs_stay_one_row_and_tweaks_stays_attached(page,width):
-    # Main tabs and subtabs always share one row of equal lanes.
+    """Main tabs and subtabs share one row, and no label is cut to fit.
+
+    The old fixture listed sixteen invented tabs and measured clipping without
+    asserting it, so an equal-share strip that truncated half of FF8's real
+    names passed. The labels now come from the plugin's own tab list.
+    """
+    import re
+    declared = re.findall(r'\["([a-z0-9_]+)","([^"]+)"\]',
+                          (ROOT/'plugins/ff8/boot.js').read_text(encoding='utf-8'))
+    labels = [label for _id, label in declared]
+    assert len(labels) >= 18, f"the FF8 tab list was not found: {labels}"
     page.set_viewport_size({'width':width,'height':900})
     framework(page)
     page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
-    page.evaluate('''()=>{
+    page.evaluate('''labels=>{
       const U=LexeditorUI;
       document.body.prepend(U.el('div',{id:'shell'}));
       U.mountShell({host:'#shell',brand:'LEXEDITOR',plugin:{id:'fixture',name:'Fixture'},
-        tabs:['Abilities','Cards','Characters','Encounters','Enemies','Formulae','GFs','Items','Magic','Maps','New Game','Refine','Shops','Text','Weapons','Tweaks'].map(label=>({id:label==='Tweaks'?'settings':label,label})),activeTab:()=> 'Cards',navigate(){}});
+        tabs:labels.map(label=>({id:label==='Tweaks'?'settings':label,label})),
+        activeTab:()=> 'Cards',navigate(){}});
       U.finishPluginLoading();
       document.querySelector('main').append(U.subtabBar({tabs:['Properties','Loot','Renzokuken','Defense','Text','Stats'].map(id=>({id,label:id})),active:'Properties',change(){}}));
-    }''')
+    }''',labels)
     page.wait_for_timeout(400)
     for selector in ['.lex-shell-header nav','.lex-subtab-bar']:
         result=page.locator(selector).first.evaluate('''n=>{
@@ -83,7 +94,22 @@ def test_tabs_stay_one_row_and_tweaks_stays_attached(page,width):
             shrunk:labels.filter(l=>l.style.fontSize).map(l=>l.textContent),
             clipped:labels.filter(l=>l.scrollWidth>l.clientWidth+1).map(l=>l.textContent)};
         }''')
-        assert result['inside'] and result['rows']==1,result
+        assert result['rows']==1,result
+        assert not result['clipped'], result
+        # A strip too narrow for its whole labels must scroll rather than cut
+        # one; the nav frame owns that overflow. A strip that fits keeps every
+        # button inside its own box.
+        scrolls = page.locator(selector).first.evaluate(
+            'n=>n.scrollWidth>n.clientWidth+1')
+        if not scrolls:
+            assert result['inside'],result
+        else:
+            frame = (page.locator('.lex-nav-frame').first
+                     if selector.startswith('.lex-shell-header')
+                     else page.locator(selector).first)
+            assert frame.evaluate(
+                'n=>["auto","scroll"].includes(getComputedStyle(n).overflowX)'), \
+                f"the {selector} strip is wider than its box and cannot scroll"
     nav=page.locator('.lex-shell-header nav')
     assert nav.locator('button').last.get_attribute('data-tab')=='settings'
     assert nav.locator('button').last.evaluate('n=>getComputedStyle(n).marginLeft')=='0px'
