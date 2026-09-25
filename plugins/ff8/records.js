@@ -216,7 +216,12 @@
     return detailPanel({heading:false,body:[
       LexeditorUI.controlGroup([["Source","sourceLabel"],["Section","sectionId"],["Record","recordId"],["Field","role"]].map(([label,key])=>({label,control:readonlyField(row[key]),pin:prefs?.pinButton(key,label)})),{columns:4,stacked:true}),
       textTokenToolbar(input),
-      detailField({className:"lex-detail-field-stacked lex-text-editor",showType:false,label:"",help:infoHelp(`Use Special text to insert names, colours, page breaks, pauses, locations, variables and key icons at the cursor. A colour applies to the text that follows it; use White to restore white text. Pause inserts {Wait030}; edit its number from 000 to 223 to change the wait. Variables use values supplied by the current game message. ${boundary}`),control,pin:prefs?.pinButton("value","Text")})]});
+      detailField({className:"lex-detail-field-stacked lex-text-editor",showType:false,
+      // The strip above the box names the value and opens its record, so the same
+      // box shown anywhere else can send a reader to the page that edits it properly.
+      label:hoverable({content:row.name,targetType:"text",targetId:row.id,
+        targetLabel:`text record ${row.name}`,
+        activate:()=>{state.selected.text=row.id;navigate("text")}}),help:infoHelp(`Use Special text to insert names, colours, page breaks, pauses, locations, variables and key icons at the cursor. A colour applies to the text that follows it; use White to restore white text. Pause inserts {Wait030}; edit its number from 000 to 223 to change the wait. Variables use values supplied by the current game message. ${boundary}`),control,pin:prefs?.pinButton("value","Text")})]});
   }
   function renderText(){const rows=filtered("text",["sourceLabel","section","recordId","role","value"]),columns=[{key:"sourceLabel",label:"Source",width:"95px"},{key:"sectionId",label:"Section",numeric:true,width:"70px"},{key:"recordId",label:"Record",numeric:true,width:"70px"},{key:"role",label:"Field",width:"minmax(106px,.55fr)"},{key:"value",label:"Text",grow:1}];showPaged("text",rows,columns,textDetail,"95px 70px 70px minmax(106px,.55fr) minmax(160px,1fr)")}
   const characterCurveOrder=["HP","STR","VIT","MAG","SPR","SPD","LUCK"];

@@ -6334,6 +6334,29 @@ body:has(> .lex-shell-header) > main {min-height:0;}
   min-height:30px;
   padding-right:30px;
 }
+/* The editor's copy button rides inside the box: the stacked layout makes the
+   control static, which anchored the button to the whole field and left it over
+   the name row above the box. */
+.lex-detail-field.lex-text-editor > .lex-detail-field-control { position:relative; }
+/* The editor's reference rail rides inside the box at its bottom right. The
+   vanilla text is as long as the value, so the rail shows its tag until it is
+   pointed at or focused, and then opens the full value over the box. As a row
+   under the box it took sixteen pixels of height from the box itself. */
+.lex-text-editor .lex-source-control > .lex-reference-values {
+  position:absolute;
+  right:6px;
+  bottom:6px;
+  z-index:2;
+  max-width:min(70%, 32em);
+  padding:2px 6px;
+  background:var(--lex-panel);
+  border:1px solid var(--lex-border);
+  border-radius:var(--lex-radius);
+}
+.lex-text-editor .lex-reference-value > .lex-reference-text { display:none; }
+.lex-text-editor .lex-reference-values:is(:hover, :focus-within)
+  .lex-reference-text { display:block; }
+
 .lex-detail-field.lex-detail-field-stacked > .lex-detail-field-control > .lex-copy-value {
   position:absolute;
   top:7px;

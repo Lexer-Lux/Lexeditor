@@ -21,7 +21,7 @@ def main():
   p.add_style_tag(content=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8'))
   p.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
   p.add_style_tag(content='main{display:block!important;padding:0!important}.lex-detail-panel{width:100%}')
-  p.add_script_tag(content="""const {el,detailField,detailSection,infoHelp,detailPanel,readonlyField}=LexeditorUI;
+  p.add_script_tag(content="""const {el,detailField,detailSection,infoHelp,detailPanel,readonlyField,hoverable}=LexeditorUI;
  const state={references:[],vanilla:{},data:{text:{}}},shell={refresh(){}};
  function matchingTextRow(){return {value:'Drain'}}
  function sourceControl(control,current,vanilla,references,apply,format,options){return LexeditorUI.provenanceControl({control,current,vanilla,references,apply,internal:options.internal})}
@@ -33,7 +33,8 @@ def main():
    p.wait_for_timeout(60)
    assert p.locator('textarea').evaluate('(e)=>e.offsetWidth/e.closest(".lex-detail-field").clientWidth>.9'),width
    assert p.locator('.ff8-text-token-toolbar').evaluate('(e)=>e.scrollWidth<=e.clientWidth+1'),width
-  # The editor has no name but keeps its help about tokens and save limits.
+  # The editor's strip names the value and keeps its help about tokens and save
+  # limits: one bubble, beside the name.
   assert p.locator('.lex-text-editor .lex-info-help').count()==1
   p.locator('textarea').fill('New text')
   assert p.evaluate('row.value')=='New text'
