@@ -200,6 +200,8 @@ class Handler(PluginRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if self.refuse_write_when_read_only(path):
+            return
         try:
             if path not in POST_ROUTES:
                 self.json_response({"error": "Not found"}, 404); return

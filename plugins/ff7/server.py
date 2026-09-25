@@ -280,6 +280,8 @@ class Handler(PluginRequestHandler):
     def do_POST(self):
         try:
             path = urlparse(self.path).path
+            if self.refuse_write_when_read_only(path):
+                return
             if path not in {"/api/save", "/api/platform-config/save", "/api/extended/save", "/api/deployment/setup", "/api/deployment/export", "/api/deployment/deploy", "/api/deployment/remove"}:
                 self.json_response({"error": "Not found"}, 404)
                 return

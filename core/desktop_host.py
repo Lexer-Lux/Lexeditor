@@ -395,7 +395,8 @@ class HostApi:
             self._dirty_count = 0
             return {
                 "id": plugin_id,
-                "url": f"{self._session.url}?lexTransition=resume",
+                "url": f"{self._session.url}?lexTransition=resume"
+                       + ("&lexNoMod=1" if getattr(self, "_session_no_mod", False) else ""),
                 "identity": self._session_identity,
                 "resident": True,
             }
@@ -523,7 +524,10 @@ class HostApi:
             if plugin.projects is not None and installation["status"] != "not-added":
                 project = self._projects.snapshot(plugin.plugin_id)
                 selected = next((row for row in project["projects"] if row["current"]), None)
-                if selected and selected["problems"]:
+                # No mod yet is not a broken game. The editor opens such a game
+                # on its own data and locks every write, so the card stays
+                # ready and the row carries the fact for the page that opens.
+                if selected and selected["problems"] and not selected.get("noMod"):
                     problems = problems + selected["problems"]
                     installation = dict(installation)
                     installation["problems"] = problems
@@ -552,6 +556,8 @@ class HostApi:
                 "accent": plugin.accent,
                 "ready": installation["canOpen"] and not problems,
                 "problem": (problems or [None])[0],
+                "noMod": bool(selected.get("noMod")) if plugin.projects is not None
+                         and installation["status"] != "not-added" and selected else False,
                 **installation,
                 "current": plugin.plugin_id == self._plugin_id,
                 "resident": plugin.plugin_id == self._plugin_id and self._session is not None,
@@ -1818,12 +1824,17 @@ class HostApi:
             if plugin.projects is not None:
                 project = self._projects.snapshot(plugin_id)
                 current = next((row for row in project["projects"] if row["current"]), None)
-                if current is None or not current["valid"]:
+                # A game with no mod opens locked, showing its own data. Only a
+                # project that exists and is damaged still refuses to open.
+                no_mod = bool(current and current.get("noMod"))
+                if not no_mod and (current is None or not current["valid"]):
                     raise RuntimeError("\n".join((current or {}).get(
                         "problems", [f"{plugin.name} has no valid editable project"])))
                 environment[plugin.projects.root_env] = project["current"]
-                environment["LEXEDITOR_MOD_READ_ONLY"] = "1" if self._managed_project_locked(
+                environment["LEXEDITOR_MOD_READ_ONLY"] = "1" if no_mod or self._managed_project_locked(
                     plugin_id, Path(project["current"])) else "0"
+                environment["LEXEDITOR_NO_MOD"] = "1" if no_mod else "0"
+                self._session_no_mod = no_mod
             fonts = self.download_fonts(plugin_id)
             session = plugin.session_factory(environment) if environment else plugin.session_factory()
             try:
@@ -1842,7 +1853,7 @@ class HostApi:
             return {
                 "id": plugin_id,
                 "name": plugin.name,
-                "url": f"{session.url}?lexTransition=load",
+                "url": f"{session.url}?lexTransition=load" + ("&lexNoMod=1" if no_mod else ""),
                 "identity": identity,
                 "fonts": fonts,
                 "resident": False,
@@ -1855,6 +1866,7 @@ class HostApi:
             self._session = None
             self._session_identity = None
             self._plugin_id = None
+            self._session_no_mod = False
 
 
 def run_host(plugins: dict[str, GamePlugin], initial_plugin: str | None = None,

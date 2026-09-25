@@ -313,6 +313,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if self.refuse_write_when_read_only(path):
+            return
 
         if path == "/api/module/save":
             try:

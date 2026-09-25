@@ -13,14 +13,46 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 NO_STORE = "no-cache, no-store, must-revalidate"
 
+# A session the host opened read-only - a game with no mod yet, or a managed
+# mod copy the player may not edit in place - must not write. The shared UI
+# refuses the edit and disables Save; this is the backstop for a plugin whose
+# write route is reached anyway, so the rule lives here once instead of in
+# every service.
+#
+# A request is a write when the last segment of its path names the change it
+# makes. Read routes such as /api/content/file, /api/dashboard or
+# /api/settings are left alone, and so is /api/build, which reports a build -
+# /api/build/start is the route that writes.
+READ_ONLY_WRITE_ROUTES = frozenset({
+    "save", "create", "delete", "remove", "rename", "write", "import",
+    "install", "deploy", "revert", "restore", "export", "discard", "apply",
+    "activate", "start", "setup", "patch", "commit",
+})
+READ_ONLY_MESSAGE = ("This game is open without a mod, so nothing can be saved. "
+                     "Create a mod, then edit it.")
+
 
 class PluginRequestHandler(BaseHTTPRequestHandler):
     """A plugin service's replies: JSON, a file, and a quiet log."""
+
+    def refuse_write_when_read_only(self, path: str) -> bool:
+        """Refuse a write in a read-only session; True when it was refused.
+
+        Called at the top of a service's POST routes, before the payload is
+        read, so a refused write changes nothing and says why.
+        """
+        if os.environ.get("LEXEDITOR_MOD_READ_ONLY") != "1":
+            return False
+        if path.rstrip("/").rsplit("/", 1)[-1].lower() not in READ_ONLY_WRITE_ROUTES:
+            return False
+        self.send_json({"error": READ_ONLY_MESSAGE}, status=403)
+        return True
 
     def log_message(self, _format, *_args):
         # A plugin service writes into a pipe the desktop host drains. Logging

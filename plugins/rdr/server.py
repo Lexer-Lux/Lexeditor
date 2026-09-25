@@ -2197,6 +2197,8 @@ class Handler(PluginRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if self.refuse_write_when_read_only(path):
+            return
         try:
             body = self.body()
             if path == "/api/file/save":

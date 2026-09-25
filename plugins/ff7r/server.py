@@ -590,6 +590,8 @@ class Handler(PluginRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if self.refuse_write_when_read_only(path):
+            return
         try:
             if os.environ.get("LEXEDITOR_MOD_READ_ONLY") == "1" and (path == "/api/save" or path.endswith("/save")
                     or path.startswith("/api/unreal-config/")):

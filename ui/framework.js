@@ -4329,10 +4329,15 @@ ${contents.path}`});
       const canChoose = Boolean(value);
       box.hidden = !current && !selectedSource && !canChoose;
       if (!current && !selectedSource && !canChoose) return;
+      // A game nobody has modded yet: the folder this game would use is a
+      // plan, not a mod, so the control says what is true and the menu offers
+      // to add or find one.
+      const noMod = Boolean(current?.noMod);
       mode.hidden = !selectedSource;
       mode.textContent = selectedSource?.readOnly === false ? "📝" : "🔒";
       mode.setAttribute("aria-label", selectedSource?.readOnly === false ? "Editable" : "Read only");
-      name.textContent = selectedSource?.label || current?.name || "Select a mod";
+      name.textContent = noMod ? "No mod"
+        : selectedSource?.label || current?.name || "Select a mod";
       status.hidden = true;
       status.textContent = selectedSource?.enabled === false ? "×" : "✓";
       status.className = `lex-project-source-status ${selectedSource?.enabled === false ? "disabled" : "enabled"}`;
@@ -4340,7 +4345,9 @@ ${contents.path}`});
       path.textContent = selectedSource?.path || (selectedSource
         ? (selectedSource.readOnly === false ? "Editable mod" : "Read-only reference")
         : current?.path || "New Mod or Find a Mod");
-      box.title = path.textContent;
+      box.title = noMod
+        ? "This game has no mod. Add a Mod creates one; Find a Mod opens one you already have."
+        : path.textContent;
       const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid)).map(row => {
         const select = element("button", {
         class: `lex-project-menu-item-select${row.current && activeSource === "mine" ? " active" : ""}`,
@@ -4483,12 +4490,17 @@ ${contents.path}`});
         class:"lex-project-menu-action",type:"button",role:"menuitem",
         onclick:async()=>{closeMenu();try{await options.addProjectSource();render(snapshot)}catch(error){showAlert({title:"Could not add mod",message:error.message})}}
       },"➕ Add a Mod"):null;
-      // A game without mod management says so where the mod buttons would be,
-      // instead of offering buttons it cannot back up.
-      menu.replaceChildren(...sourceRows, ...projects,
-        modSupport && !modSupport.canManage && !options.addProjectSource
-          ? element("p", {class:"lex-dialog-status"}, modSupport.message || "Mod management is not supported for this game yet.")
-          : element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, addSource || create, browse,
+        // A game without mod management says so where the mod buttons would
+        // be. That note explains why the menu has no library row; it must not
+        // replace adding and finding a mod, which are how a reader gets out of
+        // the unmodded state - and which the comment above already says are
+        // not mod-library work.
+        const modLibraryNote = modSupport && !modSupport.canManage
+          ? element("p", {class:"lex-dialog-status"},
+              modSupport.message || "Mod management is not supported for this game yet.")
+          : null;
+        menu.replaceChildren(...sourceRows, ...projects, modLibraryNote,
+          element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, addSource || create, browse,
             options.sourcesReplaceProjects ? null : element("button", {type:"button", class:"lex-project-menu-action", onclick:() => { closeMenu(); openModLibrary(options.plugin.id); }}, "Mod library…")));
       measureNameColumn();
     };
@@ -5423,9 +5435,15 @@ ${contents.path}`});
   const shellIsReadonly = () => {
     try { return !!activeShellReadonly?.(); } catch { return false; }
   };
+  // A game opened with no mod is read-only whatever the plugin believes: the
+  // page is showing the game's own data and there is no mod to write into, so
+  // the host marks the frame's own URL. A locked save button is better than a
+  // save that cannot work, and the header says why.
+  const sessionHasNoMod = () => loadingParameters.get("lexNoMod") === "1";
 
   const mountShell = options => {
-    activeShellReadonly = typeof options.readonly === "function" ? options.readonly : null;
+    activeShellReadonly = sessionHasNoMod() ? () => true
+      : typeof options.readonly === "function" ? options.readonly : null;
     const host = typeof options.host === "string" ? document.querySelector(options.host) : options.host;
     if (!host) throw new Error("Lexeditor shell host is missing");
     document.body.dataset.lexPlugin = options.plugin.id;
@@ -5624,9 +5642,17 @@ ${contents.path}`});
       "data-lex-history-control": true,
     }, restartIcon());
     const projectControl = mountProjectControl(options, context);
+    // Why nothing can be saved, in the row where saving happens: a session
+    // opened on a game with no mod shows the game's own data and locks every
+    // edit, and the reader should not have to guess that from a dead button.
+    const noModNote = sessionHasNoMod()
+      ? badge("NO MOD", {tone: "warning",
+          title: `This game has no mod yet, so the editor shows the game's own data. Create a mod from the project menu to change anything.`})
+      : null;
     const brandSlot = element("div", {class: "lex-brand-slot"}, brand);
     const leftActions = element("div", {class: "lex-shell-left-actions"}, context);
-    const centerActions = element("div", {class: "lex-shell-center-actions"}, undo, save, game, redo);
+    const centerActions = element("div", {class: "lex-shell-center-actions"},
+      undo, save, game, noModNote, redo);
     const rightActions = element("div", {class: "lex-shell-right-actions"}, uiScaleControl(), settings, shortcuts, help, info);
     // Restart acts on the window, so it sits with the window controls and is
     // shaped like them. Parked at the end of the developer group it read as a
@@ -5873,7 +5899,10 @@ ${contents.path}`});
       navigationHistory?.visit(githubWorkspace?.state.open ? "github" : `tab:${options.activeTab()}`);
       undo.disabled = !history?.canUndo;
       redo.disabled = !history?.canRedo;
-      const projectReadonly = !!options.readonly?.();
+      // The shell's own accessor, not the plugin's, so a session the host
+      // opened without a mod locks every edit even when the plugin never grew
+      // a read-only notion of its own.
+      const projectReadonly = shellIsReadonly();
       // Published so CSS can drop edit affordances that would be refused.
       document.documentElement.setAttribute(
         "data-lex-project-readonly", String(projectReadonly));

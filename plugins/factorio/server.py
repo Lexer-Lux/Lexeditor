@@ -298,6 +298,8 @@ class Handler(PluginRequestHandler):
     def do_POST(self):
         global _dirty, _store, _source_fingerprint, _saved_edits
         path = urlparse(self.path).path
+        if self.refuse_write_when_read_only(path):
+            return
         if not self._same_origin():
             self.send_json({"error": "Cross-origin writes are not permitted"}, 403)
             return

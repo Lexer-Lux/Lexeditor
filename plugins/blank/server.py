@@ -68,6 +68,8 @@ class Handler(PluginRequestHandler):
             self.send_json({"error": "Not found"}, 404)
 
     def do_POST(self):
+        if self.refuse_write_when_read_only(urlparse(self.path).path):
+            return
         if urlparse(self.path).path != "/api/projects":
             self.send_json({"error": "Not found"}, 404)
             return

@@ -59,13 +59,24 @@
       "warband"
     ],
     "badge": [
+      "bannerlord",
       "blank",
+      "chrono_trigger",
+      "ds3",
       "factorio",
+      "ff7",
+      "ff7r",
+      "ff7r2",
       "ff8",
+      "ff9",
       "ffx_x2",
       "palworld",
+      "project_zomboid",
+      "rdr",
       "rdr2",
-      "terraria"
+      "stardew_valley",
+      "terraria",
+      "warband"
     ],
     "beginSearcher": [
       "ff8"
@@ -1476,6 +1487,7 @@
     "actionRow",
     "applyTheme",
     "autoFitControlText",
+    "badge",
     "booleanMark",
     "bottomSearch",
     "callWindow",

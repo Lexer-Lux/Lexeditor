@@ -149,6 +149,8 @@ class Handler(PluginRequestHandler):
     def do_POST(self):
         try:
             path = urlparse(self.path).path
+            if self.refuse_write_when_read_only(path):
+                return
             payload = self.read_json()
             root = self.project()
             identity = {"path", "module", "id", "sha256", "edits"}

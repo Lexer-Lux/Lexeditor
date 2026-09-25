@@ -554,6 +554,8 @@ class Handler(PluginRequestHandler):
         except (OSError, VBFError, ValueError, RuntimeError) as error: self.json_response({"error": str(error)}, 400)
     def do_POST(self):
         route = urlparse(self.path).path
+        if self.refuse_write_when_read_only(route):
+            return
         try:
             if route not in POST_ROUTES: self.json_response({"error": "Not found"}, 404); return
             port = self.server.server_address[1]; allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}; host = self.headers.get("Host", "").casefold(); origin = self.headers.get("Origin")

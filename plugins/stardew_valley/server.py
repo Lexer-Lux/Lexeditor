@@ -192,6 +192,8 @@ class Handler(PluginRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if self.refuse_write_when_read_only(path):
+            return
         try:
             is_dataset_save = path.startswith("/api/datasets/") and path.endswith("/save")
             if path not in POST_ROUTES and not is_dataset_save:

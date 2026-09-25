@@ -158,6 +158,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         route = urlparse(self.path).path
+        if self.refuse_write_when_read_only(route):
+            return
         try:
             body = self.read_json()
             if route == "/api/messages/save":

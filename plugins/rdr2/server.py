@@ -5303,6 +5303,8 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length) or b"{}")
             url = urlparse(self.path)
             path = url.path
+            if self.refuse_write_when_read_only(path):
+                return
             ds = parse_qs(url.query).get("ds", ["mine"])[0]
             with _lock:
                 if path == "/api/catalog/save":

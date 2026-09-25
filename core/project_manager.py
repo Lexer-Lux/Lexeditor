@@ -181,20 +181,26 @@ class ProjectManager:
             if key in forgotten and key != os.path.normcase(str(current)):
                 continue
             problems = self._problems(root, spec.required_paths, spec.required_any)
+            # A game with no mod yet is not a broken game: the editor can show
+            # the game's own data and lock every edit, so "no mod" has to be
+            # told apart from a folder that is damaged or gone. Callers read
+            # this flag instead of matching the sentence below.
+            no_mod = False
             if not root.exists() and key == os.path.normcase(str(current)):
                 # A folder that was never created is not a damaged project.
                 # Say so directly instead of listing files missing from it.
                 if entry.get("current"):
                     problems = [f"Project folder not found: {root}. Reselect or recreate it."]
                 else:
-                    problems = [f"No {plugin.name} project yet at {root}. Create one to open the editor."]
+                    no_mod = True
+                    problems = [f"No {plugin.name} project yet at {root}. Create one to save changes."]
             try:
                 info = metadata(root)
             except (OSError, ValueError):
                 info = {}
             rows.append({"path": str(root), "name": info.get("name") or display_names.get(key) or root.name or plugin.name,
                          "version": info.get("version", ""),
-                         "valid": not problems, "problems": problems,
+                         "valid": not problems, "problems": problems, "noMod": no_mod,
                          "current": key == os.path.normcase(str(current))})
         return {"pluginId": plugin_id, "current": str(current),
                 "environment": spec.root_env, "projects": rows,

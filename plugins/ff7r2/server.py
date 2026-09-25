@@ -564,6 +564,8 @@ class Handler(PluginRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if self.refuse_write_when_read_only(path):
+            return
         # Reject browser cross-origin writes to this loopback service: these
         # routes change files inside the game folder.
         origin = self.headers.get("Origin")

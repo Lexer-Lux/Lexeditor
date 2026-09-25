@@ -292,6 +292,8 @@ class Handler(PluginRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path
+        if self.refuse_write_when_read_only(path):
+            return
         try:
             if path == "/api/mods/import":
                 length = int(self.headers.get("Content-Length", "0"))
