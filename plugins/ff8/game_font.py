@@ -14,7 +14,7 @@ from . import paths
 FONT_NAME = "FF8Menu"
 FONT_PATH = paths.DATA_ROOT / "generated" / "ff8-menu.ttf"
 FONT_REVISION_PATH = paths.DATA_ROOT / "generated" / "ff8-menu.revision"
-FONT_REVISION = "4"
+FONT_REVISION = "5"
 GLYPH_SIZE = 12
 ATLAS_COLUMNS = 21
 FIRST_CODE = 0x20
@@ -28,6 +28,27 @@ CHARACTERS = (
     " 0123456789%/:!?…+-=*&「」()·.,~”“‘#$'_"
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "abcdefghijklmnopqrstuvwxyz"
+)
+
+# The atlas has no brace cell at all: its punctuation runs from parentheses to
+# the 「」 quotes and the accented letters, and the last cells hold the packed
+# two-letter pairs. The editor's own text notation writes braces around a
+# name, a colour, a variable or a key ("{Griever}", "{Wait030}"), so those
+# characters fell through to the fallback face and read as a different font
+# inside the menu text. They are drawn here from the parenthesis art: same two
+# pixel stroke, same height, with the middle cusp that makes a brace.
+BRACE_LEFT = (
+    "..##........",
+    ".##.........",
+    ".##.........",
+    ".##.........",
+    ".##.........",
+    "###.........",
+    "###.........",
+    ".##.........",
+    ".##.........",
+    ".##.........",
+    "..##........",
 )
 
 
@@ -96,6 +117,30 @@ def _glyph(width: int, pixels: bytes, visible: list[int], code: int):
     return pen.glyph()
 
 
+def _bitmap_glyph(rows: tuple[str, ...]):
+    """A glyph drawn from pixels, in the atlas's own geometry and scale."""
+    pen = TTGlyphPen(None)
+    for row, pattern in enumerate(rows):
+        column = 0
+        while column < GLYPH_SIZE:
+            while column < GLYPH_SIZE and (column >= len(pattern) or pattern[column] != "#"):
+                column += 1
+            start = column
+            while column < GLYPH_SIZE and column < len(pattern) and pattern[column] == "#":
+                column += 1
+            if start == column:
+                continue
+            x0, x1 = start * SCALE, column * SCALE
+            y0, y1 = ((GLYPH_SIZE - row - 1) * SCALE - 211,
+                      (GLYPH_SIZE - row) * SCALE - 211)
+            pen.moveTo((x0, y0))
+            pen.lineTo((x1, y0))
+            pen.lineTo((x1, y1))
+            pen.lineTo((x0, y1))
+            pen.closePath()
+    return pen.glyph()
+
+
 def ensure_font() -> Path:
     """Return a generated TTF. The source atlas stays in the private cache."""
     texture, widths_path = _font_sources()
@@ -131,6 +176,17 @@ def ensure_font() -> Path:
         if character == "1":
             advance = 4
         metrics[name] = (max(advance, 2) * SCALE, 0)
+        cmap[ord(character)] = name
+
+    # The game font has no brace cell, so the editor's text notation draws its
+    # own. Advance 5 is the parenthesis cell the art is taken from.
+    brace_advance = 5 * SCALE
+    for character, rows in (("{", BRACE_LEFT),
+                            ("}", tuple(row[::-1] for row in BRACE_LEFT))):
+        name = f"uni{ord(character):04X}"
+        glyph_order.append(name)
+        glyphs[name] = _bitmap_glyph(rows)
+        metrics[name] = (brace_advance, 0)
         cmap[ord(character)] = name
 
     builder = FontBuilder(UNITS_PER_EM, isTTF=True)
