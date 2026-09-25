@@ -93,7 +93,10 @@ METRICS_SCRIPT = r"""() => [...document.querySelectorAll('.ff8-character-curve')
     shadow:style?.textShadow||'',
     font:style?.fontFamily||'',
     fontSize:Number.parseFloat(style?.fontSize||'0'),
-    transform:label?.style.getPropertyValue('--lex-formula-angle')||'',
+    // Each term of the equation carries its own tilt now, so the tilt is read
+    // from the terms. The element that holds them has no angle of its own.
+    angles:[...card.querySelectorAll('.lex-curve-plot > .lex-math-formula .lex-curve-math-atom')]
+      .map(node=>node.style.getPropertyValue('--lex-formula-angle')),
     oldDisplay:old?getComputedStyle(old).display:'',
     // Use local box geometry. getBoundingClientRect() is screen-space and the
     // whole equation is intentionally rotated with the curve, so screen Y is
@@ -147,7 +150,8 @@ with sync_playwright() as playwright:
                 assert item["shadow"]!="none",(width,item)
                 assert "FF8 Menu" in item["font"],(width,item)
                 assert item["fontSize"]>=7.49,(width,item)
-                assert item["transform"].endswith("deg"),(width,item)
+                assert item["angles"],(width,item)
+                assert all(angle.endswith("deg") for angle in item["angles"]),(width,item)
                 assert item["oldDisplay"]=="none",(width,item)
                 assert item["fractionStacked"],(width,item)
                 assert item["fractionRule"]>=1,(width,item)

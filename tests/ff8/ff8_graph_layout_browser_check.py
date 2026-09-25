@@ -31,7 +31,11 @@ def main():
    card.hover();page.wait_for_timeout(220)
    aligned=card.evaluate("""e=>{const a=e.getBoundingClientRect(),b=e.querySelector('.lex-curve-variables').getBoundingClientRect();return b.left>=a.left&&b.right<=a.right}""")
    assert aligned,i
-   clear=card.evaluate("""e=>{const a=e.querySelector('.lex-curve-plot > .lex-math-formula').getBoundingClientRect();return [...e.querySelectorAll('.lex-curve-range-value')].every(n=>{const b=n.getBoundingClientRect();return a.right<=b.left-7||a.left>=b.right+7||a.bottom<=b.top-5||a.top>=b.bottom+5})}""")
+   # The equation is drawn term by term, and each term is turned to the slope
+   # under it, so the terms are what the two end numbers have to stay clear of.
+   # The element that holds them is now a box spanning the plot, and measuring
+   # against it would pass whatever the terms did.
+   clear=card.evaluate("""e=>{const terms=[...e.querySelectorAll('.lex-curve-plot > .lex-math-formula .lex-curve-math-atom')];return terms.length>0&&[...e.querySelectorAll('.lex-curve-range-value')].every(n=>{const b=n.getBoundingClientRect();return terms.every(t=>{const c=t.getBoundingClientRect();return c.right<=b.left-7||c.left>=b.right+7||c.bottom<=b.top-5||c.top>=b.bottom+5})})}""")
    assert clear,i
   # A narrow card must wrap its variables instead of squeezing them: four
   # variables in a ~300px drawer used to render ~50px inputs while two-variable
