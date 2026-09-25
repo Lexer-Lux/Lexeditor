@@ -5555,6 +5555,53 @@ ${contents.path}`});
       return rank(left) - rank(right) || String(left.label).localeCompare(String(right.label), undefined, {sensitivity: "base"});
     });
     for (const [tabIndex, tab] of orderedTabs.entries()) {
+      // A developer renames a page tab in place: double-click the name, type,
+      // press Enter. The name is saved with that tab's view defaults, so it
+      // ships to everyone the way a held tab's layout does. Escape keeps the
+      // old name, and an empty name restores the shipped one, because a tab
+      // nobody can name is a tab nobody can find.
+      const shippedLabel = (id, fallback) => {
+        try { return localStorage.getItem(`${options.plugin.id}-${id}.label`) || fallback; }
+        catch (_error) { return fallback; }
+      };
+      const renameLabel = (id, tabId, fallback, text) => {
+        const before = text.textContent;
+        const input = element("input", {type: "text", class: "lex-label-rename",
+          value: text.textContent, "aria-label": `Rename ${fallback}`});
+        text.replaceWith(input);
+        input.focus();
+        input.select();
+        let finished = false;
+        const finish = async commit => {
+          if (finished) return;
+          finished = true;
+          const typed = input.value.trim();
+          const label = typed && typed !== fallback ? typed : fallback;
+          // Escape, or a click somewhere else, keeps the name that was there.
+          if (!commit) { text.textContent = before; input.replaceWith(text); return; }
+          const key = `${options.plugin.id}-${id}.label`;
+          try {
+            if (label === fallback) localStorage.removeItem(key);
+            else localStorage.setItem(key, label);
+          } catch (_error) {}
+          text.textContent = label;
+          input.replaceWith(text);
+          try {
+            await callWindow("save_default_view", options.plugin.id, tabId,
+              {[key]: label === fallback ? "" : label});
+            toast(label === fallback ? `${fallback} is back to its shipped name.`
+                                     : `${label} is now the shipped name.`);
+          } catch (error) {
+            showAlert({title: "Could not save the name",
+                       message: error.message || String(error)});
+          }
+        };
+        input.addEventListener("keydown", event => {
+          if (event.key === "Enter") { event.preventDefault(); finish(true); }
+          else if (event.key === "Escape") { event.preventDefault(); finish(false); }
+        });
+        input.addEventListener("blur", () => finish(false));
+      };
       let defaultHoldTimer = 0;
       let savedDefault = false;
       const saveDefault = async () => {
@@ -5613,11 +5660,21 @@ ${contents.path}`});
           options.navigate(tab.id);
         },
       }, element("span", {class: "lex-tab-label"},
-          element("span", {class: "lex-tab-label-text"}, tab.label)),
+          element("span", {class: "lex-tab-label-text"}, shippedLabel(tab.id, tab.label))),
         (key => key ? element("span", {
           class: "lex-tab-shortcut", "aria-hidden": "true",
         }, key) : "")(shortcutKeyFor(tabIndex + 1)));
       nav.append(button);
+      // The handler is always attached and the mode is read when it fires:
+      // settings arrive after the bar is built, so a developer-mode test at
+      // build time would leave every tab unrenamable.
+      const labelText = button.querySelector(".lex-tab-label-text");
+      labelText.addEventListener("dblclick", event => {
+        if (!developerMode) return;
+        event.preventDefault();
+        event.stopPropagation();
+        renameLabel(tab.id, tab.id, tab.label, labelText);
+      });
     }
     const context = element("div", {class: "lex-plugin-context"});
     const undo = element("button", {

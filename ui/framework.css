@@ -7588,3 +7588,13 @@ body { text-shadow: var(--lex-text-shadow, none); }
   content:"";
   pointer-events:none;
 }
+
+/* A tab being renamed in place: the field takes the label's place, so the tab
+   does not change size while it is being named. */
+.lex-tab-label > .lex-label-rename {
+  width:100%;
+  min-width:0;
+  padding:0 2px;
+  font:inherit;
+  text-align:inherit;
+}
