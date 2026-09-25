@@ -87,3 +87,75 @@ def test_menu_lifts_loading_screen_when_a_cover_never_settles():
     stuck = [{'id': 'stuck', 'name': 'Stuck Cover', 'status': 'added', 'canOpen': True,
               'coverArt': {'state': 'loading', 'uri': '', 'error': ''}}]
     test_menu_renders_cards_covers_and_fallbacks(plugins_override=stuck, loading_timeout=10000)
+
+
+def test_hovered_card_title_keeps_room_for_its_descenders():
+    """A title's y and its shadow paint below the last line box.
+
+    The clamped title element clips at its own box, so a flush box cut the
+    descender's shadow off mid-letter - a screenshot of the hovered FF9 card
+    showed the shadow stopping under the y. The element reserves the room now;
+    this holds the reservation and the fitter's view of the same height.
+    """
+    import functools
+    import json
+    import threading
+    from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+    from playwright.sync_api import sync_playwright
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    settings = dict(BASE, developerMode=False, developerAuthorized=False, viewPreferences={},
+                    defaultValues=dict(BASE), loadingTransitionMinimumSeconds=0,
+                    updateCheckChoices=[])
+    plugin = [{'id': 'ff9', 'name': 'Final Fantasy 9', 'status': 'added', 'canOpen': True,
+               'coverArt': {'state': 'none'}}]
+    stub = (f"window.pywebview={{api:new Proxy({{lexeditor_settings:async()=>({json.dumps(settings)}),"
+            f"plugins:async()=>({json.dumps(plugin)}),"
+            "loading_quote:async()=>({quote:''}),app_update_status:async()=>({available:false}),"
+            "window_state:async()=>({maximized:false}),game_process_status:async()=>({running:false}),"
+            "theme_sounds:async()=>({rows:[]}),helper_versions:async()=>({helpers:[]}),"
+            "project_info:async()=>({canCreate:false,projects:[]})},{get:(t,k)=>t[k]||(async()=>false)})};")
+
+    class Handler(SimpleHTTPRequestHandler):
+        def log_message(self, *_args):
+            pass
+
+    server = ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Handler, directory=str(root)))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with sync_playwright() as play:
+            browser = play.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(viewport={'width': 1357, 'height': 853})
+                page.add_init_script(stub)
+                page.goto(f'http://127.0.0.1:{server.server_port}/ui/chooser.html')
+                page.evaluate("dispatchEvent(new Event('pywebviewready'))")
+                page.wait_for_selector('.game', timeout=8000)
+                page.wait_for_selector('#loading-screen', state='hidden', timeout=8000)
+                card = page.locator('.game').first
+                card.hover()
+                page.wait_for_timeout(400)
+                metrics = card.evaluate("""e=>{
+                  const text=e.querySelector('.game-name-text'),name=e.querySelector('.game-name');
+                  const style=getComputedStyle(text);
+                  return {paddingBottom:parseFloat(style.paddingBottom),
+                    overflow:style.overflow,
+                    textTop:text.getBoundingClientRect().top,
+                    textBottom:text.getBoundingClientRect().bottom,
+                    boxTop:name.getBoundingClientRect().top,
+                    boxBottom:name.getBoundingClientRect().bottom,
+                    scrollHeight:text.scrollHeight,boxClient:name.clientHeight,
+                    lines:getComputedStyle(name).getPropertyValue('--game-name-lines')}}""")
+                assert metrics['overflow'] == 'hidden', metrics
+                assert metrics['paddingBottom'] >= 3, metrics
+                # The room has to be inside the box the fitter measures.
+                assert metrics['textTop'] >= metrics['boxTop'], metrics
+                assert metrics['scrollHeight'] <= metrics['boxClient'] + 1, metrics
+            finally:
+                browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
