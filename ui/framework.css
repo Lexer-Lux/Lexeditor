@@ -1008,7 +1008,19 @@ details.lex-detail-section[open] > summary::before { content:"▾"; }
 .lex-text-editor { flex:1 1 auto; min-height:160px; }
 .lex-text-editor > .lex-detail-field-control,
 .lex-text-editor .lex-source-control { height:100%; }
-.lex-text-editor textarea { height:100%; resize:none; }
+/* The box fills the field. A percentage height did not do it: the textarea
+   asks to size itself to its content, so a one-line value kept an eight-row
+   box in the middle of an empty panel. As the only grid row of its control,
+   stretched, it takes the height the panel gives it. */
+.lex-text-editor .lex-source-control { display:grid; grid-template-rows:minmax(0,1fr);
+  align-items:stretch; }
+.lex-text-editor textarea { height:auto; min-height:0; field-sizing:fixed; resize:none; }
+/* The editor's name row is one line and its box takes the rest of the panel.
+   The field is stretched by the panel's flex layout, and without rows of its
+   own the two implicit rows shared that stretch: the name row grew to a
+   quarter of the panel and the box stayed at its eight rows, which is the
+   blank space a reader saw above a small text box. */
+.lex-detail-field.lex-text-editor { grid-template-rows:auto minmax(0,1fr); }
 .lex-detail-panel-body:has(> .lex-table-fill:only-child) { flex:1; }
 .lex-tweaks-paged > .lex-subtab-bar { flex:0 0 auto; }
 .lex-field-readonly-lock {
