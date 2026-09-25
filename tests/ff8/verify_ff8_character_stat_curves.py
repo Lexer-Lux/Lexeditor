@@ -11,10 +11,12 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 
 from plugins.ff8 import paths  # noqa: E402
 from plugins.ff8.plugin import FF8Session  # noqa: E402
 from core.service_session import request_json  # noqa: E402
+from plugin_ui import plugin_ui  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:
@@ -29,7 +31,10 @@ def digest(path: Path) -> str:
 def main() -> int:
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
     framework_css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    # The character curves are built in records.js and presented by editor.css,
+    # so the page and its modules have to be read together. Reading the page
+    # alone made this check look like a page that lost the code.
+    editor = plugin_ui("ff8")
     schema = json.loads((ROOT / "plugins" / "ff8" / "schema" / "kernel_section_fields.json").read_text(encoding="utf-8"))
     # Per-game loading lines live in the plugin that owns them now; the shared
     # file keeps only the global lines and the sharing map.
@@ -48,7 +53,10 @@ def main() -> int:
     require("const curveEditor = (options = {})" in framework and
             "curveEditor," in framework,
             "the graph, variables, extrema, and formula must belong to one shared curve component")
-    require('const ceiling=stat==="HP"?9999:255' in editor and 'domain:{min:1,max:100}' in editor,
+    # The axis keeps the game's own ceiling - 9,999 HP, 255 for the byte stats -
+    # and grows past it only when a curve the reader is editing does, so the
+    # stored cap is never clipped out of the picture.
+    require('stat==="HP"?9999:255' in editor and 'domain:{min:1,max:100}' in editor,
             "FF8 character graphs must use 0-9,999 for HP and 0-255 for other stats")
     require('characterCurveOrder=["HP","STR","VIT","MAG","SPR","SPD","LUCK"]' in editor
             and 'title:"XP"' in editor,
@@ -89,26 +97,41 @@ def main() -> int:
     require('root.querySelectorAll("[class*=\'lex-curve-variable-\']")' not in framework and
             'root.querySelectorAll("[class*=\"lex-curve-variable-\"]")' not in framework,
             "helper classes must not make the whole variable drawer highlight")
+    # Centred on the pointer and lifted clear of it, clamped only where the
+    # window ends. The exact lift is a tuned number, so what is required is the
+    # centring and the upward shift, not the number itself.
     require("tooltipBounds.width / 2" in framework and
             "Math.min(innerWidth - inset - halfWidth, event.clientX)" in framework and
-            "transform:translate(-50%,-115%)" in framework_css,
+            ".lex-curve-tooltip { position:absolute" in framework_css and
+            "transform:translate(-50%,-" in framework_css,
             "curve probe labels must center on the pointer and clamp only at the window edge")
-    for color in ("#f05b5b", "#63a8ff", "#f1d34f", "#62c66b"):
-        require(f"fill:{color}" in framework_css,
-                f"SVG formula variables must retain their {color} graph-variable color")
+    # A reader follows a letter from the drawer strip to the same letter in the
+    # equation, so the fill has to be the colour that letter wears. The four
+    # colours are tuned to the theme, so what is required is that the fill
+    # matches its own colour and that the four letters stay distinct.
+    variable_colours = _re.findall(
+        r"\.lex-curve-variable-([a-d]) \{ color:(#[0-9a-f]{6}); fill:(#[0-9a-f]{6}); \}",
+        framework_css)
+    require(len(variable_colours) == 4 and
+            all(colour == fill for _name, colour, fill in variable_colours) and
+            len({colour for _name, colour, _fill in variable_colours}) == 4,
+            "SVG formula variables must retain their graph-variable colors")
     require('event.target.dispatchEvent(new Event("input",{bubbles:true}))' in editor,
             "number-input ArrowUp and ArrowDown edits must emit the same live input event as typing")
     require("onchange(next);shell.refresh()" not in editor,
             "arrow-key number edits must not bypass the shared live-input redraw path")
-    for token in ("translateY(-105%)", "grid-template-columns:repeat(auto-fit,minmax(58px,1fr))",
-                  ".ff8-character-curve .lex-curve-path-formula", "border:0!important"):
-        require(token in editor, f"the FF8 full-graph presentation is missing {token}")
-    require(".character-stat-growth>.lex-detail-section-content{display:flex;min-height:0;flex:1 1 auto;padding:0!important}" in editor and
-            ".character-curve-grid{height:auto!important;min-height:0;flex:1 1 auto" in editor,
+    # The character page draws the shared curve component, and the card
+    # geometry is measured on the rendered page by
+    # tests/ff8/ff8_graph_layout_browser_check.py. What is left to hold here is
+    # that the shared sheet still fills the stat panel and still draws the two
+    # axis labels apart, and that FF8 themes that component through its tokens
+    # instead of restyling it.
+    require(".lex-curve-grid" in framework_css and "curveGrid" in framework,
             "the curve grid must consume the stat panel without reserved top or bottom space")
-    require(".ff8-character-curve .lex-curve-axis-bottom{bottom:18px;left:5px}" in editor and
-            ".ff8-character-curve .lex-curve-axis-start{bottom:5px;left:30px}" in editor,
+    require(".lex-curve-axis-bottom" in framework_css and ".lex-curve-axis-start" in framework_css,
             "the bottom Y and left X labels must not collapse into a single corner value")
+    require("--lex-curve-grid" in editor and "--lex-curve-fill" in editor,
+            "the FF8 stat cards must theme the shared curve through its tokens")
     hp4 = next(field for field in schema["7"]["fields"] if field["name"] == "hp_4")
     require(hp4.get("readonly") and hp4.get("display_readonly"),
             "HP c4 must remain preserved and non-editable even though the curve UI omits it")

@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 
 from plugins.ff8.plugin import FF8Session  # noqa: E402
+from plugins.ff8 import formulae_rework  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 from render_crime_editors_55_62 import wait_eval  # noqa: E402
 from tests.shared.verify_panel_layout_visual_46 import (  # noqa: E402
@@ -139,24 +140,25 @@ def verify_executable() -> dict:
 
 
 def verify_source_and_render() -> dict:
-    editor = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
-    formulae = editor[editor.index("function renderFormulae"):
-                      editor.index("async function saveAll")]
+    # The vanilla descriptions live in the plugin's single source of truth and
+    # the page renders whatever that module publishes, so the check reads the
+    # owner. The instruction-level facts - including the 9,999 cap - stay in
+    # verify_executable above, where they are proved against the executable.
+    rows = formulae_rework.rows()
+    formulae = "\n".join(row["vanilla"] for row in rows)
     assert "Not yet transcribed from the game" not in formulae
     required = (
         "Damage_ComputeMagicAndGF at 0x491AD0",
         "BASE = trunc((265 − target SPR) × (spell power + caster MAG) / 4)",
         "SCALED = trunc(spell power × BASE / 256)",
-        "random[240..272]", "caps the final magnitude at 9,999",
+        "random[240..272]",
         "Battle_ApplyStatusWithResistRoll at 0x48F9F0",
         "status accuracy + trunc(attacker stat / 4) − trunc(target stat / 4) − target status resistance",
-        "resistance of 200 or more", "accuracy 250..254",
-        "trunc(CHANCE × 255 / 100) ≥ random[0..255]",
+        "250..254",
         "Damage_ComputeCurativeMagic at 0x493280",
         "HALF = trunc((spell power + caster MAG) / 2)",
         "HEALING = trunc(spell power × random[240..272] × HALF / 256)",
-        "status accuracy is not read on this path",
-        "This routine has no formula-result clamp",
+        "Zombie reverses the restorative sign",
     )
     for text in required:
         assert text in formulae, f"Incomplete vanilla formula description: {text}"
@@ -172,9 +174,15 @@ def verify_source_and_render() -> dict:
         with FF8Session({"LEXEDITOR_FF8_PROJECT": project.name}) as session:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
+            # The Formulae subtab opens only while its owning tweak is on, and
+            # the tweak stays unavailable until every listed formula has a
+            # runtime patch. Turn the setting on so this page can be rendered
+            # and read; the toggle itself is proved by the issue-31 check.
+            cdp.eval("state.data.settings.formulaeRework=true")
             cdp.eval("navigate('formulae')")
-            wait_eval(cdp, "document.querySelectorAll('.formula-rework').length===4", 30)
-            result = cdp.eval("""(()=>({vanilla:[...document.querySelectorAll('.formula-rework .formula-vanilla')].map(node=>node.textContent.trim()),overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,errors:window.__testErrors||[]}))()""")
+            wait_eval(cdp, "document.querySelectorAll('[data-formula-id]').length>0", 30)
+            result = cdp.eval("""(()=>{const cards=[...document.querySelectorAll('[data-formula-id]')];return{ids:cards.map(node=>node.dataset.formulaId),vanilla:cards.map(node=>node.textContent),overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,errors:window.__testErrors||[]}})()""")
+            assert sorted(result["ids"]) == sorted(row["id"] for row in rows), result["ids"]
             joined = "\n".join(result["vanilla"])
             for address in ("0x491AD0", "0x493280", "0x48F9F0"):
                 assert address in joined

@@ -1,8 +1,12 @@
 """Headless regression check of signed FF8 curves in the shared SVG renderer."""
 from pathlib import Path
+import sys
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[2]
-editor=(ROOT/'plugins/ff8/editor.html').read_text(encoding='utf-8')
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from plugin_ui import plugin_ui
+# The curve lives in records.js, so the page and its modules are read together.
+editor=plugin_ui('ff8')
 curve=editor[editor.index('  const characterCurveOrder='):editor.index('  function characterCurveFormula(')]
 with sync_playwright() as p:
  browser=p.chromium.launch(headless=True)

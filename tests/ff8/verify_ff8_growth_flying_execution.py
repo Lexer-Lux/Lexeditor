@@ -117,7 +117,10 @@ print('Native SPR/SPD zero across 11 characters x100 levels; bonus preservation;
 
 # Run the actual browser curve function, not a Python copy.
 import subprocess, shutil
-editor=(ROOT/'plugins/ff8/editor.html').read_text(encoding='utf-8')
+sys.path.insert(0,str(ROOT/'tests/shared'))
+from plugin_ui import plugin_ui
+# The curve lives in records.js, so the page and its modules are read together.
+editor=plugin_ui('ff8')
 curve=editor[editor.index('  const characterCurveOrder='):editor.index('  function characterCurveFormula(')]
 js=curve+"""
 const fields=(stat,values)=>values.map((value,i)=>({field:stat.toLowerCase()+'_'+(i+1),value}));

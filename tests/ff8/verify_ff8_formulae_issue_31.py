@@ -18,7 +18,8 @@ def main() -> int:
     # Formulae is a subtab under Tweaks now, not a top-level tab.
     assert '["formulae","Formulae"]' not in boot
     assert "formulae:renderFormulae" not in boot
-    assert '{id:"formulae",label:"Formulae"}' in boot
+    # The tab carries its own help now, so only the identity is pinned.
+    assert '{id:"formulae",label:"Formulae"' in boot
     assert "function renderFormulae()" in boot
 
     # The subtab unlocks only while its owning tweak is enabled.
