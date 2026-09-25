@@ -5972,6 +5972,12 @@ ${contents.path}`});
     // out of the run of tabs and gave it a paler fill, so a page the reader
     // uses constantly read as chrome. Settings is the only tab that sits apart.
     const isSpecialTab = tab => tab.special === true || tab.id === "settings" || tab.id === "tweaks";
+    // A plugin lists its pages in the order it wants them read. The order was
+    // alphabetical unless a tab stated `order`, which put Weapons last on one
+    // game and shuffled others, so the declared order is the default now and
+    // `order` only overrides it.
+    const declaredIndex = new Map(options.tabs.map((tab, index) => [tab, index]));
+    const declaredOrder = tab => declaredIndex.get(tab) ?? 0;
     const orderedTabs = [...options.tabs].sort((left, right) => {
       const leftSettings = isSpecialTab(left);
       const rightSettings = isSpecialTab(right);
@@ -5981,7 +5987,7 @@ ${contents.path}`});
       // whole pages down to single controls - says so with `order`.
       const stated = tab => Number.isFinite(tab.order) ? tab.order : null;
       if (stated(left) !== null && stated(right) !== null && stated(left) !== stated(right)) return stated(left) - stated(right);
-      return rank(left) - rank(right) || String(left.label).localeCompare(String(right.label), undefined, {sensitivity: "base"});
+      return rank(left) - rank(right) || declaredOrder(left) - declaredOrder(right);
     });
     for (const [tabIndex, tab] of orderedTabs.entries()) {
       let defaultHoldTimer = 0;

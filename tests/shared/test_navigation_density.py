@@ -38,6 +38,27 @@ def test_row_pointer_follows_clickable_label(page,with_icon):
         }''')
     page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-clickable-row-pointer.png'))
 
+def test_a_plugins_pages_keep_the_order_it_declares(page):
+    """The shell sorted pages alphabetically and put Weapons last on one game.
+
+    A plugin lists its pages in the order it wants them read; only `order` and
+    the settings/tweaks rule may move them.
+    """
+    framework(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      document.body.prepend(U.el('div',{id:'shell'}));
+      U.mountShell({host:'#shell',brand:'LEXEDITOR',plugin:{id:'fixture',name:'Fixture'},
+        tabs:[{id:'zebra',label:'Zebra'},{id:'alpha',label:'Alpha'},{id:'middle',label:'Middle'}],
+        activeTab:()=>'zebra',navigate:()=>{}});
+      U.finishPluginLoading();
+    }''')
+    page.wait_for_timeout(300)
+    order = page.evaluate('''()=>[...document.querySelectorAll('.lex-shell-header nav button[data-tab]')]
+      .map(node=>node.dataset.tab)''')
+    assert order[:3] == ['zebra','alpha','middle'], order
+
+
 @pytest.mark.parametrize('width',[700,1000,1600])
 def test_tabs_stay_one_row_and_tweaks_stays_attached(page,width):
     # Main tabs and subtabs always share one row of equal lanes.
