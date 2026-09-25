@@ -4852,7 +4852,9 @@ nav button.active:focus-visible .lex-tab-shortcut,
   pointer-events:none;
   animation:lex-help-popover-in .1s ease-out;
 
- width:min(440px,calc(100vw - 24px)); max-width:calc(100vw - 24px); max-height:calc(100vh - 24px); overflow:auto; overflow-wrap:anywhere;
+ /* Wide enough that a long explanation wraps into few lines: at 440px the longest
+    bubbles needed the viewport's whole height and scrolled. */
+ width:min(560px,calc(100vw - 24px)); max-width:calc(100vw - 24px); max-height:calc(100vh - 24px); overflow:auto; overflow-wrap:anywhere;
 }
 
 /* Data Map uses the same fitted Table + Detail/pager as record editors. */

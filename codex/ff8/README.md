@@ -13,4 +13,5 @@ Canonical game-specific knowledge. No standalone source has been imported for th
 
 - [SFX, Models, and Textures assets](asset-tabs.md): audio.fmt layout and FFNx external SFX names, battle `.dat` section inventory, and the verified FFNx external texture paths behind the asset tabs.
 
+- [World draw points](world-draw-points.md): where a draw point is stored, how the game resolves a standing position to one record through its block and sub-ID, and why its spell lives in the executable.
 - [Editability and the older tools](editability.md): what each FF8 file allows here, why the locked bytes stay locked, and how this plugin's coverage compares with Deling, FF8 Ultimate Editor, Rinoa's Toolset, Jumbo Cactuar, IfritAI and Hyne.
