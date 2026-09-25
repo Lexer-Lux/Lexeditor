@@ -122,7 +122,12 @@ Not covered today, with what each would need:
   source to vendor the way the LZS decoder already is — with its licence and
   credits — rather than re-deriving the format by guesswork.
 - **Model export** (3D, glTF). The Models tab previews a model; it does not
-  export geometry.
+  export geometry, and the geometry bytes are still only counted here. FF8
+  Ultimate Editor's 3D work is large rather than a decoder to lift: its editor
+  widget alone is 148 KB, its glTF exporter 27 KB and its importer 13 KB, with
+  round-trip tests of their own. Exporting therefore starts with vendoring and
+  crediting that geometry decode (the way its LZS decoder is already vendored,
+  GPL-3.0), not with a small reader in this plugin.
 - **VRAM palette animation** (Dynamic Texture). Not worth building, and here is
   the evidence. FF8 Ultimate Editor parses the section (battle `.dat` section 4)
   and records in its own source that the feature is **vestigial in the retail PC
