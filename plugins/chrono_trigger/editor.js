@@ -427,6 +427,32 @@ function exitDetail(row){return detailPanel({title:`Exit ${row.exitId}`,identity
 function exitsView(){return records("exits",[{key:"sceneId",label:"Scene",numberedId:true,sortable:true},{key:"exitId",label:"Exit",numberedId:true,sortable:true},{key:"destinationId",label:"Destination",numeric:true,sortable:true},{key:"orientation",label:"Shape",sortable:true}],exitDetail,"exits")}
 function treasureDetail(row){if(row.alias)return detailPanel({title:`Treasure ${row.treasureId}`,identity:recordId(row.sceneId),meta:`Scene ${row.sceneId}`,body:[detailSection({title:"ALIAS",body:[detailField({label:"OTHER SCENE",control:readonlyField(String(row.aliasScene)),help:infoHelp("A 0,0 position redirects treasure lookup to another scene. Alias records remain read-only.")}),detailField({label:"PRESERVED WORD",control:readonlyField(`0x${row.trailingWord.toString(16).padStart(4,"0").toUpperCase()}`,{format:false})})]})]});if(!row.editable)return detailPanel({title:`Treasure ${row.treasureId}`,identity:recordId(row.sceneId),meta:`Scene ${row.sceneId}`,body:[el("p",{class:"lex-notice"},"This record uses an unknown contents encoding and is preserved read-only.")]});const contents=row.kind==="gold"?[detailField({label:"GOLD",...numberField("treasure",row,"gold",0,65534,"Steam stores treasure gold in increments of two.")})]:[detailField({label:"ITEM INDEX",...numberField("treasure",row,"localIndex",0,511,"Index within the selected Steam item category.")}),detailField({label:"RESOLVED ITEM",control:readonlyField(row.itemName||"Name unavailable")})];return detailPanel({title:`Treasure ${row.treasureId}`,identity:recordId(row.sceneId),meta:`Scene ${row.sceneId}`,body:[detailSection({title:"POSITION",body:[detailField({label:"X TILE",...numberField("treasure",row,"xTile",0,255,"Chest X tile. 0,0 together is reserved for an alias.")}),detailField({label:"Y TILE",...numberField("treasure",row,"yTile",0,255,"Chest Y tile. 0,0 together is reserved for an alias.")})]}),detailSection({title:"CONTENTS",body:[detailField({label:"TYPE",...selectField("treasure",row,"kind",KINDS,"Known Steam treasure encoding family.")}),...contents,detailField({label:"PRESERVED WORD",control:readonlyField(`0x${row.trailingWord.toString(16).padStart(4,"0").toUpperCase()}`,{format:false}),help:infoHelp("The final PC treasure word has no established meaning here and is never rewritten.")})]})]})}
 function treasureView(){return records("treasure",[{key:"sceneId",label:"Scene",numberedId:true,sortable:true},{key:"treasureId",label:"Chest",numberedId:true,sortable:true},{key:"kind",label:"Contents",sortable:true},{key:"itemName",label:"Item",sortable:true}],treasureDetail,"treasure records")}
+
+// The palette as the game uses it: 256 colours in one picture. The list below
+// shows one colour at a time, which is what made these pages read as numbers
+// that refer to something the reader cannot see. Styling is inline because a
+// plugin stylesheet may hold theme tokens only.
+const paletteColorCache=new Map();
+function paletteStrip(rows,selected,onPick,label){
+  const cells=rows.map(row=>{const chosen=Number(row.index)===Number(selected);
+    const cell=el("button",{type:"button",title:`${row.index} · ${row.hex}`,
+      "aria-label":`Colour ${row.index} ${row.hex}${chosen?" (selected)":""}`,
+      "aria-pressed":chosen?"true":"false",
+      style:`background:${row.hex};border:1px solid rgba(0,0,0,.35);height:20px;padding:0;`
+        +(chosen?"outline:2px solid var(--lex-accent);outline-offset:-2px;z-index:1;":""),
+      onclick:event=>{event.preventDefault();onPick?.(row.index)}});
+    return cell;});
+  return el("div",{class:"ct-palette-strip",role:"group","aria-label":label||"The whole palette",
+    style:"display:grid;grid-template-columns:repeat(32,1fr);gap:1px;padding:6px;"
+      +"background:var(--lex-panel-2);overflow:auto"},...cells);
+}
+async function paletteColorsFor(path,id){
+  const key=`${path}:${state.source}`;
+  if(paletteColorCache.has(key))return paletteColorCache.get(key);
+  const payload=await api(`/api/palette?path=${encodeURIComponent(path)}&source=${state.source}`);
+  paletteColorCache.set(key,payload.rows||[]);
+  return payload.rows||[];
+}
 function paletteDetail(row){const picker=el("input",{type:"color",value:row.hex.toLowerCase(),disabled:readonly(),oninput:event=>{remember("palettes",row,{hex:event.target.value.toUpperCase()});render()}});return detailPanel({title:`Color ${row.index}`,identity:recordId(row.index),meta:state.palette.path||"",body:[
   detailSection({title:"COLOR",body:[
     detailField({label:"COLOR",dataType:"STRING",control:picker,help:infoHelp("The Steam palette stores five bits each of red, green and blue. Lexeditor quantizes the chosen color to those exact RGB555 levels when saving.")}),
@@ -438,13 +464,16 @@ function paletteDetail(row){const picker=el("input",{type:"color",value:row.hex.
     detailField({label:"TRAILING BYTES",control:readonlyField(String(state.palette.trailingBytes??0))}),
   ]}),
 ]})}
-function palettesView(){return records("palettes",[
+function palettesView(){const rows=state.palette.rows||[];
+  const pick=index=>{state.selected.palettes=String(index);render()};
+  const strip=paletteStrip(rows,rows.find(row=>row.token===state.selected.palettes)?.index,pick,`${state.palette.path||"Palette"} colours`);
+  return LexeditorUI.stack(strip,records("palettes",[
   {key:"index",label:"ID",numberedId:true,sortable:true},
   {key:"hex",label:"Color",sortable:true},
   {key:"red5",label:"R/31",numeric:true,sortable:true},
   {key:"green5",label:"G/31",numeric:true,sortable:true},
   {key:"blue5",label:"B/31",numeric:true,sortable:true},
-],paletteDetail,"colors")}
+],paletteDetail,"colors"))}
 function infoView(){const actions=el("div",{class:"lex-action-row"},el("button",{type:"button",disabled:state.busy||dirtyCount()>0||state.source!=="mine",onclick:exportCtp},"Export CTP"),el("button",{type:"button",disabled:state.busy,onclick:()=>refreshInfo(true)},"Refresh"));return panelLayout([detailPanel({className:"lex-information-panel",icon:infoIcon(),title:"Chrono Trigger",meta:"Steam replacement plugin",body:[detailSection({title:"GAME",body:[detailField({label:"INSTALL",control:readonlyField(state.dashboard?.game?.root||"")}),detailField({label:"ARCHIVE",control:readonlyField(state.dashboard?.game?.archive||"")}),detailField({label:"RESOURCES",control:readonlyField(String(state.dashboard?.game?.resourceCount??0))})]}),detailSection({title:"PROJECT",body:[detailField({label:"FOLDER",control:readonlyField(state.dashboard?.project?.root||"")}),detailField({label:"CHANGED FILES",control:readonlyField(String(state.changes.length))}),detailField({label:"ACTIONS",control:actions}),...(state.exportResult?[detailField({label:"LAST EXPORT",control:readonlyField(state.exportResult.path)})]:[])]}),LexeditorUI.modLoaderSection({loader:"Lexeditor exports standard Chrono Trigger .ctp ZIP packages. No runtime loader is bundled by this plugin.",output:"Each CTP contains only changed Game/... and Localize/... resources at resources.bin-relative paths. The installed resources.bin remains unchanged.",order:"Runtime load order belongs to the external loader. Lexeditor exports one project and does not claim semantic merging between separate CTP mods.",safety:"Project writes stay outside the game folder; export never repacks or overwrites resources.bin.",removal:"Remove the exported CTP from the loader's mod location, or revert the project override in Lexeditor."}),LexeditorUI.creditsPanel("chrono-trigger")]})],{layoutKey:"chrono-info",defaultSizes:[100]})}
 function dataMapView(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows||[],query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,open:row=>row.target&&navigate(row.target),changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changePage:value=>{state.mapPage=value;render()},changeSort:key=>{const [active,dir]=state.mapSort;state.mapSort=[key,active===key?-dir:1];render()}});state.mapPage=view.page;setToolbar(view.controls);return view.content}
 function paletteToolbar(){const file=el("select",{onchange:async event=>{state.palettePath=event.target.value;await loadPalette()}},...state.paletteFiles.map(row=>{const option=el("option",{value:row.path},row.label);option.selected=row.path===state.palettePath;return option}));return [el("label",{},"Palette",file)]}
