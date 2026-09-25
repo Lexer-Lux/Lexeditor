@@ -53,4 +53,27 @@ being edited by another lane while this landed.
 - **Section 9's extent rule.** The wiki calls section 9 the exception — spawn
   lists that end on `END` (`0xFF05`) and run to the next offset — but its table
   does not parse cleanly with section 11's rule, so nothing is claimed for it.
-  Sections 7, 9, 10, 12, 13 and 36 remain unread.
+  Sections 7, 9, 13 and 36 remain unread; 10 and 12 are read below.
+
+## The position tables beside the scripts
+
+Sections 8, 10 and 12 hold fixed records from the start of the section, then a
+four-byte footer. This is one convention, not three: the field-return reader
+already reads section 8 that way (`FIELD_RETURN_RECORD_SIZE`,
+`FIELD_RETURN_FOOTER_SIZE` in `plugins/ff8/world_map.py`), and it is what the
+shipped sizes say.
+
+| Section | Records | Record | Bytes in the installed file |
+| --- | --- | --- | --- |
+| 10 entity spawn positions | 64 | x, y, z int32 then yaw and pitch int16 (wiki's `EntityPosition`) | 1028 = 64 × 16 + 4 |
+| 12 train exit positions | 3 | x, y int32, z int16, then two unnamed bytes | 40 = 3 × 12 + 4 |
+
+Both footers are zero in the installed file. The wiki describes section 12 as a
+four-byte `entries_size` followed by records; the shipped file does not match
+that — its first four bytes are a coordinate and the arithmetic only works with
+the count at the end — so the reader follows the file and this page says so.
+
+`entity_spawn_positions` and `train_exit_positions` read both tables and
+`tests/ff8/verify_ff8_world_positions.py` proves the counts, the record fields,
+the footers, that every coordinate lies inside the range the world projection
+uses, and that a section whose size is not records plus a footer is refused.

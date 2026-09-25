@@ -340,6 +340,55 @@ VEHICLE_WARP_SECTION = 11
 SCRIPT_RETURN = 0xFF16
 SCRIPT_END = 0xFF05
 
+# The position tables share one shape: fixed records from the start of the
+# section, then a four-byte footer. Section 8 (field landing) is read the same
+# way further down, and the footer is preserved rather than explained.
+ENTITY_SPAWN_SECTION = 10
+ENTITY_SPAWN_RECORD = 16     # x, y, z int32, then yaw and pitch int16
+TRAIN_EXIT_SECTION = 12
+TRAIN_EXIT_RECORD = 12       # x, y int32, z int16, then two unnamed bytes
+POSITION_FOOTER = 4
+
+
+def _position_rows(data: bytes, section: int, record: int, fields: tuple) -> dict:
+    pointers = _pointers(data)
+    if not 0 <= section < SECTION_COUNT - 1:
+        raise ValueError(f"wmsetus.obj has no section {section}")
+    body = data[pointers[section]:pointers[section + 1]]
+    if len(body) < POSITION_FOOTER or (len(body) - POSITION_FOOTER) % record:
+        raise ValueError(
+            f"Section {section} is {len(body)} bytes, which is not {record}-byte "
+            f"records plus a {POSITION_FOOTER}-byte footer")
+    count = (len(body) - POSITION_FOOTER) // record
+    rows = []
+    for index in range(count):
+        start = index * record
+        row = {"index": index, "offset": pointers[section] + start}
+        for name, offset, code in fields:
+            row[name] = struct.unpack_from(f"<{code}", body, start + offset)[0]
+        rows.append(row)
+    footer = body[len(body) - POSITION_FOOTER:]
+    return {"rows": rows, "count": count, "section": section, "recordSize": record,
+            "footer": footer.hex(" "), "sha256": hashlib.sha256(body).hexdigest()}
+
+
+def entity_spawn_positions(dataset: str = "current") -> dict:
+    """Where the section 9 spawn scripts put their entities (wiki: EntityPosition)."""
+    path = source_path(dataset)
+    payload = _position_rows(path.read_bytes(), ENTITY_SPAWN_SECTION, ENTITY_SPAWN_RECORD,
+                             (("x", 0, "i"), ("y", 4, "i"), ("z", 8, "i"),
+                              ("yaw", 12, "h"), ("pitch", 14, "h")))
+    return {**payload, "path": str(path), "source": dataset}
+
+
+def train_exit_positions(dataset: str = "current") -> dict:
+    """Where the player leaves the Shumi train (wiki: TrainExitPosition)."""
+    path = source_path(dataset)
+    payload = _position_rows(path.read_bytes(), TRAIN_EXIT_SECTION, TRAIN_EXIT_RECORD,
+                             (("x", 0, "i"), ("y", 4, "i"), ("z", 8, "h"),
+                              ("unknownA", 10, "B"), ("unknownB", 11, "B")))
+    return {**payload, "path": str(path), "source": dataset}
+
 
 def vehicle_warp_scripts(dataset: str = "current") -> dict:
     """The five vehicle warp scripts wmsetus.obj holds (Ragnarok, Garden, train)."""
