@@ -538,7 +538,6 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
  transform: rotate(-45deg);
 }
 
-.lex-toast.visible { opacity:1;transform:translate(-50%,0); }
 
 /* The default lives on :root so the setting, which is applied to the root
    element, is inherited here instead of being overwritten by this block. */
@@ -4185,12 +4184,16 @@ body:has(.lex-data-map-table) #main {
 }
 .lex-toast {
 
-  position:fixed;
+  /* The stack seats the toast: a game states where its messages belong with
+     the stack's own tokens, and a toast that positioned itself would ignore
+     every one of them. It also has to be a normal child, not a fixed one -
+     inside a transformed stack a fixed child is laid out against a box with
+     no size, which is how a message ended up a couple of characters wide and
+     most of it above the top of the window. */
+  position:relative;
   z-index:100020;
-  left:50%;
-  bottom:24px;
   opacity:0;
-  transform:translate(-50%,12px);
+  transform:none;
 
   max-width:min(640px,70vw);
   padding:var(--lex-toast-padding, 13px 20px);

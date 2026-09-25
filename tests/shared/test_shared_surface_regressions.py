@@ -84,7 +84,7 @@ def test_platform_pages_fit_below_tabs(page):
 def test_grouped_controls_keep_usable_width_in_a_narrow_panel(page):
     framework(page)
     page.evaluate("""()=>{
-      const U=LexeditorUI,group=U.controlGroup(['Attack animation','Target hit animation','Attack type','Spell power','Draw resist','Hit count'].map(label=>({label,control:U.el('input',{type:'number',value:10})})));
+        const U=LexeditorUI,group=U.controlGroup(['Attack animation','Target hit animation','Attack type','Spell power','Draw resist','Hit count'].map(label=>({label,control:U.el('input',{type:'number',value:10})})));
       const wrapper=U.el('div',{},group);group.style.width='500px';
       document.querySelector('main').append(wrapper);
     }""")
@@ -138,3 +138,65 @@ def test_shell_header_fits_the_window(page, width):
     # The scale slider is kept wherever there is room for it; a window that
     # cannot hold the whole rail drops it rather than overflowing.
     assert fit["scaleVisible"] or width <= 650, fit
+
+
+TOAST = "The selected file did not load, so nothing was saved."
+
+
+def toast_box(page):
+    return page.locator(".lex-toast").last.evaluate("""n=>{
+      const box=n.getBoundingClientRect();
+      const range=document.createRange();
+      range.selectNodeContents(n);
+      const lines=range.getClientRects();
+      return {left:Math.round(box.left), top:Math.round(box.top),
+        right:Math.round(box.right), bottom:Math.round(box.bottom),
+        width:Math.round(box.width), height:Math.round(box.height),
+        lineCount:lines.length, position:getComputedStyle(n).position,
+        innerWidth:innerWidth, innerHeight:innerHeight};
+    }""")
+
+
+def test_a_toast_is_placed_by_its_stack_and_stays_on_screen(page):
+    """A message must be readable wherever a game seats it.
+
+    FF8 seats its messages under the window bar with the stack's own tokens.
+    The toast used to position itself fixed, and inside the stack's transform
+    that meant a box laid out against no width and no height: a couple of
+    characters wide, most of it above the top of the window.
+    """
+    framework(page)
+    page.evaluate("""(message)=>{
+      document.documentElement.style.setProperty('--lex-toast-top','120px');
+      document.documentElement.style.setProperty('--lex-toast-bottom','auto');
+      document.documentElement.style.setProperty('--lex-toast-right','auto');
+      document.documentElement.style.setProperty('--lex-toast-left','50%');
+      document.documentElement.style.setProperty('--lex-toast-shift','-50% 0');
+      document.documentElement.style.setProperty('--lex-toast-align','center');
+      document.documentElement.style.setProperty('--lex-toast-font-size','26px');
+      document.documentElement.style.setProperty('--lex-toast-padding','14px 28px');
+      LexeditorUI.showToast(message);
+    }""", TOAST)
+    page.wait_for_timeout(200)
+    box = toast_box(page)
+    assert box["position"] != "fixed", box
+    assert box["top"] >= 0 and box["bottom"] <= box["innerHeight"] + 1, box
+    assert box["left"] >= 0 and box["right"] <= box["innerWidth"] + 1, box
+    # Under the bar, centred, and wide enough for the sentence rather than one
+    # character per line.
+    assert abs(box["top"] - 120) <= 6, box
+    assert abs((box["left"] + box["right"]) / 2 - box["innerWidth"] / 2) <= 6, box
+    assert box["lineCount"] <= 2, box
+    assert box["width"] >= 260, box
+
+
+def test_a_toast_with_no_game_tokens_sits_in_the_corner(page):
+    framework(page)
+    page.evaluate("(message)=>LexeditorUI.showToast(message)", TOAST)
+    page.wait_for_timeout(200)
+    box = toast_box(page)
+    assert box["bottom"] <= box["innerHeight"] + 1 and box["top"] >= 0, box
+    assert box["right"] <= box["innerWidth"] + 1, box
+    assert box["left"] > box["innerWidth"] * 0.35, box
+    assert box["bottom"] > box["innerHeight"] * 0.6, box
+    assert box["lineCount"] <= 2, box
