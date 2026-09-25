@@ -4174,7 +4174,12 @@ body:has(.lex-data-map-table) #main {
 .lex-image-map { display:grid; place-items:center; container-type:size; position:relative; min-width:0; min-height:200px; height:100%; overflow:hidden; background:var(--lex-panel-2); }
 .lex-image-map-natural { container-type:inline-size; height:auto; aspect-ratio:var(--lex-map-ratio); }
 .lex-image-map-natural > /* A picked marker on a map reads as picked, the way a picked cell does. */
+/* A picked marker on a map reads as picked, the way a picked cell does.
+   A sky zone's marker is a different record on the same map, so it reads in
+   another colour rather than as another draw point. */
 .lex-image-map-point.selected { outline:2px solid var(--lex-highlight); outline-offset:1px; }
+.lex-image-map-point.world-sky-point { background:var(--lex-panel);
+  border-color:var(--lex-highlight); }
 
 /* A map's corner readout: what the pointer is over, beside the map itself. */
 .lex-image-map-readout {

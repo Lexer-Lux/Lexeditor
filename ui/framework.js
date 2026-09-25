@@ -1491,7 +1491,7 @@
     if(options.cells?.length)stage.append(element("div",{class:"lex-image-map-cells"},...options.cells.map(cell=>
       element("button",{type:"button",class:cell.selected?"selected":"",title:cell.title||cell.label,
         "aria-label":cell.label,"aria-pressed":!!cell.selected,onclick:()=>options.select?.(cell.id)}))));
-    for(const point of options.points||[])stage.append(element("button",{type:"button",class:`lex-image-map-point${point.selected?" selected":""}`,
+    for(const point of options.points||[])stage.append(element("button",{type:"button",class:`lex-image-map-point${point.selected?" selected":""}${point.className?" "+point.className:""}`,
       style:`left:${point.x*100}%;top:${point.y*100}%`,title:point.label,"aria-label":point.label,
       onclick:event=>{event.stopPropagation();point.activate?.();}}));
     if(options.place)stage.addEventListener("click",event=>{
