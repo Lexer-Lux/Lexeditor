@@ -119,8 +119,33 @@
     return detail;
   }
   function abilityIcon(row){const icon=itemIcon(row)||LexeditorUI.inlineLabel(el("span",{},"?"));icon.dataset.abilityType=row?.abilityType||"Unknown";icon.title=row?.abilityType||"Unknown ability type";return icon}
-  function abilityLabel(row){return LexeditorUI.inlineLabel(abilityIcon(row),el("span",{},row.name))}
-  function recordHoverLabel(view,row,content){return hoverable({class:"ff8-record-hover-label",content,targetType:view,targetId:row.id,targetLabel:row.name,activate:()=>{state.selected[view]=row.id;navigate(view)}})}
+  // An ability's name is one string in the kernel text table, and this page
+  // shows it twice: in the list and in the panel title. Both rename that one
+  // string, so the two views cannot disagree about what the ability is called.
+  // A record with no stored name - the empty first slot - has none to rename.
+  function abilityNameRow(row){
+    const ref=row?.nameRef;
+    if(!ref||!state.data.text?.rows)return null;
+    return state.data.text.rows.find(entry=>entry.source===ref.source&&entry.sectionId===ref.sectionId
+      &&entry.recordId===ref.recordId&&entry.slot===ref.slot)||null;
+  }
+  function renameAbilityName(row,node){
+    const entry=abilityNameRow(row);
+    if(!entry)return null;
+    return LexeditorUI.renameValue(node,{value:row.name,label:`ability ${row.id}`,
+      commit:value=>{
+        entry.value=value;
+        row.name=value;
+        shell.refresh();
+        LexeditorUI.showToast?.(`${value} is now this ability's name.`);
+      }});
+  }
+  function abilityLabel(row,edit){
+    const name=el("span",{},row.name);
+    if(edit)name.addEventListener("dblclick",event=>{event.preventDefault();event.stopPropagation();edit(name)});
+    return LexeditorUI.inlineLabel(abilityIcon(row),name);
+  }
+  function recordHoverLabel(view,row,content,edit){return hoverable({class:"ff8-record-hover-label",content,targetType:view,targetId:row.id,targetLabel:row.name,edit,activate:()=>{state.selected[view]=row.id;navigate(view)}})}
   // FF8 keeps its ability definitions in one kernel section per category,
   // each record carrying its AP-to-learn cost. They are ordinary kernel
   // sections, so each category renders through the shared kernel view.
@@ -142,7 +167,7 @@
       change:value=>{state.abilityTab=value;renderAbilities()},
     }));
   }
-  function renderKernel(view,label){const rows=filtered(view,["name","id"]),sample=state.data[view].rows[0],columns=[{key:"id",label:"ID"},{key:"name",label,render:row=>recordHoverLabel(view,row,view==="magic"?magicLabel(row):row.abilityType?abilityLabel(row):row.name)},...(sample?.fields||[]).map(field=>({key:`field:${field.field}`,label:field.label,pinned:false,numeric:field.control!=="boolean"&&field.lookup?.type!=="enum",sortValue:row=>row.fields.find(value=>value.field===field.field)?.value??"",render:row=>displayFieldValue(row.fields.find(value=>value.field===field.field))}))];showPaged(view,rows,columns,view==="magic"?magicDetail:(row,prefs)=>sharedDetail(row.abilityType?{...row,titleContent:abilityLabel(row)}:row,prefs,fieldGroups(row.fields,view,row.id,false,prefs)),"74px minmax(180px,1fr)",view==="magic"?{leadingPanel:magicLeadingPanel,minLeading:260,defaultLeadingWidth:20,minLeft:260,minRight:430}:{})}
+  function renderKernel(view,label){const rows=filtered(view,["name","id"]),sample=state.data[view].rows[0],columns=[{key:"id",label:"ID"},{key:"name",label,render:row=>recordHoverLabel(view,row,view==="magic"?magicLabel(row):row.abilityType?abilityLabel(row):row.name,row.abilityType?node=>renameAbilityName(row,node):null)},...(sample?.fields||[]).map(field=>({key:`field:${field.field}`,label:field.label,pinned:false,numeric:field.control!=="boolean"&&field.lookup?.type!=="enum",sortValue:row=>row.fields.find(value=>value.field===field.field)?.value??"",render:row=>displayFieldValue(row.fields.find(value=>value.field===field.field))}))];showPaged(view,rows,columns,view==="magic"?magicDetail:(row,prefs)=>sharedDetail(row.abilityType?{...row,titleContent:abilityLabel(row,node=>renameAbilityName(row,node))}:row,prefs,fieldGroups(row.fields,view,row.id,false,prefs)),"74px minmax(180px,1fr)",view==="magic"?{leadingPanel:magicLeadingPanel,minLeading:260,defaultLeadingWidth:20,minLeft:260,minRight:430}:{})}
   function matchingTextRow(dataset,row){return dataset?.text?.rows?.find(value=>value.source===row.source&&value.sectionId===row.sectionId&&value.recordId===row.recordId&&value.slot===row.slot)}
   function textTokenToolbar(input){
     const tokens=state.data.text?.tokens;

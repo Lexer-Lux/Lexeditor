@@ -7613,6 +7613,17 @@ body { text-shadow: var(--lex-text-shadow, none); }
   font:inherit;
   text-align:inherit;
 }
+/* A value renamed where it is shown - a record name in a table or a panel
+   title - takes the space its text had, so nothing on the page moves while it
+   is being typed. */
+.lex-label-rename {
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  padding:0 2px;
+  font:inherit;
+  text-align:inherit;
+}
 
 /* A help bubble being reworded in the developer page: the popover takes the
    pointer only while its editor is open. */

@@ -391,17 +391,56 @@ def save_weapons(edits: list[dict]) -> dict:
 ABILITY_SECTION_BASES = {12: 0, 13: 20, 14: 39, 15: 58, 16: 78, 17: 83, 18: 92}
 ABILITY_SECTIONS = tuple(ABILITY_SECTION_BASES)
 
+# The name of an ability is stored once, in the kernel text section that the
+# data section points at, and each category's text section holds one row per
+# record in the same order. The lookup below spells the same names its own way -
+# "STR-J" where the shipped file says "Str-J" - so the page read one name while
+# the game showed another. The stored string wins; the lookup is the fallback
+# for a record the text table does not cover.
+ABILITY_TEXT_SECTIONS = {12: 42, 13: 43, 14: 44, 15: 45, 16: 46, 17: 47, 18: 48}
+
 ABILITY_NAMES = {
     int(row.get("value", row.get("id", 0))): str(row["name"])
     for row in LOOKUPS["junctionable_ability"]["entries"]
 }
 
 
-def _record_name(section_id: int, record_id: int) -> str:
+def _ability_text_names(dataset: str) -> dict[tuple[int, int], str]:
+    """The names the kernel text section stores, keyed by data section and record.
+
+    Reading the text table costs about eight milliseconds, and a page asks for
+    its seven ability sections in a row, so the result is held against the
+    file's size and modified time: an edit that lands on disk is picked up, and
+    a repeated read of the same file is not parsed seven times.
+    """
+    path = source_path("kernel.bin", dataset)
+    stat = path.stat()
+    key = (dataset, stat.st_size, stat.st_mtime_ns)
+    cached = _ABILITY_NAME_CACHE.get("key")
+    if cached == key:
+        return _ABILITY_NAME_CACHE["names"]
+    names: dict[tuple[int, int], str] = {}
+    text_id_to_data = {text: data for data, text in ABILITY_TEXT_SECTIONS.items()}
+    for row in kernel_text.rows(path.read_bytes(), SECTIONS)["rows"]:
+        data_id = text_id_to_data.get(row["sectionId"])
+        if data_id is None or row["slot"] != 0:
+            continue
+        names[(data_id, row["recordId"])] = row["value"]
+    _ABILITY_NAME_CACHE.update(key=key, names=names)
+    return names
+
+
+_ABILITY_NAME_CACHE: dict[str, object] = {}
+
+
+def _record_name(section_id: int, record_id: int, dataset: str = "current") -> str:
     rows = {2: MAGIC, 3: GFORCES, 5: WEAPONS, 7: CHARACTERS}.get(section_id)
     if rows and record_id < len(rows):
         return rows[record_id]["name"]
     if section_id in ABILITY_SECTIONS:
+        stored = _ability_text_names(dataset).get((section_id, record_id))
+        if stored:
+            return stored
         identifier = ABILITY_SECTION_BASES[section_id] + record_id
         return ABILITY_NAMES.get(identifier, f"Ability {identifier}")
     if section_id == 8:
@@ -451,6 +490,7 @@ def kernel_rows(section_id: int, dataset: str = "current") -> dict:
     raw = source_path("kernel.bin", dataset).read_bytes()
     section_start = int.from_bytes(raw[section_id * 4:section_id * 4 + 4], "little")
     fields = _display_fields(section_id)
+    names = _ability_text_names(dataset) if section_id in ABILITY_SECTIONS else {}
     rows = []
     for record_id in range(section["number_sub_section"]):
         base = section_start + record_id * section["sub_section_size"]
@@ -478,7 +518,13 @@ def kernel_rows(section_id: int, dataset: str = "current") -> dict:
                 "subgroup": field.get("subgroup"),
                 "readonly": bool(field.get("readonly")),
             })
-        rows.append({"id": record_id, "name": _record_name(section_id, record_id), "fields": values,
+        # Where this record's name is stored, so a page can offer to change it
+        # instead of guessing or keeping a second copy.
+        name_ref = ({"source": "kernel", "sectionId": ABILITY_TEXT_SECTIONS[section_id],
+                     "recordId": record_id, "slot": 0}
+                    if (section_id, record_id) in names else None)
+        rows.append({"id": record_id, "name": _record_name(section_id, record_id, dataset),
+                     "nameRef": name_ref, "fields": values,
                      **(ability_identity(ABILITY_SECTION_BASES[section_id] + record_id)
                         if section_id in ABILITY_SECTIONS else {})})
     return {"section": section["section_name"], "rows": rows, "source": source_label("kernel.bin")}

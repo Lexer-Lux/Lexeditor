@@ -3951,11 +3951,21 @@
       element("td", {}, row.message || "")))));
   const hoverable = options => {
     const target = String(options.targetLabel || options.label || "linked record");
+    // A link that is also editable waits out a second click before it follows:
+    // one click opens the record, two clicks rename it. Every other link keeps
+    // its instant click, because waiting is only worth paying where a double
+    // click means something else.
+    let waiting = null;
     const activate = event => {
       const keyboard = event.detail === 0;
       if (hoverableAltClickEnabled() && !event.altKey && !keyboard) return;
       event.preventDefault();
       event.stopPropagation();
+      if (options.edit && !keyboard) {
+        if (waiting) return;
+        waiting = setTimeout(() => { waiting = null; options.activate?.(); }, 240);
+        return;
+      }
       options.activate?.();
     };
     const button = element("button", {
@@ -3966,6 +3976,12 @@
       "aria-label": options["aria-label"] || `Open ${target}`,
       title: `Open ${target}`,
       onclick: activate,
+      ondblclick: options.edit ? event => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (waiting) { clearTimeout(waiting); waiting = null; }
+        options.edit(button);
+      } : undefined,
     }, options.content ?? options.label ?? target);
     // Flex buttons cannot ellipsize anonymous text nodes.
     [...button.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).forEach(node => {
@@ -5717,6 +5733,35 @@ ${contents.path}`});
       renameInPlace(fieldLabelKey(shipped), activePageTab(), shipped, node);
     });
     return node;
+  };
+  // Rename a value in place: the text is swapped for an input, and Enter hands
+  // the new text to the caller, which owns where that text is stored. Escape,
+  // or a click somewhere else, leaves the value as it was. This is the same
+  // edit a UI label gets from renameInPlace; what differs is only what happens
+  // to the text afterwards, which is why the caller is handed it.
+  const renameValue = (node, options = {}) => {
+    const before = String(options.value ?? node.textContent ?? "");
+    const input = element("input", {type: "text", class: "lex-label-rename",
+      value: before, "aria-label": `Rename ${options.label || "this value"}`});
+    node.replaceWith(input);
+    input.focus();
+    input.select();
+    let finished = false;
+    const finish = accept => {
+      if (finished) return;
+      finished = true;
+      const typed = input.value.trim();
+      input.replaceWith(node);
+      if (!accept || !typed || typed === before) return;
+      node.textContent = typed;
+      options.commit?.(typed);
+    };
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter") { event.preventDefault(); finish(true); }
+      else if (event.key === "Escape") { event.preventDefault(); finish(false); }
+    });
+    input.addEventListener("blur", () => finish(false));
+    return input;
   };
   const renameInPlace = (key, tabId, fallback, text) => {
     const before = text.textContent;
@@ -8833,7 +8878,7 @@ ${contents.path}`});
       paged)
   };
 
-  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 
