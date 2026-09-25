@@ -141,7 +141,12 @@ def api_and_render() -> dict:
 
 
 def main() -> int:
-    source = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
+    # The field editor's sections moved out of editor.html into the plugin's
+    # own scripts. Read the whole plugin so a later file split cannot fail this
+    # precondition while the section itself is still there.
+    plugin = ROOT / "plugins/ff8"
+    source = "\n".join(path.read_text(encoding="utf-8") for path in
+                       [plugin / "editor.html", *sorted(plugin.glob("*.js"))])
     assert "fieldDialogueSection" in source and 'type:"dialogue"' in source
     print({"binary": corpus_and_binary(), "rendered": api_and_render()})
     return 0
