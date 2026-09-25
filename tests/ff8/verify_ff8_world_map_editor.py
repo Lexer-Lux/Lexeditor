@@ -136,10 +136,13 @@ def verify_rendered() -> dict:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
             cdp.eval("navigate('world')")
-            wait_eval(cdp, "document.querySelectorAll('.world-map-tabs [role=tab]').length===9", 30)
+            wait_eval(cdp, "document.querySelectorAll('.world-map-tabs [role=tab]').length===7", 30)
             first = cdp.eval("document.querySelector('.world-map-detail input')?.value")
-            cdp.eval("[...document.querySelectorAll('.world-map-tabs [role=tab]')].find(n=>n.textContent.includes('Encounter Rules')).click()")
-            wait_eval(cdp, "document.querySelector('.world-map-detail input[aria-label=\"Encounter rule region ID\"]')!==null", 20)
+            # The region-and-ground rule table is a subtab of Encounters now, so
+            # the World tab is checked for what is left on it and the rules are
+            # checked where they live.
+            cdp.eval("[...document.querySelectorAll('.world-map-tabs [role=tab]')].find(n=>n.textContent.includes('Regions')).click()")
+            wait_eval(cdp, "document.querySelector('.world-map-detail input[aria-label=\"World region ID\"]')!==null", 20)
             result = cdp.eval("""(()=>{const root=document.querySelector('.world-map-view'),panel=document.querySelector('.world-map-detail');return{
               tabs:[...document.querySelectorAll('.world-map-tabs [role=tab]')].map(n=>n.textContent.trim().replace(/\\d+$/,'')),
               active:document.querySelector('.world-map-tabs [role=tab][aria-selected=true]')?.textContent.trim().replace(/\\d+$/,''),
@@ -148,9 +151,21 @@ def verify_rendered() -> dict:
               panelHeight:panel.getBoundingClientRect().height,
             }})()""")
             assert first is not None, "Region ID is not editable"
-            assert result["tabs"] == ["Map", "Regions", "Encounter Rules", "Encounter Groups", "Field → World", "Draw Points", "Sky Colours", "Train Tracks", "World Textures"], result
-            assert result["active"] == "Encounter Rules" and result["inputs"] == 3, result
+            assert result["tabs"] == ["Map", "Regions", "Field → World", "Draw Points", "Sky Colours", "Train Tracks", "World Textures"], result
+            assert result["active"] == "Regions" and result["inputs"] >= 1, result
             assert not result["overflow"] and result["panelHeight"] > 200, result
+            cdp.eval("state.encountersTab='rules';navigate('encounters')")
+            wait_eval(cdp, "document.querySelector('.ff8-encounter-rule-table')!==null", 20)
+            rules_view = cdp.eval("""(()=>{const table=document.querySelector('.ff8-encounter-rule-table');return{
+              cellEditors:table.querySelectorAll('input[type=number]').length,
+              groundColumns:[...table.querySelectorAll('.lex-column-list-head-cell')].length-1,
+              rules:state.data.world.rows.filter(row=>row.kind==='helper').length,
+            }})()""")
+            assert rules_view["cellEditors"] == rules_view["rules"], rules_view
+            assert rules_view["groundColumns"] >= 1, rules_view
+            result["rules"] = rules_view
+            cdp.eval("navigate('world')")
+            wait_eval(cdp, "document.querySelectorAll('.world-map-tabs [role=tab]').length===7", 30)
             cdp.eval("[...document.querySelectorAll('.world-map-tabs [role=tab]')].find(n=>n.textContent.includes('Train Tracks')).click()")
             wait_eval(cdp, "document.querySelector('.world-map-detail.world-rail')!==null", 20)
             rail_view = cdp.eval("""(()=>{const panel=document.querySelector('.world-map-detail.world-rail'),table=panel?.querySelector('.rail-point-table');return{

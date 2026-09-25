@@ -134,8 +134,7 @@ def main() -> int:
               text:panel.textContent,
               overflow:root.scrollWidth>root.clientWidth+1,
             }})()""")
-            assert rendered["tabs"] == ["Map", "Regions", "Encounter Rules",
-                                         "Encounter Groups", "Field → World",
+            assert rendered["tabs"] == ["Map", "Regions", "Field → World",
                                          "Draw Points", "Sky Colours", "Train Tracks",
                                          "World Textures"]
             assert "Maps" in rendered["mainTabs"]

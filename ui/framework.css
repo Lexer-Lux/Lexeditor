@@ -4104,6 +4104,10 @@ body:has(.lex-data-map-table) #main {
 .lex-figure-grid > figure > :is(img, canvas) { display:block; width:100%; height:auto; min-width:0; object-fit:contain; }
 .lex-figure-grid .lex-model-stage { --lex-model-stage-min-height:150px; }
 .lex-figure-grid figcaption { color:var(--lex-muted); font-size:12px; text-align:center; }
+/* A caption over its media names the figure, so it is read as a name rather
+   than as a note, and the footer under the media is the figure's value. */
+.lex-figure-grid.lex-figure-caption-above figcaption { color:var(--lex-text); font-weight:600; }
+.lex-figure-grid .lex-figure-footer { color:var(--lex-muted); font-size:12px; text-align:center; }
 
 /* A map image with cell selection and point markers. */
 .lex-image-map { display:grid; place-items:center; container-type:size; position:relative; min-width:0; min-height:200px; height:100%; overflow:hidden; background:var(--lex-panel-2); }

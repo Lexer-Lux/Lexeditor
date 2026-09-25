@@ -9,7 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 from plugin_ui import plugin_ui
 def main():
  source=plugin_ui('ff8')
- functions=source[source.index('  function encounterLevelRule'):source.index('  function renderEncounters()')]
+ # The formation editor ends where battle.js hands the tab over to encounters_ui.js.
+ functions=source[source.index('  function encounterLevelRule'):source.index('  // The Encounters tab itself lives in encounters_ui.js')]
  with sync_playwright() as pw:
   browser=pw.chromium.launch(headless=True)
   page=browser.new_page(viewport={'width':1100,'height':900})

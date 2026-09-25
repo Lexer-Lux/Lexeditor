@@ -150,7 +150,7 @@ def verify_api_and_rendered() -> dict:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
             cdp.eval("navigate('world')")
-            wait_eval(cdp, "document.querySelectorAll('.world-map-tabs [role=tab]').length===9", 30)
+            wait_eval(cdp, "document.querySelectorAll('.world-map-tabs [role=tab]').length===7", 30)
             cdp.eval("[...document.querySelectorAll('.world-map-tabs [role=tab]')].find(n=>n.textContent.includes('World Textures')).click()")
             wait_eval(cdp, "document.querySelector('.world-map-detail.world-texture img')?.naturalWidth===256", 30)
             rendered = cdp.eval("""(()=>{const panel=document.querySelector('.world-map-detail.world-texture'),image=panel.querySelector('.world-texture-preview'),select=panel.querySelector('select[aria-label$="preview palette"]'),links=[...panel.querySelectorAll('.world-texture-actions a')],buttons=[...panel.querySelectorAll('.world-texture-actions button')];return{

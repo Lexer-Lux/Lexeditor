@@ -120,9 +120,8 @@ def main() -> int:
               overflow:root.scrollWidth>root.clientWidth+1,
             }})()""")
             assert rendered["active"] == "Draw Points"
-            assert rendered["tabs"] == ["Map", "Regions", "Encounter Rules", "Encounter Groups",
-                                        "Field → World", "Draw Points", "Sky Colours", "Train Tracks",
-                                        "World Textures"]
+            assert rendered["tabs"] == ["Map", "Regions", "Field → World", "Draw Points",
+                                        "Sky Colours", "Train Tracks", "World Textures"]
             assert rendered["inputs"] == ["Draw Point 129 X", "Draw Point 129 Y",
                                           "Draw Point 129 sub-ID"]
             assert abs(rendered["map"]["width"] - rendered["map"]["height"]) < 2

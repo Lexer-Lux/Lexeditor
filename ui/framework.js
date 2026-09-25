@@ -1364,8 +1364,20 @@
   };
 
   // Pictures side by side, each over its caption: [{media, caption}].
-  const figureGrid = (items = []) => element("div", {class: "lex-figure-grid"},
-    ...items.map(item => element("figure", {}, item.media, element("figcaption", {}, item.caption))));
+      // A grid of figures: media with a caption. A grid may put the caption
+      // above the media and add a footer under it, which is how a battle
+      // position names the enemy over its box and gives the level below.
+      const figureGrid = (items = [], options = {}) => element("div", {
+        class: ["lex-figure-grid", options.captionAbove ? "lex-figure-caption-above" : ""]
+          .filter(Boolean).join(" "),
+      }, ...items.map(item => {
+        const caption = item.caption == null ? null : element("figcaption", {}, item.caption);
+        return element("figure", {...(item.attrs || {})},
+          options.captionAbove ? caption : null,
+          item.media ?? null,
+          options.captionAbove ? null : caption,
+          item.footer == null ? null : element("div", {class: "lex-figure-footer"}, item.footer));
+      }));
 
   // Map coordinates are fractions of the image, independent of UI zoom.
   const imageMap = (options = {}) => {
