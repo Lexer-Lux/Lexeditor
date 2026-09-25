@@ -54,7 +54,7 @@ def check() -> list[str]:
         "gameplay_settings.py", "flat_stat_abilities.py", "max_spell.py", "mug_drops.py",
         "single_gf.py", "game_icons.py",
         "ffnx_issue_51/runtime_config.py", "ffnx_issue_51/runtime_package.py",
-        "runtime_layout.py", "iroj_archive.py", "mod_folders.py", "mngrp_merge.py",
+        "runtime_layout.py", "mod_support.py", "iroj_archive.py", "mod_folders.py", "mngrp_merge.py",
         "featured_mods.py", "featured_mods.json", "reshade-defaults.ini",
         "world_map.py", "world_geometry.py", "world_textures.py", "world_data_merge.py", "field_data.py", "field_background.py", "field_dialogue.py", "field_encounters.py", "field_scripts.py", "field_walkmesh.py", "kernel_text.py", "mngrp_text.py", "refine_tables.py", "namedic.py", "wm2field.py", "archive_index.py", "archives_ui.js",
         "executable_text.py", "cards.py", "cards_ui.js", "card_art.py",

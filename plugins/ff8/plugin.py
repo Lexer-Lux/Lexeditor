@@ -9,7 +9,7 @@ from pathlib import Path
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from core.service_session import LocalPluginSession, request_json
 
-from . import ffnx_manager, gameplay_settings, paths
+from . import ffnx_manager, gameplay_settings, mod_support, paths
 from .extractor import plugin_prepare
 
 
@@ -163,6 +163,11 @@ PLUGIN = GamePlugin(
     launch=launch,
     smoke=smoke,
     session_factory=FF8Session,
+    # The shared mod library and the FF8 composer already share one folder
+    # layout, so the adapter hands library mods to the composer that the FF8
+    # Mods tab uses. Without it the header said mod management was unsupported
+    # while the plugin's own tab managed mods.
+    mod_adapter=mod_support.Ff8ModAdapter(),
     projects=ModProjectSpec(
         root_env="LEXEDITOR_FF8_PROJECT",
         default_root=paths.PROJECT_ROOT,

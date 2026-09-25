@@ -1323,7 +1323,7 @@ class HostApi:
         source_path = Path(source).resolve()
         if source_path.parent != (library.root / plugin_id).resolve():
             raise ValueError("Choose a mod in this game's library")
-        adapter = self._plugins[plugin_id].mod_adapter
+        adapter = self._mod_adapter(plugin_id)
         if adapter is None:
             raise ValueError("This game does not support editable mod copies yet")
         with self._mod_library_lock:
@@ -1334,7 +1334,7 @@ class HostApi:
     def mod_library_status(self, plugin_id: str) -> dict:
         from core.mod_library import default_user_library_root
         plugin = self._plugins[plugin_id]
-        adapter = plugin.mod_adapter
+        adapter = self._mod_adapter(plugin_id)
         root = self._settings.snapshot().get("modLibraryPath") or str(default_user_library_root())
         author = bool(adapter and self._github.visible_repository(LEXEDITOR_REPOSITORY))
         return {"root": root, "verified": bool(adapter and adapter.verified),
@@ -1342,6 +1342,36 @@ class HostApi:
                 "authorTest": bool(adapter and not adapter.verified and author),
                 "message": getattr(adapter, "message", "Mod management is not supported for this game yet."),
                 "packageTypes": list(getattr(adapter, "package_types", ()))}
+
+    def _mod_adapter(self, plugin_id: str):
+        """Return the plugin's mod adapter with the paths only the host knows.
+
+        A plugin states its defaults; only the host knows which project the
+        reader selected and where the mod library now lives. An adapter that
+        asks for them receives them before every call instead of guessing.
+        """
+        adapter = self._plugins[plugin_id].mod_adapter
+        attach = getattr(adapter, "attach_context", None)
+        if attach is None:
+            return adapter
+        projects = getattr(self, "_projects", None)
+        installations = getattr(self, "_installations", None)
+        current = ""
+        if projects is not None:
+            try:
+                current = projects.snapshot(plugin_id).get("current") or ""
+            except Exception:
+                current = ""
+        game = ""
+        if installations is not None:
+            try:
+                game = installations.snapshot(plugin_id).get("root") or ""
+            except Exception:
+                game = ""
+        attach(project_root=current or None,
+               library_root=Path(self.mod_library_location()["root"]) / plugin_id,
+               game_root=game or None)
+        return adapter
 
     def mod_library_location(self) -> dict:
         from core.mod_library import default_user_library_root
@@ -1444,7 +1474,7 @@ class HostApi:
 
     def inspect_mod_package(self, plugin_id: str, source: str, data_root: str = "", selected: list[str] | None = None) -> dict:
         from core.mod_library import ModLibrary
-        adapter = self._plugins[plugin_id].mod_adapter
+        adapter = self._mod_adapter(plugin_id)
         if adapter is None:
             raise ValueError("Mod management is not supported for this game yet")
         return ModLibrary(Path(self.mod_library_status(plugin_id)["root"])).inspect(
@@ -1453,7 +1483,7 @@ class HostApi:
     def import_mod_package(self, plugin_id: str, source: str, name: str,
                            data_root: str = "", selected: list[str] | None = None) -> dict:
         from core.mod_library import ModLibrary
-        adapter = self._plugins[plugin_id].mod_adapter
+        adapter = self._mod_adapter(plugin_id)
         if adapter is None or not self.mod_library_status(plugin_id)["canManage"]:
             raise ValueError("Mod management is not supported for this game yet")
         with self._mod_library_lock:
@@ -1525,7 +1555,7 @@ class HostApi:
         root = Path(status["root"]) / plugin_id
         game = self._installations.snapshot(plugin_id).get("root")
         active = []
-        adapter = self._plugins[plugin_id].mod_adapter
+        adapter = self._mod_adapter(plugin_id)
         if game and adapter is not None and hasattr(adapter, "active_mod_ids"):
             active = list(adapter.active_mod_ids(Path(game)))
         entries = []
@@ -1588,7 +1618,7 @@ class HostApi:
         if len(set(roots)) != len(roots) or any(path.parent != library for path in roots):
             raise ValueError("Choose each mod once from this game's library")
         with self._mod_library_lock:
-            self._plugins[plugin_id].mod_adapter.activate(roots, Path(game))
+            self._mod_adapter(plugin_id).activate(roots, Path(game))
         return self.mod_library_entries(plugin_id)
 
     def _choose_folder(self, directory: str = "") -> str:
