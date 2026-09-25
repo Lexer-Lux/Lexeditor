@@ -38,9 +38,13 @@
       /* The hand is the marker, so the shared lift and underline go away. */
       --lex-tab-lift:0px;--lex-tab-underline-content:none;
       --lex-unit-align:baseline;
-      --lex-settings-tab-bg:linear-gradient(135deg,#464646,#323232);
-      --lex-settings-tab-hover-bg:linear-gradient(135deg,#4f4f4f,#393939);
-      --lex-settings-tab-active-bg:linear-gradient(135deg,#575757,#3d3d3d);
+      /* Tweaks keeps its own shade so it is findable, and that shade has to
+         follow the ordinary tabs: when they darkened for contrast with the
+         selected tab, Tweaks stayed put and the ratio between them fell from
+         2.5 to 1.7. These are the same three tones, darker by the same step. */
+      --lex-settings-tab-bg:linear-gradient(135deg,#3a3a3a,#292929);
+      --lex-settings-tab-hover-bg:linear-gradient(135deg,#424242,#2f2f2f);
+      --lex-settings-tab-active-bg:linear-gradient(135deg,#484848,#333333);
 
       /* Window buttons: the same bevel, round where the game draws it round. */
       --lex-shell-button-fg:#fff;--lex-shell-button-border-width:2px;
