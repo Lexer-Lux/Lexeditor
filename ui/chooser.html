@@ -9,16 +9,16 @@
   <style>
 
     :root {
-      --lex-bg:#171a1f;
-      --lex-panel:#191c21;
-      --lex-panel-2:#23272e;
-      --lex-border:#454b55;
-      --lex-text:#e7e9ed;
-      --lex-muted:#979eaa;
-      --lex-accent:#68717e;
-      --lex-accent-text:#fff;
-      --lex-highlight:#c9ced6;
-      --lex-success:#66856d;
+      /* The home screen wears the shared theme, not a palette of its own. An
+         unthemed game is the reference: these are the neutral defaults Blank
+         declares, and ui/framework.css supplies every other token. Anything
+         drawn over cover art keeps its own white ink, because the art is dark
+         whatever the interface is. */
+      --lex-accent:#72ff1e;
+      --lex-accent-text:#102008;
+      --lex-highlight:#405247;
+      --lex-command-row-bg:#fff;
+      --lex-nav-bg:#e5e9ed;
       --lex-chooser-menu-height:9vh;
       --lex-page-overflow:auto;
       --lex-absent-desaturation:40%;
@@ -89,7 +89,7 @@
     .game-action-icon svg { width:70px; height:70px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
     @keyframes spin { to { transform:rotate(360deg); } }
     @keyframes loading-spin { to { rotate:360deg } }
-    button { align-self:flex-start; padding:9px 20px; color:#fff; border:0; border-radius:5px; background:var(--lex-accent); cursor:pointer; font-weight:800; }
+    button { align-self:flex-start; padding:9px 20px; color:var(--lex-accent-text); border:0; border-radius:5px; background:var(--lex-accent); cursor:pointer; font-weight:800; }
     button:disabled { cursor:default; filter:grayscale(1); opacity:.45; }
     @media (max-width:520px) { main { grid-template-columns:minmax(180px,238px); padding:20px; } }
     .modal-backdrop { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:24px; background:#000b; }
@@ -99,7 +99,7 @@
     .dialog-actions>button {flex:1 1 0;min-width:0;}
     .dialog h2 { margin:0 0 13px; }
     .dialog-message { color:var(--lex-text); white-space:pre-wrap; }
-    .dialog-problems { margin:14px 0 0; padding-left:20px; color:#e0b15a; }
+    .dialog-problems { margin:14px 0 0; padding-left:20px; color:var(--lex-warning,#c0392b); }
     .dialog-progress { margin-top:14px; color:var(--lex-muted); }
     .dialog-actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:22px; }
     .dialog-actions .secondary { color:var(--lex-text); border:1px solid var(--lex-border); background:var(--lex-panel-2); }
@@ -153,13 +153,13 @@
     .lexer-dev-files { font-size:12px; color:var(--lex-muted); }
     .lexer-dev-files ul { margin:6px 0 0; padding-left:18px; display:grid; gap:2px; }
     .lexer-dev-files li.over { color:var(--lex-text); font-weight:600; }
-    .lexer-dev-error { color:var(--lex-warning,#d7b65d); font-size:13px; }
+    .lexer-dev-error { color:var(--lex-warning,#c0392b); font-size:13px; }
     .lexer-dev-task { display:block; white-space:nowrap; }
     .lexer-dev-task.done { color:var(--lex-muted); }
     .lexer-dev-task.todo { color:var(--lex-text); font-weight:600; }
-    .lex-dev-good { color:#7fc08a; font-weight:600; }
+    .lex-dev-good { color:var(--lex-success,#34784b); font-weight:600; }
     .lex-dev-todo { color:var(--lex-muted); }
-    .lex-dev-over { color:var(--lex-warning,#d7b65d); font-weight:600; }
+    .lex-dev-over { color:var(--lex-warning,#c0392b); font-weight:600; }
     .lexer-panel-list { display:flex; overflow:auto; flex:1 1 auto; flex-direction:column; gap:9px; margin:0; padding:0; list-style:none; }
     .lexer-helper { display:grid; gap:3px; padding:10px 11px; border:1px solid var(--lex-border); border-radius:5px; background:var(--lex-panel-2); }
     .lexer-helper[class*="state-"] { border-color:var(--state-color); }
@@ -168,13 +168,13 @@
     .lexer-helper-versions { color:var(--lex-text); font-size:12px; overflow-wrap:anywhere; line-height:1.5; }
     button.lexer-helper-source { justify-self:start; padding:3px 0; background:none; border:0; text-decoration:underline; cursor:pointer; }
     .lexer-helper-source,.lexer-helper-error { overflow-wrap:anywhere; color:var(--lex-muted); font-size:11px; }
-    .lexer-helper-error { color:#e08a80; }
+    .lexer-helper-error { color:var(--lex-warning,#c0392b); }
     .lexer-panel-actions { display:flex; gap:8px; }
     .lexer-panel-actions button { padding:6px 11px; color:var(--lex-text); border:1px solid var(--lex-border); border-radius:5px; background:var(--lex-panel-2); font:inherit; }
     .lexer-panel-actions button:hover { border-color:var(--lex-highlight); }
     #lexer-handle-name { font-weight:700; }
     .home-social { position:fixed; z-index:45; left:16px; bottom:15px; display:flex; gap:8px; }
-    .home-social-button { display:grid; width:38px; height:38px; place-items:center; padding:7px; color:var(--lex-text); border:1px solid var(--lex-border); border-radius:5px; background:#111c; box-shadow:0 3px 12px #0008; }
+    .home-social-button { display:grid; width:38px; height:38px; place-items:center; padding:7px; color:var(--lex-text); border:1px solid var(--lex-border); border-radius:5px; background:var(--lex-panel-2); box-shadow:0 3px 12px #0008; }
     .home-social-button:hover,.home-social-button:focus-visible { color:#fff; border-color:var(--lex-highlight); background:var(--lex-panel-2); transform:translateY(-1px); }
     .home-social-button svg { width:22px; height:22px; fill:currentColor; }
     .home-social-twitter .twitter-x { display:none; }
