@@ -10,9 +10,11 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 
 from core.desktop_host import HostApi  # noqa: E402
 from plugins.ff8 import extractor, paths, server  # noqa: E402
+from plugin_ui import plugin_ui  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:
@@ -68,7 +70,9 @@ def verify_host_folder_action() -> None:
 
 
 def verify_source() -> None:
-    editor = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
+    # The dashboard is built in boot.js now, so the page and its modules are
+    # read together.
+    editor = plugin_ui("ff8")
     framework = (ROOT / "ui/framework.js").read_text(encoding="utf-8")
     # The page now uses the shared information panel rather than bespoke cards.
     require('lex-information-panel ff8-information' in editor,

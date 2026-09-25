@@ -12,11 +12,13 @@ from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 
 from app import discover_plugins  # noqa: E402
 from plugins.ff8 import paths  # noqa: E402
 from plugins.ff8.plugin import FF8Session  # noqa: E402
 from core.service_session import request_json  # noqa: E402
+from plugin_ui import plugin_ui  # noqa: E402
 
 
 def digest(path: Path) -> str:
@@ -33,12 +35,14 @@ def main() -> int:
     assert plugin.installation and plugin.installation.steam_app_id == "39150"
     assert not plugin.check()
 
-    html = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    # The editor page and its modules together: most of the shell now lives in
+    # the plugin's own modules, and the styled sheet carries the rest.
+    html = plugin_ui("ff8")
     for required in ("/shared/framework.css", "/shared/framework.js", "pagedListDetail",
                      "LexeditorUI.dataMap", '["characters","Characters"]',
                      'type:"text",inputmode:"decimal"', 'search:{key:`ff8-${view}`',
-                     '@font-face{font-family:"FF8 Menu"',
-                     "linear-gradient(135deg,#747474,#555"):
+                     "@font-face", 'font-family:"FF8 Menu"',
+                     "--lex-command-row-bg:linear-gradient(135deg,#"):
         assert required in html, f"FF8 editor is missing {required}"
     assert 'value:gfCompatibilityFormat(field.value)' in html
     assert "gf-compat-sign" not in html, "GF Compatibility restored the detached plus-sign overlay"
