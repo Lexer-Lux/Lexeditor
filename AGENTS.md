@@ -25,6 +25,11 @@
 - Give editor tabs, sections, and fields shared question-mark help. Explain the
   gameplay effect, how to use the control, and any known limits in plain language.
   File offsets and parser details are not a substitute for user instructions.
+- Necessary information belongs in the question-mark help, not in a paragraph
+  on the page. A panel body carries controls and data: counts, coverage,
+  limits, caveats and the word "disclaimer" go into that panel's own help
+  bubble. A visible note is only for a state the reader must act on now, such
+  as an error, a missing file, or a table with nothing to show yet.
 - Do not claim visual acceptance from source, API, or smoke checks.
 
 ## Muse use

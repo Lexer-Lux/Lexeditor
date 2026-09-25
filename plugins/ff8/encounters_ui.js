@@ -161,6 +161,8 @@
       class:"ff8-encounter-rule-table ff8-record-list","aria-label":"Encounter rules by region and ground"}),
       regions,grounds,rules,cells,reachable};
   }
+  // The counts describe the file, so they belong in the panel's question-mark
+  // bubble with the rest of the explanation. A panel body carries the table.
   function encounterRuleSummary(built){
     const clashes=[...built.cells.values()].filter(entry=>entry.length>1).length;
     const missing=[...built.reachable.keys()].filter(key=>!built.cells.has(key)).length;
@@ -170,7 +172,7 @@
       : "world terrain is unavailable, so unreachable and uncovered pairs cannot be counted");
     parts.push(clashes?`${clashes} ${clashes===1?"pair has":"pairs have"} more than one rule`
       :"no pair has more than one rule");
-    return LexeditorUI.detailNote(`${parts.join(". ")}.`);
+    return `${parts.join(". ")}.`;
   }
 
   // ---- Group preview panel -------------------------------------------------
@@ -222,12 +224,13 @@
     };
     const built=encounterRuleTable(refresh);
     const rule=encounterRuleById(state.selected.encounterRule);
+    const summary=encounterRuleSummary(built);
     const table=detailPanel({title:"ENCOUNTER RULES",className:"ff8-encounter-rules-panel",
       help:"Every stored rule, with region codes down the side and ground codes across the top. The number in a cell is the encounter group the game uses there. "
         +"A dash means no rule is stored for that pair; an exclamation mark means world terrain uses that pair and no rule covers it. "
         +"Where two rules store the same pair both are shown and marked; which of them the game obeys is not established here. "
-        +"Rules cannot be added or removed: the file reserves a fixed number of them.",
-      body:[encounterRuleSummary(built),built.table]});
+        +"Rules cannot be added or removed: the file reserves a fixed number of them. "+summary,
+      body:[built.table]});
     preview=encounterGroupPreviewPanel(rule,refresh,()=>showEncounterSubtab("rules"));
     layout=LexeditorUI.panelLayout([table,preview],"ff8-encounter-rules",
       {layoutKey:"ff8-encounter-rules",defaultSizes:[1.35,1]});

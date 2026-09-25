@@ -249,8 +249,12 @@ def main():
         assert "Only one of them can decide" in (
             clash.first.locator(".lex-badge").get_attribute("data-lex-title") or "")
         shot("rules")
-        summary = text_of(page.locator(".ff8-encounter-rules-panel .lex-detail-note"))
+        # The counts describe the stored file, so they belong in the panel's
+        # question-mark bubble. The body carries the table and nothing else.
+        summary = page.locator(".ff8-encounter-rules-panel .lex-info-help").first.get_attribute("aria-label") or ""
         assert "5 stored rules" in summary and "have no rule" in summary, summary
+        assert page.locator(".ff8-encounter-rules-panel .lex-detail-note").count() == 0, \
+            "the rules panel still shows its counts as a paragraph instead of in the help bubble"
         # No control invents a rule: every input in the table belongs to a
         # stored rule, and there are exactly as many as the file holds.
         inputs = page.locator(".ff8-encounter-rule-table input[type=number]").count()
