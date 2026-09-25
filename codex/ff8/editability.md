@@ -112,7 +112,15 @@ Not covered today, with what each would need:
   and a reader and writer exist (`plugins/ff8/namedic.py`,
   `codex/ff8/namedic.md`, `tests/ff8/verify_ff8_namedic.py`); no page edits it
   yet, so the Data Map does not claim it.
-- **Animation sequences** (Seq). Read and shown; no writer is proved.
+- **Animation sequences** (Seq). Read and shown; no writer is proved. The
+  section itself is not decoded here: measured on the installed
+  `battle/c0m001.dat`, the animation-sequence section is 308 bytes and opens
+  `0x000E 0x001E 0x0000 0x0067 …`, which is not a monotonic offset table, so the
+  obvious container assumption is unproven. FF8 Ultimate Editor spreads this
+  format over a codec, a command table, a VM, a timeline and a bake step
+  (`FF8GameData/dat/sequencecodec.py` and neighbours, GPL-3.0), which is the
+  source to vendor the way the LZS decoder already is — with its licence and
+  credits — rather than re-deriving the format by guesswork.
 - **Model export** (3D, glTF). The Models tab previews a model; it does not
   export geometry.
 - **VRAM palette animation** (Dynamic Texture). Palettes can be previewed;
