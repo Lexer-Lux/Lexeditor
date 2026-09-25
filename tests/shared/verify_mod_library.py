@@ -155,8 +155,53 @@ class ImportTests(unittest.TestCase):
                 with self.assertRaises(urllib.error.HTTPError) as error:
                     urllib.request.urlopen(request)
                 self.assertEqual(error.exception.code, 403)
+                # A managed mod is locked because an update would replace a
+                # direct edit, so the refusal asks for a copy. The no-mod lock
+                # has its own wording, which the host marks with LEXEDITOR_NO_MOD.
                 self.assertIn("editable copy", error.exception.read().decode())
             self.assertFalse(any(project.iterdir()))
+
+    def test_a_game_with_a_mod_adapter_stops_reporting_no_mod_management(self):
+        """The host must not say "not supported" for a game that has one.
+
+        FF8 had a composer and a library folder but no adapter, so the header
+        told the reader mod management did not exist while the plugin's own
+        Mods tab managed mods. The adapter now reaches the composer, and the
+        host hands it the library root the reader actually configured.
+        """
+        from core.desktop_host import HostApi
+        from plugins.ff8.plugin import PLUGIN
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            library = root / "library"
+            project = root / "project"
+            (project / "direct").mkdir(parents=True)
+            mod = library / "ff8" / "My Mod"
+            (mod / "direct").mkdir(parents=True)
+            (mod / "mod.json").write_text('{"id": "my-mod", "name": "My Mod"}', encoding="utf-8")
+            host = HostApi.__new__(HostApi)
+            host._mod_library_lock = threading.RLock()
+            host._managed_mod_results = {}
+            host._plugins = {"ff8": PLUGIN}
+            host._projects = SimpleNamespace(snapshot=lambda plugin: {
+                "current": str(project),
+                "projects": [{"path": str(project), "current": True}]})
+            host._installations = SimpleNamespace(
+                snapshot=lambda plugin: {"root": str(root / "game")})
+            host._settings = SimpleNamespace(
+                path=root / "settings.json",
+                snapshot=lambda: {"modLibraryPath": str(library)})
+            host._github = SimpleNamespace(visible_repository=lambda repository: False)
+            host.mod_library_location = lambda: {"root": str(library), "move": None}
+            status = host.mod_library_status("ff8")
+            self.assertTrue(status["canManage"], status)
+            self.assertNotIn("not supported", status["message"], status)
+            self.assertEqual(status["packageTypes"], ["folder", "zip"], status)
+            entries = host.mod_library_entries("ff8")
+            self.assertEqual([row["name"] for row in entries["entries"]], ["My Mod"], entries)
+            # The adapter was given the library the host knows, not its default.
+            self.assertEqual(PLUGIN.mod_adapter.context["libraryRoot"], str(library / "ff8"))
+            self.assertEqual(PLUGIN.mod_adapter.context["projectRoot"], str(project))
 
     def test_managed_recovery_finishes_interrupted_commit(self):
         with tempfile.TemporaryDirectory() as temp:
