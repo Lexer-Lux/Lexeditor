@@ -2682,7 +2682,14 @@
           const box = source.getBoundingClientRect();
           const offset = (box.left + box.width / 2 - sourceBounds.left - sourceBounds.width / 2) / scale;
           const distance = Math.max(0, Math.min(length, length / 2 + offset / unit));
-          const delta = Math.max(.1, Math.min(2, box.width / scale / unit / 4));
+          // The tilt is measured over a window of about two levels of the x
+          // axis, not over the term's own width. A stat that grows in whole
+          // points moves up one step about every level, and a narrow window
+          // can sit entirely inside one step: neighbouring terms then took
+          // wildly different angles and the equation read as a seesaw with
+          // each term tilted to nothing in particular. A window this wide
+          // averages the steps and still follows a curve that really bends.
+          const delta = Math.max(2, Math.min(8, length / 40));
           const sample = at => {
             const point = line.getPointAtLength(Math.max(0, Math.min(length, at)));
             return new DOMPoint(point.x, point.y).matrixTransform(matrix);
@@ -2717,6 +2724,53 @@
     }
     if (mathOverlay) document.fonts?.ready.then(positionMath);
 
+    // The samples joined by a curve through every one of them, instead of a
+    // straight line between each pair. A level's value is a number at that
+    // level, and the polyline said something else: a stat that grew by one
+    // every five levels came out as five flat steps and a jump, which is the
+    // staircase a reader saw. The tangents are Fritsch-Carlson, so the curve
+    // passes through each sample and never overshoots one: a stat that only
+    // rises never dips between two levels.
+    const curvePath = points => {
+      const flat = () => points.map(([x, y], index) =>
+        `${index ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`).join(" ");
+      if (points.length < 3) return flat();
+      const slopes = points.slice(1).map(([x, y], index) =>
+        (y - points[index][1]) / ((x - points[index][0]) || 1));
+      const tangents = points.map((_, index) => {
+        if (index === 0) return slopes[0];
+        if (index === points.length - 1) return slopes[slopes.length - 1];
+        const before = slopes[index - 1], after = slopes[index];
+        if (before * after <= 0) return 0;
+        const runBack = points[index][0] - points[index - 1][0];
+        const runForward = points[index + 1][0] - points[index][0];
+        const first = 2 * runForward + runBack, second = runForward + 2 * runBack;
+        return (first + second) / (first / before + second / after);
+      });
+      // Fritsch-Carlson's monotonicity pass: clamp the tangents of any interval
+      // whose ends would otherwise turn the curve past its own samples.
+      for (let index = 0; index < points.length - 1; index += 1) {
+        const run = points[index + 1][0] - points[index][0];
+        const slope = run ? (points[index + 1][1] - points[index][1]) / run : 0;
+        if (!slope) { tangents[index] = 0; tangents[index + 1] = 0; continue; }
+        const alpha = tangents[index] / slope, beta = tangents[index + 1] / slope;
+        const overshoot = alpha * alpha + beta * beta;
+        if (overshoot > 9) {
+          const scale = 3 / Math.sqrt(overshoot);
+          tangents[index] = scale * alpha * slope;
+          tangents[index + 1] = scale * beta * slope;
+        }
+      }
+      const commands = [`M${points[0][0].toFixed(2)} ${points[0][1].toFixed(2)}`];
+      for (let index = 1; index < points.length; index += 1) {
+        const [x0, y0] = points[index - 1], [x1, y1] = points[index];
+        const third = (x1 - x0) / 3;
+        commands.push(`C${(x0 + third).toFixed(2)} ${(y0 + tangents[index - 1] * third).toFixed(2)} `
+          + `${(x1 - third).toFixed(2)} ${(y1 - tangents[index] * third).toFixed(2)} `
+          + `${x1.toFixed(2)} ${y1.toFixed(2)}`);
+      }
+      return commands.join(" ");
+    };
     const draw = () => {
       const bounds=svg.getBoundingClientRect();
       if(bounds.width>0&&bounds.height>0){
@@ -2845,7 +2899,7 @@
         rect.setAttribute("height", Math.abs(zeroY - y).toFixed(2));
         return rect;
       }));
-      const path = points.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`).join(" ");
+      const path = curvePath(points);
       line.setAttribute("d", path);
       fill.setAttribute("d", `${path} L${points.at(-1)[0].toFixed(2)} ${zeroY} L${points[0][0].toFixed(2)} ${zeroY} Z`);
       // The formula rides its own guide path, and a glyph on a textPath takes
