@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 import json
 import os
+import csv
+import io
 from pathlib import Path
 import shutil
 import tempfile
@@ -1237,5 +1239,133 @@ def data_map_rows() -> dict:
             row["status"] = "partial"
         if row["filename"] == "FFNx.toml" and not (paths.GAME_ROOT / "FFNx.toml").is_file():
             row.update(status="not-integrated", coverage="unavailable", openable=False)
-            row["notes"] = "FFNx.toml is missing; its settings editor becomes available after FFNx creates it."
+        row["notes"] = "FFNx.toml is missing; its settings editor becomes available after FFNx creates it."
     return {"rows": rows}
+
+
+# --- Bulk table export and import -------------------------------------------
+# The editor changes one record at a time. A spreadsheet is how a modder changes
+# many at once, which the editability audit lists as missing. Every table names
+# the columns a sheet shows, which of them are editable, where its rows come
+# from, and which writer applies an edit - the same writers the pages use, so a
+# sheet can never write something the editor itself would refuse.
+
+def _table_specs() -> dict:
+    return {
+        "items": {
+            "label": "Item prices",
+            "identity": "id",
+            "columns": ("id", "name", "buyPrice", "sellMultiplier", "sellPrice"),
+            "editable": ("buyPrice", "sellMultiplier"),
+            "rows": lambda dataset="current": item_rows(dataset)["rows"],
+            "save": save_items,
+            "note": "Buy price is written in steps of 10, the resolution the file stores.",
+        },
+        "names": {
+            "label": "The game's own names (namedic.bin)",
+            "identity": "id",
+            "columns": ("id", "text"),
+            "editable": ("text",),
+            "rows": lambda dataset="current": namedic.rows(dataset)["rows"],
+            "save": lambda edits: namedic.save(
+                [{"index": edit["id"], "text": edit["text"]} for edit in edits]),
+            "note": "A name of a different length is written by rebuilding the file's offset table.",
+        },
+        "wm2field": {
+            "label": "World to field (wm2field.tbl)",
+            "identity": "id",
+            "columns": ("id", "x", "y", "z", "fieldId"),
+            "editable": ("x", "y", "z", "fieldId"),
+            "rows": lambda dataset="current": wm2field.rows(dataset)["rows"],
+            "save": lambda edits: wm2field.save(
+                [{key: edit[key] for key in ("id", "x", "y", "z", "fieldId")}
+                 for edit in edits]),
+            "note": "The byte after the field ID and the fifteen after it are preserved.",
+        },
+    }
+
+
+def _table_spec(name: str) -> dict:
+    key = str(name or "").strip()
+    spec = _table_specs().get(key)
+    if spec is None:
+        raise ValueError(f"Unknown table: {name}")
+    return {"name": key, **spec}
+
+
+def table_list() -> dict:
+    """What can be exported, and which of its columns a sheet may change."""
+    return {"rows": [{"name": name, "label": spec["label"],
+                      "columns": list(spec["columns"]),
+                      "editable": list(spec["editable"]),
+                      "note": spec["note"]}
+                     for name, spec in _table_specs().items()]}
+
+
+def table_csv(name: str, dataset: str = "current") -> dict:
+    """One table as CSV, with a header row naming every column."""
+    spec = _table_spec(name)
+    rows = spec["rows"](dataset)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(spec["columns"])
+    for row in rows:
+        writer.writerow([row.get(column, "") for column in spec["columns"]])
+    return {"table": spec["name"], "filename": f"ff8-{spec['name']}.csv",
+            "rows": len(rows), "text": buffer.getvalue()}
+
+
+def import_table_csv(name: str, text: str) -> dict:
+    """Apply a sheet's edits through the table's own writer.
+
+    A row the writer refuses is reported with its line, and the rows that are
+    fine still land, so a sheet with one bad cell does not lose the rest.
+    """
+    spec = _table_spec(name)
+    current = {str(row[spec["identity"]]): row for row in spec["rows"]("current")}
+    reader = csv.DictReader(io.StringIO(text))
+    header = reader.fieldnames or []
+    if spec["identity"] not in header:
+        raise ValueError(f"The sheet needs a {spec['identity']} column")
+    missing = [column for column in spec["editable"] if column not in header]
+    if missing:
+        raise ValueError("The sheet is missing: " + ", ".join(missing))
+    prepared, rejected = [], []
+    for line, row in enumerate(reader, start=2):
+        key = str(row.get(spec["identity"], "")).strip()
+        if key not in current:
+            rejected.append({"line": line, "reason": f"no {spec['identity']} {key}"})
+            continue
+        before = current[key]
+        values: dict = {}
+        bad = ""
+        for column in spec["editable"]:
+            raw = str(row.get(column, "")).strip()
+            if isinstance(before.get(column), str):
+                values[column] = raw
+            else:
+                try:
+                    values[column] = int(raw)
+                except ValueError:
+                    bad = f"{column} is not a whole number: {raw!r}"
+                    break
+        if bad:
+            rejected.append({"line": line, "reason": bad})
+            continue
+        if any(values[column] != before.get(column) for column in spec["editable"]):
+            prepared.append({spec["identity"]: before[spec["identity"]], **values})
+    applied = 0
+    if prepared:
+        try:
+            spec["save"](prepared)
+            applied = len(prepared)
+        except ValueError:
+            for edit in prepared:
+                try:
+                    spec["save"]([edit])
+                    applied += 1
+                except ValueError as error:
+                    rejected.append({"line": None,
+                                     "reason": f"{spec['identity']} {edit[spec['identity']]}: {error}"})
+    return {"table": spec["name"], "applied": applied, "rejected": rejected,
+            "changed": applied}

@@ -1,4 +1,4 @@
-  function renderDataMap(){const view=LexeditorUI.dataMap({rows:state.datamap.rows,open:row=>{if(row.filename==="FFNx.toml")state.settingsTab="platform";else if(row.filename.includes("FLYING_EVA"))state.settingsTab="gameplay";if(row.target)navigate(row.target)},query:state.filters.datamap,status:state.filters.mapStatus,page:state.pages.datamap,sort:state.sorts.datamap,pageSize:100,changeQuery:value=>{state.filters.datamap=value;state.pages.datamap=0;renderDataMap()},changeStatus:value=>{state.filters.mapStatus=value;state.pages.datamap=0;renderDataMap()},changePage:page=>{state.pages.datamap=page;renderDataMap()},changeSort:key=>{const [active,direction]=state.sorts.datamap;state.sorts.datamap=[key,active===key?-direction:1];renderDataMap()}});state.pages.datamap=view.page;$("#toolbar").replaceChildren(...view.controls);$("#main").replaceChildren(view.content)}
+  function renderDataMap(){const view=LexeditorUI.dataMap({rows:state.datamap.rows,open:row=>{if(row.filename==="FFNx.toml")state.settingsTab="platform";else if(row.filename.includes("FLYING_EVA"))state.settingsTab="gameplay";if(row.target)navigate(row.target)},query:state.filters.datamap,status:state.filters.mapStatus,page:state.pages.datamap,sort:state.sorts.datamap,pageSize:100,changeQuery:value=>{state.filters.datamap=value;state.pages.datamap=0;renderDataMap()},changeStatus:value=>{state.filters.mapStatus=value;state.pages.datamap=0;renderDataMap()},changePage:page=>{state.pages.datamap=page;renderDataMap()},changeSort:key=>{const [active,direction]=state.sorts.datamap;state.sorts.datamap=[key,active===key?-direction:1];renderDataMap()}});state.pages.datamap=view.page;$("#toolbar").replaceChildren(...view.controls);$("#main").replaceChildren(LexeditorUI.stack(spreadsheetBar(),view.content))}
   function renderDashboard(){
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
     const dashboard=state.dashboard,runtime=dashboard.runtime,baseline=dashboard.baseline,game=dashboard.game;
@@ -434,6 +434,49 @@
   // are separate jobs, and browsing never writes to the installation.
   let archivesUI;
   function renderArchives(){archivesUI??=FF8ArchivesUI({el:LexeditorUI.el,columnList:LexeditorUI.columnList,pagedListDetail:LexeditorUI.pagedListDetail,detailPanel:LexeditorUI.detailPanel,detailSection:LexeditorUI.detailSection,detailField:LexeditorUI.detailField,readonlyField:LexeditorUI.readonlyField,infoHelp:LexeditorUI.infoHelp,notice:LexeditorUI.notice,panelLayout:LexeditorUI.panelLayout,shell,formatNumber:LexeditorUI.formatNumber});return archivesUI.render()}
+  // A spreadsheet is how a modder changes many records at once, which the
+  // editability audit lists as missing. The bar above the Data Map exports any
+  // table that has a writer and imports the edited sheet back through that same
+  // writer, so a sheet cannot write something the editor would refuse.
+  let tableList=null,tableChoice="items",tableResult="";
+  function spreadsheetBar(){
+    if(!tableList)api("/api/tables").then(payload=>{
+      tableList=payload.rows||[];tableChoice=tableList[0]?.name||"";renderDataMap()}).catch(()=>{tableList=[]});
+    const tables=tableList||[];
+    const picker=el("select",{"aria-label":"Table to export or import",
+      onchange:event=>{tableChoice=event.target.value;tableResult="";renderDataMap()}},
+      ...tables.map(row=>{const option=el("option",{value:row.name},row.label);
+        option.selected=row.name===tableChoice;return option}));
+    const file=el("input",{type:"file",accept:".csv,text/csv",hidden:true});
+    file.addEventListener("change",async event=>{
+      const chosen=event.target.files?.[0];if(!chosen)return;
+      try{
+        const result=await api("/api/table/import",post({name:tableChoice,csv:await chosen.text()}));
+        const refused=result.rejected||[];
+        tableResult=`${result.applied} row${result.applied===1?"":"s"} changed`
+          +(refused.length?`; ${refused.length} refused (${refused.slice(0,3)
+            .map(entry=>`${entry.line?`line ${entry.line}: `:""}${entry.reason}`).join("; ")})`:"");
+        await reloadEditable();
+      }catch(error){tableResult=`Import failed: ${error.message}`}
+      event.target.value="";renderDataMap();});
+    const exportButton=el("button",{type:"button",class:"lex-dialog-action",
+      onclick:async()=>{
+        try{
+          const response=await fetch(`/api/table.csv?name=${encodeURIComponent(tableChoice)}&dataset=current`);
+          if(!response.ok)throw new Error(`Export failed (${response.status})`);
+          const text=await response.text();
+          const link=el("a",{href:URL.createObjectURL(new Blob([text],{type:"text/csv"})),
+            download:`ff8-${tableChoice}.csv`});
+          document.body.append(link);link.click();link.remove();
+          tableResult=`Exported ff8-${tableChoice}.csv`;
+        }catch(error){tableResult=`Export failed: ${error.message}`}
+        renderDataMap();}},"Export CSV");
+    const importButton=el("button",{type:"button",class:"lex-dialog-action",
+      onclick:()=>file.click()},"Import CSV");
+    return el("div",{class:"lex-action-row ff8-spreadsheet-bar"},
+      el("label",{},"Table",picker),exportButton,importButton,
+      tableResult?el("span",{class:"lex-detail-note"},tableResult):null,file);
+  }
   let cardsUI;
   function renderCards(){cardsUI??=FF8CardsUI({el,state,rowOf,filtered,showPaged,sharedDetail,detailSection,detailField,numberControl,selectControl,sourceControl,referenceValues,infoHelp,shell,noteFieldEdit,subtabBar,detailPanel,recordId,columnList,conceptIcon,ensureFieldDetail});return cardsUI.render()}
   const views={cards:renderCards,abilities:renderAbilities,starting:renderStartingData,items:renderItems,refine:renderRefine,shops:renderShops,weapons:renderWeapons,magic:()=>renderKernel("magic","Magic"),gfs:renderGFs,characters:renderCharacters,text:renderText,names:renderNames,archives:renderArchives,enemies:renderEnemies,encounters:renderEncounters,fields:renderFields,world:renderWorldMap,settings:renderSettings,sfx:renderSfx,models:renderModels,textures:renderTextures,datamap:renderDataMap,dashboard:renderDashboard};

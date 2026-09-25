@@ -113,8 +113,12 @@ Not covered today, with what each would need:
   export geometry.
 - **VRAM palette animation** (Dynamic Texture). Palettes can be previewed;
   the animated-VRAM effects are not editable.
-- **Spreadsheet bulk import and export** (Xlsx). Every field is editable in the
-  editor, but there is no spreadsheet round trip for a whole table.
+- **Spreadsheet bulk import and export** (Xlsx). Covered for the tables that
+  have a writer: item prices, the game's own name list and the world-to-field
+  table export as CSV and import back through the same writers the pages use
+  (`plugins/ff8/formats.py`, `table_csv`/`import_table_csv`; the bar above the
+  Data Map). A row the writer refuses is reported with its line and the rest
+  still land. Other tables can be added by naming their columns and writer.
 - **Archive browse, extract and repack** (Deling). Browse and single-entry
   extract are covered: the Archives tab lists every entry of main, menu, battle,
   field, world and magic with its stored name, unpacked size, compression flag

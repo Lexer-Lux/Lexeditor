@@ -226,6 +226,12 @@ class Handler(PluginRequestHandler):
                 self.json_response(formats.archive_entries(
                     query.get("name", ["main"])[0], query.get("query", [""])[0],
                     int(query.get("page", ["0"])[0]), int(query.get("pageSize", ["60"])[0])))
+            elif path == "/api/tables":
+                self.json_response(formats.table_list())
+            elif path == "/api/table.csv":
+                payload = formats.table_csv(query.get("name", [""])[0],
+                                            query.get("dataset", ["current"])[0])
+                self.send_bytes(payload["text"].encode("utf-8"), "text/csv; charset=utf-8")
             elif path == "/api/shops":
                 self.json_response(formats.shop_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/weapons":
@@ -340,6 +346,9 @@ class Handler(PluginRequestHandler):
             elif path == "/api/archive/extract":
                 self.json_response(formats.extract_archive_entry(
                     str(body.get("name", "")), int(body.get("index", -1))))
+            elif path == "/api/table/import":
+                self.json_response(formats.import_table_csv(
+                    str(body.get("name", "")), str(body.get("csv", ""))))
             elif path == "/api/shops/save":
                 self.json_response(formats.save_shops(body.get("edits", [])))
             elif path == "/api/weapons/save":
