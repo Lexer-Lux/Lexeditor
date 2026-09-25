@@ -31,7 +31,8 @@ from .build_metadata import BOOLEAN_KEYS, parse_build_text, update_build_text
 from .content_wizard import create_mod_item, create_mod_player, create_mod_system
 from .localization import parse_localization_text, try_get_culture_and_prefix
 from .localization_lifecycle import apply_localization_transaction
-from .plugin import DEFAULT_PROJECT_ROOT, MOD_SOURCE_ROOTS, TMODLOADER_SAVE_ROOT
+from .plugin import (DEFAULT_PROJECT_ROOT, MOD_SOURCE_ROOTS, TERRARIA_SAVE_ROOT,
+                     TMODLOADER_SAVE_ROOT)
 from .structured_content import (
     create_structured_content,
     structured_content_index,
@@ -82,12 +83,19 @@ def _read_build() -> tuple[bytes, str]:
         # say what is missing and what to do, so the page can show it instead
         # of waiting for a file that will never appear on its own.
         looked = ", ".join(str(root) for root in MOD_SOURCE_ROOTS)
+        # The reader may well have mods installed and running: those are
+        # compiled, and this plugin edits sources. Saying how many are there
+        # answers "why does it say no mod" without pretending they are absent.
+        compiled = sum(
+            len(list((root / "Mods").glob("*.tmod"))) if (root / "Mods").is_dir() else 0
+            for root in (TMODLOADER_SAVE_ROOT, TERRARIA_SAVE_ROOT / "ModLoader"))
         raise ValueError(
             f"No Terraria mod source project is at {target}. "
-            f"Lexeditor looked in: {looked}. "
-            "A tModLoader source project is a folder with build.txt in it - a "
-            "compiled .tmod or a Workshop item is not one. Choose Create Mod in "
-            "the Mod menu, or select the folder that holds your build.txt.")
+            f"Lexeditor looked in: {looked}. A source project is a folder that "
+            f"contains build.txt; this installation has {compiled} compiled mods, "
+            "and a mod the game runs from Mods or the Workshop is compiled, not "
+            "source. Choose Create Mod in the Mod menu, or select the folder "
+            "that holds your build.txt.")
     data = target.read_bytes()
     if len(data) > MAX_BODY:
         raise ValueError("build.txt is too large for structured editing")

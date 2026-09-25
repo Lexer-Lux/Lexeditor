@@ -36,7 +36,7 @@
   function missingModPanel(title="No mod yet"){
     return detailPanel({title,body:[
       el("p",{class:"lex-notice lex-tone-warning",role:"alert"},error||"This game has no mod source yet."),
-      el("p",{class:"lex-notice"},"Lexeditor never creates a mod on its own. Choose Create Mod in the Mod menu, then reopen this tab.")]})}
+      el("p",{class:"lex-notice"},"Lexeditor edits tModLoader source projects - a folder that holds build.txt. Choose Create Mod in the Mod menu, or select the folder that holds your build.txt.")]})}
   // Every tab describes a mod source, so a game with no mod has nothing to
   // list on any of them. They must say that instead of showing an empty table
   // that reads as a broken page.
