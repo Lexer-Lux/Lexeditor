@@ -159,6 +159,16 @@
        squeezed grid keeps its stated height and paints the last games outside
        the scroll area, where the scrollbar cannot reach them. */
     #lexer-dev-table > .lex-column-list { flex:1 1 auto; min-height:max-content; }
+    /* Stacked, each panel takes the height its own content needs and the drawer
+       itself scrolls. A stacked grid splits the page between its rows instead,
+       which left the games table a four-row window with the rest of the height
+       empty below it. */
+    @media (max-width:1280px){
+      .lexer-dev-body { grid-auto-rows:max-content; align-content:start; }
+      .lexer-dev-table-wrap { display:block; flex:none; overflow:visible; }
+      #lexer-dev-table { display:block; flex:none; }
+      #lexer-dev-table > .lex-column-list { flex:none; min-height:0; }
+    }
     /* The overview's own columns hold sentences and lists, not values: they
        wrap inside their cell instead of pushing the table past its column,
        which is what gave the drawer a horizontal scrollbar. */

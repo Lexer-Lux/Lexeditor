@@ -144,3 +144,43 @@ def test_a_narrow_drawer_stacks_its_panels_and_keeps_every_game(base):
             assert not fit["clipped"], fit
         finally:
             browser.close()
+
+
+def test_a_stacked_drawer_gives_the_games_panel_the_height_it_needs(base):
+    """Stacked, the games table is as tall as its own rows.
+
+    The stacked grid split the drawer between its two rows instead: the table
+    was given a four-row window, and because the rows painted on, the last
+    games were drawn over the helper cards below with no scrollbar able to
+    reach them. Each panel now takes the height its content needs and the
+    drawer scrolls.
+    """
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = browser.new_page()
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            open_drawer(page, base, 1100, 700)
+            fit = page.evaluate(MEASURE)
+            geometry = page.evaluate("""() => {
+              const body=document.querySelector('.lexer-dev-body');
+              const games=document.querySelector('.lexer-dev-games');
+              const wrap=document.querySelector('.lexer-dev-table-wrap');
+              const table=document.querySelector('#lexer-dev-table .lex-column-list');
+              return {section:Math.round(games.getBoundingClientRect().height),
+                wrapBottom:Math.round(wrap.getBoundingClientRect().bottom),
+                sectionBottom:Math.round(games.getBoundingClientRect().bottom),
+                table:Math.round(table.getBoundingClientRect().height),
+                bodyScroll:body.scrollHeight, bodyClient:body.clientHeight};
+            }""")
+            assert not errors, errors
+            assert fit["tableGrew"], fit
+            # The table stays inside the panel that owns it. It used to hang
+            # past the panel's bottom edge and paint over the helper cards.
+            assert geometry["wrapBottom"] <= geometry["sectionBottom"] + 1, geometry
+            # The panel is taller than the drawer, so the drawer scrolls rather
+            # than squeezing the table into the height that is left.
+            assert geometry["bodyScroll"] > geometry["bodyClient"] + 1, geometry
+        finally:
+            browser.close()
