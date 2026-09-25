@@ -99,7 +99,8 @@ def editor_tokens() -> dict:
         return {"label": name, "text": "{" + name + "}", **extra}
     colours = ("#505050", "#9696a0", "#ffff00", "#ff2020", "#00ee20", "#60b8ef", "#e000ed", "#ffffff")
     return {
-        "characters": [token(name, **({"portrait": index} if index < 11 else {}))
+        "characters": [token(name, **({"portrait": index} if index < 11
+                                      else {"initials": _CHARACTER_INITIALS.get(name, name[:2])}))
                        for index, name in enumerate(_CHARACTERS)],
         "colours": [token(name + suffix, colour=colour, blink=bool(suffix))
                     for suffix in ("", "Blink") for name, colour in zip(_COLORS, colours)],
@@ -109,8 +110,15 @@ def editor_tokens() -> dict:
         "keys": [token(name) for name in _ICONS],
         "symbols": [{"label": char, "text": char} for byte, char in _BYTE_TO_TEXT.items()
                     if byte >= 0xA8],
-        "breaks": [token("NewPage", caption="Page break"), token("Wait030", caption="Pause")],
+        "breaks": [token("NewPage", caption="Page break", glyph=_FLOW_GLYPHS["NewPage"]), token("Wait030", caption="Pause", glyph=_FLOW_GLYPHS["Wait030"])],
     }
+
+# The three characters the game has no portrait for. Their buttons carry two
+# letters turned a quarter rather than a name too wide for the tile.
+_CHARACTER_INITIALS = {"Angelo": "AG", "Griever": "GV", "Boko": "BK"}
+# Page break and pause are buttons in the colour row, so each shows a mark
+# instead of a word: the page break uses the arrow the game draws for it.
+_FLOW_GLYPHS = {"NewPage": "↡", "Wait030": "‖"}
 
 _RAW_TOKEN = re.compile(r"\{x([0-9A-Fa-f]{2})\}")
 

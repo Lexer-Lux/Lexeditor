@@ -3784,6 +3784,26 @@ body:has(.lex-data-map-table) #main {
 .lex-toolbar-icons select { width:auto; max-width:100%; min-width:0; }
 .lex-toolbar-chip { display:block; width:var(--lex-toolbar-chip-size,18px); height:var(--lex-toolbar-chip-size,18px); border:1px solid #222; background:var(--lex-toolbar-chip-bg,transparent); }
 .lex-toolbar-chip-blink { background:linear-gradient(90deg,var(--lex-toolbar-chip-bg,transparent) 50%,#555 50%); }
+/* A toolbar button shaped like a tile. A game's own portrait and the short
+   name it has no portrait for share one square, so a row of them reads as one
+   strip instead of buttons of two widths; a name that will not fit the square
+   turns a quarter and reads bottom to top. */
+.lex-toolbar button.lex-toolbar-tile {
+  width:var(--lex-toolbar-tile-size, 26px);
+  height:var(--lex-toolbar-tile-size, 26px);
+  padding:0;
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+}
+.lex-toolbar-tile > img { width:100%; height:100%; object-fit:cover; }
+.lex-toolbar-tile-text {
+  writing-mode:vertical-rl;
+  transform:rotate(180deg);
+  font-size:.74em;
+  line-height:1;
+  letter-spacing:0;
+}
 /* Important, so a game's own toolbar class cannot show an empty bar. */
 #toolbar:empty {
   display:none;

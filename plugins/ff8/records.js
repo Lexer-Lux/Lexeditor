@@ -190,9 +190,15 @@
     const group=(label,children)=>el("div",{class:"lex-toolbar ff8-text-token-group",role:"group","aria-label":label},...children);
     const choose=(label,entries)=>el("select",{"aria-label":`Insert ${label}`,onchange:event=>{if(event.target.value)insert(event.target.value);event.target.value=""}},el("option",{value:""},label),...entries.map(entry=>el("option",{value:entry.text},entry.label)));
     return el("div",{class:"lex-toolbar lex-toolbar-icons ff8-text-token-toolbar",role:"group","aria-label":"Special text"},
-      group("Character names",tokens.characters.map(entry=>button(entry,entry.portrait!==undefined?el("img",{src:`/assets/portraits/characters/${entry.portrait}.png`,alt:""}):entry.label))),
-      group("Text flow",tokens.breaks.map(entry=>button(entry,entry.caption))),
-      group("Text colours",tokens.colours.map(entry=>button(entry,el("span",{class:`lex-toolbar-chip${entry.blink?" lex-toolbar-chip-blink":""}`,style:`--lex-toolbar-chip-bg:${entry.colour}`})))),
+      group("Character names",tokens.characters.map(entry=>button(entry,
+        entry.portrait!==undefined?el("img",{src:`/assets/portraits/characters/${entry.portrait}.png`,alt:""})
+          :el("span",{class:"lex-toolbar-tile-text"},entry.initials||entry.label),{class:"lex-toolbar-tile"}))),
+      // The colours and the two flow tokens are one row of square buttons: a
+      // word beside a colour chip made that row twice as tall as the marks in it.
+      group("Text colours",[...tokens.colours.map(entry=>button(entry,
+        el("span",{class:`lex-toolbar-chip${entry.blink?" lex-toolbar-chip-blink":""}`,style:`--lex-toolbar-chip-bg:${entry.colour}`}),{class:"lex-toolbar-tile"})),
+        ...tokens.breaks.map(entry=>button(entry,
+          el("span",{class:"lex-toolbar-tile-text"},entry.glyph||entry.caption),{class:"lex-toolbar-tile"}))]),
       group("Insert token",[choose("Locations",tokens.locations),choose("Variables",tokens.variables),choose("Keys",tokens.keys),choose("Special characters",tokens.symbols)]));
   }
   function textDetail(row,prefs){
