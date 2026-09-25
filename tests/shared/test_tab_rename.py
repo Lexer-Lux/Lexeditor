@@ -87,3 +87,39 @@ def test_a_reader_who_is_not_the_developer_cannot_rename(page):
     page.wait_for_timeout(200)
     assert page.locator('nav button[data-tab="items"] .lex-label-rename').count() == 0
     assert label_of(page, "items") == "Items"
+
+
+def mount_subtabs(page):
+    page.evaluate("""()=>{
+      document.querySelector('main').replaceChildren(LexeditorUI.subtabBar({
+        label: 'Sections',
+        tabs: [{id:'stats',label:'Stats'},{id:'growth',label:'Growth'}],
+        active: 'stats', change(){}}));
+    }""")
+    page.wait_for_timeout(200)
+
+
+def subtab_label(page, index=0):
+    return page.locator(".lex-subtab-button .lex-tab-label-text").nth(index) \
+        .evaluate("n=>n.textContent.trim()")
+
+
+def test_renaming_a_subtab_ships_under_the_page_tab_that_owns_it(page):
+    framework(page)
+    mount_shell(page)
+    mount_subtabs(page)
+    assert subtab_label(page) == "Stats"
+    page.locator(".lex-subtab-button .lex-tab-label-text").first.dblclick()
+    field = page.locator(".lex-subtab-button .lex-label-rename").first
+    field.wait_for(timeout=3000)
+    field.fill("Parameters")
+    field.press("Enter")
+    page.wait_for_timeout(250)
+    assert subtab_label(page) == "Parameters"
+    saved = page.evaluate("window.savedCalls")
+    # The name is stored under the page tab the subtabs belong to, which is
+    # where that screen's shippable view defaults live.
+    assert saved == [["fixture", "items", {"fixture-items.sub.stats.label": "Parameters"}]], saved
+    mount_subtabs(page)
+    assert subtab_label(page) == "Parameters", "the saved subtab name did not come back"
+    assert subtab_label(page, 1) == "Growth"
