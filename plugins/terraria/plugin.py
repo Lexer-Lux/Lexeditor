@@ -16,13 +16,48 @@ from .runtime import inspect_runtime
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 TEMPLATE_ROOT = PLUGIN_ROOT / "template"
-TMODLOADER_SAVE_ROOT = Path(
-    os.environ.get(
-        "LEXEDITOR_TERRARIA_SAVE_ROOT",
-        Path.home() / "Documents" / "My Games" / "Terraria" / "tModLoader",
-    )
+
+
+def _documents_folder() -> Path:
+    """Windows' own Documents folder, which is not always under the profile.
+
+    On this machine it is D:\\Documents, so a plugin that assumed
+    `Path.home() / "Documents"` looked in a folder tModLoader never writes to,
+    and then reported "no mod source" while the reader's own mod sources sat on
+    another drive.
+    """
+    if os.name == "nt":
+        try:
+            import ctypes
+            import uuid
+            guide = ctypes.create_string_buffer(
+                uuid.UUID("{FDD39AD0-238F-46AF-ADB4-6C85480369C7}").bytes_le)
+            folder = ctypes.c_wchar_p()
+            if ctypes.windll.shell32.SHGetKnownFolderPath(
+                    guide, 0, None, ctypes.byref(folder)) == 0:
+                value = folder.value
+                ctypes.windll.ole32.CoTaskMemFree(folder)
+                if value:
+                    return Path(value)
+        except (OSError, ValueError, AttributeError):
+            pass
+    return Path.home() / "Documents"
+
+
+TERRARIA_SAVE_ROOT = Path(os.environ.get(
+    "LEXEDITOR_TERRARIA_SAVE_ROOT",
+    str(_documents_folder() / "My Games" / "Terraria"),
+))
+# tModLoader keeps ModSources beside the tModLoader save folder; the older
+# ModLoader build kept "Mod Sources" with a space. A reader may have either, so
+# both are searched and the one that exists is the default.
+MOD_SOURCE_ROOTS = (
+    TERRARIA_SAVE_ROOT / "tModLoader" / "ModSources",
+    TERRARIA_SAVE_ROOT / "ModLoader" / "Mod Sources",
 )
-MOD_SOURCES_ROOT = TMODLOADER_SAVE_ROOT / "ModSources"
+TMODLOADER_SAVE_ROOT = TERRARIA_SAVE_ROOT / "tModLoader"
+MOD_SOURCES_ROOT = next((path for path in MOD_SOURCE_ROOTS if path.is_dir()),
+                        MOD_SOURCE_ROOTS[0])
 DEFAULT_PROJECT_ROOT = MOD_SOURCES_ROOT / "LexeditorTerrariaMod"
 
 
@@ -114,12 +149,13 @@ def _looks_like_source_mod(root: Path) -> bool:
 
 
 def discover_projects() -> list[Path]:
-    if not MOD_SOURCES_ROOT.is_dir():
-        return []
-    return sorted(
-        (path for path in MOD_SOURCES_ROOT.iterdir() if path.is_dir() and _looks_like_source_mod(path)),
-        key=lambda value: value.name.casefold(),
-    )
+    found: list[Path] = []
+    for root in MOD_SOURCE_ROOTS:
+        if not root.is_dir():
+            continue
+        found.extend(path for path in root.iterdir()
+                     if path.is_dir() and _looks_like_source_mod(path))
+    return sorted(dict.fromkeys(found), key=lambda value: value.name.casefold())
 
 
 def check() -> list[str]:
