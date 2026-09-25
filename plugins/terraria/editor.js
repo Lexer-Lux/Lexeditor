@@ -37,6 +37,10 @@
     return detailPanel({title,body:[
       el("p",{class:"lex-notice lex-tone-warning",role:"alert"},error||"This game has no mod source yet."),
       el("p",{class:"lex-notice"},"Lexeditor never creates a mod on its own. Choose Create Mod in the Mod menu, then reopen this tab.")]})}
+  // Every tab describes a mod source, so a game with no mod has nothing to
+  // list on any of them. They must say that instead of showing an empty table
+  // that reads as a broken page.
+  function noModSource(){return !current&&!!error}
   function cultureFlag(culture){const code=String(culture||"").toLowerCase();if(code==="en-us")return "🇺🇸";if(code==="en-gb")return "🇬🇧";if(code==="fr-fr")return "🇫🇷";if(code==="de-de")return "🇩🇪";if(code==="es-es")return "🇪🇸";if(code==="it-it")return "🇮🇹";if(code==="pt-br")return "🇧🇷";if(code==="ru-ru")return "🇷🇺";if(code==="pl-pl")return "🇵🇱";if(code==="zh-hans")return "🇨🇳";if(code==="ja-jp")return "🇯🇵";if(code==="ko-kr")return "🇰🇷";return "🌐"}
   function showNavigationLoading(label){document.querySelector("#main").replaceChildren(loadingPanel(`Loading ${label}…`))}
 
@@ -306,6 +310,7 @@
     ]})]});
   }
   function contentPanel(){
+    if(noModSource())return missingModPanel();
     const tabs=[{id:"managed",label:"Managed"},{id:"create",label:"Create"},{id:"scaffolds",label:"Scaffolds"}];
     const content=contentView==="create"?contentCreatePanel():contentView==="scaffolds"?logicScaffoldPanel():contentManagedPanel();
     return stack({},...warnings(),tabbedPanel({tabs,active:contentView,label:"Terraria content views",change:value=>{contentView=value;render()},content}));
@@ -386,6 +391,7 @@
     });
   }
   function localizationPanel(){
+    if(noModSource())return missingModPanel();
     const cultures=[...new Set(localizationRows().map(row=>row.culture).filter(Boolean))].sort();
     if(!cultures.length)return stack({fill:false},...warnings(),emptyPanel("Localization","No loadable .hjson localization files are present in this source project yet."));
     if(!cultures.includes(locCulture))locCulture=cultures[0];
@@ -430,6 +436,7 @@
     ]});
   }
   function sourcePanel(){
+    if(noModSource())return missingModPanel();
     const query=sourceQuery.trim().toLocaleLowerCase();let rows=sourceFiles.filter(row=>!row.error&&(!query||row.path.toLocaleLowerCase().includes(query)));rows=sortedRows(rows,sourceSort,{path:row=>row.path,lines:row=>row.lines,bytes:row=>row.bytes});
     return stack({},...warnings(),pagedListDetail({rows,key:row=>row.path,slots:false,noun:"source files",page:sourcePage,pageSize:sourcePageSize,selected:sourceCreateMode?"__new__":sourceCurrent?.path||rows[0]?.path||null,
       splitKey:"terraria-source",rowsKey:"terraria-source",defaultSplit:44,minLeft:300,minRight:380,add:()=>{sourceCreateMode=true;render()},addTitle:"Add C# source file",addDisabled:sourceLoading||dirtyCount()>0,
@@ -488,6 +495,7 @@
     ]});
   }
   function assetsPanel(){
+    if(noModSource())return missingModPanel();
     const query=assetQuery.trim().toLocaleLowerCase();let rows=assetFiles.filter(row=>!row.error&&(!query||`${row.path} ${row.kind}`.toLocaleLowerCase().includes(query)));rows=sortedRows(rows,assetSort,{path:row=>row.path,kind:row=>row.kind,bytes:row=>row.bytes});
     return stack({},...warnings(),pagedListDetail({rows,key:row=>row.path,slots:false,noun:"assets",page:assetPage,pageSize:assetPageSize,selected:assetImportMode?"__new__":assetCurrent?.path||rows[0]?.path||null,
       splitKey:"terraria-assets",rowsKey:"terraria-assets",defaultSplit:46,minLeft:300,minRight:360,add:()=>{assetImportMode=true;render()},addTitle:"Import Terraria asset",addDisabled:assetLoading||dirtyCount()>0,
@@ -504,6 +512,9 @@
   }
 
   function mappedDataRows(){
+    // The Data Map answers "what data can I edit". With no mod source the
+    // honest answer is the reason, not an empty table.
+    if(!mapRows.length&&error)return [{filename:"No mod source yet",controls:"Nothing to map",notes:error,coverage:"unavailable",status:"not-integrated"}];
     const managed=new Set(contentFiles.map(row=>row.path));
     return mapRows.map(row=>{
       const filename=row.path,lower=filename.toLocaleLowerCase();
