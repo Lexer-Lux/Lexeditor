@@ -55,3 +55,63 @@ def test_github_owns_search_pager_detail_and_workflow(page):
     assert page.evaluate('writes[1]')==['ff8','high priority','untested']
     page.evaluate('shell.githubWorkspace().hide()')
     assert page.locator('.lex-pager:visible').count()==1
+
+
+def test_workflow_tabs_wear_their_label_colours(page):
+    """The workflow subtabs take their colours from the repository's labels."""
+    page.set_viewport_size({'width':1600,'height':900})
+    page.evaluate('''()=>{
+      // Deliberately unlike the built-in defaults: if a tab shows these, the
+      // colour came from the repository's labels rather than from the code.
+      window.labelColors={actionable:'112233',untested:'445566',waiting:'778899',unfeasible:'aabbcc'};
+      const labels=Object.entries(labelColors).map(([name,color])=>({name,color}));
+      const issue={number:484,title:'Fix shared editor layout',state:'OPEN',body:'Example issue body',
+        labels:[{name:'actionable',color:labelColors.actionable},{name:'ff8',color:'123456'}],comments:[]};
+      window.pywebview={api:{lexeditor_settings:async()=>({developerMode:true}),
+        github_repository:async()=>({repository:'Lexer-Lux/Lexeditor'}),
+        github_issues:async()=>({issues:[issue]}),
+        github_issue:async()=>({...issue}),
+        github_labels:async()=>({labels}),
+        github_set_issue_labels:async()=>({...issue})}};
+      document.body.prepend(Object.assign(document.createElement('div'),{id:'shell'}));
+    }''')
+    framework(page)
+    page.evaluate('''()=>{
+      window.shell=LexeditorUI.mountShell({host:'#shell',brand:'LEXEDITOR',
+        plugin:{id:'ff8',name:'FF8'},tabs:[{id:'items',label:'Items'}],
+        activeTab:()=> 'items',navigate(){}});
+      LexeditorUI.finishPluginLoading();
+    }''')
+    page.wait_for_function('shell.githubWorkspace()')
+    page.evaluate('shell.githubWorkspace().show()')
+    page.wait_for_selector('.lex-github-workspace .lex-subtab-bar [data-workflow]')
+    # The tabs take the repository's label colours as soon as those labels
+    # arrive, which is one call after the workspace opens.
+    page.wait_for_timeout(500)
+    tabs = page.evaluate('''()=>[...document.querySelectorAll(
+        '.lex-github-workspace .lex-subtab-button[data-workflow]')].map(node=>({
+        workflow:node.dataset.workflow,
+        colour:node.style.getPropertyValue('--lex-workflow-color').trim().toLowerCase(),
+        rule:getComputedStyle(node).borderTopColor,
+        ring:getComputedStyle(node).boxShadow,
+        ringBorder:getComputedStyle(node,'::after').borderTopColor,
+        ringWidth:getComputedStyle(node,'::after').borderTopWidth,
+        active:node.classList.contains('active')}))''')
+    assert [tab['workflow'] for tab in tabs] == [
+        'actionable', 'untested', 'waiting', 'unfeasible'], tabs
+    expected = {'actionable': '112233', 'untested': '445566',
+                'waiting': '778899', 'unfeasible': 'aabbcc'}
+    for tab in tabs:
+        assert tab['colour'] == f"#{expected[tab['workflow']]}", tab
+        red, green, blue = (int(expected[tab['workflow']][i:i + 2], 16)
+                            for i in (0, 2, 4))
+        assert tab['rule'] == f"rgb({red}, {green}, {blue})", tab
+    selected = [tab for tab in tabs if tab['active']]
+    assert len(selected) == 1, tabs
+    assert selected[0]['ringWidth'] == "3px", selected
+    pale = expected[selected[0]['workflow']]
+    assert selected[0]['ringBorder'] == ("rgb(%d, %d, %d)" % tuple(
+        int(pale[i:i + 2], 16) for i in (0, 2, 4))), selected
+    # Two colours in the fixture are close enough to confuse; a real repository
+    # uses four different ones, and the tabs must not all carry one colour.
+    assert len({tab['colour'] for tab in tabs}) == 4, tabs

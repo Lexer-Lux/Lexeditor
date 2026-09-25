@@ -5058,6 +5058,21 @@ ${contents.path}`});
     const subtabs=subtabBar({label:"Issue workflow",tabs:workflows.map(id=>({id,label:workflowNames[id]})),active:state.filter,change:selectWorkflow});
     const workflowButtons=[...subtabs.querySelectorAll('[role=tab]')];
     workflowButtons.forEach((control,index)=>control.dataset.workflow=workflows[index]);
+    // Each workflow tab is named by one of the repository's own labels, and
+    // those labels carry a colour. The tab wears that colour, taken from the
+    // loaded labels rather than copied here, so recolouring a label on GitHub
+    // recolours its tab. The map below is only the fallback for a label the
+    // loaded pages have not mentioned yet.
+    const workflowFallbackColors={actionable:"#0e8a16",untested:"#fbca04",waiting:"#e87924",unfeasible:"#b60205"};
+    const workflowColor=workflow=>{
+      const named=row=>String(row?.name||"").toLowerCase()===workflow;
+      const label=(state.labels||[]).find(named)
+        || (state.issues||[]).flatMap(issue=>issue.labels||[]).find(named);
+      const hex=String(label?.color||"").replace("#","").trim();
+      return /^[0-9a-f]{6}$/i.test(hex)?`#${hex}`:workflowFallbackColors[workflow];
+    };
+    const paintWorkflow=control=>control.style.setProperty("--lex-workflow-color",workflowColor(control.dataset.workflow));
+    workflowButtons.forEach(paintWorkflow);
     const footer=element("div",{class:"lex-github-footer"});
     const stateIcon=issue=>{
       const closed=String(issue.state).toLowerCase()==='closed';
@@ -5105,6 +5120,7 @@ ${contents.path}`});
       for (const control of workflowButtons) {
         const workflow = control.dataset.workflow;
         const count = state.issues.filter(issue => hasLabel(issue, workflow)).length;
+        paintWorkflow(control);
         control.querySelector(".lex-tab-label-text").textContent = workflowNames[workflow];
         control.classList.toggle("active", workflow === state.filter);
         control.setAttribute("aria-selected", String(workflow === state.filter));
@@ -5359,6 +5375,10 @@ ${contents.path}`});
       navigationChanged();
       if (!state.loaded) loadIssues();
       else root.querySelector('input[type="search"]')?.focus();
+      // The repository's labels carry the workflow colours. Fetching them is
+      // one call, and when it lands the tabs repaint; without it they keep the
+      // standard colours of these labels.
+      ensureLabels().then(() => workflowButtons.forEach(paintWorkflow)).catch(() => {});
     };
     const hide = () => {
       state.open = false;

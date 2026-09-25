@@ -3912,13 +3912,14 @@ body:has(.lex-data-map-table) #main {
 .lex-source-control.lex-source-control-stacked { grid-template-columns:minmax(0,1fr); gap:2px; }
 .lex-source-control-stacked > .lex-reference-values { grid-column:1; justify-self:end; max-width:100%; }
 .lex-icon-value { display:flex; flex-direction:column; align-items:stretch; gap:4px; min-width:0; }
-.lex-icon-value-toggle { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; cursor:pointer; min-width:0; padding:4px; }
+  /* One definition: the toggle filled its lane from a second rule further
+     down, which is exactly the shape the CSS budget forbids. */
+  .lex-icon-value-toggle { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; cursor:pointer; min-width:0; padding:4px; flex:1; }
 .lex-icon-value-toggle > input { position:absolute; opacity:0; width:100%; height:100%; inset:0; margin:0; }
 .lex-icon-value-art { display:grid; place-items:center; width:32px; height:32px; }
 .lex-icon-value-toggle > :not(input) { pointer-events:none; }
 .lex-icon-value-art img { width:32px; height:32px; object-fit:contain; image-rendering:pixelated; }
 .lex-icon-value-toggle:has(:focus-visible) { outline:2px solid var(--lex-highlight); }
-.lex-icon-value-toggle { flex:1; }
 .lex-icon-value-toggle:has(:checked) .lex-icon-value-art { filter:grayscale(1); opacity:.45; }
 .lex-unit-field:has(> input:placeholder-shown) > .lex-unit { visibility:hidden; }
 .lex-paged-pane:has(> .lex-paged-pane-content > .lex-curve-editor) { flex:1; height:100%; }
@@ -7547,4 +7548,26 @@ body { text-shadow: var(--lex-text-shadow, none); }
   transform:none;
   opacity:1;
   visibility:visible;
+}
+
+/* The issue workflow tabs are named by the repository's workflow labels, and
+   each of those carries a colour. A tab shows its own colour as a rule along
+   the top, and the tab in view takes that colour as a ring, so the row reads
+   as the labels it filters by. The rule is drawn with a border and an inset
+   shadow rather than a background: a game's tabs may be graded surfaces, and a
+   colour mixed into a gradient is not a colour. These sit outside the layers,
+   which is what lets them win over the shared tab rules above. */
+.lex-github-workspace .lex-subtab-button[data-workflow] {
+  position:relative;
+  border-top:3px solid var(--lex-workflow-color, transparent);
+}
+/* The selected tab wears its colour as a ring laid inside its own box. An
+   overlay rather than a shadow, so a game's own bevel shadow survives: a
+   shadow list cannot hold an optional value. */
+.lex-github-workspace .lex-subtab-button[data-workflow].active::after {
+  position:absolute;
+  inset:0;
+  border:3px solid var(--lex-workflow-color, var(--lex-accent));
+  content:"";
+  pointer-events:none;
 }
