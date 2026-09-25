@@ -12,3 +12,5 @@ Canonical game-specific knowledge. No standalone source has been imported for th
 - [Altered content](altered-content.md): #319 restoration targets, the nunchaku verdict, and the safe rule.
 
 - [SFX, Models, and Textures assets](asset-tabs.md): audio.fmt layout and FFNx external SFX names, battle `.dat` section inventory, and the verified FFNx external texture paths behind the asset tabs.
+
+- [Editability and the older tools](editability.md): what each FF8 file allows here, why the locked bytes stay locked, and how this plugin's coverage compares with Deling, FF8 Ultimate Editor, Rinoa's Toolset, Jumbo Cactuar, IfritAI and Hyne.

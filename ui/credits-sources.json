@@ -312,6 +312,21 @@
           "url": "https://github.com/julianxhokaxhiu/FFNx"
         },
         {
+          "name": "MaKiPL (Maki), FF8 Rinoa’s Toolset",
+          "role": "FF8 Rinoa’s Toolset, surveyed for the editability audit: its coverage of world-map vehicles, Wm2field and Namedic.bin is what the audit compares this plugin against, and its battle-stage and UV views set the bar for the Models and Textures tabs.",
+          "url": "https://github.com/MaKiPL/FF8-Rinoa-s-Toolset"
+        },
+        {
+          "name": "Nihil-1",
+          "role": "Jumbo Cactuar Scene.out editor, surveyed for the editability audit and used to check this plugin’s battle formation coverage.",
+          "url": "https://github.com/Nihil-1/JumboCactuar"
+        },
+        {
+          "name": "Jérôme Arzel (myst6re)",
+          "role": "Hyne save editor, surveyed for the editability audit: it confirms save editing is a separate domain from the game-data editing this plugin does.",
+          "url": "https://github.com/myst6re/hyne"
+        },
+        {
           "name": "Robin Engström and ff8-decomp contributors",
           "role": "FF8 decompilation used to check game behavior and ability categories.",
           "url": "https://github.com/roengstrom/ff8-decomp"
