@@ -6,10 +6,16 @@
  * not restyle shared controls in their own editor page.
  */
 
-body.lex-neutral-ui {
+/* The unthemed token set. A page wears these whether or not it uses the
+   editor shell below: the home screen shows the same neutral colours as an
+   unthemed game, and Blank stays the reference for both. */
+:is(body.lex-neutral-theme, body.lex-neutral-ui) {
   --lex-accent:#72ff1e;
   --lex-accent-text:#102008;
   --lex-highlight:#405247;
+}
+
+body.lex-neutral-ui {
   display:flex;
   flex-direction:column;
   height:100vh;

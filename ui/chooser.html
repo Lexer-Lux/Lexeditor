@@ -6,19 +6,16 @@
   <title>Lexeditor</title>
   <script>if(new URLSearchParams(location.hash.slice(1)).get("lexTransition")==="home")document.documentElement.classList.add("lex-transition-entry")</script>
   <link rel="stylesheet" href="framework.css">
+  <link rel="stylesheet" href="neutral.css">
   <style>
 
     :root {
-      /* The home screen wears the shared theme, not a palette of its own. An
-         unthemed game is the reference: these are the neutral defaults Blank
-         declares, and ui/framework.css supplies every other token. Anything
+      /* The home screen declares no colours. It carries the unthemed
+         presentation that ui/neutral.css supplies to Blank and to every other
+         page without a game of its own, so a change there reaches this screen
+         too. Only this screen's own behaviour switches live here. Anything
          drawn over cover art keeps its own white ink, because the art is dark
          whatever the interface is. */
-      --lex-accent:#72ff1e;
-      --lex-accent-text:#102008;
-      --lex-highlight:#405247;
-      --lex-command-row-bg:#fff;
-      --lex-nav-bg:#e5e9ed;
       --lex-chooser-menu-height:9vh;
       --lex-page-overflow:auto;
       --lex-absent-desaturation:40%;
@@ -230,7 +227,7 @@
     #chooser-window-header>.lex-ui-scale{margin-left:auto;align-self:center}
   </style>
 </head>
-<body>
+<body class="lex-neutral-theme">
   <div id="chooser-surface" class="chooser-surface">
     <header id="chooser-window-header">
       <div class="chooser-title"><h1>LEXEDITOR</h1></div>

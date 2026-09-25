@@ -1006,13 +1006,12 @@ details.lex-detail-section[open] > summary::before { content:"▾"; }
 .lex-row-remove:focus-visible { opacity:1; }
 .lex-detail-panel-body:has(> .lex-text-editor) { flex:1; }
 .lex-text-editor { flex:1 1 auto; min-height:160px; }
-.lex-text-editor > .lex-detail-field-control,
-.lex-text-editor .lex-source-control { height:100%; }
+.lex-text-editor > .lex-detail-field-control { height:100%; }
 /* The box fills the field. A percentage height did not do it: the textarea
    asks to size itself to its content, so a one-line value kept an eight-row
    box in the middle of an empty panel. As the only grid row of its control,
    stretched, it takes the height the panel gives it. */
-.lex-text-editor .lex-source-control { display:grid; grid-template-rows:minmax(0,1fr);
+.lex-text-editor .lex-source-control { height:100%; display:grid; grid-template-rows:minmax(0,1fr);
   align-items:stretch; }
 .lex-text-editor textarea { height:auto; min-height:0; field-sizing:fixed; resize:none; }
 /* The editor's name row is one line and its box takes the rest of the panel.
@@ -4201,7 +4200,6 @@ body:has(.lex-data-map-table) #main {
   pointer-events:none;
 }
 
-.lex-image-map-stage { width:100%; }
 .lex-image-map-stage { position:relative; width:min(100cqw, calc(100cqh * var(--lex-map-ratio, 1.333333))); overflow:hidden; background-color:var(--lex-panel-2); background-image:linear-gradient(var(--lex-border) 1px,transparent 1px),linear-gradient(90deg,var(--lex-border) 1px,transparent 1px); background-size:calc(100% / var(--lex-map-columns)) calc(100% / var(--lex-map-rows)); }
 .lex-image-map-stage > img { display:block; width:100%; height:100%; object-fit:fill; }
 .lex-image-map-cells { position:absolute; inset:0; display:grid; grid-template-columns:repeat(var(--lex-map-columns),1fr); grid-template-rows:repeat(var(--lex-map-rows),1fr); }
