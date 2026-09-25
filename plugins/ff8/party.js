@@ -500,6 +500,8 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     else if(tab==='defense'&&table)body=[enemyDefenceSection(table,'elementDefence','ELEMENT'),enemyDefenceSection(table,'statusDefence','STATUS')];
     else if(tab==='text')body=[enemyBattleTextPanel(row,prefs)];
     else if(tab==='stats')body=[enemyStatGrowth(row.fields.filter(field=>field.group==='Stat curves'),row.id)];
-    return tabbedPanel({tabs,active:tab,label:'Enemy details',change:async value=>{if(!(await enemyAiBeforeLeave()))return;state.enemyDetailTab=value;renderEnemies()},content:tab==='stats'?body:sharedDetail({...row,name:enemyDisplayName(row.name)},prefs,body,'enemy-detail')});
+    const model=state.data.models?.rows?.find(entry=>Number(entry.enemyId)===Number(row.id));
+    const openModel=model?el('button',{type:'button',onclick:()=>{state.selected.models=model.file;navigate('models')}},'Open in Models'):null;
+    return tabbedPanel({tabs,active:tab,label:'Enemy details',change:async value=>{if(!(await enemyAiBeforeLeave()))return;state.enemyDetailTab=value;renderEnemies()},content:tab==='stats'?body:sharedDetail({...row,name:enemyDisplayName(row.name)},prefs,body,'enemy-detail','',null,null,model?modelPreviewSpec(model,openModel?LexeditorUI.actionRow(openModel):null):null)});
   }
   function enemyLeadingPanel(row){return enemyAiPanel(row)}

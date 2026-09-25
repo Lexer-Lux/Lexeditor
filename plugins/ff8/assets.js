@@ -80,6 +80,37 @@
       {key:"timCount",label:"Textures",render:row=>row.timCount??"—"}];
     showPaged("models",rows,columns,modelDetail,"110px minmax(150px,2fr) 90px 80px 70px");
   }
+  // A model's texture pages as cards. The panel body and the model-preview
+  // drawer show the same grid, so it is built once.
+  function modelTextureCards(row){
+    return LexeditorUI.tileGrid((row.tims||[]).map(tim=>{
+      const key=`${row.id}#${tim.index}`,palette=Math.max(0,Math.min((tim.paletteCount||1)-1,Number(assetPalettes[key]??0)));
+      const targetId=`battle/${row.file}#${tim.index}`,targetLabel=`Texture ${tim.index+1}`;
+      const preview=el("img",{src:`/assets/texture.png?id=${encodeURIComponent(targetId)}&palette=${palette}&dataset=${encodeURIComponent(assetDataset())}`,alt:`${row.name}, texture ${tim.index+1}`});
+      const link=hoverable({content:LexeditorUI.stack({fill:false},el("span",{},targetLabel),LexeditorUI.iconSlot({content:preview,shape:'square'})),targetType:"texture",targetId,targetLabel,activate:()=>{state.selected.textures=targetId;navigate("textures")}})
+      const paletteSelect=tim.paletteCount>1?selectControl(palette,Array.from({length:tim.paletteCount},(_,id)=>({value:id,name:`Palette ${id+1}`})),value=>{assetPalettes[key]=value;renderModels()}):null;
+      if(paletteSelect)paletteSelect.setAttribute("aria-label",`${row.name} texture ${tim.index+1} palette`);
+      const card=[link];
+      if(paletteSelect)card.push(detailField({label:"PALETTE",help:infoHelp("Palette selection only changes this preview; the game chooses palettes while rendering."),control:paletteSelect}));
+      return LexeditorUI.stack({fill:false},...card);
+    }),{minWidth:160});
+  }
+  // What the shared model-preview drawer shows for a battle model. Nothing here
+  // draws 3D: what a reader can check without leaving the page is the model's own
+  // texture pages, the file facts beside them, and the way on to its record.
+  function modelPreviewSpec(row,extra=null){
+    if(!row?.file)return null;
+    return {label:`${row.name} model`,
+      openLabel:`Open the ${row.name} model`,
+      closeLabel:`Close the ${row.name} model`,
+      content:()=>LexeditorUI.stack({fill:false},
+        LexeditorUI.detailNote([row.file,modelKindName(row.modelKind),
+          row.vertices==null?"no vertices":`${formatNumber(row.vertices)} vertices`,
+          `${row.timCount??0} textures`].join(" - ")),
+        row.tims?.length?modelTextureCards(row)
+          :LexeditorUI.detailNote("This file has no texture pages to preview."),
+        ...(extra?[extra]:[]))};
+  }
   function modelDetail(row,prefs){
     const sections=[];
     if(row.counts)sections.push(detailSection({title:"GEOMETRY",body:LexeditorUI.controlGroup([
@@ -87,17 +118,7 @@
       {label:"VERTICES",control:readonlyField(formatNumber(row.counts.vertices))},
       {label:"TRIANGLES",control:readonlyField(formatNumber(row.counts.triangles))},
       {label:"QUADS",control:readonlyField(formatNumber(row.counts.quads))}],{columns:4,stacked:true})}));
-    if(row.tims?.length)sections.push(detailSection({title:"TEXTURES",body:LexeditorUI.tileGrid(row.tims.map(tim=>{
-      const key=`${row.id}#${tim.index}`,palette=Math.max(0,Math.min((tim.paletteCount||1)-1,Number(assetPalettes[key]??0)));
-      const targetId=`battle/${row.file}#${tim.index}`,targetLabel=`Texture ${tim.index+1}`;
-      const preview=el("img",{src:`/assets/texture.png?id=${encodeURIComponent(targetId)}&palette=${palette}&dataset=${encodeURIComponent(assetDataset())}`,alt:`${row.name}, texture ${tim.index+1}`});
-      const link=hoverable({content:LexeditorUI.stack({fill:false},el("span",{},targetLabel),LexeditorUI.iconSlot({content:preview,shape:'square'})),targetType:"texture",targetId,targetLabel,activate:()=>{state.selected.textures=targetId;navigate("textures")}});
-      const paletteSelect=tim.paletteCount>1?selectControl(palette,Array.from({length:tim.paletteCount},(_,id)=>({value:id,name:`Palette ${id+1}`})),value=>{assetPalettes[key]=value;renderModels()}):null;
-      if(paletteSelect)paletteSelect.setAttribute("aria-label",`${row.name} texture ${tim.index+1} palette`);
-      const card=[link];
-      if(paletteSelect)card.push(detailField({label:"PALETTE",help:infoHelp("Palette selection only changes this preview; the game chooses palettes while rendering."),control:paletteSelect}));
-      return LexeditorUI.stack({fill:false},...card);
-    }),{minWidth:160})}));
+    if(row.tims?.length)sections.push(detailSection({title:"TEXTURES",body:modelTextureCards(row)}));
     if(row.sections?.length){
       const table=columnList({fill:true,rows:row.sections,key:section=>section.index,localSort:false,class:"ff8-model-sections",template:"52px minmax(150px,1fr) 110px 110px",columns:[
         {key:"index",label:"#",render:section=>String(section.index)},
@@ -127,7 +148,7 @@
       detailField({label:"",control:actions}),
       detailField({label:"",control:pending})],
       help:infoHelp([row.note,"Replace writes this battle file into the project's direct/ folder; FFNx loads it instead of the archive copy. Revert deletes the project copy."].filter(Boolean).join(' '))}));
-    return detailPanel({title:row.name,meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections});
+    return detailPanel({title:row.name,meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections,modelPreview:modelPreviewSpec(row)});
   }
 
   function renderTextures(){
