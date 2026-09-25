@@ -100,7 +100,10 @@ From the wiki
 
 FFNx loads whole-file `direct/battle/*.dat` overrides, so whole-file
 replace/export/revert is the editor granularity. Geometry, skeleton, and
-animation bytes have no proven writer and stay visible-but-locked.
+animation bytes have no proven writer and stay visible-but-locked. The
+animation-sequence section's container is proved (count, one offset per id,
+then the byte code; `/api/animation-sequences?file=c0m001.dat`), but the byte
+code inside it is still only counted, so that row stays locked too.
 
 Out of scope: battle stages (`a0stg*.x`), magic-effect files (`mag*`),
 field MCH/`chara.one` models, and world-map models. Stage/magic archive

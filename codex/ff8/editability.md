@@ -112,15 +112,24 @@ Not covered today, with what each would need:
   and a reader and writer exist (`plugins/ff8/namedic.py`,
   `codex/ff8/namedic.md`, `tests/ff8/verify_ff8_namedic.py`); no page edits it
   yet, so the Data Map does not claim it.
-- **Animation sequences** (Seq). Read and shown; no writer is proved. The
-  section itself is not decoded here: measured on the installed
-  `battle/c0m001.dat`, the animation-sequence section is 308 bytes and opens
-  `0x000E 0x001E 0x0000 0x0067 …`, which is not a monotonic offset table, so the
-  obvious container assumption is unproven. FF8 Ultimate Editor spreads this
-  format over a codec, a command table, a VM, a timeline and a bake step
-  (`FF8GameData/dat/sequencecodec.py` and neighbours, GPL-3.0), which is the
-  source to vendor the way the LZS decoder already is — with its licence and
-  credits — rather than re-deriving the format by guesswork.
+- **Animation sequences** (Seq). The container is read and served; the byte
+  code itself is not decoded and no writer is proved. The section is a u16
+  sequence count, that many u16 offsets, then one byte-code body per sequence
+  (FF8 Ultimate Editor's `FF8GameData/monsterdata.py`,
+  `SECTION_MODEL_SEQ_ANIM_NB_SEQ` and `SECTION_MODEL_SEQ_ANIM_OFFSET`;
+  verified on `battle/c0m001.dat`, count 14 and first offset 30 = 2 + 2 x 14).
+  The offsets are indexed by id, not laid out in id order — `c0m001.dat` stores
+  its id 3 after its id 9 — so extents come from the offsets in file order.
+  A zero offset means the shipped file has no body for that id; 199 of the 200
+  installed `c0m*.dat` parse (the two-section `c0m127.dat` is the exception),
+  giving 2,280 sequences across 775 ids with no body.
+  Reading the byte code, and writing it, needs FF8 Ultimate Editor's
+  command/VM/timeline/bake layer (`FF8GameData/dat/sequencecodec.py` and
+  neighbours, GPL-3.0) — vendor it the way the LZS decoder already is, with its
+  licence and credits, rather than re-deriving the format by guesswork.
+  See `plugins/ff8/assets.py` `animation_sequences`,
+  `tests/ff8/verify_ff8_animation_sequences.py`, and
+  `/api/animation-sequences?file=c0m001.dat`.
 - **Model export** (3D, glTF). The Models tab previews a model; it does not
   export geometry, and the geometry bytes are still only counted here. FF8
   Ultimate Editor's 3D work is large rather than a decoder to lift: its editor

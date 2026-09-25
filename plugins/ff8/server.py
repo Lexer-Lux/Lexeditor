@@ -231,6 +231,8 @@ class Handler(PluginRequestHandler):
             elif path == "/api/world-extra":
                 self.json_response(formats.world_extra(
                     query.get("kind", [""])[0], query.get("dataset", ["current"])[0]))
+            elif path == "/api/animation-sequences":
+                self.json_response(formats.animation_sequences(query.get("file", [""])[0]))
             elif path == "/api/table.csv":
                 payload = formats.table_csv(query.get("name", [""])[0],
                                             query.get("dataset", ["current"])[0])

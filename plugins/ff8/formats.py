@@ -347,6 +347,21 @@ def world_extra(kind: str, dataset: str = "current") -> dict:
     return {**payload, "kind": str(kind).strip()}
 
 
+def animation_sequences(filename: str) -> dict:
+    """The animation-sequence byte code of one battle model file."""
+    # Imported here, not at module level: the asset format imports this module
+    # for its monster table, so a top-level import would close the cycle.
+    from . import assets as asset_format
+    from . import paths as ff8_paths
+    source = ff8_paths.BASELINE_ROOT / "battle" / str(filename)
+    if not source.is_file():
+        raise ValueError(f"No installed battle file named {filename}")
+    payload = asset_format.animation_sequences(str(filename), source.read_bytes())
+    if payload is None:
+        raise ValueError(f"{filename} is not a model file with an animation-sequence section")
+    return payload
+
+
 def shop_rows(dataset: str = "current") -> dict:
     raw = source_path("shop.bin", dataset).read_bytes()
     if len(raw) < 20 * 16 * 2:

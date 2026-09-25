@@ -379,6 +379,69 @@ def parse_dat_sections(data: bytes) -> list[dict] | None:
             for index, (start, end) in enumerate(zip(positions, positions[1:]))]
 
 
+# FF8 Ultimate Editor declares section 5's own shape in its model module
+# (FF8GameData/monsterdata.py, SECTION_MODEL_SEQ_ANIM_*): a 16-bit sequence
+# count, that many 16-bit offsets, then one byte-code body per sequence. A zero
+# offset means that id has no sequence, which the tool says its writer never
+# produces but the shipped files do contain. Reading follows that declaration,
+# and the version of the file does not lie about it: c0m001's first offset is
+# 30, which is 2 + 2 x its count of 14.
+SEQUENCE_SECTION = "Animation sequences"
+
+
+def animation_sequences(filename: str, data: bytes) -> dict | None:
+    """Each animation-sequence id and the byte code that plays it.
+
+    Returns None when the file is not a battle-model container, the same way
+    `parse_dat_sections` does, so a mod-supplied file degrades to a locked row
+    instead of raising.
+    """
+    sections = parse_dat_sections(data)
+    if sections is None:
+        return None
+    kind, names = _section_names(filename, len(sections))
+    if names is None or SEQUENCE_SECTION not in names:
+        return None
+    index = names.index(SEQUENCE_SECTION)
+    section = sections[index]
+    body = data[section["offset"]:section["offset"] + section["size"]]
+    if len(body) < 4:
+        raise ValueError(f"{filename}: the animation-sequence section is too small")
+    count, = struct.unpack_from("<H", body, 0)
+    table_end = 2 + count * 2
+    if count == 0 or table_end > len(body):
+        raise ValueError(f"{filename}: the animation-sequence count ({count}) does not fit")
+    offsets = list(struct.unpack_from(f"<{count}H", body, 2))
+    if any(offset and offset < table_end for offset in offsets):
+        raise ValueError(f"{filename}: an animation offset points inside its own table")
+    if any(offset >= len(body) for offset in offsets if offset):
+        raise ValueError(f"{filename}: an animation offset points past the section")
+    # The table is indexed by id, not laid out in id order: c0m001 stores its
+    # third id's byte code after its ninth's. Extents therefore come from the
+    # offsets in file order, and each id points at the span that starts where
+    # its own offset does.
+    present = sorted({offset for offset in offsets if offset})
+    spans = {}
+    for index, start in enumerate(present):
+        stop = present[index + 1] if index + 1 < len(present) else len(body)
+        spans[start] = stop
+    rows = []
+    for id_index, offset in enumerate(offsets, start=1):
+        if not offset:
+            rows.append({"id": id_index, "offset": 0, "bytes": 0, "present": False,
+                         "placed": False, "sha256": "", "head": ""})
+            continue
+        stop = spans[offset]
+        rows.append({"id": id_index, "offset": section["offset"] + offset,
+                     "bytes": stop - offset, "present": True, "placed": True,
+                     "sha256": hashlib.sha256(body[offset:stop]).hexdigest(),
+                     "head": body[offset:offset + 8].hex(" ")})
+    return {"file": filename, "kind": kind, "sectionIndex": index + 1,
+            "sectionOffset": section["offset"], "count": count,
+            "present": len(present), "tableBytes": table_end,
+            "sectionBytes": section["size"], "rows": rows}
+
+
 def _section_names(filename: str, section_count: int) -> tuple[str, tuple[str, ...] | None]:
     """Name a model layout from its filename kind and section count."""
     if MONSTER_FILENAME.fullmatch(filename):
