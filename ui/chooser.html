@@ -144,10 +144,21 @@
     .lexer-panel-note { margin:0; color:var(--lex-muted); font-size:11px; line-height:1.45; }
     .lexer-panel { width:100vw; }
     .lexer-dev-body { display:grid; grid-template-columns:minmax(0,2fr) minmax(280px,1fr); gap:18px; flex:1 1 auto; min-height:0; }
-    @media (max-width:900px){ .lexer-dev-body { grid-template-columns:1fr; overflow:auto; } }
+    /* Six columns whose headings alone need 807px: below this width the two
+       panels stack, or the games table has to scroll sideways to reach its own
+       last column. */
+    @media (max-width:1280px){ .lexer-dev-body { grid-template-columns:1fr; overflow:auto; } }
     .lexer-dev-body > section { display:flex; flex-direction:column; gap:10px; min-height:0; }
     .lexer-dev-body h3 { margin:0; font:800 12px/1 var(--lex-heading-font,var(--lex-font)); letter-spacing:.1em; color:var(--lex-muted); }
-    .lexer-dev-table-wrap { overflow:auto; min-height:0; }
+    /* The table owns the column's spare height rather than leaving a blank
+       band below it, and its text columns share the width instead of each
+       holding a floor of its own, which is what forced the sideways scroll. */
+    .lexer-dev-table-wrap { display:flex; overflow:auto; flex:1 1 auto; min-height:0; }
+    #lexer-dev-table { display:flex; flex:1 1 auto; flex-direction:column; min-height:0; }
+    /* Grows into the space it has, and never shrinks below its own rows: a
+       squeezed grid keeps its stated height and paints the last games outside
+       the scroll area, where the scrollbar cannot reach them. */
+    #lexer-dev-table > .lex-column-list { flex:1 1 auto; min-height:max-content; }
     /* The overview's own columns hold sentences and lists, not values: they
        wrap inside their cell instead of pushing the table past its column,
        which is what gave the drawer a horizontal scrollbar. */
@@ -391,6 +402,10 @@
         const rows=table.rows||[];
         mount.replaceChildren(LexeditorUI.columnList({
           "aria-label":"Developer overview by game",
+          // The table seats itself in the column it is given, the way the
+          // barrel tables do, instead of leaving the lower half of the drawer
+          // empty under a short table.
+          fill:true,
           columns:[
             {key:"game",label:"GAME",align:"start"},
             {key:"modState",label:"MOD LOADING",cellClass:row=>row.modWorks?"lex-dev-good":"lex-dev-todo"},
@@ -398,7 +413,10 @@
               render:row=>{const wrap=document.createElement("span");wrap.append(...taskSpans(row));return wrap;}},
             {key:"quotes",label:"QUOTES",numeric:true,
               render:row=>row.quotes??"—",sortValue:row=>row.quotes??-1},
-            {key:"copiedLines",label:"COPIED LINES",numeric:true,
+            // Not a numeric column: the cell reads "12 (was 9)", so the
+            // no-squeeze rule for numbers would only add a floor the drawer
+            // has to scroll sideways to reach.
+            {key:"copiedLines",label:"COPIED LINES",
               render:row=>copiedText(row),
               cellClass:row=>row.copiedOver?"lex-dev-over":"",
               sortValue:row=>row.copiedLines??-1},

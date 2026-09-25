@@ -76,6 +76,33 @@ EXHAUSTED_QUOTE = ("I'm officially all out of funny loading messages. "
                    "You must really like this program!")
 
 
+def _budget_counts(module_name: str, root: Path | None = None) -> dict:
+    """Live counts from the verifier that owns them.
+
+    The budget verifiers moved from tools/ to tests/shared/ with the rest of
+    the checks. The developer page read them from the old folder and swallowed
+    the ImportError, so its shared-UI and copied-line columns reported zeroes
+    for every game instead of the conversion work that is left. Load the file
+    by path: the verifier resolves the repository from its own location, so it
+    keeps working wherever the checks live.
+    """
+    import importlib.util
+
+    base = Path(root) if root else Path(__file__).resolve().parents[1]
+    for folder in (base / "tests" / "shared", base / "tools"):
+        path = folder / f"{module_name}.py"
+        if not path.is_file():
+            continue
+        try:
+            spec = importlib.util.spec_from_file_location(f"lexeditor_{module_name}", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module.counts()
+        except Exception:
+            continue
+    return {}
+
+
 def choose_loading_quote(payload: dict, plugin_id: str, global_rarity: float,
                          chooser=random.choices, used: set[str] | None = None):
     """Choose one game line with down-weighted shared lines.
@@ -904,15 +931,9 @@ class HostApi:
     def _shared_code_budget(self) -> list[dict]:
         """Plugin Python that is a second copy of another plugin's function."""
         import json
-        import sys
 
         root = Path(__file__).resolve().parents[1]
-        sys.path.insert(0, str(root / "tools"))
-        try:
-            from verify_shared_code_budget import counts
-            live = counts()
-        except Exception:
-            return []
+        live = _budget_counts("verify_shared_code_budget")
         try:
             recorded = json.loads((root / "ui" / "shared-code-budget.json").read_text(encoding="utf-8"))["plugins"]
         except (OSError, ValueError, KeyError):
@@ -948,15 +969,9 @@ class HostApi:
         conversion work left rather than only failing a test when it grows.
         """
         import json
-        import sys
 
         root = Path(__file__).resolve().parents[1]
-        sys.path.insert(0, str(root / "tools"))
-        try:
-            from verify_shared_ui_budget import counts
-            live = counts()
-        except Exception:
-            return []
+        live = _budget_counts("verify_shared_ui_budget")
         try:
             recorded = json.loads((root / "ui" / "shared-ui-budget.json").read_text(encoding="utf-8"))["files"]
         except (OSError, ValueError, KeyError):

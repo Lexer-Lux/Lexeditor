@@ -58,13 +58,30 @@ def test_unpinned_control_group_pin_can_be_found_again(page):
     }''')
     pin = lambda: page.locator('[data-lex-pin-column="source"]')
     page.wait_for_timeout(150)
-    assert pin().evaluate('el=>el.classList.contains("pinned")')
-    pin().click()
-    page.wait_for_timeout(200)
-    assert not pin().evaluate('el=>el.classList.contains("pinned")')
+    is_pinned = lambda: pin().evaluate('el=>el.classList.contains("pinned")')
+
+    def click_pin():
+        """Click the pin and wait for the state it commits.
+
+        A pin drops into place over 220ms before it commits, because the panel
+        is rebuilt when the visible columns change. A fixed sleep here made
+        this check fail against working code; polling the committed state still
+        fails when the click changes nothing.
+        """
+        was_pinned = is_pinned()
+        pin().click()
+        page.wait_for_function(
+            """wasPinned => {
+              const el=document.querySelector('[data-lex-pin-column="source"]');
+              return !!el && el.classList.contains("pinned") !== wasPinned;
+            }""",
+            arg=was_pinned, timeout=3000)
+
+    assert is_pinned()
+    click_pin()
+    assert not is_pinned()
     page.locator('.lex-detail-part').first.hover()
     page.wait_for_timeout(200)
     assert pin().evaluate('el=>Number(getComputedStyle(el).opacity)') > 0
-    pin().click()
-    page.wait_for_timeout(200)
-    assert pin().evaluate('el=>el.classList.contains("pinned")')
+    click_pin()
+    assert is_pinned()
