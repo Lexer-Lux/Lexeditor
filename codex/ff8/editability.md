@@ -101,7 +101,10 @@ Not covered today, with what each would need:
   section 9) and nothing for the world-to-field direction.
 - **`Namedic.bin`** (Rinoa's Toolset). The Text tab inserts location, variable
   and key tokens from static tables in `kernel_text.editor_tokens()`, so the
-  names behind those tokens are not editable here.
+  names behind those tokens are not editable here. The file's layout is proved
+  and a reader and writer exist (`plugins/ff8/namedic.py`,
+  `codex/ff8/namedic.md`, `tests/ff8/verify_ff8_namedic.py`); no page edits it
+  yet, so the Data Map does not claim it.
 - **Animation sequences** (Seq). Read and shown; no writer is proved.
 - **Model export** (3D, glTF). The Models tab previews a model; it does not
   export geometry.
