@@ -151,7 +151,7 @@ def main() -> int:
             assert not rendered["overflow"]
 
             cdp.eval("document.querySelectorAll('.world-segment-cell')[33].click()")
-            wait_eval(cdp, "state.selected.world===33&&document.querySelector('.world-segment-detail')?.textContent.includes('WORLD SEGMENT 33')", 20)
+            wait_eval(cdp, "state.selected.world===33&&document.querySelector('.world-segment-detail')?.textContent.includes('WORLD MAP CELL 33')", 20)
             before = cdp.eval("worldRow(state.data,'worldSegment',33).groupId")
             cdp.eval("""(()=>{const input=document.querySelector('input[aria-label="World segment 33 group ID"]');const value=Number(input.value.replaceAll(',',''))+1;input.value=String(value);input.dispatchEvent(new Event('input',{bubbles:true}))})()""")
             wait_eval(cdp, f"worldRow(state.data,'worldSegment',33).groupId==={before + 1}", 10)

@@ -131,7 +131,7 @@ def _segment(data: bytes | bytearray, segment_id: int) -> dict:
     return {
         "id": segment_id,
         "kind": "worldSegment",
-        "name": f"World segment {segment_id}",
+        "name": f"World map cell {segment_id}",
         "x": segment_id % 32,
         "y": segment_id // 32,
         "groupId": group_id,
