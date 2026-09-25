@@ -3886,10 +3886,15 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-axis-name { position:absolute; color:var(--lex-muted); font:10px/1 var(--lex-font); pointer-events:none; }
 .lex-curve-axis-name-x { bottom:3px; left:50%; transform:translateX(-50%); }
 .lex-curve-axis-name-y { top:50%; left:2px; writing-mode:vertical-rl; transform:translateY(-50%) rotate(180deg); }
-.lex-curve-variables { position:absolute; z-index:6; left:0; right:0; bottom:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,84px),1fr)); gap:4px 8px; padding:6px; color:var(--lex-text); background:color-mix(in srgb,var(--lex-panel) 90%,var(--lex-text) 10%); border:1px solid var(--lex-border); border-color:color-mix(in srgb,var(--lex-border) 65%,var(--lex-text) 35%); box-shadow:0 -4px 12px rgb(0 0 0 / 28%),inset 0 1px rgb(255 255 255 / 18%); opacity:0; pointer-events:none; clip-path:inset(100% 0 0); transition:opacity .15s,clip-path .15s; }
+/* The value strip wraps, and every row fills. A grid of equal columns left the
+   last row short of its right edge - one box, then empty space, then a toggle
+   on a row of its own in a narrow card - which read as a broken drawer and
+   covered a short card's graph. Wrapping flex lines grow their boxes to the
+   width they have, so the strip ends at the same edge whichever row it is. */
+.lex-curve-variables { position:absolute; z-index:6; left:0; right:0; bottom:0; display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; padding:6px; color:var(--lex-text); background:color-mix(in srgb,var(--lex-panel) 90%,var(--lex-text) 10%); border:1px solid var(--lex-border); border-color:color-mix(in srgb,var(--lex-border) 65%,var(--lex-text) 35%); box-shadow:0 -4px 12px rgb(0 0 0 / 28%),inset 0 1px rgb(255 255 255 / 18%); opacity:0; pointer-events:none; clip-path:inset(100% 0 0); transition:opacity .15s,clip-path .15s; }
 .lex-curve-editor:is(:hover,:focus-within) > .lex-curve-variables { opacity:1; pointer-events:auto; clip-path:inset(0); }
 
-.lex-curve-variable { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:4px; min-width:0; }
+.lex-curve-variable { flex:1 1 84px; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:4px; min-width:0; }
 .lex-curve-variable :is(input,select) { width:100%; min-width:0; }
 .lex-curve-variable-a { color:#f05b5b; fill:#f05b5b; }
 .lex-curve-variable-b { color:#63a8ff; fill:#63a8ff; }
@@ -3905,7 +3910,7 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-plot:hover > .lex-curve-mode-toggle,.lex-curve-mode-toggle:focus-visible { opacity:1; }
 /* The toggle rides in the variable drawer when one exists, so it is
    a grid cell there instead of an overlay: same control, no overlap. */
-.lex-curve-variables > .lex-curve-mode-toggle { position:static; min-width:max-content; align-self:center; justify-self:end; opacity:1; }
+.lex-curve-variables > .lex-curve-mode-toggle { position:static; flex:0 0 auto; margin-left:auto; min-width:max-content; align-self:center; opacity:1; }
 .lex-curve-bars { display:none; fill:var(--lex-curve-fill,var(--lex-accent)); stroke:var(--lex-curve-stroke,var(--lex-highlight)); stroke-width:.3; }
 .lex-curve-bar-mode .lex-curve-bars { display:block; }
 .lex-curve-bar-mode :is(.lex-curve-line,.lex-curve-fill,.lex-curve-path-formula) { display:none; }
@@ -4189,9 +4194,8 @@ body:has(.lex-data-map-table) #main {
 .lex-map-magnifier-body { display:grid; height:calc(96vh - 160px); min-height:220px; }
 /* The crosshair: two hairlines and a ring, at the pixel under the pointer. */
 .lex-map-crosshair { position:absolute; z-index:3; width:0; height:0; pointer-events:none; }
-.lex-map-crosshair::before,.lex-map-crosshair::after { position:absolute; background:color-mix(in srgb,var(--lex-accent) 78%,transparent); content:""; }
-.lex-map-crosshair::before { top:-100vh; left:-.5px; width:1px; height:200vh; }
-.lex-map-crosshair::after { top:-.5px; left:-100vw; width:200vw; height:1px; }
+.lex-map-crosshair::before { position:absolute; top:-100vh; left:-.5px; width:1px; height:200vh; background:color-mix(in srgb,var(--lex-accent) 78%,transparent); content:""; }
+.lex-map-crosshair::after { position:absolute; top:-.5px; left:-100vw; width:200vw; height:1px; background:color-mix(in srgb,var(--lex-accent) 78%,transparent); content:""; }
 .lex-map-crosshair > span { position:absolute; width:11px; height:11px; translate:-50% -50%; border:1px solid var(--lex-accent); border-radius:50%; box-shadow:0 0 0 1px #0007; }
 
 /* A map's corner readout: what the pointer is over, beside the map itself. */

@@ -60,6 +60,30 @@ def main():
   assert narrow.evaluate("e=>e.querySelector('.lex-curve-plot').classList.contains('lex-curve-bar-mode')")
   toggle.click()
   assert toggle.inner_text()=='BARS'
+  # A wrapped strip fills the row it is in and keeps its rows down to two. The
+  # grid this replaced left the last row short of the right edge and, in a
+  # 240px card, needed three rows - 109px of a 143px card, so the strip covered
+  # the graph it belongs to.
+  page.evaluate("""()=>{const mount=document.createElement('div');
+    mount.id='wrap-mount';mount.style.cssText='width:240px;height:200px;margin-top:12px';
+    document.body.append(mount);
+    const variables=['A','B','C','D'].map(label=>({label,control:LexeditorUI.el('input',{type:'number',value:20,min:0,max:255})}));
+    mount.append(LexeditorUI.curveEditor({title:'WRAP',variables,domain:{min:1,max:100},range:{min:0,max:255},evaluate:x=>x,formula:LexeditorUI.mathFormula('N = A')}));}""")
+  wrap=page.locator('#wrap-mount .lex-curve-editor')
+  wrap.hover();page.wait_for_timeout(220)
+  strip=wrap.evaluate("""e=>{const drawer=e.querySelector('.lex-curve-variables'),
+    items=[...drawer.children].map(node=>node.getBoundingClientRect()),bands=[];
+    for(const item of [...items].sort((a,b)=>a.top-b.top)){const band=bands.find(b=>item.top<b.bottom&&item.bottom>b.top);
+      if(band){band.items.push(item);band.top=Math.min(band.top,item.top);band.bottom=Math.max(band.bottom,item.bottom)}
+      else bands.push({top:item.top,bottom:item.bottom,items:[item]})}
+    const last=bands[bands.length-1],box=drawer.getBoundingClientRect();
+    return {rows:bands.length,slack:Math.round(box.right-6-Math.max(...last.items.map(item=>item.right))),
+      share:Math.round(box.height/e.getBoundingClientRect().height*100),
+      widths:[...e.querySelectorAll('.lex-curve-variable input')].map(node=>Math.round(node.getBoundingClientRect().width))}}""")
+  assert strip['rows']<=2,strip
+  assert strip['slack']<=2,strip
+  assert strip['share']<=65,strip
+  assert len(strip['widths'])==4 and min(strip['widths'])>=70,strip
   page.mouse.move(1,1);page.wait_for_timeout(250)
   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-ff8-eight-graphs.png'))
   browser.close();print('Eight graphs: titles, borders, colors, drawer bounds and equation spacing passed.')
