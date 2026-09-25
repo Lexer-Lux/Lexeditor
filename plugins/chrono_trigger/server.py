@@ -12,6 +12,8 @@ from .archive import ResourcesBin
 from .animation_data import load_chip_animations, save_chip_animations
 from .data_map import build_data_map
 from .field_data import load_exits, load_treasure, save_exits, save_treasure
+from .gameplay_data import (load_weapons, save_weapons, load_armor, save_armor,
+                            load_helmets, save_helmets)
 from .palette_data import load_palette, palette_files, save_palette
 from .project import OverlayStore
 from .scene_data import load_scenes, save_scene
@@ -20,6 +22,7 @@ from .scene_map_data import (scene_map_files, load_scene_map, save_scene_map,
                              load_scene_render_settings, save_scene_render_settings)
 from .sprite_data import load_sprite_headers, save_sprite_header
 from .sprite_assembly_data import load_sprite_assemblies, save_sprite_assembly
+from .sprite_graphics import load_sprite_image, save_sprite_image
 from .text_data import languages, load_messages, save_messages, text_files
 from .tileset_data import load_graphics_sets, save_graphics_set, load_tile_assemblies, save_tile_assembly
 from .world_data import load_worlds, save_worlds
@@ -93,7 +96,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({
                     "apiVersion": 1, "pluginId": "chrono-trigger", "name": "Chrono Trigger",
                     "hosted": True, "windowHost": "webview2",
-                    "capabilities": ["data-map", "localization-text", "area-settings", "area-map-tiles", "field-exits", "treasure", "palettes", "world-settings", "world-navigation", "world-maps", "chip-animations", "tilesets", "sprite-descriptors", "sprite-assemblies", "project-overlay", "ctp-export"],
+                    "capabilities": ["data-map", "localization-text", "area-settings", "area-map-tiles", "field-exits", "treasure", "palettes", "world-settings", "world-navigation", "world-maps", "chip-animations", "tilesets", "sprite-descriptors", "sprite-assemblies", "sprite-graphics", "weapons", "armor", "helmets", "project-overlay", "ctp-export"],
                 })
             if route == "/api/dashboard":
                 langs = languages(STORE)
@@ -148,6 +151,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(load_sprite_headers(STORE, query.get("source", "mine")))
             if route == "/api/sprite-assemblies":
                 return self.send_json(load_sprite_assemblies(STORE, query.get("source", "mine")))
+            if route == "/api/sprite-image":
+                return self.send_json(load_sprite_image(STORE, int(query["index"]), int(query.get("bitmap", "0")), query.get("source", "mine")))
+            if route == "/api/weapons":
+                return self.send_json(load_weapons(STORE, query.get("source", "mine"), query.get("language", "en")))
+            if route == "/api/armor":
+                return self.send_json(load_armor(STORE, query.get("source", "mine"), query.get("language", "en")))
+            if route == "/api/helmets":
+                return self.send_json(load_helmets(STORE, query.get("source", "mine"), query.get("language", "en")))
             if route == "/api/datamap":
                 return self.send_json(build_data_map(STORE))
             if route == "/api/changes":
@@ -200,6 +211,14 @@ class Handler(BaseHTTPRequestHandler):
                 result = save_sprite_header(STORE, str(body["path"]), str(body["sha256"]), dict(body.get("values") or {}))
             elif route == "/api/sprite-assemblies/save":
                 result = save_sprite_assembly(STORE, str(body["path"]), str(body["sha256"]), list(body.get("edits") or []))
+            elif route == "/api/sprite-image/save":
+                result = save_sprite_image(STORE, int(body["index"]), int(body.get("bitmap", 0)), str(body["sha256"]), str(body["imageBase64"]))
+            elif route == "/api/weapons/save":
+                result = save_weapons(STORE, str(body["sha256"]), list(body.get("edits") or []), str(body.get("language", "en")))
+            elif route == "/api/armor/save":
+                result = save_armor(STORE, str(body["sha256"]), list(body.get("edits") or []), str(body.get("language", "en")))
+            elif route == "/api/helmets/save":
+                result = save_helmets(STORE, str(body["sha256"]), list(body.get("edits") or []), str(body.get("language", "en")))
             elif route == "/api/export":
                 result = STORE.export_ctp()
             elif route == "/api/revert":

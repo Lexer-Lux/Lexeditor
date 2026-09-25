@@ -115,7 +115,7 @@ def save_exits(store: OverlayStore, expected_data_sha: str, expected_offset_sha:
     return load_exits(store, "mine")
 
 
-def _item_names(store: OverlayStore, language: str, source: str) -> list[str]:
+def item_names(store: OverlayStore, language: str, source: str) -> list[str]:
     path = f"Localize/{language}/msg/item.txt"
     if not store.archive.has(path):
         return []
@@ -145,7 +145,7 @@ def load_treasure(store: OverlayStore, source: str = "mine", language: str = "en
     offset_payload, offset_origin = store.read(TREASURE_OFFSET_PATH, source)
     data_payload, data_origin = store.read(TREASURE_DATA_PATH, source)
     offsets = _offsets(offset_payload, 6, label="Takara")
-    names = _item_names(store, language, source)
+    names = item_names(store, language, source)
     rows = []
     for scene in range(max(0, len(offsets) - 1)):
         start, end = offsets[scene], offsets[scene + 1]

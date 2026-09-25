@@ -26,10 +26,18 @@ ROWS = [
     ("Game/world/colanim_bin/*_colanim.bin", "World palette-animation colors", "Edit existing flat RGB555 world animation colors. Bit 15 and any odd trailing byte are preserved.", "integrated", "worldcolors"),
     ("Game/world/EventTable/EventTable_*.dat", "World exits and triggers", "Edit existing current-PC 8-byte exits and live 3-byte triggers without changing counts. Scripted-vs-destination semantics, trigger terminators, the unknown third block, script addresses, unmodelled flag bits and trailing bytes are preserved.", "integrated", "worldnav"),
     ("Game/world/esl/Event_*.dat + map_bin + Chip + gif", "World scripts and graphics", "Current-PC world scripts and raw graphics are recognized, but this replacement does not rewrite variable script bodies or expose a raster graphics editor.", "not-integrated", None),
-    ("Game/chara/dat/c*.dat", "Sprite descriptors", "Edit documented current-PC sprite size-group bits, primary-enemy flag, animation-set index and enemy hand coordinates. Stored bitmap/assembly/palette references ignored by the PC runtime, unknown flags/enemy bytes and trailing data are preserved.", "integrated", "sprites"),
+    ("Game/chara/dat/c*.dat", "Sprite descriptors", "Edit documented current-PC sprite size-group bits, primary-enemy flag, animation-set index and enemy hand coordinates. Stored bitmap/assembly/palette references ignored by the PC runtime, unknown flags/enemy bytes and trailing data are preserved. Shows the sprite's own bitmap frame.", "integrated", "sprites"),
     ("Game/chara/cell/c*.cel", "Sprite assemblies", "Edit existing current-PC sprite-cell chip index, signed X/Y and flip-X without changing frame/tile counts. The odd stored source bit, other flag bits, header word, prefix and trailing bytes are preserved.", "integrated", "spriteassemblies"),
-    ("Game/chara/bmp + common Slot/Interval", "Sprite graphics and animations", "Current-PC sprite bitmaps and variable animation bodies are recognized but remain outside the bounded descriptor/assembly editors.", "not-integrated", None),
-    ("Game/common/*DataTable*.dat", "Gameplay tables", "Candidate item/accessory/enemy/tech/shop tables exist in the Steam archive, but no independently verified typed record schema is claimed yet.", "not-integrated", None),
+    ("Game/chara/bmp/c*.bmp", "Sprite graphics", "View each sprite's own bitmap frames (the file CTViewer's PC renderer reads directly) and replace a frame with a same-size, same-mode image. Frame 0 of a sprite also supplies the shared 16-color palette used by every other frame of that sprite.", "integrated", "sprites"),
+    ("Game/common/SlotAddress.bin + IntervalAddress.bin", "Sprite animations", "Variable per-facing animation frame/duration lists are recognized (CTViewer documents their layout) but have no bounded, resize-safe editor yet.", "not-integrated", None),
+    ("Game/common/WeaponDataTable.dat", "Weapon stats", "Edit each weapon's Attack value. Independently verified: the table's own header count matches the Steam weapon name range, and the decoded values match published Steam Attack figures for named weapons. The remaining per-record bytes have no independently verified meaning yet and are preserved.", "integrated", "weapons"),
+    ("Game/common/ArmorDataTable.dat", "Armor stats", "Edit each armor's Defense value, verified the same way as weapons (header count plus published Defense figures for named armor). Remaining per-record bytes are preserved.", "integrated", "armor"),
+    ("Game/common/HelmetDataTable.dat", "Helmet stats", "Edit each helmet's Defense value, verified the same way as weapons and armor. Remaining per-record bytes are preserved.", "integrated", "helmets"),
+    ("Game/common/AccessorieDataTable.dat + AccessorieMenuDataTable.dat", "Accessory data", "The table's own header count matches the Steam accessory name range, but no byte beyond that count has an independently verified stat meaning yet (CTViewer's accessory flag model is SNES-era and unproven for Steam). Left read-only rather than guessed at.", "not-integrated", None),
+    ("Game/common/ItemInfoDataTable.dat", "Consumable item data", "Header count matches the Steam consumable name range, but per-item effect bytes have no independently verified meaning yet.", "not-integrated", None),
+    ("Game/common/MonsterDataTable.dat + MonsterGainTable.dat", "Enemy data", "Header counts (333 records in each, consistently) are proven, but no independently verified stat schema exists yet for enemy HP/stats or EXP/GP/item drops.", "not-integrated", None),
+    ("Game/common/TechnicBaseDataTable.dat + TechnicData0Table.dat + TechnicData1Table.dat + TechnicMemberTable.dat + TechnicMpTable.dat", "Tech data", "Header counts are proven (124 techs; 72 single-character techs with their own MP-cost table) but per-tech effect/damage fields have no independently verified schema yet.", "not-integrated", None),
+    ("Game/common/ShopItemListTable.dat", "Shop inventories", "This table uses a variable per-shop layout, but the item-slot encoding has no independently verified schema yet.", "not-integrated", None),
 ]
 
 
@@ -79,9 +87,25 @@ def build_data_map(store: OverlayStore) -> dict:
         elif filename.startswith("Game/chara/cell"):
             present = any(path.startswith("Game/chara/cell/") for path in available)
         elif filename.startswith("Game/chara/bmp"):
-            present = any(path.startswith(("Game/chara/bmp/", "Game/common/Slot", "Game/common/Interval")) for path in available)
-        elif filename.startswith("Game/common/*DataTable"):
-            present = any(path.startswith("Game/common/") and "DataTable" in path for path in available)
+            present = any(path.startswith("Game/chara/bmp/") for path in available)
+        elif filename.startswith("Game/common/SlotAddress"):
+            present = {"Game/common/SlotAddress.bin", "Game/common/IntervalAddress.bin"} <= available
+        elif filename.startswith("Game/common/WeaponDataTable"):
+            present = "Game/common/WeaponDataTable.dat" in available
+        elif filename.startswith("Game/common/ArmorDataTable"):
+            present = "Game/common/ArmorDataTable.dat" in available
+        elif filename.startswith("Game/common/HelmetDataTable"):
+            present = "Game/common/HelmetDataTable.dat" in available
+        elif filename.startswith("Game/common/AccessorieDataTable"):
+            present = "Game/common/AccessorieDataTable.dat" in available
+        elif filename.startswith("Game/common/ItemInfoDataTable"):
+            present = "Game/common/ItemInfoDataTable.dat" in available
+        elif filename.startswith("Game/common/MonsterDataTable"):
+            present = "Game/common/MonsterDataTable.dat" in available
+        elif filename.startswith("Game/common/TechnicBaseDataTable"):
+            present = "Game/common/TechnicBaseDataTable.dat" in available
+        elif filename.startswith("Game/common/ShopItemListTable"):
+            present = "Game/common/ShopItemListTable.dat" in available
         actual = status if present else "not-integrated"
         rows.append({
             "filename": filename,
