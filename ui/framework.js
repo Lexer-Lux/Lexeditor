@@ -1491,7 +1491,7 @@
     if(options.cells?.length)stage.append(element("div",{class:"lex-image-map-cells"},...options.cells.map(cell=>
       element("button",{type:"button",class:cell.selected?"selected":"",title:cell.title||cell.label,
         "aria-label":cell.label,"aria-pressed":!!cell.selected,onclick:()=>options.select?.(cell.id)}))));
-    for(const point of options.points||[])stage.append(element("button",{type:"button",class:"lex-image-map-point",
+    for(const point of options.points||[])stage.append(element("button",{type:"button",class:`lex-image-map-point${point.selected?" selected":""}`,
       style:`left:${point.x*100}%;top:${point.y*100}%`,title:point.label,"aria-label":point.label,
       onclick:event=>{event.stopPropagation();point.activate?.();}}));
     if(options.place)stage.addEventListener("click",event=>{
@@ -1499,6 +1499,24 @@
       const box=stage.getBoundingClientRect();
       options.place({x:Math.max(0,Math.min(1,(event.clientX-box.left)/box.width)),y:Math.max(0,Math.min(1,(event.clientY-box.top)/box.height))});
     });
+    // What the pointer is over, in the map's own corner: the reader is looking at
+    // the map, so the answer belongs beside it rather than in another panel.
+    let readout=null;
+    if(typeof options.readout==="function"){
+      const columns=Math.max(1,Number(options.columns)||1),rows=Math.max(1,Number(options.rows)||1);
+      readout=element("div",{class:"lex-image-map-readout","aria-live":"polite",hidden:true});
+      stage.append(readout);
+      stage.addEventListener("pointermove",event=>{
+        const box=stage.getBoundingClientRect();
+        if(!box.width||!box.height)return;
+        const x=Math.max(0,Math.min(1,(event.clientX-box.left)/box.width));
+        const y=Math.max(0,Math.min(1,(event.clientY-box.top)/box.height));
+        const text=options.readout({x,y,column:Math.min(columns-1,Math.floor(x*columns)),
+          row:Math.min(rows-1,Math.floor(y*rows))});
+        readout.textContent=text==null?"":String(text);
+        readout.hidden=!readout.textContent;});
+      stage.addEventListener("pointerleave",()=>{readout.hidden=true;});
+    }
     // A region, so its label is announced; a bare div's aria-label is not.
     const root=element("div",{class:options.fill===false?"lex-image-map lex-image-map-natural":"lex-image-map",role:"region","aria-label":options.label||"Map"},stage);
     root.style.setProperty("--lex-map-ratio", String(Number(options.ratio)||4/3));
