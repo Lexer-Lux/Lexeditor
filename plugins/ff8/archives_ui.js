@@ -1,0 +1,95 @@
+// What is inside the game's archives: the entry names, their stored sizes and
+// whether they are compressed. Read-only by design - the plugin extracts what
+// it edits into the project copy, and browsing must never write to the game.
+function FF8ArchivesUI({el,columnList,pagedListDetail,detailPanel,detailSection,detailField,
+                        readonlyField,infoHelp,notice,panelLayout,shell,formatNumber}){
+  const local={archives:[],archive:"main",query:"",page:0,pageSize:60,data:null,
+    selected:null,error:"",busy:false,loaded:false,source:""};
+  async function api(path){
+    const response=await fetch(path),value=await response.json();
+    if(!response.ok)throw new Error(value.error||response.statusText);
+    return value;
+  }
+  async function loadArchives(){
+    try{const payload=await api("/api/archives");local.archives=payload.rows||[];local.source=payload.source||"";
+      if(!local.archives.some(row=>row.name===local.archive&&row.available))
+        local.archive=(local.archives.find(row=>row.available)||{name:"main"}).name;
+      local.error="";}
+    catch(error){local.error=String(error.message||error)}
+  }
+  async function loadEntries(){
+    if(!local.archive)return;
+    local.busy=true;
+    try{const query=new URLSearchParams({name:local.archive,query:local.query,
+        page:String(local.page),pageSize:String(local.pageSize)});
+      local.data=await api(`/api/archive?${query}`);local.selected=null;local.error="";}
+    catch(error){local.error=String(error.message||error);local.data=null}
+    finally{local.busy=false}
+  }
+  function readable(bytes){
+    const value=Number(bytes)||0;
+    if(value>=1024*1024)return `${formatNumber(Math.round(value/1024/1024*10)/10)} MB`;
+    if(value>=1024)return `${formatNumber(Math.round(value/1024))} KB`;
+    return `${formatNumber(value)} B`;
+  }
+  function entryDetail(row){
+    if(!row)return notice({message:"Choose an entry to see where it is stored."});
+    return detailPanel({title:row.basename,meta:row.name,body:[
+      detailSection({title:"STORED",body:[
+        detailField({label:"ARCHIVE",control:readonlyField(local.archive)}),
+        detailField({label:"ENTRY NAME",help:infoHelp("The name the archive stores, with its original folder path. FFNx matches a replacement by this name under its direct folder."),control:readonlyField(row.name)}),
+        detailField({label:"INDEX",help:infoHelp("Position of this entry in the archive's own list."),control:readonlyField(row.index)}),
+        detailField({label:"UNPACKED SIZE",help:infoHelp("How large the file is once its compression is undone."),control:readonlyField(readable(row.bytes))}),
+        detailField({label:"COMPRESSED",help:infoHelp("Whether the archive stores this entry compressed. Lexeditor writes replacements uncompressed."),control:readonlyField(row.compressed?"Yes":"No")}),
+        detailField({label:"OFFSET",help:infoHelp("Where the stored bytes begin inside the .fs file."),control:readonlyField(`0x${Number(row.offset).toString(16).toUpperCase()}`)})]}),
+      notice({message:"Browsing reads the installed archive only. Extracting an entry and repacking a whole archive are not built yet; the files this plugin edits are written to the project copy instead."})]});
+  }
+  function view(){
+    const rows=(local.data?.rows||[]).map(row=>({...row,id:row.index}));
+    const list=columnList({rows,key:row=>row.id,columns:[
+      {key:"index",label:"#",number:true,sortable:false,render:row=>row.index},
+      {key:"basename",label:"FILE",grow:1,render:row=>row.basename},
+      {key:"name",label:"STORED NAME",grow:2,render:row=>row.name},
+      {key:"bytes",label:"SIZE",numeric:true,render:row=>readable(row.bytes)},
+      {key:"compressed",label:"ZIP",render:row=>row.compressed?"●":"·"}],
+      selected:local.selected,select:id=>{local.selected=id;render()},
+      class:"ff8-record-list ff8-archive-list","aria-label":`${local.archive} entries`});
+    const picker=el("select",{onchange:event=>{local.archive=event.target.value;local.page=0;
+      local.selected=null;void loadEntries().then(render)}},
+      ...local.archives.map(row=>{const option=el("option",{value:row.name},
+        row.available?`${row.name} · ${row.entries} entries`:`${row.name} · not installed`);
+        option.disabled=!row.available;option.selected=row.name===local.archive;return option}));
+    const left=detailPanel({heading:false,className:"ff8-archive-entries",body:[
+      pagedListDetail({rows,key:row=>row.id,page:local.page,pageSize:local.pageSize,
+        noun:"entries",splitKey:"ff8-archives",rowsKey:"ff8-archives",
+        defaultSplit:60,minLeft:320,minRight:360,
+        search:{key:"ff8-archive-search",value:local.query,delay:120,label:"Search entries",
+          placeholder:"Search stored names…",change:value=>{local.query=value;local.page=0;
+            void loadEntries().then(render)}},
+        sync:value=>{local.page=value.page;local.pageSize=value.pageSize;
+          if(value.selected!==null)local.selected=value.selected},
+        change:value=>{local.page=value.page;local.pageSize=value.pageSize;
+          if(value.selected!==null)local.selected=value.selected;render()},
+        master:()=>list,
+        detail:()=>entryDetail(rows.find(entry=>entry.id===local.selected)||null)})]});
+    const status=[
+      detailField({label:"ARCHIVE",help:infoHelp("The game's own FS/FI/FL triplet. Main holds kernel, init, namedic and wm2field; field holds every field map."),control:picker}),
+      detailField({label:"ENTRIES",control:readonlyField(local.data?`${formatNumber(local.data.matched)} shown of ${formatNumber(local.data.total)}`:"—")}),
+      detailField({label:"SOURCE",help:infoHelp("The installed game. Browsing never changes it."),control:readonlyField(local.source||"—")})];
+    const right=detailPanel({heading:false,className:"ff8-archive-panel",body:[
+      detailSection({title:"ARCHIVE",body:status}),
+      local.error?notice({message:local.error,tone:"warning"}):null,
+      local.busy?notice({message:"Reading the archive list…"}):null]});
+    return panelLayout([left,right],"ff8-archives",
+      {layoutKey:"ff8-archives",defaultSizes:[1,1]});
+  }
+  function render(){
+    if(!local.loaded&&!local.busy){local.loaded=true;void loadArchives().then(()=>loadEntries()).then(render)}
+    // FF8's shell calls a view for its side effect, so this one mounts itself
+    // the way showPaged does for the record pages.
+    const node=view(),host=document.querySelector("#main");
+    if(host)host.replaceChildren(node);
+    return node;
+  }
+  return {render};
+}

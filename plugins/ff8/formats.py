@@ -19,6 +19,7 @@ from . import init_data as init_format
 from . import kernel_text
 from . import namedic
 from . import wm2field
+from . import archive_index
 from . import menu_items as menu_item_format
 from . import mngrp_text
 from . import refine_tables
@@ -297,6 +298,16 @@ def save_wm2field(edits: list[dict]) -> dict:
     """Write the changed coordinates and field IDs of that table."""
     payload = wm2field.save(edits)
     return {"saved": len(edits), "file": payload["path"], **payload}
+
+
+def archive_rows() -> dict:
+    """What the installed game's archives hold, without reading entry contents."""
+    return archive_index.archives()
+
+
+def archive_entries(name: str, query: str = "", page: int = 0,
+                    page_size: int = archive_index.DEFAULT_PAGE_SIZE) -> dict:
+    return archive_index.entries(name, query, page, page_size)
 
 
 def shop_rows(dataset: str = "current") -> dict:
@@ -1178,6 +1189,7 @@ def data_map_rows() -> dict:
         {"filename": "menu/mngrp.bin", "controls": "Tutorial text and all 377 refine/card-mod recipes", "notes": "Editable: proved text and recipe tables. Locked: scripts, text-box maps, images.", "status": "partial"},
         {"filename": "main.fs → namedic.bin", "controls": "The game's own name list: world place names and the words its text inserts", "notes": "Editable: all 32 names. A name of any length up to the file's 64 KB of offsets.", "status": "integrated"},
         {"filename": "main.fs → wm2field.tbl", "controls": "World to field: where each stored world position sends the player", "notes": "Editable: X, Y, Z and the field ID of all 72 entries. The unnamed byte and fifteen tail bytes are preserved.", "status": "integrated"},
+        {"filename": "ff8/*.fs + .fi + .fl archives", "controls": "What the game's archives hold: every stored entry name, size and compression flag", "notes": "Browse only: the list, with search and paging, reads metadata and never entry contents. Extracting an entry and repacking an archive are not built.", "status": "partial"},
         {"filename": "battle/c0m*.dat", "controls": "Enemy stats, actions, battle AI, battle text; battle model inventory and textures", "notes": "Editable: proved AI scripts, dialogue lines, whole-model replacement. Locked: unknown tails, undecoded battle files.", "status": "partial"},
         {"filename": "battle/scene.out", "controls": "Battle formations, stages, cameras, enemy slots and levels", "notes": "Editable: all supported record fields. Locked: unresolved special level bytes.", "status": "integrated"},
         {"filename": "world.fs / world/dat/wmx.obj + wmsetus.obj + rail.obj + texl.obj", "controls": "World map cells, encounters, draw points, sky colors, rails and textures", "notes": "Editable: proved map and texture fields. Locked: draw-point magic data (lives in the exe).", "status": "partial"},
@@ -1199,6 +1211,7 @@ def data_map_rows() -> dict:
         "menu/mitem.bin": ["items"], "menu/mngrp.bin": ["text", "refine"],
         "main.fs → namedic.bin": ["names"],
         "main.fs → wm2field.tbl": ["world"],
+        "ff8/*.fs + .fi + .fl archives": ["archives"],
         "battle/c0m*.dat": ["enemies", "models"], "battle/scene.out": ["encounters"],
         "FF8_EN.exe": ["cards", "text", "enemies"],
         "ff8/en/exe/battle_scans.msd": ["enemies"],

@@ -220,6 +220,12 @@ class Handler(PluginRequestHandler):
                 self.json_response(formats.namedic_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/wm2field":
                 self.json_response(formats.wm2field_rows(query.get("dataset", ["current"])[0]))
+            elif path == "/api/archives":
+                self.json_response(formats.archive_rows())
+            elif path == "/api/archive":
+                self.json_response(formats.archive_entries(
+                    query.get("name", ["main"])[0], query.get("query", [""])[0],
+                    int(query.get("page", ["0"])[0]), int(query.get("pageSize", ["60"])[0])))
             elif path == "/api/shops":
                 self.json_response(formats.shop_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/weapons":
