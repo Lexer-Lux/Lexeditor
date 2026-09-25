@@ -7609,3 +7609,10 @@ body { text-shadow: var(--lex-text-shadow, none); }
   box-sizing:border-box;
   resize:vertical;
 }
+/* A Data Map line being reworded in the developer page. */
+.lex-data-map-scope > .lex-label-rename,
+.lex-data-map-notes > .lex-label-rename {
+  width:100%;
+  min-width:0;
+  font:inherit;
+}

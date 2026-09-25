@@ -8549,9 +8549,15 @@ ${contents.path}`});
     const saved = dataMapState.get(stateKey) || {pageSize:15, selected:null};
     dataMapState.set(stateKey, saved);
     const labels = {integrated:"Integrated", partial:"Partial", "not-integrated":"Not integrated"};
-    const status = row => Object.hasOwn(labels,row.status) ? row.status : "not-integrated";
-    const label = row => labels[status(row)];
-    const coverage = row => row.coverage;
+        const status = row => Object.hasOwn(labels,row.status) ? row.status : "not-integrated";
+        const label = row => labels[status(row)];
+        const coverage = row => row.coverage;
+        // The file is the row's identity, so it is the key for the two prose
+        // lines a developer can reword. The handler is delegated: the detail
+        // pane is rebuilt whenever a row is clicked, and a listener on the line
+        // itself would be thrown away between the two clicks of a double-click.
+        const proseKey = (row, field) =>
+          `${plugin}-${activePageTab()}.datamap.${row.filename}.${field}`;
     const keyOf = row => row.id || `${row.filename}\u001f${row.controls || ""}`;
     const query = String(options.query || "").trim().toLocaleLowerCase();
     const wanted = options.status || "";
@@ -8567,8 +8573,17 @@ ${contents.path}`});
         const option=element("option",{value},text);option.selected=value===wanted;return option;
       }));
     const detail = row => {
-      const body = [element("p",{class:"lex-data-map-scope"},row.controls || "No mapped interface"),
-        element("p",{class:"lex-data-map-notes"},row.notes || "No further notes.")];
+      // Both prose lines carry the sentence they shipped with, so a reworded
+      // line can be traced back to it: clearing the line restores the shipped
+      // sentence rather than leaving an empty paragraph.
+      const shippedControls = row.controls || "No mapped interface";
+      const shippedNotes = row.notes || "No further notes.";
+      const prose = (className, field, shipped) => element("p",
+        {class: className, "data-lex-shipped": shipped, "data-lex-prose": field},
+        element("span", {class: "lex-data-map-prose"},
+          savedLabel(proseKey(row, field), shipped)));
+      const body = [prose("lex-data-map-scope", "controls", shippedControls),
+        prose("lex-data-map-notes", "notes", shippedNotes)];
       const actions=[];
       const targets = row.targets || (row.target || row.view ? [{id:row.target || row.view,label:row.target || row.view}] : []);
       if (["structured","view"].includes(coverage(row)) && options.open) {
@@ -8611,6 +8626,20 @@ ${contents.path}`});
           {key:"filename",label:"Filename",sortable:true,align:"start"},
           {key:"controls",label:"What it controls",sortable:true,align:"start"}]}),
       detail,
+    });
+    // A delegated listener on the whole view: the detail pane's lines are
+    // rebuilt whenever a row is clicked, so the handler has to live above them.
+    content.addEventListener("dblclick", event => {
+      if (!sharedSettingsSnapshot?.developerMode) return;
+      const line = event.target?.closest?.("[data-lex-prose]");
+      if (!line || !content.contains(line)) return;
+      const row = (options.rows || []).find(candidate => keyOf(candidate) === saved.selected);
+      const text = line.querySelector(":scope > .lex-data-map-prose");
+      if (!row || !text) return;
+      event.preventDefault();
+      event.stopPropagation();
+      renameInPlace(proseKey(row, line.dataset.lexProse), activePageTab(),
+        line.dataset.lexShipped || text.textContent, text);
     });
     return {controls:[],content,page,pages:Math.max(1,Math.ceil(filtered.length/saved.pageSize)),filtered};
   };
