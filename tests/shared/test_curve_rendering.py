@@ -99,3 +99,48 @@ def test_formula_terms_follow_curve_after_resize_and_scale():
                 assert page.locator('.lex-curve-plot').evaluate('n=>n.scrollWidth<=n.clientWidth+1')
         finally:
             browser.close()
+
+
+def test_the_least_and_greatest_values_read_in_the_accent_and_the_equation_is_legible():
+    """The graph's own numbers are graph ink, and its equation can be read.
+
+    The curve's minimum and maximum were plain body text with no rule of their
+    own, so they read as grey labels between other words, and the equation
+    drawn over the line was set at 11px.
+    """
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={"width": 1000, "height": 700})
+            page.route('http://fixture/**', lambda route: route.fulfill(
+                body='<main id="main"></main>', content_type='text/html'))
+            page.goto('http://fixture/')
+            page.add_style_tag(path=str(ROOT / 'ui/framework.css'))
+            page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
+            page.evaluate('''() => {
+                const UI=LexeditorUI;
+                const curve=UI.curveEditor({title:'HP', range:{min:0,max:100},
+                    domain:{min:1,max:10}, evaluate:x=>x*x,
+                    formula:UI.mathFormula('HP(L)=L^2')});
+                document.querySelector('main').append(UI.curveGrid(curve));
+            }''')
+            page.wait_for_timeout(200)
+            measured = page.evaluate('''() => {
+                const accent=getComputedStyle(document.documentElement)
+                    .getPropertyValue('--lex-accent').trim();
+                const probe=document.createElement('span');
+                probe.style.color=accent;
+                document.body.append(probe);
+                const wanted=getComputedStyle(probe).color;
+                probe.remove();
+                const minimum=getComputedStyle(document.querySelector('.lex-curve-minimum')).color;
+                const maximum=getComputedStyle(document.querySelector('.lex-curve-maximum')).color;
+                const formula=getComputedStyle(document.querySelector('.lex-curve-path-formula'));
+                return {wanted, minimum, maximum,
+                    formulaSize: parseFloat(formula.fontSize)};
+            }''')
+            assert measured['minimum'] == measured['wanted'], measured
+            assert measured['maximum'] == measured['wanted'], measured
+            assert measured['formulaSize'] >= 12.5, measured
+        finally:
+            browser.close()

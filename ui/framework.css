@@ -7616,3 +7616,8 @@ body { text-shadow: var(--lex-text-shadow, none); }
   min-width:0;
   font:inherit;
 }
+/* The curve's own least and greatest values read in the accent ink: they are
+   the graph's numbers, not body text sitting between other labels. The
+   equation on the line is drawn from the same token a game can tune. */
+.lex-curve-minimum, .lex-curve-maximum { color:var(--lex-accent); }
+.lex-curve-path-formula { font-size:var(--lex-curve-formula-size, 13px); }
