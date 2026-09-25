@@ -1484,6 +1484,33 @@
           item.footer == null ? null : element("div", {class: "lex-figure-footer"}, item.footer));
       }));
 
+  // The large view behind a map's magnifier: the caller's own map options drawn
+  // bigger, with a crosshair and a live readout. A placement runs the caller's
+  // handler and then redraws this view, so the marker shows where the record is
+  // now instead of where it was when the panel was drawn.
+  const mapMagnifier = (options = {}) => {
+    const backdrop=element("div",{class:"lex-dialog-backdrop lex-map-magnifier-backdrop","data-lex-history-control":true});
+    const note=element("p",{class:"lex-map-magnifier-note"});
+    const body=element("div",{class:"lex-map-magnifier-body"});
+    const close=()=>{document.removeEventListener("keydown",onKey,true);backdrop.remove();};
+    const onKey=event=>{if(event.key==="Escape"){event.preventDefault();close();}};
+    const draw=()=>{
+      const spec=options.magnify()||{},place=spec.place;
+      note.textContent=spec.note||"Point at the map to read the value, then click to place the point.";
+      body.replaceChildren(imageMap({...spec,fill:true,magnify:null,crosshair:true,
+        place:place?point=>{place(point);draw();}:undefined}));
+    };
+    const done=element("button",{type:"button",class:"lex-dialog-action primary",onclick:close},"Close");
+    backdrop.append(element("section",{class:"lex-dialog lex-map-magnifier-dialog",role:"dialog","aria-modal":"true",
+      "aria-label":`${options.label||"Map"}, full size`},
+      element("h2",{},options.label||"Map"),note,body,element("div",{class:"lex-dialog-actions"},done)));
+    document.body.append(backdrop);
+    document.addEventListener("keydown",onKey,true);
+    draw();
+    done.focus();
+    return backdrop;
+  };
+
   // Map coordinates are fractions of the image, independent of UI zoom.
   const imageMap = (options = {}) => {
     const stage=element("div",{class:"lex-image-map-stage",style:`aspect-ratio:${Number(options.ratio)||4/3};--lex-map-columns:${Number(options.columns)||1};--lex-map-rows:${Number(options.rows)||1}`},
@@ -1500,22 +1527,29 @@
       options.place({x:Math.max(0,Math.min(1,(event.clientX-box.left)/box.width)),y:Math.max(0,Math.min(1,(event.clientY-box.top)/box.height))});
     });
     // What the pointer is over, in the map's own corner: the reader is looking at
-    // the map, so the answer belongs beside it rather than in another panel.
+    // the map, so the answer belongs beside it rather than in another panel. The
+    // large view keeps that line and adds a crosshair, because the reader who
+    // opens it is placing a point and has to see which pixel they are on.
     let readout=null;
-    if(typeof options.readout==="function"){
+    if(typeof options.readout==="function"||options.crosshair){
       const columns=Math.max(1,Number(options.columns)||1),rows=Math.max(1,Number(options.rows)||1);
-      readout=element("div",{class:"lex-image-map-readout","aria-live":"polite",hidden:true});
+      readout=element("div",{class:"lex-image-map-readout","aria-live":"polite",hidden:!options.crosshair});
       stage.append(readout);
+      const crosshair=options.crosshair?element("div",{class:"lex-map-crosshair","aria-hidden":"true"},element("span",{})):null;
+      if(crosshair)stage.append(crosshair);
       stage.addEventListener("pointermove",event=>{
         const box=stage.getBoundingClientRect();
         if(!box.width||!box.height)return;
         const x=Math.max(0,Math.min(1,(event.clientX-box.left)/box.width));
         const y=Math.max(0,Math.min(1,(event.clientY-box.top)/box.height));
-        const text=options.readout({x,y,column:Math.min(columns-1,Math.floor(x*columns)),
-          row:Math.min(rows-1,Math.floor(y*rows))});
+        if(crosshair){crosshair.style.left=`${x*100}%`;crosshair.style.top=`${y*100}%`;crosshair.hidden=false;}
+        const text=typeof options.readout==="function"
+          ? options.readout({x,y,column:Math.min(columns-1,Math.floor(x*columns)),
+              row:Math.min(rows-1,Math.floor(y*rows))})
+          : `${Math.round(x*100)}%, ${Math.round(y*100)}%`;
         readout.textContent=text==null?"":String(text);
         readout.hidden=!readout.textContent;});
-      stage.addEventListener("pointerleave",()=>{readout.hidden=true;});
+      stage.addEventListener("pointerleave",()=>{readout.hidden=!options.crosshair;if(crosshair)crosshair.hidden=true;});
     }
     // A region, so its label is announced; a bare div's aria-label is not.
     const root=element("div",{class:options.fill===false?"lex-image-map lex-image-map-natural":"lex-image-map",role:"region","aria-label":options.label||"Map"},stage);
@@ -1523,6 +1557,15 @@
     const image=stage.querySelector('img');
     if(image&&!options.ratio){const fit=()=>{if(!image.naturalWidth||!image.naturalHeight)return;const ratio=image.naturalWidth/image.naturalHeight;root.style.setProperty('--lex-map-ratio',String(ratio));stage.style.aspectRatio=String(ratio)};image.addEventListener('load',fit);fit();}
     root.lexStage=stage;
+    // A map in a panel is small, and a stored coordinate is not. The magnifier
+    // opens the same map at the size of the window, with the same markers and the
+    // same click, so a point is placed against the art. `magnify` returns that
+    // view's options from the caller's own state, so each placement redraws the
+    // markers where the record is now.
+    if(typeof options.magnify==="function")
+      root.append(element("button",{type:"button",class:"lex-image-map-magnify",
+        title:"Open the large map","aria-label":`Open the large map: ${options.label||"map"}`,
+        onclick:event=>{event.stopPropagation();mapMagnifier(options);}},magnifyIcon()));
     return root;
   };
 
@@ -7552,6 +7595,26 @@ ${contents.path}`});
     return svg;
   };
 
+  // A magnifier with a plus: the control that opens a map at full size.
+  const magnifyIcon = () => {
+    const namespace = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(namespace, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    const circle = document.createElementNS(namespace, "circle");
+    circle.setAttribute("cx", "10.5"); circle.setAttribute("cy", "10.5"); circle.setAttribute("r", "6.5");
+    const handle = document.createElementNS(namespace, "path");
+    handle.setAttribute("d", "m15.5 15.5 5 5");
+    const plus = document.createElementNS(namespace, "path");
+    plus.setAttribute("d", "M10.5 7.5v6M7.5 10.5h6");
+    svg.append(circle, handle, plus);
+    return svg;
+  };
+
   let activeSearcher = null;
   const finishSearcher = (navigateOrigin = true) => {
     if (!activeSearcher) return;
@@ -8933,7 +8996,7 @@ ${contents.path}`});
       paged)
   };
 
-  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 

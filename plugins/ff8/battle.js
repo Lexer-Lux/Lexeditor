@@ -94,6 +94,13 @@
   // Packed block coordinates: FF8UltimateEditor/Cid/drawmapwidget.py.
   function worldDrawPosition(point){return {x:point.x&127,y:2*point.y+(point.x>>7)}}
   function worldDrawBytes(x,y){return {x:(x&127)|((y&1)<<7),y:y>>1}}
+  // A click on the map, read back as what the record stores: a draw point is a
+  // block of the 128 by 96 grid, and a field return is a world coordinate. These
+  // are the other direction of the two conversions that put a marker on the map.
+  function worldDrawBlock(point){return {x:Math.max(0,Math.min(127,Math.round(point.x*128))),
+    y:Math.max(0,Math.min(95,Math.round(point.y*96)))}}
+  function worldMapCoordinate(point){return {x:Math.round((point.x*128-64)*2048),
+    z:Math.round((point.y*96-48)*2048)}}
   const worldVisualView={scale:1,x:0,y:0};
   function worldMapNavigation(panel,stage){
     const view=worldVisualView,apply=()=>{stage.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.scale})`};apply();
@@ -144,35 +151,50 @@
   // Where a record sits on the world map, for a panel that has to show it. The
   // map carries the same markers and the same click the Map page uses, so a
   // point can be placed from the page that owns it.
+  // One map, two sizes. `points` is asked for again after each placement, so the
+  // marker in the panel and the marker in the magnifier both show where the
+  // record is now.
+  function worldLocationOptions(options){
+    return {fill:false,columns:32,rows:24,ratio:4/3,label:options.label,
+      image:`/assets/world-map.png?dataset=${encodeURIComponent(worldTextureDataset())}&v=${encodeURIComponent(state.data.world.sha256)}`,
+      points:typeof options.points==="function"?options.points():options.points,
+      cells:options.cells,select:options.select,place:options.place,
+      readout:options.readout,note:options.note};
+  }
   function worldLocationMap(options){
     // Unfilled, so the map takes the section's width and its own aspect ratio: a
     // filled map fills a panel, and a panel's sections have no height to fill.
-    const map=LexeditorUI.imageMap({fill:false,columns:32,rows:24,ratio:4/3,label:options.label,
-      image:`/assets/world-map.png?dataset=${encodeURIComponent(worldTextureDataset())}&v=${encodeURIComponent(state.data.world.sha256)}`,
-      points:options.points,cells:options.cells,select:options.select,place:options.place});
+    const map=LexeditorUI.imageMap({...worldLocationOptions(options),
+      magnify:()=>worldLocationOptions(options)});
     worldMapNavigation(map,map.lexStage);
     return map;
   }
   function worldDrawPointDetail(row,prefs){
     // The world map itself, not a blank grid: the point sits where the map puts it,
     // and clicking the map moves it there.
-    const position=worldDrawPosition(row),map=worldLocationMap({
+    const map=worldLocationMap({
       label:`Set Draw Point ${row.drawId} position`,
-      points:position.y>=96?[]:[{x:position.x/128,y:position.y/96,selected:true,
-        label:`Draw Point ${row.drawId}`}],
-      place:point=>{Object.assign(row,worldDrawBytes(Math.max(0,Math.min(127,Math.round(point.x*128))),Math.max(0,Math.min(95,Math.round(point.y*96)))));rerenderWorldMap();shell.refresh()}});
+      points:()=>{const at=worldDrawPosition(row);return at.y>=96?[]:[{x:at.x/128,y:at.y/96,selected:true,
+        label:`Draw Point ${row.drawId}`}];},
+      readout:point=>{const block=worldDrawBlock(point);return `block ${block.x}, ${block.y}`},
+      note:"Click the map to place the Draw Point. The grid is 128 blocks across and 96 down, and the crosshair names the block under the pointer.",
+      place:point=>{const block=worldDrawBlock(point);Object.assign(row,worldDrawBytes(block.x,block.y));rerenderWorldMap();shell.refresh()}});
 
     return sharedDetail({...row,name:`DRAW POINT ${row.drawId}`},prefs,[detailSection({className:"world-draw-position",title:"WORLD POSITION",help:infoHelp("Section 34 stores only this world Draw Point's X, Y, and sub-ID bytes. Its magic, quantity, and refill behavior live in FF8_EN.exe and are not invented here."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},el("p",{class:"world-draw-help"},"Click the map to place the point, or enter exact byte coordinates below."),detailField({label:"X",help:infoHelp(worldPropertyHelp.drawPoint.x),control:worldNumber(row,"x",0,255,`Draw Point ${row.drawId} X`)}),detailField({label:"Y",help:infoHelp(worldPropertyHelp.drawPoint.y),control:worldNumber(row,"y",0,255,`Draw Point ${row.drawId} Y`)}),detailField({label:"SUB-ID",help:infoHelp(worldPropertyHelp.drawPoint.subId),control:worldNumber(row,"subId",0,255,`Draw Point ${row.drawId} sub-ID`)}))],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
   }
   function worldFieldReturnDetail(row,prefs){
     // The map, so the reader can see where the stored point lands: the coordinates are
     // world units, and codex/ff8/world-terrain.md records how they reach the map image.
-    const at=worldMapFraction(row.x,row.z),map=worldLocationMap({
+    const map=worldLocationMap({
       label:`World position of field return ${row.id}`,
-      points:(row.x===0&&row.z===0)||at.x<0||at.x>1||at.y<0||at.y>1?[]
-        :[{x:at.x,y:at.y,selected:true,label:`Field return ${row.id}`}]});
+      points:()=>{const at=worldMapFraction(row.x,row.z);
+        return (row.x===0&&row.z===0)||at.x<0||at.x>1||at.y<0||at.y>1?[]
+          :[{x:at.x,y:at.y,selected:true,label:`Field return ${row.id}`}];},
+      readout:point=>{const at=worldMapCoordinate(point);return `x ${formatNumber(at.x)}, z ${formatNumber(at.z)}`},
+      note:"Click the map to place this record. The map position is a fit to the stored world coordinates, recorded in codex/ff8/world-terrain.md, and the crosshair names the coordinate under the pointer.",
+      place:point=>{const at=worldMapCoordinate(point);row.x=at.x;row.z=at.z;rerenderWorldMap();shell.refresh()}});
     return sharedDetail({...row,name:`FIELD RETURN ${row.id}`},prefs,[
-      detailSection({title:"FIELD → WORLD POSITION",help:infoHelp("OpenVIII proves this as one entry in wmset section 9's field-to-world coordinate table. The entry index is a transition-location index, not a field ID. Lexeditor preserves the unresolved fourth word."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},detailField({label:"X",help:infoHelp(worldPropertyHelp.fieldReturn.x),control:worldNumber(row,"x",-2147483648,2147483647,`Field return ${row.id} X`)}),detailField({label:"Y",help:infoHelp(worldPropertyHelp.fieldReturn.y),control:worldNumber(row,"y",-32768,32767,`Field return ${row.id} Y`)}),detailField({label:"Z",help:infoHelp("Z coordinate for this record. Changing it moves the stored world position."),control:worldNumber(row,"z",-2147483648,2147483647,`Field return ${row.id} Z`)}),detailField({label:"UNRESOLVED WORD",help:infoHelp("The final signed 16-bit word in this record has no proved gameplay name. It remains visible and byte-preserved, but cannot be edited as a guessed property."),control:readonlyField(row.unknown)}))],{columns:2,minWidth:300})]})],"world-map-detail world-field-return")}
+      detailSection({title:"FIELD → WORLD POSITION",help:infoHelp("OpenVIII proves this as one entry in wmset section 9's field-to-world coordinate table. The entry index is a transition-location index, not a field ID. Lexeditor preserves the unresolved fourth word."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},LexeditorUI.detailNote("Click the map to place this record, or enter exact coordinates below."),detailField({label:"X",help:infoHelp(worldPropertyHelp.fieldReturn.x),control:worldNumber(row,"x",-2147483648,2147483647,`Field return ${row.id} X`)}),detailField({label:"Y",help:infoHelp(worldPropertyHelp.fieldReturn.y),control:worldNumber(row,"y",-32768,32767,`Field return ${row.id} Y`)}),detailField({label:"Z",help:infoHelp("Z coordinate for this record. Changing it moves the stored world position."),control:worldNumber(row,"z",-2147483648,2147483647,`Field return ${row.id} Z`)}),detailField({label:"UNRESOLVED WORD",help:infoHelp("The final signed 16-bit word in this record has no proved gameplay name. It remains visible and byte-preserved, but cannot be edited as a guessed property."),control:readonlyField(row.unknown)}))],{columns:2,minWidth:300})]})],"world-map-detail world-field-return")}
   function worldSkyDetail(row,prefs){return sharedDetail({...row,name:`SKY RECORD ${row.id}`},prefs,[detailSection({title:"WORLD POSITION",help:infoHelp("The record holds two world coordinates and then a fade distance, in the stored order X, Z, RANGE. The first two say where the zone applies; the third says how far its colours fade."),body:[detailField({label:"X",help:infoHelp("X coordinate for this record. Changing it moves the stored world position."),control:worldNumber(row,"x",-2147483648,2147483647,`Sky record ${row.id} X`)}),detailField({label:"RANGE",help:infoHelp("Fade distance in world units. The shipped records use round values - 16384, 24576, 40960 - which is how a distance reads rather than a coordinate. How the game fades between zones is not established."),control:worldNumber(row,"y",-2147483648,2147483647,`Sky record ${row.id} fade range`)}),detailField({label:"Z",help:infoHelp("World Z coordinate of this lighting zone. The zone applies around the point X, Z."),control:worldNumber(row,"z",-2147483648,2147483647,`Sky record ${row.id} Z`)})]}),detailSection({className:"world-sky-colors",title:"SKY AND AMBIENT COLOURS",help:infoHelp("OpenVIII proves five RGB triples in each section 33 record. Lexeditor preserves each unused fourth colour byte and the unresolved record tail."),body:[detailField({label:"SHADOWS",help:infoHelp("Ambient shadow colour for this world colour record. Choose a colour and test the result at this location."),control:worldColor(row,"shadows",`Sky record ${row.id} shadows colour`)}),detailField({label:"VEHICLES",help:infoHelp("Vehicle colour value stored in this world colour record."),control:worldColor(row,"vehicles",`Sky record ${row.id} vehicles colour`)}),detailField({label:"SKY TOP",help:infoHelp("Colour at the top of the sky gradient."),control:worldColor(row,"skyTop",`Sky record ${row.id} sky top colour`)}),detailField({label:"SKY CENTRE",help:infoHelp("Colour in the middle of the sky gradient."),control:worldColor(row,"skyCenter",`Sky record ${row.id} sky centre colour`)}),detailField({label:"SKY BOTTOM",help:infoHelp("Colour at the bottom of the sky gradient."),control:worldColor(row,"skyBottom",`Sky record ${row.id} sky bottom colour`)})]})],"world-map-detail world-sky-detail")}
   function worldSegmentDetail(row){
     const region=worldRow(state.data,"region",row.id),blocks=LexeditorUI.tileGrid(row.blocks.map(block=>detailSection({title:`Block ${block.id}`,body:[detailField({label:"Polygons",control:readonlyField(block.polygonCount)}),detailField({label:"Vertices",control:readonlyField(block.vertexCount)})]})));

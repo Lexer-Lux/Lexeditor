@@ -52,3 +52,52 @@ def test_image_map_bounds_and_fractional_selection(zoom):
             assert page.get_by_role('button',name='Natural center').is_visible()
         finally:
             browser.close()
+
+
+def test_magnifier_opens_the_same_map_at_the_size_of_the_window():
+    """A small panel map is hard to place a point on exactly.
+
+    The magnifier draws the caller's own map bigger, with a crosshair and a live
+    readout, and a click inside it runs the same placement handler.
+    """
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={'width': 1280, 'height': 900})
+            page.route('http://fixture/**', lambda route: route.fulfill(
+                body='<div id="host" style="width:420px;height:280px"></div>', content_type='text/html'))
+            page.goto('http://fixture/')
+            page.add_style_tag(path=str(ROOT / 'ui/framework.css'))
+            page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
+            page.evaluate('''() => {
+                window.placed = [];
+                window.spec = () => ({
+                    ratio: 4 / 3, columns: 8, rows: 8, label: 'Fixture map',
+                    points: [{x: .25, y: .25, label: 'Fixture point'}],
+                    place: point => placed.push(point),
+                    readout: point => `cell ${point.column}, ${point.row}`,
+                });
+                const map = LexeditorUI.imageMap({...spec(), magnify: () => spec()});
+                document.querySelector('#host').append(map);
+            }''')
+            small = page.locator('.lex-image-map-stage').bounding_box()
+            page.get_by_role('button', name='Open the large map: Fixture map').click()
+            dialog = page.locator('.lex-map-magnifier-dialog')
+            assert dialog.is_visible()
+            large = page.locator('.lex-map-magnifier-body .lex-image-map-stage').bounding_box()
+            assert large['width'] > small['width'] * 1.5, (small, large)
+            assert abs(large['width'] / large['height'] - 4 / 3) < .02
+            page.mouse.move(large['x'] + large['width'] * .5, large['y'] + large['height'] * .5)
+            assert page.evaluate(
+                "document.querySelector('.lex-map-magnifier-body .lex-image-map-readout').textContent") == 'cell 4, 4'
+            crosshair = page.evaluate("""()=>{const node=document.querySelector('.lex-map-magnifier-body .lex-map-crosshair');
+              return {hidden:node.hidden,left:node.style.left,top:node.style.top}}""")
+            assert crosshair == {'hidden': False, 'left': '50%', 'top': '50%'}, crosshair
+            page.mouse.click(large['x'] + large['width'] * .25, large['y'] + large['height'] * .75)
+            placed = page.evaluate('placed[0]')
+            assert abs(placed['x'] - .25) < .01 and abs(placed['y'] - .75) < .01, placed
+            assert dialog.is_visible(), 'the large map stays open, so a point can be nudged'
+            page.keyboard.press('Escape')
+            assert page.locator('.lex-map-magnifier-dialog').count() == 0
+        finally:
+            browser.close()

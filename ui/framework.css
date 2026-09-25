@@ -4172,13 +4172,27 @@ body:has(.lex-data-map-table) #main {
 /* A map image with cell selection and point markers. */
 .lex-image-map { display:grid; place-items:center; container-type:size; position:relative; min-width:0; min-height:200px; height:100%; overflow:hidden; background:var(--lex-panel-2); }
 .lex-image-map-natural { container-type:inline-size; height:auto; aspect-ratio:var(--lex-map-ratio); }
-.lex-image-map-natural > /* A picked marker on a map reads as picked, the way a picked cell does. */
 /* A picked marker on a map reads as picked, the way a picked cell does.
    A sky zone's marker is a different record on the same map, so it reads in
    another colour rather than as another draw point. */
 .lex-image-map-point.selected { outline:2px solid var(--lex-highlight); outline-offset:1px; }
 .lex-image-map-point.world-sky-point { background:var(--lex-panel);
   border-color:var(--lex-highlight); }
+
+/* The magnifier: the same map at the size of the window, for placing a point
+   against the art instead of guessing from a small panel. */
+.lex-image-map-magnify { position:absolute; z-index:5; top:6px; right:6px; display:grid; width:30px; height:30px; min-width:30px; padding:0; place-items:center; color:var(--lex-text); border:1px solid var(--lex-border); border-radius:var(--lex-radius); background:color-mix(in srgb,var(--lex-panel) 86%,transparent); }
+.lex-image-map-magnify > svg { width:18px; height:18px; }
+.lex-image-map-magnify:hover,.lex-image-map-magnify:focus-visible { color:var(--lex-accent); border-color:var(--lex-highlight); }
+.lex-map-magnifier-dialog { width:min(1600px,96vw); max-height:96vh; }
+.lex-map-magnifier-note { margin:0 0 8px; color:var(--lex-muted); font-size:.86em; }
+.lex-map-magnifier-body { display:grid; height:calc(96vh - 160px); min-height:220px; }
+/* The crosshair: two hairlines and a ring, at the pixel under the pointer. */
+.lex-map-crosshair { position:absolute; z-index:3; width:0; height:0; pointer-events:none; }
+.lex-map-crosshair::before,.lex-map-crosshair::after { position:absolute; background:color-mix(in srgb,var(--lex-accent) 78%,transparent); content:""; }
+.lex-map-crosshair::before { top:-100vh; left:-.5px; width:1px; height:200vh; }
+.lex-map-crosshair::after { top:-.5px; left:-100vw; width:200vw; height:1px; }
+.lex-map-crosshair > span { position:absolute; width:11px; height:11px; translate:-50% -50%; border:1px solid var(--lex-accent); border-radius:50%; box-shadow:0 0 0 1px #0007; }
 
 /* A map's corner readout: what the pointer is over, beside the map itself. */
 .lex-image-map-readout {
