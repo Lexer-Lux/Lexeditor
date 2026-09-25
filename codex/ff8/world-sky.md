@@ -50,10 +50,9 @@ is unaffected.
   proved by any source read here. OpenVIII has no sky module in its tree and the
   FF8 decompilation names no sky or fog symbols, so this is a gap, not a
   settled fact.
-- **Where the zones sit on the map image.** The Map page could show these
-  records as markers, and the geometry page gives a candidate scale for that:
-  `wmx.obj` vertex coordinates divide stored units by 2048 to reach the 128 by
-  96 block grid, and the zones' coordinates are in the same order of magnitude.
-  The origin and axis directions are not proved, so no marker is drawn from a
-  guess. Proving it needs one known landmark: a zone or field-return record
-  whose place on the map can be checked independently.
+- **Where the zones sit on the map image.** Answered since this page was
+  written: the world-to-map projection was calibrated and its evidence is in
+  [world-terrain.md](world-terrain.md) (column = x/2048 + 64, row = z/2048 + 48
+  on the 128 by 96 grid). The Map page draws each zone as a marker from it, and
+  the fit is a calibration, not a proved origin - which is why the sky panel
+  says so when a record is moved by hand.
