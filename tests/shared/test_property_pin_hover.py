@@ -2,6 +2,74 @@
 from test_shared_ui_feedback import page, framework
 
 
+PANEL = '''() => {
+  const U=LexeditorUI;
+  const main=document.querySelector('main');
+  // A narrow panel puts the value box's right edge where the panel body ends,
+  // which is the width at which the mark was being cut.
+  main.style.cssText='position:absolute;inset:0;padding:20px;width:520px';
+  const prefs=U.columnPreferences('pin-mark',[
+    {key:'alpha',label:'Alpha'},{key:'beta',label:'Beta',pinned:false}],()=>{});
+  const number=value=>U.element('input',{type:'number',value});
+  main.replaceChildren(U.detailPanel({title:'Probe',body:[
+    U.detailField({label:'Alpha',control:number(3),pin:prefs.pinButton('alpha','Alpha')}),
+    U.detailField({label:'Beta',control:number(4),pin:prefs.pinButton('beta','Beta')})]}));
+}'''
+
+
+def _pin_mark(page, key):
+    """Colour and opacity of one pin, as the screen draws them."""
+    return page.locator(f'[data-lex-pin-column="{key}"]').evaluate(
+        'el=>{const s=getComputedStyle(el);return [s.color, Number(s.opacity)];}')
+
+
+def test_a_pinned_pin_keeps_its_own_mark_when_its_row_is_hovered(page):
+    """The ghost belongs to a pin that is not in the column.
+
+    Pointing at a row used to dim the pin that was already stuck in, so the
+    mark that said "this property is in the table" looked exactly like the mark
+    that said it was not. The two states are measured rather than compared as
+    images, because the same icon draws both.
+    """
+    framework(page)
+    page.evaluate(PANEL)
+    page.wait_for_timeout(200)
+    alpha_rest, beta_rest = _pin_mark(page, 'alpha'), _pin_mark(page, 'beta')
+    page.get_by_text('Alpha', exact=True).hover()
+    page.wait_for_timeout(200)
+    alpha_hover = _pin_mark(page, 'alpha')
+    page.get_by_text('Beta', exact=True).hover()
+    page.wait_for_timeout(200)
+    beta_hover = _pin_mark(page, 'beta')
+
+    assert alpha_rest[1] == 1 and beta_rest[1] == 0, (alpha_rest, beta_rest)
+    assert alpha_hover == alpha_rest, (alpha_rest, alpha_hover)
+    assert beta_hover[1] > 0 and beta_hover != alpha_hover, (alpha_hover, beta_hover)
+
+
+def test_a_hidden_pin_is_drawn_inside_its_own_row(page):
+    """The mark leans up and to the right of its tip.
+
+    With the tip on the value box's own right edge, the mark hung past the edge
+    of the panel body, which clips its overflow, and the pin lost its right
+    side - so half of it was missing exactly while it was being pointed at.
+    """
+    framework(page)
+    page.evaluate(PANEL)
+    page.get_by_text('Beta', exact=True).hover()
+    page.wait_for_timeout(250)
+    overflow = page.locator('[data-lex-pin-column="beta"]').evaluate('''el=>{
+      const ink=el.querySelector('svg').getBoundingClientRect();
+      const control=el.closest('.lex-detail-field-control');
+      const box=control.getBoundingClientRect();
+      const body=control.closest('.lex-detail-panel-body');
+      return {overRow:Math.round(ink.right-(box.left+control.clientWidth)),
+        overPanel:body?Math.round(ink.right-(body.getBoundingClientRect().left+body.clientWidth)):0};
+    }''')
+    assert overflow['overRow'] <= 0, overflow
+    assert overflow['overPanel'] <= 0, overflow
+
+
 def test_group_hover_does_not_reveal_child_pins(page):
     framework(page)
     page.evaluate('''() => {

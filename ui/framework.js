@@ -1697,8 +1697,15 @@
       // The Boxicons pin tip is at 3.71,21.71 in its 24-by-24 view box.
       const tipX = icon.width * 3.71 / 24;
       const tipY = icon.height * 21.71 / 24;
-      const targetX = target.right + (outward ? inset : -inset);
-      const targetY = target.top + (outward ? -inset : inset);
+      // The drawn pin leans up and to the right of that tip. A tip set on the
+      // value box's own right edge therefore hung the whole mark past the edge
+      // of the row, and the panel body - which clips its overflow - cut the
+      // pin's right side off. The tip is placed left by the overhang instead,
+      // and a little further down, so the mark stays inside the row.
+      const overhangX = icon.width - tipX;
+      const dropY = Math.min(4, target.height * .2);
+      const targetX = target.right + (outward ? inset : -inset - overhangX);
+      const targetY = target.top + (outward ? -inset : inset + dropY);
       const scale = owner.width / control.offsetWidth || 1;
       pin.style.setProperty("left", `${(targetX - owner.left - tipX) / scale}px`, "important");
       pin.style.setProperty("top", `${(targetY - owner.top - tipY) / scale}px`, "important");

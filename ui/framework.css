@@ -2422,14 +2422,17 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 }
 /* A subtle lift so a pin reads as sitting on the field rather than in it. */
 
-:where(.lex-pinnable-property,.detail-title-row,.field-row,.price-card label):hover > .lex-column-pin,
-:where(.lex-pinnable-property,.detail-title-row,.field-row,.price-card label):hover > .lex-source-control > .lex-column-pin,
-.lex-detail-field:hover > .lex-detail-field-control > .lex-column-pin,
-.lex-detail-field:hover > .lex-detail-field-control > .lex-source-control > .lex-column-pin,
-.lex-source-control:hover > .lex-column-pin,
+:where(.lex-pinnable-property,.detail-title-row,.field-row,.price-card label):hover > .lex-column-pin:not(.pinned),
+:where(.lex-pinnable-property,.detail-title-row,.field-row,.price-card label):hover > .lex-source-control > .lex-column-pin:not(.pinned),
+.lex-detail-field:hover > .lex-detail-field-control > .lex-column-pin:not(.pinned),
+.lex-detail-field:hover > .lex-detail-field-control > .lex-source-control > .lex-column-pin:not(.pinned),
+.lex-source-control:hover > .lex-column-pin:not(.pinned),
 /* A part of a control group keeps its pin one level down, in its control box.
    Without this an unpinned part's pin could never be seen again. */
-.lex-detail-part:hover > .lex-detail-part-control > .lex-column-pin,
+.lex-detail-part:hover > .lex-detail-part-control > .lex-column-pin:not(.pinned),
+/* The ghost is what an empty pin looks like before it is used. A pin that is
+   already in the column keeps its own colour while the row is pointed at:
+   dimming it to the ghost made the pin read as absent. */
 .lex-column-pin:focus-visible { color:var(--lex-muted);opacity:.75; }
 .lex-column-pin.pinned { color:var(--lex-accent);opacity:1; }
 
