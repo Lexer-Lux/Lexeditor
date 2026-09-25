@@ -7599,3 +7599,13 @@ body { text-shadow: var(--lex-text-shadow, none); }
   font:inherit;
   text-align:inherit;
 }
+
+/* A help bubble being reworded in the developer page: the popover takes the
+   pointer only while its editor is open. */
+.lex-help-popover.lex-help-editing { pointer-events:auto; }
+.lex-help-edit {
+  width:min(420px,70vw);
+  min-height:9em;
+  box-sizing:border-box;
+  resize:vertical;
+}

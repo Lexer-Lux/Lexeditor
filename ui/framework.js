@@ -534,10 +534,71 @@
       cancelClose();
       if (activeHelpPopup?.id === popupId) return;
       closeHelpPopup();
+      // A developer can reword what the bubble says. The shipped string stays
+      // the key, so a bubble reworded here reads the new text on every screen
+      // that shows the same explanation.
+      const shipped = typeof text === "string" ? text : null;
+      const shown = () => shipped === null ? text : savedLabel(helpKey(shipped), shipped);
       const popup = element("div", {
         id: popupId, class: "lex-help-popover", role: "tooltip", tabindex: "0",
-      }, text instanceof Node ? text.cloneNode(true) : String(text ?? title ?? ""));
+      }, text instanceof Node ? text.cloneNode(true) : String(shown() ?? title ?? ""));
       document.body.append(popup);
+      if (shipped !== null && sharedSettingsSnapshot?.developerMode) {
+        // The bubble itself never takes the pointer, so the editor is started
+        // from the marker and the popover takes the pointer only while it is
+        // being edited.
+        popup.startEditing = () => {
+          popup.classList.add("lex-help-editing");
+          const editor = element("textarea", {class: "lex-help-edit", value: shown()});
+          popup.replaceChildren(editor);
+          editor.focus();
+          editor.select();
+          let finished = false;
+          const finish = async commit => {
+            if (finished) return;
+            finished = true;
+            popup.classList.remove("lex-help-editing");
+            const typed = editor.value.trim();
+            const next = typed && typed !== shipped ? typed : shipped;
+            if (!commit) {
+              popup.replaceChildren(String(shown()));
+              // The editor's own blur schedules the bubble's close; keep the
+              // wording on screen while the reader is still looking at it.
+              cancelClose();
+              popup.focus();
+              position();
+              return;
+            }
+            try {
+              if (next === shipped) localStorage.removeItem(helpKey(shipped));
+              else localStorage.setItem(helpKey(shipped), next);
+            } catch (_error) {}
+            // The editor took the pointer, and the bubble's close timers key on
+            // the pointer being back on the marker, so reopen it to face the
+            // reader with the wording that was just saved.
+            closeHelpPopup();
+            open();
+            try {
+              await callWindow("save_default_view", shellPluginId(), activePageTab(),
+                {[helpKey(shipped)]: next === shipped ? "" : next});
+              showToast(next === shipped ? "The shipped help text is back."
+                                         : "The new help text is now the shipped one.");
+            } catch (error) {
+              showAlert({title: "Could not save the help text",
+                         message: error.message || String(error)});
+            }
+          };
+          editor.addEventListener("keydown", keyEvent => {
+            keyEvent.stopPropagation();
+            if (keyEvent.key === "Escape") { keyEvent.preventDefault(); finish(false); }
+            else if (keyEvent.key === "Enter" && (keyEvent.ctrlKey || keyEvent.metaKey)) {
+              keyEvent.preventDefault();
+              finish(true);
+            }
+          });
+          editor.addEventListener("blur", () => finish(false));
+        };
+      }
       const position = () => {
         if (!marker.isConnected || !popup.isConnected) return;
         const anchor = marker.getBoundingClientRect();
@@ -561,8 +622,9 @@
       const close = () => closeHelpPopup();
       const onScroll = event => {
         if (popup.contains(event.target)) return;
-        // Keyboard focus can scroll the marker into view after opening help.
-        if (marker.matches(":focus-within")) position();
+        // Keyboard focus can scroll the marker - or the bubble itself, which is
+        // focusable so its own text can be read - into view after opening help.
+        if (marker.matches(":focus-within") || popup.matches(":focus-within")) position();
         else close();
       };
       popup.addEventListener("pointerenter", cancelClose);
@@ -584,6 +646,13 @@
     marker.addEventListener("pointerenter", open);
     marker.addEventListener("pointerleave", scheduleClose);
     marker.addEventListener("focus", open);
+    marker.addEventListener("dblclick", event => {
+      if (!sharedSettingsSnapshot?.developerMode) return;
+      event.preventDefault();
+      event.stopPropagation();
+      open();
+      activeHelpPopup?.startEditing?.();
+    });
     marker.addEventListener("blur", scheduleClose);
     marker.addEventListener("keydown", event => {
       if (event.key === "ArrowDown" && activeHelpPopup?.id === popupId) {
@@ -5498,6 +5567,20 @@ ${contents.path}`});
   const savedLabel = (key, fallback) => {
     try { return localStorage.getItem(key) || fallback; } catch (_error) { return fallback; }
   };
+  // The help text a developer rewords. A bubble has no name of its own and its
+  // text is far too long for a key, so the key is a short digest of the shipped
+  // text. A string rewritten in a plugin's code simply stops matching, and the
+  // reader then sees the new shipped text rather than an orphaned override.
+  const textDigest = value => {
+    let hash = 2166136261;
+    for (let index = 0; index < value.length; index += 1) {
+      hash ^= value.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16);
+  };
+  const helpKey = shipped =>
+    `${shellPluginId()}-${activePageTab()}.help.${textDigest(shipped)}.text`;
   // A property's name as the developer last named it. The shipped name is the
   // key, so an override never orphans itself: the same property, drawn on any
   // screen, reads the same. A label that is a node rather than a name (a chip
