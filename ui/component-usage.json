@@ -1235,6 +1235,10 @@
       "terraria",
       "warband"
     ],
+    "renameValue": [
+      "blank",
+      "ff8"
+    ],
     "reshadeSection": [
       "bannerlord",
       "blank",

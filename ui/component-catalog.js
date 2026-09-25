@@ -69,6 +69,9 @@
       sample: () => sampleButton("Copy a value", () => UI.copyText("Example Item"))},
     {id: "hoverable", level: "atom", summary: "A value that links to the record it names.",
       sample: () => UI.hoverable({label: "Example Item", targetLabel: "Example Item", open: () => {}})},
+    {id: "renameValue", level: "atom", summary: "A value a developer renames in place: the text becomes an input, and Enter hands the new name to the caller.",
+      sample: () => {const value = el("span", {}, "Example Item");
+        return el("div", {}, value, el("button", {onclick: () => UI.renameValue(value, {label: "example"})}, "Rename it"));}},
 
     // ---- molecules -------------------------------------------------------
     {id: "detailField", level: "molecule", summary: "One property: label, control, help, and its changed state.",
