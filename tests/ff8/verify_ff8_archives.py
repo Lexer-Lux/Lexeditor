@@ -83,6 +83,54 @@ def main() -> int:
             assert "archive" in str(error).lower() or "entry" in str(error).lower(), error
         else:
             raise AssertionError(f"extract accepted {bad_name}:{bad_index}")
+
+    # Repacking writes a whole triplet into the project and reads it back with
+    # the same parser: every untouched entry must survive byte for byte.
+    project = tempfile.TemporaryDirectory(prefix="lexeditor-archive-repack-",
+                                          ignore_cleanup_errors=True)
+    try:
+        root = Path(project.name)
+        installed = FsArchive(paths.GAME_ROOT / "Data" / "lang-en" / "main")
+        target = installed.entries[2]
+        replacement = b"lexeditor repack check" * 8
+        result = archive_index.repack("main", {target.index: replacement}, project_root=root)
+        assert result["replaced"] == 1 and result["entries"] == installed.entries[-1].index + 1
+        rebuilt = FsArchive(root / "repacked" / "main")
+        assert [entry.name for entry in rebuilt.entries] == \
+            [entry.name for entry in installed.entries]
+        assert rebuilt.extract(rebuilt.entries[target.index]) == replacement
+        for original, written in zip(installed.entries, rebuilt.entries):
+            if original.index == target.index:
+                continue
+            assert rebuilt.extract(written) == installed.extract(original), original.name
+        for suffix in (".fs", ".fi", ".fl"):
+            assert (root / "repacked" / f"main{suffix}").is_file()
+        try:
+            archive_index.repack("main", {99_999: b"x"}, project_root=root)
+        except ValueError as error:
+            assert "entry" in str(error).lower(), error
+        else:
+            raise AssertionError("repack accepted an entry outside the archive")
+        # A file the project replaces is what the repack is for: writing it into
+        # the project's own direct tree must place it in the archive.
+        direct = root / "direct"
+        direct.mkdir(parents=True, exist_ok=True)
+        (direct / "kernel.bin").write_bytes(b"project kernel" * 16)
+        from plugins.ff8 import formats  # noqa: PLC0415 - keeps this check self-contained
+        # The wrapper reads the project paths, so point them at this check's
+        # temporary project: a check must never touch the reader's own project.
+        previous_project, previous_direct = paths.PROJECT_ROOT, paths.DIRECT_ROOT
+        try:
+            paths.PROJECT_ROOT, paths.DIRECT_ROOT = root, direct
+            routed = formats.repack_archive("main")
+        finally:
+            paths.PROJECT_ROOT, paths.DIRECT_ROOT = previous_project, previous_direct
+        assert routed["replaced"] == 1, routed
+        kernel = next(entry for entry in installed.entries if entry.basename == "kernel.bin")
+        rebuilt = FsArchive(root / "repacked" / "main")
+        assert rebuilt.extract(rebuilt.entries[kernel.index]) == b"project kernel" * 16
+    finally:
+        project.cleanup()
     print(json.dumps({"archives": len(rows), "available": len(available),
                       "totals": {name: row["entries"] for name, row in rows.items()},
                       "namedicFound": found["rows"][0]["name"],

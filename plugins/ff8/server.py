@@ -346,6 +346,8 @@ class Handler(PluginRequestHandler):
             elif path == "/api/archive/extract":
                 self.json_response(formats.extract_archive_entry(
                     str(body.get("name", "")), int(body.get("index", -1))))
+            elif path == "/api/archive/repack":
+                self.json_response(formats.repack_archive(str(body.get("name", ""))))
             elif path == "/api/table/import":
                 self.json_response(formats.import_table_csv(
                     str(body.get("name", "")), str(body.get("csv", ""))))

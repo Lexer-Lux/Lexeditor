@@ -67,10 +67,22 @@ def main() -> int:
                         break
                     page.wait_for_timeout(500)
                 assert extracted and extracted[0].stat().st_size > 0, extracted
+                # Repacking writes the triplet into this session's project, and
+                # reads it back before reporting.
+                page.get_by_role("button", name="Repack to project").click()
+                repacked = []
+                for _ in range(240):
+                    repacked = sorted((Path(project.name) / "repacked").glob("main.*"))
+                    if len(repacked) == 3:
+                        break
+                    page.wait_for_timeout(500)
+                assert [path.suffix for path in repacked] == [".fi", ".fl", ".fs"], repacked
+                assert all(path.stat().st_size > 0 for path in repacked), repacked
                 assert not errors, errors
                 print(json.dumps({"archivesListed": options, "available": len(available),
                                   "visibleRows": rows, "namedic": searched["rows"][0]["name"],
                                   "extracted": extracted[0].name,
+                                  "repacked": [path.name for path in repacked],
                                   "totals": {row["name"]: row["entries"] for row in available}},
                                  ensure_ascii=True))
                 browser.close()

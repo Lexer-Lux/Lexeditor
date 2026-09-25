@@ -116,3 +116,84 @@ def extract(name: str, index: int, project_root: Path | None = None) -> dict:
     return {"archive": str(name).strip().lower(), "index": wanted, "name": entry.name,
             "bytes": len(data), "path": str(destination), "project": str(root)}
 EXTRACTED_ROOT = "extracted"
+REPACKED_ROOT = "repacked"
+
+
+def replacements_from_project(name: str, direct_root: Path) -> dict[int, bytes]:
+    """The entries a project already replaces, matched by stored file name.
+
+    A modder's edited files live in the project's `direct/` tree under the names
+    the archives use - `direct/kernel.bin`, `direct/battle/c0m001.dat` - which
+    is the FFNx override layout. Repacking takes those, so the archive built
+    here carries exactly the reader's own changes and nothing else.
+    """
+    prefix = _prefix(name)
+    if not prefix.with_suffix(".fi").is_file():
+        raise ValueError(f"The {name} archive is not installed")
+    root = Path(direct_root)
+    if not root.is_dir():
+        return {}
+    by_name: dict[str, Path] = {}
+    for path in root.rglob("*"):
+        if path.is_file() and not path.name.endswith(".bak"):
+            by_name.setdefault(path.name.casefold(), path)
+    archive = FsArchive(prefix)
+    return {entry.index: path.read_bytes()
+            for entry in archive.entries
+            if (path := by_name.get(entry.basename)) is not None}
+
+
+def repack(name: str, replacements: dict[int, bytes] | None = None,
+           project_root: Path | None = None, direct_root: Path | None = None) -> dict:
+    """Write a copy of one archive into the project, with entries replaced.
+
+    The FS/FI/FL triplet is the format this plugin already reads: FI holds one
+    twelve-byte record per entry (unpacked length, offset, compression flag) and
+    FL holds one stored name per line, in the same order. A repacked archive
+    writes every entry uncompressed and aligned to four bytes, which is what
+    Deling writes when it rebuilds an archive and what the game reads.
+
+    Nothing here changes the installation: the triplet goes under the project's
+    own `repacked/` folder and is read back with the same parser before it is
+    reported, so an archive that cannot be read again is a failure, not a
+    delivered file.
+    """
+    prefix = _prefix(name)
+    if not prefix.with_suffix(".fi").is_file():
+        raise ValueError(f"The {name} archive is not installed")
+    archive = FsArchive(prefix)
+    wanted = {int(index): bytes(data) for index, data in (replacements or {}).items()}
+    if direct_root is not None:
+        for index, data in replacements_from_project(name, direct_root).items():
+            wanted.setdefault(index, data)
+    known = {entry.index for entry in archive.entries}
+    for index in wanted:
+        if index not in known:
+            raise ValueError(f"The {name} archive has no entry {index}")
+    root = Path(project_root) if project_root is not None else paths.PROJECT_ROOT
+    folder = root / REPACKED_ROOT
+    folder.mkdir(parents=True, exist_ok=True)
+    stream = bytearray()
+    records = bytearray()
+    for entry in archive.entries:
+        data = wanted.get(entry.index, archive.extract(entry))
+        while len(stream) % 4:
+            stream.append(0)
+        records += int(len(data)).to_bytes(4, "little")
+        records += len(stream).to_bytes(4, "little")
+        records += (0).to_bytes(4, "little")   # stored uncompressed, as Deling writes
+        stream += data
+    (folder / f"{name}.fs").write_bytes(bytes(stream))
+    (folder / f"{name}.fi").write_bytes(bytes(records))
+    (folder / f"{name}.fl").write_text(
+        "\n".join(entry.name for entry in archive.entries) + "\n", encoding="utf-8")
+    rebuilt = FsArchive(folder / name)
+    for original, written in zip(archive.entries, rebuilt.entries):
+        if original.name != written.name:
+            raise ValueError("The repacked archive lost an entry name")
+        if rebuilt.extract(written) != wanted.get(original.index, archive.extract(original)):
+            raise ValueError(f"Entry {original.name} did not survive the repack")
+    return {"archive": str(name).strip().lower(), "entries": len(archive.entries),
+            "replaced": len(wanted),
+            "files": [str(folder / f"{name}{suffix}") for suffix in (".fs", ".fi", ".fl")],
+            "folder": str(folder)}

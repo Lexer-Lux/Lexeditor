@@ -127,7 +127,11 @@ Not covered today, with what each would need:
   own `extracted/` folder, keeping one previous copy
   (`plugins/ff8/archive_index.py`, `archives_ui.js`). Listing reads metadata
   only; the extract is the one place contents are read, and it never writes to
-  the installation. Repacking a whole archive is still open.
+  the installation. Repacking is covered too: the Archives page builds a whole
+  triplet in the project's `repacked/` folder from the files the project
+  replaces (matched by stored name, the FFNx `direct/` layout), writes every
+  entry uncompressed the way Deling rebuilds an archive, and reads the result
+  back with the same parser before reporting it.
 - **Save-file editing** (Hyne). Out of scope: a save is player state, not game
   data, and writing one is a different risk from writing an override.
 

@@ -317,6 +317,12 @@ def extract_archive_entry(name: str, index: int) -> dict:
     return archive_index.extract(name, index)
 
 
+def repack_archive(name: str) -> dict:
+    """Build an archive from the project's own replaced files."""
+    return archive_index.repack(name, project_root=paths.PROJECT_ROOT,
+                                direct_root=paths.DIRECT_ROOT)
+
+
 def shop_rows(dataset: str = "current") -> dict:
     raw = source_path("shop.bin", dataset).read_bytes()
     if len(raw) < 20 * 16 * 2:

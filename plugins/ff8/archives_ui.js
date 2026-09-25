@@ -87,8 +87,20 @@ function FF8ArchivesUI({el,columnList,pagedListDetail,detailPanel,detailSection,
       detailField({label:"ARCHIVE",help:infoHelp("The game's own FS/FI/FL triplet. Main holds kernel, init, namedic and wm2field; field holds every field map."),control:picker}),
       detailField({label:"ENTRIES",control:readonlyField(local.data?`${formatNumber(local.data.matched)} shown of ${formatNumber(local.data.total)}`:"—")}),
       detailField({label:"SOURCE",help:infoHelp("The installed game. Browsing never changes it."),control:readonlyField(local.source||"—")})];
+    const repack=el("button",{type:"button",class:"lex-dialog-action",
+      onclick:async event=>{event.preventDefault();
+        repack.textContent="Repacking…";
+        try{const result=await api("/api/archive/repack",{method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({name:local.archive})});
+          local.repacked=`${result.replaced} replaced entries written to ${result.folder}`;}
+        catch(error){local.repacked=`Could not repack: ${error.message}`}
+        repack.textContent="Repack to project";render()}},"Repack to project");
     const right=detailPanel({heading:false,className:"ff8-archive-panel",body:[
       detailSection({title:"ARCHIVE",body:status}),
+      detailSection({title:"REPACK",help:infoHelp("Builds this archive in the project's own repacked folder from the files the project replaces. Entries are written uncompressed, the way Deling rebuilds an archive. The installed game is never changed, and the archive is read back before it is reported."),body:[
+        detailField({label:"ACTION",control:repack}),
+        local.repacked?detailField({label:"LAST REPACK",control:readonlyField(local.repacked)}):null]}),
       local.error?notice({message:local.error,tone:"warning"}):null,
       local.busy?notice({message:"Reading the archive list…"}):null]});
     return panelLayout([left,right],"ff8-archives",
