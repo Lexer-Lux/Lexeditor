@@ -1135,8 +1135,7 @@
       .forEach(control => panels.add(
         control.closest(".lex-detail-panel-body, .lex-detail-panel, .lex-detail") || container));
     for (const panel of panels) {
-      const controls = [...panel.querySelectorAll(".lex-source-control[data-lex-rail-tag]")]
-        .filter(control => !control.classList.contains("lex-source-control-internal"));
+      const controls = [...panel.querySelectorAll(".lex-source-control[data-lex-rail-tag]")];
       if (!controls.length) continue;
       // Each entry gets an equal share of the space beside the property it
       // annotates, so a deeper stack is a smaller stack rather than a taller
@@ -1192,6 +1191,38 @@
         control.style.setProperty("--lex-reference-tag-width", `${tag}px`);
       }
     }
+    // An inside rail lives in the value box, so its share comes from that box
+    // rather than from the property row: it is capped at the box's own height.
+    // Uncapped, a drawer's strip was taller than the value it labelled and
+    // stood above it, which read as a rail that had left its box. These
+    // controls have no outside rail, so their share is measured on its own -
+    // a graph card's variable drawer is a panel with nothing else in it.
+    container.querySelectorAll?.(".lex-source-control[data-lex-inside-rail]").forEach(control => {
+      const stack = control.querySelector(":scope > .lex-reference-values");
+      const count = stack?.children.length || 0;
+      if (!count) return;
+      // The box the rail shares is the control's own input, not the grid cell
+      // around it: a drawer's cell is taller than the box inside it, and
+      // measuring the cell left the strip taller than the value again.
+      const box = control.querySelector("input:not([type=checkbox]), select, output, textarea")
+        || control.querySelector(":scope > .lex-unit-field, :scope > .lex-readonly-field") || control;
+      const cap = Math.max(12, Math.round(box.getBoundingClientRect().height) - 2);
+      control.style.setProperty("--lex-reference-cap", `${cap}px`);
+      control.style.setProperty("--lex-reference-slot", `${Math.max(6, Math.floor(cap / count))}px`);
+      // The lane is measured from the longest entry this rail can paint, at the
+      // size it paints it. The old character-count estimate was tuned for the
+      // shared symbol font at an outside rail's small size; an inside rail
+      // draws at the value's own size, so "V 255" in a game font came out wider
+      // than the lane reserved for it and left the box.
+      const probe = element("span", {class: "lex-reference-value lex-reference-probe-value",
+        "aria-hidden": "true"},
+        element("span", {class: "lex-reference-tag"}, control.dataset.lexInsideTag || "V"),
+        element("span", {class: "lex-reference-text"}, control.dataset.lexInsideValue || ""));
+      control.append(probe);
+      const width = Math.ceil(probe.getBoundingClientRect().width) + 2;
+      probe.remove();
+      if (width > 2) control.style.setProperty("--lex-internal-reference-requested-width", `${width}px`);
+    });
   };
 
   // Refresh every mounted reference display from its live control value. This
@@ -8554,8 +8585,14 @@ ${contents.path}`});
       // lane from the actual tag+value character count with enough average
       // glyph width for game fonts; the old .38em estimate clipped values such
       // as "V DEFAULT" and two-digit numbers against native select chrome.
-      const reserve = Math.max(2.75, Math.min(8.5, referenceCharacters * .58 + .65));
-      root.style.setProperty("--lex-internal-reference-requested-width", `${reserve}em`);
+      // The lane is measured from what this rail can paint, once the control is
+      // in the document and its font has resolved; the alignment pass does that
+      // and needs the longest entry this control can ever show.
+      root.dataset.lexInsideTag = widestTag;
+      root.dataset.lexInsideValue = widestValue;
+      // Marked so the alignment pass measures this rail against the box it
+      // shares rather than against a property row it has nothing to do with.
+      root.dataset.lexInsideRail = widestTag;
     } else {
       // Sizing the rail per control makes value boxes on the same panel end at
       // different edges, because one reference reading "V 25" needs less room

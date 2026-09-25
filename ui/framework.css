@@ -2973,7 +2973,20 @@ select optgroup {
      arrow-width here clips text before the visible arrow is reached. */
   padding-right:calc(var(--lex-internal-reference-width) + 6px);
 }
-.lex-source-control-internal > .lex-source-strip.lex-reference-values { align-items:flex-end; }
+.lex-source-control-internal > .lex-source-strip.lex-reference-values {
+  /* The strip shares the value box, so it takes that box's height exactly
+     rather than its own content's: its ends are pinned to the box's ends. It
+     used to be centred on the box with a content height, and a stack taller
+     than the box - 20 pixels in a graph drawer where the value box is 18 -
+     stood above the value it labelled. Its rows share the height it is given,
+     so a deep stack still reads inside the box. */
+  top:0;
+  bottom:0;
+  height:auto;
+  transform:none;
+  align-items:center;
+  grid-auto-rows:minmax(0,1fr);
+}
 
 .lex-source-control-internal .lex-reference-tag { margin-right:.12em; }
 .lex-source-strip {
@@ -3808,7 +3821,10 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-editor { position:relative; min-width:0; padding:0; border:0; background:transparent; }
 .lex-curve-heading { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 .lex-curve-plot { position:relative; isolation:isolate; container-type:inline-size; min-width:0; padding:20px; background:var(--lex-curve-bg,var(--lex-panel-2)); border:var(--lex-curve-border,1px solid); border-color:var(--lex-curve-border-color,var(--lex-border)); }
-.lex-curve-plot::before { content:attr(data-curve-title); position:absolute; inset:20px; z-index:2; display:grid; place-items:center; color:var(--lex-text); opacity:.13; text-shadow:none; font:800 clamp(24px,22cqw,90px)/1 var(--lex-heading-font); pointer-events:none; }
+/* The title takes a share of the card, so it grows with the card. It used to
+   stop at 90px, which is a quarter of a small card but under a fifth of a large
+   one: on a wide window the label read small beside its own graph. */
+.lex-curve-plot::before { content:attr(data-curve-title); position:absolute; inset:20px; z-index:2; display:grid; place-items:center; color:var(--lex-text); opacity:.13; text-shadow:none; font:800 clamp(24px,22cqw,220px)/1 var(--lex-heading-font); pointer-events:none; }
 .lex-curve-svg { display:block; position:relative; width:100%; height:auto; aspect-ratio:2; overflow:visible; background:transparent; }
 .lex-curve-svg :is(path,line,polyline) { vector-effect:non-scaling-stroke; }
 .lex-curve-grid-lines { fill:none; stroke:var(--lex-curve-grid,color-mix(in srgb,var(--lex-border) 42%,transparent)); stroke-width:1; }
@@ -5491,6 +5507,20 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   --lex-reference-slot:11px;
 }
 .lex-reference-probe .lex-reference-value { grid-template-columns:auto auto; }
+/* A hidden copy of the longest entry an inside rail can paint, used to measure
+   its lane at the size that rail actually draws: an inside rail paints at the
+   value's own size, unlike an outside one. */
+.lex-source-control-internal > .lex-reference-probe-value {
+  position:absolute;
+  visibility:hidden;
+  width:max-content;
+  height:0;
+  display:grid;
+  grid-template-columns:auto auto;
+  column-gap:.3em;
+  white-space:nowrap;
+  pointer-events:none;
+}
 
 /* A multi-variable property gives each variable its own copy button, so the
    item is three columns: button, name, box. The button holds its lane whether
@@ -6313,7 +6343,13 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 /* Reference colors identify sources. They are not the editable-value accent. */
 .lex-source-control-internal .lex-reference-value {
 
-  font-size:clamp(8px,calc(1em - (var(--lex-reference-count,1) - 1) * 2px),1em);
+  /* An inside rail paints in the lane it was given, and the lane is capped at a
+     third of the box so the value keeps the rest. In a graph card's variable
+     drawer that lane is about twenty-four pixels, where a three-digit
+     reference at the value's own size was wider than its lane and spilled out
+     of the box. The type follows the lane; a wide box still gets full size. */
+  font-size:clamp(8px,min(calc(1em - (var(--lex-reference-count,1) - 1) * 2px),
+    calc(var(--lex-internal-reference-width, 24px) / 3.2)),1em);
 
   overflow:visible;
   padding-inline:2px;
@@ -6614,11 +6650,14 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 .lex-source-control-internal:not(:has(> select)) > :is(.lex-reference-values, .lex-reference-placeholder) { right: .35em; }
 .lex-reference-tag {
 
-  /* V, R1, R2 are control markers, not words, so they use the shared symbol
-     font like every other marker. In the FF8 pixel font the V is drawn with a
-     clipped-looking top-left arm, which read as a rendering bug on every
-     reference stack in the editor. */
-  font-family:var(--lex-symbol-font);
+  /* V, R1 and R2 mark a control, and they sit inside the value box beside the
+     number they label: the tag takes the same font as that number, or the two
+     look like they came from different programs. These markers were once set in
+     the shared symbol font for every theme, because in the FF8 pixel face the V
+     is drawn with a notched top-left arm; the game's own face is still the right
+     one for a game's value, and the symbol font stays behind it for a marker
+     character a theme's font has no glyph for. */
+  font-family:var(--lex-font), var(--lex-symbol-font);
   font-weight:700;
 
  margin-right: .08em;
