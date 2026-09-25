@@ -34,8 +34,13 @@ READ_ONLY_WRITE_ROUTES = frozenset({
     "install", "deploy", "revert", "restore", "export", "discard", "apply",
     "activate", "start", "setup", "patch", "commit",
 })
-READ_ONLY_MESSAGE = ("This game is open without a mod, so nothing can be saved. "
-                     "Create a mod, then edit it.")
+# Two different locks reach this backstop, and they need different advice. A
+# game with no mod asks for a mod; a managed mod that updates itself asks for a
+# copy, because a direct edit would be replaced at the next update.
+READ_ONLY_NO_MOD_MESSAGE = ("This game is open without a mod, so nothing can be saved. "
+                            "Create a mod, then edit it.")
+READ_ONLY_MANAGED_MESSAGE = ("This mod updates automatically, so direct edits would be "
+                             "lost. Make an editable copy to keep your changes.")
 
 
 class PluginRequestHandler(BaseHTTPRequestHandler):
@@ -51,7 +56,10 @@ class PluginRequestHandler(BaseHTTPRequestHandler):
             return False
         if path.rstrip("/").rsplit("/", 1)[-1].lower() not in READ_ONLY_WRITE_ROUTES:
             return False
-        self.send_json({"error": READ_ONLY_MESSAGE}, status=403)
+        message = (READ_ONLY_NO_MOD_MESSAGE
+                   if os.environ.get("LEXEDITOR_NO_MOD") == "1"
+                   else READ_ONLY_MANAGED_MESSAGE)
+        self.send_json({"error": message}, status=403)
         return True
 
     def log_message(self, _format, *_args):

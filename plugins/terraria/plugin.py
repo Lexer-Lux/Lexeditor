@@ -26,22 +26,14 @@ def _documents_folder() -> Path:
     and then reported "no mod source" while the reader's own mod sources sat on
     another drive.
     """
-    if os.name == "nt":
-        try:
-            import ctypes
-            import uuid
-            guide = ctypes.create_string_buffer(
-                uuid.UUID("{FDD39AD0-238F-46AF-ADB4-6C85480369C7}").bytes_le)
-            folder = ctypes.c_wchar_p()
-            if ctypes.windll.shell32.SHGetKnownFolderPath(
-                    guide, 0, None, ctypes.byref(folder)) == 0:
-                value = folder.value
-                ctypes.windll.ole32.CoTaskMemFree(folder)
-                if value:
-                    return Path(value)
-        except (OSError, ValueError, AttributeError):
-            pass
-    return Path.home() / "Documents"
+    # One implementation for the whole program: the shared helper sets the
+    # argument types on the Windows call, and a second copy of the call with
+    # its own pointer type fails once those types are set.
+    from core.mod_library import documents_folder
+    try:
+        return documents_folder()
+    except (OSError, RuntimeError):
+        return Path.home() / "Documents"
 
 
 TERRARIA_SAVE_ROOT = Path(os.environ.get(

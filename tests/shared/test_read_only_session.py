@@ -21,7 +21,8 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests" / "ds3"))
 
-from core.plugin_http import READ_ONLY_MESSAGE, PluginRequestHandler  # noqa: E402
+from core.plugin_http import (READ_ONLY_MANAGED_MESSAGE,  # noqa: E402
+                              READ_ONLY_NO_MOD_MESSAGE, PluginRequestHandler)
 
 WRITES = ("/api/save", "/api/cards/save", "/api/assets/delete", "/api/assets/rename",
           "/api/deployment/export", "/api/settings/activate", "/api/build/start",
@@ -39,8 +40,9 @@ class FakeService(PluginRequestHandler):
 
 
 @contextmanager
-def read_only(value):
-    with patch.dict(os.environ, {"LEXEDITOR_MOD_READ_ONLY": value}):
+def read_only(value, no_mod=""):
+    with patch.dict(os.environ, {"LEXEDITOR_MOD_READ_ONLY": value,
+                                 "LEXEDITOR_NO_MOD": no_mod}):
         yield
 
 
@@ -48,10 +50,20 @@ class GuardTests(unittest.TestCase):
     def test_writes_are_refused_in_a_read_only_session(self):
         for path in WRITES:
             service = FakeService()
+            with read_only("1", no_mod="1"):
+                self.assertTrue(service.refuse_write_when_read_only(path), path)
+            self.assertEqual(service.sent[0][1], 403, path)
+            self.assertEqual(service.sent[0][0]["error"], READ_ONLY_NO_MOD_MESSAGE, path)
+
+    def test_a_locked_managed_mod_asks_for_a_copy_instead_of_a_new_mod(self):
+        # The host reports both locks through one read-only flag. A managed mod
+        # that updates itself needs the copy wording, not "create a mod".
+        for path in WRITES:
+            service = FakeService()
             with read_only("1"):
                 self.assertTrue(service.refuse_write_when_read_only(path), path)
             self.assertEqual(service.sent[0][1], 403, path)
-            self.assertEqual(service.sent[0][0]["error"], READ_ONLY_MESSAGE, path)
+            self.assertEqual(service.sent[0][0]["error"], READ_ONLY_MANAGED_MESSAGE, path)
 
     def test_reads_are_untouched_in_a_read_only_session(self):
         for path in READS:
@@ -95,6 +107,7 @@ class LiveServiceTests(unittest.TestCase):
                 "LEXEDITOR_DS3_PROJECT": str(temp / "no-such-project"),
                 "LEXEDITOR_DS3_ROOT": str(temp / "game"),
                 "LEXEDITOR_MOD_READ_ONLY": "1",
+                "LEXEDITOR_NO_MOD": "1",
             }
             session = LocalPluginSession(module="plugins.ds3.server", plugin_id="ds3",
                                          app_root=ROOT, check=lambda: [], extra_env=environment)
@@ -103,7 +116,7 @@ class LiveServiceTests(unittest.TestCase):
                 status, payload = self._post(session.url, {"table": "EquipParamWeapon", "id": 1000,
                                                            "key": "weight", "edits": []})
                 self.assertEqual(status, 403, payload)
-                self.assertEqual(payload["error"], READ_ONLY_MESSAGE, payload)
+                self.assertEqual(payload["error"], READ_ONLY_NO_MOD_MESSAGE, payload)
                 # Reading still works: the page and its data are not locked.
                 with urllib.request.urlopen(session.url + "/api/info", timeout=20) as reply:
                     self.assertEqual(reply.status, 200)
