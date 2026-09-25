@@ -4564,6 +4564,16 @@ ${contents.path}`});
     showAlert({title, items, message: contents.path});
   };
 
+  // One call that turns "this game has no mod" into a mod: name it, create it,
+  // and let the host restart the plugin on the new project. The mod menu and a
+  // game's own page both need it, and a page that is showing the game's own
+  // read-only data needs it most.
+  const createModProject = async (pluginId, options = {}) => {
+    const name = await askProjectName(options.pluginName || pluginId, options);
+    if (!name) return null;
+    return callWindow("create_mod_project", pluginId, name);
+  };
+
   const mountProjectControl = (options, host) => {
     const mode = element("span", {class: "lex-project-source-mode", hidden: true});
     const name = element("span", {class: "lex-project-name"}, "Loading mod…");
@@ -4619,6 +4629,7 @@ ${contents.path}`});
       const rows = value?.projects || [];
       const current = rows.find(row => row.current);
       const sources = options.projectSources?.() || [];
+      const vanillaSource = sources.find(row => String(row.key) === "vanilla") || null;
       const activeSource = String(options.projectActiveSource?.() || "mine");
       const selectedReference = sources.find(row => String(row.key) === activeSource);
       const selectedSource = activeSource === "mine" && current ? {
@@ -4632,20 +4643,28 @@ ${contents.path}`});
       // plan, not a mod, so the control says what is true and the menu offers
       // to add or find one.
       const noMod = Boolean(current?.noMod);
-      mode.hidden = !selectedSource;
-      mode.textContent = selectedSource?.readOnly === false ? "📝" : "🔒";
-      mode.setAttribute("aria-label", selectedSource?.readOnly === false ? "Editable" : "Read only");
-      name.textContent = noMod ? "No mod"
+      // A game with no mod yet is showing the game's own data, so the control
+      // names that source. It used to read "No mod" over the folder a mod would
+      // USE, which reads as a mod that exists and is empty, and sent readers
+      // looking in tModLoader's ModSources for something that was never created.
+      const vanilla = vanillaSource || {label: "Vanilla", path: "The game's own data", readOnly: true};
+      const readOnly = noMod ? true : selectedSource?.readOnly !== false;
+      mode.hidden = !selectedSource && !noMod;
+      mode.textContent = readOnly ? "🔒" : "📝";
+      mode.setAttribute("aria-label", readOnly ? "Read only" : "Editable");
+      name.textContent = noMod ? vanilla.label
         : selectedSource?.label || current?.name || "Select a mod";
       status.hidden = true;
       status.textContent = selectedSource?.enabled === false ? "×" : "✓";
       status.className = `lex-project-source-status ${selectedSource?.enabled === false ? "disabled" : "enabled"}`;
       status.setAttribute("aria-label", selectedSource?.enabled === false ? "Disabled" : "Enabled");
-      path.textContent = selectedSource?.path || (selectedSource
+      path.textContent = noMod ? vanilla.path : (selectedSource?.path || (selectedSource
         ? (selectedSource.readOnly === false ? "Editable mod" : "Read-only reference")
-        : current?.path || "New Mod or Find a Mod");
+        : current?.path || "New Mod or Find a Mod"));
       box.title = noMod
-        ? "This game has no mod. Add a Mod creates one; Find a Mod opens one you already have."
+        ? `This game has no mod yet, so ${vanilla.label} is shown read-only: it is the `
+          + "game's own data and there is no mod folder to write into. Add a Mod creates "
+          + "an editable mod; Find a Mod opens one you already have."
         : path.textContent;
       const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid)).map(row => {
         const select = element("button", {
@@ -4798,18 +4817,51 @@ ${contents.path}`});
           ? element("p", {class:"lex-dialog-status"},
               modSupport.message || "Mod management is not supported for this game yet.")
           : null;
-        menu.replaceChildren(...sourceRows, ...projects, modLibraryNote,
+        // A game with no mod yet still has one thing to show: the game's own
+        // read-only data. It belongs in the menu beside the actions that get
+        // the reader out of that state, so the list does not read as empty.
+        const vanillaMenuItem = noMod && !vanillaSource
+          ? element("div", {class: "lex-project-menu-item lex-project-reference active"},
+              element("span", {class: "lex-project-source-mode", "aria-label": "Read only"}, "🔒"),
+              element("span", {class: "lex-project-menu-name"}, vanilla.label),
+              element("span", {class: "lex-project-menu-path"}, vanilla.path))
+          : null;
+        menu.replaceChildren(...(vanillaMenuItem?[vanillaMenuItem]:[]), ...sourceRows, ...projects, modLibraryNote,
           element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, addSource || create, browse,
             options.sourcesReplaceProjects ? null : element("button", {type:"button", class:"lex-project-menu-action", onclick:() => { closeMenu(); openModLibrary(options.plugin.id); }}, "Mod library…")));
       measureNameColumn();
     };
     trigger.onclick = event => { event.stopPropagation(); toggleMenu(); };
     let copyPromptOpen = false;
+    // Clicking a property, or typing into a control, is an edit attempt. A
+    // button inside one is not: pins, copy buttons and question marks stay
+    // usable while the page is read-only.
+    const isEditAttempt = target => {
+      if (!target?.closest?.("main") || target.closest?.("button")) return false;
+      return Boolean(target.closest?.(".lex-detail-field"))
+        || Boolean(target.matches?.("input,select,textarea,[contenteditable='true']"));
+    };
     const protectManagedEdit = async event => {
       const current = snapshot?.projects?.find(row => row.current);
-      if (!current?.readOnly || current.vanilla || copyPromptOpen || !event.target.closest?.("main") ||
-          !event.target.matches?.("input,select,textarea,[contenteditable='true']")) return;
       if (event.type === "keydown" && ["Tab","Escape","Shift","Control","Alt"].includes(event.key)) return;
+      if (copyPromptOpen || !isEditAttempt(event.target)) return;
+      // A game with no mod has nothing to write into, so the attempt to edit
+      // the game's own data is the moment to offer the way out of it.
+      if (current?.noMod) {
+        event.preventDefault(); event.stopImmediatePropagation();
+        copyPromptOpen = true;
+        try {
+          const agreed = await confirmAction({
+            title: "Create a mod to edit?",
+            message: "This is the game's own data, so Lexeditor shows it read-only: there is "
+              + "no mod to save into yet. Create a mod and this page becomes editable.",
+            confirmLabel: "Create a mod"});
+          if (!agreed) return;
+          await createModProject(options.plugin.id, {pluginName: options.plugin.name});
+        } finally { copyPromptOpen = false; }
+        return;
+      }
+      if (!current?.readOnly || current.vanilla) return;
       event.preventDefault(); event.stopImmediatePropagation();
       copyPromptOpen = true;
       try {
@@ -9053,7 +9105,7 @@ ${contents.path}`});
       paged)
   };
 
-window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 

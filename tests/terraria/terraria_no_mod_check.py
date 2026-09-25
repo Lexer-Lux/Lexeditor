@@ -22,7 +22,10 @@ from core.service_session import LocalPluginSession  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 OUTPUT = Path(__import__("tempfile").gettempdir()) / "lexeditor-dev" / "terraria-no-mod"
-INSTRUCTION = "Choose Create Mod in the Mod menu"
+# The panel names the state, says the page is read-only, and hands the reader
+# the action. The paths the service looked in belong to the panel's own help.
+STATE = "no mod yet"
+ACTION = "Create a mod"
 TABS = (
     ("metadata", "Mod Metadata"),
     ("dependencies", "Dependencies & Build"),
@@ -62,8 +65,19 @@ def main() -> int:
                     page.wait_for_timeout(800)
                     text = page.locator("#main").inner_text()
                     page.screenshot(path=str(OUTPUT / f"{tab}.png"), full_page=True)
-                    if INSTRUCTION not in text:
-                        failures.append(f"{label} tab does not say how to make a mod: {text[:160]!r}")
+                    if STATE not in text.lower():
+                        failures.append(f"{label} tab does not say the game has no mod: {text[:160]!r}")
+                    if "read-only" not in text.lower():
+                        failures.append(f"{label} tab does not say the page is read-only: {text[:160]!r}")
+                    if page.locator("#main button").filter(has_text=ACTION).count() != 1:
+                        failures.append(f"{label} tab does not offer to create a mod: {text[:160]!r}")
+                    help_text = page.locator("#main .lex-info-help").first.get_attribute("aria-label") or ""
+                    if "tModLoader source projects" not in help_text:
+                        failures.append(f"{label} help does not explain what this plugin edits: {help_text[:160]!r}")
+                # The title names the read-only source, not a missing mod.
+                heading = page.locator("#main .lex-detail-panel-title").first.inner_text()
+                if "Vanilla" not in heading:
+                    failures.append(f"the no-mod panel is titled {heading!r}, not Vanilla")
                 page.locator("#plugin-data-map").click()
                 page.wait_for_selector(".lex-data-map", timeout=20000)
                 page.wait_for_timeout(800)
@@ -82,7 +96,7 @@ def main() -> int:
         for failure in failures:
             print(" -", failure)
         return 1
-    print("PASS: every Terraria tab explains the missing mod source")
+    print("PASS: every Terraria tab names the read-only no-mod state and offers to create a mod")
     print("PASS: screenshots:", OUTPUT)
     return 0
 

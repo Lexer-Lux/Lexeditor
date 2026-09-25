@@ -31,6 +31,10 @@
   bubble. A visible note is only for a state the reader must act on now, such
   as an error, a missing file, or a table with nothing to show yet.
 - Do not claim visual acceptance from source, API, or smoke checks.
+- Never create a mod the reader did not ask for. Opening a game lands on the
+  game's own data, read-only, and the mod selector names that source Vanilla;
+  creating or copying a mod is an explicit action. An edit attempt in that
+  state offers to create one. See `codex/shared/no-mod-state.md`.
 
 ## Muse use
 

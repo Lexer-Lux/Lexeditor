@@ -78,8 +78,11 @@ def test_no_mod_session_shows_vanilla_values_and_locks_the_editor(no_mod_session
             assert state["badge"] == "NO MOD", state
             assert state["saveDisabled"] is True, state
             assert state["showsGameData"], state
-            # The project menu is still the way out of this state.
-            assert state["projectTrigger"] and "No mod" in state["projectTrigger"], state
+            # The control names the source that is actually being shown. It
+            # used to read "No mod" over the folder a mod would use, which sent
+            # readers looking for a mod that had never been created.
+            assert state["projectTrigger"] and "Vanilla" in state["projectTrigger"], state
+            assert "no-such-project" not in state["projectTrigger"], state
             page.locator(".lex-project-control .lex-project-select").first.click()
             page.wait_for_timeout(300)
             menu = page.evaluate("""()=>{
@@ -96,10 +99,24 @@ def test_no_mod_session_shows_vanilla_values_and_locks_the_editor(no_mod_session
             assert menu["hidden"] is False, menu
             assert any("Add a Mod" in label for label in labels), menu
             assert any("Find a Mod" in label for label in labels), menu
-            # Editing is refused even though the value came from the game.
-            page.locator("#main input").first.click()
-            page.keyboard.type("9")
+            # The unmodded game's own read-only source is named in the list, so
+            # the menu does not read as empty.
+            assert any("Vanilla" in label for label in labels), menu
+            # Editing is refused even though the value came from the game, and
+            # the attempt offers the one action that makes the page editable.
+            first = page.locator("#main input").first
+            before = first.input_value()
+            first.click()
+            dialog = page.locator(".lex-dialog")
+            dialog.wait_for(state="visible", timeout=5000)
+            assert "Create a mod" in dialog.inner_text(), dialog.inner_text()
+            dialog.get_by_role("button", name="Cancel", exact=False).first.click()
+            page.wait_for_timeout(150)
+            first.click()
+            dialog.wait_for(state="visible", timeout=5000)
+            dialog.get_by_role("button", name="Create a mod", exact=False).first.click()
+            page.wait_for_timeout(200)
             assert page.evaluate(
-                "()=>document.querySelector('#main input').value") != "", "input vanished"
+                "()=>document.querySelector('#main input').value") == before, "input changed"
         finally:
             browser.close()

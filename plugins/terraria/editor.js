@@ -33,10 +33,20 @@
   // A game with no mod yet is not a stuck editor. The service says what is
   // missing (usually the mod source folder), and this shows that instead of a
   // spinner that waits for a file nobody is going to create on its own.
-  function missingModPanel(title="No mod yet"){
-    return detailPanel({title,body:[
-      el("p",{class:"lex-notice lex-tone-warning",role:"alert"},error||"This game has no mod source yet."),
-      el("p",{class:"lex-notice"},"Lexeditor edits tModLoader source projects - a folder that holds build.txt. Choose Create Mod in the Mod menu, or select the folder that holds your build.txt.")]})}
+  // This is the game's own read-only state, so it is called Vanilla like the
+  // mod menu calls it, and the way out is a button rather than an instruction
+  // to go and find a menu. The detailed paths stay in the panel's question
+  // mark: what a reader needs on the page is the state and the action.
+  function missingModPanel(title="Vanilla"){
+    return detailPanel({title,
+      help:"Nothing here can be changed because this game has no mod yet. Lexeditor edits tModLoader source projects - a folder that holds build.txt. "
+        +"The compiled .tmod files the game runs from Mods or the Steam Workshop are not source and this plugin does not rewrite them. "
+        +"Create a mod to get an editable project; every tab fills in as soon as one exists."
+        +(error?"\n\nWhat Lexeditor found: "+error:""),
+      body:[
+        el("p",{class:"lex-notice",role:"status"},"There is no mod yet, so this is the game's own data and it is read-only. Nothing in these tabs can be changed until a mod exists."),
+        actionRow(el("button",{class:"lex-dialog-action primary",type:"button",
+          onclick:()=>LexeditorUI.createModProject("terraria",{pluginName:"Terraria"})},"Create a mod"))]})}
   // Every tab describes a mod source, so a game with no mod has nothing to
   // list on any of them. They must say that instead of showing an empty table
   // that reads as a broken page.
