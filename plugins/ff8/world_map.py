@@ -21,7 +21,7 @@ import shutil
 import struct
 import tempfile
 
-from . import paths, runtime_layout, world_geometry, world_textures
+from . import kernel_text, paths, runtime_layout, world_geometry, world_textures
 from .fs_archive import FsArchive
 
 
@@ -348,6 +348,47 @@ ENTITY_SPAWN_RECORD = 16     # x, y, z int32, then yaw and pitch int16
 TRAIN_EXIT_SECTION = 12
 TRAIN_EXIT_RECORD = 12       # x, y int32, z int16, then two unnamed bytes
 POSITION_FOOTER = 4
+
+SIDE_QUEST_TEXT_SECTION = 13
+
+
+def side_quest_texts(dataset: str = "current") -> dict:
+    """The world map's own dialog strings (wiki: Dialog texts, side quests).
+
+    Offsets terminated by a zero sentinel, then concatenated FF8 single-byte
+    text; each string runs to the next offset or the end of the section. The
+    script opcodes SHOW_TEXT_BOX (0xFF1F) and SHOW_CHOICE_BOX (0xFF23) reference
+    these by id, and the section is world-map data rather than a field message,
+    which is why it is not on the Text tab.
+    """
+    path = source_path(dataset)
+    data = path.read_bytes()
+    pointers = _pointers(data)
+    body = data[pointers[SIDE_QUEST_TEXT_SECTION]:pointers[SIDE_QUEST_TEXT_SECTION + 1]]
+    offsets: list[int] = []
+    cursor = 0
+    while cursor + 4 <= len(body):
+        value = struct.unpack_from("<I", body, cursor)[0]
+        if value == 0:
+            break
+        offsets.append(value)
+        cursor += 4
+    if not offsets:
+        raise ValueError("Section 13 has no string offsets")
+    sentinel = cursor + 4
+    if any(offset < sentinel or offset >= len(body) for offset in offsets):
+        raise ValueError("Section 13 has an offset outside its own section")
+    rows = []
+    for index, offset in enumerate(offsets):
+        stop = offsets[index + 1] if index + 1 < len(offsets) else len(body)
+        payload = body[offset:stop]
+        terminator = payload.find(b"\x00")
+        raw = payload[:terminator] if terminator >= 0 else payload
+        rows.append({"index": index, "offset": pointers[SIDE_QUEST_TEXT_SECTION] + offset,
+                     "bytes": len(raw), "text": kernel_text.decode(raw)})
+    return {"rows": rows, "count": len(rows), "section": SIDE_QUEST_TEXT_SECTION,
+            "path": str(path), "source": dataset,
+            "sha256": hashlib.sha256(body).hexdigest()}
 
 
 def _position_rows(data: bytes, section: int, record: int, fields: tuple) -> dict:

@@ -77,3 +77,28 @@ the count at the end — so the reader follows the file and this page says so.
 `tests/ff8/verify_ff8_world_positions.py` proves the counts, the record fields,
 the footers, that every coordinate lies inside the range the world projection
 uses, and that a section whose size is not records plus a footer is refused.
+
+## Section 13: the world map's own dialog
+
+Section 13 holds the world map's dialog strings: offsets terminated by a zero
+sentinel, then concatenated FF8 single-byte text, each string running to the
+next offset. The wiki names the script opcodes that reference them,
+`SHOW_TEXT_BOX` (`0xFF1F`) and `SHOW_CHOICE_BOX` (`0xFF23`). They belong to the
+world map rather than to a field, which is why they are not on the Text tab.
+
+Measured on the installed file: 151 entries, offsets ascending from 608, one of
+them a null string, and the rest the train and station dialogs the world map
+shows — "`{Blue} {East Academy Station} {White}  Get off? Yes / No`", "Bound for
+Timber. Pay 3,000 Gil to ride". Six entries carry a control byte `0x0D` that
+neither the wiki's control-code list nor the kernel text codec names, so it
+stays visible as `{x0D}` plus its argument instead of being given an invented
+meaning.
+
+`side_quest_texts` reads them and `tests/ff8/verify_ff8_world_texts.py` proves
+the count, the ascending offsets, the sentinel, that each string ends at a
+terminator inside its own span with zeros after it, the known dialog, the six
+unnamed control bytes, and that an offset outside the section is refused.
+
+Writing this section is not built: changing a string's length moves every later
+section, so it needs the 48-entry pointer header rebuilt, which this plugin has
+not done for any section yet.
