@@ -58,11 +58,18 @@ def _source_path() -> Path:
 
 
 def _snapshot_edits(store: PrototypeStore) -> dict:
-    return copy.deepcopy(store.overrides.get("edits", {}))
+    result = {}
+    for kind in KINDS:
+        edits = store.overrides.get("edits", {}).get(kind, {})
+        created = store.overrides.get("created", {}).get(kind, {})
+        if edits or created:
+            result[kind] = {name: {"edits": copy.deepcopy(edits.get(name, {})),
+                                  "source": created.get(name)} for name in set(edits) | set(created)}
+    return result
 
 
 def _dirty_records(store: PrototypeStore) -> int:
-    current = store.overrides.get("edits", {})
+    current = _snapshot_edits(store)
     kinds = set(_saved_edits) | set(current)
     return sum(
         _saved_edits.get(kind, {}).get(name) != current.get(kind, {}).get(name)
@@ -311,7 +318,15 @@ class Handler(PluginRequestHandler):
                 self.send_json({"error": "Chunked requests are not supported"}, 400)
                 return
             body = self._body()
-            if path == "/api/edit":
+            if path == "/api/create":
+                _require_edit_context()
+                store = _load_store()
+                _require_source_unchanged()
+                kind, name = body.get("kind"), body.get("name")
+                store.create(kind, name, body.get("source"))
+                _dirty = _dirty_records(store)
+                self.send_json({"row": _row(store, kind, name), "dirty": _dirty})
+            elif path == "/api/edit":
                 _require_edit_context()
                 kind = body.get("kind")
                 name = body.get("name")
