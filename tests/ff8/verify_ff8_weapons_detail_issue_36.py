@@ -10,6 +10,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+from tests.shared.plugin_ui import plugin_ui
 
 from plugins.ff8 import paths  # noqa: E402
 from plugins.ff8.plugin import FF8Session  # noqa: E402
@@ -25,7 +26,7 @@ def post(session: FF8Session, endpoint: str, payload: dict) -> dict:
 
 
 def main() -> int:
-    html = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    html = plugin_ui('ff8')
     weapon_start = html.index("function weaponDetail(row,prefs)")
     weapon_end = html.index("function renderKernel", weapon_start)
     weapon_source = html[weapon_start:weapon_end]

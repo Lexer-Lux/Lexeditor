@@ -4,7 +4,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EDITOR = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
+import sys
+sys.path.insert(0, str(ROOT))
+from tests.shared.plugin_ui import plugin_ui
+EDITOR = plugin_ui('ff8')
 
 
 def require(condition: bool, message: str) -> None:

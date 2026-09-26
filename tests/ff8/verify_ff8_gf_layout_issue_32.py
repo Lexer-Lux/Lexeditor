@@ -12,6 +12,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+import sys
+sys.path.insert(0, str(ROOT))
+from tests.shared.plugin_ui import plugin_ui
 EDITOR = ROOT / "plugins" / "ff8" / "editor.html"
 GF_SCHEMA = ROOT / "plugins" / "ff8" / "schema" / "gforce.json"
 KERNEL_SCHEMA = ROOT / "plugins" / "ff8" / "schema" / "kernel_section_fields.json"
@@ -40,7 +43,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    editor = EDITOR.read_text(encoding="utf-8")
+    editor = plugin_ui('ff8')
     gforce = json.loads(GF_SCHEMA.read_text(encoding="utf-8"))["gforce"]
     section = json.loads(KERNEL_SCHEMA.read_text(encoding="utf-8"))["3"]
     fields = section["fields"]

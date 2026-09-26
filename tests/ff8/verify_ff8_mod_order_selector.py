@@ -9,6 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+from tests.shared.plugin_ui import plugin_ui
 
 from plugins.ff8 import runtime_layout
 
@@ -67,7 +68,7 @@ def main() -> int:
         manifest = json.loads((empty / runtime_layout.COMPOSITION_FILE).read_text())
         assert manifest["mods"] == [] and manifest["conflicts"] == []
 
-    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    editor = plugin_ui('ff8')
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
     server = (ROOT / "plugins" / "ff8" / "server.py").read_text(encoding="utf-8")
     assert "FF8 MOD LOAD ORDER" in editor

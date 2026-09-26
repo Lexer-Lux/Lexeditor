@@ -11,6 +11,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+from tests.shared.plugin_ui import plugin_ui
 
 
 def require(condition: bool, message: str) -> None:
@@ -19,7 +20,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> None:
-    editor = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
+    editor = plugin_ui('ff8')
     server = (ROOT / "plugins/ff8/server.py").read_text(encoding="utf-8")
     require("Read-only inventory" not in editor, "The old read-only enemy placeholder remains")
     require('/api/enemies/save' in server, "The enemy save route is missing")

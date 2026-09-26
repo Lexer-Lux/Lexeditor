@@ -11,6 +11,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+from tests.shared.plugin_ui import plugin_ui
 
 from plugins.ff8.game_icons import ensure_portraits, portrait_root  # noqa: E402
 
@@ -21,7 +22,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    editor = plugin_ui('ff8')
     manifest = ensure_portraits()
     require(manifest.get("available"), "installed mngrp.bin portrait sheets must decode")
     require(set(manifest["portraits"]) == {"characters", "gfs"},

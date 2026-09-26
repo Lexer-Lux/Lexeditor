@@ -1,10 +1,13 @@
 """FF8 toolbar source-label contract for GitHub issue 38."""
 
 from pathlib import Path
+import sys
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EDITOR = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+sys.path.insert(0, str(ROOT))
+from tests.shared.plugin_ui import plugin_ui
+EDITOR = plugin_ui('ff8')
 FORMATS = (ROOT / "plugins" / "ff8" / "formats.py").read_text(encoding="utf-8")
 
 
