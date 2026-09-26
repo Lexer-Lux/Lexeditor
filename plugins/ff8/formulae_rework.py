@@ -18,20 +18,23 @@ FORMULAE = (
     {
         "id": "melee_damage",
         "name": "Melee damage",
-        "status": STATUS_INCOMPLETE,
-        "runtime": None,
+        "status": STATUS_IMPLEMENTED,
+        "runtime": "melee_damage_rework",
         "replacement": (
             "DAMAGE = attacker STR × weapon STR bonus × (attack power × 5%), then the "
-            "target's VIT reduces it by 1% per point, capped at 75%"
+            "target's VIT reduces it by 1% per point, capped at 75%; no random spread. "
+            "Squall's trigger bonus still applies on top"
+        ),
+        "enemies": (
+            "Enemies have no weapon: their STR bonus counts as 1 and the attack's own "
+            "power is the attack power, so enemy damage = STR × (ability power × 5%)"
         ),
         "vanilla": (
             "STR = min(255, attacker STR + weapon STR bonus); DAMAGE = "
             "floor(POWER × floor((265 − VIT) × (STR + floor(STR² / 16)) / 256) / 16) "
             "× RANDOM / 256; RANDOM = 240..272"
         ),
-        "blocker": (
-            "Native replacement is not installed yet (Damage_ComputePhysicalCore at 0x492C40)."
-        ),
+        "blocker": "",
     },
     {
         "id": "magic_damage",
@@ -246,6 +249,9 @@ MITIGATION_CAP = 75  # VIT and SPR reduce damage by 1% per point, at most 75%
 def mitigated(damage: int, defence: int) -> int:
     """Apply the 1%-per-point defence reduction, capped at 75%."""
     return damage * (100 - min(MITIGATION_CAP, defence)) // 100
+
+
+ENEMY_WEAPON_STR_BONUS = 1  # enemies have no weapon (Lexer, #31)
 
 
 def melee_damage(attacker_str: int, weapon_str_bonus: int, attack_power: int,

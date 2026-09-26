@@ -34,6 +34,7 @@ from . import damage_limit
 from . import hit_frame_log
 from . import music_volume_issue_498
 from . import magic_damage_rework
+from . import melee_damage_rework
 from . import mug_chance_rework
 from . import status_chance_rework
 from . import fast_start
@@ -597,6 +598,7 @@ def _verify_executable(game_root: Path) -> Path:
             (hit_frame_log.HOOK, hit_frame_log.HOOK_ORIGINAL),
             *music_volume_issue_498.verified_hooks(),
             *magic_damage_rework.verified_hooks(),
+            *melee_damage_rework.verified_hooks(),
             *mug_chance_rework.verified_hooks(),
             *status_chance_rework.verified_hooks(),
             (healing_rework.HEALING_FORMULA_HOOK, healing_rework.HEALING_FORMULA_ORIGINAL),
@@ -777,6 +779,7 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
     else:
         lines.append("# Formulae Rework is disabled; curative-magic arithmetic remains vanilla.")
     lines.extend(magic_damage_rework.build_hext(formulae_rework).rstrip().splitlines())
+    lines.extend(melee_damage_rework.build_hext(formulae_rework).rstrip().splitlines())
     lines.extend(mug_chance_rework.build_hext(formulae_rework).rstrip().splitlines())
     lines.extend(status_chance_rework.build_hext(formulae_rework).rstrip().splitlines())
     fixed_commands = fixed_command_menu.build_patch(

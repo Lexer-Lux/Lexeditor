@@ -103,7 +103,7 @@ def main() -> int:
 
     print(
         "FF8 Formulae runtime audit passed: healing and full LUCK proved; "
-        f"{rejected} mutations rejected; melee, magic, and status remain preview-only"
+        f"{rejected} mutations rejected; the other runtimes have their own unicorn tests"
     )
     return 0
 
