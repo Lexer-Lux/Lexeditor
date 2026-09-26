@@ -4807,6 +4807,12 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
    content:none;
  opacity:0;
 }
+/* The rule above that hides a sorted field's type ties with the ordinary hover
+   and focus rules and comes later, so pointing at a sorted field hid the
+   triangle and the type together and left the rail blank. The triangle gives
+   way to the same type name, and to the range on focus, as any other field. */
+.lex-detail-field[data-lex-sort]:hover:not(:focus-within) > .lex-field-type-rail > .lex-field-type-name,
+.lex-detail-field[data-lex-sort]:focus-within > .lex-field-type-rail > .lex-field-type-range { display:block;opacity:1; }
 /* Reference markers use only their text width, with a small gap to the value. */
 
 /* ---- Transition end -------------------------------------------------- */
