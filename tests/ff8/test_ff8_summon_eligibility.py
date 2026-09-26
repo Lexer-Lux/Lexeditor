@@ -183,14 +183,40 @@ class SummonGate(unittest.TestCase):
         self.assertLess(text.index("pop eax"), text.index("movsx esi, word ptr [eax + 0x34]"))
         self.assertIn("or bl, 2", listing)
 
-    def test_the_select_path_raises_the_flag_that_says_why(self):
+    def test_the_select_path_says_why_in_the_games_own_box(self):
         listing = self._disassemble(
             battle._draw_select_payload(draw_once=False, summon_gate=True),
             battle.DRAW_SELECT_CAVE)
         text = "\n".join(listing)
-        self.assertIn(f"mov byte ptr [{battle.SUMMON_REFUSED_FLAG:#x}], 1", text)
+        self.assertIn(f"call {battle.SUMMON_MESSAGE_CAVE:#x}", text)
+        self.assertNotIn(f"[{battle.SUMMON_REFUSED_FLAG:#x}]", text)
         # And then hands the press to FF8's own refusal, which makes the noise.
         self.assertIn(f"jmp {battle.COMMAND_SELECT_DISABLED_BRANCH:#x}", text)
+
+    def test_the_message_uses_the_games_top_notice_call(self):
+        listing = self._disassemble(battle._summon_message_payload(), battle.SUMMON_MESSAGE_CAVE)
+        text = "\n".join(listing)
+        # The same arguments 00485420 passes for the game's own notices.
+        for expected in (f"movzx ecx, byte ptr [{battle.BATTLE_MESSAGE_SPEED:#x}]",
+                         "lea ecx, [ecx*8 + 8]", "push 0x56", "push 0x80", "push 3", "push ecx",
+                         f"push {battle.SUMMON_MESSAGE_TEXT:#x}", f"call {battle.BATTLE_MESSAGE:#x}",
+                         "add esp, 0x14"):
+            self.assertIn(expected, text)
+        self.assertLess(text.index("pushal"), text.index("call"))
+        self.assertLess(text.index("popal"), text.index("ret"))
+        from plugins.ff8 import kernel_text
+        raw = battle.summon_message_bytes()
+        self.assertEqual(raw[-1:], b"\x00")
+        self.assertEqual(kernel_text.decode(raw[:-1]), battle.SUMMON_MESSAGE)
+        patch = battle.build_command_eligibility_patch(draw_once=False, summon_gate=True)
+        self.assertIn(f"\n{battle.SUMMON_MESSAGE_TEXT:X} = {raw.hex(' ').upper()}", patch)
+
+    def test_the_message_fits_before_the_fixed_command_block(self):
+        self.assertLessEqual(battle.SUMMON_REFUSED_FLAG + 4, battle.SUMMON_MESSAGE_CAVE)
+        self.assertLessEqual(battle.SUMMON_MESSAGE_CAVE + len(battle._summon_message_payload()),
+                             battle.SUMMON_MESSAGE_TEXT)
+        self.assertLessEqual(battle.SUMMON_MESSAGE_TEXT + len(battle.summon_message_bytes()),
+                             0x0279F600)
 
     def test_both_paths_branch_on_the_gf_command_and_nothing_else(self):
         select = self._disassemble(
