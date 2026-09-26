@@ -505,8 +505,10 @@ than clever code written before the game's existing ecosystem is understood.
 
 ### Help for new users
 
-Use the shared question-mark help on tabs, sections, and fields. Explain what
-the player can change, the effect in the game, and how related controls work
+Use the shared question-mark help on tabs, sections, and fields whose label
+and control do not already say everything; a bubble that repeats its label is
+noise. The help-text skill (`.agents/skills/help-text/SKILL.md`) sets the
+writing style. Explain what the player can change, the effect in the game, and how related controls work
 together. Explain special values and preview-only controls. State unknown
 behaviour clearly. Check that help is reachable by mouse and keyboard and does
 not activate the control beneath it. Storage-format notes alone are not user help.

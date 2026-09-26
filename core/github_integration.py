@@ -17,7 +17,7 @@ from core.plugin_api import GitHubRepository
 _AUTO = object()
 _UNCHECKED = object()
 
-# Five independent issues per game, identified by title and game label.
+# Five independent issues per game, identified by title and game label (add-game skill).
 PLUGIN_SUBISSUES = (
     ("editor", "Create Editor"), ("ux", "UX Refinement"), ("modloader", "Mod Loader"),
     ("theme", "Create Theme"), ("reshade", "ReShade"),
