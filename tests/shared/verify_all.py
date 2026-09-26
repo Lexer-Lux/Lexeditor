@@ -114,6 +114,8 @@ _FF8_BASELINE_TOOLS = frozenset({
     # run on CI without a proprietary game installation.
     "ff8_asset_tabs_browser_check",
     "ff8_enemy_texture_panel_check",
+    "ff8_enemy_ai_speed_check",
+    "ff8_model_viewer_check",
     "ff8_field_name_fade_check",
     "ff8_field_page_check",
     "ff8_textures_list_check",

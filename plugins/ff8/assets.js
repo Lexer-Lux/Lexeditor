@@ -103,21 +103,17 @@
     const id=`battle/${model.file}#${tim.index}`;
     return el("img",{src:`/assets/texture.png?id=${encodeURIComponent(id)}&palette=0&dataset=${encodeURIComponent(assetDataset())}`,alt:`${model.name} texture page`});
   }
-  // What the shared model-preview drawer shows for a battle model. Nothing here
-  // draws 3D: what a reader can check without leaving the page is the model's own
-  // texture pages, the file facts beside them, and the way on to its record.
+  // Both Enemies and Models open the same geometry viewer from their header.
   function modelPreviewSpec(row,extra=null,options={}){
     if(!row?.file)return null;
     return {label:`${row.name} model`,
       openLabel:`Open the ${row.name} model`,
       closeLabel:`Close the ${row.name} model`,
-      content:()=>LexeditorUI.stack({fill:false},
-        LexeditorUI.detailNote([row.file,modelKindName(row.modelKind),
-          row.vertices==null?"no vertices":`${formatNumber(row.vertices)} vertices`,
-          `${row.timCount??0} textures`].join(" - ")),
-        row.tims?.length?modelTextureCards(row,options)
-          :LexeditorUI.detailNote("This file has no texture pages to preview."),
-        ...(extra?[extra]:[]))};
+      content:()=>LexeditorUI.stack(
+        LexeditorUI.actionRow(infoHelp('Drag to turn the model and use the wheel to zoom. Arrow keys also turn it; plus and minus zoom, and Home resets the view. The preview shows its first pose; Export GLB includes its textures, skeleton, and animations.'),
+          el('button',{type:'button',onclick:()=>el('a',{href:`/assets/model.glb?file=${encodeURIComponent(row.file)}&dataset=${encodeURIComponent(assetDataset())}`,download:`${row.file.replace(/\.[^.]+$/,'')}.glb`}).click()},'Export GLB'),...(extra?[extra]:[])),
+        FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name})),
+      onClose:drawer=>{drawer.querySelector('.lex-model-stage')?.lexDispose?.();drawer.replaceChildren();}};
   }
   function modelDetail(row,prefs){
     const sections=[];
@@ -156,7 +152,7 @@
       detailField({label:"",control:actions}),
       detailField({label:"",control:pending})],
       help:infoHelp([row.note,"Replace writes this battle file into the project's direct/ folder; FFNx loads it instead of the archive copy. Revert deletes the project copy."].filter(Boolean).join(' '))}));
-    return detailPanel({title:row.name,meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections,modelPreview:modelPreviewSpec(row)});
+    return detailPanel({title:row.name,icon:LexeditorUI.noImage(),meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections,modelPreview:modelPreviewSpec(row)});
   }
 
   function renderTextures(){

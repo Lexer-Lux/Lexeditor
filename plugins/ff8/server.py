@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from . import assets, card_art, cards, editor_settings, field_data, featured_mods, formats, gameplay_settings, paths, runtime_layout, world_geometry, world_map, world_textures
 from . import world_preview
+from . import model_geometry
 from .game_icons import icon_path, portrait_path
 from .extractor import baseline_ready, manifest_path
 from .ffnx_manager import status as ffnx_status
@@ -169,6 +170,12 @@ class Handler(PluginRequestHandler):
                         query.get("id", [""])[0],
                         int(query.get("palette", ["0"])[0]),
                         query.get("dataset", ["current"])[0]), "image/png")
+            elif path == "/api/model-scene":
+                self.json_response(model_geometry.scene(query.get("file",[""])[0],query.get("dataset",["current"])[0]))
+            elif path == "/assets/model.glb":
+                filename=query.get("file",[""])[0]
+                self.binary_response(model_geometry.glb(filename,query.get("dataset",["current"])[0]),
+                    "model/gltf-binary",Path(filename).stem+'.glb')
             elif path.startswith("/assets/models/"):
                 filename = path.rsplit("/", 1)[-1]
                 dataset = query.get("dataset", ["current"])[0]
