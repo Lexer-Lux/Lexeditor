@@ -87,7 +87,7 @@ def main() -> int:
         assert wm2field.source_path("current") == written
         assert wm2field.source_path("vanilla") == wm2field.ensure_baseline()
         wm2field.save([{"id": 5, "x": -272, "y": -543, "z": 8, "fieldId": 900}])
-        assert written.with_name("wm2field.tbl.bak").is_file()
+        assert not written.with_name("wm2field.tbl.bak").exists()
     finally:
         paths.PROJECT_ROOT, paths.DIRECT_ROOT = previous_project, previous_direct
         project.cleanup()

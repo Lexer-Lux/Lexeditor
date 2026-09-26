@@ -8,7 +8,6 @@ import os
 import csv
 import io
 from pathlib import Path
-import shutil
 import tempfile
 
 from . import paths, runtime_layout
@@ -199,10 +198,6 @@ def source_label(name: str) -> str:
 
 def _atomic_write(destination: Path, data: bytes) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.is_file():
-        # One rolling backup, like field saves: a timestamped copy per save
-        # filled mod folders with stale files that never went away.
-        shutil.copy2(destination, destination.with_name(f"{destination.name}.bak"))
     handle, temp_name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent)
     try:
         with os.fdopen(handle, "wb") as stream:
