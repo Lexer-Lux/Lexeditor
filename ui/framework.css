@@ -1267,6 +1267,21 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
 .lex-detail-field-control > .lex-column-pin { position:absolute;z-index:3;top:4px;right:4px; }
 .lex-tabbed-panel { display:flex;min-width:0;min-height:0;flex-direction:column;overflow:hidden; }
 .lex-tabbed-panel > .lex-tabbed-panel-tabs { flex:0 0 auto; }
+/* A detail panel whose body is one tabbed panel carries that tab bar along its
+   own top edge, like every other tabbed panel, with the record's heading
+   under it: "if a details panel is made tabbed, then the tab bar should run
+   along its top, like with any other tabbed panel" (FF8's Magic). The body
+   and the tabbed panel step aside so the bar, the heading and the tab's
+   content are the panel's own rows. */
+.lex-detail-panel:has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child) {
+  display:flex;
+  flex-direction:column;
+}
+.lex-detail-panel:has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child) > .lex-detail-panel-body,
+.lex-detail-panel > .lex-detail-panel-body > .lex-tabbed-panel:only-child { display:contents; }
+.lex-detail-panel > .lex-detail-panel-body > .lex-tabbed-panel:only-child > .lex-tabbed-panel-tabs { order:-1; flex:0 0 auto; }
+.lex-detail-panel:has(> .lex-detail-panel-body > .lex-tabbed-panel:only-child) > .lex-detail-panel-heading { flex:0 0 auto; }
+.lex-detail-panel > .lex-detail-panel-body > .lex-tabbed-panel:only-child > .lex-tabbed-panel-content { flex:1 1 auto; min-height:0; }
 
 .lex-detail-field-control:has(> .lex-source-control) > .lex-column-pin {
   right:calc(var(--lex-field-reference-rail-width, 9em) + 12px);
