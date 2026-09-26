@@ -36,8 +36,8 @@ FORMULAE = (
     {
         "id": "magic_damage",
         "name": "Magic damage",
-        "status": STATUS_INCOMPLETE,
-        "runtime": None,
+        "status": STATUS_IMPLEMENTED,
+        "runtime": "magic_damage_rework",
         "replacement": (
             "DAMAGE = spell power × attacker MAG, then the target's SPR reduces it by 1% "
             "per point, capped at 75%"
@@ -48,10 +48,7 @@ FORMULAE = (
             "ROLLED = trunc(random[240..272] × SCALED / 256), followed by vanilla "
             "caster/Shell/Defend, elemental, sign and damage-cap handling."
         ),
-        "blocker": (
-            "Native replacement is not installed yet. The rework must preserve the proven "
-            "post-formula Shell/Defend/element/sign behavior while replacing only base damage."
-        ),
+        "blocker": "",
     },
     {
         "id": "status_infliction",

@@ -35,7 +35,7 @@ class FormulaeReworkTests(unittest.TestCase):
     def test_only_real_runtime_components_are_marked_implemented(self):
         self.assertEqual(
             formulae_rework.implemented_ids(),
-            ("spell_healing", "physical_accuracy"),
+            ("magic_damage", "spell_healing", "physical_accuracy"),
         )
         runtime = {
             row["id"]: row["runtime"]
@@ -43,6 +43,7 @@ class FormulaeReworkTests(unittest.TestCase):
             if row["status"] == formulae_rework.STATUS_IMPLEMENTED
         }
         self.assertEqual(runtime, {
+            "magic_damage": "magic_damage_rework",
             "spell_healing": "healing_rework",
             "physical_accuracy": "luck_accuracy",
         })
@@ -51,7 +52,7 @@ class FormulaeReworkTests(unittest.TestCase):
         self.assertFalse(formulae_rework.available())
         self.assertEqual(
             formulae_rework.incomplete_ids(),
-            ("melee_damage", "magic_damage", "status_infliction", "status_attack",
+            ("melee_damage", "status_infliction", "status_attack",
              "elemental_attack", "mug_chance"),
         )
 
