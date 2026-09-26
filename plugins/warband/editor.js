@@ -135,10 +135,12 @@
     if(!choice||choice.recordIndex===undefined||choice.recordIndex===null)return;
     moduleRecords.openRecord("meshes",choice.recordIndex);
   }
-  // One sizing rule for the panel: the shared fitter already enlarges a number
-  // box, and a text box beside it then read as a different size for the same
-  // kind of value. Every control in this panel is fitted by the same rule.
-  function fitted(control){return LexeditorUI.autoFitControlText(control,{minimum:12});}
+  // One sizing rule for the panel. The shared fitter grows a number box until
+  // its digits fill it, which in a panel of text boxes, a dropdown and
+  // checkboxes read as one property ("Weight") shouting and the next
+  // ("Value") whispering. Every control here keeps the panel's own text size,
+  // which is also the size a native dropdown and a checkbox row can hold.
+  function sized(control){control.dataset.lexAutofit="false";return control;}
   function itemMeshControl(item,index,entries,readOnly){
     const entry=entries[index];
     const select=el("select",{disabled:readOnly,"aria-label":`Mesh ${index+1}`,
@@ -146,7 +148,7 @@
     const names=itemMeshNames();
     if(!names.includes(entry.name))select.append(el("option",{value:entry.name,selected:true},entry.name));
     for(const name of names)select.append(el("option",{value:name,selected:name===entry.name},name));
-    fitted(select);
+    sized(select);
     const show=el("button",{type:"button",title:`Show ${entry.name} in the Meshes area`,
       "aria-label":`Show ${entry.name} in the Meshes area`,onclick:()=>openItemMesh(entry.name)},"Show mesh");
     return el("div",{class:"lex-action-row"},select,show);
@@ -186,36 +188,45 @@
     const weightControl=()=>el("input",{type:"number",step:"any",value:itemWeightFromStats(effectiveItemField(item,"stats")),disabled:readOnly,onchange:event=>setItemWeight(item,event.target.value)});
     const core=detailGroup({title:"Item",body:[
       detailField({label:"ID",property:"id",dataType:"STRING",description:ITEM_HELP.id,control:el("input",{value:item.id,disabled:true})}),
-      detailField({label:"Name",property:"name",dataType:"STRING",description:ITEM_HELP.name,control:fitted(nameControl)}),
+      detailField({label:"Name",property:"name",dataType:"STRING",description:ITEM_HELP.name,control:sized(nameControl)}),
       // The type is one of the itp_type_* values the project's header_items.py
       // defines, so it is a list of those names, not a box a typo can brick an
       // armour piece in.
       detailField({label:"Type",property:"type",dataType:"ENUM",description:ITEM_HELP.type,
-        control:fitted(WarbandFieldControls.enumSelect({options:types,value:itemTypeFromFlags(flagsExpression),readOnly,
+        control:sized(WarbandFieldControls.enumSelect({options:types,value:itemTypeFromFlags(flagsExpression),readOnly,
           apply:value=>setItemType(item,value)}))}),
-      detailField({label:"Value",property:"value",dataType:"EXPR",description:ITEM_HELP.value,control:fitted(valueControl)}),
-      detailField({label:"Weight",property:"weight",dataType:"FLOAT",description:ITEM_HELP.weight,control:weightControl()}),
+      detailField({label:"Value",property:"value",dataType:"EXPR",description:ITEM_HELP.value,control:sized(valueControl)}),
+      detailField({label:"Weight",property:"weight",dataType:"FLOAT",description:ITEM_HELP.weight,control:sized(weightControl())}),
       // The table shows an inventory mesh for every item, so the panel says
       // which mesh that is and lets the reader change it here.
       detailField({label:"Inventory mesh",property:"inventoryMesh",dataType:"MESH",showType:false,description:ITEM_HELP.inventoryMesh,
         control:entries.length?itemMeshControl(item,0,entries,readOnly):LexeditorUI.readonlyField("No mesh in this record",{format:false})})
     ]});
     const body=[core];
+    // A field only leaves the "Module System fields" list when a control was
+    // actually built for it, so nothing becomes unreachable when a project's
+    // headers do not name a set (a compiled module, or a header without
+    // imodbits_*).
+    const handled=["id","name","value"];
     // Stats read as one row per stat with a number box per value. A stats
     // expression this editor cannot take apart keeps its source control.
     const statsExpression=String(effectiveItemField(item,"stats")).trim();
     const calls=statsExpression===""||statsExpression==="0"?[]:WarbandFieldControls.parseCalls(statsExpression);
     if(calls){
       const named=calls.filter(call=>call.name!=="weight");
+      handled.push("stats");
       body.push(detailGroup({title:"Stats",help:LexeditorUI.infoHelp("One row per stat macro in this item's stats field. Weight has its own row above, so it is not repeated here."),
         body:WarbandFieldControls.statRows({calls:named,macros:(state.items?.choices?.stats||[]).filter(name=>name!=="weight"),readOnly,
+          arguments:state.items?.choices?.statArguments||{},
           apply:value=>{setItemField(item,"stats",value||"0");render();}})}));
     }else{
+      handled.push("stats");
       body.push(detailGroup({title:"Stats",body:[detailField({label:"Stat macros",property:"stats",dataType:"EXPR",description:ITEM_HELP.stats,
         control:(()=>{const control=itemExpressionControl(item,"stats");control.disabled=readOnly;return control;})()}),
-        detailField({label:"Weight",property:"weight-from-stats",dataType:"FLOAT",description:ITEM_HELP.weight,control:weightControl()})]}));
+        detailField({label:"Weight",property:"weight-from-stats",dataType:"FLOAT",description:ITEM_HELP.weight,control:sized(weightControl())})]}));
     }
-    if(bits.length&&flagsExpression.trim()&&flagsExpression.trim()!=="0"){
+    if(bits.length){
+      handled.push("flags");
       body.push(WarbandFieldControls.bitFields({label:"Flags",help:ITEM_HELP.flags,flags:bits,expression:flagsExpression,readOnly,
         // The item's Type property owns the itp_type_* part of this same field,
         // so it is not repeated as an "also set" part of the flag list.
@@ -224,16 +235,17 @@
     }
     const modifierChoices=state.items?.choices?.modifierBits||[];
     if(modifierChoices.length){
+      handled.push("modifierBits");
       body.push(WarbandFieldControls.bitFields({label:"Modifier bits",help:ITEM_HELP.modifierBits,flags:modifierChoices,
         expression:String(effectiveItemField(item,"modifierBits")),readOnly,
         apply:value=>{setItemField(item,"modifierBits",value);render();}}));
     }
     if(meshNames.length){
+      handled.push("meshes");
       body.push(detailGroup({title:"Meshes",help:LexeditorUI.infoHelp(ITEM_HELP.meshes),
         body:WarbandFieldControls.meshRows({label:"Mesh",property:"mesh",entries,choices:itemMeshChoices(),readOnly,
           apply:next=>setItemMeshes(item,next),open:entry=>openItemMesh(entry.name)})}));
     }
-    const handled=["id","name","value","meshes","flags","stats","modifierBits"];
     const sourceFields=(item.fieldOrder||[]).filter(key=>!handled.includes(key));
     if(sourceFields.length){
       body.push(detailGroup({title:"Module System fields",body:sourceFields.map(key=>detailField({label:itemFieldLabel(key),property:key,dataType:"EXPR",description:ITEM_HELP[key]||"",control:(()=>{const control=itemExpressionControl(item,key);control.disabled=readOnly;return control;})()}))}));

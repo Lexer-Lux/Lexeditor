@@ -19,6 +19,16 @@ import threading
 
 _LOCK = threading.Lock()
 
+# Reading the project's headers is cheap once, and the reader asks for them on
+# every item request; the key carries each file's size and modification time so
+# an edited header is read again and a compiled project caches nothing.
+_READ_CACHE: dict = {}
+
+
+def _fingerprint(paths) -> tuple:
+    return tuple((str(path), path.stat().st_mtime_ns, path.stat().st_size)
+                 for path in paths if path.is_file())
+
 
 def _f(key, label, kind="expr", help="", **extra):
     value = {"key": key, "label": label, "kind": kind, "help": help}
@@ -601,6 +611,9 @@ def header_constants(root, filenames=None) -> dict:
     pending = []
     paths = ([root / name for name in filenames] if filenames is not None
              else sorted(root.glob("header_*.py")))
+    key = ("symbols", _fingerprint(paths))
+    if key in _READ_CACHE:
+        return dict(_READ_CACHE[key])
     for path in paths:
         if not path.is_file():
             continue
@@ -615,6 +628,7 @@ def header_constants(root, filenames=None) -> dict:
                 symbols[key] = _constant_number(expression.strip(), symbols)
             except (KeyError, ValueError, SyntaxError, TypeError):
                 pass
+    _READ_CACHE[key] = dict(symbols)
     return symbols
 
 
@@ -644,6 +658,9 @@ def mesh_choices(root) -> list:
     path = Path(root) / "module_meshes.py"
     if not path.is_file():
         return []
+    key = ("meshes", _fingerprint([path]))
+    if key in _READ_CACHE:
+        return [dict(entry) for entry in _READ_CACHE[key]]
     text, _encoding, _raw = _source(path)
     found = []
     for row in _records(text, SCHEMAS["meshes"]):
@@ -653,6 +670,7 @@ def mesh_choices(root) -> list:
         for name in sorted({resource, str(row.get("id") or "")} - {""}):
             found.append({"name": name, "id": row.get("id", ""),
                           "recordIndex": row.get("recordIndex"), "label": name})
+    _READ_CACHE[key] = [dict(entry) for entry in found]
     return found
 
 

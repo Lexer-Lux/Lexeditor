@@ -62,9 +62,15 @@ class FieldChoiceTests(unittest.TestCase):
                          ["horse", "one_handed_wpn", "shield"])
         self.assertEqual([entry["name"] for entry in choices["flags"]],
                          ["itp_merchandise", "itp_civilian", "itp_unique"])
-        # A ready-made combination is not a checkbox set: its bits are.
+        # The bits the header names come first with their values; a name the
+        # header does not value (a ready-made combination such as
+        # imodbits_sword, or a project that keeps the names elsewhere) is still
+        # offered, as text, because the project's own records use it.
         self.assertEqual([entry["name"] for entry in choices["modifierBits"]],
-                         ["imodbits_sword_low", "imodbits_sword_med"])
+                         ["imodbits_sword_low", "imodbits_sword_med", "imodbits_sword"])
+        named = {entry["name"]: entry["value"] for entry in choices["modifierBits"]}
+        self.assertEqual(named["imodbits_sword_low"], 1)
+        self.assertIsNone(named["imodbits_sword"])
         self.assertEqual(choices["stats"], ["spd_rtng", "weight"])
         self.assertEqual([entry["name"] for entry in choices["meshes"]],
                          ["fixture_sword", "panel", "panel_mesh"])

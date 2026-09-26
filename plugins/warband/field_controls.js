@@ -54,7 +54,14 @@
     for (const part of parts) {
       const text = part.trim();
       if (/^\d+$/.test(text)) { total |= Number(text); continue; }
-      if (Object.prototype.hasOwnProperty.call(values, text)) { total |= values[text]; continue; }
+      if (Object.prototype.hasOwnProperty.call(values, text)) {
+        // A name the project uses but whose value this editor cannot see still
+        // counts as known text, so the control edits tokens instead of numbers.
+        if (!Number.isInteger(values[text])) return null;
+        if (values[text] === null) return null;
+        total |= values[text];
+        continue;
+      }
       if (text === "0") continue;
       return null;
     }
@@ -65,7 +72,7 @@
     const values = {};
     for (const flag of flags) values[flag.name] = flag.value;
     const numeric = reduce(expression, values);
-    if (numeric === null) return withToken(expression, name, on);
+    if (numeric === null || !Number.isInteger(values[name])) return withToken(expression, name, on);
     const bit = values[name];
     const next = on ? (numeric | bit) : (numeric & ~bit);
     // Rebuild from the names, so the boxes and the source keep saying the same
@@ -96,7 +103,8 @@
   }
 
   const isSet = (expression, flag) => hasToken(expression, flag.name)
-    || (reduce(expression, {[flag.name]: flag.value}) & flag.value) === flag.value;
+    || (Number.isInteger(flag.value) && flag.value > 0
+      && (reduce(expression, {[flag.name]: flag.value}) & flag.value) === flag.value);
 
   // A flag field becomes one checkbox per named flag. Anything in the source
   // that is not one of those names is shown, not hidden, so nobody has to guess
@@ -202,16 +210,33 @@
       dataType: call.args.every(arg => /^-?\d+(\.\d+)?$/.test(arg)) ? "FLOAT" : "EXPR",
       description: `${call.name}(${options.macros.includes(call.name) ? "value" : "value"}) - change a value here, or remove the stat. Values are numbers because the Module System reads them as numbers.`,
       control: el("div", {class: "lex-action-row"},
-        ...call.args.map((arg, position) => el("input", {
-          type: "number", step: "any", value: arg, disabled: options.readOnly,
-          "aria-label": `${call.name} value ${position + 1}`,
-          onchange: event => {
-            if (event.target.value === "") return;
+        ...call.args.map((arg, position) => {
+          const change = value => {
+            if (value === "") return;
             const next = options.calls.map(entry => ({...entry, args: [...entry.args]}));
-            next[index].args[position] = String(event.target.value);
+            next[index].args[position] = String(value);
             options.apply(callExpression(next));
-          },
-        })),
+          };
+          // A position the project fills with a name (swing_damage(16, blunt))
+          // is a choice among the names this project uses there, not a box.
+          const names = options.arguments?.[call.name]?.[position];
+          if (Array.isArray(names)) {
+            const select = el("select", {disabled: options.readOnly,
+              "aria-label": `${call.name} argument ${position + 1}`,
+              onchange: event => change(event.target.value)});
+            if (!names.includes(arg)) select.append(el("option", {value: arg, selected: true}, arg));
+            for (const name of names) select.append(el("option", {value: name, selected: name === arg}, name));
+            return select;
+          }
+          return el("input", {
+            type: "number", step: "any", value: arg, disabled: options.readOnly,
+            // Keep the panel's own text size: a fitted number box beside it
+            // would read as a different property from the one above.
+            "data-lex-autofit": "false",
+            "aria-label": `${call.name} value ${position + 1}`,
+            onchange: event => change(event.target.value),
+          });
+        }),
         el("button", {
           type: "button", disabled: options.readOnly,
           "aria-label": `Remove the ${call.name} stat`,

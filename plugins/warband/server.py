@@ -274,27 +274,54 @@ def item_choices(rows: list[dict]) -> dict:
     # The checkbox set is the single modifier bits. A header also names ready
     # combinations (imodbits_sword is three bits); those stay reachable as
     # source text rather than as boxes that overlap each other.
-    modifiers = sorted(({"name": name, "value": value} for name, value in symbols.items()
-                        if name.startswith("imodbits_") and value > 0 and value & (value - 1) == 0),
-                       key=lambda entry: (entry["value"], entry["name"]))
+    modifiers = [{"name": name, "value": value, "label": name}
+                 for name, value in symbols.items()
+                 if name.startswith("imodbits_") and value > 0 and value & (value - 1) == 0]
     used_stats = set()
     used_meshes = set()
+    used_modifiers = set()
+    stat_arguments: dict = {}
     for record in rows:
-        used_stats.update(re.findall(r"([A-Za-z_]\w*)\s*\(", record["fields"].get("stats", "")))
+        stats_field = record["fields"].get("stats", "")
+        used_stats.update(re.findall(r"([A-Za-z_]\w*)\s*\(", stats_field))
+        # A stat argument that is not a number is a name the Module System reads,
+        # such as swing_damage(16, blunt). The names this project uses in that
+        # position are the finite choices for it.
+        for macro, arguments in re.findall(r"([A-Za-z_]\w*)\s*\(([^()]*)\)", stats_field):
+            for position, argument in enumerate(part.strip() for part in arguments.split(",")):
+                if not argument or re.fullmatch(r"-?\d+(\.\d+)?", argument):
+                    continue
+                slots = stat_arguments.setdefault(macro, [])
+                while len(slots) <= position:
+                    slots.append(set())
+                slots[position].add(argument)
         used_meshes.update(record.get("meshes", []))
+        used_modifiers.update(re.findall(r"\bimodbits_\w+", record["fields"].get("modifierBits", "")))
+    # A project whose header keeps the modifier bits elsewhere still offers the
+    # names its own item records use: a name already in the records is one the
+    # compile step accepts.
+    for name in sorted(used_modifiers):
+        if not any(entry["name"] == name for entry in modifiers):
+            modifiers.append({"name": name, "value": None, "label": name})
+    modifiers.sort(key=lambda entry: (entry["value"] is None, entry["value"] or 0, entry["name"]))
     declared = set()
     header = MODULE_SYSTEM / "header_items.py"
     if header.is_file():
         declared.update(re.findall(r"(?m)^def\s+([A-Za-z_]\w*)\s*\(",
                                    header.read_text(encoding="utf-8", errors="replace")))
-    stats = sorted(used_stats | declared)
+    # The header also defines getter helpers (get_weight, get_head_armor) that
+    # scripts call; they are not item stat macros, and offering them invites a
+    # value the build accepts and the game ignores.
+    stats = sorted(name for name in (used_stats | declared) if not name.startswith("get_"))
     # A mesh choice names the record behind it, so the item panel's finder can
     # open that record in the Meshes area instead of only naming the mesh.
     meshes = {choice["name"]: choice for choice in mesh_choices(MODULE_SYSTEM)}
     for name in used_meshes:
         meshes.setdefault(name, {"name": name, "id": "", "recordIndex": None})
     return {"types": types, "flags": flags, "modifierBits": modifiers,
-            "stats": stats, "meshes": [meshes[name] for name in sorted(meshes)]}
+            "stats": stats, "statArguments": {macro: [sorted(values) if values else None for values in slots]
+                                              for macro, slots in stat_arguments.items()},
+            "meshes": [meshes[name] for name in sorted(meshes)]}
 
 
 def item_rows() -> list[dict]:
