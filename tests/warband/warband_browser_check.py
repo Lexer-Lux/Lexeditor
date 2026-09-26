@@ -212,6 +212,20 @@ def main():
                     assert page.get_by_role('button',name='Discard changes',exact=True).count()==0
                     page.get_by_role('tab',name='Strings',exact=True).click()
                     page.wait_for_function('document.querySelector(".warband-module-state")?.textContent.includes("No strings records")')
+                    page.get_by_role('button',name='Music',exact=True).click()
+                    page.locator('.warband-module-detail').wait_for(state='visible')
+                    heading=page.evaluate('''() => {
+                      const panel=document.querySelector('.warband-module-detail');
+                      const title=panel.querySelector('.lex-detail-panel-title');
+                      return {title:[...title.childNodes].filter(node=>node.nodeType===Node.TEXT_NODE).map(node=>node.textContent).join(''),
+                              subtitles:[...panel.querySelectorAll('.lex-detail-panel-id,.lex-detail-panel-meta')].map(node=>node.textContent)};
+                    }''')
+                    # A record whose name is its own ID prints that ID once: not
+                    # as a heading and a second subtitle, and not with coverage
+                    # as a third line. Coverage and the source caveat are the
+                    # panel's own help bubble.
+                    assert heading['title']=='travel',heading
+                    assert heading['subtitles']==[],heading
                     page.get_by_role('button',name='Sounds',exact=True).click()
                     page.wait_for_function('document.querySelector(".warband-module-state")?.textContent.includes("Synthetic sound parse failure")')
                     page.get_by_role('button',name='Retry',exact=True).click()

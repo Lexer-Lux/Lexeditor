@@ -545,7 +545,11 @@ def _records(text: str, schema: dict):
         else:
             row["id"] = identity
         display = row["fields"].get("name")
-        for key in ("file", "resource", "value", "text", "description", "mesh", "sampleMaterial", "bodyMesh"):
+        # Only a field that names the record becomes its heading. A mesh,
+        # resource or file name is a property of the record, not its name; using
+        # one put a mesh name in the heading and then printed the real ID under
+        # it, so the heading repeated itself on some records and not others.
+        for key in ("text", "description", "value"):
             if isinstance(display, str):
                 break
             display = row["fields"].get(key)

@@ -106,9 +106,15 @@
           dataType:({identity:"ID",string:"STRING",text:"STRING",expr:"EXPR",integer:"INT",number:"FLOAT",vec2:"VECTOR2",vec3:"VECTOR3",vec4:"VECTOR4"})[spec.kind]||"VALUE",
           description,control:fieldControl(dataset,row,spec,readOnly)});
       });
-      return LexeditorUI.detailPanel({className:"warband-module-detail",title:row.name||row.id,identity:row.id,
-        meta:data.schema.status==="integrated"?"Structured":"Structured partial",
-        body:[LexeditorUI.detailGroup({title:data.schema.label,body:fields}),LexeditorUI.detailNote(data.schema.notes)]});
+      return LexeditorUI.detailPanel({className:"warband-module-detail",title:row.name||row.id,
+        // The heading shows the record's name; the ID repeats beside it only
+        // when it is a different string. Coverage and the source caveat are
+        // panel help, not a second subtitle and a paragraph on the page.
+        identity:row.id===row.name?"":row.id,
+        help:data.schema.notes+" "+(data.schema.status==="integrated"
+          ?"Every documented field is editable here."
+          :"Fields this editor does not interpret stay in the source; open the Data Map row's source editor for those."),
+        body:[LexeditorUI.detailGroup({title:data.schema.label,body:fields})]});
     }
     function render(tab){
       const rows=availableRows();
