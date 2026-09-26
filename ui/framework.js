@@ -4905,7 +4905,12 @@ ${contents.path}`});
               element("span", {class: "lex-project-menu-name"}, vanilla.label),
               element("span", {class: "lex-project-menu-path"}, vanilla.path))
           : null;
-        menu.replaceChildren(...(vanillaMenuItem?[vanillaMenuItem]:[]), ...sourceRows, ...projects, modLibraryNote,
+        // Every spread here must be a node or the argument list builds one:
+        // replaceChildren turns a bare null into the text "null". This note is
+        // for games that cannot manage mods, so on every game that can it was
+        // passed as null and printed the word in the middle of the menu.
+        menu.replaceChildren(...(vanillaMenuItem?[vanillaMenuItem]:[]), ...sourceRows, ...projects,
+          ...(modLibraryNote?[modLibraryNote]:[]),
           element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, addSource || create, browse,
             options.sourcesReplaceProjects ? null : element("button", {type:"button", class:"lex-project-menu-action", onclick:() => { closeMenu(); openModLibrary(options.plugin.id); }}, "Mod library…")));
       measureNameColumn();
