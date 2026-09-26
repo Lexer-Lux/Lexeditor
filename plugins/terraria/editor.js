@@ -346,6 +346,11 @@
     entry.value=String(value);locSelectedKey=row.key;render();shell?.refresh?.();
   }
   let locSelectedKey="";
+  function beginLocalizationEntry(){
+    locQuery="";locPage=0;render();
+    const input=document.querySelector('[aria-label="New localization key"]');
+    input?.scrollIntoView({block:"nearest"});input?.focus();
+  }
   function addLocalizationEntry(){
     if(!locCurrent?.editable)return;
     const suffix=locNewKey.trim();if(!suffix){error="Enter a localization key.";render();return}
@@ -363,16 +368,18 @@
     const approved=await confirmAction({title:"Delete localization key?",message:`Delete ${entry.key} from ${locCurrent.path}?`,confirmLabel:"Delete"});
     if(!approved)return;locDeletedKeys.add(entry.key);locCurrent.entries.splice(index,1);render();shell?.refresh?.();
   }
-  function localizationDetail(row){
-    if(!row)return emptyPanel("Localization","No localization entry is selected.");
-    if(locLoading||locCurrent?.path!==row.path)return loadingPanel(`Loading ${row.key}…`);
-    const entry=locCurrent.entries.find(item=>item.key===row.key);if(!entry)return emptyPanel("Localization","The selected entry is no longer present.");
-    const control=entry.editable?el("input",{type:"text",value:entry.value,"aria-label":"Localization value",oninput:event=>{entry.value=event.target.value;shell?.refresh?.()}}):readonlyField(entry.value||`[${entry.kind}]`);
-    const addKey=locCurrent.editable?detailSection({title:"ADD KEY",body:[
+  function localizationAddSection(){
+    return locCurrent?.editable?detailSection({title:"ADD KEY",body:[
       detailField({label:"KEY",dataType:"STRING",control:el("input",{type:"text",value:locNewKey,"aria-label":"New localization key",placeholder:locCurrent.prefix?"Custom.Greeting":`Mods.${projectName()}.Custom.Greeting`,oninput:event=>{locNewKey=event.target.value}})}),
       detailField({label:"VALUE",dataType:"STRING",control:el("input",{type:"text",value:locNewValue,"aria-label":"New localization value",oninput:event=>{locNewValue=event.target.value}})}),
       detailField({label:"ACTION",control:el("button",{class:"lex-dialog-action primary",type:"button",onclick:addLocalizationEntry},"Add key")}),
     ]}):null;
+  }
+  function localizationDetail(row){
+    if(!row)return locCurrent?.editable?detailPanel({title:"Localization",body:[localizationAddSection()]}):emptyPanel("Localization","No localization entry is selected.");
+    if(locLoading||locCurrent?.path!==row.path)return loadingPanel(`Loading ${row.key}…`);
+    const entry=locCurrent.entries.find(item=>item.key===row.key);if(!entry)return emptyPanel("Localization","The selected entry is no longer present.");
+    const control=entry.editable?el("input",{type:"text",value:entry.value,"aria-label":"Localization value",oninput:event=>{entry.value=event.target.value;shell?.refresh?.()}}):readonlyField(entry.value||`[${entry.kind}]`);
     return detailPanel({title:entry.key,meta:`${locCurrent.culture||"Unknown culture"} · ${locCurrent.path}`,body:[
       detailSection({title:"TEXT",body:[detailField({label:"VALUE",dataType:"STRING",control,help:infoHelp("The player-facing localized string used by tModLoader for this effective key.")})]}),
       detailSection({title:"SOURCE",body:[
@@ -381,7 +388,7 @@
         detailField({label:"PREFIX",control:readonlyField(locCurrent.prefix||"None"),help:infoHelp("A prefix encoded in the localization filename is applied to effective tModLoader keys without changing unrelated HJSON structure.")}),
       ]}),
       entry.editable?detailSection({title:"ACTIONS",body:[detailField({label:"DELETE",control:el("button",{class:"lex-dialog-action",type:"button",onclick:()=>deleteLocalizationRow(row)},entry.isNew?"Remove new key":"Delete key")})]}):null,
-      addKey,
+      localizationAddSection(),
     ].filter(Boolean)});
   }
   function localizationCulturePanel(){
@@ -389,7 +396,9 @@
     let rows=localizationRows().filter(row=>row.culture===locCulture&&(!query||`${row.key} ${row.value} ${row.path}`.toLocaleLowerCase().includes(query)));
     rows=sortedRows(rows,locSort,{key:row=>row.key,value:row=>row.value,path:row=>row.path});
     const selected=rows.some(row=>row.key===locSelectedKey&&row.path===locCurrent?.path)?locSelectedKey:(rows[0]?.key||"");
-    return pagedListDetail({addDisabledReason:"Localization entries follow the keys your mod's content defines; add the content first and its keys appear here.",rows,key:row=>`${row.path}\u001f${row.key}`,slots:false,noun:"localization entries",page:locPage,pageSize:locPageSize,selected:rows.find(row=>row.key===selected&&row.path===locCurrent?.path)?`${locCurrent.path}\u001f${selected}`:(rows[0]?`${rows[0].path}\u001f${rows[0].key}`:null),
+    return pagedListDetail({add:beginLocalizationEntry,addDisabled:locLoading||!locCurrent?.editable,
+      addDisabledReason:locLoading?"Wait for the localization file to load.":"This localization file is read-only.",
+      addTitle:"Add localization key",rows,key:row=>`${row.path}\u001f${row.key}`,slots:false,noun:"localization entries",page:locPage,pageSize:locPageSize,selected:rows.find(row=>row.key===selected&&row.path===locCurrent?.path)?`${locCurrent.path}\u001f${selected}`:(rows[0]?`${rows[0].path}\u001f${rows[0].key}`:null),
       splitKey:`terraria-localization-${locCulture}`,rowsKey:`terraria-localization-${locCulture}`,defaultSplit:48,minLeft:320,minRight:360,
       search:{key:`terraria-localization-${locCulture}`,value:locQuery,label:`Search ${locCulture} localization`,placeholder:"Search keys, values, or resource paths…",change:value=>{locQuery=value;locPage=0;render()}},
       sync:next=>{locPage=next.page;locPageSize=next.pageSize;if(next.selected){const [path,key]=String(next.selected).split("\u001f");locSelectedKey=key;if(path!==locCurrent?.path&&!locLoading)void loadLocalizationFile(path,key)}},
@@ -397,12 +406,12 @@
       master:({rows,selected,select})=>columnList({rows,key:row=>`${row.path}\u001f${row.key}`,selected,select,sortState:locSort,sort:key=>{locSort=nextSort(locSort,key);render()},refresh:()=>{render();shell?.refresh?.()},
         template:"minmax(180px,1.25fr) minmax(170px,1.1fr) minmax(160px,1fr)",
         columns:[{key:"key",label:"Key",sortable:true,align:"start"},{key:"value",label:"Value",sortable:true,align:"start",edit:(row,value)=>void editLocalizationCell(row,value),editValue:row=>row.value},{key:"path",label:"Resource",sortable:true,align:"start"}],"aria-label":`${locCulture} localization entries`}),
-      detail:localizationDetail,emptyDetail:()=>emptyPanel("Localization","No localization entries match this language/search."),
+      detail:localizationDetail,emptyDetail:()=>localizationDetail(null),
     });
   }
   function localizationPanel(){
     if(noModSource())return missingModPanel();
-    const cultures=[...new Set(localizationRows().map(row=>row.culture).filter(Boolean))].sort();
+    const cultures=[...new Set([...localizationRows().map(row=>row.culture),locCurrent?.culture].filter(Boolean))].sort();
     if(!cultures.length)return stack({fill:false},...warnings(),emptyPanel("Localization","No loadable .hjson localization files are present in this source project yet."));
     if(!cultures.includes(locCulture))locCulture=cultures[0];
     const tabs=cultures.map(culture=>({id:culture,label:`${cultureFlag(culture)} ${culture}`}));
