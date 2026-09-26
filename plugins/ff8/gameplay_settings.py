@@ -315,12 +315,11 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         streamlined_draw_enabled = DEFAULT_STREAMLINED_DRAW
     formulae_rework = data.get("formulaeRework")
     if not isinstance(formulae_rework, bool):
-        # Merge the two short-lived legacy switches into their one owning
-        # formula feature. This preserves an enabled old mod on first load.
-        formulae_rework = bool(
-            data.get("spellHealingRework", False)
-            or data.get("fullLuckAccuracy", False)
-        )
+        # The two short-lived legacy switches (spellHealingRework,
+        # fullLuckAccuracy) each changed one formula. The rework now changes
+        # seven, so an old mod that had one of them on stays off rather than
+        # silently taking every formula change; the reader turns it on.
+        formulae_rework = DEFAULT_FORMULAE_REWORK
     better_card_enabled = data.get("betterCard", DEFAULT_BETTER_CARD)
     if not isinstance(better_card_enabled, bool):
         better_card_enabled = DEFAULT_BETTER_CARD

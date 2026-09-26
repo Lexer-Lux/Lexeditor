@@ -295,7 +295,6 @@ def main() -> int:
         ):
             for value in (0, 1, "true", None):
                 expect_invalid({**base, key: value}, label)
-        expect_invalid({**base, "formulaeRework": True}, "Formulae Rework is not available")
         expect_invalid({**base, "worldMapFullscreen": True}, "requires Modern Controls")
         expect_invalid({**base, "modernControls": True, "worldMapFullscreen": True}, "no proved native overlay hooks")
 

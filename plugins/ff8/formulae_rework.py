@@ -116,15 +116,6 @@ FORMULAE = (
         "blocker": "",
     },
     {
-        "id": "elemental_attack",
-        "name": "Elemental attack damage",
-        "status": STATUS_INCOMPLETE,
-        "runtime": None,
-        "replacement": "Not specified yet: the mod doc says only \"Redo elemental attack dmg formula too.\"",
-        "vanilla": "Vanilla elemental attack and elemental defence scaling.",
-        "blocker": "Waiting on Lexer for the replacement rule.",
-    },
-    {
         "id": "mug_chance",
         "name": "Mug chance",
         "status": STATUS_IMPLEMENTED,
@@ -176,6 +167,8 @@ def blocker() -> str:
     who cannot turn it on is not left guessing.
     """
     missing = ", ".join(row["name"] for row in FORMULAE if row["status"] != STATUS_IMPLEMENTED)
+    if not missing:
+        return ""
     done = ", ".join(row["name"] for row in FORMULAE if row["status"] == STATUS_IMPLEMENTED)
     return (f"Not available yet: {missing} still need a guarded game patch. "
             f"{done} are implemented and previewed on this page, but a preview does not "
