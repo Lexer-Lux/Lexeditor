@@ -923,8 +923,40 @@
   // first section beside the others, for a record with a picture.
   const DETAIL_BODY_LAYOUTS = {stacked: "", beside: "lex-detail-panel-beside"};
 
+  // A NAME property whose value is the heading's text is the heading. Lexer:
+  // "names should not be shown in the details panel as a property if the
+  // header shows the name. instead, i should just be able to edit the name
+  // from there." Its own input moves into the heading, handlers and all, so
+  // it edits exactly what it edited before; a read-only one stays read-only.
+  const headingNameField = options => {
+    if (options.titleControl || typeof options.renameRecord === "function") return null;
+    if (typeof options.title !== "string" && typeof options.title !== "number") return null;
+    const title = String(options.title).trim();
+    if (!title) return null;
+    for (const node of [options.body].flat()) {
+      if (!(node instanceof Element)) continue;
+      for (const field of [node, ...node.querySelectorAll(".lex-detail-field")]) {
+        if (!field.matches(".lex-detail-field")) continue;
+        const label = field.querySelector(":scope > .lex-detail-field-label > .lex-detail-field-label-text");
+        if (label?.textContent.trim().toLowerCase() !== "name") continue;
+        const input = field.querySelector(':scope > .lex-detail-field-control > input:is([type="text"],:not([type]))');
+        if (input && input.value.trim() === title) return {field, input};
+      }
+    }
+    return null;
+  };
+
   const detailPanel = (options = {}) => {
     const bodyClass = ["lex-detail-panel-body", DETAIL_BODY_LAYOUTS[options.bodyLayout] || ""].filter(Boolean).join(" ");
+    const nameField = headingNameField(options);
+    if (nameField) {
+      const section = nameField.field.closest(".lex-detail-section");
+      nameField.field.remove();
+      const emptied = section && !section.querySelector(":scope > .lex-detail-section-content > *") ? section : null;
+      emptied?.remove();
+      options = {...options, titleControl: nameField.input,
+        body: [options.body].flat().filter(node => node !== nameField.field && node !== emptied)};
+    }
     // A record's name is the heading, so the heading is where it is edited. It
     // was an ordinary property row lower down the panel instead, which meant
     // the name appeared twice and the copy at the top - the one being read -
