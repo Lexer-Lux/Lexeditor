@@ -7063,7 +7063,8 @@ ${contents.path}`});
     // Never hand the growth column to a generated fixture like the enabled
     // switch: unpinning the name column would otherwise leave every real
     // column at max-content and the table wider than its panel.
-    const firstReal = columns.findIndex(column => !column.generated && !column.width);
+    const firstDescription = columns.findIndex(column => !column.generated && !column.width && !column.numberedId && !column.numeric);
+    const firstReal = firstDescription >= 0 ? firstDescription : columns.findIndex(column => !column.generated && !column.width);
     const automaticGrow = nameIndex >= 0 ? nameIndex : firstReal;
     return columns.map((column, index) => {
       if (column.width) return column.width;
