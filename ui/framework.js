@@ -4670,13 +4670,17 @@ ${contents.path}`});
       status.textContent = selectedSource?.enabled === false ? "×" : "✓";
       status.className = `lex-project-source-status ${selectedSource?.enabled === false ? "disabled" : "enabled"}`;
       status.setAttribute("aria-label", selectedSource?.enabled === false ? "Disabled" : "Enabled");
-      path.textContent = noMod ? vanilla.path : (selectedSource?.path || (selectedSource
+      // The header shows the state, not the game's install path: a long path
+      // squeezed the source's own name down to one letter. The menu keeps the
+      // path, where there is room for it.
+      path.textContent = noMod ? "The game's own data" : (selectedSource?.path || (selectedSource
         ? (selectedSource.readOnly === false ? "Editable mod" : "Read-only reference")
         : current?.path || "New Mod or Find a Mod"));
       box.title = noMod
         ? `This game has no mod yet, so ${vanilla.label} is shown read-only: it is the `
           + "game's own data and there is no mod folder to write into. Add a Mod creates "
           + "an editable mod; Find a Mod opens one you already have."
+          + (vanilla.path ? `\n\n${vanilla.path}` : "")
         : path.textContent;
       const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid)).map(row => {
         const select = element("button", {
