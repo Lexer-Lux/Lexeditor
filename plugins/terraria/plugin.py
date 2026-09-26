@@ -217,6 +217,7 @@ PLUGIN = GamePlugin(
     installation=GameInstallSpec(
         root_env="LEXEDITOR_TERRARIA_ROOT",
         required_paths=("start-tModLoader.bat", "tModLoader.dll", "LaunchUtils"),
+        executable="dotnet/dotnet.exe",
         steam_app_id="1281930",
         art_app_id="105600",
         install_dir_names=("tModLoader",),

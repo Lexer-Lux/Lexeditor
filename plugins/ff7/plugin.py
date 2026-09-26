@@ -208,6 +208,7 @@ PLUGIN = GamePlugin(
             "FFVII_LAUNCHER.exe",
             "ff7/workingdir/data/lang-en/kernel/kernel.bin",
         ),
+        executable="FFVII.exe",
         steam_app_id="3837340",
         install_dir_names=("FINAL FANTASY VII Steam Edition",),
         default_roots=(

@@ -316,6 +316,7 @@ PLUGIN = GamePlugin(
         root_env="RDR_GAME_ROOT",
         data_env="LEXEDITOR_RDR_EXTRACT_ROOT",
         required_paths=("RDR.exe", "game/tune_d11generic.rpf", "game/content.rpf", "game/mapres.rpf"),
+        executable="RDR.exe",
         steam_app_id="2668510",
         install_dir_names=("Red Dead Redemption",),
         default_roots=(

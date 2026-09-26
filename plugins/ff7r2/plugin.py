@@ -110,13 +110,13 @@ PLUGIN = GamePlugin(
     installation=GameInstallSpec(
         root_env="LEXEDITOR_FF7R2_ROOT",
         required_paths=(EXECUTABLE, "End/Content/Paks"),
+        executable="End/Binaries/Win64/ff7rebirth_.exe",
         steam_app_id="2909400",
         install_dir_names=("FINAL FANTASY VII REBIRTH",),
         default_roots=(
             Path(r"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VII REBIRTH"),
         ),
         # ReShade loads from beside the renderer, not the installation root.
-        reshade_root="End/Binaries/Win64",
         reshade_renderer=RENDERER,
         launch_path=EXECUTABLE,
     ),

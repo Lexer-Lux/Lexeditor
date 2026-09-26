@@ -201,6 +201,7 @@ PLUGIN = GamePlugin(
         reshade_renderer="dxgi",
         # Use normal startup. Skipping the warning is a separate opt-in tweak.
         launch_path="FF8_Launcher.exe",
+        executable="FF8_EN.exe",
         steam_app_id="39150",
         install_dir_names=("FINAL FANTASY VIII",),
         default_roots=(

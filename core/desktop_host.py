@@ -1679,7 +1679,17 @@ class HostApi:
             return None
         root = Path(root)
         plugin = self._plugins.get(plugin_id)
-        declared = getattr(getattr(plugin, "installation", None), "reshade_root", "") or ""
+        spec = getattr(plugin, "installation", None)
+        declared = getattr(spec, "reshade_root", "") or ""
+        if not declared:
+            # The folder holding the game's own executable is where a wrapper
+            # is loaded from, and every plugin states that executable by hand.
+            # A game whose executable is not in the root therefore stops
+            # getting the DLL written to the root.
+            declared = str(PurePosixPath(
+                (getattr(spec, "executable", "") or "").replace("\\", "/")).parent)
+            if declared == ".":
+                declared = ""
         if not declared:
             return root
         target = root / Path(*PurePosixPath(declared.replace("\\", "/")).parts)

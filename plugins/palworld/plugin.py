@@ -332,6 +332,7 @@ PLUGIN = GamePlugin(
     installation=GameInstallSpec(
         root_env="LEXEDITOR_PALWORLD_ROOT",
         required_paths=("Palworld.exe", "Pal/Content/Paks"),
+        executable="Palworld.exe",
         steam_app_id="1623730",
         install_dir_names=("Palworld",),
         default_roots=(Path(r"C:\Program Files (x86)\Steam\steamapps\common\Palworld"),),

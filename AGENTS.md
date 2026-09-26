@@ -35,6 +35,10 @@
   game's own data, read-only, and the mod selector names that source Vanilla;
   creating or copying a mod is an explicit action. An edit attempt in that
   state offers to create one. See `codex/shared/no-mod-state.md`.
+- Every game plugin's installation descriptor names the game's own executable
+  (`executable=`), relative to the installation root and set by hand: the
+  process that renders, not whatever Play starts. ReShade's folder is derived
+  from it, so a game whose executable is not in the root must say where it is.
 
 ## Muse use
 

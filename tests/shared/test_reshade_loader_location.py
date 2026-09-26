@@ -1,4 +1,4 @@
-"""Each game says where its ReShade loader goes. Nothing is inferred.
+"""Each game names its own executable, and the loader goes beside it.
 
 Rebirth and Remake keep their renderer in End/Binaries/Win64 and FF9 keeps
 its in x64. Lexeditor wrote the DLL to the installation root, where Windows
@@ -7,8 +7,15 @@ and the game started with none in it.
 
 Working it out from the launch path was the first repair and it was still a
 guess - FF9's launch path is a launcher at the root, and the renderer is
-somewhere else entirely. The folder is declared per game now, and a game that
-declares one it does not have is an error rather than a quiet fall back.
+somewhere else entirely. Every plugin now declares its own executable by hand
+- the process that renders, not whatever Play happens to start - and the
+wrapper's folder is that executable's folder. Dark Souls III declares
+Game/DarkSoulsIII.exe inside a root that holds no executable at all, and
+tModLoader declares the dotnet host it actually runs through, so both used to
+point ReShade somewhere nothing could load it.
+
+A game that declares an executable it does not have is an error rather than a
+quiet fall back.
 """
 from pathlib import Path
 from types import SimpleNamespace
@@ -73,15 +80,29 @@ class LoaderLocation(unittest.TestCase):
             if getattr(plugin, "installation", None) is None:
                 continue
             with self.subTest(plugin=plugin_id):
+                # Every game says which of its executables is the game, by
+                # hand. The wrapper's folder is derived from it, so a game
+                # whose executable is not in the root cannot silently get the
+                # DLL written to the root.
+                self.assertTrue(plugin.installation.executable,
+                                f"{plugin_id} does not declare its executable")
                 found = host._reshade_root(plugin_id)
                 if found is None:
                     continue  # the game is not installed on this machine
                 self.assertTrue(found.is_dir(), f"{plugin_id} resolved to {found}")
+                root = Path(host._installations.snapshot(plugin_id)["root"])
+                executable = root / plugin.installation.executable
                 # The check that would have caught Rebirth: a renderer wrapper
-                # is only loaded from a folder holding an executable.
-                self.assertTrue(list(found.glob("*.exe")),
-                                f"{plugin_id} points ReShade at {found}, which has no "
-                                "executable, so nothing there would ever load it")
+                # is only loaded from the folder holding the executable that
+                # renders. Pointing at a folder with some other .exe in it is
+                # not enough, and pointing at one with none is how the DLL
+                # ended up somewhere nothing could load it.
+                self.assertTrue(executable.is_file(),
+                                f"{plugin_id} declares executable "
+                                f"{plugin.installation.executable}, which is not in {root}")
+                self.assertEqual(executable.parent.resolve(), found.resolve(),
+                                 f"{plugin_id} points ReShade at {found}, but its own "
+                                 f"executable is in {executable.parent}")
 
 
 if __name__ == "__main__":

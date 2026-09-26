@@ -407,6 +407,7 @@ PLUGIN = GamePlugin(
         root_env="LEXEDITOR_CHRONO_TRIGGER_ROOT",
         required_paths=("Chrono Trigger.exe", "resources.bin"),
         launch_path="Chrono Trigger.exe",
+        executable="Chrono Trigger.exe",
         steam_app_id="613830",
         install_dir_names=("Chrono Trigger",),
         default_roots=(

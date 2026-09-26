@@ -164,6 +164,7 @@ PLUGIN = GamePlugin(
     installation=GameInstallSpec(
         root_env="LEXEDITOR_WARBAND_ROOT",
         required_paths=("mb_warband.exe", "Modules"),
+        executable="mb_warband.exe",
         steam_app_id="48700",
         install_dir_names=("MountBlade Warband", "Mount & Blade Warband"),
         default_roots=(Path(

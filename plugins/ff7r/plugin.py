@@ -289,6 +289,7 @@ PLUGIN = GamePlugin(
             "End/Binaries/Win64/ff7remake_.exe",
             "End/Content/Paks",
         ),
+        executable="End/Binaries/Win64/ff7remake_.exe",
         steam_app_id="1462040",
         install_dir_names=("FINAL FANTASY VII REMAKE", "FFVIIRemakeIntergrade"),
         default_roots=(
@@ -296,7 +297,6 @@ PLUGIN = GamePlugin(
             Path(r"C:\Program Files\Epic Games\FFVIIRemakeIntergrade"),
         ),
         # ReShade loads from beside the renderer, not the installation root.
-        reshade_root="End/Binaries/Win64",
         reshade_renderer="dxgi",
         launch_path="End/Binaries/Win64/ff7remake_.exe",
     ),

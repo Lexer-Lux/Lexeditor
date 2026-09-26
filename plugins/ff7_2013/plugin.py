@@ -180,6 +180,7 @@ PLUGIN = GamePlugin(
         root_env="LEXEDITOR_FF7_2013_ROOT",
         data_env="LEXEDITOR_FF7_2013_DATA_ROOT",
         required_paths=("ff7_en.exe", "data/lang-en/kernel/KERNEL.BIN"),
+        executable="ff7_en.exe",
         steam_app_id="39140",
         install_dir_names=("FINAL FANTASY VII",),
         default_roots=(DEFAULT_ROOT, Path(r"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VII")),

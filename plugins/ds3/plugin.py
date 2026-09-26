@@ -83,6 +83,7 @@ PLUGIN = GamePlugin(
     installation=GameInstallSpec(
         root_env="LEXEDITOR_DS3_ROOT",
         required_paths=("Game/DarkSoulsIII.exe", "Game/Data0.bdt"),
+        executable="Game/DarkSoulsIII.exe",
         steam_app_id="374320",
         install_dir_names=("DARK SOULS III",),
         default_roots=(

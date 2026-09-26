@@ -137,6 +137,7 @@ PLUGIN = GamePlugin(
         required_paths=(
             "RDR2.exe", "common_0.rpf", "update_1.rpf", "update_3.rpf", "update_4.rpf",
         ),
+        executable="RDR2.exe",
         steam_app_id="1174180",
         install_dir_names=("Red Dead Redemption 2",),
         default_roots=(Path(

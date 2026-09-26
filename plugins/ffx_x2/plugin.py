@@ -335,6 +335,7 @@ PLUGIN = GamePlugin(
             "data/FFX_Data.vbf", "data/FFX2_Data.vbf",
         ),
         launch_path="FFX&X-2_LAUNCHER.exe",
+        executable="FFX.exe",
         steam_app_id="359870",
         install_dir_names=("FINAL FANTASY FFX&FFX-2 HD Remaster",),
         default_roots=(

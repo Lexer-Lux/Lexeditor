@@ -180,6 +180,7 @@ PLUGIN = GamePlugin(
     installation=GameInstallSpec(
         root_env="FACTORIO_GAME_ROOT",
         required_paths=("bin/x64/factorio.exe", "data/base/info.json", "data/core"),
+        executable="bin/x64/factorio.exe",
         steam_app_id="427520",
         install_dir_names=("Factorio",),
         default_roots=(

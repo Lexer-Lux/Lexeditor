@@ -123,6 +123,7 @@ PLUGIN = GamePlugin(
     installation=GameInstallSpec(
         root_env="LEXEDITOR_STARDEW_ROOT",
         required_paths=("Stardew Valley.exe", "Content"),
+        executable="Stardew Valley.exe",
         steam_app_id="413150",
         install_dir_names=("Stardew Valley",),
         default_roots=(

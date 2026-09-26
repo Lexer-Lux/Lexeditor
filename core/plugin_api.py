@@ -82,14 +82,24 @@ class GameInstallSpec:
     # that runs its own updater. Lexeditor pins helper versions, so it starts
     # the game directly and keeps that decision.
     launch_path: str = ""
-    # Where a renderer wrapper - ReShade - has to sit for this game to load
-    # it: the folder holding the executable that actually renders, relative to
-    # the installation root. Declared per game and never guessed. Lexeditor
-    # inferred it once from launch_path, wrote the DLL where nothing would
-    # load it, and reported success.
+    # The game's own executable: the process that renders, relative to the
+    # installation root, set by hand for every game. This is where a renderer
+    # wrapper such as ReShade has to sit, so a game whose executable is not in
+    # the root no longer gets the DLL written somewhere nothing loads it.
     #
-    # "" means the installation root, which is a statement, not a default: a
-    # game whose renderer wrapper belongs somewhere else must say so.
+    # Set by hand because only the plugin knows which of its executables is the
+    # game: some ship a launcher beside the renderer (FF9's launcher is at the
+    # root and the renderer under x64), some launch a DLL through a host
+    # process (tModLoader runs through dotnet.exe), and some are a mod loader
+    # in front of the game (SMAPI, WSE2).
+    executable: str = ""
+    # Where the renderer wrapper has to sit when that is NOT the executable's
+    # own folder. Declared per game and never guessed. Lexeditor inferred it
+    # once from launch_path, wrote the DLL where nothing would load it, and
+    # reported success.
+    #
+    # "" means the folder holding `executable`, and "" for both means the
+    # installation root, which is a statement rather than a default.
     reshade_root: str = ""
     # The loader name ReShade goes in under for this game ("dxgi", "d3d9", ...).
     reshade_renderer: str = ""
@@ -260,6 +270,17 @@ def validate_plugin(plugin: GamePlugin) -> None:
                 raise ValueError(f"{plugin.plugin_id} has an unsafe required path: {relative}")
         if any(not _absolute_for_host_or_windows(path) for path in spec.default_roots):
             raise ValueError(f"{plugin.plugin_id} has a relative default game path")
+        if not spec.executable:
+            raise ValueError(
+                f"{plugin.plugin_id} does not say which executable is the game")
+        executable = Path(spec.executable)
+        if executable.is_absolute() or ".." in executable.parts:
+            raise ValueError(
+                f"{plugin.plugin_id} has an unsafe executable path: {spec.executable}")
+        if executable.suffix.casefold() != ".exe":
+            raise ValueError(
+                f"{plugin.plugin_id} executable is not a Windows program: "
+                f"{spec.executable}")
     font_ids: set[str] = set()
     destinations: set[Path] = set()
     for font in plugin.fonts:

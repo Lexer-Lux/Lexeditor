@@ -143,6 +143,7 @@ PLUGIN = GamePlugin(
             "bin/Win64_Shipping_Client/Bannerlord.exe",
             "Modules",
         ),
+        executable="bin/Win64_Shipping_Client/Bannerlord.exe",
         steam_app_id="261550",
         install_dir_names=("Mount & Blade II Bannerlord",),
         default_roots=(Path(
