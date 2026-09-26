@@ -80,24 +80,19 @@
       {key:"timCount",label:"Textures",render:row=>row.timCount??"—"}];
     showPaged("models",rows,columns,modelDetail,"110px minmax(150px,2fr) 90px 80px 70px");
   }
-  // A model's texture pages as cards. The panel body and the model-preview
-  // drawer show the same grid, so it is built once. `inPlace` keeps the pages
-  // where the reader already is: a creature's own texture pages are that
-  // creature's data, not a reason to leave for the Textures page.
+  // The detail pane and preview drawer share the same linked texture cards.
   function modelTextureCards(row,options={}){
-    const inPlace=options.inPlace===true;
     return LexeditorUI.tileGrid((row.tims||[]).map(tim=>{
       const key=`${row.id}#${tim.index}`,palette=Math.max(0,Math.min((tim.paletteCount||1)-1,Number(assetPalettes[key]??0)));
       const targetId=`battle/${row.file}#${tim.index}`,targetLabel=`Texture ${tim.index+1}`;
       const preview=el("img",{src:`/assets/texture.png?id=${encodeURIComponent(targetId)}&palette=${palette}&dataset=${encodeURIComponent(assetDataset())}`,alt:`${row.name}, texture ${tim.index+1}`});
-      const cardContent=LexeditorUI.stack({fill:false},el("span",{},targetLabel),LexeditorUI.iconSlot({content:preview,shape:'square'}));
-      const link=inPlace?cardContent:hoverable({content:cardContent,targetType:"texture",targetId,targetLabel,activate:()=>{state.selected.textures=targetId;navigate("textures")}})
-      const paletteSelect=tim.paletteCount>1?selectControl(palette,Array.from({length:tim.paletteCount},(_,id)=>({value:id,name:`Palette ${id+1}`})),value=>{assetPalettes[key]=value;renderModels()}):null;
+      const link=content=>hoverable({content,targetType:"textures",targetId,targetLabel,
+        activate:()=>{state.selected.textures=targetId;state.filters.textures='';navigate("textures")}});
+      const paletteSelect=tim.paletteCount>1?selectControl(palette,Array.from({length:tim.paletteCount},(_,id)=>({value:id,name:`Palette ${id+1}`})),value=>{assetPalettes[key]=value;render()}):null;
       if(paletteSelect)paletteSelect.setAttribute("aria-label",`${row.name} texture ${tim.index+1} palette`);
-      const card=[link];
-      if(paletteSelect)card.push(detailField({label:"PALETTE",help:infoHelp("Palette selection only changes this preview; the game chooses palettes while rendering."),control:paletteSelect}));
-      return LexeditorUI.stack({fill:false},...card);
-    }),{minWidth:160});
+      return LexeditorUI.recordCard({title:link(targetLabel),image:link(preview),
+        body:paletteSelect?detailField({label:"PALETTE",help:infoHelp("Palette selection only changes this preview; the game chooses palettes while rendering."),control:paletteSelect}):null});
+    }),{minWidth:160,balanced:true});
   }
   // The first texture page of a battle model, as the record's own picture.
   // A creature whose model the game ships shows the creature; only a record
