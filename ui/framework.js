@@ -8741,7 +8741,13 @@ ${contents.path}`});
           const stacked = tracks.length < 2 && tracks[0] !== "none";
           const fittedHeight = measurement?.full && !stacked ? `${height}px` : "";
           masterNode.style.height = fittedHeight;
-          root.classList.toggle("lex-full-table-page", !!measurement?.full);
+          // The class stops the panes stretching to their row, so it goes on
+          // only with the heights that replace the stretch. A fit that ran
+          // before the page was attached read the grid as stacked, pinned
+          // nothing and still set it, and the detail panel shrank to its
+          // content - most of it blank - until the next fit: the flash on
+          // clicking a tab that is already open.
+          root.classList.toggle("lex-full-table-page", Boolean(fittedHeight));
           detailNode.style.height = fittedHeight;
         },
         change: nextSize => {
