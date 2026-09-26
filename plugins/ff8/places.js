@@ -35,6 +35,7 @@
   }
   function fieldParamControl(row,entry){
     const param=entry.param,vanilla=fieldMapRow(state.vanilla,row.key)?.players?.[entry.player.id]?.params?.[param.id];
+    if(param.id===4||param.id===5)return readonlyField(param.value);
     if(!param.editable)return readonlyField(`Unsupported opcode 0x${Number(param.opcode).toString(16).toLocaleUpperCase()}`);
     return sourceControl(numberControl(param.value,0,0xFFFFFF,1,value=>param.value=value,{"aria-label":`${row.name} ${entry.player.entity} ${param.name}`}),()=>param.value,vanilla?.value,[],value=>param.value=Number(value));
   }

@@ -1278,6 +1278,8 @@ def save(edits: list[dict]) -> dict:
                 if identity in seen or not 0 <= player_id < len(players) or not 0 <= param_id < 7:
                     raise ValueError("Invalid or duplicate field card-player edit")
                 seen.add(identity)
+                if param_id in (4, 5):
+                    raise ValueError("Unverified CARDGAME settings must retain their original values")
                 param = players[player_id]["params"][param_id]
                 if not param["editable"]:
                     raise ValueError("This field script expression is not a supported literal or variable push")

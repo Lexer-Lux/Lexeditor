@@ -23,7 +23,9 @@ def run(browser_path=None,screenshot=None):
                 {id:0,name:'Deck',value:1,editable:true,mode:'literal'},
                 {id:1,name:'Region rule',value:4,editable:false,mode:'variable'},
                 {id:3,name:'Rare card chance',value:30,editable:true,mode:'literal'},
-                {id:6,name:'Card levels',value:1,editable:true,mode:'literal'}]},
+                {id:6,name:'Card levels',value:1,editable:true,mode:'literal'},
+                {id:4,name:'Unknown setting 1',value:17,editable:true,mode:'literal'},
+                {id:5,name:'Unknown setting 2',value:23,editable:true,mode:'literal'}]},
                 {id:1,entity:'student',params:[{id:0,name:'Deck',value:1,editable:true,mode:'literal'}]}]};
               window.state={tab:'cards',activeSource:'mine',selected:{},filters:{fields:'old search'},data:{cards:{rows:[card],elements:[{id:0,name:'None'}]},fields:{rows:[map]},text:{rows:[]}},
                 base:{cards:[structuredClone(card)]},vanilla:{cards:{rows:[structuredClone(card)]},fields:{rows:[structuredClone(map)]}}};
@@ -44,6 +46,10 @@ def run(browser_path=None,screenshot=None):
             page.get_by_role('tab',name='PLAYERS',exact=True).click()
             field=page.get_by_label('queen_est Deck',exact=True);field.wait_for()
             assert page.get_by_label('queen_est Region rule',exact=True).is_disabled()
+            for label, value in [('Unknown setting 1', '17'), ('Unknown setting 2', '23')]:
+                protected = page.locator('.lex-detail-field').filter(has=page.get_by_text(label, exact=True))
+                assert value in protected.inner_text()
+                assert protected.locator('input:not([readonly]),select,textarea').count() == 0
             assert page.get_by_label('queen_est Rare card chance',exact=True).locator('..').inner_text()=='%'
             assert page.get_by_label('queen_est card level 1',exact=True).is_checked()
             assert page.locator('.lex-record-card').count()==1

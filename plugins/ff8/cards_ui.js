@@ -205,6 +205,8 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         if(calls.length>1)body.push(LexeditorUI.detailNote('This opponent has more than one card-game setup. The game script decides which setup is used.'));
         calls.forEach((player,index)=>{
           const fields=(player.params||[]).map(param=>{
+            if(param.id===4||param.id===5)return detailField({label:param.name,
+              help:infoHelp(help[param.id]),control:LexeditorUI.readonlyField(param.value)});
             const before=state.vanilla?.fields?.rows?.find(row=>row.key===map.key)?.players?.find(row=>row.id===player.id)?.params?.find(row=>row.id===param.id);
             const update=value=>{param.value=Number(value);noteFieldEdit('fields',{field:param.name});shell.refresh()};
             if(param.id===6&&param.mode==='literal'){
