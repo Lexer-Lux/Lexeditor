@@ -3,7 +3,7 @@
 window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
   detailSection, detailField, numberControl, selectControl, sourceControl,
   referenceValues, infoHelp, shell, noteFieldEdit, subtabBar, detailPanel,
-  recordId, columnList, conceptIcon, ensureFieldDetail}) => {
+  recordId, columnList, conceptIcon, ensureFieldDetail, navigate}) => {
   // The card's own four sides, in the order Triple Triad draws them.
   const sides = ["top", "left", "right", "bottom"];
   const fields = [...sides, "element", "power"];
@@ -160,6 +160,15 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       if(entry.deckMode!=="literal"||entry.deckId===null||entry.deckId===undefined)continue;
       deckOfCall.set(`${entry.map}:${entry.entity}`,Number(entry.deckId));
     }
+    // Loaded script values include unsaved edits; the initial scan does not.
+    for(const map of state.data.fields.rows){
+      if(!map._loaded)continue;
+      for(const player of map.players||[]){
+        const param=player.params?.find(value=>value.id===0),key=`${map.key}:${player.entity}`;
+        if(param?.mode==='literal')deckOfCall.set(key,Number(param.value));
+        else deckOfCall.delete(key);
+      }
+    }
     const deckMembers=new Map();
     for(const entry of groups.values()){
       const deck=deckOfCall.get(entry.key);
@@ -185,7 +194,9 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       if(!map)return detailPanel({title:entry.name,body:[LexeditorUI.detailNote('Location data is unavailable.')]});
       if(!map._loaded&&!map._loading&&!map._error)
         queueMicrotask(async()=>{await ensureFieldDetail(map);if(state.tab==='cards'&&mode==='players')render()});
-      const body=[detailField({label:'Location',control:LexeditorUI.readonlyField(map.name)}),
+      const body=[detailField({label:'Location',control:LexeditorUI.hoverable({content:map.name,
+        targetType:'fields',targetId:map.id,targetLabel:map.name,
+        activate:()=>{state.selected.fields=map.id;state.filters.fields='';navigate('fields')}})}),
         detailField({label:'Map file',control:LexeditorUI.readonlyField(map.key)})];
       if(map._error)body.push(LexeditorUI.detailNote(`Could not load opponent: ${map._error}`));
       else if(!map._loaded)body.push(LexeditorUI.loadingPanel({label:'Loading opponent settings'}));
@@ -201,7 +212,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
             input.disabled=!param.editable||state.activeSource!=='mine';
             return detailField({label:param.name+(variable?' variable':''),dataType:'INT',min:0,max:maximum,
               help:infoHelp(help[param.id]+(variable?' Holds a game-variable reference; changing it selects a different variable.':'')),
-              control:sourceControl(input,()=>param.value,before?.value,[],update)});
+              control:sourceControl(!variable&&param.id===3?LexeditorUI.unitField(input,'%'):input,()=>param.value,before?.value,[],update)});
           });
           body.push(calls.length===1?LexeditorUI.stack({fill:false},...fields):detailSection({title:`Setup ${index+1}`,body:fields}));
         });
@@ -217,9 +228,9 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
               +` Each opponent below has its own CARDGAME call; select one to edit the values its script passes.`),
             body:others.length
               ?LexeditorUI.stack({fill:false},...others.map(other=>
-                  el("button",{type:"button",style:"text-align:left",
-                    onclick:()=>{playerView.selected=other.key;playerView.page=0;render()}},
-                    `${other.name} · ${other.map}`)))
+                  LexeditorUI.hoverable({content:`${other.name} · ${other.map}`,
+                    targetType:'card-players',targetId:other.key,targetLabel:other.name,
+                    activate:()=>{playerView.selected=other.key;playerView.query='';playerView.page=0;render()}})))
               :LexeditorUI.detailNote(`No other CARDGAME call in the game data names deck ${deck}.`)}));
         }
       }

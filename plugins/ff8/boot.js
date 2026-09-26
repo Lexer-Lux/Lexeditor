@@ -506,7 +506,7 @@
       tableResult?el("span",{class:"lex-detail-note"},tableResult):null,file);
   }
   let cardsUI;
-  function renderCards(){cardsUI??=FF8CardsUI({el,state,rowOf,filtered,showPaged,sharedDetail,detailSection,detailField,numberControl,selectControl,sourceControl,referenceValues,infoHelp,shell,noteFieldEdit,subtabBar,detailPanel,recordId,columnList,conceptIcon,ensureFieldDetail});return cardsUI.render()}
+  function renderCards(){cardsUI??=FF8CardsUI({el,state,rowOf,filtered,showPaged,sharedDetail,detailSection,detailField,numberControl,selectControl,sourceControl,referenceValues,infoHelp,shell,noteFieldEdit,subtabBar,detailPanel,recordId,columnList,conceptIcon,ensureFieldDetail,navigate});return cardsUI.render()}
   const views={cards:renderCards,abilities:renderAbilities,starting:renderStartingData,items:renderItems,refine:renderRefine,shops:renderShops,weapons:renderWeapons,magic:()=>renderKernel("magic","Magic"),gfs:renderGFs,characters:renderCharacters,text:renderText,archives:renderArchives,enemies:renderEnemies,encounters:renderEncounters,fields:renderFields,world:renderWorldMap,settings:renderSettings,sfx:renderSfx,models:renderModels,textures:renderTextures,datamap:renderDataMap,dashboard:renderDashboard};
   // An ability record lives in a category subtab of Abilities, so a link to one
   // names its dataset (abilityJunction) and lands on that subtab.
