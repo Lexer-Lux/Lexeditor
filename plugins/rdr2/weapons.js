@@ -322,6 +322,7 @@ async function renderWeapons() {
   m.append(LexeditorUI.pagedListDetail({modOnly:(()=>{const touched=touchedRecords(Object.values(state.weaponEdits||{}),[],1);
       return {available:!isRO(),value:state.modOnly===true,changed:name=>touched.has(String(name)),
         change:value=>{state.modOnly=value;f.weaponPage=0;renderWeapons();}};})(),
+    addDisabledReason:section==="weapons"?"Lexeditor edits existing weapon definitions. It cannot create a new weapon and its required links yet.":"Lexeditor edits existing ammunition definitions but cannot create a new ammunition type yet.",
     rows:listNames,key:n=>n,slots:false,page:f.weaponPage,pageSize:f.weaponPageSize,selected:f.weapon,noun:"records",splitKey:`rdr2-weapons-${section}`,defaultSplit:44,
     search:{key:`rdr2-weapons-${section}`,value:f.weaponQ||"",placeholder:`Search ${section}…`,change:value=>{f.weaponQ=value;f.weaponPage=0;renderWeapons();}},filters:weaponFilters,
     master:({rows,selected,select})=>LexeditorUI.columnList({rows,key:n=>n,selected,select,columns:[

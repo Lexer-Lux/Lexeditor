@@ -112,7 +112,7 @@ async function renderChallenges() {
       LexeditorUI.detailSection({title:"Rewards",body:rewardBox}));
     return LexeditorUI.detailPanel({title:`Rank ${rank.rank}`,identity:String(rank.rank),body});
   };
-  m.append(LexeditorUI.pagedListDetail({rows:strand.ranks,key:rank=>rank.rank,selected:f.challengeRank,
+  m.append(LexeditorUI.pagedListDetail({addDisabledReason:"Lexeditor edits the existing challenge ranks. Adding another rank and its progression rules is not supported yet.",rows:strand.ranks,key:rank=>rank.rank,selected:f.challengeRank,
     slots:false,page:0,pageSize:strand.ranks.length,splitKey:"rdr2-challenges",defaultSplit:35,
     master:({rows,selected,select})=>LexeditorUI.columnList({rows,key:rank=>rank.rank,selected,select,columns:[
       {key:"rank",label:"Rank",numeric:true,width:"4em"},{key:"name",label:"Challenge",render:rank=>localizedValue(rank.descriptionLabel)?.trim()||rank.descriptionLabel,
