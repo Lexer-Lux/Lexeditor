@@ -16,7 +16,7 @@ def _portable_script_paths(root: Path) -> list[Path]:
     """Return supported script files with canonical filesystem identities."""
     root = Path(root).resolve()
     paths: dict[str, Path] = {}
-    for relative in core.SCRIPT_ROOTS:
+    for relative in core.script_roots():
         base = (root / Path(*relative.split("/"))).resolve()
         if not base.is_dir():
             continue

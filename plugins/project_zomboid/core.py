@@ -49,6 +49,17 @@ MOD_INFO_SCALAR_FIELDS = (
 )
 ITEM_EDITABLE_FIELDS = ("ItemType", "Weight", "Icon", "DisplayCategory")
 SCRIPT_ROOTS = ("common/media/scripts", "42/media/scripts")
+# The installed game keeps its own scripts here. With no mod open the editor
+# reads these, locked, so every value shown is the vanilla one.
+VANILLA_SCRIPT_ROOTS = ("media/scripts",)
+
+
+def vanilla() -> bool:
+    return os.environ.get("LEXEDITOR_VANILLA") == "1"
+
+
+def script_roots() -> tuple[str, ...]:
+    return VANILLA_SCRIPT_ROOTS if vanilla() else SCRIPT_ROOTS
 IGNORED_DEPLOY_NAMES = {".git", ".lexeditor", ".pytest_cache", "__pycache__"}
 _VERSION_RE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 _INFO_LINE_RE = re.compile(r"^(?P<prefix>\s*)(?P<key>[A-Za-z][A-Za-z0-9_]*)\s*=(?P<value>.*?)(?P<ending>\r?\n)?$")
@@ -73,6 +84,14 @@ def sha256_file(path: Path) -> str:
 
 
 def project_root() -> Path:
+    if vanilla():
+        value = os.environ.get("LEXEDITOR_PROJECT_ZOMBOID_ROOT")
+        if not value:
+            raise ProjectZomboidError("Locate Project Zomboid to show its vanilla scripts")
+        root = Path(value).expanduser().resolve()
+        if not root.is_dir():
+            raise ProjectZomboidError(f"Project Zomboid folder does not exist: {root}")
+        return root
     value = os.environ.get("LEXEDITOR_PROJECT_ZOMBOID_PROJECT")
     if not value:
         raise ProjectZomboidError("No Project Zomboid project is selected")
@@ -401,7 +420,7 @@ def _properties(text: str, block: Block) -> tuple[dict[str, str], set[str]]:
 
 def script_paths(root: Path) -> list[Path]:
     paths: list[Path] = []
-    for relative in SCRIPT_ROOTS:
+    for relative in script_roots():
         base = root / relative
         if base.is_dir():
             paths.extend(path for path in base.rglob("*.txt") if path.is_file() and not path.is_symlink())

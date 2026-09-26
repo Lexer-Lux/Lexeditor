@@ -107,7 +107,13 @@ class Handler(PluginRequestHandler):
                     "editorRoot": str(PLUGIN_ROOT),
                 })
             elif path == "/api/mod-info":
-                self.send_json(core.read_mod_info(self.project()))
+                if core.vanilla():
+                    # The unmodded game has no mod.info to show.
+                    self.send_json({"path": "", "sha256": "", "vanilla": True,
+                                    "fields": {key: "" for key in core.MOD_INFO_SCALAR_FIELDS},
+                                    "duplicateKeys": [], "unmodeledLines": 0})
+                else:
+                    self.send_json(core.read_mod_info(self.project()))
             elif path == "/api/animationmeshes":
                 self.send_json(animationsmesh.read(self.project()))
             elif path == "/api/items":

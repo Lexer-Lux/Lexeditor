@@ -11,7 +11,7 @@ from pathlib import Path
 import threading
 from urllib.parse import parse_qs, urlparse
 
-from plugin_http import PluginRequestHandler
+from plugin_http import PluginRequestHandler, vanilla_session
 
 from .data_map import build_data_map
 from .model import (
@@ -53,7 +53,27 @@ def _fingerprint(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _vanilla_dump_candidates() -> list[Path]:
+    """Where `factorio --dump-data` leaves data-raw-dump.json.
+
+    It writes into the game's write-data folder: %APPDATA%\\Factorio for an
+    installed copy, or the game folder itself for a portable one.
+    """
+    candidates = []
+    if GAME_ROOT is not None:
+        candidates.append(GAME_ROOT / "script-output" / SOURCE_DUMP)
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        candidates.append(Path(appdata) / "Factorio" / "script-output" / SOURCE_DUMP)
+    return candidates
+
+
 def _source_path() -> Path:
+    if vanilla_session():
+        # No mod is open, so there is no copied dump: read the game's own.
+        candidates = _vanilla_dump_candidates()
+        return next((path for path in candidates if path.is_file()),
+                    candidates[-1] if candidates else PROJECT_ROOT / SOURCE_DIR / SOURCE_DUMP)
     return PROJECT_ROOT / SOURCE_DIR / SOURCE_DUMP
 
 
@@ -75,7 +95,8 @@ def _load_store(*, refresh: bool = False) -> PrototypeStore:
     global _store, _source_fingerprint, _saved_edits, _dirty
     with _lock:
         if _store is None or refresh:
-            _store = PrototypeStore.from_project(PROJECT_ROOT)
+            _store = (PrototypeStore.from_dump(_source_path()) if vanilla_session()
+                      else PrototypeStore.from_project(PROJECT_ROOT))
             _source_fingerprint = _fingerprint(_source_path())
             _saved_edits = _snapshot_edits(_store)
             _dirty = 0
@@ -138,7 +159,7 @@ def _install_payload() -> dict:
 
 def _config() -> dict:
     try:
-        manifest = project_manifest(PROJECT_ROOT)
+        manifest = {} if vanilla_session() else project_manifest(PROJECT_ROOT)
         manifest_error = ""
     except FactorioDataError as error:
         manifest = {}
@@ -186,6 +207,7 @@ def _config() -> dict:
     source_space_age = "space-age" in mods
     return {
         "pluginId": "factorio",
+        "vanilla": vanilla_session(),
         "projectRoot": str(PROJECT_ROOT),
         "project": manifest,
         "projectError": manifest_error,

@@ -209,6 +209,12 @@ class PrototypeStore:
         self._validate_override_targets()
 
     @classmethod
+    def from_dump(cls, dump: Path) -> "PrototypeStore":
+        """The game's own prototypes with no overrides: vanilla, no mod open."""
+        raw = _read_json(Path(dump), label="Factorio prototype dump")
+        return cls(raw, {"format": FORMAT_VERSION, "edits": {}})
+
+    @classmethod
     def from_project(cls, project: Path) -> "PrototypeStore":
         project = Path(project).expanduser().resolve()
         raw = _read_json(project / SOURCE_DIR / SOURCE_DUMP, label="Factorio prototype dump")

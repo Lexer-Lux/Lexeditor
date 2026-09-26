@@ -61,8 +61,9 @@ function editingAllowed() {
 
 function sourceState() {
   const source = state.config?.source || {};
-  const message = source.error ||
-    "Create a Factorio 2.1 data.raw JSON dump with the game's documented --dump-data command, then copy it into this project's source folder as data-raw-dump.json.";
+  const message = source.error || (state.config?.vanilla
+    ? `Run Factorio once with its documented --dump-data command. Lexeditor then shows the vanilla prototypes from ${source.path || "script-output/data-raw-dump.json"}.`
+    : "Create a Factorio 2.1 data.raw JSON dump with the game's documented --dump-data command, then copy it into this project's source folder as data-raw-dump.json.");
   return detailPanel({className: "lex-information-panel",
     title: source.error ? "Prototype dump could not be read" : "Prototype dump required",
     body: [

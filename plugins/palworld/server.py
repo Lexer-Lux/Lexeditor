@@ -24,7 +24,7 @@ from .palschema import (
     resolve_discovered_patch,
 )
 from .palschema_fields import available_fields, coerce_new_value, schema_scalar_writable
-from plugin_http import PluginRequestHandler
+from plugin_http import PluginRequestHandler, vanilla_session
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -138,6 +138,10 @@ def info_document() -> InfoDocument:
 
 
 def info_payload() -> dict:
+    if vanilla_session():
+        # No mod is open: there is no package, and nothing patches the game.
+        return {"project": "", "path": "", "sourceSha256": "", "data": {},
+                "issues": [], "vanilla": True}
     path = info_path()
     document = InfoDocument.load(path)
     return {
@@ -189,8 +193,14 @@ def validate_schema_edits(edits: list, schema_root: Path | None) -> None:
 
 
 def palschema_catalog_payload() -> dict:
-    info = info_document().data
     schema_root = palschema_schema_root()
+    if vanilla_session():
+        # Vanilla Palworld has no PalSchema patches; the game's own tables are
+        # the unpatched values every patch would start from.
+        return {"project": "", "schemaAvailable": schema_root is not None,
+                "schemaRoot": str(schema_root) if schema_root is not None else "",
+                "patches": [], "vanilla": True}
+    info = info_document().data
     patches = discover_raw_patches(project_root(), info, schema_root=schema_root)
     if schema_root is not None:
         # Re-count fields blocked by unresolved generated constraints so the
