@@ -1212,6 +1212,9 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
   justify-content:center;
   display:grid;
   grid-auto-flow:column;
+  /* The strip fills its row: Lexer wants the sub-tab bar to use all the
+     horizontal space, the same as the page tab bar. Every tab takes an equal
+     share of it and the whole bar keeps its own width. */
   grid-auto-columns:minmax(0,1fr);
   flex:0 0 auto;
   min-width:0;
