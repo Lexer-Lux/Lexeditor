@@ -222,6 +222,21 @@ test('an editable property carries the value its record can be restored to', asy
   assert.equal(plain.attrs.control.attrs.vanilla, 7);
 });
 
+test('the Items tab repeats no file name under the record', async () => {
+  const e = await editor();
+  e.run(`installData({key:"items",label:"Items",source:"project",
+    fields:[{key:"Value",label:"Value",kind:"integer",editable:true,min:0,max:255}],
+    rows:[{line:0,id:0,name:"Hammer",values:{Value:1}}]})`);
+  const items = e.run('detail(state.datasets.items,state.datasets.items.rows[0])');
+  assert.ok(!items.attrs.meta, 'the Items panel still repeats the file name');
+  // Its sibling screens on the same tab keep the same treatment.
+  e.run(`installData({key:"item-stats",label:"Equipment stats",source:"project",
+    fields:[{key:"Strength",label:"Strength",kind:"integer",editable:true,min:0,max:255}],
+    rows:[{line:0,id:0,name:"Bonus 1",values:{Strength:1}}]})`);
+  const stats = e.run('detail(state.datasets["item-stats"],state.datasets["item-stats"].rows[0])');
+  assert.ok(!stats.attrs.meta, 'the Equipment stats panel still repeats the file name');
+});
+
 
 
 test('FF9 uses shared multi-boolean properties and conceptual character/equipment views', async () => {

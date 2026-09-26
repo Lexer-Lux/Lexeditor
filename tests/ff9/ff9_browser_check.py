@@ -192,6 +192,10 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             assert abs(strip["right"] - strip["lastRight"]) <= 2, strip
             assert strip["scroll"] <= strip["client"] + 1, strip
             assert not strip["clipped"], strip
+            # The Items tab names the records it shows itself, so the panel
+            # carries no file-name subtitle under the record's own name.
+            expect(page.locator(".ff9-detail .lex-detail-panel-meta")).to_have_count(0)
+
             price = numeric_field(page, "BUY PRICE")
             expect(price).to_have_value("250")
             page.screenshot(path=str(OUT / "ff9-items-wide.png"), full_page=True)
