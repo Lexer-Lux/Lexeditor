@@ -22,7 +22,7 @@ function FF8ArchivesUI({el,columnList,pagedPane,pager,detailPanel,detailSection,
     local.busy=true;
     try{const query=new URLSearchParams({name:local.archive,query:local.query,
         page:String(local.page),pageSize:String(local.pageSize)});
-      local.data=await api(`/api/archive?${query}`);local.selected=null;local.error="";}
+      local.data=await api(`/api/archive?${query}`);local.selected=local.data.rows?.[0]?.index??null;local.error="";}
     catch(error){local.error=String(error.message||error);local.data=null}
     finally{local.busy=false}
   }
@@ -51,7 +51,7 @@ function FF8ArchivesUI({el,columnList,pagedPane,pager,detailPanel,detailSection,
         detailField({label:"UNPACKED SIZE",help:infoHelp("How large the file is once its compression is undone."),control:readonlyField(readable(row.bytes))}),
         detailField({label:"COMPRESSED",help:infoHelp("Whether the archive stores this entry compressed. Lexeditor writes replacements uncompressed."),control:readonlyField(row.compressed?"Yes":"No")}),
         detailField({label:"OFFSET",help:infoHelp("Where the stored bytes begin inside the .fs file."),control:readonlyField(`0x${Number(row.offset).toString(16).toUpperCase()}`)})]}),
-      detailSection({title:"EXTRACT",help:infoHelp("Browsing reads the archive's own list. This copies one entry into the project so it can be looked at or edited, and it keeps one previous copy of what it overwrites. The installed game is never changed, and repacking a whole archive is still not built."),body:[
+      detailSection({title:"EXTRACT",help:infoHelp("Copies this file into your project for inspection or editing. Keeps one previous copy if you replace an earlier extraction. Your installed game stays unchanged."),body:[
         detailField({label:"ACTION",control:extract}),
         local.extracted?detailField({label:"LAST EXTRACT",control:readonlyField(local.extracted)}):null]})]});
   }
@@ -87,8 +87,7 @@ function FF8ArchivesUI({el,columnList,pagedPane,pager,detailPanel,detailSection,
         if(Number.isFinite(size)&&size>0){local.pageSize=size;local.page=0;
           void loadEntries().then(render)}}},
       change:value=>{local.page=value;void loadEntries().then(render)}});
-    const entries=detailPanel({heading:false,className:"ff8-archive-entries",body:[
-      pagedPane(list,pageBar)]});
+    const entries=pagedPane(list,pageBar);
     const status=[
       detailField({label:"ARCHIVE",help:infoHelp("The game's own FS/FI/FL triplet. Main holds kernel, init, namedic and wm2field; field holds every field map."),control:picker}),
       detailField({label:"ENTRIES",control:readonlyField(local.data?`${formatNumber(local.data.matched)} shown of ${formatNumber(local.data.total)}`:"—")}),

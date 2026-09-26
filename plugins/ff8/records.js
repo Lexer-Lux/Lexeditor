@@ -260,7 +260,7 @@
       {key:"text",label:"Name",grow:1,help:"The name as the game shows it. Double-click to change it; Enter keeps the change and Escape drops it.",
         editValue:row=>row.text,edit:(row,value)=>{row.text=String(value);renderText();shell.refresh()},
         render:row=>el("span",{class:vanilla(row.id)!==undefined&&vanilla(row.id)!==row.text?"lex-value-modified":""},el("output",{},row.text))}]});
-    $("#main").replaceChildren(detailPanel({heading:false,className:"ff8-name-panel",body:table}));
+    $("#main").replaceChildren(table);
   }
   const characterCurveOrder=["HP","STR","VIT","MAG","SPR","SPD","LUCK"];
   const characterCurveKind={HP:"hp",STR:"standard",VIT:"standard",MAG:"standard",SPR:"standard",SPD:"linear",LUCK:"linear"};
