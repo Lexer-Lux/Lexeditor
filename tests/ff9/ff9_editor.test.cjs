@@ -41,7 +41,7 @@ async function editor() {
     if ('tag' in value) return [value];
     return Object.values(value).flatMap(carried);
   };
-  for (const name of ['columnList','detailPanel','detailSection','detailField','multiNumberRow','readonlyField','recordId','pagedListDetail','booleanMark','subtabBar','infoHelp','infoIcon','modLoaderSection','reshadeSection','pagerToggle','pagerSelect','showToast','notice','detailNote'])
+  for (const name of ['columnList','detailPanel','detailSection','detailField','multiNumberRow','readonlyField','recordId','pagedListDetail','booleanMark','subtabBar','infoHelp','infoIcon','modLoaderSection','reshadeSection','pagerToggle','pagerSelect','showToast','notice','detailNote','provenanceControl','statCard','choicePopover'])
     ui[name] = (...args) => node(name, args[0], ...carried(args[0]));
   ui.columnPreferences = () => ({pinButton:(key,label)=>node('pin',{key,label})});
   ui.actionRow = (...args) => node('actionRow',{},...args);
@@ -192,12 +192,34 @@ test('catalog-driven views combine character implementation tables behind concep
 test('controller does not truncate fractional edits to an integer', async () => {
   const e = await editor();
   const field = e.run('fieldControl({}, {values:{Value:1}}, {key:"Value",label:"Value",kind:"integer",editable:true,min:0,max:255})');
-  const input = field.attrs.control;
+  // Every editable property is wrapped in the shared provenance control, so
+  // the reset can put the record's own value back; the box is inside it.
+  const input = field.attrs.control.attrs.control;
   assert.equal(input.attrs.type, 'number');
   assert.equal(input.attrs.min, 0); assert.equal(input.attrs.max, 255);
   e.run('globalThis.result=null; setValue=(d,r,f,v)=>globalThis.result=v');
   input.attrs.oninput({target:{value:'1.5'}});
   assert.equal(e.run('result'), 1.5);
+});
+
+test('an editable property carries the value its record can be restored to', async () => {
+  const e = await editor();
+  e.run(`installData({key:"items",label:"Items",source:"project",
+    fields:[{key:"Price",label:"Buy price",kind:"integer",editable:true,declaredType:"UInt32",min:0,max:4294967295}],
+    rows:[{line:3,id:0,name:"Hammer",values:{Price:250}}],
+    vanilla:{"3":{Price:250}}})`);
+  const field = e.run('fieldControl(state.datasets.items,state.datasets.items.rows[0],state.datasets.items.fields[0])');
+  const source = field.attrs.control;
+  assert.equal(source.tag, 'provenanceControl');
+  assert.equal(source.attrs.vanilla, 250);
+  assert.equal(source.attrs.current(), 250);
+  assert.equal(typeof source.attrs.apply, 'function');
+  // A record whose own values are the loaded ones still resets to those.
+  const plain = e.run(`installData({key:"shops",label:"Shop inventories",source:"baseline",
+    fields:[{key:"Price",label:"Price",kind:"integer",editable:true,declaredType:"UInt32",min:0,max:4294967295}],
+    rows:[{line:1,id:0,name:"Shop",values:{Price:7}}]});
+    fieldControl(state.datasets.shops,state.datasets.shops.rows[0],state.datasets.shops.fields[0])`);
+  assert.equal(plain.attrs.control.attrs.vanilla, 7);
 });
 
 
@@ -306,8 +328,9 @@ test('enemy attack detail offers the verified target enum and keeps legacy bits 
   assert.match(rendered, /SingleEnemy\(2\)/);
   assert.match(rendered, /STORED DATA/);
   const target = e.run('fieldControl(state.datasets["enemy-attacks"],state.datasets["enemy-attacks"].rows[0],state.datasets["enemy-attacks"].fields[0])');
-  assert.equal(target.attrs.control.tag, 'select');
-  assert.equal(target.attrs.control.children.length, 16);
+  // The enum's box sits inside the shared provenance control now.
+  assert.equal(target.attrs.control.attrs.control.tag, 'select');
+  assert.equal(target.attrs.control.attrs.control.children.length, 16);
 });
 
 test('battle scene flag detail exposes verified Memoria rules as editable toggles', async () => {
@@ -322,7 +345,7 @@ test('battle scene flag detail exposes verified Memoria rules as editable toggle
   assert.match(rendered, /SB2_FLG_BACKATK/);
   assert.match(rendered, /STORED DATA/);
   const toggle = e.run('fieldControl(state.datasets["scene-flags"],state.datasets["scene-flags"].rows[0],state.datasets["scene-flags"].fields[0])');
-  assert.equal(toggle.attrs.control.attrs.type, 'checkbox');
+  assert.equal(toggle.attrs.control.attrs.control.attrs.type, 'checkbox');
 });
 
 test('battle dataset navigation covers attacks and scene flags', async () => {

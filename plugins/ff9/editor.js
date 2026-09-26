@@ -251,6 +251,17 @@
     return FIELD_HELP[`${dataKey}:${field.key}`]||"";
   }
   function setValue(data,row,field,value){row.values[field.key]=value;shell.refresh();toolbar()}
+  // A property carries the value its record shipped with, so right-clicking it
+  // puts that value back - the reset every other game's properties already
+  // have. The plugin supplies the vanilla value and how to write one back; the
+  // shared framework owns the comparison, the reference rail and the restore.
+  const sameValue=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
+  const formatFieldValue=field=>field.kind==="fixed-list"?value=>Array.isArray(value)?value.join(", "):String(value):null;
+  function vanillaValue(data,row,field){const base=data.vanilla?.[String(row.line)];if(base&&Object.prototype.hasOwnProperty.call(base,field.key))return base[field.key];const original=data.originalByLine?.[String(row.line)]?.values;return original?original[field.key]:undefined}
+  // Restoring a value or taking a reference writes the model and rebuilds the
+  // panel, so a grouped number box shows the value that was just restored
+  // instead of the digits the reader typed into it.
+  function sourceControl(control,current,vanilla,apply,format){return LexeditorUI.provenanceControl({control,current,vanilla,format:format||undefined,same:sameValue,apply:value=>{apply(value);render()}})}
   function fieldPin(data,field){
     const key=["accessories","armor","weapons"].includes(state.tab)?`equipment-${state.tab}`:activeKey();
     if(!key)return null;
@@ -272,6 +283,9 @@
       const values=Array.isArray(row.values[field.key])?row.values[field.key]:[],labels=field.vector3?["X","Y","Z"]:field.key==="ColorBase"?["R","G","B"]:Array.from({length:field.length},(_value,index)=>String(index+1));
       control=multiNumberRow(labels.map((label,index)=>({label,control:el("input",{type:"number",min:field.itemMin,max:field.itemMax,step:field.itemKind==="integer"?1:(field.step||"any"),value:values[index]??0,oninput:event=>{if(event.target.value==="")return;const next=[...values];next[index]=Number(event.target.value);setValue(data,row,field,next)}})})),{columns:Math.min(3,field.length||3)});
     }else control=el("input",{type:"text",value:row.values[field.key]??"",oninput:event=>setValue(data,row,field,event.target.value)});
+    if(!note&&field.editable&&field.kind!=="stored")
+      control=sourceControl(control,()=>row.values[field.key],vanillaValue(data,row,field),
+        next=>setValue(data,row,field,next),formatFieldValue(field));
     return detailField({label:field.label.toLocaleUpperCase(),pin:fieldPin(data,field),help:semantic?infoHelp(semantic):null,control,dataType:note?"READ ONLY":field.declaredType,min:bounds.min,max:bounds.max});
   }
   const fieldRows=(data,row,exclude=[])=>{const blocked=new Set(exclude.map(String));return data&&row?data.fields.filter(field=>!blocked.has(field.key)&&field.key.toLocaleLowerCase()!=="id"&&field.key.toLocaleLowerCase()!=="comment").map(field=>fieldControl(data,row,field)):[]};

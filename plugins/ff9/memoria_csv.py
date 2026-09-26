@@ -424,9 +424,20 @@ class MemoriaDataStore:
         if not status["available"]:
             raise FileNotFoundError(f"{status['relativePath']} is not present in the selected project or a Memoria/Hades data export")
         document = MemoriaCsvDocument(Path(status["sourcePath"]))
-        return {**status, "sha256": document.sha256,
-                "fields": self.labelled_fields(dataset, document.fields),
-                "rows": document.public_rows(dataset)}
+        payload = {**status, "sha256": document.sha256,
+                   "fields": self.labelled_fields(dataset, document.fields),
+                   "rows": document.public_rows(dataset)}
+        # What each record shipped with, so a property can be restored to the
+        # game's own value after an edit. A project overlay is written as a copy
+        # of its source with the reader's edits, so both documents share their
+        # line numbers and the baseline can be read by line. When no overlay
+        # exists the loaded values already are the shipped ones, and the reader
+        # has nothing to compare against.
+        project, baseline = self._paths(dataset)
+        if project.is_file() and baseline is not None and baseline != project:
+            vanilla = MemoriaCsvDocument(baseline).public_rows(dataset)
+            payload["vanilla"] = {str(row["line"]): row["values"] for row in vanilla}
+        return payload
 
     @staticmethod
     def labelled_fields(dataset: Dataset, fields: list[dict[str, Any]]) -> list[dict[str, Any]]:

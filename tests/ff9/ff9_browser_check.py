@@ -179,6 +179,19 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             expect(price).to_have_value("250")
             page.screenshot(path=str(OUT / "ff9-items-wide.png"), full_page=True)
             save = page.locator("#global-save")
+            # Right-clicking a property puts back the value its record shipped
+            # with. The shared Detail owns the reset and the reference entry;
+            # the plugin supplies the vanilla value and the way to write one.
+            price.fill("333")
+            expect(save).to_be_enabled()
+            expect(page.locator(".lex-source-control.lex-value-modified")).to_have_count(1)
+            page.screenshot(path=str(OUT / "ff9-items-modified.png"), full_page=True)
+            price.click(button="right")
+            expect(price).to_have_value("250")
+            expect(save).to_be_disabled()
+            expect(page.locator(".lex-source-control.lex-value-modified")).to_have_count(0)
+            page.screenshot(path=str(OUT / "ff9-items-restored.png"), full_page=True)
+
             price.fill("333")
             expect(save).to_be_enabled()
             save.click(button="right")
