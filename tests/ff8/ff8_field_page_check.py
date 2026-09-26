@@ -16,6 +16,7 @@ Lexer's Field complaints, checked on the real page from the installed game:
 - Background layers are one checkbox each.
 - the picture has its help in its corner and no walkmesh-overlay switch.
 - Doors, Exits and Triggers are tables that fit their column.
+- a dialogue line's box has no "metric fuckton of empty space on the left".
 """
 from __future__ import annotations
 
@@ -141,6 +142,13 @@ def main() -> int:
             layers = cdp.eval("""(()=>{const boxes=[...document.querySelectorAll('.lex-tabbed-panel input[type=checkbox]')];
               return {count:boxes.length,bool:boxes.filter(b=>b.closest('.lex-detail-field')?.dataset.lexType==='BOOL').length}})()""")
             assert layers["count"] >= 2 and layers["bool"] == layers["count"], layers
+
+            # A dialogue line is the Text page's box: no label column beside it.
+            open_tab(cdp, "dialogue")
+            dialogue = cdp.eval("""(()=>{const box=document.querySelectorAll('.lex-tabbed-panel-content textarea')[1],
+              pane=box.closest('.lex-tabbed-panel-content').getBoundingClientRect(),own=box.getBoundingClientRect();
+              return {left:Math.round(own.left-pane.left),share:own.width/pane.width}})()""")
+            assert dialogue["left"] <= 16 and dialogue["share"] > .9, dialogue
 
             # Exits, doors and triggers are tables that fit their column.
             tables = {}
