@@ -21,17 +21,17 @@ int main() {
         assert(!supported_state(state));
 
     assert(axis(0.0f,0.0f) == 128);
-    assert(axis(0.0f,1.0f) == 255);
+    assert(axis(0.0f,1.0f) == 0);
     assert(axis(1.0f,0.0f) == 0);
-    assert(axis(0.0f,0.5f) == 192);
-    assert(axis(0.5f,0.0f) == 64);
+    assert(axis(0.0f,0.5f) == 64);
+    assert(axis(0.5f,0.0f) == 192);
     assert(axis(0.5f,0.5f) == 128);
-    assert(axis(0.25f,0.75f) == 192);
-    assert(axis(0.75f,0.25f) == 64);
-    assert(axis(0.0f,0.0f,false,true) == 255); // keyboard R2 = forward
-    assert(axis(0.0f,0.0f,true,false) == 0);   // keyboard L2 = reverse
+    assert(axis(0.25f,0.75f) == 64);
+    assert(axis(0.75f,0.25f) == 192);
+    assert(axis(0.0f,0.0f,false,true) == 0);   // keyboard R2 = forward
+    assert(axis(0.0f,0.0f,true,false) == 255); // keyboard L2 = reverse
     assert(axis(0.0f,0.0f,true,true) == 128);
-    assert(axis(-2.0f,3.0f) == 255);
+    assert(axis(-2.0f,3.0f) == 0);
     assert(axis(3.0f,-2.0f) == 0);
     // Tiny trigger noise is dead-zoned around center.
     assert(axis(0.00f,0.01f) == 128);
