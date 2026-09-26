@@ -40,7 +40,7 @@ class TerrariaAssetTests(unittest.TestCase):
             self.assertEqual([row["path"] for row in index["files"]], ["Content/Items/Sword.png"])
             self.assertTrue(index["files"][0]["editable"])
             target, data, read_state = read_asset(root, state["path"])
-            self.assertEqual(target, root / "Content" / "Items" / "Sword.png")
+            self.assertEqual(target.resolve(), (root / "Content" / "Items" / "Sword.png").resolve())
             self.assertEqual(data, PNG_1X1)
             self.assertEqual(read_state["sha256"], state["sha256"])
 
