@@ -6970,7 +6970,17 @@ ${contents.path}`});
         style: rowStyle,
         title: typeof options.rowTitle === "function" ? options.rowTitle(row) : options.rowTitle,
         "aria-selected": options.select ? String(selected) : null,
-        onclick: options.select ? event => options.select(row,event) : null,
+        // The clicked row is marked at once, so a caller that keeps the table
+        // and only updates what it drives does not have to reach into the
+        // list's rows to move the selection itself.
+        onclick: options.select ? event => {
+          const marked = options.selectedClass || "selected";
+          for (const sibling of root.querySelectorAll(":scope > .lex-list-row")) {
+            sibling.classList.toggle(marked, sibling === event.currentTarget);
+            sibling.setAttribute("aria-selected", String(sibling === event.currentTarget));
+          }
+          options.select(row,event);
+        } : null,
       }, options.render(row));
       options.decorateRow?.(rowNode, row, key);
       root.append(rowNode);

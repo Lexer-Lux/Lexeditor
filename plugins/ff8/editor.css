@@ -132,18 +132,7 @@
     /* Only the title shares a line with the control; the description takes the
        card's full width instead of the title's narrow column. */
 
-    /* The kind selector is two words wide; the ability slot selector
-       takes every pixel that is left, so no option is cut off. */
-    .gf-prereq-cell {grid-template-columns:auto minmax(0,1fr);align-items:center}
-    .gf-prereq-cell .gf-prereq-slot {min-width:0}
     .field-card-table {--lex-column-list-template:minmax(100px,.9fr) minmax(100px,.8fr) minmax(150px,1.2fr) 95px minmax(100px,.7fr);}
-    /* Hovering the field's own picture hides its overlaid map name entirely:
-       the reader is already looking at this map and knows which it is. The
-       shared rule keeps a faint 15% ghost, which reads as a smudge here. */
-    .field-map-detail.lex-detail-panel-media:hover > .lex-detail-panel-heading { opacity:0; }
-
-    /* The picture's help pip stays in its corner, clear of the fading heading. */
-    .field-map-detail > .field-preview-help {position:absolute;top:8px;right:8px;z-index:3;}
 
     /* The walkmesh overlay canvas covers the background preview exactly. */
 

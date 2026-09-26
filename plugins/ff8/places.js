@@ -270,7 +270,7 @@
   // line in the picture.
   function fieldRecordTable(row,records,selection,className,template,columns){
     return columnList({rows:records,key:entry=>entry.id,class:`ff8-record-list ${className}`,editable:true,localSort:false,template,selected:state[selection][row.key]??-1,selectedClass:"selected",
-      select:(entry,event)=>{state[selection][row.key]=entry.id;for(const node of event.currentTarget.parentElement.querySelectorAll(".lex-list-row"))node.classList.toggle("selected",node===event.currentTarget);refreshFieldOverlay()},
+      select:entry=>{state[selection][row.key]=entry.id;refreshFieldOverlay()},
       columns:[{key:"slot",label:"#",numeric:true,render:entry=>entry.id+1},...columns]});
   }
   // One column per stored coordinate, edited in place with the shared table
@@ -288,7 +288,7 @@
   function fieldExitsSection(row){
     const gateways=row.entrances?.gateways||[];
     if(!gateways.length)return LexeditorUI.notice({message:"This field map has no INF gateway records."});
-    return fieldRecordTable(row,gateways,"fieldGatewaySelection","field-gateway-table","32px minmax(132px,2fr) repeat(9,minmax(min-content,1fr))",[
+    return fieldRecordTable(row,gateways,"fieldGatewaySelection","field-gateway-table","32px minmax(min-content,2fr) repeat(9,minmax(min-content,1fr))",[
       {key:"fieldId",label:"TARGET",help:"The field loaded after the player crosses this exit line. Double-click to choose another field; choose Unused to disable the exit.",choices:fieldTargetChoices(),
         sortValue:entry=>fieldTargetName(entry.fieldId),editValue:entry=>fieldTargetName(entry.fieldId),
         edit:(entry,value)=>{const next=value==="Unused"?32767:state.data.fields.rows.find(field=>field.name===value)?.mapId;if(next==null)return;entry.fieldId=next;refreshFieldOverlay();rerenderFields();shell.refresh()},
@@ -375,7 +375,7 @@
     const preview=LexeditorUI.detailPanel({title:row.name.toLocaleUpperCase(),headingOverlay:true,body:fieldPreviewView(row),className:"field-map-detail"});
     // The picture's help sits in its own corner, outside the heading that
     // fades away while the picture is hovered.
-    preview.append(el("span",{class:"field-preview-help"},infoHelp("The field's background as the game composes it, with the walkmesh (white, blue where an edge has no neighbour), exits (red) and triggers (green) projected through the selected camera. Open the Tile tab and click a tile to select it, or the Walkmesh tab and click a triangle. The overlay a tab edits is drawn in full; the others stay faint. The Background tab's layer filters change only this picture.")));
+    preview.append(el("span",{class:"lex-media-help"},infoHelp("The field's background as the game composes it, with the walkmesh (white, blue where an edge has no neighbour), exits (red) and triggers (green) projected through the selected camera. Open the Tile tab and click a tile to select it, or the Walkmesh tab and click a triangle. The overlay a tab edits is drawn in full; the others stay faint. The Background tab's layer filters change only this picture.")));
     let body=fieldDetailSubtab(row,active);
     // The selected tab already supplies its name and help. Keep only that
     // section's contents, while preserving headers for actual child groups.

@@ -78,7 +78,7 @@ def main() -> int:
             layout = cdp.eval("""(()=>{const L=document.querySelector('.field-map-detail').closest('.lex-panel-layout');
               return {vertical:L.classList.contains('lex-panel-layout-vertical'),
                 tabs:[...document.querySelectorAll('.lex-tabbed-panel [role=tab]')].map(t=>t.textContent.trim().replace(/\\?$/,'')),
-                help:!!document.querySelector('.field-map-detail > .field-preview-help .lex-info-help, .field-map-detail > .field-preview-help button, .field-map-detail > .field-preview-help [aria-label]'),
+                help:!!document.querySelector('.field-map-detail > .lex-media-help .lex-info-help, .field-map-detail > .lex-media-help button, .field-map-detail > .lex-media-help [aria-label]'),
                 overlaySwitch:document.body.textContent.includes('Walkmesh overlay')}})()""")
             assert layout["vertical"] is False, layout
             assert "Tile" in layout["tabs"], layout
@@ -148,7 +148,8 @@ def main() -> int:
             dialogue = cdp.eval("""(()=>{const box=document.querySelectorAll('.lex-tabbed-panel-content textarea')[1],
               pane=box.closest('.lex-tabbed-panel-content').getBoundingClientRect(),own=box.getBoundingClientRect();
               return {left:Math.round(own.left-pane.left),share:own.width/pane.width}})()""")
-            assert dialogue["left"] <= 16 and dialogue["share"] > .9, dialogue
+            # The panel keeps a scrollbar-wide gutter on both sides (about 13px).
+            assert dialogue["left"] <= 24 and dialogue["share"] > .9, dialogue
 
             # Exits, doors and triggers are tables that fit their column.
             tables = {}
@@ -159,7 +160,7 @@ def main() -> int:
                 tables[tab] = cdp.eval(f"""(()=>{{const table=document.querySelector({selector!r});
                   const row=state.data.fields.rows.find(r=>r._loaded&&r.entrances);
                   return {{rows:table?.querySelectorAll('.lex-list-row.lex-column-list-row').length,
-                    records:row.entrances.{source}.length,fits:table.scrollWidth<=table.clientWidth+1}}}})()""")
+                    records:row.entrances.{source}.length,sw:table.scrollWidth,cw:table.clientWidth,pane:Math.round(table.closest(".lex-panel-layout-pane")?.getBoundingClientRect().width||0),fits:table.scrollWidth<=table.clientWidth+1}}}})()""")
                 assert tables[tab]["rows"] == tables[tab]["records"] and tables[tab]["fits"], (tab, tables[tab])
             open_tab(cdp, "exits")
             image = screenshot(cdp, "ff8-field-page.png")

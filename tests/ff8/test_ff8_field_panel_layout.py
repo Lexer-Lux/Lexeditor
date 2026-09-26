@@ -24,9 +24,7 @@ def mount_field_detail(page, deling):
       function fieldDetailSubtab(row,active){return el('input',{'aria-label':active,type:'number',value:1});}
       function rerenderFields(){document.querySelector('main').replaceChildren(fieldDetail(row));}
     ''' % ('true' if deling else 'false')+detail+'rerenderFields();')
-    # The plugin's own sheet places the picture's help pip in its corner.
-    sheet=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8')
-    page.add_style_tag(content=next(line for line in sheet.splitlines() if '.field-preview-help' in line))
+    # The shared sheet places a picture panel's help pip in its corner.
     page.add_style_tag(content='main {height:700px;width:950px;display:flex;}')
 
 
@@ -41,7 +39,7 @@ def check_every_tab(page, placed):
         assert abs(image['width']/image['height']-.5)<.01
         assert all(abs(image[key]-overlay[key])<1 for key in image)
         assert page.locator('.lex-detail-panel-media .lex-detail-panel-meta').count()==0
-        assert page.locator('.lex-detail-panel-media > .field-preview-help').count()==1
+        assert page.locator('.lex-detail-panel-media > .lex-media-help').count()==1
         assert page.locator('.lex-tabbed-panel input').count()==1
         assert page.locator('.lex-panel-layout > .lex-detail-panel input').count()==0
 
