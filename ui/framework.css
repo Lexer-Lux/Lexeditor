@@ -5860,6 +5860,12 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-detail-part-control > .lex-column-pin { position:absolute; z-index:3; flex:none; width:18px; }
 .lex-detail-part-spare { width:0; }
 .lex-detail-parts-bare { grid-template-columns:repeat(var(--lex-part-columns),minmax(0,1fr)); }
+/* In a table cell the parts are as wide as what they hold, and the cell's
+   spare width is shared out after that. Equal lanes gave a two-word choice
+   ("Ability") as much room as "#02 GFHP+20%", which was cut off in a cell
+   with room to spare (FF8's GF ability prerequisites). */
+.lex-column-list-cell .lex-detail-parts-bare { grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:minmax(0,auto); }
+.lex-column-list-cell .lex-detail-parts-bare > .lex-detail-part { margin-right:0; }
 .lex-detail-parts-bare > .lex-detail-part { grid-template-columns:minmax(0,1fr); }
 .lex-detail-parts-bare :is(.lex-detail-part-label,.lex-detail-part-spare) { display:none; }
 .lex-detail-parts-stacked { grid-template-columns:repeat(var(--lex-part-columns),minmax(0,1fr)); }
