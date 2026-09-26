@@ -16,6 +16,8 @@ class FormulaeReworkTests(unittest.TestCase):
         "status_infliction",
         "spell_healing",
         "physical_accuracy",
+        "status_attack",
+        "elemental_attack",
         "mug_chance",
     )
 
@@ -49,7 +51,8 @@ class FormulaeReworkTests(unittest.TestCase):
         self.assertFalse(formulae_rework.available())
         self.assertEqual(
             formulae_rework.incomplete_ids(),
-            ("melee_damage", "magic_damage", "status_infliction", "mug_chance"),
+            ("melee_damage", "magic_damage", "status_infliction", "status_attack",
+             "elemental_attack", "mug_chance"),
         )
 
     def test_healing_replacement_mirror(self):
@@ -107,29 +110,31 @@ class FormulaeReworkTests(unittest.TestCase):
         self.assertNotIn("formulae_rework.available()", settings)
         self.assertNotIn("formulae_rework.rows()", settings)
 
-    def test_melee_base_damage_mirror(self):
-        self.assertEqual(formulae_rework.melee_base_damage(100, 20, 10), 1200)
-        self.assertEqual(formulae_rework.melee_base_damage(0, 0, 0), 0)
-        self.assertEqual(formulae_rework.melee_base_damage(255, 255, 255), 130050)
+    def test_melee_damage_follows_the_mod_doc(self):
+        # STR 40 x bonus 20 x (power 20 x 5%) = 800; VIT 50 halves it.
+        self.assertEqual(formulae_rework.melee_damage(40, 20, 20, 0), 800)
+        self.assertEqual(formulae_rework.melee_damage(40, 20, 20, 50), 400)
+        self.assertEqual(formulae_rework.melee_damage(40, 20, 20, 255), 200, "VIT caps at 75%")
         with self.assertRaises(ValueError):
-            formulae_rework.melee_base_damage(256, 0, 0)
+            formulae_rework.melee_damage(256, 0, 0, 0)
         with self.assertRaises(ValueError):
-            formulae_rework.melee_base_damage(True, 0, 0)
+            formulae_rework.melee_damage(True, 0, 0, 0)
 
-    def test_magic_base_damage_mirror(self):
-        self.assertEqual(formulae_rework.magic_base_damage(12, 40), 480)
-        self.assertEqual(formulae_rework.magic_base_damage(0, 255), 0)
-        self.assertEqual(formulae_rework.magic_base_damage(255, 255), 65025)
+    def test_magic_damage_follows_the_mod_doc(self):
+        self.assertEqual(formulae_rework.magic_damage(12, 40, 0), 480)
+        self.assertEqual(formulae_rework.magic_damage(12, 40, 25), 360)
+        self.assertEqual(formulae_rework.magic_damage(12, 40, 200), 120, "SPR caps at 75%")
         with self.assertRaises(ValueError):
-            formulae_rework.magic_base_damage(-1, 0)
+            formulae_rework.magic_damage(-1, 0, 0)
 
-    def test_status_infliction_chance_mirror_and_clamp(self):
-        self.assertEqual(formulae_rework.status_infliction_chance(50, 60, 30), 80)
-        self.assertEqual(formulae_rework.status_infliction_chance(255, 255, 0), 100)
-        self.assertEqual(formulae_rework.status_infliction_chance(0, 0, 255), 0)
-        self.assertEqual(formulae_rework.status_infliction_chance(10, 10, 10), 10)
+    def test_status_chances_follow_the_mod_doc(self):
+        self.assertEqual(formulae_rework.status_infliction_chance(150, 100, 30, 10), 70)
+        self.assertEqual(formulae_rework.status_infliction_chance(255, 0, 255, 0), 100)
+        self.assertEqual(formulae_rework.status_infliction_chance(0, 200, 0, 255), 0)
+        self.assertEqual(formulae_rework.status_attack_chance(60, 20, 30, 40), 30)
+        self.assertEqual(formulae_rework.status_attack_chance(0, 255, 0, 255), 0)
         with self.assertRaises(ValueError):
-            formulae_rework.status_infliction_chance(0, 0, True)
+            formulae_rework.status_infliction_chance(0, 0, 0, True)
 
 
 if __name__ == "__main__":
