@@ -305,7 +305,7 @@
     detailSection({className:"world-region-position",title:"WORLD MAP",
       help:infoHelp("The cell this record carries a region code for. The Map page shows the same grid."),
       body:[worldLocationMap({label:`World map cell ${row.id}`,
-        cells:[{id:row.id,label:`Cell ${row.id}`,selected:true,title:`Cell ${row.id} · region ${row.regionId}`}],
+        cells:[{id:row.id,column:row.x,row:row.y,label:`Cell ${row.id}`,selected:true,title:`Cell ${row.id} · region ${row.regionId}`}],
         select:id=>{state.selected.world=id;rerenderWorldMap()}})]}),
     detailSection({title:"REGION CODE",help:infoHelp("This is the same world-map cell the Map page shows; this page lists the cells for the code each one carries."),body:[detailField({label:"X",help:infoHelp("Read-only X cell coordinate in the world-map grid."),control:readonlyField(row.x)}),detailField({label:"Y",help:infoHelp("Read-only Y cell coordinate in the world-map grid."),control:readonlyField(row.y)}),detailField({label:"REGION CODE",help:infoHelp(worldPropertyHelp.region.regionId),control:worldNumber(row,"regionId",0,255,"World map cell region code")})]})],{columns:2,minWidth:300})],"world-map-detail");
     if(row.kind==="railTrack")return railTrackDetail(row,prefs);
