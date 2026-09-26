@@ -31,6 +31,7 @@ from . import modern_controls_issue_65
 from . import vibration_consolidation_issue_66
 from . import better_targeting_issue_64
 from . import damage_limit
+from . import hit_frame_log
 from . import fast_start
 from . import streamlined_draw
 from . import healing_rework
@@ -72,6 +73,7 @@ MAX_AUDIO_VOLUME = 100
 DEFAULT_VIBRATION_CONSOLIDATION = vibration_consolidation_issue_66.DEFAULT_VIBRATION_CONSOLIDATION
 DEFAULT_BETTER_TARGETING = better_targeting_issue_64.DEFAULT_BETTER_TARGETING
 DEFAULT_DAMAGE_LIMIT_REMOVAL = damage_limit.DEFAULT_DAMAGE_LIMIT_REMOVAL
+DEFAULT_HIT_FRAME_LOG = hit_frame_log.DEFAULT_HIT_FRAME_LOG
 DEFAULT_FAST_START = fast_start.DEFAULT_FAST_START
 DEFAULT_STREAMLINED_DRAW = streamlined_draw.DEFAULT_STREAMLINED_DRAW
 DEFAULT_SHARED_MAGIC_INVENTORY = False
@@ -96,7 +98,7 @@ ACCEPTED_TWEAKS = frozenset({
     "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "betterHpColors", "gfHpBars", "inGameTime",
     "interactionIndicators",
     "flatStatAbilities", "maxSpellEnabled", "noMagicConsumption", "dropsAfterMug",
-    "dropChance", "gfHpCasting", "battleResultsHelp",
+    "dropChance", "gfHpCasting", "battleResultsHelp", "hitFrameLog",
 })
 MIN_FLYING_EVA_BONUS = 0
 MAX_FLYING_EVA_BONUS = 100
@@ -404,6 +406,9 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
     )
     if not isinstance(damage_limit_removal, bool):
         damage_limit_removal = DEFAULT_DAMAGE_LIMIT_REMOVAL
+    hit_frame_log_enabled = data.get("hitFrameLog", DEFAULT_HIT_FRAME_LOG)
+    if not isinstance(hit_frame_log_enabled, bool):
+        hit_frame_log_enabled = DEFAULT_HIT_FRAME_LOG
     fast_start_enabled = data.get("fastStart", DEFAULT_FAST_START)
     if not isinstance(fast_start_enabled, bool):
         fast_start_enabled = DEFAULT_FAST_START
@@ -496,6 +501,7 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "vibrationConsolidation": vibration_consolidation,
         "betterTargeting": better_targeting,
         "damageLimitRemoval": damage_limit_removal,
+        "hitFrameLog": hit_frame_log_enabled,
         "fastStart": fast_start_enabled,
         "xpBars": xp_bars,
         "hpBars": hp_bars,
@@ -579,6 +585,7 @@ def _verify_executable(game_root: Path) -> Path:
             (vibration_consolidation_issue_66.BATTLE_HOOK, vibration_consolidation_issue_66.BATTLE_HOOK_ORIGINAL),
             (better_targeting_issue_64.TARGET_ICON_HOOK, better_targeting_issue_64.TARGET_ICON_HOOK_ORIGINAL),
             (damage_limit.DAMAGE_LIMIT_FLAG_OPCODE, damage_limit.DAMAGE_LIMIT_FLAG_ORIGINAL),
+            (hit_frame_log.HOOK, hit_frame_log.HOOK_ORIGINAL),
             (healing_rework.HEALING_FORMULA_HOOK, healing_rework.HEALING_FORMULA_ORIGINAL),
             (menu_qol_issue_61.ABILITY_LIST_RETURN_HOOK, menu_qol_issue_61.ABILITY_LIST_RETURN_ORIGINAL),
             (menu_qol_issue_61.ABILITY_STATE_READ, menu_qol_issue_61.ABILITY_STATE_READ_ORIGINAL),
@@ -956,6 +963,7 @@ def initialize_project(project_root: Path) -> None:
         "vibrationConsolidation": False,
         "betterTargeting": False,
         "damageLimitRemoval": False,
+        "hitFrameLog": False,
         "fastStart": False,
         "xpBars": False,
         "hpBars": False,
@@ -1089,6 +1097,9 @@ def save(data: dict, game_root: Path | None = None,
         data.get("damageLimitRemoval", DEFAULT_DAMAGE_LIMIT_REMOVAL),
         "Damage Limit Removal",
     )
+    hit_frame_log_enabled = _boolean(
+        data.get("hitFrameLog", DEFAULT_HIT_FRAME_LOG), "Hit-frame Log",
+    )
     fast_start_enabled = _boolean(
         data.get("fastStart", DEFAULT_FAST_START), "Fast Start",
     )
@@ -1192,6 +1203,7 @@ def save(data: dict, game_root: Path | None = None,
         drop_chance_plan=drop_chance_plan,
     )
     hext += gf_hp_casting.build_hext(gf_casting, gf_costs)
+    hext += hit_frame_log.build_hext(hit_frame_log_enabled)
     settings_data = {
         "autoSortInventory": auto_sort,
         "autoSortMagic": auto_sort_magic,
@@ -1221,6 +1233,7 @@ def save(data: dict, game_root: Path | None = None,
         "vibrationConsolidation": vibration_consolidation,
         "betterTargeting": better_targeting,
         "damageLimitRemoval": damage_limit_removal,
+        "hitFrameLog": hit_frame_log_enabled,
         "fastStart": fast_start_enabled,
         "xpBars": xp_bars,
         "hpBars": hp_bars,
