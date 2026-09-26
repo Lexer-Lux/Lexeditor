@@ -981,7 +981,19 @@
   const tabbedPanel = (options = {}) => {
     const suppliedTabs = options.tabs || [];
     const title = tab => String(tab.label instanceof Node ? tab.label.textContent : tab.label ?? tab.id);
-    const tabs = [...suppliedTabs].sort((a,b)=>title(a).localeCompare(title(b),undefined,{numeric:true,sensitivity:"base"}));
+    // A misc tab is written with its full stop and comes last, after
+    // every named area, with a tweaks tab after it when a panel has one.
+    const tabRank = tab => {
+      const id = String(tab.id).toLocaleLowerCase();
+      return id === "tweaks" ? 2 : id === "misc" ? 1 : 0;
+    };
+    const tabTitle = tab => {
+      const name = title(tab);
+      return String(tab.id).toLocaleLowerCase() === "misc" && name === "Misc"
+        ? "Misc." : name;
+    };
+    const tabs = [...suppliedTabs].sort((a,b)=>tabRank(a)-tabRank(b)
+      ||tabTitle(a).localeCompare(tabTitle(b),undefined,{numeric:true,sensitivity:"base"}));
     const active = tabs.some(tab => tab.id === options.active)
       ? options.active
       : suppliedTabs[0]?.id;

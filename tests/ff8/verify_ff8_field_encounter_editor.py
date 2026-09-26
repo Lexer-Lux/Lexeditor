@@ -112,7 +112,7 @@ def api_and_render() -> dict:
             # that has no tab of its own.
             wait_eval(cdp, "document.querySelector('#main .lex-subtab-button')!==null", 60)
             cdp.eval("""(()=>{const tab=[...document.querySelectorAll('#main .lex-subtab-button')]
-              .find(node=>node.textContent.trim().replace(/\\?$/,'')==='Misc');tab.click()})()""")
+              .find(node=>node.textContent.trim().replace(/[.?]+$/,'')==='Misc');tab.click()})()""")
             wait_eval(cdp, "document.querySelector('.field-encounter-section')!==null", 60)
             cdp.eval(
                 "new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))",
@@ -125,6 +125,40 @@ def api_and_render() -> dict:
             assert "Field" in rendered["mapTabs"] and "Maps" not in rendered["mapTabs"], rendered
             assert rendered["active"].startswith("Field"), rendered
             assert not rendered["overflow"], rendered
+
+            # A misc tab is written with its full stop and sorts last, after
+            # every named area, and the INF variant and byte count belong with
+            # the range explanation rather than as a line of numbers above the
+            # fields it is supposed to explain.
+            # A sub-tab's text carries its help glyph as a trailing question
+            # mark, so the name is read with the glyph and any full stop removed.
+            shape = cdp.eval("""(()=>{const name=node=>node.textContent.trim().replace(/[.?]+$/,''),
+              buttons=[...document.querySelectorAll('#main .lex-subtab-button')];
+              return{labels:buttons.map(name),
+                miscRaw:(buttons.find(node=>name(node)==='Misc')||{textContent:''}).textContent,
+                ranges:buttons.some(node=>name(node)==='Camera Ranges')}})()""")
+            assert shape["labels"] and shape["labels"][-1] == "Misc", shape
+            assert shape["miscRaw"].startswith("Misc."), shape
+            assert shape["ranges"], shape
+            cdp.eval("""(()=>{const name=node=>node.textContent.trim().replace(/[.?]+$/,''),
+              tab=[...document.querySelectorAll('#main .lex-subtab-button')]
+              .find(node=>name(node)==='Camera Ranges');tab.click()})()""")
+            wait_eval(cdp, "(()=>{const name=node=>node.textContent.trim().replace(/[.?]+$/,''),"
+                           "tab=[...document.querySelectorAll('#main .lex-subtab-button')]"
+                           ".find(node=>name(node)==='Camera Ranges');"
+                           "return !!tab&&tab.classList.contains('active')})()", 60)
+            ranges = cdp.eval("""(()=>{const notes=[...document.querySelectorAll('#main .lex-detail-note')]
+                .map(node=>node.textContent.trim()).join(' | ');
+              const helps=[...document.querySelectorAll('#main .lex-info-help')]
+                .map(node=>node.getAttribute('aria-label')||'');
+              return{note:notes,help:helps.find(text=>text.includes('.inf header'))||''}})()""")
+            assert "INF variant" not in ranges["note"], ranges
+            assert ranges["help"], ranges
+            # The rate edit below belongs to the Misc tab, so come back to it.
+            cdp.eval("""(()=>{const name=node=>node.textContent.trim().replace(/[.?]+$/,''),
+              tab=[...document.querySelectorAll('#main .lex-subtab-button')]
+              .find(node=>name(node)==='Misc');tab.click()})()""")
+            wait_eval(cdp, "document.querySelector('input[aria-label$=\"random encounter rate\"]')!==null", 60)
 
             ui_rate = different(next_rate, 0xFF)
             cdp.eval(f"""(()=>{{const input=document.querySelector('input[aria-label$="random encounter rate"]');input.value={ui_rate};input.dispatchEvent(new Event('input',{{bubbles:true}}))}})()""")
