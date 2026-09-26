@@ -31,6 +31,11 @@ BASE_SETTINGS = json.loads((ROOT / "ui" / "default_settings.json").read_text(enc
 # A crash looks like this; anything else when opening is the game's absence.
 CRASHES = (AttributeError, UnboundLocalError, TypeError, KeyError, IndexError)
 OPEN_TIMEOUT_SECONDS = 300
+# A page can reach the point of drawing and then say, in its own words, that it
+# did not load. Counted as an open, that reported success for a game whose page
+# showed "Failed to load FF8 plugin: Failed to fetch" and nothing else - the
+# exact failure this check exists to catch.
+LOAD_FAILURES = ("Failed to load", "Load failed", "Startup error")
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -117,6 +122,10 @@ def main() -> int:
                         row["status"] = "never finished loading"
                         row["detail"] = (f"loading={state.get('loading')} "
                                          f"main={state.get('main')!r}")
+                        failures.append(row)
+                    elif any(phrase in state["main"] for phrase in LOAD_FAILURES):
+                        row["status"] = "reported its own load failure"
+                        row["detail"] = state["main"].splitlines()[0][:160]
                         failures.append(row)
                     elif errors:
                         row["status"] = "threw while loading"

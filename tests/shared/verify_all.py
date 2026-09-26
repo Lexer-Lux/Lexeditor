@@ -91,6 +91,11 @@ SLOW = {
     "verify_no_clipped_text": 900,
     "verify_browser_regressions": 600,
     "verify_rdr2_runtime": 600,
+    # Opens all nineteen plugins through the real chooser one at a time. FF7
+    # and FF7-2013 each spend about two minutes on their first cold read of
+    # flevel.lgp, so the run needs well over the common timeout that every
+    # other check gets. Reported as TIMEOUT, this said nothing about the code.
+    "verify_plugins_open": 900,
 }
 
 
