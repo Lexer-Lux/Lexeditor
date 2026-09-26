@@ -2551,6 +2551,12 @@
     line.setAttribute("id", curveId);
     const fill = document.createElementNS(svgNamespace, "path");
     fill.setAttribute("class", "lex-curve-fill");
+    // A theme's shadow under the line is a second stroke, not a CSS filter: a
+    // filter re-rasterised the path without smoothing, which is the jagged
+    // edge Lexer kept seeing on FF8's graphs.
+    const lineShadow = document.createElementNS(svgNamespace, "path");
+    lineShadow.setAttribute("class", "lex-curve-line-shadow");
+    lineShadow.setAttribute("fill", "none");
     const rangeLow = document.createElementNS(svgNamespace, "text");
     rangeLow.setAttribute("class", "lex-curve-range-value lex-curve-range-low");
     rangeLow.setAttribute("text-anchor", "start");
@@ -2651,7 +2657,7 @@
     // group so switching mode is a class change rather than a rebuild.
     const bars = document.createElementNS(svgNamespace, "g");
     bars.setAttribute("class", "lex-curve-bars");
-    svg.append(grid, fill, bars, line, formulaGuide, rangeLow, rangeHigh, formulaText, guide, marker);
+    svg.append(grid, fill, bars, lineShadow, line, formulaGuide, rangeLow, rangeHigh, formulaText, guide, marker);
 
     const minimum = element("output", {class: "lex-curve-minimum"}, "—");
     const maximum = element("output", {class: "lex-curve-maximum"}, "—");
@@ -3250,6 +3256,7 @@
       }));
       const path = curvePath(points);
       line.setAttribute("d", path);
+      lineShadow.setAttribute("d", path);
       fill.setAttribute("d", `${path} L${points.at(-1)[0].toFixed(2)} ${zeroY} L${points[0][0].toFixed(2)} ${zeroY} Z`);
       // The formula rides its own guide path, and a glyph on a textPath takes
       // the LOCAL slope of that path. Clamping the guide's steepest ANGLE was

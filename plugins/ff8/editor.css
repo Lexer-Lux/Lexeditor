@@ -116,7 +116,7 @@
       /* The growth curves. */
       --lex-curve-bg:#303030;--lex-curve-border:2px solid;
       --lex-curve-border-color:#292929 #a5a5a5 #a5a5a5 #292929;
-      --lex-curve-stroke:#fff;--lex-curve-line-filter:drop-shadow(2px 2px #222);
+      --lex-curve-stroke:#fff;--lex-curve-line-shadow:#222;
       --lex-curve-grid:#ffffff25;--lex-curve-fill:#aa243266;}
 
     .item-icon-property {--ff8-item-icon-size:2em;}

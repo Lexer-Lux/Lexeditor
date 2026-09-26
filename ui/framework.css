@@ -4036,10 +4036,17 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-grid-lines { fill:none; stroke:var(--lex-curve-grid,color-mix(in srgb,var(--lex-border) 42%,transparent)); stroke-width:1; }
 .lex-curve-fill { fill:var(--lex-curve-fill,color-mix(in srgb,var(--lex-accent) 22%,transparent)); stroke:none; }
 .lex-curve-line { fill:none; stroke:var(--lex-curve-stroke,var(--lex-highlight)); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; filter:var(--lex-curve-line-filter,none); }
-.lex-curve-path-formula { fill:var(--lex-text); font:600 11px/1 "Cambria Math",Cambria,serif; pointer-events:none; filter:drop-shadow(1px 1px 1px var(--lex-panel)); }
+.lex-curve-line-shadow { fill:none; stroke:var(--lex-curve-line-shadow,transparent); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; translate:var(--lex-curve-line-shadow-offset,2px 2px); }
+/* Text on a graph is outlined in the plot's own dark, not haloed in the panel
+   colour: on a grey panel that halo was the "gigantic white drop shadow". */
+.lex-curve-path-formula { fill:var(--lex-text); font:600 11px/1 "Cambria Math",Cambria,serif; pointer-events:none;
+  paint-order:stroke; stroke:color-mix(in srgb,var(--lex-curve-bg,var(--lex-panel)) 70%,#000); stroke-width:2.5px; stroke-linejoin:round; }
 /* The numbers at the two ends of the drawn line are the curve's own least and
-   greatest values, so they read in the accent, like the pair in the heading. */
-.lex-curve-range-value { fill:var(--lex-accent); font:700 10px/1 var(--lex-math-font,"Cambria Math",Cambria,serif); filter:drop-shadow(1px 1px 1px var(--lex-panel)); pointer-events:none; }
+   greatest values, so they read in the accent, like the pair in the heading -
+   lifted toward the highlight and outlined so they read on a dark plot, and
+   large enough to read at all ("min/max numbers in graphs are too small"). */
+.lex-curve-range-value { fill:color-mix(in srgb,var(--lex-accent) 60%,var(--lex-highlight)); font:700 14px/1 var(--lex-math-font,"Cambria Math",Cambria,serif);
+  paint-order:stroke; stroke:color-mix(in srgb,var(--lex-curve-bg,var(--lex-panel)) 70%,#000); stroke-width:3px; stroke-linejoin:round; pointer-events:none; }
  .lex-math-formula { display:inline-flex; flex-direction:column; gap:3px; font:700 14px/1.2 var(--lex-math-font,"Cambria Math",Cambria,serif); text-shadow:1px 1px 2px var(--lex-panel); }
 .lex-math-formula > math { font-family:inherit; font-size:inherit; }
 .lex-math-formula > small { font-size:10px; text-align:center; }
