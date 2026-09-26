@@ -30,7 +30,7 @@
     return map;
   }
   function modOnlySpec(view){
-    const changed=(name,row)=>{const before=(state.vanilla[name]?.rows||[]).find(entry=>name==="fields"?entry.key===row.key:entry.id===row.id);return before===undefined||signature(row)!==signature(before)};
+    const changed=(name,row)=>{const before=name==="text"&&row.source==="refine"?matchingTextRow(state.vanilla,row):(state.vanilla[name]?.rows||[]).find(entry=>name==="fields"?entry.key===row.key:entry.id===row.id);return before===undefined||signature(row)!==signature(before)};
     const itemEffectsChanged=row=>view==='items'&&[
       ['battleItems',(state.data.battleItems?.rows||[]).filter(entry=>Number(row.id)!==0&&entry.id===row.id)],
       ['ammoEffects',(state.data.ammoEffects?.rows||[]).filter(entry=>Number(entry.fields.find(field=>field.field==='used_item_index')?.value)===Number(row.id))],
@@ -102,7 +102,7 @@
   }
   function setStatus(text){state.status=text}
   function rowSortValue(row,key){if(String(key).startsWith("field:"))return row.fields?.find(field=>field.field===String(key).slice(6))?.value??"";return row?.[key]??""}
-  function filtered(view,fields){const query=state.filters[view].trim().toLocaleLowerCase();let rows=state.data[view].rows.filter(row=>!query||fields.some(field=>String(row[field]??"").toLocaleLowerCase().includes(query)));const [key,direction]=state.sorts[view];return [...rows].sort((a,b)=>direction*String(rowSortValue(a,key)).localeCompare(String(rowSortValue(b,key)),undefined,{numeric:true,sensitivity:"base"}))}
+  function filtered(view,fields,source=state.data[view].rows){const query=state.filters[view].trim().toLocaleLowerCase();let rows=source.filter(row=>!query||fields.some(field=>String(row[field]??"").toLocaleLowerCase().includes(query)));const [key,direction]=state.sorts[view];return [...rows].sort((a,b)=>direction*String(rowSortValue(a,key)).localeCompare(String(rowSortValue(b,key)),undefined,{numeric:true,sensitivity:"base"}))}
   function sort(view,key){const [active,direction]=state.sorts[view];state.sorts[view]=[key,active===key?-direction:1];render()}
   function listColumns(view,columns,template,prefs,forceTemplate=false){return ({rows,selected,select})=>columnList({rows,key:row=>row.id,columns:columns.map(column=>({...column,sortable:true,numberedId:column.numberedId??column.key==="id"})),columnPreferences:prefs,template:forceTemplate?template:(prefs?null:template),sortState:{key:state.sorts[view][0],dir:state.sorts[view][1]},sort:key=>sort(view,key),selected,selectedClass:"selected",select,decorateRow:(node,row)=>view==="fields"&&row.mapId==null?node:decorateSearchCandidate(node,{type:view,value:row.id,label:row.name}),class:"ff8-record-list","aria-label":`FF8 ${view}`})}
   // Why a table's add button is off. FF8 keeps every one of these in a
@@ -203,7 +203,7 @@
   function itemSearchControl(value,prompt,accept,origin){const item=itemById(value)||{id:value,name:`Item ${value}`},link=hoverable({content:itemDisplay(item,item.name),targetType:"items",targetId:item.id,targetLabel:item.name,activate:()=>{state.selected.items=Number(item.id);navigate("items")}}),finder=el("button",{type:"button",title:"Choose an item","aria-label":`Choose an item for ${item.name}`,onclick:event=>{event.preventDefault();event.stopPropagation();beginSearcher({type:"items",prompt,target:()=>navigate("items"),origin,accept})}},LexeditorUI.selectionIcon());return LexeditorUI.choiceField(link,finder)}
   function enemyById(enemyId){return state.data.enemies?.rows?.find(enemy=>Number(enemy.id)===Number(enemyId))||{id:enemyId,name:`Enemy ${enemyId}`}}
   function enemySearchControl(value,prompt,accept,origin){const enemy=enemyById(value),name=hoverable({content:enemyDisplayName(enemy.name),targetType:"enemies",targetId:enemy.id,targetLabel:enemy.name,activate:()=>{state.selected.enemies=enemy.id;navigate("enemies")}}),finder=el("button",{type:"button",title:"Choose an enemy","aria-label":"Choose an enemy",onclick:event=>{event.stopPropagation();beginSearcher({type:"enemies",prompt,target:()=>navigate("enemies"),origin,accept})}},LexeditorUI.selectionIcon());return LexeditorUI.choiceField(name,finder)}
-  function rowOf(dataset,view,id){return dataset?.[view]?.rows?.find(row=>row.id===id)}
+  function rowOf(dataset,view,id){return (view==="text"?textRecordRows(dataset):dataset?.[view]?.rows)?.find(row=>row.id===id)}
   function sameValue(left,right){return signature(left)===signature(right)}
   function sourceControl(control,current,vanilla,references,apply,format,options={}){return LexeditorUI.provenanceControl({control,current,vanilla,references,format,same:sameValue,internal:options.internal,apply:value=>{apply(value);render();shell.refresh()}})}
   function pinLabel(prefs,key,label){return el("span",{class:"lex-pinnable-property"},label,prefs?.pinButton(key,label))}
