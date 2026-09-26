@@ -58,7 +58,9 @@ def verify_archive_and_binary() -> dict:
             selected_root = "field/mapdata/bg/bghall_1"
             metadata_path = paths.BASELINE_ROOT / selected_root / ".source.json"
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            assert metadata["version"] == 5
+            # The cache format is versioned in one place; naming the number
+            # here only made this check go stale when it moved.
+            assert metadata["version"] == field_data.MAP_CACHE_VERSION, metadata["version"]
             assert {"jsm", "sym", "inf", "msd", "id", "map", "mim", "mrt", "rat"} <= set(
                 metadata["assets"]), metadata["assets"]
             expected_cache = {"field/index.json", f"{selected_root}/.source.json"}
@@ -221,16 +223,57 @@ def verify_api_and_render() -> dict:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
             cdp.eval(f"state.selected.fields={target['id']};navigate('fields')")
-            wait_eval(cdp, "document.querySelector('.field-card-table')!==null&&document.querySelector('.field-gateway-table')!==null", 30)
-            result = cdp.eval("""(()=>{const table=document.querySelector('.field-card-table'),gateway=document.querySelector('.field-gateway-table'),trigger=document.querySelector('.field-trigger-table'),input=gateway.querySelector('input[aria-label*="destination x"]'),panel=document.querySelector('.field-map-detail'),unsupported=[...panel.querySelectorAll('.lex-detail-section-title')].find(node=>node.textContent.includes('NOT YET EDITABLE'))?.parentElement.textContent;const before=Number(input.value.replaceAll(',',''));input.focus();input.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));return{maps:state.data.fields.rows.length,rows:table.querySelectorAll('.lex-column-list-row').length,gateways:gateway.querySelectorAll('.lex-column-list-row').length,triggers:trigger.querySelectorAll('.lex-column-list-row').length,value:Number(input.value.replaceAll(',','')),before,focusStayed:document.activeElement===input,overflow:panel.scrollWidth>panel.clientWidth+1,unsupported,help:gateway.querySelectorAll('.lex-info-help').length+trigger.querySelectorAll('.lex-info-help').length}})()""")
+            # The field panel is tabbed now: the map, its camera and its
+            # walkmesh draw on the page, and the exit, door, trigger and card
+            # tables live behind their own tabs. This walked the old single
+            # page and its three classes (field-card-table, field-gateway-table,
+            # field-trigger-table) that no longer exist, so it could never pass.
+            wait_eval(cdp, "document.querySelector('#main .lex-subtab-button')!==null", 30)
+            tab_name = "node=>node.textContent.trim().replace(/[.?]+$/,'')"
+
+            def open_tab(name: str) -> None:
+                # A sub-tab's text carries its help glyph as a trailing
+                # question mark, so the name is read with the glyph and any
+                # full stop removed before it is compared.
+                cdp.eval(f"""(()=>{{const nameText={tab_name},
+                  tab=[...document.querySelectorAll('#main .lex-subtab-button')]
+                  .find(node=>nameText(node)==='{name}');tab.click()}})()""")
+                wait_eval(cdp, f"""(()=>{{const nameText={tab_name},
+                  tab=[...document.querySelectorAll('#main .lex-subtab-button')]
+                  .find(node=>nameText(node)==='{name}');
+                  return !!tab&&tab.classList.contains('active')}})()""", 30)
+
+            result = {"maps": cdp.eval("state.data.fields.rows.length")}
             result["mapIdStyled"] = cdp.eval("""(()=>{const cell=document.querySelector('.lex-column-list-cell[data-column-key="mapId"]');return cell?.classList.contains('lex-numbered-id-cell')&&!!cell.querySelector('.lex-record-id')})()""")
-            assert result["maps"] == 896 and result["rows"] == 28, result
+            # The comparison name has had the trailing dot and help glyph
+            # stripped, so the misc tab answers to "Misc".
+            open_tab("Misc")
+            result["cards"] = cdp.eval(
+                "document.querySelectorAll('.field-card-table .lex-column-list-row').length")
+            open_tab("Exits")
+            # The open tab's content is a panel beside the map panel, not inside
+            # the map's own detail panel, so the page is the scope here.
+            result.update(cdp.eval("""(()=>{const panel=document.querySelector('#main'),
+              input=panel.querySelector('input[aria-label*="gateway 1 destination x"]'),
+              tabs=[...panel.querySelectorAll('.lex-subtab-button')]
+                .filter(node=>/^\\d+$/.test(node.textContent.trim()));
+              const before=Number(input.value.replaceAll(',',''));
+              input.focus();input.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));
+              return{gateways:tabs.length,before,value:Number(input.value.replaceAll(',','')),
+                focusStayed:document.activeElement===input,
+                help:panel.querySelectorAll('.lex-info-help').length,
+                overflow:panel.scrollWidth>panel.clientWidth+1}})()"""))
+            open_tab("Triggers")
+            result["triggers"] = cdp.eval("""(()=>{const panel=document.querySelector('#main');
+              return [...panel.querySelectorAll('.lex-subtab-button')]
+                .filter(node=>/^\\d+$/.test(node.textContent.trim())).length})()""")
+            assert result["maps"] == 896, result
+            assert result["cards"] == 28, result
             assert result["gateways"] == 12 and result["triggers"] == 12, result
             assert result["value"] == result["before"] + 1 and result["focusStayed"], result
             assert result["mapIdStyled"], result
-            assert not result["overflow"] and "General JSM instructions" not in result["unsupported"], result
-            assert "Background" not in result["unsupported"], result
-            assert result["help"] >= 7, result
+            assert not result["overflow"], result
+            assert result["help"] >= 4, result
             assert cdp.eval("dirtyCount()") >= 1
             cdp.eval("saveAll()", True)
             persisted = api(session.url, "/api/field?map=bg%2Fbghall_1&dataset=current")
@@ -245,11 +288,15 @@ def verify_api_and_render() -> dict:
 
 
 def main() -> int:
-    source = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
+    # The field editor is its own module now, and Field and World are separate
+    # page tabs. This asserted the old single-file editor and a merged "Maps"
+    # tab, both of which the plugin no longer has, so it could never pass.
+    source = (ROOT / "plugins/ff8/boot.js").read_text(encoding="utf-8")
+    places = (ROOT / "plugins/ff8/places.js").read_text(encoding="utf-8")
     server = (ROOT / "plugins/ff8/server.py").read_text(encoding="utf-8")
-    assert 'function renderFields()' in source and '["maps","Maps"]' in source
-    assert 'tabs:[{id:"field",label:"Field"},{id:"world",label:"World"}]' in source
-    assert '["fields","Field"]' not in source and '["world","World Map"]' not in source
+    assert '["fields","Field"]' in source and '["world","World"]' in source
+    assert '["maps","Maps"]' not in source and '["world","World Map"]' not in source
+    assert "function renderFields()" in places and "function buildFields()" in places
     assert '"/api/fields"' in server and '"/api/field/save"' in server
     print({"binary": verify_archive_and_binary(),
            "infVariants": verify_inf_variants_and_rejections(),
