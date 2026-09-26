@@ -109,6 +109,7 @@
     const switches=toggleRow({label:field.label,leading:options.leading,value:()=>word(field.value),toggles:lookup.entries.map(entry=>{
       const bit=Number(entry.mask??entry.value);
       return {key:String(bit),label:entry.name,icon:LexeditorUI.inlineLabel(conceptIcon(lookup.name,entry.name)),
+        pin:state.columnPrefs[view]?.pinButton(`flag:${field.field}:${bit}`,entry.name),
         help:entry.description||null,checked:(word(field.value)&bit)===bit,
         change:checked=>{field.value=checked?(word(field.value)|bit):(word(field.value)&~bit);noteFieldEdit(view,field)}};
     })});
@@ -125,7 +126,7 @@
     shell.refresh();
     if(!view||!field)return;
     const active=state.columnPrefs[view]?.active?.();
-    if(!active||!active.some(column=>column.key===field.field||column.key===`field:${field.field}`))return;
+    if(!active||!active.some(column=>column.key===field.field||column.key===`field:${field.field}`||column.key.startsWith(`flag:${field.field}:`)))return;
     if(pinnedRenderPending)return;
     pinnedRenderPending=true;
     requestAnimationFrame(()=>{pinnedRenderPending=false;render()});

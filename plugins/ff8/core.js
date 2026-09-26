@@ -130,7 +130,15 @@
   function showPaged(view,rows,columns,detail,template="minmax(220px,2fr) minmax(72px,.7fr) minmax(100px,1fr)",layout={},mount=true){
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
     const noun=layout.noun||(view==="gfs"?"GFs":view);
-    const normalized=columns.map(column=>({...column,sortable:true,numberedId:column.numberedId??column.key==="id"}));
+    const flagColumns=(state.data[view]?.rows?.[0]?.fields||[]).flatMap(field=>{
+      if(field.lookup?.type!=="flags"||!columns.some(column=>column.key===`field:${field.field}`))return [];
+      return field.lookup.entries.map(entry=>{
+        const mask=Number(entry.mask??entry.value),value=row=>(Number(row.fields.find(f=>f.field===field.field)?.value)&mask)===mask;
+        return {key:`flag:${field.field}:${mask}`,label:`${field.label}: ${entry.name}`,pinned:false,
+          sortValue:value,render:row=>LexeditorUI.booleanMark(value(row))};
+      });
+    });
+    const normalized=[...columns,...flagColumns].map(column=>({...column,sortable:true,numberedId:column.numberedId??column.key==="id"}));
     const prefs=state.columnPrefs[view]||=columnPreferences(`ff8-${view}`,normalized,()=>render());
     const root=pagedListDetail({bulkChanged:()=>shell.refresh(),modOnly:modOnlySpec(view),rows,key:row=>row.id,slots:true,addDisabledReason:layout.addReason||addReasonFor(view),page:state.pages[view],pageSize:state.pageSizes[view],selected:state.selected[view],noun,splitKey:`ff8-${view}`,defaultSplit:layout.defaultSplit??42,minLeft:layout.minLeft??340,minRight:layout.minRight??420,maxBarrels:layout.maxBarrels,leadingPanel:layout.leadingPanel,minLeading:layout.minLeading,defaultLeadingWidth:layout.defaultLeadingWidth,trailingPanel:layout.trailingPanel,minTrailing:layout.minTrailing,panelSizes:layout.panelSizes,
       search:{key:`ff8-${view}`,value:state.filters[view],delay:110,placeholder:`Search ${noun.toLocaleLowerCase()}…`,label:`Search ${noun}`,change:value=>{state.filters[view]=value;state.pages[view]=0;render()}},

@@ -2021,7 +2021,10 @@
       ? element("div", {class:"lex-source-control no-reference"}, options.control)
       : options.control;
     const pin = options.pin || null;
-    const input = control instanceof Element
+    const composite = control instanceof Element &&
+      (control.matches(".lex-detail-parts") || control.querySelector(".lex-detail-parts"));
+    // A group has no single scalar type or range. Its individual controls do.
+    const input = control instanceof Element && !composite
       ? (control.matches("input,select,textarea,output,.lex-readonly-field")
         ? control : control.querySelector("input,select,textarea,output,.lex-readonly-field"))
       : null;
