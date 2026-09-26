@@ -2291,14 +2291,13 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   white-space:nowrap;
 }
 
-/* A record id is never abbreviated, exactly like a number, and the game font's
-   ink is about a pixel wider than its advance box: the cell around the id kept
-   clipping that pixel off the right edge of the last digit. The id's own box
-   already refuses to clip, so the cell stops clipping too and the column stays
-   floored at the widest id the table holds. */
-.lex-numbered-id-cell > .lex-column-cell-content {
-  min-width:max-content;
-  overflow:visible;
+/* A number is never abbreviated, and neither is a record id. A game face paints
+   the ink of its last digit about a pixel past the advance box, so the id keeps
+   that lane as padding instead of losing the edge of the digit. Padding is
+   inside the clip box, which is why this works where an overflowing box would
+   instead run the id into the next column. */
+.lex-numbered-id-cell .lex-record-id {
+  padding-inline-end:.08em;
 }
 
 /* A cell that shows a tick has nothing to truncate, and the glyph's ink is
