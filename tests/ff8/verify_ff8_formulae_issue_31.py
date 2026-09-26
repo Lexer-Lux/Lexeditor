@@ -72,7 +72,7 @@ def main() -> int:
     by_id = {row["id"]: row for row in rows}
     assert {
         "melee_damage", "magic_damage", "status_infliction", "spell_healing",
-        "physical_accuracy", "mug_chance",
+        "physical_accuracy", "status_attack", "elemental_attack", "mug_chance",
     } == set(by_id)
     assert "Damage_ComputeMagicAndGF at 0x491AD0" in by_id["magic_damage"]["vanilla"]
     assert "Battle_ApplyStatusWithResistRoll at 0x48F9F0" in by_id["status_infliction"]["vanilla"]
