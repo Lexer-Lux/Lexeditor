@@ -48,7 +48,7 @@ def test_font_pipeline_maps_cells_to_text_codes(tmp_path, monkeypatch):
     found = game_font.extract_glyphs(game)
     assert len(found["glyphs"]) == len({TEXT_MAP[code] for code in wanted}) + 1
     assert found["glyphs"]["T"]["box"] is not None
-    assert found["glyphs"]["T"]["advance"] == 12
+    assert found["glyphs"]["T"]["advance"] == 3
     assert found["glyphs"][" "]["box"] is None
 
     path = game_font.ensure_font(game)
@@ -77,6 +77,22 @@ def test_font_shadow_is_not_white_ink():
     width, _, pixels = game_font._read_pixels(bytes(member))
     assert pixels[width + 13] == 1
     assert pixels[2 * width + 14] == 0
+
+
+def test_font_metrics_use_width_plus_kerning(tmp_path):
+    import gzip
+    from plugins.ff7.format_codec import TEXT_MAP
+    menu = tmp_path / 'data/menu/menu_us.lgp'
+    menu.parent.mkdir(parents=True)
+    code = TEXT_MAP.index('T')
+    menu.write_bytes(lgp_fixture([(game_font.FONT_MEMBER, font_member({code: [(0, 0), (1, 0)]}))]))
+    metrics = bytearray([3] * 0xE7)
+    metrics[code] = (2 << 5) | 7
+    compressed = gzip.compress(metrics)
+    window = tmp_path / 'data/kernel/window.bin'
+    window.parent.mkdir(parents=True)
+    window.write_bytes(struct.pack('<HHH', len(compressed), len(metrics), 1) + compressed)
+    assert game_font.extract_glyphs(tmp_path)['glyphs']['T']['advance'] == 9
 
 
 def test_theme_wiring_references_each_layer():

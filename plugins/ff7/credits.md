@@ -118,6 +118,11 @@ installation at prepare/serve time. Nothing below ships with Lexeditor:
 - Menu font: `menu_us.lgp` member `usfont_h.tex` (12-pixel fixed grid,
   21 columns, FF7 text-code order). `game_font.py` builds a private
   `ff7-menu.ttf` in the game-data cache.
+  Width and kerning are read from the English `window.bin` type-1 member;
+  the palette separates letter ink from the dark shadow. Format research:
+  [ff7tools retrieveMetrics](https://github.com/cebix/ff7tools/blob/master/trans)
+  and [charWidth](https://github.com/cebix/ff7tools/blob/master/ff7/ff7text.py)
+  (ISC; no implementation code copied).
 - Interface sounds: numeric records from the installed `audio.fmt` /
   `audio.dat` pair, decoded to the private `theme-sfx` cache by the shared
   `theme_sounds` module (FF7 format). The slot mapping (confirm/move 1,
