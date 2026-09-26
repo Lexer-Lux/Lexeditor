@@ -22,7 +22,9 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def test_resident_handle_cover_keeps_its_affordance():
-    settings = dict(BASE, developerMode=True, developerAuthorized=True,
+    # Known amounts: the shipped defaults are tuned from Developer Mode and change.
+    settings = dict(BASE, residentCoverBlurPixels=8.0, residentCoverDarkenPercent=58.0,
+                    developerMode=True, developerAuthorized=True,
                     developerLogin='Lexer-Lux', viewPreferences={},
                     defaultValues=dict(BASE), loadingTransitionMinimumSeconds=0,
                     updateCheckChoices=[{'value': 'monthly', 'label': 'Monthly'}])

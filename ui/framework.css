@@ -2964,6 +2964,15 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
   flex:0 0 auto;
 }
 
+/* The shell's own hover box for a control's description. */
+.lex-hover-tip {
+  position:fixed; z-index:100030; max-width:min(360px, 80vw);
+  padding:6px 10px; pointer-events:none;
+  color:var(--lex-tooltip-fg, var(--lex-text)); background:var(--lex-tooltip-bg, var(--lex-panel-2));
+  border:1px solid var(--lex-border); border-radius:var(--lex-radius); box-shadow:0 6px 16px #0007;
+  font:400 .9rem/1.35 var(--lex-font); white-space:normal;
+}
+
 /* The shared "no image" mark fills whatever box the picture would have. */
 .lex-no-image {
   display:grid;
@@ -2996,9 +3005,12 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
   background:var(--lex-accent);
   border-color:color-mix(in srgb, var(--lex-accent) 70%, #fff);
   box-shadow:0 3px 10px #0008;
-  opacity:.45;
+  /* Out of sight until the pointer is over the table, faint then, and whole
+     only over the button itself. */
+  opacity:0;
   transition:opacity .12s ease, transform .12s ease;
 }
+.lex-barrelled-master:hover > .lex-table-add { opacity:.45; }
 .lex-barrelled-master > .lex-table-add:is(:hover, :focus-visible) { opacity:1; transform:scale(1.06); }
 .lex-barrelled-master > .lex-table-add.unavailable {
   color:var(--lex-muted);

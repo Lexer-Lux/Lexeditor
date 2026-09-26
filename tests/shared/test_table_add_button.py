@@ -15,6 +15,7 @@ def test_table_add_button(page, kind):
     framework(page)
     page.evaluate('''kind => {
       const U = LexeditorUI, rows = Array.from({length: 20}, (_, id) => ({id, name: 'Row ' + id}));
+      U.installControlHelp(document.body);  // the shell does this when it mounts
       window.added = 0;
       document.querySelector('main').style.height = '600px';
       const view = U.pagedListDetail({rows, key: r => r.id, selected: 0, noun: 'rows',
@@ -36,7 +37,10 @@ def test_table_add_button(page, kind):
     }''')
     assert shape['round'] == '50%' and shape['square'], shape
     assert 0 <= shape['rightGap'] <= 16 and 0 <= shape['bottomGap'] <= 16, shape
-    assert shape['opacity'] < .6, 'faint until pointed at'
+    assert shape['opacity'] == 0, 'out of sight until the table is pointed at'
+    page.locator('.lex-barrelled-master').hover(position={'x': 20, 'y': 60})
+    page.wait_for_timeout(250)
+    assert .2 < float(button.evaluate('b => getComputedStyle(b).opacity')) < .6, 'faint over the table'
     button.hover(force=True)
     page.wait_for_timeout(250)
     assert float(button.evaluate('b => getComputedStyle(b).opacity')) > .8
@@ -46,6 +50,11 @@ def test_table_add_button(page, kind):
         assert page.evaluate('window.added') == 1
         assert button.get_attribute('aria-disabled') is None
     else:
+        # Pointing at it says why, before any click.
+        page.locator('.lex-barrelled-master').hover(position={'x': 20, 'y': 60})
+        button.hover(force=True)
+        page.wait_for_selector('.lex-hover-tip')
+        assert ('fixed set of slots' if kind == 'slots' else 'not supported yet') in page.locator('.lex-hover-tip').inner_text()
         assert page.evaluate('window.added') == 0
         assert button.get_attribute('aria-disabled') == 'true'
         why = page.locator('.lex-toast').last.inner_text()

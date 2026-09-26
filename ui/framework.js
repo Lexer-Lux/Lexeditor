@@ -532,7 +532,43 @@
       else record.addedNodes.forEach(strip);
     }));
     observer.observe(root, {childList:true, subtree:true, attributes:true, attributeFilter:['title']});
-    return () => observer.disconnect();
+    // The browser's own hover boxes are gone, so the shell draws the stored
+    // text itself. Nothing drew it before: every button's explanation - why an
+    // add button is unavailable, why save is off - existed and was never shown
+    // ("just hovering it should give you the text. you shouldn't have to
+    // click it"). A question mark keeps its own popup.
+    let tip = null, tipTimer = 0, tipOwner = null;
+    const hideTip = () => { clearTimeout(tipTimer); tip?.remove(); tip = null; tipOwner = null; };
+    const showTip = owner => {
+      const text = owner.dataset.lexTitle;
+      if (!text || !owner.isConnected) return;
+      tip = element("div", {class: "lex-hover-tip", role: "tooltip"}, text);
+      document.body.append(tip);
+      const box = owner.getBoundingClientRect(), size = tip.getBoundingClientRect(), pad = 8;
+      const below = box.bottom + 6 + size.height <= window.innerHeight - pad;
+      tip.style.left = `${Math.round(Math.max(pad, Math.min(box.left + box.width / 2 - size.width / 2, window.innerWidth - size.width - pad)))}px`;
+      tip.style.top = `${Math.round(below ? box.bottom + 6 : Math.max(pad, box.top - 6 - size.height))}px`;
+    };
+    const over = event => {
+      const owner = event.target.closest?.("[data-lex-title]");
+      if (owner === tipOwner) return;
+      hideTip();
+      if (!owner || owner.closest(".lex-info-help") || !root.contains(owner)) return;
+      tipOwner = owner;
+      tipTimer = setTimeout(() => showTip(owner), 450);
+    };
+    document.addEventListener("pointerover", over, true);
+    document.addEventListener("pointerdown", hideTip, true);
+    document.addEventListener("keydown", hideTip, true);
+    window.addEventListener("scroll", hideTip, true);
+    return () => {
+      observer.disconnect();
+      hideTip();
+      document.removeEventListener("pointerover", over, true);
+      document.removeEventListener("pointerdown", hideTip, true);
+      document.removeEventListener("keydown", hideTip, true);
+      window.removeEventListener("scroll", hideTip, true);
+    };
   };
 
   const infoHelp = (text, attrs = {}) => {
