@@ -27,7 +27,7 @@
          tab at least its name's width and shrinks the whole strip to the
          window; only a window too small for the readable floor scrolls. */
       --lex-nav-bg:#000;--lex-nav-padding-inline:var(--lex-panel-gap);
-      --lex-tab-min-height:44px;--lex-tab-padding-inline:clamp(5px,.75vw,20px);
+      --lex-tab-min-height:44px;--lex-tab-padding-inline:clamp(3px,.35vw,8px);
       --lex-tab-font-size:clamp(12px,1.02vw,20px);--lex-tab-fg:#cfcfcf;
       --lex-tab-bg:linear-gradient(135deg,#5c5c5c,#404040);
       --lex-tab-border:3px solid;--lex-tab-border-color:#a7a7a7 #292929 #292929 #a7a7a7;

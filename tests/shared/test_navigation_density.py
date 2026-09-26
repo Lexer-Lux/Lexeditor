@@ -38,11 +38,10 @@ def test_row_pointer_follows_clickable_label(page,with_icon):
         }''')
     page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-clickable-row-pointer.png'))
 
-def test_a_plugins_pages_keep_the_order_it_declares(page):
-    """The shell sorted pages alphabetically and put Weapons last on one game.
-
-    A plugin lists its pages in the order it wants them read; only `order` and
-    the settings/tweaks rule may move them.
+def test_pages_are_alphabetical_whatever_order_they_are_declared_in(page):
+    """Lexer: "the tabs aren't alphabetically sorted anymore. wtf? how does this
+    keep hapening?" Pages are alphabetical by name; only `order` and the
+    settings/tweaks rule move them.
     """
     framework(page)
     page.evaluate('''()=>{
@@ -56,7 +55,7 @@ def test_a_plugins_pages_keep_the_order_it_declares(page):
     page.wait_for_timeout(300)
     order = page.evaluate('''()=>[...document.querySelectorAll('.lex-shell-header nav button[data-tab]')]
       .map(node=>node.dataset.tab)''')
-    assert order[:3] == ['zebra','alpha','middle'], order
+    assert order[:3] == ['alpha','middle','zebra'], order
 
 
 @pytest.mark.parametrize('width',[700,1000,1600])

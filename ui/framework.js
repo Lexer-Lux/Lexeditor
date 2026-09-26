@@ -6154,12 +6154,12 @@ ${contents.path}`});
     // out of the run of tabs and gave it a paler fill, so a page the reader
     // uses constantly read as chrome. Settings is the only tab that sits apart.
     const isSpecialTab = tab => tab.special === true || tab.id === "settings" || tab.id === "tweaks";
-    // A plugin lists its pages in the order it wants them read. The order was
-    // alphabetical unless a tab stated `order`, which put Weapons last on one
-    // game and shuffled others, so the declared order is the default now and
-    // `order` only overrides it.
-    const declaredIndex = new Map(options.tabs.map((tab, index) => [tab, index]));
-    const declaredOrder = tab => declaredIndex.get(tab) ?? 0;
+    // Pages are alphabetical by name. Lexer asked for that and asked again when
+    // it was swapped for each plugin's declared order ("the tabs aren't
+    // alphabetically sorted anymore. wtf?"): a reader finds a page by name,
+    // and every game's bar then reads the same way. A page whose order carries
+    // meaning still states `order`.
+    const tabName = tab => String(tab.label instanceof Node ? tab.label.textContent : tab.label ?? tab.id);
     const orderedTabs = [...options.tabs].sort((left, right) => {
       const leftSettings = isSpecialTab(left);
       const rightSettings = isSpecialTab(right);
@@ -6169,7 +6169,8 @@ ${contents.path}`});
       // whole pages down to single controls - says so with `order`.
       const stated = tab => Number.isFinite(tab.order) ? tab.order : null;
       if (stated(left) !== null && stated(right) !== null && stated(left) !== stated(right)) return stated(left) - stated(right);
-      return rank(left) - rank(right) || declaredOrder(left) - declaredOrder(right);
+      return rank(left) - rank(right)
+        || tabName(left).localeCompare(tabName(right), undefined, {numeric: true, sensitivity: "base"});
     });
     for (const [tabIndex, tab] of orderedTabs.entries()) {
       let defaultHoldTimer = 0;
@@ -10090,21 +10091,40 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     // that shrinks it fires the strip's own observer, and a pass that cleared
     // its way back to the base size every time would trade those two states
     // for ever. Growing back is the window's business, and that pass resets.
-    if (reset) labels.forEach(label => { label.style.fontSize = ''; });
+    if (reset) {
+      labels.forEach(label => { label.style.fontSize = ''; });
+      nav.classList.remove('lex-nav-tight');
+    } else {
+      // A tab added after the strip was fitted arrives at the theme's base
+      // size and would stay larger than its neighbours; it takes the size the
+      // rest of the strip already has.
+      const sized = labels.map(label => parseFloat(label.style.fontSize)).filter(Number.isFinite);
+      if (sized.length && sized.length < labels.length) apply(Math.min(...sized));
+    }
     if (!overflows()) return;
-    const fixed = labels.reduce((total, label) => {
-      const css = getComputedStyle(label.closest('button') || label);
-      return total + parseFloat(css.paddingLeft) + parseFloat(css.paddingRight)
-        + parseFloat(css.borderLeftWidth) + parseFloat(css.borderRightWidth);
-    }, 0);
-    const room = Math.max(1, nav.clientWidth - fixed - 1);
-    const start = parseFloat(getComputedStyle(labels[0]).fontSize) || 12;
-    let size = start;
-    // Measuring after each step is what makes this exact: the ratio is taken
-    // from the real text width, not from an estimate that ignores padding.
-    for (let attempt = 0; attempt < 5 && size > LABEL_MIN_PX && overflows(); attempt += 1) {
-      size = Math.max(LABEL_MIN_PX, size * room / Math.max(1, nav.scrollWidth - fixed));
-      apply(size);
+    const shrink = () => {
+      const fixed = labels.reduce((total, label) => {
+        const css = getComputedStyle(label.closest('button') || label);
+        return total + parseFloat(css.paddingLeft) + parseFloat(css.paddingRight)
+          + parseFloat(css.borderLeftWidth) + parseFloat(css.borderRightWidth);
+      }, 0);
+      const room = Math.max(1, nav.clientWidth - fixed - 1);
+      let size = parseFloat(getComputedStyle(labels[0]).fontSize) || 12;
+      // Measuring after each step is what makes this exact: the ratio is taken
+      // from the real text width, not from an estimate that ignores padding.
+      for (let attempt = 0; attempt < 5 && size > LABEL_MIN_PX && overflows(); attempt += 1) {
+        size = Math.max(LABEL_MIN_PX, size * room / Math.max(1, nav.scrollWidth - fixed));
+        apply(size);
+      }
+    };
+    shrink();
+    // At the readable floor the tabs give up their side padding before the
+    // strip scrolls: "horizontal scroll bar -- this should never happen...
+    // one row. always. no scrollbar." The names keep their size; only the air
+    // around them goes.
+    if (overflows()) {
+      nav.classList.add('lex-nav-tight');
+      shrink();
     }
   };
   // The strip itself is what changes size when a page adds its tabs or when a

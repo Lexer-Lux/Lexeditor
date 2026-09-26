@@ -7438,18 +7438,17 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 
   display: grid;
   grid-auto-flow:column;
-  /* A tab is never narrower than its own name, and the row still fills the
-     window: a short strip spreads its free space over equal shares, and a
-     strip whose names overrun keeps its natural width while the fit pass
-     shrinks the whole strip into the window. One rule, so no theme declares
-     its own tab sizing. */
-  grid-auto-columns:var(--lex-nav-tab-columns,minmax(max-content,1fr));
+  /* A tab is its own name's width plus its padding, and the row still fills
+     the window: the fit pass shrinks the whole strip until the names fit, and
+     what little room is left is shared out. Equal 1fr shares evened every tab
+     up to the widest share, so a short name like SFX or Tweaks sat in half a
+     tab of empty margin - "the 'Tweaks' text takes up only like half the width
+     of the tab". One rule, so no theme declares its own tab sizing. */
+  grid-auto-columns:var(--lex-nav-tab-columns,minmax(max-content,auto));
+  justify-content: stretch;
   min-width: 0;
   width: 100%;
   max-width: 100%;
-  /* Safe: max-content tabs wider than the strip start at its left edge and
-     scroll, rather than overflowing both ends past reach. */
-  justify-content: safe center;
   align-items: stretch;
   gap: 0;
   overflow: visible;
@@ -7534,6 +7533,10 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 
 }
 .lex-shell-header nav button:first-child { border-left: var(--lex-tab-first-border, 0); }
+/* Set by the strip fit once its names are at the readable floor and the row
+   still overruns: the side padding goes before a scrollbar appears. */
+.lex-shell-header nav.lex-nav-tight button { padding-inline:1px; }
+.lex-shell-header nav.lex-nav-tight .lex-tab-label-text { padding-inline:1px; }
 .lex-shell-header nav button.lex-settings-tab {
 
   flex: 1 1 0;
