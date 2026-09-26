@@ -16,6 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
+from core.plugin_files import atomic_write
 from . import paths
 from .fs_archive import FsArchive
 
@@ -109,7 +110,7 @@ def extract(name: str, index: int, project_root: Path | None = None) -> dict:
     destination = root / EXTRACTED_ROOT / str(name).strip().lower() / safe
     destination.parent.mkdir(parents=True, exist_ok=True)
     data = archive.extract(entry)
-    destination.write_bytes(data)
+    atomic_write(destination, data)
     return {"archive": str(name).strip().lower(), "index": wanted, "name": entry.name,
             "bytes": len(data), "path": str(destination), "project": str(root)}
 EXTRACTED_ROOT = "extracted"
