@@ -11,7 +11,8 @@ folder in plugins/; tests/shared/ holds everything that belongs to no plugin
 and is what --global runs.
 
 Standard steps, in order: compile the Python, syntax-check the JavaScript,
-`app.py --game <id> --check`, pytest on the owned test_*.py files, node tests,
+`app.py --game <id> --check` (or the registered synthetic `--smoke`),
+pytest on the owned test_*.py files, node tests,
 then the owned verifier and browser-check scripts through tests/shared/verify_all.py,
 which reports a check that needs an installed game as SKIPPED rather than
 failed. Extra commands a plugin genuinely needs (a native build) are listed in
@@ -91,7 +92,10 @@ def commands(target: str | None) -> list[list[str]]:
     if target:
         steps.append([py, "-m", "compileall", "-q", f"plugins/{target}"])
         # Plugin ids are the folder name with hyphens (chrono_trigger -> chrono-trigger).
-        steps.append([py, "app.py", "--game", target.replace("_", "-"), "--check"])
+        # Some health checks validate a player's installation. Their registered
+        # synthetic service smoke exercises startup and IO without game assets.
+        health = "--smoke" if target in CONFIG.get("synthetic_service_checks", []) else "--check"
+        steps.append([py, "app.py", "--game", target.replace("_", "-"), health])
     else:
         steps.append([py, "-m", "compileall", "-q", "app.py", "core", "tools"])
         steps.append([py, "-m", "core.plugin_metadata"])
