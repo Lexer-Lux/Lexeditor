@@ -10260,7 +10260,23 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       // each of its labels here.
       if(nav){fitted.set(label,fitKey(label));return;}
       const range=document.createRange();range.selectNodeContents(label);
-      const fits=()=>{const css=getComputedStyle(label);return range.getBoundingClientRect().width <= label.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight)-3;};
+      // A tab with a help mark hugs its label to its text, so the label's own
+      // width is no measure of the room: text 3px short of a box its own
+      // size never fitted, and every such tab shrank to the floor. The room
+      // is what the tab leaves once its padding and its other parts are out.
+      const button=label.closest('button'),own=label.closest('.lex-tab-label')||label;
+      const room=()=>{
+        const css=getComputedStyle(label),inset=parseFloat(css.paddingLeft)+parseFloat(css.paddingRight)+3;
+        if(!button||!button.querySelector(':scope > .lex-info-help'))return label.clientWidth-inset;
+        const box=getComputedStyle(button),gap=parseFloat(box.columnGap)||0;
+        let space=button.clientWidth-parseFloat(box.paddingLeft)-parseFloat(box.paddingRight);
+        for(const part of button.children){
+          if(part===own||part.contains(label)||getComputedStyle(part).position==='absolute')continue;
+          space-=part.getBoundingClientRect().width+gap;
+        }
+        return space-inset;
+      };
+      const fits=()=>range.getBoundingClientRect().width<=room();
       while(size>LABEL_MIN_PX&&!fits()){size-=.5;label.style.fontSize=`${size}px`;}
       fitted.set(label,fitKey(label));
       return;
