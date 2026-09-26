@@ -143,8 +143,11 @@
           description,control:fieldControl(dataset,row,spec,readOnly)});
       });
       // The heading is drawn in the installed game's own font, the same face
-      // the shell and the shell's tabs use.
-      return LexeditorUI.detailPanel({className:"warband-module-detail",title:bitmapText(row.name||row.id,24),
+      // the shell and the shell's tabs use, and wrapped the way the item
+      // panel's heading is so every panel in the plugin sizes its heading the
+      // same way.
+      return LexeditorUI.detailPanel({className:"warband-module-detail",
+        title:LexeditorUI.el("h2",{class:"lex-detail-panel-title"},bitmapText(row.name||row.id,24)),
         // The heading shows the record's name; the ID repeats beside it only
         // when it is a different string. Coverage and the source caveat are
         // panel help, not a second subtitle and a paragraph on the page.

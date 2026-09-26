@@ -297,7 +297,7 @@ def main():
                       const title=panel.querySelector('.lex-detail-panel-title');
                       const bitmap=title.querySelector('.lex-bitmap-text');
                       return {title:bitmap?bitmap.getAttribute('aria-label')
-                                :[...title.childNodes].filter(node=>node.nodeType===Node.TEXT_NODE).map(node=>node.textContent).join(''),
+                                :title.textContent.replace('?','').trim(),
                               subtitles:[...panel.querySelectorAll('.lex-detail-panel-id,.lex-detail-panel-meta')].map(node=>node.textContent)};
                     }''')
                     # A record whose name is its own ID prints that ID once: not

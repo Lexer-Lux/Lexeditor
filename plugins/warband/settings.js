@@ -11,7 +11,7 @@
   }
 
   function settingDetail(row){
-    return detailPanel({title:bitmapText(row.key,24),meta:row.section,body:[LexeditorUI.detailSection({body:[
+    return detailPanel({title:el("h2",{class:"lex-detail-panel-title"},bitmapText(row.key,24)),meta:row.section,body:[LexeditorUI.detailSection({body:[
       detailField({label:"Value",property:"value",control:el("input",{value:effectiveSetting(row),oninput:event=>{if(event.target.value===row.value)delete state.settingEdits[row.line];else state.settingEdits[row.line]=event.target.value;shell.refresh();}})}),
       LexeditorUI.detailNote(row.description||"No description.")]})]});
   }

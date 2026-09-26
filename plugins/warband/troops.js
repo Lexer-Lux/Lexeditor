@@ -34,7 +34,7 @@
     // without an icon has nowhere to put it. A troop's icon is the first piece
     // of equipment it carries, which is also the first thing the drawer shows.
     const icon=gear.length?LexeditorUI.iconSlot({className:"warband-item-thumbnail",content:warbandPreviewStage(gear[0])}):null;
-    return detailPanel({className:"warband-tree-detail",icon,title:bitmapText(node.name||node.id,24),identity:node.id,
+    return detailPanel({className:"warband-tree-detail",icon,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(node.name||node.id,24)),identity:node.id,
       modelPreview:gear.length?{
         label:`${node.name||node.id} equipment`,
         openLabel:`Open ${node.name||node.id}'s equipment`,
