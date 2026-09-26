@@ -305,7 +305,7 @@
 
     // ---- templates -------------------------------------------------------
     {id: "mountShell", level: "template", expect: "every game", summary: "The window: brand, tabs, project selector, save, play, history. Everything above this page is it."},
-    {id: "panelLayout", level: "template", summary: "One, two or three resizable panes across a page."},
+    {id: "panelLayout", level: "template", summary: "Resizable panes; stackBelowMinimum stacks them when their container cannot fit minSizes."},
     {id: "list", level: "organism", summary: "A plain list of rows, without columns."},
     {id: "listDetail", level: "template", summary: "A list beside the detail of the selected row."},
     {id: "masterDetail", level: "template", summary: "The older list and detail shape, kept for existing pages."},
