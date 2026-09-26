@@ -12,7 +12,7 @@ from tempfile import TemporaryDirectory
 import threading
 from urllib.parse import parse_qs, urlparse
 
-from .archive import build_index, preferred_pak_version
+from .archive import build_index, is_read_only_evidence, preferred_pak_version
 from .atb_tweaks import has_enabled_data_overrides, materialize_atb_overrides
 from .encounter_tweaks import (
     has_enabled_encounter_tweaks,
@@ -165,7 +165,7 @@ def _virtual_data_map_row(item: dict) -> dict | None:
         return None
     asset = str(item["asset"])
     label = str(item.get("name") or asset)
-    if synthetic.endswith("-probe"):
+    if is_read_only_evidence(item):
         return {
             "filename": f"{asset} (generated research view)",
             "target": asset,

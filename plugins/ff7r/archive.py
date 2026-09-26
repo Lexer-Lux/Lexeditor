@@ -106,6 +106,18 @@ def _pair_rows(by_asset: dict[str, dict], prefix: str, *, text: bool = False) ->
     return rows
 
 
+def is_read_only_evidence(row: dict) -> bool:
+    """True for a synthetic research view: installed-build evidence, not a setting.
+
+    Every Lexeditor virtual row whose synthetic name ends in ``-probe`` is one
+    plugin probe's report. Nothing in the editor mutates it, and reading one
+    re-scans the installed game. The suffix is the single place that decides
+    this, so the Data Map's "generated research view" row and the catalog row a
+    reader lists cannot drift apart.
+    """
+    return str(row.get("synthetic", "")).endswith("-probe")
+
+
 def _with_virtual_assets(payload: dict) -> dict:
     """Decorate an index in memory without persisting Lexeditor-only rows to cache."""
     rows = [dict(row) for row in payload.get("assets", [])]
@@ -121,8 +133,15 @@ def _with_virtual_assets(payload: dict) -> dict:
         *VIRTUAL_ASSET_ROWS,
     ):
         if row["asset"] not in existing:
-            rows.append(dict(row))
-            existing.add(row["asset"])
+            entry = dict(row)
+            if is_read_only_evidence(entry):
+                # The Data Map calls these rows a generated research view and
+                # the editor has no mutation path for them. Say so in the row
+                # itself, so a reader that lists resources can tell a setting
+                # apart from installed-build evidence.
+                entry["readOnly"] = True
+            rows.append(entry)
+            existing.add(entry["asset"])
     return {**payload, "assets": rows}
 
 

@@ -348,7 +348,7 @@
     return detailPanel({className:"ff7r-detail",title:recordDisplayName(row)||row.tag||"Unnamed record",meta:row.tag?`Data ID ${row.tag}`:(currentAsset()?.name||state.asset),body:[detailSection({title:"PROPERTIES",body:fields})]});
   }
   function tablePanel(){const rows=sortedRows();return columnList({rows,key:row=>row.id,selected:state.selected,select:row=>{state.selected=row.id;render()},sortState:state.sort,sort:key=>{state.sort=state.sort.key===key?{key,dir:-state.sort.dir}:{key,dir:1};render()},columnPreferences:dataPreferences(),columns:dataTableColumns(),class:"ff7r-table","aria-label":"FF7 Remake DataObject records"})}
-  function assetToolbar(){const select=el("select",{"aria-label":"FF7 Remake misc data table",onchange:event=>selectAsset(event.target.value),disabled:state.busy});for(const item of (state.tab==="tweaks"?tweakAssets():gameAssets())){const label=item.group?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.asset;select.append(option)}return LexeditorUI.toolbar(el("label",{},"Table"),select)}
+  function assetToolbar(){const select=el("select",{"aria-label":"FF7 Remake misc data table",onchange:event=>selectAsset(event.target.value),disabled:state.busy});for(const item of (state.tab==="tweaks"?tweakAssets():miscAssets())){const label=item.group?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.asset;select.append(option)}return LexeditorUI.toolbar(el("label",{},"Table"),select)}
   function dataPanel(){if(state.busy&&state.tab==="misc")return loadingPanel("Loading DataObject","Reading the selected gameplay .uasset/.uexp pair…");if(state.error&&!state.data)return errorPanel(state.error);return LexeditorUI.stack(assetToolbar(),pagedDataPanel())}
   // The DataObject list uses the shared paged Table + Detail, so its search and
   // paging live in the standard bottom bar instead of a private top strip.
@@ -401,8 +401,9 @@
       : fieldsOf(data.records[0]);
     return detailSection({title,body});
   }
-  // Seventeen small DataObjects, read together. They are requested in parallel
-  // because the page cannot show anything until the last of them arrives.
+  // The tweak settings groups, read together. Read-only research views are
+  // deliberately not part of this list: each one re-scans the installed game,
+  // and a reader opening Tweaks is there for the switches.
   async function loadAllTweaks(){
     const list=tweakAssets();
     if(!list.length){state.tweaks={};return}
@@ -415,6 +416,15 @@
     state.tweaksBusy=false;
     state.tweaksPending=list.length;
     render();
+    // Groups arrive in bursts: the quick ones are back inside the same second,
+    // and each arrival used to rebuild the whole card page and re-measure every
+    // column. One render per frame is enough to show whatever has arrived.
+    let renderQueued=false;
+    const queueRender=()=>{
+      if(renderQueued)return;
+      renderQueued=true;
+      requestAnimationFrame(()=>{renderQueued=false;if(state.tab==="tweaks")render()});
+    };
     // Two groups at a time. Every group used to fire at once, and the slow
     // ones each re-scan the installed game, so one Tweaks open ran seventeen
     // concurrent full-game scans, peaked past 5GB, and starved the host until
@@ -428,7 +438,7 @@
       }catch(error){state.tweaksError=error.message}
       finally{
         state.tweaksPending=Math.max(0,(state.tweaksPending||1)-1);
-        if(state.tab==="tweaks")render();
+        queueRender();
       }
     };
     let next=0;
@@ -793,7 +803,13 @@
     const item=assets().find(entry=>entry.asset===asset);
     if(!item)return navigate(asset);
     state.asset=asset;
-    if(isTweak(item))return navigate("tweaks");
+    if(isTweak(item)){
+      // A research view is installed-build evidence, not a setting. Loading
+      // every tweak group to show one of them cost minutes of scanning, so the
+      // one resource that was asked for is shown by the DataObject screen.
+      if(isReadOnlyEvidence(item)){state.data=null;state.dataBaseline=null;return navigate("misc")}
+      return navigate("tweaks");
+    }
     const basename=String(asset).split("/").pop().toLocaleLowerCase().replace(/\.uasset$/,"");
     const economyTab=ECONOMY_TABS.find(entry=>entry.id===basename);
     if(economyTab)return navigate(economyTab.id);
@@ -840,7 +856,7 @@
     else if(tab==="misc"){
       // Opening this tab loaded nothing, so the table sat empty behind the
       // picker until the user changed the dropdown by hand.
-      const list=gameAssets();
+      const list=miscAssets();
       const wanted=list.some(item=>item.asset===state.asset)?state.asset:(list[0]?.asset||"");
       if(wanted&&(state.asset!==wanted||!state.data)){state.asset=wanted;await loadAsset(wanted);render()}
     }}
