@@ -36,8 +36,20 @@
   const textPrefs=LexeditorUI.columnPreferences("ff7r-text-records",textColumns,()=>render());
   const assets=()=>state.catalog?.assets||[];
   const isTweak=item=>String(item.group||"").startsWith("Lexeditor ");
-  const tweakAssets=()=>assets().filter(isTweak);
+  // The server marks its synthetic "-probe" research views read-only. They are
+  // installed-build evidence with no mutation path, and reading one re-scans
+  // the installed game, so they are not tweak settings: the Tweaks page leaves
+  // them alone and the Data Map opens the one a reader asks for as data.
+  const isReadOnlyEvidence=item=>item.readOnly===true;
+  const tweakAssets=()=>assets().filter(item=>isTweak(item)&&!isReadOnlyEvidence(item));
   const gameAssets=()=>assets().filter(item=>!isTweak(item));
+  // The DataObject screen's picker names the resource it is showing, so a
+  // read-only evidence view opened from the Data Map is listed there too.
+  const miscAssets=()=>{
+    const list=gameAssets();
+    const current=assets().find(item=>item.asset===state.asset);
+    return current&&isReadOnlyEvidence(current)?[current,...list]:list;
+  };
   const textAssets=()=>state.catalog?.textAssets||[];
   const currentAsset=()=>assets().find(row=>row.asset===state.asset)||assets()[0]||null;
   const currentTextAsset=()=>textAssets().find(row=>row.asset===state.textAsset)||null;
