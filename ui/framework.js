@@ -3621,10 +3621,16 @@
     // window joins them back up.
     let pieces = [];
     const joinSections = () => {
-      // Newest first, each back into the section it was cut from, so a
-      // section cut twice gets its rows back in order.
-      for (const {source, piece, subSplit} of pieces.reverse()) {
-        const body = source.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body,.settings-subs)");
+      // Every piece goes straight back into the section it was first cut
+      // from, in reading order, so each row moves once. Handing each piece to
+      // the one before it, newest first, moved a row as many times as there
+      // were pieces after it: a 168-record group's thirty pieces meant tens of
+      // thousands of moves and twenty seconds of frozen window.
+      const cutFrom = new Map(pieces.map(entry => [entry.piece, entry.source]));
+      const original = card => { let at = card; while (cutFrom.has(at)) at = cutFrom.get(at); return at; };
+      const inOrder = [...pieces].sort((left, right) => cards.indexOf(left.piece) - cards.indexOf(right.piece));
+      for (const {piece, subSplit} of inOrder) {
+        const body = original(piece).querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body,.settings-subs)");
         const rest = piece.querySelector(":scope > :is(.lex-detail-section-content,.lex-detail-panel-body,.settings-subs)");
         if (subSplit && body && rest) {
           const continued = rest.querySelector(':scope > [data-lex-continued="true"]');
@@ -3666,12 +3672,21 @@
       const outer = card.getBoundingClientRect(), inner = body.getBoundingClientRect();
       const scale = outer.height / Math.max(1, card.offsetHeight) || 1;
       const above = (inner.top - outer.top) / scale, below = (outer.bottom - inner.bottom) / scale;
-      let keep = 0;
-      for (let index = 0; index < rows.length; index++) {
-        const through = (rows[index].getBoundingClientRect().bottom - inner.top) / scale;
-        if (above + through + below > available - 1) break;
-        keep = index + 1;
-      }
+      // Every row is read once, and every cut is decided from those numbers:
+      // rows keep their height when they move to a piece at the same width.
+      // Cutting one piece at a time re-laid-out the whole page per cut.
+      const rects = rows.map(row => row.getBoundingClientRect());
+      const lead = rects.length ? rects[0].top - inner.top : 0;
+      const fitFrom = start => {
+        let end = start;
+        for (let index = start; index < rows.length; index++) {
+          const through = (rects[index].bottom - rects[start].top + lead) / scale;
+          if (above + through + below > available - 1) break;
+          end = index + 1;
+        }
+        return end;
+      };
+      const keep = fitFrom(0);
       // One row taller than the page cannot be helped by splitting between
       // rows. A settings sub taller than the page splits between its own
       // fields instead, so one long sub never fails a small window.
@@ -3683,24 +3698,40 @@
       const named = panel ? title?.querySelector(".lex-detail-panel-title") : title;
       const name = (panel ? named?.textContent || "" : [...(title?.childNodes || [])].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join(""))
         .trim().replace(/ \(continued\)$/, "");
-      const piece = card.cloneNode(false);
-      piece.classList.add("lex-detail-section-continued");
-      const rest = body.cloneNode(false);
-      rest.append(...rows.slice(keep));
-      let head = null;
-      if (panel && title) {
-        head = title.cloneNode(true);
-        const copy = head.querySelector(".lex-detail-panel-title");
-        if (copy) copy.textContent = `${name} (continued)`;
-        head.querySelectorAll(".lex-detail-panel-icon,.lex-detail-panel-actions,.lex-detail-panel-id,.lex-detail-panel-meta").forEach(node => node.remove());
-      } else if (title) {
-        head = element(title.tagName.toLowerCase(), {class: title.className}, `${name} (continued)`);
+      const segments = [];
+      for (let start = keep; start < rows.length;) {
+        // A row taller than a whole page gets a piece of its own; the strict
+        // guard reports it when that piece is measured.
+        const end = Math.max(start + 1, fitFrom(start));
+        segments.push(rows.slice(start, end));
+        start = end;
       }
-      piece.append(...(head ? [head] : []), rest);
-      card.after(piece);
-      cards.splice(cards.indexOf(card) + 1, 0, piece);
-      pieces.push({source: card, piece});
-      return true;
+      const made = [];
+      let previous = card;
+      for (const segment of segments) {
+        const piece = card.cloneNode(false);
+        piece.classList.add("lex-detail-section-continued");
+        const rest = body.cloneNode(false);
+        rest.append(...segment);
+        let head = null;
+        if (panel && title) {
+          head = title.cloneNode(true);
+          const copy = head.querySelector(".lex-detail-panel-title");
+          if (copy) copy.textContent = `${name} (continued)`;
+          head.querySelectorAll(".lex-detail-panel-icon,.lex-detail-panel-actions,.lex-detail-panel-id,.lex-detail-panel-meta").forEach(node => node.remove());
+        } else if (title) {
+          head = element(title.tagName.toLowerCase(), {class: title.className}, `${name} (continued)`);
+        }
+        piece.append(...(head ? [head] : []), rest);
+        previous.after(piece);
+        cards.splice(cards.indexOf(previous) + 1, 0, piece);
+        // Each piece is recorded as cut from the one before it, so joining
+        // them back newest first returns every row to its place in order.
+        pieces.push({source: previous, piece});
+        made.push(piece);
+        previous = piece;
+      }
+      return made;
     };
     // A settings sub taller than the page keeps its first fields and hands
     // the rest to a continued sub on the next column, repeating both titles.
@@ -3754,7 +3785,16 @@
       // rebuilds to try every possible page size.
       cardHeights=new WeakMap();
       deal(visible);
-      for(const card of visible){
+      // A section too tall for the page is split where it stands, and its new
+      // piece - placed right after it, in the same column, at the same width -
+      // is measured next. Starting the whole pass over after every split
+      // re-dealt and re-measured every card on the page each time: one FF7R
+      // group of 168 records took 30-odd splits and froze the window for
+      // 14-26 seconds.
+      visible=[...visible];
+      let split=null;
+      for(let index=0;index<visible.length;index++){
+        const card=visible[index];
         // Integer offsetHeight rounds down fractional font and border sizes.
         // Round upward before packing a tall column so the error cannot add
         // up into an extra scroll row on later pages.
@@ -3769,8 +3809,11 @@
             :card.offsetWidth>card.parentElement.clientWidth+1?`it is ${card.offsetWidth}px wide in a ${card.parentElement.clientWidth}px column`
             :card.offsetHeight>scroll.clientHeight+1?`it is ${card.offsetHeight}px tall on a ${scroll.clientHeight}px page`:"";
           // Too tall is fixed here: the section goes on in the next column.
-          if(why&&options.splitOversized!==false&&card.offsetHeight>scroll.clientHeight+1&&card.scrollWidth<=card.clientWidth+1&&splitSection(card,scroll.clientHeight))
-            return paginate(cards.filter(entry=>!entry.hidden),true);
+          if(why&&options.splitOversized!==false&&card.offsetHeight>scroll.clientHeight+1&&card.scrollWidth<=card.clientWidth+1&&(split=splitSection(card,scroll.clientHeight))){
+            visible.splice(index+1,0,...(Array.isArray(split)?split:[pieces[pieces.length-1].piece]));
+            index--;
+            continue;
+          }
           // A failed fit must still leave every setting reachable: the page
           // falls back to one scrolling column behind the thrown guard.
           if(why){scroll.style.overflowY="auto";throw new RangeError(`Tweak cannot fit one column: ${card.querySelector('.lex-detail-panel-title,.lex-detail-section-title,h2')?.textContent||card.textContent.slice(0,80)} - ${why}`);}
