@@ -5082,7 +5082,7 @@ ${contents.path}`});
           + "an editable mod; Find a Mod opens one you already have."
           + (vanilla.path ? `\n\n${vanilla.path}` : "")
         : path.textContent;
-      const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid)).map(row => {
+      const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid && !row.noMod)).map(row => {
         const select = element("button", {
         class: `lex-project-menu-item-select${row.current && activeSource === "mine" ? " active" : ""}`,
         type: "button", role: "menuitem", title: row.path,
