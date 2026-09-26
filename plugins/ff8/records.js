@@ -234,33 +234,32 @@
       // box shown anywhere else can send a reader to the page that edits it properly.
       label:hoverable({content:row.name,targetType:"text",targetId:row.id,
         targetLabel:`text record ${row.name}`,
-        activate:()=>{state.selected.text=row.id;navigate("text")}}),help:infoHelp(`${boundary} Each group in the special-text toolbar above explains what it inserts.`),control,pin:prefs?.pinButton("value","Text")})]});
+        activate:()=>{state.selected.text=row.id;state.textTab="text";navigate("text")}}),help:infoHelp(`${boundary} Each group in the special-text toolbar above explains what it inserts.`),control,pin:prefs?.pinButton("value","Text")})]});
   }
-  function renderText(){const rows=filtered("text",["sourceLabel","section","recordId","role","value"]),columns=[{key:"sourceLabel",label:"Source",width:"95px"},{key:"sectionId",label:"Section",numeric:true,width:"70px"},{key:"recordId",label:"Record",numeric:true,width:"70px"},{key:"role",label:"Field",width:"minmax(106px,.55fr)"},{key:"value",label:"Text",grow:1}];showPaged("text",rows,columns,textDetail,"95px 70px 70px minmax(106px,.55fr) minmax(160px,1fr)")}
+  function renderTextRecords(){const rows=filtered("text",["sourceLabel","section","recordId","role","value"]),columns=[{key:"sourceLabel",label:"Source",width:"95px"},{key:"sectionId",label:"Section",numeric:true,width:"70px"},{key:"recordId",label:"Record",numeric:true,width:"70px"},{key:"role",label:"Field",width:"minmax(106px,.55fr)"},{key:"value",label:"Text",grow:1}];showPaged("text",rows,columns,textDetail,"95px 70px 70px minmax(106px,.55fr) minmax(160px,1fr)")}
 
-  // The game's own name list: the world place names and the words its text
-  // inserts. Each name is one line, and the bytes it costs in the file are
-  // shown because the list is rebuilt with 16-bit offsets when a name changes
-  // length. codex/ff8/namedic.md records the layout and its evidence.
-  function renderNames(){const rows=filtered("names",["text","id"]);
-    showPaged("names",rows,[
-      {key:"id",label:"ID"},
-      {key:"text",label:"Name",grow:1},
-      {key:"bytes",label:"Bytes",numeric:true,pinned:false}],
-      nameDetail,"70px minmax(200px,2fr) 74px",{noun:"names"})}
-  function nameDetail(row,prefs){
-    const vanilla=rowOf(state.vanilla,"names",row.id);
-    const store=value=>{row.text=value;shell.refresh()};
-    const control=el("input",{type:"text",value:row.text,disabled:state.activeSource!=="mine",
-      "aria-label":`Name ${row.id}`,oninput:event=>store(event.target.value)});
-    return sharedDetail({...row,name:`NAME ${row.id}`},prefs,[
-      detailSection({title:"NAME",help:infoHelp("One of the game's own names or inserted words, stored in main.fs as namedic.bin. The Text tab writes the messages that show it; which message uses which entry is not established, so change a name only when its wording is clear."),body:[
-        detailField({label:"TEXT",help:infoHelp("The name as the game shows it. A longer or shorter name is written by rebuilding the file's offset table, so any length works."),control}),
-        detailField({label:"STORED BYTES",help:infoHelp("Bytes this name occupies in the file, without its terminator. The whole list must stay under 65536 bytes because its offsets are 16-bit."),control:readonlyField(row.bytes)}),
-        detailField({label:"FILE",help:infoHelp("The file this name is written to. The installed game is never changed."),control:readonlyField(state.data.names.path||"")}),
-        detailField({label:"LIST",help:infoHelp("How many names the file holds and how much of its 65536-byte offset space is used."),control:readonlyField(`${state.data.names.count} names, ${state.data.names.size} of ${state.data.names.capacity} bytes`)}),
-        vanilla&&vanilla.text!==row.text?detailField({label:"VANILLA",control:readonlyField(vanilla.text)}):null]})],
-      "world-map-detail ff8-name-detail")}
+  // The Text page holds the game's text records and its own name list, one
+  // sub-tab each. A name is one line, so the list is one table edited in
+  // place rather than a list beside a panel of one field.
+  const TEXT_TABS=[
+    {id:"text",label:"Game Text",help:"Menu, kernel and executable text: item and ability descriptions, card names, draw-point messages and the rest. Select a record and edit it in the box; the special-text toolbar inserts names, colours and other game tokens."},
+    {id:"names",label:"Names",help:"The game's own name list (namedic.bin in main.fs): place names and words that its messages insert. Double-click a name to change it. Any length works, because the file's offsets are rebuilt when it is saved, but the whole list must stay under 65,536 bytes. Which message uses which entry is not established, so change a name only when its wording is clear. The installed game is never changed."}];
+  function renderText(){
+    const names=state.textTab==="names";
+    if(names)renderNames();else renderTextRecords();
+    const content=$("#main").firstElementChild,tabs=subtabBar({className:"ff8-text-tabs",tabs:TEXT_TABS,active:names?"names":"text",label:"Text pages",change:value=>{state.textTab=value;renderText()}});
+    $("#main").replaceChildren(LexeditorUI.stack(tabs,content));
+  }
+  function renderNames(){
+    const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
+    const vanilla=id=>rowOf(state.vanilla,"names",id)?.text;
+    const table=columnList({rows:state.data.names.rows,key:row=>row.id,class:"ff8-record-list ff8-name-table",fill:true,"aria-label":"FF8 names",columns:[
+      {key:"id",label:"ID",numeric:true,numberedId:true,width:"90px"},
+      {key:"text",label:"Name",grow:1,help:"The name as the game shows it. Double-click to change it; Enter keeps the change and Escape drops it.",
+        editValue:row=>row.text,edit:(row,value)=>{row.text=String(value);renderText();shell.refresh()},
+        render:row=>el("span",{class:vanilla(row.id)!==undefined&&vanilla(row.id)!==row.text?"lex-value-modified":""},el("output",{},row.text))}]});
+    $("#main").replaceChildren(detailPanel({heading:false,className:"ff8-name-panel",body:table}));
+  }
   const characterCurveOrder=["HP","STR","VIT","MAG","SPR","SPD","LUCK"];
   const characterCurveKind={HP:"hp",STR:"standard",VIT:"standard",MAG:"standard",SPR:"standard",SPD:"linear",LUCK:"linear"};
   function integerDivision(numerator,denominator){return denominator?Math.trunc(numerator/denominator):Number.NaN}
