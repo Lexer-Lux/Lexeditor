@@ -55,8 +55,10 @@ def test_missing_default_project_offers_create_not_a_phantom():
         initial = manager.snapshot("ff7")
         assert initial["current"] == str(default.resolve())
         assert initial["canCreate"]
-        current = next(row for row in initial["projects"] if row["current"])
-        assert not current["valid"]
+        # Issue 567: no mod yet opens FF7 on vanilla, so the absent folder is
+        # not listed as a (broken) mod at all.
+        assert initial["vanilla"] is True
+        assert not any(row["current"] for row in initial["projects"])
         assert not default.exists()
         # The explicit create action still produces a working project.
         (root / "mods" / "ff7").mkdir(parents=True)
