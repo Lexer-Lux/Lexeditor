@@ -60,4 +60,4 @@ function troopFields(row){
  }
  body.push(advanced);return body;
 }
-function troopEditorPanel(row){return LexeditorUI.detailPanel({title:row.name,identity:row.id,body:troopFields(row)});}
+function troopEditorPanel(row){return LexeditorUI.detailPanel({title:LexeditorUI.el("h2",{class:"lex-detail-panel-title"},bitmapText(row.name,24)),identity:row.id,body:troopFields(row)});}

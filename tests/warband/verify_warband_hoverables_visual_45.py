@@ -69,7 +69,22 @@ def main() -> int:
             assert page.locator(".lex-tree-graph-stage svg path").count() == 1
             veteran.click()
             page.wait_for_function("state.selectedUpgrade==='veteran'")
-            assert "Veteran" in page.locator(".warband-tree-detail").inner_text()
+            # The heading is drawn in the installed game's bitmap font, which has
+            # no text to read back: the glyph string carries the name as its
+            # label, and the record's own field holds it as a value.
+            heading = page.evaluate(
+                """() => {
+                    const panel = document.querySelector(".warband-tree-detail");
+                    const title = panel.querySelector(".lex-detail-panel-title");
+                    const bitmap = title.querySelector(".lex-bitmap-text");
+                    return {
+                        name: bitmap ? bitmap.getAttribute("aria-label") : title.textContent,
+                        values: [...panel.querySelectorAll("input")].map(node => node.value),
+                    };
+                }"""
+            )
+            assert heading["name"] == "Veteran", heading
+            assert "Veteran" in heading["values"], heading
 
             page.evaluate(
                 """() => {

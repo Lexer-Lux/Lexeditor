@@ -61,15 +61,28 @@ def main() -> int:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
             target = cdp.eval("""(()=>{
-              const item=state.items.rows.find(row=>row.inventoryMesh);
+              const candidates=state.items.rows.filter(row=>row.inventoryMesh).slice(0,8);
               return {fontAvailable:!!state.font?.available,
-                item:item?{id:item.id,name:item.name,key:itemRowKey(item)}:null};
+                items:candidates.map(row=>({id:row.id,name:row.name,key:itemRowKey(row)}))};
             })()""")
-            if not target["fontAvailable"] or not target["item"]:
+            if not target["fontAvailable"] or not target["items"]:
                 print("SKIPPED: installed Warband font/item preview assets are unavailable on this machine")
                 return 0
-            cdp.eval(f"state.selectedItem={target['item']['key']!r};renderItems()")
-            wait_eval(cdp, "document.querySelector('.warband-item-thumbnail img')?.naturalWidth>0", 90)
+            # The first item in the table can carry a placeholder mesh whose
+            # texture is not in the installed game, and no thumbnail can render
+            # for it. Try the mesh-bearing records until one really renders, the
+            # way a reader would.
+            for candidate in target["items"]:
+                cdp.eval(f"state.selectedItem={candidate['key']!r};renderItems()")
+                try:
+                    wait_eval(cdp, "document.querySelector('.warband-item-thumbnail img')?.naturalWidth>0", 20)
+                    target["item"] = candidate
+                    break
+                except AssertionError:
+                    continue
+            if not target.get("item"):
+                print("SKIPPED: none of the first mesh-bearing items has a renderable installed texture")
+                return 0
             cdp.eval("document.querySelector('.warband-item-detail .lex-detail-panel-icon').click()")
             wait_eval(cdp, "document.querySelector('.warband-item-detail.lex-model-preview-open')&&document.querySelectorAll('.lex-model-preview-drawer canvas').length===1&&window.__warbandPreview?.length===1", 90)
             result = cdp.eval("""(()=>{
@@ -77,13 +90,13 @@ def main() -> int:
               const icon=document.querySelector('.lex-detail-panel-icon');
               const canvases=[...document.querySelectorAll('.lex-model-preview-drawer canvas')];
               const labels=[...document.querySelectorAll('nav button')].map(button=>({
-                label:button.getAttribute('aria-label'),glyphs:button.querySelectorAll('.warband-glyph').length,
-                bitmap:!!button.querySelector('.warband-bitmap-text')
+                label:button.getAttribute('aria-label'),glyphs:button.querySelectorAll('.lex-bitmap-glyph').length,
+                bitmap:!!button.querySelector('.lex-bitmap-text')
               }));
               const rect=node=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height}};
               return {heading:rect(heading),icon:rect(icon),canvases:canvases.map(rect),labels,
-                title:document.querySelector('.lex-detail-panel-title')?.textContent,
-                id:document.querySelector('.lex-detail-panel-id')?.textContent,
+                title:document.querySelector('.lex-detail-panel-title .lex-bitmap-text')?.getAttribute('aria-label'),
+                id:document.querySelector('.warband-item-detail [data-lex-property="id"] input')?.value,
                 errors:window.__testErrors};
             })()""")
             if (result["errors"] or result["title"] != target["item"]["name"] or
