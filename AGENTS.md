@@ -8,6 +8,7 @@ work, even if your tool does not load skills on its own.
 | --- | --- |
 | file, relabel, test-plan or close a GitHub issue, or write `worklog/` | `.agents/skills/github-issues/SKILL.md` |
 | start, scope or file issues for a game plugin | `.agents/skills/add-game/SKILL.md` |
+| add, change or review help bubbles or Data Map descriptions | `.agents/skills/help-text/SKILL.md` |
 | write `codex/`, or import from a `Lexers-Mod-*` repository | `.agents/skills/knowledge/SKILL.md` |
 
 ## Editor UI
@@ -22,9 +23,8 @@ work, even if your tool does not load skills on its own.
 - Keep list and detail views consistent with the RDR2 plugin: record identity
   stays in the master list, and all editable fields stay in the selected
   record's detail pane.
-- Give editor tabs, sections, and fields shared question-mark help. Explain the
-  gameplay effect, how to use the control, and any known limits in plain
-  language. File offsets and parser details are not user instructions.
+- Give a field, section or tab a question-mark bubble only when its label and
+  control do not already say everything. Write it per the help-text skill.
 - Necessary information belongs in the question-mark help, not in a paragraph
   on the page. Counts, coverage, limits, caveats and disclaimers go into that
   panel's help bubble. A visible note is only for a state the reader must act
