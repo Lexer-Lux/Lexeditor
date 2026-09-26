@@ -349,7 +349,7 @@
       title:`Change the card's icon, currently ${row.values.Icon}`,
       "aria-label":`Card icon, currently ${row.values.Icon}`,
       onclick:()=>picker.openFor(icon)},el("span",{class:"ff9-card-icon"},String(row.values.Icon||"")));
-    card=LexeditorUI.statCard({ranks:CARD_SIDES.map(rankButton),corner:icon});
+    card=LexeditorUI.statCard({ranks:CARD_SIDES.map(rankButton),corner:icon,cornerWord:true});
     return detailPanel({className:"ff9-detail ff9-card-detail",title:row.name,
       identity:recordId(row.id),body:[
         detailSection({title:"CARD",body:[card],

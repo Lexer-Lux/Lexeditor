@@ -1590,7 +1590,10 @@
     options.image ? element("img", {src:options.image,alt:options.label || "",
       onerror:event=>{event.target.hidden=true;}}) : null,
     element("div", {class:"lex-stat-card-ranks"}, ...(options.ranks || [])),
-    options.corner ? element("div", {class:"lex-stat-card-corner"}, options.corner) : null,
+    // A game that names the card's type in a word rather than one glyph asks
+    // for a corner wide enough to hold the word.
+    options.corner ? element("div", {class:["lex-stat-card-corner", options.cornerWord ? "lex-stat-card-corner-word" : ""]
+      .filter(Boolean).join(" ")}, options.corner) : null,
     options.footer ? element("div", {class:"lex-stat-card-footer"}, options.footer) : null);
 
   const choicePopover = (options = {}) => {
