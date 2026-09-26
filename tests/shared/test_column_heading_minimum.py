@@ -12,7 +12,11 @@ def test_unitless_zero_grid_minimum_is_valid_inside_heading_math(page):
         columns:[{key:'id',label:'Record'},
           {key:'kind',label:'Item Type',help:'Fixture field help'}]
       }));
-      document.querySelector('.lex-column-list').style.width='320px';
+      document.querySelector('.lex-column-list').style.width='240px';
+    }''')
+    page.evaluate('''async()=>{
+      await document.fonts.ready;
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
     }''')
     page.wait_for_function('''()=>{
       const table=document.querySelector('.lex-column-list');

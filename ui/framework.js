@@ -7517,6 +7517,12 @@ ${contents.path}`});
     pendingHeadingFits.add(root);
   };
 
+  // A font may start loading only after the first table uses it. The ready
+  // promise taken while building that detached table can already be resolved.
+  document.fonts?.addEventListener("loadingdone", () => {
+    document.querySelectorAll(".lex-column-list").forEach(fitColumnHeadings);
+  });
+
   const columnList = options => {
     const preferredColumns = options.columnPreferences?.active?.();
     // The generic enabled column is not a user-choosable column, so it is
