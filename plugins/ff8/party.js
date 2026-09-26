@@ -104,17 +104,18 @@
   const booleanMark=value=>el("span",{class:"lex-boolean-mark lex-ui-symbol"},booleanGlyph(value));
   function flagSourceControl(field,view,rowId,options={}){
     const lookup=field.lookup,word=value=>Number(value??0);
+    const writableMask=lookup.entries.reduce((mask,entry)=>entry.readonly?mask:mask|Number(entry.mask??entry.value),0);
     const vanillaField=rowOf(state.vanilla,view,rowId)?.fields?.find(value=>value.field===field.field);
     const references=referenceValues(view,rowId,value=>value?.fields?.find(entry=>entry.field===field.field)?.value);
     const switches=toggleRow({label:field.label,leading:options.leading,value:()=>word(field.value),toggles:lookup.entries.map(entry=>{
       const bit=Number(entry.mask??entry.value);
       return {key:String(bit),label:entry.name,icon:LexeditorUI.inlineLabel(conceptIcon(lookup.name,entry.name)),
         pin:state.columnPrefs[view]?.pinButton(`flag:${field.field}:${bit}`,entry.name),
-        help:entry.description||null,checked:(word(field.value)&bit)===bit,
+        help:entry.description||null,disabled:!!field.readonly||!!entry.readonly,checked:(word(field.value)&bit)===bit,
         change:checked=>{field.value=checked?(word(field.value)|bit):(word(field.value)&~bit);noteFieldEdit(view,field)}};
     })});
     return sourceControl(switches,()=>word(field.value),vanillaField?word(vanillaField.value):undefined,
-      references,value=>{field.value=word(value)},value=>`0x${word(value).toString(16).toUpperCase()}`);
+      references,value=>{field.value=(word(field.value)&~writableMask)|(word(value)&writableMask)},value=>`0x${word(value).toString(16).toUpperCase()}`);
   }
   function hitRateSourceControl(field,view,rowId){const vanilla=rowOf(state.vanilla,view,rowId)?.fields?.find(value=>value.field===field.field)?.value,references=referenceValues(view,rowId,value=>value?.fields?.find(entry=>entry.field===field.field)?.value);// FF8 stores hit rate as a percentage, not a fraction of 255: the battle formula clamps "hit rate + LUCK/2 - EVA" to 0-100 before rolling. A weapon reading 98 is 98%, not 38.43%. Values above 100 are the always-hit range.
     const input=numberControl(field.value,0,255,1,value=>{field.value=Math.max(0,Math.min(255,Math.round(Number(value)||0)));noteFieldEdit(view,field)},{"aria-label":field.label});return sourceControl(unitField(input,"%"),()=>field.value,vanilla,references,value=>{field.value=Math.max(0,Math.min(255,Math.round(Number(value)||0)))},value=>`${formatNumber(value)}%`,{internal:true})}
@@ -131,13 +132,13 @@
     pinnedRenderPending=true;
     requestAnimationFrame(()=>{pinnedRenderPending=false;render()});
   }
-  function fieldSourceControl(field,view,rowId,options={}){if(!field)return el("span",{},"—");if(view&&field.lookup?.type==="flags")return flagSourceControl(field,view,rowId);if(view&&field.field==="hit_rate")return hitRateSourceControl(field,view,rowId);const compatibility=field.formula==="gf_compat",control=compatibility?gfCompatibilityControl(field):fieldControl(field);if(!view)return control;const vanillaField=rowOf(state.vanilla,view,rowId)?.fields?.find(value=>value.field===field.field),boolean=field.control==="boolean",read=value=>boolean?Boolean(value):value,references=referenceValues(view,rowId,value=>read(value?.fields?.find(entry=>entry.field===field.field)?.value)),format=compatibility?gfCompatibilityFormat:(boolean?booleanMark:undefined);return sourceControl(control,()=>read(field.value),read(vanillaField?.value),references,value=>field.value=boolean?Boolean(value):value,format,options)}
+  function fieldSourceControl(field,view,rowId,options={}){if(!field)return el("span",{},"—");if(field.readonly)return fieldControl(field);if(view&&field.lookup?.type==="flags")return flagSourceControl(field,view,rowId);if(view&&field.field==="hit_rate")return hitRateSourceControl(field,view,rowId);const compatibility=field.formula==="gf_compat",control=compatibility?gfCompatibilityControl(field):fieldControl(field);if(!view)return control;const vanillaField=rowOf(state.vanilla,view,rowId)?.fields?.find(value=>value.field===field.field),boolean=field.control==="boolean",read=value=>boolean?Boolean(value):value,references=referenceValues(view,rowId,value=>read(value?.fields?.find(entry=>entry.field===field.field)?.value)),format=compatibility?gfCompatibilityFormat:(boolean?booleanMark:undefined);return sourceControl(control,()=>read(field.value),read(vanillaField?.value),references,value=>field.value=boolean?Boolean(value):value,format,options)}
   const elementIcons={Fire:288,Ice:289,Thunder:290,Earth:291,Poison:292,Wind:293,Water:294,Holy:295};
   const statusIcons={Death:272,Poison:273,Petrify:274,Petrifying:274,Darkness:275,Silence:276,Berserk:277,Zombie:278,Sleep:279,Slow:280,Stop:281,Curse:282,"Curse (unused for attack)":282,Confuse:283,Confusion:283,Drain:284};
   function conceptIcon(lookup,name){const id=lookup==="element"?elementIcons[name]:statusIcons[name];return id?LexeditorUI.inlineLabel(el("img",{src:`/assets/icons/${id}.png`,alt:"",title:`${name} game icon`})):null}
-  function fieldControl(field){const lookup=field.lookup;if(field.control==="boolean")return el("input",{type:"checkbox",checked:Boolean(field.value),"aria-label":field.label,onchange:event=>{field.value=event.target.checked;shell.refresh()}});if(lookup?.type==="enum")return lookup.name==="item"?itemSelectControl(field.value,lookup.entries.map(entry=>({...entry,iconId:itemById(entry.value)?.iconId})),value=>field.value=value):selectControl(field.value,lookup.entries,value=>field.value=value);if(lookup?.type==="flags"){return LexeditorUI.toggleRow({label:field.label,value:()=>field.value,toggles:lookup.entries.map(entry=>{
+  function fieldControl(field){if(field.readonly)return readonlyField(displayFieldValue(field),{"aria-label":field.label,format:false});const lookup=field.lookup;if(field.control==="boolean")return el("input",{type:"checkbox",checked:Boolean(field.value),"aria-label":field.label,onchange:event=>{field.value=event.target.checked;shell.refresh()}});if(lookup?.type==="enum")return lookup.name==="item"?itemSelectControl(field.value,lookup.entries.map(entry=>({...entry,iconId:itemById(entry.value)?.iconId})),value=>field.value=value):selectControl(field.value,lookup.entries,value=>field.value=value);if(lookup?.type==="flags"){return LexeditorUI.toggleRow({label:field.label,value:()=>field.value,toggles:lookup.entries.map(entry=>{
     const bit=Number(entry.mask??entry.value);
-    return {label:entry.name,bit,checked:(field.value&bit)===bit,icon:conceptIcon(lookup.name,entry.name),change:checked=>{field.value=checked?(field.value|bit):(field.value&~bit);shell.refresh()}};
+    return {label:entry.name,bit,disabled:!!entry.readonly,checked:(field.value&bit)===bit,icon:conceptIcon(lookup.name,entry.name),change:checked=>{field.value=checked?(field.value|bit):(field.value&~bit);shell.refresh()}};
   })})}if(field.field==="hit_rate")return ratio255Control(field.value,value=>field.value=value,field.label);const control=numberControl(field.value,field.minimum,field.maximum,field.control==="percent"?.1:1,value=>field.value=value);return field.control==="percent"?unitField(control,"%"):control}
 
   function enemyDisplayName(name){

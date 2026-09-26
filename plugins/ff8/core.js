@@ -173,12 +173,13 @@
     const selected=entry=>String(key(entry))===String(value);
     const control=el("select",{onchange:event=>{
       const entry=entries.find(entry=>String(key(entry))===event.target.value);
+      if(entry?.readonly){control.value=String(value);return;}
       onchange(entry?key(entry):event.target.value);shell.refresh();
     }});
     const lazy=entries.length>24;
-    if(lazy)lazyOptions(control,()=>entries.map(entry=>({value:key(entry),label:entry.name})));
+    if(lazy)lazyOptions(control,()=>entries.map(entry=>({value:key(entry),label:entry.name,disabled:!!entry.readonly})));
     const shown=lazy?[entries.find(selected)??entries[0]].filter(Boolean):entries;
-    for(const entry of shown)control.append(el("option",{value:key(entry),selected:selected(entry)},entry.name));
+    for(const entry of shown)control.append(el("option",{value:key(entry),selected:selected(entry),disabled:!!entry.readonly},entry.name));
     if(entries.some(entry=>entry.abilityType)){
       let icon=abilityIcon(entries.find(selected));
       control.addEventListener("change",()=>{

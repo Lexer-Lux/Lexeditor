@@ -1244,7 +1244,7 @@
       filled = true;
       const value = control.value;
       const list = typeof entries === "function" ? entries() : entries;
-      control.replaceChildren(...list.map(entry => element("option", {value: entry.value}, entry.label)));
+      control.replaceChildren(...list.map(entry => element("option", {value: entry.value, disabled: !!entry.disabled}, entry.label)));
       control.value = value;
     };
     for (const type of ["pointerdown", "focus", "keydown"]) control.addEventListener(type, fill);
