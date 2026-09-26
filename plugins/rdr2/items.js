@@ -81,10 +81,12 @@ function renderItems() {
       ...groups.map(g => { const o = el("option", { value: g }, g || "(none)"); if (g === f.group) o.selected = true; return o; })),
     el("select", { "aria-label":"Filter items by source state", title:"Filter by acquisition evidence", onchange: ev => { f.itemSource=ev.target.value;f.itemPage=0;renderItems(); } },
       ...[["all","All source states"],["confirmed","Confirmed acquisition"],["candidate","Candidate only"],["unknown","No known source"],["model","Has model"],["no-name","No localization"]].map(([value,label])=>{const o=el("option",{value},label);if(value===f.itemSource)o.selected=true;return o;})));
-  const metadata=LexeditorUI.actionRow(savebar(saveCatalog));
   const addItem=isRO()?el("span"):newButton({title:"Create new item",onclick:createNewItem});
+  // The unsaved-change counter belongs in the toolbar with the rest of this
+  // plugin's save controls. In the pagination bar it pushed the filters onto a
+  // second row inside a bar that has room for one.
   tb.append(LexeditorUI.subtabBar({tabs:ITEM_SECTIONS,active:f.itemSection,
-    change:id=>{f.itemSection=id;f.itemPage=0;renderItems();}}));
+    change:id=>{f.itemSection=id;f.itemPage=0;renderItems();}}),savebar(saveCatalog));
 
   const q = f.q.trim().toUpperCase();
   let rows = state.catalog.items.filter(it =>
@@ -102,7 +104,7 @@ function renderItems() {
     rows,key:it=>it.key,slots:false,page:f.itemPage,pageSize:f.itemPageSize,selected:f.itemSel,noun:"items",
     splitKey:"rdr2-items",defaultSplit:44,
     search:{key:"rdr2-items",value:f.q,placeholder:"Search items… (e.g. TONIC, PROVISION_)",label:"Search items",change:value=>{f.q=value;f.itemPage=0;renderItems();}},
-    filters:[addItem,metadata,filters],
+    filters:[addItem,filters],
     className:"lootsplit",
     master:({rows,selected,select})=>columnList({rows,key:it=>it.key,selected,select,
       columns:[
@@ -574,8 +576,9 @@ function itemRow(it) {
     `Container item. One purchase opens into ${bundleInfo.min} × ${localizedValue(bundleInfo.targetItem?.nameKey)||bundleInfo.target}. The container's price controls the shop purchase; the contained item's carry cap controls usable bait capacity.`:
     containerInfo.length?`Contained item produced by ${containerInfo.map(bundle=>localizedValue(state.catalog.items.find(x=>x.key===Object.keys(PURCHASE_CONTAINERS).find(key=>PURCHASE_CONTAINERS[key].target===it.key))?.nameKey)||bundle.container).join(", ")}. Its own price does not control that container purchase; its carry cap controls the usable bait stack.`:"";
   const texture=(it.textures||[]).find(t=>t.dict==="INVENTORY_ITEMS"&&t.type==="INVENTORY")||(it.textures||[])[0];
-  const nameReference=it.nameKey&&state.localization?.vanilla?.[it.nameKey]&&state.localization.vanilla[it.nameKey]!==localizedValue(it.nameKey)
-    ?el("div",{class:"name-ref"},refStack([["V","vtag",state.localization.vanilla[it.nameKey]]],localizedValue(it.nameKey),(value,ev)=>{const inp=ev.currentTarget.closest(".item-identity")?.querySelector("input.localized-name");if(inp){inp.value=value;inp.dispatchEvent(new Event("change"));}},String)):"";
+  const referenceName=it.nameKey?localizedReference(it.nameKey):undefined;
+  const nameReference=referenceName!==undefined&&referenceName!==localizedValue(it.nameKey)
+    ?el("div",{class:"name-ref"},refStack([["V","vtag",referenceName]],localizedValue(it.nameKey),(value,ev)=>{const inp=ev.currentTarget.closest(".item-identity")?.querySelector("input.localized-name");if(inp){inp.value=value;inp.dispatchEvent(new Event("change"));}},String)):"";
   const identityMain=el("div",{class:"item-identity-main"},
       el("div",{class:"name-line"},
         relationshipTitle?el("span",{class:"special-info",title:relationshipTitle},"⚠"):"",
@@ -622,7 +625,7 @@ function itemDetailPane(it, cells){
   const identityIcon=identity?.querySelector("[data-inventory-icon]");
   const identityMain=identity?.querySelector(".item-identity-main");
   const input=identityMain?.querySelector("input.localized-name")||localizationInput(it.nameKey);
-  const vanilla=state.localization?.vanilla?.[it.nameKey];
+  const vanilla=localizedReference(it.nameKey);
   const name=refField(input,vanilla===undefined?[]:[["V","vtag",vanilla]],input.value,
     value=>{input.value=value;input.dispatchEvent(new Event("change"));},String);
   const body=LexeditorUI.stack({fill:false});
@@ -995,6 +998,6 @@ function itemDescriptionCell(it){
     const originalChange=editor.onchange;
     editor.onchange=ev=>{ev.target.value=sanitizeItemDescription(ev.target.value);originalChange(ev);};
   }
-  const vanilla=state.localization?.vanilla?.[it.descriptionKey||key];
-  return el("div", {class:"desc-cell"}, refField(editor, [["V","vtag",vanilla]], localizedValue(key), v=>applyToControl(editor,v), String));
+  const vanilla=localizedReference(it.descriptionKey||key);
+  return el("div", {class:"desc-cell"}, refField(editor, vanilla===undefined?[]:[["V","vtag",vanilla]], localizedValue(key), v=>applyToControl(editor,v), String));
 }
