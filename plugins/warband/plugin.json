@@ -1,0 +1,46 @@
+{
+  "id": "warband",
+  "name": "Mount & Blade: Warband",
+  "accent": "#7a2020",
+  "installation": {
+    "rootEnv": "LEXEDITOR_WARBAND_ROOT",
+    "requiredPaths": [
+      "mb_warband.exe",
+      "Modules"
+    ],
+    "executable": "mb_warband.exe",
+    "steamAppId": "48700",
+    "installDirNames": [
+      "MountBlade Warband",
+      "Mount & Blade Warband"
+    ],
+    "defaultRoots": [
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\MountBlade Warband"
+    ]
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_MOD_PROJECT",
+    "requiredPaths": [
+      "ModuleSystem/module_items.py",
+      "settings.ini",
+      "build.bat"
+    ],
+    "requiredAny": [
+      [
+        "ModuleSystem/module_items.py",
+        "settings.ini",
+        "build.bat"
+      ],
+      [
+        "module.ini"
+      ]
+    ]
+  },
+  "loadingQuotes": [
+    "probably the first time in history a turkish warband was well-received by Europe",
+    "Did you know this game was originally about fighting zombies and stuff? I'm serious, take a look at the files.",
+    "If you haven't accelerated a warhammer into a peasant levy's head at 200km/h on a warhorse then you haven't properly lived.",
+    "Took them 12 years to create a sequel and it was somehow still mid. Major blackpill?",
+    "\"Give me ten thousand Swadian Knights and I will conquer the world\" ~ Boyar MacArthur"
+  ]
+}

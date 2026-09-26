@@ -9,6 +9,7 @@ import urllib.request
 from pathlib import Path
 
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession, request_json
 
 from . import memoria_manager, paths
@@ -122,45 +123,16 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="ff9",
-    name="Final Fantasy 9",
-    process_names=("FF9.exe", "FF9_Launcher.exe"),
-    helper_name="Memoria",
-    # Root-aware hooks only: plugin_api validation rejects declaring both
-    # install shapes, and the host installs through the located game
-    # folder, never the import-time default.
+    **plugin_defaults(__file__),
+    helper_name='Memoria',
     helper_upstream=memoria_manager.upstream_release,
     helper_status_for_root=lambda root: memoria_manager.status(root or paths.GAME_ROOT),
     helper_install_for_root=lambda root: memoria_manager.install(root),
     helper_pinned=memoria_manager.PINNED_RELEASE,
-    accent="#6e54b5",
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=FF9Session,
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_FF9_PROJECT",
-        default_root=paths.PROJECT_ROOT,
-        required_paths=("StreamingAssets/Data",),
-        template_root=paths.PROJECT_TEMPLATE_ROOT,
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_FF9_ROOT",
-        data_env="LEXEDITOR_FF9_DATA_ROOT",
-        required_paths=("FF9_Launcher.exe", "x64/FF9.exe", "StreamingAssets/p0data2.bin"),
-        # #73: use Memoria's existing settings UI on every Play, rather than
-        # recreating it in Lexeditor or bypassing it with the game executable.
-        # The launcher sits at the root; the renderer is the 64-bit build
-        # under x64, and that is where a wrapper has to be - which is why the
-        # executable below is the one under x64 and not the launcher.
-        reshade_renderer="dxgi",
-        launch_path="FF9_Launcher.exe",
-        executable="x64/FF9.exe",
-        steam_app_id="377840",
-        install_dir_names=("FINAL FANTASY IX",),
-        default_roots=(
-            Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY IX"),
-            Path(r"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY IX"),
-        ),
-    ),
+    projects=project_spec(__file__, default_root=paths.PROJECT_ROOT),
+    installation=install_spec(__file__),
 )

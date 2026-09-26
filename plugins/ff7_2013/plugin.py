@@ -11,6 +11,7 @@ from pathlib import Path
 
 from core.mod_library import default_user_library_root
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession, request_json
 from plugins.ff7.plugin import prepare_product, kernel_save_payload
 from plugins.ff7.plugin import PLUGIN as SHARED_PLUGIN
@@ -160,31 +161,12 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="ff7-2013",
-    name="Final Fantasy 7 (Original)",
-    accent="#3155b7",
+    **plugin_defaults(__file__),
     cover_art=None,
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=FF7LegacySession,
-    process_names=("ff7_en.exe", "ff7.exe", "FF7_Launcher.exe"),
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_FF7_2013_PROJECT",
-        default_root=DEFAULT_PROJECT,
-        required_paths=(PROJECT_KERNEL_PATH.as_posix(),),
-        template_root=PROJECT_TEMPLATE,
-        content_types=SHARED_PLUGIN.projects.content_types,
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_FF7_2013_ROOT",
-        data_env="LEXEDITOR_FF7_2013_DATA_ROOT",
-        required_paths=("ff7_en.exe", "data/lang-en/kernel/KERNEL.BIN"),
-        executable="ff7_en.exe",
-        steam_app_id="39140",
-        install_dir_names=("FINAL FANTASY VII",),
-        default_roots=(DEFAULT_ROOT, Path(r"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VII")),
-        launch_path="ff7_en.exe",
-        prepare=prepare,
-    ),
+    projects=project_spec(__file__, default_root=DEFAULT_PROJECT, template_root=PROJECT_TEMPLATE),
+    installation=install_spec(__file__, prepare=prepare),
 )

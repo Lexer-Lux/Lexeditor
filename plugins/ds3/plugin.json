@@ -1,0 +1,41 @@
+{
+  "id": "ds3",
+  "name": "Dark Souls III",
+  "accent": "#a4824c",
+  "processNames": [
+    "DarkSoulsIII.exe"
+  ],
+  "canLaunch": false,
+  "installation": {
+    "rootEnv": "LEXEDITOR_DS3_ROOT",
+    "requiredPaths": [
+      "Game/DarkSoulsIII.exe",
+      "Game/Data0.bdt"
+    ],
+    "executable": "Game/DarkSoulsIII.exe",
+    "steamAppId": "374320",
+    "installDirNames": [
+      "DARK SOULS III"
+    ],
+    "defaultRoots": [
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\DARK SOULS III",
+      "C:\\Program Files\\Steam\\steamapps\\common\\DARK SOULS III"
+    ],
+    "launchPath": "Game/DarkSoulsIII.exe"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_DS3_PROJECT",
+    "requiredPaths": [
+      ".lexeditor-ds3-project"
+    ],
+    "contentTypes": [
+      [
+        "Regulation archive",
+        [
+          ".bdt"
+        ]
+      ]
+    ],
+    "templateRoot": "project-template"
+  }
+}

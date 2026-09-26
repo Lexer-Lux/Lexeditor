@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession
 
 from .formats import DS3FormatError, TARGET_TABLES, load_schema
@@ -64,32 +65,10 @@ def launch() -> int:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="ds3",
-    name="Dark Souls III",
-    accent="#a4824c",
+    **plugin_defaults(__file__),
     check=check,
     launch=launch,
     session_factory=DS3Session,
-    process_names=("DarkSoulsIII.exe",),
-    can_launch=False,
-    mods_load=False,
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_DS3_PROJECT",
-        default_root=DEFAULT_PROJECT,
-        required_paths=(".lexeditor-ds3-project",),
-        template_root=PROJECT_TEMPLATE,
-        content_types=(("Regulation archive", (".bdt",)),),
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_DS3_ROOT",
-        required_paths=("Game/DarkSoulsIII.exe", "Game/Data0.bdt"),
-        executable="Game/DarkSoulsIII.exe",
-        steam_app_id="374320",
-        install_dir_names=("DARK SOULS III",),
-        default_roots=(
-            Path(r"C:\Program Files (x86)\Steam\steamapps\common\DARK SOULS III"),
-            Path(r"C:\Program Files\Steam\steamapps\common\DARK SOULS III"),
-        ),
-        launch_path="Game/DarkSoulsIII.exe",
-    ),
+    projects=project_spec(__file__, default_root=DEFAULT_PROJECT),
+    installation=install_spec(__file__),
 )

@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.runtime_bootstrap import user_data_dir
 from core.service_session import project_session, request_json
 
@@ -315,27 +316,11 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="palworld",
-    name=DISPLAY_NAME,
-    accent="#55c7d9",
+    **plugin_defaults(__file__),
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=PalworldSession,
-    process_names=("Palworld.exe", "Palworld-Win64-Shipping.exe"),
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_PALWORLD_PROJECT",
-        default_root=DEFAULT_PROJECT,
-        required_paths=("Info.json",),
-        template_root=PLUGIN_ROOT / "template",
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_PALWORLD_ROOT",
-        required_paths=("Palworld.exe", "Pal/Content/Paks"),
-        executable="Palworld.exe",
-        steam_app_id="1623730",
-        install_dir_names=("Palworld",),
-        default_roots=(Path(r"C:\Program Files (x86)\Steam\steamapps\common\Palworld"),),
-        launch_path="Palworld.exe",
-    ),
+    projects=project_spec(__file__, default_root=DEFAULT_PROJECT),
+    installation=install_spec(__file__),
 )

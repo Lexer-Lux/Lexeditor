@@ -20,6 +20,7 @@ from core.game_installation import GameInstallationManager
 from core.game_version import game_version
 from core.github_integration import GitHubIntegration
 from core.plugin_api import GamePlugin, GitHubRepository, PluginSession
+from core.plugin_manifest import loading_quotes as plugin_quotes
 from core.project_manager import ProjectManager
 from core import process_probe
 from core.settings_manager import SettingsStore
@@ -103,6 +104,16 @@ def _budget_counts(module_name: str, root: Path | None = None) -> dict:
     return {}
 
 
+def _shared_loading_lines() -> list[str]:
+    """The lines that are not about any one game, from the shared file."""
+    try:
+        payload = json.loads(LOADING_QUOTES.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return []
+    lines = payload.get("global", []) if isinstance(payload, dict) else []
+    return [line for line in lines if isinstance(line, str)] if isinstance(lines, list) else []
+
+
 def choose_loading_quote(payload: dict, plugin_id: str, global_rarity: float,
                          chooser=random.choices, used: set[str] | None = None):
     """Choose one game line with down-weighted shared lines.
@@ -116,21 +127,10 @@ def choose_loading_quote(payload: dict, plugin_id: str, global_rarity: float,
             return []
         return list(dict.fromkeys(line.strip() for line in source if isinstance(line, str) and line.strip()))
 
-    # A plugin can borrow another plugin's section, so a game and its remaster
-    # share one pool instead of duplicating every line: "shares" maps a plugin
-    # id to the sections it draws from as well as its own. Borrowed lines are
-    # GAME lines, not global ones - they carry full weight - and a line present
-    # in both sections is only offered once.
-    shares = payload.get("shares", {}) if isinstance(payload, dict) else {}
-    borrowed = shares.get(plugin_id, []) if isinstance(shares, dict) else []
+    # A game's lines arrive already merged: a game that borrows another's says
+    # so in its own metadata (`loadingQuotes`), rather than this function
+    # reading a second table to find out.
     game_lines = clean_lines(plugin_id)
-    if isinstance(borrowed, list):
-        seen = set(game_lines)
-        for section in borrowed:
-            for line in clean_lines(str(section)):
-                if line not in seen:
-                    seen.add(line)
-                    game_lines.append(line)
     global_lines = clean_lines("global")
     try:
         rarity = float(global_rarity)
@@ -431,47 +431,25 @@ class HostApi:
 
     def loading_quote_counts(self) -> dict:
         """How many loading lines each plugin owns, plus the shared pool."""
-        root = Path(__file__).resolve().parents[1]
-        try:
-            shared = json.loads((root / "ui" / "loading_quotes.json").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            shared = {}
-        shared_lines = shared.get("global", []) if isinstance(shared, dict) else []
-        counts = {}
-        games_dir = root / "plugins"
-        try:
-            names = sorted(path.name for path in games_dir.iterdir()
-                           if path.is_dir() and not path.name.startswith(("_", ".")))
-        except OSError:
-            names = []
-        for name in names:
-            try:
-                own = json.loads((games_dir / name / "loading_quotes.json").read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                own = None
-            counts[name] = len(own) if isinstance(own, list) else 0
-        return {"global": len(shared_lines) if isinstance(shared_lines, list) else 0,
-                "plugins": counts}
+        shared = _shared_loading_lines()
+        # A game's lines live in that game's own metadata file, so adding a
+        # plugin does not mean editing a shared list, and the count is read
+        # from the same place the line is chosen from.
+        counts = {plugin_id: len(plugin_quotes(plugin_id))
+                  for plugin_id in sorted(self._plugins)}
+        return {"global": len(shared), "plugins": counts}
     def loading_quote(self, plugin_id: str) -> dict:
         """Choose one editable game or down-weighted global line."""
         if plugin_id != "__home__" and plugin_id not in self._plugins:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
-        # Global and shared lines stay in one file; a game's own lines live with
-        # its plugin, so adding a plugin does not mean editing a shared list.
-        try:
-            payload = json.loads(LOADING_QUOTES.read_text(encoding="utf-8"))
-        except (OSError, ValueError, TypeError):
-            payload = {}
-        if not isinstance(payload, dict):
-            payload = {}
+        # The shared file keeps only the lines that are not about any one game.
+        # A game's own lines come from its metadata, which is also where a game
+        # says it draws on another's lines (ff7-2013 borrows FF7's).
+        payload: dict = {"global": _shared_loading_lines()}
         if plugin_id != "__home__":
-            try:
-                own = json.loads((ROOT / "plugins" / plugin_id / "loading_quotes.json")
-                                 .read_text(encoding="utf-8"))
-            except (OSError, ValueError, TypeError):
-                own = None
-            if isinstance(own, list):
-                payload = {**payload, plugin_id: own}
+            own = plugin_quotes(plugin_id)
+            if own:
+                payload[plugin_id] = own
         rarity = self._settings.snapshot().get("globalMessageRarity", 3.0)
         return {
             "pluginId": plugin_id,

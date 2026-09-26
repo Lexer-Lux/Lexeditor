@@ -1,0 +1,52 @@
+{
+  "id": "factorio",
+  "name": "Factorio",
+  "accent": "#e69b36",
+  "processNames": [
+    "factorio.exe"
+  ],
+  "installation": {
+    "rootEnv": "FACTORIO_GAME_ROOT",
+    "requiredPaths": [
+      "bin/x64/factorio.exe",
+      "data/base/info.json",
+      "data/core"
+    ],
+    "executable": "bin/x64/factorio.exe",
+    "steamAppId": "427520",
+    "installDirNames": [
+      "Factorio"
+    ],
+    "defaultRoots": [
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Factorio",
+      "C:\\Program Files\\Factorio"
+    ],
+    "launchPath": "bin/x64/factorio.exe"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_FACTORIO_PROJECT",
+    "requiredPaths": [
+      "factorio-project.json"
+    ],
+    "contentTypes": [
+      [
+        "Project data",
+        [
+          ".json"
+        ]
+      ],
+      [
+        "Generated mods",
+        [
+          ".zip"
+        ]
+      ]
+    ],
+    "templateRoot": "template"
+  },
+  "loadingQuotes": [
+    "The factory must grow.",
+    "Indexing prototype tables…",
+    "Keeping the source mods pristine…"
+  ]
+}

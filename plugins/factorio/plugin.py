@@ -11,6 +11,7 @@ import urllib.request
 import zipfile
 
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession
 
 
@@ -159,34 +160,11 @@ def launch() -> int:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="factorio",
-    name="Factorio",
-    accent="#e69b36",
+    **plugin_defaults(__file__),
     check=check,
     launch=launch,
     session_factory=FactorioSession,
     smoke=smoke,
-    process_names=("factorio.exe",),
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_FACTORIO_PROJECT",
-        default_root=DEFAULT_PROJECT,
-        required_paths=("factorio-project.json",),
-        template_root=PLUGIN_ROOT / "template",
-        content_types=(
-            ("Project data", (".json",)),
-            ("Generated mods", (".zip",)),
-        ),
-    ),
-    installation=GameInstallSpec(
-        root_env="FACTORIO_GAME_ROOT",
-        required_paths=("bin/x64/factorio.exe", "data/base/info.json", "data/core"),
-        executable="bin/x64/factorio.exe",
-        steam_app_id="427520",
-        install_dir_names=("Factorio",),
-        default_roots=(
-            Path(r"C:\Program Files (x86)\Steam\steamapps\common\Factorio"),
-            Path(r"C:\Program Files\Factorio"),
-        ),
-        launch_path="bin/x64/factorio.exe",
-    ),
+    projects=project_spec(__file__, default_root=DEFAULT_PROJECT),
+    installation=install_spec(__file__),
 )

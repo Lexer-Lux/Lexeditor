@@ -1,0 +1,36 @@
+{
+  "id": "bannerlord",
+  "name": "Mount & Blade II: Bannerlord",
+  "accent": "#8d2f25",
+  "processNames": [
+    "Bannerlord.exe"
+  ],
+  "installation": {
+    "rootEnv": "LEXEDITOR_BANNERLORD_ROOT",
+    "requiredPaths": [
+      "bin/Win64_Shipping_Client/Bannerlord.exe",
+      "Modules"
+    ],
+    "executable": "bin/Win64_Shipping_Client/Bannerlord.exe",
+    "steamAppId": "261550",
+    "installDirNames": [
+      "Mount & Blade II Bannerlord"
+    ],
+    "defaultRoots": [
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Mount & Blade II Bannerlord"
+    ],
+    "launchPath": "bin/Win64_Shipping_Client/Bannerlord.exe"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_BANNERLORD_PROJECT",
+    "requiredPaths": [
+      "SubModule.xml"
+    ],
+    "requiredAny": [
+      [
+        "SubModule.xml"
+      ]
+    ],
+    "templateRoot": "template"
+  }
+}

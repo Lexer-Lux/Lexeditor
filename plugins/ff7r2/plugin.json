@@ -1,0 +1,38 @@
+{
+  "id": "ff7r2",
+  "name": "Final Fantasy VII Rebirth",
+  "accent": "#3f7fd0",
+  "canLaunch": false,
+  "installation": {
+    "rootEnv": "LEXEDITOR_FF7R2_ROOT",
+    "requiredPaths": [
+      "End/Binaries/Win64/ff7rebirth_.exe",
+      "End/Content/Paks"
+    ],
+    "executable": "End/Binaries/Win64/ff7rebirth_.exe",
+    "steamAppId": "2909400",
+    "installDirNames": [
+      "FINAL FANTASY VII REBIRTH"
+    ],
+    "defaultRoots": [
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\FINAL FANTASY VII REBIRTH"
+    ],
+    "launchPath": "End/Binaries/Win64/ff7rebirth_.exe",
+    "reshadeRenderer": "dxgi"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_FF7R2_PROJECT",
+    "requiredPaths": [
+      "lexeditor-project.json"
+    ],
+    "contentTypes": [
+      [
+        "Rebirth DataObjects",
+        [
+          ".uasset"
+        ]
+      ]
+    ],
+    "templateRoot": "project_template"
+  }
+}

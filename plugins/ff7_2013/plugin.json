@@ -1,0 +1,74 @@
+{
+  "id": "ff7-2013",
+  "name": "Final Fantasy 7 (Original)",
+  "accent": "#3155b7",
+  "processNames": [
+    "ff7_en.exe",
+    "ff7.exe",
+    "FF7_Launcher.exe"
+  ],
+  "installation": {
+    "rootEnv": "LEXEDITOR_FF7_2013_ROOT",
+    "requiredPaths": [
+      "ff7_en.exe",
+      "data/lang-en/kernel/KERNEL.BIN"
+    ],
+    "executable": "ff7_en.exe",
+    "steamAppId": "39140",
+    "installDirNames": [
+      "FINAL FANTASY VII"
+    ],
+    "defaultRoots": [
+      "D:\\SteamLibrary\\steamapps\\common\\FINAL FANTASY VII",
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\FINAL FANTASY VII"
+    ],
+    "dataEnv": "LEXEDITOR_FF7_2013_DATA_ROOT",
+    "launchPath": "ff7_en.exe"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_FF7_2013_PROJECT",
+    "requiredPaths": [
+      "data/lang-en/kernel/KERNEL.BIN"
+    ],
+    "contentTypes": [
+      [
+        "Kernel data",
+        [
+          ".bin"
+        ]
+      ],
+      [
+        "Field and world data",
+        [
+          ".lgp",
+          ".flevel",
+          ".tex"
+        ]
+      ],
+      [
+        "Textures",
+        [
+          ".png",
+          ".dds"
+        ]
+      ],
+      [
+        "Audio",
+        [
+          ".ogg",
+          ".wav"
+        ]
+      ],
+      [
+        "Executable text",
+        [
+          ".exe"
+        ]
+      ]
+    ]
+  },
+  "loadingQuotes": [
+    "I can't believe Square gave us cloud saving in the remaster. They should have given us Aerith saving instead.",
+    "Is this the one where Gordon Ramsay is the protagonist?"
+  ]
+}

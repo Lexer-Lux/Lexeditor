@@ -1,0 +1,37 @@
+{
+  "id": "ffx-x2",
+  "name": "Final Fantasy X/X-2 HD Remaster",
+  "accent": "#5f8fd3",
+  "processNames": [
+    "FFX.exe",
+    "FFX-2.exe",
+    "FFX&X-2_LAUNCHER.exe"
+  ],
+  "installation": {
+    "rootEnv": "LEXEDITOR_FFX_X2_ROOT",
+    "requiredPaths": [
+      "FFX&X-2_LAUNCHER.exe",
+      "FFX.exe",
+      "FFX-2.exe",
+      "data/FFX_Data.vbf",
+      "data/FFX2_Data.vbf"
+    ],
+    "executable": "FFX.exe",
+    "steamAppId": "359870",
+    "installDirNames": [
+      "FINAL FANTASY FFX&FFX-2 HD Remaster"
+    ],
+    "defaultRoots": [
+      "D:\\SteamLibrary\\steamapps\\common\\FINAL FANTASY FFX&FFX-2 HD Remaster",
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\FINAL FANTASY FFX&FFX-2 HD Remaster"
+    ],
+    "launchPath": "FFX&X-2_LAUNCHER.exe"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_FFX_X2_PROJECT",
+    "requiredPaths": [
+      "efl"
+    ],
+    "templateRoot": "project-template"
+  }
+}

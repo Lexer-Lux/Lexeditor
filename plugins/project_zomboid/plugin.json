@@ -1,0 +1,39 @@
+{
+  "id": "project-zomboid",
+  "name": "Project Zomboid",
+  "accent": "#708057",
+  "processNames": [
+    "ProjectZomboid64.exe"
+  ],
+  "installation": {
+    "rootEnv": "LEXEDITOR_PROJECT_ZOMBOID_ROOT",
+    "requiredPaths": [
+      "ProjectZomboid64.exe",
+      "media/scripts",
+      "media/scripts/generated"
+    ],
+    "executable": "ProjectZomboid64.exe",
+    "steamAppId": "108600",
+    "installDirNames": [
+      "ProjectZomboid",
+      "Project Zomboid"
+    ],
+    "defaultRoots": [
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\ProjectZomboid"
+    ],
+    "launchPath": "ProjectZomboid64.exe"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_PROJECT_ZOMBOID_PROJECT",
+    "requiredPaths": [],
+    "requiredAny": [
+      [
+        "42/mod.info"
+      ],
+      [
+        "common/mod.info"
+      ]
+    ],
+    "templateRoot": "template"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "chrono-trigger",
+  "name": "Chrono Trigger",
+  "accent": "#d3a348",
+  "processNames": [
+    "Chrono Trigger.exe"
+  ],
+  "installation": {
+    "rootEnv": "LEXEDITOR_CHRONO_TRIGGER_ROOT",
+    "requiredPaths": [
+      "Chrono Trigger.exe",
+      "resources.bin"
+    ],
+    "executable": "Chrono Trigger.exe",
+    "steamAppId": "613830",
+    "installDirNames": [
+      "Chrono Trigger"
+    ],
+    "defaultRoots": [
+      "D:\\SteamLibrary\\steamapps\\common\\Chrono Trigger",
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Chrono Trigger"
+    ],
+    "launchPath": "Chrono Trigger.exe"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_CHRONO_TRIGGER_PROJECT",
+    "requiredPaths": [
+      "lexeditor-chrono-trigger.json"
+    ],
+    "contentTypes": [
+      [
+        "Steam resource overrides",
+        [
+          ".txt",
+          ".dat",
+          ".bin",
+          ".bmp",
+          ".png"
+        ]
+      ]
+    ],
+    "templateRoot": "project_template"
+  }
+}

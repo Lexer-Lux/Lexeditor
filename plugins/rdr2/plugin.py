@@ -13,6 +13,7 @@ import urllib.request
 from pathlib import Path
 
 from core.plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProjectSpec, PluginFont
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import project_session, request_json
 from .extractor import ensure_rdr2_data
 from .paths import EDITABLE_MOD_ROOT, LEXEDITOR_ROOT, PLUGIN_ROOT, PROJECT_ROOT, check as check_paths
@@ -107,63 +108,13 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="rdr2",
-    name="Red Dead Redemption II",
-    accent="#a92b20",
+    **plugin_defaults(__file__),
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=Rdr2Session,
-    github=GitHubRepository(
-        full_name="Lexer-Lux/rdr2-overhaul",
-        authorized_logins=("Lexer-Lux",),
-    ),
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_MOD_ROOT",
-        default_root=EDITABLE_MOD_ROOT,
-        required_paths=("install.xml",),
-        template_root=EDITABLE_MOD_ROOT,
-        content_types=(
-            ("Metadata", (".ymt", ".xml", ".meta")),
-            ("Archives", (".rpf",)),
-            ("Textures", (".ytd", ".dds", ".png")),
-            ("Models", (".ydr", ".yft", ".ydd")),
-            ("Scripts", (".asi", ".lua", ".dll")),
-        ),
-    ),
-    installation=GameInstallSpec(
-        root_env="RDR2_GAME_ROOT",
-        data_env="LEXEDITOR_RDR2_EXTRACT_ROOT",
-        required_paths=(
-            "RDR2.exe", "common_0.rpf", "update_1.rpf", "update_3.rpf", "update_4.rpf",
-        ),
-        executable="RDR2.exe",
-        steam_app_id="1174180",
-        install_dir_names=("Red Dead Redemption 2",),
-        default_roots=(Path(
-            r"C:\Program Files (x86)\Steam\steamapps\common\Red Dead Redemption 2"
-        ),),
-        prepare=ensure_rdr2_data,
-        prepare_on_scan=True,
-    ),
-    fonts=(
-        PluginFont(
-            font_id="redemption",
-            name="Redemption",
-            destination=PLUGIN_ROOT / "assets" / "fonts" / "Redemption.woff",
-            source_url="https://media-rockstargames-com.akamaized.net/mfe6/prod/__common/fonts/d83fe1be4c1e7239c409db49a3850103.woff",
-            sha256="a2e7903be5ebbad46801787c5dcb5964603ea4123aca0543786ae640c412fc3e",
-            file_format="woff",
-            alternatives=(PLUGIN_ROOT / "assets" / "fonts" / "Redemption.ttf",),
-        ),
-        PluginFont(
-            font_id="rdr-lino",
-            name="RDR Lino",
-            destination=PLUGIN_ROOT / "assets" / "fonts" / "RDRLino-Regular.rockstar.woff2",
-            source_url="https://media-rockstargames-com.akamaized.net/mfe6/prod/__common/fonts/593253ebb2f8260c4005859f87ed4ca3.woff2",
-            sha256="70ee112972cd7687782551044f872b10b1b787879dcb56b531c5e8977493fc08",
-            file_format="woff2",
-            alternatives=(PLUGIN_ROOT / "assets" / "fonts" / "RDRLino-Regular.woff2",),
-        ),
-    ),
+    github=GitHubRepository(full_name='Lexer-Lux/rdr2-overhaul', authorized_logins=('Lexer-Lux',)),
+    projects=project_spec(__file__, default_root=EDITABLE_MOD_ROOT, template_root=EDITABLE_MOD_ROOT),
+    installation=install_spec(__file__, prepare=ensure_rdr2_data),
+    fonts=(PluginFont(font_id='redemption', name='Redemption', destination=PLUGIN_ROOT / 'assets' / 'fonts' / 'Redemption.woff', source_url='https://media-rockstargames-com.akamaized.net/mfe6/prod/__common/fonts/d83fe1be4c1e7239c409db49a3850103.woff', sha256='a2e7903be5ebbad46801787c5dcb5964603ea4123aca0543786ae640c412fc3e', file_format='woff', alternatives=(PLUGIN_ROOT / 'assets' / 'fonts' / 'Redemption.ttf',)), PluginFont(font_id='rdr-lino', name='RDR Lino', destination=PLUGIN_ROOT / 'assets' / 'fonts' / 'RDRLino-Regular.rockstar.woff2', source_url='https://media-rockstargames-com.akamaized.net/mfe6/prod/__common/fonts/593253ebb2f8260c4005859f87ed4ca3.woff2', sha256='70ee112972cd7687782551044f872b10b1b787879dcb56b531c5e8977493fc08', file_format='woff2', alternatives=(PLUGIN_ROOT / 'assets' / 'fonts' / 'RDRLino-Regular.woff2',))),
 )

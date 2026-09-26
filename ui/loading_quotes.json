@@ -1,29 +1,21 @@
 {
-  "global": [
-    "Listen to Blocked & Reported!",
-    "Subscribe to Tor's Cabinet of Curiosities!",
-    "This program was made possible by @thsottiaux and his wonderful reset button.",
-    "Big Rigs plugin when?",
-    "There is no Undertale plugin because it doesn't need modding. It's already perfect.",
-    "Follow me on Twitter @LexerLux where I tweet regularly, against the best interests of both myself and society as a whole",
-    "1. Find a problem in a game.\n 2. Edit it out using this program.\n 3. Share your mod online so everyone can enjoy it. \n 4. Marvel in the joys of modern society.",
-    "i met a bisexual hamster in the mission district who asked me if i had chinese food. then he bit me",
-    "Data centers are good, actually.",
-    "Use Pangram! It's great!",
-    "All of these lines were written by Sweet Baby, Inc. if you don't like it, complain to them.",
-    "Call your d\u00e9put\u00e9 and tell him to #BanRDrama!",
-    "There is a sculpture honoring Muhammad at the US Supreme Court building. Pretty sure you're not supposed to do that, but I appreciate the gesture nonetheless.",
-    "Listen to Will Wood!",
-    "Listen to System of a Down!",
-    "Abolish zoning!",
-    "Land value tax now!"
-  ],
-  "shares": {
-    "ff7_2013": [
-      "ff7"
-    ],
-    "ff8_remastered": [
-      "ff8"
-    ]
-  }
+ "global": [
+  "Listen to Blocked & Reported!",
+  "Subscribe to Tor's Cabinet of Curiosities!",
+  "This program was made possible by @thsottiaux and his wonderful reset button.",
+  "Big Rigs plugin when?",
+  "There is no Undertale plugin because it doesn't need modding. It's already perfect.",
+  "Follow me on Twitter @LexerLux where I tweet regularly, against the best interests of both myself and society as a whole",
+  "1. Find a problem in a game.\n 2. Edit it out using this program.\n 3. Share your mod online so everyone can enjoy it. \n 4. Marvel in the joys of modern society.",
+  "i met a bisexual hamster in the mission district who asked me if i had chinese food. then he bit me",
+  "Data centers are good, actually.",
+  "Use Pangram! It's great!",
+  "All of these lines were written by Sweet Baby, Inc. if you don't like it, complain to them.",
+  "Call your député and tell him to #BanRDrama!",
+  "There is a sculpture honoring Muhammad at the US Supreme Court building. Pretty sure you're not supposed to do that, but I appreciate the gesture nonetheless.",
+  "Listen to Will Wood!",
+  "Listen to System of a Down!",
+  "Abolish zoning!",
+  "Land value tax now!"
+ ]
 }

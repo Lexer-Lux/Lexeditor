@@ -1,0 +1,30 @@
+{
+  "id": "terraria",
+  "name": "Terraria",
+  "accent": "#77b255",
+  "installation": {
+    "rootEnv": "LEXEDITOR_TERRARIA_ROOT",
+    "requiredPaths": [
+      "start-tModLoader.bat",
+      "tModLoader.dll",
+      "LaunchUtils"
+    ],
+    "executable": "dotnet/dotnet.exe",
+    "steamAppId": "1281930",
+    "installDirNames": [
+      "tModLoader"
+    ],
+    "defaultRoots": [
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\tModLoader"
+    ],
+    "launchPath": "start-tModLoader.bat",
+    "artAppId": "105600"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_TERRARIA_PROJECT",
+    "requiredPaths": [
+      "build.txt"
+    ],
+    "templateRoot": "template"
+  }
+}

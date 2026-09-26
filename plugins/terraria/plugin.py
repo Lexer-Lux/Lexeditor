@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession
 from .runtime import inspect_runtime
 
@@ -199,29 +200,11 @@ def launch() -> int:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="terraria",
-    name="Terraria",
-    accent="#77b255",
+    **plugin_defaults(__file__),
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=TerrariaSession,
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_TERRARIA_PROJECT",
-        default_root=DEFAULT_PROJECT_ROOT,
-        required_paths=("build.txt",),
-        template_root=TEMPLATE_ROOT,
-        initialize=initialize_project,
-        discover=discover_projects,
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_TERRARIA_ROOT",
-        required_paths=("start-tModLoader.bat", "tModLoader.dll", "LaunchUtils"),
-        executable="dotnet/dotnet.exe",
-        steam_app_id="1281930",
-        art_app_id="105600",
-        install_dir_names=("tModLoader",),
-        default_roots=(Path(r"C:\Program Files (x86)\Steam\steamapps\common\tModLoader"),),
-        launch_path="start-tModLoader.bat",
-    ),
+    projects=project_spec(__file__, default_root=DEFAULT_PROJECT_ROOT, initialize=initialize_project, discover=discover_projects),
+    installation=install_spec(__file__),
 )

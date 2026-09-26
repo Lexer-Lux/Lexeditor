@@ -1,0 +1,34 @@
+{
+  "id": "stardew-valley",
+  "name": "Stardew Valley",
+  "accent": "#6cae43",
+  "processNames": [
+    "Stardew Valley.exe",
+    "StardewModdingAPI.exe"
+  ],
+  "installation": {
+    "rootEnv": "LEXEDITOR_STARDEW_ROOT",
+    "requiredPaths": [
+      "Stardew Valley.exe",
+      "Content"
+    ],
+    "executable": "Stardew Valley.exe",
+    "steamAppId": "413150",
+    "installDirNames": [
+      "Stardew Valley"
+    ],
+    "defaultRoots": [
+      "D:\\SteamLibrary\\steamapps\\common\\Stardew Valley",
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Stardew Valley"
+    ],
+    "launchPath": "StardewModdingAPI.exe"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_STARDEW_PROJECT",
+    "requiredPaths": [
+      "manifest.json",
+      "content.json"
+    ],
+    "templateRoot": "project_template"
+  }
+}

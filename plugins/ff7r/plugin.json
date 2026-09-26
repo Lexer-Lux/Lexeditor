@@ -1,0 +1,81 @@
+{
+  "id": "ff7r",
+  "name": "FINAL FANTASY VII REMAKE INTERGRADE",
+  "accent": "#1d6fb8",
+  "processNames": [
+    "ff7remake_.exe"
+  ],
+  "canLaunch": false,
+  "installation": {
+    "rootEnv": "LEXEDITOR_FF7R_ROOT",
+    "requiredPaths": [
+      "End/Binaries/Win64/ff7remake_.exe",
+      "End/Content/Paks"
+    ],
+    "executable": "End/Binaries/Win64/ff7remake_.exe",
+    "steamAppId": "1462040",
+    "installDirNames": [
+      "FINAL FANTASY VII REMAKE",
+      "FFVIIRemakeIntergrade"
+    ],
+    "defaultRoots": [
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\FINAL FANTASY VII REMAKE",
+      "C:\\Program Files\\Epic Games\\FFVIIRemakeIntergrade"
+    ],
+    "dataEnv": "LEXEDITOR_FF7R_DATA_ROOT",
+    "launchPath": "End/Binaries/Win64/ff7remake_.exe",
+    "reshadeRenderer": "dxgi"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_FF7R_PROJECT",
+    "requiredPaths": [],
+    "requiredAny": [
+      [
+        "mod.json"
+      ],
+      [
+        "content"
+      ]
+    ],
+    "contentTypes": [
+      [
+        "DataObject tables",
+        [
+          ".uasset",
+          ".uexp"
+        ]
+      ],
+      [
+        "Packaged archives",
+        [
+          ".pak",
+          ".ucas",
+          ".utoc"
+        ]
+      ],
+      [
+        "Textures",
+        [
+          ".ubulk",
+          ".dds",
+          ".png"
+        ]
+      ],
+      [
+        "Audio",
+        [
+          ".bnk",
+          ".wem"
+        ]
+      ],
+      [
+        "ReShade presets",
+        [
+          ".ini",
+          ".fx"
+        ]
+      ]
+    ],
+    "templateRoot": "_no_project_template"
+  }
+}

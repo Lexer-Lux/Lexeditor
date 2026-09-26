@@ -11,6 +11,7 @@ import urllib.request
 from pathlib import Path
 
 from core.plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProjectSpec, PluginFont
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import project_session, request_json
 from .extractor import ensure_rdr_data
 from .paths import LEXEDITOR_ROOT, MOD_ROOT, PLUGIN_ROOT, PROJECT_ROOT, RDR2_FONT_ROOT, check as check_paths
@@ -295,54 +296,13 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="rdr",
-    name="Red Dead Redemption",
-    accent="#a92b20",
+    **plugin_defaults(__file__),
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=RdrSession,
-    github=GitHubRepository(
-        full_name="Lexer-Lux/Lexers-Mod-For-RDR",
-        authorized_logins=("Lexer-Lux",),
-    ),
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_RDR_MOD_ROOT",
-        default_root=MOD_ROOT,
-        required_paths=(),
-        template_root=MOD_ROOT,
-    ),
-    installation=GameInstallSpec(
-        root_env="RDR_GAME_ROOT",
-        data_env="LEXEDITOR_RDR_EXTRACT_ROOT",
-        required_paths=("RDR.exe", "game/tune_d11generic.rpf", "game/content.rpf", "game/mapres.rpf"),
-        executable="RDR.exe",
-        steam_app_id="2668510",
-        install_dir_names=("Red Dead Redemption",),
-        default_roots=(
-            Path(r"C:\Program Files (x86)\Steam\steamapps\common\Red Dead Redemption"),
-            Path(r"D:\SteamLibrary\steamapps\common\Red Dead Redemption"),
-        ),
-        prepare=ensure_rdr_data,
-    ),
-    fonts=(
-        PluginFont(
-            font_id="redemption",
-            name="Redemption",
-            destination=PLUGIN_ROOT / "assets" / "fonts" / "Redemption.woff",
-            source_url="https://media-rockstargames-com.akamaized.net/mfe6/prod/__common/fonts/d83fe1be4c1e7239c409db49a3850103.woff",
-            sha256="a2e7903be5ebbad46801787c5dcb5964603ea4123aca0543786ae640c412fc3e",
-            file_format="woff",
-            alternatives=(RDR2_FONT_ROOT / "Redemption.ttf",),
-        ),
-        PluginFont(
-            font_id="rdr-lino",
-            name="RDR Lino",
-            destination=PLUGIN_ROOT / "assets" / "fonts" / "RDRLino-Regular.rockstar.woff2",
-            source_url="https://media-rockstargames-com.akamaized.net/mfe6/prod/__common/fonts/593253ebb2f8260c4005859f87ed4ca3.woff2",
-            sha256="70ee112972cd7687782551044f872b10b1b787879dcb56b531c5e8977493fc08",
-            file_format="woff2",
-            alternatives=(RDR2_FONT_ROOT / "RDRLino-Regular.woff2",),
-        ),
-    ),
+    github=GitHubRepository(full_name='Lexer-Lux/Lexers-Mod-For-RDR', authorized_logins=('Lexer-Lux',)),
+    projects=project_spec(__file__, default_root=MOD_ROOT, template_root=MOD_ROOT),
+    installation=install_spec(__file__, prepare=ensure_rdr_data),
+    fonts=(PluginFont(font_id='redemption', name='Redemption', destination=PLUGIN_ROOT / 'assets' / 'fonts' / 'Redemption.woff', source_url='https://media-rockstargames-com.akamaized.net/mfe6/prod/__common/fonts/d83fe1be4c1e7239c409db49a3850103.woff', sha256='a2e7903be5ebbad46801787c5dcb5964603ea4123aca0543786ae640c412fc3e', file_format='woff', alternatives=(RDR2_FONT_ROOT / 'Redemption.ttf',)), PluginFont(font_id='rdr-lino', name='RDR Lino', destination=PLUGIN_ROOT / 'assets' / 'fonts' / 'RDRLino-Regular.rockstar.woff2', source_url='https://media-rockstargames-com.akamaized.net/mfe6/prod/__common/fonts/593253ebb2f8260c4005859f87ed4ca3.woff2', sha256='70ee112972cd7687782551044f872b10b1b787879dcb56b531c5e8977493fc08', file_format='woff2', alternatives=(RDR2_FONT_ROOT / 'RDRLino-Regular.woff2',))),
 )

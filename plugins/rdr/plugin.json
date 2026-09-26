@@ -1,0 +1,35 @@
+{
+  "id": "rdr",
+  "name": "Red Dead Redemption",
+  "accent": "#a92b20",
+  "installation": {
+    "rootEnv": "RDR_GAME_ROOT",
+    "requiredPaths": [
+      "RDR.exe",
+      "game/tune_d11generic.rpf",
+      "game/content.rpf",
+      "game/mapres.rpf"
+    ],
+    "executable": "RDR.exe",
+    "steamAppId": "2668510",
+    "installDirNames": [
+      "Red Dead Redemption"
+    ],
+    "defaultRoots": [
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Red Dead Redemption",
+      "D:\\SteamLibrary\\steamapps\\common\\Red Dead Redemption"
+    ],
+    "dataEnv": "LEXEDITOR_RDR_EXTRACT_ROOT"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_RDR_MOD_ROOT",
+    "requiredPaths": []
+  },
+  "loadingQuotes": [
+    "Billion-dollar idea: RDR spinoff set in the modern day. Who's working on this?",
+    "i saw a movie about gay cowboys once",
+    "i love rdr1 so much. god i wish mexico was real",
+    "i'm eating a bowl of mexican beef rn and it's really really tasty. thank u mexico",
+    "just replayed undead nightmare. bad news: it's mid."
+  ]
+}

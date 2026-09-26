@@ -1,5 +1,4 @@
 """Real FF9 HTTP handler with isolated runtime/data fixtures, not game acceptance."""
-import ast
 from http.client import HTTPConnection
 import importlib.util
 import json
@@ -170,12 +169,15 @@ def test_dashboard_and_plugin_choose_launcher_for_play(service):
     _, dashboard = request(service, "/api/dashboard", method="GET")
     expected = service[0].paths.GAME_ROOT / "FF9_Launcher.exe"
     assert Path(dashboard["game"]["executable"]) == expected
-    source = (Path(__file__).parents[2] / "plugins/ff9/plugin.py").read_text(encoding="utf-8")
-    specs = [node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Call)
-             and isinstance(node.func, ast.Name) and node.func.id == "GameInstallSpec"]
-    assert len(specs) == 1
-    values = {entry.arg: entry.value for entry in specs[0].keywords}
-    assert ast.literal_eval(values["launch_path"]) == "FF9_Launcher.exe"
+    # The launcher and the renderer are stated in the plugin's metadata file
+    # now, not in a call inside plugin.py. Play starts the launcher, and the
+    # renderer is the executable ReShade goes beside.
+    import json
+
+    manifest = json.loads((Path(__file__).parents[2] / "plugins/ff9/plugin.json")
+                          .read_text(encoding="utf-8"))["installation"]
+    assert manifest["launchPath"] == "FF9_Launcher.exe"
+    assert manifest["executable"] == "x64/FF9.exe"
 
 
 def test_data_map_reports_external_launcher_not_an_embedded_ini_editor(service):

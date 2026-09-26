@@ -9,6 +9,7 @@ import urllib.request
 from pathlib import Path
 
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession, request_json
 
 from . import paths
@@ -179,42 +180,12 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="ff7",
-    name=DISPLAY_NAME,
-    accent="#3155b7",
-    cover_art=LEXEDITOR_ROOT / "assets" / "covers" / "ff7-remaster.png",
+    **plugin_defaults(__file__),
+    cover_art=LEXEDITOR_ROOT / 'assets' / 'covers' / 'ff7-remaster.png',
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=FF7Session,
-    process_names=("FFVII_LAUNCHER.exe", "FFVII.exe", "ff7.exe", "ff7_en.exe", "ff7_en"),
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_FF7_PROJECT",
-        default_root=paths.PROJECT_ROOT,
-        required_paths=(paths.PROJECT_KERNEL_PATH.as_posix(),),
-        template_root=paths.PROJECT_TEMPLATE_ROOT,
-        content_types=(
-            ("Kernel data", (".bin",)),
-            ("Field and world data", (".lgp", ".flevel", ".tex")),
-            ("Textures", (".png", ".dds")),
-            ("Audio", (".ogg", ".wav")),
-            ("Executable text", (".exe",)),
-        ),
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_FF7_ROOT",
-        data_env="LEXEDITOR_FF7_DATA_ROOT",
-        required_paths=(
-            "FFVII_LAUNCHER.exe",
-            "ff7/workingdir/data/lang-en/kernel/kernel.bin",
-        ),
-        executable="FFVII.exe",
-        steam_app_id="3837340",
-        install_dir_names=("FINAL FANTASY VII Steam Edition",),
-        default_roots=(
-            Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VII Steam Edition"),
-            Path(r"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VII Steam Edition"),
-        ),
-        prepare=prepare,
-    ),
+    projects=project_spec(__file__, default_root=paths.PROJECT_ROOT, template_root=paths.PROJECT_TEMPLATE_ROOT),
+    installation=install_spec(__file__, prepare=prepare),
 )

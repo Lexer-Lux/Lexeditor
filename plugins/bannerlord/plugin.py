@@ -8,6 +8,7 @@ import tempfile
 import urllib.request
 
 from core.plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession, request_json
 
 from . import paths
@@ -116,40 +117,13 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="bannerlord",
-    name="Mount & Blade II: Bannerlord",
-    accent="#8d2f25",
+    **plugin_defaults(__file__),
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=BannerlordSession,
     game_process_factory=BannerlordGameController,
-    github=GitHubRepository(
-        full_name="Lexer-Lux/Lexers-Mod-For-Bannerlord",
-        authorized_logins=("Lexer-Lux",),
-    ),
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_BANNERLORD_PROJECT",
-        default_root=paths.DEFAULT_PROJECT_ROOT,
-        required_paths=("SubModule.xml",),
-        required_any=(("SubModule.xml",),),
-        discover=paths.installed_modules,
-        template_root=paths.PLUGIN_ROOT / "template",
-        initialize=initialize_project,
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_BANNERLORD_ROOT",
-        required_paths=(
-            "bin/Win64_Shipping_Client/Bannerlord.exe",
-            "Modules",
-        ),
-        executable="bin/Win64_Shipping_Client/Bannerlord.exe",
-        steam_app_id="261550",
-        install_dir_names=("Mount & Blade II Bannerlord",),
-        default_roots=(Path(
-            r"C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord"
-        ),),
-        launch_path="bin/Win64_Shipping_Client/Bannerlord.exe",
-    ),
-    process_names=("Bannerlord.exe",),
+    github=GitHubRepository(full_name='Lexer-Lux/Lexers-Mod-For-Bannerlord', authorized_logins=('Lexer-Lux',)),
+    projects=project_spec(__file__, default_root=paths.DEFAULT_PROJECT_ROOT, initialize=initialize_project, discover=paths.installed_modules),
+    installation=install_spec(__file__),
 )

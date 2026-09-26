@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.runtime_bootstrap import user_data_dir
 from core.service_session import project_session, request_json
 
@@ -251,53 +252,18 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
+    **plugin_defaults(__file__),
     mod_adapter=PakModAdapter(),
-    managed_mod=ManagedModSpec("Lexer-Lux/Lexers-Mod-For-FF7R-1", "Lexers-Mod-FF7R-1.zip"),
-    plugin_id="ff7r",
-    name=DISPLAY_NAME,
-    # Remake runs through Steam; Lexeditor only stops a copy that is running.
-    can_launch=False,
-    accent="#1d6fb8",
+    managed_mod=ManagedModSpec('Lexer-Lux/Lexers-Mod-For-FF7R-1', 'Lexers-Mod-FF7R-1.zip'),
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=FF7RSession,
-    process_names=("ff7remake_.exe",),
-    helper_name="repak",
+    helper_name='repak',
     helper_status=helper_status,
     helper_install=helper_install,
     helper_pinned=REPAK_TAG,
     helper_upstream=upstream_release,
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_FF7R_PROJECT",
-        default_root=DEFAULT_PROJECT,
-        required_paths=(),
-        required_any=(("mod.json",), ("content",)),
-        template_root=PLUGIN_ROOT / "_no_project_template",
-        content_types=(
-            ("DataObject tables", (".uasset", ".uexp")),
-            ("Packaged archives", (".pak", ".ucas", ".utoc")),
-            ("Textures", (".ubulk", ".dds", ".png")),
-            ("Audio", (".bnk", ".wem")),
-            ("ReShade presets", (".ini", ".fx")),
-        ),
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_FF7R_ROOT",
-        data_env="LEXEDITOR_FF7R_DATA_ROOT",
-        required_paths=(
-            "End/Binaries/Win64/ff7remake_.exe",
-            "End/Content/Paks",
-        ),
-        executable="End/Binaries/Win64/ff7remake_.exe",
-        steam_app_id="1462040",
-        install_dir_names=("FINAL FANTASY VII REMAKE", "FFVIIRemakeIntergrade"),
-        default_roots=(
-            Path(r"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VII REMAKE"),
-            Path(r"C:\Program Files\Epic Games\FFVIIRemakeIntergrade"),
-        ),
-        # ReShade loads from beside the renderer, not the installation root.
-        reshade_renderer="dxgi",
-        launch_path="End/Binaries/Win64/ff7remake_.exe",
-    ),
+    projects=project_spec(__file__, default_root=DEFAULT_PROJECT),
+    installation=install_spec(__file__),
 )

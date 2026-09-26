@@ -11,6 +11,7 @@ from pathlib import Path
 import zlib
 
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession, request_json
 
 from . import item_shops, paths, treasures
@@ -313,34 +314,11 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="ffx-x2",
-    name="Final Fantasy X/X-2 HD Remaster",
-    process_names=("FFX.exe", "FFX-2.exe", "FFX&X-2_LAUNCHER.exe"),
-    accent="#5f8fd3",
+    **plugin_defaults(__file__),
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=FFXX2Session,
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_FFX_X2_PROJECT",
-        default_root=paths.PROJECT_ROOT,
-        required_paths=("efl",),
-        template_root=paths.PLUGIN_ROOT / "project-template",
-        initialize=_initialize_project,
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_FFX_X2_ROOT",
-        required_paths=(
-            "FFX&X-2_LAUNCHER.exe", "FFX.exe", "FFX-2.exe",
-            "data/FFX_Data.vbf", "data/FFX2_Data.vbf",
-        ),
-        launch_path="FFX&X-2_LAUNCHER.exe",
-        executable="FFX.exe",
-        steam_app_id="359870",
-        install_dir_names=("FINAL FANTASY FFX&FFX-2 HD Remaster",),
-        default_roots=(
-            Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster"),
-            Path(r"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster"),
-        ),
-    ),
+    projects=project_spec(__file__, default_root=paths.PROJECT_ROOT, initialize=_initialize_project),
+    installation=install_spec(__file__),
 )

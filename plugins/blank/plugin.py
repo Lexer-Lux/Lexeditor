@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from core.plugin_api import GamePlugin
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession
 
 
@@ -27,11 +28,9 @@ def launch() -> int:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="blank",
-    name="Blank Game",
-    accent="#68717e",
+    **plugin_defaults(__file__),
     check=check,
     launch=launch,
     session_factory=BlankSession,
-    cover_art=ROOT / "ui" / "assets" / "blank-game-cover.png",
+    cover_art=ROOT / 'ui' / 'assets' / 'blank-game-cover.png',
 )

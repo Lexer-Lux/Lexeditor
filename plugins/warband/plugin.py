@@ -10,6 +10,7 @@ import urllib.parse
 from pathlib import Path
 
 from core.plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession, request_json
 
 from . import paths, wse2_manager
@@ -130,45 +131,18 @@ def installed_modules() -> list[Path]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="warband",
+    **plugin_defaults(__file__),
     game_process_factory=WarbandGameController,
-    helper_name="WSE2",
+    helper_name='WSE2',
     helper_pinned=wse2_manager.PINNED_RELEASE,
     helper_status_for_root=wse2_manager.status,
     helper_install_for_root=wse2_manager.install,
     helper_upstream=wse2_manager.upstream_release,
-    name="Mount & Blade: Warband",
-    accent="#7a2020",
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=WarbandSession,
-    github=GitHubRepository(
-        full_name="Lexer-Lux/LexersModForWarband",
-        authorized_logins=("Lexer-Lux",),
-    ),
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_MOD_PROJECT",
-        default_root=Path(paths.MOD_PROJECT),
-        required_paths=("ModuleSystem/module_items.py", "settings.ini", "build.bat"),
-        # Two editable shapes: a Module System source project, or any module
-        # installed in the game. module.ini is what makes a folder a module.
-        required_any=(
-            ("ModuleSystem/module_items.py", "settings.ini", "build.bat"),
-            ("module.ini",),
-        ),
-        prepare_existing=prepare_existing_project,
-        discover=installed_modules,
-        template_root=Path(paths.MOD_PROJECT),
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_WARBAND_ROOT",
-        required_paths=("mb_warband.exe", "Modules"),
-        executable="mb_warband.exe",
-        steam_app_id="48700",
-        install_dir_names=("MountBlade Warband", "Mount & Blade Warband"),
-        default_roots=(Path(
-            r"C:\Program Files (x86)\Steam\steamapps\common\MountBlade Warband"
-        ),),
-    ),
+    github=GitHubRepository(full_name='Lexer-Lux/LexersModForWarband', authorized_logins=('Lexer-Lux',)),
+    projects=project_spec(__file__, default_root=Path(paths.MOD_PROJECT), discover=installed_modules, prepare_existing=prepare_existing_project, template_root=Path(paths.MOD_PROJECT)),
+    installation=install_spec(__file__),
 )

@@ -1,0 +1,36 @@
+{
+  "id": "ff9",
+  "name": "Final Fantasy 9",
+  "accent": "#6e54b5",
+  "processNames": [
+    "FF9.exe",
+    "FF9_Launcher.exe"
+  ],
+  "installation": {
+    "rootEnv": "LEXEDITOR_FF9_ROOT",
+    "requiredPaths": [
+      "FF9_Launcher.exe",
+      "x64/FF9.exe",
+      "StreamingAssets/p0data2.bin"
+    ],
+    "executable": "x64/FF9.exe",
+    "steamAppId": "377840",
+    "installDirNames": [
+      "FINAL FANTASY IX"
+    ],
+    "defaultRoots": [
+      "D:\\SteamLibrary\\steamapps\\common\\FINAL FANTASY IX",
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\FINAL FANTASY IX"
+    ],
+    "dataEnv": "LEXEDITOR_FF9_DATA_ROOT",
+    "launchPath": "FF9_Launcher.exe",
+    "reshadeRenderer": "dxgi"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_FF9_PROJECT",
+    "requiredPaths": [
+      "StreamingAssets/Data"
+    ],
+    "templateRoot": "project_template"
+  }
+}

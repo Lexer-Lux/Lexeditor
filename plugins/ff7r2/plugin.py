@@ -16,6 +16,7 @@ from pathlib import Path
 import tempfile
 
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from plugins.ff7r2 import shader_injector
 from core.service_session import LocalPluginSession, request_json
 
@@ -81,43 +82,17 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="ff7r2",
-    name="Final Fantasy VII Rebirth",
-    accent="#3f7fd0",
+    **plugin_defaults(__file__),
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=Ff7r2Session,
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_FF7R2_PROJECT",
-        default_root=DEFAULT_PROJECT,
-        required_paths=("lexeditor-project.json",),
-        template_root=PROJECT_TEMPLATE,
-        content_types=(("Rebirth DataObjects", (".uasset",)),),
-    ),
-    # Shader Injector is this game's bundled helper: installed during first-time
-    # setup, listed in the Updates drawer, never updated by itself. The one
-    # setup step it can ask for is purging a shader cache older than itself.
-    helper_name="Shader Injector",
+    projects=project_spec(__file__, default_root=DEFAULT_PROJECT),
+    helper_name='Shader Injector',
     helper_pinned=shader_injector.VERSION,
     helper_status_for_root=shader_injector.helper_status,
     helper_install_for_root=shader_injector.helper_install,
     helper_upstream=shader_injector.upstream_release,
-    helper_actions={"clear_shader_cache": shader_injector.clear_cache_action},
-    # Rebirth runs through Steam; Lexeditor only stops a copy that is running.
-    can_launch=False,
-    # Gameplay edits are project overlays; the installed game remains source-only.
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_FF7R2_ROOT",
-        required_paths=(EXECUTABLE, "End/Content/Paks"),
-        executable="End/Binaries/Win64/ff7rebirth_.exe",
-        steam_app_id="2909400",
-        install_dir_names=("FINAL FANTASY VII REBIRTH",),
-        default_roots=(
-            Path(r"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VII REBIRTH"),
-        ),
-        # ReShade loads from beside the renderer, not the installation root.
-        reshade_renderer=RENDERER,
-        launch_path=EXECUTABLE,
-    ),
+    helper_actions={'clear_shader_cache': shader_injector.clear_cache_action},
+    installation=install_spec(__file__),
 )

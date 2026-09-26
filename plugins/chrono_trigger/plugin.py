@@ -9,6 +9,7 @@ import zipfile
 from pathlib import Path
 
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession, request_json
 
 from . import paths
@@ -385,34 +386,12 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="chrono-trigger",
-    name="Chrono Trigger",
-    accent="#d3a348",
+    **plugin_defaults(__file__),
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=ChronoTriggerSession,
-    process_names=("Chrono Trigger.exe",),
     mod_adapter=ChronoCtpAdapter(),
-    mods_load=False,
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_CHRONO_TRIGGER_PROJECT",
-        default_root=paths.PROJECT_ROOT,
-        required_paths=(PROJECT_MARKER,),
-        template_root=ROOT / "plugins" / "chrono_trigger" / "project_template",
-        initialize=initialize_project,
-        content_types=(("Steam resource overrides", (".txt", ".dat", ".bin", ".bmp", ".png")),),
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_CHRONO_TRIGGER_ROOT",
-        required_paths=("Chrono Trigger.exe", "resources.bin"),
-        launch_path="Chrono Trigger.exe",
-        executable="Chrono Trigger.exe",
-        steam_app_id="613830",
-        install_dir_names=("Chrono Trigger",),
-        default_roots=(
-            Path(r"D:\SteamLibrary\steamapps\common\Chrono Trigger"),
-            Path(r"C:\Program Files (x86)\Steam\steamapps\common\Chrono Trigger"),
-        ),
-    ),
+    projects=project_spec(__file__, default_root=paths.PROJECT_ROOT, initialize=initialize_project),
+    installation=install_spec(__file__),
 )

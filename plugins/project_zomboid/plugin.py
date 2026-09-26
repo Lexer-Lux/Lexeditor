@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession, request_json
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -278,20 +279,11 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="project-zomboid", name="Project Zomboid",
-    accent="#708057", check=check, launch=launch, smoke=smoke,
-    session_factory=ProjectZomboidSession, process_names=("ProjectZomboid64.exe",),
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_PROJECT_ZOMBOID_PROJECT", default_root=DEFAULT_PROJECT_ROOT,
-        required_any=(("42/mod.info",), ("common/mod.info",)), template_root=TEMPLATE_ROOT,
-        initialize=initialize_project, discover=discover_projects,
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_PROJECT_ZOMBOID_ROOT",
-        required_paths=("ProjectZomboid64.exe", "media/scripts", "media/scripts/generated"),
-        executable="ProjectZomboid64.exe",
-        steam_app_id="108600", install_dir_names=("ProjectZomboid", "Project Zomboid"),
-        default_roots=(Path(r"C:\Program Files (x86)\Steam\steamapps\common\ProjectZomboid"),),
-        launch_path="ProjectZomboid64.exe",
-    ),
+    **plugin_defaults(__file__),
+    check=check,
+    launch=launch,
+    smoke=smoke,
+    session_factory=ProjectZomboidSession,
+    projects=project_spec(__file__, default_root=DEFAULT_PROJECT_ROOT, initialize=initialize_project, discover=discover_projects),
+    installation=install_spec(__file__),
 )

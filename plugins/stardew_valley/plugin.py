@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession, request_json
 
 from . import paths
@@ -105,33 +106,11 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="stardew-valley",
-    name="Stardew Valley",
-    accent="#6cae43",
+    **plugin_defaults(__file__),
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=StardewValleySession,
-    process_names=("Stardew Valley.exe", "StardewModdingAPI.exe"),
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_STARDEW_PROJECT",
-        default_root=paths.DEFAULT_PROJECT_ROOT,
-        required_paths=("manifest.json", "content.json"),
-        template_root=paths.PROJECT_TEMPLATE_ROOT,
-        initialize=initialize_project,
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_STARDEW_ROOT",
-        required_paths=("Stardew Valley.exe", "Content"),
-        executable="Stardew Valley.exe",
-        steam_app_id="413150",
-        install_dir_names=("Stardew Valley",),
-        default_roots=(
-            Path(r"D:\SteamLibrary\steamapps\common\Stardew Valley"),
-            Path(r"C:\Program Files (x86)\Steam\steamapps\common\Stardew Valley"),
-        ),
-        # A deployed Content Patcher pack only loads through SMAPI. If SMAPI is
-        # absent, Play fails visibly instead of silently launching unmodded Stardew.
-        launch_path="StardewModdingAPI.exe",
-    ),
+    projects=project_spec(__file__, default_root=paths.DEFAULT_PROJECT_ROOT, initialize=initialize_project),
+    installation=install_spec(__file__),
 )

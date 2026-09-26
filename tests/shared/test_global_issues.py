@@ -22,8 +22,11 @@ from core.plugin_api import GamePlugin, validate_plugin
 class Quotes(unittest.TestCase):
     def test_shipped_json_is_valid_and_every_pool_contains_text(self):
         data=json.loads((ROOT/'ui/loading_quotes.json').read_text('utf-8-sig'))
+        # The shared file holds only the lines that are about no game in
+        # particular. A game's own lines are in its metadata file now, so a
+        # section named after a plugin here could only be a leftover.
+        self.assertEqual(list(data), ['global'], list(data))
         for key,rows in data.items():
-            if key=='shares': continue
             self.assertIsInstance(rows,list,key)
             self.assertTrue(all(isinstance(s,str) and s.strip() for s in rows),key)
         used=set()
@@ -32,16 +35,24 @@ class Quotes(unittest.TestCase):
         b=choose_loading_quote(data,'ff8',3,first,used)
         self.assertNotEqual(a,b)
         self.assertNotIn(a,['Loading editor…',EXHAUSTED_QUOTE])
+        # The lines a game shows come from its own metadata, including any it
+        # borrows from another game.
+        from core.plugin_manifest import loading_quotes
+        self.assertTrue(loading_quotes('ff8'))
+        self.assertEqual(loading_quotes('ff7-2013'), loading_quotes('ff7'))
     def test_missing_and_exhausted_are_different(self):
         self.assertEqual(choose_loading_quote({},'ff8',3,used=set()),'Loading editor…')
         self.assertEqual(choose_loading_quote({'ff8':['A']},'ff8',3,used={'A'}),EXHAUSTED_QUOTE)
-    def test_alias_dedup_types_and_finite_rarity(self):
+    def test_dedup_types_and_finite_rarity(self):
         chooser=Mock(return_value=['A'])
-        data={'a':['A',' A ',None,42], 'b':['B'], 'shares':{'a':['b']},'global':['G']}
+        # A game's lines arrive already merged from its metadata, so this is
+        # the cleaning and weighting step: text only, no repeats, and the
+        # global pool down-weighted by the rarity setting.
+        data={'a':['A',' A ',None,42],'global':['G']}
         choose_loading_quote(data,'a',float('nan'),chooser)
         args,kw=chooser.call_args
-        self.assertEqual(args[0],['A','B','G'])
-        self.assertEqual(kw['weights'],[1,1,1/3])
+        self.assertEqual(args[0],['A','G'])
+        self.assertEqual(kw['weights'],[1,1/3])
     def test_broken_pool_is_not_text_coerced(self):
         self.assertEqual(choose_loading_quote({'ff8':'Wrong shape'},'ff8',3,used=set()),'Loading editor…')
 

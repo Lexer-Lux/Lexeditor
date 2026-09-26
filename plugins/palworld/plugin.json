@@ -1,0 +1,32 @@
+{
+  "id": "palworld",
+  "name": "Palworld",
+  "accent": "#55c7d9",
+  "processNames": [
+    "Palworld.exe",
+    "Palworld-Win64-Shipping.exe"
+  ],
+  "installation": {
+    "rootEnv": "LEXEDITOR_PALWORLD_ROOT",
+    "requiredPaths": [
+      "Palworld.exe",
+      "Pal/Content/Paks"
+    ],
+    "executable": "Palworld.exe",
+    "steamAppId": "1623730",
+    "installDirNames": [
+      "Palworld"
+    ],
+    "defaultRoots": [
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Palworld"
+    ],
+    "launchPath": "Palworld.exe"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_PALWORLD_PROJECT",
+    "requiredPaths": [
+      "Info.json"
+    ],
+    "templateRoot": "template"
+  }
+}

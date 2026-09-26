@@ -1,0 +1,75 @@
+{
+  "id": "ff7",
+  "name": "Final Fantasy 7 (Completely Pointless 2026 Re-Release That Really Should Have Just Been A Patch)",
+  "accent": "#3155b7",
+  "processNames": [
+    "FFVII_LAUNCHER.exe",
+    "FFVII.exe",
+    "ff7.exe",
+    "ff7_en.exe",
+    "ff7_en"
+  ],
+  "installation": {
+    "rootEnv": "LEXEDITOR_FF7_ROOT",
+    "requiredPaths": [
+      "FFVII_LAUNCHER.exe",
+      "ff7/workingdir/data/lang-en/kernel/kernel.bin"
+    ],
+    "executable": "FFVII.exe",
+    "steamAppId": "3837340",
+    "installDirNames": [
+      "FINAL FANTASY VII Steam Edition"
+    ],
+    "defaultRoots": [
+      "D:\\SteamLibrary\\steamapps\\common\\FINAL FANTASY VII Steam Edition",
+      "C:\\Program Files (x86)\\Steam\\steamapps\\common\\FINAL FANTASY VII Steam Edition"
+    ],
+    "dataEnv": "LEXEDITOR_FF7_DATA_ROOT"
+  },
+  "projects": {
+    "rootEnv": "LEXEDITOR_FF7_PROJECT",
+    "requiredPaths": [
+      "ff7/workingdir/data/lang-en/kernel/kernel.bin"
+    ],
+    "contentTypes": [
+      [
+        "Kernel data",
+        [
+          ".bin"
+        ]
+      ],
+      [
+        "Field and world data",
+        [
+          ".lgp",
+          ".flevel",
+          ".tex"
+        ]
+      ],
+      [
+        "Textures",
+        [
+          ".png",
+          ".dds"
+        ]
+      ],
+      [
+        "Audio",
+        [
+          ".ogg",
+          ".wav"
+        ]
+      ],
+      [
+        "Executable text",
+        [
+          ".exe"
+        ]
+      ]
+    ]
+  },
+  "loadingQuotes": [
+    "I can't believe Square gave us cloud saving in the remaster. They should have given us Aerith saving instead.",
+    "Is this the one where Gordon Ramsay is the protagonist?"
+  ]
+}

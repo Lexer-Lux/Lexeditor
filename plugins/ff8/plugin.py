@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 
 from core.plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from core.plugin_manifest import install_spec, plugin_defaults, project_spec
 from core.service_session import LocalPluginSession, request_json
 
 from . import ffnx_manager, gameplay_settings, mod_support, paths
@@ -151,63 +152,16 @@ def smoke() -> list[str]:
 
 
 PLUGIN = GamePlugin(
-    plugin_id="ff8",
-    name="Final Fantasy 8",
-    process_names=("FF8_EN.exe", "FF8_Launcher.exe"),
-    helper_name="FFNx",
+    **plugin_defaults(__file__),
+    helper_name='FFNx',
     helper_install=lambda: ffnx_manager.ensure_ffnx(paths.GAME_ROOT, paths.RUNTIME_DIRECT_ROOT),
     helper_status=lambda: ffnx_manager.status(paths.GAME_ROOT),
     helper_upstream=ffnx_manager.upstream_release,
-    accent="#366bc2",
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=FF8Session,
-    # The shared mod library and the FF8 composer already share one folder
-    # layout, so the adapter hands library mods to the composer that the FF8
-    # Mods tab uses. Without it the header said mod management was unsupported
-    # while the plugin's own tab managed mods.
     mod_adapter=mod_support.Ff8ModAdapter(),
-    projects=ModProjectSpec(
-        root_env="LEXEDITOR_FF8_PROJECT",
-        default_root=paths.PROJECT_ROOT,
-        required_paths=("direct",),
-        template_root=paths.PROJECT_ROOT,
-        initialize=gameplay_settings.initialize_project,
-        content_types=(
-            ("Game data", (".bin", ".fs", ".fi", ".fl")),
-            ("Textures", (".png", ".dds", ".tex")),
-            ("Audio", (".ogg", ".wav", ".sgt")),
-            ("Field maps", (".msd", ".jsm", ".sym")),
-            ("FFNx runtime", (".toml", ".dll", ".p")),
-        ),
-    ),
-    installation=GameInstallSpec(
-        root_env="LEXEDITOR_FF8_ROOT",
-        data_env="LEXEDITOR_FF8_DATA_ROOT",
-        required_paths=(
-            "FF8_EN.exe",
-            "Data/lang-en/main.fs", "Data/lang-en/main.fi", "Data/lang-en/main.fl",
-            "Data/lang-en/menu.fs", "Data/lang-en/menu.fi", "Data/lang-en/menu.fl",
-            "Data/lang-en/battle.fs", "Data/lang-en/battle.fi", "Data/lang-en/battle.fl",
-            "Data/lang-en/world.fs", "Data/lang-en/world.fi", "Data/lang-en/world.fl",
-        ),
-        # FFNx renders through bgfx, whose Auto backend picks Direct3D 11 or
-        # 12 on Windows; ReShade hooks both through dxgi. The loader sits
-        # beside FF8_EN.exe at the root. FFNx's own loader is AF3DN.P, so the
-        # names never clash. (An FFNx.toml renderer_backend of OpenGL or
-        # Vulkan would need a different loader; Auto and Direct3D use this.)
-        reshade_root="",
-        reshade_renderer="dxgi",
-        # Use normal startup. Skipping the warning is a separate opt-in tweak.
-        launch_path="FF8_Launcher.exe",
-        executable="FF8_EN.exe",
-        steam_app_id="39150",
-        install_dir_names=("FINAL FANTASY VIII",),
-        default_roots=(
-            Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII"),
-            Path(r"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VIII"),
-        ),
-        prepare=plugin_prepare,
-    ),
+    projects=project_spec(__file__, default_root=paths.PROJECT_ROOT, initialize=gameplay_settings.initialize_project, template_root=paths.PROJECT_ROOT),
+    installation=install_spec(__file__, prepare=plugin_prepare),
 )
