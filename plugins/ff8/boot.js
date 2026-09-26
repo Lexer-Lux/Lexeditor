@@ -114,9 +114,10 @@
       // dependency says which one it needs in its help, and wears no badge.
       const blocker=options.blocker||"";
       const unavailable=Boolean(blocker);
-      const titleNode=unavailable?LexeditorUI.el("span",{},
-        el("span",{},title),LexeditorUI.badge("NOT AVAILABLE YET",{tone:"warning",
-          title:blocker})):title;
+      // The shared inline label is the component for a name with something
+      // beside it: it already spaces the two, so the plugin styles nothing.
+      const titleNode=unavailable?LexeditorUI.inlineLabel(el("span",{},title),
+        LexeditorUI.badge("NOT AVAILABLE YET",{tone:"warning",title:blocker})):title;
       const body=control===toggle?[]:[detailField({label:"",control})];
       if(unavailable)body.unshift(LexeditorUI.detailNote(blocker));
       return detailPanel({title:titleNode,help:description,actions:toggle,body});
