@@ -86,11 +86,11 @@
       --lex-input-bg:#3b3b3b;--lex-input-shadow:none;--lex-input-text-shadow:var(--lex-text-shadow);
       --lex-field-padding:6px 8px;
 
-      /* Section titles keep the game lettering and separate content with a line. */
+      /* Section titles keep the game lettering. No rule runs under them. */
       --lex-section-title-fg:#d0d0d0;--lex-section-title-font:20px/1 var(--lex-heading-font);
       --lex-section-title-shadow:-2px -2px 0 #151515,0 -2px 0 #151515,2px -2px 0 #151515,-2px 0 0 #151515,
         2px 0 0 #151515,-2px 2px 0 #151515,0 2px 0 #151515,2px 2px 0 #151515;
-      --lex-section-title-border:1px solid #929292;--lex-section-title-stroke:.65px #d0d0d0;
+      --lex-section-title-border:0;--lex-section-title-stroke:.65px #d0d0d0;
       --lex-section-title-position:static;--lex-section-title-top:auto;--lex-section-title-left:auto;
       --lex-section-title-shift:none;--lex-section-title-padding:1px 4px 4px;
       --lex-section-title-letter-spacing:.01em;--lex-section-title-transform:uppercase;
