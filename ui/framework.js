@@ -9958,10 +9958,40 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   };
   const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text';
   const labelSizeObserver = new ResizeObserver(entries => scheduleFit(entries.map(entry=>entry.target)));
+  // A content-sized page-tab strip is exactly as wide as its labels, so a game
+  // with twenty tabs is wider than its window and the frame scrolls. Shrinking
+  // one label at a time cannot fix that - the strip stays too wide, and the
+  // names end up in different sizes. The whole strip shrinks together, only as
+  // far as it must and only to the readable floor; past that, the frame keeps
+  // its scroll. This is the one place that decides, for every game, so no theme
+  // has to opt out of the shared fit pass to keep its labels whole.
+  const fitNavStrip = nav => {
+    const frame = nav.closest('.lex-nav-frame') || nav.parentElement;
+    const labels = [...nav.querySelectorAll('.lex-tab-label-text')];
+    if (!frame || !labels.length) return;
+    const overflows = () => frame.scrollWidth > frame.clientWidth + 1;
+    const apply = size => labels.forEach(label => { label.style.fontSize = `${size}px`; });
+    labels.forEach(label => { label.style.fontSize = ''; });
+    if (!overflows()) return;
+    const start = parseFloat(getComputedStyle(labels[0]).fontSize) || 12;
+    let size = Math.max(LABEL_MIN_PX, start * (frame.clientWidth / frame.scrollWidth));
+    apply(size);
+    // The padding and the help marks do not scale with the font, so the first
+    // estimate is close but rarely exact; a couple of steps settle it.
+    for (let attempt = 0; attempt < 3 && size > LABEL_MIN_PX && overflows(); attempt += 1) {
+      size = Math.max(LABEL_MIN_PX, size - 1);
+      apply(size);
+    }
+  };
   const fitAllLabels = root => {
     const fit = label => { labelSizeObserver.observe(label); fitLabel(label); };
     if (root instanceof Element && root.matches?.(LABEL_SELECTOR)) fit(root);
     root.querySelectorAll?.(LABEL_SELECTOR).forEach(fit);
+    const strips = new Set();
+    const own = root instanceof Element ? root.closest?.('.lex-shell-header nav') : null;
+    if (own) strips.add(own);
+    root.querySelectorAll?.('.lex-shell-header nav').forEach(nav => strips.add(nav));
+    strips.forEach(fitNavStrip);
   };
   // Measuring inside the mutation callback reads a layout that is not final:
   // the label's own height comes from the row, and the row is sized by a
