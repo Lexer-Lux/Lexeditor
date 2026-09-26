@@ -74,14 +74,18 @@ def main() -> int:
             wait_eval(cdp, "document.querySelector('.field-preview-stack')?.style.visibility===''"
                            "&&document.querySelector('.field-background-image')?.naturalWidth>0", 120)
             wait_eval(cdp, "!!document.querySelector('.field-background-image')?.lexGeometry", 30)
+            wait_eval(cdp, "!document.documentElement.classList.contains('lex-loading-live')", 30)
 
-            layout = cdp.eval("""(()=>{const L=document.querySelector('.field-map-detail').closest('.lex-panel-layout');
+            layout = cdp.eval("""(()=>{const L=document.querySelector('.field-preview-panels').parentElement.closest('.lex-panel-layout');
               return {vertical:L.classList.contains('lex-panel-layout-vertical'),
+                automatic:L.classList.contains('lex-panel-layout-below-minimum'),
                 tabs:[...document.querySelectorAll('.lex-tabbed-panel [role=tab]')].map(t=>t.textContent.trim().replace(/\\?$/,'')),
                 help:!!document.querySelector('.field-map-detail > .lex-media-help .lex-info-help, .field-map-detail > .lex-media-help button, .field-map-detail > .lex-media-help [aria-label]'),
                 overlaySwitch:document.body.textContent.includes('Walkmesh overlay')}})()""")
             assert layout["vertical"] is False, layout
+            assert layout["automatic"] is True, layout
             assert "Tile" in layout["tabs"], layout
+            assert "Background" not in layout["tabs"], layout
             assert layout["help"], layout
             assert layout["overlaySwitch"] is False, layout
 
@@ -95,6 +99,7 @@ def main() -> int:
                   shown:document.querySelector('.field-preview-stack').style.visibility===''})}
               return seen})()""", await_promise=True)
             assert all(step["sameInput"] and step["sameImage"] and step["shown"] for step in steps), steps
+            settle(cdp)
 
             # Clicking the picture on the Tile tab selects the tile under the pointer.
             tile_point = cdp.eval("""(()=>{const row=state.data.fields.rows.find(r=>r._loaded&&r.background);
@@ -106,6 +111,11 @@ def main() -> int:
             settle(cdp)
             picked = cdp.eval(f"""({{tile:state.fieldBackgroundSelection[{('bg/' + MAP)!r}],
               sameImage:document.querySelector('.field-background-image')===window.__image}})""")
+            if picked["tile"] != tile_point["id"]:
+                screenshot(cdp, "ff8-field-selection-failure.png")
+                print(cdp.eval(f"""(()=>{{const p={json.dumps(tile_point)},image=document.querySelector('.field-background-image'),overlay=image.lexOverlay;
+                  return {{hit:document.elementFromPoint(p.x,p.y)?.outerHTML,image:image.getBoundingClientRect().toJSON(),
+                    overlay:overlay.getBoundingClientRect().toJSON(),selection:state.fieldBackgroundSelection,hover:fieldHover}}}})()"""))
             assert picked == {"tile": tile_point["id"], "sameImage": True}, (picked, tile_point, image_before)
 
             # The walkmesh tab: hover marks a triangle, a click selects it, the picture stays.
@@ -136,12 +146,35 @@ def main() -> int:
             camera = cdp.eval("""(()=>{const inputs=[...document.querySelectorAll('.lex-tabbed-panel-content input:not([type=checkbox])')];
               return {count:inputs.length,railed:inputs.filter(i=>i.closest('.lex-detail-field')?.querySelector('.lex-field-type-rail')).length}})()""")
             assert camera["count"] >= 13 and camera["railed"] == camera["count"], camera
+            camera_edit = cdp.eval("""(()=>{const row=state.data.fields.rows.find(r=>r._loaded&&r.camera),
+              camera=row.camera.cameras[fieldOverlayCameraId(row)],before=camera.zoom,
+              input=document.querySelector('input[aria-label$="camera 1 zoom"]'),
+              canvas=document.querySelector('.field-preview-stack canvas'),image=document.querySelector('.field-background-image'),
+              pixels=canvas.toDataURL();
+              input.value=String(before+64);input.dispatchEvent(new Event('input',{bubbles:true}));
+              const changed=camera.zoom===before+64,redrawn=canvas.toDataURL()!==pixels;
+              input.value=String(before);input.dispatchEvent(new Event('input',{bubbles:true}));
+              return {changed,redrawn,sameImage:document.querySelector('.field-background-image')===image,
+                restored:camera.zoom===before}})()""")
+            assert all(camera_edit.values()), camera_edit
 
-            # Background layers and states are one checkbox each.
-            open_tab(cdp, "background")
-            layers = cdp.eval("""(()=>{const boxes=[...document.querySelectorAll('.lex-tabbed-panel input[type=checkbox]')];
-              return {count:boxes.length,bool:boxes.filter(b=>b.closest('.lex-detail-field')?.dataset.lexType==='BOOL').length}})()""")
+            # Preview-only filters remain beside the picture on every editor tab.
+            layers = cdp.eval("""(()=>{const root=document.querySelector('.field-preview-panels'),
+              boxes=[...root.querySelectorAll('input[type=checkbox]')],
+              left=root.querySelector('.field-preview-layers').getBoundingClientRect(),
+              picture=root.querySelector('.field-map-detail').getBoundingClientRect(),
+              right=root.querySelector('.field-preview-states').getBoundingClientRect();
+              return {count:boxes.length,bool:boxes.filter(b=>b.closest('.lex-toggle')?.querySelector('.lex-toggle-type')?.textContent==='BOOL').length,
+                beside:left.right<=picture.left+1&&picture.right<=right.left+1,pictureWidth:picture.width}})()""")
             assert layers["count"] >= 2 and layers["bool"] == layers["count"], layers
+            assert layers["beside"] and layers["pictureWidth"] >= 220, layers
+            filter_edit = cdp.eval("""(()=>{const row=state.data.fields.rows.find(r=>r._loaded&&r.background),
+              before=JSON.stringify(row.background),input=document.querySelector('.field-preview-layers input'),
+              layer=row.background.layers[0],checked=input.checked;
+              input.click();const changed=fieldBackgroundPreviewState(row).layers.includes(layer)!==checked;
+              input.click();return {changed,restored:fieldBackgroundPreviewState(row).layers.includes(layer)===checked,
+                previewOnly:JSON.stringify(row.background)===before}})()""")
+            assert all(filter_edit.values()), filter_edit
 
             # A dialogue line is the Text page's box: no label column beside it.
             open_tab(cdp, "dialogue")
@@ -164,17 +197,30 @@ def main() -> int:
                 assert tables[tab]["rows"] == tables[tab]["records"] and tables[tab]["fits"], (tab, tables[tab])
             open_tab(cdp, "exits")
             image = screenshot(cdp, "ff8-field-page.png")
+            # At 1600px the filter/picture region stacks above the editor;
+            # enough horizontal space returns it to the three-column layout.
+            cdp.call("Emulation.setDeviceMetricsOverride", {
+                "width": 1920, "height": 1000, "deviceScaleFactor": 1, "mobile": False})
+            settle(cdp)
+            wide = cdp.eval("""(()=>{const picture=document.querySelector('.field-preview-panels'),
+              editor=picture.parentElement.querySelector(':scope > .lex-tabbed-panel'),
+              a=picture.getBoundingClientRect(),b=editor.getBoundingClientRect();
+              return {beside:a.right<=b.left+1,labels:[...picture.querySelectorAll('.lex-toggle-name')].map(n=>{
+                const r=n.getBoundingClientRect(),p=n.closest('.lex-detail-panel').getBoundingClientRect();
+                return r.left>=p.left&&r.right<=p.right&&getComputedStyle(n).fontSize;})}})()""")
+            assert wide["beside"] and all(wide["labels"]), wide
+            wide_image = screenshot(cdp, "ff8-field-page-wide.png")
 
             # The Deling-style setting stacks the picture over the tabs.
             cdp.eval("""(async()=>{state.editorSettings=await api('/api/editor-settings/save',post({delingFieldLayout:true}));rerenderFields();return 1})()""",
                      await_promise=True)
             settle(cdp)
-            deling = cdp.eval("document.querySelector('.field-map-detail').closest('.lex-panel-layout').classList.contains('lex-panel-layout-vertical')")
+            deling = cdp.eval("document.querySelector('.field-preview-panels').parentElement.closest('.lex-panel-layout').classList.contains('lex-panel-layout-vertical')")
             assert deling is True, deling
             stacked = screenshot(cdp, "ff8-field-page-deling.png")
             print(json.dumps({"tabs": layout["tabs"], "tileSteps": len(steps), "tile": picked,
                               "triangle": chosen, "camera": camera, "layers": layers, "tables": tables,
-                              "screenshots": [str(image), str(stacked)]}))
+                              "screenshots": [str(image), str(wide_image), str(stacked)]}))
         return 0
     finally:
         if profile:
