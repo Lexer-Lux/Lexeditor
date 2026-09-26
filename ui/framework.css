@@ -2905,6 +2905,33 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
   flex:0 0 auto;
 }
 
+/* A table's own add button: round, in its bottom-right corner, over the rows
+   and faint until it is pointed at. An unavailable one keeps its place and
+   says why instead of vanishing. */
+.lex-barrelled-master > .lex-table-add {
+  position:absolute;
+  right:10px;
+  bottom:10px;
+  z-index:6;
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  color:var(--lex-accent-text, #fff);
+  background:var(--lex-accent);
+  border-color:color-mix(in srgb, var(--lex-accent) 70%, #fff);
+  box-shadow:0 3px 10px #0008;
+  opacity:.45;
+  transition:opacity .12s ease, transform .12s ease;
+}
+.lex-barrelled-master > .lex-table-add:is(:hover, :focus-visible) { opacity:1; transform:scale(1.06); }
+.lex-barrelled-master > .lex-table-add.unavailable {
+  color:var(--lex-muted);
+  background:var(--lex-panel-2);
+  border-color:var(--lex-border);
+  cursor:not-allowed;
+}
+.lex-barrelled-master > .lex-table-add.unavailable:is(:hover, :focus-visible) { opacity:.85; transform:none; }
+
 /* A property made of several numbers. Each pair reads label-then-box like an
    ordinary property row; the pairs wrap into as many columns as the caller
    asks for, so nine junction values do not become nine tiny stacked captions. */

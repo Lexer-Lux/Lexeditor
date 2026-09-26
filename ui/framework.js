@@ -8610,14 +8610,45 @@ ${contents.path}`});
         change: value => modOnly.change?.(value),
       }));
     }
-    if (!slotBased && typeof options.add === "function") {
-      bottomTools.push(newButton({
-        class: "lex-pager-add",
-        title: options.addTitle || `Add ${options.noun || "record"}`,
-        disabled: options.addDisabled === true,
-        onclick: () => options.add(),
-      }));
+    // Every table has one add button, round, in its own bottom-right corner
+    // and faint until pointed at. Where a record cannot be added it stays
+    // there, marked unavailable, and says why when pointed at or pressed:
+    // "every game, every list should have it... if disabled, it says why".
+    // A plugin that builds its own add button and hands it over with the
+    // pager's filters gets that button moved here, not a second one.
+    const suppliedAdd = bottomTools.find(control => control?.matches?.(".lex-new-button"));
+    if (suppliedAdd) bottomTools.splice(bottomTools.indexOf(suppliedAdd), 1);
+    const readonlySource = document.documentElement.dataset.lexProjectReadonly === "true";
+    const pluginAdd = suppliedAdd ? !suppliedAdd.disabled
+      : !slotBased && typeof options.add === "function" && options.addDisabled !== true;
+    const canAdd = pluginAdd && !readonlySource;
+    const addWhy = canAdd ? "" : readonlySource
+      ? "This is the game's own data, shown read-only. Create a mod to add records to it."
+      : options.addDisabledReason || (suppliedAdd || options.addDisabled === true
+        ? "Adding is unavailable right now."
+        : slotBased
+          ? `This table is a fixed set of slots in the game's data, so there is no room to add ${options.noun || "records"}.`
+          : `Adding ${options.noun || "records"} to this table is not supported yet.`);
+    const tableAdd = suppliedAdd || newButton({title: options.addTitle || `Add ${options.noun || "record"}`,
+      onclick: event => { event.stopPropagation(); if (canAdd) options.add(); }});
+    tableAdd.disabled = false;
+    tableAdd.classList.add("lex-table-add");
+    tableAdd.classList.toggle("unavailable", !canAdd);
+    if (canAdd) tableAdd.removeAttribute("aria-disabled");
+    else {
+      tableAdd.setAttribute("aria-disabled", "true");
+      tableAdd.title = addWhy;
+      tableAdd.setAttribute("aria-label", addWhy);
     }
+    // Capturing on the button itself runs before the handler it was built
+    // with, so an unavailable button explains itself instead of acting.
+    tableAdd.addEventListener("click", event => {
+      if (canAdd) return;
+      event.stopImmediatePropagation();
+      event.preventDefault();
+      showToast(addWhy);
+    }, {capture: true});
+    masterNode.append(tableAdd);
     if (emptyRow) {
       const toggle = element("input", {
         type: "checkbox", checked: hideEmpty, "aria-label": "Hide empty slots",
