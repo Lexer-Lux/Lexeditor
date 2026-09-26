@@ -183,7 +183,7 @@
       }
 
       const rows = matchingRows();
-      document.querySelector("#main").replaceChildren(pagedListDetail({
+      document.querySelector("#main").replaceChildren(pagedListDetail({addDisabledReason:"The game shows strings by their hash; a new string would need something in the game to show it. Edit an existing one instead.",
         modOnly:modOnlySpec(state.stringEdits,()=>{state.stringPage=0;}),
         rows,key:row=>row.id,slots:false,page:state.stringPage,
         pageSize:state.stringPageSize,selected:state.stringSelected,noun:"strings",

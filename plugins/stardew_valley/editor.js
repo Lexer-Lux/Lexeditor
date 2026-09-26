@@ -468,7 +468,7 @@ function datasetPanel() {
   const records = sortedDatasetRows();
   const columns = datasetColumns();
   const prefs = currentDatasetPrefs();
-  return pagedListDetail({
+  return pagedListDetail({addDisabledReason:"Lexeditor edits the entries this data asset already has here; adding one to this asset is not supported yet.",
     rows: records, key: row => row.id, slots: false,
     selected: state.datasetSelected, page: state.datasetPage, pageSize: state.pageSize,
     noun: state.dataset?.schema?.noun || "records",

@@ -115,7 +115,7 @@
     const table=tableState(id),label=TABLES.find(value=>value.id===id)?.label||id;
     if(!table.loaded){$("#main").replaceChildren(detailPanel({title:label,body:[LexeditorUI.detailNote("Loading records…")]}));return}
     if(!table.rows.length){$("#main").replaceChildren(detailPanel({title:label,body:[LexeditorUI.detailNote("No records were found in this parameter table.")]}));return}
-    const view=pagedListDetail({
+    const view=pagedListDetail({addDisabledReason:"Dark Souls III params can take new row IDs, but Lexeditor only edits existing rows. Adding a row is not supported yet.",
       rows:sortedRows(id),key:row=>row.id,slots:false,noun:"records",page:table.page,pageSize:table.pageSize,
       selected:table.selected,className:"ds3-layout",splitKey:"ds3-"+id,rowsKey:"ds3-"+id,
       defaultSplit:42,minLeft:280,minRight:360,fit:{minRowHeight:34},

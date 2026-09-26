@@ -495,7 +495,7 @@
         for(const key of Object.keys(state.pages))state.pages[key]=0;render()}};
   }
   function pagedTable(spec){
-    return LexeditorUI.pagedListDetail({
+    return LexeditorUI.pagedListDetail({addDisabledReason:"Final Fantasy VII Remake reads these rows from packed game tables; a new row would need the table rebuilt inside the game's archive, which Lexeditor does not do yet.",
       rows:spec.rows,key:spec.key,slots:false,noun:spec.noun||"records",
       page:state.pages[spec.id]||0,selected:spec.selected,
       className:"ff7r-layout",paneClass:"ff7r-pane",splitKey:`ff7r-${spec.id}`,rowsKey:`ff7r-${spec.id}-rows`,
@@ -594,7 +594,7 @@
   }
   function pagedDataPanel(){
     const rows=sortedRows();
-    return LexeditorUI.pagedListDetail({
+    return LexeditorUI.pagedListDetail({addDisabledReason:"Final Fantasy VII Remake reads these rows from packed game tables; a new row would need the table rebuilt inside the game's archive, which Lexeditor does not do yet.",
       rows,key:row=>row.id,slots:false,noun:"records",
       page:state.dataPage||0,selected:state.selected,
       className:"ff7r-layout",paneClass:"ff7r-pane",splitKey:"ff7r-data",rowsKey:"ff7r-data-rows",
