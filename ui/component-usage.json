@@ -499,6 +499,7 @@
     ],
     "detailText": [
       "blank",
+      "ff9",
       "warband"
     ],
     "dismissDialogs": [],
@@ -572,6 +573,7 @@
       "warband"
     ],
     "finishSearcher": [
+      "blank",
       "ff8"
     ],
     "fitListPage": [
@@ -869,6 +871,11 @@
       "stardew_valley",
       "terraria",
       "warband"
+    ],
+    "loadingPanel": [
+      "blank",
+      "ff8",
+      "rdr2"
     ],
     "logView": [
       "bannerlord",

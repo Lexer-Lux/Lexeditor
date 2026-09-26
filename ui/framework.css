@@ -198,6 +198,12 @@ html.lex-transition-entry body > .lex-plugin-loading-screen, html.lex-transition
   animation: lex-plugin-loading-pulse-enter .34s .1s ease both, lex-plugin-loading-spin .75s linear infinite;
 }
 @keyframes lex-plugin-loading-spin { to { rotate: 360deg; } }
+.lex-panel-loading { display:grid;place-items:center;min-height:64px;min-width:0;flex:1;color:var(--lex-loading-color,var(--lex-accent)); }
+.lex-panel-loading > .lex-plugin-loading-pulse {
+  position:static;width:var(--lex-loading-size,32px);height:var(--lex-loading-size,32px);
+  border-color:color-mix(in srgb,currentColor 30%,transparent);border-right-color:currentColor;
+  animation:lex-plugin-loading-spin .75s linear infinite;
+}
 
 .lex-ui-symbol {
   font-style: normal;
@@ -367,7 +373,7 @@ body.lex-save-busy .lex-save-icon.saving {
   50% { box-shadow:0 0 0 4px #66aefb66,0 0 16px #66aefbaa; background:#235f96; }
 }
 @media (prefers-reduced-motion:reduce) {
-  .lex-searcher-context.returning { animation:none; box-shadow:0 0 0 3px #66aefb; }
+  .lex-shell-header .lex-searcher-bar > .lex-searcher-context.returning { animation:none; box-shadow:0 0 0 3px #66aefb; }
 }
 .lex-searcher-cancel {
 
@@ -675,7 +681,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-project-about > svg { width:17px;height:17px; }
 
 .lex-project-path {
-  align-self:center;flex:0 1 auto;min-width:0;overflow:hidden;color:var(--lex-muted);
+  align-self:center;flex:1 1 auto;min-width:0;overflow:hidden;color:var(--lex-muted);
   /* The mod's own folder is written in the game's face, like every other word
      on this row. A hard-coded face left the path, and the "The game's own
      data" label, the only default-typeface text in an otherwise themed
@@ -1303,18 +1309,17 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
 .lex-subtab-bar {
   width:100%;
   align-self:stretch;
-  justify-content:center;
+  justify-content:stretch;
   display:grid;
   grid-auto-flow:column;
-  /* The strip fills its row: Lexer wants the sub-tab bar to use all the
-     horizontal space, the same as the page tab bar. Every tab takes an equal
-     share of it and the whole bar keeps its own width. */
-  grid-auto-columns:minmax(0,1fr);
+  /* Fill short rows; long rows keep readable names and scroll horizontally. */
+  grid-auto-columns:minmax(max-content,1fr);
   flex:0 0 auto;
   min-width:0;
   /* Navigation always uses one row, regardless of label length. */
   flex-wrap:nowrap;
-  overflow-x:visible;
+  overflow-x:auto;
+  overflow-y:hidden;
   border-bottom:1px solid var(--lex-border);
   background:var(--lex-panel-2);
 }
@@ -5582,7 +5587,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 .lex-project-name {
    color: var(--lex-highlight); white-space: nowrap;
- flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;
+ flex:0 0 auto; min-width:0; max-width:65%; overflow:hidden; text-overflow:ellipsis;
  /* It ellipsises, so the box clips; the first glyph of a game face needs the
    same one pixel of room the other clipping text boxes carry. */
  box-sizing:border-box; padding-inline:.08em;
@@ -7186,7 +7191,8 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
 
 .lex-detail-panel-title {
    display:flex;align-items:center;gap:6px;min-width:0;margin:0;font-size:var(--lex-detail-title-size,clamp(21px,2.5vw,32px));line-height:1.1;
- overflow-wrap:anywhere;
+ overflow-wrap:normal;
+ word-break:normal;
  color: var(--lex-detail-title-fg, inherit);
 }
 .lex-detail-panel-id {
@@ -7714,6 +7720,9 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   background: var(--lex-tab-active-bg, var(--lex-accent));
   border-color: var(--lex-tab-active-border-color, transparent);
 
+}
+.lex-shell-header nav button[data-tab].active {
+  padding-left:max(var(--lex-tab-padding-inline,14px),calc(var(--lex-tab-marker-width,0px) + 6px));
 }
 .lex-shell-header nav button:first-child { border-left: var(--lex-tab-first-border, 0); }
 /* Set by the strip fit once its names are at the readable floor and the row

@@ -649,7 +649,7 @@ function itemDetailPane(it, cells){
     field("Used in recipes",cells.usedIn),
     field("Effects",cells.effects),
     field("Tags",cells.tags,"Catalog tags. Use + to select a named tag from the full grouped list. Free-entry hashes are not supported."));
-  const sources=LexeditorUI.stack({fill:false},LexeditorUI.detailNote("Loading acquisition sources…"));
+  const sources=LexeditorUI.stack({fill:false},LexeditorUI.loadingPanel({label:"Loading acquisition sources"}));
   body.append(LexeditorUI.detailSection({title:"Acquisition sources",body:sources}));
   fillItemSources(it,sources).catch(error=>sources.replaceChildren(LexeditorUI.detailNote(error.message)));
   return attachItemModelPreview(pane,it);

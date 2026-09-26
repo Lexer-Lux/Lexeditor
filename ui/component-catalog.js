@@ -133,6 +133,8 @@
       sample: () => UI.logView("Build verified: 412 items, 3 troop trees.")},
     {id: "detailText", level: "atom", summary: "Prose in a section, keeping the author's line breaks.",
       sample: () => UI.detailText("Set graphics properly:\nTurn HDR off and antialiasing up.")},
+    {id: "loadingPanel", level: "atom", summary: "A shared loading indicator for a panel; themes set --lex-loading-color and --lex-loading-size.",
+      sample: () => UI.loadingPanel()},
     {id: "quantityChoice", level: "molecule", summary: "A choice and how many of it, as one value: an item and its count.",
       sample: () => UI.quantityChoice(UI.element("select", {}, UI.element("option", {}, "Potion")), UI.element("input", {type: "number", value: 3, min: 0, max: 99}))},
     {id: "iconValue", level: "molecule", summary: "An icon and its name that toggle a state (immune or not), beside the value that applies otherwise.",
