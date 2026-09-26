@@ -105,12 +105,34 @@
   function filtered(view,fields){const query=state.filters[view].trim().toLocaleLowerCase();let rows=state.data[view].rows.filter(row=>!query||fields.some(field=>String(row[field]??"").toLocaleLowerCase().includes(query)));const [key,direction]=state.sorts[view];return [...rows].sort((a,b)=>direction*String(rowSortValue(a,key)).localeCompare(String(rowSortValue(b,key)),undefined,{numeric:true,sensitivity:"base"}))}
   function sort(view,key){const [active,direction]=state.sorts[view];state.sorts[view]=[key,active===key?-direction:1];render()}
   function listColumns(view,columns,template,prefs,forceTemplate=false){return ({rows,selected,select})=>columnList({rows,key:row=>row.id,columns:columns.map(column=>({...column,sortable:true,numberedId:column.numberedId??column.key==="id"})),columnPreferences:prefs,template:forceTemplate?template:(prefs?null:template),sortState:{key:state.sorts[view][0],dir:state.sorts[view][1]},sort:key=>sort(view,key),selected,selectedClass:"selected",select,decorateRow:(node,row)=>view==="fields"&&row.mapId==null?node:decorateSearchCandidate(node,{type:view,value:row.id,label:row.name}),class:"ff8-record-list","aria-label":`FF8 ${view}`})}
+  // Why a table's add button is off. FF8 keeps every one of these in a
+  // fixed place the game reads by number, so a new record has nowhere to go;
+  // each reason says where the limit is.
+  const ADD_REASONS={
+    items:"FF8's item list is a fixed table the game reads by item number; there is no free slot for a new item. Edit an existing one instead.",
+    weapons:"Weapons are a fixed table in the game's data, one entry per upgrade the menus know; a new weapon has no slot and no menu to appear in.",
+    shops:"Each shop is a fixed slot the game's shops read by number; a new shop has no place to be opened from.",
+    cards:"Triple Triad's cards are a fixed set the game reads by card number; a new card has no slot.",
+    encounters:"Encounters are a fixed table the game reads by encounter number; a new one has no slot for the world or a field to point at.",
+    refine:"Refine abilities read a fixed table of recipes; a new recipe has no slot.",
+    enemies:"Each enemy is its own battle file the game looks up by number. Adding one needs a new file and an encounter that uses it, which Lexeditor does not do yet.",
+    fields:"Field maps are reached by fixed numbers from the game's scripts; a new map would need new archive and script entries, which Lexeditor does not do yet.",
+    models:"The game loads only the models it knows by name. Replace an existing one with a mod file instead.",
+    textures:"The game loads only the textures it knows by name. Replace an existing one with a mod file instead.",
+    sfx:"The game plays sounds by their number in its sound table; a new sound would need a script that plays it. Replace an existing sound instead.",
+    text:"The game shows messages by their number; a new message would need a script that shows it. Edit an existing one instead.",
+    world:"The world map's records are fixed tables the game reads by number; a new record has no slot.",
+    magic:"Magic is a fixed table in kernel.bin the game reads by spell number; a new spell has no slot, and nothing would draw or cast it.",
+  };
+  // Every ability category is its own fixed kernel.bin table.
+  const addReasonFor=view=>ADD_REASONS[view]||(String(view).startsWith("ability")
+    ?"Abilities are fixed tables in kernel.bin the game reads by ability number; a new ability has no slot, and no GF could learn it.":undefined);
   function showPaged(view,rows,columns,detail,template="minmax(220px,2fr) minmax(72px,.7fr) minmax(100px,1fr)",layout={},mount=true){
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
     const noun=layout.noun||(view==="gfs"?"GFs":view);
     const normalized=columns.map(column=>({...column,sortable:true,numberedId:column.numberedId??column.key==="id"}));
     const prefs=state.columnPrefs[view]||=columnPreferences(`ff8-${view}`,normalized,()=>render());
-    const root=pagedListDetail({bulkChanged:()=>shell.refresh(),modOnly:modOnlySpec(view),rows,key:row=>row.id,slots:true,page:state.pages[view],pageSize:state.pageSizes[view],selected:state.selected[view],noun,splitKey:`ff8-${view}`,defaultSplit:layout.defaultSplit??42,minLeft:layout.minLeft??340,minRight:layout.minRight??420,maxBarrels:layout.maxBarrels,leadingPanel:layout.leadingPanel,minLeading:layout.minLeading,defaultLeadingWidth:layout.defaultLeadingWidth,trailingPanel:layout.trailingPanel,minTrailing:layout.minTrailing,panelSizes:layout.panelSizes,
+    const root=pagedListDetail({bulkChanged:()=>shell.refresh(),modOnly:modOnlySpec(view),rows,key:row=>row.id,slots:true,addDisabledReason:layout.addReason||addReasonFor(view),page:state.pages[view],pageSize:state.pageSizes[view],selected:state.selected[view],noun,splitKey:`ff8-${view}`,defaultSplit:layout.defaultSplit??42,minLeft:layout.minLeft??340,minRight:layout.minRight??420,maxBarrels:layout.maxBarrels,leadingPanel:layout.leadingPanel,minLeading:layout.minLeading,defaultLeadingWidth:layout.defaultLeadingWidth,trailingPanel:layout.trailingPanel,minTrailing:layout.minTrailing,panelSizes:layout.panelSizes,
       search:{key:`ff8-${view}`,value:state.filters[view],delay:110,placeholder:`Search ${noun.toLocaleLowerCase()}…`,label:`Search ${noun}`,change:value=>{state.filters[view]=value;state.pages[view]=0;render()}},
       sync:value=>{state.pages[view]=value.page;state.pageSizes[view]=value.pageSize;state.selected[view]=value.selected},
       change:async value=>{if(view==="enemies"&&!(await enemyAiBeforeLeave()))return;state.pages[view]=value.page;state.pageSizes[view]=value.pageSize;state.selected[view]=value.selected;render()},

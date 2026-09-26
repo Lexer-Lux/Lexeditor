@@ -335,7 +335,7 @@
     const all=componentRows(level);
     const text=row=>`${row.id} ${row.summary||""} ${row.usedBy.join(" ")}`.toLocaleLowerCase();
     const rowsForLevel=all.filter(row=>text(row).includes(catalogue.query.toLocaleLowerCase()));
-    return pagedListDetail({rows:rowsForLevel,key:row=>row.id,selected:catalogue.selected,
+    return pagedListDetail({addDisabledReason:"This lists the framework's own components. A new one is added by writing it in ui/framework.js and cataloguing it.",rows:rowsForLevel,key:row=>row.id,selected:catalogue.selected,
       page:catalogue.page,pageSize:14,noun:"components",className:"blank-components",
       splitKey:`blank-components-${level}`,rowsKey:`blank-components-${level}`,
       search:{key:`blank-components-${level}`,value:catalogue.query,label:"Search components, summaries and games",

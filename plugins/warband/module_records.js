@@ -199,7 +199,7 @@
       });
       const prefs=preferencesFor(active,definitions);
       const selectedRow=filtered.find(row=>String(row.recordIndex)===local.selected)||filtered[0];if(selectedRow)local.selected=String(selectedRow.recordIndex);
-      main().replaceChildren(host(LexeditorUI.pagedListDetail({rows:filtered,key:row=>String(row.recordIndex),selected:local.selected,
+      main().replaceChildren(host(LexeditorUI.pagedListDetail({addDisabledReason:`Warband's module files can take new ${data.schema.label.toLowerCase()}, but Lexeditor only edits existing ones. Adding one is not supported yet.`,rows:filtered,key:row=>String(row.recordIndex),selected:local.selected,
         noun:data.schema.label.toLowerCase(),splitKey:"warband-module-"+active,className:"warband-paged-table warband-module-data",slots:false,
         fit:{minRowHeight:36},page:local.page,pageSize:local.pageSize,defaultSplit:45,
         search:{key:"warband-module-"+active,value:local.query,placeholder:"Search "+data.schema.label.toLowerCase()+"…",change:value=>{local.query=value;local.page=0;renderApp();}},
