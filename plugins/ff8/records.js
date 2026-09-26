@@ -71,11 +71,13 @@
     if(field.control==="boolean")return "BOOL";
     return "INT";
   }
+  // A value with its flags is one switch row with the value leading it, the
+  // same control the attack flags use. As two parts side by side, a narrow
+  // panel left each element toggle 25px wide and clipped its icon away.
   function magicComposite(valueField,flagsField,rowId,className=""){
-    if(className.includes("attack-flags")&&flagsField)return flagSourceControl(flagsField,"magic",rowId,{leading:valueField?[{label:"TYPE",help:valueField.help,control:fieldSourceControl(valueField,"magic",rowId)}]:[]});
-    return LexeditorUI.controlGroup([
-      valueField?{label:className.includes("attack-flags")?"TYPE":"VALUE",help:valueField.help,control:fieldSourceControl(valueField,"magic",rowId)}:null,
-      flagsField?{control:fieldSourceControl(flagsField,"magic",rowId)}:null].filter(Boolean));
+    const valueLabel=className.includes("attack-flags")?"TYPE":"VALUE";
+    if(flagsField)return flagSourceControl(flagsField,"magic",rowId,{leading:valueField?[{label:valueLabel,help:valueField.help,control:fieldSourceControl(valueField,"magic",rowId)}]:[]});
+    return LexeditorUI.controlGroup([valueField?{label:valueLabel,help:valueField.help,control:fieldSourceControl(valueField,"magic",rowId)}:null].filter(Boolean));
   }
   function magicLeadingPanel(row){return compatibilityPanel(row.fields.filter(field=>field.group==="GF Compatibility"),"magic",row.id)}
   function magicDetail(row,prefs){
