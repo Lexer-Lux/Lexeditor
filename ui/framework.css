@@ -4250,7 +4250,13 @@ body:has(.lex-data-map-table) #main {
 .lex-instruction-row { display:flex; align-items:center; gap:6px; min-height:96px; flex:1 0 96px; padding:6px; border-bottom:1px solid var(--lex-border); box-sizing:border-box; }
 .lex-instruction-row[draggable="true"], .lex-project-reference[draggable="true"] { cursor:grab; }
 .lex-instruction-index { flex:0 0 22px; font-size:.8em; color:var(--lex-muted); }
-.lex-instruction-controls { display:flex; align-items:center; gap:6px; flex:1 1 60%; min-width:0; }
+.lex-instruction-controls { display:flex; align-items:flex-end; gap:6px; flex:1 1 60%; min-width:0; }
+.lex-instruction-controls :is(select,input:not([type="checkbox"],[type="radio"],[type="range"])) {
+  /* Fitting long option text must not change a control's height. */
+  height:var(--lex-instruction-control-height,2rem);
+  min-height:var(--lex-instruction-control-height,2rem);
+  box-sizing:border-box;
+}
 .lex-instruction-controls > select { width:130px; min-width:90px; flex:0 1 130px; }
 .lex-instruction-operand { display:flex; flex-direction:column; gap:2px; width:90px; min-width:52px; flex:0 1 90px; font-size:.8em; }
 .lex-instruction-operand :is(input,select) { width:100%; min-width:0; }
