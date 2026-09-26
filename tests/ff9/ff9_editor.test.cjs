@@ -237,6 +237,34 @@ test('the Items tab repeats no file name under the record', async () => {
   assert.ok(!stats.attrs.meta, 'the Equipment stats panel still repeats the file name');
 });
 
+test('a Tetra Master card reads as the game draws it', async () => {
+  const e = await editor();
+  e.run(`installData({key:"tetra-cards",label:"Tetra Master cards",source:"project",fields:[
+    {key:"Id",label:"Id",kind:"integer",editable:false,declaredType:"Int32"},
+    {key:"ATK(UP)",label:"ATK (UP)",kind:"integer",editable:true,declaredType:"UInt8",min:1,max:10},
+    {key:"MDEF(RIGHT)",label:"MDEF (RIGHT)",kind:"integer",editable:true,declaredType:"UInt8",min:1,max:10},
+    {key:"MATK(DOWN)",label:"MATK (DOWN)",kind:"integer",editable:true,declaredType:"UInt8",min:1,max:10},
+    {key:"PDEF(LEFT)",label:"PDEF (LEFT)",kind:"integer",editable:true,declaredType:"UInt8",min:1,max:10},
+    {key:"Icon",label:"Icon",kind:"enum",editable:true,declaredType:"String",choices:["MONSTER","SUMMON"]}
+  ],rows:[{line:0,id:0,name:"Goblin",values:{Id:0,"ATK(UP)":2,"MDEF(RIGHT)":5,"MATK(DOWN)":1,"PDEF(LEFT)":3,Icon:"MONSTER"}}]})`);
+  const card = e.run('detail(state.datasets["tetra-cards"],state.datasets["tetra-cards"].rows[0])');
+  const find = (node, tag) => {
+    if (!node || typeof node !== 'object') return null;
+    if (node.tag === tag) return node;
+    for (const child of node.children || []) {
+      const hit = find(child, tag);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  const drawn = find(card, 'statCard');
+  assert.ok(drawn, 'the card is not drawn on the shared card');
+  // The four values in card order: attack up, defence left, defence right,
+  // attack down - the same edges QuadMist draws them on.
+  assert.deepEqual(Array.from(drawn.attrs.ranks.map(button => String(button.children[0]))), ['2', '3', '5', '1']);
+  assert.equal(String(drawn.attrs.corner.children[0].children[0]), 'MONSTER');
+});
+
 
 
 test('FF9 uses shared multi-boolean properties and conceptual character/equipment views', async () => {

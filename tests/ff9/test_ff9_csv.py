@@ -186,6 +186,25 @@ def test_project_overlay_reports_the_values_the_record_shipped_with(store):
                                 str(saved["rows"][1]["line"]): {"Id": 1, "Value": 2}}
 
 
+def test_tetra_master_card_values_and_icon_follow_the_drawn_card(store):
+    """QuadMist draws 1-9 and A, and the file lists every icon it accepts."""
+    fixture(store, "tetra-cards",
+            b"# Comment;Id;ATK(UP);MDEF(RIGHT);MATK(DOWN);PDEF(LEFT);Icon\n"
+            b"# ;Int32;UInt8;UInt8;UInt8;UInt8;String\n"
+            b"Goblin;0;2;5;1;3;MONSTER\n")
+    loaded = store.load("tetra-cards")
+    fields = {field["key"]: field for field in loaded["fields"]}
+    for side in ("ATK(UP)", "MDEF(RIGHT)", "MATK(DOWN)", "PDEF(LEFT)"):
+        assert (fields[side]["min"], fields[side]["max"]) == (1, 10), fields[side]
+        assert fields[side]["editable"]
+    assert fields["Icon"]["kind"] == "enum" and fields["Icon"]["editable"]
+    assert fields["Icon"]["choices"] == ["MONSTER", "SUMMON", "WEAPON", "SHIP", "ANIMAL", "CASTLE", "MYSTERY"]
+    saved = store.save("tetra-cards", loaded["sha256"], [
+        {"line": loaded["rows"][0]["line"], "values": {"Icon": "CASTLE", "ATK(UP)": 10}}])
+    assert saved["rows"][0]["values"]["Icon"] == "CASTLE"
+    assert b"Goblin;0;10;5;1;3;CASTLE" in Path(saved["sourcePath"]).read_bytes()
+
+
 def test_failed_default_baseline_is_retried(tmp_path, monkeypatch):
     payload = b"# Id;Value\n# Int32;UInt8\n0;1\n"
     monkeypatch.setattr(paths, "DATA_ROOT", tmp_path / "cache")

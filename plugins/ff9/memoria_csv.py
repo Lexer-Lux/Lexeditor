@@ -32,6 +32,12 @@ class Dataset:
     # same words mean something else in other tables, so the rename stays with
     # the dataset that means it.
     field_labels: tuple[tuple[str, str], ...] = ()
+    # Columns whose real range, or whose documented values, are narrower than
+    # their stored type. A card value is stored as a byte but QuadMist only
+    # draws 1 through 9 and A for 10; the card's icon is stored as text but the
+    # format documents every value it accepts.
+    field_bounds: tuple[tuple[str, int, int], ...] = ()
+    field_choices: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
 
 DATASETS = (
@@ -441,12 +447,22 @@ class MemoriaDataStore:
 
     @staticmethod
     def labelled_fields(dataset: Dataset, fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """The document's field descriptions under this dataset's own names."""
+        """The document's field descriptions under this dataset's own meaning."""
         overrides = dict(dataset.field_labels)
-        if not overrides:
+        bounds = {key: (minimum, maximum) for key, minimum, maximum in dataset.field_bounds}
+        choices = dict(dataset.field_choices)
+        if not overrides and not bounds and not choices:
             return fields
-        return [{**field, "label": overrides.get(field["key"], field["label"])}
-                for field in fields]
+        result = []
+        for field in fields:
+            updated = {**field, "label": overrides.get(field["key"], field["label"])}
+            if field["editable"] and field["key"] in bounds:
+                minimum, maximum = bounds[field["key"]]
+                updated.update(min=minimum, max=maximum)
+            if field["editable"] and field["key"] in choices:
+                updated.update(kind="enum", choices=list(choices[field["key"]]))
+            result.append(updated)
+        return result
 
     def save(self, key: str, expected_sha256: str, changes: list[dict[str, Any]]) -> dict[str, Any]:
         dataset = DATASET_BY_KEY.get(key)

@@ -6,8 +6,11 @@ from . import memoria_csv as base
 Dataset = base.Dataset
 
 def d(key: str, tab: str, label: str, path: str, controls: str,
-      field_labels: tuple[tuple[str, str], ...] = ()) -> Dataset:
-    return Dataset(key, tab, label, path, controls, field_labels=field_labels)
+      field_labels: tuple[tuple[str, str], ...] = (),
+      field_bounds: tuple[tuple[str, int, int], ...] = (),
+      field_choices: tuple[tuple[str, tuple[str, ...]], ...] = ()) -> Dataset:
+    return Dataset(key, tab, label, path, controls, field_labels=field_labels,
+                   field_bounds=field_bounds, field_choices=field_choices)
 
 CORE = (
     # Items.csv is the one table whose "Price" is what a shop charges and whose
@@ -37,7 +40,12 @@ CORE = (
     d("status-sets", "magic", "Status sets", "Battle/StatusSets.csv", "Named status-set membership"),
     d("sfx-shp", "effects", "SHP definitions", "SpecialEffects/Common/SHP.csv", "Shape-particle definitions and textures"),
     d("sfx-sps", "effects", "SPS definitions", "SpecialEffects/Common/SPS.csv", "Sprite-particle definitions, textures, colors, and timing"),
-    d("tetra-cards", "tetra-master", "Tetra Master cards", "TetraMaster/TripleTriad.csv", "Card attack, defence, type, and arrow data"),
+    # QuadMist prints a card value as 1 through 9 and A for 10, and the file's
+    # own header lists every icon name it accepts, so both stay inside what the
+    # game can draw instead of following the byte the file stores them in.
+    d("tetra-cards", "tetra-master", "Tetra Master cards", "TetraMaster/TripleTriad.csv", "Card attack, defence, type, and arrow data",
+      field_bounds=(("ATK(UP)", 1, 10), ("MDEF(RIGHT)", 1, 10), ("MATK(DOWN)", 1, 10), ("PDEF(LEFT)", 1, 10)),
+      field_choices=(("Icon", ("MONSTER", "SUMMON", "WEAPON", "SHIP", "ANIMAL", "CASTLE", "MYSTERY")),)),
     d("world-transport", "world", "Transport controls", "World/TransportControls.csv", "World transport movement and collision parameters"),
     d("world-weather", "world", "Weather colors", "World/WeatherColors.csv", "World light, fog, and ambient weather colors"),
 )

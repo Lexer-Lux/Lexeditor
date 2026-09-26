@@ -94,3 +94,9 @@
 
   --lex-toast-bg:var(--ff9-stone);--lex-toast-fg:#fff;
   --lex-toast-border:3px solid;--lex-toast-border-color:var(--ff9-bevel);}
+
+/* The card's type sits where the shared card keeps its corner picture. FF9
+   names the type in words, so that box has to fit a word rather than one
+   glyph; the card itself is the game's own art and is never bundled. */
+.ff9-card-detail .lex-stat-card-corner {width:54%;height:auto;}
+.ff9-card-detail .lex-stat-card-corner > button {font:700 13px/1.15 var(--lex-font);padding:6px 4px;}

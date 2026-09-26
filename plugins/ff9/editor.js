@@ -300,7 +300,7 @@
   // The Items tab's own screens already say which records they show, so their
   // panels do not repeat the file name and the word "CSV" under the record.
   const ITEMS_TAB_DATASETS=new Set(["items","item-effects","initial-items","item-stats"]);
-  function detail(data,row){const identity=sourceHasId(data)?recordId(row.id):null;if(data.key==="items")return detailPanel({className:"ff9-detail",title:row.name,identity,body:[itemSections(data,row)]});if(data.key==="shops")return shopDetail(data,row);if(data.key.startsWith("ability-"))return abilityDetail(data,row);const visible=data.fields.filter(field=>!["id","comment"].includes(field.key.toLocaleLowerCase())),editable=visible.filter(field=>field.editable&&field.kind!=="stored"&&!readOnlyNote(data,field)),stored=visible.filter(field=>!field.editable||field.kind==="stored"||readOnlyNote(data,field));const body=[];if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));const meta=battleKeys.includes(data.key)?`${data.label} · ${row.source||data.source} BattleScene raw16`:data.key.startsWith("field-walkmesh")?`${data.label} · ${row.source||data.source} BGI`:`${data.label} · ${data.source} CSV`;return detailPanel({className:"ff9-detail",title:row.name,identity,meta:ITEMS_TAB_DATASETS.has(data.key)?null:meta,body})}
+  function detail(data,row){const identity=sourceHasId(data)?recordId(row.id):null;if(data.key==="items")return detailPanel({className:"ff9-detail",title:row.name,identity,body:[itemSections(data,row)]});if(data.key==="shops")return shopDetail(data,row);if(data.key==="tetra-cards")return cardDetail(data,row);if(data.key.startsWith("ability-"))return abilityDetail(data,row);const visible=data.fields.filter(field=>!["id","comment"].includes(field.key.toLocaleLowerCase())),editable=visible.filter(field=>field.editable&&field.kind!=="stored"&&!readOnlyNote(data,field)),stored=visible.filter(field=>!field.editable||field.kind==="stored"||readOnlyNote(data,field));const body=[];if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));const meta=battleKeys.includes(data.key)?`${data.label} · ${row.source||data.source} BattleScene raw16`:data.key.startsWith("field-walkmesh")?`${data.label} · ${row.source||data.source} BGI`:`${data.label} · ${data.source} CSV`;return detailPanel({className:"ff9-detail",title:row.name,identity,meta:ITEMS_TAB_DATASETS.has(data.key)?null:meta,body})}
   const gilValue=value=>value===""||value===null||value===undefined?"—":`${LexeditorUI.formatNumber(value)} gil`;
   // A shop record is one row of item ids. The ids are the editable truth, but
   // a reader needs the items themselves, so the panel resolves every id to the
@@ -318,6 +318,43 @@
     if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));
     if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));
     return detailPanel({className:"ff9-detail",title:row.name,identity:null,meta:`Shops · ${data.source} CSV · ${stock.length} item${stock.length===1?"":"s"}`,body});
+  }
+  // A Tetra Master card is read the way the game draws it: one value on each
+  // edge and the card's icon in a corner. The shared stat card owns that shape,
+  // so this screen supplies only FF9's own values, their order and their names.
+  // The card art belongs to the game, so no image is bundled or shown.
+  const CARD_SIDES=[["ATK(UP)","Attack, up edge"],["PDEF(LEFT)","Defence, left edge"],["MDEF(RIGHT)","Defence, right edge"],["MATK(DOWN)","Attack, down edge"]];
+  function cardDetail(data,row){
+    // The card's own dataset owns the range and the icon names, so the card,
+    // the property rows and a saved file all read the same values.
+    const sideRange=key=>{const field=data.fields.find(value=>value.key===key)||{};
+      return [Number.isFinite(field.min)?field.min:1,Number.isFinite(field.max)?field.max:10]};
+    const stored=key=>Number(row.values[key])||0;
+    // QuadMist prints a ten as A.
+    const rank=key=>stored(key)===10?"A":String(stored(key));
+    const write=(key,next)=>{const [low,high]=sideRange(key);row.values[key]=Math.max(low,Math.min(high,Number(next)||low));shell.refresh();render()};
+    const step=(key,direction)=>{const [low,high]=sideRange(key),value=stored(key),span=high-low+1;
+      const raised=low+(((value-low+1)%span)+span)%span;
+      write(key,direction>0?raised:value<=low?high:value-1)};
+    let card=null;
+    const iconField=data.fields.find(value=>value.key==="Icon");
+    const picker=LexeditorUI.choicePopover({label:"Choose the card's icon",boundary:()=>card,
+      choices:(iconField?.choices||[]).map(name=>({value:name,label:name})),
+      select:name=>{row.values.Icon=name;shell.refresh();render()}});
+    const rankButton=([key,label])=>el("button",{type:"button",disabled:state.activeSource!=="mine",
+      title:`${label}: click to raise, right-click to lower`,
+      "aria-label":`${label}, currently ${rank(key)}`,
+      onclick:()=>step(key,1),oncontextmenu:event=>{event.preventDefault();step(key,-1)}},rank(key));
+    const icon=el("button",{type:"button",disabled:state.activeSource!=="mine",
+      title:`Change the card's icon, currently ${row.values.Icon}`,
+      "aria-label":`Card icon, currently ${row.values.Icon}`,
+      onclick:()=>picker.openFor(icon)},el("span",{class:"ff9-card-icon"},String(row.values.Icon||"")));
+    card=LexeditorUI.statCard({ranks:CARD_SIDES.map(rankButton),corner:icon});
+    return detailPanel({className:"ff9-detail ff9-card-detail",title:row.name,
+      identity:recordId(row.id),body:[
+        detailSection({title:"CARD",body:[card],
+          help:infoHelp("Each number is drawn on the edge it belongs to, the way QuadMist draws the card. Click a number to raise it and right-click to lower it. The corner shows the card's icon; press it to choose another.")}),
+        detailSection({title:"CARD VALUES",body:fieldRows(data,row)})]});
   }
   // An ability row is a slot in one character's learn list: the id says which
   // ability it holds, and the file stores no cost of its own. The MP cost comes
