@@ -1,5 +1,6 @@
 """G12: the dev drawer is one per-game table through the shared Table."""
 import functools
+import os
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -24,7 +25,7 @@ STUB = """window.pywebview={api:new Proxy({
     rows:[
       {id:"global",game:"Global",global:true,quotes:2,
        copiedLines:null,copiedRecorded:null,copiedOver:false},
-      {id:"ff8",game:"Final Fantasy 8",
+      {id:"ff8",game:"Final Fantasy 8",hasDefaults:true,reshadeDefaults:true,
        quotes:10,
        copiedLines:4,copiedRecorded:4,copiedOver:false},
       {id:"ff9",game:"Final Fantasy 9",
@@ -81,6 +82,10 @@ def test_drawer_mounts_one_shared_table_with_per_game_rows():
                 # one a dot in its label's GitHub colour.
                 assert ff8.locator('[title^="#612 UX: closed"] .lexer-dev-closed').count() == 1
                 assert ff8.locator('.lexer-dev-missing').count() == 1
+                # Old defaults metadata must not turn a missing ReShade issue
+                # into a completion tick or a claim of in-game acceptance.
+                assert ff8.locator('[title="Final Fantasy 8 has no RESHADE subissue"]').inner_text() == '!'
+                assert 'defaults set' not in table.inner_text().lower()
                 editor = ff8.locator('[title^="#21 EDITOR: waiting"] .lexer-dev-dot')
                 assert editor.evaluate("n=>getComputedStyle(n).backgroundColor") == "rgb(18, 52, 86)"
                 assert ff8.locator('[title^="#613 THEME: no status"] .lexer-dev-dot.none').count() == 1
@@ -108,6 +113,9 @@ def test_drawer_mounts_one_shared_table_with_per_game_rows():
                 files = page.locator("#lexer-dev-files").inner_text()
                 assert "plugins/ff8/party.js" in files
                 assert not errors, errors
+                if destination := os.environ.get('LEXEDITOR_UI_SCREENSHOT_DIR'):
+                    Path(destination).mkdir(parents=True, exist_ok=True)
+                    page.screenshot(path=str(Path(destination) / 'developer-reshade-status.png'))
             finally:
                 browser.close()
     finally:
