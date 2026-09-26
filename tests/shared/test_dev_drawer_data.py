@@ -36,17 +36,38 @@ class DeveloperDrawerDataTests(unittest.TestCase):
     def test_a_verifier_that_is_not_there_reports_nothing_rather_than_guessing(self):
         self.assertEqual(_budget_counts("verify_no_such_budget"), {})
 
-    def test_the_drawer_sees_debt_rather_than_zeroes(self):
-        # An empty result means the drawer lost the verifier, not that the work
-        # is finished - the duplicated-plugin check reports copies today. If the
-        # repository really does reach zero, delete this test with the debt.
-        self.assertTrue(_budget_counts("verify_shared_code_budget"),
-                        "the drawer would report no copied lines for any game")
-        # The shared-UI budget reached zero on 2026-09-25: every plugin
-        # stylesheet is tokens only and no plugin builds a table, row or list by
-        # hand, so that column reads zero because the debt is paid, not because
-        # the drawer lost the verifier. The check that the verifier is still
-        # where the drawer reads it is above this one.
+    def test_the_copied_line_verifier_still_detects_a_copy(self):
+        """The column reads zero today, and zero must mean "none", not "blind".
+
+        Both copied-code budgets reached zero on 2026-09-25, so a test that
+        required the repository to be in debt would now be a test of the debt.
+        This gives the verifier a tree of its own - two plugins holding one
+        function written twice - and requires it to name the copy.
+        """
+        import tempfile
+
+        verifier = load_verifier("verify_shared_code_budget")
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            for plugin in ("alpha", "beta"):
+                target = root / "plugins" / plugin / "server.py"
+                target.parent.mkdir(parents=True)
+                target.write_text(
+                    "def send(payload, destination):\n"
+                    "    data = payload.encode('utf-8')\n"
+                    "    destination.write(data)\n"
+                    "    destination.flush()\n"
+                    "    total = len(data)\n"
+                    "    destination.write(b'')\n"
+                    "    return total\n",
+                    encoding="utf-8")
+            original = verifier.ROOT
+            verifier.ROOT = root
+            try:
+                counts = verifier.counts()
+            finally:
+                verifier.ROOT = original
+        self.assertEqual(counts, {"beta": 6}, counts)
 
 
 if __name__ == "__main__":
