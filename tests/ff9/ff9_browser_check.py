@@ -67,6 +67,14 @@ def csv_bytes(relative: str) -> bytes:
         return (b"# Comment;Id;Items\n# ;Int32;Int32[]\n"
                 b"Shop 0000;0;1, 2, 35;# Shop 0000 Test Shop\n"
                 b"Shop 0023;23;;# Shop 0023 Closed Shop\n")
+    if relative == "TetraMaster/TripleTriad.csv":
+        return (
+            "# Comment;Id;ATK(UP);MDEF(RIGHT);MATK(DOWN);PDEF(LEFT);Icon\n"
+            "# ;Int32;UInt8;UInt8;UInt8;UInt8;String\n"
+            "Goblin;0;2;5;1;3;MONSTER\n"
+            "Fang;1;6;1;1;2;SUMMON\n"
+            "Skeleton;2;1;2;4;5;CASTLE\n"
+        ).encode()
     if relative == "Characters/Abilities/Beatrix1.csv":
         return b"# Id;AP\n# Ability;Int32\nAA:1;0;# Fire\nAA:2;0;# Cure\n0;0;# Void\n0;0;# Void\n"
     return b"# Id;Value\n# Int32;UInt8\n0;1;# Synthetic\n"
@@ -175,10 +183,44 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             assert page.locator(".lex-column-list-row").count() >= 10
             assert_table_headers_fit(page)
 
+            # The tab strip shares its width between the fifteen tabs, so the
+            # bar reaches the right edge of the window instead of stopping
+            # short of it, and no label is clipped or scrolled to get there.
+            strip = page.evaluate("""()=>{
+              const nav=document.querySelector('.lex-shell-header nav');
+              const box=nav.getBoundingClientRect();
+              const tabs=[...nav.querySelectorAll('button[data-tab]')]
+                .filter(tab=>tab.offsetParent!==null);
+              const labels=tabs.map(tab=>tab.querySelector('.lex-tab-label-text')).filter(Boolean);
+              return {right:box.right,lastRight:tabs[tabs.length-1].getBoundingClientRect().right,
+                      scroll:nav.scrollWidth,client:nav.clientWidth,
+                      clipped:labels.filter(label=>label.scrollWidth>label.clientWidth+1)
+                        .map(label=>label.textContent.trim())};
+            }""")
+            assert abs(strip["right"] - strip["lastRight"]) <= 2, strip
+            assert strip["scroll"] <= strip["client"] + 1, strip
+            assert not strip["clipped"], strip
+            # The Items tab names the records it shows itself, so the panel
+            # carries no file-name subtitle under the record's own name.
+            expect(page.locator(".ff9-detail .lex-detail-panel-meta")).to_have_count(0)
+
             price = numeric_field(page, "BUY PRICE")
             expect(price).to_have_value("250")
             page.screenshot(path=str(OUT / "ff9-items-wide.png"), full_page=True)
             save = page.locator("#global-save")
+            # Right-clicking a property puts back the value its record shipped
+            # with. The shared Detail owns the reset and the reference entry;
+            # the plugin supplies the vanilla value and the way to write one.
+            price.fill("333")
+            expect(save).to_be_enabled()
+            expect(page.locator(".lex-source-control.lex-value-modified")).to_have_count(1)
+            page.screenshot(path=str(OUT / "ff9-items-modified.png"), full_page=True)
+            price.click(button="right")
+            expect(price).to_have_value("250")
+            expect(save).to_be_disabled()
+            expect(page.locator(".lex-source-control.lex-value-modified")).to_have_count(0)
+            page.screenshot(path=str(OUT / "ff9-items-restored.png"), full_page=True)
+
             price.fill("333")
             expect(save).to_be_enabled()
             save.click(button="right")
@@ -255,6 +297,20 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
 
             page.evaluate("state.datasetChoice.world='field-walkmesh';loadDataset('field-walkmesh').then(render)")
             page.wait_for_function("state.datasets['field-walkmesh']?.rows?.length===4")
+            # One checkbox in one property is a boolean: the shared field lays
+            # it out as a checkbox with its leader arrow. Passed the CSV's own
+            # word for the storage type, it fell through to the ordinary row
+            # rules and stretched the checkbox across the whole line.
+            walkmesh_active = field(page, "FLOOR ACTIVE")
+            assert walkmesh_active.get_attribute("data-lex-type") == "BOOL"
+            boolean_box = walkmesh_active.locator('input[type="checkbox"]')
+            # The panel is rebuilt as the dataset settles, so wait for the box
+            # itself before measuring it; a detached node measures as nothing.
+            expect(boolean_box).to_be_visible()
+            expect(walkmesh_active.locator(".lex-field-boolean-arrow")).to_be_visible()
+            box_size = boolean_box.bounding_box()
+            assert box_size and 12 <= box_size["width"] <= 32 and 12 <= box_size["height"] <= 32, box_size
+            page.screenshot(path=str(OUT / "ff9-boolean.png"), full_page=True)
             active = field(page, "FLOOR ACTIVE").locator('input[type="checkbox"]')
             expect(active).to_be_checked()
             expect(field(page, "OTHER FLAG BITS").locator("input")).to_have_value("64")
@@ -324,6 +380,34 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             assert_table_headers_fit(page)
             assert_table_rows_do_not_overlap(page)
             page.screenshot(path=str(OUT / "ff9-shops.png"), full_page=True)
+
+            # A Tetra Master card is read the way the game draws it: the four
+            # values in card order (attack up, defence left, defence right,
+            # attack down) on the shared card, with the card's own icon, and
+            # that same card is the control for changing a value.
+            page.evaluate("navigate('tetra-master')")
+            page.wait_for_function("state.datasets['tetra-cards']?.rows?.length===3")
+            card = page.locator(".ff9-card-detail .lex-stat-card")
+            expect(card).to_be_visible()
+            ranks = page.locator(".ff9-card-detail .lex-stat-card-ranks > button")
+            expect(ranks).to_have_count(4)
+            selected_card = page.evaluate("""()=>{const data=state.datasets['tetra-cards'];
+              return data.rows.find(row=>row.line===state.selected['tetra-cards']).values}""")
+            card_sides = ["ATK(UP)", "PDEF(LEFT)", "MDEF(RIGHT)", "MATK(DOWN)"]
+            shown = lambda key: "A" if selected_card[key] == 10 else str(selected_card[key])
+            expect(ranks).to_have_text([shown(key) for key in card_sides])
+            expect(card.locator(".lex-stat-card-corner")).to_contain_text(selected_card["Icon"])
+            # The four values are bounded to what QuadMist can draw, and the
+            # icon is a choice rather than a free text box.
+            expect(field(page, "ATK (UP)").locator(
+                "input[type='number'], input[inputmode='decimal']")).to_have_attribute("max", "10")
+            expect(field(page, "ICON").locator("select")).to_have_count(1)
+            page.screenshot(path=str(OUT / "ff9-tetra-master.png"), full_page=True)
+            raised = "A" if selected_card["ATK(UP)"] % 10 + 1 == 10 else str(selected_card["ATK(UP)"] % 10 + 1)
+            ranks.first.click()
+            expect(ranks.first).to_have_text(raised)
+            ranks.first.click(button="right")
+            expect(ranks.first).to_have_text(shown("ATK(UP)"))
 
             # An ability slot carries no cost of its own: the cost belongs to
             # the battle action the slot names, and the file pads the list with
