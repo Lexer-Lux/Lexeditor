@@ -182,13 +182,13 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     const byKey=new Map(players.map(row=>[row.key,row]));
     const rows=players.filter(row=>`${row.name} ${row.map}`.toLowerCase().includes(query));
     const help=[
-      "Selects the opponent's deck, not a single card. The deck list itself is not editable.",
+      "Identifies this opponent's rare-card ownership. Common cards are chosen from the levels below when a match starts.",
       "The card rules you bring from previous regions. The game uses these when it offers to mix rules.",
       "The card rules used in this opponent's region. These are separate from the rules you bring with you.",
       "Percentage chance, from 0 to 100, that this opponent uses an available rare card.",
       "The gameplay effect of this argument has not been verified. Its original value is retained.",
       "The gameplay effect of this argument has not been verified. Its original value is retained.",
-      "The gameplay effect of this argument has not been verified. Its original value is retained."];
+      "Choose the levels this opponent can draw common cards from. With no levels selected, the game uses level 1. Rare cards depend on ownership in your save."];
     const detail=entry=>{
       const map=state.data.fields.rows.find(row=>row.key===entry.map);
       if(!map)return detailPanel({title:entry.name,body:[LexeditorUI.detailNote('Location data is unavailable.')]});
@@ -207,6 +207,23 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
           const fields=(player.params||[]).map(param=>{
             const before=state.vanilla?.fields?.rows?.find(row=>row.key===map.key)?.players?.find(row=>row.id===player.id)?.params?.find(row=>row.id===param.id);
             const update=value=>{param.value=Number(value);noteFieldEdit('fields',{field:param.name});shell.refresh()};
+            if(param.id===6&&param.mode==='literal'){
+              const levels=Array.from({length:7},(_,level)=>{
+                const check=el('input',{type:'checkbox',checked:!!(param.value&(1<<level)),
+                  disabled:!param.editable||state.activeSource!=='mine',
+                  'aria-label':`${entry.name} card level ${level+1}`,
+                  onchange:event=>{
+                    const next=event.target.checked?param.value|(1<<level):param.value&~(1<<level);
+                    // Bit 7 alone supplies no level and does not take the
+                    // game's zero-byte fallback. Preserve it without making
+                    // the native generator divide by an empty level count.
+                    if((next&255)===128){event.target.checked=true;return}
+                    update(next);render();}});
+                return el('label',{},check,`Level ${level+1}`);
+              });
+              return detailSection({title:'CARD LEVELS',help:infoHelp(help[6]),
+                body:LexeditorUI.tileGrid(levels,{minWidth:100})});
+            }
             const variable=param.mode==='variable',maximum=!variable&&param.id===3?100:0xFFFFFF;
             const input=numberControl(param.value,0,maximum,1,update,{'aria-label':`${entry.name} ${param.name}`});
             input.disabled=!param.editable||state.activeSource!=='mine';
@@ -214,7 +231,19 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
               help:infoHelp(help[param.id]+(variable?' Holds a game-variable reference; changing it selects a different variable.':'')),
               control:sourceControl(!variable&&param.id===3?LexeditorUI.unitField(input,'%'):input,()=>param.value,before?.value,[],update)});
           });
-          body.push(calls.length===1?LexeditorUI.stack({fill:false},...fields):detailSection({title:`Setup ${index+1}`,body:fields}));
+          if(calls.length===1)body.push(...fields);
+          else body.push(detailSection({title:`Setup ${index+1}`,body:fields}));
+          const levels=player.params?.find(param=>param.id===6);
+          if(levels?.mode==='literal'){
+            const mask=(levels.value&255)===0?1:levels.value&127;
+            const pool=state.data.cards.rows.filter(card=>card.id<77&&card.id!==47&&(mask&(1<<Math.floor(card.id/11))));
+            body.push(detailSection({title:calls.length===1?'COMMON CARD POOL':`SETUP ${index+1} COMMON CARD POOL`,
+              help:infoHelp('The game draws distinct cards from these levels when the match starts. PuPu is never drawn. Rare cards depend on the current save and can replace common cards.'),
+              body:LexeditorUI.tileGrid(pool.map(card=>LexeditorUI.recordCard({
+                title:LexeditorUI.hoverable({content:card.name,targetType:'cards',targetId:card.id,targetLabel:card.name,
+                  activate:()=>{state.selected.cards=card.id;state.filters.cards='';mode='cards';render()}}),
+                image:el('img',{src:`/assets/cards/${card.id}.png`,alt:card.name,loading:'lazy'})})),{balanced:true,minWidth:110})}));
+          }
         });
         // Which other opponents play the same deck. Editing a deck means
         // editing every script that names it, and no other screen shows that.
@@ -223,9 +252,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
           const others=(deckMembers.get(deck)||[]).filter(key=>key!==entry.key)
             .map(key=>byKey.get(key)).filter(Boolean);
           body.push(detailSection({title:`ALSO USES DECK ${deck}`,
-            help:infoHelp(`The deck number this opponent's CARDGAME call names. Several opponents can name the same deck, and the game reads that deck's own card list.`
-              +` The card list of a deck is not stored in the files this editor reads, so it cannot be shown or edited here.`
-              +` Each opponent below has its own CARDGAME call; select one to edit the values its script passes.`),
+            help:infoHelp('These opponents share the same rare-card ownership number. Their common-card levels can differ. Open an opponent to edit its settings.'),
             body:others.length
               ?LexeditorUI.stack({fill:false},...others.map(other=>
                   LexeditorUI.hoverable({content:`${other.name} · ${other.map}`,
