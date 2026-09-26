@@ -142,7 +142,9 @@
           dataType:({identity:"ID",string:"STRING",text:"STRING",expr:"EXPR",integer:"INT",number:"FLOAT",vec2:"VECTOR2",vec3:"VECTOR3",vec4:"VECTOR4"})[spec.kind]||"VALUE",
           description,control:fieldControl(dataset,row,spec,readOnly)});
       });
-      return LexeditorUI.detailPanel({className:"warband-module-detail",title:row.name||row.id,
+      // The heading is drawn in the installed game's own font, the same face
+      // the shell and the shell's tabs use.
+      return LexeditorUI.detailPanel({className:"warband-module-detail",title:bitmapText(row.name||row.id,24),
         // The heading shows the record's name; the ID repeats beside it only
         // when it is a different string. Coverage and the source caveat are
         // panel help, not a second subtitle and a paragraph on the page.

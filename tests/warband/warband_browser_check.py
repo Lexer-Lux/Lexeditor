@@ -30,6 +30,12 @@ TEXTURE=png((200,150,70,255));ICON=png((150,110,60,255))
 positions=[[-.3,-.15,-1],[.3,-.15,-1],[.3,-.15,1],[-.3,-.15,1],[-.3,.15,-1],[.3,.15,-1],[.3,.15,1],[-.3,.15,1]]
 triangles=[[0,1,2],[0,2,3],[4,6,5],[4,7,6],[0,4,5],[0,5,1],[3,2,6],[3,6,7],[1,5,6],[1,6,2],[0,3,7],[0,7,4]]
 MODEL={'cacheKey':'a'*64,'mesh':'fixture_sword','material':'fixture_steel','resource':'fixture.brf','texture':'/fixture-texture.png','summary':{'vertices':8,'triangles':12},'geometry':{'positions':positions,'normals':[[0,-1,0]]*8,'texCoords':[[0,0],[1,0],[1,1],[0,1]]*2,'triangles':triangles,'bounds':{'min':[-.3,-.15,-1],'max':[.3,.15,1]}}}
+# A stand-in for the installed Warband atlas: the same shape the plugin reads
+# out of Data/font_data.xml, so the checks can prove the game font is used for
+# headings without an installed game.
+FONT={'available':True,'width':100,'height':100,'fontSize':70,'lineSpacing':100,
+      'characters':{str(ord(character)):{'u':10,'v':10,'w':50,'h':50,'preshift':0,'yadjust':48,'postshift':40}
+                    for character in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,:;_-()[]/'\""}}
 TROOPS=[{'recordIndex':i,'id':id,'name':name,'faction':faction,'level':level,'flags':'tf_guarantee_armor','line':i+1,'status':'active','plural':name+'s'} for i,(id,name,faction,level) in enumerate([
     ('recruit','Recruit','fac_north',1),('footman','Footman','fac_north',10),('archer','Archer','fac_north',10),('knight','Knight','fac_north',20),('guard','Guard','fac_north',20),('militia','Militia','fac_north',2),('elite_militia','Elite militia','fac_north',12),('horseman','Horseman','fac_south',10),('rider','Rider','fac_south',20)])]
 for row in TROOPS:
@@ -117,10 +123,10 @@ def main():
                     # Chromium on an opaque/storage-refused document, while the shared shell
                     # legitimately uses sessionStorage during boot; that made the fixture die
                     # before Warband's scripts could render anything.
-                    fixtures={'/api/items':{'rows':ITEMS,'sha256':'fixture-items','choices':server.item_choices(ITEMS)},'/api/troops':{'rows':TROOPS,'items':[],'factions':[],'sha256':'fixture-troops','types':{},'flags':{}},'/api/upgrades':{'rows':UPGRADES},'/api/modules':{'modules':[]},'/api/warband-font':{'available':False},'/api/dashboard':{'paths':{},'problems':[]},'/api/settings':{'rows':server.settings_rows()},'/api/datamap':server.data_map_rows()}
+                    fixtures={'/api/items':{'rows':ITEMS,'sha256':'fixture-items','choices':server.item_choices(ITEMS)},'/api/troops':{'rows':TROOPS,'items':[],'factions':[],'sha256':'fixture-troops','types':{},'flags':{}},'/api/upgrades':{'rows':UPGRADES},'/api/modules':{'modules':[]},'/api/warband-font':FONT,'/api/dashboard':{'paths':{},'problems':[]},'/api/settings':{'rows':server.settings_rows()},'/api/datamap':server.data_map_rows()}
                     record_fixtures={key:server.dataset_data(module,key) for key in server.MODULE_RECORD_SCHEMAS}
                     model={**MODEL,'texture':'data:image/png;base64,'+base64.b64encode(TEXTURE).decode()}
-                    stub='const replaceState=history.replaceState.bind(history);history.replaceState=(state,unused)=>replaceState(state,unused);const recordFixtures='+json.dumps(record_fixtures)+';let failSound=true;window.fetch=async function(input,options={}){const path=String(input);const fixtures='+json.dumps(fixtures)+';if(path.startsWith("/api/module-records?")){const key=new URL(path,"http://fixture").searchParams.get("dataset");if(key==="sounds"&&failSound){failSound=false;return new Response(JSON.stringify({error:"Synthetic sound parse failure"}),{status:400});}await new Promise(r=>setTimeout(r,80));return new Response(JSON.stringify(recordFixtures[key]||{error:"Unknown fixture dataset"}));}if(path==="/api/module-records/save"){const body=JSON.parse(options.body||"{}"),data=recordFixtures[body.dataset];for(const edit of body.edits||[]){const row=data.rows.find(r=>r.recordIndex===edit.recordIndex);Object.assign(row.fields,edit.fields||{});if(Object.hasOwn(edit.fields||{},"name"))row.name=edit.fields.name;}data.sha256="saved-"+Date.now();return new Response(JSON.stringify({saved:(body.edits||[]).length,sha256:data.sha256}));}if(path==="/api/build/start")return new Response(JSON.stringify({started:true}));if(path.startsWith("/api/build/status"))return new Response(JSON.stringify({cursor:1,lines:["Build verified: fixture\\n"],running:false,returnCode:0}));if(path.startsWith("/api/item-preview?")){return new Response(JSON.stringify(path.includes("broken")?{error:"Missing diffuse texture fixture"}:'+json.dumps(model)+'),{status:path.includes("broken")?422:200});}if(path.startsWith("/api/item-icon?")){if(path.includes("broken"))return new Response(JSON.stringify({error:"Missing diffuse texture fixture"}),{status:422});const bytes=Uint8Array.from(atob("'+base64.b64encode(ICON).decode()+'"),c=>c.charCodeAt(0));return new Response(bytes,{headers:{"Content-Type":"image/png"}});}return new Response(JSON.stringify(fixtures[path]||{}));};'
+                    stub='const replaceState=history.replaceState.bind(history);history.replaceState=(state,unused)=>replaceState(state,unused);const recordFixtures='+json.dumps(record_fixtures)+';let failSound=true;const fontOn=location.search.includes("font=1");const fontOnFixture='+json.dumps(FONT)+';const fontOffFixture={"available":false};window.fetch=async function(input,options={}){const path=String(input);const fixtures='+json.dumps(fixtures)+';if(path==="/api/warband-font")return new Response(JSON.stringify(fontOn?fontOnFixture:fontOffFixture));if(path.startsWith("/api/module-records?")){const key=new URL(path,"http://fixture").searchParams.get("dataset");if(key==="sounds"&&failSound){failSound=false;return new Response(JSON.stringify({error:"Synthetic sound parse failure"}),{status:400});}await new Promise(r=>setTimeout(r,80));return new Response(JSON.stringify(recordFixtures[key]||{error:"Unknown fixture dataset"}));}if(path==="/api/module-records/save"){const body=JSON.parse(options.body||"{}"),data=recordFixtures[body.dataset];for(const edit of body.edits||[]){const row=data.rows.find(r=>r.recordIndex===edit.recordIndex);Object.assign(row.fields,edit.fields||{});if(Object.hasOwn(edit.fields||{},"name"))row.name=edit.fields.name;}data.sha256="saved-"+Date.now();return new Response(JSON.stringify({saved:(body.edits||[]).length,sha256:data.sha256}));}if(path==="/api/build/start")return new Response(JSON.stringify({started:true}));if(path.startsWith("/api/build/status"))return new Response(JSON.stringify({cursor:1,lines:["Build verified: fixture\\n"],running:false,returnCode:0}));if(path.startsWith("/api/item-preview?")){return new Response(JSON.stringify(path.includes("broken")?{error:"Missing diffuse texture fixture"}:'+json.dumps(model)+'),{status:path.includes("broken")?422:200});}if(path.startsWith("/api/item-icon?")){if(path.includes("broken"))return new Response(JSON.stringify({error:"Missing diffuse texture fixture"}),{status:422});const bytes=Uint8Array.from(atob("'+base64.b64encode(ICON).decode()+'"),c=>c.charCodeAt(0));return new Response(bytes,{headers:{"Content-Type":"image/png"}});}return new Response(JSON.stringify(fixtures[path]||{}));};'
                     html=(ROOT/'plugins/warband/editor.html').read_text(encoding="utf-8")
                     # Synthetic set_content pages need a hierarchical base for shared optional asset URLs.
                     html=html.replace('<head>','<head><base href="http://warband-fixture.test/">',1)
@@ -284,7 +290,9 @@ def main():
                     heading=page.evaluate('''() => {
                       const panel=document.querySelector('.warband-module-detail');
                       const title=panel.querySelector('.lex-detail-panel-title');
-                      return {title:[...title.childNodes].filter(node=>node.nodeType===Node.TEXT_NODE).map(node=>node.textContent).join(''),
+                      const bitmap=title.querySelector('.lex-bitmap-text');
+                      return {title:bitmap?bitmap.getAttribute('aria-label')
+                                :[...title.childNodes].filter(node=>node.nodeType===Node.TEXT_NODE).map(node=>node.textContent).join(''),
                               subtitles:[...panel.querySelectorAll('.lex-detail-panel-id,.lex-detail-panel-meta')].map(node=>node.textContent)};
                     }''')
                     # A record whose name is its own ID prints that ID once: not
@@ -319,7 +327,17 @@ def main():
                     # rather than the independent militia tree.
                     page.get_by_role('tab',name='Recruit',exact=True).click()
                     page.locator('button[data-node="knight"]').click()
-                    assert 'Knight' in page.locator('.warband-tree-detail').inner_text()
+                    # The heading is the game's own font, so its text is the
+                    # glyph string's label; the record's own fields carry the
+                    # values that the source holds.
+                    troop_heading=page.evaluate('''() => {
+                      const panel=document.querySelector('.warband-tree-detail');
+                      const title=panel.querySelector('.lex-detail-panel-title'),bitmap=title.querySelector('.lex-bitmap-text');
+                      return {title:bitmap?bitmap.getAttribute('aria-label'):title.textContent,
+                              values:[...panel.querySelectorAll('input')].map(node=>node.value)};
+                    }''')
+                    assert troop_heading['title'].startswith('Knight'),troop_heading
+                    assert 'Knight' in troop_heading['values'],troop_heading
                     assert 'knight' in page.locator('.warband-tree-detail').inner_text()
                     assert page.evaluate("() => {const title=document.querySelector('.warband-tree-detail h2').getBoundingClientRect();const body=document.querySelector('.warband-tree-detail .lex-detail-panel-body').getBoundingClientRect();return title.bottom<=body.top+1;}")
                     coords=page.evaluate('''() => Object.fromEntries([...document.querySelectorAll('[data-node]')].map(n=>[n.dataset.node,n.getBoundingClientRect().y]))''')
@@ -334,6 +352,35 @@ def main():
                     assert page.locator('.warband-item-detail [data-lex-property="name"] input').is_enabled()
                     assert page.locator('.warband-item-detail [data-lex-property="stat-spd_rtng"] input[type="number"]').is_enabled()
                     assert page.get_by_role('button',name='Open model preview',exact=True).count()==0
+                    # Panel headings come from the installed game's own font.
+                    # The fixture carries a stand-in atlas for the glyph metrics
+                    # Warband ships, so the headings can be read back by label.
+                    if width==1200:
+                        font_page=browser.new_page(viewport={'width':width,'height':height})
+                        font_page.on('pageerror',lambda e:errors.append(str(e)))
+                        font_page.route('http://warband-fixture.test/**',route_fixture)
+                        font_page.goto('http://warband-fixture.test/?font=1',wait_until='domcontentloaded')
+                        font_page.locator('.warband-item-detail').wait_for(state='visible')
+                        font_page.wait_for_function('document.querySelector(".warband-item-detail .lex-detail-panel-title .lex-bitmap-text")')
+                        headings=font_page.evaluate('''() => {
+                          const label=node=>node?.querySelector('.lex-bitmap-text')?.getAttribute('aria-label')||null;
+                          return {item:label(document.querySelector('.warband-item-detail .lex-detail-panel-title')),
+                                  tab:document.querySelector('nav button.active')?.getAttribute('aria-label')};
+                        }''')
+                        assert headings['item']=='Fixture sword 000',headings
+                        assert headings['tab']=='Items',headings
+                        font_page.get_by_role('button',name='Music',exact=True).click()
+                        font_page.locator('.warband-module-detail').wait_for(state='visible')
+                        font_page.wait_for_function('document.querySelector(".warband-module-detail .lex-detail-panel-title .lex-bitmap-text")')
+                        assert font_page.evaluate('''() => document.querySelector('.warband-module-detail .lex-detail-panel-title .lex-bitmap-text').getAttribute('aria-label')''')=='travel'
+                        font_page.evaluate('navigate("upgrades")')
+                        font_page.get_by_role('combobox',name='Troop tree faction',exact=True).select_option('fac_north')
+                        font_page.get_by_role('tab',name='Recruit',exact=True).click()
+                        font_page.locator('button[data-node="knight"]').click()
+                        font_page.wait_for_function('document.querySelector(".warband-tree-detail .lex-detail-panel-title .lex-bitmap-text")')
+                        assert font_page.evaluate('''() => document.querySelector('.warband-tree-detail .lex-detail-panel-title .lex-bitmap-text').getAttribute('aria-label')''')=='Knight'
+                        font_page.screenshot(path=str(ARTIFACTS/'font-headings.png'),full_page=True)
+                        font_page.close()
                     results.append({'width':width,'height':height,'dataMap':metrics,'status':'passed'})
                     page.close()
             finally:browser.close()

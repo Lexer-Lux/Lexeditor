@@ -242,7 +242,7 @@
     // model out of the panel, and the same slot carries the close mark. The
     // panel had the icon and the renderer but never the control, so the viewer
     // was there and unreachable.
-    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(item.name,24)),identity:item.id,body,
+    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:bitmapText(item.name,24),identity:item.id,body,
       modelPreview:item.inventoryMesh?{
         label:`${item.name} model`,
         openLabel:`Open the ${item.name} model`,
@@ -395,7 +395,7 @@
   }
 
   function settingDetail(row){
-    return detailPanel({title:row.key,meta:row.section,body:[LexeditorUI.detailSection({body:[
+    return detailPanel({title:bitmapText(row.key,24),meta:row.section,body:[LexeditorUI.detailSection({body:[
       detailField({label:"Value",property:"value",control:el("input",{value:effectiveSetting(row),oninput:event=>{if(event.target.value===row.value)delete state.settingEdits[row.line];else state.settingEdits[row.line]=event.target.value;shell.refresh();}})}),
       LexeditorUI.detailNote(row.description||"No description.")]})]});
   }
