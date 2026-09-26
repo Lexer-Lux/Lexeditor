@@ -7389,7 +7389,12 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   max-width: 100%;
 
  background: var(--lex-nav-bg, var(--lex-panel-2));
- padding-inline: var(--lex-nav-padding-inline, 0px);
+ /* A tab strip with no inset puts its first tab against the window edge, and
+    that tab's own left edge - its outline and its rounded corner - is drawn
+    against the frame instead of inside it, which reads as a cut-off tab. FF7,
+    FF8 and FF9 set this token; the rest of the games were flush. A theme that
+    really wants edge-to-edge tabs can still say 0. */
+ padding-inline: var(--lex-nav-padding-inline, var(--lex-panel-gap, 12px));
  overflow-x: var(--lex-nav-overflow-x, visible);
 }
 .lex-shell-header nav button {
