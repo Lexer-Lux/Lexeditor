@@ -35,7 +35,7 @@ class FormulaeReworkTests(unittest.TestCase):
     def test_only_real_runtime_components_are_marked_implemented(self):
         self.assertEqual(
             formulae_rework.implemented_ids(),
-            ("magic_damage", "spell_healing", "physical_accuracy"),
+            ("magic_damage", "spell_healing", "physical_accuracy", "mug_chance"),
         )
         runtime = {
             row["id"]: row["runtime"]
@@ -46,6 +46,7 @@ class FormulaeReworkTests(unittest.TestCase):
             "magic_damage": "magic_damage_rework",
             "spell_healing": "healing_rework",
             "physical_accuracy": "luck_accuracy",
+            "mug_chance": "mug_chance_rework",
         })
         self.assertTrue(healing_rework.build_hext(True))
         self.assertTrue(luck_accuracy.build_hext(True))
@@ -53,7 +54,7 @@ class FormulaeReworkTests(unittest.TestCase):
         self.assertEqual(
             formulae_rework.incomplete_ids(),
             ("melee_damage", "status_infliction", "status_attack",
-             "elemental_attack", "mug_chance"),
+             "elemental_attack"),
         )
 
     def test_healing_replacement_mirror(self):
@@ -74,9 +75,8 @@ class FormulaeReworkTests(unittest.TestCase):
         row = next(row for row in formulae_rework.FORMULAE if row["id"] == "mug_chance")
         self.assertIn("Mug Difficulty", row["replacement"])
         self.assertIn("Mug rate", row["vanilla"])
-        self.assertEqual(row["status"], formulae_rework.STATUS_INCOMPLETE)
-        self.assertIn("Difficulty", row["blocker"])
-        self.assertIn("stored-rate", row["blocker"])
+        self.assertEqual(row["status"], formulae_rework.STATUS_IMPLEMENTED)
+        self.assertIn("100 − stored Mug rate", row["replacement"])
 
     def test_mug_difficulty_contract_maps_stored_rate(self):
         self.assertEqual(formulae_rework.mug_difficulty_from_rate(0), 100.0)

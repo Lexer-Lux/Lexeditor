@@ -128,20 +128,17 @@ FORMULAE = (
     {
         "id": "mug_chance",
         "name": "Mug chance",
-        "status": STATUS_INCOMPLETE,
-        "runtime": None,
+        "status": STATUS_IMPLEMENTED,
+        "runtime": "mug_chance_rework",
         "replacement": (
-            "Mug % chance = 100% − target Mug Difficulty − target SPD + mugger SPD"
+            "Mug % chance = 100% − target Mug Difficulty − target SPD + mugger SPD, where "
+            "Mug Difficulty = 100 − stored Mug rate; a stored rate of 0 stays immune"
         ),
         "vanilla": (
             "getMugObjectIdAndQuantity: target Mug rate 0 never succeeds; otherwise Mug succeeds "
             "when random[0..255] ≤ target Mug rate + floor(mugger SPD / 2)."
         ),
-        "blocker": (
-            "Native replacement is not installed yet. The Difficulty-stored-rate contract is "
-            "explicit in mug_difficulty_from_rate (stored rate 0 stays immune); only the native "
-            "Mug comparison patch remains."
-        ),
+        "blocker": "",
     },
 )
 
