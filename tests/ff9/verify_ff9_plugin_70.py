@@ -40,7 +40,17 @@ def main() -> int:
         manager = ProjectManager({"ff9": PLUGIN}, root / "projects.json")
         snapshot = manager.snapshot("ff9")
         assert snapshot["canCreate"] is True
-        assert next(row for row in snapshot["projects"] if row["current"])["valid"] is True
+        # The project a session starts on is the folder FF9 writes into, never
+        # the shipped starter. The default used to fall back to
+        # project_template, so a game nobody had modded opened on the starter
+        # and the header named it as the current, editable mod.
+        assert PLUGIN.projects.default_root == paths.PROJECT_ROOT
+        assert PLUGIN.projects.template_root != PLUGIN.projects.default_root
+        current_row = next(row for row in snapshot["projects"] if row["current"])
+        assert current_row["path"] == str(paths.PROJECT_ROOT.expanduser().resolve())
+        # Its starting state is a usable project or the ordinary no-mod state.
+        # Report it as damage instead and Home refuses to open the game.
+        assert current_row["noMod"] or current_row["valid"], current_row
         parent = root / "mods"
         parent.mkdir()
         created = manager.create("ff9", str(parent), "My FF9 Mod")

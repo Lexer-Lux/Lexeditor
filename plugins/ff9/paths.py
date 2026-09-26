@@ -19,10 +19,13 @@ DATA_ROOT = Path(os.environ.get(
 PROJECT_ROOT = Path(os.environ.get("LEXEDITOR_FF9_PROJECT", r"C:\FF9Mod"))
 PROJECT_TEMPLATE_ROOT = PLUGIN_ROOT / "project_template"
 PROJECT_DATA_PATH = Path("StreamingAssets") / "Data"
-DEFAULT_PROJECT_ROOT = (
-    PROJECT_ROOT if (PROJECT_ROOT / PROJECT_DATA_PATH).is_dir()
-    else PROJECT_TEMPLATE_ROOT
-)
+# The project a session starts on is PROJECT_ROOT: the folder Lexeditor writes
+# into. It used to fall back to PROJECT_TEMPLATE_ROOT when that folder did not
+# exist yet, so a game nobody had modded opened on the shipped starter and the
+# header named the starter as the reader's mod. The starter is a source of
+# copies, not a mod - Add a Mod copies it to its own folder - and a folder that
+# does not exist is the ordinary "no mod yet" state the host reads from the
+# project store.
 
 
 def check() -> list[str]:

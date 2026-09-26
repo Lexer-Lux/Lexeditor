@@ -8,6 +8,7 @@ validates at startup, in the order it validates it, against the plugins
 actually in the repository.
 """
 import importlib
+import os
 from pathlib import Path
 import unittest
 
@@ -15,6 +16,11 @@ from core.plugin_api import validate_plugin
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def _key(path: Path) -> str:
+    """One comparable form of a path: resolved, and case-folded on Windows."""
+    return os.path.normcase(str(Path(path).resolve()))
 
 
 def plugins():
@@ -108,6 +114,62 @@ class PluginDescriptors(unittest.TestCase):
             with self.subTest(plugin=directory):
                 self.assertEqual(plugin.plugin_id.replace("-", "_"),
                                  directory.replace("-", "_"))
+
+    def test_no_plugin_opens_on_a_folder_inside_the_app(self):
+        """The folder a session starts on is never part of Lexeditor itself.
+
+        FF9's default project folder fell back to the plugin's own
+        `project_template` whenever the real folder did not exist yet, so a
+        game nobody had modded opened on the shipped starter and the header
+        named `project_template` as the current, editable mod. Lexer read that
+        as the editor creating a mod on its own opening. A copy source lives
+        inside the app; a project a reader edits never does.
+        """
+        app = _key(ROOT)
+        for directory, plugin in plugins():
+            spec = getattr(plugin, "projects", None)
+            if spec is None:
+                continue
+            with self.subTest(plugin=directory):
+                default = spec.default_root.resolve()
+                self.assertNotEqual(
+                    _key(default), app,
+                    f"{directory} opens on the app's own folder, {default}")
+                self.assertNotIn(
+                    app, {_key(parent) for parent in default.parents},
+                    f"{directory}'s default project folder {default} sits "
+                    f"inside Lexeditor's own folder")
+
+    def test_a_game_with_no_project_folder_yet_reports_no_mod(self):
+        """Vanilla is the ordinary state, not a damaged project.
+
+        When the folder a plugin would write into does not exist and the
+        reader never chose one, the store says `noMod`. Home keeps the card
+        ready and the session opens on the game's own data, read-only, which
+        is what Lexer's rule requires: Lexeditor never creates a mod the
+        reader did not ask for.
+        """
+        import tempfile
+        from dataclasses import replace as replace_field
+
+        from core.project_manager import ProjectManager
+
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch = Path(tmp)
+            for directory, plugin in plugins():
+                spec = getattr(plugin, "projects", None)
+                if spec is None:
+                    continue
+                with self.subTest(plugin=directory):
+                    never_created = scratch / "folder-that-does-not-exist"
+                    patched = replace_field(plugin, projects=replace_field(
+                        spec, default_root=never_created))
+                    manager = ProjectManager({plugin.plugin_id: patched},
+                                             scratch / f"{plugin.plugin_id}.json")
+                    row = manager.snapshot(plugin.plugin_id)["projects"][0]
+                    self.assertTrue(row["noMod"], row)
+                    self.assertFalse(row["valid"], row)
+                    self.assertIn("Create one to save changes", row["problems"][0], row)
 
 
 if __name__ == "__main__":

@@ -140,7 +140,7 @@ PLUGIN = GamePlugin(
     session_factory=FF9Session,
     projects=ModProjectSpec(
         root_env="LEXEDITOR_FF9_PROJECT",
-        default_root=paths.DEFAULT_PROJECT_ROOT,
+        default_root=paths.PROJECT_ROOT,
         required_paths=("StreamingAssets/Data",),
         template_root=paths.PROJECT_TEMPLATE_ROOT,
     ),

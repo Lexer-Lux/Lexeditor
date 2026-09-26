@@ -4,6 +4,7 @@ from __future__ import annotations
 # Dev caches and outputs live in the temp folder, never in the checkout.
 DEV_CACHE = __import__("pathlib").Path(__import__("tempfile").gettempdir()) / "lexeditor-dev"
 import hashlib
+import json
 from pathlib import Path
 import runpy
 import shutil
@@ -412,6 +413,85 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
         finally:
             browser.close()
     assert session.wait_closed(), "FF9 browser child service did not close"
+
+    # A game nobody has modded opens on its own data, read-only, under Vanilla.
+    # FF9's default project folder used to fall back to the plugin's shipped
+    # project_template, so this state did not exist: the header named the
+    # starter as the current, editable mod. The snapshot below comes from the
+    # real project store driven by the plugin's own declaration, so the menu
+    # cannot drift from what the app would show; only the mod menu's transport
+    # is stubbed, the way the shared shell receives it from the host.
+    from dataclasses import replace as replace_field
+
+    from core.project_manager import ProjectManager
+    from plugins.ff9.plugin import PLUGIN
+
+    no_project = temp / "no-project-folder"
+    no_mod_plugin = replace_field(PLUGIN, projects=replace_field(
+        PLUGIN.projects, default_root=no_project))
+    snapshot = ProjectManager({PLUGIN.plugin_id: no_mod_plugin},
+                              temp / "no-mod-projects.json").snapshot(PLUGIN.plugin_id)
+    current_row = next(row for row in snapshot["projects"] if row["current"])
+    assert current_row["noMod"] and not current_row["valid"], current_row
+    assert current_row["path"] == str(no_project.resolve()), current_row
+    assert current_row["name"] != "project_template", current_row
+
+    no_mod_env = {
+        **env,
+        "LEXEDITOR_FF9_PROJECT": str(no_project),
+        # What the host sets when it opens a game with no mod.
+        "LEXEDITOR_MOD_READ_ONLY": "1",
+        "LEXEDITOR_NO_MOD": "1",
+    }
+    with FF9Session(no_mod_env) as session, sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True, args=["--no-sandbox"])
+        try:
+            page = browser.new_page(viewport={"width": 1440, "height": 900})
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.add_init_script(
+                "window.pywebview={api:{"
+                f"mod_projects:async()=>({json.dumps(snapshot)}),"
+                "mod_library_status:async()=>({canManage:false,"
+                "message:'Mod management is not supported for this game yet.'}),"
+                "}};")
+            page.goto(session.url + "?lexNoMod=1", wait_until="domcontentloaded")
+            page.wait_for_selector(".lex-paged-list-detail")
+            wait_loaded(page)
+            state = page.evaluate("""()=>{
+              const save=document.querySelector('#global-save');
+              return {
+                readonly:document.documentElement.getAttribute('data-lex-project-readonly'),
+                badge:document.querySelector('.lex-shell-header .lex-badge')?.textContent||null,
+                saveDisabled:save?save.disabled:null,
+                trigger:document.querySelector('.lex-project-control')?.innerText.trim()||'',
+              };
+            }""")
+            assert state["readonly"] == "true", state
+            assert state["badge"] == "NO MOD", state
+            assert state["saveDisabled"] is True, state
+            # The control names the source that is shown. It used to read the
+            # folder a mod would use, which for FF9 was the shipped starter.
+            assert "Vanilla" in state["trigger"], state
+            assert "project_template" not in state["trigger"], state
+            # The game's own data is still on the page, not an empty table.
+            price = numeric_field(page, "BUY PRICE")
+            expect(price).to_have_value("250")
+            expect(page.locator(".lex-column-list-row")).not_to_have_count(0)
+            page.screenshot(path=str(OUT / "ff9-no-mod.png"), full_page=True)
+            # An edit attempt is refused and offers the one action that ends
+            # the read-only state, instead of leaving a dead control.
+            price.click()
+            dialog = page.locator(".lex-dialog")
+            dialog.wait_for(state="visible", timeout=5000)
+            assert "Create a mod" in dialog.inner_text(), dialog.inner_text()
+            page.keyboard.type("333")
+            expect(price).to_have_value("250")
+            dialog.get_by_role("button", name="Cancel", exact=False).first.click()
+            page.wait_for_timeout(200)
+            expect(price).to_have_value("250")
+        finally:
+            browser.close()
+    assert session.wait_closed(), "FF9 no-mod browser child service did not close"
     assert not errors, errors
 
 print("FF9 rendered browser acceptance passed")
