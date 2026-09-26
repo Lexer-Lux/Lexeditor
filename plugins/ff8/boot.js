@@ -21,6 +21,7 @@
       ]}),
       detailSection({title:"EDITOR",body:[
         detailField({label:"SHOW NEW GAME TAB",control:newGameToggle(),help:infoHelp("Show the New Game tab, which edits starting gil, GFs, characters, Magic and items. It stays hidden unless this is on, because most editing never touches starting data. Changing this reloads the editor.")}),
+        detailField({label:"DELING-STYLE FIELD TAB",control:delingFieldToggle(),help:infoHelp("Stack the Field tab's picture above its tabs, as Deling lays them out. When off, the list, the picture and the tabs stand side by side as three columns.")}),
       ]}),
     ];
     body.push(LexeditorUI.modLoaderSection({
@@ -36,6 +37,12 @@
     }
     $("#main").replaceChildren(detailPanel({className:"lex-information-panel ff8-information",
       icon:infoIcon(),title:"Information",meta:"Installation, extracted game data, and the FFNx helper",body}));
+  }
+  function delingFieldToggle(){
+    return el("input",{type:"checkbox",checked:state.editorSettings?.delingFieldLayout===true,"aria-label":"Deling-style Field tab",onchange:async event=>{
+      try{state.editorSettings=await api("/api/editor-settings/save",post({delingFieldLayout:event.target.checked}))}
+      catch(error){event.target.checked=!event.target.checked;showAlert({title:"Could not save the editor setting",message:error.message||String(error)})}
+    }});
   }
   function newGameToggle(){
     const input=el("input",{type:"checkbox",checked:state.editorSettings?.showNewGame===true,"aria-label":"Show New Game tab",onchange:async event=>{

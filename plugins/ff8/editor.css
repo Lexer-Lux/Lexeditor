@@ -142,8 +142,8 @@
        shared rule keeps a faint 15% ghost, which reads as a smudge here. */
     .field-map-detail.lex-detail-panel-media:hover > .lex-detail-panel-heading { opacity:0; }
 
-    .field-gateway-table {--lex-column-list-template:76px minmax(132px,.7fr) repeat(3,minmax(160px,1fr));}
-    .field-trigger-table {--lex-column-list-template:86px minmax(98px,.55fr) repeat(2,minmax(160px,1fr));}
+    /* The picture's help pip stays in its corner, clear of the fading heading. */
+    .field-map-detail > .field-preview-help {position:absolute;top:8px;right:8px;z-index:3;}
 
     /* The walkmesh overlay canvas covers the background preview exactly. */
 
@@ -162,6 +162,9 @@
 .ff8-shop-table {--lex-cell-padding:1px 5px;--lex-cell-padding-inline:5px;}
 
 .field-card-table {--lex-cell-padding:5px 8px;--lex-cell-padding-inline:8px;}
+
+/* Nine coordinate columns share one detail column, so their cells pack tight. */
+.field-gateway-table, .field-trigger-table {--lex-cell-padding:5px 3px;--lex-cell-padding-inline:3px;}
 
 /* A record's icon before its name in the panel heading. */
 .ff8-heading-label, .ff8-ability-label {--ff8-item-icon-size:1.15em;}
