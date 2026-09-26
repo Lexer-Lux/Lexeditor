@@ -7986,6 +7986,26 @@ body { text-shadow: var(--lex-text-shadow, none); }
    flow: sorting a column must never widen its header or move its words. The
    offset itself is layout, so the label's own rule lives with the header. */
 .lex-column-list-head-cell { overflow: var(--lex-head-cell-overflow, hidden); }
+/* A sortable header always keeps the sort mark's width free on its left, so
+   the mark has room to hang inside the header even in a table's leftmost
+   column - where it used to hang off the table's edge and be cut away - and
+   sorting still never moves the header's words. For the default caret this
+   is about the padding a header already had; for FF8's pointing hand it is
+   the room FF8's own menus leave for their cursor. */
+.lex-column-list-head-cell.lex-column-sortable {
+  padding-inline-start:max(8px, calc(var(--lex-sort-marker-width, 7px) + var(--lex-sort-marker-gap, 2px) + 2px));
+}
+/* The label, its sort button and the cell all clip, for their ellipsis, and a
+   hanging mark sits outside all three - FF8's pointing hand was cut to a few
+   pixels or vanished whenever a header also had a help mark ("the pointer
+   finger still doesn't show"). They still clip their text at their edges,
+   but leave the mark's own width of room beside them. */
+.lex-column-list-head-cell.sorted,
+.lex-column-list-head-cell.sorted :is(.header-label, .lex-column-sort) {
+  overflow:clip;
+  /* A plain length: this property does not take calc(). */
+  overflow-clip-margin:40px;
+}
 .lex-sort-indicator {
 
   filter: var(--lex-sort-marker-filter, none);
