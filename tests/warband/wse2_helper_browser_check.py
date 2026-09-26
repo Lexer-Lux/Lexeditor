@@ -46,7 +46,11 @@ def main():
                     window.dispatchEvent(new Event('pywebviewready'));
                 }''',{'settings':SETTINGS,'helpers':HELPERS,'plugin':PLUGIN})
                 page.wait_for_function('!document.querySelector("#lexer-handle").hidden')
-                page.locator('#lexer-handle').click();page.wait_for_function('document.querySelectorAll(".lexer-helper").length===3')
+                page.locator('#lexer-handle').click()
+                assert page.locator('#lexer-dev-helpers').is_hidden()
+                assert page.evaluate('window.__helperCalls')==[]
+                page.locator('#lexer-helpers-toggle').click()
+                page.wait_for_function('document.querySelectorAll(".lexer-helper").length===3')
                 page.wait_for_timeout(300)
                 rows=page.locator('.lexer-helper')
                 assert 'Installed: v1.1.5.1 (verified)' in rows.nth(2).inner_text()
