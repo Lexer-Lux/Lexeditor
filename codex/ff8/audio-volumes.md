@@ -19,25 +19,8 @@
 
 ## Implication for #498
 
-Separate in-game SFX/Music sliders need two halves: a Config-menu
-replacement (game-side mod, needs in-game proof) and backend consistency
-(Lexeditor writes the two gains into `FFNx.toml` on deploy —
-`set_audio_volumes` in `plugins/ff8/ffnx_manager.py`, `None` preserves the
-existing key so `-1` auto-detect survives when a side is unmanaged).
-
-## Editor half (landed)
-
-- The Tweaks page has SFX VOLUME and MUSIC VOLUME rows (0-100, bounded
-  number controls with a `%` unit). An unset side shows 100 without arming
-  the gain; touching a slider stores a real gain.
-- Gains persist per mod as `sfxVolume`/`musicVolume` in
-  `lexeditor-settings.json` (`None` = unmanaged) and are applied to
-  `FFNx.toml` on launch via `gameplay_settings.save(..., install_runtime=True)`.
-- Covered by `tests/ff8/test_ff8_audio_volumes_issue_498.py` (validation,
-  load round-trip, save persistence, per-key FFNx.toml writes, editor
-  slider presence).
-- Still game-side: the in-game Config-menu slider replacement and audible
-  isolation/persistence proof.
+Separate SFX/Music sliders belong in the game's own Config menu (below),
+not on Lexeditor's Tweaks page: Lexeditor does not write these FFNx gains.
 
 ## In-game Config menu (verified statically against FF8_EN.exe 064d466b)
 
