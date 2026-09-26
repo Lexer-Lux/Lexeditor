@@ -7,7 +7,7 @@ happen". Two rules answer both: a tab is never narrower than its own name, and
 the whole strip shrinks together into the window instead of clipping one label
 or scrolling. This measures the rendered strip of a real plugin page.
 
-FF8 is the hard case - twenty tabs in the game's wide lettering, wider than the
+FF8 is the hard case - nineteen tabs in the game's wide lettering, wider than the
 window at the theme's own size - and Blank is the easy one, five short names
 that must still spread across the row. FF7 is left out on purpose: its editor
 page is written into the served HTML and this harness never gives its frame an
@@ -68,14 +68,14 @@ def measure(session, widths, ready):
     return rows
 
 
-def test_ff8_twenty_tabs_fit_one_row():
+def test_ff8_nineteen_tabs_fit_one_row():
     with tempfile.TemporaryDirectory(prefix="lexeditor-navstrip-ff8-") as project:
         with FF8Session({"LEXEDITOR_FF8_PROJECT": project}) as session:
             rows = measure(session, (1600, 1280),
                            "typeof state!=='undefined'&&!state.booting")
     for width, row in rows.items():
         assert row["found"], row
-        assert row["tabs"] == 20, (width, row)
+        assert row["tabs"] == 19, (width, row)
         assert not row["clipped"], (width, row)
         assert len(row["fonts"]) == 1, (width, row)
         # The strip fills the lane the frame leaves it and stops there, so the

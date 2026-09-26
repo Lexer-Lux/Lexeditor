@@ -85,11 +85,13 @@
       --lex-input-bg:#3b3b3b;--lex-input-shadow:none;--lex-input-text-shadow:var(--lex-text-shadow);
       --lex-field-padding:6px 8px;
 
-      /* Section titles keep the game lettering and separate content with a line. */
+      /* Section titles keep the game lettering. No rule runs under them. */
+      /* The record's own picture stays with its name on the header's left. */
+      --lex-preview-icon-side:left;
       --lex-section-title-fg:#d0d0d0;--lex-section-title-font:20px/1 var(--lex-heading-font);
       --lex-section-title-shadow:-2px -2px 0 #151515,0 -2px 0 #151515,2px -2px 0 #151515,-2px 0 0 #151515,
         2px 0 0 #151515,-2px 2px 0 #151515,0 2px 0 #151515,2px 2px 0 #151515;
-      --lex-section-title-border:1px solid #929292;--lex-section-title-stroke:.65px #d0d0d0;
+      --lex-section-title-border:0;--lex-section-title-stroke:.65px #d0d0d0;
       --lex-section-title-position:static;--lex-section-title-top:auto;--lex-section-title-left:auto;
       --lex-section-title-shift:none;--lex-section-title-padding:1px 4px 4px;
       --lex-section-title-letter-spacing:.01em;--lex-section-title-transform:uppercase;
@@ -130,9 +132,18 @@
     /* Only the title shares a line with the control; the description takes the
        card's full width instead of the title's narrow column. */
 
+    /* The kind selector is two words wide; the ability slot selector
+       takes every pixel that is left, so no option is cut off. */
+    .gf-prereq-cell {grid-template-columns:auto minmax(0,1fr);align-items:center}
+    .gf-prereq-cell .gf-prereq-slot {min-width:0}
     .field-card-table {--lex-column-list-template:minmax(100px,.9fr) minmax(100px,.8fr) minmax(150px,1.2fr) 95px minmax(100px,.7fr);}
-    .field-gateway-table {--lex-column-list-template:76px minmax(132px,.7fr) repeat(3,minmax(160px,1fr));}
-    .field-trigger-table {--lex-column-list-template:86px minmax(98px,.55fr) repeat(2,minmax(160px,1fr));}
+    /* Hovering the field's own picture hides its overlaid map name entirely:
+       the reader is already looking at this map and knows which it is. The
+       shared rule keeps a faint 15% ghost, which reads as a smudge here. */
+    .field-map-detail.lex-detail-panel-media:hover > .lex-detail-panel-heading { opacity:0; }
+
+    /* The picture's help pip stays in its corner, clear of the fading heading. */
+    .field-map-detail > .field-preview-help {position:absolute;top:8px;right:8px;z-index:3;}
 
     /* The walkmesh overlay canvas covers the background preview exactly. */
 
@@ -151,6 +162,9 @@
 .ff8-shop-table {--lex-cell-padding:1px 5px;--lex-cell-padding-inline:5px;}
 
 .field-card-table {--lex-cell-padding:5px 8px;--lex-cell-padding-inline:8px;}
+
+/* Nine coordinate columns share one detail column, so their cells pack tight. */
+.field-gateway-table, .field-trigger-table {--lex-cell-padding:5px 3px;--lex-cell-padding-inline:3px;}
 
 /* A record's icon before its name in the panel heading. */
 .ff8-heading-label, .ff8-ability-label {--ff8-item-icon-size:1.15em;}

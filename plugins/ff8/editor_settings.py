@@ -16,7 +16,7 @@ from . import paths
 
 
 ENV_VAR = "LEXEDITOR_FF8_EDITOR_SETTINGS"
-DEFAULTS = {"showNewGame": False}
+DEFAULTS = {"showNewGame": False, "delingFieldLayout": False}
 
 
 def settings_path() -> Path:

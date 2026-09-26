@@ -38,33 +38,15 @@
     if(!param.editable)return readonlyField(`Unsupported opcode 0x${Number(param.opcode).toString(16).toLocaleUpperCase()}`);
     return sourceControl(numberControl(param.value,0,0xFFFFFF,1,value=>param.value=value,{"aria-label":`${row.name} ${entry.player.entity} ${param.name}`}),()=>param.value,vanilla?.value,[],value=>param.value=Number(value));
   }
-  function fieldEntranceControl(row,kind,entry,field,axis=null){
-    const collection=kind==="gateway"?"gateways":"triggers",vanilla=fieldMapRow(state.vanilla,row.key)?.entrances?.[collection]?.[entry.id],read=value=>axis?value?.[field]?.[axis]:value?.[field],minimum=field==="fieldId"?0:field==="doorId"?0:-32768,maximum=field==="fieldId"?32767:field==="doorId"?255:32767,label=`${row.name} ${kind} ${entry.id+1} ${field}${axis?` ${axis}`:""}`;
-    return sourceControl(numberControl(read(entry),minimum,maximum,1,value=>{if(axis)entry[field][axis]=value;else entry[field]=value;refreshFieldOverlay()},{"aria-label":label}),()=>read(entry),read(vanilla),[],value=>{if(axis)entry[field][axis]=Number(value);else entry[field]=Number(value);refreshFieldOverlay()});
-  }
-  function fieldGatewayTargetControl(row,entry){
-    const vanilla=fieldMapRow(state.vanilla,row.key)?.entrances?.gateways?.[entry.id]?.fieldId;
-    const target=state.data.fields.rows.find(value=>value.mapId===entry.fieldId),label=target?.name||'Unused';
-    const change=value=>{entry.fieldId=Number(value);refreshFieldOverlay();rerenderFields();shell.refresh()};
-    const originalFilter=state.filters.fields,originalPage=state.pages.fields;
-    const origin=()=>{state.fieldTargetSearch=false;state.selected.fields=row.id;state.filters.fields=originalFilter;state.pages.fields=originalPage;state.fieldDetailTab='exits';navigate('fields')};
-    const link=hoverable({content:label,targetType:'fields',targetId:target?.id,targetLabel:label,
-      activate:()=>{if(target){state.selected.fields=target.id;state.filters.fields=target.name;state.pages.fields=0;navigate('fields')}}});
-    const finder=el('button',{type:'button','aria-label':'Choose target field',title:'Choose target field',onclick:()=>beginSearcher({
-      type:'fields',prompt:'Choose the field loaded by this exit.',origin,
-      target:()=>{state.fieldTargetSearch=true;state.filters.fields='';state.pages.fields=0;navigate('fields')},accept:id=>{
-        const chosen=state.data.fields.rows.find(value=>value.id===id);
-        if(chosen?.mapId!=null)change(chosen.mapId);
-        else showAlert('This field is not in the game map list and cannot be an exit destination.');
-      }})},LexeditorUI.selectionIcon());
-    const control=LexeditorUI.inlineLabel(LexeditorUI.choiceField(link,finder),el('button',{type:'button',disabled:entry.fieldId===32767,
-      title:'Disable this exit',onclick:()=>change(32767)},'Unused'));
-    return sourceControl(control,()=>entry.fieldId,vanilla,[],change,value=>state.data.fields.rows.find(field=>field.mapId===Number(value))?.name||'Unused');
-  }
+  // An exit's target is one of the listed fields, or Unused. The table cell
+  // edits it with the shared cell select: double-click, choose, done.
+  function fieldTargetName(mapId){return mapId===32767?"Unused":state.data.fields.rows.find(value=>value.mapId===mapId)?.name||`Map ${mapId}`}
+  function fieldTargetChoices(){return ["Unused",...state.data.fields.rows.filter(value=>value.mapId!=null).map(value=>value.name).sort((a,b)=>a.localeCompare(b))]}
 
-  function fieldPointControl(row,kind,entry,point){return LexeditorUI.controlGroup(["x","y","z"].map(axis=>({label:axis.toLocaleUpperCase(),help:infoHelp(`${axis.toLocaleUpperCase()} field coordinate of this point. Moving an endpoint changes the crossing line; moving Destination changes the arrival position.`),control:fieldEntranceControl(row,kind,entry,point,axis)})))}
   function fieldDialogueReferences(row,lineId){return state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:fieldMapRow(state.referenceData[reference.id],row.key)?.dialogue?.[lineId]?.text})).filter(entry=>entry.value!==undefined)}
-  function fieldDialogueSection(row){const vanilla=fieldMapRow(state.vanilla,row.key);if(!row.dialogue?.length)return LexeditorUI.notice({message:"This field map has no dialogue lines."});return detailSection({title:"DIALOGUE",help:infoHelp("Dialogue shown by this field's scripts. Edit a line to change its message; keep its number and control codes. Some unused fields contain Japanese test text that the current Western decoder displays incorrectly. This editor does not translate it."),body:LexeditorUI.stack({fill:false},...row.dialogue.map(line=>{const area=LexeditorUI.textArea({rows:3,"aria-label":`${row.name} dialogue line ${line.id}`,oninput:event=>{line.text=event.target.value;shell.refresh()}});area.value=line.text;const control=sourceControl(area,()=>line.text,vanilla?.dialogue?.[line.id]?.text,fieldDialogueReferences(row,line.id),value=>line.text=String(value));return detailField({label:`#${line.id}`,control})}))})}
+  // A dialogue line is the same text box as the Text page's: its number on
+  // the strip above, the box across the whole row, copy and vanilla inside it.
+  function fieldDialogueSection(row){const vanilla=fieldMapRow(state.vanilla,row.key);if(!row.dialogue?.length)return LexeditorUI.notice({message:"This field map has no dialogue lines."});return detailSection({title:"DIALOGUE",help:infoHelp("Dialogue shown by this field's scripts. Edit a line to change its message; keep its number and control codes. Some unused fields contain Japanese test text that the current Western decoder displays incorrectly. This editor does not translate it."),body:LexeditorUI.stack({fill:false},...row.dialogue.map(line=>{const area=LexeditorUI.textArea({rows:3,"aria-label":`${row.name} dialogue line ${line.id}`,oninput:event=>{line.text=event.target.value;shell.refresh()}});area.value=line.text;const control=sourceControl(area,()=>line.text,vanilla?.dialogue?.[line.id]?.text,fieldDialogueReferences(row,line.id),value=>line.text=String(value),undefined,{internal:true});return detailField({className:"lex-detail-field-stacked",showType:false,label:`#${line.id}`,control})}))})}
   function fieldScriptReferences(row,methodId){return state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:fieldMapRow(state.referenceData[reference.id],row.key)?.scripts?.methods?.find(method=>method.id===methodId)?.source})).filter(entry=>entry.value!==undefined)}
   function fieldScriptsSection(row){const methods=row.scripts?.methods||[];if(!methods.length)return LexeditorUI.notice({message:"This field map has no JSM methods."});let methodId=Number(state.fieldScriptSelection[row.key]);if(!methods.some(method=>method.id===methodId))methodId=methods[0].id;state.fieldScriptSelection[row.key]=methodId;const method=methods.find(value=>value.id===methodId),vanilla=fieldMapRow(state.vanilla,row.key)?.scripts?.methods?.find(value=>value.id===methodId),picker=selectControl(methodId,methods.map(value=>({id:value.id,name:`${value.id} · ${value.name}`})),value=>{state.fieldScriptSelection[row.key]=Number(value);rerenderFields()},{"aria-label":`${row.name} field script`}),area=LexeditorUI.codeField({rows:18,wrap:"off",readOnly:!method.editable,"aria-label":`${row.name} script ${method.id}`,oninput:event=>{method.source=event.target.value;shell.refresh()}});area.value=method.source;const source=sourceControl(area,()=>method.source,vanilla?.source,fieldScriptReferences(row,method.id),value=>method.source=String(value),value=>`${String(value??"").split(/\r?\n/).filter(Boolean).length} lines`);return detailSection({title:"FIELD SCRIPTS",help:infoHelp(`Scripts control events and actions in this location. Select a script, then edit its instructions, one per line. Keep opcode names and operand order. Labels mark branch destinations. Save validates and rebuilds branches; unsupported methods remain read-only. There are ${row.scripts.opcodeCount} recognised opcode names.`),body:[LexeditorUI.controlGroup([{label:"Script",control:picker},LexeditorUI.detailNote(`${method.groupType.toLocaleUpperCase()} GROUP ${method.groupId} · ${method.instructionCount} WORDS`)]),!method.editable?LexeditorUI.detailNote("This method has an unknown opcode or a branch outside the method, so it remains read-only."):null,source]})}
   function fieldEncounterReferences(row,kind,slot=null){return state.references.map(reference=>{const encounters=fieldMapRow(state.referenceData[reference.id],row.key)?.randomEncounters,value=kind==="rate"?encounters?.rate:encounters?.formations?.[slot];return{name:reference.name,shortName:reference.shortName,value}}).filter(entry=>entry.value!==undefined)}
@@ -72,9 +54,40 @@
   function fieldBackgroundTile(dataset,row,tileId){return fieldMapRow(dataset,row.key)?.background?.tiles?.[tileId]}
   function fieldBackgroundReferences(row,tileId,field){return state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:fieldBackgroundTile(state.referenceData[reference.id],row,tileId)?.[field]})).filter(entry=>entry.value!==undefined)}
   function fieldBackgroundEdits(row){const base=state.base.fields?.find(value=>value.key===row.key)?.background,edits=[];if(!base)return edits;for(const tile of row.background?.tiles||[]){const before=base.tiles?.[tile.id];if(!before)continue;const edit={tile:tile.id};for(const field of row.background.editableFields||[])if(tile[field]!==before[field])edit[field]=tile[field];if(Object.keys(edit).length>1)edits.push(edit)}return edits}
-  function fieldBackgroundPreviewState(row){let value=state.fieldBackgroundPreview[row.key];if(!value){value={layers:[...(row.background?.layers||[])],states:(row.background?.parameterStates||[]).filter(entry=>entry.state===0).map(entry=>`${entry.parameter}:${entry.state}`),hide:false,overlay:true};state.fieldBackgroundPreview[row.key]=value}return value}
-  async function refreshFieldBackgroundPreview(row,image,status){const preview=fieldBackgroundPreviewState(row),token=Symbol("field-background-preview");image.lexRequest=token;status.textContent="Rendering field background...";try{const dataset=state.activeSource==="mine"?"current":state.activeSource,edits=fieldBackgroundEdits(row),geometryPromise=preview.overlay?api("/api/field/background-geometry",post({map:row.key,dataset,edits})).catch(()=>null):Promise.resolve(null),response=await fetch("/api/field/background-preview",post({map:row.key,dataset,edits,activeStates:preview.states.map(value=>{const [parameter,stateValue]=value.split(":").map(Number);return{parameter,state:stateValue}}),enabledLayers:preview.layers,hideBackground:preview.hide,highlightTile:state.fieldBackgroundSelection[row.key]??0}));if(!response.ok){const problem=await response.json().catch(()=>({}));throw new Error(problem.error||`HTTP ${response.status}`)}const blob=await response.blob(),geometry=await geometryPromise;if(image.lexRequest!==token||!image.isConnected)return;const url=URL.createObjectURL(blob),old=image.lexObjectUrl;image.lexObjectUrl=url;image.onload=()=>{if(old)URL.revokeObjectURL(old)};image.src=url;image.lexGeometry=geometry;image.lexBaseStatus=`${row.background.variant} MAP - ${formatNumber(row.background.tileCount)} tiles - ${image.alt}`;const note=drawFieldOverlay(row,image.lexOverlay,geometry);status.textContent=`${image.lexBaseStatus}${note?" - "+note:""}`}catch(error){if(image.lexRequest===token){status.textContent=`Preview unavailable: ${error.message||error}`}}}
-  function fieldBackgroundControl(row,tile,field,label,minimum,maximum,help){const vanilla=fieldBackgroundTile(state.vanilla,row,tile.id),references=fieldBackgroundReferences(row,tile.id,field),apply=value=>{tile[field]=field==="draw"?Boolean(value):Number(value);const image=document.querySelector(`.field-background-image[data-field-key="${CSS.escape(row.key)}"]`),status=image?.lexStatus;if(image&&status)refreshFieldBackgroundPreview(row,image,status);shell.refresh()};let control;if(field==="draw")control=el("input",{type:"checkbox",checked:tile.draw,"aria-label":`${row.name} tile ${tile.id} draw`,onchange:event=>apply(event.target.checked)});else control=numberControl(tile[field],minimum,maximum,1,apply,{"aria-label":`${row.name} tile ${tile.id} ${label}`});return detailField({label,help:infoHelp(help),control:sourceControl(control,()=>tile[field],vanilla?.[field],references,apply,field==="draw"?booleanMark:undefined),dataType:field==="draw"?"BOOL":"INT",min:field==="draw"?undefined:minimum,max:field==="draw"?undefined:maximum})}
+  function fieldBackgroundPreviewState(row){let value=state.fieldBackgroundPreview[row.key];if(!value){value={layers:[...(row.background?.layers||[])],states:(row.background?.parameterStates||[]).filter(entry=>entry.state===0).map(entry=>`${entry.parameter}:${entry.state}`),hide:false};state.fieldBackgroundPreview[row.key]=value}return value}
+  // The picture is built once per field and kept across re-renders. Rebuilding
+  // it on every selection gave an empty image for a moment each time, so the
+  // whole background flickered out and the browser drew its broken-image mark.
+  let fieldPreviewCache=null;
+  const fieldHover={key:null,tile:-1,triangle:-1};
+  function fieldPreviewRedraw(row){const cache=fieldPreviewCache;if(cache?.row===row)refreshFieldBackgroundPreview(row,cache.image,cache.status)}
+  // A tile edit settles as one re-render, not one fetch per increment: the
+  // reader can hold the stepper without the background flashing on each tick.
+  function scheduleFieldBackgroundPreview(row){
+    const key=row.key;
+    state.fieldBackgroundTimers??={};
+    clearTimeout(state.fieldBackgroundTimers[key]);
+    state.fieldBackgroundTimers[key]=setTimeout(()=>fieldPreviewRedraw(row),120);
+  }
+  // Selection is drawn on the overlay, so only a change to the pixels asks the
+  // server for a new picture. The old image stays on screen until the new one
+  // has arrived.
+  async function refreshFieldBackgroundPreview(row,image,status){
+    const preview=fieldBackgroundPreviewState(row),token=Symbol("field-background-preview");image.lexRequest=token;
+    try{
+      const dataset=state.activeSource==="mine"?"current":state.activeSource,edits=fieldBackgroundEdits(row);
+      const geometryPromise=api("/api/field/background-geometry",post({map:row.key,dataset,edits})).catch(()=>null);
+      const response=await fetch("/api/field/background-preview",post({map:row.key,dataset,edits,activeStates:preview.states.map(value=>{const [parameter,stateValue]=value.split(":").map(Number);return{parameter,state:stateValue}}),enabledLayers:preview.layers,hideBackground:preview.hide}));
+      if(!response.ok){const problem=await response.json().catch(()=>({}));throw new Error(problem.error||`HTTP ${response.status}`)}
+      const blob=await response.blob(),geometry=await geometryPromise;
+      if(image.lexRequest!==token)return;
+      const url=URL.createObjectURL(blob),old=image.lexObjectUrl;image.lexObjectUrl=url;
+      image.onload=()=>{image.parentElement.style.visibility="";if(old)URL.revokeObjectURL(old)};
+      image.src=url;image.lexGeometry=geometry;status.textContent="";
+      drawFieldOverlay(row,image.lexOverlay,geometry);
+    }catch(error){if(image.lexRequest===token)status.textContent=`Preview unavailable: ${error.message||error}`}
+  }
+  function fieldBackgroundControl(row,tile,field,label,minimum,maximum,help){const vanilla=fieldBackgroundTile(state.vanilla,row,tile.id),references=fieldBackgroundReferences(row,tile.id,field),apply=value=>{tile[field]=field==="draw"?Boolean(value):Number(value);scheduleFieldBackgroundPreview(row);shell.refresh()};let control;if(field==="draw")control=el("input",{type:"checkbox",checked:tile.draw,"aria-label":`${row.name} tile ${tile.id} draw`,onchange:event=>apply(event.target.checked)});else control=numberControl(tile[field],minimum,maximum,1,apply,{"aria-label":`${row.name} tile ${tile.id} ${label}`});return detailField({label,help:infoHelp(help),control:sourceControl(control,()=>tile[field],vanilla?.[field],references,apply,field==="draw"?booleanMark:undefined),dataType:field==="draw"?"BOOL":"INT",min:field==="draw"?undefined:minimum,max:field==="draw"?undefined:maximum})}
   function fieldProject(camera,vertex){
     // Deling WalkmeshGLWidget::paintGL: axis rows over 4096 with the Y row
     // negated, position over 4096 with Y negated, fovy of 2*atan(112/zoom)
@@ -97,74 +110,107 @@
     return {x:camera.zoom*(dx*sx+dy*sy+dz*sz)/depth,y:-camera.zoom*(dx*tx+dy*ty+dz*tz)/depth};
   }
   function fieldOverlayCameraId(row){const count=row.camera?.cameras?.length||0;if(!count)return null;return Math.max(0,Math.min(count-1,Number(state.fieldCameraSelection[row.key])||0))}
+  // The overlay the open tab edits is drawn at full strength with its
+  // selection. The others stay faint and show no selection, so the picture
+  // never marks a record that cannot be edited from where the reader is.
+  function fieldOverlayFocus(){const tab=state.fieldDetailTab;return tab==="tile"?"tile":tab==="walkmesh"?"walkmesh":tab==="exits"?"exits":tab==="doors"||tab==="triggers"?"triggers":null}
+  function fieldTileVisible(row,tile){const preview=fieldBackgroundPreviewState(row),active=preview.states.includes(`${tile.parameter}:${tile.state}`);return !(((preview.hide||tile.parameter!==255)&&!active)||!preview.layers.includes(tile.layer))}
+  // The topmost tile under the point, in the renderer's order: lower Z draws
+  // later, and a later tile wins a tie.
+  function fieldTileAt(row,geometry,x,y){let found=-1,foundZ=Infinity;for(const tile of row.background?.tiles||[]){if(!fieldTileVisible(row,tile))continue;const left=geometry.left+tile.x,top=geometry.top+tile.y;if(x<left||y<top||x>=left+16||y>=top+16)continue;if(tile.z<=foundZ){found=tile.id;foundZ=tile.z}}return found}
+  let fieldHitContext=null;
+  function fieldTriangleAt(row,geometry,x,y){const cameraId=fieldOverlayCameraId(row);if(cameraId===null)return -1;fieldHitContext??=document.createElement("canvas").getContext("2d");for(const triangle of row.walkmesh?.triangles||[]){const points=triangle.vertices.map(vertex=>fieldProject(row.camera.cameras[cameraId],vertex));if(!points.every(Boolean))continue;const path=new Path2D();points.forEach((point,index)=>path[index?"lineTo":"moveTo"](point.x+geometry.left,point.y+geometry.top));path.closePath();if(fieldHitContext.isPointInPath(path,x,y))return triangle.id}return -1}
   function drawFieldOverlay(row,canvas,geometry){
     // Deling draws walkmesh edges white (blue where the edge has no
     // neighbour), used exits red, and used triggers green over the
     // background. Segments with an end behind the camera are skipped.
     canvas.lexRow=row;canvas.lexGeometry=geometry||null;
-    const ctx=canvas.getContext("2d");if(!ctx)return "";
-    const clear=()=>{if(canvas.width)ctx.clearRect(0,0,canvas.width,canvas.height)},preview=state.fieldBackgroundPreview[row.key],cameraId=fieldOverlayCameraId(row);
-    if(preview&&preview.overlay===false){clear();return "overlay off"}
-    if(!geometry||cameraId===null||!row.walkmesh?.triangles?.length){clear();return !geometry?"overlay unavailable":cameraId===null?"no camera setups":"no walkmesh"}
+    const ctx=canvas.getContext("2d");if(!ctx)return;
+    if(!geometry){if(canvas.width)ctx.clearRect(0,0,canvas.width,canvas.height);return}
     canvas.width=geometry.width;canvas.height=geometry.height;
-    const camera=row.camera.cameras[cameraId],point=vertex=>{const projected=fieldProject(camera,vertex);return projected?{x:projected.x+geometry.left,y:projected.y+geometry.top}:null},selected=state.fieldWalkmeshSelection[row.key]??-1;
-    for(const triangle of row.walkmesh.triangles){if(triangle.id!==selected)continue;const corners=triangle.vertices.map(point);if(!corners.every(Boolean))continue;ctx.beginPath();ctx.moveTo(corners[0].x,corners[0].y);ctx.lineTo(corners[1].x,corners[1].y);ctx.lineTo(corners[2].x,corners[2].y);ctx.closePath();ctx.fillStyle="rgba(255,144,0,.35)";ctx.fill()}
-    for(const triangle of row.walkmesh.triangles){const highlight=triangle.id===selected;for(let edge=0;edge<3;edge++){const from=triangle.vertices[edge],to=triangle.vertices[(edge+1)%3],p=point(from),q=point(to);if(!p||!q)continue;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.strokeStyle=highlight?"#ff9000":from.adjacent===-1?"rgba(102,153,204,.9)":"rgba(255,255,255,.85)";ctx.lineWidth=highlight?3:1;ctx.stroke()}}
-    const gateId=state.fieldGatewaySelection[row.key]??-1;
-    for(const gate of row.entrances?.gateways||[]){if(gate.fieldId===32767)continue;const p=point(gate.exitA),q=point(gate.exitB);if(!p||!q)continue;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.strokeStyle=gate.id===gateId?"#ffffff":"#ff0000";ctx.lineWidth=gate.id===gateId?3:2;ctx.stroke()}
-    const triggerId=state.fieldTriggerSelection[row.key]??-1;
-    for(const trigger of row.entrances?.triggers||[]){if(trigger.doorId===255)continue;const p=point(trigger.lineA),q=point(trigger.lineB);if(!p||!q)continue;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.strokeStyle=trigger.id===triggerId?"#ffffff":"#00ff00";ctx.lineWidth=trigger.id===triggerId?3:2;ctx.stroke()}
-    return `overlay: camera ${cameraId+1}`;
+    const focus=fieldOverlayFocus(),hover=fieldHover.key===row.key?fieldHover:{tile:-1,triangle:-1},cameraId=fieldOverlayCameraId(row);
+    const camera=cameraId===null?null:row.camera.cameras[cameraId];
+    const point=vertex=>{const projected=camera&&fieldProject(camera,vertex);return projected?{x:projected.x+geometry.left,y:projected.y+geometry.top}:null};
+    const shape=(points,fill,stroke,width,glow)=>{ctx.save();ctx.beginPath();points.forEach((p,index)=>ctx[index?"lineTo":"moveTo"](p.x,p.y));if(points.length>2)ctx.closePath();if(glow){ctx.shadowColor=glow;ctx.shadowBlur=10}if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=width;ctx.stroke()}ctx.restore()};
+    if(camera&&row.walkmesh?.triangles?.length){
+      const own=focus==="walkmesh",selected=state.fieldWalkmeshSelection[row.key]??0;
+      ctx.save();ctx.globalAlpha=own?1:.18;
+      for(const triangle of row.walkmesh.triangles)for(let edge=0;edge<3;edge++){const from=triangle.vertices[edge],p=point(from),q=point(triangle.vertices[(edge+1)%3]);if(p&&q)shape([p,q],null,from.adjacent===-1?"rgba(102,153,204,.9)":"rgba(255,255,255,.85)",1)}
+      ctx.restore();
+      if(own){
+        const corners=id=>{const found=row.walkmesh.triangles.find(triangle=>triangle.id===id)?.vertices.map(point);return found?.every(Boolean)?found:null};
+        const hovered=hover.triangle>=0&&hover.triangle!==selected?corners(hover.triangle):null;
+        if(hovered)shape(hovered,"rgba(255,200,120,.24)","rgba(255,210,140,.85)",2,"rgba(255,200,120,.6)");
+        const chosen=corners(selected);if(chosen)shape(chosen,"rgba(255,144,0,.35)","#ff9000",3,"rgba(255,144,0,.9)");
+      }
+    }
+    if(focus==="tile"&&row.background?.tiles?.length){
+      const box=(id,fill,stroke,width,glow)=>{const tile=row.background.tiles[id];if(!tile)return;const x=geometry.left+tile.x,y=geometry.top+tile.y;shape([{x,y},{x:x+16,y},{x:x+16,y:y+16},{x,y:y+16}],fill,stroke,width,glow)};
+      const selected=state.fieldBackgroundSelection[row.key]??0;
+      if(hover.tile>=0&&hover.tile!==selected)box(hover.tile,"rgba(255,255,255,.14)","rgba(255,255,255,.6)",1,"rgba(255,255,255,.4)");
+      box(selected,"rgba(255,64,64,.2)","#ff4040",2,"rgba(255,64,64,.9)");
+    }
+    if(camera){
+      ctx.save();ctx.globalAlpha=focus==="exits"?1:.35;
+      const gateId=focus==="exits"?state.fieldGatewaySelection[row.key]??-1:-1;
+      for(const gate of row.entrances?.gateways||[]){if(gate.fieldId===32767)continue;const p=point(gate.exitA),q=point(gate.exitB);if(p&&q)shape([p,q],null,gate.id===gateId?"#ffffff":"#ff0000",gate.id===gateId?3:2,gate.id===gateId?"#ff0000":null)}
+      ctx.globalAlpha=focus==="triggers"?1:.35;
+      const triggerId=focus==="triggers"?state.fieldTriggerSelection[row.key]??-1:-1;
+      for(const trigger of row.entrances?.triggers||[]){if(trigger.doorId===255)continue;const p=point(trigger.lineA),q=point(trigger.lineB);if(p&&q)shape([p,q],null,trigger.id===triggerId?"#ffffff":"#00ff00",trigger.id===triggerId?3:2,trigger.id===triggerId?"#00ff00":null)}
+      ctx.restore();
+    }
   }
   function refreshFieldOverlay(){for(const canvas of document.querySelectorAll("canvas.field-overlay-canvas"))if(canvas.lexRow)drawFieldOverlay(canvas.lexRow,canvas,canvas.lexGeometry)}
-  function fieldPreviewPanel(row){
-    const background=row.background;
-    if(!background?.tiles?.length){const message=background?.error?`This background is read-only: ${background.error}`:"This field map has no MAP/MIM background.";return {preview:LexeditorUI.detailNote(message),editor:LexeditorUI.detailNote(message)}}
-    const tileId=Math.max(0,Math.min(background.tileCount-1,Number(state.fieldBackgroundSelection[row.key])||0));
-    state.fieldBackgroundSelection[row.key]=tileId;
-    const preview=fieldBackgroundPreviewState(row),tile=background.tiles[tileId];
-    if(state.fieldDetailTab==='walkmesh')preview.overlay=true;
+  function fieldNoBackground(row){const background=row.background;return LexeditorUI.detailNote(background?.error?`This background is read-only: ${background.error}`:"This field map has no MAP/MIM background.")}
+  function fieldPreviewView(row){
+    const cache=fieldPreviewCache;
+    if(cache?.row===row&&cache.source===state.activeSource){drawFieldOverlay(row,cache.overlay,cache.image.lexGeometry);return cache.view}
+    if(!row.background?.tiles?.length)return fieldNoBackground(row);
     const image=el("img",{class:"field-background-image lex-overlay-base","data-field-key":row.key,alt:`${row.name} composed background`});
     const overlay=el("canvas",{class:"field-overlay-canvas lex-overlay-layer","aria-hidden":"true"});
     image.lexOverlay=overlay;
-    const media=el("div",{class:"field-preview-stack lex-overlay-stack"},image,overlay);
-    media.addEventListener('click',event=>{
-      if(state.fieldDetailTab!=='walkmesh'||!image.lexGeometry)return;
-      const cameraId=fieldOverlayCameraId(row);if(cameraId===null)return;
-      const box=overlay.getBoundingClientRect(),x=(event.clientX-box.left)*overlay.width/box.width,y=(event.clientY-box.top)*overlay.height/box.height;
-      for(const triangle of row.walkmesh?.triangles||[]){
-        const points=triangle.vertices.map(vertex=>fieldProject(row.camera.cameras[cameraId],vertex));
-        if(!points.every(Boolean))continue;
-        const path=new Path2D();points.forEach((point,index)=>path[index?'lineTo':'moveTo'](point.x+image.lexGeometry.left,point.y+image.lexGeometry.top));path.closePath();
-        if(overlay.getContext('2d').isPointInPath(path,x,y)){state.fieldWalkmeshSelection[row.key]=triangle.id;rerenderFields();break;}
-      }
-    });
-    const status=LexeditorUI.detailNote("Rendering field background...");image.lexStatus=status;
-    status.classList.add('lex-media-status');status.hidden=true;status.setAttribute('role','status');
-    new MutationObserver(()=>{status.hidden=!status.textContent.startsWith('Preview unavailable:')}).observe(status,{childList:true});
-    const redraw=()=>refreshFieldBackgroundPreview(row,image,status);
-    const picker=numberControl(tileId,0,background.tileCount-1,1,value=>{state.fieldBackgroundSelection[row.key]=Number(value);rerenderFields()},{"aria-label":`${row.name} selected background tile`});
-    const cameras=row.camera?.cameras||[],overlayCamId=cameras.length?fieldOverlayCameraId(row):null;
-    const overlayToggle=LexeditorUI.toggleRow({toggles:[{label:"Walkmesh overlay",checked:preview.overlay!==false,help:"Project walkable triangles, exits, and triggers over the background through the selected camera. This changes only the preview.",change:checked=>{preview.overlay=checked;const note=drawFieldOverlay(row,overlay,image.lexGeometry);if(image.lexBaseStatus)status.textContent=`${image.lexBaseStatus}${note?" - "+note:""}`}}]});
-    const overlayCamera=cameras.length?detailField({label:"Overlay camera",help:infoHelp("Camera used to project the walkmesh overlay. This is the same selection as the Camera page."),control:selectControl(overlayCamId,cameras.map(entry=>({id:entry.id,name:`Camera ${entry.id+1}`})),value=>{state.fieldCameraSelection[row.key]=Number(value);rerenderFields()})}):null;
-    const layers=LexeditorUI.toggleRow({label:"Preview layers",toggles:background.layers.map(layer=>({label:`Layer ${layer}`,checked:preview.layers.includes(layer),change:checked=>{preview.layers=checked?[...new Set([...preview.layers,layer])]:preview.layers.filter(value=>value!==layer);redraw()}}))});
-    const states=background.parameterStates.length?LexeditorUI.toggleRow({label:"Preview parameter states",toggles:background.parameterStates.map(entry=>{
-      const key=`${entry.parameter}:${entry.state}`;
-      return {label:`P${entry.parameter} S${entry.state}`,checked:preview.states.includes(key),change:checked=>{preview.states=checked?[...new Set([...preview.states,key])]:preview.states.filter(value=>value!==key);redraw()}};
-    })}):LexeditorUI.detailNote("No conditional states");
-    const definitions=[
+    // Hidden until the first picture arrives, so the overlay never floats over
+    // an empty frame and the browser never shows its broken-image mark.
+    const media=el("div",{class:"field-preview-stack lex-overlay-stack",style:"visibility:hidden"},image,overlay);
+    const locate=event=>{const geometry=image.lexGeometry,box=overlay.getBoundingClientRect();if(!geometry||!box.width||!box.height)return null;return{geometry,x:(event.clientX-box.left)*geometry.width/box.width,y:(event.clientY-box.top)*geometry.height/box.height}};
+    const pick=event=>{const at=locate(event),focus=fieldOverlayFocus();if(!at)return null;if(focus==="tile")return{kind:"tile",id:fieldTileAt(row,at.geometry,at.x,at.y)};if(focus==="walkmesh")return{kind:"triangle",id:fieldTriangleAt(row,at.geometry,at.x,at.y)};return null};
+    const hoverAt=(tile,triangle)=>{if(fieldHover.key===row.key&&fieldHover.tile===tile&&fieldHover.triangle===triangle)return;Object.assign(fieldHover,{key:row.key,tile,triangle});drawFieldOverlay(row,overlay,image.lexGeometry)};
+    media.addEventListener("pointermove",event=>{const hit=pick(event);media.style.cursor=hit&&hit.id>=0?"pointer":"";hoverAt(hit?.kind==="tile"?hit.id:-1,hit?.kind==="triangle"?hit.id:-1)});
+    media.addEventListener("pointerleave",()=>{media.style.cursor="";hoverAt(-1,-1)});
+    media.addEventListener("click",event=>{const hit=pick(event);if(!hit||hit.id<0)return;if(hit.kind==="tile")state.fieldBackgroundSelection[row.key]=hit.id;else state.fieldWalkmeshSelection[row.key]=hit.id;rerenderFields()});
+    const status=LexeditorUI.detailNote("");
+    status.classList.add("lex-media-status");status.hidden=true;status.setAttribute("role","status");
+    new MutationObserver(()=>{status.hidden=!status.textContent.startsWith("Preview unavailable:")}).observe(status,{childList:true});
+    image.lexStatus=status;
+    const view=LexeditorUI.imageMap({media,label:`${row.name} background and walkmesh`});view.append(status);
+    fieldPreviewCache={row,source:state.activeSource,view,image,overlay,status};
+    requestAnimationFrame(()=>refreshFieldBackgroundPreview(row,image,status));
+    return view;
+  }
+  function fieldPreviewToggle(label,help,checked,change){return detailField({label,help:infoHelp(help),dataType:"BOOL",control:el("input",{type:"checkbox",checked,"aria-label":label,onchange:event=>change(event.target.checked)})})}
+  function fieldBackgroundSection(row){
+    const background=row.background;if(!background?.tiles?.length)return fieldNoBackground(row);
+    const preview=fieldBackgroundPreviewState(row),redraw=()=>fieldPreviewRedraw(row);
+    const layers=background.layers.map(layer=>fieldPreviewToggle(`Layer ${layer}`,"Show this layer's tiles in the picture. This changes only the preview, not the game.",preview.layers.includes(layer),checked=>{preview.layers=checked?[...new Set([...preview.layers,layer])]:preview.layers.filter(value=>value!==layer);redraw()}));
+    const states=background.parameterStates.map(entry=>{const key=`${entry.parameter}:${entry.state}`;return fieldPreviewToggle(`P${entry.parameter} S${entry.state}`,`Show the tiles that background parameter ${entry.parameter} draws in state ${entry.state}. Field scripts switch these states during play. This changes only the preview.`,preview.states.includes(key),checked=>{preview.states=checked?[...new Set([...preview.states,key])]:preview.states.filter(value=>value!==key);redraw()})});
+    const hide=fieldPreviewToggle("Conditional only","Hide the tiles with parameter 255, which always draw, to see the conditional tiles on their own. This changes only the preview.",preview.hide,checked=>{preview.hide=checked;redraw()});
+    return detailSection({title:"Preview filters",help:infoHelp("Show or hide each background layer, and the conditional tiles. P is a background parameter and S the state it must be in for its tiles to draw; field scripts change these states during play. These filters change only the picture, not the game."),body:LexeditorUI.tileGrid([...layers,hide,...states],{minWidth:170})});
+  }
+  const fieldTileDefinitions=[
     ["x","DESTINATION X",-32768,32767,"Horizontal destination of this 16 by 16 tile."],["y","DESTINATION Y",-32768,32767,"Vertical destination of this 16 by 16 tile."],["z","DESTINATION Z",0,65535,"Draw-order depth stored by this tile."],["sourceX","SOURCE X",0,255,"Horizontal source coordinate in the MIM texture."],["sourceY","SOURCE Y",0,255,"Vertical source coordinate in the MIM texture."],["texture","TEXTURE",0,15,"MIM texture page selected by this tile."],["palette","PALETTE",0,15,"MIM palette selected by indexed-colour tiles."],["blend","ALPHA",0,3,"Two-bit alpha mode stored in the packed texture word."],["draw","DRAW",0,1,"When off, this tile draws black instead of its MIM pixels."],["depth","COLOUR TYPE",0,3,"Stored colour-depth selector used to read the MIM pixels."],["layer","LAYER",0,255,"New-format background layer used by the preview filter."],["blendType","ALPHA TYPE",0,4,"New-format pixel blend operation."],["parameter","PARAMETER",0,255,"Field-script background parameter. 255 is unconditional."],["state","STATE",0,255,"State paired with the background parameter."]
   ];
-    const fields=definitions.filter(([field])=>background.editableFields.includes(field)).map(([field,label,min,max,help])=>fieldBackgroundControl(row,tile,field,label,min,max,help));
-    const editor=LexeditorUI.stack({fill:false},...[overlayToggle,overlayCamera,
-      detailField({label:"Tile",control:picker,help:infoHelp("Select an existing tile to edit. This does not add a tile.")}),
-      detailField({label:"Layers",control:layers,help:infoHelp("Show or hide layers in the preview. These filters do not change the game.")}),
-      detailField({label:"Parameter states",control:states,help:infoHelp("P is the parameter number and S is its required state. These filters change only the preview.")}),
-      LexeditorUI.toggleRow({toggles:[{label:"Hide unconditional background",checked:preview.hide,help:"Hide tiles with parameter 255 to inspect conditional tiles. This changes only the preview.",change:checked=>{preview.hide=checked;redraw()}}]}),
-      LexeditorUI.tileGrid(fields)].filter(Boolean));
-    requestAnimationFrame(redraw);
-    const view=LexeditorUI.imageMap({media,label:`${row.name} background and walkmesh`});view.append(status);
-    return {preview:view,editor};
+  function fieldTileSection(row){
+    const background=row.background;if(!background?.tiles?.length)return fieldNoBackground(row);
+    const tileId=Math.max(0,Math.min(background.tileCount-1,Number(state.fieldBackgroundSelection[row.key])||0));
+    state.fieldBackgroundSelection[row.key]=tileId;
+    // A new tile number refills the fields in place. Rebuilding the page on
+    // every step dropped the slider under the pointer, so it moved one step
+    // per drag.
+    const fields=LexeditorUI.tileGrid([]);
+    const fill=id=>{const tile=background.tiles[id];fields.replaceChildren(...fieldTileDefinitions.filter(([field])=>background.editableFields.includes(field)).map(([field,label,min,max,help])=>fieldBackgroundControl(row,tile,field,label,min,max,help)))};
+    const picker=numberControl(tileId,0,background.tileCount-1,1,value=>{state.fieldBackgroundSelection[row.key]=Number(value);fill(Number(value));refreshFieldOverlay()},{"aria-label":`${row.name} selected background tile`});
+    fill(tileId);
+    return LexeditorUI.stack({fill:false},detailField({label:"Tile",control:picker,help:infoHelp("Select the tile to edit by its number, or click it in the picture while this tab is open. The selected tile has a red outline. This selects an existing tile; it does not add one.")}),fields);
   }
   function fieldWalkmeshVertex(dataset,row,triangleId,vertexId){return fieldMapRow(dataset,row.key)?.walkmesh?.triangles?.[triangleId]?.vertices?.[vertexId]}
   function fieldWalkmeshControl(row,triangle,vertex,field){const vanilla=fieldWalkmeshVertex(state.vanilla,row,triangle.id,vertex.id),references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:fieldWalkmeshVertex(state.referenceData[reference.id],row,triangle.id,vertex.id)?.[field]})).filter(entry=>entry.value!==undefined),minimum=field==="adjacent"?-1:-32768,maximum=field==="adjacent"?row.walkmesh.triangleCount-1:32767,apply=value=>{vertex[field]=Number(value);refreshFieldOverlay()};return sourceControl(numberControl(vertex[field],minimum,maximum,1,apply,{"aria-label":`${row.name} triangle ${triangle.id} vertex ${vertex.id} ${field}`}),()=>vertex[field],vanilla?.[field],references,apply)}
@@ -177,13 +223,15 @@
     const showVertices=triangle=>vertexPanel.replaceChildren(...triangle.vertices.map(vertex=>detailSection({title:`Vertex ${vertex.id+1}`,body:LexeditorUI.tileGrid(
       ["x","y","z","adjacent"].map(field=>detailField({label:field==="adjacent"?`Edge ${vertex.id+1}`:field.toLocaleUpperCase(),
         help:infoHelp(field==="adjacent"?"Neighbour triangle across this edge. Use -1 for no neighbour.":`${field.toLocaleUpperCase()} coordinate of this corner. Changing it reshapes the walkable triangle.`),
-        control:fieldWalkmeshControl(row,triangle,vertex,field)})))})));
+        control:fieldWalkmeshControl(row,triangle,vertex,field)})),{minWidth:220})})));
     const select=value=>{state.fieldWalkmeshSelection[row.key]=Math.max(0,Math.min(mesh.triangleCount-1,Number(value)||0));showVertices(mesh.triangles[state.fieldWalkmeshSelection[row.key]]);refreshFieldOverlay()};
     const picker=numberControl(triangleId,0,mesh.triangleCount-1,1,select,{"aria-label":`${row.name} selected walkmesh triangle`});
+    const cameras=row.camera?.cameras||[];
+    const camera=cameras.length?detailField({label:"Overlay camera",help:infoHelp("The camera that projects the walkmesh, exits and triggers onto the picture. This is the same choice as on the Camera tab. It changes only the preview."),control:selectControl(fieldOverlayCameraId(row),cameras.map(entry=>({id:entry.id,name:`Camera ${entry.id+1}`})),value=>{state.fieldCameraSelection[row.key]=Number(value);rerenderFields()})}):null;
     showVertices(mesh.triangles[triangleId]);
-    return LexeditorUI.stack({fill:false},detailField({label:"Triangle",help:infoHelp("Select the triangle to edit by its zero-based number, or click it in the background preview above. The selected triangle is orange. This selects an existing triangle; it does not change the triangle count."),control:picker}),vertexPanel);
+    return LexeditorUI.stack({fill:false},camera,detailField({label:"Triangle",help:infoHelp("Select the triangle to edit by its number, or click it in the picture while this tab is open. The selected triangle is orange; the one under the pointer is lit more faintly. This selects an existing triangle; it does not change the triangle count."),control:picker}),vertexPanel);
   }
-  const fieldDetailTabs=[{id:"camera",label:"Camera",help:"Edit the fixed camera setups stored in this field's .ca file. Each camera has three axis vectors, a position, and a zoom. The preview overlay uses the selected camera."},{id:"walkmesh",label:"Walkmesh",help:"The walkmesh is the surface on which characters can move. Select a triangle by number or click it in the preview above. Orange marks the selected triangle. Move its corners with X, Y and Z, and set which neighbour each edge leads to. The preview uses the selected field camera."},{id:"exits",label:"Exits",help:"Edit the gateway exit lines that leave this field. Crossing an exit line loads the target field and places the player at its destination point."},{id:"doors",label:"Doors",help:"Enable door triggers and set which field script door line each one opens. A trigger with Used off stores door ID 255 and never fires."},{id:"ranges",label:"Camera Ranges",help:"Camera ranges limit how far the view can scroll across this location. Screen ranges define the field screen bounds. Set the top, bottom, left and right edges for the selected range. Some field formats omit these values; those ranges are read-only. The selected field's .inf header is quoted here as its variant and byte size: the variant decides which ranges the file actually stores, and a range it does not store shows Deling's defaults and cannot be edited."},{id:"movie",label:"Movie Camera",help:"Edit the movie camera frames stored in this field's .msk file. Each frame holds four vertices that steer the camera during scripted sequences."},{id:"misc",label:"Misc.",help:"Edit this field's header values, random encounters, and Triple Triad player parameters. Parts of the location that are not editable are listed too."},{id:"scripts",label:"Field Scripts",help:"Edit the JSM field scripts that control events in this location, one instruction per line. Saving validates the methods and rebuilds branches."},{id:"dialogue",label:"Dialogue",help:"Edit the dialogue lines shown by this field's scripts. Keep each line's number and control codes. Unused fields may hold untranslated test text."},{id:"triggers",label:"Triggers",help:"Edit the trigger lines that start field script door or event actions when crossed. Each trigger fires the door ID set on the Doors page."}];
+  const fieldDetailTabs=[{id:"background",label:"Background",help:"Choose which background layers and conditional tiles the picture shows. These filters change only the preview, not the game."},{id:"tile",label:"Tile",help:"The background is built from 16 by 16 image tiles. Select a tile by number or click it in the picture, then change its position, texture or draw settings."},{id:"camera",label:"Camera",help:"Edit the fixed camera setups stored in this field's .ca file. Each camera has three axis vectors, a position, and a zoom. The picture's overlay uses the selected camera."},{id:"walkmesh",label:"Walkmesh",help:"The walkmesh is the surface on which characters can move. Select a triangle by number or click it in the picture. Orange marks the selected triangle. Move its corners with X, Y and Z, and set which neighbour each edge leads to. Outside this tab the walkmesh is drawn faintly and shows no selection."},{id:"exits",label:"Exits",help:"Edit the gateway exit lines that leave this field. Crossing an exit line loads the target field and places the player at its destination point. A X, A Y and A Z are the first end of the exit line, B the second end, and TO the point where the player arrives in the target field. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."},{id:"doors",label:"Doors",help:"Enable door triggers and set which field script door line each one opens. A trigger with Used off stores door ID 255 and never fires."},{id:"ranges",label:"Camera Ranges",help:"Camera ranges limit how far the view can scroll across this location. Screen ranges define the field screen bounds. Set the top, bottom, left and right edges for the selected range. Some field formats omit these values; those ranges are read-only. The selected field's .inf header is quoted here as its variant and byte size: the variant decides which ranges the file actually stores, and a range it does not store shows Deling's defaults and cannot be edited."},{id:"movie",label:"Movie Camera",help:"Edit the movie camera frames stored in this field's .msk file. Each frame holds four vertices that steer the camera during scripted sequences."},{id:"misc",label:"Misc.",help:"Edit this field's header values, random encounters, and Triple Triad player parameters. Parts of the location that are not editable are listed too."},{id:"scripts",label:"Field Scripts",help:"Edit the JSM field scripts that control events in this location, one instruction per line. Saving validates the methods and rebuilds branches."},{id:"dialogue",label:"Dialogue",help:"Edit the dialogue lines shown by this field's scripts. Keep each line's number and control codes. Unused fields may hold untranslated test text."},{id:"triggers",label:"Triggers",help:"Edit the trigger lines that start field script door or event actions when crossed. Each trigger fires the door ID set on the Doors tab. A X, A Y and A Z are the first end of the trigger line and B the second end. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."}];
   function fieldDetailHelp(id){return infoHelp(fieldDetailTabs.find(tab=>tab.id===id).help)}
   function fieldCameraControl(row,camera,field,axis=null){
     const vector=field.startsWith("axis")?Number(field.slice(4)):null,vanilla=fieldMapRow(state.vanilla,row.key)?.camera?.cameras?.[camera.id];
@@ -194,6 +242,9 @@
     const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:read(fieldMapRow(state.referenceData[reference.id],row.key)?.camera?.cameras?.[camera.id])})).filter(entry=>entry.value!==undefined);
     return sourceControl(numberControl(read(camera),minimum,maximum,1,value=>{write(camera,value);refreshFieldOverlay();shell.refresh()},{"aria-label":label}),()=>read(camera),read(vanilla),references,value=>{write(camera,Number(value));refreshFieldOverlay()});
   }
+  // Each stored number is an ordinary property, with the type rail, range and
+  // value bar every other editor field has.
+  function fieldAxisFields(help,control){return LexeditorUI.tileGrid(["x","y","z"].map(axis=>detailField({label:axis.toLocaleUpperCase(),help:infoHelp(help(axis.toLocaleUpperCase())),control:control(axis)})),{minWidth:160})}
   function fieldCameraSection(row){
     const cameras=row.camera?.cameras||[];
     if(!cameras.length)return LexeditorUI.detailNote(row.camera?.error?`These cameras are read-only: ${row.camera.error}`:"This field map has no camera setups.");
@@ -201,8 +252,8 @@
     state.fieldCameraSelection[row.key]=cameraId;
     const camera=cameras[cameraId];
     const picker=selectControl(cameraId,cameras.map(entry=>({id:entry.id,name:`Camera ${entry.id+1} of ${cameras.length}`})),value=>{state.fieldCameraSelection[row.key]=Number(value);rerenderFields()});
-    const vectors=[0,1,2].map(vector=>detailSection({title:`Axis ${vector+1}`,body:LexeditorUI.controlGroup(["x","y","z"].map(axis=>({label:axis.toLocaleUpperCase(),help:infoHelp(`Axis ${vector+1} ${axis.toLocaleUpperCase()} component. The three axes aim the fixed camera; the preview overlay projects through them.`),control:fieldCameraControl(row,camera,"axis"+vector,axis)})))}));
-    return detailSection({title:"Camera",help:fieldDetailHelp("camera"),body:LexeditorUI.stack({fill:false},detailField({label:"Camera",control:picker}),detailField({label:"Zoom",help:infoHelp("Camera zoom. Higher values narrow the view. Zero is rejected because the game projection would divide by zero."),control:fieldCameraControl(row,camera,"zoom")}),detailSection({title:"Position",body:LexeditorUI.controlGroup(["x","y","z"].map(axis=>({label:axis.toLocaleUpperCase(),help:infoHelp(`Camera position ${axis.toLocaleUpperCase()} in field coordinates. Moving it moves the viewpoint.`),control:fieldCameraControl(row,camera,"position",axis)})))}),...vectors)});
+    const vectors=[0,1,2].map(vector=>detailSection({title:`Axis ${vector+1}`,body:fieldAxisFields(axis=>`Axis ${vector+1} ${axis} component. The three axes aim the fixed camera; the picture's overlay projects through them.`,axis=>fieldCameraControl(row,camera,"axis"+vector,axis))}));
+    return detailSection({title:"Camera",help:fieldDetailHelp("camera"),body:LexeditorUI.stack({fill:false},detailField({label:"Camera",control:picker}),detailField({label:"Zoom",help:infoHelp("Camera zoom. Higher values narrow the view. Zero is rejected because the game projection would divide by zero."),control:fieldCameraControl(row,camera,"zoom")}),detailSection({title:"Position",body:fieldAxisFields(axis=>`Camera position ${axis} in field coordinates. Moving it moves the viewpoint.`,axis=>fieldCameraControl(row,camera,"position",axis))}),...vectors)});
   }
   function fieldMovieSection(row){
     const frames=row.movie?.frames||[];
@@ -211,32 +262,56 @@
     state.fieldMovieSelection[row.key]=frameId;
     const frame=frames[frameId],vanilla=fieldMapRow(state.vanilla,row.key)?.movie?.frames?.[frameId];
     const picker=selectControl(frameId,frames.map(entry=>({id:entry.id,name:`Frame ${entry.id+1} of ${frames.length}`})),value=>{state.fieldMovieSelection[row.key]=Number(value);rerenderFields()});
-    const points=frame.points.map((point,pointId)=>detailSection({title:`Point ${pointId+1}`,body:LexeditorUI.controlGroup(["x","y","z"].map(axis=>{const read=value=>value?.points?.[pointId]?.[axis],references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:read(fieldMapRow(state.referenceData[reference.id],row.key)?.movie?.frames?.[frame.id])})).filter(entry=>entry.value!==undefined);return{label:axis.toLocaleUpperCase(),help:infoHelp(`Frame vertex ${axis.toLocaleUpperCase()}. The four vertices steer the movie camera through this frame.`),control:sourceControl(numberControl(point[axis],-32768,32767,1,value=>point[axis]=value,{"aria-label":`${row.name} movie frame ${frame.id+1} point ${pointId+1} ${axis}`}),()=>point[axis],read(vanilla),references,value=>point[axis]=Number(value))}}))}));
+    const points=frame.points.map((point,pointId)=>detailSection({title:`Point ${pointId+1}`,body:fieldAxisFields(axis=>`Frame vertex ${axis}. The four vertices steer the movie camera through this frame.`,axis=>{const read=value=>value?.points?.[pointId]?.[axis],references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:read(fieldMapRow(state.referenceData[reference.id],row.key)?.movie?.frames?.[frame.id])})).filter(entry=>entry.value!==undefined);return sourceControl(numberControl(point[axis],-32768,32767,1,value=>point[axis]=value,{"aria-label":`${row.name} movie frame ${frame.id+1} point ${pointId+1} ${axis}`}),()=>point[axis],read(vanilla),references,value=>point[axis]=Number(value))})}));
     return detailSection({title:"Movie camera",help:fieldDetailHelp("movie"),body:LexeditorUI.stack({fill:false},detailField({label:"Frame",control:picker}),...points)});
+  }
+  // Exits, doors and triggers are short lists of like records, so each is one
+  // table: a row per record, its values in the row. Selecting a row lights its
+  // line in the picture.
+  function fieldRecordTable(row,records,selection,className,template,columns){
+    return columnList({rows:records,key:entry=>entry.id,class:`ff8-record-list ${className}`,editable:true,localSort:false,template,selected:state[selection][row.key]??-1,selectedClass:"selected",
+      select:(entry,event)=>{state[selection][row.key]=entry.id;for(const node of event.currentTarget.parentElement.querySelectorAll(".lex-list-row"))node.classList.toggle("selected",node===event.currentTarget);refreshFieldOverlay()},
+      columns:[{key:"slot",label:"#",numeric:true,render:entry=>entry.id+1},...columns]});
+  }
+  // One column per stored coordinate, edited in place with the shared table
+  // cell editor: double-click a number, type, Enter. A value that differs
+  // from the game's own is marked like any other changed value. Nine help
+  // marks made the exit table wider than its column, so the tab's own help
+  // explains the coordinate columns once.
+  function fieldAxisColumns(row,kind,point,prefix){
+    const collection=kind==="gateway"?"gateways":"triggers";
+    return ["x","y","z"].map(axis=>({key:`${point}${axis}`,label:`${prefix} ${axis.toLocaleUpperCase()}`,numeric:true,min:-32768,max:32767,step:1,
+      sortValue:entry=>entry[point][axis],editValue:entry=>entry[point][axis],
+      edit:(entry,value)=>{const next=Number(value);if(!Number.isFinite(next))return;entry[point][axis]=Math.max(-32768,Math.min(32767,Math.round(next)));refreshFieldOverlay();rerenderFields();shell.refresh()},
+      render:entry=>{const vanilla=fieldMapRow(state.vanilla,row.key)?.entrances?.[collection]?.[entry.id]?.[point]?.[axis];return el("span",{class:vanilla!==undefined&&vanilla!==entry[point][axis]?"lex-value-modified":""},el("output",{},formatNumber(entry[point][axis])))}}));
   }
   function fieldExitsSection(row){
     const gateways=row.entrances?.gateways||[];
     if(!gateways.length)return LexeditorUI.notice({message:"This field map has no INF gateway records."});
-    const gateId=Math.max(0,Math.min(gateways.length-1,Number(state.fieldGatewaySelection[row.key])||0));
-    state.fieldGatewaySelection[row.key]=gateId;
-    const entry=gateways[gateId];
-    const tabs={label:"Exits",shortcuts:false,tabs:gateways.map(candidate=>({id:candidate.id,label:String(candidate.id+1)})),active:gateId,change:value=>{state.fieldGatewaySelection[row.key]=Number(value);rerenderFields()}};
-    return LexeditorUI.tabbedPanel({...tabs,content:LexeditorUI.stack({fill:false},detailField({label:"Target field",help:infoHelp("The field loaded after the player crosses this exit line. Choose Unused to disable the exit."),control:fieldGatewayTargetControl(row,entry)}),detailField({label:"Exit line A",help:infoHelp("First endpoint of the line the player crosses to leave this field."),control:fieldPointControl(row,"gateway",entry,"exitA")}),detailField({label:"Exit line B",help:infoHelp("Second endpoint of the line the player crosses to leave this field."),control:fieldPointControl(row,"gateway",entry,"exitB")}),detailField({label:"Destination",help:infoHelp("Player position after the target field loads."),control:fieldPointControl(row,"gateway",entry,"destination")}))});
+    return fieldRecordTable(row,gateways,"fieldGatewaySelection","field-gateway-table","32px minmax(132px,2fr) repeat(9,minmax(min-content,1fr))",[
+      {key:"fieldId",label:"TARGET",help:"The field loaded after the player crosses this exit line. Double-click to choose another field; choose Unused to disable the exit.",choices:fieldTargetChoices(),
+        sortValue:entry=>fieldTargetName(entry.fieldId),editValue:entry=>fieldTargetName(entry.fieldId),
+        edit:(entry,value)=>{const next=value==="Unused"?32767:state.data.fields.rows.find(field=>field.name===value)?.mapId;if(next==null)return;entry.fieldId=next;refreshFieldOverlay();rerenderFields();shell.refresh()},
+        render:entry=>{const vanilla=fieldMapRow(state.vanilla,row.key)?.entrances?.gateways?.[entry.id]?.fieldId;return el("span",{class:vanilla!==undefined&&vanilla!==entry.fieldId?"lex-value-modified":""},el("output",{},fieldTargetName(entry.fieldId)))}},
+      ...fieldAxisColumns(row,"gateway","exitA","A"),
+      ...fieldAxisColumns(row,"gateway","exitB","B"),
+      ...fieldAxisColumns(row,"gateway","destination","TO")]);
+  }
+  function fieldDoorControls(row,entry){
+    const vanilla=fieldMapRow(state.vanilla,row.key)?.entrances?.triggers?.[entry.id],used=entry.doorId!==255;
+    const setUsed=value=>{entry.doorId=(value&&vanilla&&vanilla.doorId!==255)?vanilla.doorId:value?0:255;refreshFieldOverlay();rerenderFields();shell.refresh()};
+    const doorRefs=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:fieldMapRow(state.referenceData[reference.id],row.key)?.entrances?.triggers?.[entry.id]?.doorId})).filter(item=>item.value!==undefined);
+    const check=el("input",{type:"checkbox",checked:used,"aria-label":`${row.name} door ${entry.id+1} used`,onchange:event=>setUsed(event.target.checked)});
+    return {
+      used:sourceControl(check,()=>entry.doorId!==255,vanilla?.doorId!==undefined?vanilla.doorId!==255:undefined,doorRefs.map(ref=>({name:ref.name,shortName:ref.shortName,value:ref.value!==255})),value=>setUsed(value===true||value==="true"),booleanMark),
+      id:sourceControl(numberControl(used?entry.doorId:0,0,254,1,value=>{entry.doorId=value;refreshFieldOverlay()},{"aria-label":`${row.name} door ${entry.id+1} ID`,disabled:!used}),()=>entry.doorId,vanilla?.doorId,doorRefs,value=>{entry.doorId=Number(value);refreshFieldOverlay()})};
   }
   function fieldDoorsSection(row){
     const triggers=row.entrances?.triggers||[];
     if(!triggers.length)return LexeditorUI.notice({message:"This field map has no INF trigger records."});
-    const triggerId=Math.max(0,Math.min(triggers.length-1,Number(state.fieldTriggerSelection[row.key])||0));
-    state.fieldTriggerSelection[row.key]=triggerId;
-    const entry=triggers[triggerId],vanilla=fieldMapRow(state.vanilla,row.key)?.entrances?.triggers?.[entry.id];
-    const tabs={label:"Doors",shortcuts:false,tabs:triggers.map(candidate=>({id:candidate.id,label:String(candidate.id+1)})),active:triggerId,change:value=>{state.fieldTriggerSelection[row.key]=Number(value);rerenderFields()}};
-    const used=entry.doorId!==255;
-    const setUsed=value=>{entry.doorId=(value&&vanilla&&vanilla.doorId!==255)?vanilla.doorId:value?0:255;refreshFieldOverlay();rerenderFields();shell.refresh()};
-    const doorRefs=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:fieldMapRow(state.referenceData[reference.id],row.key)?.entrances?.triggers?.[entry.id]?.doorId})).filter(item=>item.value!==undefined);
-    const check=el("input",{type:"checkbox",checked:used,"aria-label":`${row.name} door ${entry.id+1} used`,onchange:event=>setUsed(event.target.checked)});
-    const usedControl=sourceControl(check,()=>entry.doorId!==255,vanilla?.doorId!==undefined?vanilla.doorId!==255:undefined,doorRefs.map(ref=>({name:ref.name,shortName:ref.shortName,value:ref.value!==255})),value=>setUsed(value===true||value==="true"),booleanMark);
-    const idControl=sourceControl(numberControl(used?entry.doorId:0,0,254,1,value=>{entry.doorId=value;refreshFieldOverlay()},{"aria-label":`${row.name} door ${entry.id+1} ID`,disabled:!used}),()=>entry.doorId,vanilla?.doorId,doorRefs,value=>{entry.doorId=Number(value);refreshFieldOverlay()});
-    return LexeditorUI.tabbedPanel({...tabs,content:LexeditorUI.stack({fill:false},detailField({label:"Used",help:infoHelp("When off, this trigger stores door ID 255 and never fires. When on, crossing its trigger line opens the door below."),control:usedControl}),detailField({label:"Door ID",help:infoHelp("The field script door line opened when the player crosses this trigger. 255 disables the trigger."),control:idControl}))});
+    return fieldRecordTable(row,triggers,"fieldTriggerSelection","field-door-table","36px minmax(110px,.6fr) minmax(150px,1fr)",[
+      {key:"used",label:"USED",help:"When off, this trigger stores door ID 255 and never fires. When on, crossing its trigger line opens the door beside it.",render:entry=>fieldDoorControls(row,entry).used},
+      {key:"doorId",label:"DOOR ID",help:"The field script door line opened when the player crosses this trigger. 255 disables the trigger.",render:entry=>fieldDoorControls(row,entry).id}]);
   }
   function fieldRangeControl(row,collection,entry,edge){
     const vanilla=fieldMapRow(state.vanilla,row.key)?.entrances?.[collection]?.[entry.id];
@@ -252,7 +327,7 @@
     const screenId=Math.max(0,Math.min(screens.length-1,Number(state.fieldScreenRangeSelection[row.key])||0));
     state.fieldScreenRangeSelection[row.key]=screenId;
     const range=ranges[rangeId],screen=screens[screenId],edges=["top","bottom","right","left"];
-    const fields=(collection,entry)=>entry.present?LexeditorUI.controlGroup(edges.map(edge=>({label:edge.toLocaleUpperCase(),help:infoHelp(`The ${edge} edge of this range in field coordinates.`),control:fieldRangeControl(row,collection,entry,edge)}))):LexeditorUI.stack({fill:false},LexeditorUI.detailNote("This INF variant does not store this range. The values are Deling's defaults and cannot be edited."),LexeditorUI.tileGrid(edges.map(edge=>detailField({label:edge.toLocaleUpperCase(),control:readonlyField(entry[edge])}))));
+    const fields=(collection,entry)=>LexeditorUI.tileGrid(edges.map(edge=>detailField({label:edge.toLocaleUpperCase(),help:entry.present?infoHelp(`The ${edge} edge of this range in field coordinates.`):infoHelp("This INF variant does not store this range. The value is Deling's default and cannot be edited."),control:entry.present?fieldRangeControl(row,collection,entry,edge):readonlyField(entry[edge])})),{minWidth:160});
     return detailSection({title:"Camera ranges",help:fieldDetailHelp("ranges"),body:LexeditorUI.stack({fill:false},detailField({label:"Camera range",control:selectControl(rangeId,ranges.map(candidate=>({id:candidate.id,name:`Camera range ${candidate.id+1}${candidate.present?"":" (absent)"}`})),value=>{state.fieldCameraRangeSelection[row.key]=Number(value);rerenderFields()})}),fields("cameraRanges",range),detailField({label:"Screen range",control:selectControl(screenId,screens.map(candidate=>({id:candidate.id,name:`Screen range ${candidate.id+1}${candidate.present?"":" (absent)"}`})),value=>{state.fieldScreenRangeSelection[row.key]=Number(value);rerenderFields()})}),fields("screenRanges",screen))});
   }
   function fieldHeaderControl(row,field,minimum,maximum,label){
@@ -273,13 +348,14 @@
   function fieldTriggersSection(row){
     const triggers=row.entrances?.triggers||[];
     if(!triggers.length)return LexeditorUI.notice({message:"This field map has no INF trigger records."});
-    const triggerId=Math.max(0,Math.min(triggers.length-1,Number(state.fieldTriggerSelection[row.key])||0));
-    state.fieldTriggerSelection[row.key]=triggerId;
-    const entry=triggers[triggerId];
-    const tabs={label:"Triggers",shortcuts:false,tabs:triggers.map(candidate=>({id:candidate.id,label:String(candidate.id+1)})),active:triggerId,change:value=>{state.fieldTriggerSelection[row.key]=Number(value);rerenderFields()}};
-    return LexeditorUI.tabbedPanel({...tabs,content:LexeditorUI.stack({fill:false},detailField({label:"Door",help:infoHelp("Door ID fired by this trigger. Change it on the Doors page."),control:readonlyField(entry.doorId===255?"Unused":`Door ${entry.doorId}`)}),detailField({label:"Trigger line A",help:infoHelp("First endpoint of the door or event trigger line."),control:fieldPointControl(row,"trigger",entry,"lineA")}),detailField({label:"Trigger line B",help:infoHelp("Second endpoint of the door or event trigger line."),control:fieldPointControl(row,"trigger",entry,"lineB")}))});
+    return fieldRecordTable(row,triggers,"fieldTriggerSelection","field-trigger-table","36px minmax(90px,.8fr) repeat(6,minmax(min-content,1fr))",[
+      {key:"doorId",label:"DOOR",help:"Door ID fired by this trigger. Change it on the Doors tab.",render:entry=>entry.doorId===255?"Unused":`Door ${entry.doorId}`},
+      ...fieldAxisColumns(row,"trigger","lineA","A"),
+      ...fieldAxisColumns(row,"trigger","lineB","B")]);
   }
   function fieldDetailSubtab(row,active){
+    if(active==="background")return fieldBackgroundSection(row);
+    if(active==="tile")return fieldTileSection(row);
     if(active==="walkmesh")return fieldWalkmeshSection(row);
     if(active==="exits")return fieldExitsSection(row);
     if(active==="doors")return fieldDoorsSection(row);
@@ -293,21 +369,26 @@
   }
   function fieldDetail(row,prefs){
     if(!row._loaded){ensureFieldDetail(row);return sharedDetail(row,prefs,[el("div",{class:"field-empty"},row._error?`This map could not be opened: ${row._error}`:"Reading this field map...")],"field-map-detail",row.key)}
-    const tabs=[{id:"background",label:"Background",help:"The background is built from image tiles. Select a tile to change its position or texture. Preview filters and the walkmesh overlay do not change the game."},...fieldDetailTabs].sort((a,b)=>a.label.localeCompare(b.label));
+    const tabs=[...fieldDetailTabs].sort((a,b)=>a.label.localeCompare(b.label));
     const active=tabs.some(tab=>tab.id===state.fieldDetailTab)?state.fieldDetailTab:"background";
     state.fieldDetailTab=active;
-    const background=fieldPreviewPanel(row);
-    const preview=LexeditorUI.detailPanel({title:row.name.toLocaleUpperCase(),headingOverlay:true,body:background.preview,className:"field-map-detail"});
-    let body=active==="background"?background.editor:fieldDetailSubtab(row,active);
+    const preview=LexeditorUI.detailPanel({title:row.name.toLocaleUpperCase(),headingOverlay:true,body:fieldPreviewView(row),className:"field-map-detail"});
+    // The picture's help sits in its own corner, outside the heading that
+    // fades away while the picture is hovered.
+    preview.append(el("span",{class:"field-preview-help"},infoHelp("The field's background as the game composes it, with the walkmesh (white, blue where an edge has no neighbour), exits (red) and triggers (green) projected through the selected camera. Open the Tile tab and click a tile to select it, or the Walkmesh tab and click a triangle. The overlay a tab edits is drawn in full; the others stay faint. The Background tab's layer filters change only this picture.")));
+    let body=fieldDetailSubtab(row,active);
     // The selected tab already supplies its name and help. Keep only that
     // section's contents, while preserving headers for actual child groups.
     // Asking the framework for the parts keeps the shared class names here.
     const parts=LexeditorUI.sectionParts(body);
     if(parts.content)body=parts.content;
     const editor=LexeditorUI.tabbedPanel({tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:LexeditorUI.detailPanel({heading:false,body})});
-    return LexeditorUI.panelLayout([preview,editor],{orientation:"vertical",layoutKey:"ff8-field-detail",defaultSizes:[1,1]});
+    // Three columns by default: list, picture, tabs. The Deling-style setting
+    // stacks the picture over the tabs instead, as Deling does.
+    const deling=state.editorSettings?.delingFieldLayout===true;
+    return LexeditorUI.panelLayout([preview,editor],deling?{orientation:"vertical",layoutKey:"ff8-field-detail",defaultSizes:[1,1]}:{layoutKey:"ff8-field-columns",defaultSizes:[2,5]});
   }
-  function buildFields(){const rows=filtered("fields",["name","key","group","mapId"]).filter(row=>!state.fieldTargetSearch||row.mapId!=null);return showPaged("fields",rows,[{key:"mapId",label:"MAP ID",help:"Number used to identify this field in MAPLIST. A dash means the archive is not listed; it may contain unused or test content.",numeric:true,numberedId:true,render:row=>row.mapId??"—"},{key:"name",label:"FIELD MAP",help:"Internal field archive name. Select a row to edit that location."},{key:"group",label:"GROUP",help:"Archive folder prefix used to organise fields. This is not an encounter group."},{key:"listed",label:"MAPLIST",help:"Whether this field appears in the game map list. A cross means it is not listed; it does not mean the archive is missing.",render:row=>row.listed?"✓":"×"}],fieldDetail,"90px minmax(180px,1fr) 90px 90px",{defaultSplit:34,minLeft:330,minRight:680},false)}
+  function buildFields(){const rows=filtered("fields",["name","key","group","mapId"]);return showPaged("fields",rows,[{key:"mapId",label:"MAP ID",help:"Number used to identify this field in MAPLIST. A dash means the archive is not listed; it may contain unused or test content.",numeric:true,numberedId:true,render:row=>row.mapId??"—"},{key:"name",label:"FIELD MAP",help:"Internal field archive name. Select a row to edit that location."},{key:"group",label:"GROUP",help:"Archive folder prefix used to organise fields. This is not an encounter group."},{key:"listed",label:"MAPLIST",help:"Whether this field appears in the game map list. A cross means it is not listed; it does not mean the archive is missing.",render:row=>row.listed?"✓":"×"}],fieldDetail,"90px minmax(180px,1fr) 90px 90px",{defaultSplit:state.editorSettings?.delingFieldLayout===true?34:32,minLeft:330,minRight:680},false)}
   function renderFields(){const root=buildFields();$("#main").replaceChildren(root);return root}
   function rerenderFields(){renderFields()}
   function rerenderWorldMap(){renderWorldMap()}

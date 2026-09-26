@@ -1,4 +1,4 @@
-"""The FF8 New Game tab stays hidden unless its plugin setting is on."""
+"""FF8 editor settings are off unless their plugin setting is turned on."""
 import json
 import os
 import tempfile
@@ -8,13 +8,15 @@ from unittest.mock import patch
 
 from plugins.ff8 import editor_settings
 
+OFF = {"showNewGame": False, "delingFieldLayout": False}
+
 
 class EditorSettingsTests(unittest.TestCase):
     def test_new_game_defaults_to_hidden(self):
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary) / "ff8-editor.json"
             with patch.dict(os.environ, {editor_settings.ENV_VAR: str(target)}):
-                self.assertEqual(editor_settings.load(), {"showNewGame": False})
+                self.assertEqual(editor_settings.load(), OFF)
                 self.assertFalse(target.exists())
 
     def test_save_roundtrip_persists_the_toggle(self):
@@ -22,10 +24,18 @@ class EditorSettingsTests(unittest.TestCase):
             target = Path(temporary) / "ff8-editor.json"
             with patch.dict(os.environ, {editor_settings.ENV_VAR: str(target)}):
                 self.assertEqual(editor_settings.save({"showNewGame": True}),
-                                 {"showNewGame": True})
-                self.assertEqual(editor_settings.load(), {"showNewGame": True})
+                                 {**OFF, "showNewGame": True})
+                self.assertEqual(editor_settings.load(), {**OFF, "showNewGame": True})
                 self.assertEqual(json.loads(target.read_text(encoding="utf-8")),
-                                 {"showNewGame": True})
+                                 {**OFF, "showNewGame": True})
+
+    def test_deling_field_layout_defaults_off_and_persists(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / "ff8-editor.json"
+            with patch.dict(os.environ, {editor_settings.ENV_VAR: str(target)}):
+                self.assertFalse(editor_settings.load()["delingFieldLayout"])
+                editor_settings.save({"delingFieldLayout": True})
+                self.assertTrue(editor_settings.load()["delingFieldLayout"])
 
     def test_unknown_keys_and_non_booleans_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -44,7 +54,7 @@ class EditorSettingsTests(unittest.TestCase):
             target = Path(temporary) / "ff8-editor.json"
             target.write_text("{not json", encoding="utf-8")
             with patch.dict(os.environ, {editor_settings.ENV_VAR: str(target)}):
-                self.assertEqual(editor_settings.load(), {"showNewGame": False})
+                self.assertEqual(editor_settings.load(), OFF)
 
 
 if __name__ == "__main__":

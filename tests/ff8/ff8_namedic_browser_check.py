@@ -30,20 +30,24 @@ def main() -> int:
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.goto(session.url)
                 page.wait_for_function("()=>typeof state!=='undefined'&&!state.booting", timeout=180000)
+                # Names is a sub-tab of Text: one table of every name, each
+                # edited in place with the shared double-click cell.
                 page.evaluate("()=>navigate('names')")
-                page.wait_for_selector(".ff8-name-detail", timeout=60000)
-                # The list pages at fifteen; the whole list is what this checks.
-                page.evaluate("()=>{state.pageSizes.names=40;render()}")
-                page.wait_for_selector(".ff8-name-detail", timeout=60000)
-                rows = page.locator(".ff8-record-list .lex-list-row").count()
+                page.wait_for_selector(".ff8-name-table", timeout=60000)
+                assert page.evaluate("()=>state.tab") == "text"
+                assert page.locator(".ff8-text-tabs [role=tab]").count() == 2
+                assert page.locator('nav [data-tab="names"]').count() == 0
+                rows = page.locator(".ff8-name-table .lex-column-list-row").count()
                 assert rows == 32, rows
-                field = page.locator('input[aria-label="Name 0"]')
-                assert field.input_value() == "Galbadia"
-                # The labels are drawn in the game's bitmap font, so the page's
-                # own state, not the painted text, is what this reads.
-                assert page.evaluate("()=>[state.data.names.count,state.data.names.bytes]") == [32, None]
+                cell = page.locator('.ff8-name-table .lex-column-list-cell[data-column-key="text"]').first
+                assert cell.inner_text().strip() == "Galbadia"
+                # No detail pane of byte counts and file paths: the table is the page.
+                assert page.locator(".ff8-name-detail").count() == 0
                 assert page.evaluate("()=>state.data.names.path").endswith("namedic.bin")
-                field.fill("Galbadia Test")
+                cell.dblclick()
+                editor = page.locator(".ff8-name-table .lex-cell-editing input")
+                editor.fill("Galbadia Test")
+                editor.press("Enter")
                 page.wait_for_function("()=>dirtyCount()>0", timeout=20000)
                 page.evaluate("()=>document.querySelector('#global-save').click()")
                 page.wait_for_function(

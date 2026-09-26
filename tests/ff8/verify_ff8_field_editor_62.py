@@ -251,26 +251,29 @@ def verify_api_and_render() -> dict:
             result["cards"] = cdp.eval(
                 "document.querySelectorAll('.field-card-table .lex-column-list-row').length")
             open_tab("Exits")
-            # The open tab's content is a panel beside the map panel, not inside
-            # the map's own detail panel, so the page is the scope here.
-            result.update(cdp.eval("""(()=>{const panel=document.querySelector('#main'),
-              input=panel.querySelector('input[aria-label*="gateway 1 destination x"]'),
-              tabs=[...panel.querySelectorAll('.lex-subtab-button')]
-                .filter(node=>/^\\d+$/.test(node.textContent.trim()));
-              const before=Number(input.value.replaceAll(',',''));
-              input.focus();input.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));
-              return{gateways:tabs.length,before,value:Number(input.value.replaceAll(',','')),
-                focusStayed:document.activeElement===input,
-                help:panel.querySelectorAll('.lex-info-help').length,
-                overflow:panel.scrollWidth>panel.clientWidth+1}})()"""))
+            # Exits, doors and triggers are tables: a row per record, one
+            # column per coordinate, edited with the shared double-click cell.
+            cell = cdp.eval("""(()=>{const table=document.querySelector('#main .field-gateway-table'),
+              cell=table.querySelector('.lex-column-list-row .lex-column-list-cell[data-column-key="destinationx"]');
+              return{rows:table.querySelectorAll('.lex-column-list-row').length,
+                before:Number(cell.textContent.replaceAll(',','')),
+                help:document.querySelectorAll('#main .lex-info-help').length,
+                overflow:table.scrollWidth>table.clientWidth+1}})()""")
+            cdp.eval("""(()=>{const cell=document.querySelector('#main .field-gateway-table .lex-column-list-cell[data-column-key="destinationx"]');
+              cell.dispatchEvent(new MouseEvent('dblclick',{bubbles:true}));return 1})()""")
+            wait_eval(cdp, "document.activeElement?.closest?.('.lex-cell-editing')!=null", 10)
+            cdp.eval(f"""(()=>{{const input=document.activeElement;input.value=String({cell['before']}+1);
+              input.dispatchEvent(new KeyboardEvent('keydown',{{key:'Enter',bubbles:true}}));return 1}})()""")
+            result.update({"gateways": cell["rows"], "before": cell["before"], "help": cell["help"],
+                           "overflow": cell["overflow"],
+                           "value": cdp.eval("state.data.fields.rows.find(row=>row.key==='bg/bghall_1').entrances.gateways[0].destination.x")})
             open_tab("Triggers")
-            result["triggers"] = cdp.eval("""(()=>{const panel=document.querySelector('#main');
-              return [...panel.querySelectorAll('.lex-subtab-button')]
-                .filter(node=>/^\\d+$/.test(node.textContent.trim())).length})()""")
+            result["triggers"] = cdp.eval(
+                "document.querySelectorAll('#main .field-trigger-table .lex-column-list-row').length")
             assert result["maps"] == 896, result
             assert result["cards"] == 28, result
             assert result["gateways"] == 12 and result["triggers"] == 12, result
-            assert result["value"] == result["before"] + 1 and result["focusStayed"], result
+            assert result["value"] == result["before"] + 1, result
             assert result["mapIdStyled"], result
             assert not result["overflow"], result
             assert result["help"] >= 4, result
