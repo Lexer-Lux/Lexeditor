@@ -130,6 +130,9 @@ on:
     {filter}:
 {paths}
   workflow_dispatch:
+concurrency:
+  group: ${{{{ github.workflow }}}}-${{{{ github.event.pull_request.number || github.run_id }}}}
+  cancel-in-progress: true
 jobs:
   checks:
     runs-on: windows-latest
