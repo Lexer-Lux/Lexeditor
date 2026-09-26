@@ -23,13 +23,16 @@ STUBS = {h.IAT_CREATE_FILE_A: (0x00F00000, 0x1C), h.IAT_SET_FILE_POINTER: (0x00F
 STACK = 0x00E00000
 CURSOR_SLOT = 0x00D00000
 SEQUENCE = 0x00D00100
+HP = (0x03E7, 0x0200, 0, 0x1234, 0x0001FFFF, 0x10, 0x270F)
 
 
 def _machine():
     emu = unicorn.Uc(unicorn.UC_ARCH_X86, unicorn.UC_MODE_32)
     for base, size in ((0x00400000, 0x00800000), (0x00D00000, 0x00300000),
-                       (0x01D98000, 0x1000), (0x027A9000, 0x1000)):
+                       (0x01D27000, 0x2000), (0x01D98000, 0x1000), (0x027A9000, 0x1000)):
         emu.mem_map(base, size)
+    for index, hp in enumerate(HP):
+        emu.mem_write(h.PARTICIPANT_HP + index * 0xD0, struct.pack("<I", hp))
     emu.mem_write(h.CAVE, h.CODE)
     emu.mem_write(h.DATA, h.DATA_BYTES)
     emu.mem_write(h.SEQUENCE_OWNER, struct.pack("<I", 0x01D973A0))
@@ -86,10 +89,11 @@ def test_logs_each_opcode_once_opened_and_resumes_intact():
     assert [call for call in calls if call[0] == "seek"] == [("seek", 0x1234, 2)]
     writes = [call[2].decode() for call in calls if call[0] == "write"]
     assert len(writes) == 2
-    pattern = re.compile(r"^[0-9A-F]{16} 01D973A0 ([0-9A-F]{8}) ([0-9A-F]{2})\r\n$")
+    pattern = re.compile(r"^[0-9A-F]{16} 01D973A0 ([0-9A-F]{8}) ([0-9A-F]{2})((?: [0-9A-F]{8}){7})\r\n$")
     first, second = (pattern.match(line) for line in writes)
-    assert first and first.groups() == (f"{SEQUENCE:08X}", "AB")
-    assert second and second.groups() == (f"{SEQUENCE + 8:08X}", "91")
+    hp = " " + " ".join(f"{value:08X}" for value in HP)
+    assert first and first.groups() == (f"{SEQUENCE:08X}", "AB", hp)
+    assert second and second.groups() == (f"{SEQUENCE + 8:08X}", "91", hp)
 
 
 def test_off_writes_nothing_and_on_hooks_the_verified_bytes():

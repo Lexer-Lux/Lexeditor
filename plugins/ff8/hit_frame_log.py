@@ -8,12 +8,16 @@ later, and the instruction that does so is not yet identified statically
 While enabled, every battle animation-sequence instruction the game runs is
 appended to `lexeditor-hitframe.log` in the game folder as one line:
 
-    <tsc hi><tsc lo> <sequence owner> <instruction address> <opcode>
+    <tsc hi><tsc lo> <sequence owner> <instruction address> <opcode> <HP 0> .. <HP 6>
 
 `tsc` orders the lines in time. The owner is the sequence entity the engine
-is running (`[01D98204]`). A hit shows as the target starting its
-damage-taken sequence immediately after one of the attacker's instructions,
-and that instruction is the hit frame.
+is running (`[01D98204]`). The seven HP values are battle participants 0-6
+(three party members, four enemies), current HP at `01D27B28 + n x 0xD0`.
+The first session's log (opcodes only) could not show which instruction is
+the hit: owners interleave frame by frame and nothing marked the damage. With
+HP on every line, the instruction on the line where a target's HP first
+drops is the hit frame - or, if HP always drops before the attack animation
+runs, that proves damage lands at the command and the display path is next.
 
 The hook sits at the entry of the opcode handler `00504BB0`, which the
 generic sequence interpreter `0050DB40` calls as `handler(opcode, &cursor)`
@@ -42,10 +46,12 @@ CAVE = 0x027A9000
 DATA = 0x027A9400
 HANDLE = DATA + 0x00
 WRITTEN = DATA + 0x04
-LINE = DATA + 0x08
 HEX_DIGITS = DATA + 0x40
 FILE_NAME = DATA + 0x60
+LINE = DATA + 0x100  # up to 0x70 bytes: 39 + 7 x 9 + 2
 LOG_NAME = "lexeditor-hitframe.log"
+PARTICIPANT_HP = 0x01D27B28  # + participant x 0xD0
+LOGGED_PARTICIPANTS = 7
 
 ASSEMBLY = f"""
     pushad
@@ -98,6 +104,16 @@ have_handle:
     shl eax, 24
     mov ecx, 2
     call hexn
+    xor esi, esi
+hp_next:
+    mov byte ptr [edi], 0x20
+    inc edi
+    imul eax, esi, 0xd0
+    mov eax, dword ptr [eax + {PARTICIPANT_HP:#x}]
+    call hex8
+    inc esi
+    cmp esi, {LOGGED_PARTICIPANTS}
+    jb hp_next
     mov word ptr [edi], 0x0a0d
     add edi, 2
     push 0
@@ -134,20 +150,22 @@ hexn:
 # Assembled at CAVE from ASSEMBLY (keystone); tests/ff8/test_ff8_hit_frame_log.py
 # re-assembles it and runs it under unicorn to check the lines it writes.
 CODE = bytes.fromhex(
-    "60 9C BB 00 94 7A 02 8B 03 85 C0 75 32 6A 00 68"
+    "60 9C BB 00 94 7A 02 8B 03 85 C0 75 36 6A 00 68"
     "80 00 00 00 6A 04 6A 00 6A 01 68 00 00 00 40 8D"
-    "43 60 50 FF 15 C8 91 B6 00 89 03 83 F8 FF 74 7A"
-    "6A 02 6A 00 6A 00 50 FF 15 C4 91 B6 00 8B 03 83"
-    "F8 FF 74 66 8D 7B 08 0F 31 50 89 D0 E8 68 00 00"
-    "00 58 E8 62 00 00 00 C6 07 20 47 A1 04 82 D9 01"
-    "E8 54 00 00 00 C6 07 20 47 8B 44 24 2C 8B 00 48"
-    "E8 44 00 00 00 C6 07 20 47 0F B6 44 24 28 C1 E0"
-    "18 B9 02 00 00 00 E8 33 00 00 00 66 C7 07 0D 0A"
-    "83 C7 02 6A 00 8D 43 04 50 8D 43 08 89 F9 29 C1"
-    "51 50 FF 33 FF 15 AC 90 B6 00 9D 61 8A 44 24 04"
-    "83 EC 08 68 B7 4B 50 00 C3 B9 08 00 00 00 C1 C0"
-    "04 89 C2 83 E2 0F 8A 54 13 40 88 17 47 49 75 EE"
-    "C3"
+    "43 60 50 FF 15 C8 91 B6 00 89 03 83 F8 FF 0F 84"
+    "A1 00 00 00 6A 02 6A 00 6A 00 50 FF 15 C4 91 B6"
+    "00 8B 03 83 F8 FF 0F 84 89 00 00 00 8D BB 00 01"
+    "00 00 0F 31 50 89 D0 E8 88 00 00 00 58 E8 82 00"
+    "00 00 C6 07 20 47 A1 04 82 D9 01 E8 74 00 00 00"
+    "C6 07 20 47 8B 44 24 2C 8B 00 48 E8 64 00 00 00"
+    "C6 07 20 47 0F B6 44 24 28 C1 E0 18 B9 02 00 00"
+    "00 E8 53 00 00 00 31 F6 C6 07 20 47 69 C6 D0 00"
+    "00 00 8B 80 28 7B D2 01 E8 37 00 00 00 46 83 FE"
+    "07 72 E5 66 C7 07 0D 0A 83 C7 02 6A 00 8D 43 04"
+    "50 8D 83 00 01 00 00 89 F9 29 C1 51 50 FF 33 FF"
+    "15 AC 90 B6 00 9D 61 8A 44 24 04 83 EC 08 68 B7"
+    "4B 50 00 C3 B9 08 00 00 00 C1 C0 04 89 C2 83 E2"
+    "0F 8A 54 13 40 88 17 47 49 75 EE C3"
 )
 
 DATA_BYTES = (
@@ -156,6 +174,7 @@ DATA_BYTES = (
     + b"\x00" * 0x10
     + LOG_NAME.encode("ascii") + b"\x00"
 )
+DATA_BYTES += b"\x00" * (LINE - DATA + 0x80 - len(DATA_BYTES))
 
 
 def hook_bytes() -> bytes:
