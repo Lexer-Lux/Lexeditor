@@ -7391,9 +7391,12 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 
   display: grid;
   grid-auto-flow:column;
-  /* Equal shares by default; a game with many long labels sizes tabs to
-     their content instead (--lex-nav-tab-columns:auto). */
-  grid-auto-columns:var(--lex-nav-tab-columns,minmax(0,1fr));
+  /* A tab is never narrower than its own name, and the row still fills the
+     window: a short strip spreads its free space over equal shares, and a
+     strip whose names overrun keeps its natural width while the fit pass
+     shrinks the whole strip into the window. One rule, so no theme declares
+     its own tab sizing. */
+  grid-auto-columns:var(--lex-nav-tab-columns,minmax(max-content,1fr));
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -7423,8 +7426,11 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
     against the frame instead of inside it, which reads as a cut-off tab. FF7,
     FF8 and FF9 set this token; the rest of the games were flush. A theme that
     really wants edge-to-edge tabs can still say 0. */
- padding-inline: var(--lex-nav-padding-inline, var(--lex-panel-gap, 12px));
- overflow-x: var(--lex-nav-overflow-x, visible);
+  padding-inline: var(--lex-nav-padding-inline, var(--lex-panel-gap, 12px));
+  /* Past the readable floor the strip cannot shrink further, so the frame
+     gives the reader a way to reach the rest instead of hiding it. A theme
+     that wants other edges can still say visible. */
+  overflow-x: var(--lex-nav-overflow-x, auto);
 }
 .lex-shell-header nav button {
 

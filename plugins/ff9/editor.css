@@ -33,10 +33,9 @@
   --lex-command-row-padding:0 10px;--lex-command-row-bg:var(--ff9-stone);
   --lex-command-row-border:3px solid;--lex-command-row-border-color:var(--ff9-bevel);
 
-  /* Fifteen tabs in the wide FF9 lettering: content-sized, with the shared fit
-     pass shrinking the strip to the window. */
+  /* Fifteen tabs in the wide FF9 lettering. The shared shell keeps each tab at
+     least its name's width and shrinks the whole strip to the window. */
   --lex-nav-bg:#14181c;--lex-nav-padding-inline:var(--lex-panel-gap);
-  --lex-nav-tab-columns:max-content;--lex-nav-overflow-x:auto;
   --lex-tab-min-height:40px;--lex-tab-padding-inline:clamp(4px,.4vw,10px);
   --lex-tab-font-size:clamp(12px,.93vw,18px);--lex-tab-fg:#e4e6e6;
   --lex-tab-bg:var(--ff9-stone);
