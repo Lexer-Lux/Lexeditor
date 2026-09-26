@@ -40,6 +40,11 @@ TROOPS=[{'recordIndex':i,'id':id,'name':name,'faction':faction,'level':level,'fl
     ('recruit','Recruit','fac_north',1),('footman','Footman','fac_north',10),('archer','Archer','fac_north',10),('knight','Knight','fac_north',20),('guard','Guard','fac_north',20),('militia','Militia','fac_north',2),('elite_militia','Elite militia','fac_north',12),('horseman','Horseman','fac_south',10),('rider','Rider','fac_south',20)])]
 for row in TROOPS:
     row.update(fields={'name':row['name'],'plural':row['plural'],'faction':row['faction'],'attributes':'0','flags':'0','inventory':'[]'},stats={},flagValue=None)
+# A troop that carries equipment is the case where its heading can show a
+# preview: the equipment is what resolves to meshes.
+equipped=[row for row in TROOPS if row['id']=='knight'][0]
+equipped['items']=['itm_fixture_000']
+equipped['fields']['inventory']='[itm_fixture_000]'
 UPGRADES=[{'fromId':a,'toId':b} for a,b in [('recruit','footman'),('recruit','archer'),('footman','knight'),('footman','guard'),('militia','elite_militia'),('horseman','rider')]]
 def fixture_item(i,mesh='fixture_sword'):
     item_id=f'fixture_{i:03}';name=f'Fixture sword {i:03}'
@@ -339,6 +344,19 @@ def main():
                     assert troop_heading['title'].startswith('Knight'),troop_heading
                     assert 'Knight' in troop_heading['values'],troop_heading
                     assert 'knight' in page.locator('.warband-tree-detail').inner_text()
+                    # A troop tree node's thumbnail is a preview, not a door:
+                    # opening it keeps the reader in Troop Trees.
+                    drawer='.warband-tree-detail .lex-model-preview-drawer'
+                    assert page.locator('.warband-tree-detail .lex-detail-panel-icon').count()==1
+                    page.locator('.warband-tree-detail .lex-detail-panel-icon').click()
+                    page.wait_for_timeout(400)
+                    assert page.locator('.warband-tree-detail.lex-model-preview-open').count()==1
+                    assert page.locator(f'{drawer} .lex-figure-grid').count()==1
+                    assert page.evaluate('state.tab')=='upgrades'
+                    page.locator('.warband-tree-detail .lex-model-preview-close').click()
+                    page.wait_for_timeout(300)
+                    assert page.locator('.warband-tree-detail.lex-model-preview-open').count()==0
+                    assert page.evaluate('state.tab')=='upgrades'
                     assert page.evaluate("() => {const title=document.querySelector('.warband-tree-detail h2').getBoundingClientRect();const body=document.querySelector('.warband-tree-detail .lex-detail-panel-body').getBoundingClientRect();return title.bottom<=body.top+1;}")
                     coords=page.evaluate('''() => Object.fromEntries([...document.querySelectorAll('[data-node]')].map(n=>[n.dataset.node,n.getBoundingClientRect().y]))''')
                     assert coords['recruit']>coords['footman']>coords['knight'],coords
