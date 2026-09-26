@@ -34,7 +34,7 @@ window.pad={index:0,mapping:'standard',connected:true,axes:[0,0,0,0],
   buttons:Array.from({length:17},()=>({pressed:false,value:0}))};
 navigator.getGamepads=()=>[window.pad];
 window.press=async(index)=>{const t=performance.now();pad.buttons[index].pressed=true;
-  LexeditorUI.gamepad.step(t);pad.buttons[index].pressed=false;LexeditorUI.gamepad.step(t+1)};
+  LexeditorGamepad.step(t);pad.buttons[index].pressed=false;LexeditorGamepad.step(t+1)};
 </script>'''
 
 A, B, LB, RB, LT, RT, UP, DOWN, LEFT, RIGHT = 0, 1, 4, 5, 6, 7, 12, 13, 14, 15
@@ -80,7 +80,7 @@ def test_dpad_moves_focus_spatially_and_shows_it(page):
 
 def test_left_stick_moves_and_repeats_while_held(page):
     page.focus('#b1')
-    page.evaluate('''() => { pad.axes[0] = 1; const g = LexeditorUI.gamepad;
+    page.evaluate('''() => { pad.axes[0] = 1; const g = LexeditorGamepad;
       g.step(1000); g.step(1100); g.step(1400); pad.axes[0] = 0; g.step(1500); }''')
     assert focused(page) == 'b3'
 
@@ -187,10 +187,10 @@ def test_home_cards_are_reachable_and_open_with_a():
             page.evaluate("dispatchEvent(new Event('pywebviewready'))")
             page.wait_for_selector('.game[data-plugin="game2"]', timeout=15000)
             page.focus('.game[data-plugin="game0"]')
-            page.evaluate('''() => { const g = LexeditorUI.gamepad; pad.buttons[15].pressed = true;
+            page.evaluate('''() => { const g = LexeditorGamepad; pad.buttons[15].pressed = true;
               g.step(1); pad.buttons[15].pressed = false; g.step(2); }''')
             assert page.evaluate('document.activeElement.dataset.plugin') == 'game1'
-            page.evaluate('''() => { const g = LexeditorUI.gamepad; pad.buttons[0].pressed = true;
+            page.evaluate('''() => { const g = LexeditorGamepad; pad.buttons[0].pressed = true;
               g.step(3); pad.buttons[0].pressed = false; g.step(4); }''')
             page.wait_for_function("opened.length > 0", timeout=5000)
             assert page.evaluate('opened') == ['game1']
