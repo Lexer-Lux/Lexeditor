@@ -5198,7 +5198,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   opacity:0; transition:opacity .15s ease;
 
   position:absolute;
-  z-index:3;
+  /* The drawer covers the editing surface, so it must also cover the field
+     help pips that sit on that surface: they are z-index 5, and letting them
+     poke through left a row of "?" marks floating over the model preview. */
+  z-index:6;
   /* The drawer covers the editing surface and stops at the heading. It used to
      start at a flat 10%, which is the heading's share only while the heading
      fits in a tenth; a heading with a subtitle grows past it and the drawer

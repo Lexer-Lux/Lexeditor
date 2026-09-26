@@ -200,6 +200,25 @@ def main():
                     assert page.locator('.lex-model-preview-drawer .warband-preview-stage').count()==1
                     page.locator('.lex-model-preview-drawer .warband-preview-stage canvas').wait_for(state='visible')
                     assert page.evaluate('window.__warbandPreview?.length===1')
+                    # The open drawer covers the editing surface, so the field
+                    # help pips on that surface must be underneath it. They
+                    # used to stay on top (z-index 5 over the drawer's 3) and a
+                    # row of "?" marks floated over the model.
+                    assert page.evaluate('''(() => {
+                      const drawer = document.querySelector(
+                        '.warband-item-detail .lex-model-preview-drawer');
+                      const r = drawer.getBoundingClientRect();
+                      return [...document.querySelectorAll(
+                        '.warband-item-detail .lex-field-help')].filter(pip => {
+                        const b = pip.getBoundingClientRect();
+                        const overlaps = !(b.right < r.left || b.left > r.right
+                          || b.bottom < r.top || b.top > r.bottom);
+                        if (!overlaps) return false;
+                        const hit = document.elementFromPoint(
+                          b.left + b.width / 2, b.top + b.height / 2);
+                        return hit && hit.closest('.lex-field-help') === pip;
+                      }).length;
+                    })()''') == 0
                     page.locator('.warband-item-detail .lex-model-preview-close').click()
                     page.wait_for_timeout(250)
                     assert page.locator('.warband-item-detail.lex-model-preview-open').count()==0
