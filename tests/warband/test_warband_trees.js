@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict');
-const {build,layout}=require('../plugins/warband/troop_trees.js');
+const {build,layout}=require('../../plugins/warband/troop_trees.js');
 const troops=['recruit','footman','archer','knight','guard','other','other_elite'].map((id,i)=>({id,name:id,faction:i<5?'fac_a':'fac_b',status:'active'}));
 const edge=(a,b)=>({fromId:a,toId:b});
 const edges=[edge('recruit','footman'),edge('recruit','archer'),edge('footman','knight'),edge('footman','guard'),edge('other','other_elite')];
