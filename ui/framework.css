@@ -920,6 +920,27 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   grid-template-rows:minmax(0,1fr);
 }
 
+/* The heading scrolls away with the record instead of standing still over it:
+   "the scroll wheel should pass through it like everything else, and the
+   scrolling should move it". The panel is the scroller, so a wheel over the
+   heading scrolls too, and its gutter is reserved on both edges - the left
+   margin is the same width as the scrollbar's lane on the right. A panel whose
+   body fills its height and scrolls inside itself - tabs, a text editor, a
+   table, a curve, paged settings, a picture - keeps the heading in place, and
+   a panel used as a card (a Tweaks column) is not a scroller at all. */
+.lex-detail-panel:not(.lex-detail-panel-media, .lex-tweaks-scroll .lex-detail-panel, :has(> .lex-tweaks-paged, > .lex-detail-panel-body > :is(.lex-tabbed-panel:only-child, .lex-text-editor, .lex-table-fill:only-child, .lex-detail-section > .lex-detail-section-content > .lex-curve-grid))) {
+  overflow-y:auto;
+  overflow-x:clip;
+  scrollbar-gutter:stable both-edges;
+  grid-template-rows:minmax(min-content, 10%) 1fr;
+}
+.lex-detail-panel.no-heading:not(.lex-detail-panel-media, .lex-tweaks-scroll .lex-detail-panel, :has(> .lex-tweaks-paged, > .lex-detail-panel-body > :is(.lex-tabbed-panel:only-child, .lex-text-editor, .lex-table-fill:only-child, .lex-detail-section > .lex-detail-section-content > .lex-curve-grid))) {
+  grid-template-rows:1fr;
+}
+.lex-detail-panel:not(.lex-detail-panel-media, .lex-tweaks-scroll .lex-detail-panel, :has(> .lex-tweaks-paged, > .lex-detail-panel-body > :is(.lex-tabbed-panel:only-child, .lex-text-editor, .lex-table-fill:only-child, .lex-detail-section > .lex-detail-section-content > .lex-curve-grid))) > .lex-detail-panel-body {
+  overflow-y:visible;
+}
+
 .lex-detail-panel-heading.no-actions:not(.lex-model-preview-heading) .lex-detail-panel-identity { grid-column:2 / -1; }
 .lex-detail-panel-heading.no-icon.no-actions .lex-detail-panel-identity { grid-column:1 / -1; }
 
