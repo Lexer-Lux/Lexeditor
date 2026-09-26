@@ -1,5 +1,6 @@
 """A long record name stays inside its header without splitting its words."""
 import os
+from pathlib import Path
 from test_shared_ui_feedback import page, framework, ROOT
 
 
@@ -27,5 +28,8 @@ def test_record_title_fits_beside_picture_and_id_after_panel_resize(page):
         assert result['right'] <= result['copy'] + 1, result
         assert result['lines'] == 1, result
         assert result['size'] >= 14, result
+        if os.environ.get('LEX_TITLE_SCREENSHOT'):
+            output=Path(os.environ['LEX_TITLE_SCREENSHOT'])
+            page.screenshot(path=str(output.with_stem(output.stem+f'-{width}')))
     if os.environ.get('LEX_TITLE_SCREENSHOT'):
         page.screenshot(path=os.environ['LEX_TITLE_SCREENSHOT'])
