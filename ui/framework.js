@@ -2223,18 +2223,11 @@
     // hover the fill slides out into a slider for rough adjustment.
     const lowBound = min === null || min === undefined || min === "" ? null : Number(min);
     const highBound = max === null || max === undefined || max === "" ? null : Number(max);
-    // A drag slider is only honest when a pixel of travel is worth a sensible
-    // amount. Over a raw INT32 field the whole range is four billion wide, so
-    // the pointer lands a hair off centre and writes -24832854 into a price -
-    // the control looks broken because it is being asked to resolve four
-    // billion values across three hundred pixels. Past this span the value gets
-    // a plain number box with no fill and no handle.
-    const SLIDER_MAX_STEPS = 100000;
-    const boundedSpan = Number.isFinite(lowBound) && Number.isFinite(highBound)
-      ? (highBound - lowBound) / (Number(step) || 1) : Infinity;
+    // Wide ranges still have a coarse slider; direct entry retains precise
+    // control. A field's declared bounds, not an arbitrary span cutoff,
+    // determine whether it has a range to show.
     if (input && !readOnly && numericLike &&
-        Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound &&
-        boundedSpan <= SLIDER_MAX_STEPS) {
+        Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound) {
       const fill = element("span", {class: "lex-value-fill", "aria-hidden": "true"});
       const handle = element("span", {class: "lex-value-handle", "aria-hidden": "true"});
       fill.append(handle);

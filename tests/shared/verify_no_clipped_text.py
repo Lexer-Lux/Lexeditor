@@ -234,14 +234,13 @@ CONTROLS_PROBE = r"""
     }
   }
   for(const fill of document.querySelectorAll('.lex-has-value-fill')){
-    const input=fill.querySelector('input[type="number"]');
+    const input=fill.querySelector('input[min][max]');
     if(!input) continue;
-    const low=Number(input.min), high=Number(input.max);
-    const step=Number(input.step)||1;
-    if(!Number.isFinite(low)||!Number.isFinite(high)||high<=low) continue;
-    const span=(high-low)/step;
-    if(span>100000){
-      bad.push({kind:'slider-over-unusable-range',span:Math.round(span),
+    const grip=fill.querySelector('.lex-value-handle');
+    if(!grip) continue;
+    const box=input.getBoundingClientRect(), handle=grip.getBoundingClientRect();
+    if(box.width && (handle.left<box.left-1 || handle.right>box.right+1)){
+      bad.push({kind:'slider-handle-outside-input',
                 label:(input.getAttribute('aria-label')||input.name||'').slice(0,24)});
     }
   }
