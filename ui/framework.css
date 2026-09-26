@@ -5740,7 +5740,18 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 /* The record name is edited where it is read: in the panel heading. The box is
    the heading, not a box drawn around it, so the panel looks the same until it
    is pointed at and the field only declares itself when it can be used. */
-.lex-detail-panel-rename { display:block;min-width:0; }
+.lex-detail-panel-rename { min-width:0; }
+/* The box hugs the name, so the copy button beside it lands beside the name
+   and not at the far edge of the heading. */
+.lex-detail-panel-title.lex-detail-panel-rename > input { field-sizing:content;width:auto;max-width:calc(100% + 7px);flex:0 1 auto; }
+.lex-detail-panel-rename > .lex-source-control { flex:1 1 auto; }
+/* The heading's copy button sits right of the name and appears on hover, like
+   a property's. It scales with the heading so it does not read as a stray dot
+   beside a thirty-pixel name. */
+.lex-detail-panel-name { min-width:0; }
+.lex-detail-panel-title > .lex-copy-value { --lex-copy-lane:clamp(12px,.5em,16px);flex:none; }
+.lex-detail-panel-title:hover > .lex-copy-value { opacity:.7; }
+.lex-detail-panel-title > .lex-copy-value:hover { opacity:1; }
 .lex-detail-panel-rename :is(input, .lex-source-control) {
   box-sizing:border-box;
   width:calc(100% + 6px + 1px);

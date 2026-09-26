@@ -941,7 +941,21 @@
             title: options.renameLabel || "Record name",
             oninput: event => options.renameRecord(event.target.value, event),
           }))
-        : element("h2", {class: "lex-detail-panel-title"}, options.title ?? "");
+        : element("h2", {class: "lex-detail-panel-title"},
+          element("span", {class: "lex-detail-panel-name"}, options.title ?? ""));
+    // The name is the one thing on a record people most often want to paste
+    // somewhere else, so it copies like any property value, from its right.
+    const titleText = () => {
+      const field = title.querySelector('input:not([type="checkbox"]),select,textarea');
+      if (field) return field.tagName === "SELECT"
+        ? (field.selectedOptions[0]?.textContent || field.value) : field.value;
+      const bitmap = title.querySelector(".lex-bitmap-text[aria-label]");
+      if (bitmap) return bitmap.getAttribute("aria-label");
+      const name = title.querySelector(".lex-detail-panel-name") || title;
+      return name.textContent.trim();
+    };
+    if (options.title !== undefined || options.titleControl || options.renameRecord)
+      title.append(copyValueButton(titleText, "Copy this name"));
     if (options.help) title.append(infoHelp(options.help));
     const identity = element("div", {class: "lex-detail-panel-identity"},
       title,
@@ -1289,7 +1303,9 @@
   const shellTextNodes = (root = document) => [
     ...root.querySelectorAll(".lex-brand-button h1"),
     ...root.querySelectorAll(".lex-shell-header nav button .lex-tab-label-text"),
-    ...root.querySelectorAll(".lex-detail-panel-title"),
+    // The name inside a heading, so a redraw leaves its copy button alone.
+    ...[...root.querySelectorAll(".lex-detail-panel-title")]
+      .map(title => title.querySelector(":scope > .lex-detail-panel-name") || title),
   ];
 
   // Close any shared dialog that is open, without knowing how one is built.
@@ -2150,8 +2166,8 @@
       event.preventDefault();
       event.stopPropagation();
       const text = String(read() ?? "");
-      const copied = await copyText(text);
-      showToast(copied ? `Copied: "${text}"` : "Could not reach the clipboard");
+      const copied = await copyText(text, {quiet: true});
+      showToast(copied ? `Copied: "${text}"` : "Could not reach the clipboard", !copied);
     },
   }, copyIcon());
 
