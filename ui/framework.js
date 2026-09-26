@@ -8028,9 +8028,23 @@ ${contents.path}`});
       options.search ? bottomSearch(options.search) : null);
     let rowControl = null;
     if (options.rowControl) {
-      const commitRows = input => options.rowControl.change?.(input.value);
+      // The most rows that fit this panel at a readable height. Asking for
+      // more used to be saved and then silently capped, so Enter looked dead.
+      const rowMax = Math.max(5, Math.min(80, Number(options.rowControl.max) || 80));
+      const commitRows = input => {
+        // A box replaced by the render its own Enter caused still blurs; that
+        // second commit re-rendered the table again for nothing.
+        if (input.dataset.lexCommitted === input.value) return;
+        input.dataset.lexCommitted = input.value;
+        const requested = Number.parseInt(input.value, 10);
+        if (Number.isFinite(requested) && requested > rowMax) {
+          input.value = rowMax;
+          showToast(`Only ${rowMax} rows fit this panel at a readable height.`);
+        }
+        options.rowControl.change?.(input.value);
+      };
       const rowInput = element("input", {
-        type: "number", min: "5", max: "80", step: "1", value: options.rowControl.value,
+        type: "number", min: "5", max: String(rowMax), step: "1", value: options.rowControl.value,
         // This box is sized for two digits. Fitting its font to its own ch
         // width creates a feedback loop that keeps shrinking both.
         "data-lex-autofit": "false",
@@ -8160,6 +8174,9 @@ ${contents.path}`});
   };
   const tableCapacityCache = new Map();
   const tableFitCapacityCache = new Map();
+  // The table whose row count the reader just typed, so a fit that caps it
+  // says why instead of quietly showing fewer rows than asked for.
+  let typedRowsKey = null;
   // Which page each table last drew, so a page the reader asked for can be
   // told apart from the page a stale selection would pull it back to.
   const lastRenderedPage = new Map();
@@ -8582,6 +8599,7 @@ ${contents.path}`});
       const setPageSize = requested => {
         const nextSize = saveTableRows(rowPreferenceKey, requested);
         if (nextSize === pageSize) return;
+        typedRowsKey = rowPreferenceKey;
         const selectedIndex = records.findIndex(record => keyOf(record) === selected);
         const anchor = selectedIndex >= 0 ? selectedIndex : groupStart;
         const nextBarrelSize = nextSize * barrels;
@@ -8591,6 +8609,7 @@ ${contents.path}`});
       };
       const rowControl = sharedSettingsSnapshot?.developerMode ? {
         value: pageSize,
+        max: fitCapacity?.capacity || null,
         defaultValue: globalPageSize,
         overridden: hasRowOverride,
         change: setPageSize,
@@ -8713,6 +8732,9 @@ ${contents.path}`});
         },
         change: nextSize => {
           if (fitMinimum) tableFitCapacityCache.set(rowPreferenceKey, {capacity: nextSize, requested: requestedPageSize});
+          if (typedRowsKey === rowPreferenceKey && nextSize < requestedPageSize)
+            showToast(`Only ${nextSize} rows fit this panel at a readable height.`);
+          typedRowsKey = null;
           const selectedIndex = records.findIndex(record => keyOf(record) === selected);
           const anchor = selectedIndex >= 0 ? selectedIndex : groupStart;
           const nextBarrelSize = nextSize * barrels;
