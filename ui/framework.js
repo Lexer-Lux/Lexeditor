@@ -7245,7 +7245,7 @@ ${contents.path}`});
         ? element("span", {class: "lex-column-heading"}, sortControl, help)
         : sortControl;
       return bindColumnHighlight(element("div", {
-        class: ["lex-column-list-head-cell", active ? "sorted" : "", headerAlignmentClass(column), column.class || ""].filter(Boolean).join(" "),
+        class: ["lex-column-list-head-cell", sortable ? "lex-column-sortable" : "", active ? "sorted" : "", headerAlignmentClass(column), column.class || ""].filter(Boolean).join(" "),
         role: "columnheader",
         title: column.headerTitle || null,
         draggable: false,

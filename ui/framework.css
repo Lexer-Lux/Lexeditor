@@ -2449,6 +2449,10 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   justify-self:center;
 }
 
+/* The whole header cell sorts on click, not just its label, so the whole
+   cell says so. Only the label showed the pointer, which read as a header
+   that could not be clicked. */
+.lex-column-list-head-cell.lex-column-sortable { cursor:pointer; }
 .lex-column-list-head-cell[draggable="true"] { cursor:grab; }
 .lex-column-list-head-cell[draggable="true"]:active { cursor:grabbing; }
 
