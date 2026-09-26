@@ -16,6 +16,7 @@ import re
 import subprocess
 import tempfile
 import threading
+from .sound_preview import sample_names
 
 _LOCK = threading.Lock()
 
@@ -728,6 +729,9 @@ def dataset_data(root, dataset: str):
         return {"dataset": dataset, "available": False, "rows": [], "sha256": "", "schema": public}
     text, encoding, raw = _source(path)
     rows = _records(text, schema)
+    if dataset == "sounds":
+        for row in rows:
+            row["audioSamples"] = sample_names(row.get("fields", {}).get("samples", ""))
     seen = {}
     for row in rows:
         if row["id"].startswith("record@"):

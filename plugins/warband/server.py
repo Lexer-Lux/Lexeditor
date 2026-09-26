@@ -22,6 +22,7 @@ from .troop_editor import troop_data, save_troops
 from .module_records import (PROMOTED_TABS, SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME,
                              _single_bits, dataset_data, header_constants, mesh_choices, save_dataset)
 from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
+from .sound_preview import sample_path
 from .model_preview import PreviewUnavailable, preview as item_preview, texture_path as preview_texture_path
 from core.plugin_http import PluginRequestHandler
 
@@ -807,6 +808,8 @@ class Handler(PluginRequestHandler):
                 self.json_response(data_map_rows())
             elif path == "/api/module-records":
                 self.json_response(dataset_data(MODULE_SYSTEM, query.get("dataset", [""])[0]))
+            elif path == "/api/sound-sample":
+                self.file_response(sample_path(PROJECT, Path(paths.WARBAND_ROOT), query.get("name", [""])[0]))
             elif path == "/api/catalog/file":
                 self.json_response(read_catalog_file(query.get("name", [""])[0]))
             elif path == "/api/build/status":

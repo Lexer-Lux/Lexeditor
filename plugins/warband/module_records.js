@@ -118,6 +118,9 @@
       if(row.problem)return LexeditorUI.detailPanel({className:"warband-module-detail",title:row.name||row.id,identity:row.id,body:[LexeditorUI.el("section",{class:"card error"},row.problem)]});
       const readOnly=state.activeSource!=="mine";
       const choices=data.choices||{};
+      const samples=dataset==="sounds"?row.audioSamples||[]:[];
+      const sampleKey=`sample:${row.recordIndex}`;
+      const selectedSample=samples.includes(viewState(dataset)[sampleKey])?viewState(dataset)[sampleKey]:samples[0];
       const fields=data.schema.fields.filter(spec=>row.presentFields?.includes(spec.key)).map(spec=>{
         const description=row.fieldProblems?.[spec.key]?(spec.help||"")+" This field is not a supported literal in this record: "+row.fieldProblems[spec.key]+". Use source editing for this field.":spec.help||"";
         const choice=row.fieldProblems?.[spec.key]?null:choices[spec.key];
@@ -142,11 +145,16 @@
           dataType:({identity:"ID",string:"STRING",text:"STRING",expr:"EXPR",integer:"INT",number:"FLOAT",vec2:"VECTOR2",vec3:"VECTOR3",vec4:"VECTOR4"})[spec.kind]||"VALUE",
           description,control:fieldControl(dataset,row,spec,readOnly)});
       });
+      if(samples.length>1)fields.unshift(LexeditorUI.detailField({label:"Preview sample",control:
+        LexeditorUI.el("select",{"aria-label":"Preview sample",onchange:event=>{
+          viewState(dataset)[sampleKey]=event.target.value;renderApp();
+        }},...samples.map(name=>LexeditorUI.el("option",{value:name,selected:name===selectedSample},name)))}));
       // The heading is drawn in the installed game's own font, the same face
       // the shell and the shell's tabs use, and wrapped the way the item
       // panel's heading is so every panel in the plugin sizes its heading the
       // same way.
       return LexeditorUI.detailPanel({className:"warband-module-detail",
+        audio:selectedSample?{src:`/api/sound-sample?name=${encodeURIComponent(selectedSample)}`,label:row.name||row.id}:null,
         title:LexeditorUI.el("h2",{class:"lex-detail-panel-title"},bitmapText(row.name||row.id,24)),
         // The heading shows the record's name; the ID repeats beside it only
         // when it is a different string. Coverage and the source caveat are
