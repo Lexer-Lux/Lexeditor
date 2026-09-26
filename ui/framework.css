@@ -4824,7 +4824,8 @@ body:has(.lex-data-map-table) #main {
 .lex-value-handle {
 
   position:absolute;
-  left:calc(var(--lex-value-ratio,0) * 100%);
+  /* Keep the whole grip inside the box at both range endpoints. */
+  left:clamp(4.5px,calc(var(--lex-value-ratio,0) * 100%),calc(100% - 4.5px));
   /* A flat slab spanning the full box height reads as a bar, not a grip. */
   top:3px;
   bottom:3px;
