@@ -3,7 +3,9 @@
 The panels that own a world position show the map beside the numbers, but a
 panel-sized map is a coarse pointer. The magnifier draws the same map at the
 size of the window with a crosshair and a live readout, and a click inside it
-runs the same placement handler as the small map.
+places the record. A draw point's own map opens that view when it is clicked -
+a click on a panel must not move game data - while the panel that still places
+points keeps its magnifier button. Either way one placement handler runs.
 """
 import re
 import sys
@@ -73,12 +75,17 @@ def main():
         page.add_script_tag(content=STUBS + projection + helpers + draw + field_return + "\nrender();\n")
         assert not errors, errors
 
-        # A draw point: the small map names the block under the pointer, and the
-        # magnifier places the point on a map four times as wide.
+        # A draw point: the small map names the block under the pointer, and
+        # clicking it opens the large map, which is where the point is placed.
         small = page.locator('.lex-image-map-stage').bounding_box()
         page.mouse.move(small['x'] + small['width'] * .5, small['y'] + small['height'] * .5)
         assert readout(page, False) == 'block 64, 48', readout(page, False)
-        page.get_by_role('button', name='Open the large map: Set Draw Point 129 position').click()
+        assert page.locator('.world-draw-point .lex-image-map-magnify').count() == 0, \
+            'the panel map is the way into the large map, so it carries no magnifier button'
+        before = page.evaluate('[drawRow.x,drawRow.y]')
+        page.mouse.click(small['x'] + small['width'] * .5, small['y'] + small['height'] * .5)
+        page.wait_for_selector('.lex-map-magnifier-dialog', timeout=5000)
+        assert page.evaluate('[drawRow.x,drawRow.y]') == before, 'a click on the panel moved the point'
         assert page.locator('.lex-map-magnifier-dialog').is_visible()
         large = page.locator('.lex-map-magnifier-body .lex-image-map-stage').bounding_box()
         assert large['width'] > small['width'] * 2, (small, large)

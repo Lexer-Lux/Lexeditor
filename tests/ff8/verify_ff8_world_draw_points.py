@@ -109,31 +109,48 @@ def main() -> int:
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 120)
             cdp.eval("navigate('world');state.worldTab='drawPoints';state.selected.world=0;renderWorldMap()")
             wait_eval(cdp, "document.querySelector('.world-map-detail.world-draw-point')!==null", 30)
-            rendered = cdp.eval("""(()=>{const root=document.querySelector('.world-map-view'),panel=document.querySelector('.world-map-detail.world-draw-point'),map=panel.querySelector('.world-draw-map'),marker=map.querySelector('.world-draw-marker');return{
-              tabs:[...document.querySelectorAll('.world-map-tabs [role=tab]')].map(node=>node.textContent.trim().replace(/\\d+$/,'')),
-              active:document.querySelector('.world-map-tabs [role=tab][aria-selected=true]')?.textContent.trim().replace(/\\d+$/,''),
+            rendered = cdp.eval("""(()=>{const root=document.querySelector('#main'),panel=document.querySelector('.world-map-detail.world-draw-point'),map=panel.querySelector('.world-draw-map'),marker=map.querySelector('.lex-image-map-point.selected');return{
+              tabs:[...document.querySelectorAll('.ff8-world-tabs [role=tab] .lex-tab-label-text')].map(node=>node.textContent.trim()),
+              active:document.querySelector('.ff8-world-tabs [role=tab][aria-selected=true] .lex-tab-label-text')?.textContent.trim(),
               rows:document.querySelectorAll('.lex-list-row,.lex-column-list-row').length,
               inputs:[...panel.querySelectorAll('input')].map(node=>node.getAttribute('aria-label')),
               map:{width:map.getBoundingClientRect().width,height:map.getBoundingClientRect().height,label:map.getAttribute('aria-label')},
               marker:{left:marker.style.left,top:marker.style.top},
-              help:panel.querySelector('.lex-info-help')?.getAttribute('aria-label')||'',
+              sectionTitles:panel.querySelectorAll('.lex-detail-section-title').length,
+              magnifiers:panel.querySelectorAll('.lex-image-map-magnify').length,
+              help:[...document.querySelectorAll('.ff8-world-tabs [role=tab]')]
+                .find(node=>/draw points/i.test(node.textContent))
+                ?.querySelector('.lex-info-help')?.getAttribute('aria-label')||'',
               overflow:root.scrollWidth>root.clientWidth+1,
             }})()""")
             assert rendered["active"] == "Draw Points"
-            assert rendered["tabs"] == ["Map", "Regions", "Field → World", "Draw Points",
-                                        "Sky Colours", "Train Tracks", "World Textures"]
+            assert rendered["tabs"] == ["Map", "Regions", "Field → World", "World → Field",
+                                        "Draw Points", "Sky Colours", "Train Tracks",
+                                        "World Textures"], rendered["tabs"]
             assert rendered["inputs"] == ["Draw Point 129 X", "Draw Point 129 Y",
                                           "Draw Point 129 sub-ID"]
-            assert abs(rendered["map"]["width"] - rendered["map"]["height"]) < 2
+            # The world map is the game's 4:3 art, so the panel shows it 4:3.
+            assert abs(rendered["map"]["width"] / rendered["map"]["height"] - 4 / 3) < 0.02, rendered["map"]
             assert rendered["map"]["width"] > 250 and "Set Draw Point 129" in rendered["map"]["label"]
-            assert "magic, quantity, and refill" in rendered["help"]
+            # The page's own help carries what the file does not store, and the
+            # panel is the map and the three byte fields, with no heading band.
+            assert "FF8_EN.exe" in rendered["help"], rendered["help"]
+            assert rendered["sectionTitles"] == 0, rendered
+            assert rendered["magnifiers"] == 0, rendered
             assert not rendered["overflow"]
 
-            # The visual placement control and the exact inputs both change the
-            # same record. Save uses the normal global save button.
+            # A click on the panel's map opens the large map and leaves the
+            # record alone; the large map is where the point is placed. Save
+            # uses the normal global save button.
             before_xy = cdp.eval("(()=>{const row=worldRow(state.data,'drawPoint',0);return{x:row.x,y:row.y}})()")
             cdp.eval("""(()=>{const map=document.querySelector('.world-draw-map'),box=map.getBoundingClientRect();map.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:box.left+box.width*.25,clientY:box.top+box.height*.75}))})()""")
-            wait_eval(cdp, f"worldRow(state.data,'drawPoint',0).x!=={before_xy['x']}&&worldRow(state.data,'drawPoint',0).y!=={before_xy['y']}", 10)
+            wait_eval(cdp, "document.querySelector('.lex-map-magnifier-dialog')!==null", 10)
+            assert cdp.eval("(()=>{const row=worldRow(state.data,'drawPoint',0);return row.x==="
+                            f"{before_xy['x']}&&row.y==={before_xy['y']}}})()"), \
+                "a click on the panel's own map moved the record"
+            cdp.eval("""(()=>{const map=document.querySelector('.lex-map-magnifier-body .lex-image-map-stage'),box=map.getBoundingClientRect();map.dispatchEvent(new MouseEvent('click',{bubbles:true,clientX:box.left+box.width*.25,clientY:box.top+box.height*.75}))})()""")
+            wait_eval(cdp, f"worldRow(state.data,'drawPoint',0).x!=={before_xy['x']}||worldRow(state.data,'drawPoint',0).y!=={before_xy['y']}", 10)
+            cdp.eval("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))")
             assert cdp.eval("dirtyCount()") > 0
             cdp.eval("document.querySelector('#global-save').click()")
             wait_eval(cdp, "dirtyCount()===0&&document.querySelector('#global-save').disabled", 30)

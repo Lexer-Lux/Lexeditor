@@ -199,9 +199,11 @@
     map.classList.add("world-draw-map");
     // The large map keeps the same click that places the point, and the panel
     // states the rule on its bar, as the shared finder does.
-    map.addEventListener("click",event=>{if(event.target.closest("button,input,a"))return;
+    // The marker is a button and stops its own click, so the map listens on the
+    // way down: any click on the picture opens the large map.
+    map.addEventListener("click",event=>{if(event.target.closest("input,a"))return;
       LexeditorUI.mapMagnifier({label:`Draw Point ${row.drawId}`,magnify:()=>({...spec(),
-        note:`Click the map to place Draw Point ${row.drawId}, or close this view and type the exact byte coordinates.`})});});
+        note:`Click the map to place Draw Point ${row.drawId}, or close this view and type the exact byte coordinates.`})});},true);
 
     // The list shows the draw point's own draw ID, so the panel does too.
     return sharedDetail({...row,id:row.drawId,name:`DRAW POINT ${row.drawId}`},prefs,[detailSection({className:"world-draw-position",help:infoHelp("Section 34 stores only this world Draw Point's X, Y, and sub-ID bytes. Its magic, quantity, and refill behavior live in FF8_EN.exe and are not invented here."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},detailField({label:"X",help:infoHelp(worldPropertyHelp.drawPoint.x),control:worldNumber(row,"x",0,255,`Draw Point ${row.drawId} X`)}),detailField({label:"Y",help:infoHelp(worldPropertyHelp.drawPoint.y),control:worldNumber(row,"y",0,255,`Draw Point ${row.drawId} Y`)}),detailField({label:"SUB-ID",help:infoHelp(worldPropertyHelp.drawPoint.subId),control:worldNumber(row,"subId",0,255,`Draw Point ${row.drawId} sub-ID`)}))],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
