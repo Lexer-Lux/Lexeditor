@@ -175,6 +175,23 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
             assert page.locator(".lex-column-list-row").count() >= 10
             assert_table_headers_fit(page)
 
+            # The tab strip shares its width between the fifteen tabs, so the
+            # bar reaches the right edge of the window instead of stopping
+            # short of it, and no label is clipped or scrolled to get there.
+            strip = page.evaluate("""()=>{
+              const nav=document.querySelector('.lex-shell-header nav');
+              const box=nav.getBoundingClientRect();
+              const tabs=[...nav.querySelectorAll('button[data-tab]')]
+                .filter(tab=>tab.offsetParent!==null);
+              const labels=tabs.map(tab=>tab.querySelector('.lex-tab-label-text')).filter(Boolean);
+              return {right:box.right,lastRight:tabs[tabs.length-1].getBoundingClientRect().right,
+                      scroll:nav.scrollWidth,client:nav.clientWidth,
+                      clipped:labels.filter(label=>label.scrollWidth>label.clientWidth+1)
+                        .map(label=>label.textContent.trim())};
+            }""")
+            assert abs(strip["right"] - strip["lastRight"]) <= 2, strip
+            assert strip["scroll"] <= strip["client"] + 1, strip
+            assert not strip["clipped"], strip
             price = numeric_field(page, "BUY PRICE")
             expect(price).to_have_value("250")
             page.screenshot(path=str(OUT / "ff9-items-wide.png"), full_page=True)

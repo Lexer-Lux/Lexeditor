@@ -33,10 +33,12 @@
   --lex-command-row-padding:0 10px;--lex-command-row-bg:var(--ff9-stone);
   --lex-command-row-border:3px solid;--lex-command-row-border-color:var(--ff9-bevel);
 
-  /* Fifteen tabs in the wide FF9 lettering: content-sized, so every label
-     keeps one size; a window too narrow for them scrolls the strip. */
+  /* Fifteen tabs in the wide FF9 lettering. Each tab is at least as wide as its
+     own label, and the strip shares out whatever space is left, so the bar
+     reaches the right edge of the window instead of stopping short of it. A
+     window too narrow for the labels still scrolls the strip. */
   --lex-nav-bg:#14181c;--lex-nav-padding-inline:var(--lex-panel-gap);
-  --lex-nav-tab-columns:max-content;--lex-nav-overflow-x:auto;
+  --lex-nav-tab-columns:minmax(max-content,1fr);--lex-nav-overflow-x:auto;
   --lex-tab-min-height:40px;--lex-tab-padding-inline:clamp(4px,.4vw,10px);
   --lex-tab-font-size:clamp(12px,.93vw,18px);--lex-tab-fg:#e4e6e6;
   --lex-tab-bg:var(--ff9-stone);
