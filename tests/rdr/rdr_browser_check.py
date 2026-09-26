@@ -175,12 +175,15 @@ def run(output: Path, executable: str | None) -> None:
                 page.route("**/*", lambda route: route.abort())
                 page.set_content(document(), wait_until="domcontentloaded")
                 page.wait_for_function("!state.booting")
+                page.wait_for_function("!document.querySelector('.lex-plugin-loading-screen')")
+                page.evaluate("document.fonts.ready")
                 if zoom != 100:
                     page.evaluate("(value) => { document.documentElement.style.zoom = value; }", zoom / 100)
                     page.wait_for_timeout(100)
                 assert not errors, errors
 
                 page.evaluate("state.itemSelected='base:0'; renderItems()")
+                page.evaluate("new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))")
                 fields = page.locator(".record-detail .lex-detail-field")
                 expect(fields).to_have_count(5)
                 assert page.locator(".record-detail .detail-field").count() == 0
