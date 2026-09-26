@@ -337,6 +337,14 @@ class Handler(PluginRequestHandler):
                     document = _document()
                     row = document.edit(table, row_id, field, payload.get("value"))
                     self.send_json({"row": row, "dirtyCount": document.dirty_count})
+            elif path == "/api/create":
+                table = str(payload.get("table", ""))
+                if table not in TARGET_TABLES:
+                    raise ValueError(f"Unsupported DS3 table: {table}")
+                with _LOCK:
+                    document = _document()
+                    row = document.create_row(table, int(payload.get("sourceId")), payload.get("id"), payload.get("name"))
+                    self.send_json({"row": row, "dirtyCount": document.dirty_count})
             elif path == "/api/save":
                 self.send_json(_save())
             elif path == "/api/discard":

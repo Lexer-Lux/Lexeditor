@@ -129,6 +129,24 @@ def main(argv: list[str] | None = None) -> int:
                 if field_value(row, "atkBasePhysics") != 321:
                     raise RuntimeError("Saved weapon damage did not read back as 321")
 
+                page.locator('.lex-column-list').hover()
+                page.locator('.lex-table-add').click()
+                page.get_by_label('New record ID',exact=True).fill('1999999999')
+                page.get_by_label('New record name',exact=True).fill('Created fixture weapon')
+                page.screenshot(path=str(output/'create-record.png'),full_page=True)
+                page.get_by_role('button',name='Create record',exact=True).click()
+                page.get_by_role('img',name='Created in this mod',exact=True).wait_for()
+                page.wait_for_selector('[data-ds3-field="atkBasePhysics"]')
+                assert page.locator('[data-ds3-field="atkBasePhysics"]').input_value()=='321'
+                page.locator('[data-ds3-field="atkBasePhysics"]').fill('432')
+                page.locator('[data-ds3-field="atkBasePhysics"]').press('Tab')
+                page.wait_for_timeout(250)
+                page.locator('#global-save').click()
+                page.wait_for_function("()=>document.querySelector('#global-save').disabled")
+                new_row=request_json(session.url+'api/row?table=EquipParamWeapon&id=1999999999')['row']
+                assert new_row['name']=='Created fixture weapon'
+                assert field_value(new_row,'atkBasePhysics')==432
+
                 for table, name in TABLES:
                     page.locator(f'button[data-tab="{table}"]').click()
                     page.wait_for_selector(".lex-column-list .lex-list-row", timeout=10000)
@@ -176,6 +194,9 @@ def main(argv: list[str] | None = None) -> int:
             )["row"]
             if field_value(row, "atkBasePhysics") != 321:
                 raise RuntimeError("Fresh service did not reopen the exported weapon edit")
+            new_row=request_json(reopened.url+'api/row?table=EquipParamWeapon&id=1999999999')['row']
+            assert new_row['name']=='Created fixture weapon'
+            assert field_value(new_row,'atkBasePhysics')==432
 
     if response_failures:
         errors.extend(f"response: {value}" for value in response_failures)

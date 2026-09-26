@@ -1,8 +1,8 @@
 """Dark Souls III regulation/BND4/PARAM support.
 
-This module deliberately patches known fixed-width PARAM cells in place. It
-never reconstructs PARAM rows or BND4 archives, so unknown bytes stay exactly
-as they were. Compressed binder members are rejected instead of guessed.
+Known fixed-width PARAM cells are patched in place. Row creation relocates
+directory pointers and grows uncompressed binder members while retaining
+existing payloads and unknown bytes. Compressed members are rejected.
 
 The installed regulation, Game/Data0.bdt, is a 16-byte IV followed by
 AES-256-CBC ciphertext, and the ciphertext holds a DCX container with one DFLT
@@ -294,6 +294,34 @@ class BND4View:
         return bytes(result)
 
 
+    def grow_member(self, entry: BinderEntry, replacement: bytes) -> bytes:
+        """Grow one uncompressed member, retaining other members and alignment."""
+        if entry.compressed or len(replacement) < entry.size:
+            raise DS3FormatError("Only uncompressed member growth is supported")
+        end = entry.data_offset + entry.size
+        directory_end = 0x40 + self.file_count * self.file_header_size
+        first_data = min(item.data_offset for item in self.entries)
+        if directory_end > first_data or any(self._unpack('q', pos) > first_data for pos in (0x28, 0x38)):
+            raise DS3FormatError("BND4 metadata must precede member data before resizing")
+        for other in self.entries:
+            if other.index != entry.index and other.data_offset < end and other.data_offset + other.size > entry.data_offset:
+                raise DS3FormatError("Overlapping BND4 members cannot be resized")
+        growth = (len(replacement) - entry.size + 15) // 16 * 16
+        padding = entry.size + growth - len(replacement)
+        result = bytearray(self.data[:entry.data_offset] + replacement + bytes(padding) + self.data[end:])
+        offset_field = 16 + (8 if self.format & self.FORMAT_COMPRESSION else 0)
+        offset_code = 'q' if self.format & self.FORMAT_LONG_OFFSETS else 'I'
+        for item in self.entries:
+            pos = 0x40 + item.index * self.file_header_size
+            if item.index == entry.index:
+                struct.pack_into(self.endian+'q', result, pos+8, len(replacement))
+                if self.format & self.FORMAT_COMPRESSION:
+                    struct.pack_into(self.endian+'q', result, pos+16, len(replacement))
+            elif item.data_offset >= end:
+                struct.pack_into(self.endian+offset_code, result, pos+offset_field, item.data_offset+growth)
+        return bytes(result)
+
+
 @dataclass(frozen=True)
 class ParamRow:
     row_id: int
@@ -431,7 +459,6 @@ class ParamView:
         struct.pack_into(self.endian + code, result, pos, strings + stride)
         struct.pack_into(self.endian + code, result, pos + (8 if self.long_offsets else 4), name_offset)
         return bytes(result)
-
 
 _TYPE_SIZE = {"s8":1,"u8":1,"dummy8":1,"s16":2,"u16":2,"s32":4,"u32":4,"b32":4,"f32":4,"angle32":4,"f64":8}
 _INT_LIMITS = {
@@ -691,6 +718,7 @@ class RegulationDocument:
         self._plain=plain
         self._original_plain=plain
         self._dirty=set()
+        self._created_originals={}
 
     def _display_name(self, table: str, row: ParamRow) -> str:
         schema = self.schemas[table]
@@ -698,7 +726,22 @@ class RegulationDocument:
 
     def list_rows(self, table: str):
         param=self.params[table]
-        return [{"id":r.row_id,"name":self._display_name(table,r)} for r in param.rows]
+        return [{"id":r.row_id,"name":self._display_name(table,r),"created":(table,r.row_id) in self._created_originals} for r in param.rows]
+
+    def create_row(self, table: str, source_id: int, new_id: int, name: str):
+        schema = self.schemas[table]
+        param = self.params[table]
+        member = param.copy_row(source_id, new_id, name, schema.row_size)
+        plain = self.binder.grow_member(self.entries[table], member)
+        binder = BND4View(plain)
+        # Validate all relocated members before publishing the draft.
+        entries = {key:binder.find_param(key) for key in self.params}
+        params = {key:ParamView(binder.member_bytes(entry)) for key,entry in entries.items()}
+        created = params[table].row(new_id)
+        self._created_originals[table,new_id] = member[created.data_offset:created.data_offset+schema.row_size]
+        self._plain,self.binder,self.entries,self.params = plain,binder,entries,params
+        self._dirty.add((table,new_id,'__created__'))
+        return self.read_row(table,new_id)
 
     def read_row(self, table: str, row_id: int):
         schema=self.schemas[table]; param=self.params[table]; row=param.row(row_id)
@@ -734,8 +777,12 @@ class RegulationDocument:
         self._plain=new_plain; self.binder=BND4View(new_plain)
         self.entries[table]=self.binder.find_param(table)
         self.params[table]=ParamView(self.binder.member_bytes(self.entries[table]))
-        original_member = BND4View(self._original_plain).member_bytes(entry)
-        original_row_bytes = original_member[row.data_offset:row.data_offset+schema.row_size]
+        original_row_bytes = self._created_originals.get((table,row_id))
+        if original_row_bytes is None:
+            original_binder = BND4View(self._original_plain)
+            original_member = original_binder.member_bytes(original_binder.find_param(table))
+            original_row = ParamView(original_member).row(row_id)
+            original_row_bytes = original_member[original_row.data_offset:original_row.data_offset+schema.row_size]
         original_value = read_field(original_row_bytes,field,param.endian)
         dirty_key=(table,row_id,field_key)
         current_value=read_field(patched,field,param.endian)

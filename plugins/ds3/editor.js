@@ -111,11 +111,39 @@
       body:[...groups].map(([title,fields])=>detailSection({title,body:fields}))});
   }
 
+  function renderCreation(id){
+    const draft=state.creating;
+    const field=(label,control)=>detailField({label,control});
+    const create=async()=>{
+      try{
+        const result=await api('/api/create',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({table:id,sourceId:draft.sourceId,id:draft.id,name:draft.name})});
+        state.dirty=result.dirtyCount;state.creating=null;
+        tableState(id).selected=result.row.id;tableState(id).query=String(result.row.id);tableState(id).page=0;
+        await loadTable(id,true);render();shell.refresh();
+      }catch(error){LexeditorUI.showAlert({title:'Could not create row',message:error.message||String(error)})}
+    };
+    $('#main').replaceChildren(detailPanel({title:'Create record',body:[
+      field('Copy from',el('select',{'aria-label':'Copy from',value:draft.sourceId,onchange:event=>{draft.sourceId=Number(event.target.value)}},
+        ...tableState(id).rows.map(row=>el('option',{value:row.id,selected:row.id===draft.sourceId},`${row.id} — ${row.name}`)))),
+      field('ID',el('input',{type:'number',min:-2147483648,max:2147483647,step:1,value:draft.id,'aria-label':'New record ID',
+        oninput:event=>{draft.id=event.target.value===''?null:Number(event.target.value)}})),
+      field('Name',el('input',{value:draft.name,maxlength:1024,'aria-label':'New record name',oninput:event=>{draft.name=event.target.value}})),
+      LexeditorUI.actionRow(el('button',{type:'button',onclick:()=>{state.creating=null;render()}},'Cancel'),
+        el('button',{type:'button',onclick:create},'Create record'))
+    ]}));
+  }
+
   function renderTable(id){
     const table=tableState(id),label=TABLES.find(value=>value.id===id)?.label||id;
     if(!table.loaded){$("#main").replaceChildren(detailPanel({title:label,body:[LexeditorUI.loadingPanel({label:"Loading records"})]}));return}
     if(!table.rows.length){$("#main").replaceChildren(detailPanel({title:label,body:[LexeditorUI.detailNote("No records were found in this parameter table.")]}));return}
-    const view=pagedListDetail({addDisabledReason:"Dark Souls III params can take new row IDs, but Lexeditor only edits existing rows. Adding a row is not supported yet.",
+    if(state.creating?.table===id){renderCreation(id);return}
+    const view=pagedListDetail({add:()=>{
+      const source=table.rows.find(row=>row.id===table.selected)||table.rows[0];
+      state.creating={table:id,sourceId:source.id,id:Math.min(2147483647,Math.max(...table.rows.map(row=>row.id))+1),name:source.name+' copy'};
+      render();
+    },
       rows:sortedRows(id),key:row=>row.id,slots:false,noun:"records",page:table.page,pageSize:table.pageSize,
       selected:table.selected,className:"ds3-layout",splitKey:"ds3-"+id,rowsKey:"ds3-"+id,
       defaultSplit:42,minLeft:280,minRight:360,fit:{minRowHeight:34},
@@ -130,7 +158,7 @@
         sort:key=>{table.sort=[key,table.sort[0]===key?-table.sort[1]:1];table.page=0;render()},
         columns:[
           {key:"id",label:"ID",numberedId:true,numeric:true,sortable:true,align:"start"},
-          {key:"name",label:"Name",sortable:true,align:"start"},
+          {key:"name",label:"Name",sortable:true,align:"start",render:row=>LexeditorUI.inlineLabel(LexeditorUI.recordSource({created:row.created}),row.name)},
         ]}),
       detail:row=>rowDetail(id,row),
       emptyDetail:()=>detailPanel({title:"No matching records",body:[LexeditorUI.detailNote("Change the search to show a record.")]}),

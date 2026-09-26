@@ -2,8 +2,8 @@
 import struct
 import pytest
 
-from plugins.ds3.formats import ParamView, DS3FormatError, TARGET_TABLES, load_schema
-from test_ds3_plugin import _param, METADATA
+from plugins.ds3.formats import ParamView, DS3FormatError, TARGET_TABLES, load_schema, RegulationDocument
+from test_ds3_plugin import _param, _bnd4, _installed_regulation, METADATA
 
 
 @pytest.mark.parametrize('table', TARGET_TABLES)
@@ -64,3 +64,47 @@ def test_long_offset_unicode_rows_preserve_unknown_directory_words(endian):
     assert result[parsed.row(30).data_offset:parsed.row(30).data_offset+8]==b'ABCDEFGH'
     assert struct.unpack_from(endian+'i',result,68)[0]==0x1234
     assert struct.unpack_from(endian+'i',result,92)[0]==0x5678
+
+
+def test_regulation_creation_preserves_other_members_and_survives_export():
+    document=RegulationDocument(_bnd4(),METADATA)
+    original={name:document.binder.member_bytes(entry) for name,entry in document.entries.items()}
+    for table in ('Magic','EquipParamWeapon'):
+        source=document.params[table].rows[0].row_id
+        new_id=max(row.row_id for row in document.params[table].rows)+1
+        document.create_row(table,source,new_id,'Copied '+table)
+        field=next(f for f in document.read_row(table,new_id)['fields']
+                   if f['type']=='number' and f['minimum'] <= 0 and f['maximum'] >= 1)
+        document.edit(table,new_id,field['key'],1)
+        document.edit(table,new_id,field['key'],0)
+        # Editing an existing row after relocation compares its original ID,
+        # not an offset that belonged to the smaller archive.
+        document.edit(table,source,field['key'],1)
+        document.edit(table,source,field['key'],0)
+    assert document.dirty_count==2
+    for table in set(TARGET_TABLES)-{'Magic','EquipParamWeapon'}:
+        assert document.binder.member_bytes(document.entries[table])==original[table]
+    reloaded=RegulationDocument(document.export(),METADATA)
+    for table in ('Magic','EquipParamWeapon'):
+        assert len(reloaded.params[table].rows)==3
+        assert reloaded.params[table].rows[-1].name=='Copied '+table
+    assert reloaded.dirty_count==0
+
+
+def test_installed_regulation_creation_is_memory_only_and_preserves_members():
+    source=_installed_regulation()
+    if source is None:
+        pytest.skip('Installed DS3 regulation is unavailable; synthetic coverage still runs')
+    original_bytes=source.read_bytes()
+    document=RegulationDocument(original_bytes,METADATA)
+    original={entry.index:document.binder.member_bytes(entry) for entry in document.binder.entries}
+    table='Magic';entry_index=document.entries[table].index
+    rows=document.params[table].rows
+    new_id=max(row.row_id for row in rows)+1
+    document.create_row(table,rows[0].row_id,new_id,'Lexeditor test copy')
+    reloaded=RegulationDocument(document.export(),METADATA)
+    assert reloaded.params[table].row(new_id).name=='Lexeditor test copy'
+    for entry in reloaded.binder.entries:
+        if entry.index!=entry_index:
+            assert reloaded.binder.member_bytes(entry)==original[entry.index]
+    assert source.read_bytes()==original_bytes
