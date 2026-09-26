@@ -38,6 +38,7 @@
     {id: "newButton", level: "atom", summary: "The standard button.",
       sample: () => el("div", {class: "lex-reshade-actions"},
         UI.newButton({label: "Do the thing"}))},
+    {id: "openGitHubIssues", level: "utility", summary: "Opens a game's GitHub issues workspace with no editor behind it, for Home: a slim bar with the game's name and a close button."},
     {id: "noImage", level: "atom", summary: "The one mark for a missing picture: a record with no art, or an image that failed to load. It fills the picture's box.",
       sample: () => el("div", {style: "width:96px;height:96px"}, UI.noImage("No card art"))},
     {id: "closeButton", level: "atom", summary: "The mark that dismisses a dialog or panel.",

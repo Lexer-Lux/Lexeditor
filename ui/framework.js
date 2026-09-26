@@ -343,18 +343,9 @@
   // Short-lived confirmations. One stack, oldest dropped first, so a burst of
   // copies cannot bury the screen.
   let toastStack = null;
-  // Toasts never take the pointer, so hovering one is measured, not heard:
-  // one under the pointer fades until the pointer moves off it.
-  const ghostToasts = event => {
-    for (const toast of document.querySelectorAll(".lex-toast")) {
-      const box = toast.getBoundingClientRect();
-      const over = event.clientX >= box.left && event.clientX <= box.right &&
-        event.clientY >= box.top && event.clientY <= box.bottom;
-      toast.classList.toggle("lex-toast-ghost", over);
-    }
-  };
-  // Listened for from the start: the window bar's own toast is not made here.
-  document.addEventListener("pointermove", ghostToasts, {passive: true});
+  // A toast takes the pointer: pointing at it holds it, a click dismisses it.
+  // It used to ignore the pointer and fade when hovered, which is exactly why
+  // it could not be clicked away.
   const showToast = (message, options = {}) => {
     if (!toastStack || !toastStack.isConnected) {
       toastStack = element("div", {class: "lex-toast-stack", role: "status", "aria-live": "polite"});
@@ -369,10 +360,25 @@
     const toast = element("div", {class: ["lex-toast", tone ? `lex-tone-${tone}` : ""].filter(Boolean).join(" ")}, message);
     toastStack.append(toast);
     while (toastStack.children.length > 4) toastStack.firstElementChild.remove();
-    setTimeout(() => {
+    // Long enough to read - Lexer: "the toasts disappear way too quick and
+    // can't be dispelled by clicking them". A toast stays at least four
+    // seconds and longer for longer text, waits while it is pointed at, and a
+    // click sends it away at once.
+    const text = String(toast.textContent || "");
+    const readFor = Number(options.duration) || Math.min(10000, Math.max(4000, text.length * 70));
+    let timer = 0;
+    const leave = () => {
+      clearTimeout(timer);
+      if (toast.classList.contains("leaving")) return;
       toast.classList.add("leaving");
       setTimeout(() => toast.remove(), 220);
-    }, Math.max(900, Number(options.duration) || 2000));
+    };
+    const wait = delay => { clearTimeout(timer); timer = setTimeout(leave, delay); };
+    toast.title = "Click to dismiss";
+    toast.addEventListener("click", leave);
+    toast.addEventListener("pointerenter", () => clearTimeout(timer));
+    toast.addEventListener("pointerleave", () => wait(1500));
+    wait(Math.max(900, readFor));
     return toast;
   };
 
@@ -6097,6 +6103,36 @@ ${contents.path}`});
     return {root, state, show, hide, loadIssues, loadIssue};
   };
 
+  // The same GitHub issues workspace, opened without a game's editor behind it -
+  // from Home, for a game that is not installed ("right click on a game's
+  // cover on the main menu to just go straight to its github page/tab thing
+  // in the app"). It gets a slim bar of its own with the game's name and a
+  // close button, in place of the editor's header.
+  const openGitHubIssues = async (pluginId, pluginName = "") => {
+    const repository = await callWindow("github_repository", pluginId);
+    if (!repository?.repository) {
+      showToast(`No GitHub repository is set for ${pluginName || pluginId}.`, true);
+      return null;
+    }
+    document.querySelectorAll(".lex-github-standalone").forEach(node => node.remove());
+    const button = element("button", {type: "button", hidden: true});
+    let workspace = null;
+    const close = () => {
+      workspace?.hide();
+      workspace?.root.remove();
+      header.remove();
+    };
+    const header = element("header", {class: "lex-shell-header lex-github-standalone"},
+      element("strong", {class: "lex-github-standalone-title"}, `${pluginName || pluginId} issues`),
+      closeButton({title: "Close the issues", onclick: close}));
+    document.body.append(header);
+    workspace = mountGitHubWorkspace({plugin: {id: pluginId, name: pluginName}, activeTab: () => ""},
+      button, header, repository);
+    workspace.root.classList.add("lex-github-standalone");
+    workspace.show();
+    return {...workspace, close};
+  };
+
   const installWindowFrame = options => {
     const controls = options.controls || createWindowActions();
     const {minimize, maximize, close} = controls;
@@ -9941,7 +9977,7 @@ ${contents.path}`});
     return api;
   })();
 
-window.LexeditorUI = {panelIcon, noImage, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
+window.LexeditorUI = {panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
 // no pad attached pays one idle check a second and changes nothing on screen.

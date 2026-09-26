@@ -1667,6 +1667,13 @@ body[data-lex-github-open="true"] > :is(#main,#toolbar,footer) {
   user-select: text;
 }
 
+.lex-shell-header.lex-github-standalone {
+  position:fixed; inset:0 0 auto; z-index:102;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:10px var(--lex-panel-gap, 12px);
+  color:var(--lex-text); background:var(--lex-panel); border-bottom:1px solid var(--lex-border);
+}
+.lex-github-standalone-title { font:700 1.1em/1.2 var(--lex-heading-font, var(--lex-font)); }
 .lex-github-subtabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4478,6 +4485,8 @@ body:has(.lex-data-map-table) #main {
 }
 .lex-toast {
 
+  pointer-events:auto;
+  cursor:pointer;
   /* The stack seats the toast: a game states where its messages belong with
      the stack's own tokens, and a toast that positioned itself would ignore
      every one of them. It also has to be a normal child, not a fixed one -
@@ -4502,11 +4511,6 @@ body:has(.lex-data-map-table) #main {
   animation:lex-toast-enter .18s ease both;
   transition:opacity .15s ease;
 
-}
-/* A toast under the pointer all but disappears, so whatever it covers can be
-   read and clicked through it - it never takes the pointer anyway. */
-.lex-toast.lex-toast-ghost {
-  opacity:.12;
 }
 @keyframes lex-toast-enter { from { opacity:0;translate:0 10px } to { opacity:1;translate:0 0 } }
 .lex-toast.leaving { opacity:0;translate:0 6px;transition:opacity .2s ease,translate .2s ease; }
