@@ -96,6 +96,9 @@
       frame.id = "lexeditor-editor";
       frame.name = "lexeditor-editor";
       frame.title = "Game editor";
+      // The editor reads the controller itself; a cross-origin frame may
+      // only do that when it is allowed to.
+      frame.allow = "gamepad";
       frame.style.cssText = "position:fixed;inset:0;width:100%;height:100%;border:0;z-index:85;transform:translateX(100%);background:var(--lex-bg)";
       const ready = new Promise((resolve, reject) => { opening = {resolve, reject}; });
       opening.promise=ready;

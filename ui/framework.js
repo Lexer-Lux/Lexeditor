@@ -8341,7 +8341,236 @@ ${contents.path}`});
       paged)
   };
 
-  window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  // Controller navigation (issue 566). Every page that loads the shared UI -
+  // Home, each game's editor, Settings and every dialog - can be driven with
+  // a game controller and nothing else. It reads the browser Gamepad API's
+  // standard mapping: the D-pad or left stick moves focus to the nearest
+  // control in that direction, A activates, B backs out, the bumpers switch
+  // tabs and the triggers turn pages. Left and right adjust the focused
+  // slider, number or choice list instead of moving away from it.
+  const gamepad = (() => {
+    const BUTTON = {a: 0, b: 1, x: 2, y: 3, lb: 4, rb: 5, lt: 6, rt: 7, view: 8, menu: 9,
+      up: 12, down: 13, left: 14, right: 15};
+    const DIRECTIONS = ["up", "down", "left", "right"];
+    const FIRST_REPEAT_MS = 380;
+    const REPEAT_MS = 110;
+    const STICK = 0.55;
+    const FOCUSABLE = [
+      "a[href]", "button", "input:not([type='hidden'])", "select", "textarea", "summary",
+      "[tabindex]:not([tabindex='-1'])", "[contenteditable='true']",
+    ].join(",");
+    const held = new Map();
+    let frame = 0;
+    let active = false;
+
+    const visible = node => {
+      if (!(node instanceof HTMLElement) || node.closest("[hidden],[inert]")) return false;
+      if (node.disabled && !node.matches("button")) return false;
+      const box = node.getBoundingClientRect();
+      if (box.width < 1 || box.height < 1) return false;
+      return node.checkVisibility ? node.checkVisibility({visibilityProperty: true}) : true;
+    };
+    // Movement stays inside whatever is on top: an open dialog or menu owns
+    // the controller until it closes, as it owns the mouse.
+    const scope = () => {
+      const layers = [...document.querySelectorAll(
+        ".lex-dialog-backdrop,[role='dialog'][aria-modal='true'],#modal,[role='menu']")]
+        .filter(visible);
+      return layers.at(-1) || document.body;
+    };
+    const candidates = () => [...scope().querySelectorAll(FOCUSABLE)].filter(node =>
+      visible(node) && !node.disabled && node.getAttribute("aria-hidden") !== "true");
+    const centre = box => ({x: box.left + box.width / 2, y: box.top + box.height / 2});
+
+    // The nearest control whose centre lies in DIRECTION, preferring ones
+    // straight ahead: distance off the axis costs three times distance along it.
+    const nearest = (from, direction, pool) => {
+      const origin = from.getBoundingClientRect();
+      const start = centre(origin);
+      let best = null;
+      let bestScore = Infinity;
+      for (const node of pool) {
+        if (node === from || from.contains(node)) continue;
+        const box = node.getBoundingClientRect();
+        const point = centre(box);
+        const along = {up: origin.top - point.y, down: point.y - origin.bottom,
+          left: origin.left - point.x, right: point.x - origin.right}[direction];
+        const beyond = {up: box.bottom <= origin.top + 1, down: box.top >= origin.bottom - 1,
+          left: box.right <= origin.left + 1, right: box.left >= origin.right - 1}[direction];
+        if (!beyond && along <= 0) continue;
+        const across = direction === "up" || direction === "down"
+          ? Math.abs(point.x - start.x) : Math.abs(point.y - start.y);
+        const score = Math.max(0, along) + across * 3;
+        if (score < bestScore) { bestScore = score; best = node; }
+      }
+      return best;
+    };
+
+    const show = node => {
+      document.documentElement.classList.add("lex-gamepad-active");
+      node.focus({preventScroll: true});
+      node.scrollIntoView?.({block: "nearest", inline: "nearest"});
+      playThemeSound("move");
+    };
+    const current = () => {
+      const focused = document.activeElement;
+      return focused && focused !== document.body && scope().contains(focused) && visible(focused)
+        ? focused : null;
+    };
+    const textEntry = node => node?.matches?.(
+      "textarea,[contenteditable='true'],input:not([type]),input[type='text'],input[type='search'],input[type='email'],input[type='url'],input[type='password']");
+    const editing = node => textEntry(node) && node.dataset.lexGamepadEditing === "true";
+
+    const fire = (node, type) => node.dispatchEvent(new Event(type, {bubbles: true}));
+    // Left and right change a value in place rather than leaving the control.
+    const adjust = (node, delta) => {
+      if (!node || node.readOnly || node.disabled || shellIsReadonly()) return false;
+      if (node.matches("input[type='range'],input[type='number']")) {
+        const before = node.value;
+        if (delta > 0) node.stepUp(); else node.stepDown();
+        if (node.value !== before) { fire(node, "input"); fire(node, "change"); }
+        return true;
+      }
+      if (node.matches("select")) {
+        const options = [...node.options];
+        let index = node.selectedIndex;
+        do index += delta; while (options[index]?.disabled);
+        if (index < 0 || index >= options.length) return true;
+        node.selectedIndex = index;
+        fire(node, "input"); fire(node, "change");
+        return true;
+      }
+      return false;
+    };
+
+    const move = direction => {
+      const focused = current();
+      if (editing(focused)) return;
+      if ((direction === "left" || direction === "right") &&
+          adjust(focused, direction === "right" ? 1 : -1)) return;
+      const pool = candidates();
+      if (!pool.length) return;
+      const next = focused ? nearest(focused, direction, pool) : pool[0];
+      if (next) show(next);
+    };
+
+    const key = (target, name) => target.dispatchEvent(new KeyboardEvent("keydown",
+      {key: name, code: name, bubbles: true, cancelable: true}));
+
+    const accept = () => {
+      const focused = current();
+      if (!focused) { const first = candidates()[0]; if (first) show(first); return; }
+      if (textEntry(focused)) {
+        // A starts typing; the Steam Deck's own keyboard comes up for it.
+        focused.dataset.lexGamepadEditing = "true";
+        focused.focus();
+        callWindow("show_on_screen_keyboard").catch(() => {});
+        return;
+      }
+      if (focused.matches("select")) { adjust(focused, 1); return; }
+      playThemeSound("select");
+      focused.click();
+    };
+
+    const back = () => {
+      const focused = current();
+      if (editing(focused)) { delete focused.dataset.lexGamepadEditing; return; }
+      // Escape already closes every dialog, menu and popup; if nothing takes
+      // it, B steps back through the editor's own history.
+      const target = focused || document.activeElement || document.body;
+      const layer = scope();
+      if (!key(target, "Escape") || scope() !== layer) return;
+      if (layer !== document.body) {
+        layer.querySelector(".lex-close-button,[aria-label='Close'],.lex-dialog-actions button:last-child")?.click();
+        return;
+      }
+      playThemeSound("back");
+      window.__lexeditorNavigateHistory?.(-1);
+    };
+
+    const cycleTabs = delta => {
+      const tabs = [...document.querySelectorAll("nav button[data-tab]")].filter(visible);
+      if (!tabs.length) return;
+      const index = tabs.findIndex(tab => tab.classList.contains("active"));
+      const next = tabs[(index + delta + tabs.length) % tabs.length];
+      next.click();
+      show(next);
+    };
+    const turnPage = delta => {
+      const within = current()?.closest(".lex-master-detail,.lex-list-detail,.lex-panel,section,main");
+      const pagers = [...(within || document).querySelectorAll(".lex-pager")].filter(visible);
+      const pager = pagers[0] || [...document.querySelectorAll(".lex-pager")].find(visible);
+      pager?.querySelector(`button[aria-label='${delta > 0 ? "Next page" : "Previous page"}']:not(:disabled)`)?.click();
+    };
+
+    const actions = {up: () => move("up"), down: () => move("down"), left: () => move("left"),
+      right: () => move("right"), a: accept, b: back, lb: () => cycleTabs(-1), rb: () => cycleTabs(1),
+      lt: () => turnPage(-1), rt: () => turnPage(1)};
+    const repeats = new Set([...DIRECTIONS, "lt", "rt"]);
+
+    const pressed = pad => {
+      const down = new Set();
+      for (const [name, index] of Object.entries(BUTTON)) {
+        const button = pad.buttons?.[index];
+        if (button && (button.pressed || button.value > 0.5)) down.add(name);
+      }
+      const [x = 0, y = 0] = pad.axes || [];
+      if (x <= -STICK) down.add("left");
+      if (x >= STICK) down.add("right");
+      if (y <= -STICK) down.add("up");
+      if (y >= STICK) down.add("down");
+      return down;
+    };
+
+    // One read of every connected controller. Exposed so a check can drive
+    // it with a scripted pad; the page itself calls it every frame.
+    const step = (now = performance.now()) => {
+      // While an editor sits in front of Home, the editor reads the pad.
+      if (document.querySelector("#lexeditor-editor")) { held.clear(); return; }
+      const down = new Set();
+      for (const pad of navigator.getGamepads?.() || []) {
+        if (pad && pad.mapping === "standard") pressed(pad).forEach(name => down.add(name));
+      }
+      for (const name of [...held.keys()]) if (!down.has(name)) held.delete(name);
+      for (const name of down) {
+        const since = held.get(name);
+        if (since === undefined) {
+          held.set(name, now + FIRST_REPEAT_MS);
+          actions[name]?.();
+        } else if (repeats.has(name) && now >= since) {
+          held.set(name, now + REPEAT_MS);
+          actions[name]?.();
+        }
+      }
+    };
+    const loop = () => {
+      if (!active) return;
+      try { step(); } catch (error) { console.error(error); }
+      frame = requestAnimationFrame(loop);
+    };
+    const start = () => {
+      if (active) return;
+      active = true;
+      frame = requestAnimationFrame(loop);
+    };
+    const stop = () => {
+      if ((navigator.getGamepads?.() || []).some(Boolean)) return;
+      active = false;
+      cancelAnimationFrame(frame);
+      held.clear();
+    };
+    window.addEventListener("gamepadconnected", start);
+    window.addEventListener("gamepaddisconnected", stop);
+    // A controller already connected before this page loaded announces
+    // itself only on its next button press, which the loop must be running for.
+    if ((navigator.getGamepads?.() || []).some(Boolean)) start();
+    // The mouse takes over again the moment it moves.
+    document.addEventListener("pointermove", () =>
+      document.documentElement.classList.remove("lex-gamepad-active"), {passive: true});
+    return {step, start, stop, nearest};
+  })();
+
+  window.LexeditorUI = {gamepad, panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 

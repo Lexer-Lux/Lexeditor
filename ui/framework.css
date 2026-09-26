@@ -7466,3 +7466,11 @@ body { text-shadow: var(--lex-text-shadow, none); }
   opacity:1;
   visibility:visible;
 }
+
+/* Controller focus (issue 566): driven without a mouse, the focused control
+   must be findable at a glance from across a room, on every theme. */
+.lex-gamepad-active :focus {
+  outline: 3px solid var(--lex-highlight) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--lex-bg, #000) 70%, transparent);
+}

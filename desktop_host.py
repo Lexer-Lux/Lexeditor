@@ -564,6 +564,21 @@ class HostApi:
             })
         return rows
 
+    def show_on_screen_keyboard(self) -> dict:
+        """Bring up the Steam Deck's keyboard for a field chosen with a controller.
+
+        Only SteamOS has one to ask for; elsewhere a physical keyboard is
+        assumed and nothing happens.
+        """
+        if os.environ.get("SteamDeck") != "1" and os.environ.get("SteamOS") != "1":
+            return {"opened": False}
+        try:
+            subprocess.Popen(["xdg-open", "steam://open/keyboard"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            return {"opened": False}
+        return {"opened": True}
+
     def ui_scale(self, percent=None) -> dict:
         """Apply the saved scale, or save a scale selected in the menu bar."""
         if percent is None:
