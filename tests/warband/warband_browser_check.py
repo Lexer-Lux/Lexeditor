@@ -297,6 +297,18 @@ def main():
                     page.wait_for_function('document.querySelector(".warband-module-state")?.textContent.includes("Synthetic sound parse failure")')
                     page.get_by_role('button',name='Retry',exact=True).click()
                     page.locator('.warband-module-detail').wait_for(state='visible')
+                    # Every property in the right panel carries the shared pin,
+                    # and pinning one adds that property to the table.
+                    assert page.locator('.warband-module-detail .lex-column-pin').count()>=3
+                    assert page.locator('.warband-record-list [data-column-key="samples"]').count()>=1
+                    pin=page.locator('.warband-module-detail [data-lex-pin-column="samples"]')
+                    pin.click()
+                    page.wait_for_timeout(400)
+                    assert page.locator('.warband-record-list [data-column-key="samples"]').count()==0
+                    page.locator('.warband-module-detail [data-lex-pin-column="samples"]').click()
+                    page.wait_for_timeout(400)
+                    assert page.locator('.warband-record-list .lex-column-list-row [data-column-key="samples"]').count()==1
+                    page.screenshot(path=str(ARTIFACTS/f'sounds-pin-{width}.png'),full_page=True)
                     page.get_by_role('button',name='Misc.',exact=True).click()
                     page.get_by_role('tab',name='Particle systems',exact=True).click()
                     page.locator('.warband-module-detail').wait_for(state='visible')

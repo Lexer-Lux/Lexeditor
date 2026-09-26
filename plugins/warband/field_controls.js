@@ -115,6 +115,9 @@
     const left = (chain(options.expression) || [])
       .map(part => part.trim())
       .filter(part => part && !options.flags.some(flag => flag.name === part)
+        // A plain number is already the state of the boxes above, and the
+        // owner's own part (an item's itp_type_*, say) has its own property.
+        && !/^\d+$/.test(part)
         && !(options.ownOther && options.ownOther.test(part)));
     if (left.length) rows.push(detailField({
       label: "Also set", property: `${options.label} other`, dataType: "EXPR", showType: false,
@@ -122,8 +125,12 @@
       control: readonlyField(left.join(" | "), {format: false}),
     }));
     // A section's help is one of the shared question-mark bubbles, not a
-    // paragraph beside its title.
-    return detailSection({title: options.label, help: options.help ? infoHelp(options.help) : null, body: rows});
+    // paragraph beside its title. A pin beside the section title adds the whole
+    // field to the table, because the boxes are one property.
+    const title = options.pin
+      ? el("span", {class: "lex-pinnable-property"}, options.label, options.pin)
+      : options.label;
+    return detailSection({title, help: options.help ? infoHelp(options.help) : null, body: rows});
   }
 
   // A known enum: the current value stays selectable even when the project's
@@ -253,7 +260,7 @@
       }, "Remove");
       return detailField({
         label: `${options.label} ${index + 1}`, property: `${options.property}-${index + 1}`,
-        dataType: "MESH", showType: false,
+        dataType: "MESH", showType: false, pin: options.pin || null,
         description: "A mesh resource name this project uses or declares. \"Show mesh\" opens that mesh's record in the Meshes area.",
         control: el("div", {class: "lex-action-row"}, select, open, remove),
       });
