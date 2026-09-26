@@ -154,11 +154,12 @@
     .lexer-panel-head h2 { margin:0; font:900 15px/1 var(--lex-heading-font,var(--lex-font)); letter-spacing:.08em; }
     .lexer-panel-note { margin:0; color:var(--lex-muted); font-size:11px; line-height:1.45; }
     .lexer-panel { width:100vw; }
-    .lexer-dev-body { display:grid; grid-template-columns:minmax(0,2fr) minmax(280px,1fr); gap:18px; flex:1 1 auto; min-height:0; }
-    /* Six columns whose headings alone need 807px: below this width the two
-       panels stack, or the games table has to scroll sideways to reach its own
-       last column. */
-    @media (max-width:1280px){ .lexer-dev-body { grid-template-columns:1fr; overflow:auto; } }
+    /* The helper cards keep their narrowest comfortable width and the games
+       table takes the rest: thirteen columns whose headings alone need about
+       970px. Below this width the two panels stack, or the games table has
+       to scroll sideways to reach its own last column. */
+    .lexer-dev-body { display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:18px; flex:1 1 auto; min-height:0; }
+    @media (max-width:1319px){ .lexer-dev-body { grid-template-columns:1fr; overflow:auto; } }
     .lexer-dev-body > section { display:flex; flex-direction:column; gap:10px; min-height:0; }
     .lexer-dev-body h3 { margin:0; font:800 12px/1 var(--lex-heading-font,var(--lex-font)); letter-spacing:.1em; color:var(--lex-muted); }
     /* The table owns the column's spare height rather than leaving a blank
@@ -174,7 +175,7 @@
        itself scrolls. A stacked grid splits the page between its rows instead,
        which left the games table a four-row window with the rest of the height
        empty below it. */
-    @media (max-width:1280px){
+    @media (max-width:1319px){
       .lexer-dev-body { grid-auto-rows:max-content; align-content:start; }
       .lexer-dev-table-wrap { display:block; flex:none; overflow:visible; }
       #lexer-dev-table { display:block; flex:none; }
@@ -197,10 +198,22 @@
     .lexer-dev-files ul { margin:6px 0 0; padding-left:18px; display:grid; gap:2px; }
     .lexer-dev-files li.over { color:var(--lex-text); font-weight:600; }
     .lexer-dev-error { color:var(--lex-warning,#c0392b); font-size:13px; }
-    .lexer-dev-task { display:block; white-space:nowrap; }
-    .lexer-dev-task.done { color:var(--lex-muted); }
-    .lexer-dev-task.todo { color:var(--lex-text); font-weight:600; }
-    .lex-dev-good { color:var(--lex-success,#34784b); font-weight:600; }
+    /* One plugin subissue or one status count: a link to GitHub dressed as the
+       cell's value, not as a button. */
+    .lexer-dev-issue { all:unset; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+      min-width:18px; min-height:18px; border-radius:4px; font-variant-numeric:tabular-nums; }
+    .lexer-dev-issue:hover, .lexer-dev-issue:focus-visible { outline:1px solid var(--lex-accent); outline-offset:2px; }
+    .lexer-dev-issue.zero { color:var(--lex-muted); }
+    .lexer-dev-dot { display:inline-block; width:16px; height:16px; border-radius:50%;
+      background:var(--lexer-dev-status,var(--lex-muted)); box-shadow:inset 0 0 0 1px rgba(0,0,0,.25); }
+    /* A blocked subissue wears GitHub's blocked badge on its lower right. The
+       mark keeps room for it: a table cell clips whatever hangs outside. */
+    .lexer-dev-mark { position:relative; display:inline-flex; padding:0 6px 6px 0; margin:6px 0 0 6px; }
+    .lexer-dev-blocked { position:absolute; right:0; bottom:0; width:12px; height:12px;
+      color:var(--lex-warning,#c0392b); background:var(--lex-panel,#fff); border-radius:3px; }
+    .lexer-dev-dot.none { background:none; box-shadow:inset 0 0 0 1.5px var(--lex-muted); }
+    .lexer-dev-closed { color:var(--lex-success,#34784b); font-weight:800; }
+    .lexer-dev-missing { color:var(--lex-warning,#c0392b); font-weight:800; }
     .lex-dev-todo { color:var(--lex-muted); }
     .lex-dev-over { color:var(--lex-warning,#c0392b); font-weight:600; }
     .lexer-panel-list { display:flex; overflow:auto; flex:1 1 auto; flex-direction:column; gap:9px; margin:0; padding:0; list-style:none; }
@@ -406,21 +419,64 @@
           {className:"lexer-helper",textContent:String(error?.message||error)}));
       }
     }
-    // One row per game through the shared table: mod loading, tasks, quotes,
-    // copied lines, and everything else. The shared pools live in the summary
-    // line and the file disclosure below, not in separate tables.
+    // The five subissues every game's Plugin parent links (AGENTS.md), and the
+    // four workflow labels plus "none" for the open-issue counts.
+    const DEV_SUBISSUES=[["editor","EDITOR"],["ux","UX"],["modloader","MODLOADER"],["theme","THEME"],["reshade","RESHADE"]];
+    const DEV_STATUSES=[["actionable","Actionable"],["untested","Needs testing"],["waiting","Waiting"],["unfeasible","Unfeasible"],["none","No status"]];
+    const devStatusName=Object.fromEntries(DEV_STATUSES);
+    // A load that starts after this one has begun owns the table.
+    let developerOverviewLoad=0;
+    // One row per game through the shared table: the plugin subissues, open
+    // issues by status, quotes and copied lines. The shared pools live in the summary line and the file disclosure
+    // below, not in separate tables.
     async function loadDeveloperOverview(){
+      const load=++developerOverviewLoad;
       const mount=document.querySelector("#lexer-dev-table");
       const summary=document.querySelector("#lexer-dev-summary");
       const files=document.querySelector("#lexer-dev-files");
-      const taskSpans=row=>(row.tasks||[]).map(task=>Object.assign(document.createElement("span"),
-        {className:`lexer-dev-task ${task.done?"done":"todo"}`,textContent:`${task.done?"✓":"○"} ${task.label}`}));
       const copiedText=row=>row.copiedLines==null?"—"
         :row.copiedLines===row.copiedRecorded?String(row.copiedLines)
         :`${row.copiedLines} (was ${row.copiedRecorded})`;
-      try{
-        const table=(await window.pywebview.api.developer_overview())?.table||{};
-        const rows=table.rows||[];
+      // GitHub answers seconds after the rest of the table, so the issue cells
+      // start as a dash and the table is drawn again when the board arrives.
+      let board=null,boardError="",colors={};
+      const dot=status=>{const node=document.createElement("span");
+        node.className=`lexer-dev-dot${status&&status!=="none"?"":" none"}`;
+        if(colors[status])node.style.setProperty("--lexer-dev-status",colors[status]);return node;};
+      // A row's issues live under its label, which two editions of one game share.
+      const labelOf=row=>row.issueLabel||row.id;
+      // GitHub's "blocked" octicon: a circle struck through.
+      const blockedBadge=()=>{const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+        svg.setAttribute("viewBox","0 0 16 16");svg.setAttribute("class","lexer-dev-blocked");svg.setAttribute("aria-hidden","true");
+        svg.innerHTML='<path fill="currentColor" d="M4.467.22a.749.749 0 0 1 .53-.22h6.006c.199 0 .389.079.53.22l4.247 4.247c.141.14.22.331.22.53v6.006a.749.749 0 0 1-.22.53l-4.247 4.247a.749.749 0 0 1-.53.22H4.997a.749.749 0 0 1-.53-.22L.22 11.533a.749.749 0 0 1-.22-.53V4.997c0-.199.079-.389.22-.53Zm.84 1.28L1.5 5.308v5.384L5.308 14.5h5.384l3.808-3.808V5.308L10.692 1.5ZM4 7.75A.75.75 0 0 1 4.75 7h6.5a.75.75 0 0 1 0 1.5h-6.5A.75.75 0 0 1 4 7.75Z"/>';
+        return svg;};
+      const openIssues=(row,number,status)=>window.pywebview.api.open_developer_issues(labelOf(row),number??null,status??null);
+      const link=(title,onclick,...children)=>{const node=document.createElement("button");
+        node.type="button";node.className="lexer-dev-issue";node.title=title;node.onclick=onclick;node.append(...children);return node;};
+      const pending=()=>Object.assign(document.createElement("span"),{className:"lex-dev-todo",textContent:"—",title:boardError||"Reading GitHub…"});
+      const subissueCell=(row,key,name)=>{
+        // Global is the shared application, not a plugin: it has no subissues.
+        if(row.global)return "";
+        if(!board)return pending();
+        const issue=board.games?.[labelOf(row)]?.subissues?.[key];
+        if(!issue)return Object.assign(document.createElement("span"),
+          {className:"lexer-dev-missing",textContent:"!",title:`${row.game} has no ${name} subissue`});
+        const label=issue.closed?"closed":devStatusName[issue.status||"none"].toLowerCase();
+        const mark=issue.closed?Object.assign(document.createElement("span"),{className:"lexer-dev-closed",textContent:"✓"}):dot(issue.status||"none");
+        if(issue.closed||!issue.blocked)return link(`#${issue.number} ${name}: ${label}`,()=>openIssues(row,issue.number),mark);
+        const wrap=Object.assign(document.createElement("span"),{className:"lexer-dev-mark"});
+        wrap.append(mark,blockedBadge());
+        return link(`#${issue.number} ${name}: ${label}, blocked`,()=>openIssues(row,issue.number),wrap);
+      };
+      const countCell=(row,status,name)=>{
+        if(!board)return pending();
+        const count=board.games?.[labelOf(row)]?.counts?.[status]??0;
+        const node=link(`${row.game}: ${count} open ${name.toLowerCase()} issue${count===1?"":"s"}`,()=>openIssues(row,null,status),String(count));
+        if(!count)node.classList.add("zero");
+        return node;
+      };
+      const draw=(table,rows)=>{
+        colors={...(table.workflowColors||{}),...(board?.colors||{})};
         mount.replaceChildren(LexeditorUI.columnList({
           "aria-label":"Developer overview by game",
           // The table seats itself in the column it is given, the way the
@@ -429,9 +485,13 @@
           fill:true,
           columns:[
             {key:"game",label:"GAME",align:"start"},
-            {key:"modState",label:"MOD LOADING",cellClass:row=>row.modWorks?"lex-dev-good":"lex-dev-todo"},
-            {key:"tasks",label:"TASKS",align:"start",sortable:false,
-              render:row=>{const wrap=document.createElement("span");wrap.append(...taskSpans(row));return wrap;}},
+            ...DEV_SUBISSUES.map(([key,label])=>({key:`issue-${key}`,label,
+              headerTitle:`The game's ${label.toLowerCase()} subissue: its status colour, or a tick once closed. Click one to open it on GitHub.`,
+              sortable:false,render:row=>subissueCell(row,key,label)})),
+            ...DEV_STATUSES.map(([status,name])=>({key:`count-${status}`,
+              label:()=>status==="none"?Object.assign(document.createElement("span"),{textContent:"✕"}):dot(status),
+              headerTitle:`Open ${name.toLowerCase()} issues. Click a count to list them on GitHub.`,
+              sortable:false,render:row=>countCell(row,status,name)})),
             {key:"quotes",label:"QUOTES",numeric:true,
               render:row=>row.quotes??"—",sortValue:row=>row.quotes??-1},
             // Not a numeric column: the cell reads "12 (was 9)", so the
@@ -441,15 +501,26 @@
               render:row=>copiedText(row),
               cellClass:row=>row.copiedOver?"lex-dev-over":"",
               sortValue:row=>row.copiedLines??-1},
-            {key:"rest",label:"REST",align:"start"},
           ],
           rows,
           // Every column can give space back, so the table fits the drawer
-          // instead of pushing a horizontal scrollbar under it.
-          template:"minmax(110px,1.1fr) minmax(70px,.7fr) minmax(120px,1.2fr) 64px 96px minmax(110px,1.3fr)",
+          // instead of pushing a horizontal scrollbar under it. The issue and
+          // count columns hold one mark or a short number each, and are not
+          // sortable: a sort control's padding would add 40px to each.
+          template:"minmax(110px,1.1fr)"+" max-content".repeat(DEV_SUBISSUES.length)
+            +" 32px".repeat(DEV_STATUSES.length)+" 64px 96px",
         }));
+      };
+      try{
+        const table=(await window.pywebview.api.developer_overview())?.table||{};
+        const rows=table.rows||[];
+        draw(table,rows);
+        // A failed board read leaves the rest of the table standing.
+        Promise.resolve().then(()=>window.pywebview.api.developer_issue_board()).then(result=>{board=result;},
+          error=>{boardError=`GitHub could not be read: ${error?.message||error}`;})
+          .then(()=>{if(load===developerOverviewLoad)draw(table,rows);});
         const ui=table.sharedUi||{files:[],totalShared:0,totalHand:0};
-        summary.textContent=`${rows.length} games · ${table.quotesTotal||0} loading quotes`
+        summary.textContent=`${rows.filter(row=>!row.global).length} games · ${table.quotesTotal||0} loading quotes`
           +` (Global (shared): ${table.globalQuotes||0}) · shared UI ${ui.totalShared||0} selectors,`
           +` ${ui.totalHand||0} hand-built rows across ${(ui.files||[]).length} files`;
         const count=(now,was)=>now===was?String(now):`${now} (was ${was})`;

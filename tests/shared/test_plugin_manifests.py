@@ -55,7 +55,7 @@ class PluginManifestTests(unittest.TestCase):
                 # not the game's metadata. The descriptor must not restate it.
                 self.assertEqual(
                     given & {"plugin_id", "name", "accent", "process_names",
-                             "can_launch", "mods_load"},
+                             "can_launch", "mods_load", "issue_label"},
                     set(), f"{directory.name} restates metadata in its descriptor")
 
     def test_the_descriptor_matches_the_manifest(self):
@@ -66,6 +66,7 @@ class PluginManifestTests(unittest.TestCase):
                 self.assertEqual(plugin.accent, data["accent"])
                 self.assertEqual(list(plugin.process_names), data.get("processNames", []))
                 self.assertEqual(plugin.can_launch, data.get("canLaunch", True))
+                self.assertEqual(plugin.tracker_label, data.get("issueLabel") or data["id"])
                 install, declared = plugin.installation, data.get("installation")
                 if declared:
                     self.assertEqual(install.executable, declared["executable"])

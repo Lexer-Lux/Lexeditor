@@ -66,8 +66,12 @@
 
 ### Standard plugin issue structure
 
-Use one parent issue titled `Plugin`, identified by its game label. Link these
-four actual subissues in this order, with the same game label on each. Mark
+Every game plugin has one parent issue titled `Plugin`, identified by its game
+label, which is the plugin's id. An edition that runs another plugin's code
+shares that plugin's label and issues through `issueLabel` in its
+`plugin.json` (ff7-2013 files under `ff7`). Link these five actual subissues in this order,
+with the same game label on each. The developer page shows their status per
+game, and `tests/shared/test_plugin_issues.py` fails when a game lacks one. Mark
 `UX Refinement` and `Mod Loader` as blocked by `Create Editor` with GitHub's
 issue dependencies:
 
@@ -91,8 +95,12 @@ issue dependencies:
 4. `Create Theme`: Use the game's fonts, colours and sound effects for a fitting
    theme. Record asset provenance and distribution rights; extract locally when
    redistribution is not permitted. Do not publish proprietary assets blindly.
+5. `ReShade`: Get ReShade working on the game's rendering executable, set the
+   game's ReShade defaults so they apply on a fresh install, and customise the
+   CRT filters for the game and make them work, where Lexer wants them. It
+   starts `waiting`, since each step needs Lexer in the running game.
 
-Reuse existing matching issues and preserve their discussion. These four
+Reuse existing matching issues and preserve their discussion. These five
 subissues track one plugin, not four separate efforts.
 Keep game names out of issue titles. Each open subissue needs its own truthful
 workflow label; the `Plugin` parent carries none, because its status is its

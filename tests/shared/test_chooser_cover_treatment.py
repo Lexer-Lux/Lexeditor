@@ -95,7 +95,10 @@ def test_cover_settings_are_stored_and_bounded(tmp_path):
 
 
 def test_cover_is_blurred_and_darkened_at_the_shipped_amounts(base):
-    settings = dict(BASE, developerMode=True, developerAuthorized=True,
+    # The treatment at a known pair of values; the shipped defaults are tuned
+    # from Developer Mode and change, so the amounts are set here.
+    settings = dict(BASE, residentCoverBlurPixels=8.0, residentCoverDarkenPercent=58.0,
+                    developerMode=True, developerAuthorized=True,
                     developerLogin='Lexer-Lux', viewPreferences={},
                     defaultValues=dict(BASE))
     with sync_playwright() as play:

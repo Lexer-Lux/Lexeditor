@@ -160,6 +160,9 @@ class GamePlugin:
     fonts: tuple[PluginFont, ...] = ()
     installation: GameInstallSpec | None = None
     github: GitHubRepository | None = None
+    # The GitHub label its issues carry in the central tracker. Empty means the
+    # plugin id; an edition that shares another plugin's code names that one.
+    issue_label: str = ""
     projects: ModProjectSpec | None = None
     cover_art: Path | None = None
     # A plugin that drives a real game through a runtime helper cannot open
@@ -195,13 +198,18 @@ class GamePlugin:
     mod_adapter: object | None = None
     # Does a mod built here actually load in the game? Stated by the plugin,
     # never inferred: an adapter that exists is not an adapter that works. The
-    # developer page reads this, and the answer is no until someone proves
-    # otherwise in the game itself.
+    # answer is no until someone proves otherwise in the game itself. Nothing
+    # reads it since the developer page moved to the Mod Loader issue's status.
     mods_load: bool = False
     managed_mod: object | None = None
     # Multi-helper plugins opt into independent setup/update rows. Legacy
     # singular fields above remain valid and are synthesized into one helper.
     helpers: tuple[PluginHelper, ...] = ()
+
+    @property
+    def tracker_label(self) -> str:
+        """The label on this plugin's issues in the central GitHub tracker."""
+        return self.issue_label or self.plugin_id
 
 
 def plugin_helpers(plugin: GamePlugin) -> tuple[PluginHelper, ...]:

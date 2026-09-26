@@ -16,6 +16,38 @@ from core.plugin_api import GitHubRepository
 
 _AUTO = object()
 _UNCHECKED = object()
+
+# Every game plugin's `Plugin` parent links these five, in this order (AGENTS.md).
+PLUGIN_SUBISSUES = (
+    ("editor", "Create Editor"), ("ux", "UX Refinement"), ("modloader", "Mod Loader"),
+    ("theme", "Create Theme"), ("reshade", "ReShade"),
+)
+WORKFLOW_LABELS = ("actionable", "untested", "waiting", "unfeasible")
+# Only for a label no open issue carries yet; GitHub's own label colour wins.
+WORKFLOW_FALLBACK_COLORS = {"actionable": "#0e8a16", "untested": "#fbca04",
+                            "waiting": "#e87924", "unfeasible": "#b60205"}
+_PLUGIN_PARENTS_QUERY = """
+query($q: String!, $endCursor: String) {
+  search(query: $q, type: ISSUE, first: 100, after: $endCursor) {
+    pageInfo { hasNextPage endCursor }
+    nodes { ... on Issue {
+      title labels(first: 30) { nodes { name } }
+      subIssues(first: 30) { nodes {
+        number title state labels(first: 30) { nodes { name } }
+        issueDependenciesSummary { blockedBy }
+      } }
+    } }
+  }
+}"""
+_OPEN_ISSUES_QUERY = """
+query($owner: String!, $name: String!, $endCursor: String) {
+  repository(owner: $owner, name: $name) {
+    issues(first: 100, states: OPEN, after: $endCursor) {
+      pageInfo { hasNextPage endCursor }
+      nodes { labels(first: 30) { nodes { name color } } subIssues { totalCount } }
+    }
+  }
+}"""
 CommandRunner = Callable[..., subprocess.CompletedProcess[str]]
 
 
@@ -221,6 +253,90 @@ class GitHubIntegration:
         ])
         labels = sorted(self._labels(payload), key=lambda row: row["name"].casefold())
         return {"repository": repository.full_name, "labels": labels}
+
+    def plugin_board(self, repository: GitHubRepository, games: list[str], *,
+                     owner_only: bool = True) -> dict:
+        """Each game's five plugin subissues and its open issues by workflow label.
+
+        A game's label is its plugin id. Its `Plugin` parent links the five
+        subissues named in PLUGIN_SUBISSUES; a missing one comes back as None.
+        The counts leave out closed issues and any issue with subissues of its
+        own, which is what a `Plugin` parent is. The issues are public, so the
+        repository check can read them with CI's own token (owner_only=False).
+        """
+        if owner_only:
+            self._require_authorized(repository, refresh=True)
+        owner, name = repository.full_name.split("/", 1)
+        pages = self._json([
+            "api", "graphql", "--paginate", "--slurp",
+            "-f", f"q=repo:{repository.full_name} is:issue in:title Plugin",
+            "-f", "query=" + _PLUGIN_PARENTS_QUERY,
+        ], timeout=60)
+        opens = self._json([
+            "api", "graphql", "--paginate", "--slurp",
+            "-F", f"owner={owner}", "-F", f"name={name}",
+            "-f", "query=" + _OPEN_ISSUES_QUERY,
+        ], timeout=60)
+        colors = dict(WORKFLOW_FALLBACK_COLORS)
+        board = {game: {"subissues": {key: None for key, _ in PLUGIN_SUBISSUES},
+                        "counts": {status: 0 for status in (*WORKFLOW_LABELS, "none")}}
+                 for game in games}
+        titles = dict((title, key) for key, title in PLUGIN_SUBISSUES)
+        for page in pages if isinstance(pages, list) else []:
+            for parent in page["data"]["search"]["nodes"]:
+                if parent.get("title") != "Plugin":
+                    continue
+                label_names = [row["name"] for row in parent["labels"]["nodes"]]
+                game = next((label for label in label_names if label in board), None)
+                if game is None:
+                    continue
+                for issue in parent["subIssues"]["nodes"]:
+                    key = titles.get(issue["title"])
+                    if key is None:
+                        continue
+                    labels = issue["labels"]["nodes"]
+                    status = next((row["name"] for row in labels if row["name"] in WORKFLOW_LABELS), None)
+                    board[game]["subissues"][key] = {
+                        "number": int(issue["number"]),
+                        "closed": issue["state"] == "CLOSED",
+                        "status": status,
+                        # Open issues it is marked blocked by, as GitHub counts them.
+                        "blocked": bool((issue.get("issueDependenciesSummary") or {}).get("blockedBy")),
+                    }
+        for page in opens if isinstance(opens, list) else []:
+            for issue in page["data"]["repository"]["issues"]["nodes"]:
+                if issue["subIssues"]["totalCount"]:
+                    continue
+                labels = issue["labels"]["nodes"]
+                for row in labels:
+                    if row["name"] in WORKFLOW_LABELS and row.get("color"):
+                        colors[row["name"]] = "#" + row["color"].lstrip("#")
+                names = {row["name"] for row in labels}
+                status = next((label for label in WORKFLOW_LABELS if label in names), "none")
+                for game in names & set(board):
+                    board[game]["counts"][status] += 1
+        return {"games": board, "colors": colors}
+
+    @staticmethod
+    def issues_url(repository: GitHubRepository, game: str, *,
+                   number: int | None = None, status: str | None = None) -> str:
+        """The GitHub page for one issue, or for a game's open issues in one status."""
+        import re
+        from urllib.parse import quote_plus
+
+        base = f"https://github.com/{repository.full_name}/issues"
+        if number is not None:
+            return f"{base}/{GitHubIntegration._issue_number(number)}"
+        if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", game):
+            raise ValueError(f"Invalid game label: {game}")
+        if status in WORKFLOW_LABELS:
+            query = f"is:issue is:open label:{game} label:{status}"
+        elif status == "none":
+            query = (f"is:issue is:open label:{game} no:sub-issue "
+                     + " ".join(f"-label:{label}" for label in WORKFLOW_LABELS))
+        else:
+            raise ValueError(f"Unknown workflow status: {status}")
+        return f"{base}?q={quote_plus(query)}"
 
     def edit_issue(self, repository: GitHubRepository, number: int | str,
                    title: str, body: str) -> dict:

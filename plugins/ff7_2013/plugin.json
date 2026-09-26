@@ -2,6 +2,7 @@
   "id": "ff7-2013",
   "name": "Final Fantasy 7 (Original)",
   "accent": "#3155b7",
+  "issueLabel": "ff7",
   "processNames": [
     "ff7_en.exe",
     "ff7.exe",

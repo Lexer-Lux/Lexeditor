@@ -21,10 +21,10 @@ def main():
             dev.wait_for()
             page.evaluate("""window.pywebview.api.developer_overview=async()=>({table:{
               rows: [
-                {id: 'ff8', game: 'Final Fantasy 8', modState: 'Loads mods', modWorks: true,
-                 tasks: [], quotes: 10, copiedLines: 0, copiedRecorded: 0, copiedOver: false, rest: 'Ready'},
-                {id: 'ff9', game: 'Final Fantasy 9', modState: 'Not yet', modWorks: false,
-                 tasks: [], quotes: 0, copiedLines: null, copiedRecorded: null, copiedOver: false, rest: 'Ready'},
+                {id: 'ff8', game: 'Final Fantasy 8', 
+                 quotes: 10, copiedLines: 0, copiedRecorded: 0, copiedOver: false},
+                {id: 'ff9', game: 'Final Fantasy 9', 
+                 quotes: 0, copiedLines: null, copiedRecorded: null, copiedOver: false},
               ],
               quotesTotal: 12, globalQuotes: 2, quotedPlugins: 2,
               sharedUi: {files: [], totalShared: 0, totalHand: 0},

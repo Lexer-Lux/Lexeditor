@@ -19,13 +19,9 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[2]
 BASE = json.loads((ROOT / "ui/default_settings.json").read_text(encoding="utf-8"))
 
-ROWS = [{"id": f"game_{index}", "game": f"GAME {index}", "modWorks": index % 2 == 0,
-         "tasks": [{"label": label, "done": index % 3 != 0} for label in (
-             "Create Editor", "UX Refinement", "Mod Loader", "Create Theme",
-             "Researched the format", "Vendored the loader")],
+ROWS = [{"id": f"game_{index}", "game": f"GAME {index}",
          "quotes": 10 + index, "copiedLines": index * 3, "copiedRecorded": 0,
-         "copiedOver": index == 2,
-         "rest": "the last save is older than the newest upstream release"}
+         "copiedOver": index == 2}
         for index in range(18)]
 
 

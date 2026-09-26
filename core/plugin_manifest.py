@@ -69,6 +69,7 @@ def plugin_defaults(plugin_file: str | Path) -> dict:
         "process_names": tuple(data.get("processNames", ())),
         "can_launch": data.get("canLaunch", True) is not False,
         "mods_load": data.get("modsLoad", False) is True,
+        "issue_label": str(data.get("issueLabel", "")),
     }
     return defaults
 

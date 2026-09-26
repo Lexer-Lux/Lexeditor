@@ -134,7 +134,7 @@ jobs:
   checks:
     runs-on: windows-latest
     timeout-minutes: 90
-    steps:
+{env}    steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -157,11 +157,13 @@ def workflow_files() -> dict[str, str]:
         paths = [f"plugins/{plugin}/**", f"tests/{plugin}/**"] + shared
         paths.append(f".github/workflows/{plugin}-checks.yml")
         files[f"{plugin}-checks.yml"] = WORKFLOW.format(
-            title=f"{plugin} checks", filter="paths", argument=plugin,
+            title=f"{plugin} checks", filter="paths", argument=plugin, env="",
             paths="\n".join(f"      - '{path}'" for path in paths))
     ignored = ["plugins/**", "worklog/**", "codex/**", "**.md"]
     files["global-checks.yml"] = WORKFLOW.format(
         title="global checks", filter="paths-ignore", argument="--global",
+        # tests/shared/test_plugin_issues.py reads the public issue tracker.
+        env="    env:\n      GH_TOKEN: ${{ github.token }}\n",
         paths="\n".join(f"      - '{path}'" for path in ignored))
     return files
 

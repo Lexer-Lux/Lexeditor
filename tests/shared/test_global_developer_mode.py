@@ -164,7 +164,8 @@ class DeveloperModeUiContractTests(unittest.TestCase):
         source = (ROOT / "ui" / "chooser.html").read_text(encoding="utf-8")
         self.assertIn('id="lexer-dev-table"', source)
         self.assertIn("Developer overview by game", source)
-        for header in ("GAME", "MOD LOADING", "TASKS", "QUOTES", "COPIED LINES", "REST"):
+        for header in ("GAME", "EDITOR", "UX", "MODLOADER", "THEME", "RESHADE",
+                       "QUOTES", "COPIED LINES"):
             self.assertIn(header, source)
         self.assertIn("Global (shared)", source)
         self.assertNotIn('id="lexer-dev-games"', source)

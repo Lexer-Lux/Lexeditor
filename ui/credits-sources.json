@@ -43,6 +43,11 @@
         "url": "https://github.com/crosire/reshade"
       },
       {
+        "name": "GitHub / Primer Octicons",
+        "role": "The blocked icon on the developer page's issue board (octicon blocked-16, MIT licence).",
+        "url": "https://github.com/primer/octicons"
+      },
+      {
         "name": "4lex4nder and Frans Bouma / ReshadeEffectShaderToggler",
         "role": "The add-on Lexeditor installs beside ReShade to run effects before a game draws its HUD.",
         "url": "https://github.com/4lex4nder/ReshadeEffectShaderToggler"

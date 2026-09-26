@@ -18,7 +18,7 @@ from core.cover_art import CoverArtCache
 from core.font_manager import font_status, install_missing_fonts
 from core.game_installation import GameInstallationManager
 from core.game_version import game_version
-from core.github_integration import GitHubIntegration
+from core.github_integration import GitHubIntegration, WORKFLOW_FALLBACK_COLORS
 from core.plugin_api import GamePlugin, GitHubRepository, PluginSession
 from core.plugin_manifest import loading_quotes as plugin_quotes
 from core.plugin_manifest import manifest_in, plugin_directories
@@ -43,6 +43,8 @@ WINDOW_STATE_PATH = Path(os.environ.get("LOCALAPPDATA", ROOT / "out")) / "Lexedi
 DEFAULT_WINDOW_BOUNDS = [80, 80, 1440, 900]
 LOADING_QUOTES = ROOT / "ui" / "loading_quotes.json"
 DEFAULT_VIEWS = ROOT / "ui" / "default_views.json"
+# The label on shared-application issues, and the developer table's first row.
+GLOBAL_ISSUE_LABEL = "global"
 LEXEDITOR_REPOSITORY = GitHubRepository(
     full_name="Lexer-Lux/Lexeditor",
     authorized_logins=("Lexer-Lux",),
@@ -663,7 +665,7 @@ class HostApi:
         return GitHubRepository(
             full_name=LEXEDITOR_REPOSITORY.full_name,
             authorized_logins=LEXEDITOR_REPOSITORY.authorized_logins,
-            issue_label=plugin_id,
+            issue_label=plugin.tracker_label,
         )
 
     def github_repository(self, plugin_id: str) -> dict | None:
@@ -872,18 +874,9 @@ class HostApi:
             plugin = managed["plugin"]
             if plugin.plugin_id == "blank":
                 continue
-            installation = managed["installation"]
-            tasks = []
-            if plugin.installation is not None:
-                tasks.append({"label": "ReShade defaults set",
-                              "done": self._reshade_defaults(plugin.plugin_id).is_file()})
-            loading = self._mod_loading_state(plugin)
-            status = installation.get("statusText") or installation.get("status", "")
-            rest = " · ".join(part for part in (status, loading["loader"]) if part)
             games.append({"id": plugin.plugin_id, "name": plugin.name,
-                          "directory": self._plugin_dir(plugin.plugin_id, plugin),
-                          "modState": loading["state"], "modWorks": loading["works"],
-                          "tasks": tasks, "rest": rest})
+                          "issueLabel": plugin.tracker_label,
+                          "directory": self._plugin_dir(plugin.plugin_id, plugin)})
         codes = {row["plugin"]: row for row in self._shared_code_budget()}
         ui_rows = self._shared_ui_budget()
         quote_counts = self.loading_quote_counts()
@@ -892,16 +885,21 @@ class HostApi:
         for game in games:
             directory = game.pop("directory")
             code = codes.get(directory, {})
-            rows.append({"id": game["id"], "game": game["name"],
-                         "modState": game["modState"], "modWorks": game["modWorks"],
-                         "tasks": game["tasks"],
+            rows.append({"id": game["id"], "game": game["name"], "issueLabel": game["issueLabel"],
                          "quotes": quote_by_dir.get(directory),
                          "copiedLines": code.get("copiedLines") if code else None,
                          "copiedRecorded": code.get("recorded") if code else None,
-                         "copiedOver": bool(code.get("over")) if code else False,
-                         "rest": game["rest"]})
+                         "copiedOver": bool(code.get("over")) if code else False})
+        # Global comes first: the shared application's own issues and quotes.
+        # It has no plugin subissues or plugin code of its own.
+        global_row = {"id": GLOBAL_ISSUE_LABEL, "game": "Global", "global": True,
+                      "issueLabel": GLOBAL_ISSUE_LABEL,
+                      "quotes": quote_counts["global"],
+                      "copiedLines": None, "copiedRecorded": None, "copiedOver": False}
         return {"table": {
-            "rows": sorted(rows, key=lambda row: row["game"].lower()),
+            "rows": [global_row, *sorted(rows, key=lambda row: row["game"].lower())],
+            # The issue board's colours until GitHub's own labels arrive.
+            "workflowColors": dict(WORKFLOW_FALLBACK_COLORS),
             "quotesTotal": quote_counts["global"] + sum(quote_by_dir.values()),
             "globalQuotes": quote_counts["global"],
             "quotedPlugins": len(quote_by_dir),
@@ -909,6 +907,37 @@ class HostApi:
                          "totalShared": sum(row["sharedSelectors"] for row in ui_rows),
                          "totalHand": sum(row["handBuiltRows"] for row in ui_rows)},
         }}
+
+    def _developer_labels(self) -> list[str]:
+        """The GitHub labels the developer table tracks: global, then each game's.
+
+        Two editions that share one plugin's code share its label, and so its issues.
+        """
+        labels = [GLOBAL_ISSUE_LABEL]
+        for plugin_id, plugin in self._plugins.items():
+            if plugin_id != "blank" and plugin.tracker_label not in labels:
+                labels.append(plugin.tracker_label)
+        return labels
+
+    def developer_issue_board(self) -> dict:
+        """Each game's five plugin subissues and its open issues by status.
+
+        Separate from the overview because it waits on GitHub: the page draws
+        its table first and fills these columns when this answers.
+        """
+        if not self._developer():
+            raise ValueError("The developer page needs Developer Mode.")
+        return self._github.plugin_board(LEXEDITOR_REPOSITORY, self._developer_labels())
+
+    def open_developer_issues(self, label: str, number: int | None = None,
+                              status: str | None = None) -> dict:
+        """Open one game's issue, or its open issues in one status, on GitHub."""
+        if not self._developer():
+            raise ValueError("The developer page needs Developer Mode.")
+        if label not in self._developer_labels():
+            raise ValueError(f"Unknown issue label: {label}")
+        url = self._github.issues_url(LEXEDITOR_REPOSITORY, label, number=number, status=status)
+        return {"opened": bool(webbrowser.open(url, new=2, autoraise=True)), "url": url}
 
     def _shared_code_budget(self) -> list[dict]:
         """Plugin Python that is a second copy of another plugin's function."""
@@ -924,25 +953,6 @@ class HostApi:
                  "over": live.get(name, 0) > recorded.get(name, 0)}
                 for name in sorted(set(live) | set(recorded))]
         return sorted(rows, key=lambda row: -row["copiedLines"])
-
-    def _mod_loading_state(self, plugin) -> dict:
-        """Whether this game can load a mod yet, and how.
-
-        A plugin that can install and enable a package has an adapter; one that
-        only edits project copies does not, and says so in ui/mod-loading.json.
-        """
-        import json
-
-        try:
-            entry = json.loads((Path(__file__).resolve().parents[1] / "ui" / "mod-loading.json")
-                               .read_text(encoding="utf-8"))["plugins"].get(plugin.plugin_id, {})
-        except (OSError, ValueError, KeyError):
-            entry = {}
-        loader = str(entry.get("loader", ""))
-        works = bool(getattr(plugin, "mods_load", False))
-        return {"works": works,
-                "state": "Loads mods" if works else "Not yet",
-                "loader": loader.split(". ")[0] if loader else "No loader declared."}
 
     def _shared_ui_budget(self) -> list[dict]:
         """How far each plugin still reaches into the shared components.
