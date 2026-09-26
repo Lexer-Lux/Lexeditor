@@ -43,6 +43,46 @@ class WarbandItemEditorTests(unittest.TestCase):
         self.assertIn("weapon_length(90)", sword["fields"]["stats"])
         self.assertEqual(sword["fieldOrder"][:8], ["id","name","meshes","flags","capabilities","value","stats","modifierBits"])
 
+    def test_create_appends_template_preserving_existing_records_and_extra_fields(self):
+        source = SOURCE.replace('imodbits_sword]', 'imodbits_sword, [(ti_on_weapon_attack, [(call_script, "script_custom")])]]')
+        self.path.write_text(source, encoding="utf-8")
+        original = self.path.read_bytes()
+        before = server.item_data()
+        result = server.create_item(0, "sword", "new_sword", "New café Sword", before["sha256"])
+        after = server.item_data()
+        self.assertEqual([r["id"] for r in after["rows"]], ["sword", "boots", "new_sword"])
+        self.assertEqual(after["rows"][2]["name"], "New café Sword")
+        for key, value in before["rows"][0]["fields"].items():
+            if key not in ("id", "name"):
+                self.assertEqual(after["rows"][2]["fields"][key], value)
+        self.assertEqual([r["fields"] for r in after["rows"][:2]], [r["fields"] for r in before["rows"]])
+        self.assertEqual(result["recordIndex"], 2)
+        self.assertEqual(Path(result["backup"]).read_bytes(), original)
+        compile(self.path.read_bytes(), str(self.path), "exec")
+
+    def test_create_rejects_bad_identity_collision_and_stale_source_without_write(self):
+        before = self.path.read_bytes()
+        digest = server.item_data()["sha256"]
+        for index, original_id, item_id, name, sha in (
+            (0, "sword", "sword", "Copy", digest),
+            (0, "sword", "bad id", "Copy", digest),
+            (0, "sword", "copy", "", digest),
+            (0, "wrong", "copy", "Copy", digest),
+            (-1, "boots", "copy", "Copy", digest),
+            (True, "boots", "copy", "Copy", digest),
+            (0, "sword", "copy", "Copy", "stale"),
+        ):
+            with self.subTest(index=index, item_id=item_id, name=name, sha=sha):
+                with self.assertRaises(ValueError):
+                    server.create_item(index, original_id, item_id, name, sha)
+                self.assertEqual(self.path.read_bytes(), before)
+
+    def test_create_handles_absent_trailing_comma(self):
+        self.path.write_text(SOURCE.replace('imodbits_cloth],', 'imodbits_cloth]'))
+        server.create_item(1, "boots", "new_boots", "New Boots", server.item_data()["sha256"])
+        compile(self.path.read_bytes(), str(self.path), "exec")
+        self.assertEqual(server.item_rows()[-1]["id"], "new_boots")
+
     def test_structured_save_changes_only_requested_fields_and_makes_backup(self):
         original = self.path.read_bytes();data=server.item_data()
         result = server.save_item_edits([{

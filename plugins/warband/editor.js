@@ -84,11 +84,46 @@
     {key:"inventoryMesh",label:"Inventory mesh",width:"minmax(7em,1fr)",render:row=>el("span",{title:itemInventoryMesh(row)},itemInventoryMesh(row)),
       sortValue:itemInventoryMesh}];}
   function itemRowKey(item){return String(item.recordIndex??item.line??item.id);}
+  function beginItemCreation(){
+    if(state.activeSource!=="mine"||dirtyCount()||state.build.running)return;
+    const source=el("select",{"aria-label":"Copy from item"},...state.items.rows.map(row=>
+      el("option",{value:row.recordIndex,selected:itemRowKey(row)===state.selectedItem},`${row.name} (${row.id})`)));
+    const id=el("input",{type:"text",required:true,pattern:"[a-z][a-z0-9_]*","aria-label":"New item ID"});
+    const name=el("input",{type:"text",required:true,"aria-label":"New item name"});
+    const create=el("button",{type:"button",onclick:async()=>{
+      if(!id.reportValidity()||!name.reportValidity())return;
+      const template=state.items.rows.find(row=>row.recordIndex===Number(source.value));
+      if(!template)return;
+      create.disabled=true;
+      try{
+        const result=await api("/api/items/create",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({recordIndex:template.recordIndex,originalId:template.id,id:id.value,name:name.value,sha256:state.items.sha256})});
+        state.items=await api("/api/items");state.selectedItem=String(result.recordIndex);state.filters.items="";state.modOnly=false;
+        if(state.catalogFile?.filename==="module_items.py"){
+          state.catalogFile=await api("/api/catalog/file?name=module_items.py");state.catalogDraft=state.catalogFile.text;
+        }
+        shell.history.clear();render();
+        try{await buildSavedModule();}
+        catch(error){setStatus("Item created; build failed");showAlert({title:"Item created; build failed",items:[{item:result.created,issue:error.message||String(error)}]});}
+        shell.refresh();
+      }catch(error){create.disabled=false;LexeditorUI.showToast(error.message||String(error),true);}
+    }},"Create and build");
+    $("#main").replaceChildren(detailPanel({title:"Add item",body:[
+      detailField({label:"Copy from",control:source,description:"Copies the item's properties, appearance and triggers. Existing shops and troops still refer to their original items."}),
+      detailField({label:"ID",control:id,description:"Use a unique name with lowercase letters, digits and underscores, starting with a letter. This ID stays fixed after creation."}),
+      detailField({label:"Name",control:name}),
+      LexeditorUI.actionRow(el("button",{type:"button",onclick:renderItems},"Cancel"),create),
+    ]}));
+    id.focus();
+  }
   function renderItems(){
     const view="items",columns=itemColumns(),query=state.filters.items||"";
     const filtered=sorted(search(state.items.rows,query,["name","id","type","inventoryMesh"]),view);
     $("#toolbar").replaceChildren();
-    $("#main").replaceChildren(pagedListDetail({addDisabledReason:"Warband's module files can take new items, but Lexeditor only edits existing ones. Adding an item is not supported yet.",modOnly:modOnlySpec("items",item=>Object.keys(state.itemEdits[itemEditKey(item)]?.fields||{}).length>0),rows:filtered,key:itemRowKey,slots:false,fit:{minRowHeight:36},page:state.pages.items,pageSize:state.pageSizes.items,selected:state.selectedItem,noun:"items",splitKey:"warband-items",className:"warband-paged-table warband-items",defaultSplit:43,
+    $("#main").replaceChildren(pagedListDetail({add:beginItemCreation,
+      addDisabled:state.activeSource!=="mine"||!!dirtyCount()||state.build.running||!state.items.rows.length,
+      addDisabledReason:state.activeSource!=="mine"?"Open an editable mod first.":dirtyCount()?"Save or discard pending edits before creating an item.":state.build.running?"Wait for the current build to finish.":"A source item is needed as a template.",
+      modOnly:modOnlySpec("items",item=>Object.keys(state.itemEdits[itemEditKey(item)]?.fields||{}).length>0),rows:filtered,key:itemRowKey,slots:false,fit:{minRowHeight:36},page:state.pages.items,pageSize:state.pageSizes.items,selected:state.selectedItem,noun:"items",splitKey:"warband-items",className:"warband-paged-table warband-items",defaultSplit:43,
       search:{key:"warband-items",value:query,placeholder:"Search items…",change:value=>{state.filters.items=value;state.pages.items=0;renderItems();}},
       master:({rows,selected,select})=>columnList({rows,key:itemRowKey,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts.items[0],dir:state.sorts.items[1]},sort:key=>sort("items",key),selected,selectedClass:"selected",select,class:"warband-record-list","aria-label":"Warband items"}),
       detail:()=>warbandItemDetail(state.items.rows.find(row=>itemRowKey(row)===state.selectedItem)),sync:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";},change:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";renderItems();}}));

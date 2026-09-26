@@ -383,6 +383,61 @@ def _validate_module_items_candidate(text: str, encoding: str) -> bytes:
     return encoded
 
 
+def _write_items_candidate(candidate: str, encoding: str, raw: bytes) -> dict:
+    source = MODULE_SYSTEM / "module_items.py"
+    if any(ord(char) > 127 for char in candidate) and not re.search(
+            r"coding[:=]\s*[-\w.]+", "\n".join(candidate.splitlines()[:2])):
+        candidate = f"# coding: {encoding}\n" + candidate
+    encoded = _validate_module_items_candidate(candidate, encoding)
+    if source.read_bytes() != raw:
+        raise ValueError("module_items.py changed while validating; reload before saving")
+    backup = source.with_name(source.name + ".lexeditor.bak")
+    backup.write_bytes(raw)
+    fd, temporary_name = tempfile.mkstemp(prefix=".items-", dir=source.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(encoded)
+        os.replace(temporary_name, source)
+    finally:
+        if os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+    return {"backup": str(backup), "sha256": hashlib.sha256(encoded).hexdigest()}
+
+
+def create_item(record_index: int, original_id: str, item_id: str, name: str,
+                expected_sha256: str) -> dict:
+    """Append a template copy without renumbering existing item records."""
+    if not isinstance(item_id, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", item_id):
+        raise ValueError("Item ID must start with a lowercase letter and use letters, digits or underscores")
+    if not isinstance(name, str) or not name.strip() or any(ord(c) < 32 for c in name):
+        raise ValueError("Item name must be nonempty and contain no control characters")
+    if type(record_index) is not int:
+        raise ValueError("Choose an existing template record")
+    with CATALOG_LOCK:
+        text, encoding, raw = _module_items_source()
+        if expected_sha256 != hashlib.sha256(raw).hexdigest():
+            raise ValueError("module_items.py changed; reload before saving")
+        records = _item_records(text)
+        if not 0 <= record_index < len(records) or records[record_index]["id"] != original_id:
+            raise ValueError("Template item changed; reload before creating")
+        if any(record["id"] == item_id for record in records):
+            raise ValueError("An item with that ID already exists")
+        spans = _item_record_spans(text)
+        start, end = spans[record_index]
+        copied = text[start:end]
+        for (left, right), value in reversed(list(zip(
+                records[record_index]["_fieldSpans"][:2], [item_id, name]))):
+            copied = copied[:left-start] + _python_string(value) + copied[right-start:]
+        insertion = spans[-1][1]
+        newline = "\r\n" if "\r\n" in text else "\n"
+        candidate = text[:insertion] + "," + newline + "  " + copied + text[insertion:]
+        expected_ids = [record["id"] for record in records] + [item_id]
+        if [record["id"] for record in _item_records(candidate)] != expected_ids:
+            raise ValueError("Creation changed existing item identities; refusing the write")
+        result = _write_items_candidate(candidate, encoding, raw)
+        return {**result, "created": item_id, "recordIndex": len(records)}
+
+
 def save_item_edits(edits: list[dict], expected_sha256: str | None = None) -> dict:
     source = MODULE_SYSTEM / "module_items.py"
     if not source.is_file():
@@ -441,27 +496,7 @@ def save_item_edits(edits: list[dict], expected_sha256: str | None = None) -> di
             raise ValueError("Saving changed the number of item records; refusing the write")
         if [record["id"] for record in candidate_records] != identities:
             raise ValueError("Saving changed item record identities; refusing the write")
-        if any(ord(char) > 127 for char in candidate) and not re.search(
-                r"coding[:=]\s*[-\w.]+", "\n".join(candidate.splitlines()[:2])):
-            candidate = f"# coding: {encoding}\n" + candidate
-        encoded = _validate_module_items_candidate(candidate, encoding)
-        if source.read_bytes() != raw:
-            raise ValueError("module_items.py changed while validating; reload before saving")
-        backup = source.with_name(source.name + ".lexeditor.bak")
-        backup.write_bytes(raw)
-        fd, temporary_name = tempfile.mkstemp(prefix=".items-", dir=source.parent)
-        try:
-            with os.fdopen(fd, "wb") as stream:
-                stream.write(encoded)
-            os.replace(temporary_name, source)
-        finally:
-            if os.path.exists(temporary_name):
-                os.unlink(temporary_name)
-        return {
-            "saved": len(edited_records),
-            "backup": str(backup),
-            "sha256": hashlib.sha256(encoded).hexdigest(),
-        }
+        return {"saved": len(edited_records), **_write_items_candidate(candidate, encoding, raw)}
 
 
 def upgrade_rows() -> list[dict]:
@@ -795,6 +830,9 @@ class Handler(PluginRequestHandler):
                 self.json_response(save_troops(MODULE_SYSTEM, body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/items/save":
                 self.json_response(save_item_edits(body.get("edits", []), body.get("sha256", "")))
+            elif path == "/api/items/create":
+                self.json_response(create_item(body.get("recordIndex"), body.get("originalId"),
+                                               body.get("id"), body.get("name"), body.get("sha256", "")))
             elif path == "/api/module-records/save":
                 self.json_response(save_dataset(MODULE_SYSTEM, body.get("dataset", ""), body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/catalog/file/save":
