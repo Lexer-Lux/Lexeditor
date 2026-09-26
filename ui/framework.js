@@ -2136,6 +2136,7 @@
     const node = element("div", {
       ...(options.attrs || {}),
       class: ["lex-detail-field", "lex-pinnable-property", booleanField ? "lex-boolean-field" : "",
+        input?.tagName === "TEXTAREA" ? "lex-detail-field-stacked" : "",
         options.tone ? `lex-tone-${options.tone}` : "", options.className || ""].filter(Boolean).join(" "),
       "data-lex-type": dataType,
       "data-lex-property": options.property
