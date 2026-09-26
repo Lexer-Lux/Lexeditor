@@ -203,14 +203,13 @@
     const background=row.background;if(!background?.tiles?.length)return fieldNoBackground(row);
     const tileId=Math.max(0,Math.min(background.tileCount-1,Number(state.fieldBackgroundSelection[row.key])||0));
     state.fieldBackgroundSelection[row.key]=tileId;
-    // A new tile number refills the fields in place. Rebuilding the page on
-    // every step dropped the slider under the pointer, so it moved one step
-    // per drag.
+    // Selecting an existing record changes the fields, never its stored ID.
     const fields=LexeditorUI.tileGrid([]);
     const fill=id=>{const tile=background.tiles[id];fields.replaceChildren(...fieldTileDefinitions.filter(([field])=>background.editableFields.includes(field)).map(([field,label,min,max,help])=>fieldBackgroundControl(row,tile,field,label,min,max,help)))};
-    const picker=numberControl(tileId,0,background.tileCount-1,1,value=>{state.fieldBackgroundSelection[row.key]=Number(value);fill(Number(value));refreshFieldOverlay()},{"aria-label":`${row.name} selected background tile`});
+    const picker=selectControl(tileId,background.tiles.map(tile=>({id:tile.id,name:`#${tile.id}`})),value=>{state.fieldBackgroundSelection[row.key]=Number(value);fill(Number(value));refreshFieldOverlay()});
+    picker.setAttribute("aria-label",`${row.name} selected background tile`);
     fill(tileId);
-    return LexeditorUI.stack({fill:false},detailField({label:"Tile",control:picker,help:infoHelp("Select the tile to edit by its number, or click it in the picture while this tab is open. The selected tile has a red outline. This selects an existing tile; it does not add one.")}),fields);
+    return detailPanel({title:"Tile",identity:picker,className:"field-tile-detail",body:fields});
   }
   function fieldWalkmeshVertex(dataset,row,triangleId,vertexId){return fieldMapRow(dataset,row.key)?.walkmesh?.triangles?.[triangleId]?.vertices?.[vertexId]}
   function fieldWalkmeshControl(row,triangle,vertex,field){const vanilla=fieldWalkmeshVertex(state.vanilla,row,triangle.id,vertex.id),references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:fieldWalkmeshVertex(state.referenceData[reference.id],row,triangle.id,vertex.id)?.[field]})).filter(entry=>entry.value!==undefined),minimum=field==="adjacent"?-1:-32768,maximum=field==="adjacent"?row.walkmesh.triangleCount-1:32767,apply=value=>{vertex[field]=Number(value);refreshFieldOverlay()};return sourceControl(numberControl(vertex[field],minimum,maximum,1,apply,{"aria-label":`${row.name} triangle ${triangle.id} vertex ${vertex.id} ${field}`}),()=>vertex[field],vanilla?.[field],references,apply)}
@@ -225,11 +224,12 @@
         help:infoHelp(field==="adjacent"?"Neighbour triangle across this edge. Use -1 for no neighbour.":`${field.toLocaleUpperCase()} coordinate of this corner. Changing it reshapes the walkable triangle.`),
         control:fieldWalkmeshControl(row,triangle,vertex,field)})),{minWidth:220})})));
     const select=value=>{state.fieldWalkmeshSelection[row.key]=Math.max(0,Math.min(mesh.triangleCount-1,Number(value)||0));showVertices(mesh.triangles[state.fieldWalkmeshSelection[row.key]]);refreshFieldOverlay()};
-    const picker=numberControl(triangleId,0,mesh.triangleCount-1,1,select,{"aria-label":`${row.name} selected walkmesh triangle`});
+    const picker=selectControl(triangleId,mesh.triangles.map(triangle=>({id:triangle.id,name:`#${triangle.id}`})),select);
+    picker.setAttribute("aria-label",`${row.name} selected walkmesh triangle`);
     const cameras=row.camera?.cameras||[];
     const camera=cameras.length?detailField({label:"Overlay camera",help:infoHelp("The camera that projects the walkmesh, exits and triggers onto the picture. This is the same choice as on the Camera tab. It changes only the preview."),control:selectControl(fieldOverlayCameraId(row),cameras.map(entry=>({id:entry.id,name:`Camera ${entry.id+1}`})),value=>{state.fieldCameraSelection[row.key]=Number(value);rerenderFields()})}):null;
     showVertices(mesh.triangles[triangleId]);
-    return LexeditorUI.stack({fill:false},camera,detailField({label:"Triangle",help:infoHelp("Select the triangle to edit by its number, or click it in the picture while this tab is open. The selected triangle is orange; the one under the pointer is lit more faintly. This selects an existing triangle; it does not change the triangle count."),control:picker}),vertexPanel);
+    return detailPanel({title:"Triangle",identity:picker,className:"field-triangle-detail",body:[camera,vertexPanel]});
   }
   const fieldDetailTabs=[{id:"background",label:"Background",help:"Choose which background layers and conditional tiles the picture shows. These filters change only the preview, not the game."},{id:"tile",label:"Tile",help:"The background is built from 16 by 16 image tiles. Select a tile by number or click it in the picture, then change its position, texture or draw settings."},{id:"camera",label:"Camera",help:"Edit the fixed camera setups stored in this field's .ca file. Each camera has three axis vectors, a position, and a zoom. The picture's overlay uses the selected camera."},{id:"walkmesh",label:"Walkmesh",help:"The walkmesh is the surface on which characters can move. Select a triangle by number or click it in the picture. Orange marks the selected triangle. Move its corners with X, Y and Z, and set which neighbour each edge leads to. Outside this tab the walkmesh is drawn faintly and shows no selection."},{id:"exits",label:"Exits",help:"Edit the gateway exit lines that leave this field. Crossing an exit line loads the target field and places the player at its destination point. A X, A Y and A Z are the first end of the exit line, B the second end, and TO the point where the player arrives in the target field. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."},{id:"doors",label:"Doors",help:"Enable door triggers and set which field script door line each one opens. A trigger with Used off stores door ID 255 and never fires."},{id:"ranges",label:"Camera Ranges",help:"Camera ranges limit how far the view can scroll across this location. Screen ranges define the field screen bounds. Set the top, bottom, left and right edges for the selected range. Some field formats omit these values; those ranges are read-only. The selected field's .inf header is quoted here as its variant and byte size: the variant decides which ranges the file actually stores, and a range it does not store shows Deling's defaults and cannot be edited."},{id:"movie",label:"Movie Camera",help:"Edit the movie camera frames stored in this field's .msk file. Each frame holds four vertices that steer the camera during scripted sequences."},{id:"misc",label:"Misc.",help:"Edit this field's header values, random encounters, and Triple Triad player parameters. Parts of the location that are not editable are listed too."},{id:"scripts",label:"Field Scripts",help:"Edit the JSM field scripts that control events in this location, one instruction per line. Saving validates the methods and rebuilds branches."},{id:"dialogue",label:"Dialogue",help:"Edit the dialogue lines shown by this field's scripts. Keep each line's number and control codes. Unused fields may hold untranslated test text."},{id:"triggers",label:"Triggers",help:"Edit the trigger lines that start field script door or event actions when crossed. Each trigger fires the door ID set on the Doors tab. A X, A Y and A Z are the first end of the trigger line and B the second end. Double-click a number to change it; each coordinate runs from -32,768 to 32,767. Select a row to light its line in the picture."}];
   function fieldDetailHelp(id){return infoHelp(fieldDetailTabs.find(tab=>tab.id===id).help)}
@@ -381,8 +381,9 @@
     // section's contents, while preserving headers for actual child groups.
     // Asking the framework for the parts keeps the shared class names here.
     const parts=LexeditorUI.sectionParts(body);
-    if(parts.content)body=parts.content;
-    const editor=LexeditorUI.tabbedPanel({tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:LexeditorUI.detailPanel({heading:false,body})});
+    const recordPanel=active==="tile"||active==="walkmesh";
+    if(parts.content&&!recordPanel)body=parts.content;
+    const editor=LexeditorUI.tabbedPanel({tabs,active,label:"Field detail",change:value=>{state.fieldDetailTab=value;rerenderFields()},content:recordPanel?body:LexeditorUI.detailPanel({heading:false,body})});
     // Three columns by default: list, picture, tabs. The Deling-style setting
     // stacks the picture over the tabs instead, as Deling does.
     const deling=state.editorSettings?.delingFieldLayout===true;
