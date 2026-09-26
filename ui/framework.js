@@ -2858,7 +2858,7 @@
       status);
 
     const variableKeys = curveVariableSet;
-    const formulaTokens = [...root.querySelectorAll(".lex-curve-path-formula [class]")];
+    const formulaTokens = [...root.querySelectorAll(".lex-curve-path-formula [class], .lex-curve-math-atom [class]")];
     formulaTokens.forEach(token => {
       const match = [...token.classList].find(name => {
         if (!name.startsWith("lex-curve-variable-")) return false;
