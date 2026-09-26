@@ -7475,7 +7475,10 @@ ${contents.path}`});
         // Their natural size already includes the unwrapped heading.
         if (range) {
           if (/^(?:min-content|max-content|auto)$/.test(range[1].trim())) return track;
-          const candidate = `minmax(max(${width}px, ${range[1]}), ${range[2]})`;
+          // Grid accepts unitless zero, but CSS math requires a length when
+          // comparing against pixels. Otherwise minmax(0,1fr) loses its floor.
+          const minimum = /^[-+]?0(?:\.0+)?$/.test(range[1].trim()) ? "0px" : range[1];
+          const candidate = `minmax(max(${width}px, ${minimum}), ${range[2]})`;
           return CSS.supports('grid-template-columns', candidate) ? candidate : track;
         }
         if (/^[\d.]+(?:px|em|rem|ch|%)$/.test(track)) return `max(${width}px, ${track})`;

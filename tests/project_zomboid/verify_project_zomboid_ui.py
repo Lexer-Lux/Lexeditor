@@ -370,6 +370,10 @@ def main() -> int:
                         assert identity_fit["scroll"] <= identity_fit["client"] + 1, (tab, identity_fit)
                         for header in page.locator(".pz-record-table .lex-column-list-head-cell .lex-column-sort").all():
                             header_fit = header.evaluate("(node) => ({client:node.clientWidth, scroll:node.scrollWidth, text:node.textContent})")
+                            if header_fit["scroll"] > header_fit["client"] + 1:
+                                screenshot(page, args.screenshots, f"failure-{tab}-header")
+                                print(header.evaluate("n=>({html:n.closest('.lex-column-list-head-cell').outerHTML,template:getComputedStyle(n.closest('.lex-column-list-header')).gridTemplateColumns})"))
+                                print(header.evaluate("n=>({base:n.closest('.lex-column-list').lexHeadingTemplate,style:n.closest('.lex-column-list').style.cssText,ancestors:[n,n.parentElement,n.parentElement.parentElement].map(e=>({width:e.clientWidth,font:getComputedStyle(e).font,padding:getComputedStyle(e).padding,gap:getComputedStyle(e).gap}))})"))
                             assert header_fit["scroll"] <= header_fit["client"] + 1, (tab, header_fit)
                         assert_layout(page, f"{tab}-desktop")
                         screenshot(page, args.screenshots, f"{index:02d}-{tab}-desktop")

@@ -258,7 +258,7 @@ class TerrariaBuildMetadataTests(unittest.TestCase):
                 self.assertEqual(
                     observed["command"],
                     [
-                        str(launch_utils / "busybox64.exe"),
+                        str((launch_utils / "busybox64.exe").resolve()),
                         "bash",
                         "./LaunchUtils/ScriptCaller.sh",
                         "-build",
