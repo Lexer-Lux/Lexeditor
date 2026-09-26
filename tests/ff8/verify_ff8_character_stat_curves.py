@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 from plugins.ff8 import paths  # noqa: E402
 from plugins.ff8.plugin import FF8Session  # noqa: E402
 from core.service_session import request_json  # noqa: E402
+from core.plugin_manifest import loading_quotes as plugin_quotes  # noqa: E402
 from plugin_ui import plugin_ui  # noqa: E402
 
 
@@ -36,15 +37,7 @@ def main() -> int:
     # alone made this check look like a page that lost the code.
     editor = plugin_ui("ff8")
     schema = json.loads((ROOT / "plugins" / "ff8" / "schema" / "kernel_section_fields.json").read_text(encoding="utf-8"))
-    # Per-game loading lines live in the plugin that owns them now; the shared
-    # file keeps only the global lines and the sharing map.
-    def plugin_quotes(plugin_id: str) -> list:
-        path = ROOT / "plugins" / plugin_id / "loading_quotes.json"
-        if not path.is_file():
-            return []
-        loaded = json.loads(path.read_text(encoding="utf-8"))
-        return loaded if isinstance(loaded, list) else []
-
+    # Resolve each game's manifest quotes through the same reader as the app.
     shared = json.loads((ROOT / "ui" / "loading_quotes.json").read_text(encoding="utf-8"))
     quotes = {plugin.name: plugin_quotes(plugin.name)
               for plugin in (ROOT / "plugins").iterdir() if plugin.is_dir()}
@@ -80,7 +73,7 @@ def main() -> int:
                   'root.addEventListener("pointermove"', "formulaTokens", "lex-curve-guide",
                   "lex-curve-point-marker", "lex-curve-path-formula", "lex-curve-hover-extrema"):
         require(token in framework, f"the shared curve interaction is missing {token}")
-    require('root.querySelectorAll(".lex-curve-path-formula [class]")' in framework and
+    require('root.querySelectorAll(".lex-curve-path-formula [class], .lex-curve-math-atom [class]")' in framework and
             "variableKeys.has(key)" in framework,
             "only actual formula variable tokens may receive graph-variable identities")
     import re as _re

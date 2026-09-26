@@ -205,7 +205,9 @@ def main() -> int:
 
     editor = plugin_ui('ff8')
     server = (ROOT / "plugins" / "ff8" / "server.py").read_text(encoding="utf-8")
-    assert "ff8-mod-folder-options" in editor
+    assert "settings:(mod.folderConfig||[]).map" in editor
+    assert "value:mod.folderOptions?.[option.id]??option.default" in editor
+    assert "if(change.option)row.folderOptions=" in editor
     assert "folderOptions:Object.fromEntries" in editor
     assert 'body.get("folderOptions", {})' in server
     print("FF8 option folders and fail-closed pre-launch conditions passed")

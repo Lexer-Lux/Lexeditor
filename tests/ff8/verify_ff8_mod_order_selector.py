@@ -71,15 +71,16 @@ def main() -> int:
     editor = plugin_ui('ff8')
     framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
     server = (ROOT / "plugins" / "ff8" / "server.py").read_text(encoding="utf-8")
-    assert "FF8 MOD LOAD ORDER" in editor
-    assert "Claimants, low to high:" in editor
+    assert "LexeditorUI.modLoaderSection(" in editor
+    assert "conflict.claimants?.includes(mod.id)" in editor
     assert "sourcesReplaceProjects:true" in editor
-    assert "manageProjectSources:openModOrder" in editor
+    assert "changeProjectSource,addProjectSource" in editor
+    assert "if(change.move)" in editor
     assert "mod.selected?\"mine\":`mod:${mod.id}`" in editor
-    assert "Load Order…" in framework
+    assert "options.changeProjectSource" in framework
     assert 'path == "/api/mods/configure"' in server
     assert 'path == "/api/mods/import"' in server
-    assert '"Import IROJ…"' in editor
+    assert 'accept:".iroj"' in editor
     assert "junction" not in editor[editor.index("function projectSources"):editor.index("function discardAll")].casefold()
     print("FF8 managed-mod selector, persistence, empty order, and conflicts passed")
     return 0
