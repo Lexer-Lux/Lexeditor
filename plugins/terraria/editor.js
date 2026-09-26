@@ -27,7 +27,7 @@
     return [...rows].sort((left,right)=>{const a=get(left),b=get(right);const result=typeof a==="number"&&typeof b==="number"?a-b:String(a??"").localeCompare(String(b??""),undefined,{numeric:true,sensitivity:"base"});return result*dir});
   }
   function nextSort(state,key){return state.key===key?{key,dir:-state.dir}:{key,dir:1}}
-  function loadingPanel(message="Loading…"){return el("p",{class:"lex-notice",role:"status"},message)}
+  function loadingPanel(message="Loading…"){return LexeditorUI.loadingPanel({label:message})}
 
   function emptyPanel(title,message){return detailPanel({title,body:[el("p",{class:"lex-notice"},message)]})}
   // A game with no mod yet is not a stuck editor. The service says what is

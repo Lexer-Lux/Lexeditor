@@ -30,8 +30,7 @@ function uiButton(label,onclick,{danger=false,disabled=false,title=""}={}){
   return el("button",{type:"button",class:danger?"bannerlord-danger":"",disabled,title,onclick},label);
 }
 function uiLoading(title,message){
-  return BLUI.detailPanel({icon:BLUI.infoIcon(),title,meta:"Loading",
-    body:[BLUI.detailSection({title:"STATUS",body:[BLUI.detailField({label:"State",control:uiText(message)})]})]});
+  return BLUI.loadingPanel({label:`${title}: ${message}`});
 }
 function uiEmpty(title,message,actions=[]){
   return BLUI.detailPanel({icon:BLUI.infoIcon(),title,meta:"Nothing to edit",actions,
