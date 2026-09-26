@@ -415,7 +415,12 @@ def main() -> int:
         assert f'{key}:state.data.settings.{key}' in editor
     assert "FULL LUCK ACCURACY" not in gameplay_view
     assert "SPELL HEALING REWORK" not in gameplay_view
-    assert 'row("FORMULAE REWORK"' not in gameplay_view
+    # This asserted the opposite until the Formulae Rework row landed in the
+    # Gameplay list, which is where its switch has lived ever since: the two
+    # checks contradicted each other, and verify_ff8_formulae_issue_31.py pins
+    # the row's presence and its gate. What matters here is that the row owns
+    # the rework and that no formula became a tweak of its own.
+    assert 'row("FORMULAE REWORK"' in gameplay_view
     assert 'row("FAST START"' in gameplay_view
     assert 'row("MONOGAMY"' in gameplay_view
     assert 'row("UNIVERSAL ITEM"' in gameplay_view

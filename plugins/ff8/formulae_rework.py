@@ -148,6 +148,20 @@ def available() -> bool:
     return all(row["status"] == STATUS_IMPLEMENTED for row in FORMULAE)
 
 
+def blocker() -> str:
+    """Why the owning toggle cannot be selected yet, naming what is missing.
+
+    The toggle is one switch for six changes, so it can only be honest when all
+    six are real. This says which of them are still preview-only, so a reader
+    who cannot turn it on is not left guessing.
+    """
+    missing = ", ".join(row["name"] for row in FORMULAE if row["status"] != STATUS_IMPLEMENTED)
+    done = ", ".join(row["name"] for row in FORMULAE if row["status"] == STATUS_IMPLEMENTED)
+    return (f"Not available yet: {missing} still need a guarded game patch. "
+            f"{done} are implemented and previewed on this page, but a preview does not "
+            "change the game, and one switch for all six cannot be half on.")
+
+
 def bounded_percent(value, label: str) -> float:
     return decimal(value, label, 0, 100)
 

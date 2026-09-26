@@ -101,11 +101,25 @@
     // 0-100 gain that launch writes to that layer's FFNx.toml key.
     const sfxVolume=numberControl(settings.sfxVolume ?? 100,settings.audioVolumeMinimum,settings.audioVolumeMaximum,1,value=>settings.sfxVolume=value,{"aria-label":"SFX volume"});
     const musicVolume=numberControl(settings.musicVolume ?? 100,settings.audioVolumeMinimum,settings.audioVolumeMaximum,1,value=>settings.musicVolume=value,{"aria-label":"Music volume"});
-    const row=(title,description,control)=>{
+    const row=(title,description,control,options={})=>{
       const toggle=control.matches?.('input[type="checkbox"]')?control:control.querySelector?.('input[type="checkbox"]');
       if(toggle&&toggle!==control)toggle.remove();
-      return detailPanel({title,help:description,actions:toggle,
-        body:control===toggle?[]:detailField({label:"",control})});
+      // A tweak that cannot be switched on yet says so where it stands. The
+      // blocker used to be the help text instead of the description, so the row
+      // showed a dead checkbox and the reader never learned what the tweak
+      // would do. Both belong on the page: what it does in the help bubble,
+      // why it is unavailable in the body, with the switch itself.
+      // "Not available yet" is for a feature that is not finished, not for a
+      // switch that is waiting on another switch: a row disabled by its own
+      // dependency says which one it needs in its help, and wears no badge.
+      const blocker=options.blocker||"";
+      const unavailable=Boolean(blocker);
+      const titleNode=unavailable?LexeditorUI.el("span",{},
+        el("span",{},title),LexeditorUI.badge("NOT AVAILABLE YET",{tone:"warning",
+          title:blocker})):title;
+      const body=control===toggle?[]:[detailField({label:"",control})];
+      if(unavailable)body.unshift(LexeditorUI.detailNote(blocker));
+      return detailPanel({title:titleNode,help:description,actions:toggle,body});
     };
     // The number is a percentage of effective EVA, so it carries its unit. A
     // bare number here reads as flat points and the row label alone does not
@@ -113,44 +127,44 @@
     const flyingControl=LexeditorUI.actionRow(flyingEnabled,unitField(flying,"% EVA"));
     const maxSpellControl=LexeditorUI.actionRow(maxSpellEnabled,maxSpellValue);
     const view=el("section",{class:"settings-view"},
-      row("AUTO-SORT INVENTORY","Sorts the inventory before the Item screen opens, then runs the normal Item-screen initialization.",autoSort,"boolean"),
-      row("AUTO-SORT MAGIC MENU","Uses the Attack, Restore, Indirect order for every character when the Magic menu opens.",autoSortMagic,"boolean"),
-      row("BETTER CARD","Removes enemies that cannot become cards from Card targeting and disables Card when no valid target exists.",betterCard,"boolean"),
-      row("BETTER TARGETING","Removes the red Target labels.",betterTargeting,"boolean"),
-      row("COMMAND MENU REWORK","Gives each character the fixed four-slot command layout. Requires Monogamy.",fixedCommandMenu,"boolean"),
-      row("DRAW ONCE PER ENEMY","After any party member successfully Draws from an enemy instance, that enemy cannot be Drawn from again during that battle.",drawOnce,"boolean"),
-      row("DROP CHANCE REWORK",dropChanceDescription(),dropChance,"boolean"),
-      row("DROPS AFTER MUG","A successfully Mugged enemy still rolls its normal death drops. Mugging the same enemy twice remains prohibited; its item-slot distribution follows the current Drop Chance setting.",dropsAfterMug,"boolean"),
-      row("ENHANCED ABILITY MENU","Shows unfinished GF abilities first, orders each group by name, and dims completed abilities.",enhancedAbilityMenu,"boolean"),
-      row("ENHANCED SCAN","Card Game opens Scan target selection without requiring or consuming Scan Magic and without spending the active character's turn.",scannedTargetScan,"boolean"),
-      row("FAST START","Skips the Square Enix logo movie and the opening credits, then uses the game's normal transition into the main menu.",fastStart,"boolean"),
-      row("FF10-STYLE PARTY SWITCH","Look Left opens the reserve-party selector during an active turn. Confirming a replacement spends that turn.",partySwitch,"boolean"),
-      row("FLAT +STAT ABILITIES","Changes +Stat% abilities into fixed-point +Stat abilities and updates their in-game names and descriptions.",flatStatAbilities,"boolean"),
-      row("FORMULAE REWORK","Uses Lexer's reworked battle formulae and unlocks the Formulae subtab. Only healing and physical accuracy have runtime patches today; melee damage, magic damage, status infliction and Mug remain preview-only, so the toggle stays unavailable until every listed formula has a guarded game patch.",formulaeRework,"boolean"),
-      row("FLYING EVA BONUS","Adds the selected effective EVA to intrinsic flying targets against grounded melee attacks. A hit rate of 255 does not bypass it.",flyingControl,"value-toggle"),
-      row("FULL-SCREEN WORLD MAP",settings.worldMapFullscreenAvailable?"R1 opens the full-screen map from the world map; L1 opens the Journal. The base is the game's own world-map textures, always visible. Location names appear once discovered or Journal-revealed, and selecting a location sets a waypoint only. Requires Modern Controls.":settings.worldMapFullscreenBlocker,worldMapFullscreen,"boolean"),
-      row("BATTLE RESULTS ITEM HELP",settings.battleResultsHelpAvailable?"The battle reward screen shows Item, Quantity and Help columns so every received item's help text is visible at once, using current item text including mod edits.":settings.battleResultsHelpBlocker,battleResultsHelp,"boolean"),
-      row("GF HP CASTING","Battle Magic spends the spell’s GF HP cost instead of spell stock. Set costs in Magic → Attack Data. Requires Monogamy and No Magic Consumption. A character without a GF or enough GF HP cannot cast.",gfHpCasting,"boolean"),
-      row("GF ACQUISITION REWORK",settings.gfAcquisitionReworkAvailable?"Awards drawable GFs automatically on winning their vanilla boss fight instead of through Draw, with missed GFs recovered at their Disc 4 boss. Ordinary spell Draw is unaffected, and disabling keeps acquired GFs.":settings.gfAcquisitionReworkBlocker,gfAcquisitionRework,"boolean"),
-      row('GF "MP" BARS',"Shows a blue bar above each party name for the junctioned GF's HP, which is spent like MP, including damage it takes while being summoned. Requires Monogamy. With more than one GF junctioned the bar is hidden and the FFNx log says why.",gfHpBars,"boolean"),
-      row("HP BARS","Shows thin red HP bars below the active party's HP numbers in the main menu and in battle. The lost part is black.",hpBars,"boolean"),
-      row("BETTER HP COLORS","Smoothly blends living HP numbers from white at full HP through yellow at 50% and orange at 25% toward red near zero. KO keeps FF8's vanilla display. Applies in battle and the verified shared character menu panels where FF8 already recolours HP.",betterHpColors,"boolean"),
-      row("IN-GAME TIME","Shows your computer's local clock where the main menu shows play time. It does not replace FF8's saved play-time counter: that keeps counting, and timed events still measure against it.",inGameTime,"boolean"),
-      row("INTERACTION INDICATORS","Shows a fixed HUD cue when the field interaction selector has a target. Card-capable Talk scripts add a distinct CARD cue. It never presses a button or starts the interaction for you.",interactionIndicators,"boolean"),
-      row("MAX SPELL","Sets the maximum stock for each spell. A full stack keeps the same junction effect as 100 spells in vanilla.",maxSpellControl,"value-toggle"),
-      row("MODERN CONTROLS",settings.modernControlsBlocker||el("div",{},el("p",{},"Modern bindings for battle and the world map. The number is the camera turn rate as a multiple of the shipped speed, from 0.2 to 4."),el("ul",{class:"tweak-bindings"},el("li",{},"Right stick: turns the battle camera while it is idle, and rotates the world map camera. Up tilts the view up. The camera stops level with what it looks at."),el("li",{},"RT / R2 / left mouse button: fire. The gunblade trigger, and Irvine's shots."),el("li",{},"LT / L2 / right mouse button: hold to flee."),el("li",{},"B / Circle / Backspace: end Irvine's Shot early."),el("li",{},"RT and LT on the world map: accelerate and reverse vehicles."))),modernControlsControl,"value-toggle"),
-      row("MONOGAMY","Allows one GF on each character. Warning: when gameplay starts, any character who already has several GFs junctioned will have all of those GFs unequipped.",singleGf,"boolean"),
-      row("GF SPELLBOOKS","Uses the ordered spell pages configured under GFs → Spellbook. Requires Monogamy on and Shared Party Magic Inventory off. Turning this off preserves your pages.",gfSpellbooks,"boolean"),
+      row("AUTO-SORT INVENTORY","Sorts the inventory before the Item screen opens, then runs the normal Item-screen initialization.",autoSort),
+      row("AUTO-SORT MAGIC MENU","Uses the Attack, Restore, Indirect order for every character when the Magic menu opens.",autoSortMagic),
+      row("BETTER CARD","Removes enemies that cannot become cards from Card targeting and disables Card when no valid target exists.",betterCard),
+      row("BETTER TARGETING","Removes the red Target labels.",betterTargeting),
+      row("COMMAND MENU REWORK","Gives each character the fixed four-slot command layout. Requires Monogamy.",fixedCommandMenu),
+      row("DRAW ONCE PER ENEMY","After any party member successfully Draws from an enemy instance, that enemy cannot be Drawn from again during that battle.",drawOnce),
+      row("DROP CHANCE REWORK",dropChanceDescription(),dropChance),
+      row("DROPS AFTER MUG","A successfully Mugged enemy still rolls its normal death drops. Mugging the same enemy twice remains prohibited; its item-slot distribution follows the current Drop Chance setting.",dropsAfterMug),
+      row("ENHANCED ABILITY MENU","Shows unfinished GF abilities first, orders each group by name, and dims completed abilities.",enhancedAbilityMenu),
+      row("ENHANCED SCAN","Card Game opens Scan target selection without requiring or consuming Scan Magic and without spending the active character's turn.",scannedTargetScan),
+      row("FAST START","Skips the Square Enix logo movie and the opening credits, then uses the game's normal transition into the main menu.",fastStart),
+      row("FF10-STYLE PARTY SWITCH","Look Left opens the reserve-party selector during an active turn. Confirming a replacement spends that turn.",partySwitch),
+      row("FLAT +STAT ABILITIES","Changes +Stat% abilities into fixed-point +Stat abilities and updates their in-game names and descriptions.",flatStatAbilities),
+      row("FORMULAE REWORK","Uses Lexer's reworked battle formulae and opens the Formulae subtab, which previews each formula against a weapon you choose.",formulaeRework,{blocker:settings.formulaeReworkBlocker}),
+      row("FLYING EVA BONUS","Adds the selected effective EVA to intrinsic flying targets against grounded melee attacks. A hit rate of 255 does not bypass it.",flyingControl),
+      row("FULL-SCREEN WORLD MAP","R1 opens the full-screen map from the world map; L1 opens the Journal. The base is the game's own world-map textures, always visible. Location names appear once discovered or Journal-revealed, and selecting a location sets a waypoint only. Requires Modern Controls.",worldMapFullscreen,{blocker:settings.worldMapFullscreenBlocker}),
+      row("BATTLE RESULTS ITEM HELP","The battle reward screen shows Item, Quantity and Help columns so every received item's help text is visible at once, using current item text including mod edits.",battleResultsHelp,{blocker:settings.battleResultsHelpBlocker}),
+      row("GF HP CASTING","Battle Magic spends the spell’s GF HP cost instead of spell stock. Set costs in Magic → Attack Data. Requires Monogamy and No Magic Consumption. A character without a GF or enough GF HP cannot cast.",gfHpCasting),
+      row("GF ACQUISITION REWORK","Awards drawable GFs automatically on winning their vanilla boss fight instead of through Draw, with missed GFs recovered at their Disc 4 boss. Ordinary spell Draw is unaffected, and disabling keeps acquired GFs.",gfAcquisitionRework,{blocker:settings.gfAcquisitionReworkBlocker}),
+      row('GF "MP" BARS',"Shows a blue bar above each party name for the junctioned GF's HP, which is spent like MP, including damage it takes while being summoned. Requires Monogamy. With more than one GF junctioned the bar is hidden and the FFNx log says why.",gfHpBars),
+      row("HP BARS","Shows thin red HP bars below the active party's HP numbers in the main menu and in battle. The lost part is black.",hpBars),
+      row("BETTER HP COLORS","Smoothly blends living HP numbers from white at full HP through yellow at 50% and orange at 25% toward red near zero. KO keeps FF8's vanilla display. Applies in battle and the verified shared character menu panels where FF8 already recolours HP.",betterHpColors),
+      row("IN-GAME TIME","Shows your computer's local clock where the main menu shows play time. It does not replace FF8's saved play-time counter: that keeps counting, and timed events still measure against it.",inGameTime),
+      row("INTERACTION INDICATORS","Shows a fixed HUD cue when the field interaction selector has a target. Card-capable Talk scripts add a distinct CARD cue. It never presses a button or starts the interaction for you.",interactionIndicators),
+      row("MAX SPELL","Sets the maximum stock for each spell. A full stack keeps the same junction effect as 100 spells in vanilla.",maxSpellControl),
+      row("MODERN CONTROLS",el("div",{},el("p",{},"Modern bindings for battle and the world map. The number is the camera turn rate as a multiple of the shipped speed, from 0.2 to 4."),el("ul",{class:"tweak-bindings"},el("li",{},"Right stick: turns the battle camera while it is idle, and rotates the world map camera. Up tilts the view up. The camera stops level with what it looks at."),el("li",{},"RT / R2 / left mouse button: fire. The gunblade trigger, and Irvine's shots."),el("li",{},"LT / L2 / right mouse button: hold to flee."),el("li",{},"B / Circle / Backspace: end Irvine's Shot early."),el("li",{},"RT and LT on the world map: accelerate and reverse vehicles."))),modernControlsControl,{blocker:settings.modernControlsBlocker}),
+      row("MONOGAMY","Allows one GF on each character. Warning: when gameplay starts, any character who already has several GFs junctioned will have all of those GFs unequipped.",singleGf),
+      row("GF SPELLBOOKS","Uses the ordered spell pages configured under GFs → Spellbook. Requires Monogamy on and Shared Party Magic Inventory off. Turning this off preserves your pages.",gfSpellbooks),
       row("MUSIC VOLUME","Sets the music gain this mod requests from FFNx, from 0 (silent) to 100 (full). Sound effects are untouched. The gain is written to FFNx.toml when the game launches; 100 matches the game's normal level.",unitField(musicVolume,"%")),
-      row("NO MAGIC CONSUMPTION","Casting spells in battle or from the field Magic menu keeps their stock. Items, discarding and other inventory operations are unchanged; works with Shared Magic and Max Spell.",noMagicConsumption,"boolean"),
-      row("REMOVE DAMAGE LIMIT","Uses FF8's existing 60,000-damage path instead of the normal 9,999 cap.",damageLimitRemoval,"boolean"),
+      row("NO MAGIC CONSUMPTION","Casting spells in battle or from the field Magic menu keeps their stock. Items, discarding and other inventory operations are unchanged; works with Shared Magic and Max Spell.",noMagicConsumption),
+      row("REMOVE DAMAGE LIMIT","Uses FF8's existing 60,000-damage path instead of the normal 9,999 cap.",damageLimitRemoval),
       row("SFX VOLUME","Sets the sound-effects gain this mod requests from FFNx, from 0 (silent) to 100 (full). Music is untouched. The gain is written to FFNx.toml when the game launches; 100 matches the game's normal level.",unitField(sfxVolume,"%")),
-      row("SHARED PARTY MAGIC INVENTORY","Uses one lossless 32-slot Magic pool for the party. Works with Party Switch and the selected Max Spell cap. If existing stocks cannot merge without loss, the game keeps them unchanged and disables sharing for that launch; details are written to FFNx.shared-magic.log.",sharedMagic,"boolean"),
-      row("STREAMLINED DRAW","Skips the spell list when only one spell is available and submits the native Stock action directly.",streamlinedDraw,"boolean"),
-      row("TRUE ATB WAIT","Works only when the game is set to ATB Wait mode. Stops all party and enemy ATB filling while any party member is ready to act. Active mode keeps its normal behavior.",trueAtbWait,"boolean"),
-      row("UNIVERSAL ITEM","Look Right opens the normal battle Item menu without using an equipped command slot. The shortcut follows the configured input mapping.",universalItem,"boolean"),
-      row("VIBRATION RATIONALIZATION","Start uses the normal field and battle pause behavior instead of FFNx's separate vibration screen.",vibrationConsolidation,"boolean"),
-      row("XP BARS","Shows thin yellow XP bars below character and GF level rows, including the active and reserve party in the main menu, and on the post-battle report.",xpBars,"boolean"));
+      row("SHARED PARTY MAGIC INVENTORY","Uses one lossless 32-slot Magic pool for the party. Works with Party Switch and the selected Max Spell cap. If existing stocks cannot merge without loss, the game keeps them unchanged and disables sharing for that launch; details are written to FFNx.shared-magic.log.",sharedMagic),
+      row("STREAMLINED DRAW","Skips the spell list when only one spell is available and submits the native Stock action directly.",streamlinedDraw),
+      row("TRUE ATB WAIT","Works only when the game is set to ATB Wait mode. Stops all party and enemy ATB filling while any party member is ready to act. Active mode keeps its normal behavior.",trueAtbWait),
+      row("UNIVERSAL ITEM","Look Right opens the normal battle Item menu without using an equipped command slot. The shortcut follows the configured input mapping.",universalItem),
+      row("VIBRATION RATIONALIZATION","Start uses the normal field and battle pause behavior instead of FFNx's separate vibration screen.",vibrationConsolidation),
+      row("XP BARS","Shows thin yellow XP bars below character and GF level rows, including the active and reserve party in the main menu, and on the post-battle report.",xpBars));
     const settingsView=LexeditorUI.settingsColumns([...view.children],tweakTabProps());
     $("#main").replaceChildren(settingsView);
     bindSettingDependencies(settingsView,[{
@@ -192,14 +206,16 @@
           {key:"normal",label:"Normal",render:entry=>change(vanilla.normal[entry.slot-1],rework.normal[entry.slot-1])},
           {key:"rare",label:"Rare Item",render:entry=>change(vanilla.rare[entry.slot-1],rework.rare[entry.slot-1])}]}));
   }
-  const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"formulae",label:"Formulae",help:"Enable Formulae Rework on Gameplay to open this page. The rework is currently unavailable: melee damage, magic damage, status infliction and Mug still need runtime patches. A preview alone does not change the game."},{id:"platform",label:"FFNx"},{id:"reshade",label:"ReShade"}];
-  const tweakTabProps=()=>({tabs:TWEAK_TABS.map(tab=>tab.id==="formulae"?{...tab,disabled:!state.data.settings.formulaeRework}:tab),activeTab:state.settingsTab,
+  const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"formulae",label:"Formulae",help:"What each of Lexer's reworked battle formulae does, previewed against a weapon you choose. The switch that turns them on lives on Gameplay, and it says there why it cannot be turned on yet."},{id:"platform",label:"FFNx"},{id:"reshade",label:"ReShade"}];
+  // The subtab stays visible and openable even while its owning switch cannot
+  // be turned on - the same treatment GFs -> Spellbook uses. A tab that goes
+  // dead reads as a broken page; a tab that opens onto the reason reads as a
+  // feature that is not finished yet.
+  const tweakTabProps=()=>({tabs:TWEAK_TABS,activeTab:state.settingsTab,
     tabsLabel:"Tweak settings",
     changeTab:value=>{state.settingsTab=value;renderSettings()}});
   function renderSettings(){
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
-    // The Formulae subtab unlocks only while its owning tweak is enabled; without it, fall back to the Gameplay list that owns the toggle.
-    if(state.settingsTab==="formulae"&&!state.data.settings.formulaeRework)state.settingsTab="gameplay";
     if(state.settingsTab==="platform")renderPlatformSettings();else if(state.settingsTab==="formulae")renderFormulae();else if(state.settingsTab==="reshade")renderReshade();else renderGameplaySettings();
   }
 
@@ -252,7 +268,10 @@
         formula.blocker?LexeditorUI.detailNote(`INCOMPLETE: ${formula.blocker}`):null].filter(Boolean)});
     const implementedCount=formulaRows.filter(formula=>formula.status==="implemented").length;
     const master=section("FORMULAE REWORK",[
-      LexeditorUI.detailNote("The Formulae Rework tweak in the Gameplay list owns this page. It stays unavailable until every listed formula has a guarded game patch."),
+      // The blocker comes from the module that owns the switch, so this page
+      // cannot disagree with the row that cannot turn it on.
+      LexeditorUI.detailNote(settings.formulaeReworkBlocker
+        || "Formulae Rework is on: every listed formula has a guarded game patch, so what the previews below show is what the game runs."),
       LexeditorUI.detailNote(`${implementedCount}/${formulaRows.length} requested runtime formulae are implemented.`)])
     const view=LexeditorUI.stack({fill:false},master,LexeditorUI.tileGrid([damage,accuracy,...formulaRows.map(reworkCard)],{minWidth:450}));
     view.addEventListener("input",()=>requestAnimationFrame(updateOutputs));updateOutputs();

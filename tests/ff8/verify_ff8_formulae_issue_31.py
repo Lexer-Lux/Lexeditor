@@ -22,8 +22,13 @@ def main() -> int:
     assert '{id:"formulae",label:"Formulae"' in boot
     assert "function renderFormulae()" in boot
 
-    # The subtab unlocks only while its owning tweak is enabled.
-    assert "disabled:!state.data.settings.formulaeRework" in boot
+    # The subtab stays visible and openable while its owning switch cannot be
+    # turned on: the page says what is missing, the way GFs -> Spellbook does.
+    # A greyed-out tab that falls back to another page reads as a broken screen,
+    # and the reader never learns why the formulae cannot be turned on.
+    assert "disabled:!state.data.settings.formulaeRework" not in boot
+    assert 'state.settingsTab==="formulae"&&!state.data.settings.formulaeRework' not in boot
+    assert "settings.formulaeReworkBlocker" in boot
     assert 'state.settingsTab="formulae";tab="settings"' in boot
     assert "subtabBar({tabs:tweaks.tabs" in boot
 

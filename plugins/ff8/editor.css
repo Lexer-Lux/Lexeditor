@@ -168,3 +168,12 @@
 
 /* The world map fills its panel: no band, no heading, just the map. */
 .ff8-world-map-panel {--lex-panel-body-gap:0;}
+
+/* A Tweaks row whose feature is not finished yet carries a badge beside its
+   name. Without a gap the panel title and the badge read as one word. */
+.settings-view .lex-detail-panel-title > span:has(> .lex-badge) {
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
