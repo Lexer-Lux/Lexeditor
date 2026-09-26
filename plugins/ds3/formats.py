@@ -380,6 +380,58 @@ class ParamView:
             raise DS3FormatError(f"Expected one row ID {row_id}; found {len(matches)}")
         return matches[0]
 
+    def copy_row(self, source_id: int, new_id: int, name: str, row_size: int) -> bytes:
+        """Extend the directory and data region, preserving existing payloads."""
+        if type(new_id) is not int or not -(2**31) <= new_id < 2**31:
+            raise DS3FormatError("A PARAM row ID must be a signed 32-bit integer")
+        if any(row.row_id == new_id for row in self.rows):
+            raise DS3FormatError("That PARAM row ID already exists")
+        if self.row_count == 65535:
+            raise DS3FormatError("PARAM already has the maximum number of rows")
+        if not isinstance(name, str) or '\0' in name or len(name) > 1024:
+            raise DS3FormatError("Invalid PARAM row name")
+        source = self.row(source_id)
+        extended = bool(self.format2d & 4 or self.format2d & 3 == 3)
+        header_end = 64 if extended else 48
+        stride = 24 if self.long_offsets else 12
+        directory_end = header_end + self.row_count * stride
+        strings = self.strings_offset
+        if row_size <= 0 or not directory_end <= strings <= len(self.data):
+            raise DS3FormatError("PARAM data/string boundaries are inconsistent")
+        if any(not directory_end <= row.data_offset or row.data_offset + row_size > strings for row in self.rows):
+            raise DS3FormatError("PARAM row overlaps its directory or strings")
+        encoding = ('utf-16-be' if self.big_endian else 'utf-16-le') if self.format2e & 1 else 'shift_jis'
+        try:
+            encoded_name = name.encode(encoding) + (b'\0\0' if self.format2e & 1 else b'\0')
+        except UnicodeEncodeError as error:
+            raise DS3FormatError("Row name cannot be represented in this PARAM encoding") from error
+        payload = self.data[source.data_offset:source.data_offset + row_size]
+        result = bytearray(self.data[:directory_end] + bytes(stride)
+                           + self.data[directory_end:strings] + payload + self.data[strings:])
+        name_offset = len(result)
+        result.extend(encoded_name)
+        def relocated(offset):
+            return offset + (stride if offset >= directory_end else 0) + (row_size if offset >= strings else 0)
+        struct.pack_into(self.endian + 'H', result, 10, self.row_count + 1)
+        struct.pack_into(self.endian + 'I', result, 0, strings + stride + row_size)
+        data_code, data_position = ('q', 48) if self.long_offsets else ('I', 48) if extended else ('H', 4)
+        data_start = self._unpack(data_code, data_position)
+        struct.pack_into(self.endian + data_code, result, data_position, relocated(data_start))
+        if self.format2d & 0x80:
+            struct.pack_into(self.endian + 'q', result, 16, relocated(self._unpack('q', 16)))
+        code = 'q' if self.long_offsets else 'I'
+        for index in range(self.row_count):
+            pos = header_end + index * stride + (8 if self.long_offsets else 4)
+            for offset_position in (pos, pos + (8 if self.long_offsets else 4)):
+                offset = self._unpack(code, offset_position)
+                if offset:
+                    struct.pack_into(self.endian + code, result, offset_position, relocated(offset))
+        struct.pack_into(self.endian + 'i', result, directory_end, new_id)
+        pos = directory_end + (8 if self.long_offsets else 4)
+        struct.pack_into(self.endian + code, result, pos, strings + stride)
+        struct.pack_into(self.endian + code, result, pos + (8 if self.long_offsets else 4), name_offset)
+        return bytes(result)
+
 
 _TYPE_SIZE = {"s8":1,"u8":1,"dummy8":1,"s16":2,"u16":2,"s32":4,"u32":4,"b32":4,"f32":4,"angle32":4,"f64":8}
 _INT_LIMITS = {
