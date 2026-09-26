@@ -9193,7 +9193,8 @@ ${contents.path}`});
     // the player's input.
     const openDialog = () => {
       const dialogs = [...document.querySelectorAll(
-        ".lex-dialog, .lex-modal, .lex-global-settings, [role='dialog']")].filter(shown);
+        ".lex-dialog, .lex-modal, .lex-global-settings, .modal-backdrop, [role='dialog']")]
+        .filter(shown);
       return dialogs.length ? dialogs[dialogs.length - 1] : null;
     };
 
@@ -9325,9 +9326,15 @@ ${contents.path}`});
 
     // Anything that owns the screen on its own: a dialog, a menu, a rename
     // editor, the shortcut legend. While one is open, B means "close this".
-    const POPUPS = ".lex-dialog,.lex-modal,.lex-global-settings,[role='dialog'],"
+    const POPUPS = ".lex-dialog,.lex-modal,.lex-global-settings,.modal-backdrop,[role='dialog'],"
       + ".lex-label-rename,.lex-shortcut-panel,.lex-project-menu,.lex-github-workspace,"
       + ".lex-map-magnifier-backdrop";
+    // A dialog a page built by hand may not answer Escape at all - Home's own
+    // modal only offers a button. These are the labels that mean "leave without
+    // changing anything", and only they are ever clicked for the player.
+    const DISMISS = /^(close|cancel|back|dismiss|not now|later|no)$/i;
+    const dismissButton = root => [...root.querySelectorAll("button")]
+      .find(node => !node.disabled && DISMISS.test(String(node.textContent).trim()));
 
     const escape = dialog => {
       const active = document.activeElement;
@@ -9345,7 +9352,11 @@ ${contents.path}`});
 
     const cancel = () => {
       const dialog = openDialog();
-      if (dialog) { escape(dialog); return true; }
+      if (dialog) {
+        escape(dialog);
+        if (dialog.isConnected && shown(dialog)) dismissButton(dialog)?.click();
+        return true;
+      }
       const popup = [...document.querySelectorAll(POPUPS)].find(shown);
       if (popup) { escape(null); return true; }
       // Nothing to close. A field being edited is left first, so B never

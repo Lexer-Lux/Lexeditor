@@ -6,7 +6,11 @@ shared UI so every plugin gets it, and these checks drive it through its test
 seam - a pad source and a single tick - so the behaviour is proven without a
 pad, a Deck or a physical frame.
 """
+import functools
+import json
 from pathlib import Path
+import threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 from playwright.sync_api import sync_playwright
 
@@ -338,3 +342,182 @@ def test_the_pad_changes_values_pages_and_tabs():
             assert _focused(page) != "first-action", _focused(page)
         finally:
             browser.close()
+
+
+def _shell_page(browser):
+    """The real shared shell, mounted the way a plugin mounts it."""
+    page = browser.new_page(viewport={"width": 1280, "height": 820})
+    page.route("http://fixture/**", lambda route: route.fulfill(
+        body='<div id="shell"></div><main id="main"></main>', content_type="text/html"))
+    page.add_init_script("window.__osk = 0;"
+                         "navigator.virtualKeyboard = {show(){ window.__osk += 1; }};")
+    page.goto("http://fixture/")
+    page.add_style_tag(path=str(ROOT / "ui/framework.css"))
+    page.add_script_tag(path=str(ROOT / "ui/framework.js"))
+    page.evaluate("""()=>{
+      window.__pad = {index:0, id:'fixture pad', connected:true, mapping:'standard',
+        axes:[0,0,0,0],
+        buttons:Array.from({length:17},()=>({pressed:false,value:0}))};
+      window.__press = (index,down=true)=>{window.__pad.buttons[index].pressed=down;
+        window.__pad.buttons[index].value=down?1:0;};
+      const pad=LexeditorUI.gamepadNavigation;
+      pad.setPadSource(()=>[window.__pad]);
+      pad.uninstall();
+      let shell;
+      window.__active='one';
+      shell=LexeditorUI.mountShell({
+        host:'#shell', plugin:{id:'fixture',name:'Fixture'},
+        tabs:[{id:'one',label:'One'},{id:'two',label:'Two'}],
+        activeTab:()=>window.__active,
+        navigate:id=>{window.__navigated=id;window.__active=id;shell.refresh();},
+        dirtyCount:()=>0, save:async()=>{},
+      });
+      const field=document.createElement('input');
+      field.type='text'; field.value='Original'; field.id='shell-field';
+      field.setAttribute('aria-label','Field');
+      document.querySelector('#main').append(field);
+    }""")
+    return page
+
+
+def test_the_real_shell_takes_the_bumpers_and_the_pad_focus_ring():
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = _shell_page(browser)
+            # The bumpers are the shell's own tabs.
+            page.evaluate("()=>window.__press(5)")
+            _tick(page, 0)
+            assert page.evaluate("()=>window.__navigated") == "two"
+            assert page.evaluate(
+                "()=>document.querySelector('nav button.active')?.dataset.tab") == "two"
+            page.evaluate("()=>window.__press(5,false)")
+            _tick(page, 100)
+
+            # A direction puts the pad's ring on a real shell control.
+            page.evaluate("()=>window.__press(13)")
+            _tick(page, 200)
+            marked = page.evaluate("""()=>{
+              const node=document.querySelector('.lex-pad-focus');
+              return node?{tab:node.dataset.tab||'', tag:node.tagName,
+                inShell:!!node.closest('.lex-shell')
+                  ||!!node.closest('nav')||!!node.closest('#main')}:null;
+            }""")
+            assert marked and (marked["tab"] or marked["inShell"]), marked
+            page.evaluate("()=>window.__press(13,false)")
+            _tick(page, 300)
+
+            # A on a text field is the Deck's text entry, on the real shell.
+            page.evaluate("""()=>{
+              document.getElementById('shell-field').focus();
+              window.__press(0);
+            }""")
+            _tick(page, 400)
+            assert page.evaluate("()=>window.__osk") == 1
+            page.evaluate("()=>window.__press(0,false)")
+            _tick(page, 500)
+            assert page.locator(".lex-pad-focus").count() == 1
+        finally:
+            browser.close()
+
+
+class _Handler(SimpleHTTPRequestHandler):
+    def log_message(self, *_args):
+        pass
+
+
+def test_the_home_screen_walks_its_cards_and_opens_settings():
+    """Home is the first screen a Deck player sees, and it is not a plugin."""
+    base_settings = json.loads((ROOT / "ui/default_settings.json").read_text(encoding="utf-8"))
+    settings = dict(base_settings, developerMode=False, developerAuthorized=False,
+                    viewPreferences={}, defaultValues=dict(base_settings),
+                    loadingTransitionMinimumSeconds=0,
+                    updateCheckChoices=[{"value": "monthly", "label": "Monthly"}])
+    plugins = [
+        {"id": "with-cover", "name": "With Cover", "status": "added", "canOpen": True,
+         "coverArt": {"state": "missing", "uri": "", "error": "none"}},
+        {"id": "no-cover", "name": "No Cover Game", "status": "added", "canOpen": True,
+         "coverArt": {"state": "missing", "uri": "", "error": "none"}},
+    ]
+    server = ThreadingHTTPServer(("127.0.0.1", 0),
+                                 functools.partial(_Handler, directory=str(ROOT)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        base = f"http://127.0.0.1:{server.server_port}"
+        stub = (
+            f"window.pywebview={{api:new Proxy({{lexeditor_settings:async()=>({json.dumps(settings)}),"
+            f"plugins:async()=>({json.dumps(plugins)}),"
+            # Opening a game is the one action Home exists for; recording it
+            # and stopping there keeps the check on this page.
+            "open_plugin:async(id)=>{window.__opened=id;throw new Error('held for the check');},"
+            "loading_quote:async()=>({quote:''}),app_update_status:async()=>({available:false}),"
+            "window_state:async()=>({maximized:false}),game_process_status:async()=>({running:false}),"
+            "theme_sounds:async()=>({rows:[]}),helper_versions:async()=>({helpers:[]}),"
+            "project_info:async()=>({canCreate:false,projects:[]})},"
+            "{get:(t,k)=>t[k]||(async()=>false)})};")
+        with sync_playwright() as play:
+            browser = play.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(viewport={"width": 1600, "height": 900})
+                page.add_init_script(stub)
+                page.goto(base + "/ui/chooser.html")
+                page.evaluate("dispatchEvent(new Event('pywebviewready'))")
+                page.wait_for_selector(".game", timeout=15000)
+                page.evaluate("""()=>{
+                  window.__pad = {index:0, id:'fixture pad', connected:true,
+                    mapping:'standard', axes:[0,0,0,0],
+                    buttons:Array.from({length:17},()=>({pressed:false,value:0}))};
+                  window.__press = (index,down=true)=>{
+                    window.__pad.buttons[index].pressed=down;
+                    window.__pad.buttons[index].value=down?1:0;};
+                  const pad=LexeditorUI.gamepadNavigation;
+                  pad.setPadSource(()=>[window.__pad]);
+                  pad.uninstall();
+                }""")
+                # A direction lands on something the player can act on, and it
+                # is marked where it is.
+                page.evaluate("()=>window.__press(13)")
+                _tick(page, 0)
+                marked = page.evaluate("""()=>{
+                  const node=document.querySelector('.lex-pad-focus');
+                  return node?{tag:node.tagName,cls:String(node.className),
+                    onCard:!!node.closest('.game')}:null;
+                }""")
+                assert marked, "the pad found nothing on Home"
+                page.evaluate("()=>window.__press(13,false)")
+                _tick(page, 100)
+                # A on a game card opens that game, which is what Home is for.
+                page.evaluate("""()=>{
+                  LexeditorUI.gamepadNavigation.setPadFocus(
+                    document.querySelector('.game[data-plugin="with-cover"]'));
+                  window.__press(0);
+                }""")
+                _tick(page, 150)
+                page.wait_for_function("()=>window.__opened==='with-cover'", timeout=5000)
+                page.evaluate("()=>window.__press(0,false)")
+                _tick(page, 180)
+                # The host refused the open, so Home answers with its own
+                # dialog; B is back out of it before anything else is touched.
+                page.evaluate("()=>window.__press(1)")
+                _tick(page, 190)
+                assert page.evaluate(
+                    "()=>document.querySelector('#modal').hidden") is True, \
+                    "B left Home's own dialog open"
+                page.evaluate("()=>window.__press(1,false)")
+                _tick(page, 200)
+                # A on the settings button opens the shared settings panel.
+                page.wait_for_selector("#chooser-settings", timeout=10000)
+                page.evaluate("""()=>{
+                  LexeditorUI.gamepadNavigation.setPadFocus(
+                    document.getElementById('chooser-settings'));
+                  window.__press(0);
+                }""")
+                _tick(page, 300)
+                page.wait_for_selector(".lex-global-settings", state="visible", timeout=10000)
+                page.evaluate("()=>window.__press(0,false)")
+                _tick(page, 300)
+            finally:
+                browser.close()
+    finally:
+        server.shutdown()
+        server.server_close()
