@@ -58,6 +58,21 @@ def test_menu_renders_cards_covers_and_fallbacks(plugins_override=None, loading_
                 assert not errors, errors
                 if plugins_override:
                     return
+                # The home bar is the same chrome as an editor's: a shared
+                # border below it, not a bright accent stripe. Lexer: "the main
+                # menu still has a fuckton of weird custom styling. like the
+                # green bar below the menu bar."
+                bar = page.evaluate("""()=>{const header=document.querySelector('header'),
+                  cs=getComputedStyle(header), theme=getComputedStyle(document.body),
+                  resolve=value=>{const probe=document.createElement('div');
+                    probe.style.color=value; document.body.append(probe);
+                    const colour=getComputedStyle(probe).color; probe.remove(); return colour;};
+                  return {width:cs.borderBottomWidth, colour:cs.borderBottomColor,
+                    border:resolve(theme.getPropertyValue('--lex-border')),
+                    accent:resolve(theme.getPropertyValue('--lex-accent'))};}""")
+                assert bar['width'] == '1px', bar
+                assert bar['colour'] == bar['border'], bar
+                assert bar['colour'] != bar['accent'], bar
                 assert page.locator('.game').count() == 2
                 assert page.locator('#modal').is_hidden()
                 # The ready cover paints real pixels.

@@ -35,7 +35,10 @@
        in a strip down the right edge of every editor screen. The menu keeps
        its position and only stops scrolling. */
     html.lex-editor-open { --lex-page-overflow:hidden; }
-    header { position:relative; z-index:60; display:flex; width:100%; height:var(--lex-chooser-menu-height); min-height:0; box-sizing:border-box; align-items:flex-start; justify-content:space-between; gap:24px; overflow:hidden; padding:clamp(5px,1.15vh,11px) 16px clamp(5px,1.15vh,11px) 26px; border-bottom:2px solid var(--lex-accent); background:var(--lex-panel); }
+    /* The home bar is the same chrome as an editor's: a shared border below it,
+       not a bright accent stripe. Lexer: "the main menu still has a fuckton of
+       weird custom styling. like the green bar below the menu bar." */
+    header { position:relative; z-index:60; display:flex; width:100%; height:var(--lex-chooser-menu-height); min-height:0; box-sizing:border-box; align-items:flex-start; justify-content:space-between; gap:24px; overflow:hidden; padding:clamp(5px,1.15vh,11px) 16px clamp(5px,1.15vh,11px) 26px; border-bottom:1px solid var(--lex-border); background:var(--lex-panel); }
     .chooser-title { flex:1; user-select:none; -webkit-user-select:none; }
     .chooser-title h1 { user-select:none; -webkit-user-select:none; }
     .chooser-window-controls { position:relative; z-index:80; display:flex; align-self:flex-start; align-items:center; gap:8px; }
