@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
-import mimetypes
 import os
 from pathlib import Path
 from urllib.parse import urlparse
@@ -147,14 +146,8 @@ class Handler(PluginRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers(); self.wfile.write(data)
 
-    def file_response(self, target: Path):
-        data = target.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers(); self.wfile.write(data)
-
+    # A file reply is the shared handler's, inherited: the same headers, and a
+    # dead client ends it quietly instead of raising into the service.
     def do_GET(self):
         path = urlparse(self.path).path
         try:

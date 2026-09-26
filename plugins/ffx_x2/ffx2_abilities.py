@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from core.bounded import whole_number
+
 from .ffx2_table import FFX2TableError, parse_table
 from .treasures import sha256_bytes
 
@@ -55,15 +57,7 @@ def parse_abilities(data: bytes) -> tuple[FFX2AbilityRecord, ...]:
 
 
 def _u16_value(value, label: str) -> int:
-    if isinstance(value, bool):
-        raise FFX2AbilityError(f"{label} must be an integer")
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as error:
-        raise FFX2AbilityError(f"{label} must be an integer") from error
-    if not 0 <= parsed <= 0xFFFF:
-        raise FFX2AbilityError(f"{label} must be between 0 and 65535")
-    return parsed
+    return whole_number(value, label, 0, 0xFFFF, FFX2AbilityError)
 
 
 def apply_edits(data: bytes, edits: list[dict]) -> bytes:

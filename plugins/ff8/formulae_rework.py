@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from core.bounded import decimal
+
 STATUS_IMPLEMENTED = "implemented"
 STATUS_INCOMPLETE = "incomplete"
 
@@ -147,15 +149,7 @@ def available() -> bool:
 
 
 def bounded_percent(value, label: str) -> float:
-    if isinstance(value, bool):
-        raise ValueError(f"{label} must be a number from 0 to 100")
-    try:
-        result = float(value)
-    except (TypeError, ValueError) as error:
-        raise ValueError(f"{label} must be a number from 0 to 100") from error
-    if not 0 <= result <= 100:
-        raise ValueError(f"{label} must be from 0 to 100")
-    return result
+    return decimal(value, label, 0, 100)
 
 
 def bounded_stat(value, label: str) -> int:

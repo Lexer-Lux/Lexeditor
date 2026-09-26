@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import ThreadingHTTPServer
 import json
-import mimetypes
 import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+from core.plugin_http import PluginRequestHandler
 
 from . import paths
 from .deploy_data import sync_project_assets
@@ -82,35 +83,14 @@ def project_summary(requested: str | None = None) -> dict:
     }
 
 
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, _format, *_args):
-        return
-
-    def send_json(self, payload, status=200):
-        data = json.dumps(payload).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
+class Handler(PluginRequestHandler):
+    # A JSON reply, a file reply and a quiet log are the shared handler's. This
+    # service wrote its own copies of all three.
     def read_json(self) -> dict:
         length = int(self.headers.get("Content-Length", "0") or 0)
         if length <= 0:
             return {}
         return json.loads(self.rfile.read(length).decode("utf-8"))
-
-    def send_file(self, target: Path):
-        data = target.read_bytes()
-        self.send_response(200)
-        self.send_header(
-            "Content-Type",
-            mimetypes.guess_type(target.name)[0] or "application/octet-stream",
-        )
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
 
     def send_page_module(self, requested: str):
         """Serve one editor-local JS/CSS module without exposing arbitrary files."""

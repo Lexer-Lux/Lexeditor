@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from core.bounded import whole_number
+
 from .ffx_table import FFXTableError, parse_table
 from .treasures import sha256_bytes
 
@@ -112,15 +114,7 @@ def parse_commands(data: bytes, table: str = "command") -> tuple[FFXCommandRecor
 
 
 def _u16_value(value, label: str) -> int:
-    if isinstance(value, bool):
-        raise FFXCommandError(f"{label} must be an integer")
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as error:
-        raise FFXCommandError(f"{label} must be an integer") from error
-    if not 0 <= parsed <= 0xFFFF:
-        raise FFXCommandError(f"{label} must be between 0 and 65535")
-    return parsed
+    return whole_number(value, label, 0, 0xFFFF, FFXCommandError)
 
 
 def apply_table_edits(data: bytes, edits: list[dict], table: str = "command") -> bytes:

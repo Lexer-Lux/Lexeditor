@@ -5,7 +5,6 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
-import mimetypes
 import os
 import re
 import subprocess
@@ -628,15 +627,7 @@ class Handler(PluginRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def file_response(self, path: Path):
-        data = path.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", mimetypes.guess_type(path.name)[0] or "application/octet-stream")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
+    # A file reply is the shared handler's, inherited.
     def body(self) -> dict:
         length = int(self.headers.get("Content-Length", "0"))
         return json.loads(self.rfile.read(length).decode("utf-8")) if length else {}

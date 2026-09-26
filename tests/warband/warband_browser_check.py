@@ -7,12 +7,12 @@ import io
 import os
 import json
 from pathlib import Path
-import sys as _sys
-_sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
-from plugin_ui import inline_modules
 import sys
 import tempfile
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
+from plugin_ui import inline_modules  # noqa: E402
 
 from PIL import Image
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright

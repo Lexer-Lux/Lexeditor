@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from core.bounded import whole_number
+
 from .ffx_table import FFXTableError, parse_table
 from .treasures import sha256_bytes
 
@@ -53,15 +55,7 @@ def parse_ctb_base(data: bytes) -> tuple[CtbBaseRecord, ...]:
 
 
 def _u8(value, label: str) -> int:
-    if isinstance(value, bool):
-        raise CtbBaseError(f"{label} must be an integer")
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as error:
-        raise CtbBaseError(f"{label} must be an integer") from error
-    if not 0 <= parsed <= 0xFF:
-        raise CtbBaseError(f"{label} must be between 0 and 255")
-    return parsed
+    return whole_number(value, label, 0, 0xFF, CtbBaseError)
 
 
 def apply_edits(data: bytes, edits: list[dict]) -> bytes:
