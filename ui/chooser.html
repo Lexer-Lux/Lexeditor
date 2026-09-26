@@ -63,8 +63,10 @@
        below the last line, so a flush box cut them off - the shadow simply
        stopped under the letter. Four pixels of padding give the descender its
        room back; the height fitter counts them because they are part of the
-       element's scroll height. */
-    .game-name-text { display:-webkit-box; max-width:100%; overflow:hidden; padding-bottom:4px; -webkit-box-orient:vertical; -webkit-line-clamp:var(--game-name-lines,2); overflow-wrap:anywhere; }
+       element's scroll height. The same clip took the shadow off the right of
+       the last letter in a hard line - Lexer saw the right edge of FF8's and
+       FF9's names cut off on hover - so the sides get the same room. */
+    .game-name-text { display:-webkit-box; box-sizing:border-box; max-width:100%; overflow:hidden; padding:0 4px 4px; -webkit-box-orient:vertical; -webkit-line-clamp:var(--game-name-lines,2); overflow-wrap:anywhere; }
     .game:hover .game-name,.game:focus-visible .game-name,.game:focus-within .game-name { transform:translateY(0); opacity:1; }
     /* A stamp: a ring of opaque ink with a mark in it, pressed on slightly
        crooked. The mark alone says the state, so there is no word to read. */
