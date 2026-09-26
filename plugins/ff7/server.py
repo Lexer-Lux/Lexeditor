@@ -9,6 +9,7 @@ from pathlib import Path
 import threading
 from urllib.parse import urlparse
 
+from . import kernel as base
 from . import paths, deployment, tooling
 from .game_font import ensure_font
 from .extended import FAMILIES, ERRORS as EXTENDED_ERRORS, load_extended, save_extended, resolve_source, model
@@ -39,17 +40,46 @@ _DATA_CACHE: dict = {"key": None, "value": None}
 _DATA_CACHE_LOCK = threading.Lock()
 
 
-def _signature() -> tuple:
-    def stamp(path: Path) -> tuple:
+def _stamp(path) -> tuple:
+    try:
+        info = Path(path).stat()
+    except OSError:
+        return (str(path), None, None)
+    return (str(path), info.st_size, info.st_mtime_ns)
+
+
+def _stamped_sources() -> list[str]:
+    """Every file the cached load reads, resolved the way the loaders resolve it.
+
+    The key used to stamp one hard-coded install layout, so it never saw the
+    files the loader actually read: the second supported layout, and the
+    project copy the loader prefers. A kernel that changed on disk - replaced,
+    truncated, or newly copied into the project - kept serving the data loaded
+    before it, so a broken file still read as editable.
+    """
+    paths = {str(GAME_ROOT / "FFNx.toml")}
+    try:
+        source, relative = base.resolve_kernel(GAME_ROOT)
+        paths.add(str(source))
+        paths.add(str(target_path(GAME_ROOT, PROJECT_ROOT, source, relative)))
+    except READ_ERRORS:
+        pass
+    for family in FAMILIES:
         try:
-            info = path.stat()
-        except OSError:
-            return (str(path), None, None)
-        return (str(path), info.st_size, info.st_mtime_ns)
+            source, relative = resolve_source(GAME_ROOT, family)
+        except (ValueError, OSError):
+            continue
+        paths.add(str(source))
+        try:
+            paths.add(str(target_path(GAME_ROOT, PROJECT_ROOT, source, relative)))
+        except (ValueError, OSError):
+            pass
+    return sorted(paths)
+
+
+def _signature() -> tuple:
     return (str(GAME_ROOT), str(PROJECT_ROOT),
-            stamp(GAME_ROOT / "ff7" / "workingdir" / "data" / "field" / "flevel.lgp"),
-            stamp(GAME_ROOT / "ff7" / "workingdir" / "data" / "lang-en" / "kernel" / "kernel.bin"),
-            stamp(GAME_ROOT / "ff7" / "workingdir" / "data" / "lang-en" / "kernel" / "kernel2.bin"))
+            tuple(_stamp(path) for path in _stamped_sources()))
 
 
 def cached_editor_data() -> dict:
