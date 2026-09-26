@@ -109,6 +109,17 @@ def timeout_for(tool: Path, default: float) -> float:
 # HTTP 400s, empty-corpus assertions, or font timeouts. Keep this list exact so
 # self-contained FF8 source/unit verifiers still run in CI.
 _FF8_BASELINE_TOOLS = frozenset({
+    # These checks intentionally inspect shipped archives/models/sounds or
+    # render their real records. Synthetic archive/card/control checks still
+    # run on CI without a proprietary game installation.
+    "ff8_asset_tabs_browser_check",
+    "ff8_enemy_texture_panel_check",
+    "ff8_field_name_fade_check",
+    "ff8_field_page_check",
+    "ff8_textures_list_check",
+    "verify_ff8_animation_sequences",
+    "verify_ff8_archives",
+    "verify_ff8_field_walkmesh_editor",
     "verify_bottom_command_bar_visual",
     "verify_ff8_cards_visual_91",
     "verify_ff8_data_ui_completion",
