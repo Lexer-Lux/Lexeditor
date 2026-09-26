@@ -325,20 +325,20 @@ body.lex-save-busy .lex-save-icon.saving {
 
 .lex-game-process.running { color:#e24a43; }
 
-.lex-searcher-active .lex-shell-command-row :is(.lex-brand-slot, .lex-shell-left-actions, .lex-shell-center-actions, .lex-shell-right-actions, .lex-developer-actions),
-.lex-searcher-active .lex-nav-frame {
+.lex-searcher-source :is(#main,#toolbar,.lex-shell-left-actions,.lex-shell-center-actions) {
   opacity:.34;
   filter:grayscale(1);
   pointer-events:none;
 }
+.lex-searcher-active .lex-nav-frame { display:none; }
 
 .lex-searcher-bar {
-  position:absolute;
+  position:relative;
   z-index:20;
-  left:0;
-  right:118px;
-  top:0;
-  bottom:0;
+  grid-column:1;
+  grid-row:2;
+  min-height:var(--lex-tab-min-height,40px);
+  min-width:0;
   display:grid;
   grid-template-columns:38px minmax(0,1fr) 38px;
   align-items:center;
@@ -348,7 +348,7 @@ body.lex-save-busy .lex-save-icon.saving {
   background:color-mix(in srgb,var(--lex-panel,#171717) 92%,transparent);
 }
 
-.lex-searcher-context {
+.lex-shell-header .lex-searcher-bar > .lex-searcher-context {
 
   display:grid;
   width:34px;
@@ -361,6 +361,14 @@ body.lex-save-busy .lex-save-icon.saving {
  color:#66aefb; background:#163454;
 }
 .lex-searcher-context svg { width:20px; height:20px; }
+.lex-searcher-return-prompt { color:#66aefb; }
+.lex-shell-header .lex-searcher-bar > .lex-searcher-context.returning { animation:lex-searcher-return-pulse 1.2s ease-in-out infinite; }
+@keyframes lex-searcher-return-pulse {
+  50% { box-shadow:0 0 0 4px #66aefb66,0 0 16px #66aefbaa; background:#235f96; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .lex-searcher-context.returning { animation:none; box-shadow:0 0 0 3px #66aefb; }
+}
 .lex-searcher-cancel {
 
   display:grid;

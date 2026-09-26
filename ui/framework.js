@@ -8170,10 +8170,20 @@ ${contents.path}`});
   };
 
   let activeSearcher = null;
+  const lockSearcherSource = (searcher, locked) => {
+    for (const [node, inert] of searcher.sourceLocks || []) node.inert = inert;
+    searcher.sourceLocks = [];
+    document.body.classList.toggle("lex-searcher-source", locked);
+    if (locked) for (const node of document.querySelectorAll("#main,#toolbar,.lex-shell-left-actions,.lex-shell-center-actions")) {
+      searcher.sourceLocks.push([node, node.inert]);
+      node.inert = true;
+    }
+  };
   const finishSearcher = (navigateOrigin = true) => {
     if (!activeSearcher) return;
     const searcher = activeSearcher;
     activeSearcher = null;
+    lockSearcherSource(searcher, false);
     searcher.header?.classList.remove("lex-searcher-active");
     searcher.bar?.remove();
     if (navigateOrigin) searcher.origin?.();
@@ -8182,8 +8192,7 @@ ${contents.path}`});
   const beginSearcher = options => {
     finishSearcher(false);
     const header = document.querySelector(".lex-shell-header");
-    const command = header?.querySelector(".lex-shell-command-row");
-    if (!header || !command) throw new Error("The shared Searcher needs the Lexeditor shell");
+    if (!header?.querySelector(".lex-nav-frame")) throw new Error("The shared Searcher needs the Lexeditor shell");
     const context = element("button", {type: "button", class: "lex-searcher-context", title: "Show the source record"}, searchIcon());
     const prompt = element("strong", {class: "lex-searcher-prompt"}, options.prompt || "Select a record");
     const cancel = element("button", {type: "button", class: "lex-searcher-cancel", title: "Cancel selection", "aria-label": "Cancel selection"}, "×");
@@ -8199,9 +8208,18 @@ ${contents.path}`});
         searcher.atTarget = false;
         context.replaceChildren(element("span", {class: "lex-searcher-return lex-ui-symbol", "aria-hidden": "true"}, "↩"));
         context.title = "Return to selection results";
-        searcher.origin?.();
+        context.classList.add("returning");
+        prompt.replaceChildren("Click the ", element("span", {class:"lex-searcher-return-prompt"}, "blue return button"),
+          ` to ${options.prompt || "select a record"}`);
+        lockSearcherSource(searcher, true);
+        Promise.resolve(searcher.origin?.()).then(() => {
+          if (activeSearcher === searcher && !searcher.atTarget) lockSearcherSource(searcher, true);
+        });
       } else {
         searcher.atTarget = true;
+        lockSearcherSource(searcher, false);
+        context.classList.remove("returning");
+        prompt.textContent = options.prompt || "Select a record";
         context.replaceChildren(searchIcon());
         context.title = "Show the source record";
         searcher.target?.();
@@ -8209,7 +8227,7 @@ ${contents.path}`});
     };
     cancel.onclick = () => finishSearcher(true);
     header.classList.add("lex-searcher-active");
-    command.append(bar);
+    header.append(bar);
     searcher.target?.();
     window.dispatchEvent(new CustomEvent("lexeditor-searcher-changed", {detail: {active: true, type: searcher.type}}));
     return searcher;
@@ -8224,20 +8242,18 @@ ${contents.path}`});
       clearTimeout(timer); timer = 0; node.classList.remove("selecting");
     };
     node.addEventListener("pointerdown", event => {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || !searcher.atTarget || activeSearcher !== searcher) return;
       event.preventDefault();
       node.setPointerCapture?.(event.pointerId);
       node.classList.add("selecting");
       timer = setTimeout(() => {
         timer = 0;
         node.classList.remove("selecting");
+        if (activeSearcher !== searcher || !searcher.atTarget) return;
         const accept = searcher.accept;
-        activeSearcher = null;
-        searcher.header?.classList.remove("lex-searcher-active");
-        searcher.bar?.remove();
+        finishSearcher(false);
         accept?.(options.value, options.label);
         searcher.origin?.();
-        window.dispatchEvent(new CustomEvent("lexeditor-searcher-changed", {detail: {active: false}}));
       }, searcher.holdMs);
     });
     for (const type of ["pointerup", "pointercancel", "pointerleave"]) node.addEventListener(type, cancel);
