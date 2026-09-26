@@ -156,29 +156,33 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     // several opponents. The scan already read every CARDGAME call, so the
     // deck each opponent names is known without loading a single area here.
     const deckOfCall=new Map();
+    const addDeck=(key,deck)=>{
+      if(!deckOfCall.has(key))deckOfCall.set(key,new Set());
+      deckOfCall.get(key).add(Number(deck));
+    };
     for(const entry of playerAreas.players||[]){
       if(entry.deckMode!=="literal"||entry.deckId===null||entry.deckId===undefined)continue;
-      deckOfCall.set(`${entry.map}:${entry.entity}`,Number(entry.deckId));
+      addDeck(`${entry.map}:${entry.entity}`,entry.deckId);
     }
     // Loaded script values include unsaved edits; the initial scan does not.
     for(const map of state.data.fields.rows){
       if(!map._loaded)continue;
+      for(const entry of groups.values())if(entry.map===map.key)deckOfCall.delete(entry.key);
       for(const player of map.players||[]){
         const param=player.params?.find(value=>value.id===0),key=`${map.key}:${player.entity}`;
-        if(param?.mode==='literal')deckOfCall.set(key,Number(param.value));
-        else deckOfCall.delete(key);
+        if(param?.mode==='literal')addDeck(key,param.value);
       }
     }
     const deckMembers=new Map();
     for(const entry of groups.values()){
-      const deck=deckOfCall.get(entry.key);
-      if(deck===undefined)continue;
-      if(!deckMembers.has(deck))deckMembers.set(deck,[]);
-      deckMembers.get(deck).push(entry.key);
+      for(const deck of deckOfCall.get(entry.key)||[]){
+        if(!deckMembers.has(deck))deckMembers.set(deck,[]);
+        deckMembers.get(deck).push(entry.key);
+      }
     }
     const players=[...groups.values()].map(entry=>({...entry,
       name:known.get(entry.entity.toLowerCase())||entry.entity,
-      deck:deckOfCall.get(entry.key)}));
+      deck:deckOfCall.has(entry.key)?[...deckOfCall.get(entry.key)].sort((a,b)=>a-b).join(', '):undefined}));
     const byKey=new Map(players.map(row=>[row.key,row]));
     const rows=players.filter(row=>`${row.name} ${row.map}`.toLowerCase().includes(query));
     const help=[
@@ -249,8 +253,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         });
         // Which other opponents play the same deck. Editing a deck means
         // editing every script that names it, and no other screen shows that.
-        const deck=deckOfCall.get(entry.key);
-        if(deck!==undefined){
+        for(const deck of deckOfCall.get(entry.key)||[]){
           const others=(deckMembers.get(deck)||[]).filter(key=>key!==entry.key)
             .map(key=>byKey.get(key)).filter(Boolean);
           body.push(detailSection({title:`ALSO USES DECK ${deck}`,

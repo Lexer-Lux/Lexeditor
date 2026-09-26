@@ -48,7 +48,7 @@ def run(browser_path=None,screenshot=None):
             assert page.get_by_label('queen_est Region rule',exact=True).is_disabled()
             for label, value in [('Unknown setting 1', '17'), ('Unknown setting 2', '23')]:
                 protected = page.locator('.lex-detail-field').filter(has=page.get_by_text(label, exact=True))
-                assert value in protected.inner_text()
+                assert protected.locator('input[readonly]').input_value() == value
                 assert protected.locator('input:not([readonly]),select,textarea').count() == 0
             assert page.get_by_label('queen_est Rare card chance',exact=True).locator('..').inner_text()=='%'
             assert page.get_by_label('queen_est card level 1',exact=True).is_checked()
@@ -77,6 +77,16 @@ def run(browser_path=None,screenshot=None):
             page.evaluate("state.activeSource='vanilla';cardsUI.render()")
             assert field.is_disabled()
             assert page.get_by_label('queen_est card level 1',exact=True).is_disabled()
+            # One actor can call CARDGAME from several script branches with
+            # different ownership IDs. Every literal setup contributes links.
+            page.evaluate("""() => {
+              state.data.fields.rows[0].players.push({id:2,entity:'queen_est',params:[
+                {id:0,name:'Deck',value:1,editable:true,mode:'literal'}]});
+              cardsUI.render();
+            }""")
+            assert page.locator('section[aria-label="ALSO USES DECK 7"]').count() == 1
+            assert page.locator('section[aria-label="ALSO USES DECK 1"]').count() == 1
+            assert page.get_by_role('button', name='Open student', exact=True).count() == 1
             assert not errors,errors
             print('PASS current Cards/Players tabs, rank edits, native identifier, editable literal, protected variable and read-only source')
         finally:browser.close()
