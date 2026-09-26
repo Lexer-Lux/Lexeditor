@@ -946,7 +946,85 @@
     return null;
   };
 
+  // A record that is a sound plays from its own heading: the thumbnail slot is
+  // a play/pause button and the line under the heading is the sound's
+  // progress, which can be dragged to scrub. Lexer asked for this on FF8's SFX
+  // and Warband's Sounds. One sound plays at a time across the page.
+  let playingRecordAudio = null;
+  const formatClock = seconds => {
+    const whole = Math.max(0, Math.floor(Number(seconds) || 0));
+    return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+  };
+  const recordAudio = options => {
+    const audio = new Audio();
+    audio.preload = "metadata";
+    audio.src = options.src;
+    const label = options.label || "sound";
+    const glyph = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    glyph.setAttribute("viewBox", "0 0 24 24");
+    glyph.setAttribute("aria-hidden", "true");
+    const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    glyph.append(shape);
+    const button = element("button", {type: "button", class: "lex-audio-play"}, glyph);
+    const scrub = element("input", {type: "range", class: "lex-audio-scrub", min: "0", max: "0", step: "0.01",
+      value: "0", "aria-label": `Position in ${label}`, "data-lex-autofit": "false"});
+    const paint = () => {
+      const playing = !audio.paused && !audio.ended;
+      shape.setAttribute("d", playing ? "M7 5h4v14H7zM13 5h4v14h-4z" : "M8 5v14l11-7z");
+      button.title = `${playing ? "Pause" : "Play"} ${label}`;
+      button.setAttribute("aria-label", button.title);
+      const length = Number.isFinite(audio.duration) ? audio.duration : 0;
+      scrub.max = String(length);
+      if (!scrub.matches(":active")) scrub.value = String(audio.currentTime || 0);
+      scrub.style.setProperty("--lex-audio-progress", `${length ? (audio.currentTime / length) * 100 : 0}%`);
+      scrub.setAttribute("aria-valuetext", `${formatClock(audio.currentTime)} of ${formatClock(length)}`);
+      scrub.title = scrub.getAttribute("aria-valuetext");
+    };
+    const stopIfGone = () => { if (!button.isConnected) audio.pause(); };
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      if (audio.paused || audio.ended) {
+        if (playingRecordAudio && playingRecordAudio !== audio) playingRecordAudio.pause();
+        playingRecordAudio = audio;
+        audio.play().catch(() => showToast(`Could not play ${label}.`, true));
+      } else audio.pause();
+    });
+    scrub.addEventListener("input", () => {
+      audio.currentTime = Number(scrub.value) || 0;
+      paint();
+    });
+    for (const type of ["play", "pause", "ended", "timeupdate", "loadedmetadata", "durationchange"])
+      audio.addEventListener(type, () => { stopIfGone(); paint(); });
+    paint();
+    return {button, scrub, audio};
+  };
+
+  // A panel whose body carries a sound player (FF8's SFX preview row) plays
+  // from its heading instead: the player's source moves up, and the row that
+  // held it goes, with its section when that was all the section held.
+  const adoptBodyAudio = options => {
+    if (options.audio || options.icon) return options;
+    const body = [options.body].flat();
+    for (const node of body) {
+      if (!(node instanceof Element)) continue;
+      const player = node.matches("audio[src]") ? node : node.querySelector("audio[src]");
+      if (!player) continue;
+      const row = player.closest(".lex-detail-field") || player;
+      const section = row.closest(".lex-detail-section");
+      row.remove();
+      const emptied = section && !section.querySelector(":scope > .lex-detail-section-content > *") ? section : null;
+      emptied?.remove();
+      const label = (player.getAttribute("aria-label") || "").replace(/^Play\s+/i, "") || undefined;
+      return {...options, audio: {src: player.getAttribute("src"), label},
+        body: body.filter(item => item !== row && item !== emptied)};
+    }
+    return options;
+  };
+
   const detailPanel = (options = {}) => {
+    options = adoptBodyAudio(options);
+    const sound = options.audio?.src ? recordAudio(options.audio) : null;
+    if (sound) options = {...options, icon: sound.button};
     const bodyClass = ["lex-detail-panel-body", DETAIL_BODY_LAYOUTS[options.bodyLayout] || ""].filter(Boolean).join(" ");
     const nameField = headingNameField(options);
     if (nameField) {
@@ -1005,7 +1083,9 @@
     },
       options.icon ? element("div", {class: "lex-detail-panel-icon"}, options.icon) : null,
       identity,
-      options.actions ? element("div", {class: "lex-detail-panel-actions"}, options.actions) : null);
+      options.actions ? element("div", {class: "lex-detail-panel-actions"}, options.actions) : null,
+      sound ? sound.scrub : null);
+    if (sound && heading) heading.classList.add("lex-audio-heading");
     return element("section", {
       ...(options.attrs || {}),
       class: ["lex-detail-panel", "lex-detail", options.headingOverlay ? "lex-detail-panel-media" : "", options.tone ? `lex-panel-tone-${options.tone}` : "", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
