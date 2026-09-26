@@ -19,7 +19,7 @@ BASE = json.loads((ROOT / 'ui/default_settings.json').read_text(encoding='utf-8'
 
 ROWS = [{"id": f"game_{index}", "game": f"GAME {index}", "modWorks": index % 2 == 0,
          "tasks": [{"label": label, "done": index % 3 != 0} for label in (
-             "Create Editor", "Implement Mod Loading", "Create Theme", "Create GUI",
+             "Create Editor", "UX Refinement", "Mod Loader", "Create Theme",
              "Researched the format", "Vendored the loader")],
          "quotes": 10 + index, "copiedLines": index * 3, "copiedRecorded": 0,
          "copiedOver": index == 2,

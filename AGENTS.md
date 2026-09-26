@@ -67,7 +67,9 @@
 ### Standard plugin issue structure
 
 Use one parent issue titled `Plugin`, identified by its game label. Link these
-four actual subissues in this order, with the same game label on each:
+four actual subissues in this order, with the same game label on each. Mark
+`UX Refinement` and `Mod Loader` as blocked by `Create Editor` with GitHub's
+issue dependencies:
 
 1. `Create Editor`: Research existing tools and format knowledge first. Build
    the plugin and required code, vendor permitted helpers, and record Credits.
@@ -75,23 +77,26 @@ four actual subissues in this order, with the same game label on each:
    unsupported rows or call raw-file access full integration. Only Lexer can
    exclude areas as not worth the effort; ask when scope or value is in doubt.
    Unknown semantics remain protected until proven; report the gap, not success.
-2. `Implement Mod Loading`: Find, add, load and remove real mods. Support record
-   overrides and composition against vanilla where the format requires them,
-   rather than silently replacing a whole file for unrelated record changes.
-   Define load order, conflicts, dependencies and restoration. Test a documented
-   range of real online mods in isolation, including overlapping edits, and
-   make supported mods work without manual repair. Record unsupported cases.
-3. `Create Theme`: Use the game's fonts, colours and sound effects for a fitting
+2. `UX Refinement` (blocked by `Create Editor`): Make the editor's screens
+   usable and human-friendly with shared controls, clear help and good
+   navigation. Inspect rendered screens and interactions, repair UI defects,
+   and check small windows and large UI scales.
+3. `Mod Loader` (blocked by `Create Editor`): Find, add, load and remove real
+   mods. Support record overrides and composition against vanilla where the
+   format requires them, rather than silently replacing a whole file for
+   unrelated record changes. Define load order, conflicts, dependencies and
+   restoration. Test a documented range of real online mods in isolation,
+   including overlapping edits, and make supported mods work without manual
+   repair. Record unsupported cases.
+4. `Create Theme`: Use the game's fonts, colours and sound effects for a fitting
    theme. Record asset provenance and distribution rights; extract locally when
    redistribution is not permitted. Do not publish proprietary assets blindly.
-4. `Create GUI`: Build usable, human-friendly screens with shared controls,
-   clear help and good navigation. Inspect rendered screens and interactions,
-   repair UI defects, and check small windows and large UI scales.
 
 Reuse existing matching issues and preserve their discussion. These four
 subissues track one plugin, not four separate efforts.
-Keep game names out of issue titles. Each open issue needs its own truthful
-workflow label. Source, rendered UI, mod compatibility, delivered candidate and
+Keep game names out of issue titles. Each open subissue needs its own truthful
+workflow label; the `Plugin` parent carries none, because its status is its
+subissues' statuses. Source, rendered UI, mod compatibility, delivered candidate and
 in-game acceptance are separate checks; the parent is not complete while required
 scope remains. Do not infer permission to merge from completion.
 
@@ -128,7 +133,8 @@ files, screenshots, or GitHub API metadata into this repository.
 
 ### Workflow labels
 
-Every open issue has exactly one of these workflow labels. Keep game, bug,
+Every open issue has exactly one of these workflow labels, except a `Plugin`
+parent, which has none (see above). Keep game, bug,
 enhancement, and priority labels separate from workflow status.
 
 | Human status | GitHub label | Meaning |
