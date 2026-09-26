@@ -8,7 +8,7 @@ const rdr2Shell=LexeditorUI.mountShell({
   host:"#lexeditor-shell",
   plugin:{
     id:"rdr2",themeName:"rdr2",
-    theme:{bg:"#100f0d",panel:"#191714","panel-2":"#24211c",border:"#4a4439",text:"#e8e1d4",muted:"#918a7e",accent:"#a92b20","accent-text":"#ffffff",highlight:"#d7b65d",success:"#667b50",font:'"Lex RDR Lino", "Arial Narrow", "Segoe UI", sans-serif',"heading-font":'"Lex Redemption", Georgia, serif'}
+    theme:{bg:"#100f0d",panel:"#191714","panel-2":"#24211c",border:"#4a4439",text:"#e8e1d4",muted:"#918a7e",accent:"#a92b20","accent-text":"#ffffff",highlight:"#d7b65d",success:"#667b50",font:'"Lex RDR Lino", "Arial Narrow", "Segoe UI", sans-serif',"heading-font":'"Lex Redemption", Georgia, serif',"subtab-font":'800 .98em/1 "Lex RDR Lino", "Arial Narrow", "Segoe UI", sans-serif'}
   },
   tabs:[
     ["ai","AI"],["challenges","Challenges"],["crime","Crime & Law"],["crafting","Crafting"],

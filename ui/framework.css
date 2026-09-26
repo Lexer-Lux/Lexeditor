@@ -1246,7 +1246,10 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
   border:1px solid var(--lex-border);
   border-radius:0;
   background:var(--lex-panel);
-  font:800 .98em/1 var(--lex-heading-font);
+  /* A theme whose display face ships no bold weight gets a synthetic bold that
+     smears the small labels, so the face is a token a theme may redirect to a
+     weight it can actually render. */
+  font:var(--lex-subtab-font, 800 .98em/1 var(--lex-heading-font));
   letter-spacing:.03em;
   text-transform:uppercase;
   cursor:pointer;
