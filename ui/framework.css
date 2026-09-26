@@ -6221,6 +6221,18 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    flex:0 1 auto;min-width:0;
  overflow:visible;
 }
+/* Renaming a label in place is a typing job, so the field hands the whole row
+   to the input. Lexer: "when i'm double clicking a property name to edit it the
+   ref rail thing should not show. and the text box should expand to fit
+   available space instead of being this tiny little thing". The input used to
+   be the width of the name lane - a tenth of the row - with the value's
+   reference rail beside it. */
+.lex-detail-field:has(> .lex-detail-field-label > .lex-label-rename) {
+  grid-template-columns:minmax(0,1fr);
+}
+.lex-detail-field:has(> .lex-detail-field-label > .lex-label-rename) > .lex-detail-field-control {
+  display:none;
+}
 .lex-toggle {
   display:flex;
   min-width:0;
