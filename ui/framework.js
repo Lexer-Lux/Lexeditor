@@ -7825,6 +7825,29 @@ ${contents.path}`});
       index < current.length - 1 && dividers
         ? [`minmax(0, ${value}fr)`, "var(--lex-panel-gap, 14px)"]
         : [`minmax(0, ${value}fr)`]).join(" ");
+    const minSizes = Array.from({length: nodes.length}, (_, index) =>
+      Math.max(80, Number(options.minSizes?.[index]) || 240));
+    let belowMinimum = false, measuredGap = 14;
+    const updateResponsive = () => {
+      if (!options.stackBelowMinimum || vertical || !root.clientWidth) return 0;
+      const css = getComputedStyle(root);
+      const divider = root.querySelector(':scope > .lex-panel-layout-divider');
+      if (divider?.offsetWidth) measuredGap = divider.offsetWidth;
+      else if (options.resizable === false && !belowMinimum) measuredGap = parseFloat(css.columnGap) || 0;
+      const available = root.clientWidth - (parseFloat(css.paddingLeft) || 0)
+        - (parseFloat(css.paddingRight) || 0) - measuredGap * (nodes.length - 1);
+      belowMinimum = available < minSizes.reduce((sum, value) => sum + value, 0);
+      root.classList.toggle('lex-panel-layout-below-minimum', belowMinimum);
+      root.style.setProperty('--lex-panel-count', nodes.length);
+      return belowMinimum ? 0 : available;
+    };
+    const fitResponsiveSizes = available => {
+      if (!available || !sizes.some((value,index)=>value*available/100<minSizes[index]-.5)) return null;
+      const spare=available-minSizes.reduce((sum,value)=>sum+value,0);
+      const weights=sizes.map((value,index)=>Math.max(0,value*available/100-minSizes[index]));
+      const total=weights.reduce((sum,value)=>sum+value,0);
+      return minSizes.map((value,index)=>value+spare*(total?weights[index]/total:1/nodes.length));
+    };
 
     if (nodes.length < 2 || options.resizable === false) {
       root.style.setProperty("--lex-panel-layout-template", template(sizes, false));
@@ -7832,12 +7855,23 @@ ${contents.path}`});
         ? `${Number(options.gap)}px` : "var(--lex-panel-gap, 14px)");
       root.classList.add("lex-panel-layout-static");
       root.append(...nodes);
+      if (options.stackBelowMinimum && !vertical) {
+        const refresh = () => {
+          const fitted = fitResponsiveSizes(updateResponsive());
+          if (fitted) {
+            sizes = sizesWithMinimums(fitted);
+            root.style.setProperty('--lex-panel-layout-template',template(sizes,false));
+          }
+        };
+        const observer = new ResizeObserver(refresh);
+        observer.observe(root);
+        root.__lexPanelLayoutObserver = observer;
+        requestAnimationFrame(refresh);
+      }
       return root;
     }
 
     root.classList.add("lex-panel-layout-resizable");
-    const minSizes = Array.from({length: nodes.length}, (_, index) =>
-      Math.max(80, Number(options.minSizes?.[index]) || 240));
     const dividers = Array.from({length: nodes.length - 1}, (_, index) => {
       const divider = element("div", {
         class: "lex-panel-layout-divider",
@@ -7889,6 +7923,7 @@ ${contents.path}`});
       return hidden;
     };
     const resizePair = (index, delta, persist = false, edge = "", initialWidths = null) => {
+      if (belowMinimum) return false;
       const widths = initialWidths ? [...initialWidths]
         : nodes.map(node => vertical ? node.getBoundingClientRect().height : node.getBoundingClientRect().width);
       if (!root.isConnected || widths.some(value => value <= 0)) return false;
@@ -7998,12 +8033,17 @@ ${contents.path}`});
       if (index < dividers.length) root.append(dividers[index]);
     });
     setSizes(sizes);
+    const refreshResponsive = () => {
+      const fitted = fitResponsiveSizes(updateResponsive());
+      if (fitted) setSizes(fitted);
+    };
     if (typeof ResizeObserver !== "undefined") {
       let pending = 0;
       const observer = new ResizeObserver(() => {
         if (pending) cancelAnimationFrame(pending);
         pending = requestAnimationFrame(() => {
           pending = 0;
+          refreshResponsive();
           if (nodes.length === 2 && !dividers[0]?.classList.contains("dragging")) {
             resizePair(0, 0);
           }
@@ -8014,6 +8054,7 @@ ${contents.path}`});
       root.__lexPanelLayoutObserver = observer;
     }
     requestAnimationFrame(() => {
+      refreshResponsive();
       if (root.isConnected && nodes.length === 2) resizePair(0, 0);
     });
     return root;

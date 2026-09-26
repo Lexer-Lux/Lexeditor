@@ -3927,6 +3927,14 @@ body:has(.lex-data-map-table) #main {
   }
 }
 
+/* A container can run out of horizontal room even in a wide app window. */
+.lex-panel-layout.lex-panel-layout-below-minimum {
+  grid-template-columns:minmax(0,1fr);
+  grid-template-rows:repeat(var(--lex-panel-count),minmax(0,1fr));
+  gap:var(--lex-panel-gap,14px);
+}
+.lex-panel-layout.lex-panel-layout-below-minimum > .lex-panel-layout-divider { display:none; }
+
 /* Shared multi-toggle property row. Wraps rather than shrinking, so a row of
    eight switches never collapses into unreadable two-line micro-labels. */
 
