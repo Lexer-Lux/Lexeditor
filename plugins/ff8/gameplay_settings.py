@@ -599,6 +599,7 @@ def _verify_executable(game_root: Path) -> Path:
             *magic_damage_rework.verified_hooks(),
             *mug_chance_rework.verified_hooks(),
             *status_chance_rework.verified_hooks(),
+            *gf_acquisition_rework.verified_hooks(),
             (healing_rework.HEALING_FORMULA_HOOK, healing_rework.HEALING_FORMULA_ORIGINAL),
             (menu_qol_issue_61.ABILITY_LIST_RETURN_HOOK, menu_qol_issue_61.ABILITY_LIST_RETURN_ORIGINAL),
             (menu_qol_issue_61.ABILITY_STATE_READ, menu_qol_issue_61.ABILITY_STATE_READ_ORIGINAL),

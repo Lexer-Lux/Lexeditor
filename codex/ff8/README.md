@@ -7,6 +7,7 @@ Canonical game-specific knowledge. No standalone source has been imported for th
 - [Rebuilding the FFNx runtime](native-runtime-build.md): pinned FFNx revision, toolchain, compile gates and artifact checks.
 - [Smooth HP-number colours](hp-colours.md): FFNx RGB seam, verified native HP scopes, and acceptance boundary.
 
+- [GF acquisition in battle](gf-acquisition.md): the GF-owned bit, GF entries in enemy Draw lists, the victory write and the post-battle "GF acquired" list.
 - [Timed hits and blocks](timed-hits.md): the `0xAB` trigger opcode, the Renzokuken/Attack trigger task and its ×1.5 bonus, how it is gated to Squall, and why damage is already applied before a hit lands.
 
 - [Audio volumes](audio-volumes.md): vanilla Sound slider scope, FFNx SFX/Music layer gains, and the #498 split.

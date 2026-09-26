@@ -86,13 +86,11 @@ class DrawFilterTests(unittest.TestCase):
 
 
 class GateTests(unittest.TestCase):
-    def test_activation_fails_closed(self):
-        self.assertFalse(m.GF_ACQUISITION_AVAILABLE)
+    def test_activation_is_available(self):
+        self.assertTrue(m.GF_ACQUISITION_AVAILABLE)
         self.assertEqual(m.requirement_errors(enabled=False), [])
-        self.assertEqual(
-            m.requirement_errors(enabled=True), [m.GF_ACQUISITION_BLOCKER])
-        with self.assertRaises(ValueError):
-            m.build_hext(True)
+        self.assertEqual(m.requirement_errors(enabled=True), [])
+        self.assertTrue(m.build_hext(True))
         self.assertEqual(m.build_hext(False), "")
         with self.assertRaises(ValueError):
             m.requirement_errors(enabled="yes")
