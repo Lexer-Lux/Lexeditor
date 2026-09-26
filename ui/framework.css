@@ -5446,6 +5446,8 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 }
 
+.lex-model-preview-drawer > .lex-stack { flex:1 1 auto; min-width:0; }
+
 /* The thumbnail owns one magnifier for hover and the open viewer state. */
 .lex-model-preview-trigger {
    cursor:pointer;
