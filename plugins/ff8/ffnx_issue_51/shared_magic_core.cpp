@@ -19,24 +19,29 @@ MergeResult try_merge(const PrivateInventories &source, const std::uint8_t stock
     std::array<std::uint8_t, 255> order{};
     std::size_t distinct = 0;
 
-    for (const MagicInventory &inventory : source) {
-        for (const MagicSlot slot : inventory) {
-            if (slot.id == 0 && slot.amount == 0) {
+    for (std::size_t character = 0; character < source.size(); ++character) {
+        const auto who = static_cast<std::uint8_t>(character);
+        for (const MagicSlot slot : source[character]) {
+            // A slot with no spell or no copies holds nothing to lose. FF8
+            // leaves such leftovers behind, so they count as empty rather
+            // than blocking the whole merge.
+            if (slot.id == 0 || slot.amount == 0) {
                 continue;
             }
-            if (slot.id == 0 || slot.amount == 0 || slot.amount > stock_limit) {
-                return {MergeError::invalid_slot, slot.id, {}};
+            if (slot.amount > stock_limit) {
+                return {MergeError::spell_stock_exceeds_limit, slot.id, who, slot.amount, {}};
             }
             if (!seen[slot.id]) {
                 if (distinct >= kSlotCount) {
-                    return {MergeError::too_many_distinct_spells, slot.id, {}};
+                    return {MergeError::too_many_distinct_spells, slot.id, who,
+                            static_cast<std::uint16_t>(distinct + 1), {}};
                 }
                 seen[slot.id] = true;
                 order[distinct++] = slot.id;
             }
             totals[slot.id] = static_cast<std::uint16_t>(totals[slot.id] + slot.amount);
             if (totals[slot.id] > stock_limit) {
-                return {MergeError::spell_stock_exceeds_limit, slot.id, {}};
+                return {MergeError::spell_stock_exceeds_limit, slot.id, who, totals[slot.id], {}};
             }
         }
     }
@@ -70,6 +75,8 @@ ActivationResult request_activation(PrivateInventories &source, const std::uint8
         static_cast<bool>(result),
         result.error,
         result.spell_id,
+        result.character,
+        result.amount,
     };
 }
 
@@ -252,6 +259,36 @@ std::string migration_warning_template(const MergeError error,
             " copies of one spell. No Magic was changed.";
     }
     return "Shared Magic cannot start. No Magic was changed.";
+}
+
+std::string migration_warning(const ActivationResult &result, const std::uint8_t stock_limit)
+{
+    static const char *const kNames[kCharacterCount] = {
+        "Squall", "Zell", "Irvine", "Quistis", "Rinoa", "Selphie", "Seifer", "Edea",
+    };
+    const std::string limit = std::to_string(static_cast<unsigned int>(stock_limit));
+    const std::string spell = "spell no. " +
+        std::to_string(static_cast<unsigned int>(result.spell_id));
+    const std::string who = result.character < kCharacterCount
+        ? kNames[result.character] : "a character";
+    switch (result.error) {
+    case MergeError::none:
+        return "";
+    case MergeError::invalid_slot:
+        return "Shared Magic is off: the Max Spell limit is 0. Set it to 1 or more "
+               "on the Tweaks tab. No Magic was changed.";
+    case MergeError::too_many_distinct_spells:
+        return "Shared Magic is off: the party holds more than 32 different spells (" +
+               who + "'s " + spell + " is the 33rd). Use up or discard a few kinds, then "
+               "load again. No Magic was changed.";
+    case MergeError::spell_stock_exceeds_limit:
+        return "Shared Magic is off: pooled, the party would hold " +
+               std::to_string(static_cast<unsigned int>(result.amount)) + " of " + spell +
+               ", over the Max Spell limit of " + limit + " (" + who +
+               "'s copies push it over). Use or discard some, then load again. "
+               "No Magic was changed.";
+    }
+    return migration_warning_template(result.error, stock_limit);
 }
 
 bool add_stock(MagicInventory &inventory, const std::uint8_t spell_id,
