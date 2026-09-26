@@ -1,10 +1,43 @@
 """Map selection stays on the image when its container or UI scale changes."""
 from pathlib import Path
+import os
 
 import pytest
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
+from test_shared_ui_feedback import page, framework
+
+
+def test_magnifier_properties_and_placement_share_state(page):
+    framework(page)
+    page.evaluate('''()=>{const U=LexeditorUI;window.position={x:.25,y:.5};
+      U.mapMagnifier({label:'Position',magnify:()=>({ratio:4/3,
+        note:'Click to place the point. Edit its coordinates on the right.',
+        points:[{...position,label:'Point'}],place:point=>Object.assign(position,point)}),
+        details:({refresh})=>U.detailPanel({title:'Coordinates',body:['x','y'].map(key=>
+          U.detailField({label:key.toUpperCase(),control:U.el('input',{type:'number',min:0,max:1,step:.01,
+            value:position[key],'aria-label':key,onchange:event=>{position[key]=Number(event.target.value);refresh()}})}))})});}''')
+    stage=page.locator('.lex-map-magnifier-body .lex-image-map-stage')
+    box=stage.bounding_box()
+    page.mouse.click(box['x']+box['width']*.75,box['y']+box['height']*.25)
+    assert abs(float(page.get_by_role('spinbutton',name='x',exact=True).input_value())-.75)<.01
+    x=page.get_by_role('spinbutton',name='x',exact=True)
+    x.fill('0.1')
+    x.press('Tab')
+    page.wait_for_function("Math.abs(parseFloat(document.querySelector('.lex-image-map-point').style.left)-10)<.01")
+    map_box=page.locator('.lex-map-magnifier-map').bounding_box()
+    details=page.locator('.lex-map-magnifier-details').bounding_box()
+    assert details['x']>=map_box['x']+map_box['width']-1
+    assert map_box['width']>details['width']
+    if destination:=os.environ.get('LEXEDITOR_UI_SCREENSHOT_DIR'):
+        Path(destination).mkdir(parents=True,exist_ok=True)
+        page.screenshot(path=str(Path(destination)/'map-properties-wide.png'))
+    page.set_viewport_size({'width':650,'height':800})
+    page.wait_for_function("document.querySelector('.lex-panel-layout').classList.contains('lex-panel-layout-below-minimum')")
+    assert page.locator('.lex-map-magnifier-dialog').evaluate('n=>n.scrollWidth<=n.clientWidth+1')
+    page.get_by_role('button',name='Close large map',exact=True).click()
+    assert page.locator('.lex-map-magnifier-dialog').count()==0
 
 
 @pytest.mark.parametrize('zoom', [1, 1.25])

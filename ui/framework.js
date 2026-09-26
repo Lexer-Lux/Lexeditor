@@ -1746,21 +1746,28 @@
   // handler and then redraws this view, so the marker shows where the record is
   // now instead of where it was when the panel was drawn.
   const mapMagnifier = (options = {}) => {
+    const opener=document.activeElement;
     const backdrop=element("div",{class:"lex-dialog-backdrop lex-map-magnifier-backdrop","data-lex-history-control":true});
-    const note=element("p",{class:"lex-map-magnifier-note"});
+    const note=element("div",{class:"lex-map-magnifier-note",role:"status"});
     const body=element("div",{class:"lex-map-magnifier-body"});
-    const close=()=>{document.removeEventListener("keydown",onKey,true);backdrop.remove();};
-    const onKey=event=>{if(event.key==="Escape"){event.preventDefault();close();}};
+    const mapHost=element("div",{class:"lex-map-magnifier-map"});
+    const detailsHost=element("div",{class:"lex-map-magnifier-details"});
+    const close=()=>{document.removeEventListener("keydown",onKey,true);backdrop.remove();if(opener?.isConnected)opener.focus();};
+    const onKey=event=>{if(event.key==="Escape"){event.preventDefault();event.stopImmediatePropagation();close();}};
     const draw=()=>{
       const spec=options.magnify()||{},place=spec.place;
       note.textContent=spec.note||"Point at the map to read the value, then click to place the point.";
-      body.replaceChildren(imageMap({...spec,fill:true,magnify:null,crosshair:true,
+      mapHost.replaceChildren(imageMap({...spec,fill:true,magnify:null,crosshair:true,
         place:place?point=>{place(point);draw();}:undefined}));
+      if(options.details)detailsHost.replaceChildren(options.details({refresh:draw}));
     };
-    const done=element("button",{type:"button",class:"lex-dialog-action primary",onclick:close},"Close");
+    body.append(options.details?panelLayout([mapHost,detailsHost],"",{
+      defaultSizes:[3,1],minSizes:options.minSizes||[480,280],stackBelowMinimum:true,
+    }):mapHost);
+    const done=closeButton({onclick:close,"aria-label":"Close large map"});
     backdrop.append(element("section",{class:"lex-dialog lex-map-magnifier-dialog",role:"dialog","aria-modal":"true",
       "aria-label":`${options.label||"Map"}, full size`},
-      element("h2",{},options.label||"Map"),note,body,element("div",{class:"lex-dialog-actions"},done)));
+      element("header",{class:"lex-map-magnifier-header"},note,done),body));
     document.body.append(backdrop);
     document.addEventListener("keydown",onKey,true);
     draw();
