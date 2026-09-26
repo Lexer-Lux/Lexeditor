@@ -34,6 +34,10 @@ enum class MergeError {
 struct MergeResult {
     MergeError error = MergeError::none;
     std::uint8_t spell_id = 0;
+    // Where the blocker was found, so the warning can name it: the character
+    // index (0 Squall .. 7 Edea) and the copies of spell_id at that point.
+    std::uint8_t character = 0;
+    std::uint16_t amount = 0;
     MagicInventory inventory{};
 
     explicit operator bool() const { return error == MergeError::none; }
@@ -46,6 +50,8 @@ struct ActivationResult {
     bool shared_pool_active = false;
     MergeError error = MergeError::none;
     std::uint8_t spell_id = 0;
+    std::uint8_t character = 0;
+    std::uint16_t amount = 0;
 };
 
 enum class RuntimePhase {
@@ -109,6 +115,11 @@ bool finish_canonical_save(RuntimeState &state, PrivateInventories &source);
 // window. Each one states that no data was changed.
 std::string migration_warning_template(
     MergeError error, std::uint8_t stock_limit = kDefaultStockLimit);
+
+// The same warning, naming the character, spell number and copies that
+// blocked it and what to do about it.
+std::string migration_warning(const ActivationResult &result,
+                              std::uint8_t stock_limit = kDefaultStockLimit);
 
 bool add_stock(MagicInventory &inventory, std::uint8_t spell_id, std::uint8_t amount,
                std::uint8_t stock_limit = kDefaultStockLimit);

@@ -42,6 +42,32 @@ int main()
     assert(blocked.spell_id == 1);
     assert(overstock == overstock_before);
     assert(migration_warning_template(blocked.error)[0] != '\0');
+    // The warning names who and what blocked it.
+    assert(blocked.character == 3 && blocked.amount == 101);
+    const std::string detail = migration_warning(blocked);
+    assert(detail.find("Quistis") != std::string::npos);
+    assert(detail.find("spell no. 1") != std::string::npos);
+    assert(detail.find("101") != std::string::npos);
+    assert(detail.find("No Magic was changed.") != std::string::npos);
+
+    // Leftover slots FF8 leaves behind - a spell with no copies, or copies
+    // with no spell - hold nothing and do not block the merge.
+    PrivateInventories leftovers = source;
+    leftovers[2][4] = {5, 0};
+    leftovers[6][9] = {0, 3};
+    MergeResult leftover_result = try_merge(leftovers);
+    assert(leftover_result);
+    assert(leftover_result.inventory[0].id == 1 && leftover_result.inventory[0].amount == 100);
+    assert(leftover_result.inventory[1].id == 9 && leftover_result.inventory[1].amount == 12);
+    assert(leftover_result.inventory[2].id == 0);
+
+    // One private slot above the limit names that character and its count.
+    PrivateInventories single = {};
+    single[5][0] = {7, 120};
+    ActivationResult single_blocked = request_activation(single);
+    assert(single_blocked.error == MergeError::spell_stock_exceeds_limit);
+    assert(single_blocked.character == 5 && single_blocked.amount == 120);
+    assert(migration_warning(single_blocked).find("Selphie") != std::string::npos);
 
     // The selected setting can activate later after the player removes the
     // blocker. No periodic synchronization is needed or permitted.

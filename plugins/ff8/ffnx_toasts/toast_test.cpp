@@ -50,13 +50,21 @@ static void placement()
 {
     Metrics metrics;
     const Box box = layout(metrics, 2, 38);
-    // Inside the frame, above the bottom edge, and centred.
+    // Inside the frame, across the top like the game's notice, and centred.
     assert(box.x > 0.0f && box.y > 0.0f);
     assert(box.x + box.width <= metrics.width);
     assert(box.y + box.height <= metrics.height);
     const float left = box.x, right = metrics.width - (box.x + box.width);
     assert(left > right - 0.5f && left < right + 0.5f);
     assert(box.text_x > box.x && box.text_y > box.y);
+    assert(box.y < metrics.height * 0.1f);
+    assert(box.width > metrics.width * 0.9f);
+    // Short text is centred inside the wide box.
+    const Box short_text = layout(metrics, 1, 10);
+    const float text_left = short_text.text_x - short_text.x;
+    const float text_right = short_text.x + short_text.width
+        - (short_text.text_x + 10 * metrics.char_width);
+    assert(text_left > text_right - 0.5f && text_left < text_right + 0.5f);
     // A sentence too wide for the frame is clamped, not hung off the edge.
     const Box wide = layout(metrics, 1, 400);
     assert(wide.x >= 0.0f && wide.x + wide.width <= metrics.width);
@@ -87,6 +95,6 @@ int main()
     placement();
     fading();
     std::puts("FF8 toast: wraps to the box, holds long enough to read, "
-              "sits above the bottom edge and fades only at the ends.");
+              "sits across the top and fades only at the ends.");
     return 0;
 }

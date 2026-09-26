@@ -62,6 +62,44 @@ def integrate_shared_magic_notifications(source: Path) -> None:
 
 
 
+def overlay_shared_magic_core(source: Path) -> None:
+    """Build the Shared Magic core from the maintained, tested copy.
+
+    The pinned patch carries an older snapshot as lexeditor_shared_magic_core.*;
+    the copy under plugins/ff8/ffnx_issue_51 is the one its C++ test covers.
+    """
+    for suffix in ('h', 'cpp'):
+        text = (ROOT/f'plugins/ff8/ffnx_issue_51/shared_magic_core.{suffix}').read_text(encoding='utf-8')
+        text = text.replace('#include "shared_magic_core.h"', '#include "lexeditor_shared_magic_core.h"')
+        (source/f'src/ff8/lexeditor_shared_magic_core.{suffix}').write_text(text, encoding='utf-8')
+
+
+def integrate_detailed_shared_magic_warning(source: Path) -> None:
+    """Say who and what blocked Shared Magic, once, in the FF8-style box.
+
+    The blocked activation used to set FFNx's red popup as well as queueing
+    the box, and both said only "a private Magic slot is invalid".
+    """
+    path = source/'src/ff8/shared_magic_runtime.cpp'
+    text = path.read_text(encoding='utf-8')
+    old = (
+        "        g_activation_toast = migration_warning_template(result.error, g_stock_limit);\n"
+        "        append_runtime_log((g_activation_toast + \"\\n\").c_str());\n"
+        "        {\n"
+        "            const std::string message =\n"
+        "                migration_warning_template(result.error, g_stock_limit);\n"
+    )
+    new = (
+        "        {\n"
+        "            const std::string message = migration_warning(result, g_stock_limit);\n"
+    )
+    if new in text:
+        return
+    if text.count(old) != 1:
+        raise RuntimeError('Shared Magic warning anchor changed')
+    path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+
 def integrate_flare_owner(source: Path, *, startup: bool = False) -> None:
     """Wire only FF8 gates; preserve native encounter/music handling afterward."""
     changes = {
@@ -105,6 +143,8 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
     subprocess.run(['git','apply','--check','--ignore-space-change',str(patch)],cwd=source,check=True)
     subprocess.run(['git','apply','--ignore-space-change',str(patch)],cwd=source,check=True)
     integrate_shared_magic_notifications(source)
+    overlay_shared_magic_core(source)
+    integrate_detailed_shared_magic_warning(source)
     for folder,name in (
         ('ffnx_status_bars','lexeditor_ff8_bars.cpp'),
         ('ffnx_status_bars','lexeditor_ff8_bars.h'),
