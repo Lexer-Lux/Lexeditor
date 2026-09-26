@@ -8,7 +8,7 @@ from plugins.ff8 import field_data
 
 
 class FieldSaveTests(unittest.TestCase):
-    def test_repeated_saves_keep_one_backup_and_preserve_history(self):
+    def test_repeated_saves_add_no_copies_and_leave_old_files_alone(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             path = root / "a.inf"
@@ -17,12 +17,10 @@ class FieldSaveTests(unittest.TestCase):
             historical.write_bytes(b"history")
             for number in range(1, 101):
                 field_data._write_atomic(path, f"{number:04d}".encode())
-            latest = root / "a.inf.lexeditor-auto.bak"
-            self.assertEqual(latest.read_bytes(), b"0099")
             self.assertEqual(path.read_bytes(), b"0100")
             self.assertEqual(historical.read_bytes(), b"history")
-            self.assertEqual(len(list(root.iterdir())), 3)
-            self.assertEqual(sum(entry.stat().st_size for entry in root.iterdir()), 15)
+            self.assertEqual(sorted(entry.name for entry in root.iterdir()),
+                             ["a.inf", "a.inf.20260901-120000.bak"])
             before = {entry.name: (entry.read_bytes(), entry.stat().st_mtime_ns)
                       for entry in root.iterdir()}
             for _ in range(100):
@@ -72,8 +70,7 @@ class FieldSaveTests(unittest.TestCase):
             self.assertEqual(existing.read_bytes(), b"original")
             self.assertFalse(new.exists())
             self.assertFalse(failed.exists())
-            self.assertEqual(len(list(root.glob("*.bak"))), 1)
-            self.assertEqual(next(root.glob("*.bak")).read_bytes(), b"original")
+            self.assertEqual(list(root.glob("*.bak")), [])
             self.assertEqual(list(root.glob("*.tmp")), [])
 
     def test_successful_multi_map_save_reports_count_and_writes_all(self):

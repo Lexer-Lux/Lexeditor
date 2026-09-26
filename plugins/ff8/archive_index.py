@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
-import shutil
 
 from . import paths
 from .fs_archive import FsArchive
@@ -109,8 +108,6 @@ def extract(name: str, index: int, project_root: Path | None = None) -> dict:
     safe = re.sub(r"[^A-Za-z0-9._-]+", "_", entry.basename) or f"entry-{wanted}"
     destination = root / EXTRACTED_ROOT / str(name).strip().lower() / safe
     destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.is_file():
-        shutil.copy2(destination, destination.with_name(f"{destination.name}.bak"))
     data = archive.extract(entry)
     destination.write_bytes(data)
     return {"archive": str(name).strip().lower(), "index": wanted, "name": entry.name,

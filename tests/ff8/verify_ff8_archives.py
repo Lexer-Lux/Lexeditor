@@ -69,10 +69,10 @@ def main() -> int:
         assert first["bytes"] == entry.unpacked_length
         assert written.read_bytes() == installed.extract(entry)
         assert root in written.parents and paths.GAME_ROOT not in written.parents
-        # A second extract keeps one previous copy and nothing else.
+        # A second extract replaces the file and leaves no copies beside it.
         archive_index.extract("main", entry.index, project_root=root)
-        assert written.with_name(f"{written.name}.bak").is_file()
-        assert len(list(written.parent.glob("*.bak"))) == 1
+        assert written.read_bytes() == installed.extract(entry)
+        assert not list(written.parent.glob("*.bak"))
     finally:
         project.cleanup()
     for bad_name, bad_index in [("nope", 0), ("main", 99_999)]:

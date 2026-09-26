@@ -23,7 +23,6 @@ from io import BytesIO
 import os
 from pathlib import Path
 import re
-import shutil
 import struct
 import tempfile
 
@@ -1027,10 +1026,6 @@ def save_models(edits: list[dict]) -> dict:
         if filename.endswith(".dat") and parse_dat_sections(data) is None:
             raise ValueError(f"{filename} is not a battle-model container")
         destination.parent.mkdir(parents=True, exist_ok=True)
-        if destination.is_file():
-            # One rolling backup, like field saves: a timestamped copy per
-            # save filled mod folders with stale files that never went away.
-            shutil.copy2(destination, destination.with_name(f"{destination.name}.bak"))
         handle, temporary = tempfile.mkstemp(
             prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent)
         try:

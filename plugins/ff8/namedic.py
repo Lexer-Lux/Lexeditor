@@ -19,7 +19,6 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-import shutil
 import struct
 import tempfile
 
@@ -211,10 +210,6 @@ def apply_edits(raw: bytes, edits: list[dict]) -> bytes:
 
 def _write(destination: Path, raw: bytes) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.is_file():
-        # One rolling backup, like the other direct-tree writers: a timestamped
-        # copy per save would fill the project with stale files.
-        shutil.copy2(destination, destination.with_name(f"{destination.name}.bak"))
     handle, temp_name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".tmp",
                                          dir=destination.parent)
     try:

@@ -916,16 +916,13 @@ def background_geometry(key: str, dataset: str = "current",
             "height": bounds["top"] + bounds["bottom"] + 16}
 
 
-def _write_atomic(destination: Path, raw: bytes, *, backup: bool = True) -> None:
+def _write_atomic(destination: Path, raw: bytes) -> None:
+    # Edits only ever land in a mod, and a failed batch restores from memory
+    # (_write_batch), so no .bak copy is kept: nothing ever read one back.
     previous = destination.read_bytes() if destination.is_file() else None
     if previous == raw:
         return
     destination.parent.mkdir(parents=True, exist_ok=True)
-    if backup and previous is not None:
-        # One latest automatic backup per field file. Historical timestamp
-        # backups remain untouched; repeated saves must not grow their count.
-        backup_path = destination.with_name(f"{destination.name}.lexeditor-auto.bak")
-        _write_atomic(backup_path, previous, backup=False)
     handle, temporary = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".tmp",
                                          dir=destination.parent)
     try:
@@ -955,7 +952,7 @@ def _write_batch(prepared: list[tuple[Path, bytes]]) -> None:
                 if original is None:
                     destination.unlink(missing_ok=True)
                 else:
-                    _write_atomic(destination, original, backup=False)
+                    _write_atomic(destination, original)
             except OSError:
                 failures.append(str(destination))
         if failures:

@@ -91,8 +91,8 @@ def main() -> int:
         assert namedic.source_path("vanilla") == namedic.ensure_baseline()
         again = namedic.save([{"index": 0, "text": "Lexeditor Test Two"}])
         assert again["entries"][0]["text"] == "Lexeditor Test Two"
-        assert written.with_name("namedic.bin.bak").is_file(), \
-            "a save keeps one rolling backup"
+        assert not written.with_name("namedic.bin.bak").exists(), \
+            "a save into the mod keeps no .bak copy"
     finally:
         paths.PROJECT_ROOT = previous_project
         paths.DIRECT_ROOT = previous_project / "direct"
