@@ -4,6 +4,10 @@ from __future__ import annotations
 
 
 SPECS = {
+    "direct/wm2field.tbl": {"baseline": "main/wm2field.tbl", "record": 24, "count": 72,
+        "fields": (("x", 0, 2), ("y", 2, 2), ("z", 4, 2), ("field", 6, 2),
+                   # Preserve unsupported data as a single indivisible claim.
+                   ("reserved", 8, 16))},
     "direct/menu/price.bin": {"baseline": "menu/price.bin", "record": 4,
         "fields": (("buy_price", 0, 2), ("sell_multiplier", 2, 1), ("unknown_3", 3, 1))},
     "direct/menu/mitem.bin": {"baseline": "menu/mitem.bin", "record": 4,
@@ -36,6 +40,8 @@ def merge(vanilla: bytes, mods: list[tuple[str, bytes]], spec: dict,
     record_size = int(spec["record"])
     if len(vanilla) % record_size:
         raise ValueError(f"Vanilla {path} has a partial record")
+    if "count" in spec and len(vanilla) != record_size * int(spec["count"]):
+        raise ValueError(f"Vanilla {path} has an unsupported record count")
     for mod_id, data in mods:
         if len(data) != len(vanilla):
             raise ValueError(f"{mod_id} changes the fixed size of {path}")
