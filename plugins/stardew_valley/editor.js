@@ -492,6 +492,9 @@ function datasetPanel() {
   });
 }
 async function openDataset(key) {
+  // Returning from the Data Map to the current family keeps its draft.
+  // Only switching families would replace the records holding unsaved edits.
+  if (key === state.datasetKey) { navigate("objects"); return; }
   if (dirtyCount()) {
     LexeditorUI.showAlert({title: "Save or discard changes first", message: "Switching data families is blocked while this project has unsaved edits."});
     return;

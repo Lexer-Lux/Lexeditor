@@ -445,8 +445,9 @@ def assert_navigation_loading(page, button_selector: str, expected: str, screens
       };
     }""")
     page.locator(button_selector).click()
-    loading = page.locator("#main .lex-notice", has_text=expected)
+    loading = page.locator("#main").get_by_role("status", name=expected)
     loading.wait_for(state="visible", timeout=2000)
+    assert loading.get_attribute("aria-busy") == "true"
     take(page, screenshot_name)
     page.evaluate("""() => {
       const callbacks = window.__svAuditHeldFrames || [];
@@ -478,7 +479,7 @@ def exercise_data_map(page, label: str) -> None:
     open_button = page.get_by_role("button", name="Open crops", exact=True)
     assert open_button.count() == 1, (label, "Crops open action missing")
     open_button.click()
-    page.wait_for_selector(".lex-column-list")
+    page.locator(".lex-column-list-row").filter(has_text="Fixture Crop").first.wait_for()
 
 
 def exercise_typed_data(page, project: Path, label: str, new_value: int) -> None:
@@ -520,7 +521,7 @@ def exercise_typed_data(page, project: Path, label: str, new_value: int) -> None
     crops = page.locator(".lex-data-map-table .lex-column-list-row").filter(has_text="Crops.xnb").first
     crops.click()
     page.get_by_role("button", name="Open crops", exact=True).click()
-    page.wait_for_selector(".lex-column-list")
+    page.locator(".lex-column-list-row").filter(has_text="Fixture Crop").first.wait_for()
     page.locator(".lex-pager-search input").first.fill("Fixture Crop")
     page.wait_for_timeout(120)
     page.locator(".lex-column-list-row").filter(has_text="Fixture Crop").first.click()
@@ -585,6 +586,11 @@ def main() -> int:
                         exercise_info(page, label, height)
                         assert not errors, (label, errors)
                         results.append({"label": label, "passed": True})
+                    except Exception:
+                        print(json.dumps({"label": label, "pageErrors": errors,
+                                          "visibleText": page.locator("body").inner_text()}, indent=2))
+                        take(page, f"failure-{label}.png")
+                        raise
                     finally:
                         page.close()
             finally:
