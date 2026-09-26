@@ -5919,6 +5919,25 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 .lex-detail-parts-switches > .lex-toggle { grid-column:auto; }
 .lex-detail-parts-switches > .lex-detail-part { margin-right:0; }
+/* On narrow property rows, put the group name above its switches instead of
+   spending their remaining width on a separate label column. Em units also
+   account for a larger editor font. */
+.lex-detail-field:has(.lex-toggle-row) {
+  container:lex-switch-property / inline-size;
+}
+@container lex-switch-property (max-width:24em) {
+  .lex-detail-field > .lex-detail-field-label:has(+ .lex-detail-field-control .lex-toggle-row) {
+    grid-column:1 / -1;
+    contain:none;
+    min-height:30px;
+    height:auto;
+    justify-content:flex-start;
+    text-align:left;
+  }
+  .lex-detail-field > .lex-detail-field-control:has(.lex-toggle-row) {
+    grid-column:1 / -1;
+  }
+}
 
 /* Each flag box is as wide as the flag in it. The boxes sit on a column grid
    so their left edges line up, but the box was taking the whole track, so a

@@ -36,9 +36,10 @@ def test_flag_names_and_help_fit_before_adding_columns(page):
       })})]}));
     }''')
     for scale in [16,24]:
-        for width in ([400,650,1000] if scale == 16 else [650,1000]):
+        for width in [1000,650,400]:
             page.evaluate('([w,s])=>{const m=document.querySelector("main");m.style.width=w+"px";m.style.fontSize=s+"px"}',[width,scale])
             page.wait_for_timeout(100)
+            assert page.locator('.lex-detail-field-label').evaluate('e=>parseFloat(getComputedStyle(e).fontSize)>=12')
             if os.environ.get('LEX_TOGGLE_SCREENSHOT'):
                 page.screenshot(path=os.environ['LEX_TOGGLE_SCREENSHOT'])
             assert page.locator('.lex-toggle-name').evaluate_all('''es=>es.every(e=>{
