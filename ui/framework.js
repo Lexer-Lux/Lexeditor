@@ -4933,11 +4933,11 @@ ${contents.path}`});
         class:"lex-project-menu-action",type:"button",role:"menuitem",
         onclick:async()=>{closeMenu();try{await options.addProjectSource();render(snapshot)}catch(error){showAlert({title:"Could not add mod",message:error.message})}}
       },"➕ Add a Mod"):null;
-        // A game without mod management says so where the mod buttons would
-        // be. That note explains why the menu has no library row; it must not
-        // replace adding and finding a mod, which are how a reader gets out of
-        // the unmodded state - and which the comment above already says are
-        // not mod-library work.
+        // A game without mod management says so where the Mod library button
+        // would be. The button opened a dialog that only repeated that it is
+        // not supported. Adding and finding a mod stay: they are project work,
+        // they work without a mod adapter, and they are how a reader gets out
+        // of the unmodded state.
         const modLibraryNote = modSupport && !modSupport.canManage
           ? element("p", {class:"lex-dialog-status"},
               modSupport.message || "Mod management is not supported for this game yet.")
@@ -4956,9 +4956,9 @@ ${contents.path}`});
         // for games that cannot manage mods, so on every game that can it was
         // passed as null and printed the word in the middle of the menu.
         menu.replaceChildren(...(vanillaMenuItem?[vanillaMenuItem]:[]), ...sourceRows, ...projects,
-          ...(modLibraryNote?[modLibraryNote]:[]),
           element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, addSource || create, browse,
-            options.sourcesReplaceProjects ? null : element("button", {type:"button", class:"lex-project-menu-action", onclick:() => { closeMenu(); openModLibrary(options.plugin.id); }}, "Mod library…")));
+            modLibraryNote || (options.sourcesReplaceProjects ? null
+              : element("button", {type:"button", class:"lex-project-menu-action", onclick:() => { closeMenu(); openModLibrary(options.plugin.id); }}, "Mod library…"))));
       measureNameColumn();
     };
     trigger.onclick = event => { event.stopPropagation(); toggleMenu(); };

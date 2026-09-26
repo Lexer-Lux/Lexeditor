@@ -218,6 +218,26 @@ def test_mod_menu_still_says_when_mod_management_is_absent(page):
     assert page.get_by_text('Mod management is not supported for this game yet.').is_visible()
 
 
+def test_unmanaged_game_shows_the_note_instead_of_a_mod_library_button(page):
+    # Lexer: "it says 'mod management is not supported' in the mod selector...
+    # then why are the find/add a mod buttons still visible?" The button that
+    # did not work was Mod library, which only opened a dialog repeating the
+    # note; the note takes its place. Add and Find are project work and work.
+    page.evaluate('''()=>window.pywebview={api:{mod_library_status:async()=>
+      ({canManage:false,message:'Mod management is not supported for this game yet.'})}}''')
+    framework(page)
+    page.evaluate('''()=>{const U=LexeditorUI;document.body.prepend(U.el('div',{id:'shell'}));
+      U.mountShell({host:'#shell',plugin:{id:'fixture',name:'Fixture'},tabs:[],
+        activeTab:()=>'',navigate(){},projectSnapshot:async()=>({canCreate:true,projects:[]}),
+        changeProjectSource:async()=>{}});U.finishPluginLoading()}''')
+    page.locator('.lex-project-select').click()
+    actions=page.locator('.lex-project-menu-actions')
+    assert actions.get_by_text('Mod management is not supported for this game yet.').is_visible()
+    assert page.get_by_text('Mod library…',exact=True).count()==0
+    assert actions.get_by_text('➕ Add a Mod',exact=True).is_visible()
+    assert actions.get_by_text('🔍 Find a Mod',exact=True).is_visible()
+
+
 def test_platform_settings_use_six_columns_without_scrolling(page):
     framework(page)
     page.evaluate('''()=>{const U=LexeditorUI;document.querySelector('main').append(U.platformConfigView({config:{

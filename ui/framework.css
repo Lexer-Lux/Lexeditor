@@ -780,6 +780,16 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   font: inherit;
 }
 .lex-project-menu-action + .lex-project-menu-action { border-left: 1px solid var(--lex-border); }
+/* A game without mod management states it across the row, in the place the
+   Mod library button would take. */
+.lex-project-menu-actions > .lex-dialog-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 8px 10px;
+  border-top: 1px solid var(--lex-border);
+  color: var(--lex-muted);
+  text-align: center;
+}
 .lex-project-menu-actions:has(>.lex-project-menu-action:nth-child(3):not([hidden])) {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
