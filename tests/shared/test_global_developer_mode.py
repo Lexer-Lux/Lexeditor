@@ -145,17 +145,17 @@ class DeveloperModeUiContractTests(unittest.TestCase):
     def test_loading_quote_counts_cover_every_plugin_and_the_shared_pool(self):
         from core.desktop_host import HostApi
         counts = HostApi.loading_quote_counts(object.__new__(HostApi))
+        # A game's lines are in its own metadata file now; the count and the
+        # line come from the same place.
+        import json
+
         games = sorted(path.name for path in (ROOT / "plugins").iterdir()
-                       if path.is_dir() and not path.name.startswith(("_", ".")))
+                       if path.is_dir() and not path.name.startswith(("_", "."))
+                       and (path / "plugin.json").is_file())
         self.assertEqual(sorted(counts["plugins"]), games)
         for name, count in counts["plugins"].items():
-            own = ROOT / "plugins" / name / "loading_quotes.json"
-            if own.is_file():
-                import json
-                self.assertEqual(count, len(json.loads(own.read_text(encoding="utf-8"))))
-            else:
-                self.assertEqual(count, 0)
-        import json
+            data = json.loads((ROOT / "plugins" / name / "plugin.json").read_text(encoding="utf-8"))
+            self.assertEqual(count, len(data.get("loadingQuotes", [])))
         shared = json.loads((ROOT / "ui" / "loading_quotes.json").read_text(encoding="utf-8"))
         self.assertEqual(counts["global"], len(shared["global"]))
         self.assertGreater(counts["global"], 0)

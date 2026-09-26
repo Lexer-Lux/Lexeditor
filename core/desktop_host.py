@@ -21,6 +21,7 @@ from core.game_version import game_version
 from core.github_integration import GitHubIntegration
 from core.plugin_api import GamePlugin, GitHubRepository, PluginSession
 from core.plugin_manifest import loading_quotes as plugin_quotes
+from core.plugin_manifest import manifest_in, plugin_directories
 from core.project_manager import ProjectManager
 from core import process_probe
 from core.settings_manager import SettingsStore
@@ -434,9 +435,10 @@ class HostApi:
         shared = _shared_loading_lines()
         # A game's lines live in that game's own metadata file, so adding a
         # plugin does not mean editing a shared list, and the count is read
-        # from the same place the line is chosen from.
-        counts = {plugin_id: len(plugin_quotes(plugin_id))
-                  for plugin_id in sorted(self._plugins)}
+        # from the same place the line is chosen from. Keyed by folder, like
+        # the developer table's other per-plugin columns.
+        counts = {path.name: len(manifest_in(path).get("loadingQuotes", []))
+                  for path in plugin_directories()}
         return {"global": len(shared), "plugins": counts}
     def loading_quote(self, plugin_id: str) -> dict:
         """Choose one editable game or down-weighted global line."""

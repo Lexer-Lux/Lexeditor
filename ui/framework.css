@@ -865,6 +865,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-numbered-id-cell .lex-record-id {
    width:100%;
  justify-content:flex-start;
+  /* The game face paints the last digit's ink about a pixel past its advance
+     box. The lane keeps that pixel inside the id's own clip box, so the cell
+     can go on clipping a column that is genuinely too narrow. */
+  padding-inline-end:.08em;
 }
 
 .lex-record-id-prefix {
@@ -2289,15 +2293,6 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-}
-
-/* A number is never abbreviated, and neither is a record id. A game face paints
-   the ink of its last digit about a pixel past the advance box, so the id keeps
-   that lane as padding instead of losing the edge of the digit. Padding is
-   inside the clip box, which is why this works where an overflowing box would
-   instead run the id into the next column. */
-.lex-numbered-id-cell .lex-record-id {
-  padding-inline-end:.08em;
 }
 
 /* A cell that shows a tick has nothing to truncate, and the glyph's ink is

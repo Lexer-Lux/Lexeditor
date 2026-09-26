@@ -37,17 +37,25 @@ MANIFEST_NAME = "plugin.json"
 def manifest(plugin_file: str | Path) -> dict:
     """One plugin's `plugin.json`, read from beside its `plugin.py`."""
     path = Path(plugin_file).resolve().parent / MANIFEST_NAME
+    return _read(path)
+
+
+def manifest_in(directory: str | Path) -> dict:
+    """One plugin's `plugin.json`, from its directory."""
+    return _read(Path(directory).resolve() / MANIFEST_NAME)
+
+
+def _read(path: Path) -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError(f"{path} is not an object")
     for key, expected in (("id", str), ("name", str), ("accent", str)):
         if not isinstance(data.get(key), expected) or not data[key]:
             raise ValueError(f"{path} has no usable {key}")
-    if data["id"] != Path(plugin_file).resolve().parent.name.replace("_", "-") \
-            and data["id"].replace("-", "_") != Path(plugin_file).resolve().parent.name:
+    folder = path.parent.name
+    if data["id"].replace("-", "_") != folder.replace("-", "_"):
         raise ValueError(
-            f"{path} says id {data['id']}, which is not its folder "
-            f"{Path(plugin_file).resolve().parent.name}")
+            f"{path} says id {data['id']}, which is not its folder {folder}")
     return data
 
 
@@ -123,10 +131,16 @@ def project_spec(plugin_file: str | Path, default_root: Path, *,
 
 def loading_quotes(plugin_id: str) -> list[str]:
     """The lines this game shows while it opens, in order, without repeats."""
-    for path in sorted((Path(__file__).resolve().parents[1] / "plugins").iterdir()):
-        if not (path / MANIFEST_NAME).is_file():
-            continue
-        data = manifest(path / "plugin.py") if (path / "plugin.py").is_file() else None
-        if data and data["id"] == plugin_id:
+    for path in plugin_directories():
+        data = manifest_in(path)
+        if data["id"] == plugin_id:
             return list(dict.fromkeys(data.get("loadingQuotes", [])))
     return []
+
+
+def plugin_directories() -> list[Path]:
+    """Every plugin folder that has a metadata file, in name order."""
+    root = Path(__file__).resolve().parents[1] / "plugins"
+    return sorted(path for path in root.iterdir()
+                  if path.is_dir() and not path.name.startswith(("_", "."))
+                  and (path / MANIFEST_NAME).is_file())
