@@ -991,6 +991,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-detail-panel-heading.no-icon.no-actions .lex-detail-panel-identity { grid-column:1 / -1; }
 
 .lex-detail-panel-identity {
+  container:lex-record-heading / inline-size;
   position:relative;
   display:grid;
   grid-template-columns:minmax(0,1fr) auto;
@@ -7245,6 +7246,20 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   text-align:right;
   font-weight: 400;
   color: var(--lex-detail-id-fg, color-mix(in srgb, var(--lex-muted) 55%, var(--lex-panel)));
+}
+
+/* At narrow widths, the number gets its own row before the name would need
+   unreadably small text. The preview keeps its independent bounded size. */
+@container lex-record-heading (max-width:16em) {
+  .lex-detail-panel-identity > .lex-detail-panel-title,
+  .lex-detail-panel-identity:not(:has(> .lex-detail-panel-meta)) > .lex-detail-panel-title {
+    grid-column:1 / -1;
+    grid-row:auto;
+  }
+  .lex-detail-panel-identity > .lex-detail-panel-id {
+    grid-column:1 / -1;
+    grid-row:auto;
+  }
 }
 
 /* More of the same: a plain list and its rows, so a game's own palette reaches

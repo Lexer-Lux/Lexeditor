@@ -10509,7 +10509,8 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       if (label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1) widenLabelLane(label);
       label.style.whiteSpace = wrap;
     }
-    while (size > LABEL_MIN_PX && overflows()) {
+    const minimum = label.classList.contains('lex-detail-panel-name') ? 14 : LABEL_MIN_PX;
+    while (size > minimum && overflows()) {
       size -= .5;
       label.style.fontSize = `${size}px`;
     }
@@ -10525,7 +10526,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     // the key is the same one computed above and the label settles in one pass.
     fitted.set(label, key);
   };
-  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text';
+  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text,.lex-detail-panel-name';
   const labelSizeObserver = new ResizeObserver(entries => scheduleFit(entries.map(entry=>entry.target)));
   // Within the page-tab strip every tab is at least its own name's width, so a
   // game with twenty tabs wants a strip wider than its window. Shrinking one
