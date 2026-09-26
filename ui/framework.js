@@ -466,6 +466,10 @@
 
   const closeHelpPopup = () => {
     if (!activeHelpPopup) return;
+    if (activeHelpPopup.classList.contains("lex-help-editing") && activeHelpPopup.commitEdit) {
+      activeHelpPopup.commitEdit();
+      return;
+    }
     activeHelpPopup.cleanup?.();
     activeHelpPopup.remove();
     activeHelpPopup = null;
@@ -621,7 +625,7 @@
           editor.focus();
           editor.select();
           let finished = false;
-          const finish = async commit => {
+          const finish = async (commit, reopen = true) => {
             if (finished) return;
             finished = true;
             popup.classList.remove("lex-help-editing");
@@ -644,7 +648,7 @@
             // the pointer being back on the marker, so reopen it to face the
             // reader with the wording that was just saved.
             closeHelpPopup();
-            open();
+            if (reopen) open();
             // A bubble has no lasting node, so undoing a rewording puts the text
             // back for the next time it opens rather than under the pointer.
             labelUndo.push({key: helpKey(shipped), tabId: activePageTab(), before,
@@ -659,15 +663,22 @@
                                          : "The new help text is now the shipped one.");
             } catch (_error) {}
           };
+          // Enter or clicking away keeps the new wording; Shift+Enter starts a
+          // new line; Escape puts the old one back. Clicking away used to throw
+          // the edit away and only Ctrl+Enter kept it, so a reworded bubble
+          // looked as if it had been ignored.
           editor.addEventListener("keydown", keyEvent => {
             keyEvent.stopPropagation();
             if (keyEvent.key === "Escape") { keyEvent.preventDefault(); finish(false); }
-            else if (keyEvent.key === "Enter" && (keyEvent.ctrlKey || keyEvent.metaKey)) {
+            else if (keyEvent.key === "Enter" && !keyEvent.shiftKey) {
               keyEvent.preventDefault();
               finish(true);
             }
           });
-          editor.addEventListener("blur", () => finish(false));
+          editor.addEventListener("blur", () => finish(true));
+          // A click outside closes the bubble and removes the editor before
+          // it can blur; closing it keeps the wording all the same.
+          popup.commitEdit = () => finish(true, false);
         };
       }
       const position = () => {
