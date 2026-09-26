@@ -12,12 +12,10 @@
 
 namespace lexeditor_toast {
 
-// Lexer asked for the game's own notice: the wide silver box across the top
-// of the screen that battle uses for "Received ..." and ability names. It
-// spans nearly the whole frame, sits just below the top edge, and is padded
-// inside by about one character.
-constexpr float TOP_MARGIN = 0.02f;      // of the game's height
-constexpr float SIDE_MARGIN = 0.02f;     // of the game's width
+// FF8's own message boxes sit a little above the bottom edge, indented from
+// both sides, and are padded inside by about one character.
+constexpr float BOTTOM_MARGIN = 0.08f;   // of the game's height
+constexpr float SIDE_MARGIN = 0.06f;     // of the game's width
 constexpr float PADDING_CHARS = 1.0f;
 constexpr float PADDING_LINES = 0.5f;
 // The last fraction of the hold fades out, and the first fraction fades in, so
@@ -37,22 +35,23 @@ struct Box {
     float text_x = 0.0f, text_y = 0.0f;
 };
 
-// The box is always the full width between the margins, like the game's
-// top notice, and as tall as the text. Its text is centred.
+// Size the box to the text, then place it bottom-centre. A box wider than the
+// frame allows is clamped rather than allowed to hang off the edge, which is
+// the case a long sentence in a small window produces.
 inline Box layout(const Metrics &metrics, std::size_t lines, std::size_t columns)
 {
     const float padding_x = metrics.char_width * PADDING_CHARS;
     const float padding_y = metrics.line_height * PADDING_LINES;
     const float limit = metrics.width * (1.0f - 2.0f * SIDE_MARGIN);
     Box box;
-    box.width = limit;
+    box.width = std::min(limit,
+        static_cast<float>(columns) * metrics.char_width + 2.0f * padding_x);
     box.height = static_cast<float>(lines ? lines : 1) * metrics.line_height
         + 2.0f * padding_y;
     box.x = (metrics.width - box.width) * 0.5f;
-    box.y = metrics.height * TOP_MARGIN;
-    const float text_width = std::min(limit - 2.0f * padding_x,
-        static_cast<float>(columns) * metrics.char_width);
-    box.text_x = box.x + (box.width - text_width) * 0.5f;
+    box.y = metrics.height * (1.0f - BOTTOM_MARGIN) - box.height;
+    if (box.y < 0.0f) box.y = 0.0f;
+    box.text_x = box.x + padding_x;
     box.text_y = box.y + padding_y;
     return box;
 }

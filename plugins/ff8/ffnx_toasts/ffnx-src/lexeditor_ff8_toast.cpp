@@ -26,13 +26,13 @@ namespace {
 
 lexeditor_toast::Queue g_queue;
 
-// FF8's default window: a silver-grey gradient, lighter at the top, inside a
-// dark outer line and a pale inner one. Lexer asked for the game's own top
-// notice rather than a blue box, so these follow the default grey window.
-constexpr ImU32 kFillTop = IM_COL32(150, 150, 158, 236);
-constexpr ImU32 kFillBottom = IM_COL32(84, 84, 92, 236);
-constexpr ImU32 kEdgeOuter = IM_COL32(32, 32, 40, 255);
-constexpr ImU32 kEdgeInner = IM_COL32(224, 224, 232, 255);
+// FF8's window: a dark blue gradient behind a pale double edge. These are the
+// colours the game's own window reads as on screen, not a theme of ours; a
+// message that looked like an overlay would defeat the point of this file.
+constexpr ImU32 kFillTop = IM_COL32(12, 24, 96, 232);
+constexpr ImU32 kFillBottom = IM_COL32(4, 8, 40, 232);
+constexpr ImU32 kEdgeOuter = IM_COL32(24, 32, 72, 255);
+constexpr ImU32 kEdgeInner = IM_COL32(200, 208, 232, 255);
 constexpr ImU32 kText = IM_COL32(255, 255, 255, 255);
 constexpr ImU32 kTextWarning = IM_COL32(255, 216, 136, 255);
 constexpr ImU32 kTextShadow = IM_COL32(0, 0, 0, 200);

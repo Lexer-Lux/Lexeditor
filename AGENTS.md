@@ -38,6 +38,16 @@ work, even if your tool does not load skills on its own.
 - Do not claim visual acceptance from source, API, or smoke checks. Look at the
   rendered screen.
 
+## Game patches
+
+- Hext first. A change to how a game behaves, including calling the game's own
+  routines, is a Hext patch. Reach for a custom native driver (FF8's FFNx
+  derivative and the like) only when Hext cannot do the job well: drawing the
+  game has no routine for, renderer or frame-rate work, file I/O, or logic too
+  large to keep correct in hand-written assembly. Say which of those applies
+  when adding driver code.
+- In-game messages use the game's own message box, never an overlay imitation.
+
 ## Git and publishing
 
 - Branches are fine; leftovers are not. When a task is done and verified, merge
