@@ -17,7 +17,7 @@ from core.plugin_api import GitHubRepository
 _AUTO = object()
 _UNCHECKED = object()
 
-# Every game plugin's `Plugin` parent links these five, in this order (AGENTS.md).
+# Every game plugin's `Plugin` parent links these five, in this order (.agents/skills/add-game/SKILL.md).
 PLUGIN_SUBISSUES = (
     ("editor", "Create Editor"), ("ux", "UX Refinement"), ("modloader", "Mod Loader"),
     ("theme", "Create Theme"), ("reshade", "ReShade"),
