@@ -125,6 +125,9 @@ def main():
         note = page.locator(".lex-map-magnifier-note").inner_text()
         assert "place Draw Point 129" in note, note
         assert page.locator(".lex-map-magnifier-dialog .lex-image-map-stage").count() == 1
+        properties = page.locator('.lex-map-magnifier-dialog .lex-detail-panel')
+        assert properties.locator('input[type=number]').count() == 3
+        assert properties.bounding_box()['x'] > page.locator('.lex-map-magnifier-dialog .lex-image-map').bounding_box()['x']
         shots = Path(tempfile.gettempdir()) / "lexeditor-dev"
         shots.mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(shots / "ff8-draw-point-map.png"))
@@ -136,9 +139,22 @@ def main():
         page.wait_for_timeout(250)
         moved = stored(page)
         assert moved != before, ("a click on the large map did not move the record", before, moved)
+        assert properties.get_by_label('Draw Point 129 X', exact=True).input_value() == str(moved[0])
+        properties.get_by_label('Draw Point 129 X', exact=True).fill('40')
+        properties.get_by_label('Draw Point 129 X', exact=True).press('Tab')
+        assert stored(page)[0] == 40
+        assert page.locator('.lex-map-magnifier-dialog .lex-image-map-point').evaluate("n=>n.style.left") == '31.25%'
+        page.screenshot(path=str(shots / 'ff8-draw-point-properties.png'))
         page.keyboard.press("Escape")
         page.wait_for_timeout(200)
         assert page.locator(".lex-map-magnifier-dialog").count() == 0
+        page.evaluate("state.activeSource='vanilla';rerenderWorldMap()")
+        page.click('.world-draw-map .lex-image-map-stage', position={'x':40,'y':40})
+        locked = stored(page)
+        page.locator('.lex-map-magnifier-dialog .lex-image-map-stage').click(position={'x':70,'y':70})
+        assert stored(page) == locked
+        assert properties.get_by_label('Draw Point 129 X', exact=True).is_disabled()
+        page.keyboard.press('Escape')
         browser.close()
     print("Draw point panel: heading DRAW POINT 129 with identity #129 beside row 129; no subheader, "
           "paragraph, or magnifier button; a click on the panel's map opened the large map and left "

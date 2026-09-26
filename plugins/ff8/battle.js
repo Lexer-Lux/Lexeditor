@@ -46,7 +46,7 @@
   // above is its Formations subtab, beside Rules and Groups.
 
   function worldRow(dataset,kind,id){return dataset?.world?.rows?.find(row=>row.kind===kind&&Number(row.id)===Number(id))}
-  function worldNumber(row,key,min,max,label){
+  function worldNumber(row,key,min,max,label,refresh=render){
     const vanilla=worldRow(state.vanilla,row.kind,row.id),refs=state.references.map(reference=>({name:reference.name,
       shortName:reference.shortName,value:worldRow(state.referenceData[reference.id],row.kind,row.id)?.[key]}))
       .filter(entry=>entry.value!==undefined);
@@ -56,8 +56,8 @@
     // alone changed the stored number and left the drawing where it was, which is
     // why a draw point's dot did not move when its X was edited. The rebuild waits
     // for the change, not every keystroke, so the field keeps focus while typing.
-    control.addEventListener("change",()=>{render();shell.refresh()});
-    return sourceControl(control,()=>row[key],vanilla?.[key],refs,value=>{row[key]=Number(value);render();shell.refresh()})
+    control.addEventListener("change",()=>{refresh();shell.refresh()});
+    return sourceControl(control,()=>row[key],vanilla?.[key],refs,value=>{row[key]=Number(value);refresh();shell.refresh()})
   }
   // Where a signed world coordinate lands on the map image: 2048 stored units
   // to a block, on the 128 by 96 grid the draw points use, centred on the
@@ -178,6 +178,12 @@
     return map;
   }
   function worldDrawPointDetail(row,prefs){
+    const editable=()=>state.activeSource==='mine'&&document.documentElement.dataset.lexProjectReadonly!=='true';
+    const fields=refresh=>[['x','X'],['y','Y'],['subId','SUB-ID']].map(([key,label])=>{
+      const control=worldNumber(row,key,0,255,`Draw Point ${row.drawId} ${label}`,refresh);
+      if(!editable())control.querySelectorAll('input,select,button').forEach(node=>node.disabled=true);
+      return detailField({label,help:infoHelp(worldPropertyHelp.drawPoint[key]),control});
+    });
     // The panel's map is a picture of where the point is. Clicking it opens the
     // large map, and the large map is where the point is placed: a stray click on
     // a panel must never move game data.
@@ -186,7 +192,7 @@
       points:()=>{const at=worldDrawPosition(row);return at.y>=96?[]:[{x:at.x/128,y:at.y/96,selected:true,
         label:`Draw Point ${row.drawId}`}];},
       readout:point=>{const block=worldDrawBlock(point);return `block ${block.x}, ${block.y}`},
-      place:point=>{const block=worldDrawBlock(point);Object.assign(row,worldDrawBytes(block.x,block.y));rerenderWorldMap();shell.refresh()}});
+      place:editable()?point=>{const block=worldDrawBlock(point);Object.assign(row,worldDrawBytes(block.x,block.y));rerenderWorldMap();shell.refresh()}:null});
     const map=LexeditorUI.imageMap({...spec(),place:null,magnify:null});
     worldMapNavigation(map,map.lexStage);
     map.classList.add("world-draw-map");
@@ -195,11 +201,15 @@
     // The marker is a button and stops its own click, so the map listens on the
     // way down: any click on the picture opens the large map.
     map.addEventListener("click",event=>{if(event.target.closest("input,a"))return;
-      LexeditorUI.mapMagnifier({label:`Draw Point ${row.drawId}`,magnify:()=>({...spec(),
-        note:`Click the map to place Draw Point ${row.drawId}, or close this view and type the exact byte coordinates.`})});},true);
+      LexeditorUI.mapMagnifier({label:`Draw Point ${row.drawId}`,minSizes:[480,300],
+        details:({refresh})=>detailPanel({title:`Draw Point ${row.drawId}`,
+          body:detailSection({body:fields(()=>{rerenderWorldMap();refresh()})})}),
+        magnify:()=>({...spec(),note:editable()
+          ?`Click the map to place Draw Point ${row.drawId}, or edit its position on the right.`
+          :'This source is read-only. Select an editable mod to move this draw point.'})});},true);
 
     // The list shows the draw point's own draw ID, so the panel does too.
-    return sharedDetail({...row,id:row.drawId,name:`DRAW POINT ${row.drawId}`},prefs,[detailSection({className:"world-draw-position",help:infoHelp("Section 34 stores only this world Draw Point's X, Y, and sub-ID bytes. Its magic, quantity, and refill behavior live in FF8_EN.exe and are not invented here."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},detailField({label:"X",help:infoHelp(worldPropertyHelp.drawPoint.x),control:worldNumber(row,"x",0,255,`Draw Point ${row.drawId} X`)}),detailField({label:"Y",help:infoHelp(worldPropertyHelp.drawPoint.y),control:worldNumber(row,"y",0,255,`Draw Point ${row.drawId} Y`)}),detailField({label:"SUB-ID",help:infoHelp(worldPropertyHelp.drawPoint.subId),control:worldNumber(row,"subId",0,255,`Draw Point ${row.drawId} sub-ID`)}))],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
+    return sharedDetail({...row,id:row.drawId,name:`DRAW POINT ${row.drawId}`},prefs,[detailSection({className:"world-draw-position",help:infoHelp("Section 34 stores only this world Draw Point's X, Y, and sub-ID bytes. Its magic, quantity, and refill behavior live in FF8_EN.exe and are not invented here."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},...fields())],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
   }
   function worldFieldReturnDetail(row,prefs){
     // The map, so the reader can see where the stored point lands: the coordinates are
