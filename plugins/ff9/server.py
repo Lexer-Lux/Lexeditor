@@ -17,7 +17,7 @@ from .battle_scene import BattleSceneStore
 from .field_walkmesh import FieldWalkmeshStore
 from .memoria_baseline import ensure as ensure_baseline
 from . import memoria_manager, features, mod_compat
-from . import game_font
+from . import game_font, card_art
 from core.plugin_http import PluginRequestHandler
 
 
@@ -178,6 +178,15 @@ class Handler(PluginRequestHandler):
                     self.json_response({"error": str(error)}, 404)
                 else:
                     self.file_response(font)
+            elif re.fullmatch(r"/assets/cards/\d{1,2}\.png", path):
+                # Card faces cut from the installed game into the private
+                # cache; without an install the card shows its plain face.
+                try:
+                    face = card_art.ensure_card(int(path.rsplit("/", 1)[1].removesuffix(".png")))
+                except (OSError, ValueError) as error:
+                    self.json_response({"error": str(error)}, 404)
+                else:
+                    self.file_response(face)
             elif path == "/api/plugin":
                 self.json_response({"apiVersion": 1, "pluginId": "ff9", "name": "Final Fantasy IX",
                     "edition": "Steam Unity / Memoria CSV", "hosted": HOSTED, "windowHost": WINDOW_HOST,

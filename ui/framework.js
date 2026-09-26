@@ -2335,6 +2335,28 @@
   // kept being rebuilt per plugin and kept collapsing into unreadable strips,
   // so this is the one implementation: labels stay full size and the row wraps
   // onto as many lines as it needs instead of shrinking to fit one.
+  // A wrapped row of switches is balanced, not filled: the grid takes as many
+  // columns as fit, and when that leaves a ragged last line the columns are
+  // cut to the fewest that still need the same number of lines. Eight switches
+  // where five fit read as four and four, not five and three.
+  const balanceToggleRow = row => {
+    const count = row.childElementCount, style = getComputedStyle(row);
+    const width = row.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0);
+    if (!count || width <= 0) return;
+    const probe = element("span", {style: "position:absolute;visibility:hidden;width:var(--lex-toggle-basis,11em)"});
+    row.append(probe);
+    const basis = Math.min(width, probe.getBoundingClientRect().width || 176);
+    probe.remove();
+    const gap = parseFloat(style.columnGap) || 0;
+    const fit = Math.max(1, Math.min(count, Math.floor((width + gap) / (basis + gap))));
+    const columns = Math.ceil(count / Math.ceil(count / fit));
+    if (row.style.getPropertyValue("--lex-toggle-fit-columns") !== String(columns))
+      row.style.setProperty("--lex-toggle-fit-columns", String(columns));
+  };
+  // One observer for every switch row on the page.
+  const toggleRowObserver = typeof ResizeObserver === "function"
+    ? new ResizeObserver(entries => entries.forEach(entry => balanceToggleRow(entry.target)))
+    : null;
   const toggleRow = (options = {}) => {
     const toggles = (options.toggles || []).map(toggle => {
       const input = toggle.control || element("input", {
@@ -2369,6 +2391,7 @@
     });
     if (options.minimum) root.style.setProperty("--lex-toggle-minimum", `${options.minimum}px`);
     if (options.columns) root.style.setProperty("--lex-toggle-columns", String(options.columns));
+    toggleRowObserver?.observe(root);
     // A row of switches is one property holding one number. Copying it copies
     // that number - the bare flag word the game actually stores - not a list
     // of the labels drawn over it. A caller that knows the word passes it; a

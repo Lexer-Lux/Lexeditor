@@ -70,6 +70,12 @@ def service(tmp_path, monkeypatch):
         return font_file
     dependency("game_font", FACES={"ff9-menu.ttf": "Alexandria", "ff9-heading.ttf": "Garnet"},
                ensure_font=ensure_font, FONT_FILE=font_file)
+    card_file = tmp_path / "generated" / "tetra-cards" / "00.png"
+    def ensure_card(card):
+        if card != 0 or not card_file.is_file():
+            raise FileNotFoundError("The installed FF9 card art (sharedassets2.assets) was not found")
+        return card_file
+    dependency("card_art", ensure_card=ensure_card, CARD_FILE=card_file)
     file = Path(__file__).parents[2] / "plugins/ff9/server.py"
     spec = importlib.util.spec_from_file_location(f"{package_name}.server", file)
     module = importlib.util.module_from_spec(spec)
@@ -127,6 +133,23 @@ def test_theme_font_is_served_privately_or_answers_404(service):
     finally:
         connection.close()
     assert request(service, "/assets/other.ttf", body=None, method="GET")[0] == 404
+
+
+def test_card_face_is_served_privately_or_answers_404(service):
+    module, port, _ = service
+    status, payload = request(service, "/assets/cards/0.png", body=None, method="GET")
+    assert status == 404 and "sharedassets2" in payload["error"]
+    target = module.card_art.CARD_FILE
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"\x89PNGfixture")
+    connection = HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        connection.request("GET", "/assets/cards/0.png")
+        response = connection.getresponse()
+        assert response.status == 200 and response.read() == b"\x89PNGfixture"
+    finally:
+        connection.close()
+    assert request(service, "/assets/cards/../server.py", body=None, method="GET")[0] == 404
 
 
 def test_same_origin_post(service):

@@ -263,6 +263,9 @@ test('a Tetra Master card reads as the game draws it', async () => {
   // attack down - the same edges QuadMist draws them on.
   assert.deepEqual(Array.from(drawn.attrs.ranks.map(button => String(button.children[0]))), ['2', '3', '5', '1']);
   assert.equal(String(drawn.attrs.corner.children[0].children[0]), 'MONSTER');
+  // The face is the game's own art, and the card stands beside its values.
+  assert.equal(drawn.attrs.image, '/assets/cards/0.png');
+  assert.equal(card.attrs.bodyLayout, 'beside');
 });
 
 
@@ -322,7 +325,7 @@ test('field walkmesh detail labels BGI and exposes only the active bit as editab
   ],rows:[{line:0,name:'FBG_TEST · Floor 0',source:'project',values:{Field:'FBG_TEST',Active:true,OtherFlags:64}}]};`);
   const node=e.run(`detail(state.datasets['field-walkmesh'],state.datasets['field-walkmesh'].rows[0])`);
   const text=JSON.stringify(node);
-  assert.match(text,/Field walkmesh floors · project BGI/);
+  assert.doesNotMatch(text,/project BGI/);
   assert.match(text,/BGI_FLOOR_ACTIVE/);
   assert.match(text,/STORED DATA/);
 });
@@ -341,7 +344,7 @@ test('field walkmesh triangle detail exposes documented pathing flags as editabl
   ],rows:[{line:0,id:0,name:'Triangle 0',source:'project',values:{Field:'FBG_TEST',Triangle:0,Floor:2,Active:true,AlternateFootstep:true,PreventNPC:true,PreventPC:true,OtherFlags:32}}]};`);
   const node=e.run(`detail(state.datasets['field-walkmesh-triangles'],state.datasets['field-walkmesh-triangles'].rows[0])`);
   const text=JSON.stringify(node);
-  assert.match(text,/Field walkmesh triangles · project BGI/);
+  assert.doesNotMatch(text,/project BGI/);
   assert.match(text,/BGI_TRI_ACTIVE/);
   assert.match(text,/Alternate footstep/);
   assert.match(text,/Prevent NPC pathing/);
@@ -349,13 +352,13 @@ test('field walkmesh triangle detail exposes documented pathing flags as editabl
   assert.match(text,/STORED DATA/);
 });
 
-test('battle scene detail labels raw16 instead of CSV', async () => {
+test('a record panel carries no file-format subtitle', async () => {
   const e = await editor();
   e.run('installData({key:"enemies",label:"Enemies",source:"vanilla",fields:[{key:"MaxHP",label:"Max HP",kind:"integer",editable:true,min:0,max:65535}],rows:[{line:0,id:"B3_001:0",name:"B3_001 · Enemy 1",values:{MaxHP:1234}}]})');
   const panel = e.run('detail(state.datasets.enemies,state.datasets.enemies.rows[0])');
   const rendered = JSON.stringify(panel);
-  assert.match(rendered, /Enemies · vanilla BattleScene raw16/);
-  assert.doesNotMatch(rendered, /Enemies · vanilla CSV/);
+  assert.ok(!panel.attrs.meta, 'the Enemies panel still names its file format');
+  assert.doesNotMatch(rendered, /BattleScene raw16|vanilla CSV/);
 });
 
 test('enemy attack detail offers the verified target enum and keeps legacy bits stored', async () => {
@@ -367,7 +370,7 @@ test('enemy attack detail offers the verified target enum and keeps legacy bits 
   ],rows:[{line:0,id:"B3_002:0",name:"B3_002 · Attack 1",source:"vanilla",values:{Target:"SingleEnemy(2)",Power:80,LegacySfx:2748}}]})`);
   const panel = e.run('detail(state.datasets["enemy-attacks"],state.datasets["enemy-attacks"].rows[0])');
   const rendered = JSON.stringify(panel);
-  assert.match(rendered, /Enemy attacks · vanilla BattleScene raw16/);
+  assert.ok(!panel.attrs.meta);
   assert.match(rendered, /SingleEnemy\(2\)/);
   assert.match(rendered, /STORED DATA/);
   const target = e.run('fieldControl(state.datasets["enemy-attacks"],state.datasets["enemy-attacks"].rows[0],state.datasets["enemy-attacks"].fields[0])');
@@ -384,7 +387,7 @@ test('battle scene flag detail exposes verified Memoria rules as editable toggle
   ],rows:[{line:0,id:"B3_002:0",name:"B3_002 · Scene 1",source:"vanilla",values:{BackAttack:true,OtherFlags:5}}]})`);
   const panel = e.run('detail(state.datasets["scene-flags"],state.datasets["scene-flags"].rows[0])');
   const rendered = JSON.stringify(panel);
-  assert.match(rendered, /Battle scene flags · vanilla BattleScene raw16/);
+  assert.ok(!panel.attrs.meta);
   assert.match(rendered, /SB2_FLG_BACKATK/);
   assert.match(rendered, /STORED DATA/);
   const toggle = e.run('fieldControl(state.datasets["scene-flags"],state.datasets["scene-flags"].rows[0],state.datasets["scene-flags"].fields[0])');

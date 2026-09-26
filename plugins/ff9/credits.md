@@ -58,6 +58,13 @@ No proprietary game data is included here.
     recreation of the PlayStation FF9 lettering, is the body and tab face.
   - "Garnet", the heavier pixel face bundled beside it, is the heading face.
   - The bundle's "TBUDGothic Std B" (Morisawa, commercial) is not used.
+- Tetra Master card faces are cut at serve time from the player's installed
+  `x64/FF9_Data/sharedassets2.assets` into the private game-data cache
+  (`plugins/ff9/card_art.py`): the ARGB32 texture `quadmist_image1` is cropped
+  to the rectangles the NGUI atlas drawn with "QuadMist Image Atlas 1" gives
+  for `card_00`..`card_99`. The Texture2D field order follows the UnityPy
+  reader (MIT); the sprite record follows NGUI's `UISpriteData`. Nothing is
+  vendored, and no card image is bundled.
 - No FF9 font, image, or audio asset is bundled, downloaded, or redistributed.
   Without an install the editor falls back to system fonts. Game-derived
   interface sounds are never shipped: they require local extraction from an

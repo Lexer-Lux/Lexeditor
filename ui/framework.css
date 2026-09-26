@@ -4105,7 +4105,7 @@ body:has(.lex-data-map-table) #main {
 .lex-subtab-bar-images img { display:block; width:100%; height:100%; object-fit:cover; image-rendering:pixelated; }
 .lex-subtab-bar-images > .active { outline:0; }
 /* A card with four directional ranks, a corner control and a score. */
-.lex-stat-card { position:relative; width:clamp(150px,17vw,208px); aspect-ratio:3/4; flex:none; overflow:hidden; color:var(--lex-card-fg,var(--lex-text)); background:var(--lex-card-bg,var(--lex-panel-2)); }
+.lex-stat-card { position:relative; width:clamp(150px,17vw,208px); aspect-ratio:var(--lex-card-ratio,3/4); flex:none; overflow:hidden; color:var(--lex-card-fg,var(--lex-text)); background:var(--lex-card-bg,var(--lex-panel-2)); }
 .lex-stat-card > img { position:absolute; inset:calc(-1 * var(--lex-card-image-crop,0%)); width:calc(100% + 2 * var(--lex-card-image-crop,0%)); height:calc(100% + 2 * var(--lex-card-image-crop,0%)); object-fit:fill; image-rendering:pixelated; }
 .lex-stat-card-ranks { position:absolute; top:5px; left:6px; display:grid; grid-template-columns:1em 1em; justify-items:center; font:700 32px/1 var(--lex-font); filter:drop-shadow(2px 2px 1px #000) drop-shadow(-1px -1px 1px #000); }
 .lex-stat-card-ranks > button { min-width:1ch; min-height:1em; padding:0; border:0; color:inherit; background:transparent; font:inherit; }
@@ -5876,6 +5876,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-detail-parts.lex-detail-parts-switches {
   grid-template-columns:repeat(auto-fit, minmax(min(100%, var(--lex-toggle-basis, 11em)), 1fr));
   gap:var(--lex-panel-gap, 12px);
+}
+/* Once measured, a switch row is balanced across its lines (see toggleRow). */
+.lex-detail-parts.lex-toggle-row[style*="--lex-toggle-fit-columns"] {
+  grid-template-columns:repeat(var(--lex-toggle-fit-columns), minmax(0, 1fr));
 }
 .lex-detail-parts-switches > .lex-toggle { grid-column:auto; }
 .lex-detail-parts-switches > .lex-detail-part { margin-right:0; }
