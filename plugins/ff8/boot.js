@@ -236,12 +236,15 @@
     const preset=()=>detailField({label:"Weapon preset",control:selectControl(f.weaponId,weapons.map(row=>({id:row.id,name:row.name})),value=>{f.weaponId=value;renderFormulae()})});
     const formulaTerm=(name,label,help)=>{const field=weaponField(name);return field?detailField({label,help:infoHelp(help),control:fieldSourceControl(field,"weapons",weapon.id)}):null};
     const boost=()=>state.data.settings.flyingEvaEnabled?state.data.settings.flyingEvaBonus:0;
-    const calculate=()=>{const strength=Math.min(255,Math.max(0,Math.trunc(Number(f.strength)+fieldValue("str_bonus")))),inner=Math.trunc((265-Number(f.vitality))*(strength+Math.trunc(strength*strength/16))/256),middle=Math.max(0,Math.trunc(fieldValue("attack_power")*inner/16)),low=Math.max(0,Math.trunc(middle*240/256)),average=Math.max(0,middle),high=Math.max(0,Math.trunc(middle*272/256)),flyingPenalty=f.flying&&Boolean(fieldValue("melee"))&&!f.float?boost():0,luckTerm=settings.formulaeRework?Number(f.luck):Math.floor(Number(f.luck)/2),effective=Math.max(0,Math.min(100,fieldValue("hit_rate")+luckTerm-Number(f.eva)-Number(f.targetLuck)-flyingPenalty)),chance=Math.max(0,Math.min(100,(Math.floor(255*effective/100)+1)/256*100));return{low,average,high,flyingPenalty,chance}};
+    const reworkedMelee=()=>{const raw=Math.trunc(Number(f.strength)*fieldValue("str_bonus")*fieldValue("attack_power")*5/100);return Math.max(0,Math.trunc(raw*(100-Math.min(75,Number(f.vitality)))/100))};
+    const calculate=()=>{const strength=Math.min(255,Math.max(0,Math.trunc(Number(f.strength)+fieldValue("str_bonus")))),inner=Math.trunc((265-Number(f.vitality))*(strength+Math.trunc(strength*strength/16))/256),middle=Math.max(0,Math.trunc(fieldValue("attack_power")*inner/16)),low=Math.max(0,Math.trunc(middle*240/256)),average=Math.max(0,middle),high=Math.max(0,Math.trunc(middle*272/256)),flyingPenalty=f.flying&&Boolean(fieldValue("melee"))&&!f.float?boost():0,luckTerm=settings.formulaeRework?Number(f.luck):Math.floor(Number(f.luck)/2),effective=Math.max(0,Math.min(100,fieldValue("hit_rate")+luckTerm-Number(f.eva)-Number(f.targetLuck)-flyingPenalty)),chance=Math.max(0,Math.min(100,(Math.floor(255*effective/100)+1)/256*100));if(settings.formulaeRework){const fixed=reworkedMelee();return{low:fixed,average:fixed,high:fixed,flyingPenalty,chance}}return{low,average,high,flyingPenalty,chance}};
     const checkbox=(label,key)=>detailField({label,control:el("input",{type:"checkbox",checked:f[key],onchange:event=>{f[key]=event.target.checked;updateOutputs()}})});
     const damageOutput=LexeditorUI.detailNote(""),accuracyOutput=LexeditorUI.detailNote("");
     const section=(title,body)=>detailSection({title,body});
     const damage=section("PHYSICAL DAMAGE",[
-      preset(),section("FORMULA",[
+      preset(),section("FORMULA",settings.formulaeRework?[
+        LexeditorUI.mathFormula("DAMAGE = floor(STR * STR BONUS * POWER * 5 / 100) * (100 - min(75, VIT)) / 100"),
+        LexeditorUI.mathFormula("ENEMIES: STR BONUS = 1 and POWER = the ability's attack power")]:[
         LexeditorUI.mathFormula("STR = min(255, attacker STR + weapon STR bonus)"),
         LexeditorUI.mathFormula("DAMAGE = floor(POWER * floor((265 - VIT) * (STR + floor(STR^2 / 16)) / 256) / 16) * RANDOM / 256"),
         LexeditorUI.detailNote("RANDOM = 240 to 272")]),
@@ -261,7 +264,7 @@
         formulaTerm("melee","Melee weapon","Marks the attack as close-range for this formula; grounded melee attacks take the flying-target accuracy penalty."),
         detailField({label:"Flying EVA bonus",help:infoHelp("This penalty applies to grounded melee attackers when the target is flying."),control:flyingTerm})]),
       section("PREVIEW INPUTS",[formulaInput("Attacker LUCK","luck",0,255),formulaInput("Target EVA","eva",0,255),formulaInput("Target LUCK","targetLuck",0,255),checkbox("Target is flying","flying"),checkbox("Attacker has Float","float")]),accuracyOutput]);
-    function updateOutputs(){const value=calculate();damageOutput.textContent=`DAMAGE: ${formatNumber(value.low)} TO ${formatNumber(value.high)} · AVERAGE ${formatNumber(value.average)}`;accuracyOutput.textContent=`FLYING PENALTY: ${formatNumber(value.flyingPenalty)}% · HIT CHANCE: ${formatNumber(value.chance,{maximumFractionDigits:1})}%`}
+    function updateOutputs(){const value=calculate();damageOutput.textContent=value.low===value.high?`DAMAGE: ${formatNumber(value.low)}`:`DAMAGE: ${formatNumber(value.low)} TO ${formatNumber(value.high)} · AVERAGE ${formatNumber(value.average)}`;accuracyOutput.textContent=`FLYING PENALTY: ${formatNumber(value.flyingPenalty)}% · HIT CHANCE: ${formatNumber(value.chance,{maximumFractionDigits:1})}%`}
     // The backend owns the complete requested inventory and each row's runtime
     // status. A formula cannot disappear from this page merely because its native
     // implementation is unfinished.
@@ -269,6 +272,7 @@
     const reworkCard=formula=>detailSection({title:`${String(formula.name||formula.id).toUpperCase()} · ${formula.status==="implemented"?"IMPLEMENTED":"INCOMPLETE"}`,
       attrs:{"data-formula-id":formula.id},body:[
         section("REWORKED",LexeditorUI.mathFormula(formula.replacement||"Not specified")),
+        formula.enemies?section("ENEMIES",LexeditorUI.mathFormula(formula.enemies)):null,
         section("VANILLA",LexeditorUI.mathFormula(formula.vanilla||"Not documented")),
         formula.blocker?LexeditorUI.detailNote(`INCOMPLETE: ${formula.blocker}`):null].filter(Boolean)});
     const implementedCount=formulaRows.filter(formula=>formula.status==="implemented").length;

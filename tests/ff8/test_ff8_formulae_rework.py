@@ -35,8 +35,8 @@ class FormulaeReworkTests(unittest.TestCase):
     def test_only_real_runtime_components_are_marked_implemented(self):
         self.assertEqual(
             formulae_rework.implemented_ids(),
-            ("magic_damage", "status_infliction", "spell_healing", "physical_accuracy",
-             "status_attack", "mug_chance"),
+            ("melee_damage", "magic_damage", "status_infliction", "spell_healing",
+             "physical_accuracy", "status_attack", "mug_chance"),
         )
         runtime = {
             row["id"]: row["runtime"]
@@ -44,6 +44,7 @@ class FormulaeReworkTests(unittest.TestCase):
             if row["status"] == formulae_rework.STATUS_IMPLEMENTED
         }
         self.assertEqual(runtime, {
+            "melee_damage": "melee_damage_rework",
             "magic_damage": "magic_damage_rework",
             "spell_healing": "healing_rework",
             "physical_accuracy": "luck_accuracy",
@@ -56,7 +57,7 @@ class FormulaeReworkTests(unittest.TestCase):
         self.assertFalse(formulae_rework.available())
         self.assertEqual(
             formulae_rework.incomplete_ids(),
-            ("melee_damage", "elemental_attack"),
+            ("elemental_attack",),
         )
 
     def test_healing_replacement_mirror(self):
@@ -122,6 +123,15 @@ class FormulaeReworkTests(unittest.TestCase):
             formulae_rework.melee_damage(256, 0, 0, 0)
         with self.assertRaises(ValueError):
             formulae_rework.melee_damage(True, 0, 0, 0)
+
+    def test_melee_page_states_the_enemy_rule(self):
+        row = next(row for row in formulae_rework.FORMULAE if row["id"] == "melee_damage")
+        self.assertIn("STR bonus counts as 1", row["enemies"])
+        self.assertIn("attack's own power", row["enemies"])
+        self.assertEqual(formulae_rework.ENEMY_WEAPON_STR_BONUS, 1)
+        editor = plugin_ui("ff8")
+        self.assertIn('section("ENEMIES"', editor)
+        self.assertIn("ENEMIES: STR BONUS = 1", editor)
 
     def test_magic_damage_follows_the_mod_doc(self):
         self.assertEqual(formulae_rework.magic_damage(12, 40, 0), 480)

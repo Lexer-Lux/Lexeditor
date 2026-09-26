@@ -7,8 +7,8 @@ which runs taller than the main region, and the FF8 plugin clips #main. The
 page must therefore mount inside the shared tweaks scroll container. This
 check renders the page with stubbed data (CI needs no private game install),
 scrolls the container to its end, and requires the last formula card to sit
-inside the window. It then disables the tweak and requires the subtab to
-fall back to the Gameplay list that owns the toggle. It sends no writes.
+inside the window. It then turns the tweak off and requires the subtab to
+stay open on the same cards. It sends no writes.
 """
 import json
 import sys
@@ -64,9 +64,12 @@ document.body.dataset.lexPlugin="ff8";renderSettings();LexeditorUI.finishPluginL
         assert unlocked["rework"] == [row["id"] for row in formulae_rework.rows()], unlocked["rework"]
         assert any("PHYSICAL DAMAGE" in card for card in unlocked["cards"]), unlocked["cards"]
         assert any("PHYSICAL ACCURACY" in card for card in unlocked["cards"]), unlocked["cards"]
-        assert any("MELEE DAMAGE" in card and "INCOMPLETE" in card for card in unlocked["cards"]), unlocked["cards"]
+        assert any("MELEE DAMAGE" in card and "IMPLEMENTED" in card for card in unlocked["cards"]), unlocked["cards"]
+        assert "ENEMIES" in unlocked["cards"], unlocked["cards"]
+        assert any("ELEMENTAL ATTACK DAMAGE" in card and "INCOMPLETE" in card for card in unlocked["cards"]), unlocked["cards"]
         assert any("SPELL HEALING" in card and "IMPLEMENTED" in card for card in unlocked["cards"]), unlocked["cards"]
-        assert "2/6 requested runtime formulae are implemented" in unlocked["master"], unlocked["master"]
+        implemented = len(formulae_rework.implemented_ids())
+        assert f"{implemented}/{len(formulae_rework.rows())} requested runtime formulae are implemented" in unlocked["master"], unlocked["master"]
         formulae_tab = next(tab for tab in unlocked["subtabs"] if tab["label"] == "Formulae")
         assert formulae_tab == {"label": "Formulae", "disabled": False, "active": True}, unlocked["subtabs"]
         metrics = page.evaluate("""() => {
@@ -91,8 +94,8 @@ document.body.dataset.lexPlugin="ff8";renderSettings();LexeditorUI.finishPluginL
         assert metrics["overflowY"] == "auto", metrics
         assert metrics["scrollable"] > 0, metrics
         assert metrics["lastBottom"] <= metrics["viewport"], metrics
-        # Locking the owning tweak must fall back to the Gameplay list that
-        # owns the toggle instead of stranding the viewer on a locked subtab.
+        # The subtab stays open while the owning switch is off, like
+        # GFs -> Spellbook: it opens onto the formulae and the reason.
         locked = page.evaluate("""() => {
           state.data.settings.formulaeRework = false;
           renderSettings();
@@ -108,14 +111,12 @@ document.body.dataset.lexPlugin="ff8";renderSettings();LexeditorUI.finishPluginL
           };
         }""")
         assert not errors, errors
-        assert locked["settingsTab"] == "gameplay", locked
-        assert locked["formulaCards"] == 0, locked
-        assert locked["gameplay"], locked
-        assert locked["tweak"] == {"disabled": True}, locked
+        assert locked["settingsTab"] == "formulae", locked
+        assert locked["formulaCards"] == len(formulae_rework.rows()), locked
         formulae_tab = next(tab for tab in locked["subtabs"] if tab["label"] == "Formulae")
-        assert formulae_tab["disabled"] is True, locked["subtabs"]
+        assert formulae_tab == {"label": "Formulae", "disabled": False, "active": True}, locked["subtabs"]
         browser.close()
-    print("PASS: Formulae tweaks subtab scrolls when unlocked and falls back to Gameplay when locked")
+    print("PASS: Formulae tweaks subtab scrolls and stays open while its switch is off")
 finally:
     server.shutdown()
     server.server_close()
