@@ -285,6 +285,20 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
 
             page.evaluate("state.datasetChoice.world='field-walkmesh';loadDataset('field-walkmesh').then(render)")
             page.wait_for_function("state.datasets['field-walkmesh']?.rows?.length===4")
+            # One checkbox in one property is a boolean: the shared field lays
+            # it out as a checkbox with its leader arrow. Passed the CSV's own
+            # word for the storage type, it fell through to the ordinary row
+            # rules and stretched the checkbox across the whole line.
+            walkmesh_active = field(page, "FLOOR ACTIVE")
+            assert walkmesh_active.get_attribute("data-lex-type") == "BOOL"
+            boolean_box = walkmesh_active.locator('input[type="checkbox"]')
+            # The panel is rebuilt as the dataset settles, so wait for the box
+            # itself before measuring it; a detached node measures as nothing.
+            expect(boolean_box).to_be_visible()
+            expect(walkmesh_active.locator(".lex-field-boolean-arrow")).to_be_visible()
+            box_size = boolean_box.bounding_box()
+            assert box_size and 12 <= box_size["width"] <= 32 and 12 <= box_size["height"] <= 32, box_size
+            page.screenshot(path=str(OUT / "ff9-boolean.png"), full_page=True)
             active = field(page, "FLOOR ACTIVE").locator('input[type="checkbox"]')
             expect(active).to_be_checked()
             expect(field(page, "OTHER FLAG BITS").locator("input")).to_have_value("64")

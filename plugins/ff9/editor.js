@@ -286,7 +286,13 @@
     if(!note&&field.editable&&field.kind!=="stored")
       control=sourceControl(control,()=>row.values[field.key],vanillaValue(data,row,field),
         next=>setValue(data,row,field,next),formatFieldValue(field));
-    return detailField({label:field.label.toLocaleUpperCase(),pin:fieldPin(data,field),help:semantic?infoHelp(semantic):null,control,dataType:note?"READ ONLY":field.declaredType,min:bounds.min,max:bounds.max});
+    // A single on/off property is a boolean, whatever word the CSV's type line
+    // stores it as ("Bit", "Boolean"). The shared field only lays a checkbox
+    // out and points its leader arrow at it under the name it knows, so the
+    // declared word is translated rather than passed through: passed through,
+    // the box stretched to the full row with no arrow at all.
+    const dataType=note?"READ ONLY":field.kind==="boolean"?"BOOL":field.declaredType;
+    return detailField({label:field.label.toLocaleUpperCase(),pin:fieldPin(data,field),help:semantic?infoHelp(semantic):null,control,dataType,min:bounds.min,max:bounds.max});
   }
   const fieldRows=(data,row,exclude=[])=>{const blocked=new Set(exclude.map(String));return data&&row?data.fields.filter(field=>!blocked.has(field.key)&&field.key.toLocaleLowerCase()!=="id"&&field.key.toLocaleLowerCase()!=="comment").map(field=>fieldControl(data,row,field)):[]};
   function boolProperty(data,row,label,keys,help){const fields=new Map(data.fields.map(field=>[field.key,field]));const toggles=keys.filter(key=>fields.has(key)).map(key=>({key,label:key,pin:fieldPin(data,fields.get(key)),checked:!!row.values[key],disabled:state.activeSource!=="mine",change:value=>setValue(data,row,fields.get(key),value)}));return toggles.length?detailField({label,help:help?infoHelp(help):null,control:toggleRow({label,toggles}),dataType:"FLAGS"}):null}
