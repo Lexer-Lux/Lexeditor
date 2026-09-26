@@ -271,7 +271,7 @@
         formulaTerm("melee","Melee weapon","Marks the attack as close-range for this formula; grounded melee attacks take the flying-target accuracy penalty."),
         detailField({label:"Flying EVA bonus",help:infoHelp("This penalty applies to grounded melee attackers when the target is flying."),control:flyingTerm})]),
       section("PREVIEW INPUTS",[formulaInput("Attacker LUCK","luck",0,255),formulaInput("Target EVA","eva",0,255),formulaInput("Target LUCK","targetLuck",0,255),checkbox("Target is flying","flying"),checkbox("Attacker has Float","float")]),accuracyOutput]);
-    function updateOutputs(){const value=calculate();damageOutput.textContent=`DAMAGE: ${formatNumber(value.low)} TO ${formatNumber(value.high)} · AVERAGE ${formatNumber(value.average)}`;accuracyOutput.textContent=`FLYING PENALTY: ${formatNumber(value.flyingPenalty)}% · HIT CHANCE: ${formatNumber(value.chance,{maximumFractionDigits:1})}%`}
+    function updateOutputs(){const value=calculate();damageOutput.textContent=value.low===value.high?`DAMAGE: ${formatNumber(value.low)}`:`DAMAGE: ${formatNumber(value.low)} TO ${formatNumber(value.high)} · AVERAGE ${formatNumber(value.average)}`;accuracyOutput.textContent=`FLYING PENALTY: ${formatNumber(value.flyingPenalty)}% · HIT CHANCE: ${formatNumber(value.chance,{maximumFractionDigits:1})}%`}
     // The backend owns the complete requested inventory and each row's runtime
     // status. A formula cannot disappear from this page merely because its native
     // implementation is unfinished.
