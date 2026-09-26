@@ -172,7 +172,9 @@ def main():
                     skill_row=page.locator('.lex-column-list-row').filter(has_text='module_skills.py')
                     skill_row.wait_for(state='visible')
                     skill_row.click()
-                    page.get_by_role('button',name='Open misc',exact=True).click()
+                    # Skills is a page tab of its own now, so the Data Map
+                    # names the page the record actually opens on.
+                    page.get_by_role('button',name='Open skills',exact=True).click()
                     page.locator('.warband-module-detail').wait_for(state='visible')
                     assert page.locator('.warband-module-detail [data-lex-property="id"] input').is_disabled()
                     max_level=page.locator('.warband-module-detail [data-lex-property="maxLevel"] input')
@@ -187,7 +189,9 @@ def main():
                     cell=page.locator('.warband-record-list .lex-column-list-row').first.locator('[data-column-key="maxLevel"]')
                     cell.dblclick();cell.locator('input').fill('12');cell.locator('input').press('Enter')
                     assert page.locator('.warband-module-detail [data-lex-property="maxLevel"] input').input_value()=='12'
-                    page.get_by_role('button',name='Discard changes',exact=True).click()
+                    # The shell's own Undo is the only revert in the editor; the
+                    # view keeps no second Save or Discard beside it.
+                    page.get_by_role('button',name='Undo',exact=True).click()
                     assert page.locator('.warband-module-detail [data-lex-property="maxLevel"] input').input_value()=='10'
                     max_level=page.locator('.warband-module-detail [data-lex-property="maxLevel"] input');max_level.fill('11')
                     assert page.evaluate('moduleRecords.dirtyCount()')==1
@@ -196,17 +200,24 @@ def main():
                     page.wait_for_function('!document.body.classList.contains("lex-save-busy")')
                     assert page.locator('.lex-dialog').filter(has_text='Save failed').count()==0
                     page.get_by_role('button',name='Items',exact=True).click()
-                    page.get_by_role('button',name='Misc.',exact=True).click()
+                    page.get_by_role('button',name='Skills',exact=True).click()
                     page.locator('.warband-module-detail').wait_for(state='visible')
                     assert page.locator('.warband-module-detail [data-lex-property="maxLevel"] input').input_value()=='11'
                     page.screenshot(path=str(ARTIFACTS/f'module-data-{width}.png'),full_page=True)
-                    page.get_by_role('combobox',name='Warband Module System dataset',exact=True).select_option('strings')
+                    # Misc. keeps its remaining areas behind a subtab bar.
+                    page.get_by_role('button',name='Misc.',exact=True).click()
+                    # The view keeps no Save, Discard or unsaved-field counter of
+                    # its own: the shell's Save and History own that.
+                    assert page.locator('#toolbar').inner_text().strip()==''
+                    assert page.get_by_role('button',name='Discard changes',exact=True).count()==0
+                    page.get_by_role('tab',name='Strings',exact=True).click()
                     page.wait_for_function('document.querySelector(".warband-module-state")?.textContent.includes("No strings records")')
-                    page.get_by_role('combobox',name='Warband Module System dataset',exact=True).select_option('sounds')
+                    page.get_by_role('button',name='Sounds',exact=True).click()
                     page.wait_for_function('document.querySelector(".warband-module-state")?.textContent.includes("Synthetic sound parse failure")')
                     page.get_by_role('button',name='Retry',exact=True).click()
                     page.locator('.warband-module-detail').wait_for(state='visible')
-                    page.get_by_role('combobox',name='Warband Module System dataset',exact=True).select_option('particle-systems')
+                    page.get_by_role('button',name='Misc.',exact=True).click()
+                    page.get_by_role('tab',name='Particle systems',exact=True).click()
                     page.locator('.warband-module-detail').wait_for(state='visible')
                     assert page.locator('.warband-module-detail [data-lex-property="emitBox"] input[type="number"]').count()==3
                     assert page.locator('.warband-module-detail [data-lex-property="rotationSpeed"] input[type="number"]').count()==1

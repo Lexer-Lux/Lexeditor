@@ -348,6 +348,11 @@ SCHEMAS = {
 
 SCHEMA_BY_FILENAME = {schema["filename"]: key for key, schema in SCHEMAS.items()}
 
+# Areas the plugin shows as page tabs of their own instead of inside Misc.
+# The Data Map names that tab so its open button does not promise a place the
+# record no longer lives.
+PROMOTED_TABS = {"music": "music", "factions": "factions", "skills": "skills", "sounds": "sounds"}
+
 
 def _source(path: Path):
     raw = path.read_bytes()

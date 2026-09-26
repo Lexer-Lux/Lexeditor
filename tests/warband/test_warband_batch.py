@@ -23,7 +23,7 @@ class CoverageTests(unittest.TestCase):
         self.root=Path(self.temp.name); (self.root/'ModuleSystem').mkdir();(self.root/'Module').mkdir()
         (self.root/'Module'/'module.ini').write_text('module_name = Fixture')
         (self.root/'settings.ini').write_text('[Test]\nvalue=1\n')
-        for name in ('module_troops.py','module_items.py','module_skills.py'):
+        for name in ('module_troops.py','module_items.py','module_skills.py','module_sounds.py'):
             (self.root/'ModuleSystem'/name).write_text('')
         for key,value in {'PROJECT':self.root,'MODULE_SYSTEM':self.root/'ModuleSystem','SETTINGS':self.root/'settings.ini'}.items():
             p=patch.object(server,key,value);p.start();self.addCleanup(p.stop)
@@ -33,7 +33,10 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(rows['settings.ini']['coverage'],'structured')
         self.assertEqual(rows['module_skills.py']['coverage'],'structured')
         self.assertEqual(rows['module_skills.py']['status'],'partial')
-        self.assertEqual(rows['module_skills.py']['view'],'misc')
+        # Music, factions, skills and sounds are page tabs of their own; the
+        # Data Map names the page each record really opens on.
+        self.assertEqual(rows['module_skills.py']['view'],'skills')
+        self.assertEqual(rows['module_sounds.py']['view'],'sounds')
         self.assertEqual(rows['module_items.py']['coverage'],'structured')
         self.assertEqual(rows['module_items.py']['status'],'integrated')
         self.assertEqual(rows['module_items.py']['view'],'items')
@@ -63,7 +66,8 @@ class CoverageTests(unittest.TestCase):
         }
         expected_structured_partial={'module_troops.py':'troops'}
         expected_structured_partial.update({
-            schema['filename']:'misc' for schema in server.MODULE_RECORD_SCHEMAS.values()
+            schema['filename']:server.PROMOTED_TABS.get(dataset,'misc')
+            for dataset,schema in server.MODULE_RECORD_SCHEMAS.items()
             if schema['filename'] not in {'module_strings.py','module_info_pages.py'}
         })
         expected_source_only={

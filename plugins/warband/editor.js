@@ -410,7 +410,9 @@
     }catch(error){setStatus("Save failed");showAlert({title:"Save failed",items:[{item:"Save",issue:error.message||String(error)}],closeLabel:"Confirm and Close"});}
   }
 
-  const views={items:renderItems,misc:()=>moduleRecords.render(),manuals:renderManuals,upgrades:renderUpgrades,troops:renderTroops,tweaks:renderSettings,datamap:renderDataMap,dashboard:renderDashboard};
+  // Music, factions, skills and sounds are areas of their own; Misc. keeps the
+  // rest behind a subtab bar.
+  const views={items:renderItems,misc:()=>moduleRecords.render("misc"),music:()=>moduleRecords.render("music"),factions:()=>moduleRecords.render("factions"),skills:()=>moduleRecords.render("skills"),sounds:()=>moduleRecords.render("sounds"),manuals:renderManuals,upgrades:renderUpgrades,troops:renderTroops,tweaks:renderSettings,datamap:renderDataMap,dashboard:renderDashboard};
   function navigate(tab){disposeWarbandPreview();state.tab=tab;render();}
   function renderVanilla(){$("#toolbar").replaceChildren();$("#main").replaceChildren(detailPanel({className:"lex-information-panel",title:"Vanilla",body:[LexeditorUI.detailSection({body:[
     LexeditorUI.detailText("The installed Native module is read-only. Its generated text files do not contain the Module System source used by this editor."),

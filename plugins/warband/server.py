@@ -19,7 +19,7 @@ from .item_icons import CACHE as ICON_CACHE
 from .catalog import DATA_CATALOG
 from .dump_infopages import parse_info_pages
 from .troop_editor import troop_data, save_troops
-from .module_records import SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME, dataset_data, save_dataset
+from .module_records import PROMOTED_TABS, SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME, dataset_data, save_dataset
 from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
 from .model_preview import PreviewUnavailable, preview as item_preview, texture_path as preview_texture_path
 from core.plugin_http import PluginRequestHandler
@@ -471,7 +471,8 @@ def data_map_rows() -> dict:
                 notes = "Troop names, factions, attributes, flags and equipment have controls. Advanced fields use source expressions. Saves preserve record IDs and upgrade code, then use the project build."
             elif dataset and source_available:
                 schema = MODULE_RECORD_SCHEMAS[dataset]
-                coverage, status, view = "structured", schema["status"], "misc"
+                coverage, status = "structured", schema["status"]
+                view = PROMOTED_TABS.get(dataset, "misc")
                 notes = schema["notes"] + " Structured controls apply to literal top-level records; helper/wrapper-generated records stay source-only."
             elif source_available:
                 coverage, status = "source", "not-integrated"
