@@ -2402,8 +2402,20 @@
     if (!count || width <= 0) return;
     const probe = element("span", {style: "position:absolute;visibility:hidden;width:var(--lex-toggle-basis,11em)"});
     row.append(probe);
-    const basis = Math.min(width, probe.getBoundingClientRect().width || 176);
+    let basis = probe.getBoundingClientRect().width || 176;
     probe.remove();
+    // Include each switch's full label, help, checkbox and padding before
+    // choosing columns. A fixed em basis can split a name and its help mark.
+    for (const toggle of Array.from(row.children)) {
+      if (!toggle.classList.contains("lex-toggle")) continue;
+      const sample = toggle.cloneNode(true);
+      sample.style.cssText = "position:absolute;visibility:hidden;width:max-content;max-width:none;min-width:0;";
+      sample.querySelector(".lex-toggle-name").style.cssText = "white-space:nowrap;flex:none;";
+      row.append(sample);
+      basis = Math.max(basis, sample.getBoundingClientRect().width);
+      sample.remove();
+    }
+    basis = Math.min(width, Math.ceil(basis));
     const gap = parseFloat(style.columnGap) || 0;
     const fit = Math.max(1, Math.min(count, Math.floor((width + gap) / (basis + gap))));
     const columns = Math.ceil(count / Math.ceil(count / fit));

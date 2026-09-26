@@ -1,5 +1,6 @@
 """A related selector shares the flag grid without reserving another column."""
 from test_shared_ui_feedback import page, framework, ROOT
+import os
 
 
 def test_selector_and_flags_share_grid(page):
@@ -23,3 +24,28 @@ def test_selector_and_flags_share_grid(page):
     assert page.locator('.lex-toggle-rail .lex-info-help').count()==0
     assert page.locator('.lex-toggle-name .lex-info-help').count()==4
     assert all(page.locator('.lex-toggle-name .lex-info-help').nth(i).is_visible() for i in range(4))
+
+
+def test_flag_names_and_help_fit_before_adding_columns(page):
+    framework(page)
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
+    page.evaluate('''()=>{
+      const U=LexeditorUI;
+      document.querySelector('main').append(U.detailPanel({title:'Item',body:[U.detailField({label:'Use flags',control:U.toggleRow({
+        toggles:['Target chars','Target GF','GF compat others','Usable in battle'].map(label=>({label,help:'Help for '+label}))
+      })})]}));
+    }''')
+    for scale in [16,24]:
+        for width in ([400,650,1000] if scale == 16 else [650,1000]):
+            page.evaluate('([w,s])=>{const m=document.querySelector("main");m.style.width=w+"px";m.style.fontSize=s+"px"}',[width,scale])
+            page.wait_for_timeout(100)
+            if os.environ.get('LEX_TOGGLE_SCREENSHOT'):
+                page.screenshot(path=os.environ['LEX_TOGGLE_SCREENSHOT'])
+            assert page.locator('.lex-toggle-name').evaluate_all('''es=>es.every(e=>{
+              const r=document.createRange();r.selectNode(e.firstChild);
+              const text=r.getBoundingClientRect(),help=e.querySelector('.lex-info-help').getBoundingClientRect();
+              return r.getClientRects().length===1 && Math.abs((text.top+text.bottom-help.top-help.bottom)/2)<5
+                && e.scrollWidth<=e.clientWidth+1;
+            })'''), (width, scale)
+    if os.environ.get('LEX_TOGGLE_SCREENSHOT'):
+        page.screenshot(path=os.environ['LEX_TOGGLE_SCREENSHOT'])
