@@ -8,7 +8,7 @@
   --lex-list-row-padding:9px 11px;--lex-row-selected-fg:#6b1717;--lex-row-selected-bg:#e4c98d;--lex-list-header-bg:#d1b879;--lex-list-cell-border:#c8ae78;--lex-row-hover-bg:#f0dba8;
   --lex-shell-header-fg:#f4dfb1;--lex-shell-header-bg:#4b1717;--lex-shell-header-border:#a66b24;--lex-shell-button-fg:#f4dfb1;--lex-shell-button-border:#8c4a35;--lex-shell-button-bg:#6b2424;--lex-command-row-bg:#4b1717;
   --lex-fitted-row-height:36px;
-  --lex-detail-icon-size:96px;--lex-detail-heading-padding:4px 10px 5px;--lex-detail-title-fg:#651919;--lex-detail-id-fg:var(--lex-muted);
+  --lex-detail-icon-size:96px;--lex-detail-heading-padding:8px 10px;--lex-detail-title-fg:#651919;--lex-detail-id-fg:var(--lex-muted);
   --lex-detail-icon-border:#8b6b39;--lex-detail-icon-bg:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09);
   --lex-model-stage-bg:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09);--lex-model-stage-fg:#ead8ac;--lex-model-stage-spinner:#d5b469;
   --lex-input-bg:#fff5d8;--lex-tab-fg:#2b2114;--lex-preview-icon-side:left;
