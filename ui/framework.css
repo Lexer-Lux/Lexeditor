@@ -667,7 +667,11 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 
 .lex-project-path {
   align-self:center;flex:0 1 auto;min-width:0;overflow:hidden;color:var(--lex-muted);
-  font:500 12px/1.25 "Lexend", "Segoe UI", system-ui, sans-serif;text-shadow:none;
+  /* The mod's own folder is written in the game's face, like every other word
+     on this row. A hard-coded face left the path, and the "The game's own
+     data" label, the only default-typeface text in an otherwise themed
+     window. */
+  font:500 12px/1.25 var(--lex-font);text-shadow:none;
   text-overflow: ellipsis; white-space: nowrap;
 }
 .lex-project-select::after {
@@ -754,7 +758,8 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   align-self: center;
   overflow: hidden;
   color: var(--lex-muted);
-  font: 500 12px/1.25 "Lexend", "Segoe UI", system-ui, sans-serif;
+  /* Same face as the row above it, so a menu of paths reads as one list. */
+  font: 500 12px/1.25 var(--lex-font);
   text-overflow: ellipsis;
   text-shadow: none;
   white-space: nowrap;
@@ -4830,7 +4835,10 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
   background:color-mix(in srgb,var(--lex-bg) 55%,transparent);
   color:var(--lex-muted);
   font-size:calc(var(--lex-tab-badge-size,24px) * .6);
-  font-family:"Lexend","Segoe UI",sans-serif;
+  /* The key prompt is read on the tab, so it is set in the tab's own face
+     rather than the shipped default: a game whose tabs are drawn in its menu
+     font had the numbers beside them in a different one. */
+  font-family:inherit;
   font-weight:500;
   letter-spacing:0;
   text-shadow:none;
@@ -6372,10 +6380,13 @@ body:has(> .lex-shell-header) > main {min-height:0;}
   color:var(--lex-accent-ink);
 }
 
-/* Keep tab help beside its label at every navigation density. */
-.lex-subtab-button:has(> .lex-info-help) { display:flex;align-items:center;justify-content:center; }
-.lex-subtab-button > .lex-info-help { flex:0 0 auto;position:relative; }
-.lex-subtab-button:has(> .lex-info-help) > .lex-tab-label { flex:0 1 auto;min-width:0; }
+/* Keep tab help beside its label at every navigation density. The label hugs
+   its own text and the mark follows it in the same gap, the way a table
+   header's mark does; a label that filled the tab left the mark stranded
+   against the tab's trailing edge with the label centred somewhere else. */
+.lex-subtab-button:has(> .lex-info-help) { display:flex;align-items:center;justify-content:center;gap:.35em; }
+.lex-subtab-button > .lex-info-help { flex:0 0 auto;position:relative;margin-left:0; }
+.lex-subtab-button:has(> .lex-info-help) > .lex-tab-label { flex:0 1 auto;width:auto;min-width:0; }
 
 /* Titles contribute to column minima and must not split inside a word. */
 .lex-column-list-head-cell .header-label {
@@ -6888,9 +6899,11 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 /* A tab bar with no margin of its own, against what it labels. */
 .lex-subtab-bar-flush { margin: 0; flex: 0 0 auto; }
 
-/* Help inside a tab sits beside the label rather than floating over it. */
-[role="tab"] .lex-info-help { position: relative; inset: auto; margin-left: 8px; }
-.lex-tabbed-panel-tabs [role="tab"] > .lex-info-help { margin-left:3px; }
+/* Help inside a tab sits beside the label rather than floating over it. The
+   tab row's own gap does the spacing, so the mark carries no left margin of
+   its own and cannot add a second, uneven one. */
+[role="tab"] .lex-info-help { position: relative; inset: auto; margin-left: 0; }
+.lex-tabbed-panel-tabs [role="tab"] > .lex-info-help { margin-left:0; }
 
 /* Colours a game restyles through tokens rather than by naming shared classes:
    the window bar, its buttons, a list's header and cell rules, a panel's

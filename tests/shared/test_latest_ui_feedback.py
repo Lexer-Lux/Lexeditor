@@ -82,6 +82,75 @@ def test_subtab_selection_and_hover_preserve_all_boxes(page):
         assert [tabs.nth(i).locator('.lex-tab-label').bounding_box() for i in range(2)]==labels
 
 
+def test_panel_tab_help_sits_beside_its_label(page):
+    # The mark is read with the name it explains, so the two travel as one
+    # centred group. Sized to the tab instead, the label filled the button and
+    # the mark was pinned against the tab's trailing edge, away from the word.
+    framework(page)
+    page.evaluate('''()=>{const U=LexeditorUI;
+      document.querySelector('main').append(U.tabbedPanel({
+        tabs:[{id:'a',label:'Alpha',help:'The alpha view.'},
+              {id:'b',label:'Beta',help:'The beta view.'}],
+        active:'a',content:id=>U.el('p',{},id),change(){}}))}''')
+    page.wait_for_timeout(200)
+    assert page.locator('.lex-subtab-button .lex-info-help').count()==2
+    for tab in page.locator('.lex-subtab-button').all():
+        assert tab.evaluate('''n=>{
+          const box=n.getBoundingClientRect(),label=n.querySelector('.lex-tab-label').getBoundingClientRect(),
+                help=n.querySelector('.lex-info-help').getBoundingClientRect();
+          const gap=help.left-label.right;
+          return gap>1&&gap<12&&Math.abs((label.left-box.left)-(box.right-help.right))<2;
+        }''')
+
+
+def test_tab_key_prompt_uses_the_games_own_font(page):
+    # The key prompt rides on the tab, so it is drawn in that tab's face. A
+    # fixed family left every game with the shipped default beside its labels.
+    framework(page)
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
+    page.evaluate('''()=>{const U=LexeditorUI;document.body.prepend(U.el('div',{id:'shell'}));
+      U.mountShell({host:'#shell',plugin:{id:'fixture',name:'Fixture'},
+        tabs:[{id:'items',label:'Items'},{id:'magic',label:'Magic'}],
+        activeTab:()=>'items',navigate(){}});U.finishPluginLoading();
+      document.querySelector('main').append(U.subtabBar({
+        tabs:[{id:'a',label:'Alpha'},{id:'b',label:'Beta'}],active:'a',change(){}}))}''')
+    page.wait_for_timeout(250)
+    badges=page.locator('nav button[data-tab] .lex-tab-shortcut, .lex-subtab-button .lex-tab-shortcut')
+    assert badges.count()==4
+    for badge in badges.all():
+        assert badge.evaluate('''n=>{
+          const face=game=>game.replace(/["\\']/g,'').split(',')[0].trim();
+          return face(getComputedStyle(n).fontFamily)
+            ===face(getComputedStyle(n.parentElement).fontFamily);
+        }''')
+    assert 'FF8 Menu' in badges.first.evaluate('n=>getComputedStyle(n).fontFamily')
+
+
+def test_mod_selector_paths_use_the_games_own_font(page):
+    # The path under a mod's name - and the "The game's own data" label that
+    # stands in for one - is part of the picker, so it is set in the game's
+    # face like the name above it. Hard-coded, it was the one line of the
+    # window that stayed in the shipped default for every game.
+    page.evaluate('''()=>window.pywebview={api:{mod_library_status:async()=>({canManage:true})}}''')
+    framework(page)
+    page.add_style_tag(path=str(ROOT/'plugins/ff8/editor.css'))
+    page.evaluate('''()=>{const U=LexeditorUI;document.body.prepend(U.el('div',{id:'shell'}));
+      U.mountShell({host:'#shell',plugin:{id:'fixture',name:'Fixture'},tabs:[],
+        activeTab:()=>'',navigate(){},projectSnapshot:async()=>({canCreate:false,projects:[]}),
+        projectSources:()=>[{key:'vanilla',label:'Vanilla',path:'C:/Games/FF8',readOnly:true},
+          {key:'a',label:'First mod',path:'C:/Mods/First',managed:true}],
+        projectActiveSource:()=>'a',sourcesReplaceProjects:true,addProjectSource(){},
+        changeProjectSource:async()=>{}});U.finishPluginLoading()}''')
+    page.wait_for_timeout(200)
+    select=page.locator('.lex-project-select')
+    assert select.locator('.lex-project-path').inner_text()=='C:/Mods/First'
+    select.click()
+    paths=page.locator('.lex-project-menu-path')
+    assert paths.first.inner_text()=='C:/Games/FF8'
+    for node in [select.locator('.lex-project-path'), paths.first, paths.nth(1)]:
+        assert node.evaluate('n=>getComputedStyle(n).fontFamily').startswith('"FF8 Menu"')
+
+
 def test_mod_menu_has_live_toggles_and_drag_order(page):
     page.evaluate('''()=>window.pywebview={api:{mod_library_status:async()=>({canManage:true})}}''')
     framework(page)
@@ -108,6 +177,45 @@ def test_mod_menu_has_live_toggles_and_drag_order(page):
     assert page.evaluate('modChanges')==[['a',{'move':1}]]
     page.get_by_role('checkbox',name='Enable First mod').click()
     assert page.evaluate('modChanges.at(-1)')==['a',{'enabled':True}]
+
+
+def test_mod_menu_prints_no_word_between_its_rows(page):
+    # The note explaining that a game cannot manage mods was handed to
+    # replaceChildren whether or not there was one, and the DOM turns a bare
+    # null into the text "null": every game that *does* manage mods printed the
+    # word between its last mod row and the Add a Mod button.
+    page.evaluate('''()=>window.pywebview={api:{mod_library_status:async()=>({canManage:true})}}''')
+    framework(page)
+    page.evaluate('''()=>{const U=LexeditorUI;document.body.prepend(U.el('div',{id:'shell'}));
+      U.mountShell({host:'#shell',plugin:{id:'fixture',name:'Fixture'},tabs:[],
+        activeTab:()=>'',navigate(){},projectSnapshot:async()=>({canCreate:false,projects:[]}),
+        projectSources:()=>[{key:'vanilla',label:'Vanilla',readOnly:true},
+          {key:'a',label:'First mod',managed:true}],
+        projectActiveSource:()=>'a',sourcesReplaceProjects:true,addProjectSource(){},
+        changeProjectSource:async()=>{}});U.finishPluginLoading()}''')
+    page.locator('.lex-project-select').click()
+    menu=page.locator('.lex-project-menu')
+    stray=menu.evaluate('''n=>[...n.childNodes].filter(node=>node.nodeType===3)
+      .map(node=>node.textContent.trim()).filter(Boolean)''')
+    assert stray==[]
+    assert menu.get_by_text('➕ Add a Mod',exact=True).count()==1
+    assert page.get_by_text('not supported',exact=False).count()==0
+
+
+def test_mod_menu_still_says_when_mod_management_is_absent(page):
+    # The same note is the whole point for a game that has no mod management;
+    # dropping the stray null must not drop the sentence with it.
+    page.evaluate('''()=>window.pywebview={api:{mod_library_status:async()=>
+      ({canManage:false,message:'Mod management is not supported for this game yet.'})}}''')
+    framework(page)
+    page.evaluate('''()=>{const U=LexeditorUI;document.body.prepend(U.el('div',{id:'shell'}));
+      U.mountShell({host:'#shell',plugin:{id:'fixture',name:'Fixture'},tabs:[],
+        activeTab:()=>'',navigate(){},projectSnapshot:async()=>({canCreate:false,projects:[]}),
+        projectSources:()=>[{key:'vanilla',label:'Vanilla',readOnly:true}],
+        projectActiveSource:()=>'vanilla',sourcesReplaceProjects:true,
+        changeProjectSource:async()=>{}});U.finishPluginLoading()}''')
+    page.locator('.lex-project-select').click()
+    assert page.get_by_text('Mod management is not supported for this game yet.').is_visible()
 
 
 def test_platform_settings_use_six_columns_without_scrolling(page):
