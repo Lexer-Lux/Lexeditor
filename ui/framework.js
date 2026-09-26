@@ -3616,7 +3616,20 @@
       const title = panel ? card.querySelector(":scope > .lex-detail-panel-heading") : settings ? card.querySelector(":scope > h2") : card.querySelector(":scope > .lex-detail-section-title");
       const body = card.querySelector(panel ? ":scope > .lex-detail-panel-body" : settings ? ":scope > .settings-subs" : ":scope > .lex-detail-section-content");
       const rows = body ? [...body.children] : [];
-      if (rows.length < 2) return false;
+      if (rows.length < 2) {
+        // A settings section that a previous split left holding one long sub
+        // is still splittable: that single sub is exactly what splitSettingsSub
+        // takes apart. Returning early here left the piece taller than the page
+        // with nothing left to split, so the strict guard below threw and the
+        // tab was left mid-layout - one page of cards with the "(continued)"
+        // pieces still in it.
+        if (!settings || !body || rows.length !== 1) return false;
+        const frame = card.getBoundingClientRect(), content = body.getBoundingClientRect();
+        const ratio = frame.height / Math.max(1, card.offsetHeight) || 1;
+        return splitSettingsSub(card, body, rows[0], available,
+          (content.top - frame.top) / ratio, (frame.bottom - content.bottom) / ratio,
+          ratio, content.top);
+      }
       const outer = card.getBoundingClientRect(), inner = body.getBoundingClientRect();
       const scale = outer.height / Math.max(1, card.offsetHeight) || 1;
       const above = (inner.top - outer.top) / scale, below = (outer.bottom - inner.bottom) / scale;
