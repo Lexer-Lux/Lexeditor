@@ -107,6 +107,7 @@
     {id: "toolbar", level:"molecule", summary:"A row of page controls.", sample:()=>UI.toolbar(UI.readonlyField("Current table"))},
     {id: "textArea", level:"atom", summary:"An editable text block.", sample:()=>UI.textArea({value:"Example description",rows:2})},
     {id: "tileGrid",level:"template",summary:"A responsive grid of shared fields, sections, or cards.",sample:()=>UI.tileGrid([UI.detailSection({title:"First",body:"First value"}),UI.detailSection({title:"Second",body:"Second value"})])},
+    {id: "recordCard",level:"molecule",summary:"A named game-record preview with an optional ID, properties and hover action. Use a balanced tileGrid to keep rows even.",sample:()=>UI.tileGrid(Array.from({length:6},(_,index)=>UI.recordCard({title:`Enemy ${index+1}`,identity:index+1,action:el("button",{},"Choose enemy")})),{balanced:true,minWidth:150})},
     {id: "inlineLabel",level:"molecule",summary:"A name with inline icons at one shared size.",sample:()=>UI.inlineLabel(UI.infoIcon(),"Example item")},
     {id: "choiceField",level:"molecule",summary:"A value with a separate selection action.",sample:()=>UI.choiceField("Potion",el("button",{},UI.selectionIcon()))},
     {id: "statCard",level:"molecule",summary:"An image card with directional ranks and corner controls.",sample:()=>UI.statCard({ranks:["8","5","3","6"].map(value=>el("button",{},value)),corner:el("button",{},"+"),footer:"70"})},

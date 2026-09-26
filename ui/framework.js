@@ -1597,10 +1597,29 @@
   };
 
   // Graphs side by side, as many to a row as fit at a readable width.
-  const tileGrid = (cards = [], options = {}) => element("div", {
+  const tileGrid = (cards = [], options = {}) => {
+    const minimum = Math.max(80,Number(options.minWidth)||320);
+    const grid = element("div", {
     class:"lex-tile-grid",
-    style:`--lex-tile-min-width:${Math.max(80,Number(options.minWidth)||320)}px;${options.columns ? `--lex-tile-columns:repeat(${Math.max(1,Math.floor(options.columns))},minmax(0,1fr))` : ""}`,
-  }, ...cards);
+    style:`--lex-tile-min-width:${minimum}px;${options.columns ? `--lex-tile-columns:repeat(${Math.max(1,Math.floor(options.columns))},minmax(0,1fr))` : ""}`,
+    }, ...cards);
+    if (options.balanced && !options.columns) {
+      const balance = () => {
+        if (!grid.isConnected || !grid.clientWidth) return;
+        const css = getComputedStyle(grid), gap = parseFloat(css.columnGap) || 0;
+        const width = grid.clientWidth - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight);
+        const count = [...grid.children].filter(child => !child.hidden && getComputedStyle(child).display !== "none").length;
+        const maximum = Math.max(1, Math.floor((width + gap) / (minimum + gap)));
+        // Use the fewest rows that fit, then distribute their columns evenly:
+        // six cards with room for five become two rows of three, not five + one.
+        const columns = Math.max(1, Math.ceil(count / Math.ceil(Math.max(1, count) / maximum)));
+        grid.style.setProperty("--lex-tile-columns", `repeat(${columns},minmax(0,1fr))`);
+      };
+      new ResizeObserver(balance).observe(grid);
+      new MutationObserver(balance).observe(grid, {childList:true, attributes:true, attributeFilter:["hidden"], subtree:true});
+    }
+    return grid;
+  };
   const curveGrid = (...cards) => {
     const options=cards[0] && !(cards[0] instanceof Node) ? cards.shift() : {};
     const grid=tileGrid(cards,options);
@@ -1620,6 +1639,17 @@
       : element("span", {class: "lex-game-card-cover lex-game-card-initial", "aria-hidden": "true"}, name.slice(0, 1).toUpperCase()),
     element("span", {class: "lex-game-card-name"}, name));
   };
+
+  // A preview of a game record. The caller supplies shared links and controls;
+  // this frame keeps the name, picture and hover action consistent everywhere.
+  const recordCard = (options = {}) => element("article", {
+    class:["lex-record-card", options.className || ""].filter(Boolean).join(" "),
+  }, element("header", {class:"lex-record-card-header"},
+    element("h3", {class:"lex-record-card-title"}, options.title ?? ""),
+    options.identity == null ? null : element("span", {class:"lex-record-card-id"}, options.identity)),
+  element("div", {class:"lex-record-card-image"}, options.image || noImage()),
+  options.body == null ? null : element("div", {class:"lex-record-card-body"}, options.body),
+  options.action ? element("div", {class:"lex-record-card-action"}, options.action) : null);
 
   // The component catalogue's frame for one live sample: the component at the
   // size it really is, or across the pane when it is a page-wide one.
@@ -10090,7 +10120,7 @@ ${contents.path}`});
     return api;
   })();
 
-window.LexeditorUI = {panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
+window.LexeditorUI = {panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
 // no pad attached pays one idle check a second and changes nothing on screen.
