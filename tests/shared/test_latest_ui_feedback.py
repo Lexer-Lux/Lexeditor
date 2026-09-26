@@ -117,10 +117,18 @@ def test_platform_settings_use_six_columns_without_scrolling(page):
         id:i,key:'value'+i,label:'Setting '+String(i).padStart(2,'0'),kind:i%2?'boolean':'integer',value:32768,minimum:0,maximum:99999}))}]
     },change(){},search(){},showHeader:false}))}''')
     page.wait_for_timeout(200)
-    assert page.locator('.lex-tweak-column').count()==6
+    # `columns` is a ceiling, not a count. A card is never narrower than the
+    # width the shared layout needs for a name, its copy button, its value and
+    # its help mark, so a 1200px window fits two columns and a wide one reaches
+    # six. Both halves are the contract: the grid uses the width it has, and it
+    # never goes beyond six.
+    columns=page.locator('.lex-tweak-column')
+    fitted=columns.count()
+    assert 1 < fitted <= 6, fitted
     assert page.locator('.lex-tweaks-scroll').evaluate('n=>n.scrollHeight<=n.clientHeight+1')
-    widths=page.locator('.lex-tweak-column').evaluate_all('ns=>ns.map(n=>n.clientWidth)')
+    widths=columns.evaluate_all('ns=>ns.map(n=>n.clientWidth)')
     assert max(widths)-min(widths)<=1
+    assert min(widths)>=400, widths
     for _ in range(20):
         assert page.locator('.lex-tweaks-scroll').evaluate('n=>n.scrollHeight<=n.clientHeight+1')
         next=page.get_by_role('button',name='Next page',exact=True)
@@ -130,3 +138,10 @@ def test_platform_settings_use_six_columns_without_scrolling(page):
         page.wait_for_timeout(100)
     else:
         raise AssertionError('Settings pages did not end')
+    # The six-column ceiling is still reachable, and it still does not scroll:
+    # this is the layout Lexer asked for, on a window that can hold it.
+    page.locator('main').evaluate('n=>n.style.width="2900px"')
+    page.wait_for_timeout(300)
+    wide=page.locator('.lex-tweak-column')
+    assert wide.count()==6, wide.count()
+    assert page.locator('.lex-tweaks-scroll').evaluate('n=>n.scrollHeight<=n.clientHeight+1')
