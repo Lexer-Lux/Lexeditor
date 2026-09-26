@@ -923,6 +923,11 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 /* A sound's heading: the thumbnail slot is a play/pause button and the line
    under the heading is the sound's progress, dragged to scrub. The track is
    the heading's own bottom rule, so nothing else is drawn there. */
+/* A pinnable thumbnail carries its pin on its top-right corner, shown on
+   hover like a property's and always once pinned. */
+.lex-detail-panel-icon:has(> .lex-column-pin) { position:relative; }
+.lex-detail-panel-icon > .lex-column-pin { position:absolute; top:-4px; right:-4px; z-index:4; }
+.lex-detail-panel-icon:not(:hover) > .lex-column-pin:not(.pinned) { opacity:0; }
 .lex-detail-panel-heading.lex-audio-heading { position:relative; border-bottom-color:transparent; }
 .lex-audio-play {
   display:grid; place-items:center; width:100%; height:100%; min-width:36px; min-height:36px; aspect-ratio:1;

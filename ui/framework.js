@@ -1081,7 +1081,12 @@
     const heading = options.heading === false ? null : element("div", {
       class: ["lex-detail-panel-heading", options.icon ? "" : "no-icon", options.actions ? "" : "no-actions"].filter(Boolean).join(" "),
     },
-      options.icon ? element("div", {class: "lex-detail-panel-icon"}, options.icon) : null,
+      options.icon ? element("div", {class: "lex-detail-panel-icon",
+        // The record's picture can be pinned as a table column like any
+        // property: its pin sits on the thumbnail's corner, and a right-click
+        // on the thumbnail places or removes it.
+        oncontextmenu: options.iconPin ? event => { event.preventDefault(); options.iconPin.click(); } : null,
+      }, options.icon, options.iconPin || null) : null,
       identity,
       options.actions ? element("div", {class: "lex-detail-panel-actions"}, options.actions) : null,
       sound ? sound.scrub : null);
