@@ -6081,7 +6081,12 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   left: 0;
   z-index: 900;
   display: grid;
-  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  /* The page controls sit in the middle while there is room for that. The
+     right side never gets less than its own controls need - the search box
+     on the left gives way instead - because three filters squeezed into a
+     half-width column wrapped into a stack that ran off the top and bottom
+     of the bar (RDR2's items below about 1350px). */
+  grid-template-columns:minmax(0,1fr) auto minmax(max-content,1fr);
   align-items: center;
   gap: 12px;
   width: 100%;
@@ -6110,6 +6115,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 .lex-pager > * { min-height:0; }
 .lex-pager > :is(.lex-pager-left,.lex-pager-controls,.lex-pager-right) { height:100%; flex-wrap:nowrap; }
+.lex-pager .lex-action-row { flex-wrap:nowrap; }
 .lex-pager :is(button,input:not([type=checkbox]),select,.lex-pager-search,.lex-page-position,.lex-pager-filter) { min-height:0; max-height:100%; height:100%; padding-block:0; }
 .lex-pager :is(button,select) { font-size:inherit; }
 .lex-pager-search {
