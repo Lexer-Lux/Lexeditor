@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 import threading
 from urllib.parse import parse_qs, urlparse
-from plugin_http import PluginRequestHandler
+from plugin_http import PluginRequestHandler, vanilla_session
 
 from .assets import (
     ASSET_TYPES,
@@ -88,6 +88,10 @@ def _read_build() -> tuple[bytes, str]:
 
 
 def build_state() -> dict:
+    if vanilla_session():
+        # No mod is open, so there is no build.txt: nothing to show or edit.
+        return {"path": "build.txt", "sha256": "", "values": {}, "duplicates": [],
+                "editable": False, "vanilla": True}
     data, text = _read_build()
     parsed = parse_build_text(text)
     values: dict[str, object] = dict(parsed.values)

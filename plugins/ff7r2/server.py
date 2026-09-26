@@ -196,6 +196,12 @@ def active_player_path(source: str = "mine") -> tuple[Path, str]:
     baseline = source_path()
     candidate = output_path()
     if baseline is None:
+        if os.environ.get("LEXEDITOR_VANILLA") == "1":
+            # Rebirth's vanilla PlayerParameter is extracted into a mod's own
+            # source folder; with no mod there is no extraction to show yet.
+            raise DataObjectError(
+                "No mod is open. Rebirth's vanilla PlayerParameter is read from a mod's "
+                "extracted source, so Add a Mod or Find a Mod to see it.")
         raise DataObjectError("No FF7 Rebirth project is selected.")
     if not baseline.is_file():
         raise DataObjectError(

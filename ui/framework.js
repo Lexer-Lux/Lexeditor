@@ -5850,6 +5850,11 @@ ${contents.path}`});
       if (!result?.vanilla || result.pluginId !== options.plugin.id) return;
       sessionVanilla = true;
       document.documentElement.setAttribute("data-lex-vanilla", "true");
+      // A game that already offers its own Vanilla reference shows that
+      // instead of an empty mod.
+      const own = (options.projectSources?.() || []).find(row => String(row.key) === "vanilla");
+      if (own && String(options.projectActiveSource?.() || "mine") !== "vanilla")
+        Promise.resolve(options.selectProjectSource?.("vanilla")).catch(() => {}).then(refresh);
       refresh();
       showToast(VANILLA_NOTICE, {duration: 6000});
     }).catch(() => {});

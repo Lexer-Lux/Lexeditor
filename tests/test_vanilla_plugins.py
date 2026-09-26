@@ -100,3 +100,41 @@ def test_project_zomboid_reads_the_games_own_scripts(tmp_path, vanilla, monkeypa
     core.deployment_state(root)
     assert not missing.exists()
     assert not (game / ".lexeditor").exists()
+
+
+def test_terraria_opens_with_no_mod_source(tmp_path, vanilla, monkeypatch):
+    from plugins.terraria import server
+
+    missing = tmp_path / "no-mod"
+    monkeypatch.setenv("LEXEDITOR_TERRARIA_PROJECT", str(missing))
+    assert server.build_state()["editable"] is False
+    for name in ("localization_index", "structured_content_catalog", "source_state",
+                 "assets_state", "build_status", "data_map"):
+        getattr(server, name)()
+    assert not missing.exists()
+
+
+def test_ds3_reads_the_installed_regulation(tmp_path, vanilla, monkeypatch):
+    from plugins.ds3 import server
+
+    game = tmp_path / "DARK SOULS III"
+    (game / "Game").mkdir(parents=True)
+    (game / "Game" / "Data0.bdt").write_bytes(b"installed")
+    missing = tmp_path / "no-mod"
+    monkeypatch.setattr(server, "PROJECT", missing)
+    monkeypatch.setattr(server, "GAME_ROOT", game)
+    monkeypatch.setattr(server, "SOURCE_OVERRIDE", "")
+    assert server._find_source() == (game / "Game" / "Data0.bdt").resolve()
+    assert not missing.exists()
+
+
+def test_ffx_x2_reads_archives_when_no_mod_exists(tmp_path, vanilla, monkeypatch):
+    from plugins.ffx_x2 import deployment, paths, server
+
+    missing = tmp_path / "no-mod"
+    monkeypatch.setattr(paths, "PROJECT_ROOT", missing)
+    monkeypatch.setattr(paths, "GAME_ROOT", tmp_path / "game")
+    assert deployment.status(paths.GAME_ROOT, paths.PROJECT_ROOT)["projectFileCount"] == 0
+    server.data_map()
+    server.dashboard()
+    assert not missing.exists()
