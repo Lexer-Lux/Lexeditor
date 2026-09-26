@@ -2273,6 +2273,7 @@
       const box = () => (control instanceof Element && control.matches(".lex-unit-field")
         ? control : input);
       const setFromPointer = event => {
+        if (input.disabled || input.readOnly || refusesEdit(input)) return;
         const bounds = box().getBoundingClientRect();
         const share = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
         const step = Number(input.step) || 1;
@@ -2289,6 +2290,7 @@
         input.dispatchEvent(new Event("input", {bubbles: true}));
       };
       handle.addEventListener("pointerdown", event => {
+        if (input.disabled || input.readOnly || refusesEdit(input)) return;
         event.preventDefault();
         handle.setPointerCapture(event.pointerId);
         node.classList.add("lex-value-dragging");

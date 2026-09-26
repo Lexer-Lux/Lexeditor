@@ -4882,6 +4882,12 @@ body:has(.lex-data-map-table) #main {
  z-index: 4; pointer-events: auto;
 }
 .lex-detail-field.lex-value-dragging .lex-value-handle { opacity:.38; }
+html[data-lex-project-readonly="true"] main .lex-detail-field .lex-value-handle,
+.lex-value-host:has(> input:is(:disabled,[readonly])) .lex-value-handle,
+.lex-unit-field:has(> input:is(:disabled,[readonly])) .lex-value-handle {
+  pointer-events:none;
+  opacity:0;
+}
 
 /* The rail is anchored at its own centre, so growing on hover grows evenly in
    both directions rather than dropping downward. */
