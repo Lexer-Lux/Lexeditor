@@ -89,6 +89,9 @@ def test_regulation_creation_preserves_other_members_and_survives_export():
         assert len(reloaded.params[table].rows)==3
         assert reloaded.params[table].rows[-1].name=='Copied '+table
     assert reloaded.dirty_count==0
+    reloaded.identify_created_rows(_bnd4())
+    assert sum(row['created'] for table in TARGET_TABLES for row in reloaded.list_rows(table))==2
+    assert reloaded.dirty_count==0
 
 
 def test_installed_regulation_creation_is_memory_only_and_preserves_members():
@@ -108,3 +111,28 @@ def test_installed_regulation_creation_is_memory_only_and_preserves_members():
         if entry.index!=entry_index:
             assert reloaded.binder.member_bytes(entry)==original[entry.index]
     assert source.read_bytes()==original_bytes
+
+
+def test_project_save_keeps_created_marker_after_reload(tmp_path,monkeypatch):
+    from plugins.ds3 import server
+    original=_bnd4()
+    source=tmp_path/'source.bdt';source.write_bytes(original)
+    project=tmp_path/'project';project.mkdir()
+    (project/server.PROJECT_MARKER).write_text('{}')
+    for key,value in {'PROJECT':project,'GAME_ROOT':tmp_path/'game','SOURCE_OVERRIDE':str(source),
+                      '_DOCUMENT':None,'_SOURCE_PATH':None,'_SOURCE_HASH':None,'_OUTPUT_HASH_AT_LOAD':None}.items():
+        monkeypatch.setattr(server,key,value)
+    document=server._reload()
+    source_id=document.params['Magic'].rows[0].row_id
+    new_id=max(row.row_id for row in document.params['Magic'].rows)+1
+    document.create_row('Magic',source_id,new_id,'Saved copy')
+    assert server._save()['saved'] is True
+    rows=server._reload().list_rows('Magic')
+    assert next(row for row in rows if row['id']==new_id)['created'] is True
+    assert next(row for row in rows if row['id']==source_id)['created'] is False
+    assert source.read_bytes()==original
+    # An unavailable/unsupported baseline cannot invalidate the saved project.
+    source.write_bytes(b'unsupported source')
+    reloaded=server._reload()
+    assert reloaded.read_row('Magic',new_id)['name']=='Saved copy'
+    assert not any(row['created'] for row in reloaded.list_rows('Magic'))

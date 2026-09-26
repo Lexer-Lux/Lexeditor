@@ -719,6 +719,18 @@ class RegulationDocument:
         self._original_plain=plain
         self._dirty=set()
         self._created_originals={}
+        self._created_ids=set()
+
+    def identify_created_rows(self, source: bytes):
+        """Identify rows supplied by this project beyond its source regulation."""
+        plain, _ = decrypt_regulation(source)
+        baseline = BND4View(plain)
+        created = set()
+        for table,param in self.params.items():
+            original = ParamView(baseline.member_bytes(baseline.find_param(table)))
+            ids = {row.row_id for row in original.rows}
+            created.update((table,row.row_id) for row in param.rows if row.row_id not in ids)
+        self._created_ids = created | set(self._created_originals)
 
     def _display_name(self, table: str, row: ParamRow) -> str:
         schema = self.schemas[table]
@@ -726,7 +738,7 @@ class RegulationDocument:
 
     def list_rows(self, table: str):
         param=self.params[table]
-        return [{"id":r.row_id,"name":self._display_name(table,r),"created":(table,r.row_id) in self._created_originals} for r in param.rows]
+        return [{"id":r.row_id,"name":self._display_name(table,r),"created":(table,r.row_id) in self._created_ids} for r in param.rows]
 
     def create_row(self, table: str, source_id: int, new_id: int, name: str):
         schema = self.schemas[table]
@@ -739,6 +751,7 @@ class RegulationDocument:
         params = {key:ParamView(binder.member_bytes(entry)) for key,entry in entries.items()}
         created = params[table].row(new_id)
         self._created_originals[table,new_id] = member[created.data_offset:created.data_offset+schema.row_size]
+        self._created_ids.add((table,new_id))
         self._plain,self.binder,self.entries,self.params = plain,binder,entries,params
         self._dirty.add((table,new_id,'__created__'))
         return self.read_row(table,new_id)

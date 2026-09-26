@@ -197,6 +197,9 @@ def main(argv: list[str] | None = None) -> int:
             new_row=request_json(reopened.url+'api/row?table=EquipParamWeapon&id=1999999999')['row']
             assert new_row['name']=='Created fixture weapon'
             assert field_value(new_row,'atkBasePhysics')==432
+            listed=request_json(reopened.url+'api/table?name=EquipParamWeapon')['rows']
+            assert next(row for row in listed if row['id']==1999999999)['created'] is True
+            assert next(row for row in listed if row['id']==weapon_id)['created'] is False
 
     if response_failures:
         errors.extend(f"response: {value}" for value in response_failures)

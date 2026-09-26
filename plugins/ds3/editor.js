@@ -227,7 +227,7 @@
   async function saveProject(){
     const result=await api("/api/save",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
     state.dirty=result.dirtyCount||0;state.source=result.source||state.source;state.info=await api("/api/info");
-    if(TABLES.some(table=>table.id===state.tab))await loadDetail(state.tab,tableState(state.tab).selected,true);
+    if(TABLES.some(table=>table.id===state.tab))await loadTable(state.tab,true);
     LexeditorUI.showToast("Exported "+result.path);shell.refresh();render();
   }
   async function discardChanges(){

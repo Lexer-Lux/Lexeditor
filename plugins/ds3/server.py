@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import threading
 from http.server import ThreadingHTTPServer
@@ -98,6 +99,16 @@ def _reload() -> RegulationDocument:
     _SOURCE_HASH = hashlib.sha256(raw).hexdigest()
     output = _project_output()
     _OUTPUT_HASH_AT_LOAD = _sha256_path(output) if output.is_file() else None
+    if source.resolve() == output.resolve():
+        for baseline in _source_candidates()[1:]:
+            if baseline.is_file() and baseline.resolve() != output.resolve():
+                try:
+                    _DOCUMENT.identify_created_rows(baseline.read_bytes())
+                except (OSError, DS3FormatError) as error:
+                    # Optional provenance must not turn a successful project
+                    # save into an error or guess that every row was created.
+                    logging.getLogger(__name__).warning("Cannot compare DS3 record sources: %s", error)
+                break
     return _DOCUMENT
 
 
