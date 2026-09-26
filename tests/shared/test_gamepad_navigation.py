@@ -115,6 +115,45 @@ def _focused(page):
                          "||document.activeElement?.textContent?.trim()||''")
 
 
+def test_background_pad_cannot_edit_activate_navigate_or_replay_on_return():
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = _page(browser)
+            page.evaluate("""()=>{
+              window.__focused = true;
+              window.__hidden = false;
+              document.hasFocus = () => window.__focused;
+              Object.defineProperty(document, 'hidden', {get:()=>window.__hidden});
+              document.getElementById('amount').focus();
+              window.__focused = false;
+              for(const button of [0,1,4,5,6,7,12,13,14,15]) window.__press(button);
+              window.__axis(1,1);
+            }""")
+            for now in (0, 500, 5000):
+                assert _tick(page, now) is False
+            assert page.evaluate("()=>window.__events") == []
+            assert page.locator('#amount').input_value() == '10'
+            assert _focused(page) == 'amount'
+            page.evaluate("()=>window.__focused=true")
+            assert _tick(page, 6000) is False  # Held inputs cannot replay.
+            assert page.evaluate("()=>window.__events") == []
+            page.evaluate("""()=>{
+              for(let i=0;i<17;i++)window.__press(i,false);
+              window.__axis(0,0);
+            }""")
+            assert _tick(page, 6100) is True
+            page.evaluate("()=>window.__press(15)")
+            _tick(page, 6200)
+            assert page.locator('#amount').input_value() == '15'
+            page.evaluate("()=>{window.__events=[];window.__hidden=true;}")
+            assert _tick(page, 7000) is False
+            assert page.locator('#amount').input_value() == '15'
+            assert page.evaluate("()=>window.__events") == []
+        finally:
+            browser.close()
+
+
 def test_the_pad_walks_the_interface_and_activates_what_it_reaches():
     with sync_playwright() as play:
         browser = play.chromium.launch(headless=True)

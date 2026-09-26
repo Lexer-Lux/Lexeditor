@@ -9697,6 +9697,15 @@ ${contents.path}`});
     const heldSince = new Map();
     let lastRepeat = 0;
     const discreteDown = new Set();
+    let awaitingNeutral = false;
+    const acceptsPadInput = () => document.hasFocus() && !document.hidden;
+    const suspendPadInput = () => {
+      awaitingNeutral = true;
+      heldSince.clear();
+      discreteDown.clear();
+      lastRepeat = 0;
+      clearPadFocus();
+    };
 
     const shown = node => {
       if (!(node instanceof HTMLElement)) return false;
@@ -9920,6 +9929,7 @@ ${contents.path}`});
     };
 
     const press = action => {
+      if (!acceptsPadInput()) { suspendPadInput(); return false; }
       switch (action) {
         case "up": case "down": case "left": case "right": return move(action);
         case "a": return activate();
@@ -9961,10 +9971,20 @@ ${contents.path}`});
     // One frame of pad input. `now` is a parameter so a check can drive the
     // repeat timing instead of waiting for real frames.
     const tick = (now = performance.now()) => {
+      // Gamepad polling continues while another native window has focus.
+      // Never turn those gameplay inputs into edits in the background page.
+      if (!acceptsPadInput()) { suspendPadInput(); return false; }
       let pads = [];
       try { pads = source() || []; } catch (_error) { pads = []; }
       const pad = [...pads].find(entry => entry && entry.connected !== false);
       if (!pad) { heldSince.clear(); discreteDown.clear(); return false; }
+      // A button/stick held while returning from the game must be released
+      // before it can activate a control or resume directional repeats.
+      if (awaitingNeutral) {
+        if ([...pad.buttons || []].some((_, index) => held(pad, index)) ||
+            [...pad.axes || []].some(value => Math.abs(value) >= DEADZONE)) return false;
+        awaitingNeutral = false;
+      }
 
       for (const [index, action] of DISCRETE) {
         const down = held(pad, index);
@@ -10026,6 +10046,8 @@ ${contents.path}`});
       pollHandle = 0;
       window.removeEventListener("gamepadconnected", connect);
       window.removeEventListener("gamepaddisconnected", onDisconnect);
+      window.removeEventListener("blur", suspendPadInput);
+      document.removeEventListener("visibilitychange", suspendPadInput);
       for (const type of CONNECT_EVENTS) document.removeEventListener(type, connect, true);
       for (const type of CLEAR_EVENTS) window.removeEventListener(type, clearPadFocus, true);
       heldSince.clear();
@@ -10038,6 +10060,8 @@ ${contents.path}`});
       installed = true;
       window.addEventListener("gamepadconnected", connect);
       window.addEventListener("gamepaddisconnected", onDisconnect);
+      window.addEventListener("blur", suspendPadInput);
+      document.addEventListener("visibilitychange", suspendPadInput);
       for (const type of CONNECT_EVENTS) document.addEventListener(type, connect, true);
       for (const type of CLEAR_EVENTS) window.addEventListener(type, clearPadFocus, true);
       if (!pollHandle) pollHandle = setInterval(connect, 1000);
