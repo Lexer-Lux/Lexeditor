@@ -10009,7 +10009,16 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     // A word wider than the lane widens the lane before anything shrinks, so
     // one long name does not come out smaller than the names around it. The
     // lane settles on the next pass, when the observer sees it resize.
-    if (label.classList.contains('lex-detail-field-label') && (label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1)) widenLabelLane(label);
+    // A name that only fits by wrapping asks for the room too: measured on one
+    // line, it widens the lane (the grid caps the lane at half the row) before
+    // it is broken over two lines and shrunk. "MDEF (RIGHT)" came out as two
+    // clipped 13px lines beside a value box six times wider than it needed.
+    if (label.classList.contains('lex-detail-field-label')) {
+      const wrap = label.style.whiteSpace;
+      label.style.whiteSpace = 'nowrap';
+      if (label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1) widenLabelLane(label);
+      label.style.whiteSpace = wrap;
+    }
     while (size > LABEL_MIN_PX && overflows()) {
       size -= .5;
       label.style.fontSize = `${size}px`;
