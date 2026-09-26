@@ -646,7 +646,7 @@
     if(!player)return statusPanel("PLAYERPARAMETER NOT LOADED",playerError||"The project has no extracted source asset yet.");
     if(!player.records.length)return statusPanel("EMPTY PLAYERPARAMETER","The DataObject parsed successfully but contains no rows.");
     const rows=playerRows();
-    return pagedListDetail({
+    return pagedListDetail({addDisabledReason:"Final Fantasy VII Rebirth reads these rows from packed game tables; a new row would need the table rebuilt inside the game's archive, which Lexeditor does not do yet.",
       rows,key:row=>row.id,slots:false,selected:selectedRecord,page:recordPage,pageSize:recordPageSize,noun:"records",
       className:"ff7r2-layout",splitKey:"ff7r2-player",rowsKey:"ff7r2-player",defaultSplit:48,minLeft:330,minRight:390,
       search:{key:"ff7r2-player-search",value:recordQuery,label:"Search PlayerParameter records",
@@ -753,7 +753,7 @@
         detailField({label:"DETAIL",control:readonlyField("The DataObject parsed successfully but contains no rows.")})
       ]})]});
     const rows=battlePlayerRows();
-    return pagedListDetail({
+    return pagedListDetail({addDisabledReason:"Final Fantasy VII Rebirth reads these rows from packed game tables; a new row would need the table rebuilt inside the game's archive, which Lexeditor does not do yet.",
       rows,key:row=>row.id,slots:false,selected:selectedBattlePlayerRecord,page:battlePlayerPage,pageSize:battlePlayerPageSize,noun:"records",
       className:"ff7r2-layout",splitKey:"ff7r2-battle-player",rowsKey:"ff7r2-battle-player",defaultSplit:48,minLeft:330,minRight:390,
       search:{key:"ff7r2-battle-player-search",value:battlePlayerQuery,label:"Search BattlePlayerParameter records",
@@ -849,7 +849,7 @@
         detailField({label:"DETAIL",control:readonlyField("The DataObject parsed successfully but contains no rows.")})
       ]})]});
     const rows=battleRows();
-    return pagedListDetail({
+    return pagedListDetail({addDisabledReason:"Final Fantasy VII Rebirth reads these rows from packed game tables; a new row would need the table rebuilt inside the game's archive, which Lexeditor does not do yet.",
       rows,key:row=>row.id,slots:false,selected:selectedBattleRecord,page:battlePage,pageSize:battlePageSize,noun:"records",
       className:"ff7r2-layout",splitKey:"ff7r2-battle-items",rowsKey:"ff7r2-battle-items",defaultSplit:48,minLeft:330,minRight:390,
       search:{key:"ff7r2-battle-search",value:battleQuery,label:"Search BattleItemPossession records",

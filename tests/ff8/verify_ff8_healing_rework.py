@@ -71,7 +71,7 @@ def main() -> int:
                    payload, h.HEALING_FORMULA_CAVE)]
     for instruction in (
         "mov eax, dword ptr [esp + 0x10]",
-        "movzx eax, byte ptr [eax + 0x1d27bcf]",
+        "movzx eax, byte ptr [eax + 0x1d27bd0]",
         "imul eax, edi",
         f"jmp {h.HEALING_FORMULA_CONTINUE:#x}",
     ):
@@ -93,7 +93,7 @@ def main() -> int:
             raise AssertionError("non-boolean enable state was accepted")
 
     require(h.reworked_healing(30, 120) == 3600,
-            "spell power * MAG contract changed")
+            "spell power * SPR contract changed")
     require(h.apply_native_healing_modifiers(3600, shell=True) == 1800,
             "native Shell branch was not preserved")
     require(h.apply_native_healing_modifiers(

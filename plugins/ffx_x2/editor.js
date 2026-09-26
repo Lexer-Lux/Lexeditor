@@ -192,7 +192,7 @@ function pendingChanges(){
 function refreshShell(){shell?.refresh?.()}
 function markChanged(){refreshShell()}
 function setLoading(message){
-  $("#main").replaceChildren(el("div",{class:"lex-notice",role:"status"},message||"Loading FFX/X-2 data…"));
+  $("#main").replaceChildren(LexeditorUI.loadingPanel({label:message||"Loading FFX/X-2 data"}));
 }
 function setError(message){
   $("#main").replaceChildren(el("div",{class:"lex-notice lex-tone-warning",role:"alert"},message));
@@ -509,7 +509,7 @@ function renderRecordDataset(key,host){
     return;
   }
   if(ds.selected==null||!ds.data.rows.some(row=>rowKey(row)===ds.selected))ds.selected=rowKey(rows[0]);
-  const view=pagedListDetail({
+  const view=pagedListDetail({addDisabledReason:"These records are fixed tables the game reads by number; a new record has no slot.",
     rows:rows,key:row=>rowKey(row),slots:false,page:ds.page,pageSize:ds.pageSize,selected:ds.selected,noun:"records",
     splitKey:"ffxx2-"+key,defaultSplit:46,minLeft:300,minRight:330,
     search:{key:"ffxx2-"+key,value:ds.query,label:"Search "+spec.label,placeholder:"Search "+spec.label.toLocaleLowerCase()+"…",
@@ -571,7 +571,7 @@ function renderArchive(key,host){
     return result*sort.dir;
   });
   if(ds.selected==null||!rows.some(row=>row.path===ds.selected))ds.selected=rows[0]?.path||null;
-  const view=pagedListDetail({
+  const view=pagedListDetail({addDisabledReason:"This lists the game's own files; a new file would never be loaded by the game.",
     rows:rows,key:row=>row.path,slots:false,page:ds.page,pageSize:ds.pageSize,selected:ds.selected,noun:"files",
     splitKey:"ffxx2-"+key,defaultSplit:56,minLeft:360,minRight:300,fit:{minRowHeight:38},
     search:{key:"ffxx2-"+key,value:state.archiveQueries[spec.game]||"",label:"Search "+spec.label,

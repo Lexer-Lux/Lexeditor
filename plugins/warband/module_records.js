@@ -171,8 +171,8 @@
         change:value=>{active=value;viewState(active);renderApp();}});
       const host=node=>promoted||!bar?node:LexeditorUI.stack(bar,node);
       const entry=cache.get(active);
-      if(!entry){main().replaceChildren(host(LexeditorUI.notice({className:"warband-module-state",message:"Loading structured Module System records…"})));load(active);return;}
-      if(entry.loading&&!entry.data){main().replaceChildren(host(LexeditorUI.notice({className:"warband-module-state",message:"Loading structured Module System records…"})));return;}
+      if(!entry){main().replaceChildren(host(LexeditorUI.loadingPanel({label:"Loading structured Module System records"})));load(active);return;}
+      if(entry.loading&&!entry.data){main().replaceChildren(host(LexeditorUI.loadingPanel({label:"Loading structured Module System records"})));return;}
       if(entry.error){main().replaceChildren(host(LexeditorUI.notice({className:"warband-module-state",title:labelFor(active)+" could not be loaded",message:entry.error,action:LexeditorUI.el("button",{type:"button",onclick:()=>load(active,true)},"Retry")})));return;}
       const data=entry.data;
       if(!data?.available){main().replaceChildren(host(LexeditorUI.notice({className:"warband-module-state",title:labelFor(active)+" source is unavailable",message:"The selected project does not contain this Module System source file."})));return;}
@@ -199,7 +199,7 @@
       });
       const prefs=preferencesFor(active,definitions);
       const selectedRow=filtered.find(row=>String(row.recordIndex)===local.selected)||filtered[0];if(selectedRow)local.selected=String(selectedRow.recordIndex);
-      main().replaceChildren(host(LexeditorUI.pagedListDetail({rows:filtered,key:row=>String(row.recordIndex),selected:local.selected,
+      main().replaceChildren(host(LexeditorUI.pagedListDetail({addDisabledReason:`Warband's module files can take new ${data.schema.label.toLowerCase()}, but Lexeditor only edits existing ones. Adding one is not supported yet.`,rows:filtered,key:row=>String(row.recordIndex),selected:local.selected,
         noun:data.schema.label.toLowerCase(),splitKey:"warband-module-"+active,className:"warband-paged-table warband-module-data",slots:false,
         fit:{minRowHeight:36},page:local.page,pageSize:local.pageSize,defaultSplit:45,
         search:{key:"warband-module-"+active,value:local.query,placeholder:"Search "+data.schema.label.toLowerCase()+"…",change:value=>{local.query=value;local.page=0;renderApp();}},

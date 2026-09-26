@@ -5,16 +5,18 @@ The US menu lettering lives in the installed ``menu_us.lgp`` archive member
 256x256 8-bit pixels. Glyphs sit in a fixed 12-pixel grid, 21 columns wide,
 in FF7 text-code order (``format_codec.TEXT_MAP``): code 0x01 is the top-left
 cell, and code 0x00 is the space, which has no cell. Any nonzero pixel index
-is glyph ink.
+is not necessarily glyph ink: the darkest nonzero entry is the drop shadow.
 
 Like the FF8 menu font, the generated TTF is written to the player's private
-game-data cache only; the atlas never ships with Lexeditor. Advances are the
-atlas pitch, the way the game spaces the cells.
+game-data cache only; the atlas never ships with Lexeditor. Character advances
+come from WINDOW.BIN, rather than treating the atlas's cell pitch as spacing.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+import gzip
+import struct
 
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
@@ -27,7 +29,7 @@ from .format_codec import TEXT_MAP
 FONT_NAME = "FF7Menu"
 FONT_PATH = paths.DATA_ROOT / "generated" / "ff7-menu.ttf"
 FONT_REVISION_PATH = paths.DATA_ROOT / "generated" / "ff7-menu.revision"
-FONT_REVISION = "1"
+FONT_REVISION = "2"
 FONT_MEMBER = "usfont_h.tex"
 CELL = 12
 ATLAS_COLUMNS = 21
@@ -60,7 +62,40 @@ def _read_pixels(member: bytes) -> tuple[int, int, bytes]:
     pixels = member[offset:offset + side * side]
     if any(byte >= TEX_ENTRIES for byte in pixels):
         raise ValueError("FF7 usfont_h.TEX uses an unknown palette entry")
-    return side, side, pixels
+    palette = member[TEX_HEADER:TEX_HEADER + TEX_ENTRIES * 4]
+    brightness = [sum(palette[index * 4:index * 4 + 3]) for index in range(TEX_ENTRIES)]
+    brightest = max(brightness)
+    if not brightest:
+        raise ValueError("FF7 usfont_h.TEX has no visible palette ink")
+    # White contours must not incorporate the black drop shadow; that filled
+    # the counters of small letters and made the web font look unlike the game.
+    ink = bytes(int(palette[index * 4 + 3] != 0 and brightness[index] >= brightest / 2)
+                for index in range(TEX_ENTRIES))
+    return side, side, pixels.translate(ink + bytes(256 - len(ink)))
+
+
+def _font_metrics(game_root: Path) -> bytes | None:
+    # WINDOW.BIN's first type-1 member holds width/kerning bytes, as documented
+    # by ff7tools' retrieveMetrics/charWidth. The English atlas needs English
+    # metrics, including on the 2026 release's language-specific layout.
+    for base in (game_root / 'ff7/workingdir', game_root):
+        for relative in ('data/lang-en/kernel/window.bin', 'data/kernel/window.bin'):
+            path = base / relative
+            if not path.is_file():
+                continue
+            data, offset = path.read_bytes(), 0
+            while offset + 6 <= len(data):
+                size, expected, kind = struct.unpack_from('<HHH', data, offset)
+                end = offset + 6 + size
+                if end > len(data):
+                    raise ValueError('FF7 font metrics archive is truncated')
+                if kind == 1:
+                    raw = gzip.decompress(data[offset + 6:end])
+                    if len(raw) != expected or len(raw) < 0xE7:
+                        raise ValueError('FF7 font metrics are incomplete')
+                    return raw
+                offset = end
+    return None
 
 
 def _cell_ink(width: int, pixels: bytes, left: int, top: int) -> list[int] | None:
@@ -90,6 +125,7 @@ def extract_glyphs(game_root: Path | None = None) -> dict[str, dict]:
     except ValueError:
         raise FileNotFoundError(f"{FONT_MEMBER} is not in the installed menu archive")
     width, height, pixels = _read_pixels(member)
+    metrics = _font_metrics(root)
     ordered: dict[str, dict] = {}
     rows: dict[int, list[dict]] = {}
     for code in range(0x01, 0xE7):
@@ -103,7 +139,8 @@ def extract_glyphs(game_root: Path | None = None) -> dict[str, dict]:
         box = _cell_ink(width, pixels, left, top)
         if box is None:
             continue
-        entry = {"box": box, "char": TEXT_MAP[code], "advance": CELL,
+        advance = ((metrics[code] & 31) + (metrics[code] >> 5)) if metrics else box[2] - box[0] + 2
+        entry = {"box": box, "char": TEXT_MAP[code], "advance": advance,
                  "baseline": 0}
         if TEXT_MAP[code] not in ordered:
             ordered[TEXT_MAP[code]] = entry
@@ -123,7 +160,8 @@ def extract_glyphs(game_root: Path | None = None) -> dict[str, dict]:
     for number, entries in rows.items():
         for entry in entries:
             entry["baseline"] = baselines[number]
-    ordered[" "] = {"box": None, "char": " ", "advance": CELL, "baseline": 0}
+    space = ((metrics[0] & 31) + (metrics[0] >> 5)) if metrics else 3
+    ordered[" "] = {"box": None, "char": " ", "advance": space, "baseline": 0}
     return {"glyphs": ordered, "pixels": pixels, "width": width}
 
 

@@ -37,7 +37,7 @@ def healing_payload_is_exact(payload: bytes) -> bool:
         "lea edx, [eax + eax*2]",
         "lea eax, [eax + edx*4]",
         "shl eax, 4",
-        "movzx eax, byte ptr [eax + 0x1d27bcf]",
+        "movzx eax, byte ptr [eax + 0x1d27bd0]",
         "imul eax, edi",
         f"jmp {healing_rework.HEALING_FORMULA_CONTINUE:#x}",
     ]
@@ -65,7 +65,7 @@ def main() -> int:
             "the normal-curative-magic hook no longer matches the executable")
     healing_payload = healing_rework.build_code_cave()
     require(healing_payload_is_exact(healing_payload),
-            "the healing cave is not exactly spell power times effective MAG")
+            "the healing cave is not exactly spell power times effective SPR")
 
     combined = gameplay_settings.build_hext(25, formulae_rework=True)
     require(luck_accuracy.build_hext(True).rstrip() in combined,

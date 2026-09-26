@@ -7,6 +7,7 @@ ready, and the session opens locked so nothing can be written. Only a project
 that exists and is damaged still warns.
 """
 import json
+from dataclasses import replace
 import tempfile
 import threading
 import unittest
@@ -151,6 +152,35 @@ class ProjectlessPluginTests(unittest.TestCase):
 
 
 class NoModProjectTests(unittest.TestCase):
+    def test_removing_current_mod_returns_to_vanilla_without_a_project(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            default=root/'DefaultMod'
+            default.mkdir()
+            (default/'data.txt').write_text('Keep this mod',encoding='utf-8')
+            other=root/'OtherMod'
+            other.mkdir()
+            (other/'data.txt').write_text('Keep this too',encoding='utf-8')
+            plugin=replace(PLUGIN,projects=replace(PLUGIN.projects,default_root=default,
+                required_paths=('data.txt',),required_any=(),discover=lambda:[default,other]))
+            manager=ProjectManager({plugin.plugin_id:plugin},root/'projects.json')
+            for selected in [default,other]:
+                manager.select(plugin.plugin_id,str(selected))
+                result=manager.forget(plugin.plugin_id,str(selected))
+                current=next(row for row in result['projects'] if row['current'])
+                self.assertEqual(current['name'],'Vanilla')
+                self.assertTrue(current['noMod'])
+                self.assertTrue(current['readOnly'])
+                self.assertFalse(Path(result['current']).exists())
+                self.assertNotIn(str(selected.resolve()),[row['path'] for row in result['projects']])
+                restored=ProjectManager({plugin.plugin_id:plugin},manager.path).snapshot(plugin.plugin_id)
+                self.assertEqual(restored,result)
+            self.assertEqual((default/'data.txt').read_text(),'Keep this mod')
+            self.assertEqual((other/'data.txt').read_text(),'Keep this too')
+            self.assertFalse((root/'vanilla-view').exists())
+            selected=manager.select(plugin.plugin_id,str(default))
+            self.assertFalse(next(row for row in selected['projects'] if row['current'])['noMod'])
+
     def test_project_store_reports_no_mod_apart_from_damage(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

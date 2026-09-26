@@ -1,4 +1,4 @@
-    @font-face {font-family:"FF7 Menu";src:url("/assets/ff7-menu.ttf?v=1") format("truetype");font-display:swap;ascent-override:88%;descent-override:12%;line-gap-override:0}
+    @font-face {font-family:"FF7 Menu";src:url("/assets/ff7-menu.ttf?v=2") format("truetype");font-display:swap;ascent-override:88%;descent-override:12%;line-gap-override:0}
     /* The FF7 window, as values: menu blue under white lettering with a dark
        drop, white window borders, and the game's own red for warnings. This
        layers over the shared neutral presentation; layout stays shared. */
@@ -12,14 +12,17 @@
       --lex-command-row-border:2px solid;--lex-command-row-border-color:#e8e8f8;
       --lex-nav-bg:#04042c;--lex-nav-padding-inline:var(--lex-panel-gap);
       --lex-tab-min-height:40px;--lex-tab-padding-inline:clamp(4px,.4vw,10px);
-      /* Fifteen tabs in the menu's wide pitch: the labels scale to one row. */
-      --lex-tab-font-size:clamp(9px,.83vw,16px);--lex-tab-fg:#e8e8f8;
+      /* Let the shared strip fit or scroll instead of starting the bitmap
+         lettering at a nine-pixel size that loses its strokes. */
+      --lex-tab-font-size:clamp(14px,1vw,18px);--lex-tab-fg:#e8e8f8;
       --lex-tab-bg:linear-gradient(180deg,#2323a8,#12126e);
       --lex-tab-border:2px solid;--lex-tab-border-color:#e8e8f8;
       --lex-tab-hover-bg:linear-gradient(180deg,#2e2ec2,#1a1a80);
       --lex-tab-active-fg:#fff;--lex-tab-active-bg:linear-gradient(180deg,#3434cc,#1e1e88);
       --lex-tab-active-border-color:#fff;
-      --lex-tab-lift:0px;
+      /* These tabs sit flush: the shared lifted-tab connector would extend
+         below their two-pixel border and create vertical scroll overflow. */
+      --lex-tab-lift:0px;--lex-tab-underline-content:none;
       /* Panels, lists and the marked row. */
       --lex-surface-bg:linear-gradient(180deg,#1a1aa0,#0e0e60);--lex-surface-border:2px solid;
       --lex-surface-border-color:#e8e8f8;

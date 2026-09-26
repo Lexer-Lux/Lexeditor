@@ -38,14 +38,10 @@
     /* The home bar is the same chrome as an editor's: a shared border below it,
        not a bright accent stripe. Lexer: "the main menu still has a fuckton of
        weird custom styling. like the green bar below the menu bar." */
-    header { position:relative; z-index:60; display:flex; width:100%; height:var(--lex-chooser-menu-height); min-height:0; box-sizing:border-box; align-items:flex-start; justify-content:space-between; gap:24px; overflow:hidden; padding:clamp(5px,1.15vh,11px) 16px clamp(5px,1.15vh,11px) 26px; border-bottom:1px solid var(--lex-border); background:var(--lex-panel); }
+    #chooser-window-header { --lex-command-row-height:var(--lex-chooser-menu-height); position:relative; z-index:60; box-sizing:border-box; border-bottom:1px solid var(--lex-border); }
     .chooser-title { flex:1; user-select:none; -webkit-user-select:none; }
     .chooser-title h1 { user-select:none; -webkit-user-select:none; }
-    .chooser-window-controls { position:relative; z-index:80; display:flex; align-self:flex-start; align-items:center; gap:8px; }
-    .chooser-settings,.chooser-restart { display:grid; width:36px; height:36px; place-items:center; padding:0; color:var(--lex-muted); border:1px solid var(--lex-border); border-radius:5px; background:var(--lex-panel-2); }
-    .chooser-settings[hidden],.chooser-restart[hidden] { display:none; }
-    .chooser-settings:hover,.chooser-restart:hover { color:var(--lex-text); }
-    .chooser-restart svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2}
+    .chooser-window-controls { position:relative; z-index:80; justify-self:end; }
     h1 { margin:0; font:900 clamp(20px,3.3vh,30px)/1 var(--lex-heading-font); }
     main { --lex-game-row-gap:52px; display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,238px)); justify-content:center; align-items:start; column-gap:25px; row-gap:var(--lex-game-row-gap); padding:66px 28px 28px; }
     .game { position:relative; display:block; aspect-ratio:2/3; min-width:0; box-sizing:border-box; overflow:visible; padding:0; border:3px solid #30353d; border-radius:0; background:#20242a; box-shadow:0 9px 22px #0006; cursor:pointer; isolation:isolate; transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease; }
@@ -97,7 +93,7 @@
     .game-action-icon svg { width:70px; height:70px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
     @keyframes spin { to { transform:rotate(360deg); } }
     @keyframes loading-spin { to { rotate:360deg } }
-    button { align-self:flex-start; padding:9px 20px; color:var(--lex-accent-text); border:0; border-radius:5px; background:var(--lex-accent); cursor:pointer; font-weight:800; }
+    .dialog-actions button { align-self:flex-start; padding:9px 20px; color:var(--lex-accent-text); border:0; border-radius:5px; background:var(--lex-accent); cursor:pointer; font-weight:800; }
     button:disabled { cursor:default; filter:grayscale(1); opacity:.45; }
     @media (max-width:520px) { main { grid-template-columns:minmax(180px,238px); padding:20px; } }
     .modal-backdrop { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:24px; background:#000b; }
@@ -112,12 +108,8 @@
     .dialog-actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:22px; }
     .dialog-actions .secondary { color:var(--lex-text); border:1px solid var(--lex-border); background:var(--lex-panel-2); }
     .resident-handle { position:fixed; z-index:40; top:0; right:0; bottom:0; display:block; width:var(--lex-resident-handle-width,5vw); height:100vh; overflow:hidden; padding:0; border:0; border-radius:0; color:#fff; background:#303640 left center/cover no-repeat; box-shadow:-4px 0 14px #0008; }
-    .chooser-window-controls>.lex-window-actions{display:flex;width:auto;height:36px;align-items:center;gap:8px;padding:0;transition:opacity .12s ease}
-    .chooser-window-controls>.lex-window-actions>.lex-window-button{flex:0 0 36px;width:36px;min-width:36px;height:36px;padding:0;color:var(--lex-muted);border:1px solid var(--lex-border);border-radius:5px;background:var(--lex-panel-2);box-shadow:none}
     body:has(.resident-handle:not([hidden])) .chooser-window-controls>.lex-window-actions{opacity:.5}
     body:has(.resident-handle:not([hidden])) .chooser-window-controls>.lex-window-actions:hover{opacity:1}
-    .chooser-window-controls>.lex-window-actions>.lex-window-button:hover{border-color:var(--lex-highlight);background:color-mix(in srgb,var(--lex-panel-2) 78%,var(--lex-highlight))}
-    .chooser-window-controls>.lex-window-actions>.lex-window-close:hover{border-color:#c42b1c;background:#c42b1c}
     /* The game cover is the handle's texture, not a picture to read: it is
        blurred and darkened behind the arrow and the save mark. Both amounts
        are developer settings, and 0% leaves the art untouched. The dark film
@@ -158,7 +150,11 @@
        table takes the rest: thirteen columns whose headings alone need about
        970px. Below this width the two panels stack, or the games table has
        to scroll sideways to reach its own last column. */
-    .lexer-dev-body { display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:18px; flex:1 1 auto; min-height:0; }
+    .lexer-dev-body { display:grid; grid-template-columns:minmax(0,1fr); gap:18px; flex:1 1 auto; min-height:0; }
+    .lexer-dev-body:has(.lexer-dev-helpers:not([hidden])) { grid-template-columns:minmax(0,1fr) 280px; }
+    .lexer-dev-body > section[hidden] { display:none; }
+    .lexer-dev-loading { display:grid; place-items:center; flex:1; min-height:100px; }
+    .lexer-dev-loading .lex-plugin-loading-pulse { position:static; margin:0; }
     @media (max-width:1319px){ .lexer-dev-body { grid-template-columns:1fr; overflow:auto; } }
     .lexer-dev-body > section { display:flex; flex-direction:column; gap:10px; min-height:0; }
     .lexer-dev-body h3 { margin:0; font:800 12px/1 var(--lex-heading-font,var(--lex-font)); letter-spacing:.1em; color:var(--lex-muted); }
@@ -176,7 +172,7 @@
        which left the games table a four-row window with the rest of the height
        empty below it. */
     @media (max-width:1319px){
-      .lexer-dev-body { grid-auto-rows:max-content; align-content:start; }
+      .lexer-dev-body,.lexer-dev-body:has(.lexer-dev-helpers:not([hidden])) { grid-template-columns:1fr; grid-auto-rows:max-content; align-content:start; }
       .lexer-dev-table-wrap { display:block; flex:none; overflow:visible; }
       #lexer-dev-table { display:block; flex:none; }
       #lexer-dev-table > .lex-column-list { flex:none; min-height:0; }
@@ -251,14 +247,14 @@
     #app-update:focus-visible{outline:2px solid var(--lex-text);outline-offset:4px}
     #app-update:hover{background:var(--lex-border)}
     #app-update:disabled{opacity:.6;cursor:wait}
-    #chooser-window-header>.lex-ui-scale{margin-left:auto;align-self:center}
   </style>
 </head>
 <body class="lex-neutral-theme">
   <div id="chooser-surface" class="chooser-surface">
-    <header id="chooser-window-header">
+    <header id="chooser-window-header" class="lex-shell-command-row">
       <div class="chooser-title"><h1>LEXEDITOR</h1></div>
-      <div id="chooser-window-controls" class="chooser-window-controls"></div>
+      <div></div>
+      <div id="chooser-window-controls" class="chooser-window-controls lex-shell-end"></div>
     </header>
     <main id="games" aria-busy="true"></main>
   <button id="lexer-handle" class="lexer-handle" type="button" hidden aria-label="Open helper versions" title="Developer helper versions across every Lexeditor plugin"><span class="resident-arrow" aria-hidden="true"><svg viewBox="0 0 24 120"><path d="M18 8L6 60 18 112"/></svg></span><span class="lexer-handle-name" aria-hidden="true">DEV</span></button>
@@ -272,6 +268,7 @@
   <aside id="lexer-panel" class="lexer-panel" aria-label="Developer" hidden>
     <div class="lexer-panel-head">
       <h2>DEVELOPER</h2>
+      <button id="lexer-helpers-toggle" type="button" aria-controls="lexer-dev-helpers" aria-expanded="false">Helpers</button>
       <button id="lexer-panel-close" type="button" title="Close" aria-label="Close developer page">✕</button>
     </div>
     <div class="lexer-dev-body">
@@ -284,7 +281,7 @@
           <ul id="lexer-dev-files"></ul>
         </details>
       </section>
-      <section class="lexer-dev-helpers">
+      <section id="lexer-dev-helpers" class="lexer-dev-helpers" hidden>
         <h3>HELPERS</h3>
         <ul id="lexer-panel-list" class="lexer-panel-list"></ul>
 
@@ -306,7 +303,6 @@
   <script>
     const games=document.querySelector("#games"),surface=document.querySelector("#chooser-surface"),residentHandle=document.querySelector("#resident-handle"),loadingScreen=document.querySelector("#loading-screen"),loadingQuote=document.querySelector("#loading-quote");
     const modal=document.querySelector("#modal"),dialogTitle=document.querySelector("#dialog-title"),dialogMessage=document.querySelector("#dialog-message"),dialogProblems=document.querySelector("#dialog-problems"),dialogProgress=document.querySelector("#dialog-progress"),dialogActions=document.querySelector("#dialog-actions");
-    document.querySelector("#chooser-window-controls").before(LexeditorUI.uiScaleControl());
     // The loading screen waits for pending covers so the menu does not pop
     // in half-drawn, but never longer than this: a cover stuck "loading"
     // held the whole menu behind a black screen. Late covers draw in place.
@@ -339,11 +335,13 @@
       finally{updateButton.disabled=false;updateButton.removeAttribute("aria-busy");updateButton.title="Update Lexeditor";}
     };
     const windowControls=LexeditorUI.createWindowActions();
-    const restartButton=document.createElement("button");restartButton.id="chooser-restart";restartButton.className="chooser-restart";restartButton.title="Restart Lexeditor";restartButton.setAttribute("aria-label","Restart Lexeditor");restartButton.hidden=true;restartButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.59 5.45 A8 8 0 1 1 9.26 4.48" fill="none" stroke="currentColor" stroke-linecap="round"/><path d="M12.46 3.32 L10.05 6.64 L8.48 2.32 Z" fill="currentColor" stroke="none"/></svg>';
-    const settingsButton=document.createElement("button");settingsButton.id="chooser-settings";settingsButton.className="chooser-settings";settingsButton.title="Lexeditor settings";settingsButton.setAttribute("aria-label","Open Lexeditor settings");settingsButton.append(LexeditorUI.settingsIcon());settingsButton.onclick=LexeditorUI.openSettings;
+    const restartButton=document.createElement("button");restartButton.id="chooser-restart";restartButton.className="lex-window-button lex-window-restart";restartButton.title="Restart Lexeditor";restartButton.setAttribute("aria-label","Restart Lexeditor");restartButton.hidden=true;restartButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.59 5.45 A8 8 0 1 1 9.26 4.48" fill="none" stroke="currentColor" stroke-linecap="round"/><path d="M12.46 3.32 L10.05 6.64 L8.48 2.32 Z" fill="currentColor" stroke="none"/></svg>';
+    const settingsButton=document.createElement("button");settingsButton.id="chooser-settings";settingsButton.className="lex-settings-button";settingsButton.title="Lexeditor settings";settingsButton.setAttribute("aria-label","Open Lexeditor settings");settingsButton.append(LexeditorUI.settingsIcon());settingsButton.onclick=LexeditorUI.openSettings;
     const residentSave=residentHandle.querySelector(".resident-save"),residentName=residentHandle.querySelector(".resident-game-name");residentSave.append(LexeditorUI.saveIcon(),Object.assign(document.createElement("span"),{className:"lex-save-count",hidden:true}));
     const lexerHandle=document.querySelector("#lexer-handle");
-    document.querySelector("#chooser-window-controls").replaceChildren(restartButton,settingsButton,windowControls.root);
+    windowControls.root.prepend(restartButton);
+    document.querySelector("#chooser-window-controls").replaceChildren(
+      LexeditorUI.element("div",{class:"lex-shell-right-actions"},LexeditorUI.uiScaleControl(),settingsButton),windowControls.root);
     const lexerPanel=document.querySelector("#lexer-panel"),lexerList=document.querySelector("#lexer-panel-list");
     function lexerHelperRow(helper){
       const unavailable=!!helper.error||!helper.latest;
@@ -419,7 +417,7 @@
           {className:"lexer-helper",textContent:String(error?.message||error)}));
       }
     }
-    // The five subissues every game's Plugin parent links (AGENTS.md), and the
+    // The five independent tasks every game tracks (add-game skill), and the
     // four workflow labels plus "none" for the open-issue counts.
     const DEV_SUBISSUES=[["editor","EDITOR"],["ux","UX"],["modloader","MODLOADER"],["theme","THEME"],["reshade","RESHADE"]];
     const DEV_STATUSES=[["actionable","Actionable"],["untested","Needs testing"],["waiting","Waiting"],["unfeasible","Unfeasible"],["none","No status"]];
@@ -434,11 +432,15 @@
       const mount=document.querySelector("#lexer-dev-table");
       const summary=document.querySelector("#lexer-dev-summary");
       const files=document.querySelector("#lexer-dev-files");
+      mount.setAttribute("aria-busy","true");
+      mount.replaceChildren(LexeditorUI.element("div",{class:"lexer-dev-loading",role:"status","aria-label":"Loading developer overview"},
+        LexeditorUI.element("span",{class:"lex-plugin-loading-pulse","aria-hidden":"true"})));
+      summary.textContent="";files.replaceChildren();
+      document.querySelector("#lexer-dev-files-wrap").hidden=true;
       const copiedText=row=>row.copiedLines==null?"—"
         :row.copiedLines===row.copiedRecorded?String(row.copiedLines)
         :`${row.copiedLines} (was ${row.copiedRecorded})`;
-      // GitHub answers seconds after the rest of the table, so the issue cells
-      // start as a dash and the table is drawn again when the board arrives.
+      // Reveal a complete table once both independent reads have settled.
       let board=null,boardError="",colors={};
       const dot=status=>{const node=document.createElement("span");
         node.className=`lexer-dev-dot${status&&status!=="none"?"":" none"}`;
@@ -512,13 +514,17 @@
         }));
       };
       try{
-        const table=(await window.pywebview.api.developer_overview())?.table||{};
+        const [overview,issues]=await Promise.allSettled([
+          window.pywebview.api.developer_overview(),window.pywebview.api.developer_issue_board()]);
+        if(load!==developerOverviewLoad)return;
+        if(overview.status==="rejected")throw overview.reason;
+        if(issues.status==="fulfilled"&&issues.value?.games)board=issues.value;
+        else boardError=`GitHub could not be read: ${issues.reason?.message||issues.reason||"No issue data returned"}`;
+        const table=overview.value?.table||{};
         const rows=table.rows||[];
         draw(table,rows);
-        // A failed board read leaves the rest of the table standing.
-        Promise.resolve().then(()=>window.pywebview.api.developer_issue_board()).then(result=>{board=result;},
-          error=>{boardError=`GitHub could not be read: ${error?.message||error}`;})
-          .then(()=>{if(load===developerOverviewLoad)draw(table,rows);});
+        if(boardError)mount.prepend(LexeditorUI.element("div",{class:"lexer-dev-error",role:"alert"},boardError,
+          LexeditorUI.element("button",{type:"button",onclick:loadDeveloperOverview},"Retry")));
         const ui=table.sharedUi||{files:[],totalShared:0,totalHand:0};
         summary.textContent=`${rows.filter(row=>!row.global).length} games · ${table.quotesTotal||0} loading quotes`
           +` (Global (shared): ${table.globalQuotes||0}) · shared UI ${ui.totalShared||0} selectors,`
@@ -534,13 +540,20 @@
           return item;
         }));
       }catch(error){
+        if(load!==developerOverviewLoad)return;
         mount.replaceChildren(Object.assign(document.createElement("div"),
           {className:"lexer-dev-error",textContent:String(error?.message||error)}));
         summary.textContent="";files.replaceChildren();
-      }
+      }finally{if(load===developerOverviewLoad)mount.setAttribute("aria-busy","false");}
     }
+    const helpersToggle=document.querySelector("#lexer-helpers-toggle"),helpersPanel=document.querySelector("#lexer-dev-helpers");
+    helpersToggle.onclick=()=>{
+      helpersPanel.hidden=!helpersPanel.hidden;
+      helpersToggle.setAttribute("aria-expanded",String(!helpersPanel.hidden));
+      if(!helpersPanel.hidden)loadHelperVersions(false);
+    };
     function setLexerPanel(open){
-      if(open){lexerPanel.hidden=false;requestAnimationFrame(()=>lexerPanel.classList.add("open"));loadHelperVersions(false);loadDeveloperOverview();}
+      if(open){lexerPanel.hidden=false;requestAnimationFrame(()=>lexerPanel.classList.add("open"));if(!helpersPanel.hidden)loadHelperVersions(false);loadDeveloperOverview();}
       else{lexerPanel.classList.remove("open");setTimeout(()=>{lexerPanel.hidden=true;},240);}
       lexerHandle.setAttribute("aria-expanded",String(!!open));lexerHandle.setAttribute("aria-label",open?"Close helper versions":"Open helper versions");
     }
@@ -742,6 +755,12 @@
       card.innerHTML=`<div class="cover-fallback" aria-hidden="true"></div><div class="game-name"><span class="game-name-text"></span></div><div class="state-indicator" aria-hidden="true"><span class="state-label"></span><span class="state-symbol"></span></div><div class="game-hover"><button class="game-folder-button" type="button" title="Open game folder" aria-label="Open game folder"></button><div class="game-version"></div><div class="game-action-icon"></div><div class="hover-detail"></div></div>`;
       const folder=card.querySelector(".game-folder-button");folder.append(LexeditorUI.folderIcon());folder.onclick=async event=>{event.stopPropagation();try{await LexeditorUI.openGameFolder(card._plugin.id);}catch(error){setDialog(card._plugin.name,String(error),[button("CLOSE",closeDialog,true)]);}};folder.onkeydown=event=>event.stopPropagation();
       card.onclick=()=>activate(card._plugin);
+      card.oncontextmenu=async event=>{
+        if(!chooser.settings?.developerMode)return;
+        event.preventDefault();event.stopPropagation();closeDialog();
+        try{await LexeditorUI.openGitHubIssues(card._plugin.id,card._plugin.name);}
+        catch(error){LexeditorUI.showToast(String(error?.message||error),true);}
+      };
       card.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();activate(card._plugin);}};
       return card;
     }

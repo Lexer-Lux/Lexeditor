@@ -21,8 +21,8 @@ FORMULAE = (
         "status": STATUS_INCOMPLETE,
         "runtime": None,
         "replacement": (
-            "DAMAGE = (attacker STR + weapon STR bonus) × weapon power, "
-            "then a % reduction from the target's VIT"
+            "DAMAGE = attacker STR × weapon STR bonus × (attack power × 5%), then the "
+            "target's VIT reduces it by 1% per point, capped at 75%"
         ),
         "vanilla": (
             "STR = min(255, attacker STR + weapon STR bonus); DAMAGE = "
@@ -30,17 +30,17 @@ FORMULAE = (
             "× RANDOM / 256; RANDOM = 240..272"
         ),
         "blocker": (
-            "Native replacement is not installed yet. The exact reduction/clamp rule "
-            "must be fixed before patching Damage_ComputePhysicalCore at 0x492C40."
+            "Native replacement is not installed yet (Damage_ComputePhysicalCore at 0x492C40)."
         ),
     },
     {
         "id": "magic_damage",
         "name": "Magic damage",
-        "status": STATUS_INCOMPLETE,
-        "runtime": None,
+        "status": STATUS_IMPLEMENTED,
+        "runtime": "magic_damage_rework",
         "replacement": (
-            "DAMAGE = spell power × attacker MAG, then a % reduction from the target's SPR"
+            "DAMAGE = spell power × attacker MAG, then the target's SPR reduces it by 1% "
+            "per point, capped at 75%"
         ),
         "vanilla": (
             "Damage_ComputeMagicAndGF at 0x491AD0: BASE = trunc((265 − target SPR) × "
@@ -48,19 +48,18 @@ FORMULAE = (
             "ROLLED = trunc(random[240..272] × SCALED / 256), followed by vanilla "
             "caster/Shell/Defend, elemental, sign and damage-cap handling."
         ),
-        "blocker": (
-            "Native replacement is not installed yet. The rework must preserve the proven "
-            "post-formula Shell/Defend/element/sign behavior while replacing only base damage."
-        ),
+        "blocker": "",
     },
     {
         "id": "status_infliction",
         "name": "Status infliction",
-        "status": STATUS_INCOMPLETE,
-        "runtime": None,
+        "status": STATUS_IMPLEMENTED,
+        "runtime": "status_chance_rework",
         "replacement": (
-            "CHANCE % = spell power + attacker MAG − target SPR, then the vanilla "
-            "status-defence rules"
+            "CHANCE % = status accuracy − target status resistance + caster SPR − target SPR "
+            "(1% per point instead of vanilla's 0.25% MAG/SPR terms), then the vanilla "
+            "immunity rules. The 50% base chance for status spells is a spell-data change "
+            "(status accuracy), not part of this formula."
         ),
         "vanilla": (
             "Battle_ApplyStatusWithResistRoll at 0x48F9F0: CHANCE = status accuracy + "
@@ -68,17 +67,14 @@ FORMULAE = (
             "physical branches use STR/VIT and magical/GF branches use MAG/SPR, followed by "
             "the native immunity, 255, 250..254 and random-roll rules."
         ),
-        "blocker": (
-            "Native replacement is not installed yet. The patch must change the magical "
-            "chance term without changing the native resistance/immunity special cases."
-        ),
+        "blocker": "",
     },
     {
         "id": "spell_healing",
         "name": "Spell healing",
         "status": STATUS_IMPLEMENTED,
         "runtime": "healing_rework",
-        "replacement": "HEALING = spell power × attacker MAG; Shell still halves the result",
+        "replacement": "HEALING = spell power × caster SPR; Shell still halves the result",
         "vanilla": (
             "Damage_ComputeCurativeMagic at 0x493280: HALF = trunc((spell power + caster MAG) / 2); "
             "HEALING = trunc(spell power × random[240..272] × HALF / 256); Shell halves it, "
@@ -102,22 +98,43 @@ FORMULAE = (
         "blocker": "",
     },
     {
-        "id": "mug_chance",
-        "name": "Mug chance",
+        "id": "status_attack",
+        "name": "Status attack (ST-Atk junction)",
+        "status": STATUS_IMPLEMENTED,
+        "runtime": "status_chance_rework",
+        "replacement": (
+            "CHANCE % = junctioned status attack % − target status defence − target VIT "
+            "+ attacker VIT (1% per point)"
+        ),
+        "vanilla": (
+            "CHANCE = junctioned status attack − target status defence + attacker STR / 4 "
+            "− target VIT / 4."
+        ),
+        "blocker": "",
+    },
+    {
+        "id": "elemental_attack",
+        "name": "Elemental attack damage",
         "status": STATUS_INCOMPLETE,
         "runtime": None,
+        "replacement": "Not specified yet: the mod doc says only \"Redo elemental attack dmg formula too.\"",
+        "vanilla": "Vanilla elemental attack and elemental defence scaling.",
+        "blocker": "Waiting on Lexer for the replacement rule.",
+    },
+    {
+        "id": "mug_chance",
+        "name": "Mug chance",
+        "status": STATUS_IMPLEMENTED,
+        "runtime": "mug_chance_rework",
         "replacement": (
-            "Mug % chance = 100% − target Mug Difficulty − target SPD + mugger SPD"
+            "Mug % chance = 100% − target Mug Difficulty − target SPD + mugger SPD, where "
+            "Mug Difficulty = 100 − stored Mug rate; a stored rate of 0 stays immune"
         ),
         "vanilla": (
             "getMugObjectIdAndQuantity: target Mug rate 0 never succeeds; otherwise Mug succeeds "
             "when random[0..255] ≤ target Mug rate + floor(mugger SPD / 2)."
         ),
-        "blocker": (
-            "Native replacement is not installed yet. The Difficulty-stored-rate contract is "
-            "explicit in mug_difficulty_from_rate (stored rate 0 stays immune); only the native "
-            "Mug comparison patch remains."
-        ),
+        "blocker": "",
     },
 )
 
@@ -151,7 +168,7 @@ def available() -> bool:
 def blocker() -> str:
     """Why the owning toggle cannot be selected yet, naming what is missing.
 
-    The toggle is one switch for six changes, so it can only be honest when all
+    The toggle is one switch for every change, so it can only be honest when all
     six are real. This says which of them are still preview-only, so a reader
     who cannot turn it on is not left guessing.
     """
@@ -159,7 +176,7 @@ def blocker() -> str:
     done = ", ".join(row["name"] for row in FORMULAE if row["status"] == STATUS_IMPLEMENTED)
     return (f"Not available yet: {missing} still need a guarded game patch. "
             f"{done} are implemented and previewed on this page, but a preview does not "
-            "change the game, and one switch for all six cannot be half on.")
+            "change the game, and one switch for all of them cannot be half on.")
 
 
 def bounded_percent(value, label: str) -> float:
@@ -175,11 +192,11 @@ def bounded_stat(value, label: str) -> int:
     return result
 
 
-def healing_amount(spell_power: int, caster_mag: int, *, shell: bool = False) -> int:
+def healing_amount(spell_power: int, caster_spr: int, *, shell: bool = False) -> int:
     """Mirror the implemented replacement arithmetic before Zombie/sign handling."""
     power = bounded_stat(spell_power, "Spell power")
-    mag = bounded_stat(caster_mag, "Caster MAG")
-    amount = power * mag
+    spr = bounded_stat(caster_spr, "Caster SPR")
+    amount = power * spr
     return amount // 2 if shell else amount
 
 
@@ -223,39 +240,51 @@ def mug_stored_success_chance(mug_rate: float, target_spd: int,
     return mug_chance_percent(100.0 - rate, target_spd, mugger_spd)
 
 
-def melee_base_damage(attacker_str: int, weapon_str_bonus: int,
-                      weapon_power: int) -> int:
-    """Mirror the precise base term of the requested melee replacement.
+MITIGATION_CAP = 75  # VIT and SPR reduce damage by 1% per point, at most 75%
 
-    The target-VIT % reduction rule is still unspecified, so this covers only
-    the ``(STR + bonus) x power`` base; runtime status stays incomplete.
-    """
+
+def mitigated(damage: int, defence: int) -> int:
+    """Apply the 1%-per-point defence reduction, capped at 75%."""
+    return damage * (100 - min(MITIGATION_CAP, defence)) // 100
+
+
+def melee_damage(attacker_str: int, weapon_str_bonus: int, attack_power: int,
+                 target_vit: int) -> int:
+    """STR x weapon STR bonus x (attack power x 5%), less 1% per target VIT (cap 75%)."""
     strength = bounded_stat(attacker_str, "Attacker STR")
     bonus = bounded_stat(weapon_str_bonus, "Weapon STR bonus")
-    power = bounded_stat(weapon_power, "Weapon power")
-    return (strength + bonus) * power
+    power = bounded_stat(attack_power, "Attack power")
+    vit = bounded_stat(target_vit, "Target VIT")
+    return mitigated(strength * bonus * power * 5 // 100, vit)
 
 
-def magic_base_damage(spell_power: int, attacker_mag: int) -> int:
-    """Mirror the precise base term of the requested magic replacement.
-
-    The target-SPR % reduction rule is still unspecified, so this covers only
-    the ``spell power x MAG`` base; runtime status stays incomplete.
-    """
-    power = bounded_stat(spell_power, "Spell power")
-    mag = bounded_stat(attacker_mag, "Attacker MAG")
-    return power * mag
-
-
-def status_infliction_chance(spell_power: int, attacker_mag: int,
-                             target_spr: int) -> int:
-    """Mirror the requested status replacement before native defence rules.
-
-    The vanilla status-defence rules (immunity, resistance, the 255 and
-    250..254 special cases and the random roll) would remain native; only the
-    chance term is mirrored here. Runtime status stays incomplete.
-    """
+def magic_damage(spell_power: int, attacker_mag: int, target_spr: int) -> int:
+    """Spell power x MAG, less 1% per target SPR (cap 75%)."""
     power = bounded_stat(spell_power, "Spell power")
     mag = bounded_stat(attacker_mag, "Attacker MAG")
     spr = bounded_stat(target_spr, "Target SPR")
-    return max(0, min(100, power + mag - spr))
+    return mitigated(power * mag, spr)
+
+
+def status_infliction_chance(status_accuracy: int, target_resistance: int,
+                             caster_spr: int, target_spr: int) -> int:
+    """Status accuracy - resistance + caster SPR - target SPR, as a 0..100 chance.
+
+    The native immunity rules (resistance at or above the accuracy, and the
+    254/255 always-hit values) stay native and are not mirrored here.
+    """
+    accuracy = bounded_stat(status_accuracy, "Status accuracy")
+    resistance = bounded_stat(target_resistance, "Target status resistance")
+    caster = bounded_stat(caster_spr, "Caster SPR")
+    target = bounded_stat(target_spr, "Target SPR")
+    return max(0, min(100, accuracy - resistance + caster - target))
+
+
+def status_attack_chance(status_attack: int, target_defence: int,
+                         attacker_vit: int, target_vit: int) -> int:
+    """Junctioned ST-Atk % - status defence + attacker VIT - target VIT, 0..100."""
+    attack = bounded_stat(status_attack, "Status attack")
+    defence = bounded_stat(target_defence, "Target status defence")
+    attacker = bounded_stat(attacker_vit, "Attacker VIT")
+    target = bounded_stat(target_vit, "Target VIT")
+    return max(0, min(100, attack - defence + attacker - target))

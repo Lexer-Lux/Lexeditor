@@ -33,7 +33,7 @@ def tracked() -> list[str]:
 
 
 ROOT_ENTRIES = {
-    ".gitattributes", ".gitignore", ".gitmodules", ".github", "AGENTS.md", "README.md",
+    ".agents", ".gitattributes", ".gitignore", ".gitmodules", ".github", "AGENTS.md", "README.md",
     "Lexeditor.cmd", "install.ps1", "app.py", "pytest.ini", "requirements.txt",
     "requirements-test.txt", "assets", "codex", "core", "docs", "plugins", "shaders",
     "tests", "tools", "ui", "worklog",

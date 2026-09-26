@@ -468,7 +468,7 @@ function datasetPanel() {
   const records = sortedDatasetRows();
   const columns = datasetColumns();
   const prefs = currentDatasetPrefs();
-  return pagedListDetail({
+  return pagedListDetail({addDisabledReason:"Lexeditor edits the entries this data asset already has here; adding one to this asset is not supported yet.",
     rows: records, key: row => row.id, slots: false,
     selected: state.datasetSelected, page: state.datasetPage, pageSize: state.pageSize,
     noun: state.dataset?.schema?.noun || "records",
@@ -661,7 +661,7 @@ async function refresh() {
   if (values[3]) installDataset(values[3]);
 }
 function mainState(message, error = false) {
-  $("#main").replaceChildren(el("p", {class: "lex-notice", role: error ? "alert" : "status"}, message));
+  $("#main").replaceChildren(error ? el("p", {class:"lex-notice",role:"alert"},message) : LexeditorUI.loadingPanel({label:message}));
 }
 function render() {
   if (!state.dashboard) return;

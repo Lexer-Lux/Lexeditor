@@ -942,33 +942,17 @@ def canonical_effect_key(key):
     return f"0x{key[2:].upper()}" if key.lower().startswith("0x") else f"0x{joaat(key):08X}"
 
 
-_label_cache = None
-
-
 def effect_label_map(all_ids):
-    """Some effect keys exist only as hashes even in Rockstar's data. They
-    usually follow <FAMILY>_<SUFFIX> naming, so brute-force every readable
-    effect family x suffix combination and index by hash — a hash match is
-    proof the guessed name is the original string."""
-    global _label_cache
-    if _label_cache is not None:
-        return _label_cache
-    suffixes = [""] + [f"_{n}" for n in range(0, 51)] + \
-        ["_GOLD", "_EMPTY", "_MAX", "_MIN", "_FULL", "_OVERPOWERED", "_DRAIN",
-         "_SMALL", "_MEDIUM", "_LARGE", "_LOW", "_HIGH", "_ALL"]
-    extra = ["_GOLD", "_HORSE", "_CORE"]
-    families = set()
-    for i in all_ids:
-        if i and not i.startswith("0x"):
-            families.add(i)
-            for e in extra:
-                families.add(i + e)
-    _label_cache = {}
-    for fam in families:
-        for suf in suffixes:
-            name = fam + suf
-            _label_cache[joaat(name)] = name
-    return _label_cache
+    """Only names explicitly present as effect keys may name an effect.
+
+    A generated family/suffix string sharing a 32-bit hash is not evidence
+    of its original name. Ambiguous observed names also stay unresolved.
+    """
+    observed = {}
+    for name in all_ids:
+        if name and not name.lower().startswith("0x"):
+            observed.setdefault(joaat(name), set()).add(name)
+    return {key: next(iter(names)) for key, names in observed.items() if len(names) == 1}
 
 
 def txt(elem, tag, default=""):
@@ -1548,7 +1532,7 @@ def _build_catalog(ds="mine"):
             "shopListings": shop_listings.get(it.get("key") or txt(it, "key"), []),
         })
     eff_elems = root.find("effectsids").findall("item")
-    labels = effect_label_map([txt(e, "id") for e in eff_elems])
+    labels = effect_label_map([txt(e, "key") for e in eff_elems])
     custom_symbols = _raw_labels().get("effectSymbols", {}) if ds == "mine" else {}
     effects = []
     for e in eff_elems:

@@ -20,17 +20,17 @@ class VehicleDriveTests(unittest.TestCase):
 #include <limits>
 int main() {
   using namespace lexeditor_vehicle_drive;
-  if (axis(0,0)!=128 || axis(0,0,false,true)!=255 || axis(0,0,true,false)!=0) return 1;
+  if (axis(0,0)!=128 || axis(0,0,false,true)!=0 || axis(0,0,true,false)!=255) return 1;
   if (axis(0,0,true,true)!=128) return 2;
   for (int n=1; n<=100; ++n) {
     float pull=n/100.0f;
     if (axis(0,pull,false,true)!=axis(0,pull)) return 3;
     if (axis(pull,0,true,false)!=axis(pull,0)) return 4;
     if (axis(pull,pull,true,true)!=128) return 5;
-    if (n<100 && n>2 && (axis(0,pull)>=255 || axis(pull,0)<=0)) return 6;
+    if (n<100 && n>2 && (axis(0,pull)<=0 || axis(pull,0)>=255)) return 6;
   }
-  if (axis(0,0.5f,false,true)!=192 || axis(0.5f,0,true,false)!=64) return 7;
-  if (axis(-1,2)!=255) return 8;
+  if (axis(0,0.5f,false,true)!=64 || axis(0.5f,0,true,false)!=192) return 7;
+  if (axis(-1,2)!=0) return 8;
   if (axis(std::numeric_limits<float>::quiet_NaN(),0)!=128) return 9;
   if (axis(0,std::numeric_limits<float>::infinity())!=128) return 10;
   return 0;

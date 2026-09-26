@@ -27,7 +27,7 @@
     return [...rows].sort((left,right)=>{const a=get(left),b=get(right);const result=typeof a==="number"&&typeof b==="number"?a-b:String(a??"").localeCompare(String(b??""),undefined,{numeric:true,sensitivity:"base"});return result*dir});
   }
   function nextSort(state,key){return state.key===key?{key,dir:-state.dir}:{key,dir:1}}
-  function loadingPanel(message="Loading…"){return el("p",{class:"lex-notice",role:"status"},message)}
+  function loadingPanel(message="Loading…"){return LexeditorUI.loadingPanel({label:message})}
 
   function emptyPanel(title,message){return detailPanel({title,body:[el("p",{class:"lex-notice"},message)]})}
   // A game with no mod yet is not a stuck editor. The service says what is
@@ -285,7 +285,7 @@
     const query=contentQuery.trim().toLocaleLowerCase();
     let rows=contentFiles.filter(row=>!query||`${row.name} ${row.kind} ${row.path}`.toLocaleLowerCase().includes(query));
     rows=sortedRows(rows,contentSort,{name:row=>row.name,kind:row=>row.kind,path:row=>row.path});
-    return pagedListDetail({rows,key:row=>row.path,slots:false,noun:"managed content",page:contentPage,pageSize:contentPageSize,selected:structuredCurrent?.path||rows[0]?.path||null,
+    return pagedListDetail({addDisabledReason:"This lists content Lexeditor manages in your mod; new content arrives through Source files or Assets.",rows,key:row=>row.path,slots:false,noun:"managed content",page:contentPage,pageSize:contentPageSize,selected:structuredCurrent?.path||rows[0]?.path||null,
       splitKey:"terraria-content",rowsKey:"terraria-content",defaultSplit:43,minLeft:300,minRight:360,
       search:{key:"terraria-content",value:contentQuery,label:"Search managed Terraria content",placeholder:"Search names, families, or source paths…",change:value=>{contentQuery=value;contentPage=0;render()}},
       sync:next=>{contentPage=next.page;contentPageSize=next.pageSize;if(next.selected&&next.selected!==structuredCurrent?.path&&!structuredLoading)void loadStructuredContent(next.selected)},
@@ -389,7 +389,7 @@
     let rows=localizationRows().filter(row=>row.culture===locCulture&&(!query||`${row.key} ${row.value} ${row.path}`.toLocaleLowerCase().includes(query)));
     rows=sortedRows(rows,locSort,{key:row=>row.key,value:row=>row.value,path:row=>row.path});
     const selected=rows.some(row=>row.key===locSelectedKey&&row.path===locCurrent?.path)?locSelectedKey:(rows[0]?.key||"");
-    return pagedListDetail({rows,key:row=>`${row.path}\u001f${row.key}`,slots:false,noun:"localization entries",page:locPage,pageSize:locPageSize,selected:rows.find(row=>row.key===selected&&row.path===locCurrent?.path)?`${locCurrent.path}\u001f${selected}`:(rows[0]?`${rows[0].path}\u001f${rows[0].key}`:null),
+    return pagedListDetail({addDisabledReason:"Localization entries follow the keys your mod's content defines; add the content first and its keys appear here.",rows,key:row=>`${row.path}\u001f${row.key}`,slots:false,noun:"localization entries",page:locPage,pageSize:locPageSize,selected:rows.find(row=>row.key===selected&&row.path===locCurrent?.path)?`${locCurrent.path}\u001f${selected}`:(rows[0]?`${rows[0].path}\u001f${rows[0].key}`:null),
       splitKey:`terraria-localization-${locCulture}`,rowsKey:`terraria-localization-${locCulture}`,defaultSplit:48,minLeft:320,minRight:360,
       search:{key:`terraria-localization-${locCulture}`,value:locQuery,label:`Search ${locCulture} localization`,placeholder:"Search keys, values, or resource paths…",change:value=>{locQuery=value;locPage=0;render()}},
       sync:next=>{locPage=next.page;locPageSize=next.pageSize;if(next.selected){const [path,key]=String(next.selected).split("\u001f");locSelectedKey=key;if(path!==locCurrent?.path&&!locLoading)void loadLocalizationFile(path,key)}},

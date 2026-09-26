@@ -1,6 +1,6 @@
-"""Every game plugin has its `Plugin` parent and all five subissues on GitHub.
+"""Every game plugin has its five independent issues on GitHub.
 
-AGENTS.md names the five (Create Editor, UX Refinement, Mod Loader, Create
+.agents/skills/add-game/SKILL.md names the five (Create Editor, UX Refinement, Mod Loader, Create
 Theme, ReShade); the developer page shows them per game from the same
 `GitHubIntegration.plugin_board` read this uses. The issues are public, so CI
 reads them with its own job token (GH_TOKEN in global-checks.yml).
@@ -34,6 +34,6 @@ def test_every_game_has_its_five_plugin_subissues():
                for game in games
                for key, title in PLUGIN_SUBISSUES
                if board["games"][game]["subissues"][key] is None]
-    assert not missing, ("Each game needs a `Plugin` issue with the game's label linking "
-                         "these subissues (AGENTS.md, Standard plugin issue structure):\n  "
+    assert not missing, ("Each game needs these independent issues with its game label "
+                         "(.agents/skills/add-game/SKILL.md, Issue structure):\n  "
                          + "\n  ".join(missing))

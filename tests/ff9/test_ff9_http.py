@@ -35,6 +35,7 @@ def service(tmp_path, monkeypatch):
         def status_rows(self): return []
     dependency("field_walkmesh", FieldWalkmeshStore=FakeFieldWalkmeshStore)
     dependency("memoria_baseline", ensure=lambda: {"release": "fixture", "source": "fixture", "problems": []})
+    dependency("message_text", add_descriptions=lambda payload, root: payload)
     dependency("mod_compat", audit=lambda: {
         "pinnedMemoria": "v2025.07.04", "mods": [], "declaredConflicts": [],
         "overlaps": [], "unsupportedByPinnedMemoria": [], "folderNames": [],
@@ -284,9 +285,7 @@ def test_data_map_keeps_each_known_p0data_gap_visible(service):
         "StreamingAssets/p0data6*.bin and other unmatched p0data*.bin",
         # Not a p0data container: FF9's own item/ability names and the help text
         # that describes them are Unity TextAssets in the game's resource files.
-        # The pinned Memoria CSV data this editor reads carries no description
-        # column, so the gap is the game's text, and it is listed rather than
-        # left to look like there is nothing to show.
+        # Descriptions can be read, but writing game text is still unsupported.
         "x64/FF9_Data/resources.assets (EmbeddedAsset/Text)",
     }
     # Exact set, not a subset: a catch-all row previously concealed known format families (#74),
@@ -296,7 +295,8 @@ def test_data_map_keeps_each_known_p0data_gap_visible(service):
                for name in expected)
     assert "mesh/rig" in gaps["StreamingAssets/p0data4.bin"]["notes"]
     assert "event-script" in gaps["StreamingAssets/p0data7.bin"]["notes"]
-    assert "description column" in gaps["x64/FF9_Data/resources.assets (EmbeddedAsset/Text)"]["notes"]
+    text_note = gaps["x64/FF9_Data/resources.assets (EmbeddedAsset/Text)"]["notes"].lower()
+    assert "read-only" in text_note and "editing" in text_note
 
 
 def test_dashboard_exposes_read_only_mod_compatibility_snapshot(service):

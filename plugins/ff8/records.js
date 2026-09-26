@@ -95,7 +95,9 @@
     if(state.data.settings.gfHpCasting)generalRows.unshift(detailField({label:"GF HP COST",help:infoHelp("GF HP spent when this spell is confirmed through the battle Magic command. Requires a junctioned GF, Monogamy and No Magic Consumption."),control:el("input",{type:"number",min:0,max:9999,step:1,value:state.data.settings.gfHpCastingCosts[row.id],"aria-label":`GF HP cost for ${row.name}`,oninput:event=>{if(event.target.validity.valid){state.data.settings.gfHpCastingCosts[row.id]=Number(event.target.value);shell.refresh()}}})}));
     const generalRemainder=row.fields.filter(field=>field.group==="General"&&!used.has(field.field));
     generalRemainder.forEach(field=>used.add(field.field));
-    if(generalRemainder.length)generalRows.unshift(detailField({label:"ATTACK DATA",control:compactMagicFields(generalRemainder,"magic",row.id,"",Math.min(6,generalRemainder.length))}));
+    generalRows.unshift(...generalRemainder.map(field=>detailField({label:field.label,
+      help:field.help?infoHelp(field.help):null,control:fieldSourceControl(field,"magic",row.id),
+      pin:prefs?.pinButton(`field:${field.field}`,field.label)})));
     const junctionRows=[
       detailField({label:"JUNCTION (STATS)",control:multiNumberRow(many(["j_hp","j_str","j_vit","j_mag","j_spr","j_spd","j_eva","j_hit","j_luck"]).map(field=>({label:field.label.replace(/^J-/,""),title:field.label,control:fieldSourceControl(field,"magic",row.id)})),{columns:3,className:"magic-junction-stats"})}),
       detailField({label:"J-ELEMENT (ATTACK)",control:magicComposite(take("j_elem_attack_value"),take("j_elem_attack"),row.id)}),
@@ -108,8 +110,8 @@
     // halves of one record, read one at a time: a tab each, as the GF panel
     // splits its properties from its defaults.
     const sections={
-      attack:()=>detailSection({title:"ATTACK DATA",help:infoHelp("Change what this spell does when cast."),body:generalRows}),
-      junction:()=>detailSection({title:"JUNCTION",help:infoHelp("Change the bonuses granted when this spell is junctioned."),body:junctionRows}),
+      attack:()=>detailSection({body:generalRows}),
+      junction:()=>detailSection({body:junctionRows}),
     };
     const active=sections[state.magicDetailTab]?state.magicDetailTab:"attack";
     const body=[LexeditorUI.tabbedPanel({label:"Magic details",active,

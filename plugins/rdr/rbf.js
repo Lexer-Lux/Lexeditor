@@ -65,7 +65,7 @@
       const count=`${scalarCount} safe scalar${scalarCount===1?"":"s"} · ${resourceCount} RBF0 resource${resourceCount===1?"":"s"}`;
       document.querySelector("#toolbar").replaceChildren(discardButton,el("span",{class:"count"},count));
       const rows=matchingRows();
-      document.querySelector("#main").replaceChildren(pagedListDetail({
+      document.querySelector("#main").replaceChildren(pagedListDetail({addDisabledReason:"These are the values this file already holds; the game reads them by name, so a new one would be ignored.",
         modOnly:modOnlySpec(state.rbfEdits,()=>{state.rbfPage=0;}),rows,key:row=>row.id,slots:false,
         page:state.rbfPage,pageSize:state.rbfPageSize,selected:state.rbfSelected,noun:"scalars",
         splitKey:"rdr-rbf",className:"rdr-split",defaultSplit:50,fit:{minRowHeight:32},

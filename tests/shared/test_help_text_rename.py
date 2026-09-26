@@ -95,3 +95,27 @@ def test_a_reader_who_is_not_the_developer_cannot_reword_help(page):
     page.wait_for_timeout(200)
     assert page.locator(".lex-help-edit").count() == 0
     assert popover_text(page) == SHIPPED
+
+
+@pytest.mark.parametrize('finish', ['Enter', 'click away'])
+def test_plain_enter_or_clicking_away_keeps_the_new_wording(page, finish):
+    # Lexer: "any changes i make straight up don't even matter. just ignored."
+    # Only Ctrl+Enter saved; clicking away threw the edit away.
+    framework(page)
+    mount_shell(page)
+    mount_help(page)
+    open_help(page)
+    page.locator(".lex-field-help .lex-info-help").first.dblclick()
+    editor = page.locator(".lex-help-edit").first
+    editor.wait_for(timeout=3000)
+    widths = page.evaluate("""() => {const e=document.querySelector('.lex-help-edit'),p=e.parentElement,s=getComputedStyle(p);
+      return {editor:e.getBoundingClientRect().width, room:p.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)}}""")
+    assert abs(widths['editor'] - widths['room']) <= 2, widths  # fills the bubble
+    editor.fill(REWORDED)
+    if finish == 'Enter':
+        editor.press("Enter")
+    else:
+        page.mouse.click(600, 700)
+    page.wait_for_timeout(300)
+    saved = page.evaluate("window.savedCalls")
+    assert saved and list(saved[-1][2].values())[0] == REWORDED, saved

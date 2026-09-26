@@ -343,18 +343,9 @@
   // Short-lived confirmations. One stack, oldest dropped first, so a burst of
   // copies cannot bury the screen.
   let toastStack = null;
-  // Toasts never take the pointer, so hovering one is measured, not heard:
-  // one under the pointer fades until the pointer moves off it.
-  const ghostToasts = event => {
-    for (const toast of document.querySelectorAll(".lex-toast")) {
-      const box = toast.getBoundingClientRect();
-      const over = event.clientX >= box.left && event.clientX <= box.right &&
-        event.clientY >= box.top && event.clientY <= box.bottom;
-      toast.classList.toggle("lex-toast-ghost", over);
-    }
-  };
-  // Listened for from the start: the window bar's own toast is not made here.
-  document.addEventListener("pointermove", ghostToasts, {passive: true});
+  // A toast takes the pointer: pointing at it holds it, a click dismisses it.
+  // It used to ignore the pointer and fade when hovered, which is exactly why
+  // it could not be clicked away.
   const showToast = (message, options = {}) => {
     if (!toastStack || !toastStack.isConnected) {
       toastStack = element("div", {class: "lex-toast-stack", role: "status", "aria-live": "polite"});
@@ -369,10 +360,25 @@
     const toast = element("div", {class: ["lex-toast", tone ? `lex-tone-${tone}` : ""].filter(Boolean).join(" ")}, message);
     toastStack.append(toast);
     while (toastStack.children.length > 4) toastStack.firstElementChild.remove();
-    setTimeout(() => {
+    // Long enough to read - Lexer: "the toasts disappear way too quick and
+    // can't be dispelled by clicking them". A toast stays at least four
+    // seconds and longer for longer text, waits while it is pointed at, and a
+    // click sends it away at once.
+    const text = String(toast.textContent || "");
+    const readFor = Number(options.duration) || Math.min(10000, Math.max(4000, text.length * 70));
+    let timer = 0;
+    const leave = () => {
+      clearTimeout(timer);
+      if (toast.classList.contains("leaving")) return;
       toast.classList.add("leaving");
       setTimeout(() => toast.remove(), 220);
-    }, Math.max(900, Number(options.duration) || 2000));
+    };
+    const wait = delay => { clearTimeout(timer); timer = setTimeout(leave, delay); };
+    toast.title = "Click to dismiss";
+    toast.addEventListener("click", leave);
+    toast.addEventListener("pointerenter", () => clearTimeout(timer));
+    toast.addEventListener("pointerleave", () => wait(1500));
+    wait(Math.max(900, readFor));
     return toast;
   };
 
@@ -460,6 +466,10 @@
 
   const closeHelpPopup = () => {
     if (!activeHelpPopup) return;
+    if (activeHelpPopup.classList.contains("lex-help-editing") && activeHelpPopup.commitEdit) {
+      activeHelpPopup.commitEdit();
+      return;
+    }
     activeHelpPopup.cleanup?.();
     activeHelpPopup.remove();
     activeHelpPopup = null;
@@ -526,7 +536,43 @@
       else record.addedNodes.forEach(strip);
     }));
     observer.observe(root, {childList:true, subtree:true, attributes:true, attributeFilter:['title']});
-    return () => observer.disconnect();
+    // The browser's own hover boxes are gone, so the shell draws the stored
+    // text itself. Nothing drew it before: every button's explanation - why an
+    // add button is unavailable, why save is off - existed and was never shown
+    // ("just hovering it should give you the text. you shouldn't have to
+    // click it"). A question mark keeps its own popup.
+    let tip = null, tipTimer = 0, tipOwner = null;
+    const hideTip = () => { clearTimeout(tipTimer); tip?.remove(); tip = null; tipOwner = null; };
+    const showTip = owner => {
+      const text = owner.dataset.lexTitle;
+      if (!text || !owner.isConnected) return;
+      tip = element("div", {class: "lex-hover-tip", role: "tooltip"}, text);
+      document.body.append(tip);
+      const box = owner.getBoundingClientRect(), size = tip.getBoundingClientRect(), pad = 8;
+      const below = box.bottom + 6 + size.height <= window.innerHeight - pad;
+      tip.style.left = `${Math.round(Math.max(pad, Math.min(box.left + box.width / 2 - size.width / 2, window.innerWidth - size.width - pad)))}px`;
+      tip.style.top = `${Math.round(below ? box.bottom + 6 : Math.max(pad, box.top - 6 - size.height))}px`;
+    };
+    const over = event => {
+      const owner = event.target.closest?.("[data-lex-title]");
+      if (owner === tipOwner) return;
+      hideTip();
+      if (!owner || owner.closest(".lex-info-help") || !root.contains(owner)) return;
+      tipOwner = owner;
+      tipTimer = setTimeout(() => showTip(owner), 450);
+    };
+    document.addEventListener("pointerover", over, true);
+    document.addEventListener("pointerdown", hideTip, true);
+    document.addEventListener("keydown", hideTip, true);
+    window.addEventListener("scroll", hideTip, true);
+    return () => {
+      observer.disconnect();
+      hideTip();
+      document.removeEventListener("pointerover", over, true);
+      document.removeEventListener("pointerdown", hideTip, true);
+      document.removeEventListener("keydown", hideTip, true);
+      window.removeEventListener("scroll", hideTip, true);
+    };
   };
 
   const infoHelp = (text, attrs = {}) => {
@@ -579,7 +625,7 @@
           editor.focus();
           editor.select();
           let finished = false;
-          const finish = async commit => {
+          const finish = async (commit, reopen = true) => {
             if (finished) return;
             finished = true;
             popup.classList.remove("lex-help-editing");
@@ -602,7 +648,7 @@
             // the pointer being back on the marker, so reopen it to face the
             // reader with the wording that was just saved.
             closeHelpPopup();
-            open();
+            if (reopen) open();
             // A bubble has no lasting node, so undoing a rewording puts the text
             // back for the next time it opens rather than under the pointer.
             labelUndo.push({key: helpKey(shipped), tabId: activePageTab(), before,
@@ -617,15 +663,22 @@
                                          : "The new help text is now the shipped one.");
             } catch (_error) {}
           };
+          // Enter or clicking away keeps the new wording; Shift+Enter starts a
+          // new line; Escape puts the old one back. Clicking away used to throw
+          // the edit away and only Ctrl+Enter kept it, so a reworded bubble
+          // looked as if it had been ignored.
           editor.addEventListener("keydown", keyEvent => {
             keyEvent.stopPropagation();
             if (keyEvent.key === "Escape") { keyEvent.preventDefault(); finish(false); }
-            else if (keyEvent.key === "Enter" && (keyEvent.ctrlKey || keyEvent.metaKey)) {
+            else if (keyEvent.key === "Enter" && !keyEvent.shiftKey) {
               keyEvent.preventDefault();
               finish(true);
             }
           });
-          editor.addEventListener("blur", () => finish(false));
+          editor.addEventListener("blur", () => finish(true));
+          // A click outside closes the bubble and removes the editor before
+          // it can blur; closing it keeps the wording all the same.
+          popup.commitEdit = () => finish(true, false);
         };
       }
       const position = () => {
@@ -1191,7 +1244,7 @@
       filled = true;
       const value = control.value;
       const list = typeof entries === "function" ? entries() : entries;
-      control.replaceChildren(...list.map(entry => element("option", {value: entry.value}, entry.label)));
+      control.replaceChildren(...list.map(entry => element("option", {value: entry.value, disabled: !!entry.disabled}, entry.label)));
       control.value = value;
     };
     for (const type of ["pointerdown", "focus", "keydown"]) control.addEventListener(type, fill);
@@ -1839,6 +1892,10 @@
 
   // Prose in a section: a manual page, an explanation. Its line breaks are
   // the author's.
+  const loadingPanel = (options = {}) => element("div", {
+    class: ["lex-panel-loading", options.className || ""].filter(Boolean).join(" "),
+    role: "status", "aria-label": options.label || "Loading", "aria-busy": "true",
+  }, element("span", {class:"lex-plugin-loading-pulse", "aria-hidden":"true"}));
   const detailText = text => element("p", {class: "lex-detail-text"}, text);
 
   // A word or two that classifies a record - Project or Vanilla - in a
@@ -1964,7 +2021,10 @@
       ? element("div", {class:"lex-source-control no-reference"}, options.control)
       : options.control;
     const pin = options.pin || null;
-    const input = control instanceof Element
+    const composite = control instanceof Element &&
+      (control.matches(".lex-detail-parts") || control.querySelector(".lex-detail-parts"));
+    // A group has no single scalar type or range. Its individual controls do.
+    const input = control instanceof Element && !composite
       ? (control.matches("input,select,textarea,output,.lex-readonly-field")
         ? control : control.querySelector("input,select,textarea,output,.lex-readonly-field"))
       : null;
@@ -2076,6 +2136,7 @@
     const node = element("div", {
       ...(options.attrs || {}),
       class: ["lex-detail-field", "lex-pinnable-property", booleanField ? "lex-boolean-field" : "",
+        input?.tagName === "TEXTAREA" ? "lex-detail-field-stacked" : "",
         options.tone ? `lex-tone-${options.tone}` : "", options.className || ""].filter(Boolean).join(" "),
       "data-lex-type": dataType,
       "data-lex-property": options.property
@@ -2345,8 +2406,20 @@
     if (!count || width <= 0) return;
     const probe = element("span", {style: "position:absolute;visibility:hidden;width:var(--lex-toggle-basis,11em)"});
     row.append(probe);
-    const basis = Math.min(width, probe.getBoundingClientRect().width || 176);
+    let basis = probe.getBoundingClientRect().width || 176;
     probe.remove();
+    // Include each switch's full label, help, checkbox and padding before
+    // choosing columns. A fixed em basis can split a name and its help mark.
+    for (const toggle of Array.from(row.children)) {
+      if (!toggle.classList.contains("lex-toggle")) continue;
+      const sample = toggle.cloneNode(true);
+      sample.style.cssText = "position:absolute;visibility:hidden;width:max-content;max-width:none;min-width:0;";
+      sample.querySelector(".lex-toggle-name").style.cssText = "white-space:nowrap;flex:none;";
+      row.append(sample);
+      basis = Math.max(basis, sample.getBoundingClientRect().width);
+      sample.remove();
+    }
+    basis = Math.min(width, Math.ceil(basis));
     const gap = parseFloat(style.columnGap) || 0;
     const fit = Math.max(1, Math.min(count, Math.floor((width + gap) / (basis + gap))));
     const columns = Math.ceil(count / Math.ceil(count / fit));
@@ -5010,7 +5083,7 @@ ${contents.path}`});
           + "an editable mod; Find a Mod opens one you already have."
           + (vanilla.path ? `\n\n${vanilla.path}` : "")
         : path.textContent;
-      const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid)).map(row => {
+      const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid && !row.noMod)).map(row => {
         const select = element("button", {
         class: `lex-project-menu-item-select${row.current && activeSource === "mine" ? " active" : ""}`,
         type: "button", role: "menuitem", title: row.path,
@@ -6097,6 +6170,36 @@ ${contents.path}`});
     return {root, state, show, hide, loadIssues, loadIssue};
   };
 
+  // The same GitHub issues workspace, opened without a game's editor behind it -
+  // from Home, for a game that is not installed ("right click on a game's
+  // cover on the main menu to just go straight to its github page/tab thing
+  // in the app"). It gets a slim bar of its own with the game's name and a
+  // close button, in place of the editor's header.
+  const openGitHubIssues = async (pluginId, pluginName = "") => {
+    const repository = await callWindow("github_repository", pluginId);
+    if (!repository?.repository) {
+      showToast(`No GitHub repository is set for ${pluginName || pluginId}.`, true);
+      return null;
+    }
+    document.querySelectorAll(".lex-github-standalone").forEach(node => node.remove());
+    const button = element("button", {type: "button", hidden: true});
+    let workspace = null;
+    const close = () => {
+      workspace?.hide();
+      workspace?.root.remove();
+      header.remove();
+    };
+    const header = element("header", {class: "lex-shell-header lex-github-standalone"},
+      element("strong", {class: "lex-github-standalone-title"}, `${pluginName || pluginId} issues`),
+      closeButton({title: "Close the issues", onclick: close}));
+    document.body.append(header);
+    workspace = mountGitHubWorkspace({plugin: {id: pluginId, name: pluginName}, activeTab: () => ""},
+      button, header, repository);
+    workspace.root.classList.add("lex-github-standalone");
+    workspace.show();
+    return {...workspace, close};
+  };
+
   const installWindowFrame = options => {
     const controls = options.controls || createWindowActions();
     const {minimize, maximize, close} = controls;
@@ -6934,7 +7037,17 @@ ${contents.path}`});
         style: rowStyle,
         title: typeof options.rowTitle === "function" ? options.rowTitle(row) : options.rowTitle,
         "aria-selected": options.select ? String(selected) : null,
-        onclick: options.select ? event => options.select(row,event) : null,
+        // The clicked row is marked at once, so a caller that keeps the table
+        // and only updates what it drives does not have to reach into the
+        // list's rows to move the selection itself.
+        onclick: options.select ? event => {
+          const marked = options.selectedClass || "selected";
+          for (const sibling of root.querySelectorAll(":scope > .lex-list-row")) {
+            sibling.classList.toggle(marked, sibling === event.currentTarget);
+            sibling.setAttribute("aria-selected", String(sibling === event.currentTarget));
+          }
+          options.select(row,event);
+        } : null,
       }, options.render(row));
       options.decorateRow?.(rowNode, row, key);
       root.append(rowNode);
@@ -8077,10 +8190,20 @@ ${contents.path}`});
   };
 
   let activeSearcher = null;
+  const lockSearcherSource = (searcher, locked) => {
+    for (const [node, inert] of searcher.sourceLocks || []) node.inert = inert;
+    searcher.sourceLocks = [];
+    document.body.classList.toggle("lex-searcher-source", locked);
+    if (locked) for (const node of document.querySelectorAll("#main,#toolbar,.lex-shell-left-actions,.lex-shell-center-actions")) {
+      searcher.sourceLocks.push([node, node.inert]);
+      node.inert = true;
+    }
+  };
   const finishSearcher = (navigateOrigin = true) => {
     if (!activeSearcher) return;
     const searcher = activeSearcher;
     activeSearcher = null;
+    lockSearcherSource(searcher, false);
     searcher.header?.classList.remove("lex-searcher-active");
     searcher.bar?.remove();
     if (navigateOrigin) searcher.origin?.();
@@ -8089,8 +8212,7 @@ ${contents.path}`});
   const beginSearcher = options => {
     finishSearcher(false);
     const header = document.querySelector(".lex-shell-header");
-    const command = header?.querySelector(".lex-shell-command-row");
-    if (!header || !command) throw new Error("The shared Searcher needs the Lexeditor shell");
+    if (!header?.querySelector(".lex-nav-frame")) throw new Error("The shared Searcher needs the Lexeditor shell");
     const context = element("button", {type: "button", class: "lex-searcher-context", title: "Show the source record"}, searchIcon());
     const prompt = element("strong", {class: "lex-searcher-prompt"}, options.prompt || "Select a record");
     const cancel = element("button", {type: "button", class: "lex-searcher-cancel", title: "Cancel selection", "aria-label": "Cancel selection"}, "×");
@@ -8106,9 +8228,18 @@ ${contents.path}`});
         searcher.atTarget = false;
         context.replaceChildren(element("span", {class: "lex-searcher-return lex-ui-symbol", "aria-hidden": "true"}, "↩"));
         context.title = "Return to selection results";
-        searcher.origin?.();
+        context.classList.add("returning");
+        prompt.replaceChildren("Click the ", element("span", {class:"lex-searcher-return-prompt"}, "blue return button"),
+          ` to ${options.prompt || "select a record"}`);
+        lockSearcherSource(searcher, true);
+        Promise.resolve(searcher.origin?.()).then(() => {
+          if (activeSearcher === searcher && !searcher.atTarget) lockSearcherSource(searcher, true);
+        });
       } else {
         searcher.atTarget = true;
+        lockSearcherSource(searcher, false);
+        context.classList.remove("returning");
+        prompt.textContent = options.prompt || "Select a record";
         context.replaceChildren(searchIcon());
         context.title = "Show the source record";
         searcher.target?.();
@@ -8116,7 +8247,7 @@ ${contents.path}`});
     };
     cancel.onclick = () => finishSearcher(true);
     header.classList.add("lex-searcher-active");
-    command.append(bar);
+    header.append(bar);
     searcher.target?.();
     window.dispatchEvent(new CustomEvent("lexeditor-searcher-changed", {detail: {active: true, type: searcher.type}}));
     return searcher;
@@ -8131,20 +8262,18 @@ ${contents.path}`});
       clearTimeout(timer); timer = 0; node.classList.remove("selecting");
     };
     node.addEventListener("pointerdown", event => {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || !searcher.atTarget || activeSearcher !== searcher) return;
       event.preventDefault();
       node.setPointerCapture?.(event.pointerId);
       node.classList.add("selecting");
       timer = setTimeout(() => {
         timer = 0;
         node.classList.remove("selecting");
+        if (activeSearcher !== searcher || !searcher.atTarget) return;
         const accept = searcher.accept;
-        activeSearcher = null;
-        searcher.header?.classList.remove("lex-searcher-active");
-        searcher.bar?.remove();
+        finishSearcher(false);
         accept?.(options.value, options.label);
         searcher.origin?.();
-        window.dispatchEvent(new CustomEvent("lexeditor-searcher-changed", {detail: {active: false}}));
       }, searcher.holdMs);
     });
     for (const type of ["pointerup", "pointercancel", "pointerleave"]) node.addEventListener(type, cancel);
@@ -9941,7 +10070,7 @@ ${contents.path}`});
     return api;
   })();
 
-window.LexeditorUI = {panelIcon, noImage, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
+window.LexeditorUI = {panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
 // no pad attached pays one idle check a second and changes nothing on screen.

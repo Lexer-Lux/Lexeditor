@@ -77,7 +77,7 @@ async function renderLootSounds(){
   const current=renderScope("renderLootSounds");
   document.body.classList.remove("loot-split-view");
   $("#toolbar").replaceChildren(lootTabButtons(),savebar(saveLootSounds));
-  const main=$("#main");main.replaceChildren(LexeditorUI.stack({fill:false,className:"lex-notice"},"Loading sound mappings…"));
+  const main=$("#main");main.replaceChildren(LexeditorUI.loadingPanel({label:"Loading sound mappings"}));
   const data=await api("/api/loot-sounds");
   if(!current())return;
   if(state.tab!=="loot"||state.lootFile!=="__sounds")return;
@@ -146,7 +146,7 @@ async function renderLoot() {
   const m = $("#main"); m.innerHTML = "";
   if (!state.lootFile) { m.append(LexeditorUI.stack({fill:false,className:"lex-notice"}, `This dataset has no loot files yet (${dsInfo().dir}).`)); return; }
   if (!allView && !state.loot[state.lootFile]) {
-    m.append(LexeditorUI.stack({fill:false,className:"lex-notice"}, "Loading…"));
+    m.append(LexeditorUI.loadingPanel());
     await loadLoot(state.lootFile);
   }
   if(!current())return;

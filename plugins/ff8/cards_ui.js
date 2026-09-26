@@ -188,7 +188,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       const body=[detailField({label:'Location',control:LexeditorUI.readonlyField(map.name)}),
         detailField({label:'Map file',control:LexeditorUI.readonlyField(map.key)})];
       if(map._error)body.push(LexeditorUI.detailNote(`Could not load opponent: ${map._error}`));
-      else if(!map._loaded)body.push(LexeditorUI.detailNote('Loading opponent settings…'));
+      else if(!map._loaded)body.push(LexeditorUI.loadingPanel({label:'Loading opponent settings'}));
       else {
         const calls=(map.players||[]).filter(player=>player.entity===entry.entity);
         if(calls.length>1)body.push(LexeditorUI.detailNote('This opponent has more than one card-game setup. The game script decides which setup is used.'));
@@ -226,7 +226,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       return detailPanel({title:entry.name,body});
     };
     return LexeditorUI.pagedListDetail({rows,key:row=>row.key,selected:playerView.selected,
-      page:playerView.page,pageSize:40,noun:'players',maxBarrels:1,slots:true,fit:{minRowHeight:28},
+      page:playerView.page,pageSize:40,noun:'players',maxBarrels:1,slots:true,addDisabledReason:'Card players are the people the game places in its world; each is fixed by the game and a new one has nowhere to stand.',fit:{minRowHeight:28},
       className:'ff8-card-players',splitKey:'ff8-card-players',rowsKey:'ff8-card-players',
       search:{key:'ff8-card-players',value:playerView.query,label:'Search card players',change:value=>{playerView.query=value;playerView.page=0;render()}},
       sync:next=>Object.assign(playerView,next),change:next=>{Object.assign(playerView,next);render()},
@@ -308,7 +308,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     const marker = LexeditorUI.stack({fill:false});
     marker.classList.add(PANEL_CLASS);
     marker.dataset.gf = String(gfId);
-    marker.textContent = "Loading GF spellbook…";
+    marker.replaceChildren(LexeditorUI.loadingPanel({label:'Loading GF spellbook'}));
     const abilitiesPanel=host.querySelector('[data-gf-panel="abilities"]');
     if(!abilitiesPanel)return;
     const parts=LexeditorUI.sectionParts(abilitiesPanel);

@@ -922,8 +922,8 @@ class HostApi:
     def developer_issue_board(self) -> dict:
         """Each game's five plugin subissues and its open issues by status.
 
-        Separate from the overview because it waits on GitHub: the page draws
-        its table first and fills these columns when this answers.
+        Separate from the overview so both reads can run concurrently. Home
+        keeps its loading state until the complete overview is available.
         """
         if not self._developer():
             raise ValueError("The developer page needs Developer Mode.")

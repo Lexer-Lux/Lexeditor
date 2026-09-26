@@ -23,7 +23,7 @@
   // Returning early left #main completely empty until the kernel finished
   // reading, so whichever tab the user opened first was a blank page rather
   // than a page that was loading. A tab must always render something.
-  function render(){if(!state.loaded){main.replaceChildren(detailPanel({className:"ff7-detail",title:"Loading FF7 data",identity:null,meta:"Reading kernel.bin",body:[detailSection({title:"STATUS",body:[detailField({label:"STATE",control:readonlyField("Reading the installed FF7 data files…")})]})]}));return}let content;if(state.tab==="info")content=infoView();else if(state.tab==="datamap")content=mapView();else if(state.tab==="tweaks")content=tweakView();else if(state.tab==="deployment")content=deploymentView();else if(integrated.includes(state.tab))content=dataWorkspace();else content=unresolvedView();main.replaceChildren(content);shellRefresh()}
+  function render(){if(!state.loaded){main.replaceChildren(LexeditorUI.loadingPanel({label:"Loading FF7 data"}));return}let content;if(state.tab==="info")content=infoView();else if(state.tab==="datamap")content=mapView();else if(state.tab==="tweaks")content=tweakView();else if(state.tab==="deployment")content=deploymentView();else if(integrated.includes(state.tab))content=dataWorkspace();else content=unresolvedView();main.replaceChildren(content);shellRefresh()}
   function navigate(tab){state.tab=tab;render();if(tab==="tweaks")void refreshPlatformConfig();if(tab==="deployment")void refreshDeployment()}
   async function save(){
     if(readonly())return;

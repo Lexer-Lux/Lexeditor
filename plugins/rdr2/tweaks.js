@@ -147,7 +147,7 @@ function renderSettingField(section,setting){
     control=el("span",{class:"setting-value"},input,...(unit?[el("span",{class:"setting-unit"},unit)]:[]));
   }
   const help=settingHelp(section,setting);
-  return el("div",{class:["settings-field",dev?"dev":"",constBoundary?"const":""].filter(Boolean).join(" ")},
+  return el("div",{"data-setting-section":section.name,class:["settings-field",dev?"dev":"",constBoundary?"const":""].filter(Boolean).join(" ")},
     el("div",{class:"settings-field-label"},
       el("span",{class:"settings-field-name"},label,
         dev?el("span",{class:"setting-dev-chip",title:"Developer setting: the runtime gates it behind developer mode, or the INI documents it as a probe/trace."},"DEV"):"",
@@ -157,16 +157,48 @@ function renderSettingField(section,setting){
     el("div",{class:"settings-field-control"},control));
 }
 
+function refreshSettingAvailability(){
+  const switches=new Map((state.settings?.sections||[]).map(section=>{
+    const enabled=section.settings.find(setting=>setting.key==="Enabled");
+    return [section.name,!enabled||Number.parseInt(state.settingEdits[`${section.name}|Enabled`]??enabled.value,10)!==0];
+  }));
+  document.querySelectorAll("[data-setting-section]").forEach(row=>{
+    const disabled=isRO()||switches.get(row.dataset.settingSection)===false;
+    row.setAttribute("aria-disabled",String(disabled));
+    row.style.opacity=disabled?".45":"";
+    row.querySelectorAll("input,select,textarea,button").forEach(control=>control.disabled=disabled);
+  });
+}
+
+function settingEnableControl({section,setting}){
+  const compound=`${section.name}|${setting.key}`;
+  const control=el("input",{type:"checkbox","aria-label":`Enable ${humanSettingName(section.name)}`,
+    title:settingHelp(section,setting),style:"width:24px;height:24px;margin-left:auto;flex:none",
+    checked:Number.parseInt(state.settingEdits[compound]??setting.value,10)!==0,disabled:isRO(),
+    onchange:event=>{
+      const value=event.target.checked?"1":"0";
+      if(value===setting.value)delete state.settingEdits[compound];else state.settingEdits[compound]=value;
+      refreshSettingAvailability();refreshGlobalSave();
+    }});
+  return control;
+}
+
 function renderSettingCategory(category){
+  const masters=category.subs.flatMap(sub=>sub.entries).filter(({setting})=>setting.key==="Enabled");
+  const heading=(tag,title,help,entries=[])=>el(tag,{},LexeditorUI.actionRow(
+    el("span",{style:"flex:1"},title),help?fieldHelp(help):"",...entries.map(settingEnableControl)));
   const subs=el("div",{class:"settings-subs"});
   for(const sub of category.subs){
     const fields=el("div",{class:"settings-fields"});
-    for(const {section,setting} of sub.entries)fields.append(renderSettingField(section,setting));
+    for(const {section,setting} of sub.entries){
+      if(setting.key!=="Enabled")fields.append(renderSettingField(section,setting));
+    }
+    const switches=masters.length===1?[]:sub.entries.filter(({setting})=>setting.key==="Enabled");
     subs.append(el("div",{class:"settings-sub"},
-      sub.title?el("h3",{},sub.title,sub.help?fieldHelp(sub.help):""):"",fields));
+      sub.title||switches.length?heading("h3",sub.title||humanSettingName(switches[0].section.name),sub.help,switches):"",fields));
   }
   return el("section",{class:"settings-section"},
-    el("h2",{},category.title,category.help?fieldHelp(category.help):""),subs);
+    heading("h2",category.title,category.help,masters.length===1?masters:[]),subs);
 }
 
 // Resolve the schema against the INI that actually loaded. Sections and keys the
@@ -230,5 +262,6 @@ async function renderSettings(){
   const m=$("#main");m.querySelector(".settings-layout")?.__settingsColumnsObserver?.disconnect();m.innerHTML="";
   if(!state.settings.available){m.append(LexeditorUI.stack({fill:false,className:"lex-notice"},"GameplayTweaks.ini is not installed for this editor profile. Catalog, loot, crafting, and other data editing remain available."));installTabContext();return;}
   m.append(LexeditorUI.settingsColumns(buildSettingsCategories().filter(category=>category.subs.length).map(renderSettingCategory),{columnMajor:true,strictColumns:true}));
+  refreshSettingAvailability();
   installTabContext();
 }

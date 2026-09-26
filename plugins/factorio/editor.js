@@ -80,8 +80,7 @@ function errorState(message) {
 }
 
 function loadingState(message = "Loading Factorio project…") {
-  return detailPanel({className: "lex-information-panel", title: message,
-    body: [detailNote("Reading the project through the Factorio plugin service.")]});
+  return LexeditorUI.loadingPanel({label:message});
 }
 
 function inputNumber(value, options, change) {
@@ -518,7 +517,7 @@ function sorted(kind, values) {
 function recordsPanel(kind) {
   if (!sourceReady()) return sourceState();
   const rows = sorted(kind, filtered(kind));
-  return pagedListDetail({
+  return pagedListDetail({addDisabledReason:`A mod can define new ${LABELS[kind].toLocaleLowerCase()} in its own data stage, but Lexeditor only edits the existing ones. Adding one is not supported yet.`,
     modOnly: {
       available: true,
       value: state.modOnly[kind],
