@@ -1,6 +1,7 @@
 "use strict";
 
 const BLUI={
+  loadingPanel:LexeditorUI.loadingPanel,
   pagedListDetail:LexeditorUI.pagedListDetail,
   columnList:LexeditorUI.columnList,
   detailPanel:LexeditorUI.detailPanel,
