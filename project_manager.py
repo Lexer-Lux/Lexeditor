@@ -150,6 +150,11 @@ class ProjectManager:
             payload = self._read()
         entry = payload.get(plugin_id, {}) if isinstance(payload.get(plugin_id), dict) else {}
         current = Path(entry.get("current") or spec.default_root).expanduser().resolve()
+        # A game nobody has made a mod for yet opens on its unmodded data,
+        # locked read-only. That is the normal first state of every game, not
+        # a warning. A mod the player explicitly chose that has since vanished
+        # is different, and keeps its warning below.
+        vanilla = not entry.get("current") and not current.exists()
         candidates = [current, spec.default_root.resolve()]
         # A discovered root is often a junction into the game folder, and
         # resolving it renames it to the link target. Keep the name the player
@@ -182,12 +187,12 @@ class ProjectManager:
                 continue
             problems = self._problems(root, spec.required_paths, spec.required_any)
             if not root.exists() and key == os.path.normcase(str(current)):
-                # A folder that was never created is not a damaged project.
-                # Say so directly instead of listing files missing from it.
-                if entry.get("current"):
-                    problems = [f"Project folder not found: {root}. Reselect or recreate it."]
-                else:
-                    problems = [f"No {plugin.name} project yet at {root}. Create one to open the editor."]
+                if vanilla:
+                    # No mod yet is not a mod at all, so it is not listed as
+                    # one. The game opens on its vanilla data instead.
+                    continue
+                # A mod the player chose that has since gone is a real problem.
+                problems = [f"Project folder not found: {root}. Reselect or recreate it."]
             try:
                 info = metadata(root)
             except (OSError, ValueError):
@@ -196,7 +201,7 @@ class ProjectManager:
                          "version": info.get("version", ""),
                          "valid": not problems, "problems": problems,
                          "current": key == os.path.normcase(str(current))})
-        return {"pluginId": plugin_id, "current": str(current),
+        return {"pluginId": plugin_id, "current": str(current), "vanilla": vanilla,
                 "environment": spec.root_env, "projects": rows,
                 "canCreate": spec.template_root.is_dir(),
                 "modSupport": {"verified": bool(getattr(plugin, "mod_adapter", None) and getattr(plugin, "mod_adapter", None).verified),
@@ -365,10 +370,13 @@ class ProjectManager:
             if key not in {os.path.normcase(str(Path(value).expanduser().resolve()))
                            for value in forgotten}:
                 forgotten.append(str(root))
-            current = Path(entry.get("current") or spec.default_root).expanduser().resolve()
-            if os.path.normcase(str(current)) == key:
-                current = spec.default_root.resolve()
-            payload[plugin_id] = {"current": str(current), "known": known,
-                                  "forgotten": forgotten}
+            current = entry.get("current")
+            if current and os.path.normcase(str(Path(current).expanduser().resolve())) == key:
+                # Removing the open mod leaves no mod chosen, which opens the
+                # game on vanilla, rather than naming the default folder as a
+                # choice the player never made.
+                current = None
+            payload[plugin_id] = {"known": known, "forgotten": forgotten,
+                                  **({"current": current} if current else {})}
             self._write(payload)
         return self.snapshot(plugin_id)

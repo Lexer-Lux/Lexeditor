@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from plugin_http import PluginRequestHandler
 import json
 import mimetypes
 import os
@@ -82,7 +83,7 @@ def project_summary(requested: str | None = None) -> dict:
     }
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(PluginRequestHandler):
     def log_message(self, _format, *_args):
         return
 

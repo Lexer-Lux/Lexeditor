@@ -13,6 +13,7 @@ from .acceptance import acceptance_status, begin_acceptance
 from .content_pack import ContentPackStore, deploy, deployment_status, loader_status, revert
 from .datasets import DATASET_SPECS, schema as dataset_schema
 from .source_data import load_base_dataset, load_base_objects
+from plugin_http import vanilla_session
 
 try:
     from plugin_http import PluginRequestHandler
@@ -42,9 +43,22 @@ POST_ROUTES = {
     "/api/deployment/revert",
     "/api/acceptance/begin",
 }
+def _vanilla_patches(key: str) -> dict:
+    """No mod is open: nothing overrides the game, so every value is vanilla.
+
+    Shaped like the content pack's own reply, so the editor shows the same
+    view it would show a mod with no changes, locked.
+    """
+    spec = DATASET_SPECS[key]
+    editable = ["Price", "Edibility", "IsDrink"] if key == "objects" else list(spec["fields"])
+    return {"datasetKey": key, "asset": spec["target"], "sha256": "", "rows": [],
+            "editableFields": editable, "schema": dataset_schema(key), "source": "vanilla"}
+
+
 def objects_dataset() -> dict:
     """Combine read-only vanilla values, when available, with project-owned overrides."""
-    payload = ContentPackStore(paths.PROJECT_ROOT).objects()
+    payload = (_vanilla_patches("objects") if vanilla_session()
+               else ContentPackStore(paths.PROJECT_ROOT).objects())
     base_rows, source = load_base_objects(paths.GAME_ROOT)
     patched = {row["id"]: row for row in payload["rows"]}
     rows = []
@@ -69,7 +83,8 @@ def objects_dataset() -> dict:
 
 
 def dataset_payload(key: str) -> dict:
-    payload = ContentPackStore(paths.PROJECT_ROOT).dataset(key)
+    payload = (_vanilla_patches(key) if vanilla_session()
+               else ContentPackStore(paths.PROJECT_ROOT).dataset(key))
     base_rows, source = load_base_dataset(paths.GAME_ROOT, key)
     patched = {row["id"]: row for row in payload["rows"]}
     rows = []
@@ -96,7 +111,9 @@ def dataset_payload(key: str) -> dict:
 
 
 def data_map() -> dict:
-    project_ready = (paths.PROJECT_ROOT / "manifest.json").is_file() and (paths.PROJECT_ROOT / "content.json").is_file()
+    # Vanilla has no content pack but every row still opens, on vanilla data.
+    project_ready = vanilla_session() or (
+        (paths.PROJECT_ROOT / "manifest.json").is_file() and (paths.PROJECT_ROOT / "content.json").is_file())
     rows = []
     for key, spec in DATASET_SPECS.items():
         _base, source = load_base_dataset(paths.GAME_ROOT, key)

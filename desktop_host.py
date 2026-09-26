@@ -151,6 +151,7 @@ class HostApi:
         self._mod_uploads = {}
         self._managed_mod_results = {}
         self._session_project_path = None
+        self._session_vanilla = False
         self._library_move_progress = None
         self._window_state_path = window_state_path
         self._session: PluginSession | None = None
@@ -519,6 +520,9 @@ class HostApi:
             if plugin.projects is not None and installation["status"] != "not-added":
                 project = self._projects.snapshot(plugin.plugin_id)
                 selected = next((row for row in project["projects"] if row["current"]), None)
+                if project.get("vanilla"):
+                    # No mod yet: the game is ready and opens on vanilla.
+                    installation = {**installation, "noMod": True}
                 if selected and selected["problems"]:
                     problems = problems + selected["problems"]
                     installation = dict(installation)
@@ -1281,6 +1285,15 @@ class HostApi:
             row["readOnly"] = self._managed_project_locked(plugin_id, Path(row["path"]))
         return result
 
+    def vanilla_session(self) -> dict:
+        """Whether the open editor shows the unmodded game, locked.
+
+        The shared shell asks once when it mounts. A game opened without a mod
+        has nothing that could be saved, so the shell disables Save and every
+        editing control, and says why, whatever the plugin's own lock says.
+        """
+        return {"pluginId": self._plugin_id, "vanilla": bool(self._session and self._session_vanilla)}
+
     def _managed_project_locked(self, plugin_id: str, path: Path) -> bool:
         policy = self._plugins[plugin_id].managed_mod
         if policy is None:
@@ -1811,14 +1824,20 @@ class HostApi:
                 self._installations.environment(plugin_id)
                 if self._enforce_installations and plugin.installation is not None else {}
             )
+            vanilla = False
             if plugin.projects is not None:
                 project = self._projects.snapshot(plugin_id)
                 current = next((row for row in project["projects"] if row["current"]), None)
-                if current is None or not current["valid"]:
+                vanilla = bool(project.get("vanilla"))
+                if not vanilla and (current is None or not current["valid"]):
                     raise RuntimeError("\n".join((current or {}).get(
                         "problems", [f"{plugin.name} has no valid editable project"])))
+                # With no mod the service is still told where a mod would go,
+                # but LEXEDITOR_VANILLA says there is none there: it reads the
+                # game's vanilla data, creates nothing, and refuses every write.
                 environment[plugin.projects.root_env] = project["current"]
-                environment["LEXEDITOR_MOD_READ_ONLY"] = "1" if self._managed_project_locked(
+                environment["LEXEDITOR_VANILLA"] = "1" if vanilla else "0"
+                environment["LEXEDITOR_MOD_READ_ONLY"] = "1" if vanilla or self._managed_project_locked(
                     plugin_id, Path(project["current"])) else "0"
             fonts = self.download_fonts(plugin_id)
             session = plugin.session_factory(environment) if environment else plugin.session_factory()
@@ -1829,7 +1848,9 @@ class HostApi:
                 raise
             previous = self._session
             self._session = session
-            self._session_project_path = Path(environment[plugin.projects.root_env]) if plugin.projects else None
+            self._session_project_path = (Path(environment[plugin.projects.root_env])
+                                          if plugin.projects and not vanilla else None)
+            self._session_vanilla = vanilla
             self._session_identity = identity
             self._plugin_id = plugin_id
             self._dirty_count = 0

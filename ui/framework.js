@@ -4270,6 +4270,13 @@ ${contents.path}`});
       const canChoose = Boolean(value);
       box.hidden = !current && !selectedSource && !canChoose;
       if (!current && !selectedSource && !canChoose) return;
+      if (sessionVanilla) {
+        // No mod is open. Say so in the one place a player looks for the mod.
+        mode.hidden = false; mode.textContent = "🔒"; mode.setAttribute("aria-label", "Read only");
+        name.textContent = "Vanilla"; status.hidden = true;
+        path.textContent = "Unmodded game · Add a Mod or Find a Mod to edit";
+        box.title = VANILLA_NOTICE;
+      } else {
       mode.hidden = !selectedSource;
       mode.textContent = selectedSource?.readOnly === false ? "📝" : "🔒";
       mode.setAttribute("aria-label", selectedSource?.readOnly === false ? "Editable" : "Read only");
@@ -4282,6 +4289,7 @@ ${contents.path}`});
         ? (selectedSource.readOnly === false ? "Editable mod" : "Read-only reference")
         : current?.path || "New Mod or Find a Mod");
       box.title = path.textContent;
+      }
       const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid)).map(row => {
         const select = element("button", {
         class: `lex-project-menu-item-select${row.current && activeSource === "mine" ? " active" : ""}`,
@@ -5362,9 +5370,17 @@ ${contents.path}`});
   const shellIsReadonly = () => {
     try { return !!activeShellReadonly?.(); } catch { return false; }
   };
+  // A game opened with no mod shows its vanilla data, and the host says so.
+  // The lock is the shell's, not the plugin's: every game gets it, whatever
+  // its own readonly accessor says, and it lifts only when a mod is chosen,
+  // which reloads the editor.
+  let sessionVanilla = false;
+  const VANILLA_NOTICE = "Vanilla game, locked read-only. Open the mod menu and choose Add a Mod or Find a Mod to make changes.";
 
   const mountShell = options => {
-    activeShellReadonly = typeof options.readonly === "function" ? options.readonly : null;
+    const pluginReadonly = typeof options.readonly === "function" ? options.readonly : null;
+    options.readonly = () => sessionVanilla || !!pluginReadonly?.();
+    activeShellReadonly = options.readonly;
     const host = typeof options.host === "string" ? document.querySelector(options.host) : options.host;
     if (!host) throw new Error("Lexeditor shell host is missing");
     document.body.dataset.lexPlugin = options.plugin.id;
@@ -5830,6 +5846,15 @@ ${contents.path}`});
       }
     }
     refresh();
+    const askVanilla = () => callWindow("vanilla_session").then(result => {
+      if (!result?.vanilla || result.pluginId !== options.plugin.id) return;
+      sessionVanilla = true;
+      document.documentElement.setAttribute("data-lex-vanilla", "true");
+      refresh();
+      showToast(VANILLA_NOTICE, {duration: 6000});
+    }).catch(() => {});
+    if (window.pywebview?.api) askVanilla();
+    else window.addEventListener("pywebviewready", askVanilla, {once: true});
     // Shortcut handling. Every branch flashes its own row in the panel when
     // the panel happens to be open, so the panel doubles as a live legend.
     const focusableSearch = () => document.querySelector(

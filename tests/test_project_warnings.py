@@ -28,22 +28,22 @@ def _plugin(default_root: Path) -> GamePlugin:
     )
 
 
-def test_absent_default_project_gets_creation_guidance(tmp_path):
+def test_absent_default_project_is_vanilla_not_damage(tmp_path):
+    # Issue 567: no mod yet opens the game on vanilla, locked, instead of a
+    # warning. It must not read as a damaged project either.
     missing = tmp_path / "mods" / "probe" / "My Mod"
-    manager = ProjectManager({"probe-game": _plugin(missing)})
-    rows = manager.snapshot("probe-game")["projects"]
-    current = next(row for row in rows if row["current"])
-    assert not current["valid"]
-    assert len(current["problems"]) == 1, current["problems"]
-    assert "marker.json" not in current["problems"][0], current["problems"]
-    assert "No Probe Game project yet" in current["problems"][0], current["problems"]
-    assert str(missing) in current["problems"][0], current["problems"]
+    manager = ProjectManager({"probe-game": _plugin(missing)}, tmp_path / "projects.json")
+    snapshot = manager.snapshot("probe-game")
+    assert snapshot["vanilla"] is True
+    assert not any(row["current"] for row in snapshot["projects"]), snapshot["projects"]
+    assert not any("marker.json" in problem for row in snapshot["projects"]
+                   for problem in row["problems"]), snapshot["projects"]
 
 
 def test_incomplete_project_keeps_per_file_lines(tmp_path):
     root = tmp_path / "project"
     root.mkdir()
-    manager = ProjectManager({"probe-game": _plugin(root)})
+    manager = ProjectManager({"probe-game": _plugin(root)}, tmp_path / "projects.json")
     rows = manager.snapshot("probe-game")["projects"]
     current = next(row for row in rows if row["current"])
     assert not current["valid"]

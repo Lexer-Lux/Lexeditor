@@ -25,6 +25,7 @@ import sys
 import threading
 import xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from plugin_http import PluginRequestHandler
 
 # keep the game's xi: prefix on XInclude tags (ET would rename to ns0:)
 ET.register_namespace("xi", "http://www.w3.org/2001/XInclude")
@@ -5044,7 +5045,7 @@ def apply_mob_edits(edits):
 
 # ---------------- HTTP ----------------
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(PluginRequestHandler):
     def log_message(self, fmt, *args):
         pass
 
