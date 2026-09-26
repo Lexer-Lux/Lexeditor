@@ -27,8 +27,8 @@ from plugins.ff8.ffnx_issue_51 import runtime_package
 SUPPORT_FILES = {
     'tests/lexeditor_live_conditions_test.cpp',
     'tests/lexeditor_shared_magic_config_test.cpp',
-    'tests/verify_issue51_runtime_artifact.py',
-    'tests/verify_issue51_shared_magic_runtime.py',
+    'tools/verify_issue51_runtime_artifact.py',
+    'tools/verify_issue51_shared_magic_runtime.py',
     'verify-issue51-build.ps1',
 }
 NEW_DRIVER_MARKERS = (
@@ -113,7 +113,7 @@ def package(candidate: Path, ffnx_source: Path, *, driver_sha256: str,
         if sections((candidate / complete_patch.name).read_bytes()).keys() == sections(complete_patch.read_bytes()).keys():
             # Keep the exact complete build patch, including its line endings.
             complete_patch.write_bytes((candidate / complete_patch.name).read_bytes())
-        verify_linked(ffnx_source / 'tests/verify_issue51_runtime_artifact.py', driver)
+        verify_linked(ffnx_source / 'tools/verify_issue51_runtime_artifact.py', driver)
         image, _ = runtime_package._pe_exports(driver)
         runtime_package._reject_unloadable_manifest(image)
         require(all(marker in image for marker in NEW_DRIVER_MARKERS),
@@ -142,7 +142,7 @@ def package(candidate: Path, ffnx_source: Path, *, driver_sha256: str,
         origin = ('Local MSVC x86 build from the uncommitted editor worktree; '
                   'the complete derivative patch identifies the compiled source.'
                   if local_build else f'Actions build run: `{build_run}`')
-        report = f'''# Lexeditor FFNx battle repair build
+        report = f'''# Lexeditor FFNx runtime build
 
 ## Artifact and source
 
@@ -191,6 +191,18 @@ canonical pool. Shared Magic works with the configured stock cap (1–255);
 lossless migration refuses overflow. No Magic Consumption hooks only field and
 battle spell-cast debits, never the shared Item debit path. Drops After Mug is
 a separate guarded one-byte Hext change, retaining Mug-once and reward-once checks.
+
+Modern Controls maps RT to forward and LT to reverse on the native world
+vehicle axis, including digital keyboard fallbacks. Partial physical trigger
+pulls retain their axis magnitude even when they also set a digital trigger bit.
+This verifies the mapped input; proportional in-game vehicle speed remains a
+separate acceptance check.
+
+Runtime messages use a queued FF8-style panel with wrapping and a measured
+display duration. A refused summon consumes its notification flag once.
+Shared Magic migration failures identify the character, spell and stock count
+that prevented lossless activation. Messages keep the overlay render path
+active even when other overlays are disabled.
 
 ## Build reproduction
 
