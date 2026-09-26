@@ -29,6 +29,8 @@
   ];
 
   const entries = [
+    {id: "recordSource", level: "atom", summary: "Record origin: a pen for records created in the current mod, or a plugin-supplied source icon. Vanilla has no marker.",
+      sample: () => UI.inlineLabel(UI.recordSource({created:true}), "Created record")},
     // ---- atoms -----------------------------------------------------------
     {id: "element", level: "utility", summary: "document.createElement with the boring parts done: attributes, event handlers, children, and nulls skipped. Not a component - the thing every component is built out of.",
       sample: () => el("div", {class: "lex-reshade-actions"},

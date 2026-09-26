@@ -183,10 +183,9 @@ function originMarker(record){
     const title=document.createElementNS(ns,"title");title.textContent="Imported from Red Dead Online";
     const circle=document.createElementNS(ns,"circle");circle.setAttribute("cx","12");circle.setAttribute("cy","12");circle.setAttribute("r","9");
     const path=document.createElementNS(ns,"path");path.setAttribute("d","M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18");
-    icon.append(title,circle,path);return icon;
+    icon.append(title,circle,path);return LexeditorUI.recordSource({icon,label:"Imported from Red Dead Online"});
   }
-  if(record?.customAdded)return el("span",{class:"lex-ui-symbol",title:"Created locally in LEXEDITOR","aria-label":"Created locally in LEXEDITOR"},"✒️");
-  return "";
+  return LexeditorUI.recordSource({created:record?.customAdded});
 }
 
 function originDisplayName(value,record){return LexeditorUI.inlineLabel(

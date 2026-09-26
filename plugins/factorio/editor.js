@@ -493,7 +493,8 @@ function filtered(kind) {
 function table(kind, rows, selected, select) {
   return columnList({
     rows, key: row => row.name, selected, select,
-    columns: columns[kind], columnPreferences: prefs[kind],
+    columns: columns[kind].map(column=>column.key==="name"?{...column,
+      render:row=>LexeditorUI.inlineLabel(LexeditorUI.recordSource({created:row.created}),row.name)}:column), columnPreferences: prefs[kind],
     sortState: state.sort[kind],
     sort: key => {
       const current = state.sort[kind];
