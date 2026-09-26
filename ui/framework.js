@@ -422,6 +422,30 @@
     return svg;
   };
 
+  // One "no image" mark for every place a picture is missing: a record with
+  // no art of its own, or an image that failed to load. It replaces the
+  // browser's broken-image glyph and alt text ("[mapid] composed background").
+  const noImage = (label = "No image") => {
+    const namespace = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(namespace, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    const frame = document.createElementNS(namespace, "path");
+    frame.setAttribute("d", "M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M3 3l18 18");
+    svg.append(frame);
+    return element("span", {class: "lex-no-image", role: "img", "aria-label": label, title: label}, svg);
+  };
+  document.addEventListener("error", event => {
+    const image = event.target;
+    if (!(image instanceof HTMLImageElement) || image.dataset.lexNoImage === "off" || !image.isConnected) return;
+    if (image.nextElementSibling?.classList.contains("lex-no-image-standin")) return;
+    const standin = noImage(image.alt ? `No image: ${image.alt}` : "No image");
+    standin.classList.add("lex-no-image-standin");
+    image.after(standin);
+    image.hidden = true;
+    image.addEventListener("load", () => { image.hidden = false; standin.remove(); }, {once: true});
+  }, true);
+
   const newButton = (attrs = {}) => {
     const {class: className = "", title = "Add", "aria-label": ariaLabel = title, ...rest} = attrs;
     return element("button", {
@@ -1720,8 +1744,10 @@
   };
 
   const statCard = (options = {}) => element("div", {class:"lex-stat-card"},
+    // A card without art says so with the shared mark behind its ranks.
     options.image ? element("img", {src:options.image,alt:options.label || "",
-      onerror:event=>{event.target.hidden=true;}}) : null,
+      onerror:event=>{event.target.hidden=true;}})
+      : Object.assign(noImage(options.label ? `No art for ${options.label}` : "No card art"), {className:"lex-no-image lex-no-image-standin"}),
     element("div", {class:"lex-stat-card-ranks"}, ...(options.ranks || [])),
     // A game that names the card's type in a word rather than one glyph asks
     // for a corner wide enough to hold the word.
@@ -9887,7 +9913,7 @@ ${contents.path}`});
     return api;
   })();
 
-window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
+window.LexeditorUI = {panelIcon, noImage, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
 // no pad attached pays one idle check a second and changes nothing on screen.
@@ -10075,7 +10101,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     }
     // The picture, not the pin on its corner or a sound's play button.
     const art = [...icon.querySelectorAll('img,svg,picture')]
-      .find(node => !node.closest('.lex-column-pin,.lex-audio-play'));
+      .find(node => !node.hidden && !node.closest('.lex-column-pin,.lex-audio-play,.lex-no-image'));
     return art instanceof Element ? art.cloneNode(true) : null;
   };
   document.addEventListener('pointerover', event => {

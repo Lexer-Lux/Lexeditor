@@ -2952,6 +2952,23 @@ body:has(.lex-pager:not(.lex-pager-inline)) #main {
   flex:0 0 auto;
 }
 
+/* The shared "no image" mark fills whatever box the picture would have. */
+.lex-no-image {
+  display:grid;
+  place-items:center;
+  box-sizing:border-box;
+  width:100%;
+  height:100%;
+  min-width:24px;
+  min-height:24px;
+  color:var(--lex-muted);
+  background:color-mix(in srgb, var(--lex-panel-2) 70%, transparent);
+  border:1px dashed color-mix(in srgb, var(--lex-border) 80%, transparent);
+  border-radius:var(--lex-radius);
+}
+.lex-stat-card > .lex-no-image-standin { position:absolute; inset:0; }
+.lex-no-image > svg { width:min(48px, 45%); height:min(48px, 45%); fill:none; stroke:currentColor; stroke-width:1.6; stroke-linejoin:round; }
+
 /* A table's own add button: round, in its bottom-right corner, over the rows
    and faint until it is pointed at. An unavailable one keeps its place and
    says why instead of vanishing. */

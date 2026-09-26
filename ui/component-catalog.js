@@ -38,6 +38,8 @@
     {id: "newButton", level: "atom", summary: "The standard button.",
       sample: () => el("div", {class: "lex-reshade-actions"},
         UI.newButton({label: "Do the thing"}))},
+    {id: "noImage", level: "atom", summary: "The one mark for a missing picture: a record with no art, or an image that failed to load. It fills the picture's box.",
+      sample: () => el("div", {style: "width:96px;height:96px"}, UI.noImage("No card art"))},
     {id: "closeButton", level: "atom", summary: "The mark that dismisses a dialog or panel.",
       sample: () => UI.closeButton({onclick: () => {}})},
     {id: "readonlyField", level: "atom", summary: "A value that can be read and copied but not changed.",
