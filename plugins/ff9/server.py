@@ -53,6 +53,8 @@ UNRESOLVED_AREAS = (
      "Public tooling decodes and emits the compiled .eb event-script families loaded from p0data7. Lexeditor has no safe script decompiler/editor/recompiler UI with preservation coverage yet."),
     ("StreamingAssets/p0data6*.bin and other unmatched p0data*.bin", "Audio evidence plus remaining packed Unity asset families",
      "Public research byte-identifies at least title BGM music033.akb in p0data61.bin/p0data601.bin, and Memoria recognizes p0data61.bin, p0data62.bin and p0data63.bin as mod-content bundle names. That does not establish a bounded schema for the whole p0data6* family, so Lexeditor keeps the remaining contents visible and unintegrated rather than guessing."),
+    ("x64/FF9_Data/resources.assets (EmbeddedAsset/Text)", "Item, ability, command and other game message text",
+     "FF9 keeps its own item and ability names, the help text that describes them, and the other message tables inside the game's Unity resource files. The pinned Memoria CSV data this editor reads has no description column for any item, spell or ability, so Lexeditor cannot yet show or edit that text: reading it needs an extractor for those asset containers plus a writer that composes with them. The tables stay listed here as an unsupported area rather than being silently omitted."),
 )
 
 
