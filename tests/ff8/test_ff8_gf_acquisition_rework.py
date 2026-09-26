@@ -16,29 +16,30 @@ class GfAcquisitionReworkTests(unittest.TestCase):
         self.assertEqual(gf_acquisition_rework.TWEAK_NAME, "GF Acquisition Rework")
         self.assertIn("gfAcquisitionRework", gameplay_settings.ACCEPTED_TWEAKS)
 
-    def test_load_defaults_and_forces_off(self):
+    def test_load_defaults_off_and_keeps_a_stored_choice(self):
         with tempfile.TemporaryDirectory(prefix="ff8-gf-acquisition-") as directory:
             project = Path(directory)
             defaults = gameplay_settings.load(project)
             self.assertIs(defaults["gfAcquisitionRework"], False)
-            self.assertFalse(defaults["gfAcquisitionReworkAvailable"])
-            self.assertIn("no proved battle-victory",
-                          defaults["gfAcquisitionReworkBlocker"])
+            self.assertTrue(defaults["gfAcquisitionReworkAvailable"])
+            self.assertEqual(defaults["gfAcquisitionReworkBlocker"], "")
             gameplay_settings.settings_path(project).write_text(
                 '{"gfAcquisitionRework": true}',
                 encoding="utf-8",
             )
-            # No proved hooks: a stored true never loads as enabled.
-            self.assertIs(gameplay_settings.load(project)["gfAcquisitionRework"], False)
+            self.assertIs(gameplay_settings.load(project)["gfAcquisitionRework"], True)
 
     def test_disabled_build_emits_no_acquisition_bytes(self):
         patch = gameplay_settings.build_hext(25, False)
         self.assertIn("GF Acquisition Rework is disabled", patch)
         self.assertNotIn("Tri-Point", patch)
 
-    def test_save_fails_closed(self):
-        with self.assertRaisesRegex(ValueError, "no proved battle-victory"):
-            gf_acquisition_rework.build_hext(True)
+    def test_enabled_build_installs_both_hooks(self):
+        patch = gf_acquisition_rework.build_hext(True)
+        self.assertIn(f"\n{gf_acquisition_rework.CAPTURE_HOOK:X} = E9", patch)
+        self.assertIn(f"\n{gf_acquisition_rework.VICTORY_HOOK:X} = E9", patch)
+        self.assertIn("GF Acquisition Rework", gameplay_settings.build_hext(
+            25, False, gf_acquisition_rework_enabled=True))
 
     def test_editor_exposes_approved_rule(self):
         editor = (ROOT / "plugins/ff8/boot.js").read_text(encoding="utf-8")
