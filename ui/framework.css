@@ -1128,6 +1128,9 @@ details.lex-detail-section[open] > summary::before { content:"▾"; }
      no longer reserving slack instead. */
   background:color-mix(in srgb,var(--lex-border) 72%,transparent);
 }
+/* A locked checkbox has its lock just left of the box, where the arrow ended;
+   the arrow stops short of the lock instead of running into it. */
+.lex-detail-field:has(.lex-field-readonly-lock) .lex-field-boolean-arrow { margin-right:18px; }
 .lex-field-boolean-arrow::after {
   position:absolute;
   /* Flush with the end of the line, not a pixel past it. The label clips what

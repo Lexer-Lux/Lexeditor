@@ -1994,6 +1994,20 @@
         ? control : (input?.parentElement || node);
       host.classList.add("lex-has-readonly-lock");
       host.append(lock);
+      // A checkbox is smaller than the lock's margin, so right-aligned the
+      // lock was drawn over the tick. It stands just left of the box instead,
+      // placed the way the pin is beside a checkbox.
+      if (inputType === "checkbox" && input) {
+        const place = () => {
+          if (!lock.isConnected || !input.isConnected) return;
+          const owner = host.getBoundingClientRect(), target = input.getBoundingClientRect();
+          if (!owner.width || !target.width) return;
+          const scale = owner.width / host.offsetWidth || 1;
+          lock.style.right = `${(owner.right - target.left) / scale + 4}px`;
+        };
+        requestAnimationFrame(place);
+        if (typeof ResizeObserver !== "undefined") new ResizeObserver(place).observe(host);
+      }
     }
     if (pin && input && !control?.classList?.contains("lex-source-control"))
       anchorDetailPin(pin, node.querySelector(".lex-detail-field-control"), input);
