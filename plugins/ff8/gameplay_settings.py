@@ -35,6 +35,7 @@ from . import hit_frame_log
 from . import music_volume_issue_498
 from . import magic_damage_rework
 from . import mug_chance_rework
+from . import status_chance_rework
 from . import fast_start
 from . import streamlined_draw
 from . import healing_rework
@@ -597,6 +598,7 @@ def _verify_executable(game_root: Path) -> Path:
             *music_volume_issue_498.verified_hooks(),
             *magic_damage_rework.verified_hooks(),
             *mug_chance_rework.verified_hooks(),
+            *status_chance_rework.verified_hooks(),
             (healing_rework.HEALING_FORMULA_HOOK, healing_rework.HEALING_FORMULA_ORIGINAL),
             (menu_qol_issue_61.ABILITY_LIST_RETURN_HOOK, menu_qol_issue_61.ABILITY_LIST_RETURN_ORIGINAL),
             (menu_qol_issue_61.ABILITY_STATE_READ, menu_qol_issue_61.ABILITY_STATE_READ_ORIGINAL),
@@ -776,6 +778,7 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
         lines.append("# Formulae Rework is disabled; curative-magic arithmetic remains vanilla.")
     lines.extend(magic_damage_rework.build_hext(formulae_rework).rstrip().splitlines())
     lines.extend(mug_chance_rework.build_hext(formulae_rework).rstrip().splitlines())
+    lines.extend(status_chance_rework.build_hext(formulae_rework).rstrip().splitlines())
     fixed_commands = fixed_command_menu.build_patch(
         enabled=fixed_command_menu_enabled,
         single_gf_enabled=single_gf_enabled,

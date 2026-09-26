@@ -53,8 +53,8 @@ FORMULAE = (
     {
         "id": "status_infliction",
         "name": "Status infliction",
-        "status": STATUS_INCOMPLETE,
-        "runtime": None,
+        "status": STATUS_IMPLEMENTED,
+        "runtime": "status_chance_rework",
         "replacement": (
             "CHANCE % = status accuracy − target status resistance + caster SPR − target SPR "
             "(1% per point instead of vanilla's 0.25% MAG/SPR terms), then the vanilla "
@@ -67,10 +67,7 @@ FORMULAE = (
             "physical branches use STR/VIT and magical/GF branches use MAG/SPR, followed by "
             "the native immunity, 255, 250..254 and random-roll rules."
         ),
-        "blocker": (
-            "Native replacement is not installed yet. The patch must change the magical "
-            "chance term without changing the native resistance/immunity special cases."
-        ),
+        "blocker": "",
     },
     {
         "id": "spell_healing",
@@ -103,8 +100,8 @@ FORMULAE = (
     {
         "id": "status_attack",
         "name": "Status attack (ST-Atk junction)",
-        "status": STATUS_INCOMPLETE,
-        "runtime": None,
+        "status": STATUS_IMPLEMENTED,
+        "runtime": "status_chance_rework",
         "replacement": (
             "CHANCE % = junctioned status attack % − target status defence − target VIT "
             "+ attacker VIT (1% per point)"
@@ -113,8 +110,7 @@ FORMULAE = (
             "CHANCE = junctioned status attack − target status defence + attacker STR / 4 "
             "− target VIT / 4."
         ),
-        "blocker": "Native replacement is not installed yet; the physical status branch of "
-                   "Battle_ApplyStatusWithResistRoll (0x48F9F0) is not yet patched.",
+        "blocker": "",
     },
     {
         "id": "elemental_attack",
