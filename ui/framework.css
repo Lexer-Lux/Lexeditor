@@ -1407,7 +1407,12 @@ body[data-window-maximized="true"] [data-window-action="maximize"] .lex-window-i
   width: 8px;
   height: 8px;
   border: 1px solid currentColor;
-  background: var(--lex-panel-2);
+  /* The back square of the restore glyph is a cutout of the front square, so
+     it must be filled with the button's own surface. Filling it with the
+     panel colour painted a bright patch on themes whose shell button is dark
+     (Warband's #6b2424 button on #dcc99a), which read as one square "filled
+     in" for no reason. */
+  background: var(--lex-shell-button-bg, var(--lex-panel-2));
 }
 
 body[data-window-maximized="true"] [data-window-action="maximize"]:hover .lex-window-icon::after {

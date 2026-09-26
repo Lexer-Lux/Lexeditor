@@ -151,6 +151,18 @@ def main():
                     except PlaywrightTimeoutError as error:
                         raise AssertionError({'pageErrors':errors,'main':page.locator('#main').inner_text(),'url':page.url}) from error
                     page.wait_for_function('document.querySelector(".warband-item-thumbnail img")?.naturalWidth>0')
+                    # The restore glyph's back square is filled with the button's
+                    # own surface. Filling it with the panel colour left a bright
+                    # patch on Warband's dark shell button and read as one square
+                    # "filled in" for no reason.
+                    assert page.evaluate('''(() => {
+                      document.body.dataset.windowMaximized = "true";
+                      const button = document.querySelector(
+                        '[data-window-action="maximize"]');
+                      const icon = button.querySelector('.lex-window-icon');
+                      return getComputedStyle(icon, '::after').backgroundColor
+                        === getComputedStyle(button).backgroundColor;
+                    })()''') is True
                     assert page.locator('.warband-item-detail [data-lex-property="id"] input').count()==1
                     assert page.locator('.warband-item-detail [data-lex-property="id"] input').is_disabled()
                     assert page.locator('.warband-item-detail [data-lex-property="name"] input').count()==1
