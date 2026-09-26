@@ -661,7 +661,7 @@ async function refresh() {
   if (values[3]) installDataset(values[3]);
 }
 function mainState(message, error = false) {
-  $("#main").replaceChildren(el("p", {class: "lex-notice", role: error ? "alert" : "status"}, message));
+  $("#main").replaceChildren(error ? el("p", {class:"lex-notice",role:"alert"},message) : LexeditorUI.loadingPanel({label:message}));
 }
 function render() {
   if (!state.dashboard) return;

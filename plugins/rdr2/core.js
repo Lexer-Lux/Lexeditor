@@ -572,7 +572,7 @@ async function switchDataset(ds) {
   if (!state.store[ds]) state.store[ds] = { catalog: null, quickSelect:null, effectByKey: {}, loot: {}, matrix: null, shops:null };
   const st = state.store[ds];
   if (!st.catalog && dsInfo().catalog) {
-    $("#main").replaceChildren(LexeditorUI.stack({fill:false,className:"lex-notice"}, "Loading dataset…"));
+    $("#main").replaceChildren(LexeditorUI.loadingPanel({label:"Loading dataset"}));
   }
   // Request independent data together, but publish it only after both complete.
   // Explicit dataset ids prevent a later UI selection from redirecting a request.
@@ -875,7 +875,7 @@ function render() {
     document.body.classList.remove("loot-split-view");
     document.body.classList.remove("weapon-detail-view");
     document.body.classList.remove("shop-workspace-view");
-    noData("Loading editor data...");
+    $("#main").replaceChildren(LexeditorUI.loadingPanel({label:"Loading editor data"}));
     refreshGlobalSave();
     return Promise.resolve();
   }
@@ -888,7 +888,7 @@ function render() {
     state.tab==="shops" && state.filters.shopMode!=="report");
   if(state.renderedTab!==state.tab){
     const main=$("#main");
-    if(main){main.scrollLeft=0;main.replaceChildren(LexeditorUI.notice({message:"Loading…"}));}
+    if(main){main.scrollLeft=0;main.replaceChildren(LexeditorUI.loadingPanel());}
     state.renderedTab=state.tab;
   }
   const rendered=Promise.resolve(TABS[state.tab]()).finally(()=>installTabContext());

@@ -192,7 +192,7 @@ function pendingChanges(){
 function refreshShell(){shell?.refresh?.()}
 function markChanged(){refreshShell()}
 function setLoading(message){
-  $("#main").replaceChildren(el("div",{class:"lex-notice",role:"status"},message||"Loading FFX/X-2 data…"));
+  $("#main").replaceChildren(LexeditorUI.loadingPanel({label:message||"Loading FFX/X-2 data"}));
 }
 function setError(message){
   $("#main").replaceChildren(el("div",{class:"lex-notice lex-tone-warning",role:"alert"},message));

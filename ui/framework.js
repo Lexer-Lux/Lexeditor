@@ -1244,7 +1244,7 @@
       filled = true;
       const value = control.value;
       const list = typeof entries === "function" ? entries() : entries;
-      control.replaceChildren(...list.map(entry => element("option", {value: entry.value}, entry.label)));
+      control.replaceChildren(...list.map(entry => element("option", {value: entry.value, disabled: !!entry.disabled}, entry.label)));
       control.value = value;
     };
     for (const type of ["pointerdown", "focus", "keydown"]) control.addEventListener(type, fill);
@@ -1744,6 +1744,8 @@
       options.media || (options.image?element("img",{src:options.image,alt:options.label||"Map",draggable:false}):null));
     if(options.cells?.length)stage.append(element("div",{class:"lex-image-map-cells"},...options.cells.map(cell=>
       element("button",{type:"button",class:cell.selected?"selected":"",title:cell.title||cell.label,
+        style:Number.isInteger(cell.column)&&Number.isInteger(cell.row)
+          ?`grid-column:${cell.column+1};grid-row:${cell.row+1}`:null,
         "aria-label":cell.label,"aria-pressed":!!cell.selected,onclick:()=>options.select?.(cell.id)}))));
     for(const point of options.points||[])stage.append(element("button",{type:"button",class:`lex-image-map-point${point.selected?" selected":""}${point.className?" "+point.className:""}`,
       style:`left:${point.x*100}%;top:${point.y*100}%`,title:point.label,"aria-label":point.label,
@@ -2021,7 +2023,10 @@
       ? element("div", {class:"lex-source-control no-reference"}, options.control)
       : options.control;
     const pin = options.pin || null;
-    const input = control instanceof Element
+    const composite = control instanceof Element &&
+      (control.matches(".lex-detail-parts") || control.querySelector(".lex-detail-parts"));
+    // A group has no single scalar type or range. Its individual controls do.
+    const input = control instanceof Element && !composite
       ? (control.matches("input,select,textarea,output,.lex-readonly-field")
         ? control : control.querySelector("input,select,textarea,output,.lex-readonly-field"))
       : null;
@@ -2133,6 +2138,7 @@
     const node = element("div", {
       ...(options.attrs || {}),
       class: ["lex-detail-field", "lex-pinnable-property", booleanField ? "lex-boolean-field" : "",
+        input?.tagName === "TEXTAREA" ? "lex-detail-field-stacked" : "",
         options.tone ? `lex-tone-${options.tone}` : "", options.className || ""].filter(Boolean).join(" "),
       "data-lex-type": dataType,
       "data-lex-property": options.property
@@ -2217,18 +2223,11 @@
     // hover the fill slides out into a slider for rough adjustment.
     const lowBound = min === null || min === undefined || min === "" ? null : Number(min);
     const highBound = max === null || max === undefined || max === "" ? null : Number(max);
-    // A drag slider is only honest when a pixel of travel is worth a sensible
-    // amount. Over a raw INT32 field the whole range is four billion wide, so
-    // the pointer lands a hair off centre and writes -24832854 into a price -
-    // the control looks broken because it is being asked to resolve four
-    // billion values across three hundred pixels. Past this span the value gets
-    // a plain number box with no fill and no handle.
-    const SLIDER_MAX_STEPS = 100000;
-    const boundedSpan = Number.isFinite(lowBound) && Number.isFinite(highBound)
-      ? (highBound - lowBound) / (Number(step) || 1) : Infinity;
+    // Wide ranges still have a coarse slider; direct entry retains precise
+    // control. A field's declared bounds, not an arbitrary span cutoff,
+    // determine whether it has a range to show.
     if (input && !readOnly && numericLike &&
-        Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound &&
-        boundedSpan <= SLIDER_MAX_STEPS) {
+        Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound) {
       const fill = element("span", {class: "lex-value-fill", "aria-hidden": "true"});
       const handle = element("span", {class: "lex-value-handle", "aria-hidden": "true"});
       fill.append(handle);
@@ -2402,8 +2401,20 @@
     if (!count || width <= 0) return;
     const probe = element("span", {style: "position:absolute;visibility:hidden;width:var(--lex-toggle-basis,11em)"});
     row.append(probe);
-    const basis = Math.min(width, probe.getBoundingClientRect().width || 176);
+    let basis = probe.getBoundingClientRect().width || 176;
     probe.remove();
+    // Include each switch's full label, help, checkbox and padding before
+    // choosing columns. A fixed em basis can split a name and its help mark.
+    for (const toggle of Array.from(row.children)) {
+      if (!toggle.classList.contains("lex-toggle")) continue;
+      const sample = toggle.cloneNode(true);
+      sample.style.cssText = "position:absolute;visibility:hidden;width:max-content;max-width:none;min-width:0;";
+      sample.querySelector(".lex-toggle-name").style.cssText = "white-space:nowrap;flex:none;";
+      row.append(sample);
+      basis = Math.max(basis, sample.getBoundingClientRect().width);
+      sample.remove();
+    }
+    basis = Math.min(width, Math.ceil(basis));
     const gap = parseFloat(style.columnGap) || 0;
     const fit = Math.max(1, Math.min(count, Math.floor((width + gap) / (basis + gap))));
     const columns = Math.ceil(count / Math.ceil(count / fit));
@@ -5067,7 +5078,7 @@ ${contents.path}`});
           + "an editable mod; Find a Mod opens one you already have."
           + (vanilla.path ? `\n\n${vanilla.path}` : "")
         : path.textContent;
-      const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid)).map(row => {
+      const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid && !row.noMod)).map(row => {
         const select = element("button", {
         class: `lex-project-menu-item-select${row.current && activeSource === "mine" ? " active" : ""}`,
         type: "button", role: "menuitem", title: row.path,
@@ -7047,7 +7058,8 @@ ${contents.path}`});
     // Never hand the growth column to a generated fixture like the enabled
     // switch: unpinning the name column would otherwise leave every real
     // column at max-content and the table wider than its panel.
-    const firstReal = columns.findIndex(column => !column.generated && !column.width);
+    const firstDescription = columns.findIndex(column => !column.generated && !column.width && !column.numberedId && !column.numeric);
+    const firstReal = firstDescription >= 0 ? firstDescription : columns.findIndex(column => !column.generated && !column.width);
     const automaticGrow = nameIndex >= 0 ? nameIndex : firstReal;
     return columns.map((column, index) => {
       if (column.width) return column.width;

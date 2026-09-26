@@ -873,9 +873,19 @@
       "warband"
     ],
     "loadingPanel": [
+      "bannerlord",
       "blank",
+      "chrono_trigger",
+      "ds3",
+      "factorio",
+      "ff7",
       "ff8",
-      "rdr2"
+      "ff9",
+      "ffx_x2",
+      "rdr2",
+      "stardew_valley",
+      "terraria",
+      "warband"
     ],
     "logView": [
       "bannerlord",

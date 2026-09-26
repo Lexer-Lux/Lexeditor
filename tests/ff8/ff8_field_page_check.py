@@ -7,7 +7,7 @@ Lexer's Field complaints, checked on the real page from the installed game:
   panel and i can only change it by 1 increment at a time", and clicking a
   walkmesh triangle "makes the entire BG briefly flicker out of existence": the
   picture must be the same image element before and after, and the tile
-  slider must be the same input after every step.
+  selector must keep the same control after each selection.
 - the three panels are columns by default; a Deling-style setting stacks the
   picture over the tabs.
 - tiles have their own tab, where clicking the picture selects a tile; the
@@ -85,12 +85,12 @@ def main() -> int:
             assert layout["help"], layout
             assert layout["overlaySwitch"] is False, layout
 
-            # The tile slider: one input and one picture across every step.
+            # The header record selector keeps its picture across selection changes.
             steps = cdp.eval("""(async()=>{const image=document.querySelector('.field-background-image');
-              const input=document.querySelector('input[aria-label$="selected background tile"]');const seen=[];
-              for(let value=1;value<=6;value++){input.value=String(value);input.dispatchEvent(new Event('input',{bubbles:true}));
+              const input=document.querySelector('select[aria-label$="selected background tile"]');input.focus();const seen=[];
+              for(let value=1;value<=6;value++){input.value=String(value);input.dispatchEvent(new Event('change',{bubbles:true}));
                 await new Promise(r=>setTimeout(r,50));
-                seen.push({sameInput:document.querySelector('input[aria-label$="selected background tile"]')===input,
+                seen.push({sameInput:document.querySelector('select[aria-label$="selected background tile"]')===input,
                   sameImage:document.querySelector('.field-background-image')===image,
                   shown:document.querySelector('.field-preview-stack').style.visibility===''})}
               return seen})()""", await_promise=True)
@@ -127,7 +127,7 @@ def main() -> int:
             settle(cdp)
             chosen = cdp.eval(f"""({{triangle:state.fieldWalkmeshSelection[{('bg/' + MAP)!r}],
               sameImage:document.querySelector('.field-background-image')===window.__image,
-              picker:document.querySelector('input[aria-label$="selected walkmesh triangle"]').value}})""")
+              picker:document.querySelector('select[aria-label$="selected walkmesh triangle"]').value}})""")
             assert chosen == {"triangle": tri_point["id"], "sameImage": True,
                               "picker": str(tri_point["id"])}, (chosen, tri_point)
 

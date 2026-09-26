@@ -80,8 +80,7 @@ function errorState(message) {
 }
 
 function loadingState(message = "Loading Factorio project…") {
-  return detailPanel({className: "lex-information-panel", title: message,
-    body: [detailNote("Reading the project through the Factorio plugin service.")]});
+  return LexeditorUI.loadingPanel({label:message});
 }
 
 function inputNumber(value, options, change) {

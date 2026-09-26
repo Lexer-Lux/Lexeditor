@@ -40,6 +40,9 @@ def main() -> int:
                     timeout=60000)
                 rows = page.locator(".ff8-archive-list .lex-list-row").count()
                 assert rows >= 5, rows
+                assert page.get_by_role("button", name="Extract copy").count() == 1
+                assert page.locator(".ff8-archive-list").evaluate(
+                    "node=>!node.closest('.lex-detail-panel')")
                 # The archive picker lists every archive, and the search reaches
                 # an entry by its stored name.
                 options = page.locator(".ff8-archive-panel select option").count()

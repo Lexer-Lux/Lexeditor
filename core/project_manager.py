@@ -149,7 +149,12 @@ class ProjectManager:
         with self._lock:
             payload = self._read()
         entry = payload.get(plugin_id, {}) if isinstance(payload.get(plugin_id), dict) else {}
-        current = Path(entry.get("current") or spec.default_root).expanduser().resolve()
+        vanilla = bool(entry.get("vanilla"))
+        current = (self.path.parent / "vanilla-view" / plugin_id).resolve() if vanilla else Path(entry.get("current") or spec.default_root).expanduser().resolve()
+        # This is an absent mod overlay, not a project to create. Never load
+        # unexpected files from the reserved path as though they were vanilla.
+        if vanilla and current.exists():
+            raise ValueError(f"Vanilla view requires an absent mod overlay: {current}")
         candidates = [current, spec.default_root.resolve()]
         # A discovered root is often a junction into the game folder, and
         # resolving it renames it to the link target. Keep the name the player
@@ -178,6 +183,11 @@ class ProjectManager:
             if key in seen:
                 continue
             seen.add(key)
+            if vanilla and root == current:
+                rows.append({"path": str(root), "name": "Vanilla", "version": "",
+                             "valid": True, "problems": [], "noMod": True,
+                             "current": True, "readOnly": True})
+                continue
             if key in forgotten and key != os.path.normcase(str(current)):
                 continue
             problems = self._problems(root, spec.required_paths, spec.required_any)
@@ -283,7 +293,7 @@ class ProjectManager:
                          for value in entry.get("known", []) if isinstance(value, str)]
                 if os.path.normcase(str(current)) == os.path.normcase(str(root)):
                     current = target
-                payload[plugin_id] = {"current": str(current), "known": known,
+                payload[plugin_id] = {**entry, "current": str(current), "known": known,
                                       "forgotten": entry.get("forgotten", [])}
                 self._write(payload)
         except Exception as error:
@@ -313,6 +323,9 @@ class ProjectManager:
             with self._lock:
                 payload = self._read()
             entry = payload.get(plugin_id, {}) if isinstance(payload.get(plugin_id), dict) else {}
+            if entry.get("vanilla"):
+                return {"path": "", "exists": False, "declared": bool(getattr(spec, "content_types", None)),
+                        "categories": [], "unrecognized": 0, "files": 0, "bytes": 0}
             root = Path(entry.get("current") or spec.default_root).expanduser().resolve()
         categories = [(label, tuple(suffix.lower() for suffix in suffixes))
                       for label, suffixes in (getattr(spec, "content_types", None) or ())]
@@ -372,9 +385,8 @@ class ProjectManager:
                            for value in forgotten}:
                 forgotten.append(str(root))
             current = Path(entry.get("current") or spec.default_root).expanduser().resolve()
-            if os.path.normcase(str(current)) == key:
-                current = spec.default_root.resolve()
-            payload[plugin_id] = {"current": str(current), "known": known,
+            vanilla = bool(entry.get("vanilla")) or os.path.normcase(str(current)) == key
+            payload[plugin_id] = {"current": "" if vanilla else str(current), "vanilla": vanilla, "known": known,
                                   "forgotten": forgotten}
             self._write(payload)
         return self.snapshot(plugin_id)

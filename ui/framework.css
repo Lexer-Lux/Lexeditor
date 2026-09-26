@@ -681,7 +681,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-project-about > svg { width:17px;height:17px; }
 
 .lex-project-path {
-  align-self:center;flex:1 1 auto;min-width:0;overflow:hidden;color:var(--lex-muted);
+  align-self:center;flex:1 1 0;min-width:0;overflow:hidden;color:var(--lex-muted);
   /* The mod's own folder is written in the game's face, like every other word
      on this row. A hard-coded face left the path, and the "The game's own
      data" label, the only default-typeface text in an otherwise themed
@@ -2393,6 +2393,11 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   justify-content:inherit;
   text-overflow:ellipsis;
   white-space:nowrap;
+}
+/* Visual values such as gradients occupy their whole cell, not a text lane. */
+.lex-column-list-cell.lex-cell-fill { position:relative; padding:0; align-items:stretch; }
+.lex-column-list-cell.lex-cell-fill > .lex-column-cell-content {
+  position:absolute;inset:0;width:100%;height:100%;padding:0;translate:none;align-items:stretch;
 }
 
 .lex-column-list-cell.lex-column-pointer-cell,
@@ -4819,7 +4824,8 @@ body:has(.lex-data-map-table) #main {
 .lex-value-handle {
 
   position:absolute;
-  left:calc(var(--lex-value-ratio,0) * 100%);
+  /* Keep the whole grip inside the box at both range endpoints. */
+  left:clamp(4.5px,calc(var(--lex-value-ratio,0) * 100%),calc(100% - 4.5px));
   /* A flat slab spanning the full box height reads as a bar, not a grip. */
   top:3px;
   bottom:3px;
@@ -5587,7 +5593,8 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 .lex-project-name {
    color: var(--lex-highlight); white-space: nowrap;
- flex:0 0 auto; min-width:0; max-width:65%; overflow:hidden; text-overflow:ellipsis;
+ /* Keep the mod's identity readable first; the folder uses the spare width. */
+ flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;
  /* It ellipsises, so the box clips; the first glyph of a game face needs the
    same one pixel of room the other clipping text boxes carry. */
  box-sizing:border-box; padding-inline:.08em;
@@ -5919,6 +5926,25 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 .lex-detail-parts-switches > .lex-toggle { grid-column:auto; }
 .lex-detail-parts-switches > .lex-detail-part { margin-right:0; }
+/* On narrow property rows, put the group name above its switches instead of
+   spending their remaining width on a separate label column. Em units also
+   account for a larger editor font. */
+.lex-detail-field:has(.lex-toggle-row) {
+  container:lex-switch-property / inline-size;
+}
+@container lex-switch-property (max-width:24em) {
+  .lex-detail-field > .lex-detail-field-label:has(+ .lex-detail-field-control .lex-toggle-row) {
+    grid-column:1 / -1;
+    contain:none;
+    min-height:30px;
+    height:auto;
+    justify-content:flex-start;
+    text-align:left;
+  }
+  .lex-detail-field > .lex-detail-field-control:has(.lex-toggle-row) {
+    grid-column:1 / -1;
+  }
+}
 
 /* Each flag box is as wide as the flag in it. The boxes sit on a column grid
    so their left edges line up, but the box was taking the whole track, so a
@@ -7285,8 +7311,9 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   overflow: hidden;
 
   display: grid;
-  width: auto;
-  height: 100%;
+  /* The picture does not grow when a long name makes the heading taller. */
+  width: var(--lex-detail-icon-size, clamp(40px, 4em, 80px));
+  height: var(--lex-detail-icon-size, clamp(40px, 4em, 80px));
   aspect-ratio: 1;
   place-items: center;
   color: var(--lex-accent);

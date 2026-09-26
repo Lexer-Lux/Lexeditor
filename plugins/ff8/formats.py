@@ -559,12 +559,16 @@ def _display_fields(section_id: int) -> list[dict]:
     return result
 
 
+def _protected_lookup_entry(entry: dict) -> bool:
+    return bool(entry.get("readonly") or str(entry.get("name", "")).casefold().startswith(("unknown", "unused")))
+
+
 def _lookup_payload(field: dict) -> dict | None:
     lookup_name = field.get("lookup")
     lookup = LOOKUPS.get(lookup_name) if lookup_name else None
     if not lookup:
         return None
-    entries = lookup.get("entries", [])
+    entries = [{**entry, "readonly": _protected_lookup_entry(entry)} for entry in lookup.get("entries", [])]
     if lookup_name == "junctionable_ability":
         entries = [{**entry, **ability_identity(entry.get("value", entry.get("id", -1)))} for entry in entries]
     return {"name": lookup_name, "type": lookup.get("type", "enum"), "entries": entries}
@@ -640,11 +644,23 @@ def save_kernel(section_id: int, edits: list[dict]) -> dict:
         if not minimum <= value <= maximum:
             raise ValueError(f"{field_name} must be {minimum} to {maximum}")
         absolute = section_start + record_id * section["sub_section_size"] + relative
+        current = int.from_bytes(raw[absolute:absolute + size], "little")
         mask = definition.get("mask")
         if mask is not None:
             current = int.from_bytes(raw[absolute:absolute + size], "little")
             mask = int(mask)
             value = (current & ~mask) | (value & mask)
+        lookup = _lookup_payload(definition)
+        if lookup and value != current:
+            if lookup["type"] == "flags":
+                writable = 0
+                for entry in lookup["entries"]:
+                    if not entry["readonly"]:
+                        writable |= int(entry.get("mask", entry.get("value", 0)))
+                if (value ^ current) & ~writable:
+                    raise ValueError(f"{field_name}: unknown or unused flags are read-only")
+            elif not any(int(entry.get("value", entry.get("id", -1))) == value and not entry["readonly"] for entry in lookup["entries"]):
+                raise ValueError(f"{field_name}: choose a documented option")
         raw[absolute:absolute + size] = value.to_bytes(size, "little")
         changed += 1
     _atomic_write(output_path("kernel.bin"), bytes(raw))

@@ -98,7 +98,7 @@
   function rowDetail(table,rowIdentity){
     const row=state.details[table];
     if(!row||row.id!==rowIdentity.id)return detailPanel({title:rowIdentity.name,identity:String(rowIdentity.id),
-      body:[LexeditorUI.detailNote("Loading this record…")]});
+      body:[LexeditorUI.loadingPanel({label:"Loading this record"})]});
     const groups=new Map();
     for(const field of row.fields||[]){
       if(!groups.has(field.group))groups.set(field.group,[]);
@@ -113,7 +113,7 @@
 
   function renderTable(id){
     const table=tableState(id),label=TABLES.find(value=>value.id===id)?.label||id;
-    if(!table.loaded){$("#main").replaceChildren(detailPanel({title:label,body:[LexeditorUI.detailNote("Loading records…")]}));return}
+    if(!table.loaded){$("#main").replaceChildren(detailPanel({title:label,body:[LexeditorUI.loadingPanel({label:"Loading records"})]}));return}
     if(!table.rows.length){$("#main").replaceChildren(detailPanel({title:label,body:[LexeditorUI.detailNote("No records were found in this parameter table.")]}));return}
     const view=pagedListDetail({addDisabledReason:"Dark Souls III params can take new row IDs, but Lexeditor only edits existing rows. Adding a row is not supported yet.",
       rows:sortedRows(id),key:row=>row.id,slots:false,noun:"records",page:table.page,pageSize:table.pageSize,
