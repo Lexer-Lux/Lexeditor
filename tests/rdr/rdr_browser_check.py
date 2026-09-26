@@ -6,6 +6,7 @@ installed game, game assets, native runtime, or network access is required.
 from pathlib import Path
 import argparse
 import json
+import tempfile
 from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -196,9 +197,15 @@ def run(output: Path, executable: str | None) -> None:
                   if (!field || !label) return false;
                   const b=field.getBoundingClientRect(), l=label.getBoundingClientRect();
                   if (!field.isConnected || b.width<=0 || l.width<=0) return false;
-                  return {field:b.width,label:l.width,ratio:l.width/b.width};
+                  const control=field.querySelector('.lex-detail-field-control').getBoundingClientRect();
+                  return {field:b.width,label:l.width,ratio:l.width/b.width,
+                    labelFits:label.scrollWidth<=label.clientWidth+1,
+                    control:control.width};
                 }""").json_value()
-                assert 0.075 <= geometry["ratio"] <= 0.16, (width, "RDR1 bypassed shared adaptive label lane", geometry)
+                # The shared lane widens for readable labels at small sizes.
+                # Preserve room for editing without forcing a fixed percentage.
+                assert geometry["labelFits"], (width, "Detail label clipped", geometry)
+                assert geometry["control"] >= geometry["field"] * .45, (width, "Label crowds out the control", geometry)
                 page.screenshot(path=str(output / f"rdr-items-{width}-zoom{zoom}.png"), full_page=True)
 
                 page.evaluate("state.tab='strings'; stringsUI.render()")
@@ -242,7 +249,7 @@ def run(output: Path, executable: str | None) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--screenshots", type=Path, default=ROOT / "artifacts/rdr-browser")
+    parser.add_argument("--screenshots", type=Path, default=Path(tempfile.gettempdir()) / "lexeditor-dev/rdr-browser")
     parser.add_argument("--chromium", default=None)
     args = parser.parse_args()
     run(args.screenshots, args.chromium)
