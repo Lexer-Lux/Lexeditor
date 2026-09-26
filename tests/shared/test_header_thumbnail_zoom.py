@@ -1,7 +1,8 @@
 """Header thumbnails expand on hover, except model-viewer triggers.
 
-A details-panel header thumbnail that does not open the model viewer shows a
-floating enlargement on hover so the art can be previewed at a readable size.
+A details-panel header thumbnail that does not open the model viewer grows in
+place on hover so the art can be seen at a readable size: "it should expand",
+not put a second thumbnail beside it.
 A thumbnail that opens the model viewer keeps its magnifier instead.
 """
 from pathlib import Path
@@ -48,9 +49,24 @@ def test_plain_header_thumbnail_expands_on_hover():
             assert box["left"] >= 0 and box["top"] >= 0
             assert box["right"] <= 1100 and box["bottom"] <= 800
             assert zoom.locator("img").count() == 1
+            # It is the thumbnail growing, not a second picture beside it: it
+            # covers the thumbnail (kept on screen near an edge), is larger
+            # than it, and the original is hidden meanwhile.
+            page.wait_for_timeout(300)
+            grown = page.evaluate("""() => {
+              const z = document.querySelector('.lex-header-thumb-zoom').getBoundingClientRect();
+              const slot = document.querySelector('.lex-detail-panel-icon');
+              const t = slot.getBoundingClientRect();
+              return {covers: z.left <= t.left + 1 && z.top <= t.top + 1 && z.right >= t.right - 1 && z.bottom >= t.bottom - 1,
+                      bigger: z.width > t.width * 1.5,
+                      hidden: getComputedStyle(slot.querySelector('img')).visibility};
+            }""")
+            assert grown["bigger"] and grown["hidden"] == "hidden", grown
+            assert grown["covers"], grown
             page.mouse.move(5, 5)
             page.wait_for_timeout(200)
             assert page.locator(".lex-header-thumb-zoom").count() == 0
+            assert page.evaluate("getComputedStyle(document.querySelector('.lex-detail-panel-icon img')).visibility") == "visible"
         finally:
             browser.close()
 

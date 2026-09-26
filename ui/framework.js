@@ -10058,7 +10058,11 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   // zoom beside the drawer they open would fight it. The enlargement is a
   // fixed overlay, never an in-place scale, so hovering changes no layout.
   let headerZoom = null;
-  const closeHeaderZoom = () => { headerZoom?.remove(); headerZoom = null; };
+  const closeHeaderZoom = () => {
+    headerZoom?.lexSource?.classList.remove('lex-thumb-zoomed');
+    headerZoom?.remove();
+    headerZoom = null;
+  };
   const headerZoomArt = icon => {
     const canvas = icon.querySelector('canvas');
     if (canvas instanceof HTMLCanvasElement && canvas.width > 0 && canvas.height > 0) {
@@ -10069,7 +10073,9 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       copy.getContext('2d')?.drawImage(canvas, 0, 0);
       return copy;
     }
-    const art = icon.querySelector('img,svg,picture');
+    // The picture, not the pin on its corner or a sound's play button.
+    const art = [...icon.querySelectorAll('img,svg,picture')]
+      .find(node => !node.closest('.lex-column-pin,.lex-audio-play'));
     return art instanceof Element ? art.cloneNode(true) : null;
   };
   document.addEventListener('pointerover', event => {
@@ -10080,18 +10086,27 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     if (!art) return;
     const box = icon.getBoundingClientRect();
     if (box.width <= 0 || box.height <= 0) return;
+    // The thumbnail itself grows: the enlargement starts exactly over it and
+    // swells outward from its centre, and the original is hidden meanwhile.
+    // Lexer: "i didn't say that hovering a thumbnail should make a second
+    // thumbnail appear lol. it should expand so you can see it better."
     const zoom = document.createElement('div');
     zoom.className = 'lex-header-thumb-zoom';
     zoom.setAttribute('aria-hidden', 'true');
     zoom.append(art);
+    const place = (left, top, width, height) => Object.assign(zoom.style, {
+      left: `${Math.round(left)}px`, top: `${Math.round(top)}px`,
+      width: `${Math.round(width)}px`, height: `${Math.round(height)}px`});
+    place(box.left, box.top, box.width, box.height);
     document.body.append(zoom);
-    // Seat the enlargement beside the header icon, inside the viewport.
-    const pad = 12, cap = 320;
-    const width = Math.min(cap, zoom.offsetWidth || cap);
-    const height = Math.min(cap, zoom.offsetHeight || cap);
-    zoom.style.left = `${Math.round(Math.max(pad, Math.min(box.right + pad, window.innerWidth - width - pad)))}px`;
-    zoom.style.top = `${Math.round(Math.max(pad, Math.min(box.bottom + pad, window.innerHeight - height - pad)))}px`;
+    icon.classList.add('lex-thumb-zoomed');
+    zoom.lexSource = icon;
     headerZoom = zoom;
+    const pad = 12, scale = Math.min(320 / box.width, 320 / box.height, 3);
+    const width = box.width * Math.max(1, scale), height = box.height * Math.max(1, scale);
+    const left = Math.max(pad, Math.min(box.left + box.width / 2 - width / 2, window.innerWidth - width - pad));
+    const top = Math.max(pad, Math.min(box.top + box.height / 2 - height / 2, window.innerHeight - height - pad));
+    requestAnimationFrame(() => { if (headerZoom === zoom) place(left, top, width, height); });
   });
   document.addEventListener('pointerout', event => {
     if (!headerZoom) return;
