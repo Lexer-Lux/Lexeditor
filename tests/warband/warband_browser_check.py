@@ -64,6 +64,30 @@ RECORD_SOURCES={
     'module_skins.py':'skins=[("man",0,"body","calf","hand","head",face_keys,["hair"],[],["hair_tex"],[],[],[],"skel_human",1.0)]\n',
     'module_particle_systems.py':'particle_systems=[("dust",psf_billboard_3d,"dust",5,2.0,10,0.05,10.0,39.0,(0.2,0.5),(1,0),(0,1),(1,1),(0,0.9),(1,0.9),(0,0.78),(1,0.78),(0,2),(1,3.5),(0.2,0.3,0.2),(0,0,3.9),0.5,130,0.5)]\n',
 }
+# A Module System ships one header_<area>.py beside each module_*.py, and that
+# is where the named flags, item types and modifier bits come from. The fixture
+# carries them so the checks exercise the same finite sets a real project has.
+HEADER_SOURCES={
+    'header_items.py':('itp_type_horse = 0\n'
+                       'itp_type_one_handed_wpn = 1\n'
+                       'itp_type_shield = 6\n'
+                       'itp_type_goods = 10\n'
+                       'itp_merchandise = 0x00000002\n'
+                       'itp_civilian = 0x00000010\n'
+                       'itp_unique = 0x00000020\n'
+                       'imodbits_sword_low = 0x00000001\n'
+                       'imodbits_sword_med = 0x00000002\n'
+                       'imodbits_sword = imodbits_sword_low|imodbits_sword_med\n'
+                       'def weight(x): return x\n'
+                       'def spd_rtng(x): return x\n'
+                       'def weapon_length(x): return x\n'),
+    'header_meshes.py':'render_order_plus_1 = 0x00000010\n',
+    'header_skills.py':'sf_base_att_str = 0x00000100\nsf_base_att_int = 0x00000200\n',
+    'header_quests.py':'qf_random_quest = 0x00000001\n',
+    'header_music.py':'mtf_sit_travel = 0x00000001\nmtf_sit_town = 0x00000002\n',
+    'header_sounds.py':'sf_priority_4 = 0x00000004\nsf_looping = 0x00000020\n',
+    'header_particle_systems.py':'psf_billboard_3d = 0x00000001\n',
+}
 # Enough real source records to prove the shared fitted pager, not a one-page demo.
 RECORD_SOURCES['module_skills.py']='skills=[\n'+',\n'.join(
     ('("power_strike","Power Strike",sf_base_att_str,10,"Hit harder.")' if i==0 else
@@ -79,6 +103,8 @@ def main():
         for records in server.DATA_CATALOG.values():
             for filename,_ in records:
                 if filename.endswith('.py'):(module/filename).write_text(RECORD_SOURCES.get(filename,'# fixture source\n'))
+        for filename,text in HEADER_SOURCES.items():
+            (module/filename).write_text(text)
         server.PROJECT=project;server.MODULE_SYSTEM=module;server.SETTINGS=project/'settings.ini'
         errors=[];results=[]
         with sync_playwright() as p:
@@ -91,7 +117,7 @@ def main():
                     # Chromium on an opaque/storage-refused document, while the shared shell
                     # legitimately uses sessionStorage during boot; that made the fixture die
                     # before Warband's scripts could render anything.
-                    fixtures={'/api/items':{'rows':ITEMS,'sha256':'fixture-items'},'/api/troops':{'rows':TROOPS,'items':[],'factions':[],'sha256':'fixture-troops','types':{},'flags':{}},'/api/upgrades':{'rows':UPGRADES},'/api/modules':{'modules':[]},'/api/warband-font':{'available':False},'/api/dashboard':{'paths':{},'problems':[]},'/api/settings':{'rows':server.settings_rows()},'/api/datamap':server.data_map_rows()}
+                    fixtures={'/api/items':{'rows':ITEMS,'sha256':'fixture-items','choices':server.item_choices(ITEMS)},'/api/troops':{'rows':TROOPS,'items':[],'factions':[],'sha256':'fixture-troops','types':{},'flags':{}},'/api/upgrades':{'rows':UPGRADES},'/api/modules':{'modules':[]},'/api/warband-font':{'available':False},'/api/dashboard':{'paths':{},'problems':[]},'/api/settings':{'rows':server.settings_rows()},'/api/datamap':server.data_map_rows()}
                     record_fixtures={key:server.dataset_data(module,key) for key in server.MODULE_RECORD_SCHEMAS}
                     model={**MODEL,'texture':'data:image/png;base64,'+base64.b64encode(TEXTURE).decode()}
                     stub='const replaceState=history.replaceState.bind(history);history.replaceState=(state,unused)=>replaceState(state,unused);const recordFixtures='+json.dumps(record_fixtures)+';let failSound=true;window.fetch=async function(input,options={}){const path=String(input);const fixtures='+json.dumps(fixtures)+';if(path.startsWith("/api/module-records?")){const key=new URL(path,"http://fixture").searchParams.get("dataset");if(key==="sounds"&&failSound){failSound=false;return new Response(JSON.stringify({error:"Synthetic sound parse failure"}),{status:400});}await new Promise(r=>setTimeout(r,80));return new Response(JSON.stringify(recordFixtures[key]||{error:"Unknown fixture dataset"}));}if(path==="/api/module-records/save"){const body=JSON.parse(options.body||"{}"),data=recordFixtures[body.dataset];for(const edit of body.edits||[]){const row=data.rows.find(r=>r.recordIndex===edit.recordIndex);Object.assign(row.fields,edit.fields||{});if(Object.hasOwn(edit.fields||{},"name"))row.name=edit.fields.name;}data.sha256="saved-"+Date.now();return new Response(JSON.stringify({saved:(body.edits||[]).length,sha256:data.sha256}));}if(path==="/api/build/start")return new Response(JSON.stringify({started:true}));if(path.startsWith("/api/build/status"))return new Response(JSON.stringify({cursor:1,lines:["Build verified: fixture\\n"],running:false,returnCode:0}));if(path.startsWith("/api/item-preview?")){return new Response(JSON.stringify(path.includes("broken")?{error:"Missing diffuse texture fixture"}:'+json.dumps(model)+'),{status:path.includes("broken")?422:200});}if(path.startsWith("/api/item-icon?")){if(path.includes("broken"))return new Response(JSON.stringify({error:"Missing diffuse texture fixture"}),{status:422});const bytes=Uint8Array.from(atob("'+base64.b64encode(ICON).decode()+'"),c=>c.charCodeAt(0));return new Response(bytes,{headers:{"Content-Type":"image/png"}});}return new Response(JSON.stringify(fixtures[path]||{}));};'
@@ -117,8 +143,42 @@ def main():
                     assert page.locator('.warband-item-detail [data-lex-property="id"] input').count()==1
                     assert page.locator('.warband-item-detail [data-lex-property="id"] input').is_disabled()
                     assert page.locator('.warband-item-detail [data-lex-property="name"] input').count()==1
-                    assert page.locator('.warband-item-detail [data-lex-property="flags"] textarea').count()==1
-                    assert page.locator('.warband-item-detail [data-lex-property="stats"] textarea').count()==1
+                    # The type, the flags, the modifier bits, the stats and the
+                    # meshes each offer the finite set the project's own
+                    # header_items.py and module_items.py name, instead of a
+                    # text box a typo can brick the game in.
+                    item_type=page.locator('.warband-item-detail [data-lex-property="type"] select')
+                    assert item_type.count()==1
+                    assert item_type.input_value()=='one_handed_wpn'
+                    assert sorted(value for value in item_type.locator('option').all_inner_texts()
+                                  if value in {'horse','one_handed_wpn','shield','goods'})==['goods','horse','one_handed_wpn','shield']
+                    assert page.locator('.warband-item-detail [data-lex-property="itp_merchandise"] input[type="checkbox"]').is_checked()
+                    assert not page.locator('.warband-item-detail [data-lex-property="itp_civilian"] input[type="checkbox"]').is_checked()
+                    assert page.locator('.warband-item-detail [data-lex-property="imodbits_sword_med"] input[type="checkbox"]').count()==1
+                    assert page.locator('.warband-item-detail [data-lex-property="stat-spd_rtng"] input[type="number"]').count()==1
+                    mesh_select=page.locator('.warband-item-detail [data-lex-property="inventoryMesh"] select')
+                    assert mesh_select.count()==1
+                    assert mesh_select.input_value()=='fixture_sword'
+                    assert page.locator('.warband-item-detail [data-lex-property="mesh-1"] select').count()==1
+                    # A flag box writes the project's own constant name back.
+                    page.locator('.warband-item-detail [data-lex-property="itp_civilian"] input[type="checkbox"]').check()
+                    assert page.evaluate('Object.values(state.itemEdits)[0].fields.flags')=='itp_type_one_handed_wpn|itp_merchandise|itp_civilian'
+                    page.locator('.warband-item-detail [data-lex-property="itp_civilian"] input[type="checkbox"]').uncheck()
+                    assert page.evaluate('itemDirtyCount()')==0
+                    # Every one of those sets is a named section of the panel,
+                    # and each is reachable by scrolling the panel body.
+                    titles=page.evaluate('''() => [...document.querySelectorAll('.warband-item-detail .lex-detail-section-title')]
+                        .map(node=>node.textContent.replace(/\\s|\\?/g,''))''')
+                    assert titles[:5]==['Item','Stats','Flags','Modifierbits','Meshes'],titles
+                    # What is left is only what this editor does not interpret.
+                    assert titles[5:]==['ModuleSystemfields'],titles
+                    page.evaluate('''() => {const body=document.querySelector('.warband-item-detail .lex-detail-panel-body');
+                        body.scrollTop=body.scrollHeight;}''')
+                    page.wait_for_timeout(250)
+                    page.screenshot(path=str(ARTIFACTS/f'items-flags-{width}.png'),full_page=True)
+                    page.evaluate('''() => {const body=document.querySelector('.warband-item-detail .lex-detail-panel-body');
+                        body.scrollTop=0;}''')
+                    page.wait_for_timeout(150)
                     # The heading icon is the shared 3D viewer control. It used
                     # to be absent, so the renderer was there and unreachable.
                     assert page.locator('.lex-model-preview-drawer').count()==1
@@ -180,7 +240,14 @@ def main():
                     max_level=page.locator('.warband-module-detail [data-lex-property="maxLevel"] input')
                     assert max_level.get_attribute('type')=='number'
                     assert page.locator('.warband-module-detail [data-lex-property="description"] textarea').count()==1
-                    assert page.locator('.warband-module-detail [data-lex-property="flags"] textarea').count()==1
+                    # A flag field offers the names header_skills.py declares,
+                    # as boxes, and writes them back as the same constants.
+                    flag_box='.warband-module-detail [data-lex-property="sf_base_att_int"] input[type="checkbox"]'
+                    assert page.locator('.warband-module-detail [data-lex-property="sf_base_att_str"] input[type="checkbox"]').is_checked()
+                    page.locator(flag_box).check()
+                    assert page.evaluate('moduleRecords.snapshot().edits.skills[0].fields.flags')=='sf_base_att_str|sf_base_att_int'
+                    page.locator(flag_box).uncheck()
+                    assert page.evaluate('moduleRecords.dirtyCount()')==0
                     assert page.get_by_role('button',name='Next page',exact=True).is_enabled()
                     page.get_by_role('button',name='Next page',exact=True).click()
                     assert page.locator('.lex-page-number').input_value()=='2'
@@ -253,7 +320,7 @@ def main():
                     page.evaluate('state.filters.items="Missing texture fixture";navigate("items")')
                     page.wait_for_function('document.querySelector(".warband-item-thumbnail .lex-icon-slot-message")?.textContent.includes("Icon unavailable")')
                     assert page.locator('.warband-item-detail [data-lex-property="name"] input').is_enabled()
-                    assert page.locator('.warband-item-detail [data-lex-property="stats"] textarea').is_enabled()
+                    assert page.locator('.warband-item-detail [data-lex-property="stat-spd_rtng"] input[type="number"]').is_enabled()
                     assert page.get_by_role('button',name='Open model preview',exact=True).count()==0
                     results.append({'width':width,'height':height,'dataMap':metrics,'status':'passed'})
                     page.close()

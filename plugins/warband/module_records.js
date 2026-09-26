@@ -68,6 +68,15 @@
       viewState(active);
     }
     function open(dataset){activate(dataset);state.tab=tabFor(dataset);renderApp();}
+    // A finder elsewhere in the plugin opens the record it names, so a mesh
+    // property can show the mesh's own row instead of only its name.
+    function openRecord(dataset,recordIndex){
+      if(!availableRows().some(row=>row.dataset===dataset))return false;
+      open(dataset);
+      viewState(dataset).selected=String(recordIndex);
+      renderApp();
+      return true;
+    }
     function fieldControl(dataset,row,spec,readOnly){
       const value=effective(dataset,row,spec.key),problem=row.fieldProblems?.[spec.key];
       const disabled=readOnly||spec.kind==="identity"||!!problem;
@@ -100,8 +109,26 @@
       if(!row)return LexeditorUI.detailPanel({className:"warband-module-detail",title:"Select a "+data.schema.label.toLowerCase()+" record"});
       if(row.problem)return LexeditorUI.detailPanel({className:"warband-module-detail",title:row.name||row.id,identity:row.id,body:[LexeditorUI.el("section",{class:"card error"},row.problem)]});
       const readOnly=state.activeSource!=="mine";
+      const choices=data.choices||{};
       const fields=data.schema.fields.filter(spec=>row.presentFields?.includes(spec.key)).map(spec=>{
         const description=row.fieldProblems?.[spec.key]?(spec.help||"")+" This field is not a supported literal in this record: "+row.fieldProblems[spec.key]+". Use source editing for this field.":spec.help||"";
+        const choice=row.fieldProblems?.[spec.key]?null:choices[spec.key];
+        if(choice?.kind==="bits"){
+          // A flag field lists the names the project's own header defines, so
+          // the reader picks the flags instead of typing an expression.
+          return WarbandFieldControls.bitFields({label:spec.label,help:description,flags:choice.flags,
+            expression:effective(dataset,row,spec.key),readOnly,
+            apply:value=>{setField(dataset,row,spec.key,value);renderApp();}});
+        }
+        if(choice?.kind==="mesh"){
+          // A mesh property names a mesh this project declares, so it is chosen
+          // from those names and can open the mesh's own record.
+          return WarbandFieldControls.meshRows({label:spec.label,property:spec.key,add:false,
+            entries:[{name:String(effective(dataset,row,spec.key)??""),flag:"0"}],choices:choice.meshes,readOnly,
+            apply:next=>{setField(dataset,row,spec.key,next.length?next[0].name:"none");renderApp();},
+            open:entry=>{const match=choice.meshes.find(value=>value.name===entry.name);
+              if(match&&match.recordIndex!==undefined&&match.recordIndex!==null)openRecord("meshes",match.recordIndex);}})[0];
+        }
         return LexeditorUI.detailField({label:spec.label,property:spec.key,
           dataType:({identity:"ID",string:"STRING",text:"STRING",expr:"EXPR",integer:"INT",number:"FLOAT",vec2:"VECTOR2",vec3:"VECTOR3",vec4:"VECTOR4"})[spec.kind]||"VALUE",
           description,control:fieldControl(dataset,row,spec,readOnly)});
@@ -176,7 +203,7 @@
       return {saved,files:savedFiles};
     }
     function fileHasEdits(filename){const row=availableRows().find(value=>value.filename===filename&&value.dataset);return row?datasetDirtyCount(row.dataset)>0:false;}
-    return {render,open,activate,dirtyCount,snapshot,restore,saveAll,fileHasEdits,load,active:()=>active,datasetDirtyCount,tabFor};
+    return {render,open,openRecord,activate,dirtyCount,snapshot,restore,saveAll,fileHasEdits,load,active:()=>active,datasetDirtyCount,tabFor};
   }
   window.WarbandModuleRecords={create};
 })();

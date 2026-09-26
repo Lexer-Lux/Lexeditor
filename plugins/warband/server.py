@@ -19,7 +19,8 @@ from .item_icons import CACHE as ICON_CACHE
 from .catalog import DATA_CATALOG
 from .dump_infopages import parse_info_pages
 from .troop_editor import troop_data, save_troops
-from .module_records import PROMOTED_TABS, SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME, dataset_data, save_dataset
+from .module_records import (PROMOTED_TABS, SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME,
+                             _single_bits, dataset_data, header_constants, mesh_choices, save_dataset)
 from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
 from .model_preview import PreviewUnavailable, preview as item_preview, texture_path as preview_texture_path
 from core.plugin_http import PluginRequestHandler
@@ -245,13 +246,55 @@ def _item_records(text: str) -> list[dict]:
 def item_data() -> dict:
     source = MODULE_SYSTEM / "module_items.py"
     if not source.is_file():
-        return {"rows": [], "sha256": ""}
+        return {"rows": [], "sha256": "", "choices": item_choices([])}
     text, _encoding, raw = _module_items_source()
     rows = [
         {key: value for key, value in record.items() if not key.startswith("_")}
         for record in _item_records(text)
     ]
-    return {"rows": rows, "sha256": hashlib.sha256(raw).hexdigest()}
+    return {"rows": rows, "sha256": hashlib.sha256(raw).hexdigest(), "choices": item_choices(rows)}
+
+
+def item_choices(rows: list[dict]) -> dict:
+    """The finite choices an item field has, read from the project's own sources.
+
+    A Module System header defines every ``itp_type_*``, ``itp_*`` and
+    ``imodbits_*`` name the compile step accepts, and the item records
+    themselves say which mesh resources and stat macros this project uses. A
+    free-number or free-text box for one of those invites a typo the build will
+    reject, or worse, a value the game accepts and misreads.
+    """
+    symbols = header_constants(MODULE_SYSTEM)
+    types = sorted(({"name": name[len("itp_type_"):], "value": value}
+                    for name, value in symbols.items()
+                    if name.startswith("itp_type_") and value >= 0),
+                   key=lambda entry: (entry["value"], entry["name"]))
+    flags = [entry for entry in _single_bits(symbols, "itp_")
+             if not entry["name"].startswith("itp_type_")]
+    # The checkbox set is the single modifier bits. A header also names ready
+    # combinations (imodbits_sword is three bits); those stay reachable as
+    # source text rather than as boxes that overlap each other.
+    modifiers = sorted(({"name": name, "value": value} for name, value in symbols.items()
+                        if name.startswith("imodbits_") and value > 0 and value & (value - 1) == 0),
+                       key=lambda entry: (entry["value"], entry["name"]))
+    used_stats = set()
+    used_meshes = set()
+    for record in rows:
+        used_stats.update(re.findall(r"([A-Za-z_]\w*)\s*\(", record["fields"].get("stats", "")))
+        used_meshes.update(record.get("meshes", []))
+    declared = set()
+    header = MODULE_SYSTEM / "header_items.py"
+    if header.is_file():
+        declared.update(re.findall(r"(?m)^def\s+([A-Za-z_]\w*)\s*\(",
+                                   header.read_text(encoding="utf-8", errors="replace")))
+    stats = sorted(used_stats | declared)
+    # A mesh choice names the record behind it, so the item panel's finder can
+    # open that record in the Meshes area instead of only naming the mesh.
+    meshes = {choice["name"]: choice for choice in mesh_choices(MODULE_SYSTEM)}
+    for name in used_meshes:
+        meshes.setdefault(name, {"name": name, "id": "", "recordIndex": None})
+    return {"types": types, "flags": flags, "modifierBits": modifiers,
+            "stats": stats, "meshes": [meshes[name] for name in sorted(meshes)]}
 
 
 def item_rows() -> list[dict]:
