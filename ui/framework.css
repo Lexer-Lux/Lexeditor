@@ -2291,6 +2291,16 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   white-space:nowrap;
 }
 
+/* A record id is never abbreviated, exactly like a number, and the game font's
+   ink is about a pixel wider than its advance box: the cell around the id kept
+   clipping that pixel off the right edge of the last digit. The id's own box
+   already refuses to clip, so the cell stops clipping too and the column stays
+   floored at the widest id the table holds. */
+.lex-numbered-id-cell > .lex-column-cell-content {
+  min-width:max-content;
+  overflow:visible;
+}
+
 /* A cell that shows a tick has nothing to truncate, and the glyph's ink is
    about a pixel wider than the column's own box. Clipping it there shaved the
    left side of the tick, so the cell stops clipping. */

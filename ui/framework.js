@@ -904,6 +904,11 @@
   };
   const recordId = (value, attrs = {}) => {
     const {class: className = "", ...rest} = attrs;
+    // An identity that is already drawn is already done. A table column that
+    // renders U.recordId itself is numbered by the grid as well, so wrapping it
+    // again printed "##0": one prefix from the cell, one from the id.
+    if (!className && !Object.keys(rest).length && value instanceof Element
+        && value.classList.contains("lex-record-id")) return value;
     let content = value instanceof Node ? value : String(value ?? "").replace(/^#/, "");
     if (!(value instanceof Node) && /^\d+$/.test(content)) content = content.padStart(recordIdWidth, "0");
     return element("span", {
