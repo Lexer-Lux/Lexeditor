@@ -185,18 +185,26 @@
     return map;
   }
   function worldDrawPointDetail(row,prefs){
-    // The world map itself, not a blank grid: the point sits where the map puts it,
-    // and clicking the map moves it there.
-    const map=worldLocationMap({
+    // The panel's map is a picture of where the point is. Clicking it opens the
+    // large map, and the large map is where the point is placed: a stray click on
+    // a panel must never move game data.
+    const spec=()=>worldLocationOptions({
       label:`Set Draw Point ${row.drawId} position`,
       points:()=>{const at=worldDrawPosition(row);return at.y>=96?[]:[{x:at.x/128,y:at.y/96,selected:true,
         label:`Draw Point ${row.drawId}`}];},
       readout:point=>{const block=worldDrawBlock(point);return `block ${block.x}, ${block.y}`},
-      note:"Click the map to place the Draw Point. The grid is 128 blocks across and 96 down, and the crosshair names the block under the pointer.",
       place:point=>{const block=worldDrawBlock(point);Object.assign(row,worldDrawBytes(block.x,block.y));rerenderWorldMap();shell.refresh()}});
+    const map=LexeditorUI.imageMap({...spec(),place:null,magnify:null});
+    worldMapNavigation(map,map.lexStage);
+    map.classList.add("world-draw-map");
+    // The large map keeps the same click that places the point, and the panel
+    // states the rule on its bar, as the shared finder does.
+    map.addEventListener("click",event=>{if(event.target.closest("button,input,a"))return;
+      LexeditorUI.mapMagnifier({label:`Draw Point ${row.drawId}`,magnify:()=>({...spec(),
+        note:`Click the map to place Draw Point ${row.drawId}, or close this view and type the exact byte coordinates.`})});});
 
     // The list shows the draw point's own draw ID, so the panel does too.
-    return sharedDetail({...row,id:row.drawId,name:`DRAW POINT ${row.drawId}`},prefs,[detailSection({className:"world-draw-position",title:"WORLD POSITION",help:infoHelp("Section 34 stores only this world Draw Point's X, Y, and sub-ID bytes. Its magic, quantity, and refill behavior live in FF8_EN.exe and are not invented here."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},el("p",{class:"world-draw-help"},"Click the map to place the point, or enter exact byte coordinates below."),detailField({label:"X",help:infoHelp(worldPropertyHelp.drawPoint.x),control:worldNumber(row,"x",0,255,`Draw Point ${row.drawId} X`)}),detailField({label:"Y",help:infoHelp(worldPropertyHelp.drawPoint.y),control:worldNumber(row,"y",0,255,`Draw Point ${row.drawId} Y`)}),detailField({label:"SUB-ID",help:infoHelp(worldPropertyHelp.drawPoint.subId),control:worldNumber(row,"subId",0,255,`Draw Point ${row.drawId} sub-ID`)}))],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
+    return sharedDetail({...row,id:row.drawId,name:`DRAW POINT ${row.drawId}`},prefs,[detailSection({className:"world-draw-position",help:infoHelp("Section 34 stores only this world Draw Point's X, Y, and sub-ID bytes. Its magic, quantity, and refill behavior live in FF8_EN.exe and are not invented here."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},detailField({label:"X",help:infoHelp(worldPropertyHelp.drawPoint.x),control:worldNumber(row,"x",0,255,`Draw Point ${row.drawId} X`)}),detailField({label:"Y",help:infoHelp(worldPropertyHelp.drawPoint.y),control:worldNumber(row,"y",0,255,`Draw Point ${row.drawId} Y`)}),detailField({label:"SUB-ID",help:infoHelp(worldPropertyHelp.drawPoint.subId),control:worldNumber(row,"subId",0,255,`Draw Point ${row.drawId} sub-ID`)}))],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
   }
   function worldFieldReturnDetail(row,prefs){
     // The map, so the reader can see where the stored point lands: the coordinates are
