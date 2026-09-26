@@ -207,10 +207,14 @@ html.lex-transition-entry body > .lex-plugin-loading-screen, html.lex-transition
 
 .lex-command-primary {
   box-sizing:border-box;
-  width:38px;
-  min-width:38px;
-  height:38px;
-  min-height:38px;
+  /* One control size for the whole command row. Save and Play were 38px
+     beside 36px history and window buttons and 34px round ones, so a row that
+     is centred still showed three different tops. Lexer: "the buttons in the
+     menu bar are all different. different position, different gap". */
+  width:36px;
+  min-width:36px;
+  height:36px;
+  min-height:36px;
   padding:0;
   color:var(--lex-text);
   border:1px solid var(--lex-border);
@@ -219,13 +223,10 @@ html.lex-transition-entry body > .lex-plugin-loading-screen, html.lex-transition
   cursor:pointer;
 }
 
-#global-save.lex-command-primary, #global-game-process.lex-command-primary {
-  width:38px;
-  min-width:38px;
-  height:38px;
-  min-height:38px;
-  padding:0;
-}
+/* Save and Play were pinned two pixels larger than everything beside them by
+   an id rule, and the round menu buttons two pixels smaller by their own cap.
+   Both take the row's one control size now: the whole command row is one set
+   of controls, on one centre line. */
 
 .lex-command-primary:hover:not(:disabled) {
   color:var(--lex-accent-text);
@@ -1211,6 +1212,9 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
   justify-content:center;
   display:grid;
   grid-auto-flow:column;
+  /* The strip fills its row: Lexer wants the sub-tab bar to use all the
+     horizontal space, the same as the page tab bar. Every tab takes an equal
+     share of it and the whole bar keeps its own width. */
   grid-auto-columns:minmax(0,1fr);
   flex:0 0 auto;
   min-width:0;
@@ -6134,7 +6138,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    flattening into ovals on a short bar. */
 .lex-shell-command-row :is(.lex-settings-button, .lex-help-button,
   .lex-developer-button, .lex-shortcuts-button, .lex-info-button, .lex-github-tab) {
-  --lex-menu-icon:min(34px, calc(var(--lex-command-row-height) - 6px));
+  --lex-menu-icon:min(36px, calc(var(--lex-command-row-height) - 6px));
   box-sizing:border-box;
   display:inline-grid;
   width:var(--lex-menu-icon);
@@ -6216,6 +6220,18 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-detail-field-label-text {
    flex:0 1 auto;min-width:0;
  overflow:visible;
+}
+/* Renaming a label in place is a typing job, so the field hands the whole row
+   to the input. Lexer: "when i'm double clicking a property name to edit it the
+   ref rail thing should not show. and the text box should expand to fit
+   available space instead of being this tiny little thing". The input used to
+   be the width of the name lane - a tenth of the row - with the value's
+   reference rail beside it. */
+.lex-detail-field:has(> .lex-detail-field-label > .lex-label-rename) {
+  grid-template-columns:minmax(0,1fr);
+}
+.lex-detail-field:has(> .lex-detail-field-label > .lex-label-rename) > .lex-detail-field-control {
+  display:none;
 }
 .lex-toggle {
   display:flex;
@@ -7502,8 +7518,8 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 }
 .lex-history-button {
 
-  width: 38px;
-  min-width: 38px;
+  width: 36px;
+  min-width: 36px;
   height: 36px;
   padding: 0;
   border-radius: var(--lex-radius);
@@ -7519,9 +7535,9 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 .lex-settings-button {
 
   display: inline-grid;
-  width: 34px;
-  min-width: 34px;
-  height: 34px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
   padding: 0;
   place-items: center;
   border-radius: 50%;
@@ -7536,9 +7552,9 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 .lex-help-button {
 
   display: inline-grid;
-  width: 34px;
-  min-width: 34px;
-  height: 34px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
   padding: 0;
   border-radius: 50%;
   cursor: pointer;

@@ -59,6 +59,8 @@ def test_resident_handle_cover_keeps_its_affordance():
                   beforeFilter: getComputedStyle(n, '::before').filter,
                   beforeSize: getComputedStyle(n, '::before').backgroundSize,
                   beforeImage: getComputedStyle(n, '::before').backgroundImage,
+                  beforePosition: getComputedStyle(n, '::before').backgroundPosition,
+                  handlePosition: getComputedStyle(n).backgroundPosition,
                   afterContent: getComputedStyle(n, '::after').content,
                   afterBackground: getComputedStyle(n, '::after').backgroundColor,
                   position: getComputedStyle(n).position,
@@ -69,6 +71,11 @@ def test_resident_handle_cover_keeps_its_affordance():
                 assert 'brightness(0.42)' in art['beforeFilter'], art
                 assert 'cover' in art['beforeSize'], art
                 assert art['beforeImage'] != 'none', art
+                # The sliver is the cover's left edge. A centred crop showed the
+                # middle of the artwork instead, which is the picture's subject
+                # and not the part that stays recognisable at a hand's width.
+                assert art['beforePosition'].startswith('0%'), art
+                assert art['handlePosition'].startswith('0%'), art
                 assert art['afterContent'] == '""', art
                 film = art['afterBackground']
                 assert float(film[film.index('(') + 1:film.rindex(')')].split(',')[3]) > 0.3, art
