@@ -11,8 +11,9 @@
 - Branches are fine; leftovers are not. When a task is done and verified, merge
   its branch into master and delete the branch, its worktree and any stash in
   the same session. Never leave finished work parked where Lexer has to find
-  it, and say plainly if you stop with unmerged work. Pushing needs Lexer's
-  explicit go-ahead.
+  it, and say plainly if you stop with unmerged work. A worker may push the
+  branch it owns. Pushing master, or merging into it, is the root agent's job
+  and needs Lexer's explicit go-ahead.
 - Every game plugin must expose a Data Map screen. Do not use a generic Files
   tab as the player-facing editor for data that needs a format-specific view.
 - Always use the most appropriate HTML control for the value. Use checkboxes
@@ -196,6 +197,15 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
 
 ## Checks
 
+- Verify on CI, not on Lexer's machine. One plugin's suite takes minutes and
+  starts a browser process tree of its own; several agents doing that at the
+  same time pins his six-core CPU at 100% and makes every one of them slower,
+  which is what happened on 25 September. Run the one check that covers the
+  item you are changing, one browser at a time, and leave `--global` and the
+  whole `tests` tree to CI. To run a full suite, push the branch you own and
+  open a draft pull request: the generated workflows trigger on `pull_request`
+  and mirror these commands exactly, one `<plugin>-checks.yml` per plugin plus
+  `global-checks.yml`. Never merge that pull request; the root agent does.
 - Every plugin's checks run with `python tools/check_plugin.py <plugin>`, and
   shared ones with `--global`; CI runs exactly these, one generated
   `<plugin>-checks.yml` per plugin plus `global-checks.yml`. Put a new test in
@@ -243,5 +253,5 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
 
 ## Actionable-to-waiting handoff
 
-- Work every open actionable issue you can: verify the code, run `python tools/check_plugin.py <plugin>`, and record evidence plus human test plans (or blocked findings with proof) in the per-issue handoff. Close nothing without a delivered candidate; once one is pushed, move the issue to `untested` yourself.
+- Work every open actionable issue you can: verify the code, run the one check that covers it locally, and read the branch's CI run for the rest of the suite. Record evidence plus human test plans (or blocked findings with proof) in the per-issue handoff. Close nothing without a delivered candidate; once one is pushed, move the issue to `untested` yourself.
 - When agent work is done and only a specific Lexer action blocks the next step, flip the issue to waiting: append an unchecked checklist of the exact actions or answers needed from Lexer and swap the actionable label for waiting. Everything else keeps actionable.

@@ -22,6 +22,9 @@ def test_cached_preview_opens_once_and_closes_from_the_same_icon():
               const modelPreviewKey=()=> 'item';
               const fieldHelp=LexeditorUI.infoHelp,refField=control=>control;
               const localizationInput=()=>LexeditorUI.el('input',{class:'localized-name',value:'Item'});
+              // No base-game localization is loaded in this fixture, so no
+              // heading has a reference to restore.
+              const localizedReference=()=>undefined;
               const fillItemSources=async (item,root)=>root.append(LexeditorUI.detailNote('Source fixture'));
               let built=0;
               function armItemModelPreview(pane){LexeditorUI.attachModelPreview(pane,{

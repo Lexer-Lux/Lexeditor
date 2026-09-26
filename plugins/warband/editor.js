@@ -73,7 +73,16 @@
   // Undeclared columns size to their longest value, and Warband's ids and mesh
   // names are long enough to push the table past its panel and cut the last
   // column in half. Bounded widths let the long ones ellipsise instead.
-  function itemColumns(){return [{key:"name",label:"Name",width:"minmax(9em,1.4fr)",render:row=>el("span",{title:row.name},row.name)},{key:"id",label:"ID",width:"minmax(6em,.8fr)"},{key:"type",label:"Type",width:"minmax(6em,.7fr)"},{key:"inventoryMesh",label:"Inventory mesh",width:"minmax(7em,1fr)"}];}
+  // The cells read the edited values, so a change in the detail pane shows in
+  // the row it belongs to instead of waiting for a save.
+  function itemColumns(){return [
+    {key:"name",label:"Name",width:"minmax(9em,1.4fr)",render:row=>el("span",{title:effectiveItemField(row,"name")},effectiveItemField(row,"name")),
+      sortValue:row=>effectiveItemField(row,"name")},
+    {key:"id",label:"ID",width:"minmax(6em,.8fr)"},
+    {key:"type",label:"Type",width:"minmax(6em,.7fr)",render:row=>el("span",{title:itemTypeFromFlags(effectiveItemField(row,"flags"))},itemTypeFromFlags(effectiveItemField(row,"flags"))),
+      sortValue:row=>itemTypeFromFlags(effectiveItemField(row,"flags"))},
+    {key:"inventoryMesh",label:"Inventory mesh",width:"minmax(7em,1fr)",render:row=>el("span",{title:itemInventoryMesh(row)},itemInventoryMesh(row)),
+      sortValue:itemInventoryMesh}];}
   function itemRowKey(item){return String(item.recordIndex??item.line??item.id);}
   function renderItems(){
     const view="items",columns=itemColumns(),query=state.filters.items||"";
@@ -105,7 +114,44 @@
   function setItemType(item,value){
     const clean=String(value).trim().replace(/^itp_type_/i,""),flags=String(effectiveItemField(item,"flags"));if(!clean)return;
     const token=`itp_type_${clean}`,next=/\bitp_type_[a-z0-9_]+/i.test(flags)?flags.replace(/\bitp_type_[a-z0-9_]+/i,token):(flags.trim()?`${token}|${flags}`:token);
-    setItemField(item,"flags",next);const control=document.querySelector('[data-lex-property="flags"] textarea');if(control)control.value=next;
+    setItemField(item,"flags",next);render();
+  }
+  // The meshes field is a list of (mesh, flags) pairs. Lexeditor reads and
+  // writes the pair list itself, so a mesh can be chosen from the project's own
+  // names instead of typed, and the item's first mesh - the icon's own mesh -
+  // has a property exactly where the table column shows it.
+  const meshField=()=>WarbandFieldControls;
+  function itemMeshEntries(item){return meshField().parseMeshes(effectiveItemField(item,"meshes"))||[];}
+  function setItemMeshes(item,entries){
+    const expression=meshField().meshExpression(entries);
+    if(!expression)return;
+    setItemField(item,"meshes",expression);render();
+  }
+  function itemInventoryMesh(item){const entries=itemMeshEntries(item);return entries.length?entries[0].name:(item.inventoryMesh||"");}
+  function itemMeshChoices(){return state.items?.choices?.meshes||[];}
+  function itemMeshNames(){return itemMeshChoices().map(choice=>choice.name);}
+  function openItemMesh(name){
+    const choice=itemMeshChoices().find(value=>value.name===name);
+    if(!choice||choice.recordIndex===undefined||choice.recordIndex===null)return;
+    moduleRecords.openRecord("meshes",choice.recordIndex);
+  }
+  // One sizing rule for the panel. The shared fitter grows a number box until
+  // its digits fill it, which in a panel of text boxes, a dropdown and
+  // checkboxes read as one property ("Weight") shouting and the next
+  // ("Value") whispering. Every control here keeps the panel's own text size,
+  // which is also the size a native dropdown and a checkbox row can hold.
+  function sized(control){control.dataset.lexAutofit="false";return control;}
+  function itemMeshControl(item,index,entries,readOnly){
+    const entry=entries[index];
+    const select=el("select",{disabled:readOnly,"aria-label":`Mesh ${index+1}`,
+      onchange:event=>{const next=entries.map(value=>({...value}));next[index].name=event.target.value;setItemMeshes(item,next);}});
+    const names=itemMeshNames();
+    if(!names.includes(entry.name))select.append(el("option",{value:entry.name,selected:true},entry.name));
+    for(const name of names)select.append(el("option",{value:name,selected:name===entry.name},name));
+    sized(select);
+    const show=el("button",{type:"button",title:`Show ${entry.name} in the Meshes area`,
+      "aria-label":`Show ${entry.name} in the Meshes area`,onclick:()=>openItemMesh(entry.name)},"Show mesh");
+    return el("div",{class:"lex-action-row"},select,show);
   }
   function itemWeightFromStats(stats){return (String(stats).match(/\bweight\(([^)]+)\)/)||[])[1]?.trim()||"";}
   function setItemWeight(item,value){
@@ -120,6 +166,7 @@
     value:"Base item price before merchant, trade-skill, abundance, and other economy adjustments.",
     weight:"Inventory/equipment weight from the weight(...) stat macro; Warband uses it for encumbrance and other weight-sensitive behavior.",
     meshes:"Meshes used to render the item. The first mesh is also the source for Lexeditor's generated inventory icon.",
+    inventoryMesh:"The mesh the item table and the item icon read: the first mesh in this item's meshes field. Change it here or open it in the Meshes area, which is where the mesh's own record lives.",
     flags:"Item behavior flags control equipment class, merchandise/civilian availability, handedness, and other engine behavior.",
     capabilities:"Weapon capability expression controlling supported attacks and animations; non-weapons commonly leave this at zero.",
     stats:"Gameplay stat macros for weight, abundance, armor, speed, reach, damage, ammunition, and related item values.",
@@ -133,20 +180,81 @@
     if(!item)return detailPanel({className:"warband-item-detail",title:"Select an item"});
     const thumbnail=LexeditorUI.iconSlot({className:"warband-item-thumbnail",message:item.inventoryMesh?"Preparing icon…":"No mesh"}),thumbnailMessage=thumbnail.lexMessage;
     const readOnly=state.activeSource!=="mine";
+    const flagsExpression=String(effectiveItemField(item,"flags")),bits=state.items?.choices?.flags||[];
+    const types=state.items?.choices?.types||[];
+    const entries=itemMeshEntries(item),meshNames=itemMeshNames();
+    const valueControl=el("input",{value:effectiveItemField(item,"value"),disabled:readOnly,oninput:event=>setItemField(item,"value",event.target.value)});
+    const nameControl=el("input",{value:effectiveItemField(item,"name"),disabled:readOnly,oninput:event=>setItemField(item,"name",event.target.value)});
+    const weightControl=()=>el("input",{type:"number",step:"any",value:itemWeightFromStats(effectiveItemField(item,"stats")),disabled:readOnly,onchange:event=>setItemWeight(item,event.target.value)});
     const core=detailGroup({title:"Item",body:[
       detailField({label:"ID",property:"id",dataType:"STRING",description:ITEM_HELP.id,control:el("input",{value:item.id,disabled:true})}),
-      detailField({label:"Name",property:"name",dataType:"STRING",description:ITEM_HELP.name,control:el("input",{value:effectiveItemField(item,"name"),disabled:readOnly,oninput:event=>setItemField(item,"name",event.target.value)})}),
-      detailField({label:"Type",property:"type",dataType:"STRING",description:ITEM_HELP.type,control:el("input",{value:itemTypeFromFlags(effectiveItemField(item,"flags")),disabled:readOnly,onchange:event=>setItemType(item,event.target.value)})}),
-      detailField({label:"Value",property:"value",dataType:"EXPR",description:ITEM_HELP.value,control:el("input",{value:effectiveItemField(item,"value"),disabled:readOnly,oninput:event=>setItemField(item,"value",event.target.value)})}),
-      detailField({label:"Weight",property:"weight",dataType:"FLOAT",description:ITEM_HELP.weight,control:el("input",{type:"number",step:"any",value:itemWeightFromStats(effectiveItemField(item,"stats")),disabled:readOnly,onchange:event=>setItemWeight(item,event.target.value)})})
+      detailField({label:"Name",property:"name",dataType:"STRING",description:ITEM_HELP.name,control:sized(nameControl)}),
+      // The type is one of the itp_type_* values the project's header_items.py
+      // defines, so it is a list of those names, not a box a typo can brick an
+      // armour piece in.
+      detailField({label:"Type",property:"type",dataType:"ENUM",description:ITEM_HELP.type,
+        control:sized(WarbandFieldControls.enumSelect({options:types,value:itemTypeFromFlags(flagsExpression),readOnly,
+          apply:value=>setItemType(item,value)}))}),
+      detailField({label:"Value",property:"value",dataType:"EXPR",description:ITEM_HELP.value,control:sized(valueControl)}),
+      detailField({label:"Weight",property:"weight",dataType:"FLOAT",description:ITEM_HELP.weight,control:sized(weightControl())}),
+      // The table shows an inventory mesh for every item, so the panel says
+      // which mesh that is and lets the reader change it here.
+      detailField({label:"Inventory mesh",property:"inventoryMesh",dataType:"MESH",showType:false,description:ITEM_HELP.inventoryMesh,
+        control:entries.length?itemMeshControl(item,0,entries,readOnly):LexeditorUI.readonlyField("No mesh in this record",{format:false})})
     ]});
-    const sourceFields=(item.fieldOrder||[]).filter(key=>!["id","name","value"].includes(key));
-    const source=detailGroup({title:"Module System fields",body:sourceFields.map(key=>detailField({label:itemFieldLabel(key),property:key,dataType:"EXPR",description:ITEM_HELP[key]||"",control:(()=>{const control=itemExpressionControl(item,key);control.disabled=readOnly;return control;})()}))});
+    const body=[core];
+    // A field only leaves the "Module System fields" list when a control was
+    // actually built for it, so nothing becomes unreachable when a project's
+    // headers do not name a set (a compiled module, or a header without
+    // imodbits_*).
+    const handled=["id","name","value"];
+    // Stats read as one row per stat with a number box per value. A stats
+    // expression this editor cannot take apart keeps its source control.
+    const statsExpression=String(effectiveItemField(item,"stats")).trim();
+    const calls=statsExpression===""||statsExpression==="0"?[]:WarbandFieldControls.parseCalls(statsExpression);
+    if(calls){
+      const named=calls.filter(call=>call.name!=="weight");
+      handled.push("stats");
+      body.push(detailGroup({title:"Stats",help:LexeditorUI.infoHelp("One row per stat macro in this item's stats field. Weight has its own row above, so it is not repeated here."),
+        body:WarbandFieldControls.statRows({calls:named,macros:(state.items?.choices?.stats||[]).filter(name=>name!=="weight"),readOnly,
+          arguments:state.items?.choices?.statArguments||{},
+          apply:value=>{setItemField(item,"stats",value||"0");render();}})}));
+    }else{
+      handled.push("stats");
+      body.push(detailGroup({title:"Stats",body:[detailField({label:"Stat macros",property:"stats",dataType:"EXPR",description:ITEM_HELP.stats,
+        control:(()=>{const control=itemExpressionControl(item,"stats");control.disabled=readOnly;return control;})()}),
+        detailField({label:"Weight",property:"weight-from-stats",dataType:"FLOAT",description:ITEM_HELP.weight,control:sized(weightControl())})]}));
+    }
+    if(bits.length){
+      handled.push("flags");
+      body.push(WarbandFieldControls.bitFields({label:"Flags",help:ITEM_HELP.flags,flags:bits,expression:flagsExpression,readOnly,
+        // The item's Type property owns the itp_type_* part of this same field,
+        // so it is not repeated as an "also set" part of the flag list.
+        ownOther:/^itp_type_[a-z0-9_]+$/i,
+        apply:value=>{setItemField(item,"flags",value);render();}}));
+    }
+    const modifierChoices=state.items?.choices?.modifierBits||[];
+    if(modifierChoices.length){
+      handled.push("modifierBits");
+      body.push(WarbandFieldControls.bitFields({label:"Modifier bits",help:ITEM_HELP.modifierBits,flags:modifierChoices,
+        expression:String(effectiveItemField(item,"modifierBits")),readOnly,
+        apply:value=>{setItemField(item,"modifierBits",value);render();}}));
+    }
+    if(meshNames.length){
+      handled.push("meshes");
+      body.push(detailGroup({title:"Meshes",help:LexeditorUI.infoHelp(ITEM_HELP.meshes),
+        body:WarbandFieldControls.meshRows({label:"Mesh",property:"mesh",entries,choices:itemMeshChoices(),readOnly,
+          apply:next=>setItemMeshes(item,next),open:entry=>openItemMesh(entry.name)})}));
+    }
+    const sourceFields=(item.fieldOrder||[]).filter(key=>!handled.includes(key));
+    if(sourceFields.length){
+      body.push(detailGroup({title:"Module System fields",body:sourceFields.map(key=>detailField({label:itemFieldLabel(key),property:key,dataType:"EXPR",description:ITEM_HELP[key]||"",control:(()=>{const control=itemExpressionControl(item,key);control.disabled=readOnly;return control;})()}))}));
+    }
     // The heading icon is the shared 3D viewer control: pressing it slides the
     // model out of the panel, and the same slot carries the close mark. The
     // panel had the icon and the renderer but never the control, so the viewer
     // was there and unreachable.
-    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(item.name,24)),identity:item.id,body:[core,source],
+    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(item.name,24)),identity:item.id,body,
       modelPreview:item.inventoryMesh?{
         label:`${item.name} model`,
         openLabel:`Open the ${item.name} model`,
@@ -299,7 +407,7 @@
   }
 
   function settingDetail(row){
-    return detailPanel({title:row.key,meta:row.section,body:[LexeditorUI.detailSection({body:[
+    return detailPanel({title:el("h2",{class:"lex-detail-panel-title"},bitmapText(row.key,24)),meta:row.section,body:[LexeditorUI.detailSection({body:[
       detailField({label:"Value",property:"value",control:el("input",{value:effectiveSetting(row),oninput:event=>{if(event.target.value===row.value)delete state.settingEdits[row.line];else state.settingEdits[row.line]=event.target.value;shell.refresh();}})}),
       LexeditorUI.detailNote(row.description||"No description.")]})]});
   }
@@ -410,7 +518,9 @@
     }catch(error){setStatus("Save failed");showAlert({title:"Save failed",items:[{item:"Save",issue:error.message||String(error)}],closeLabel:"Confirm and Close"});}
   }
 
-  const views={items:renderItems,misc:()=>moduleRecords.render(),manuals:renderManuals,upgrades:renderUpgrades,troops:renderTroops,tweaks:renderSettings,datamap:renderDataMap,dashboard:renderDashboard};
+  // Music, factions, skills and sounds are areas of their own; Misc. keeps the
+  // rest behind a subtab bar.
+  const views={items:renderItems,misc:()=>moduleRecords.render("misc"),music:()=>moduleRecords.render("music"),factions:()=>moduleRecords.render("factions"),skills:()=>moduleRecords.render("skills"),sounds:()=>moduleRecords.render("sounds"),manuals:renderManuals,upgrades:renderUpgrades,troops:renderTroops,tweaks:renderSettings,datamap:renderDataMap,dashboard:renderDashboard};
   function navigate(tab){disposeWarbandPreview();state.tab=tab;render();}
   function renderVanilla(){$("#toolbar").replaceChildren();$("#main").replaceChildren(detailPanel({className:"lex-information-panel",title:"Vanilla",body:[LexeditorUI.detailSection({body:[
     LexeditorUI.detailText("The installed Native module is read-only. Its generated text files do not contain the Module System source used by this editor."),

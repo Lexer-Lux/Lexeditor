@@ -941,7 +941,21 @@
             title: options.renameLabel || "Record name",
             oninput: event => options.renameRecord(event.target.value, event),
           }))
-        : element("h2", {class: "lex-detail-panel-title"}, options.title ?? "");
+        : element("h2", {class: "lex-detail-panel-title"},
+          element("span", {class: "lex-detail-panel-name"}, options.title ?? ""));
+    // The name is the one thing on a record people most often want to paste
+    // somewhere else, so it copies like any property value, from its right.
+    const titleText = () => {
+      const field = title.querySelector('input:not([type="checkbox"]),select,textarea');
+      if (field) return field.tagName === "SELECT"
+        ? (field.selectedOptions[0]?.textContent || field.value) : field.value;
+      const bitmap = title.querySelector(".lex-bitmap-text[aria-label]");
+      if (bitmap) return bitmap.getAttribute("aria-label");
+      const name = title.querySelector(".lex-detail-panel-name") || title;
+      return name.textContent.trim();
+    };
+    if (options.title !== undefined || options.titleControl || options.renameRecord)
+      title.append(copyValueButton(titleText, "Copy this name"));
     if (options.help) title.append(infoHelp(options.help));
     const identity = element("div", {class: "lex-detail-panel-identity"},
       title,
@@ -1289,7 +1303,9 @@
   const shellTextNodes = (root = document) => [
     ...root.querySelectorAll(".lex-brand-button h1"),
     ...root.querySelectorAll(".lex-shell-header nav button .lex-tab-label-text"),
-    ...root.querySelectorAll(".lex-detail-panel-title"),
+    // The name inside a heading, so a redraw leaves its copy button alone.
+    ...[...root.querySelectorAll(".lex-detail-panel-title")]
+      .map(title => title.querySelector(":scope > .lex-detail-panel-name") || title),
   ];
 
   // Close any shared dialog that is open, without knowing how one is built.
@@ -1590,7 +1606,10 @@
     options.image ? element("img", {src:options.image,alt:options.label || "",
       onerror:event=>{event.target.hidden=true;}}) : null,
     element("div", {class:"lex-stat-card-ranks"}, ...(options.ranks || [])),
-    options.corner ? element("div", {class:"lex-stat-card-corner"}, options.corner) : null,
+    // A game that names the card's type in a word rather than one glyph asks
+    // for a corner wide enough to hold the word.
+    options.corner ? element("div", {class:["lex-stat-card-corner", options.cornerWord ? "lex-stat-card-corner-word" : ""]
+      .filter(Boolean).join(" ")}, options.corner) : null,
     options.footer ? element("div", {class:"lex-stat-card-footer"}, options.footer) : null);
 
   const choicePopover = (options = {}) => {
@@ -2147,8 +2166,8 @@
       event.preventDefault();
       event.stopPropagation();
       const text = String(read() ?? "");
-      const copied = await copyText(text);
-      showToast(copied ? `Copied: "${text}"` : "Could not reach the clipboard");
+      const copied = await copyText(text, {quiet: true});
+      showToast(copied ? `Copied: "${text}"` : "Could not reach the clipboard", !copied);
     },
   }, copyIcon());
 
@@ -3616,7 +3635,20 @@
       const title = panel ? card.querySelector(":scope > .lex-detail-panel-heading") : settings ? card.querySelector(":scope > h2") : card.querySelector(":scope > .lex-detail-section-title");
       const body = card.querySelector(panel ? ":scope > .lex-detail-panel-body" : settings ? ":scope > .settings-subs" : ":scope > .lex-detail-section-content");
       const rows = body ? [...body.children] : [];
-      if (rows.length < 2) return false;
+      if (rows.length < 2) {
+        // A settings section that a previous split left holding one long sub
+        // is still splittable: that single sub is exactly what splitSettingsSub
+        // takes apart. Returning early here left the piece taller than the page
+        // with nothing left to split, so the strict guard below threw and the
+        // tab was left mid-layout - one page of cards with the "(continued)"
+        // pieces still in it.
+        if (!settings || !body || rows.length !== 1) return false;
+        const frame = card.getBoundingClientRect(), content = body.getBoundingClientRect();
+        const ratio = frame.height / Math.max(1, card.offsetHeight) || 1;
+        return splitSettingsSub(card, body, rows[0], available,
+          (content.top - frame.top) / ratio, (frame.bottom - content.bottom) / ratio,
+          ratio, content.top);
+      }
       const outer = card.getBoundingClientRect(), inner = body.getBoundingClientRect();
       const scale = outer.height / Math.max(1, card.offsetHeight) || 1;
       const above = (inner.top - outer.top) / scale, below = (outer.bottom - inner.bottom) / scale;
@@ -7213,7 +7245,7 @@ ${contents.path}`});
         ? element("span", {class: "lex-column-heading"}, sortControl, help)
         : sortControl;
       return bindColumnHighlight(element("div", {
-        class: ["lex-column-list-head-cell", active ? "sorted" : "", headerAlignmentClass(column), column.class || ""].filter(Boolean).join(" "),
+        class: ["lex-column-list-head-cell", sortable ? "lex-column-sortable" : "", active ? "sorted" : "", headerAlignmentClass(column), column.class || ""].filter(Boolean).join(" "),
         role: "columnheader",
         title: column.headerTitle || null,
         draggable: false,
@@ -9910,11 +9942,13 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
     if(label.classList.contains('lex-tab-label-text')) {
       // Main tabs and subtabs fit their labels inside a single row.
-      // Main tabs sized to their text (--lex-nav-tab-columns:max-content)
-      // already are their label's width; shrinking one only narrows the tab
-      // with it, down to the floor. Their strip scrolls instead.
       const nav=label.closest('.lex-shell-header nav');
-      if(nav&&getComputedStyle(nav).getPropertyValue('--lex-nav-tab-columns').trim()==='max-content'){fitted.set(label,fitKey(label));return;}
+      // A page tab is never narrower than its own name, and its strip is sized
+      // as a whole by fitNavStrip. Shrinking one of those labels here would
+      // leave one strip's names in different sizes and fight that pass, so the
+      // strip owns them. A sub-tab bar shares its row equally and still fits
+      // each of its labels here.
+      if(nav){fitted.set(label,fitKey(label));return;}
       const range=document.createRange();range.selectNodeContents(label);
       const fits=()=>{const css=getComputedStyle(label);return range.getBoundingClientRect().width <= label.clientWidth-parseFloat(css.paddingLeft)-parseFloat(css.paddingRight)-3;};
       while(size>LABEL_MIN_PX&&!fits()){size-=.5;label.style.fontSize=`${size}px`;}
@@ -9958,32 +9992,67 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   };
   const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text';
   const labelSizeObserver = new ResizeObserver(entries => scheduleFit(entries.map(entry=>entry.target)));
-  // A content-sized page-tab strip is exactly as wide as its labels, so a game
-  // with twenty tabs is wider than its window and the frame scrolls. Shrinking
-  // one label at a time cannot fix that - the strip stays too wide, and the
-  // names end up in different sizes. The whole strip shrinks together, only as
-  // far as it must and only to the readable floor; past that, the frame keeps
-  // its scroll. This is the one place that decides, for every game, so no theme
-  // has to opt out of the shared fit pass to keep its labels whole.
-  const fitNavStrip = nav => {
+  // Within the page-tab strip every tab is at least its own name's width, so a
+  // game with twenty tabs wants a strip wider than its window. Shrinking one
+  // label at a time cannot fix that - the strip stays too wide, and the names
+  // end up in different sizes. The whole strip shrinks together, only as far as
+  // it must and only to the readable floor; past that, the frame scrolls. This
+  // is the one place that decides the strip's size, for every game.
+  const fitNavStrip = (nav, reset) => {
+    // A strip the pass has found is watched here as well as where it was built:
+    // a page that swaps its header for a fresh one leaves the original strip
+    // detached, and this is what picks the replacement up.
+    stripObserver.observe(nav);
     const frame = nav.closest('.lex-nav-frame') || nav.parentElement;
     const labels = [...nav.querySelectorAll('.lex-tab-label-text')];
     if (!frame || !labels.length) return;
-    const overflows = () => frame.scrollWidth > frame.clientWidth + 1;
+    // The frame scrolls exactly when the strip is wider than the lane the
+    // frame leaves it, and the buttons' own padding does not shrink with the
+    // font, so the size is solved against the text room that is left.
+    const overflows = () => nav.scrollWidth > nav.clientWidth + 1;
     const apply = size => labels.forEach(label => { label.style.fontSize = `${size}px`; });
-    labels.forEach(label => { label.style.fontSize = ''; });
+    // Only a pass that is allowed to start over may grow the strip back: one
+    // that shrinks it fires the strip's own observer, and a pass that cleared
+    // its way back to the base size every time would trade those two states
+    // for ever. Growing back is the window's business, and that pass resets.
+    if (reset) labels.forEach(label => { label.style.fontSize = ''; });
     if (!overflows()) return;
+    const fixed = labels.reduce((total, label) => {
+      const css = getComputedStyle(label.closest('button') || label);
+      return total + parseFloat(css.paddingLeft) + parseFloat(css.paddingRight)
+        + parseFloat(css.borderLeftWidth) + parseFloat(css.borderRightWidth);
+    }, 0);
+    const room = Math.max(1, nav.clientWidth - fixed - 1);
     const start = parseFloat(getComputedStyle(labels[0]).fontSize) || 12;
-    let size = Math.max(LABEL_MIN_PX, start * (frame.clientWidth / frame.scrollWidth));
-    apply(size);
-    // The padding and the help marks do not scale with the font, so the first
-    // estimate is close but rarely exact; a couple of steps settle it.
-    for (let attempt = 0; attempt < 3 && size > LABEL_MIN_PX && overflows(); attempt += 1) {
-      size = Math.max(LABEL_MIN_PX, size - 1);
+    let size = start;
+    // Measuring after each step is what makes this exact: the ratio is taken
+    // from the real text width, not from an estimate that ignores padding.
+    for (let attempt = 0; attempt < 5 && size > LABEL_MIN_PX && overflows(); attempt += 1) {
+      size = Math.max(LABEL_MIN_PX, size * room / Math.max(1, nav.scrollWidth - fixed));
       apply(size);
     }
   };
-  const fitAllLabels = root => {
+  // The strip itself is what changes size when a page adds its tabs or when a
+  // page that opened hidden becomes visible, and neither of those resizes the
+  // window or a label the fit pass already knew about. Watching every strip
+  // from the moment it is built is what lets it be measured at the size it
+  // really has; nothing else reaches a strip whose page builds it late. It is
+  // fitted here rather than batched into the next frame, because a frame that
+  // has not painted yet receives no animation frame at all.
+  const stripLane = new WeakMap();
+  const stripObserver = new ResizeObserver(entries => entries.forEach(entry => {
+    const nav = entry.target;
+    if (!nav.isConnected) return;
+    const width = Math.round(nav.clientWidth);
+    const laneChanged = stripLane.get(nav) !== width;
+    stripLane.set(nav, width);
+    // A lane that changed width is solved again from the base size, so the
+    // strip can grow back. One that only changed height is only ever shrunk:
+    // clearing it there would trade the two sizes for ever, because the height
+    // of a tab follows its own font.
+    fitNavStrip(nav, laneChanged);
+  }));
+  const fitAllLabels = (root, reset) => {
     const fit = label => { labelSizeObserver.observe(label); fitLabel(label); };
     if (root instanceof Element && root.matches?.(LABEL_SELECTOR)) fit(root);
     root.querySelectorAll?.(LABEL_SELECTOR).forEach(fit);
@@ -9991,7 +10060,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     const own = root instanceof Element ? root.closest?.('.lex-shell-header nav') : null;
     if (own) strips.add(own);
     root.querySelectorAll?.('.lex-shell-header nav').forEach(nav => strips.add(nav));
-    strips.forEach(fitNavStrip);
+    strips.forEach(nav => fitNavStrip(nav, reset));
   };
   // Measuring inside the mutation callback reads a layout that is not final:
   // the label's own height comes from the row, and the row is sized by a
@@ -10004,27 +10073,44 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   // its font size cannot change the row's height, so this settles in one pass.
   let fitPending = false;
   let fitRoots = null;
+  // A window resize must be able to grow the strip back even when a pass that
+  // only shrinks it is already queued for the same frame, so the reset sticks
+  // to the pass rather than to whoever asked first.
+  let fitReset = false;
   // A rebuilt reference stack is not a reason to re-measure the property names
   // three panels away. Only what was just added is fitted; a resize or a font
   // arriving is what re-fits the page.
-  const scheduleFit = roots => {
+  const scheduleFit = (roots, reset = roots === undefined) => {
     if (!Array.isArray(roots)) fitRoots = null;
     else if (fitRoots) for (const root of roots) fitRoots.add(root);
+    fitReset = fitReset || reset;
     if (fitPending) return;
     fitPending = true;
     requestAnimationFrame(() => {
       fitPending = false;
-      const targets = fitRoots;
+      const targets = fitRoots, resetNow = fitReset;
       fitRoots = new Set();
-      if (targets === null || !targets.size) fitAllLabels(document);
-      else for (const root of targets) if (root.isConnected) fitAllLabels(root);
+      fitReset = false;
+      if (targets === null || !targets.size) fitAllLabels(document, resetNow);
+      else for (const root of targets) if (root.isConnected) fitAllLabels(root, resetNow);
     });
   };
   const labelObserver = new MutationObserver(records => {
     const added = [];
+    const strips = new Set();
     for (const record of records) {
       for (const node of record.addedNodes) if (node instanceof Element) added.push(node);
+      // The strip is fitted here, in the mutation itself, rather than in the
+      // next animation frame like the rest of the pass. A frame that has not
+      // painted yet never receives one, and FF7's editor page can sit in that
+      // state with twenty labels that still have to fit; the strip's own
+      // measurement reads the lane the shell has already given it, so it does
+      // not need the row heights that the batched pass waits for.
+      const nav = record.target instanceof Element
+        ? record.target.closest('.lex-shell-header nav') : null;
+      if (nav) strips.add(nav);
     }
+    strips.forEach(nav => fitNavStrip(nav, true));
     if (added.length) scheduleFit(added);
   });
   labelObserver.observe(document.documentElement, {childList: true, subtree: true});
@@ -10040,6 +10126,15 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     document.querySelectorAll(LABEL_SELECTOR).forEach(label => fitted.delete(label));
     scheduleFit();
   });
+  // A page whose header is written into the served HTML fires no mutation for
+  // the observer above to see, so nothing would ever ask its strip to be
+  // measured; FF7's editor is built that way. The strip reads the lane the
+  // shell has already given it, so it is fitted directly here, once the
+  // document is parsed and the game's own stylesheet has been applied.
+  const fitStripsNow = () => document.querySelectorAll('.lex-shell-header nav')
+    .forEach(nav => fitNavStrip(nav, true));
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fitStripsNow, {once: true});
+  else fitStripsNow();
   scheduleFit();
 })();
 

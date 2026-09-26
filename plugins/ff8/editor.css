@@ -23,12 +23,10 @@
       --lex-command-row-padding:0 10px;--lex-command-row-bg:linear-gradient(135deg,#737373,#555 72%);
       --lex-command-row-border:3px solid;--lex-command-row-border-color:#aaa #282828 #282828 #aaa;
 
-      /* Twenty tabs in the game's wide lettering. Content-sized tabs keep
-         every label whole; the shared fit pass shrinks the whole strip to fit
-         the window, and only a window too small for the readable floor
-         scrolls. */
+      /* Twenty tabs in the game's wide lettering. The shared shell keeps each
+         tab at least its name's width and shrinks the whole strip to the
+         window; only a window too small for the readable floor scrolls. */
       --lex-nav-bg:#000;--lex-nav-padding-inline:var(--lex-panel-gap);
-      --lex-nav-tab-columns:max-content;--lex-nav-overflow-x:auto;
       --lex-tab-min-height:44px;--lex-tab-padding-inline:clamp(5px,.75vw,20px);
       --lex-tab-font-size:clamp(12px,1.02vw,20px);--lex-tab-fg:#cfcfcf;
       --lex-tab-bg:linear-gradient(135deg,#5c5c5c,#404040);

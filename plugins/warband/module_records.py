@@ -19,6 +19,16 @@ import threading
 
 _LOCK = threading.Lock()
 
+# Reading the project's headers is cheap once, and the reader asks for them on
+# every item request; the key carries each file's size and modification time so
+# an edited header is read again and a compiled project caches nothing.
+_READ_CACHE: dict = {}
+
+
+def _fingerprint(paths) -> tuple:
+    return tuple((str(path), path.stat().st_mtime_ns, path.stat().st_size)
+                 for path in paths if path.is_file())
+
 
 def _f(key, label, kind="expr", help="", **extra):
     value = {"key": key, "label": label, "kind": kind, "help": help}
@@ -34,7 +44,7 @@ SCHEMAS = {
         "fields": [
             _f("id", "ID", "identity", "Stable skl_* source identity. Renaming is disabled because other Module System files reference it."),
             _f("name", "Name", "string", "Player-facing skill name."),
-            _f("flags", "Flags", "expr", "sf_* governing-attribute, party-effect and inactive flags. Preserved as a validated expression."),
+            _f("flags", "Flags", "expr", "sf_* governing-attribute, party-effect and inactive flags. The header_skills.py flags are checkboxes; anything else stays in the source expression.", bits=True),
             _f("maxLevel", "Maximum level", "integer", "Highest level the skill can reach.", min=0),
             _f("description", "Description", "text", "Player-facing skill description."),
         ],
@@ -47,7 +57,7 @@ SCHEMAS = {
         "fields": [
             _f("id", "ID", "identity", "Stable qst_* source identity. References are not rewritten."),
             _f("name", "Name", "string", "Name shown in the quest screen."),
-            _f("flags", "Flags", "expr", "qf_* quest behavior flags, preserved as a validated expression."),
+            _f("flags", "Flags", "expr", "qf_* quest behavior flags, chosen from the project's header_quests.py.", bits=True),
             _f("description", "Description", "text", "Quest description compiled for the player."),
         ],
         "columns": ["name", "id", "flags"],
@@ -80,8 +90,8 @@ SCHEMAS = {
         "fields": [
             _f("id", "ID", "identity", "Stable track identity."),
             _f("file", "Audio file", "string", "Filename of the music track."),
-            _f("flags", "Playback flags", "expr", "mtf_* situations/cultures in which the track may start."),
-            _f("continueFlags", "Continue flags", "expr", "mtf_* situations/cultures in which the track may continue."),
+            _f("flags", "Playback flags", "expr", "mtf_* situations/cultures in which the track may start.", bits=True),
+            _f("continueFlags", "Continue flags", "expr", "mtf_* situations/cultures in which the track may continue.", bits=True),
         ],
         "columns": ["id", "file", "flags"],
     },
@@ -91,7 +101,7 @@ SCHEMAS = {
         "notes": "Sound event identities and flags are structured. The variable sample-list expression remains source syntax because entries may carry per-sample flags.",
         "fields": [
             _f("id", "ID", "identity", "Stable snd_* source identity."),
-            _f("flags", "Flags", "expr", "sf_* sound-event flags, preserved as a validated expression."),
+            _f("flags", "Flags", "expr", "sf_* sound-event flags, chosen from the project's header_sounds.py.", bits=True),
             _f("samples", "Samples", "expr", "Sample list. Entries may be filenames or filename/flag pairs."),
         ],
         "columns": ["id", "flags", "samples"],
@@ -102,7 +112,7 @@ SCHEMAS = {
         "notes": "Resource name and all nine documented transform values have semantic controls. Mesh flags remain a validated expression.",
         "fields": [
             _f("id", "ID", "identity", "Stable mesh_* source identity."),
-            _f("flags", "Flags", "expr", "header_meshes.py flags, preserved as a validated expression."),
+            _f("flags", "Flags", "expr", "header_meshes.py flags.", bits=True),
             _f("resource", "Resource name", "string", "BRF mesh resource name."),
             _f("translateX", "Translate X", "number", "Automatic X-axis translation."),
             _f("translateY", "Translate Y", "number", "Automatic Y-axis translation."),
@@ -123,7 +133,7 @@ SCHEMAS = {
         "fields": [
             _f("id", "ID", "identity", "Stable fac_* source identity."),
             _f("name", "Name", "string", "Faction display name."),
-            _f("flags", "Flags", "expr", "Faction rating/behavior expression."),
+            _f("flags", "Flags", "expr", "Faction rating/behavior flags.", bits=True),
             _f("coherence", "Coherence", "number", "Self-relation/coherence value exported by process_factions.py."),
             _f("relations", "Relations", "expr", "List of (faction id, relation) pairs."),
             _f("ranks", "Ranks", "expr", "Faction rank-name list."),
@@ -137,7 +147,7 @@ SCHEMAS = {
         "notes": "Tonemap operator and the three documented four-value shader vectors have bounded/semantic controls. Flags remain a validated expression.",
         "fields": [
             _f("id", "ID", "identity", "Stable pfx_* source identity."),
-            _f("flags", "Flags", "expr", "Post-processing flags from header_postfx.py."),
+            _f("flags", "Flags", "expr", "Post-processing flags from header_postfx.py.", bits=True),
             _f("tonemap", "Tonemap operator", "integer", "Documented operator type 0, 1, 2 or 3.", min=0, max=3),
             _f("params1", "HDR parameters", "vec4", "HDR range, exposure scaler, luminance-average scaler, luminance-max scaler.",
                components=["HDR range", "Exposure", "Luminance average", "Luminance max"]),
@@ -155,7 +165,7 @@ SCHEMAS = {
         "fields": [
             _f("id", "ID", "identity", "Stable pt_* source identity."),
             _f("name", "Name", "string", "Party-template display name."),
-            _f("flags", "Flags", "expr", "Party/map-icon behavior flags."),
+            _f("flags", "Flags", "expr", "Party/map-icon behavior flags.", bits=True),
             _f("menu", "Encounter menu", "expr", "Menu used when this party is met; 0 uses the default encounter system."),
             _f("faction", "Faction", "expr", "Faction assigned to generated parties."),
             _f("personality", "Personality", "expr", "AI personality expression."),
@@ -170,7 +180,7 @@ SCHEMAS = {
         "fields": [
             _f("id", "ID", "identity", "Stable p_* source identity."),
             _f("name", "Name", "string", "Party display name."),
-            _f("flags", "Flags", "expr", "Party behavior and map-icon flags."),
+            _f("flags", "Flags", "expr", "Party behavior and map-icon flags.", bits=True),
             _f("menu", "Encounter menu", "expr", "Encounter menu; 0 uses the default system."),
             _f("template", "Party template", "expr", "pt_* template; pt_none means no template."),
             _f("faction", "Faction", "expr", "fac_* faction reference."),
@@ -189,8 +199,8 @@ SCHEMAS = {
         "notes": "ID, flags, mesh, scale and sound are the documented common prefix and are editable. Optional offsets and custom trigger tails have multiple record shapes and remain source-only.",
         "fields": [
             _f("id", "ID", "identity", "Stable icon_* source identity."),
-            _f("flags", "Flags", "expr", "Map-icon behavior flags."),
-            _f("mesh", "Mesh", "string", "World-map mesh name."),
+            _f("flags", "Flags", "expr", "Map-icon behavior flags.", bits=True),
+            _f("mesh", "Mesh", "string", "World-map mesh name.", mesh=True),
             _f("scale", "Scale", "number", "World-map icon scale.", min=0),
             _f("sound", "Sound", "expr", "Sound event used by the icon."),
         ],
@@ -202,8 +212,8 @@ SCHEMAS = {
         "notes": "Indoor mesh/body, movement bounds, water level, terrain code and optional outer terrain are structured. Flags/reference lists remain expressions; .sco layout still belongs to Warband's scene editor.",
         "fields": [
             _f("id", "ID", "identity", "Stable scn_* source identity."),
-            _f("flags", "Flags", "expr", "sf_* scene generation/behavior flags."),
-            _f("mesh", "Indoor mesh", "string", "Indoor scene mesh; use \"none\" for outdoor scenes."),
+            _f("flags", "Flags", "expr", "sf_* scene generation/behavior flags.", bits=True),
+            _f("mesh", "Indoor mesh", "string", "Indoor scene mesh; use \"none\" for outdoor scenes.", mesh=True),
             _f("body", "Indoor body", "string", "Indoor collision body; use \"none\" for outdoor scenes."),
             _f("minPosition", "Minimum position", "vec2", "Minimum player X/Y movement boundary.", components=["X", "Y"], container="tuple"),
             _f("maxPosition", "Maximum position", "vec2", "Maximum player X/Y movement boundary.", components=["X", "Y"], container="tuple"),
@@ -221,8 +231,8 @@ SCHEMAS = {
         "notes": "Visual mesh is structured. Flags, physics object and associated trigger operation blocks remain validated expressions.",
         "fields": [
             _f("id", "ID", "identity", "Stable spr_* source identity."),
-            _f("flags", "Flags", "expr", "Scene-prop behavior flags."),
-            _f("mesh", "Mesh", "string", "Visual mesh name."),
+            _f("flags", "Flags", "expr", "Scene-prop behavior flags.", bits=True),
+            _f("mesh", "Mesh", "string", "Visual mesh name.", mesh=True),
             _f("physicsObject", "Physics object", "expr", "Collision/physics object reference; some records use 0."),
             _f("triggers", "Triggers", "expr", "Simple-trigger operation list associated with the prop."),
         ],
@@ -234,7 +244,7 @@ SCHEMAS = {
         "notes": "Mission descriptions are semantic text. Flags/type and spawn/trigger operation lists remain validated expressions.",
         "fields": [
             _f("id", "ID", "identity", "Stable mt_* source identity."),
-            _f("flags", "Flags", "expr", "Mission-template flags."),
+            _f("flags", "Flags", "expr", "Mission-template flags.", bits=True),
             _f("missionType", "Mission type", "expr", "Default meeting-system type such as charge/charge_with_ally, or -1 for custom missions."),
             _f("description", "Description", "text", "Text describing the mission."),
             _f("spawns", "Spawn records", "expr", "Entry/spawn/alter/AI flags, troop count and optional equipment."),
@@ -248,9 +258,9 @@ SCHEMAS = {
         "notes": "Menu text and mesh-name are structured. Flags, activation operations and nested options remain validated expressions.",
         "fields": [
             _f("id", "ID", "identity", "Stable menu_* source identity."),
-            _f("flags", "Flags", "expr", "Game-menu flags and optional text-color expression."),
+            _f("flags", "Flags", "expr", "Game-menu flags; a text-colour expression stays in source.", bits=True),
             _f("text", "Menu text", "text", "Text displayed when the menu opens."),
-            _f("mesh", "Mesh", "string", "Documented unused mesh-name field; Native uses \"none\"."),
+            _f("mesh", "Mesh", "string", "Documented unused mesh-name field; Native uses \"none\".", mesh=True),
             _f("operations", "Activation operations", "expr", "Operation block run when the menu activates."),
             _f("options", "Menu options", "expr", "Nested option records with id, conditions, text and consequences."),
         ],
@@ -262,8 +272,8 @@ SCHEMAS = {
         "notes": "Stable presentation records are browsable. Flags, background mesh and trigger operation list remain validated expressions.",
         "fields": [
             _f("id", "ID", "identity", "Stable prsnt_* source identity."),
-            _f("flags", "Flags", "expr", "Presentation behavior flags."),
-            _f("backgroundMesh", "Background mesh", "expr", "Background mesh reference."),
+            _f("flags", "Flags", "expr", "Presentation behavior flags.", bits=True),
+            _f("backgroundMesh", "Background mesh", "string", "Background mesh reference.", mesh=True),
             _f("triggers", "Triggers", "expr", "Presentation simple-trigger operation list."),
         ],
         "columns": ["id", "backgroundMesh", "flags"],
@@ -274,7 +284,7 @@ SCHEMAS = {
         "notes": "Sample material, dimensions and documented mesh bounds are semantic controls. Flags and executable operation block remain expressions.",
         "fields": [
             _f("id", "ID", "identity", "Stable tab_* source identity."),
-            _f("flags", "Flags", "expr", "Tableau behavior flags."),
+            _f("flags", "Flags", "expr", "Tableau behavior flags.", bits=True),
             _f("sampleMaterial", "Sample material", "string", "Sample material used by the tableau."),
             _f("width", "Width", "integer", "Generated tableau texture width in pixels.", min=1),
             _f("height", "Height", "integer", "Generated tableau texture height in pixels.", min=1),
@@ -292,11 +302,11 @@ SCHEMAS = {
         "notes": "Body/calf/hand/head meshes, skeleton and scale are structured. Face/hair/beard/texture/voice lists plus optional blood/constraint expressions remain source expressions.",
         "fields": [
             _f("id", "ID", "identity", "Stable skin identity."),
-            _f("flags", "Flags", "expr", "Skin flags; the reference Module System notes this is normally 0."),
-            _f("bodyMesh", "Body mesh", "string", "Body mesh name."),
-            _f("calfMesh", "Calf mesh", "string", "Left calf mesh name."),
-            _f("handMesh", "Hand mesh", "string", "Left hand mesh name."),
-            _f("headMesh", "Head mesh", "string", "Head mesh name."),
+            _f("flags", "Flags", "expr", "Skin flags; the reference Module System notes this is normally 0.", bits=True),
+            _f("bodyMesh", "Body mesh", "string", "Body mesh name.", mesh=True),
+            _f("calfMesh", "Calf mesh", "string", "Left calf mesh name.", mesh=True),
+            _f("handMesh", "Hand mesh", "string", "Left hand mesh name.", mesh=True),
+            _f("headMesh", "Head mesh", "string", "Head mesh name.", mesh=True),
             _f("faceKeys", "Face keys", "expr", "Face morph-key definition/reference."),
             _f("hairMeshes", "Hair meshes", "expr", "Hair mesh list."),
             _f("beardMeshes", "Beard meshes", "expr", "Beard mesh list."),
@@ -318,8 +328,8 @@ SCHEMAS = {
         "notes": "Emission/lifetime/turbulence values, two-key color/alpha/scale curves, emit vectors and rotation controls are semantic. Flags remain a validated expression.",
         "fields": [
             _f("id", "ID", "identity", "Stable psys_* source identity."),
-            _f("flags", "Flags", "expr", "Particle-system behavior flags."),
-            _f("mesh", "Particle mesh", "string", "Mesh rendered for each particle."),
+            _f("flags", "Flags", "expr", "Particle-system behavior flags.", bits=True),
+            _f("mesh", "Particle mesh", "string", "Mesh rendered for each particle.", mesh=True),
             _f("particlesPerSecond", "Particles / second", "number", "Particles emitted each second.", min=0),
             _f("particleLife", "Particle life", "number", "Particle lifetime in seconds.", min=0),
             _f("damping", "Damping", "number", "Speed lost to friction."),
@@ -347,6 +357,11 @@ SCHEMAS = {
 }
 
 SCHEMA_BY_FILENAME = {schema["filename"]: key for key, schema in SCHEMAS.items()}
+
+# Areas the plugin shows as page tabs of their own instead of inside Misc.
+# The Data Map names that tab so its open button does not promise a place the
+# record no longer lives.
+PROMOTED_TABS = {"music": "music", "factions": "factions", "skills": "skills", "sounds": "sounds"}
 
 
 def _source(path: Path):
@@ -540,13 +555,162 @@ def _records(text: str, schema: dict):
         else:
             row["id"] = identity
         display = row["fields"].get("name")
-        for key in ("file", "resource", "value", "text", "description", "mesh", "sampleMaterial", "bodyMesh"):
+        # Only a field that names the record becomes its heading. A mesh,
+        # resource or file name is a property of the record, not its name; using
+        # one put a mesh name in the heading and then printed the real ID under
+        # it, so the heading repeated itself on some records and not others.
+        for key in ("text", "description", "value"):
             if isinstance(display, str):
                 break
             display = row["fields"].get(key)
         row["name"] = display if isinstance(display, str) else row["id"]
         rows.append(row)
     return rows
+
+
+def _constant_number(expression: str, symbols: dict) -> int:
+    """The integer a Module System constant expression reduces to."""
+    node = ast.parse(re.sub(r"(?<=[0-9a-fA-F])L\b", "", expression), mode="eval").body
+
+    def value(item):
+        if isinstance(item, ast.Constant) and type(item.value) is int:
+            return item.value
+        if isinstance(item, ast.Name):
+            return symbols[item.id]
+        if isinstance(item, ast.UnaryOp) and isinstance(item.op, ast.Invert):
+            return ~value(item.operand)
+        if isinstance(item, ast.BinOp):
+            left, right = value(item.left), value(item.right)
+            if isinstance(item.op, ast.BitOr):
+                return left | right
+            if isinstance(item.op, ast.BitAnd):
+                return left & right
+            if isinstance(item.op, ast.LShift) and 0 <= right <= 256:
+                return left << right
+            if isinstance(item.op, ast.Add):
+                return left + right
+        if (isinstance(item, ast.Call) and isinstance(item.func, ast.Name)
+                and item.func.id == "level" and len(item.args) == 1):
+            return value(item.args[0]) << 32
+        raise ValueError("not a fixed integer")
+
+    return value(node)
+
+
+def header_constants(root, filenames=None) -> dict:
+    """Every numeric constant the project's Module System headers define.
+
+    A Module System keeps one ``header_<area>.py`` beside the ``module_*.py``
+    files, and that is where ``itp_*``, ``sf_*``, ``mtf_*``, ``imodbits_*`` and
+    the rest of the documented constants come from. Reading the project's own
+    headers means the editor offers the names the compile step will accept.
+    A compiled module ships without headers, and its fields keep source
+    controls because there is no finite set to offer.
+    """
+    root = Path(root)
+    pending = []
+    paths = ([root / name for name in filenames] if filenames is not None
+             else sorted(root.glob("header_*.py")))
+    key = ("symbols", _fingerprint(paths))
+    if key in _READ_CACHE:
+        return dict(_READ_CACHE[key])
+    for path in paths:
+        if not path.is_file():
+            continue
+        text, _encoding, _raw = _source(path)
+        pending += re.findall(r"(?m)^([A-Za-z_]\w*)\s*=\s*([^\n#]+)", text)
+    symbols: dict = {}
+    for _ in range(8):
+        for key, expression in pending:
+            if key in symbols:
+                continue
+            try:
+                symbols[key] = _constant_number(expression.strip(), symbols)
+            except (KeyError, ValueError, SyntaxError, TypeError):
+                pass
+    _READ_CACHE[key] = dict(symbols)
+    return symbols
+
+
+def _single_bits(symbols: dict, prefix: str) -> list[dict]:
+    """The named single-bit flags of one prefix, lowest bit first."""
+    found = [(name, number) for name, number in symbols.items()
+             if name.startswith(prefix) and number > 0 and number & (number - 1) == 0]
+    found.sort(key=lambda pair: (pair[1], pair[0]))
+    return [{"name": name, "value": number, "label": name[len(prefix):]} for name, number in found]
+
+
+def _declared_names(path: Path) -> set:
+    """The constant names one header file declares."""
+    if not path.is_file():
+        return set()
+    text, _encoding, _raw = _source(path)
+    return set(re.findall(r"(?m)^([A-Za-z_]\w*)\s*=", text))
+
+
+def mesh_choices(root) -> list:
+    """The mesh records a project declares, by resource name and by record id.
+
+    A mesh property in one Module System file names a mesh the project
+    declares in module_meshes.py, so the editor can offer those names and open
+    the record they belong to instead of asking the reader to type one.
+    """
+    path = Path(root) / "module_meshes.py"
+    if not path.is_file():
+        return []
+    key = ("meshes", _fingerprint([path]))
+    if key in _READ_CACHE:
+        return [dict(entry) for entry in _READ_CACHE[key]]
+    text, _encoding, _raw = _source(path)
+    found = []
+    for row in _records(text, SCHEMAS["meshes"]):
+        if row.get("problem"):
+            continue
+        resource = str(row["fields"].get("resource") or "").strip()
+        for name in sorted({resource, str(row.get("id") or "")} - {""}):
+            found.append({"name": name, "id": row.get("id", ""),
+                          "recordIndex": row.get("recordIndex"), "label": name})
+    _READ_CACHE[key] = [dict(entry) for entry in found]
+    return found
+
+
+def _field_choices(root, schema: dict) -> dict:
+    """The finite sets a dataset's fields can choose from, if the project has them."""
+    root = Path(root)
+    symbols = header_constants(root)
+    choices = {}
+    area_header = "header_" + schema["filename"][len("module_"):]
+    area_names = _declared_names(root / area_header)
+    for spec in schema["fields"]:
+        if spec.get("mesh"):
+            meshes = mesh_choices(root)
+            if meshes:
+                choices[spec["key"]] = {"kind": "mesh", "meshes": meshes}
+            continue
+        bits = spec.get("bits")
+        if bits:
+            if bits is True:
+                # The area's own header is the list of flags that belong to that
+                # area's records, so a field there offers exactly those.
+                flags = [entry for entry in _single_bits(symbols, "")
+                         if entry["name"] in area_names]
+            else:
+                prefixes = [bits] if isinstance(bits, str) else list(bits)
+                flags = []
+                for prefix in prefixes:
+                    flags += _single_bits(symbols, prefix)
+            if flags:
+                choices[spec["key"]] = {"kind": "bits", "flags": flags}
+        enum = spec.get("enum")
+        if enum:
+            options = [(name, number) for name, number in symbols.items()
+                       if name.startswith(enum) and number >= 0]
+            options.sort(key=lambda pair: (pair[1], pair[0]))
+            if options:
+                choices[spec["key"]] = {"kind": "enum",
+                                        "options": [{"name": name, "label": name[len(enum):], "value": number}
+                                                    for name, number in options]}
+    return choices
 
 
 def _public_schema(schema: dict):
@@ -576,6 +740,7 @@ def dataset_data(root, dataset: str):
     for row in rows:
         row.pop("_spans", None)
     return {"dataset": dataset, "available": True, "filename": schema["filename"],
+            "choices": _field_choices(root, schema),
             "encoding": encoding, "sha256": hashlib.sha256(raw).hexdigest(),
             "rows": rows, "schema": public}
 

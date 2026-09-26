@@ -155,7 +155,8 @@
     ],
     "choicePopover": [
       "blank",
-      "ff8"
+      "ff8",
+      "ff9"
     ],
     "clone": [
       "bannerlord",
@@ -232,7 +233,8 @@
       "ff8",
       "ff9",
       "ffx_x2",
-      "stardew_valley"
+      "stardew_valley",
+      "warband"
     ],
     "componentSample": [
       "blank"
@@ -1190,6 +1192,7 @@
       "blank",
       "ff7",
       "ff8",
+      "ff9",
       "rdr",
       "rdr2"
     ],
@@ -1241,6 +1244,7 @@
       "blank",
       "ff7",
       "ff8",
+      "ff9",
       "rdr",
       "rdr2"
     ],
@@ -1427,7 +1431,8 @@
     ],
     "statCard": [
       "blank",
-      "ff8"
+      "ff8",
+      "ff9"
     ],
     "subtabBar": [
       "bannerlord",

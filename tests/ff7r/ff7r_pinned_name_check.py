@@ -44,7 +44,12 @@ def main():
    assert page.evaluate("curatedRows(curatedSpec('abilities')).length")==1
    for font_size in (10,14,18):
     table.evaluate('(e,size)=>e.style.fontSize=`${size}px`',font_size)
-    bounds=table.evaluate("""e=>{const head=e.querySelector('.lex-column-list-head-cell[data-column-key="tag"]').getBoundingClientRect();return [...e.querySelectorAll('.lex-column-list-cell[data-column-key="id"]')].map(c=>({head:head.right,row:c.getBoundingClientRect().right}))}""")
+    # The record-identity column's own cells, not a literal key from before it
+    # was renamed: the curated tabs key the game's row key as "tag". Asking for
+    # "id" matched no cell at all, so this measured nothing and every font size
+    # passed an empty list. It compares the column's header edge against the
+    # cells under it, which is the alignment the pinned Name column sits beside.
+    bounds=table.evaluate("""e=>{const head=e.querySelector('.lex-column-list-head-cell[data-column-key="tag"]').getBoundingClientRect();return [...e.querySelectorAll('.lex-column-list-cell[data-column-key="tag"]')].map(c=>({head:head.right,row:c.getBoundingClientRect().right}))}""")
     assert bounds and all(abs(b['head']-b['row'])<1 for b in bounds),bounds
    table.evaluate("e=>e.style.removeProperty('font-size')")
    page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-ff7r-pinned-name.png'))

@@ -44,6 +44,3 @@
       --lex-heading-font:"FF7 Menu","Arial Narrow",sans-serif;--lex-radius:6px;
       --lex-detail-icon-bg:var(--lex-surface-bg);--lex-detail-icon-fg:#fff;
       --ff7-menu-surface:linear-gradient(180deg,#1a1aa0,#0e0e60);}
-      /* Fifteen tabs in the menu's wide pitch: content-sized, with the shared
-         fit pass shrinking the strip to the window. */
-      --lex-nav-tab-columns:auto;--lex-nav-overflow-x:auto;

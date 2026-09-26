@@ -1246,7 +1246,10 @@ input[type="checkbox"]:focus-visible { outline:2px solid var(--lex-accent); outl
   border:1px solid var(--lex-border);
   border-radius:0;
   background:var(--lex-panel);
-  font:800 .98em/1 var(--lex-heading-font);
+  /* A theme whose display face ships no bold weight gets a synthetic bold that
+     smears the small labels, so the face is a token a theme may redirect to a
+     weight it can actually render. */
+  font:var(--lex-subtab-font, 800 .98em/1 var(--lex-heading-font));
   letter-spacing:.03em;
   text-transform:uppercase;
   cursor:pointer;
@@ -1407,7 +1410,12 @@ body[data-window-maximized="true"] [data-window-action="maximize"] .lex-window-i
   width: 8px;
   height: 8px;
   border: 1px solid currentColor;
-  background: var(--lex-panel-2);
+  /* The back square of the restore glyph is a cutout of the front square, so
+     it must be filled with the button's own surface. Filling it with the
+     panel colour painted a bright patch on themes whose shell button is dark
+     (Warband's #6b2424 button on #dcc99a), which read as one square "filled
+     in" for no reason. */
+  background: var(--lex-shell-button-bg, var(--lex-panel-2));
 }
 
 body[data-window-maximized="true"] [data-window-action="maximize"]:hover .lex-window-icon::after {
@@ -2441,6 +2449,10 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   justify-self:center;
 }
 
+/* The whole header cell sorts on click, not just its label, so the whole
+   cell says so. Only the label showed the pointer, which read as a header
+   that could not be clicked. */
+.lex-column-list-head-cell.lex-column-sortable { cursor:pointer; }
 .lex-column-list-head-cell[draggable="true"] { cursor:grab; }
 .lex-column-list-head-cell[draggable="true"]:active { cursor:grabbing; }
 
@@ -3969,6 +3981,8 @@ body:has(.lex-data-map-table) #main {
 .lex-stat-card-corner { position:absolute; top:0; right:0; width:30%; height:28%; display:grid; place-items:center; }
 .lex-stat-card-corner > button { display:grid; place-items:center; width:100%; min-width:28px; height:100%; min-height:28px; padding:4px; border:0; color:inherit; background:transparent; font:30px/1 var(--lex-symbol-font); }
 .lex-stat-card-corner img { width:100%; height:100%; object-fit:contain; image-rendering:pixelated; }
+.lex-stat-card-corner-word { width:54%; height:auto; }
+.lex-stat-card-corner-word > button { font:700 13px/1.15 var(--lex-font); padding:6px 4px; }
 .lex-stat-card-corner > .lex-card-corner-empty { opacity:0; }
 .lex-stat-card-corner:hover > .lex-card-corner-empty,.lex-stat-card-corner > .lex-card-corner-empty:focus-visible { opacity:1; }
 .lex-stat-card-footer { position:absolute; right:6px; bottom:4px; font:700 22px/1 var(--lex-font); }
@@ -4797,6 +4811,12 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
    content:none;
  opacity:0;
 }
+/* The rule above that hides a sorted field's type ties with the ordinary hover
+   and focus rules and comes later, so pointing at a sorted field hid the
+   triangle and the type together and left the rail blank. The triangle gives
+   way to the same type name, and to the range on focus, as any other field. */
+.lex-detail-field[data-lex-sort]:hover:not(:focus-within) > .lex-field-type-rail > .lex-field-type-name,
+.lex-detail-field[data-lex-sort]:focus-within > .lex-field-type-rail > .lex-field-type-range { display:block;opacity:1; }
 /* Reference markers use only their text width, with a small gap to the value. */
 
 /* ---- Transition end -------------------------------------------------- */
@@ -5198,7 +5218,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   opacity:0; transition:opacity .15s ease;
 
   position:absolute;
-  z-index:3;
+  /* The drawer covers the editing surface, so it must also cover the field
+     help pips that sit on that surface: they are z-index 5, and letting them
+     poke through left a row of "?" marks floating over the model preview. */
+  z-index:6;
   /* The drawer covers the editing surface and stops at the heading. It used to
      start at a flat 10%, which is the heading's share only while the heading
      fits in a tenth; a heading with a subtitle grows past it and the drawer
@@ -5727,7 +5750,18 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 /* The record name is edited where it is read: in the panel heading. The box is
    the heading, not a box drawn around it, so the panel looks the same until it
    is pointed at and the field only declares itself when it can be used. */
-.lex-detail-panel-rename { display:block;min-width:0; }
+.lex-detail-panel-rename { min-width:0; }
+/* The box hugs the name, so the copy button beside it lands beside the name
+   and not at the far edge of the heading. */
+.lex-detail-panel-title.lex-detail-panel-rename > input { field-sizing:content;width:auto;max-width:calc(100% + 7px);flex:0 1 auto; }
+.lex-detail-panel-rename > .lex-source-control { flex:1 1 auto; }
+/* The heading's copy button sits right of the name and appears on hover, like
+   a property's. It scales with the heading so it does not read as a stray dot
+   beside a thirty-pixel name. */
+.lex-detail-panel-name { min-width:0; }
+.lex-detail-panel-title > .lex-copy-value { --lex-copy-lane:clamp(12px,.5em,16px);flex:none; }
+.lex-detail-panel-title:hover > .lex-copy-value { opacity:.7; }
+.lex-detail-panel-title > .lex-copy-value:hover { opacity:1; }
 .lex-detail-panel-rename :is(input, .lex-source-control) {
   box-sizing:border-box;
   width:calc(100% + 6px + 1px);
@@ -7391,9 +7425,12 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 
   display: grid;
   grid-auto-flow:column;
-  /* Equal shares by default; a game with many long labels sizes tabs to
-     their content instead (--lex-nav-tab-columns:auto). */
-  grid-auto-columns:var(--lex-nav-tab-columns,minmax(0,1fr));
+  /* A tab is never narrower than its own name, and the row still fills the
+     window: a short strip spreads its free space over equal shares, and a
+     strip whose names overrun keeps its natural width while the fit pass
+     shrinks the whole strip into the window. One rule, so no theme declares
+     its own tab sizing. */
+  grid-auto-columns:var(--lex-nav-tab-columns,minmax(max-content,1fr));
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -7423,8 +7460,11 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
     against the frame instead of inside it, which reads as a cut-off tab. FF7,
     FF8 and FF9 set this token; the rest of the games were flush. A theme that
     really wants edge-to-edge tabs can still say 0. */
- padding-inline: var(--lex-nav-padding-inline, var(--lex-panel-gap, 12px));
- overflow-x: var(--lex-nav-overflow-x, visible);
+  padding-inline: var(--lex-nav-padding-inline, var(--lex-panel-gap, 12px));
+  /* Past the readable floor the strip cannot shrink further, so the frame
+     gives the reader a way to reach the rest instead of hiding it. A theme
+     that wants other edges can still say visible. */
+  overflow-x: var(--lex-nav-overflow-x, auto);
 }
 .lex-shell-header nav button {
 

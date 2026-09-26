@@ -19,7 +19,8 @@ from .item_icons import CACHE as ICON_CACHE
 from .catalog import DATA_CATALOG
 from .dump_infopages import parse_info_pages
 from .troop_editor import troop_data, save_troops
-from .module_records import SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME, dataset_data, save_dataset
+from .module_records import (PROMOTED_TABS, SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME,
+                             _single_bits, dataset_data, header_constants, mesh_choices, save_dataset)
 from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
 from .model_preview import PreviewUnavailable, preview as item_preview, texture_path as preview_texture_path
 from core.plugin_http import PluginRequestHandler
@@ -245,13 +246,82 @@ def _item_records(text: str) -> list[dict]:
 def item_data() -> dict:
     source = MODULE_SYSTEM / "module_items.py"
     if not source.is_file():
-        return {"rows": [], "sha256": ""}
+        return {"rows": [], "sha256": "", "choices": item_choices([])}
     text, _encoding, raw = _module_items_source()
     rows = [
         {key: value for key, value in record.items() if not key.startswith("_")}
         for record in _item_records(text)
     ]
-    return {"rows": rows, "sha256": hashlib.sha256(raw).hexdigest()}
+    return {"rows": rows, "sha256": hashlib.sha256(raw).hexdigest(), "choices": item_choices(rows)}
+
+
+def item_choices(rows: list[dict]) -> dict:
+    """The finite choices an item field has, read from the project's own sources.
+
+    A Module System header defines every ``itp_type_*``, ``itp_*`` and
+    ``imodbits_*`` name the compile step accepts, and the item records
+    themselves say which mesh resources and stat macros this project uses. A
+    free-number or free-text box for one of those invites a typo the build will
+    reject, or worse, a value the game accepts and misreads.
+    """
+    symbols = header_constants(MODULE_SYSTEM)
+    types = sorted(({"name": name[len("itp_type_"):], "value": value}
+                    for name, value in symbols.items()
+                    if name.startswith("itp_type_") and value >= 0),
+                   key=lambda entry: (entry["value"], entry["name"]))
+    flags = [entry for entry in _single_bits(symbols, "itp_")
+             if not entry["name"].startswith("itp_type_")]
+    # The checkbox set is the single modifier bits. A header also names ready
+    # combinations (imodbits_sword is three bits); those stay reachable as
+    # source text rather than as boxes that overlap each other.
+    modifiers = [{"name": name, "value": value, "label": name}
+                 for name, value in symbols.items()
+                 if name.startswith("imodbits_") and value > 0 and value & (value - 1) == 0]
+    used_stats = set()
+    used_meshes = set()
+    used_modifiers = set()
+    stat_arguments: dict = {}
+    for record in rows:
+        stats_field = record["fields"].get("stats", "")
+        used_stats.update(re.findall(r"([A-Za-z_]\w*)\s*\(", stats_field))
+        # A stat argument that is not a number is a name the Module System reads,
+        # such as swing_damage(16, blunt). The names this project uses in that
+        # position are the finite choices for it.
+        for macro, arguments in re.findall(r"([A-Za-z_]\w*)\s*\(([^()]*)\)", stats_field):
+            for position, argument in enumerate(part.strip() for part in arguments.split(",")):
+                if not argument or re.fullmatch(r"-?\d+(\.\d+)?", argument):
+                    continue
+                slots = stat_arguments.setdefault(macro, [])
+                while len(slots) <= position:
+                    slots.append(set())
+                slots[position].add(argument)
+        used_meshes.update(record.get("meshes", []))
+        used_modifiers.update(re.findall(r"\bimodbits_\w+", record["fields"].get("modifierBits", "")))
+    # A project whose header keeps the modifier bits elsewhere still offers the
+    # names its own item records use: a name already in the records is one the
+    # compile step accepts.
+    for name in sorted(used_modifiers):
+        if not any(entry["name"] == name for entry in modifiers):
+            modifiers.append({"name": name, "value": None, "label": name})
+    modifiers.sort(key=lambda entry: (entry["value"] is None, entry["value"] or 0, entry["name"]))
+    declared = set()
+    header = MODULE_SYSTEM / "header_items.py"
+    if header.is_file():
+        declared.update(re.findall(r"(?m)^def\s+([A-Za-z_]\w*)\s*\(",
+                                   header.read_text(encoding="utf-8", errors="replace")))
+    # The header also defines getter helpers (get_weight, get_head_armor) that
+    # scripts call; they are not item stat macros, and offering them invites a
+    # value the build accepts and the game ignores.
+    stats = sorted(name for name in (used_stats | declared) if not name.startswith("get_"))
+    # A mesh choice names the record behind it, so the item panel's finder can
+    # open that record in the Meshes area instead of only naming the mesh.
+    meshes = {choice["name"]: choice for choice in mesh_choices(MODULE_SYSTEM)}
+    for name in used_meshes:
+        meshes.setdefault(name, {"name": name, "id": "", "recordIndex": None})
+    return {"types": types, "flags": flags, "modifierBits": modifiers,
+            "stats": stats, "statArguments": {macro: [sorted(values) if values else None for values in slots]
+                                              for macro, slots in stat_arguments.items()},
+            "meshes": [meshes[name] for name in sorted(meshes)]}
 
 
 def item_rows() -> list[dict]:
@@ -471,7 +541,8 @@ def data_map_rows() -> dict:
                 notes = "Troop names, factions, attributes, flags and equipment have controls. Advanced fields use source expressions. Saves preserve record IDs and upgrade code, then use the project build."
             elif dataset and source_available:
                 schema = MODULE_RECORD_SCHEMAS[dataset]
-                coverage, status, view = "structured", schema["status"], "misc"
+                coverage, status = "structured", schema["status"]
+                view = PROMOTED_TABS.get(dataset, "misc")
                 notes = schema["notes"] + " Structured controls apply to literal top-level records; helper/wrapper-generated records stay source-only."
             elif source_available:
                 coverage, status = "source", "not-integrated"

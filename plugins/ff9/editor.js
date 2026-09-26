@@ -251,6 +251,17 @@
     return FIELD_HELP[`${dataKey}:${field.key}`]||"";
   }
   function setValue(data,row,field,value){row.values[field.key]=value;shell.refresh();toolbar()}
+  // A property carries the value its record shipped with, so right-clicking it
+  // puts that value back - the reset every other game's properties already
+  // have. The plugin supplies the vanilla value and how to write one back; the
+  // shared framework owns the comparison, the reference rail and the restore.
+  const sameValue=(left,right)=>JSON.stringify(left)===JSON.stringify(right);
+  const formatFieldValue=field=>field.kind==="fixed-list"?value=>Array.isArray(value)?value.join(", "):String(value):null;
+  function vanillaValue(data,row,field){const base=data.vanilla?.[String(row.line)];if(base&&Object.prototype.hasOwnProperty.call(base,field.key))return base[field.key];const original=data.originalByLine?.[String(row.line)]?.values;return original?original[field.key]:undefined}
+  // Restoring a value or taking a reference writes the model and rebuilds the
+  // panel, so a grouped number box shows the value that was just restored
+  // instead of the digits the reader typed into it.
+  function sourceControl(control,current,vanilla,apply,format){return LexeditorUI.provenanceControl({control,current,vanilla,format:format||undefined,same:sameValue,apply:value=>{apply(value);render()}})}
   function fieldPin(data,field){
     const key=["accessories","armor","weapons"].includes(state.tab)?`equipment-${state.tab}`:activeKey();
     if(!key)return null;
@@ -272,12 +283,24 @@
       const values=Array.isArray(row.values[field.key])?row.values[field.key]:[],labels=field.vector3?["X","Y","Z"]:field.key==="ColorBase"?["R","G","B"]:Array.from({length:field.length},(_value,index)=>String(index+1));
       control=multiNumberRow(labels.map((label,index)=>({label,control:el("input",{type:"number",min:field.itemMin,max:field.itemMax,step:field.itemKind==="integer"?1:(field.step||"any"),value:values[index]??0,oninput:event=>{if(event.target.value==="")return;const next=[...values];next[index]=Number(event.target.value);setValue(data,row,field,next)}})})),{columns:Math.min(3,field.length||3)});
     }else control=el("input",{type:"text",value:row.values[field.key]??"",oninput:event=>setValue(data,row,field,event.target.value)});
-    return detailField({label:field.label.toLocaleUpperCase(),pin:fieldPin(data,field),help:semantic?infoHelp(semantic):null,control,dataType:note?"READ ONLY":field.declaredType,min:bounds.min,max:bounds.max});
+    if(!note&&field.editable&&field.kind!=="stored")
+      control=sourceControl(control,()=>row.values[field.key],vanillaValue(data,row,field),
+        next=>setValue(data,row,field,next),formatFieldValue(field));
+    // A single on/off property is a boolean, whatever word the CSV's type line
+    // stores it as ("Bit", "Boolean"). The shared field only lays a checkbox
+    // out and points its leader arrow at it under the name it knows, so the
+    // declared word is translated rather than passed through: passed through,
+    // the box stretched to the full row with no arrow at all.
+    const dataType=note?"READ ONLY":field.kind==="boolean"?"BOOL":field.declaredType;
+    return detailField({label:field.label.toLocaleUpperCase(),pin:fieldPin(data,field),help:semantic?infoHelp(semantic):null,control,dataType,min:bounds.min,max:bounds.max});
   }
   const fieldRows=(data,row,exclude=[])=>{const blocked=new Set(exclude.map(String));return data&&row?data.fields.filter(field=>!blocked.has(field.key)&&field.key.toLocaleLowerCase()!=="id"&&field.key.toLocaleLowerCase()!=="comment").map(field=>fieldControl(data,row,field)):[]};
   function boolProperty(data,row,label,keys,help){const fields=new Map(data.fields.map(field=>[field.key,field]));const toggles=keys.filter(key=>fields.has(key)).map(key=>({key,label:key,pin:fieldPin(data,fields.get(key)),checked:!!row.values[key],disabled:state.activeSource!=="mine",change:value=>setValue(data,row,fields.get(key),value)}));return toggles.length?detailField({label,help:help?infoHelp(help):null,control:toggleRow({label,toggles}),dataType:"FLAGS"}):null}
   function itemSections(data,row,title="ITEM DATA"){const grouped=[...ITEM_CATEGORY_FLAGS,...ITEM_PARTY_FLAGS];const body=fieldRows(data,row,grouped);const categories=boolProperty(data,row,"CATEGORIES",ITEM_CATEGORY_FLAGS,"These switches decide which FF9 item/equipment categories this record belongs to and whether it behaves as a normal usable item. More than one category can apply to the same underlying item record.");const party=boolProperty(data,row,"EQUIPPABLE BY",ITEM_PARTY_FLAGS,"Each switch controls whether that character is allowed to equip this record. Guest-character switches matter only while that character is actually available.");if(categories)body.push(categories);if(party)body.push(party);return detailSection({title,body})}
-  function detail(data,row){const identity=sourceHasId(data)?recordId(row.id):null;if(data.key==="items")return detailPanel({className:"ff9-detail",title:row.name,identity,meta:`Items · ${data.source} CSV`,body:[itemSections(data,row)]});if(data.key==="shops")return shopDetail(data,row);if(data.key.startsWith("ability-"))return abilityDetail(data,row);const visible=data.fields.filter(field=>!["id","comment"].includes(field.key.toLocaleLowerCase())),editable=visible.filter(field=>field.editable&&field.kind!=="stored"&&!readOnlyNote(data,field)),stored=visible.filter(field=>!field.editable||field.kind==="stored"||readOnlyNote(data,field));const body=[];if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));const meta=battleKeys.includes(data.key)?`${data.label} · ${row.source||data.source} BattleScene raw16`:data.key.startsWith("field-walkmesh")?`${data.label} · ${row.source||data.source} BGI`:`${data.label} · ${data.source} CSV`;return detailPanel({className:"ff9-detail",title:row.name,identity,meta,body})}
+  // The Items tab's own screens already say which records they show, so their
+  // panels do not repeat the file name and the word "CSV" under the record.
+  const ITEMS_TAB_DATASETS=new Set(["items","item-effects","initial-items","item-stats"]);
+  function detail(data,row){const identity=sourceHasId(data)?recordId(row.id):null;if(data.key==="items")return detailPanel({className:"ff9-detail",title:row.name,identity,body:[itemSections(data,row)]});if(data.key==="shops")return shopDetail(data,row);if(data.key==="tetra-cards")return cardDetail(data,row);if(data.key.startsWith("ability-"))return abilityDetail(data,row);const visible=data.fields.filter(field=>!["id","comment"].includes(field.key.toLocaleLowerCase())),editable=visible.filter(field=>field.editable&&field.kind!=="stored"&&!readOnlyNote(data,field)),stored=visible.filter(field=>!field.editable||field.kind==="stored"||readOnlyNote(data,field));const body=[];if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));const meta=battleKeys.includes(data.key)?`${data.label} · ${row.source||data.source} BattleScene raw16`:data.key.startsWith("field-walkmesh")?`${data.label} · ${row.source||data.source} BGI`:`${data.label} · ${data.source} CSV`;return detailPanel({className:"ff9-detail",title:row.name,identity,meta:ITEMS_TAB_DATASETS.has(data.key)?null:meta,body})}
   const gilValue=value=>value===""||value===null||value===undefined?"—":`${LexeditorUI.formatNumber(value)} gil`;
   // A shop record is one row of item ids. The ids are the editable truth, but
   // a reader needs the items themselves, so the panel resolves every id to the
@@ -295,6 +318,43 @@
     if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));
     if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));
     return detailPanel({className:"ff9-detail",title:row.name,identity:null,meta:`Shops · ${data.source} CSV · ${stock.length} item${stock.length===1?"":"s"}`,body});
+  }
+  // A Tetra Master card is read the way the game draws it: one value on each
+  // edge and the card's icon in a corner. The shared stat card owns that shape,
+  // so this screen supplies only FF9's own values, their order and their names.
+  // The card art belongs to the game, so no image is bundled or shown.
+  const CARD_SIDES=[["ATK(UP)","Attack, up edge"],["PDEF(LEFT)","Defence, left edge"],["MDEF(RIGHT)","Defence, right edge"],["MATK(DOWN)","Attack, down edge"]];
+  function cardDetail(data,row){
+    // The card's own dataset owns the range and the icon names, so the card,
+    // the property rows and a saved file all read the same values.
+    const sideRange=key=>{const field=data.fields.find(value=>value.key===key)||{};
+      return [Number.isFinite(field.min)?field.min:1,Number.isFinite(field.max)?field.max:10]};
+    const stored=key=>Number(row.values[key])||0;
+    // QuadMist prints a ten as A.
+    const rank=key=>stored(key)===10?"A":String(stored(key));
+    const write=(key,next)=>{const [low,high]=sideRange(key);row.values[key]=Math.max(low,Math.min(high,Number(next)||low));shell.refresh();render()};
+    const step=(key,direction)=>{const [low,high]=sideRange(key),value=stored(key),span=high-low+1;
+      const raised=low+(((value-low+1)%span)+span)%span;
+      write(key,direction>0?raised:value<=low?high:value-1)};
+    let card=null;
+    const iconField=data.fields.find(value=>value.key==="Icon");
+    const picker=LexeditorUI.choicePopover({label:"Choose the card's icon",boundary:()=>card,
+      choices:(iconField?.choices||[]).map(name=>({value:name,label:name})),
+      select:name=>{row.values.Icon=name;shell.refresh();render()}});
+    const rankButton=([key,label])=>el("button",{type:"button",disabled:state.activeSource!=="mine",
+      title:`${label}: click to raise, right-click to lower`,
+      "aria-label":`${label}, currently ${rank(key)}`,
+      onclick:()=>step(key,1),oncontextmenu:event=>{event.preventDefault();step(key,-1)}},rank(key));
+    const icon=el("button",{type:"button",disabled:state.activeSource!=="mine",
+      title:`Change the card's icon, currently ${row.values.Icon}`,
+      "aria-label":`Card icon, currently ${row.values.Icon}`,
+      onclick:()=>picker.openFor(icon)},el("span",{class:"ff9-card-icon"},String(row.values.Icon||"")));
+    card=LexeditorUI.statCard({ranks:CARD_SIDES.map(rankButton),corner:icon,cornerWord:true});
+    return detailPanel({className:"ff9-detail ff9-card-detail",title:row.name,
+      identity:recordId(row.id),body:[
+        detailSection({title:"CARD",body:[card],
+          help:infoHelp("Each number is drawn on the edge it belongs to, the way QuadMist draws the card. Click a number to raise it and right-click to lower it. The corner shows the card's icon; press it to choose another.")}),
+        detailSection({title:"CARD VALUES",body:fieldRows(data,row)})]});
   }
   // An ability row is a slot in one character's learn list: the id says which
   // ability it holds, and the file stores no cost of its own. The MP cost comes
