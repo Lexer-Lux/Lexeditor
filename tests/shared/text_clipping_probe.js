@@ -12,13 +12,13 @@
     range.selectNodeContents(text);
     const boxes = [...range.getClientRects()].filter(r => r.width && r.height);
     if (!boxes.length) continue;
-    // A fixed-position control is laid out against the viewport - the pager
-    // reserves its own space in #main and is never cut by the panel it is
-    // nested in - and an absolutely positioned one is cut only by its
-    // containing block. Walking past either reported the page's own pager and
-    // its ROWS readout as clipped text that the user can plainly see.
-    let checkX = true, checkY = true, positioned = false;
+    // Absolute descendants escape overflow between themselves and their
+    // containing block, but that block can still be clipped by its ancestors.
+    // Relative positioning never exempts text from ancestor clipping.
+    let checkX = true, checkY = true, containingBlock = null;
     for (let node = leaf; node && (checkX || checkY); node = node.parentElement) {
+      if (containingBlock && node !== containingBlock) continue;
+      containingBlock = null;
       const cs = getComputedStyle(node);
       // Overflow does not create a clipping box on ordinary inline text.
       if (cs.display === 'inline' || cs.display === 'contents') continue;
@@ -32,16 +32,6 @@
       if (/auto|scroll/.test(cs.overflowY)) checkY = false;
       if (cs.textOverflow === 'ellipsis' && !/flex|grid/.test(cs.display)
           && cs.whiteSpace !== 'normal') checkX = false;
-      const clipsX = /hidden|clip/.test(cs.overflowX);
-      const clipsY = /hidden|clip/.test(cs.overflowY);
-      const here = cs.position !== 'static';
-      // An absolutely positioned box is cut only by its containing block, so a
-      // clipping ancestor above that point never reaches it.
-      if ((clipsX || clipsY) && positioned && !here) break;
-      if (!clipsX && !clipsY) {
-        if (cs.position === 'fixed') break;  // laid out against the viewport
-        if (here) positioned = true;
-      }
       const scaleX = node.offsetWidth ? box.width / node.offsetWidth : 1;
       const scaleY = node.offsetHeight ? box.height / node.offsetHeight : 1;
       const left = box.left + node.clientLeft * scaleX;
@@ -66,6 +56,8 @@
           clippedBy:String(node.className || node.tagName).slice(0,60), overW, overH});
         break;
       }
+      if (cs.position === 'fixed' && !node.offsetParent) break;
+      if (cs.position === 'absolute' || cs.position === 'fixed') containingBlock = node.offsetParent;
     }
   }
   return JSON.stringify(bad.slice(0,100));
