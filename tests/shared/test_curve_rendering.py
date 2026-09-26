@@ -86,14 +86,26 @@ def test_formula_terms_follow_curve_after_resize_and_scale():
                       const before=points[Math.max(0,nearest-5)],after=points[Math.min(3000,nearest+5)];
                       const tangent=Math.atan2(after.y-before.y,after.x-before.x);
                       return {distance:distance/scale,angle:angle*180/Math.PI,
+                        tangent:tangent*180/Math.PI,
                         error:Math.abs(angle-tangent)*180/Math.PI};
                     });
                 }''')
                 assert len(measurements) > 10
                 assert all(5.5 < item['distance'] < 8.5 for item in measurements), measurements
-                assert all(item['error'] < 8 for item in measurements), measurements
-                angles = [item['angle'] for item in measurements]
-                assert max(angles) - min(angles) > 5, measurements
+                # Each term takes the slope under it, except where the slope is
+                # steeper than the angle a piece of text can be read at: there
+                # it stops at the bound instead of turning onto its side.
+                for item in measurements:
+                    if abs(item['tangent']) <= 40:
+                        assert item['error'] < 8, item
+                    else:
+                        assert abs(item['angle']) <= 40.01, item
+                # The fixture's own curve is steeper than the bound nearly
+                # everywhere, so its terms all rest at the bound; what has to
+                # vary for this check to mean anything is the slope they are
+                # being compared against.
+                tangents = [item['tangent'] for item in measurements]
+                assert max(tangents) - min(tangents) > 5, measurements
                 assert page.locator('.lex-curve-math-atom mfrac').count() == 1
                 assert page.locator('.lex-curve-math-atom msup').count() == 1
                 assert page.locator('.lex-curve-plot').evaluate('n=>n.scrollWidth<=n.clientWidth+1')
@@ -142,5 +154,83 @@ def test_the_least_and_greatest_values_read_in_the_accent_and_the_equation_is_le
             assert measured['minimum'] == measured['wanted'], measured
             assert measured['maximum'] == measured['wanted'], measured
             assert measured['formulaSize'] >= 12.5, measured
+        finally:
+            browser.close()
+
+
+def test_the_end_numbers_stay_off_the_line_and_the_equation_stays_readable():
+    """The two things a steep curve broke on the character screens.
+
+    The least and greatest values were lifted straight up from the curve, so on
+    a steep line they drifted back onto it - worst where the curve climbs into
+    the top corner of the plot, which is what an XP curve does. And each term of
+    the equation took the local slope with no bound, so a curve that climbs and
+    comes back down turned the formula into a seesaw: on the arc below the
+    steepest term was 83 degrees over from level.
+    """
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={"width": 2048, "height": 1100})
+            page.route("http://fixture/**", lambda route: route.fulfill(
+                body="<main id='mount'></main>", content_type="text/html"))
+            page.goto("http://fixture/")
+            page.add_style_tag(path=str(ROOT / "ui/framework.css"))
+            page.add_style_tag(content="#mount{display:grid;"
+                               "grid-template-columns:repeat(3,minmax(0,1fr));"
+                               "gap:12px;height:900px}")
+            page.add_script_tag(path=str(ROOT / "ui/framework.js"))
+            page.evaluate("""()=>{
+                const xp=(level,a,b)=>10*(level-1)*a+Math.floor((level-1)**2*b/256);
+                const shapes=[
+                  ['XP', l=>xp(l,20,255), 0, xp(100,20,255)],
+                  ['ARC', l=>Math.max(0,255-2*(l-6)**2), 0, 255],
+                  ['STEEP', l=>Math.min(255,3*l*l), 0, 300],
+                ];
+                const mount=document.querySelector('#mount');
+                for (const [title,evaluate,min,max] of shapes) {
+                  mount.append(LexeditorUI.curveEditor({title,overlayExtrema:true,
+                    domain:{min:1,max:100},range:{min,max},evaluate,
+                    formula:LexeditorUI.mathFormula('F(L)=A*(L-1)+B*(L-1)^2/256')}));
+                }
+            }""")
+            page.wait_for_timeout(600)
+            measured = page.evaluate("""()=>[...document.querySelectorAll('.lex-curve-editor')]
+                .map(card=>{
+              const plot=card.querySelector('.lex-curve-plot');
+              const line=plot.querySelector('.lex-curve-line');
+              const matrix=plot.querySelector('svg').getScreenCTM();
+              const length=line.getTotalLength();
+              const points=[];
+              for(let i=0;i<=600;i+=1){
+                const p=line.getPointAtLength(i*length/600);
+                points.push(new DOMPoint(p.x,p.y).matrixTransform(matrix));
+              }
+              const inside=(px,py,corners)=>{
+                let hit=false;
+                for(let i=0,j=3;i<4;j=i,i+=1){
+                  const [xi,yi]=corners[i],[xj,yj]=corners[j];
+                  if(((yi>py)!==(yj>py))&&(px<(xj-xi)*(py-yi)/(yj-yi)+xi))hit=!hit;
+                }
+                return hit;};
+              const labels=[...card.querySelectorAll('.lex-curve-range-value')].map(node=>{
+                const own=node.getBBox();
+                const corners=[[own.x,own.y],[own.x+own.width,own.y],
+                  [own.x+own.width,own.y+own.height],[own.x,own.y+own.height]]
+                  .map(([x,y])=>{const p=new DOMPoint(x,y).matrixTransform(
+                    node.getScreenCTM());return [p.x,p.y];});
+                return {text:node.textContent,
+                  hits:points.filter(p=>inside(p.x,p.y,corners)).length};});
+              const angles=[...card.querySelectorAll('.lex-curve-math-atom')].map(node=>{
+                const m=new DOMMatrix(getComputedStyle(node).transform);
+                return Math.abs(Math.atan2(m.b,m.a)*180/Math.PI);});
+              return {title:card.dataset.curveTitle,labels,
+                maxAngle:angles.length?Math.max(...angles):0};})""")
+            assert len(measured) == 3, measured
+            for card in measured:
+                assert len(card['labels']) == 2, card
+                for label in card['labels']:
+                    assert label['hits'] == 0, card
+                assert card['maxAngle'] <= 40.0001, card
         finally:
             browser.close()

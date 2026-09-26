@@ -2819,7 +2819,13 @@
           const angle = Math.atan2(after.y - before.y, after.x - before.x);
           visual.style.left = `${(center.x - overlayBounds.left) / scale + Math.sin(angle) * 7}px`;
           visual.style.top = `${(center.y - overlayBounds.top) / scale - Math.cos(angle) * 7}px`;
-          visual.style.setProperty("--lex-formula-angle", `${angle * 180 / Math.PI}deg`);
+          // Bounded like the single-formula case: a curve that climbs and then
+          // comes back down - a MAG curve with a large quadratic term does -
+          // turns a term nearly on its side, and the equation reads as a seesaw
+          // instead of as a formula. It still follows the curve; it just stops
+          // short of the point where following it costs the reader the text.
+          const degrees = Math.max(-40, Math.min(40, angle * 180 / Math.PI));
+          visual.style.setProperty("--lex-formula-angle", `${degrees}deg`);
         }
         return;
       }
@@ -2968,22 +2974,6 @@
           }
           return points[points.length - 1][1];
         };
-        // Kept clear of the plot edges: at 4 units the first digit sat on the
-        // frame and ran into the axis caption beside it. The 10 units off the
-        // line are vertical, and the number is turned to the slope, so the room
-        // it really gets is 10 units times that slope's cosine.
-        const lift = 10;
-        const lowX = Math.max(12, first[0] + 4), highX = Math.min(304, last[0] - 8);
-        const lowY = Math.max(9, heightAt(lowX) - lift);
-        // A curve that climbs into the top corner of the plot - the XP curve
-        // does - has no room above its own line, so its greatest value goes
-        // under the line instead of against the frame.
-        const highLift = heightAt(highX) - lift >= 9 ? -lift : lift + 10;
-        const highY = Math.max(9, heightAt(highX) + highLift);
-        rangeLow.setAttribute("x", String(lowX));
-        rangeLow.setAttribute("y", String(lowY));
-        rangeHigh.setAttribute("x", String(highX));
-        rangeHigh.setAttribute("y", String(highY));
         // Sitting AT the ends was not the same as following the line: on a
         // steep curve a level number reads as unrelated to it. Each extreme
         // now takes the slope of the curve at its own end, measured a few
@@ -2994,13 +2984,75 @@
           const run = to[0] - from[0];
           if (Math.abs(run) < 0.01) return 0;
           const degrees = Math.atan2(to[1] - from[1], run) * 180 / Math.PI;
-          return Math.max(-38, Math.min(38, degrees));
+          return Math.max(-38, Math.min(38, degrees)) * Math.PI / 180;
         };
         const reach = Math.max(1, Math.min(2, points.length - 1));
         const lowAngle = slopeAngle(points[0], points[reach]);
         const highAngle = slopeAngle(points[points.length - 1 - reach], points[points.length - 1]);
-        rangeLow.setAttribute("transform", `rotate(${lowAngle.toFixed(2)} ${lowX} ${lowY})`);
-        rangeHigh.setAttribute("transform", `rotate(${highAngle.toFixed(2)} ${highX} ${highY})`);
+        // The number leaves the line along the line's own normal, and the
+        // placement is then checked against the line that was actually drawn.
+        // A vertical lift drifts back onto a steep curve a few pixels later -
+        // that is what put the greatest value on top of the XP curve's own
+        // line - and a perpendicular lift alone only answers that for a curve
+        // that is roughly straight: at the foot of a near-vertical climb there
+        // is no room on either side. So each candidate is measured against the
+        // drawn samples, nearest first, and the first one that clears wins.
+        const lift = 10, glyph = 9, clearance = 5;
+        const offsetFrom = (x, baseY, angle, above, distance) => {
+          const side = above ? 1 : -1;
+          return {x: x + Math.sin(angle) * side * distance,
+                  y: baseY - Math.cos(angle) * side * distance};
+        };
+        const distanceToSegment = (px, py, ax, ay, bx, by) => {
+          const dx = bx - ax, dy = by - ay;
+          const lengthSquared = dx * dx + dy * dy;
+          const t = lengthSquared ? Math.max(0, Math.min(1,
+            ((px - ax) * dx + (py - ay) * dy) / lengthSquared)) : 0;
+          return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
+        };
+        // How far the turned number's own baseline is from the nearest drawn
+        // sample. Text sits on the baseline, so the letters are the segment
+        // the value is written along, not the box around them.
+        const labelClearance = (point, angle, width, fromEnd) => {
+          const direction = fromEnd ? -width : width;
+          const endX = point.x + Math.cos(angle) * direction;
+          const endY = point.y + Math.sin(angle) * direction;
+          let best = Infinity;
+          for (const [x, y] of points) {
+            const distance = distanceToSegment(x, y, point.x, point.y, endX, endY);
+            if (distance < best) best = distance;
+          }
+          return best;
+        };
+        const placeLabel = (baseX, baseY, angle, width, fromEnd, limits) => {
+          for (const distance of [lift, lift + 7, lift + 14]) {
+            for (const above of [true, false]) {
+              const point = offsetFrom(baseX, baseY, angle, above,
+                                       above ? distance : distance + glyph);
+              if (point.y < 9 || point.y > graphHeight - 4) continue;
+              if (point.x < limits[0] || point.x > limits[1]) continue;
+              if (labelClearance(point, angle, width, fromEnd) >= clearance) return point;
+            }
+          }
+          return offsetFrom(baseX, baseY, angle, true, lift);
+        };
+        const lowWidth = rangeLow.getComputedTextLength() || 12;
+        const highWidth = rangeHigh.getComputedTextLength() || 12;
+        const lowBaseX = Math.max(10, first[0] + 2);
+        const low = placeLabel(lowBaseX, heightAt(lowBaseX), lowAngle,
+                               lowWidth, false, [2, 300]);
+        const highBaseX = Math.min(310, last[0] - 2);
+        const high = placeLabel(highBaseX, heightAt(highBaseX), highAngle,
+                                highWidth, true, [20, 314]);
+        const lowX = low.x, lowY = low.y, highX = high.x, highY = high.y;
+        rangeLow.setAttribute("x", String(lowX));
+        rangeLow.setAttribute("y", String(lowY));
+        rangeHigh.setAttribute("x", String(highX));
+        rangeHigh.setAttribute("y", String(highY));
+        rangeLow.setAttribute("transform",
+          `rotate(${(lowAngle * 180 / Math.PI).toFixed(2)} ${lowX} ${lowY})`);
+        rangeHigh.setAttribute("transform",
+          `rotate(${(highAngle * 180 / Math.PI).toFixed(2)} ${highX} ${highY})`);
       }
       // ONE BAR PER X VALUE. This used to average the samples into 32 fixed
       // buckets, which drew bars of an arbitrary width that lined up with
