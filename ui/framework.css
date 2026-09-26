@@ -7304,8 +7304,9 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   overflow: hidden;
 
   display: grid;
-  width: auto;
-  height: 100%;
+  /* The picture does not grow when a long name makes the heading taller. */
+  width: var(--lex-detail-icon-size, clamp(40px, 4em, 80px));
+  height: var(--lex-detail-icon-size, clamp(40px, 4em, 80px));
   aspect-ratio: 1;
   place-items: center;
   color: var(--lex-accent);
