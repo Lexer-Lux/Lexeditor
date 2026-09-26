@@ -3915,6 +3915,12 @@
     };
     backdrop.append(dialog);
     document.body.append(backdrop);
+    // An alert can be dismissed from the keyboard too: it is the one dialog
+    // with a single action, and a reader who opened it by accident should not
+    // have to hunt for the pointer.
+    backdrop.addEventListener("keydown", event => {
+      if (event.key === "Escape") { event.preventDefault(); close.click(); }
+    });
     close.focus();
     return backdrop;
   };
@@ -9126,7 +9132,406 @@ ${contents.path}`});
       paged)
   };
 
-window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  /* ------------------------------------------------------------------
+     Game controller navigation (issue 566)
+
+     A Steam Deck has no mouse and no keyboard. Its controls arrive inside
+     the embedded page as one standard-mapped gamepad, so a page that only
+     answers clicks cannot be used there at all, and every plugin would
+     otherwise grow its own version of this. The translation from pad to
+     interface lives here once, in the shared UI, and every plugin gets it
+     without writing a line.
+
+     The pad drives the two things the interface already has: DOM focus,
+     which every shared control already draws, and the ordinary click,
+     Escape and input events those controls already answer. Nothing here
+     knows about a particular game.
+
+     It stays quiet when no pad is attached: the loop only ticks while one
+     is, and a pad that throws cannot take the editor with it. `tick` and
+     `setPadSource` are the seam a check drives without hardware.
+  ------------------------------------------------------------------ */
+  const gamepadNavigation = (() => {
+    const FOCUSABLE = [
+      "button", "a[href]", "input", "select", "textarea",
+      "[contenteditable='true']", "[tabindex]",
+    ].join(",");
+    // Things the pad must never land on: the hidden shims a plugin keeps
+    // behind its own controls, and values that only look like controls.
+    const UNREACHABLE = "input[type='hidden'],[disabled],[aria-disabled='true'],[tabindex='-1'],output";
+    const DEADZONE = 0.5;
+    // A held direction walks the interface. The first step is immediate, then
+    // the pad repeats: fast enough to cross a long list, slow enough not to
+    // overshoot the row the player meant.
+    const REPEAT_FIRST_MS = 340;
+    const REPEAT_MS = 95;
+    // Standard mapping, which is what Steam Deck and every modern pad send.
+    const BUTTON = {a: 0, b: 1, x: 2, y: 3, lb: 4, rb: 5, lt: 6, rt: 7,
+                    select: 8, start: 9, up: 12, down: 13, left: 14, right: 15};
+    const DIRECTIONS = ["up", "down", "left", "right"];
+    const SIGN = {up: -1, down: 1, left: -1, right: 1};
+
+    let source = () => (typeof navigator !== "undefined" && navigator.getGamepads
+      ? navigator.getGamepads() : []);
+    let installed = false;
+    let running = false;
+    let padFocus = null;
+    const heldSince = new Map();
+    let lastRepeat = 0;
+    const discreteDown = new Set();
+
+    const shown = node => {
+      if (!(node instanceof HTMLElement)) return false;
+      if (node.closest("[hidden],[inert]")) return false;
+      if (typeof node.checkVisibility === "function" && !node.checkVisibility()) return false;
+      const box = node.getBoundingClientRect();
+      return box.width > 1 && box.height > 1;
+    };
+
+    // While a dialog is open the pad stays inside it: a direction that
+    // wandered back into the page behind would look like the dialog losing
+    // the player's input.
+    const openDialog = () => {
+      const dialogs = [...document.querySelectorAll(
+        ".lex-dialog, .lex-modal, .lex-global-settings, [role='dialog']")].filter(shown);
+      return dialogs.length ? dialogs[dialogs.length - 1] : null;
+    };
+
+    const focusPool = () => {
+      const root = openDialog() || document;
+      return [...root.querySelectorAll(FOCUSABLE)]
+        .filter(node => shown(node) && !node.matches(UNREACHABLE));
+    };
+
+    const clearPadFocus = () => {
+      padFocus?.classList.remove("lex-pad-focus");
+      padFocus = null;
+    };
+
+    // A programmatic focus() does not always light :focus-visible, so the
+    // highlight the pad needs is a class of its own. It goes away the moment
+    // the reader takes over with a mouse, the keyboard or a scroll.
+    const setPadFocus = node => {
+      if (!(node instanceof HTMLElement)) return false;
+      if (padFocus && padFocus !== node) padFocus.classList.remove("lex-pad-focus");
+      padFocus = node;
+      node.classList.add("lex-pad-focus");
+      try { node.focus({preventScroll: true}); } catch (_error) { node.focus?.(); }
+      node.scrollIntoView?.({block: "nearest", inline: "nearest", behavior: "auto"});
+      return true;
+    };
+
+    const focused = pool => {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && pool.includes(active)) return active;
+      if (padFocus && pool.includes(padFocus)) return padFocus;
+      return null;
+    };
+
+    const numberish = node => node.matches?.("input[type='number'],input[type='range']");
+    const textEntry = node => node.matches?.(
+      "textarea,input:not([type]),input[type='text'],input[type='search'],"
+      + "input[type='number'],input[type='tel'],input[type='url'],input[type='email'],"
+      + "input[type='password'],[contenteditable='true']");
+
+    // The Deck's own keyboard is asked for by focusing a real text field and
+    // calling the virtual-keyboard API where the page has it. Steam's own
+    // keyboard follows that focus on hardware that does not.
+    const requestOnScreenKeyboard = node => {
+      node.setAttribute("enterkeyhint", node.getAttribute("enterkeyhint") || "done");
+      try { navigator.virtualKeyboard?.show?.(); } catch (_error) { /* not available */ }
+      return true;
+    };
+
+    // Left and right on a bounded control change it instead of leaving it.
+    // A number or a slider with no way to move it is the one thing a pad
+    // cannot reach, and every value in this editor is bounded.
+    const stepControl = (node, direction) => {
+      const delta = direction === "left" ? -1 : 1;
+      if (node instanceof HTMLSelectElement) {
+        if (node.options.length < 2) return false;
+        const index = node.selectedIndex + delta;
+        if (index < 0 || index >= node.options.length) return false;
+        node.selectedIndex = index;
+        node.dispatchEvent(new Event("input", {bubbles: true}));
+        node.dispatchEvent(new Event("change", {bubbles: true}));
+        return true;
+      }
+      if (!numberish(node)) return false;
+      const step = Math.abs(Number(node.step)) || 1;
+      const current = Number(node.value);
+      if (!Number.isFinite(current)) return false;
+      let next = current + delta * step;
+      const min = Number(node.min), max = Number(node.max);
+      if (node.min !== "" && Number.isFinite(min)) next = Math.max(min, next);
+      if (node.max !== "" && Number.isFinite(max)) next = Math.min(max, next);
+      if (next === current) return false;
+      // The same two events a typed edit sends, so every plugin's own dirty
+      // tracking, clamping and reference rail answer the pad identically.
+      node.value = String(next);
+      node.dispatchEvent(new Event("input", {bubbles: true}));
+      node.dispatchEvent(new Event("change", {bubbles: true}));
+      return true;
+    };
+
+    const nearest = (pool, from, direction) => {
+      const box = from.getBoundingClientRect();
+      const fromX = box.left + box.width / 2;
+      const fromY = box.top + box.height / 2;
+      const horizontal = direction === "left" || direction === "right";
+      const sign = SIGN[direction];
+      let best = null, bestCost = Infinity;
+      for (const node of pool) {
+        if (node === from) continue;
+        const other = node.getBoundingClientRect();
+        const x = other.left + other.width / 2;
+        const y = other.top + other.height / 2;
+        const primary = (horizontal ? x - fromX : y - fromY) * sign;
+        if (primary < 4) continue;
+        const cross = Math.abs(horizontal ? y - fromY : x - fromX);
+        // A control beside this one wins over a far one that happens to sit
+        // closer along the straight line the cost alone would measure.
+        const beside = horizontal
+          ? other.bottom > box.top - 6 && other.top < box.bottom + 6
+          : other.right > box.left - 6 && other.left < box.right + 6;
+        const cost = primary + cross * (beside ? 1.5 : 4);
+        if (cost < bestCost) { bestCost = cost; best = node; }
+      }
+      return best;
+    };
+
+    const move = direction => {
+      const pool = focusPool();
+      if (!pool.length) return false;
+      const from = focused(pool);
+      if (!from) return setPadFocus(pool[0]);
+      if ((direction === "left" || direction === "right") && stepControl(from, direction)) return true;
+      const next = nearest(pool, from, direction);
+      return next ? setPadFocus(next) : false;
+    };
+
+    const activate = () => {
+      const pool = focusPool();
+      const node = focused(pool);
+      if (!node) return pool.length ? setPadFocus(pool[0]) : false;
+      if (textEntry(node)) {
+        setPadFocus(node);
+        node.select?.();
+        return requestOnScreenKeyboard(node);
+      }
+      if (typeof node.click === "function") { node.click(); return true; }
+      return false;
+    };
+
+    // Anything that owns the screen on its own: a dialog, a menu, a rename
+    // editor, the shortcut legend. While one is open, B means "close this".
+    const POPUPS = ".lex-dialog,.lex-modal,.lex-global-settings,[role='dialog'],"
+      + ".lex-label-rename,.lex-shortcut-panel,.lex-project-menu,.lex-github-workspace,"
+      + ".lex-map-magnifier-backdrop";
+
+    const escape = dialog => {
+      const active = document.activeElement;
+      // Aim the one Escape where the interface is looking. A dialog that
+      // listens on its own backdrop only hears an event from inside it, and
+      // a control with its own Escape handling still has to see it first.
+      const target = dialog && !(active instanceof HTMLElement && dialog.contains(active))
+        ? dialog
+        : (active instanceof HTMLElement ? active : document.body);
+      // One Escape on that control still travels the whole capture and bubble
+      // path to the document, where the other shared dialogs listen.
+      target.dispatchEvent(new KeyboardEvent("keydown",
+        {key: "Escape", bubbles: true, cancelable: true}));
+    };
+
+    const cancel = () => {
+      const dialog = openDialog();
+      if (dialog) { escape(dialog); return true; }
+      const popup = [...document.querySelectorAll(POPUPS)].find(shown);
+      if (popup) { escape(null); return true; }
+      // Nothing to close. A field being edited is left first, so B never
+      // throws away the value the player was working on.
+      const active = document.activeElement;
+      if (active instanceof HTMLElement
+          && active.matches("input,select,textarea,[contenteditable='true']")) {
+        escape(null);
+        if (document.activeElement === active) { active.blur(); clearPadFocus(); }
+        return true;
+      }
+      escape(null);
+      // B is the console's Back, the same step the shell's own navigation
+      // history makes when the browser's Back button is pressed.
+      window.__lexeditorNavigateHistory?.(-1);
+      return true;
+    };
+
+    const tabs = () => [...document.querySelectorAll("nav button[data-tab]")]
+      .filter(node => shown(node) && !node.disabled);
+
+    const switchTab = step => {
+      const buttons = tabs();
+      if (buttons.length < 2) return false;
+      const index = buttons.findIndex(node => node.classList.contains("active"));
+      const next = buttons[(Math.max(0, index) + step + buttons.length) % buttons.length];
+      if (!next) return false;
+      next.click();
+      setPadFocus(next);
+      return true;
+    };
+
+    const pagerButton = step => {
+      const title = step < 0 ? "Previous page" : "Next page";
+      const owner = document.activeElement?.closest?.(".lex-pager") || null;
+      const buttons = [...document.querySelectorAll(`.lex-pager button[title="${title}"]`)]
+        .filter(node => shown(node) && !node.disabled);
+      const button = (owner && buttons.find(node => owner.contains(node)))
+        || buttons[buttons.length - 1];
+      if (!button) return false;
+      button.click();
+      return true;
+    };
+
+    const press = action => {
+      switch (action) {
+        case "up": case "down": case "left": case "right": return move(action);
+        case "a": return activate();
+        case "b": return cancel();
+        case "previousTab": return switchTab(-1);
+        case "nextTab": return switchTab(1);
+        case "previousPage": return pagerButton(-1);
+        case "nextPage": return pagerButton(1);
+        default: return false;
+      }
+    };
+
+    const held = (pad, index) => {
+      const button = pad.buttons?.[index];
+      if (!button) return false;
+      return button.pressed === true || Number(button.value) > 0.5;
+    };
+
+    const directionState = pad => {
+      const down = new Set();
+      if (held(pad, BUTTON.up)) down.add("up");
+      if (held(pad, BUTTON.down)) down.add("down");
+      if (held(pad, BUTTON.left)) down.add("left");
+      if (held(pad, BUTTON.right)) down.add("right");
+      const [x = 0, y = 0] = pad.axes || [];
+      if (x <= -DEADZONE) down.add("left");
+      if (x >= DEADZONE) down.add("right");
+      if (y <= -DEADZONE) down.add("up");
+      if (y >= DEADZONE) down.add("down");
+      return down;
+    };
+
+    const DISCRETE = [
+      [BUTTON.a, "a"], [BUTTON.b, "b"],
+      [BUTTON.lb, "previousTab"], [BUTTON.rb, "nextTab"],
+      [BUTTON.lt, "previousPage"], [BUTTON.rt, "nextPage"],
+    ];
+
+    // One frame of pad input. `now` is a parameter so a check can drive the
+    // repeat timing instead of waiting for real frames.
+    const tick = (now = performance.now()) => {
+      let pads = [];
+      try { pads = source() || []; } catch (_error) { pads = []; }
+      const pad = [...pads].find(entry => entry && entry.connected !== false);
+      if (!pad) { heldSince.clear(); discreteDown.clear(); return false; }
+
+      for (const [index, action] of DISCRETE) {
+        const down = held(pad, index);
+        if (down && !discreteDown.has(index)) { discreteDown.add(index); press(action); }
+        else if (!down) discreteDown.delete(index);
+      }
+
+      const down = directionState(pad);
+      for (const direction of DIRECTIONS) {
+        if (!down.has(direction)) { heldSince.delete(direction); continue; }
+        const since = heldSince.get(direction);
+        if (since === undefined) {
+          heldSince.set(direction, now);
+          lastRepeat = now;
+          press(direction);
+        } else if (now - since >= REPEAT_FIRST_MS && now - lastRepeat >= REPEAT_MS) {
+          lastRepeat = now;
+          press(direction);
+        }
+      }
+      return true;
+    };
+
+    const attached = () => {
+      try { return (source() || []).some(pad => pad && pad.connected !== false); }
+      catch (_error) { return false; }
+    };
+
+    let frameHandle = 0;
+    let pollHandle = 0;
+    const frame = () => {
+      if (!running) return;
+      if (!attached()) { running = false; clearPadFocus(); return; }
+      try { tick(); } catch (_error) { /* a broken pad must not break the page */ }
+      frameHandle = requestAnimationFrame(frame);
+    };
+
+    const connect = () => {
+      if (running || !attached()) return false;
+      running = true;
+      frameHandle = requestAnimationFrame(frame);
+      return true;
+    };
+
+    const onDisconnect = () => { if (!attached()) running = false; };
+    // A page can load with the pad already attached, which fires no connection
+    // event, so the loop is also asked for on the reader's first gesture and
+    // once a second while nothing is running. Both are removed with the rest:
+    // a page that switched the pad path off must really be off.
+    const CONNECT_EVENTS = ["pointerdown", "keydown", "focusin"];
+    const CLEAR_EVENTS = ["pointerdown", "keydown", "wheel"];
+
+    const uninstall = () => {
+      if (!installed) return;
+      installed = false;
+      running = false;
+      cancelAnimationFrame(frameHandle);
+      clearInterval(pollHandle);
+      pollHandle = 0;
+      window.removeEventListener("gamepadconnected", connect);
+      window.removeEventListener("gamepaddisconnected", onDisconnect);
+      for (const type of CONNECT_EVENTS) document.removeEventListener(type, connect, true);
+      for (const type of CLEAR_EVENTS) window.removeEventListener(type, clearPadFocus, true);
+      heldSince.clear();
+      discreteDown.clear();
+      clearPadFocus();
+    };
+
+    const install = () => {
+      if (installed || typeof requestAnimationFrame !== "function") return api;
+      installed = true;
+      window.addEventListener("gamepadconnected", connect);
+      window.addEventListener("gamepaddisconnected", onDisconnect);
+      for (const type of CONNECT_EVENTS) document.addEventListener(type, connect, true);
+      for (const type of CLEAR_EVENTS) window.addEventListener(type, clearPadFocus, true);
+      if (!pollHandle) pollHandle = setInterval(connect, 1000);
+      connect();
+      return api;
+    };
+
+    const api = {
+      install, uninstall, tick, press, move, activate, cancel, switchTab, pagerButton,
+      setPadFocus,
+      state: () => ({installed, running, focus: padFocus}),
+      setPadSource: next => { source = typeof next === "function" ? next : source; return api; },
+    };
+    return api;
+  })();
+
+window.LexeditorUI = {panelIcon, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
+// The pad path is on for every page that mounts the shared UI, so a plugin
+// becomes usable with a controller without doing anything itself. A page with
+// no pad attached pays one idle check a second and changes nothing on screen.
+if (typeof window !== "undefined" && typeof requestAnimationFrame === "function") {
+  gamepadNavigation.install();
+}
 })();
 
 

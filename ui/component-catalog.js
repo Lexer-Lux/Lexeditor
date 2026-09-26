@@ -325,6 +325,7 @@
     {id: "EditHistory", level: "utility", summary: "Undo and redo over a page's own state."},
     {id: "NavigationHistory", level: "utility", summary: "Back and forward between tabs."},
     {id: "createModProject", level: "utility", summary: "Names a new mod, asks the host to create it, and lets the host restart the plugin on it. A page showing a game with no mod uses it for its own Create a mod button."},
+    {id: "gamepadNavigation", level: "utility", summary: "Drives the interface from a game controller: the d-pad and stick move focus, A activates or edits, B closes or goes back, the bumpers change tabs and the triggers change page. Every page that mounts the shared UI installs it, so a game becomes usable on a Steam Deck without adding anything."},
     {id: "installBrowserHistoryGuard", level: "utility", summary: "Keeps the browser's own back button in step."},
     {id: "installExtendedMouseHistory", level: "utility", summary: "The mouse's back and forward buttons."},
     {id: "installControlHelp", level: "utility", summary: "Attaches help to controls a page built itself."},

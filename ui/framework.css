@@ -7851,3 +7851,11 @@ body { text-shadow: var(--lex-text-shadow, none); }
    equation on the line is drawn from the same token a game can tune. */
 .lex-curve-minimum, .lex-curve-maximum { color:var(--lex-accent); }
 .lex-curve-path-formula { font-size:var(--lex-curve-formula-size, 13px); }
+/* The controller's own focus ring. A programmatic focus() does not always
+   light :focus-visible, and on a Steam Deck the highlight is the only thing
+   telling the player where the pad is about to act, so it is drawn here and
+   removed as soon as the mouse, the keyboard or a scroll takes over. */
+.lex-pad-focus {
+  outline:2px solid var(--lex-highlight);
+  outline-offset:2px;
+}
