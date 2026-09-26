@@ -91,13 +91,13 @@ function filterSortRows(rows,key){
   }).map(item=>item.row);
   return out;
 }
-function tableView({key,rows,keyOf,columns,detail,noun="records",placeholder="Search…",selected,setSelected,filters=[],emptyDetail}){
+function tableView({key,rows,keyOf,columns,detail,noun="records",placeholder="Search…",selected,setSelected,filters=[],emptyDetail,add,addDisabled,addDisabledReason}){
   const ui=uiState(key),prepared=filterSortRows(rows,key);
   if(selected===undefined||selected===null)selected=ui.selected;
   const available=new Set(prepared.map(keyOf));
   if(selected!==null&&!available.has(selected))selected=prepared.length?keyOf(prepared[0]):null;
   ui.selected=selected;
-  return BLUI.pagedListDetail({addDisabledReason:"Bannerlord mods can add new XML objects, but Lexeditor only edits the ones the game and your mods already define. Adding a record is not supported yet.",
+  return BLUI.pagedListDetail({add,addDisabled,addDisabledReason:addDisabledReason||"Adding records in this view is not supported yet.",
     rows:prepared,key:keyOf,slots:false,page:ui.page,pageSize:ui.pageSize,selected,noun,
     splitKey:`bannerlord-${key}`,
     search:{key:`bannerlord-${key}`,value:ui.query,placeholder,label:`Search ${noun}`,change:value=>{ui.query=value;ui.page=0;render()}},

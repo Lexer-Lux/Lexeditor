@@ -170,6 +170,30 @@ async function runModuleDataRecordAction(action,record){
   }catch(error){showAlert?.(String(error.message||error),`ModuleData ${action} failed`)}
 }
 
+function beginModuleDataCreation(){
+  const records=state.moduleData?.records||[];
+  if(moduleDataDirty()||!records.length)return;
+  let template=records.find(record=>record.path===state.moduleDataRecordPath)||records[0];
+  state.moduleDataNewId=defaultDuplicateId(template);
+  const identity=textInput(state.moduleDataNewId,value=>{state.moduleDataNewId=value},
+    {required:!!template.id,disabled:!template.id,"aria-label":"New record ID",spellcheck:"false"});
+  const source=select(template.path,records.map(record=>[record.path,moduleDataRecordLabel(record)]),value=>{
+    template=records.find(record=>record.path===value);
+    state.moduleDataNewId=defaultDuplicateId(template);identity.value=state.moduleDataNewId;
+    identity.required=!!template.id;identity.disabled=!template.id;
+  });
+  source.setAttribute("aria-label","Copy from record");
+  main.replaceChildren(BLUI.detailPanel({title:"Add XML record",body:[
+    BLUI.detailField({label:"Copy from",control:source,help:BLUI.infoHelp("Copies this record and all its nested properties. Existing references still point to the original record.")}),
+    BLUI.detailField({label:"ID",control:identity}),
+    LexeditorUI.actionRow(uiButton("Cancel",renderModuleData),uiButton("Create record",()=>{
+      if(!identity.reportValidity())return;
+      state.moduleDataNewId=identity.value;
+      return runModuleDataRecordAction("duplicate",template);
+    })),
+  ]}));
+}
+
 function renderModuleData(){
   if(state.moduleDataFiles===null){
     main.replaceChildren(uiLoading("ModuleData","Scanning ModuleData…"));
@@ -265,6 +289,8 @@ function renderModuleData(){
   ];
   main.replaceChildren(tableView({
     key:`moduledata-${state.moduleData.relativePath}`,rows:records,keyOf:item=>item.key,columns,detail,noun:"ModuleData records",
+    add:beginModuleDataCreation,addDisabled:moduleDataDirty()||!records.length,
+    addDisabledReason:moduleDataDirty()?"Save or discard pending edits before creating a record.":"Open an XML file containing a template record first.",
     placeholder:"Search ModuleData records…",selected:state.moduleDataRecordPath,
     setSelected:value=>{const record=(state.moduleData.records||[]).find(row=>row.path===String(value));applyModuleDataRecordSelection(record)},
     filters
