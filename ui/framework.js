@@ -7518,6 +7518,18 @@ ${contents.path}`});
         } catch (_error) {}
       }
     };
+    // A pane is never dragged so small that its text starts to clip: a table
+    // name cut to nothing, a choice whose words run under its arrow. The fixed
+    // floor above knows nothing of what a pane holds, so the drag also stops
+    // at the last width where the shrinking pane's text is clipped by no more
+    // pixels than before - so a name already cut short is not cut further.
+    const CLIP_CANDIDATES = ".lex-column-cell-content,.lex-column-cell-content *,select,.lex-readonly-field,.lex-toggle-label,.lex-detail-panel-title";
+    const clippedIn = node => {
+      let hidden = 0;
+      for (const item of node.querySelectorAll(CLIP_CANDIDATES))
+        if (item.clientWidth && item.scrollWidth > item.clientWidth + 1) hidden += item.scrollWidth - item.clientWidth;
+      return hidden;
+    };
     const resizePair = (index, delta, persist = false, edge = "", initialWidths = null) => {
       const widths = initialWidths ? [...initialWidths]
         : nodes.map(node => vertical ? node.getBoundingClientRect().height : node.getBoundingClientRect().width);
@@ -7542,8 +7554,20 @@ ${contents.path}`});
       // must restore those widths, even though this move transfers nothing.
       if(applied<.25){if(initialWidths)setSizes(widths,persist);return false;}
       widths[delta>0?index:index+1]+=applied;
+      const shrunk=donors.filter(donor=>widths[donor]<nodes[donor].getBoundingClientRect()[vertical?"height":"width"]-.25);
+      const before=[...sizes],clipped=shrunk.map(donor=>clippedIn(nodes[donor]));
       setSizes(widths, persist);
-      return true;
+      const clips=()=>shrunk.some((donor,i)=>clippedIn(nodes[donor])>clipped[i]+1);
+      if(!clips())return true;
+      // One fast flick can pass the limit in a single frame. Find the
+      // smallest step toward it that still clips nothing, rather than
+      // snapping the pane back to where the drag started.
+      const sum=before.reduce((a,b)=>a+b,0)||1,from=before.map(value=>value/sum*total);
+      const mix=t=>from.map((value,i)=>value+(widths[i]-value)*t);
+      let good=0,bad=1;
+      for(let step=0;step<7;step++){const t=(good+bad)/2;setSizes(mix(t),false);if(clips())bad=t;else good=t;}
+      setSizes(mix(good),persist);
+      return good>0;
     };
     let dragFrame = 0, pendingDrag = null, dragStart = null;
     const flushDrag = () => {
