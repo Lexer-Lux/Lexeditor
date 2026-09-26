@@ -23,6 +23,7 @@ def test_magnifier_ring_is_light_with_halo_despite_dark_accent():
             page.add_script_tag(path=str(ROOT / "ui/framework.js"))
             page.evaluate("""() => {
               const panel = LexeditorUI.detailPanel({title: "Example", body: "Fields"});
+              panel.style.cssText = 'width:700px;height:500px';
               panel.querySelector(".lex-detail-panel-icon")?.remove();
               const icon = document.createElement("div");
               icon.className = "lex-detail-panel-icon";
@@ -30,7 +31,9 @@ def test_magnifier_ring_is_light_with_halo_despite_dark_accent():
               icon.append(LexeditorUI.iconSlot({message: "Icon"}));
               panel.querySelector(".lex-detail-panel-heading").prepend(icon);
               LexeditorUI.attachModelPreview(panel, {
-                content: () => LexeditorUI.modelStage({message: "Model fixture"}),
+                content: () => LexeditorUI.stack({fill:true},
+                  LexeditorUI.actionRow(LexeditorUI.el('button',{},'Export')),
+                  LexeditorUI.modelStage({message: "Model fixture"})),
               });
               document.querySelector("main").append(panel);
             }""")
@@ -47,5 +50,13 @@ def test_magnifier_ring_is_light_with_halo_despite_dark_accent():
                 "n=>getComputedStyle(n).opacity") == "1"
             trigger.click()
             assert page.locator(".lex-model-preview-drawer").is_visible()
+            for width in (700, 350):
+                page.locator('.lex-detail-panel').evaluate('(e,w)=>e.style.width=w+"px"',width)
+                dimensions = page.locator('.lex-model-preview-drawer').evaluate('''e=>{
+                  const drawer=e.getBoundingClientRect(), stage=e.querySelector('.lex-model-stage').getBoundingClientRect();
+                  return {drawer:drawer.width, stage:stage.width, height:stage.height};
+                }''')
+                assert abs(dimensions['drawer']-dimensions['stage']) < 3, dimensions
+                assert dimensions['height'] > 200, dimensions
         finally:
             browser.close()
