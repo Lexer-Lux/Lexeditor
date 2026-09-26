@@ -63,6 +63,7 @@ def main():
    pin=p.locator(f'[data-lex-pin-column="{key}"]')
    pin.focus()
    if key=='text':
+    p.wait_for_timeout(100)
     p.screenshot(path=str(Path(tempfile.gettempdir())/'ff8-refine-text-pin.png'))
     bounds=pin.evaluate('''pin=>{const b=pin.getBoundingClientRect(),clipped=[];
       for(let p=pin.parentElement;p;p=p.parentElement){const s=getComputedStyle(p),r=p.getBoundingClientRect();
@@ -70,6 +71,9 @@ def main():
         if(/hidden|clip|auto|scroll/.test(s.overflowY)&&(b.top<r.top-1||b.bottom>r.bottom+1))clipped.push(p.className);}
       return clipped}''')
     assert not bounds,bounds
+    corner=pin.evaluate('''pin=>{const b=pin.getBoundingClientRect(),r=pin.closest('.lex-detail-field').querySelector('textarea').getBoundingClientRect();
+      return Math.abs(b.bottom-r.top)<18&&Math.abs(b.right-r.right)<18}''')
+    assert corner,'recipe pin is not anchored to its text box'
    pin.click();p.wait_for_timeout(300)
    assert p.locator(f'.lex-column-list-head-cell[data-column-key="{key}"]').count()==1,key
    assert pin.get_attribute('aria-pressed')=='true'

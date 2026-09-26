@@ -394,6 +394,6 @@
         LexeditorUI.quantityChoice(recipeFields[0],recipeFields[1]),
         el("span",{"aria-label":"produces"},"→"),
         LexeditorUI.quantityChoice(recipeFields[2],recipeFields[3])),
-      detailField({label:hoverable({content:"Recipe text",targetType:"text",targetId:refineTextRecord(row).id,targetLabel:`recipe text for ${label}`,activate:()=>openRefineText(row)}),className:"lex-detail-field-stacked",showType:false,pin:prefs?.pinButton("text","Recipe text"),help:infoHelp("Message shown in the game for this recipe. Line breaks here also appear in the game. Update it when you change the ingredients or quantities; it does not set the conversion itself."),control:refineSource(text,row,"text",value=>row.text=String(value??""))})
+      detailField({label:hoverable({content:"Recipe text",targetType:"text",targetId:refineTextRecord(row).id,targetLabel:`recipe text for ${label}`,activate:()=>openRefineText(row)}),className:"lex-detail-field-stacked lex-text-editor",showType:false,pin:prefs?.pinButton("text","Recipe text"),help:infoHelp("Message shown in the game for this recipe. Line breaks here also appear in the game. Update it when you change the ingredients or quantities; it does not set the conversion itself."),control:refineSource(text,row,"text",value=>row.text=String(value??""))})
     ],"refine-detail");
   }
