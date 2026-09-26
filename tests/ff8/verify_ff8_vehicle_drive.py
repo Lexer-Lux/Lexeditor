@@ -22,7 +22,7 @@ int main() {
 
     assert(axis(0.0f,0.0f) == 128);
     assert(axis(0.0f,1.0f) == 0);
-    assert(axis(1.0f,0.0f) == 0);
+    assert(axis(1.0f,0.0f) == 255);
     assert(axis(0.0f,0.5f) == 64);
     assert(axis(0.5f,0.0f) == 192);
     assert(axis(0.5f,0.5f) == 128);
@@ -32,7 +32,10 @@ int main() {
     assert(axis(0.0f,0.0f,true,false) == 255); // keyboard L2 = reverse
     assert(axis(0.0f,0.0f,true,true) == 128);
     assert(axis(-2.0f,3.0f) == 0);
-    assert(axis(3.0f,-2.0f) == 0);
+    assert(axis(3.0f,-2.0f) == 255);
+    // XInput triggers also set digital aliases; partial pressure stays partial.
+    assert(axis(0.0f,0.5f,false,true) == 64);
+    assert(axis(0.5f,0.0f,true,false) == 192);
     // Tiny trigger noise is dead-zoned around center.
     assert(axis(0.00f,0.01f) == 128);
     assert(axis(0.01f,0.00f) == 128);
