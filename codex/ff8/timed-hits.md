@@ -52,6 +52,17 @@ absolute VAs; file offset = VA − `0x400000`. Battle participants are
   change the damage at its source. It must refund the difference to HP at
   the hit frame and correct the displayed number.
 
+## Hit records handed to the animation
+
+- `0048EF80` appends one 0x18-byte hit record per target to the queue at
+  `01D28344` (count `01D280C1`): target at +0, effect/flag bytes at +1..+3,
+  damage word at +6, then the second-effect fields.
+- `0048E396` builds the action packet the animation receives. Its `+8`
+  points at the first hit record for this action. The animation side walks
+  those records to show numbers; the opcode that does so is not yet traced.
+- Neither FFNx's `ff8.h` nor ff8-decomp (the PS1 build, battle interpreter
+  not yet decompiled) names this display path.
+
 ## Not yet established
 
 - Which sequence opcode marks the moment damage is displayed (the hit frame)
