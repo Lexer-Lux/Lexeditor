@@ -88,6 +88,8 @@
       --lex-field-padding:6px 8px;
 
       /* Section titles keep the game lettering. No rule runs under them. */
+      /* The record's own picture stays with its name on the header's left. */
+      --lex-preview-icon-side:left;
       --lex-section-title-fg:#d0d0d0;--lex-section-title-font:20px/1 var(--lex-heading-font);
       --lex-section-title-shadow:-2px -2px 0 #151515,0 -2px 0 #151515,2px -2px 0 #151515,-2px 0 0 #151515,
         2px 0 0 #151515,-2px 2px 0 #151515,0 2px 0 #151515,2px 2px 0 #151515;

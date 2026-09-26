@@ -491,17 +491,22 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     const tabs=[{id:'properties',label:'Properties'},{id:'actions',label:'Actions',help:'The AI uses these action slots. Each level tier can use a different ability in the same slot.'},{id:'loot',label:'Loot'},
       {id:'renzokuken',label:'Renzokuken'},{id:'defense',label:'Defense'},
       {id:'text',label:'Text'},{id:'stats',label:'Stats',help:'Edit the coefficients to change how this enemy grows with its level.'}];
+    const model=state.data.models?.rows?.find(entry=>Number(entry.enemyId)===Number(row.id));
     let body=[];
     if(tab==='properties'){
       body=[enemyProperties(row.fields.filter(field=>field.group!=='Stat curves'),row.id,prefs)];
+      // The enemy's own texture pages stand in its own panel, where the
+      // reader looks for the monster's data.
+      if(model?.tims?.length)body.push(detailSection({title:'TEXTURES',
+        help:infoHelp('The texture pages of this enemy battle model, with the palettes it stores. Showing a page here does not change the game; the Textures tab is where a page is replaced.'),
+        body:modelTextureCards(model,{inPlace:true})}));
     }else if(tab==='actions'&&table)body=['low','medium','high'].map(tier=>enemyAbilitiesSection(table,tier));
     else if(tab==='loot'&&table)body=[enemyPairSection(table,'mug','MUG','Item'),enemyPairSection(table,'draw','DRAW','Magic'),enemyPairSection(table,'drops','DROPS','Item'),...enemySimpleTables(table).slice(0,2)];
     else if(tab==='renzokuken'&&table)body=enemySimpleTables(table).slice(2);
     else if(tab==='defense'&&table)body=[enemyDefenceSection(table,'elementDefence','ELEMENT'),enemyDefenceSection(table,'statusDefence','STATUS')];
     else if(tab==='text')body=[enemyBattleTextPanel(row,prefs)];
     else if(tab==='stats')body=[enemyStatGrowth(row.fields.filter(field=>field.group==='Stat curves'),row.id)];
-    const model=state.data.models?.rows?.find(entry=>Number(entry.enemyId)===Number(row.id));
     const openModel=model?el('button',{type:'button',onclick:()=>{state.selected.models=model.file;navigate('models')}},'Open in Models'):null;
-    return tabbedPanel({tabs,active:tab,label:'Enemy details',change:async value=>{if(!(await enemyAiBeforeLeave()))return;state.enemyDetailTab=value;renderEnemies()},content:tab==='stats'?body:sharedDetail({...row,name:enemyDisplayName(row.name)},prefs,body,'enemy-detail','',null,null,model?modelPreviewSpec(model,openModel?LexeditorUI.actionRow(openModel):null):null)});
+    return tabbedPanel({tabs,active:tab,label:'Enemy details',change:async value=>{if(!(await enemyAiBeforeLeave()))return;state.enemyDetailTab=value;renderEnemies()},content:tab==='stats'?body:sharedDetail({...row,name:enemyDisplayName(row.name)},prefs,body,'enemy-detail','',null,null,model?modelPreviewSpec(model,openModel?LexeditorUI.actionRow(openModel):null,{inPlace:true}):null,modelPageThumb(model))});
   }
   function enemyLeadingPanel(row){return enemyAiPanel(row)}
