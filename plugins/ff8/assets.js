@@ -168,13 +168,14 @@
     const rows=filtered("textures",["name","id","ffnxBase","source"]),columns=[
       {key:"name",label:"Texture"},
       {key:"source",label:"Source"},
-      {key:"width",label:"Size",render:row=>row.width==null?"—":`${row.width} × ${row.height} · ${row.depth}-bit · ${row.paletteCount} pal`},
+      {key:"width",label:"Size",render:row=>row.width==null?"—":`${row.width} × ${row.height} · ${row.depth}-bit`},
       {key:"modFiles",label:"Mod files",render:row=>row.modFiles?.length?formatNumber(row.modFiles.length):"—"}];
-    showPaged("textures",rows,columns,textureDetail,"minmax(150px,2fr) minmax(120px,1fr) 170px 90px");
+    // The name gets the room: a max-content size column took 287px and left
+    // the texture's own name a 38px stub.
+    showPaged("textures",rows,columns,textureDetail,"minmax(160px,1fr) max-content max-content max-content",{fixedTemplate:true,defaultSplit:58});
   }
   function textureDetail(row,prefs){
     const sections=[];
-    if(row.note)sections.push(LexeditorUI.detailNote(row.note));
     const paletteCount=row.paletteCount||0;
     const isFile=String(row.id).startsWith("file:");
     const previewable=row.mapped||(isFile&&String(row.name||"").toLowerCase().endsWith(".png"));
@@ -194,7 +195,8 @@
       paletteSelect.setAttribute("aria-label",`${row.name} preview palette`);
       facts.push(detailField({label:"PALETTE",help:infoHelp("Palette selection only changes this preview; the game chooses palettes while rendering."),control:paletteSelect}));
     }
-    sections.push(detailSection({title:"TEXTURE",body:facts}));
+    // The texture's caveat is help, not a paragraph in the panel body.
+    sections.push(detailSection({title:"TEXTURE",help:row.note?infoHelp(row.note):null,body:facts}));
     const modBody=(row.modFiles||[]).map(entry=>detailField({label:"FILE",control:readonlyField(`${entry.file} · ${assetFileSize(entry.sizeBytes)}`)}));
     if(!modBody.length)modBody.push(detailField({label:"",control:LexeditorUI.detailNote("No mod replaces this texture.")}));
     sections.push(detailSection({title:"MOD FILES",body:modBody,
