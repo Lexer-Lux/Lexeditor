@@ -23,6 +23,7 @@ DEFAULTS = {
     "updateCheckFrequency": "daily",
     "hoverableAltClick": False,
     "pageWrapAround": True,
+    "booleanBoxStyle": True,
     "selectionHoldMs": 650,
     "tableRowsPerPage": 15,
     "tweakColumnsPerPage": 6,
@@ -164,6 +165,7 @@ class SettingsStore:
             "hoverableAltClick": payload.get("hoverableAltClick", defaults["hoverableAltClick"]) is True,
             "panelTabTarget": "focus" if payload.get("panelTabTarget", defaults["panelTabTarget"]) == "focus" else "hover",
             "pageWrapAround": payload.get("pageWrapAround", defaults["pageWrapAround"]) is not False,
+            "booleanBoxStyle": payload.get("booleanBoxStyle", defaults.get("booleanBoxStyle", True)) is not False,
             "selectionHoldMs": max(150, min(2000, selection_hold_ms)),
             "tableRowsPerPage": max(5, min(40, table_rows_per_page)),
             "tweakColumnsPerPage": max(1, min(12, int(defaults.get("tweakColumnsPerPage", 6)))),
@@ -213,7 +215,8 @@ class SettingsStore:
              sound_volume_percent: float | None = None,
              page_wrap_around: bool | None = None,
              panel_tab_target: str | None = None,
-             pager_bar_height_percent: float | None = None) -> dict:
+             pager_bar_height_percent: float | None = None,
+             boolean_box_style: bool | None = None) -> dict:
         """Save per-user preferences. Authenticated authoring state is never persisted."""
         if update_check_frequency not in UPDATE_FREQUENCIES:
             raise ValueError("Choose a listed update-check frequency")
@@ -226,6 +229,8 @@ class SettingsStore:
             hoverable_alt_click = current["hoverableAltClick"]
         if page_wrap_around is None:
             page_wrap_around = current["pageWrapAround"]
+        if boolean_box_style is None:
+            boolean_box_style = current["booleanBoxStyle"]
         if selection_hold_ms is None:
             selection_hold_ms = current["selectionHoldMs"]
         if table_rows_per_page is None:
@@ -250,6 +255,7 @@ class SettingsStore:
                 "updateCheckFrequency": update_check_frequency,
                 "hoverableAltClick": bool(hoverable_alt_click),
                 "pageWrapAround": bool(page_wrap_around),
+                "booleanBoxStyle": bool(boolean_box_style),
                 "panelTabTarget": panel_tab_target,
                 "selectionHoldMs": selection_hold_ms,
                 "tableRowsPerPage": table_rows_per_page,
@@ -292,6 +298,7 @@ class SettingsStore:
             "updateCheckFrequency": frequency,
             "hoverableAltClick": bool(current["hoverableAltClick"]),
             "pageWrapAround": bool(current["pageWrapAround"]),
+            "booleanBoxStyle": bool(current.get("booleanBoxStyle", True)),
             "panelTabTarget": "focus" if current["panelTabTarget"] == "focus" else "hover",
             "selectionHoldMs": max(150, min(2000, int(current["selectionHoldMs"]))),
             "tableRowsPerPage": max(5, min(40, int(current["tableRowsPerPage"]))),

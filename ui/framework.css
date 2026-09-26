@@ -6782,6 +6782,22 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   height:19px;
   margin:0;
 }
+/* The wide-box style (the default setting): no arrow, and the checkbox is a
+   box that fills the value column like any other value, ticked when on. It
+   starts where the other value boxes start, past the copy lane. */
+html[data-lex-boolean-style="box"] .lex-boolean-field .lex-field-boolean-arrow { display:none; }
+html[data-lex-boolean-style="box"] .lex-boolean-field:not(:has(> .lex-detail-field-control > .lex-source-control)) > .lex-detail-field-control {
+  grid-column:2 / -1;
+  padding-left:calc(var(--lex-copy-lane, 12px) + 12px);
+}
+html[data-lex-boolean-style="box"] .lex-boolean-field .lex-detail-field-control > input[type="checkbox"],
+html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > input[type="checkbox"] {
+  grid-column:1 / -1;
+  justify-self:stretch;
+  flex:1 1 auto;
+  width:100%;
+  height:28px;
+}
 .lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
   position:absolute;
   top:calc(50% + 12.5px);

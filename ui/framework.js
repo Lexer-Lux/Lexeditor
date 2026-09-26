@@ -4154,6 +4154,9 @@
     sharedSettingsSnapshot = settings;
     if (settings.soundEnabled === false || themeSoundGain(settings.soundVolumePercent) <= 0) stopThemeSounds();
     document.documentElement.dataset.lexHoverableAltClick = settings.hoverableAltClick ? "true" : "false";
+    // Lexer liked a boolean drawn as one wide box and asked for it as the
+    // default, with the arrow-and-checkbox layout as the alternative.
+    document.documentElement.dataset.lexBooleanStyle = settings.booleanBoxStyle === false ? "arrow" : "box";
     document.documentElement.style.setProperty("--lex-panel-gap", `${Number(settings.panelGapPercent || 1)}vw`);
     // The pagination bar is one height on every page, and that height is a
     // setting rather than a number buried in the stylesheet.
@@ -5244,6 +5247,7 @@ ${contents.path}`});
         {key:"updateCheckFrequency", scope:"user", title:"Update check frequency", description:"Used by LEXEDITOR and managed helpers such as FFNx.", type:"select", choices:settings.updateCheckChoices || []},
         {key:"hoverableAltClick", scope:"user", title:"Alt + Click hoverable linking", description:"When enabled, ordinary clicks do not follow linked record mentions. Alt+Click opens them.", type:"checkbox"},
         {key:"selectionHoldMs", scope:"user", title:"Searcher hold time", description:"How long a record must be held before a Searcher selects it.", type:"number", min:150, max:2000, step:50, unit:"ms"},
+        {key:"booleanBoxStyle", scope:"user", title:"Wide boolean boxes", description:"An on/off property is one wide box that fills its row, ticked when on. Off draws a small checkbox at the end of an arrow from the property name.", type:"checkbox"},
         {key:"pageWrapAround", scope:"user", title:"Wrap around at the ends", description:"Paging past the last page returns to the first, and paging back from the first goes to the last.", type:"checkbox"},
         {key:"panelTabTarget", scope:"user", title:"Tab key panel", description:"Tab opens the next panel tab. Shift+Tab opens the previous tab. Choose the panel under the mouse or the panel with keyboard focus.", type:"select", choices:[{value:"hover",label:"Hovered panel"},{value:"focus",label:"Focused panel"}]},
         {key:"tableRowsPerPage", scope:"user", title:"Table rows per page", description:"A full table page stretches this many rows to use the exact available panel height.", type:"number", min:5, max:40, step:1},

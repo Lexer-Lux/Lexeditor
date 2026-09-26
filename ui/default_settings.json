@@ -1,5 +1,6 @@
 {
   "absentGameDesaturationPercent": 75.0,
+  "booleanBoxStyle": true,
   "globalMessageRarity": 3.0,
   "hoverableAltClick": false,
   "loadingTransitionMinimumSeconds": 2.5,

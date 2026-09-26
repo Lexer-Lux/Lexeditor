@@ -627,6 +627,7 @@ class HostApi:
             None if "pageWrapAround" not in payload else bool(payload["pageWrapAround"]),
             payload.get("panelTabTarget"),
             payload.get("pagerBarHeightPercent"),
+            None if "booleanBoxStyle" not in payload else bool(payload["booleanBoxStyle"]),
         )
         return self.lexeditor_settings()
 
