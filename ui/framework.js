@@ -8259,6 +8259,34 @@ ${contents.path}`});
   };
 
   let activeSearcher = null;
+  const lockSearcherTarget = searcher => {
+    searcher.targetLocks ||= new Map();
+    if (activeSearcher !== searcher || !searcher.atTarget) {
+      for (const [node, inert] of searcher.targetLocks) node.inert = inert;
+      searcher.targetLocks.clear();
+      return;
+    }
+    // Browsing and filtering candidates stays live; their editable details
+    // and record actions must not change data during replacement selection.
+    for (const node of document.querySelectorAll(
+      "#main .lex-detail-field,#main .lex-detail-panel-actions,#main .lex-table-add," +
+      "#main input,#main select,#main textarea,#main [contenteditable='true'],#global-save,#global-undo,#global-redo")) {
+      if (node.matches("input,select,textarea,[contenteditable='true']") &&
+          (node.matches("input[type='search']") || node.closest(READONLY_EXEMPT))) continue;
+      if (!searcher.targetLocks.has(node)) searcher.targetLocks.set(node, node.inert);
+      node.inert = true;
+    }
+    for (const [node, inert] of searcher.targetLocks) if (!node.isConnected) {
+      node.inert = inert;
+      searcher.targetLocks.delete(node);
+    }
+  };
+  document.addEventListener("keydown", event => {
+    if (activeSearcher && (event.ctrlKey || event.metaKey) && ["s","z","y"].includes(event.key.toLowerCase())) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
   const lockSearcherSource = (searcher, locked) => {
     for (const [node, inert] of searcher.sourceLocks || []) node.inert = inert;
     searcher.sourceLocks = [];
@@ -8272,6 +8300,8 @@ ${contents.path}`});
     if (!activeSearcher) return;
     const searcher = activeSearcher;
     activeSearcher = null;
+    searcher.targetObserver?.disconnect();
+    lockSearcherTarget(searcher);
     lockSearcherSource(searcher, false);
     searcher.header?.classList.remove("lex-searcher-active");
     searcher.bar?.remove();
@@ -8292,9 +8322,12 @@ ${contents.path}`});
       holdMs: Math.max(150, Math.min(2000, Number(options.holdMs || sharedSettingsSnapshot?.selectionHoldMs || 650))),
     };
     activeSearcher = searcher;
+    searcher.targetObserver = new MutationObserver(() => lockSearcherTarget(searcher));
+    searcher.targetObserver.observe(document.body, {childList:true, subtree:true});
     context.onclick = () => {
       if (searcher.atTarget) {
         searcher.atTarget = false;
+        lockSearcherTarget(searcher);
         context.replaceChildren(element("span", {class: "lex-searcher-return lex-ui-symbol", "aria-hidden": "true"}, "↩"));
         context.title = "Return to selection results";
         context.classList.add("returning");
@@ -8312,12 +8345,14 @@ ${contents.path}`});
         context.replaceChildren(searchIcon());
         context.title = "Show the source record";
         searcher.target?.();
+        lockSearcherTarget(searcher);
       }
     };
     cancel.onclick = () => finishSearcher(true);
     header.classList.add("lex-searcher-active");
     header.append(bar);
     searcher.target?.();
+    lockSearcherTarget(searcher);
     window.dispatchEvent(new CustomEvent("lexeditor-searcher-changed", {detail: {active: true, type: searcher.type}}));
     return searcher;
   };
