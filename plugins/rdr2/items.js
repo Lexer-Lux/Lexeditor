@@ -81,10 +81,12 @@ function renderItems() {
       ...groups.map(g => { const o = el("option", { value: g }, g || "(none)"); if (g === f.group) o.selected = true; return o; })),
     el("select", { "aria-label":"Filter items by source state", title:"Filter by acquisition evidence", onchange: ev => { f.itemSource=ev.target.value;f.itemPage=0;renderItems(); } },
       ...[["all","All source states"],["confirmed","Confirmed acquisition"],["candidate","Candidate only"],["unknown","No known source"],["model","Has model"],["no-name","No localization"]].map(([value,label])=>{const o=el("option",{value},label);if(value===f.itemSource)o.selected=true;return o;})));
-  const metadata=LexeditorUI.actionRow(savebar(saveCatalog));
   const addItem=isRO()?el("span"):newButton({title:"Create new item",onclick:createNewItem});
+  // The unsaved-change counter belongs in the toolbar with the rest of this
+  // plugin's save controls. In the pagination bar it pushed the filters onto a
+  // second row inside a bar that has room for one.
   tb.append(LexeditorUI.subtabBar({tabs:ITEM_SECTIONS,active:f.itemSection,
-    change:id=>{f.itemSection=id;f.itemPage=0;renderItems();}}));
+    change:id=>{f.itemSection=id;f.itemPage=0;renderItems();}}),savebar(saveCatalog));
 
   const q = f.q.trim().toUpperCase();
   let rows = state.catalog.items.filter(it =>
@@ -102,7 +104,7 @@ function renderItems() {
     rows,key:it=>it.key,slots:false,page:f.itemPage,pageSize:f.itemPageSize,selected:f.itemSel,noun:"items",
     splitKey:"rdr2-items",defaultSplit:44,
     search:{key:"rdr2-items",value:f.q,placeholder:"Search items… (e.g. TONIC, PROVISION_)",label:"Search items",change:value=>{f.q=value;f.itemPage=0;renderItems();}},
-    filters:[addItem,metadata,filters],
+    filters:[addItem,filters],
     className:"lootsplit",
     master:({rows,selected,select})=>columnList({rows,key:it=>it.key,selected,select,
       columns:[
