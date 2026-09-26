@@ -61,38 +61,37 @@
     if(rule.mode==="ultimecia")return "Level 1 to 100";
     return `Level byte ${slot.level}`;
   }
-  function encounterEnemyBox(slot){
+  function encounterEnemyBox(slot,formation,origin){
     const enemy=enemyById(slot.enemyId);
     const name=slot.enabled
       ? recordHoverLabel("enemies",enemy,enemyDisplayName(enemy.name))
       : "Empty";
-    const box=LexeditorUI.iconSlot({shape:"square",
-      content:slot.enabled?encounterEnemyTexture(slot.enemyId):null,
-      message:slot.enabled?"No battle texture":""});
-    const attrs={"aria-label":`Battle position ${slot.slot+1}`,
-      "data-lex-battle-position":String(slot.slot+1)};
-    if(!slot.enabled)attrs["data-lex-empty-position"]="";
-    return {caption:name,media:box,footer:slot.enabled?encounterSlotLevelText(slot):"—",attrs};
+    const finder=el('button',{type:'button',disabled:state.activeSource!=='mine',
+      'aria-label':`Choose enemy for formation ${formation.id} slot ${slot.slot+1}`,
+      onclick:()=>beginSearcher({type:'enemies',prompt:`Choose the enemy for formation ${formation.id}, slot ${slot.slot+1}.`,
+        target:()=>navigate('enemies'),origin,
+        accept:value=>{if(state.activeSource!=='mine')return;const next=enemyById(value);
+          slot.enemyId=Number(value);slot.enemyName=next.name;slot.enabled=true;
+          formation.name=encounterName(formation);shell.refresh();}})},LexeditorUI.selectionIcon());
+    const card=LexeditorUI.recordCard({title:name,identity:slot.slot+1,
+      image:slot.enabled?encounterEnemyTexture(slot.enemyId):LexeditorUI.noImage('Empty slot'),
+      body:slot.enabled?encounterSlotLevelText(slot):'Empty',action:finder});
+    card.setAttribute('aria-label',`Battle position ${slot.slot+1}`);
+    card.dataset.lexBattlePosition=String(slot.slot+1);
+    if(!slot.enabled)card.dataset.lexEmptyPosition='';
+    return card;
   }
   // Six boxes, one per battle position. scene.out keeps eight slots per
   // formation; slots 7 and 8 appear as extra boxes when they are switched on,
   // so nothing stored is hidden here. Formations edits all eight.
-  function encounterPreviewGrid(row){
+  function encounterPreviewGrid(row,origin){
     if(!row)return LexeditorUI.notice({message:"This formation number is not a scene.out record, so it has no enemies to show."});
     const shown=row.slots.filter((slot,index)=>index<6||slot.enabled);
-    // The shared figure grid names each enemy over its box and gives the level
-    // under it, and wraps the boxes when the panel is too narrow for six.
-    const grid=LexeditorUI.figureGrid(shown.map(encounterEnemyBox),{captionAbove:true});
+    // The shared holder keeps six cards balanced as the pane narrows.
+    const grid=LexeditorUI.tileGrid(shown.map(slot=>encounterEnemyBox(slot,row,origin)),{minWidth:100,balanced:true});
     grid.setAttribute("aria-label",`Formation ${row.id} enemies`);
     return grid;
   }
-  function encounterBattleChoice(group,change){
-    const control=selectControl(encounterGroupBattleSlot(),group.encounters.map((value,index)=>({
-      value:index,name:`Battle ${index+1} · formation ${value}`})),value=>{state.encounterBattleSlot=Number(value);change()});
-    control.setAttribute("aria-label",`Battle position shown for encounter group ${group.id}`);
-    return control;
-  }
-  function encounterGroupBattleSlot(){return Math.max(0,Math.min(7,Number(state.encounterBattleSlot)||0))}
 
   // ---- Rules: region x ground -> group ------------------------------------
   function encounterRuleVanilla(rule){return worldRow(state.vanilla,"helper",rule.id)?.encounterGroup}
@@ -102,10 +101,11 @@
       .filter(entry=>entry.value!==undefined);
   }
   function encounterRuleControl(rule,refresh){
-    const maximum=Math.max(0,encounterGroupRows().length-1);
-    const apply=value=>{rule.encounterGroup=Math.max(0,Math.min(maximum,Number(value)||0));refresh()};
-    const control=numberControl(rule.encounterGroup,0,maximum,1,value=>{rule.encounterGroup=Number(value);refresh()},
-      {"aria-label":`Region ${rule.regionId} ground ${rule.groundId} encounter group`,class:"ff8-encounter-rule-input"});
+    const apply=value=>{if(state.activeSource!=='mine'||!encounterGroupById(value))return;rule.encounterGroup=Number(value);refresh()};
+    const control=el('button',{type:'button',disabled:state.activeSource!=='mine',
+      'aria-label':`Region ${rule.regionId} ground ${rule.groundId} encounter group`,class:'ff8-encounter-rule-input',
+      onclick:()=>beginSearcher({type:'encounterGroups',prompt:`Choose the encounter group for region ${rule.regionId}, ground ${rule.groundId}.`,
+        target:()=>showEncounterSubtab('groups'),origin:()=>showEncounterSubtab('rules'),accept:apply})},String(rule.encounterGroup));
     const select=()=>{state.selected.encounterRule=rule.id;refresh()};
     control.addEventListener("focus",select);
     control.addEventListener("pointerdown",select);
@@ -153,60 +153,22 @@
     const columns=[{key:"regionId",label:"REGION",numberedId:true,sortable:false,
       help:"Region code of the world-map cell the player is standing in. Regions are set on the World tab.",
       render:row=>row.regionId},
-      ...grounds.map(ground=>({key:`ground:${ground}`,label:`GROUND ${ground}`,sortable:false,align:"center",
+      ...grounds.map(ground=>({key:`ground:${ground}`,label:String(ground),sortable:false,align:"center",
         help:`Terrain code ${ground}. The cell below holds the encounter group the game uses for this region and this ground.`,
         render:row=>encounterRuleCell(row.regionId,ground,cells,reachable,refresh)}))];
-    const template=`84px repeat(${Math.max(1,grounds.length)},minmax(66px,1fr))`;
+    const template=`84px repeat(${Math.max(1,grounds.length)},minmax(46px,1fr))`;
     return {table:columnList({rows,key:row=>row.id,columns,localSort:false,template,
       class:"ff8-encounter-rule-table ff8-record-list","aria-label":"Encounter rules by region and ground"}),
       regions,grounds,rules,cells,reachable};
-  }
-  // The counts describe the file, so they belong in the panel's question-mark
-  // bubble with the rest of the explanation. A panel body carries the table.
-  function encounterRuleSummary(built){
-    const clashes=[...built.cells.values()].filter(entry=>entry.length>1).length;
-    const missing=[...built.reachable.keys()].filter(key=>!built.cells.has(key)).length;
-    const parts=[`${built.rules.length} stored rules over ${built.regions.length} regions and ${built.grounds.length} ground codes`];
-    parts.push(built.reachable.size
-      ? `${missing} of ${built.reachable.size} region and ground pairs used by world terrain have no rule`
-      : "world terrain is unavailable, so unreachable and uncovered pairs cannot be counted");
-    parts.push(clashes?`${clashes} ${clashes===1?"pair has":"pairs have"} more than one rule`
-      :"no pair has more than one rule");
-    return `${parts.join(". ")}.`;
   }
 
   // ---- Group preview panel -------------------------------------------------
   function encounterGroupPreviewPanel(rule,refresh,origin){
     const group=encounterGroupById(rule?.encounterGroup);
-    const where=rule?`Region ${rule.regionId} · ground ${rule.groundId}`:"No rule selected";
-    const help="The encounter group this rule selects, and the enemies waiting in one of its eight battles. "
-      +"The group name opens the Groups page at that group. Each box is a battle position: the enemy's name above it and the level it fights at below.";
-    if(!group)return detailPanel({title:"NO ENCOUNTER GROUP",help,meta:where,
+    if(!group)return detailPanel({title:"Encounter group",
       className:"ff8-encounter-group-preview",
       body:LexeditorUI.notice({message:"Select a group number in the table to preview the battles it holds."})});
-    const slot=encounterGroupBattleSlot(),formationId=group.encounters[slot];
-    const title=hoverable({content:`ENCOUNTER GROUP ${group.id}`,targetType:"encounterGroups",targetId:group.id,
-      targetLabel:`encounter group ${group.id}`,class:"ff8-encounter-group-link",
-      activate:()=>showEncounterSubtab("groups","encounterGroups",group.id)});
-    const finder=el("button",{type:"button",title:"Choose an encounter group","aria-label":"Choose an encounter group",
-      onclick:event=>{event.preventDefault();event.stopPropagation();
-        beginSearcher({type:"encounterGroups",prompt:"Select the encounter group this region and ground should use.",
-          target:()=>showEncounterSubtab("groups"),origin,
-          accept:value=>{const rule=encounterRuleById(state.selected.encounterRule);if(rule)rule.encounterGroup=Number(value);refresh()}})}},
-      LexeditorUI.selectionIcon());
-    return detailPanel({title,help,meta:where,
-      className:"ff8-encounter-group-preview",identity:recordId(group.id),
-      body:[detailField({label:"GROUP",showType:false,
-        help:infoHelp("The encounter group the selected rule points at. Choose another from the Groups list and the rule's cell in the table changes with it."),
-        control:LexeditorUI.choiceField(hoverable({content:`Group ${group.id}`,targetType:"encounterGroups",
-          targetId:group.id,targetLabel:`encounter group ${group.id}`,
-          activate:()=>showEncounterSubtab("groups","encounterGroups",group.id)}),finder)}),
-      detailField({label:"BATTLE",showType:false,
-        help:infoHelp("A group holds eight battle formations and the game picks one of them at random. Choose which of the eight to preview here."),
-        control:encounterBattleChoice(group,refresh)}),
-      detailSection({className:"ff8-encounter-preview-section",title:`FORMATION ${formationId}`,
-        help:infoHelp("The enemies in the chosen battle. A name above each box, the level it fights at below it. Open a name to edit that enemy."),
-        body:[encounterPreviewGrid(encounterRowById(formationId))]})]});
+    return encounterGroupPanel(group,refresh,origin,'ff8-encounter-group-preview');
   }
 
   function renderEncounterRules(){
@@ -224,13 +186,8 @@
     };
     const built=encounterRuleTable(refresh);
     const rule=encounterRuleById(state.selected.encounterRule);
-    const summary=encounterRuleSummary(built);
-    const table=detailPanel({title:"ENCOUNTER RULES",className:"ff8-encounter-rules-panel",
-      help:"Every stored rule, with region codes down the side and ground codes across the top. The number in a cell is the encounter group the game uses there. "
-        +"A dash means no rule is stored for that pair; an exclamation mark means world terrain uses that pair and no rule covers it. "
-        +"Where two rules store the same pair both are shown and marked; which of them the game obeys is not established here. "
-        +"Rules cannot be added or removed: the file reserves a fixed number of them. "+summary,
-      body:[built.table]});
+    const table=built.table;
+    table.classList.add('ff8-encounter-rules-panel');
     preview=encounterGroupPreviewPanel(rule,refresh,()=>showEncounterSubtab("rules"));
     layout=LexeditorUI.panelLayout([table,preview],"ff8-encounter-rules",
       {layoutKey:"ff8-encounter-rules",defaultSizes:[1.35,1]});
@@ -238,18 +195,18 @@
   }
 
   // ---- Groups --------------------------------------------------------------
-  function encounterGroupSlotControl(row,index,refresh){
+  function encounterGroupSlotControl(row,index,refresh,origin){
     const value=row.encounters[index],formation=encounterRowById(value);
     const label=formation?`${value} · ${encounterName(formation)}`:`Formation ${value} (not in scene.out)`;
-    const link=hoverable({content:label,targetType:"encounters",targetId:value,targetLabel:`battle formation ${value}`,
+    const link=hoverable({content:label,targetType:"encounters",targetId:value,targetLabel:`battle formation ${value}`,class:'ff8-encounter-formation-link',
       activate:()=>showEncounterSubtab("formations","encounters",Number(value))});
-    const accept=next=>{row.encounters[index]=Number(next);refresh()};
-    const finder=el("button",{type:"button",title:"Choose a battle formation",
+    const accept=next=>{if(state.activeSource!=='mine'||!encounterRowById(next))return;row.encounters[index]=Number(next);refresh()};
+    const finder=el("button",{type:"button",title:"Choose a battle formation",disabled:state.activeSource!=='mine',class:'ff8-encounter-formation-finder',
       "aria-label":`Choose the battle formation for group ${row.id} battle ${index+1}`,
       onclick:event=>{event.preventDefault();event.stopPropagation();
         beginSearcher({type:"encounters",prompt:`Select the battle formation for group ${row.id}, battle ${index+1}.`,
           target:()=>showEncounterSubtab("formations"),
-          origin:()=>showEncounterSubtab("groups","encounterGroups",row.id),accept})}},
+          origin:origin||(()=>showEncounterSubtab("groups","encounterGroups",row.id)),accept})}},
       LexeditorUI.selectionIcon());
     const vanilla=worldRow(state.vanilla,"group",row.id)?.encounters?.[index];
     const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,
@@ -272,34 +229,23 @@
             targetId:rule.id,targetLabel:`encounter rule ${rule.id}`,
             activate:()=>{state.selected.encounterRule=rule.id;showEncounterSubtab("rules")}})}]});
   }
+  function encounterGroupPanel(row,refresh,origin,className='ff8-encounter-group-detail'){
+    const formations=row.encounters.map((value,index)=>{
+      const strip=el('div',{class:'ff8-encounter-formation-row',
+        'data-formation-position':index,'aria-label':`Battle ${index+1} of encounter group ${row.id}`},
+        el('div',{class:'ff8-encounter-formation-choice'},encounterGroupSlotControl(row,index,refresh,origin)),
+        encounterPreviewGrid(encounterRowById(value),origin));
+      return strip;
+    });
+    return detailPanel({title:'Encounter group',identity:recordId(row.id),className,
+      help:'The game chooses one of these eight formations when this group starts a battle. Hover a formation name to replace it. Changing an enemy changes that formation everywhere it is used.',
+      body:[detailSection({body:LexeditorUI.stack({fill:false,className:'ff8-encounter-formations'},...formations)}),
+        detailSection({title:'WHERE THIS GROUP IS USED',
+          help:infoHelp('These region and ground rules select this group. Open a rule to change its group.'),
+          body:[encounterGroupUsage(row)]})]});
+  }
   function encounterGroupDetail(row,prefs){
-    const refresh=()=>renderEncounters();
-    const slot=encounterGroupBattleSlot(),formationId=row.encounters[slot];
-    const battles=columnList({rows:row.encounters.map((value,index)=>({id:index,value})),key:entry=>entry.id,
-      fill:true,localSort:false,editable:true,class:"ff8-encounter-group-table ff8-record-list",
-      template:"80px minmax(220px,1.6fr) minmax(90px,.6fr)","aria-label":`Encounter group ${row.id} battles`,
-      columns:[{key:"id",label:"BATTLE",numberedId:true,sortable:false,
-        help:"Position in this group. The game picks one of the eight when a battle starts on this terrain.",
-        render:entry=>entry.id+1},
-      {key:"value",label:"FORMATION",sortable:false,
-        help:"The scene.out battle formation used by this position. Use the chooser to pick one from the Formations page, or open the name to edit it there.",
-        render:entry=>encounterGroupSlotControl(row,entry.id,refresh)},
-      {key:"preview",label:"PREVIEW",sortable:false,
-        help:"Show this battle's enemies in the preview below.",
-        render:entry=>el("button",{type:"button",class:"ff8-encounter-preview-pick","aria-pressed":String(entry.id===slot),
-          "aria-label":`Preview battle ${entry.id+1} of encounter group ${row.id}`,
-          onclick:()=>{state.encounterBattleSlot=entry.id;refresh()}},entry.id===slot?"Shown":"Show")}]});
-    return sharedDetail({...row,name:`ENCOUNTER GROUP ${row.id}`},prefs,[
-      detailSection({title:"BATTLES IN THIS GROUP",
-        help:infoHelp("The eight battle formations this group can start. Changing one changes which enemies appear on every terrain that uses this group."),
-        body:[battles]}),
-      detailSection({className:"ff8-encounter-preview-section",title:`FORMATION ${formationId} ENEMIES`,
-        help:infoHelp("The enemies in the battle chosen above: a name over each box and the level it fights at underneath. Open a name to edit that enemy."),
-        body:[encounterPreviewGrid(encounterRowById(formationId))]}),
-      detailSection({title:"WHERE THIS GROUP IS USED",
-        help:infoHelp("The region and ground rules that select this group. A group with no rule is stored but never reached."),
-        body:[encounterGroupUsage(row)]})],
-      "ff8-encounter-group-detail");
+    return encounterGroupPanel(row,()=>renderEncounters(),()=>showEncounterSubtab('groups','encounterGroups',row.id));
   }
   function encounterGroupEnemyNames(row){
     const names=new Set();

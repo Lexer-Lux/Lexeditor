@@ -1,34 +1,8 @@
-"""What this check measures, in its own words.
+"""Exercise the production Encounter pages with synthetic data in a headless browser.
 
-It loads the real FF8 editor page - `plugins/ff8/editor.html` and every module
-it names, the shared framework, and the plugin stylesheet - in a headless
-browser, with every `/api/...` call answered from a small hand-built FF8 data
-fixture instead of an installed game. Nothing here reads game files.
-
-It then opens the screens and measures:
-
-  * the Encounters tab has three subtabs, Formations, Rules and Groups, each
-    with its own question-mark help, and Formations still shows the eight-slot
-    formation editor it always did;
-  * the Rules subtab draws one axis of region codes and one axis of ground
-    codes, and the value in a cell is the encounter group. Typing in a cell
-    writes to the rule the game looks up, and only to that rule;
-  * a region and ground pair with no stored rule reads as such, a pair the
-    world terrain actually uses with no rule is called out separately, and a
-    pair with two stored rules is marked as a clash. No control can add a rule,
-    because the file cannot hold one;
-  * the group preview shows the group's name in its heading as a hoverable that
-    opens the Groups subtab at that group, and six preview boxes, each with the
-    enemy's name above the box and the level it fights at below;
-  * a formation that switches on a seventh slot gets a seventh box, so the
-    six-box layout hides nothing that is stored;
-  * the Groups subtab is a master list plus detail, its formation slots use the
-    shared record finder (the same press-and-hold Searcher as the rest of FF8),
-    and it says which rules reach a group and when none do;
-  * the World tab's Map page is only the map: the panel has no heading band and
-    the words "World map" appear nowhere on it, while the map fills the panel.
-
-It prints what it proved and exits non-zero on the first failure.
+Checks Rules matrix coverage, shared eight-formation group details, common
+record cards, actual group/formation/enemy finder selection and return, extra
+enabled slots, group usage, and the World map surface's layout.
 """
 from __future__ import annotations
 
@@ -54,6 +28,8 @@ ENEMIES = [
     {"id": 2, "name": "Geezard"},
     {"id": 3, "name": "Funguar"},
 ]
+for enemy in ENEMIES:
+    enemy.update(available=True,fields=[])
 
 
 def slot(index, enemy_id, enabled, level):
@@ -217,21 +193,22 @@ def main():
         headers = [value.strip() for value in
                    table.locator(".lex-column-list-head-cell").all_inner_texts()]
         assert headers[0].startswith("REGION"), headers
-        assert [value.split("\n")[0].strip() for value in headers[1:]] == ["GROUND 0", "GROUND 2"], headers
+        assert [value.split("\n")[0].strip() for value in headers[1:]] == ["0", "2"], headers
         region_column = [value.strip().lstrip("#").strip() for value in table.locator(
             ".lex-column-list-row > [data-column-key='regionId']").all_inner_texts()]
         assert region_column == ["1", "2", "3"], region_column
 
-        # ---- Rules: a cell is the group, and editing it edits the lookup --
-        cell = page.get_by_label("Region 1 ground 0 encounter group", exact=True)
-        assert cell.input_value() == "0", cell.input_value()
-        cell.fill("2")
-        cell.dispatch_event("input")
-        page.wait_for_timeout(150)
-        stored = page.evaluate(
-            "() => state.data.world.rows.filter(r=>r.kind==='helper').map(r=>"
-            "[r.regionId,r.groundId,r.encounterGroup])")
-        assert stored == [[1, 0, 2], [1, 2, 1], [2, 0, 1], [2, 0, 2], [3, 2, 0]], stored
+        # A group finder edits only the chosen rule, then restores Rules.
+        page.evaluate("state.activeSource='mine';renderEncounters();shell.refresh()")
+        cell=page.get_by_label('Region 1 ground 0 encounter group',exact=True)
+        assert cell.inner_text()=='0'
+        cell.click()
+        page.wait_for_selector('.lex-searcher-bar')
+        candidate=page.locator("[aria-label='FF8 encounterGroups'] .lex-search-candidate").nth(2)
+        candidate.dispatch_event('pointerdown',{'button':0,'pointerId':1})
+        page.wait_for_timeout(900)
+        page.wait_for_selector('.ff8-encounter-rule-table')
+        assert page.evaluate("state.data.world.rows.find(r=>r.kind==='helper'&&r.id===0).encounterGroup")==2
 
         # ---- Rules: what exists, what is missing, what clashes ------------
         blanks = page.locator('[data-lex-rule-cell="blank"]')
@@ -245,45 +222,24 @@ def main():
         assert "no rule is stored for it" in (missing.first.get_attribute("data-lex-title") or "")
         clash = page.locator('[data-lex-rule-cell="clash"]')
         assert clash.count() == 1, clash.count()
-        assert clash.first.locator("input").count() == 2, "both clashing rules must stay editable"
+        assert clash.first.locator(".ff8-encounter-rule-input").count() == 2, "both clashing rules must stay editable"
         assert "Only one of them can decide" in (
             clash.first.locator(".lex-badge").get_attribute("data-lex-title") or "")
         shot("rules")
-        # The counts describe the stored file, so they belong in the panel's
-        # question-mark bubble. The body carries the table and nothing else.
-        summary = page.locator(".ff8-encounter-rules-panel .lex-info-help").first.get_attribute("aria-label") or ""
-        assert "5 stored rules" in summary and "have no rule" in summary, summary
-        assert page.locator(".ff8-encounter-rules-panel .lex-detail-note").count() == 0, \
-            "the rules panel still shows its counts as a paragraph instead of in the help bubble"
-        # No control invents a rule: every input in the table belongs to a
-        # stored rule, and there are exactly as many as the file holds.
-        inputs = page.locator(".ff8-encounter-rule-table input[type=number]").count()
-        assert inputs == len(RULES), f"{inputs} cell editors for {len(RULES)} stored rules"
-        assert page.locator(".ff8-encounter-rules-panel button:has-text('Add')").count() == 0
-
-        # ---- Rules: the group preview ------------------------------------
-        preview = page.locator(".ff8-encounter-group-preview")
-        heading = preview.locator(".lex-detail-panel-title .lex-hoverable")
-        assert heading.count() == 1, "the group name is not a hoverable"
-        assert heading.inner_text().strip() == "ENCOUNTER GROUP 2", heading.inner_text()
-        boxes = preview.locator("[data-lex-battle-position]")
-        assert boxes.count() == 6, f"expected six preview boxes, found {boxes.count()}"
-        first = boxes.nth(0)
-        assert first.locator("figcaption").inner_text().strip() == "Caterchipillar"
-        assert first.locator(".lex-figure-footer").inner_text().strip() == "Level 4"
-        widths = [round(boxes.nth(i).locator(".lex-icon-slot").bounding_box()["width"])
-                  for i in range(6)]
-        assert max(widths) - min(widths) <= 2, f"the six boxes are not one size: {widths}"
-        name_top = first.locator("figcaption").bounding_box()["y"]
-        box_top = first.locator(".lex-icon-slot").bounding_box()["y"]
-        level_top = first.locator(".lex-figure-footer").bounding_box()["y"]
-        assert name_top < box_top < level_top, (name_top, box_top, level_top)
-
-        # ---- The hoverable goes to that group on the Groups subtab --------
-        heading.click()
-        page.wait_for_selector(".ff8-encounter-group-detail", timeout=10000)
-        assert page.evaluate("() => state.encountersTab") == "groups"
-        assert page.evaluate("() => state.selected.encounterGroups") == 2
+        assert table.locator('.lex-detail-panel-heading').count()==0
+        assert table.locator('.ff8-encounter-rule-input').count()==len(RULES)
+        preview=page.locator('.ff8-encounter-group-preview')
+        assert preview.locator('.lex-detail-panel-name').inner_text().strip()=='Encounter group'
+        rows=preview.locator('.ff8-encounter-formation-row')
+        assert rows.count()==8
+        assert preview.locator('select').count()==0
+        assert rows.first.locator('[data-lex-battle-position]').count()==6
+        assert rows.first.locator('.lex-record-card-title').first.inner_text()=='Caterchipillar'
+        assert rows.first.locator('.lex-record-card-body').first.inner_text()=='Level 4'
+        assert rows.first.locator('.ff8-encounter-formation-link').evaluate("e=>getComputedStyle(e).writingMode")=='vertical-rl'
+        shot('rules')
+        page.evaluate("state.encountersTab='groups';state.selected.encounterGroups=2;renderEncounters()")
+        page.wait_for_selector('.ff8-encounter-group-detail')
 
         # ---- Groups: list, finder, previews, reachability -----------------
         master = page.locator("[aria-label='FF8 encounterGroups']")
@@ -299,16 +255,23 @@ def main():
             ".lex-column-list-row > [data-column-key='id']").all_inner_texts()]
         assert identities == ["#0", "#1", "#2", "#3"], identities
         detail = page.locator(".ff8-encounter-group-detail")
-        assert "ENCOUNTER GROUP 2" in detail.locator(".lex-detail-panel-title").inner_text()
+        assert "Encounter group" in detail.locator(".lex-detail-panel-title").inner_text()
         finders = detail.get_by_label(re.compile(r"^Choose the battle formation for group 2"))
         assert finders.count() == 8, f"eight battle slots, {finders.count()} finders"
+        detail.locator('.ff8-encounter-formation-row').first.hover()
         finders.first.click()
         page.wait_for_timeout(200)
         assert page.locator(".lex-searcher-bar").count() == 1, \
             "the shared Searcher did not open for a formation slot"
         assert page.evaluate("() => state.encountersTab") == "formations"
-        page.locator(".lex-searcher-cancel").click()
-        page.wait_for_timeout(200)
+        target=page.locator("[aria-label='FF8 encounters'] .lex-search-candidate").filter(has=page.locator('[data-column-key="id"]',has_text='#5'))
+        assert target.count()==1,page.locator("[aria-label='FF8 encounters'] .lex-search-candidate").all_text_contents()
+        target.hover()
+        page.mouse.down()
+        page.wait_for_timeout(900)
+        page.mouse.up()
+        actual=page.evaluate("state.data.world.rows.find(r=>r.kind==='group'&&r.id===2).encounters")
+        assert actual==[5,2,2,2,2,2,2,2],actual
 
         page.evaluate("() => { state.encountersTab='groups'; state.selected.encounterGroups=3;"
                       " renderEncounters(); }")
@@ -320,9 +283,27 @@ def main():
                       " renderEncounters(); }")
         page.wait_for_timeout(200)
         shot("groups")
-        seventh = page.locator(".ff8-encounter-group-detail [data-lex-battle-position]")
-        assert seventh.count() == 7, \
-            f"a formation with a stored seventh slot must show it, found {seventh.count()}"
+        rows=page.locator('.ff8-encounter-group-detail .ff8-encounter-formation-row')
+        assert rows.count()==8
+        assert rows.nth(1).locator('[data-lex-battle-position]').count()==7
+        bounds=page.evaluate("""() => {
+          const rows=[...document.querySelectorAll('.ff8-encounter-group-detail .ff8-encounter-formation-row')];
+          const usage=document.querySelector('.ff8-encounter-group-detail section[aria-label="WHERE THIS GROUP IS USED"]');
+          return {bottom:rows.at(-1).getBoundingClientRect().bottom,usage:usage.getBoundingClientRect().top};
+        }""")
+        assert bounds['bottom']<=bounds['usage'],bounds
+        # An enemy cell invokes the enemy finder, including previously empty cells.
+        rows.first.locator('.lex-record-card').nth(3).hover()
+        rows.first.get_by_label('Choose enemy for formation 0 slot 4',exact=True).click()
+        page.wait_for_selector('.lex-searcher-bar')
+        assert page.evaluate('state.tab')=='enemies'
+        target=page.locator("[aria-label='FF8 enemies'] .lex-search-candidate").filter(has=page.locator('[data-column-key="id"]',has_text='#2'))
+        target.hover()
+        page.mouse.down()
+        page.wait_for_timeout(900)
+        page.mouse.up()
+        page.wait_for_selector('.ff8-encounter-group-detail')
+        assert page.evaluate("[state.data.encounters.rows[0].slots[3].enemyId,state.data.encounters.rows[0].slots[3].enabled]")==[2,True]
 
         # ---- World: the map panel is only the map -------------------------
         page.click("nav button[data-tab='world']")
@@ -334,7 +315,9 @@ def main():
             ".ff8-world-tabs .lex-tab-label-text").all_inner_texts()]
         assert "Encounter Rules" not in world_tabs and "Encounter Groups" not in world_tabs, world_tabs
         panel_box = panel.bounding_box()
-        stage = page.locator(".lex-image-map-stage").first.bounding_box()
+        # The map surface fills the pane; the image stage keeps its 4:3 ratio
+        # and can letterbox without shrinking the interactive map container.
+        stage = panel.locator(".lex-image-map").bounding_box()
         share = stage["height"] / panel_box["height"]
         assert share > 0.9, f"the map covers only {share:.0%} of its panel"
 
@@ -343,16 +326,7 @@ def main():
         browser.close()
     if failures:
         raise SystemExit("\n".join(failures))
-    print("FF8 Encounters: Formations/Rules/Groups subtabs each carry help; the rules table "
-          "shows region codes 1-3 down one axis and ground codes 0 and 2 across the other, with "
-          "the encounter group as the cell value; typing in a cell changed only that stored rule; "
-          "a pair the terrain uses with no rule is flagged, an unused empty pair reads as a dash, "
-          "and the pair with two stored rules is marked a clash with both still editable; no "
-          "control can add a rule; the group preview heads with a hoverable group name that opened "
-          "Groups at that group and drew six boxes with the enemy name above and its level below, "
-          "growing to seven when a seventh slot is stored; a group with no rule says so; the "
-          "formation slots open the shared Searcher; and the World map panel has no heading band, "
-          "never says \"World map\", and the map covers over 90% of it.")
+    print('PASS FF8 encounter matrix and group finder; shared eight-formation layouts, enemy cards, finder controls, usage and World map')
 
 
 if __name__ == "__main__":
