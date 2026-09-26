@@ -7134,6 +7134,8 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
  padding: var(--lex-detail-heading-padding, 4px); gap: var(--lex-panel-body-gap, 10px);
 }
 .lex-detail-panel-body > .lex-detail-section { flex: var(--lex-section-flex, 0 0 auto); }
+/* Natural stacks retain their rows' height; the panel scrolls their contents. */
+.lex-detail-panel-body > .lex-stack-natural { flex:0 0 auto; }
 .lex-tabbed-panel-content {
    min-width:0;min-height:0;flex:1 1 auto;overflow:auto;
  padding: var(--lex-detail-heading-padding, 4px);
