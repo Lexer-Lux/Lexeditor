@@ -626,6 +626,11 @@ def build_command_eligibility_patch(*, draw_once: bool = DEFAULT_DRAW_ONCE_PER_E
         lines.append(f"{address:X} = {payload.hex(' ').upper()}")
     if draw_once:
         lines.append(f"{DRAW_STATE:X} = 00 00 00 00")
+    if summon_gate:
+        # The flag sits in .rsrc, whose shipped byte there is 09. Left as is,
+        # the driver reads it as a refusal and says "No GF is junctioned" at
+        # the title screen, before any battle.
+        lines.append(f"{SUMMON_REFUSED_FLAG:X} = 00 00 00 00")
     return "\n".join(lines + [""])
 
 

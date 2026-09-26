@@ -208,6 +208,12 @@ class SummonGate(unittest.TestCase):
         patch = battle.build_command_eligibility_patch(draw_once=True, summon_gate=False)
         self.assertNotIn(f"{battle.SUMMON_GATE_CAVE:X}:", patch)
 
+    def test_the_refusal_flag_starts_lowered(self):
+        # The shipped .rsrc byte there is 09; unzeroed, the driver announces
+        # a refusal at the title screen.
+        patch = battle.build_command_eligibility_patch(draw_once=False, summon_gate=True)
+        self.assertIn(f"\n{battle.SUMMON_REFUSED_FLAG:X} = 00 00 00 00", patch)
+
     def test_the_gate_fits_between_the_caves_around_it(self):
         gate = battle._summon_gate_payload()
         render = battle._draw_render_payload(summon_gate=True)
