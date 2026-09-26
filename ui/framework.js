@@ -6500,17 +6500,14 @@ ${contents.path}`});
       "data-lex-history-control": true,
     }, restartIcon());
     const projectControl = mountProjectControl(options, context);
-    // Why nothing can be saved, in the row where saving happens: a session
-    // opened on a game with no mod shows the game's own data and locks every
-    // edit, and the reader should not have to guess that from a dead button.
-    const noModNote = sessionHasNoMod()
-      ? badge("NO MOD", {tone: "warning",
-          title: `This game has no mod yet, so the editor shows the game's own data. Create a mod from the project menu to change anything.`})
-      : null;
+    // A session with no mod says so once, in the mod selector ("Vanilla",
+    // locked), and the disabled save button's tooltip says why. A no-mod
+    // badge between Play and redo was a third copy of the same fact, and
+    // Lexer kept seeing it: "dude i can clearly still see this 'No mod' thing".
     const brandSlot = element("div", {class: "lex-brand-slot"}, brand);
     const leftActions = element("div", {class: "lex-shell-left-actions"}, context);
     const centerActions = element("div", {class: "lex-shell-center-actions"},
-      undo, save, game, noModNote, redo);
+      undo, save, game, redo);
     const rightActions = element("div", {class: "lex-shell-right-actions"}, uiScaleControl(), settings, shortcuts, help, info);
     // Restart acts on the window, so it sits with the window controls and is
     // shaped like them. Parked at the end of the developer group it read as a
@@ -6784,8 +6781,9 @@ ${contents.path}`});
       document.documentElement.setAttribute(
         "data-lex-project-readonly", String(projectReadonly));
       save.disabled = saveBusy || projectReadonly || !dirty;
-      save.title = saveBusy ? "Saving and building" :
-        (dirty ? `Save all ${dirty} unsaved change${dirty === 1 ? "" : "s"}` : "No unsaved changes");
+      save.title = saveBusy ? "Saving and building"
+        : projectReadonly ? "Nothing can be saved: this is the game's own data, shown read-only. Create a mod from the mod menu to change anything."
+        : (dirty ? `Save all ${dirty} unsaved change${dirty === 1 ? "" : "s"}` : "No unsaved changes");
       const saveCount = save.querySelector(".lex-save-count");
       if (saveCount) {
         saveCount.textContent = String(dirty);

@@ -551,7 +551,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-ff9-browser-") as name:
               };
             }""")
             assert state["readonly"] == "true", state
-            assert state["badge"] == "NO MOD", state
+            assert state["badge"] is None, state  # the selector says Vanilla; no third copy
             assert state["saveDisabled"] is True, state
             # The control names the source that is shown. It used to read the
             # folder a mod would use, which for FF9 was the shipped starter.

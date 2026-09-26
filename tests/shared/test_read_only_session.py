@@ -155,6 +155,7 @@ class RenderedLockTests(unittest.TestCase):
                     readonly:document.documentElement.getAttribute('data-lex-project-readonly'),
                     saveDisabled:save?save.disabled:null,
                     badge:document.querySelector('.lex-shell-header .lex-badge')?.textContent||null,
+                    saveTitle:save?(save.title||save.dataset.lexTitle||''):'',
                   };
                 }""")
                 page.locator("main input").click()
@@ -169,7 +170,8 @@ class RenderedLockTests(unittest.TestCase):
         result = self._shell("?lexNoMod=1")
         self.assertEqual(result["readonly"], "true", result)
         self.assertTrue(result["saveDisabled"], result)
-        self.assertEqual(result["badge"], "NO MOD", result)
+        self.assertIsNone(result["badge"], result)
+        self.assertIn("read-only", result["saveTitle"], result)
         self.assertEqual(result["typed"], "Original", result)
         self.assertEqual(result["saved"], 0, result)
 

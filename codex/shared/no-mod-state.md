@@ -11,9 +11,10 @@ exists it reads **Vanilla**, shows a lock, and its subtitle says the page is the
 game's own data. The mod menu lists the same Vanilla row so the list does not
 read as empty, beside **Add a Mod** and **Find a Mod**.
 
-The shell also carries a `NO MOD` badge next to the save button, and the save
-button is disabled: a session the host opened without a mod is read-only even
-when the plugin never grew its own read-only notion.
+The save button is disabled and its tooltip says why: a session the host
+opened without a mod is read-only even when the plugin never grew its own
+read-only notion. There is no separate `NO MOD` badge in the command row any
+more; it repeated what the selector already says.
 
 ## What used to happen, and why it mattered
 

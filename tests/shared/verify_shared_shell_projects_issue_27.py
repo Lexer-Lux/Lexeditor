@@ -37,11 +37,11 @@ assert ".lex-project-control" in css and ".lex-project-path" in css
 assert 'id: "global-game-process"' in framework and 'callWindow("game_process_status"' in framework
 assert 'document.createElementNS(namespace, running ? "rect" : "path")' in framework
 assert 'class: "lex-shell-left-actions"}, context)' in framework
-# The row carries the NO MOD badge beside the save button when the host
-# opened a game with no mod, so the reader can see why nothing can be saved.
+# A session with no mod says so in the mod selector and in the disabled save
+# button's tooltip; the row no longer carries a third "NO MOD" copy.
 assert 'class: "lex-shell-center-actions"},' in framework
-assert "undo, save, game, noModNote, redo);" in framework
-assert 'sessionHasNoMod()' in framework and '"NO MOD"' in framework
+assert "undo, save, game, redo);" in framework
+assert '"NO MOD"' not in framework
 # The command row is three cells (start | centre | end); the grid bounds the
 # project region, so no script measures and pins its width.
 assert 'class: "lex-shell-start"}, brandSlot, leftActions)' in framework

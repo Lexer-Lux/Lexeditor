@@ -75,7 +75,7 @@ def test_no_mod_session_shows_vanilla_values_and_locks_the_editor(no_mod_session
               };
             }""")
             assert state["readonly"] == "true", state
-            assert state["badge"] == "NO MOD", state
+            assert state["badge"] is None, state  # the selector says Vanilla; no third copy
             assert state["saveDisabled"] is True, state
             assert state["showsGameData"], state
             # The control names the source that is actually being shown. It
