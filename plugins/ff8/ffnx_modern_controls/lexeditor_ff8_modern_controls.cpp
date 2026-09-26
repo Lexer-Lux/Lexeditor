@@ -33,6 +33,7 @@ std::uint32_t last_state[3] = {~0u, ~0u, ~0u};
 std::uint32_t last_world_input_frame = ~0u;
 bool world_square_down = false;
 bool world_square_pressed = false;
+float vehicle_pressure = 0.0f;
 
 constexpr std::uintptr_t kWorldInputStates = 0x0203FDE8;
 constexpr std::uintptr_t kWorldInputParity = 0x020409BC;
@@ -130,6 +131,7 @@ void reset_world_input_state() {
     last_world_input_frame = ~0u;
     world_square_down = false;
     world_square_pressed = false;
+    vehicle_pressure = 0.0f;
 }
 
 std::uint32_t capture_world_input(bool suppress_legacy_drive) {
@@ -151,6 +153,7 @@ std::uint32_t capture_world_input(bool suppress_legacy_drive) {
 int vehicle_drive_axis(std::uint32_t keys) {
     const float left = use_sdl_gamepad ? sdlgamepad.leftTrigger : gamepad.leftTrigger;
     const float right = use_sdl_gamepad ? sdlgamepad.rightTrigger : gamepad.rightTrigger;
+    vehicle_pressure = lexeditor_vehicle_drive::pressure(left, right, (keys & kL2) != 0, (keys & kR2) != 0);
     return lexeditor_vehicle_drive::axis(left, right, (keys & kL2) != 0, (keys & kR2) != 0);
 }
 
@@ -293,13 +296,48 @@ int lexeditor_ff8_modern_world_axis(std::int8_t port, int type, std::int8_t offs
     return ff8_get_analog_value(port, type, offset);
 }
 
+// World physics accumulates input/48 (car), /16 (Garden), or /8 (Ragnarok)
+// into speed, then caps it at ESI. Scaling input alone changes acceleration,
+// not eventual speed. Keep the native terrain/turn cap and scale that cap.
+extern "C" __declspec(dllexport) int __cdecl lexeditor_ff8_vehicle_speed_limit(int native_limit) {
+    if (!lexeditor_ff8_modern_controls_world_active() ||
+        !lexeditor_vehicle_drive::supported_state(*reinterpret_cast<const unsigned *>(kWorldVehicle)))
+        return native_limit;
+    return lexeditor_vehicle_drive::speed_limit(native_limit, vehicle_pressure);
+}
+
+namespace { std::uintptr_t vehicle_cap_resume = 0x00558023; }
+
+extern "C" __declspec(dllexport) __declspec(naked) void lexeditor_ff8_vehicle_cap_hook() {
+    __asm {
+        push eax
+        push ecx
+        push edx
+        push esi
+        call lexeditor_ff8_vehicle_speed_limit
+        add esp, 4
+        mov esi, eax
+        pop edx
+        pop ecx
+        pop eax
+        // Displaced native instructions: set the negative bound and flags
+        // for the original signed conditional jump at 00558023.
+        mov eax, esi
+        neg eax
+        cmp edx, eax
+        jmp dword ptr [vehicle_cap_resume]
+    }
+}
+
 void lexeditor_ff8_modern_controls_install() {
     if (!ff8 || !enable_ff8_modern_controls || world_installed || battle_installed || bindings_installed) return;
 
     const unsigned char first[] = {0xE8, 0xD7, 0x7E, 0x01, 0x00};
     const unsigned char second[] = {0xE8, 0x6F, 0x6A, 0x01, 0x00};
+    const unsigned char cap[] = {0x8B, 0xC6, 0xF7, 0xD8, 0x3B, 0xD0, 0x7D, 0x04};
     if (!std::memcmp(reinterpret_cast<void *>(0x0053FBB4), first, sizeof first) &&
         !std::memcmp(reinterpret_cast<void *>(0x0054101C), second, sizeof second) &&
+        !std::memcmp(reinterpret_cast<void *>(0x0055801D), cap, sizeof cap) &&
         *reinterpret_cast<const unsigned char *>(0x0053FD4A) == 0xE8 &&
         get_relative_call(0x0053FD4A,0) == 0x0054A7F0 &&
         *reinterpret_cast<const unsigned char *>(0x0054111A) == 0xE8 &&
@@ -309,6 +347,8 @@ void lexeditor_ff8_modern_controls_install() {
         replace_call(0x0054101C, reinterpret_cast<void *>(&update_clear));
         replace_call(0x0053FD4A, reinterpret_cast<void *>(&world_actions));
         replace_call(0x0054111A, reinterpret_cast<void *>(&world_actions));
+        replace_function(0x0055801D, reinterpret_cast<void *>(&lexeditor_ff8_vehicle_cap_hook));
+        patch_code_byte(0x00558022, 0x90);
         world_installed = true;
     } else {
         ffnx_warning("Lexeditor Modern Controls: unsupported world-camera call sites; world camera changes not installed.\n");

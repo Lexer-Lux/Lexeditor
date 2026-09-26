@@ -20,8 +20,8 @@ inline bool supported_state(unsigned state) {
 // reversing ("the triggers for forward/reverse are well, reversed"). RT is
 // forward, LT is reverse. L2/R2 logical keys are digital fallbacks, so
 // keyboard users get the same controls.
-inline int axis(float left_trigger, float right_trigger,
-                bool left_digital = false, bool right_digital = false) {
+inline float pressure(float left_trigger, float right_trigger,
+                      bool left_digital = false, bool right_digital = false) {
     float left = std::isfinite(left_trigger) ? std::clamp(left_trigger, 0.0f, 1.0f) : 0.0f;
     float right = std::isfinite(right_trigger) ? std::clamp(right_trigger, 0.0f, 1.0f) : 0.0f;
     // A physical trigger can also set its logical L2/R2 bit. Do not let that
@@ -30,8 +30,24 @@ inline int axis(float left_trigger, float right_trigger,
     if (left_digital && left == 0.0f) left = 1.0f;
     if (right_digital && right == 0.0f) right = 1.0f;
     const float drive = right - left;
-    if (std::abs(drive) < 0.02f) return 128;
-    const float scale = drive > 0.0f ? 128.0f : 127.0f;
-    return std::clamp(128 - static_cast<int>(std::lround(drive * scale)), 0, 255);
+    return std::abs(drive) < 0.02f ? 0.0f : drive;
+}
+
+inline int speed_limit(int native_limit, float drive) {
+    if (native_limit <= 0 || !std::isfinite(drive)) return native_limit;
+    return std::clamp(static_cast<int>(std::lround(native_limit * std::abs(drive))),
+                      0, native_limit);
+}
+
+inline int axis(float left_trigger, float right_trigger,
+                bool left_digital = false, bool right_digital = false) {
+    const float drive = pressure(left_trigger, right_trigger, left_digital, right_digital);
+    if (!drive) return 128;
+    // Native input ignores magnitudes <=45; car acceleration then divides by
+    // 48. Cross both thresholds even for a light pull. The separate speed cap
+    // uses the original pressure, so this does not turn it into full throttle.
+    const float maximum = drive > 0.0f ? 127.0f : 128.0f;
+    const int magnitude = 49 + static_cast<int>(std::lround(std::abs(drive) * (maximum - 49)));
+    return 127 + (drive > 0.0f ? -magnitude : magnitude);
 }
 } // namespace lexeditor_vehicle_drive

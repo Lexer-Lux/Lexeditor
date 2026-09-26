@@ -20,6 +20,8 @@ on:
       - 'plugins/ff8/ffnx_toasts/**'
       - 'tests/ff8/verify_ff8_hp_colors_issue_481.py'
       - 'tests/ff8/verify_ff8_modern_controls_binary.py'
+      - 'tests/ff8/verify_ff8_vehicle_drive.py'
+      - 'tests/ff8/verify_ff8_vehicle_cap_binary.py'
       - 'tests/ff8/verify_ff8_reptile_atb_binary.py'
       - 'tests/ff8/verify_ff8_interaction_indicators_302.py'
       - 'tests/ff8/test_ff8_interaction_indicators_issue_302.py'
@@ -107,6 +109,7 @@ jobs:
           Get-Content "$env:RUNNER_TEMP\vcvars-build.txt" | ForEach-Object { if ($_ -match '^(.*?)=(.*)$') { Set-Content "env:\$($matches[1])" $matches[2] } }
           cmake --build ffnx/.build --config Release --parallel 4
           python editor/tests/ff8/verify_ff8_hp_colors_issue_481.py --compile
+          python editor/tests/ff8/verify_ff8_vehicle_drive.py --compiler cl
           Copy-Item ffnx/.build/bin/FFNx.dll candidate/AF3DN.P
           Copy-Item ffnx/.build/bin/FFNx.pdb candidate/FFNx.pdb
           Copy-Item ffnx/COPYING.TXT candidate/LICENSE
@@ -118,6 +121,7 @@ jobs:
           python editor/tests/ff8/verify_ff8_linked_runtime.py --verifier ffnx/tools/verify_issue51_runtime_artifact.py --driver candidate/AF3DN.P
           python editor/tests/ff8/verify_ff8_no_magic_consumption.py --driver candidate/AF3DN.P
           python editor/tests/ff8/verify_ff8_modern_controls_binary.py --driver candidate/AF3DN.P
+          python editor/tests/ff8/verify_ff8_vehicle_cap_binary.py --driver candidate/AF3DN.P
           python editor/tests/ff8/verify_ff8_reptile_atb_binary.py --driver candidate/AF3DN.P
           python editor/tests/ff8/verify_ff8_interaction_indicators_302.py --compile --compiler cl
           Push-Location editor
