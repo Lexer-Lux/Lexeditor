@@ -187,8 +187,8 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     const rows=players.filter(row=>`${row.name} ${row.map}`.toLowerCase().includes(query));
     const help=[
       "Identifies this opponent's rare-card ownership. Common cards are chosen from the levels below when a match starts.",
-      "The card rules you bring from previous regions. The game uses these when it offers to mix rules.",
-      "The card rules used in this opponent's region. These are separate from the rules you bring with you.",
+      "Rules active for this match. Other script flags and the unused Retry bit are preserved.",
+      "Which cards change hands after the match: none, one chosen card, the score difference, each side's captured cards, or all five cards.",
       "Percentage chance, from 0 to 100, that this opponent uses an available rare card.",
       "The gameplay effect of this argument has not been verified. Its original value is retained.",
       "The gameplay effect of this argument has not been verified. Its original value is retained.",
@@ -213,6 +213,25 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
               help:infoHelp(help[param.id]),control:LexeditorUI.readonlyField(param.value)});
             const before=state.vanilla?.fields?.rows?.find(row=>row.key===map.key)?.players?.find(row=>row.id===player.id)?.params?.find(row=>row.id===param.id);
             const update=value=>{param.value=Number(value);noteFieldEdit('fields',{field:param.name});shell.refresh()};
+            if(param.id===1&&param.mode==='literal'){
+              const names=['Open','Same','Plus','Random','Sudden Death','Retry (unused)','Same Wall','Elemental'];
+              return detailSection({title:'RULES',help:infoHelp(help[1]),body:LexeditorUI.tileGrid(names.map((name,bit)=>{
+                const input=el('input',{type:'checkbox',checked:!!(param.value&(1<<bit)),
+                  disabled:bit===5||!param.editable||state.activeSource!=='mine',
+                  'aria-label':`${entry.name} ${name}`,
+                  onchange:event=>update(event.target.checked?param.value|(1<<bit):param.value&~(1<<bit))});
+                return el('label',{},input,name);
+              }),{minWidth:140})});
+            }
+            if(param.id===2&&param.mode==='literal'){
+              const current=param.value&255,names=['None','One','Difference','Direct','All'];
+              const choices=names.map((name,value)=>({name,value}));
+              if(current>=names.length)choices.push({name:`Unverified (${current})`,value:current});
+              const input=selectControl(current,choices,value=>update((param.value&~255)|Number(value)));
+              input.setAttribute('aria-label',`${entry.name} Trade rule`);
+              input.disabled=!param.editable||state.activeSource!=='mine';
+              return detailField({label:'Trade rule',help:infoHelp(help[2]),control:input});
+            }
             if(param.id===6&&param.mode==='literal'){
               const levels=Array.from({length:7},(_,level)=>{
                 const check=el('input',{type:'checkbox',checked:!!(param.value&(1<<level)),

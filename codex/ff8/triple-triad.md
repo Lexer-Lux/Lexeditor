@@ -9,10 +9,30 @@ SYM entity names are internal identifiers. They are not a complete catalogue
 of displayed NPC names. Unresolved names must remain explicit; do not infer a
 named character from an arbitrary entity code.
 
-The documented argument order is deck ID, carried/known rules, region rules,
-rare-card chance, two unknown arguments, and the common-card level mask.
+The argument order is deck ID, match rules, trade rule, rare-card chance,
+two unknown arguments, and the common-card level mask. The earlier labels
+"Known rules" and "Region rules" confused script inputs with regional save
+state: argument 3 is the trade rule, not a second rule mask.
 Rare-card chance is a percentage from 0 to 100. The two unresolved arguments
 must not be labelled as proven AI profiles.
+
+## Match rules
+
+In the supported executable, CARDGAME stores argument 2 at `0x1DCD7A8` and
+argument 3 at `0x1DCD7AC`. Initialization at `0x534350` copies these to the
+active rule mask (`0x1DCD794`) and trade byte (`0x1DCD766`). Rule consumers
+test the low mask bits; for example `0x539E56` tests Open, `0x53A6E7` tests
+Elemental, and `0x53AD1D` tests Plus. Higher script flags are preserved.
+
+The low bits, in order, are Open, Same, Plus, Random, Sudden Death, unused
+Retry, Same Wall and Elemental. Trade values 0–4 are None, One, Difference,
+Direct and All. This matches the independent
+[Hyne rule controls](https://github.com/myst6re/hyne/blob/master/src/PageWidgets/TTriadEditor.cpp).
+Only established rule bits are editable. Retry remains unchanged.
+
+Variable-mode arguments contain references, not current rule values. For
+example Balamb Garden students pass variables 292 and 293 for the two inputs.
+The static editor must not display reference 292 as if it were a rule mask.
 
 ## Common-card pool
 

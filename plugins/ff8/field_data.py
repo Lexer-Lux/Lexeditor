@@ -32,7 +32,7 @@ CARDGAME_DWORD = 0x0000013A
 # https://wiki.ffrtt.ru/index.php/FF8/Field/Script/Opcodes/13A_CARDGAME
 # The last argument is the common-card level mask. Proven against the English
 # executable by verify_ff8_card_hand_levels.py; arguments 5 and 6 remain unknown.
-PARAM_NAMES = ("Deck ID", "Known rules", "Region rules", "Rare card chance",
+PARAM_NAMES = ("Deck ID", "Rules", "Trade rule", "Rare card chance",
                "Unknown setting 1", "Unknown setting 2", "Card levels")
 LITERAL_OPCODE = 0x07
 VARIABLE_OPCODES = {0x0A, 0x0C, 0x0E, 0x10, 0x11, 0x12}

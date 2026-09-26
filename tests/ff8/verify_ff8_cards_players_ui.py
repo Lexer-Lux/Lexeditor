@@ -87,6 +87,20 @@ def run(browser_path=None,screenshot=None):
             assert page.locator('section[aria-label="ALSO USES DECK 7"]').count() == 1
             assert page.locator('section[aria-label="ALSO USES DECK 1"]').count() == 1
             assert page.get_by_role('button', name='Open student', exact=True).count() == 1
+            page.evaluate("""() => {
+              state.activeSource='mine';
+              const params=state.data.fields.rows[0].players[0].params;
+              Object.assign(params.find(p=>p.id===1), {mode:'literal',editable:true,value:0x120});
+              params.push({id:2,name:'Trade rule',mode:'literal',editable:true,value:2});
+              cardsUI.render();
+            }""")
+            page.get_by_label('queen_est Open', exact=True).check()
+            assert page.evaluate('state.data.fields.rows[0].players[0].params.find(p=>p.id===1).value') == 0x121
+            assert page.get_by_label('queen_est Retry (unused)', exact=True).is_checked()
+            assert page.get_by_label('queen_est Retry (unused)', exact=True).is_disabled()
+            page.get_by_label('queen_est Trade rule', exact=True).select_option('3')
+            assert page.evaluate('state.data.fields.rows[0].players[0].params.find(p=>p.id===2).value') == 3
+            if screenshot:page.screenshot(path=str(Path(screenshot).with_stem('ff8-card-rules')))
             assert not errors,errors
             print('PASS current Cards/Players tabs, rank edits, native identifier, editable literal, protected variable and read-only source')
         finally:browser.close()
