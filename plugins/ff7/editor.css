@@ -1,4 +1,4 @@
-    @font-face {font-family:"FF7 Menu";src:url("/assets/ff7-menu.ttf?v=1") format("truetype");font-display:swap;ascent-override:88%;descent-override:12%;line-gap-override:0}
+    @font-face {font-family:"FF7 Menu";src:url("/assets/ff7-menu.ttf?v=2") format("truetype");font-display:swap;ascent-override:88%;descent-override:12%;line-gap-override:0}
     /* The FF7 window, as values: menu blue under white lettering with a dark
        drop, white window borders, and the game's own red for warnings. This
        layers over the shared neutral presentation; layout stays shared. */

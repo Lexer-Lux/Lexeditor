@@ -17,7 +17,7 @@ from .battle_scene import BattleSceneStore
 from .field_walkmesh import FieldWalkmeshStore
 from .memoria_baseline import ensure as ensure_baseline
 from . import memoria_manager, features, mod_compat
-from . import game_font, card_art
+from . import game_font, card_art, message_text
 from core.plugin_http import PluginRequestHandler
 
 
@@ -54,7 +54,7 @@ UNRESOLVED_AREAS = (
     ("StreamingAssets/p0data6*.bin and other unmatched p0data*.bin", "Audio evidence plus remaining packed Unity asset families",
      "Public research byte-identifies at least title BGM music033.akb in p0data61.bin/p0data601.bin, and Memoria recognizes p0data61.bin, p0data62.bin and p0data63.bin as mod-content bundle names. That does not establish a bounded schema for the whole p0data6* family, so Lexeditor keeps the remaining contents visible and unintegrated rather than guessing."),
     ("x64/FF9_Data/resources.assets (EmbeddedAsset/Text)", "Item, ability, command and other game message text",
-     "FF9 keeps its own item and ability names, the help text that describes them, and the other message tables inside the game's Unity resource files. The pinned Memoria CSV data this editor reads has no description column for any item, spell or ability, so Lexeditor cannot yet show or edit that text: reading it needs an extractor for those asset containers plus a writer that composes with them. The tables stay listed here as an unsupported area rather than being silently omitted."),
+     "Original US English item, action, support-ability and command descriptions are shown read-only in their detail panels. Editing message text, other languages and reading mod text replacements remain unsupported."),
 )
 
 
@@ -199,7 +199,8 @@ class Handler(PluginRequestHandler):
                 query = parse_qs(parsed.query)
                 key = query.get("key", [""])[0]
                 scene = query.get("scene", [None])[0]
-                self.json_response(BattleSceneStore().load(key) if key in BattleSceneStore.KEYS else FIELD_WALKMESH.load(key, scene) if key in FIELD_WALKMESH.KEYS else MemoriaDataStore().load(key))
+                payload = BattleSceneStore().load(key) if key in BattleSceneStore.KEYS else FIELD_WALKMESH.load(key, scene) if key in FIELD_WALKMESH.KEYS else MemoriaDataStore().load(key)
+                self.json_response(message_text.add_descriptions(payload, paths.GAME_ROOT))
             elif path == "/api/runtime": self.json_response(memoria_manager.status(paths.GAME_ROOT))
             elif path == "/api/runtime/available": self.json_response(memoria_manager.available())
             elif path == "/api/mod-compat": self.json_response(mod_compat.audit())

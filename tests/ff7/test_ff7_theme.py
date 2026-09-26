@@ -23,8 +23,11 @@ def font_member(cells: dict[int, list[tuple[int, int]]]) -> bytes:
         row, column = divmod(cell, game_font.ATLAS_COLUMNS)
         for dx, dy in points:
             pixels[(row * 12 + dy) * 256 + column * 12 + dx] = 3
+    palette = bytearray(game_font.TEX_PALETTES * game_font.TEX_ENTRIES * 4)
+    palette[4:8] = bytes([8, 8, 8, 254])
+    palette[12:16] = bytes([106, 106, 106, 254])
     return (b"\0" * game_font.TEX_HEADER
-            + b"\0" * game_font.TEX_PALETTES * game_font.TEX_ENTRIES * 4
+            + palette
             + bytes(pixels))
 
 
@@ -65,6 +68,15 @@ def test_font_rejects_a_truncated_member(tmp_path):
         lgp_fixture([(game_font.FONT_MEMBER, b"\0" * 100)]))
     with pytest.raises(ValueError, match="incomplete"):
         game_font.extract_glyphs(game)
+
+
+def test_font_shadow_is_not_white_ink():
+    member = bytearray(font_member({1: [(1, 1)]}))
+    pixel_start = game_font.TEX_HEADER + game_font.TEX_PALETTES * game_font.TEX_ENTRIES * 4
+    member[pixel_start + 2 * 256 + 14] = 1
+    width, _, pixels = game_font._read_pixels(bytes(member))
+    assert pixels[width + 13] == 1
+    assert pixels[2 * width + 14] == 0
 
 
 def test_theme_wiring_references_each_layer():

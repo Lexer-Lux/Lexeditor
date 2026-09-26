@@ -138,6 +138,10 @@ class UnityArchive:
             if absolute < 0 or size > len(data) - absolute:
                 raise ValueError(f"Unity archive object points outside {self.path.name}")
             records.append((info, absolute, size, type_id, type_index, flags))
+        # Version 15 records have 25 bytes plus alignment before the NEXT
+        # record. The script-reference count follows the last stripped byte
+        # directly, without that three-byte alignment.
+        self.object_table_end = pos - 3 if object_count else pos
         for info, absolute, size, type_id, type_index, flags in records:
             name = ""
             if type_id in NAMED_TYPES and size >= 4:
@@ -149,6 +153,30 @@ class UnityArchive:
                     except UnicodeDecodeError:
                         name = ""
             self.objects.append(UnityObject(info, absolute, size, type_id, type_index, flags, name))
+
+    def external_files(self) -> list[str]:
+        """Read the version-15 metadata's external PPtr file table."""
+        data, pos = self.data, self.object_table_end
+        count = _u32(data, pos); pos += 4
+        if count > MAX_OBJECTS:
+            raise ValueError("Unity archive has too many script references")
+        for _ in range(count):
+            pos = _align4(pos + 4) + 8
+        count = _u32(data, pos); pos += 4
+        if count > MAX_OBJECTS:
+            raise ValueError("Unity archive has too many external files")
+        result = []
+        for _ in range(count):
+            end = data.find(b"\0", pos, pos + 4096)
+            if end < 0:
+                raise ValueError("Unity external-file name is truncated")
+            pos = end + 1 + 20  # empty name, GUID and external type
+            end = data.find(b"\0", pos, pos + 4096)
+            if end < 0:
+                raise ValueError("Unity external-file path is truncated")
+            result.append(data[pos:end].decode("utf-8"))
+            pos = end + 1
+        return result
 
     def _object_payload(self, obj: UnityObject) -> bytes:
         data = self.data

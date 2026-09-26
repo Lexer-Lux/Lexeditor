@@ -70,3 +70,16 @@ No proprietary game data is included here.
   interface sounds are never shipped: they require local extraction from an
   installed copy when redistribution is not permitted.
 
+# Installed message descriptions
+
+- Memoria (MIT), `EmbadedTextResources.cs`, `EmbadedSentenseLoader.cs`,
+  `ItemImporter.cs` and `FF9TextTool.cs`, revision
+  `cbd22ae4f0f681e9f1b02dc6941d94bd4340b35d`: language-specific resource paths,
+  `[ENDN]` separation and row-index mapping. Research only; no source copied.
+  https://github.com/Albeoris/Memoria/tree/cbd22ae4f0f681e9f1b02dc6941d94bd4340b35d/Assembly-CSharp/Memoria/Assets/Text
+- AssetStudio (MIT), `ResourceManager.cs` and `SerializedFile.cs`: aligned
+  container paths, external-file table and PPtr references. Research only.
+  https://github.com/Perfare/AssetStudio/blob/master/AssetStudio/Classes/ResourceManager.cs
+  https://github.com/Perfare/AssetStudio/blob/master/AssetStudio/SerializedFile.cs
+- The text is read from the player's installation; no proprietary descriptions
+  or resource containers are distributed with Lexeditor.

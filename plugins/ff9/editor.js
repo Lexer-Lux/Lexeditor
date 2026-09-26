@@ -300,7 +300,14 @@
   // A record's panel carries no subtitle. The tab already says which records it
   // shows, and the file name and format under the record's name told a player
   // nothing they could act on.
-  function detail(data,row){const identity=sourceHasId(data)?recordId(row.id):null;if(data.key==="items")return detailPanel({className:"ff9-detail",title:row.name,identity,body:[itemSections(data,row)]});if(data.key==="shops")return shopDetail(data,row);if(data.key==="tetra-cards")return cardDetail(data,row);if(data.key.startsWith("ability-"))return abilityDetail(data,row);const visible=data.fields.filter(field=>!["id","comment"].includes(field.key.toLocaleLowerCase())),editable=visible.filter(field=>field.editable&&field.kind!=="stored"&&!readOnlyNote(data,field)),stored=visible.filter(field=>!field.editable||field.kind==="stored"||readOnlyNote(data,field));const body=[];if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));return detailPanel({className:"ff9-detail",title:row.name,identity,body})}
+  function descriptionSection(data,row){
+    if(!["items","actions","abilities","commands"].includes(data.key))return null;
+    const body=data.descriptionError?LexeditorUI.detailNote(`Could not read the installed description: ${data.descriptionError}`)
+      :detailField({label:"VANILLA DESCRIPTION",help:infoHelp("The game's original US English help text for this item or ability. Read only; changes made by mods are not shown here."),
+        control:LexeditorUI.detailText(row.vanillaDescription||"No description for this record.")});
+    return detailSection({title:"DESCRIPTION",body});
+  }
+  function detail(data,row){const identity=sourceHasId(data)?recordId(row.id):null;if(data.key==="items")return detailPanel({className:"ff9-detail",title:row.name,identity,body:[descriptionSection(data,row),itemSections(data,row)]});if(data.key==="shops")return shopDetail(data,row);if(data.key==="tetra-cards")return cardDetail(data,row);if(data.key.startsWith("ability-"))return abilityDetail(data,row);const visible=data.fields.filter(field=>!["id","comment"].includes(field.key.toLocaleLowerCase())),editable=visible.filter(field=>field.editable&&field.kind!=="stored"&&!readOnlyNote(data,field)),stored=visible.filter(field=>!field.editable||field.kind==="stored"||readOnlyNote(data,field));const body=[descriptionSection(data,row)];if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));return detailPanel({className:"ff9-detail",title:row.name,identity,body})}
   const gilValue=value=>value===""||value===null||value===undefined?"—":`${LexeditorUI.formatNumber(value)} gil`;
   // A shop record is one row of item ids. The ids are the editable truth, but
   // a reader needs the items themselves, so the panel resolves every id to the

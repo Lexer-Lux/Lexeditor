@@ -5,7 +5,7 @@ The US menu lettering lives in the installed ``menu_us.lgp`` archive member
 256x256 8-bit pixels. Glyphs sit in a fixed 12-pixel grid, 21 columns wide,
 in FF7 text-code order (``format_codec.TEXT_MAP``): code 0x01 is the top-left
 cell, and code 0x00 is the space, which has no cell. Any nonzero pixel index
-is glyph ink.
+is not necessarily glyph ink: the darkest nonzero entry is the drop shadow.
 
 Like the FF8 menu font, the generated TTF is written to the player's private
 game-data cache only; the atlas never ships with Lexeditor. Advances are the
@@ -27,7 +27,7 @@ from .format_codec import TEXT_MAP
 FONT_NAME = "FF7Menu"
 FONT_PATH = paths.DATA_ROOT / "generated" / "ff7-menu.ttf"
 FONT_REVISION_PATH = paths.DATA_ROOT / "generated" / "ff7-menu.revision"
-FONT_REVISION = "1"
+FONT_REVISION = "2"
 FONT_MEMBER = "usfont_h.tex"
 CELL = 12
 ATLAS_COLUMNS = 21
@@ -60,7 +60,16 @@ def _read_pixels(member: bytes) -> tuple[int, int, bytes]:
     pixels = member[offset:offset + side * side]
     if any(byte >= TEX_ENTRIES for byte in pixels):
         raise ValueError("FF7 usfont_h.TEX uses an unknown palette entry")
-    return side, side, pixels
+    palette = member[TEX_HEADER:TEX_HEADER + TEX_ENTRIES * 4]
+    brightness = [sum(palette[index * 4:index * 4 + 3]) for index in range(TEX_ENTRIES)]
+    brightest = max(brightness)
+    if not brightest:
+        raise ValueError("FF7 usfont_h.TEX has no visible palette ink")
+    # White contours must not incorporate the black drop shadow; that filled
+    # the counters of small letters and made the web font look unlike the game.
+    ink = bytes(int(palette[index * 4 + 3] != 0 and brightness[index] >= brightest / 2)
+                for index in range(TEX_ENTRIES))
+    return side, side, pixels.translate(ink + bytes(256 - len(ink)))
 
 
 def _cell_ink(width: int, pixels: bytes, left: int, top: int) -> list[int] | None:

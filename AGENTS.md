@@ -66,10 +66,11 @@
 
 ### Standard plugin issue structure
 
-Every game plugin has one parent issue titled `Plugin`, identified by its game
-label, which is the plugin's id. An edition that runs another plugin's code
+Every game plugin has five independent issues, identified by its game
+label, which is the plugin's id. Do not create a `Plugin` parent issue.
+An edition that runs another plugin's code
 shares that plugin's label and issues through `issueLabel` in its
-`plugin.json` (ff7-2013 files under `ff7`). Link these five actual subissues in this order,
+`plugin.json` (ff7-2013 files under `ff7`). Keep these five issues in this order,
 with the same game label on each. The developer page shows their status per
 game, and `tests/shared/test_plugin_issues.py` fails when a game lacks one. Mark
 `UX Refinement` and `Mod Loader` as blocked by `Create Editor` with GitHub's
@@ -81,7 +82,11 @@ issue dependencies:
    unsupported rows or call raw-file access full integration. Only Lexer can
    exclude areas as not worth the effort; ask when scope or value is in doubt.
    Unknown semantics remain protected until proven; report the gap, not success.
-2. `UX Refinement` (blocked by `Create Editor`): Make the editor's screens
+2. `UX Refinement` (blocked by `Create Editor`): Starts `waiting`, as explicitly
+   requested by Lexer; its final unchecked action is for Lexer to identify
+   the screens or interactions to refine. This is a specific exception to the
+   default actionable workflow, not a rule for arbitrary deferred work.
+   Make the editor's screens
    usable and human-friendly with shared controls, clear help and good
    navigation. Inspect rendered screens and interactions, repair UI defects,
    and check small windows and large UI scales.
@@ -100,13 +105,12 @@ issue dependencies:
    CRT filters for the game and make them work, where Lexer wants them. It
    starts `waiting`, since each step needs Lexer in the running game.
 
-Reuse existing matching issues and preserve their discussion. These five
-subissues track one plugin, not four separate efforts.
-Keep game names out of issue titles. Each open subissue needs its own truthful
-workflow label; the `Plugin` parent carries none, because its status is its
-subissues' statuses. Source, rendered UI, mod compatibility, delivered candidate and
-in-game acceptance are separate checks; the parent is not complete while required
-scope remains. Do not infer permission to merge from completion.
+Reuse existing matching issues and preserve their discussion. Retire existing
+`Plugin` containers by detaching their children and closing the container as
+not planned; never delete the issues or their discussion. Keep game names out
+of issue titles. Each open issue needs its own workflow label. Source, rendered
+UI, mod compatibility, delivered candidate and in-game acceptance are separate
+checks. Do not infer permission to merge from completion.
 
 Issue/PR administration belongs here. Keep private worker coordination, chat
 URLs, monitoring, recovery and cleanup out of `docs/ADDING_A_GAME.md`; that guide
@@ -141,8 +145,7 @@ files, screenshots, or GitHub API metadata into this repository.
 
 ### Workflow labels
 
-Every open issue has exactly one of these workflow labels, except a `Plugin`
-parent, which has none (see above). Keep game, bug,
+Every open issue has exactly one of these workflow labels. Keep game, bug,
 enhancement, and priority labels separate from workflow status.
 
 | Human status | GitHub label | Meaning |

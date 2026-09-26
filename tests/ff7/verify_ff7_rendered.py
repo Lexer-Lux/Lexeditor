@@ -89,7 +89,7 @@ class RenderedTests(unittest.TestCase):
         html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
         code=HOST+'\nwindow.__lexeditorPlugin='+json.dumps({'id':edition,'name':'FF7 fixture','edition':edition})+';\n'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')
         html=html.replace('<script src="/shared/framework.js"></script>','<script>'+code+'</script>')
-        scripts=''.join('<script>'+(ROOT/'plugins/ff7/'+name).read_text(encoding='utf-8')+'</script>' for name in ('editor.js','controls.js','details.js','workspace.js'))
+        scripts=''.join('<script>'+(ROOT/'plugins/ff7'/name).read_text(encoding='utf-8')+'</script>' for name in ('editor.js','controls.js','details.js','workspace.js'))
         html=html.replace('<script src="editor.js"></script>',scripts)
         for extra in ('controls.js','details.js','workspace.js'):
             html=html.replace('<script src="%s"></script>'%extra,'')
