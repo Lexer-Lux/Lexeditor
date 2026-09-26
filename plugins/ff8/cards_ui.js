@@ -206,7 +206,6 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       else if(!map._loaded)body.push(LexeditorUI.loadingPanel({label:'Loading opponent settings'}));
       else {
         const calls=(map.players||[]).filter(player=>player.entity===entry.entity);
-        if(calls.length>1)body.push(LexeditorUI.detailNote('This opponent has more than one card-game setup. The game script decides which setup is used.'));
         calls.forEach((player,index)=>{
           const fields=(player.params||[]).map(param=>{
             if(param.id===4||param.id===5)return detailField({label:param.name,
@@ -257,7 +256,8 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
               control:sourceControl(!variable&&param.id===3?LexeditorUI.unitField(input,'%'):input,()=>param.value,before?.value,[],update)});
           });
           if(calls.length===1)body.push(...fields);
-          else body.push(detailSection({title:`Setup ${index+1}`,body:fields}));
+          else body.push(detailSection({title:`Setup ${index+1}`,
+            help:infoHelp('The game script chooses which of this opponent\'s card-game setups is used.'),body:fields}));
           const levels=player.params?.find(param=>param.id===6);
           if(levels?.mode==='literal'){
             const mask=(levels.value&255)===0?1:levels.value&127;
