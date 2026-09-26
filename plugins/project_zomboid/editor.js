@@ -355,12 +355,36 @@ function structuredRows(kind){
   const {key,dir}=state.sort,spec=config.fields.find(field=>field.key===key);
   return filtered.sort((a,b)=>dir*String(spec?draftValue(kind,a,key):(a[key]??"")).localeCompare(String(spec?draftValue(kind,b,key):(b[key]??"")),undefined,{numeric:true}));
 }
+function creationSources(kind){return scripts.rows.filter(row=>row.editable&&(kind==="scripts"||scriptEditorTabs[row.kind]===kind))}
+function beginRecordCreation(kind){
+  const U=LexeditorUI,sources=creationSources(kind);
+  if(dirtyCount()||!sources.length)return;
+  const name=U.el("input",{type:"text",required:true,pattern:"[A-Za-z_][A-Za-z0-9_]*","aria-label":"New record name"});
+  const source=U.el("select",{"aria-label":"Copy from record"},...sources.map((row,index)=>
+    U.el("option",{value:index},`${row.module}.${row.name} (${row.kind}) — ${row.path}`)));
+  const create=async()=>{
+    if(!name.reportValidity())return;
+    const row=sources[Number(source.value)];
+    try{
+      await api("/api/zedscript/create",{method:"POST",body:JSON.stringify({path:row.path,module:row.module,kind:row.kind,source:row.name,name:name.value,sha256:row.sha256})});
+      const view=kind==="scripts"?scriptState:structuredState[kind];view.query=name.value;view.page=0;view.selected=null;
+      await reload();setStatus("Record created");
+    }catch(error){setStatus(error.message,true)}
+  };
+  main.replaceChildren(U.detailPanel({title:"Create record",body:[
+    U.detailField({label:"Name",control:name}),
+    U.detailField({label:"Copy from",control:source,help:U.infoHelp("Copies this record into the same module and file under a new name. Its properties and existing references are preserved. Other records continue to use the original until their references are changed.")}),
+    U.actionRow(U.el("button",{type:"button",onclick:render},"Cancel"),U.el("button",{type:"button",onclick:create},"Create record")),
+  ]}));name.focus();
+}
+function recordCreationOptions(kind){return {add:()=>beginRecordCreation(kind),addDisabled:!!dirtyCount()||!creationSources(kind).length,
+  addDisabledReason:dirtyCount()?"Save or discard your edits before creating a record.":"This view needs an existing supported record to use as a template."}}
 function renderStructured(kind){
   const config=structuredConfigs[kind],state=structuredState[kind],rows=structuredRows(kind);
   if(state.selected&&!rows.some(row=>row.key===state.selected))state.selected=null;
   if(!state.selected&&rows.length)state.selected=rows[0].key;
   const tableSpecs=(tableFieldKeys[kind]||[]).map(key=>config.fields.find(spec=>spec.key===key)).filter(Boolean);
-  const view=LexeditorUI.pagedListDetail({addDisabledReason:`Project Zomboid reads these ${config.noun} from its own files; Lexeditor edits the existing ones and does not add new ones yet.`,rows,key:row=>row.key,selected:state.selected,page:state.page,pageSize:state.pageSize,noun:config.noun,slots:false,className:"pz-record-layout",splitKey:"project-zomboid-"+kind,rowsKey:"project-zomboid-"+kind,fit:{minRowHeight:34},
+  const view=LexeditorUI.pagedListDetail({...recordCreationOptions(kind),rows,key:row=>row.key,selected:state.selected,page:state.page,pageSize:state.pageSize,noun:config.noun,slots:false,className:"pz-record-layout",splitKey:"project-zomboid-"+kind,rowsKey:"project-zomboid-"+kind,fit:{minRowHeight:34},
     search:{key:"project-zomboid-"+kind,value:state.query,label:"Search "+config.title,change:value=>{state.query=value;state.page=0;renderStructured(kind)}},
     sync:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.selected!==null)state.selected=next.selected},
     change:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.selected!==null)state.selected=next.selected;renderStructured(kind)},
@@ -411,7 +435,7 @@ function scriptDetail(row){
 }
 function renderScripts(){
   const rows=scriptRows();if(scriptState.selected&&!rows.some(row=>row.key===scriptState.selected))scriptState.selected=null;if(!scriptState.selected&&rows.length)scriptState.selected=rows[0].key;
-  const view=LexeditorUI.pagedListDetail({addDisabledReason:"Project Zomboid mods can add script records in their own script files, but Lexeditor only edits existing ones. Adding one is not supported yet.",rows,key:row=>row.key,selected:scriptState.selected,page:scriptState.page,pageSize:scriptState.pageSize,noun:"script records",slots:false,className:"pz-script-layout",splitKey:"project-zomboid-scripts",rowsKey:"project-zomboid-scripts",fit:{minRowHeight:34},
+  const view=LexeditorUI.pagedListDetail({...recordCreationOptions("scripts"),rows,key:row=>row.key,selected:scriptState.selected,page:scriptState.page,pageSize:scriptState.pageSize,noun:"script records",slots:false,className:"pz-script-layout",splitKey:"project-zomboid-scripts",rowsKey:"project-zomboid-scripts",fit:{minRowHeight:34},
     search:{key:"project-zomboid-scripts",value:scriptState.query,label:"Search Build 42 script records",change:value=>{scriptState.query=value;scriptState.page=0;renderScripts()}},
     sync:next=>{scriptState.page=next.page;scriptState.pageSize=next.pageSize;if(next.selected!==null)scriptState.selected=next.selected},
     change:next=>{scriptState.page=next.page;scriptState.pageSize=next.pageSize;if(next.selected!==null)scriptState.selected=next.selected;renderScripts()},
