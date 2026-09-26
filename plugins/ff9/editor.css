@@ -18,7 +18,7 @@
   --lex-bg:#14181c;--lex-panel:#575a59;--lex-panel-2:#4a4d4c;--lex-border:#707878;
   --lex-text:#f4f4f4;--lex-muted:#cfd2d2;--lex-accent:#4060b0;--lex-accent-text:#fff;
   --lex-highlight:#fff;--lex-success:#d8dcdc;--lex-radius:5px;--lex-tab-hover-radius:5px;
-  --lex-card-bg:#383c3c;--lex-card-fg:#fff;
+  --lex-card-bg:#383c3c;--lex-card-fg:#fff;--lex-card-ratio:168/208;
 
   --ff9-stone:repeating-linear-gradient(118deg,#ffffff08 0 1px,#0000 1px 6px),
     repeating-linear-gradient(28deg,#0000000d 0 1px,#0000 1px 4px),
