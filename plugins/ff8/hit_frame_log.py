@@ -8,7 +8,7 @@ later, and the instruction that does so is not yet identified statically
 While enabled, every battle animation-sequence instruction the game runs is
 appended to `lexeditor-hitframe.log` in the game folder as one line:
 
-    <tsc hi><tsc lo> <sequence owner> <instruction address> <opcode> <HP 0> .. <HP 6>
+    <tsc hi><tsc lo> <sequence owner> <instruction address> <opcode> <HP 0> .. <HP 6> <motion>
 
 `tsc` orders the lines in time. The owner is the sequence entity the engine
 is running (`[01D98204]`). The seven HP values are battle participants 0-6
@@ -24,6 +24,12 @@ generic sequence interpreter `0050DB40` calls as `handler(opcode, &cursor)`
 for every opcode below 0xC0. The hook replaces the handler's first two
 instructions, runs them unchanged after logging, and resumes at `00504BB7`.
 Off by default: with it off, no byte is written.
+
+`motion` is the word at `01D97718`: one bit per animation object with an
+active motion path. The physical-attack task releases the damage only once it
+is 0 (codex/ff8/timed-hits.md, "What releases a hit"), so the log shows
+whether a hit lands when the attacker's path ends - the time indicator needs
+that to predict a hit before it lands.
 """
 
 from __future__ import annotations
@@ -60,6 +66,7 @@ LINE = DATA + 0x100  # up to 0x70 bytes: 39 + 7 x 9 + 2
 LOG_NAME = "lexeditor-hitframe.log"
 PARTICIPANT_HP = 0x01D27B28  # + participant x 0xD0
 LOGGED_PARTICIPANTS = 7
+MOTION_PATHS = 0x01D97718  # word: a bit per object whose motion path is running
 
 ASSEMBLY = f"""
 opcode:
@@ -149,6 +156,12 @@ hp_next:
     inc esi
     cmp esi, {LOGGED_PARTICIPANTS}
     jb hp_next
+    mov byte ptr [edi], 0x20
+    inc edi
+    movzx eax, word ptr [{MOTION_PATHS:#x}]
+    shl eax, 16
+    mov ecx, 4
+    call hexn
     mov word ptr [edi], 0x0a0d
     add edi, 2
     push 0
@@ -189,18 +202,20 @@ CODE = bytes.fromhex(
     "EC 10 8B 44 24 14 68 27 FE 48 00 C3 51 52 BB 00"
     "94 7A 02 8B 03 85 C0 75 36 6A 00 68 80 00 00 00"
     "6A 04 6A 00 6A 01 68 00 00 00 40 8D 43 60 50 FF"
-    "15 C8 91 B6 00 89 03 83 F8 FF 0F 84 91 00 00 00"
+    "15 C8 91 B6 00 89 03 83 F8 FF 0F 84 AD 00 00 00"
     "6A 02 6A 00 6A 00 50 FF 15 C4 91 B6 00 8B 03 83"
-    "F8 FF 74 7D 8D BB 00 01 00 00 0F 31 50 89 D0 E8"
-    "71 00 00 00 58 E8 6B 00 00 00 C6 07 20 47 89 F0"
-    "E8 60 00 00 00 C6 07 20 47 58 E8 56 00 00 00 C6"
-    "07 20 47 58 C1 E0 18 B9 02 00 00 00 E8 49 00 00"
-    "00 31 F6 C6 07 20 47 69 C6 D0 00 00 00 8B 80 28"
-    "7B D2 01 E8 2D 00 00 00 46 83 FE 07 72 E5 66 C7"
-    "07 0D 0A 83 C7 02 6A 00 8D 43 04 50 8D 83 00 01"
-    "00 00 89 F9 29 C1 51 50 FF 33 FF 15 AC 90 B6 00"
-    "C3 83 C4 08 C3 B9 08 00 00 00 C1 C0 04 89 C2 83"
-    "E2 0F 8A 54 13 40 88 17 47 49 75 EE C3"
+    "F8 FF 0F 84 95 00 00 00 8D BB 00 01 00 00 0F 31"
+    "50 89 D0 E8 89 00 00 00 58 E8 83 00 00 00 C6 07"
+    "20 47 89 F0 E8 78 00 00 00 C6 07 20 47 58 E8 6E"
+    "00 00 00 C6 07 20 47 58 C1 E0 18 B9 02 00 00 00"
+    "E8 61 00 00 00 31 F6 C6 07 20 47 69 C6 D0 00 00"
+    "00 8B 80 28 7B D2 01 E8 45 00 00 00 46 83 FE 07"
+    "72 E5 C6 07 20 47 0F B7 05 18 77 D9 01 C1 E0 10"
+    "B9 04 00 00 00 E8 2C 00 00 00 66 C7 07 0D 0A 83"
+    "C7 02 6A 00 8D 43 04 50 8D 83 00 01 00 00 89 F9"
+    "29 C1 51 50 FF 33 FF 15 AC 90 B6 00 C3 83 C4 08"
+    "C3 B9 08 00 00 00 C1 C0 04 89 C2 83 E2 0F 8A 54"
+    "13 40 88 17 47 49 75 EE C3"
 )
 ENTRY = {"opcode": 0x0, "damage": 0x28}
 

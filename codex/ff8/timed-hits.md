@@ -103,6 +103,40 @@ absolute VAs; file offset = VA − `0x400000`. Battle participants are
   the timing verdict, and judges Squall at `0048F530` only while `01D28D90`
   is set.
 
+## What releases a hit (2026-09-27, static; for the time indicator)
+
+The time indicator needs a hit's landing time before it lands. Static trace:
+
+- The battle step queues the action, then the damage. `00485CE7` calls
+  `0047E3F0(0x68, 0x80, action)`: message type 0x68 (104) in the animation
+  scheduler queue at `01D96D68`. Then `00485D46`/`00485D6B` call
+  `0047E200(0048F350 or 0048F3F0)`, which is `00500DF0(10, 0x80, func)`:
+  message type 10 with the damage routine.
+- The scheduler `00500CC0` dispatches messages in order. A dispatched
+  message raises the current level to its priority (`[B8A3F0]`), so a later
+  message of the same priority (0x80) waits until the earlier one's state
+  byte (`+1`) becomes 0x0F/0xFF. Type 10 is `00500A3D`: it calls the function
+  at once. So damage lands the moment the action message is released.
+- Type 0x68 goes through `00502380` to `0050A790`, which picks a task by the
+  action kind (`[01D99A50] + 1`, table `0050A89C`/`0050A878`): kind 2 →
+  `0050B2A0` (physical, unless `+4` is 0x46 or 0x0F → `0050A9A0`), and the
+  others `0050BD00`/`0050BD80`, `0050B830`, `0050B0C0`, `0050BDC0`,
+  `0050BEE0`, `0050BB00`, `0050B190`, `0050BC20`. The task keeps the message
+  at `+0x10` and releases it with `mov byte [msg + 1], 0xFF`.
+- The physical task releases at `0050B7C8`, in its last state, after
+  `01D97718` is 0. `01D97718` is a bit per animation object with an active
+  motion path: the path interpolator around `005035E0` clears the object's
+  bit (`0050375B`) when its last key is reached. `0050B190` (spells and
+  effects) releases at `0050B266` once `0050AE80` reports every sequence
+  owner idle, the effect module done (`[01D96AAC]` = 0) and no motion path.
+- So a physical hit probably lands when the attacker's motion path ends,
+  and a spell when its effect ends. A path's keys are known when it starts,
+  which would let the indicator predict the landing time. Not yet shown: which
+  path an Attack waits on, how many frames separate its end from the damage,
+  and the frame rate these counts use. That needs a runtime log of
+  `01D97718` and the physical task's state (`[task + 0xD]`) next to the
+  existing `0048FE20` lines.
+
 ## Not yet established
 
 - Which sequence opcode marks the moment damage is displayed (the hit frame)
