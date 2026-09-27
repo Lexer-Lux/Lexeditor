@@ -1098,6 +1098,13 @@
     return options;
   };
 
+  // An identifier such as ADVERT_WHR_QUARTER_SHOES has no space to wrap at,
+  // so a narrow heading clipped it. It may break after its own separators
+  // instead, never inside a word; <wbr> adds no text, so copying the name and
+  // a game's bitmap redraw read exactly what they did before.
+  const breakableName = value => typeof value !== "string" ? [value]
+    : value.split(/(?<=[_./\\])(?=.)/).flatMap((part, index) => index ? [element("wbr"), part] : [part]);
+
   const detailPanel = (options = {}) => {
     options = adoptBodyAudio(options);
     const sound = options.audio?.src ? recordAudio(options.audio) : null;
@@ -1131,7 +1138,7 @@
             oninput: event => options.renameRecord(event.target.value, event),
           }))
         : element("h2", {class: "lex-detail-panel-title"},
-          element("span", {class: "lex-detail-panel-name"}, options.title ?? ""));
+          element("span", {class: "lex-detail-panel-name"}, ...breakableName(options.title ?? "")));
     // The name is the one thing on a record people most often want to paste
     // somewhere else, so it copies like any property value, from its right.
     const titleText = () => {
@@ -10676,7 +10683,10 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
   const LABEL_MIN_PX = 9;
   const labelLeftOverflow = label => {
     const left=label.getBoundingClientRect().left;
-    return Math.max(0,...[...label.children].map(child=>left-child.getBoundingClientRect().left));
+    // A child with no box (a <wbr> break point) reports x=0, which read as
+    // text far off the label's left edge and shrank the name to the floor.
+    return Math.max(0,...[...label.children].map(child=>child.getBoundingClientRect())
+      .filter(box=>box.width||box.height).map(box=>left-box.left));
   };
   const widenLabelLane = label => {
     const lane = label.closest('.lex-tweak-card-grid,.lex-detail-panel,.lex-detail,.lex-detail-section') || label.parentElement?.parentElement || label.parentElement;
@@ -10752,10 +10762,14 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       if (label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1) widenLabelLane(label);
       label.style.whiteSpace = wrap;
     }
-    const minimum = label.classList.contains('lex-detail-panel-name') ? 14 : LABEL_MIN_PX;
-    while (size > minimum && overflows()) {
-      size -= .5;
-      label.style.fontSize = `${size}px`;
+    // A record's name stops shrinking at 14px while wrapping can still help;
+    // one long word that fits nowhere keeps shrinking to the shared floor
+    // rather than being clipped.
+    for (const minimum of label.classList.contains('lex-detail-panel-name') ? [14, LABEL_MIN_PX] : [LABEL_MIN_PX]) {
+      while (size > minimum && overflows()) {
+        size -= .5;
+        label.style.fontSize = `${size}px`;
+      }
     }
     if (label.classList.contains('lex-detail-field-label') && overflows()) {
       // At the readable font floor, give wrapped labels space rather than
