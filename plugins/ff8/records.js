@@ -264,15 +264,26 @@
     const content=$("#main").firstElementChild,tabs=subtabBar({className:"ff8-text-tabs",tabs:TEXT_TABS,active:names?"names":"text",label:"Text pages",change:value=>{state.textTab=value;renderText()}});
     $("#main").replaceChildren(LexeditorUI.stack(tabs,content));
   }
+  // Names are a list like every other: paged, searchable, and edited in the
+  // selected name's detail pane (Lexer: Text > Names was one unpaged table).
   function renderNames(){
     const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
     const vanilla=id=>rowOf(state.vanilla,"names",id)?.text;
-    const table=columnList({rows:state.data.names.rows,key:row=>row.id,class:"ff8-record-list ff8-name-table",fill:true,"aria-label":"FF8 names",columns:[
-      {key:"id",label:"ID",numeric:true,numberedId:true,width:"90px"},
-      {key:"text",label:"Name",grow:1,help:"The name as the game shows it. Double-click to change it; Enter keeps the change and Escape drops it.",
-        editValue:row=>row.text,edit:(row,value)=>{row.text=String(value);renderText();shell.refresh()},
-        render:row=>el("span",{class:vanilla(row.id)!==undefined&&vanilla(row.id)!==row.text?"lex-value-modified":""},el("output",{},row.text))}]});
-    $("#main").replaceChildren(table);
+    const rows=filtered("names",["text","id"]),columns=[
+      {key:"id",label:"ID"},
+      {key:"text",label:"Name",
+        render:row=>el("span",{class:vanilla(row.id)!==undefined&&vanilla(row.id)!==row.text?"lex-value-modified":""},el("output",{},row.text))}];
+    showPaged("names",rows,columns,nameDetail,"90px minmax(180px,1fr)");
+  }
+  function nameDetail(row,prefs){
+    const input=el("input",{type:"text",value:row.text,"aria-label":"Name",
+      oninput:event=>{row.text=event.target.value;shell.refresh()}});
+    const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,
+      value:rowOf(state.referenceData[reference.id],"names",row.id)?.text})).filter(entry=>entry.value!==undefined);
+    const control=sourceControl(input,()=>row.text,rowOf(state.vanilla,"names",row.id)?.text,references,
+      value=>{row.text=String(value??"");renderText();shell.refresh()});
+    return sharedDetail({...row,name:row.text},prefs,[detailSection({body:[
+      detailField({label:"NAME",control})]})]);
   }
   const characterCurveOrder=["HP","STR","VIT","MAG","SPR","SPD","LUCK"];
   const characterCurveKind={HP:"hp",STR:"standard",VIT:"standard",MAG:"standard",SPR:"standard",SPD:"linear",LUCK:"linear"};

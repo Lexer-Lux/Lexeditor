@@ -30,24 +30,22 @@ def main() -> int:
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 page.goto(session.url)
                 page.wait_for_function("()=>typeof state!=='undefined'&&!state.booting", timeout=180000)
-                # Names is a sub-tab of Text: one table of every name, each
-                # edited in place with the shared double-click cell.
+                # Names is a sub-tab of Text and a list like every other one:
+                # paged, with the selected name edited in its detail pane
+                # (Lexer, 2026-09-27: it was one unpaged table).
                 page.evaluate("()=>navigate('names')")
-                page.wait_for_selector(".ff8-name-table", timeout=60000)
+                page.wait_for_selector('.lex-column-list-cell[data-column-key="text"]', timeout=60000)
                 assert page.evaluate("()=>state.tab") == "text"
                 assert page.locator(".ff8-text-tabs [role=tab]").count() == 2
                 assert page.locator('nav [data-tab="names"]').count() == 0
-                rows = page.locator(".ff8-name-table .lex-column-list-row").count()
-                assert rows == 32, rows
-                cell = page.locator('.ff8-name-table .lex-column-list-cell[data-column-key="text"]').first
+                assert page.evaluate("()=>state.data.names.rows.length") == 32
+                assert page.locator(".lex-pager").count() >= 1, "Names has no pagination"
+                cell = page.locator('.lex-column-list-cell[data-column-key="text"]').first
                 assert cell.inner_text().strip() == "Galbadia"
-                # No detail pane of byte counts and file paths: the table is the page.
-                assert page.locator(".ff8-name-detail").count() == 0
                 assert page.evaluate("()=>state.data.names.path").endswith("namedic.bin")
-                cell.dblclick()
-                editor = page.locator(".ff8-name-table .lex-cell-editing input")
+                cell.click()
+                editor = page.get_by_label("Name", exact=True)
                 editor.fill("Galbadia Test")
-                editor.press("Enter")
                 page.wait_for_function("()=>dirtyCount()>0", timeout=20000)
                 page.evaluate("()=>document.querySelector('#global-save').click()")
                 page.wait_for_function(
