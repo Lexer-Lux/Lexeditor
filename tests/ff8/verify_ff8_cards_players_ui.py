@@ -38,13 +38,17 @@ def run(browser_path=None,screenshot=None):
                 sourceControl:control=>control,referenceValues:()=>[],shell:{refresh(){}},noteFieldEdit(){},ensureFieldDetail:async()=>{},navigate:tab=>window.lastNavigation=tab});
               cardsUI.render();U.finishPluginLoading();
             }''')
-            assert page.locator('.lex-tab-label-text').all_text_contents()==['CARDS','PLAYERS']
+            assert page.locator('.lex-tab-label-text').all_text_contents()==['CARDS','DECKS','PLAYERS']
             assert page.locator('.lex-stat-card > img').get_attribute('src')=='/assets/cards/0.png'
             assert page.get_by_role('button',name='Right, currently A',exact=True).inner_text()=='A'
             page.get_by_role('button',name='Top, currently 1',exact=True).click()
             assert page.evaluate('cardsUI.edits()')==[{'id':0,'field':'top','value':2}]
             page.get_by_role('tab',name='PLAYERS',exact=True).click()
-            field=page.get_by_label('queen_est Deck',exact=True);field.wait_for()
+            # The deck is a link to its own record and a finder, not a number
+            # (Lexer: "couldn't that just be a thing finder?").
+            deck=page.get_by_role('button',name='Open deck 1',exact=True);deck.wait_for()
+            finder=page.get_by_role('button',name='Choose the deck for queen_est',exact=True)
+            assert finder.count()==1
             assert page.get_by_label('queen_est Region rule',exact=True).is_disabled()
             for label, value in [('Unknown setting 1', '17'), ('Unknown setting 2', '23')]:
                 protected = page.locator('.lex-detail-field').filter(has=page.get_by_text(label, exact=True))
@@ -73,14 +77,17 @@ def run(browser_path=None,screenshot=None):
             assert page.locator('.lex-detail-field').filter(has_text='Location').count()==0
             page.get_by_role('button',name='Open Balamb',exact=True).click()
             assert page.evaluate('[lastNavigation,state.selected.fields,state.filters.fields]')==['fields',12,'']
-            field.fill('7')
-            assert page.evaluate('state.data.fields.rows[0].players[0].params[0].value')==7
-            page.evaluate('cardsUI.render()')
-            assert field.input_value()=='7'
+            # Deck 1 lists both opponents that name it, each a link back.
+            page.get_by_role('tab',name='PLAYERS',exact=True).click()
+            page.get_by_role('button',name='Open deck 1',exact=True).click()
+            page.get_by_role('button',name='Open student',exact=True).wait_for()
+            assert page.get_by_role('button',name='Open queen_est',exact=True).count()==1
+            page.get_by_role('button',name='Open queen_est',exact=True).click()
+            page.get_by_role('button',name='Open deck 1',exact=True).wait_for()
             assert page.get_by_role('button',name='Open student',exact=True).count()==0
             assert 'Opponent queen_est' not in page.locator('body').inner_text()
             page.evaluate("state.activeSource='vanilla';cardsUI.render()")
-            assert field.is_disabled()
+            assert page.get_by_role('button',name='Choose the deck for queen_est',exact=True).is_disabled()
             assert page.get_by_label('Level 1',exact=True).is_disabled()
             # Which opponents share a deck belongs to the deck, not to each
             # opponent (Lexer: "remove the 'also uses deck X'").

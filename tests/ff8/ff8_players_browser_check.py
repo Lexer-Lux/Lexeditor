@@ -50,13 +50,9 @@ def main():
   # deck number to show.
   assert page.locator('.lex-column-list-row').filter(has_text='Student').first.inner_text().find('201')>=0
   assert page.locator('.lex-column-list-row').filter(has_text='Ghost').first.inner_text().find('—')>=0
-  control=page.get_by_label('Student Deck ID',exact=True)
-  control.fill('5')
-  assert page.evaluate('model.data.fields.rows[1].players[0].params[0].value')==5
-  assert page.evaluate('calls[0][0]')=='fields'
-  control.fill('201')
-  styles=control.evaluate('e=>{const s=getComputedStyle(e);return [s.color,s.backgroundColor]}')
-  assert styles[0]!='rgb(0, 0, 0)' and styles[1]!='rgb(255, 255, 255)',styles
+  # The deck is a link and a finder (Lexer, 2026-09-27).
+  assert page.get_by_role('button',name='Open deck 201',exact=True).count()==1
+  assert page.get_by_role('button',name='Choose the deck for Student',exact=True).count()==1
   # Which opponents share a deck belongs to the deck, not to each opponent
   # (Lexer, 2026-09-27: "remove the 'also uses deck X'").
   assert page.locator('.lex-detail-section-title',has_text='ALSO USES DECK').count()==0
