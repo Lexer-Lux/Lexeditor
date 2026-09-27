@@ -31,14 +31,15 @@ def main() -> int:
     weapon_end = html.index("function renderKernel", weapon_start)
     weapon_source = html[weapon_start:weapon_end]
 
-    assert 'detailSection({className:"weapon-section weapon-data",title:"DATA"' in weapon_source
-    assert 'detailSection({className:"weapon-section weapon-cost",title:"COST"' in weapon_source
+    assert 'detailSection({title:"DATA",body:dataFields}' in weapon_source
+    assert 'detailSection({title:"COST",body:[' in weapon_source
     assert "return sharedDetail(row,prefs" in weapon_source
     assert weapon_source.index('"DATA"') < weapon_source.index('"COST"')
     assert '"INGREDIENTS"' not in weapon_source
     assert 'el("thead"' not in weapon_source
-    cost_start = weapon_source.index('className:"weapon-section weapon-cost"')
-    assert weapon_source.index('label:"PRICE"', cost_start) < weapon_source.index("...ingredients", cost_start)
+    cost_start = weapon_source.index('title:"COST"')
+    assert weapon_source.index('control:price', cost_start) < weapon_source.index("...ingredients", cost_start)
+    assert 'pinButton("upgradePrice","Price")' in weapon_source
     assert '"Upgrade price"' not in weapon_source
     assert 'fieldSourceControl(field,"weapons",row.id,{internal:true})' in weapon_source
     assert 'sourceControl(itemSearchControl(ingredient.itemId' in weapon_source
@@ -48,7 +49,7 @@ def main() -> int:
     assert 'type:"items"' in html and 'prompt,target:()=>navigate("items")' in html
     assert "fieldGroups(" not in weapon_source
     assert 'el("details"' not in weapon_source
-    assert ".weapon-detail" in html and "overflow:hidden" in html
+    assert 'LexeditorUI.controlGroup([item,quantity].filter(Boolean))' in weapon_source
 
     baseline = {
         path: digest(path)

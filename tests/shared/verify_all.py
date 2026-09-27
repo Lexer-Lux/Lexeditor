@@ -129,6 +129,9 @@ _FF8_BASELINE_TOOLS = frozenset({
     "verify_ff8_world_extra_api",
     "verify_ff8_character_stat_curves",
     "verify_ff8_enemies_editor_issue_39",
+    "verify_ff8_weapons_detail_issue_36",
+    "verify_ff8_info_visual_58",
+    "verify_ff8_current_ui_visual",
     "ff8_field_name_fade_check",
     "ff8_field_page_check",
     "ff8_textures_list_check",
@@ -178,6 +181,10 @@ def _ff8_baseline_sentinel() -> Path:
 
 
 def _preflight_unrunnable(tool: Path) -> tuple[str, str]:
+    if tool.stem == "ff8_tabs_browser_check":
+        font = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Lexeditor/game-data/ff8/generated/ff8-menu.ttf"
+        if not font.is_file():
+            return "needs installed game/project data", f"missing extracted FF8 menu font: {font}"
     if tool.stem in _FF8_BASELINE_TOOLS:
         sentinel = _ff8_baseline_sentinel()
         if not sentinel.is_file():
