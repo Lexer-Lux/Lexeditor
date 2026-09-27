@@ -82,8 +82,14 @@ def main():
                     source.index('  function railTrackDetail')]
     sky_detail = source[source.index('  function worldSkyDetail'):
                         source.index('  function worldSegmentDetail')]
+    # A picked draw point draws the Draw Points page's panel too (Lexer,
+    # 2026-09-27: "just show me the details panel of whatever that thing is").
+    assert 'worldMapPointPreview' not in source, \
+        "the Map page still draws its own, shorter draw point panel"
+    assert 'picked?worldDrawPointDetail(picked,null,worldDrawPointMapTitle(picked))' in source, \
+        "the Map page does not draw the Draw Points panel for a picked draw point"
     sky_title = source[source.index('  function worldSkyMapTitle'):
-                       source.index('  function worldMapPointPreview')]
+                       source.index('  // A draw point picked on the map')]
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
         page = browser.new_page(viewport={'width': 1200, 'height': 900})

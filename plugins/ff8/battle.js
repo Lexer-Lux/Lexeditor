@@ -177,7 +177,7 @@
     worldMapNavigation(map,map.lexStage);
     return map;
   }
-  function worldDrawPointDetail(row,prefs){
+  function worldDrawPointDetail(row,prefs,titleContent=null){
     const editable=()=>state.activeSource==='mine'&&document.documentElement.dataset.lexProjectReadonly!=='true';
     const fields=refresh=>[['x','X'],['y','Y'],['subId','SUB-ID']].map(([key,label])=>{
       const control=worldNumber(row,key,0,255,`Draw Point ${row.drawId} ${label}`,refresh);
@@ -209,7 +209,7 @@
           :'This source is read-only. Select an editable mod to move this draw point.'})});},true);
 
     // The list shows the draw point's own draw ID, so the panel does too.
-    return sharedDetail({...row,id:row.drawId,name:`DRAW POINT ${row.drawId}`},prefs,[detailSection({className:"world-draw-position",help:infoHelp("Section 34 stores only this world Draw Point's X, Y, and sub-ID bytes. Its magic, quantity, and refill behavior live in FF8_EN.exe and are not invented here."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},...fields())],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
+    return sharedDetail({...row,id:row.drawId,name:`DRAW POINT ${row.drawId}`,...(titleContent?{titleContent}:{})},prefs,[detailSection({className:"world-draw-position",help:infoHelp("Section 34 stores only this world Draw Point's X, Y, and sub-ID bytes. Its magic, quantity, and refill behavior live in FF8_EN.exe and are not invented here."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},...fields())],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
   }
   function worldFieldReturnDetail(row,prefs){
     const editable=()=>state.activeSource==='mine'&&document.documentElement.dataset.lexProjectReadonly!=='true';
@@ -269,11 +269,12 @@
     // What the map shows on the right: the cell the reader last picked, or a draw
     // point picked from the map itself. Each panel's title leads to the page that
     // owns the record.
-    const picked=state.worldMapPoint==null?null:state.data.world.drawPoints.find(point=>point.id===state.worldMapPoint);
+    const drawRows=state.data.world.rows.filter(row=>row.kind==="drawPoint");
+    const picked=state.worldMapPoint==null?null:drawRows.find(point=>point.id===state.worldMapPoint);
     const pickedSky=state.worldMapSky==null?null:state.data.world.rows.find(row=>row.kind==="skyColor"&&row.id===state.worldMapSky);
     const cells=segments.map(segment=>({id:segment.id,label:`Select world map cell ${segment.id}`,selected:!picked&&!pickedSky&&segment.id===selected,
       title:`Cell ${segment.id} · region ${worldRow(state.data,"region",segment.id)?.regionId??"?"} · group ${segment.groupId}`}));
-    const points=state.data.world.drawPoints.filter(point=>point.x!==0||point.y!==0).map(point=>{
+    const points=drawRows.filter(point=>point.x!==0||point.y!==0).map(point=>{
       const position=worldDrawPosition(point);if(position.y>=96)return null;
       return {x:position.x/128,y:position.y/96,selected:point.id===state.worldMapPoint,
         label:`Select draw point ${point.drawId}`,
@@ -298,7 +299,7 @@
       select:id=>{state.worldMapPoint=null;state.worldMapSky=null;state.selected.world=id;rerenderWorldMap()}});
     worldMapNavigation(map,map.lexStage);
     return LexeditorUI.panelLayout([detailPanel({heading:false,className:"ff8-world-map-panel",body:map}),
-      pickedSky?worldSkyDetail(pickedSky,null,worldSkyMapTitle(pickedSky),`World ${formatNumber(pickedSky.x)}, ${formatNumber(pickedSky.z)} · fade ${formatNumber(pickedSky.y)}`):picked?worldMapPointPreview(picked):worldSegmentDetail(row)],"world-map",
+      pickedSky?worldSkyDetail(pickedSky,null,worldSkyMapTitle(pickedSky),`World ${formatNumber(pickedSky.x)}, ${formatNumber(pickedSky.z)} · fade ${formatNumber(pickedSky.y)}`):picked?worldDrawPointDetail(picked,null,worldDrawPointMapTitle(picked)):worldSegmentDetail(row)],"world-map",
       {layoutKey:"ff8-world-map",defaultSizes:[1.6,1]});
   }
   // A sky zone picked on the map is the same record the Sky Colours page
@@ -310,22 +311,15 @@
       activate:()=>{state.worldTab="skyColors";state.selected.world=row.id;state.worldMapSky=null;
         state.pages.world=0;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
   }
-  // The Map page's panel for a draw point picked from the map: where it is, the
-  // way to its own page through the title, and the reminder that what it gives is
-  // not in this file.
-  function worldMapPointPreview(row){
-    const position=worldDrawPosition(row);
-    const title=hoverable({content:`DRAW POINT ${row.drawId}`,targetType:"drawPoints",targetId:row.drawId,
+  // A draw point picked on the map is the record the Draw Points page shows,
+  // so it draws that page's panel (Lexer: "the panel on the right should just
+  // show me the details panel of whatever that thing is"). Only the title
+  // differs: here it leads to the page that owns the record.
+  function worldDrawPointMapTitle(row){
+    return hoverable({content:`DRAW POINT ${row.drawId}`,targetType:"drawPoints",targetId:row.drawId,
       targetLabel:`draw point ${row.drawId}`,
       activate:()=>{state.worldTab="drawPoints";state.selected.world=row.id;state.worldMapPoint=null;
         state.pages.world=0;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
-    return detailPanel({title,className:"world-map-detail world-draw-point",meta:`Block ${position.x}, ${position.y}`,
-      help:"Where this draw point sits on the world map. Its spell, its refill and whether it gives a high yield are set in the game's program, and this editor does not change them yet.",
-      body:[detailSection({title:"WORLD POSITION",
-        help:infoHelp("The block this draw point is anchored to. The game matches this block and the sub-ID when the action button is pressed."),
-        body:[detailField({label:"X",help:infoHelp(worldPropertyHelp.drawPoint.x),control:worldNumber(row,"x",0,255,`Draw point ${row.drawId} X`)}),
-          detailField({label:"Y",help:infoHelp(worldPropertyHelp.drawPoint.y),control:worldNumber(row,"y",0,255,`Draw point ${row.drawId} Y`)}),
-          detailField({label:"SUB-ID",help:infoHelp(worldPropertyHelp.drawPoint.subId),control:worldNumber(row,"subId",0,255,`Draw point ${row.drawId} sub-ID`)})]})]});
   }
   function worldDetail(row,prefs){
     if(row.kind==="region")return sharedDetail({...row,name:`WORLD MAP CELL ${row.id}`},prefs,[LexeditorUI.tileGrid([
