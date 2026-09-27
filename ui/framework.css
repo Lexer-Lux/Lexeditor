@@ -5116,8 +5116,9 @@ nav button.active:focus-visible .lex-tab-shortcut,
      inside a short command row. */
   --lex-tab-badge-size:min(1.6em,calc(min(46px,var(--lex-command-row-height)) - 12px));
   --lex-tab-badge-gap:.4em;
-  /* Ctrl prompts overlay the tabs without reserving label space. */
-  padding-inline:4px;
+  /* Ctrl prompts overlay the tabs without reserving label space, so a tab
+     with a shortcut keeps the same padding as one without: a fixed 4px here
+     gave the first eleven tabs different room from the rest of the strip. */
 }
 .lex-shell-header nav button[data-tab] > .lex-tab-label,
 .lex-subtab-button > .lex-tab-label {
@@ -8079,9 +8080,11 @@ body { text-shadow: var(--lex-text-shadow, none); }
 .lex-subtab-bar.lex-subtab-bar-images { gap:2px; }
 .lex-subtab-bar-images > .lex-subtab-button { background:transparent; border:0; box-shadow:none; padding:0; }
 .lex-subtab-bar-images > .lex-subtab-button.active { background:transparent; box-shadow:none; }
+/* The marker sits on the chosen image's own left edge. Hung outside it, the
+   hand covered the neighbouring image (FF8's GF portraits). */
 .lex-subtab-bar-images > .lex-subtab-button.active::before {
   content:var(--lex-tab-marker-content,none);position:absolute;z-index:3;
-  right:calc(100% + 6px);top:50%;transform:translateY(-50%);
+  left:0;top:50%;transform:translateY(-50%);
   width:var(--lex-tab-marker-width,24px);height:var(--lex-tab-marker-height,18px);
   background:var(--lex-tab-marker-image,none) center/contain no-repeat;pointer-events:none;
 }
