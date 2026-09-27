@@ -50,9 +50,11 @@ def source_contract(text: str) -> None:
         "0x004D41B0",
         "battle_menu_sub_4A3D20 + 0x139",
         # Battle HP spans a four-digit field under the drawn digits; GF HP
-        # spans the name. Battle HP retains its maximum-HP length scale.
+        # spans the widest name drawn that frame, so every row's blue gauge
+        # has one length. Battle HP retains its maximum-HP length scale.
         "row.hp_right - field",
-        "row.left, row.name_right",
+        "name_span = std::max(name_span, row.name_right - row.left)",
+        "row.left, row.left + name_span",
         "result_state + 0x234 + slot * sizeof(std::uint32_t)",
         "g_result_state(0)",
         "result_state[0x38] != 0",
