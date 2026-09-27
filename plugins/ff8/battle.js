@@ -247,20 +247,65 @@
       detailSection({title:"FIELD → WORLD POSITION",help:infoHelp("Where the player appears on the world map after leaving a field by this exit. Click the map to open the large map and move the point. The number is the exit's own index, not a field ID."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},...fields(()=>rerenderWorldMap()),
         detailField({label:"UNRESOLVED WORD",help:infoHelp("What this value does is not known. It stays exactly as stored."),control:readonlyField(row.unknown)}))],{columns:2,minWidth:300})]})],"world-map-detail world-field-return")}
   function worldSkyDetail(row,prefs,titleContent=null,note=""){return sharedDetail({...row,name:`SKY RECORD ${row.id}`,...(titleContent?{titleContent}:{})},prefs,[detailSection({title:"WORLD POSITION",help:infoHelp("The record holds two world coordinates and then a fade distance, in the stored order X, Z, RANGE. The first two say where the zone applies; the third says how far its colours fade."),body:[detailField({label:"X",help:infoHelp("X coordinate for this record. Changing it moves the stored world position."),control:worldNumber(row,"x",-2147483648,2147483647,`Sky record ${row.id} X`)}),detailField({label:"RANGE",help:infoHelp("Fade distance in world units. The shipped records use round values - 16384, 24576, 40960 - which is how a distance reads rather than a coordinate. How the game fades between zones is not established."),control:worldNumber(row,"y",-2147483648,2147483647,`Sky record ${row.id} fade range`)}),detailField({label:"Z",help:infoHelp("World Z coordinate of this lighting zone. The zone applies around the point X, Z."),control:worldNumber(row,"z",-2147483648,2147483647,`Sky record ${row.id} Z`)})]}),detailSection({className:"world-sky-colors",title:"SKY AND AMBIENT COLOURS",help:infoHelp("OpenVIII proves five RGB triples in each section 33 record. Lexeditor preserves each unused fourth colour byte and the unresolved record tail."),body:[detailField({label:"SHADOWS",help:infoHelp("Ambient shadow colour for this world colour record. Choose a colour and test the result at this location."),control:worldColor(row,"shadows",`Sky record ${row.id} shadows colour`)}),detailField({label:"VEHICLES",help:infoHelp("Vehicle colour value stored in this world colour record."),control:worldColor(row,"vehicles",`Sky record ${row.id} vehicles colour`)}),detailField({label:"SKY TOP",help:infoHelp("Colour at the top of the sky gradient."),control:worldColor(row,"skyTop",`Sky record ${row.id} sky top colour`)}),detailField({label:"SKY CENTRE",help:infoHelp("Colour in the middle of the sky gradient."),control:worldColor(row,"skyCenter",`Sky record ${row.id} sky centre colour`)}),detailField({label:"SKY BOTTOM",help:infoHelp("Colour at the bottom of the sky gradient."),control:worldColor(row,"skyBottom",`Sky record ${row.id} sky bottom colour`)})]})],"world-map-detail world-sky-detail",note)}
+  // One world-map cell, one panel: the Map page and the Cells page show the
+  // same record, so they draw the same panel (Lexer, 2026-09-27). The word
+  // "segment" belongs to the WMX file, which stores one 0x9000-byte segment per
+  // cell; the thing a reader selects is a cell of the map.
+  function worldCellOf(fraction){
+    if(fraction.x<0||fraction.x>=1||fraction.y<0||fraction.y>=1)return -1;
+    return Math.floor(fraction.y*24)*32+Math.floor(fraction.x*32);
+  }
+  function worldRecordLink(tab,row,label){
+    return hoverable({content:label,targetType:tab,targetId:row.id,targetLabel:label,
+      activate:()=>{state.worldTab=tab;state.selected.world=row.id;state.worldMapPoint=null;state.worldMapSky=null;
+        state.pages.world=0;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
+  }
+  function worldLinkList(links){return links.length?el("span",{class:"world-cell-links"},...links):el("span",{},"None")}
+  function worldCellContents(cellId,region,segment){
+    const rows=kind=>state.data.world.rows.filter(row=>row.kind===kind);
+    const placed=row=>!(row.x===0&&row.z===0)&&worldCellOf(worldMapFraction(row.x,row.z))===cellId;
+    const draws=rows("drawPoint").filter(point=>{if(point.x===0&&point.y===0)return false;
+      const at=worldDrawPosition(point);return at.y<96&&Math.floor(at.y/4)*32+Math.floor(at.x/4)===cellId});
+    const grounds=segment?.groundTypes||[];
+    const rules=region&&region.regionId!==255?rows("helper").filter(rule=>rule.regionId===region.regionId&&grounds.includes(rule.groundId)):[];
+    const encounters=rules.length?columnList({rows:rules,key:rule=>rule.id,fill:true,localSort:false,
+        class:"ff8-encounter-usage-table ff8-record-list","aria-label":`Encounter rules for cell ${cellId}`,
+        columns:[{key:"groundId",label:"GROUND",sortable:false,render:rule=>rule.groundId},
+          {key:"group",label:"ENCOUNTER GROUP",sortable:false,render:rule=>hoverable({content:`Group ${rule.encounterGroup}`,
+            targetType:"encounterGroups",targetId:rule.encounterGroup,targetLabel:`encounter group ${rule.encounterGroup}`,
+            activate:()=>showEncounterSubtab("groups","encounterGroups",rule.encounterGroup)})}]})
+      :LexeditorUI.notice({message:"No encounter rule matches this cell's region and ground types, so no battles start here."});
+    return [detailSection({title:"IN THIS CELL",
+        help:infoHelp("The world records whose position is inside this cell. World → Field entries are not listed: that table stores where the player arrives in a field, not a world position."),
+        body:[detailField({label:"DRAW POINTS",control:worldLinkList(draws.map(point=>worldRecordLink("drawPoints",point,`Draw Point ${point.drawId}`)))}),
+          detailField({label:"SKY COLOURS",control:worldLinkList(rows("skyColor").filter(placed).map(sky=>worldRecordLink("skyColors",sky,`Sky record ${sky.id}`)))}),
+          detailField({label:"FIELD → WORLD",control:worldLinkList(rows("fieldReturn").filter(placed).map(entry=>worldRecordLink("fieldReturns",entry,`Field return ${entry.id}`)))}),
+          detailField({label:"GROUND TYPES",help:infoHelp("Terrain codes used by the polygons in this cell. A ground code and the cell's region choose an encounter rule."),control:el("span",{class:"world-ground-list"},grounds.join(", ")||"None")})]}),
+      detailSection({title:"ENCOUNTERS",help:infoHelp("The rules that match this cell's region and one of its ground types, and the battle group each one starts. Open a group to see its battles."),body:[encounters]})];
+  }
+  function worldCellDetail(cellId,prefs,titleContent=null){
+    const region=worldRow(state.data,"region",cellId),segment=state.data.world.rows.find(row=>row.kind==="worldSegment"&&row.id===cellId);
+    const x=region?.x??segment?.x,y=region?.y??segment?.y;
+    const position=detailSection({className:"world-region-position",title:"WORLD MAP",
+      body:[worldLocationMap({label:`World map cell ${cellId}`,
+        cells:[{id:cellId,column:x,row:y,label:`Cell ${cellId}`,selected:true}],
+        select:id=>{state.selected.world=id;rerenderWorldMap()}})]});
+    const cell=detailSection({title:"CELL",body:[detailField({label:"X",help:infoHelp(worldPropertyHelp.region.x),control:readonlyField(x)}),
+      detailField({label:"Y",help:infoHelp(worldPropertyHelp.region.y),control:readonlyField(y)}),
+      ...(region?[detailField({label:"REGION",help:infoHelp(worldPropertyHelp.region.regionId),control:worldNumber(region,"regionId",0,255,`World map cell ${cellId} region code`)})]:[]),
+      ...(segment?[detailField({label:"GROUP ID",help:infoHelp("Stored geometry group for this cell. Its full effect in the game is not established. This is not the encounter group; use the Rules page on the Encounters tab to change battles."),control:worldNumber(segment,"groupId",0,4294967295,`World map cell ${cellId} group ID`)}),
+        detailField({label:"POLYGONS",help:infoHelp("Number of terrain faces in this cell."),control:readonlyField(segment.polygonCount)})]:[])]});
+    const blocks=segment?[detailSection({title:"BLOCKS",help:infoHelp("Each world-map cell holds 16 smaller terrain blocks. Polygons are the faces that form the terrain; vertices are the points at their corners."),
+      body:[LexeditorUI.tileGrid(segment.blocks.map(block=>detailSection({title:`Block ${block.id}`,body:[detailField({label:"Polygons",control:readonlyField(block.polygonCount)}),detailField({label:"Vertices",control:readonlyField(block.vertexCount)})]})))]})]:[];
+    return sharedDetail({id:cellId,name:`CELL ${cellId}`,...(titleContent?{titleContent}:{})},prefs,[
+      LexeditorUI.tileGrid([position,cell],{columns:2,minWidth:300}),...worldCellContents(cellId,region,segment),...blocks],
+      "world-map-detail world-segment-detail");
+  }
   function worldSegmentDetail(row){
-    const region=worldRow(state.data,"region",row.id),blocks=LexeditorUI.tileGrid(row.blocks.map(block=>detailSection({title:`Block ${block.id}`,body:[detailField({label:"Polygons",control:readonlyField(block.polygonCount)}),detailField({label:"Vertices",control:readonlyField(block.vertexCount)})]})));
-    // One world-map cell, shown for its terrain. The word "segment" belongs to
-    // the WMX file, which stores one 0x9000-byte segment per cell; the thing a
-    // reader selects here is a cell of the map, and the Cells page lists the
-    // same cells for the region code each one carries.
     const title=hoverable({content:`CELL ${row.id}`,targetType:"regions",targetId:row.id,
       targetLabel:`world map cell ${row.id}`,
       activate:()=>{state.worldTab="regions";state.selected.world=row.id;state.worldMapPoint=null;rerenderWorldMap()}});
-    return sharedDetail({...row,name:`CELL ${row.id}`,titleContent:title},null,[
-      detailSection({title:"MAP POSITION",body:[detailField({label:"X",help:infoHelp(worldPropertyHelp.region.x),control:readonlyField(row.x)}),detailField({label:"Y",help:infoHelp(worldPropertyHelp.region.y),control:readonlyField(row.y)}),detailField({label:"REGION",help:infoHelp(worldPropertyHelp.region.regionId),control:worldNumber(region,"regionId",0,255,`World map cell ${row.id} region code`)})]}),
-      detailSection({title:"WMX GEOMETRY",help:infoHelp("Deling proves the group ID at the start of each 0x9000-byte WMX segment, which holds one cell's terrain. Lexeditor changes only that value and preserves all polygon topology and unknown bytes."),body:[detailField({label:"GROUP ID",help:infoHelp("Stored geometry group for this cell. Its full effect in the game is not established. This is not the encounter group; use the Rules page on the Encounters tab to change battles."),control:worldNumber(row,"groupId",0,4294967295,`World map cell ${row.id} group ID`)}),detailField({label:"POLYGONS",help:infoHelp("Number of terrain faces in this cell. This count is read-only."),control:readonlyField(row.polygonCount)}),detailField({label:"GROUND TYPES",help:infoHelp("Terrain codes used by the polygons in this cell. A ground code and the region code select an encounter rule on the Encounters tab. These are stored codes, not counts."),control:el("span",{class:"world-ground-list"},row.groundTypes.join(", ")||"None")})]}),
-      detailSection({title:"BLOCKS",help:infoHelp("Each world-map cell holds 16 smaller terrain blocks. Polygons are the faces that form the terrain; vertices are the points at their corners. These counts describe the stored geometry."),body:[blocks]})
-    ],"world-map-detail world-segment-detail");
+    return worldCellDetail(row.id,null,title);
   }
   function renderWorldVisual(){
     const segments=state.data.world.rows.filter(row=>row.kind==="worldSegment").slice(0,32*24);
@@ -328,12 +373,7 @@
         state.pages.world=0;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
   }
   function worldDetail(row,prefs){
-    if(row.kind==="region")return sharedDetail({...row,name:`CELL ${row.id}`},prefs,[LexeditorUI.tileGrid([
-    detailSection({className:"world-region-position",title:"WORLD MAP",
-      body:[worldLocationMap({label:`World map cell ${row.id}`,
-        cells:[{id:row.id,column:row.x,row:row.y,label:`Cell ${row.id}`,selected:true,title:`Cell ${row.id} · region ${row.regionId}`}],
-        select:id=>{state.selected.world=id;rerenderWorldMap()}})]}),
-    detailSection({title:"CELL",body:[detailField({label:"X",help:infoHelp("Read-only X cell coordinate in the world-map grid."),control:readonlyField(row.x)}),detailField({label:"Y",help:infoHelp("Read-only Y cell coordinate in the world-map grid."),control:readonlyField(row.y)}),detailField({label:"REGION",help:infoHelp(worldPropertyHelp.region.regionId),control:worldNumber(row,"regionId",0,255,"World map cell region code")})]})],{columns:2,minWidth:300})],"world-map-detail");
+    if(row.kind==="region")return worldCellDetail(row.id,prefs);
     if(row.kind==="railTrack")return railTrackDetail(row,prefs);
     if(row.kind==="worldTexture")return worldTextureDetail(row,prefs);
     if(row.kind==="drawPoint")return worldDrawPointDetail(row,prefs);

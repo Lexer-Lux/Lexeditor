@@ -182,3 +182,5 @@
  covers exactly the picture (Lexer, 2026-09-27). */
 .lex-overlay-stack.world-to-field-picture{display:block;width:100%;align-self:start}
 .lex-overlay-stack.world-to-field-picture>.lex-overlay-base{width:100%}
+/* A cell's records in its World panel: one link each, wrapping. */
+.world-cell-links{display:flex;flex-wrap:wrap;gap:4px 12px;min-width:0}
