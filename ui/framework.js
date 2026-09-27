@@ -7999,20 +7999,32 @@ ${contents.path}`});
     const minSizes = Array.from({length: nodes.length}, (_, index) =>
       Math.max(80, Number(options.minSizes?.[index]) || 240));
     let belowMinimum = false, measuredGap = 14;
+    // Every side-by-side layout keeps its panes at their minimum widths, from
+    // the first draw on, not only the ones that stack when room runs out: a
+    // three-pane page at 1100px squeezed its detail to 350px of a 430px
+    // minimum while its other panes kept more than theirs (Enemies > Loot).
     const updateResponsive = () => {
-      if (!options.stackBelowMinimum || vertical || !root.clientWidth) return 0;
+      if (vertical || !root.clientWidth) return 0;
       const css = getComputedStyle(root);
       const divider = root.querySelector(':scope > .lex-panel-layout-divider');
       if (divider?.offsetWidth) measuredGap = divider.offsetWidth;
       else if (options.resizable === false && !belowMinimum) measuredGap = parseFloat(css.columnGap) || 0;
       const available = root.clientWidth - (parseFloat(css.paddingLeft) || 0)
         - (parseFloat(css.paddingRight) || 0) - measuredGap * (nodes.length - 1);
+      if (!options.stackBelowMinimum) return available;
       belowMinimum = available < minSizes.reduce((sum, value) => sum + value, 0);
       root.classList.toggle('lex-panel-layout-below-minimum', belowMinimum);
       root.style.setProperty('--lex-panel-count', nodes.length);
       return belowMinimum ? 0 : available;
     };
     const fitResponsiveSizes = available => {
+      const least=minSizes.reduce((sum,value)=>sum+value,0);
+      // Too narrow for every minimum and not allowed to stack: each pane
+      // gives up the same share of its minimum.
+      if (available && available < least) {
+        const scaled=minSizes.map(value=>value*available/least);
+        return sizes.some((value,index)=>Math.abs(value*available/100-scaled[index])>.5)?scaled:null;
+      }
       if (!available || !sizes.some((value,index)=>value*available/100<minSizes[index]-.5)) return null;
       const spare=available-minSizes.reduce((sum,value)=>sum+value,0);
       const weights=sizes.map((value,index)=>Math.max(0,value*available/100-minSizes[index]));

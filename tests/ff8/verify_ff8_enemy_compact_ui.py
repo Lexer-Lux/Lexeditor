@@ -151,8 +151,9 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
             page.evaluate("fixtureState.enemyDetailTab='loot';rerender()")
             for kind in ['draw','mug','drops']:
                 table=page.locator(f'.enemy-{kind}-table')
-                assert table.locator('.enemy-tier-row').count()==3
-                assert table.locator('[role="columnheader"]').count()==(0 if kind=='draw' else 5)
+                # One row per tier and slot, so an item name has the row's width.
+                assert table.locator('.enemy-tier-row').count()==12
+                assert table.locator('[role="columnheader"]').count()==(0 if kind=='draw' else 3)
                 for tier in ['low','medium','high']:
                     for slot in range(4):
                         control=page.get_by_label(f'{kind.upper()} {tier} choice {slot+1} quantity',exact=True)
@@ -171,6 +172,10 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
                 # overlap its input or acquire a different baseline on resize.
                 for choice in page.locator('.enemy-tier-table .lex-quantity-choice').all():
                     assert choice.evaluate('n=>n.scrollWidth<=n.clientWidth+1')
+                # And the item's name is readable, not cut to a letter.
+                if width>=1000:
+                    widths=page.locator('.enemy-tier-table .lex-quantity-choice .lex-hoverable').evaluate_all('ns=>ns.map(n=>n.getBoundingClientRect().width)')
+                    assert widths and min(widths)>=60,widths
             page.evaluate("fixtureState.enemyDetailTab='defense';rerender()")
             number=page.get_by_label('Fire defence percent',exact=True)
             toggle=page.locator('[data-defence="Fire"] input[type=checkbox]')

@@ -5914,6 +5914,12 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    value into or out of agreement with a reference cannot resize the rail and
    move every value box on the panel. It is pinned to the largest type a stack
    uses, because a deeper stack only ever draws smaller. */
+/* A detail panel keeps its scroll where the reader left it. The browser's
+   scroll anchoring re-picked its anchor when an edited value's reference strip
+   was rebuilt on blur, and jumped the panel by a hundred-odd pixels between the
+   press and the release of the next click, so that click was lost (Enemies >
+   Loot: edit a quantity, then "Clear card slot 1" did nothing). */
+.lex-detail-panel.lex-detail { overflow-anchor:none; }
 .lex-reference-probe {
   position:absolute;
   top:0;

@@ -231,17 +231,21 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       quantity.addEventListener('blur',()=>quantity.value=String(entry.quantity));
       return LexeditorUI.quantityChoice(value,enemyTableSource(quantity,row,value=>read(value)?.quantity,value=>entry.quantity=Number(value)));
     };
+    // One row per level tier and slot, like the Abilities table: four slots
+    // side by side left each item about a letter of room beside its finder
+    // and quantity (todo: "fix Enemy Loot overlap").
     const table=columnList({
-      rows:tiers.map(([tier,label])=>({key:tier,tier,label})),
+      rows:tiers.flatMap(([tier,label])=>[0,1,2,3].filter(index=>entryFor(tier,index))
+        .map(index=>({key:`${tier}-${index}`,tier,label,index}))),
       key:entry=>entry.key,
       class:`enemy-tier-table enemy-${kind}-table`,
       'aria-label':`${title} by level tier`,
       editable:true, localSort:false, showHeader:!draw,
-      template:'42px repeat(4,minmax(0,1fr))',
-      rowClass:entry=>`enemy-tier-row enemy-tier-${entry.tier}`,
-      columns:[{key:'label',label:'',render:entry=>entry.label},
-        ...[0,1,2,3].map(index=>({key:`slot${index}`,label:`SLOT ${index+1}`,
-          render:entry=>slotCell(entry.tier,entry.label,index)}))],
+      template:'46px 40px minmax(0,1fr)',
+      rowClass:entry=>`enemy-tier-row enemy-tier-${entry.tier}${entry.index===0?' enemy-tier-first':''}`,
+      columns:[{key:'label',label:'',render:entry=>entry.index===0?entry.label:''},
+        {key:'slot',label:'SLOT',render:entry=>String(entry.index+1)},
+        {key:'choice',label:draw?'MAGIC':'ITEM',render:entry=>slotCell(entry.tier,entry.label,entry.index)}],
     });
     return detailSection({className:'enemy-table-section enemy-tier-section',title,body:el('fieldset',{class:'enemy-table-controls',disabled:state.activeSource!=='mine'},table)});
   }
