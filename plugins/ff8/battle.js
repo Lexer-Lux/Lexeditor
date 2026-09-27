@@ -162,9 +162,72 @@
   // One map, two sizes. `points` is asked for again after each placement, so the
   // marker in the panel and the marker in the magnifier both show where the
   // record is now.
+  // The world map art: the game's own minimap, or the terrain drawn from
+  // above out of wmx.obj with its textures (Lexer asked for a button to swap
+  // the brown map for the detailed map Deling draws). The terrain is drawn once
+  // per dataset in the browser and kept as an image.
+  const worldTerrainImages=new Map();
+  function worldMapImage(){
+    const dataset=worldTextureDataset(),terrain=state.worldMapTerrain&&worldTerrainImages.get(dataset);
+    return typeof terrain==="string"?terrain
+      :`/assets/world-map.png?dataset=${encodeURIComponent(dataset)}&v=${encodeURIComponent(state.data.world.sha256)}`;
+  }
+  async function worldTerrainRender(dataset){
+    const [mesh,atlas]=await Promise.all([
+      fetch(`/assets/world-mesh.bin?dataset=${encodeURIComponent(dataset)}`).then(response=>{if(!response.ok)throw new Error(`HTTP ${response.status}`);return response.arrayBuffer()}),
+      new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error("The world texture atlas did not load"));
+        image.src=`/assets/world-atlas.png?dataset=${encodeURIComponent(dataset)}`})]);
+    const canvas=document.createElement("canvas");canvas.width=3072;canvas.height=2304;
+    const gl=canvas.getContext("webgl2",{preserveDrawingBuffer:true,antialias:true});
+    if(!gl)throw new Error("This browser has no WebGL2");
+    const shader=(type,source)=>{const unit=gl.createShader(type);gl.shaderSource(unit,source);gl.compileShader(unit);
+      if(!gl.getShaderParameter(unit,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(unit));return unit};
+    const program=gl.createProgram();
+    // Block units: X 0-128 west to east, Z 0-96 north to south, Y the height.
+    // Higher ground is drawn over lower ground; the light comes from the
+    // north-west so slopes read as relief.
+    gl.attachShader(program,shader(gl.VERTEX_SHADER,`#version 300 es
+      in vec3 position;in vec2 uv;out vec2 vUv;out vec3 vWorld;
+      void main(){vUv=uv;vWorld=vec3(position.x,position.y*24.0,position.z);
+        gl_Position=vec4(position.x/64.0-1.0,1.0-position.z/48.0,0.5-position.y*0.4,1.0);}`));
+    gl.attachShader(program,shader(gl.FRAGMENT_SHADER,`#version 300 es
+      precision highp float;in vec2 vUv;in vec3 vWorld;uniform sampler2D atlas;out vec4 color;
+      void main(){vec4 texel=texture(atlas,vUv);if(texel.a<0.5)discard;
+        vec3 normal=normalize(cross(dFdx(vWorld),dFdy(vWorld)));
+        float light=0.72+0.28*abs(dot(normal,normalize(vec3(-0.5,1.0,-0.6))));
+        color=vec4(texel.rgb*light,1.0);}`));
+    gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(program));
+    gl.useProgram(program);
+    const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,mesh,gl.STATIC_DRAW);
+    const attribute=(name,size,offset)=>{const at=gl.getAttribLocation(program,name);gl.enableVertexAttribArray(at);gl.vertexAttribPointer(at,size,gl.FLOAT,false,24,offset)};
+    attribute("position",3,0);attribute("uv",2,12);
+    const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,atlas);
+    gl.viewport(0,0,canvas.width,canvas.height);gl.clearColor(0,0,0,0);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);
+    gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.drawArrays(gl.TRIANGLES,0,mesh.byteLength/24);
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    if(!blob)throw new Error("The terrain image could not be made");
+    return URL.createObjectURL(blob);
+  }
+  function worldTerrainButton(){
+    const dataset=worldTextureDataset(),entry=worldTerrainImages.get(dataset),loading=state.worldMapTerrain&&entry instanceof Promise;
+    return el("button",{type:"button",class:"world-terrain-toggle","aria-pressed":state.worldMapTerrain?"true":"false",
+      "aria-busy":loading?"true":null,title:"Draw the map from the terrain and its textures",
+      ondblclick:event=>event.stopPropagation(),
+      onclick:event=>{event.stopPropagation();state.worldMapTerrain=!state.worldMapTerrain;
+        if(state.worldMapTerrain&&!worldTerrainImages.has(dataset)){
+          const job=worldTerrainRender(dataset).then(url=>{worldTerrainImages.set(dataset,url);if(state.tab==="world")rerenderWorldMap()},
+            error=>{worldTerrainImages.delete(dataset);state.worldMapTerrain=false;showAlert({title:"The terrain map could not be drawn",message:error.message||String(error)});if(state.tab==="world")rerenderWorldMap()});
+          worldTerrainImages.set(dataset,job);
+        }
+        rerenderWorldMap()}},loading?"Terrain…":"Terrain");
+  }
   function worldLocationOptions(options){
     return {fill:false,columns:32,rows:24,ratio:4/3,label:options.label,
-      image:`/assets/world-map.png?dataset=${encodeURIComponent(worldTextureDataset())}&v=${encodeURIComponent(state.data.world.sha256)}`,
+      image:worldMapImage(),
       points:typeof options.points==="function"?options.points():options.points,
       cells:options.cells,select:options.select,place:options.place,
       readout:options.readout,note:options.note};
@@ -385,8 +448,8 @@
         label:`Select sky record ${record.id}`,
         activate:()=>{state.worldMapSky=record.id;state.worldMapPoint=null;rerenderWorldMap()}});
     }
-    const map=LexeditorUI.imageMap({columns:32,rows:24,ratio:4/3,label:"FF8 world map",cells,points,tools:[lens],
-      image:`/assets/world-map.png?dataset=${encodeURIComponent(worldTextureDataset())}&v=${encodeURIComponent(state.data.world.sha256)}`,
+    const map=LexeditorUI.imageMap({columns:32,rows:24,ratio:4/3,label:"FF8 world map",cells,points,tools:[lens,worldTerrainButton()],
+      image:worldMapImage(),
       readout:point=>{
         const cell=segments[point.row*32+point.column];
         if(!cell)return "";
@@ -532,7 +595,7 @@
       {noun:"world to field entries"},false);
   }
   function renderWorldMapContent(mount=true){
-    const tabsData=[{id:"map",label:"Map",help:"The world map, and nothing else on the panel. Regions colours each cell by its region, so cells of one colour share encounter rules. Click a cell to inspect its terrain geometry and its region, or a red dot to inspect a draw point; the corner shows what the pointer is over. Each panel's title opens the page that owns it. Scroll to zoom, drag with the middle mouse button to pan, and double-click to fit the map."},{id:"regions",label:"Cells",help:"Every cell of the world map and the region it belongs to. The Encounters tab matches the region with the ground type to choose a battle group, so changing a cell's region can change which battles occur there."},{id:"groundTypes",label:"Ground Types",help:"Every terrain code the world map's polygons use, where it is, and the encounter rules that start battles on it. The game stores only the number; the descriptions are Deling's notes."},{id:"fieldReturns",label:"Field → World",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"worldToField",label:"World → Field",help:"Where the player arrives in a field when they enter it from the world map: the field, and the point and walkmesh triangle they start on. The table does not store a world-map position; which entry the game uses is decided by its own code, so test a change in the game."},{id:"drawPoints",label:"Draw Points",help:"Move world draw points. Click the placement grid or edit the packed position bytes. What a draw point gives - its spell, whether it refills and whether it draws a high yield - is stored in FF8_EN.exe, not in this file, so this page changes only where the point is."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
+    const tabsData=[{id:"map",label:"Map",help:"The world map, and nothing else on the panel. Regions colours each cell by its region, so cells of one colour share encounter rules. Terrain draws the map from the world's own terrain and textures instead of the game's small map; the first time takes a few seconds. Click a cell to inspect its terrain geometry and its region, or a red dot to inspect a draw point; the corner shows what the pointer is over. Each panel's title opens the page that owns it. Scroll to zoom, drag with the middle mouse button to pan, and double-click to fit the map."},{id:"regions",label:"Cells",help:"Every cell of the world map and the region it belongs to. The Encounters tab matches the region with the ground type to choose a battle group, so changing a cell's region can change which battles occur there."},{id:"groundTypes",label:"Ground Types",help:"Every terrain code the world map's polygons use, where it is, and the encounter rules that start battles on it. The game stores only the number; the descriptions are Deling's notes."},{id:"fieldReturns",label:"Field → World",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"worldToField",label:"World → Field",help:"Where the player arrives in a field when they enter it from the world map: the field, and the point and walkmesh triangle they start on. The table does not store a world-map position; which entry the game uses is decided by its own code, so test a change in the game."},{id:"drawPoints",label:"Draw Points",help:"Move world draw points. Click the placement grid or edit the packed position bytes. What a draw point gives - its spell, whether it refills and whether it draws a high yield - is stored in FF8_EN.exe, not in this file, so this page changes only where the point is."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
     if(state.worldTab==="map"){const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;return wrap(renderWorldVisual())}
     if(state.worldTab==="worldToField")return wrap(renderWorldToField());
     if(state.worldTab==="groundTypes"){
