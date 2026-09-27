@@ -2378,11 +2378,19 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 .lex-matrix-table > .lex-column-list-row,
 .lex-matrix-table > .lex-column-list-header { grid-column:2 / -1; }
 .lex-matrix-table > .lex-column-list-header { grid-row:2; position:static; }
+/* The row axis runs the table's full height and a header-coloured corner
+   fills the square above the id column, so no bare panel square shows in
+   the top-left. The column axis starts over the first data column, its
+   label centred over the columns as the row axis label is beside the rows. */
 .lex-matrix-table > .lex-matrix-column-axis { grid-column:3 / -1; grid-row:1; }
-.lex-matrix-column-axis > .lex-column-list-head-cell { grid-column:1 / -1; justify-content:flex-start; }
+.lex-matrix-table::before {
+  content:""; grid-column:2; grid-row:1;
+  background:var(--lex-list-header-bg, var(--lex-panel-2));
+}
+.lex-matrix-column-axis > .lex-column-list-head-cell { grid-column:1 / -1; justify-content:center; }
 .lex-matrix-column-axis .lex-matrix-axis-label { position:sticky; left:0; }
 .lex-matrix-row-axis {
-  grid-column:1; grid-row:2 / -1;
+  grid-column:1; grid-row:1 / -1;
   display:flex; align-items:center; justify-content:center;
   padding:6px; border-right:var(--lex-list-header-border, 0);
   color:var(--lex-list-header-fg, var(--lex-highlight));

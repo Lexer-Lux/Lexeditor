@@ -94,12 +94,21 @@
       value:worldRow(state.referenceData[reference.id],"helper",rule.id)?.encounterGroup}))
       .filter(entry=>entry.value!==undefined);
   }
+  // A rule's group is chosen with the thing finder: from the heading of the
+  // group panel, or by right-clicking the rule's cell. A plain click shows
+  // what the cell holds in that panel (Lexer, 2026-09-27).
+  function chooseRuleGroup(rule,refresh){
+    if(state.activeSource!=='mine')return;
+    const apply=value=>{if(state.activeSource!=='mine'||!encounterGroupById(value))return;rule.encounterGroup=Number(value);refresh()};
+    beginSearcher({type:'encounterGroups',prompt:`Choose the encounter group for region ${rule.regionId}, ground ${rule.groundId}.`,
+      target:()=>showEncounterSubtab('groups'),origin:()=>showEncounterSubtab('rules'),accept:apply});
+  }
   function encounterRuleControl(rule,refresh){
     const apply=value=>{if(state.activeSource!=='mine'||!encounterGroupById(value))return;rule.encounterGroup=Number(value);refresh()};
-    const control=el('button',{type:'button',disabled:state.activeSource!=='mine',
+    const control=el('button',{type:'button',
       'aria-label':`Region ${rule.regionId} ground ${rule.groundId} encounter group`,class:'ff8-encounter-rule-input',
-      onclick:()=>beginSearcher({type:'encounterGroups',prompt:`Choose the encounter group for region ${rule.regionId}, ground ${rule.groundId}.`,
-        target:()=>showEncounterSubtab('groups'),origin:()=>showEncounterSubtab('rules'),accept:apply})},String(rule.encounterGroup));
+      title:'Click to show this group; right-click to choose a different group',
+      oncontextmenu:event=>{event.preventDefault();state.selected.encounterRule=rule.id;chooseRuleGroup(rule,refresh)}},String(rule.encounterGroup));
     const select=()=>{state.selected.encounterRule=rule.id;refresh()};
     control.addEventListener("focus",select);
     control.addEventListener("pointerdown",select);
@@ -164,7 +173,9 @@
     if(!group)return detailPanel({title:"Encounter group",
       className:"ff8-encounter-group-preview",
       body:LexeditorUI.notice({message:"Select a group number in the table to preview the battles it holds."})});
-    return encounterGroupPanel(group,refresh,origin,'ff8-encounter-group-preview');
+    return encounterGroupPanel(group,refresh,origin,'ff8-encounter-group-preview',
+      state.activeSource==='mine'?{find:()=>chooseRuleGroup(rule,refresh),
+        findTitle:`Choose a different group for region ${rule.regionId}, ground ${rule.groundId}`}:{});
   }
 
   function renderEncounterRules(){
@@ -224,7 +235,7 @@
             targetId:rule.id,targetLabel:`encounter rule ${rule.id}`,
             activate:()=>{state.selected.encounterRule=rule.id;showEncounterSubtab("rules")}})}]});
   }
-  function encounterGroupPanel(row,refresh,origin,className='ff8-encounter-group-detail'){
+  function encounterGroupPanel(row,refresh,origin,className='ff8-encounter-group-detail',heading={}){
     const formations=row.encounters.map((value,index)=>{
       const strip=el('div',{class:'ff8-encounter-formation-row',
         'data-formation-position':index,'aria-label':`Battle ${index+1} of encounter group ${row.id}`},
@@ -232,7 +243,7 @@
         encounterPreviewGrid(encounterRowById(value),origin));
       return strip;
     });
-    return detailPanel({title:'Encounter group',identity:recordId(row.id),className,
+    return detailPanel({title:'Encounter group',identity:recordId(row.id),className,...heading,
       help:'The game chooses one of these eight formations when this group starts a battle. Hover a formation ID to replace it. Changing an enemy changes that formation everywhere it is used. Special level means the enemy uses a level rule we do not yet understand.',
       body:[detailSection({body:LexeditorUI.stack({fill:false,className:'ff8-encounter-formations'},...formations)}),
         detailSection({title:'WHERE THIS GROUP IS USED',
