@@ -4155,7 +4155,9 @@ body:has(.lex-data-map-table) #main {
    on a row of its own in a narrow card - which read as a broken drawer and
    covered a short card's graph. Wrapping flex lines grow their boxes to the
    width they have, so the strip ends at the same edge whichever row it is. */
-.lex-curve-variables { position:absolute; z-index:6; left:0; right:0; bottom:0; display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; padding:6px; color:var(--lex-text); background:color-mix(in srgb,var(--lex-panel) 90%,var(--lex-text) 10%); border:1px solid var(--lex-border); border-color:color-mix(in srgb,var(--lex-border) 65%,var(--lex-text) 35%); box-shadow:0 -4px 12px rgb(0 0 0 / 28%),inset 0 1px rgb(255 255 255 / 18%); opacity:0; pointer-events:none; clip-path:inset(100% 0 0); transition:opacity .15s,clip-path .15s; }
+/* The variable drawer opens along the graph's top edge; along the bottom it
+   covered the x-axis labels (Lexer: "put the drawers back on top"). */
+.lex-curve-variables { position:absolute; z-index:6; left:0; right:0; top:0; display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; padding:6px; color:var(--lex-text); background:color-mix(in srgb,var(--lex-panel) 90%,var(--lex-text) 10%); border:1px solid var(--lex-border); border-color:color-mix(in srgb,var(--lex-border) 65%,var(--lex-text) 35%); box-shadow:0 4px 12px rgb(0 0 0 / 28%),inset 0 1px rgb(255 255 255 / 18%); opacity:0; pointer-events:none; clip-path:inset(0 0 100%); transition:opacity .15s,clip-path .15s; }
 .lex-curve-editor:is(:hover,:focus-within) > .lex-curve-variables { opacity:1; pointer-events:auto; clip-path:inset(0); }
 
 .lex-curve-variable { flex:1 1 84px; display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:4px; min-width:0; }

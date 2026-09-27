@@ -61,7 +61,9 @@ def test_later_page_actions_use_full_script_indices(page):
     assert last['y']+last['height']<=footer['y']+1
 
 
-def test_curve_drawer_is_one_row_at_bottom(page):
+def test_curve_drawer_is_one_row_at_top(page):
+    """Lexer, 2026-09-27: the drawer sits on the graph's top edge, where it
+    does not cover the x-axis labels."""
     framework(page)
     page.evaluate('''() => {
       const U=LexeditorUI,graph=U.curveEditor({title:'HP',domain:{min:1,max:100},range:{min:0,max:100},evaluate:x=>x,
@@ -75,7 +77,7 @@ def test_curve_drawer_is_one_row_at_bottom(page):
     boxes=page.locator('.lex-curve-variable').evaluate_all('ns=>ns.map(n=>n.getBoundingClientRect().toJSON())')
     assert len({round(box['top']) for box in boxes})==1
     graph=page.locator('.lex-curve-editor').bounding_box();box=drawer.bounding_box()
-    assert abs(box['y']+box['height']-graph['y']-graph['height'])<2
+    assert abs(box['y']-graph['y'])<2
     page.locator('.lex-curve-variable input').first.focus()
     page.mouse.move(1000,700)
     assert drawer.evaluate('n=>Number(getComputedStyle(n).opacity)')==1
