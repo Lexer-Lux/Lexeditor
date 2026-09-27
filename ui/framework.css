@@ -6705,7 +6705,8 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 .lex-hoverable:has(> .lex-stack) { display:flex; width:100%; }
 .lex-hoverable > .lex-stack { width:100%; }
 
-.lex-value-modified > :is(input,select,textarea,output), .lex-value-modified > .lex-unit-field > :is(input,select,output), .lex-value-modified > :not(.lex-reference-values):not(.lex-reference-placeholder) .lex-hoverable {
+.lex-value-modified > :is(input,select,textarea,output), .lex-value-modified > .lex-unit-field > :is(input,select,output), .lex-value-modified > :not(.lex-reference-values):not(.lex-reference-placeholder) .lex-hoverable,
+.lex-column-list-cell.lex-value-modified > .lex-column-cell-content {
   color:var(--lex-accent-ink);
 }
 

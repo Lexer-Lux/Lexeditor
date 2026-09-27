@@ -100,9 +100,11 @@ def main():
             set_mod_only(page, True)
             rows = master_rows(page)
             assert len(rows) == 2, f"SFX mod-only rows: {rows}"
-            assert any("Sound 5" in row for row in rows), rows
-            assert any("Sound 9" in row for row in rows), rows
-            # A replaced asset reads like an edited record: its name in the accent.
+            # Shipped sounds have no names of their own; the list shows IDs.
+            assert any(row.startswith("#5") for row in rows), rows
+            assert any(row.startswith("#9") for row in rows), rows
+            assert not any("Sound 5" in row for row in rows), rows
+            # A replaced asset reads like an edited record: in the accent.
             assert page.locator("#main .lex-column-list .lex-value-modified").count() == 2, "SFX accent"
             assert page.locator("#main .lex-detail-panel-title .lex-value-modified").count() == 1, "SFX heading accent"
             page.evaluate("state.selected.sfx = 5")
@@ -184,7 +186,7 @@ def main():
 
             page.evaluate("() => switchProjectSource('mod:scratch-assets')")
             assert page.evaluate("state.activeSource") == "mod:scratch-assets"
-            for tab, expected in (("sfx", ["Sound 11"]),
+            for tab, expected in (("sfx", ["#11"]),
                                   ("models", ["c0m003.dat"]),
                                   ("textures", ["World Texture 6"])):
                 page.click(f'nav button[data-tab="{tab}"]')

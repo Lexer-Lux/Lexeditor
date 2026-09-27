@@ -24,16 +24,19 @@
   // saved or only staged.
   function assetName(row,overridden){return overridden?el("span",{class:"lex-value-modified"},el("output",{},row.name)):row.name}
   const sfxOverridden=row=>!!(row.modFiles?.length||row.audioBase64);
+  const sfxFile=row=>String(row.id).startsWith("file:");
   const modelOverridden=row=>!!(row.override||row.datBase64);
   const textureOverridden=row=>!!row.modFiles?.length;
   function renderSfx(){
+    // A shipped sound has no name of its own - "Sound 12" only repeats its
+    // ID - so the list shows the ID; a sound a mod adds shows its file name.
     const rows=filtered("sfx",["name","id"]),columns=[
-      {key:"id",label:"ID"},
-      {key:"name",label:"Sound",render:row=>assetName(row,sfxOverridden(row))},
+      {key:"id",label:"ID",render:row=>sfxFile(row)?row.name:row.id,
+        cellClass:row=>sfxOverridden(row)?"lex-value-modified":""},
       {key:"durationMs",label:"Length",render:row=>assetDuration(row.durationMs)},
       {key:"loop",label:"Loop",render:row=>row.valid?(row.loop?"Yes":"No"):"—"},
       {key:"modFiles",label:"Replaced",render:row=>row.modFiles?.length?`Yes (${row.modFiles.length})`:"—"}];
-    showPaged("sfx",rows,columns,sfxDetail,"70px minmax(200px,1.5fr) 90px 70px 110px");
+    showPaged("sfx",rows,columns,sfxDetail,"minmax(90px,1fr) 90px 70px 110px");
   }
   function sfxDetail(row,prefs){
     if(String(row.id).startsWith("file:"))
@@ -74,7 +77,7 @@
       sections.push(detailSection({title:"REPLACEMENT",body:replaceBody,
         help:infoHelp("Replace writes sfx/<id>.<ext> into this project; FFNx plays it instead of the shipped sound. Revert deletes the project override.")}));
     }
-    return sharedDetail({...row,titleContent:assetName(row,sfxOverridden(row))},prefs,sections);
+    return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections);
   }
 
   function modelKindName(kind){return {monster:"Monster",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Locked",empty:"Empty"}[kind]||kind}
