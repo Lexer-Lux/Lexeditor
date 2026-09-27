@@ -42,6 +42,7 @@ def build_fixture() -> dict:
         bc.prop("ATB", editable=False),
         bc.prop("Element", "ENUM", editable=False),
         bc.prop("Name", "STRING", editable=False),
+        bc.prop("DisplayText", "STRING", editable=False),
         bc.prop("Explanation", "STRING", editable=False),
         bc.prop("InternalCode", "STRING", editable=False),
     ]
@@ -50,6 +51,7 @@ def build_fixture() -> dict:
         {"id": 0, "tag": "Braver", "values": {
             "ATB": 1, "Element": "Fire",
             "Name": "$Ability_Braver_Name",
+            "DisplayText": "$Ability_Braver_Name",
             "Explanation": "$Ability_Braver_Help",
             "InternalCode": "ABL_BRAVER_001",
         }},
@@ -87,7 +89,7 @@ def measure(page) -> list[dict]:
         const boxRect = box.getBoundingClientRect();
         const lockRect = lock.getBoundingClientRect();
         out.push({
-          label: (labelNode?.textContent || '').trim(),
+          label: (labelNode?.textContent || box.getAttribute('aria-label') || '').trim(),
           boxTop: boxRect.top, boxBottom: boxRect.bottom, boxRight: boxRect.right,
           boxCenterY: (boxRect.top + boxRect.bottom) / 2,
           lockCenterY: (lockRect.top + lockRect.bottom) / 2,
@@ -116,6 +118,8 @@ def run(output: Path, executable: str | None) -> None:
                 page.wait_for_function(
                     "() => state.tab==='abilities' && !state.busy")
                 page.wait_for_selector(".lex-field-readonly-lock")
+                assert page.locator('.lex-detail-panel-title input').input_value() == 'Braver'
+                assert page.locator('.lex-detail-panel-title input').is_disabled()
                 page.screenshot(path=str(output / "abilities-readonly-locks.png"), full_page=True)
                 measurements = measure(page)
             finally:
@@ -129,7 +133,7 @@ def run(output: Path, executable: str | None) -> None:
 
     assert measurements, "No read-only lock rendered at all; nothing to measure"
     by_label = {row["label"]: row for row in measurements}
-    expected_labels = {"ATB", "Element", "Name", "Explanation", "InternalCode"}
+    expected_labels = {"ATB", "Element", "DisplayText", "Explanation", "InternalCode"}
     missing = expected_labels - set(by_label)
     assert not missing, f"Expected read-only fields not rendered: {missing}"
 

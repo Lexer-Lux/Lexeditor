@@ -24,6 +24,24 @@ def test_probe_detects_parent_clip_and_vertical_ellipsis(page):
     assert all(hit['overH'] > 1 for hit in hits)
 
 
+def test_probe_tracks_positioned_containing_blocks(page):
+    page.set_content('''<style>body{margin:0;font:20px/30px Arial}
+      .cut{width:90px;height:35px;overflow:hidden;margin-bottom:10px}
+      .line{white-space:nowrap}
+      </style>
+      <div class="cut"><div class="line" style="position:relative">Relative child clipped</div></div>
+      <div class="cut"><div style="position:relative;width:300px;height:30px">
+        <span class="line" style="position:absolute">Absolute child clipped</span></div></div>
+      <div style="position:relative;height:45px"><div class="cut">
+        <span class="line" style="position:absolute">Absolute child escapes</span></div></div>
+      <div class="cut"><span class="line" style="position:fixed;top:160px">Fixed child escapes</span></div>
+      <div class="cut" style="transform:translateX(0)">
+        <span class="line" style="position:fixed">Fixed transformed child clipped</span></div>''')
+    hits=json.loads(page.evaluate(PROBE))
+    assert {hit['text'] for hit in hits}=={
+        'Relative child clipped','Absolute child clipped','Fixed transformed child clipped'}, hits
+
+
 @pytest.mark.parametrize('height', [720, 950, 1080])
 @pytest.mark.parametrize('theme', ['blank', 'rdr2'])
 @pytest.mark.parametrize('zoom', [1, 1.5])

@@ -1,8 +1,8 @@
 """Dark Souls III regulation/BND4/PARAM support.
 
-This module deliberately patches known fixed-width PARAM cells in place. It
-never reconstructs PARAM rows or BND4 archives, so unknown bytes stay exactly
-as they were. Compressed binder members are rejected instead of guessed.
+Known fixed-width PARAM cells are patched in place. Row creation relocates
+directory pointers and grows uncompressed binder members while retaining
+existing payloads and unknown bytes. Compressed members are rejected.
 
 The installed regulation, Game/Data0.bdt, is a 16-byte IV followed by
 AES-256-CBC ciphertext, and the ciphertext holds a DCX container with one DFLT
@@ -294,6 +294,34 @@ class BND4View:
         return bytes(result)
 
 
+    def grow_member(self, entry: BinderEntry, replacement: bytes) -> bytes:
+        """Grow one uncompressed member, retaining other members and alignment."""
+        if entry.compressed or len(replacement) < entry.size:
+            raise DS3FormatError("Only uncompressed member growth is supported")
+        end = entry.data_offset + entry.size
+        directory_end = 0x40 + self.file_count * self.file_header_size
+        first_data = min(item.data_offset for item in self.entries)
+        if directory_end > first_data or any(self._unpack('q', pos) > first_data for pos in (0x28, 0x38)):
+            raise DS3FormatError("BND4 metadata must precede member data before resizing")
+        for other in self.entries:
+            if other.index != entry.index and other.data_offset < end and other.data_offset + other.size > entry.data_offset:
+                raise DS3FormatError("Overlapping BND4 members cannot be resized")
+        growth = (len(replacement) - entry.size + 15) // 16 * 16
+        padding = entry.size + growth - len(replacement)
+        result = bytearray(self.data[:entry.data_offset] + replacement + bytes(padding) + self.data[end:])
+        offset_field = 16 + (8 if self.format & self.FORMAT_COMPRESSION else 0)
+        offset_code = 'q' if self.format & self.FORMAT_LONG_OFFSETS else 'I'
+        for item in self.entries:
+            pos = 0x40 + item.index * self.file_header_size
+            if item.index == entry.index:
+                struct.pack_into(self.endian+'q', result, pos+8, len(replacement))
+                if self.format & self.FORMAT_COMPRESSION:
+                    struct.pack_into(self.endian+'q', result, pos+16, len(replacement))
+            elif item.data_offset >= end:
+                struct.pack_into(self.endian+offset_code, result, pos+offset_field, item.data_offset+growth)
+        return bytes(result)
+
+
 @dataclass(frozen=True)
 class ParamRow:
     row_id: int
@@ -380,6 +408,57 @@ class ParamView:
             raise DS3FormatError(f"Expected one row ID {row_id}; found {len(matches)}")
         return matches[0]
 
+    def copy_row(self, source_id: int, new_id: int, name: str, row_size: int) -> bytes:
+        """Extend the directory and data region, preserving existing payloads."""
+        if type(new_id) is not int or not -(2**31) <= new_id < 2**31:
+            raise DS3FormatError("A PARAM row ID must be a signed 32-bit integer")
+        if any(row.row_id == new_id for row in self.rows):
+            raise DS3FormatError("That PARAM row ID already exists")
+        if self.row_count == 65535:
+            raise DS3FormatError("PARAM already has the maximum number of rows")
+        if not isinstance(name, str) or '\0' in name or len(name) > 1024:
+            raise DS3FormatError("Invalid PARAM row name")
+        source = self.row(source_id)
+        extended = bool(self.format2d & 4 or self.format2d & 3 == 3)
+        header_end = 64 if extended else 48
+        stride = 24 if self.long_offsets else 12
+        directory_end = header_end + self.row_count * stride
+        strings = self.strings_offset
+        if row_size <= 0 or not directory_end <= strings <= len(self.data):
+            raise DS3FormatError("PARAM data/string boundaries are inconsistent")
+        if any(not directory_end <= row.data_offset or row.data_offset + row_size > strings for row in self.rows):
+            raise DS3FormatError("PARAM row overlaps its directory or strings")
+        encoding = ('utf-16-be' if self.big_endian else 'utf-16-le') if self.format2e & 1 else 'shift_jis'
+        try:
+            encoded_name = name.encode(encoding) + (b'\0\0' if self.format2e & 1 else b'\0')
+        except UnicodeEncodeError as error:
+            raise DS3FormatError("Row name cannot be represented in this PARAM encoding") from error
+        payload = self.data[source.data_offset:source.data_offset + row_size]
+        result = bytearray(self.data[:directory_end] + bytes(stride)
+                           + self.data[directory_end:strings] + payload + self.data[strings:])
+        name_offset = len(result)
+        result.extend(encoded_name)
+        def relocated(offset):
+            return offset + (stride if offset >= directory_end else 0) + (row_size if offset >= strings else 0)
+        struct.pack_into(self.endian + 'H', result, 10, self.row_count + 1)
+        struct.pack_into(self.endian + 'I', result, 0, strings + stride + row_size)
+        data_code, data_position = ('q', 48) if self.long_offsets else ('I', 48) if extended else ('H', 4)
+        data_start = self._unpack(data_code, data_position)
+        struct.pack_into(self.endian + data_code, result, data_position, relocated(data_start))
+        if self.format2d & 0x80:
+            struct.pack_into(self.endian + 'q', result, 16, relocated(self._unpack('q', 16)))
+        code = 'q' if self.long_offsets else 'I'
+        for index in range(self.row_count):
+            pos = header_end + index * stride + (8 if self.long_offsets else 4)
+            for offset_position in (pos, pos + (8 if self.long_offsets else 4)):
+                offset = self._unpack(code, offset_position)
+                if offset:
+                    struct.pack_into(self.endian + code, result, offset_position, relocated(offset))
+        struct.pack_into(self.endian + 'i', result, directory_end, new_id)
+        pos = directory_end + (8 if self.long_offsets else 4)
+        struct.pack_into(self.endian + code, result, pos, strings + stride)
+        struct.pack_into(self.endian + code, result, pos + (8 if self.long_offsets else 4), name_offset)
+        return bytes(result)
 
 _TYPE_SIZE = {"s8":1,"u8":1,"dummy8":1,"s16":2,"u16":2,"s32":4,"u32":4,"b32":4,"f32":4,"angle32":4,"f64":8}
 _INT_LIMITS = {
@@ -639,6 +718,19 @@ class RegulationDocument:
         self._plain=plain
         self._original_plain=plain
         self._dirty=set()
+        self._created_originals={}
+        self._created_ids=set()
+
+    def identify_created_rows(self, source: bytes):
+        """Identify rows supplied by this project beyond its source regulation."""
+        plain, _ = decrypt_regulation(source)
+        baseline = BND4View(plain)
+        created = set()
+        for table,param in self.params.items():
+            original = ParamView(baseline.member_bytes(baseline.find_param(table)))
+            ids = {row.row_id for row in original.rows}
+            created.update((table,row.row_id) for row in param.rows if row.row_id not in ids)
+        self._created_ids = created | set(self._created_originals)
 
     def _display_name(self, table: str, row: ParamRow) -> str:
         schema = self.schemas[table]
@@ -646,7 +738,23 @@ class RegulationDocument:
 
     def list_rows(self, table: str):
         param=self.params[table]
-        return [{"id":r.row_id,"name":self._display_name(table,r)} for r in param.rows]
+        return [{"id":r.row_id,"name":self._display_name(table,r),"created":(table,r.row_id) in self._created_ids} for r in param.rows]
+
+    def create_row(self, table: str, source_id: int, new_id: int, name: str):
+        schema = self.schemas[table]
+        param = self.params[table]
+        member = param.copy_row(source_id, new_id, name, schema.row_size)
+        plain = self.binder.grow_member(self.entries[table], member)
+        binder = BND4View(plain)
+        # Validate all relocated members before publishing the draft.
+        entries = {key:binder.find_param(key) for key in self.params}
+        params = {key:ParamView(binder.member_bytes(entry)) for key,entry in entries.items()}
+        created = params[table].row(new_id)
+        self._created_originals[table,new_id] = member[created.data_offset:created.data_offset+schema.row_size]
+        self._created_ids.add((table,new_id))
+        self._plain,self.binder,self.entries,self.params = plain,binder,entries,params
+        self._dirty.add((table,new_id,'__created__'))
+        return self.read_row(table,new_id)
 
     def read_row(self, table: str, row_id: int):
         schema=self.schemas[table]; param=self.params[table]; row=param.row(row_id)
@@ -682,8 +790,12 @@ class RegulationDocument:
         self._plain=new_plain; self.binder=BND4View(new_plain)
         self.entries[table]=self.binder.find_param(table)
         self.params[table]=ParamView(self.binder.member_bytes(self.entries[table]))
-        original_member = BND4View(self._original_plain).member_bytes(entry)
-        original_row_bytes = original_member[row.data_offset:row.data_offset+schema.row_size]
+        original_row_bytes = self._created_originals.get((table,row_id))
+        if original_row_bytes is None:
+            original_binder = BND4View(self._original_plain)
+            original_member = original_binder.member_bytes(original_binder.find_param(table))
+            original_row = ParamView(original_member).row(row_id)
+            original_row_bytes = original_member[original_row.data_offset:original_row.data_offset+schema.row_size]
         original_value = read_field(original_row_bytes,field,param.endian)
         dirty_key=(table,row_id,field_key)
         current_value=read_field(patched,field,param.endian)

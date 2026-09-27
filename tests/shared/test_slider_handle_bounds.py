@@ -44,3 +44,22 @@ def test_int32_slider_drag_and_precise_entry(page):
     assert 0 < value <= 2147483647
     page.locator('input').fill('-12345')
     assert page.locator('input').evaluate("n=>Number(n.value.replaceAll(',',''))") == -12345
+
+
+def test_slider_stops_when_project_locks_during_drag(page):
+    framework(page)
+    page.evaluate('''()=>{const U=LexeditorUI;
+      document.querySelector('main').append(U.detailField({label:'Amount',
+        control:U.el('input',{type:'number',min:0,max:100,value:50})}));}''')
+    field=page.locator('.lex-detail-field')
+    field.hover()
+    handle=field.locator('.lex-value-handle')
+    box=handle.bounding_box()
+    page.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2)
+    page.mouse.down()
+    page.evaluate("document.documentElement.dataset.lexProjectReadonly='true'")
+    page.mouse.move(box['x']+80,box['y']+box['height']/2,steps=3)
+    page.mouse.up()
+    assert page.locator('input').input_value() == '50'
+    assert handle.evaluate("e=>getComputedStyle(e).pointerEvents") == 'none'
+    assert handle.evaluate("e=>getComputedStyle(e).opacity") == '0'

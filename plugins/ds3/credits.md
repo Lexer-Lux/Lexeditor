@@ -10,6 +10,7 @@ Attributions:
 Thanks:
 
 - **JKAnderson / SoulsFormats** — Independent DS3 regulation behavior cross-check; GPL code is not bundled or copied. <https://github.com/JKAnderson/SoulsFormats>
+- **soulsmods / DSMapStudio contributors** — PARAM header, row-directory, data-start and Unicode name-offset behavior cross-check for row creation; implementation code is not copied. <https://github.com/soulsmods/DSMapStudio/blob/master/src/Andre/Andre.Formats/Param.cs>
 
 ## Smithbox
 

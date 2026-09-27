@@ -42,6 +42,17 @@ def no_mod_session():
             session.stop()
 
 
+def test_no_mod_session_refuses_record_creation(no_mod_session):
+    from urllib.request import Request, urlopen
+    from urllib.error import HTTPError
+    from core.service_session import request_json
+    with pytest.raises(HTTPError) as refused:
+        urlopen(Request(no_mod_session.url+'api/create',data=b'{"table":"Magic","sourceId":0,"id":1,"name":"No"}',
+                        headers={'Content-Type':'application/json'}))
+    assert refused.value.code==403
+    assert request_json(no_mod_session.url+'api/state')['dirtyCount']==0
+
+
 def test_no_mod_session_shows_vanilla_values_and_locks_the_editor(no_mod_session):
     from playwright.sync_api import sync_playwright
     with sync_playwright() as play:

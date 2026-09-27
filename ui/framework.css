@@ -991,6 +991,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-detail-panel-heading.no-icon.no-actions .lex-detail-panel-identity { grid-column:1 / -1; }
 
 .lex-detail-panel-identity {
+  container:lex-record-heading / inline-size;
   position:relative;
   display:grid;
   grid-template-columns:minmax(0,1fr) auto;
@@ -3927,6 +3928,14 @@ body:has(.lex-data-map-table) #main {
   }
 }
 
+/* A container can run out of horizontal room even in a wide app window. */
+.lex-panel-layout.lex-panel-layout-below-minimum {
+  grid-template-columns:minmax(0,1fr);
+  grid-template-rows:repeat(var(--lex-panel-count),minmax(0,1fr));
+  gap:var(--lex-panel-gap,14px);
+}
+.lex-panel-layout.lex-panel-layout-below-minimum > .lex-panel-layout-divider { display:none; }
+
 /* Shared multi-toggle property row. Wraps rather than shrinking, so a row of
    eight switches never collapses into unreadable two-line micro-labels. */
 
@@ -4125,6 +4134,9 @@ body:has(.lex-data-map-table) #main {
 .lex-curve-variable-c { color:#f1d34f; fill:#f1d34f; }
 .lex-curve-variable-d { color:#7fd777; fill:#7fd777; }
 .lex-curve-variable-highlight { text-decoration:underline; }
+.lex-curve-path-formula:has([data-curve-variable]) { pointer-events:auto; }
+.lex-curve-path-formula [data-curve-variable] { pointer-events:bounding-box; }
+.lex-curve-math-atom [data-curve-variable] { pointer-events:auto; }
 .lex-curve-variable-active { outline:1px solid var(--lex-highlight); }
 .lex-curve-tooltip { position:absolute; z-index:8; transform:translate(-50%,-100%); padding:4px 8px; color:var(--lex-text); background:var(--lex-panel); border:1px solid var(--lex-border); font:14px/1.3 var(--lex-font); white-space:nowrap; pointer-events:none; }
 .lex-curve-tooltip:empty { display:none; }
@@ -4239,7 +4251,13 @@ body:has(.lex-data-map-table) #main {
 .lex-instruction-row { display:flex; align-items:center; gap:6px; min-height:96px; flex:1 0 96px; padding:6px; border-bottom:1px solid var(--lex-border); box-sizing:border-box; }
 .lex-instruction-row[draggable="true"], .lex-project-reference[draggable="true"] { cursor:grab; }
 .lex-instruction-index { flex:0 0 22px; font-size:.8em; color:var(--lex-muted); }
-.lex-instruction-controls { display:flex; align-items:center; gap:6px; flex:1 1 60%; min-width:0; }
+.lex-instruction-controls { display:flex; align-items:flex-end; gap:6px; flex:1 1 60%; min-width:0; }
+.lex-instruction-controls :is(select,input:not([type="checkbox"],[type="radio"],[type="range"])) {
+  /* Fitting long option text must not change a control's height. */
+  height:var(--lex-instruction-control-height,2rem);
+  min-height:var(--lex-instruction-control-height,2rem);
+  box-sizing:border-box;
+}
 .lex-instruction-controls > select { width:130px; min-width:90px; flex:0 1 130px; }
 .lex-instruction-operand { display:flex; flex-direction:column; gap:2px; width:90px; min-width:52px; flex:0 1 90px; font-size:.8em; }
 .lex-instruction-operand :is(input,select) { width:100%; min-width:0; }
@@ -4260,6 +4278,18 @@ body:has(.lex-data-map-table) #main {
   font:800 22px/1 var(--lex-heading-font, var(--lex-font));
 }
 .lex-game-card-name { overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow-wrap:anywhere; }
+
+.lex-record-card { position:relative;display:flex;flex-direction:column;min-width:0;gap:.4em;padding:.5em;border:1px solid var(--lex-border);background:var(--lex-panel); }
+.lex-record-card-header { display:flex;align-items:center;gap:.5em;min-width:0; }
+.lex-record-card-title { flex:1;min-width:0;margin:0;font:inherit;overflow-wrap:anywhere; }
+.lex-record-card-id { flex:none;color:var(--lex-muted); }
+.lex-record-card-image { display:grid;place-items:center;min-width:0;height:var(--lex-record-card-image-height,7em); }
+.lex-record-card-image > * { min-width:0;max-width:100%;max-height:100%; }
+.lex-record-card-image :is(img,canvas,svg) { max-width:100%;max-height:100%;object-fit:contain; }
+.lex-record-card-body { min-width:0; }
+.lex-record-card-action { position:absolute;inset:0;display:grid;place-items:center;background:color-mix(in srgb,var(--lex-panel) 65%,transparent);opacity:0;pointer-events:none;transition:opacity .12s; }
+.lex-record-card-action > * { pointer-events:auto; }
+.lex-record-card:where(:hover,:focus-within) > .lex-record-card-action { opacity:1; }
 
 /* ---- Component catalogue sample --------------------------------------- */
 /* A sample is shown at the size the component really is; only the wide ones
@@ -4419,9 +4449,12 @@ body:has(.lex-data-map-table) #main {
 .lex-image-map-magnify { position:absolute; z-index:5; top:6px; right:6px; display:grid; width:30px; height:30px; min-width:30px; padding:0; place-items:center; color:var(--lex-text); border:1px solid var(--lex-border); border-radius:var(--lex-radius); background:color-mix(in srgb,var(--lex-panel) 86%,transparent); }
 .lex-image-map-magnify > svg { width:18px; height:18px; }
 .lex-image-map-magnify:hover,.lex-image-map-magnify:focus-visible { color:var(--lex-accent); border-color:var(--lex-highlight); }
-.lex-map-magnifier-dialog { width:min(1600px,96vw); max-height:96vh; }
-.lex-map-magnifier-note { margin:0 0 8px; color:var(--lex-muted); font-size:.86em; }
-.lex-map-magnifier-body { display:grid; height:calc(96vh - 160px); min-height:220px; }
+.lex-map-magnifier-dialog { width:min(1600px,96vw); height:96vh; max-height:96vh; display:flex; flex-direction:column; }
+.lex-map-magnifier-header { display:flex; align-items:center; gap:12px; flex:0 0 auto; }
+.lex-map-magnifier-note { flex:1; min-width:0; margin:0; color:var(--lex-text); }
+.lex-map-magnifier-body { display:grid; flex:1 1 auto; min-height:0; }
+.lex-map-magnifier-map,.lex-map-magnifier-details { display:grid; min-width:0; min-height:0; }
+.lex-map-magnifier-details { overflow:auto; }
 /* The crosshair: two hairlines and a ring, at the pixel under the pointer. */
 .lex-map-crosshair { position:absolute; z-index:3; width:0; height:0; pointer-events:none; }
 .lex-map-crosshair::before { position:absolute; top:-100vh; left:-.5px; width:1px; height:200vh; background:color-mix(in srgb,var(--lex-accent) 78%,transparent); content:""; }
@@ -4858,6 +4891,12 @@ body:has(.lex-data-map-table) #main {
  z-index: 4; pointer-events: auto;
 }
 .lex-detail-field.lex-value-dragging .lex-value-handle { opacity:.38; }
+html[data-lex-project-readonly="true"] main .lex-detail-field .lex-value-handle,
+.lex-value-host:has(> input:is(:disabled,[readonly])) .lex-value-handle,
+.lex-unit-field:has(> input:is(:disabled,[readonly])) .lex-value-handle {
+  pointer-events:none;
+  opacity:0;
+}
 
 /* The rail is anchored at its own centre, so growing on hover grows evenly in
    both directions rather than dropping downward. */
@@ -5406,6 +5445,8 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   background:var(--lex-panel);
 
 }
+
+.lex-model-preview-drawer > .lex-stack { flex:1 1 auto; min-width:0; }
 
 /* The thumbnail owns one magnifier for hover and the open viewer state. */
 .lex-model-preview-trigger {
@@ -7122,6 +7163,8 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
  padding: var(--lex-detail-heading-padding, 4px); gap: var(--lex-panel-body-gap, 10px);
 }
 .lex-detail-panel-body > .lex-detail-section { flex: var(--lex-section-flex, 0 0 auto); }
+/* Natural stacks retain their rows' height; the panel scrolls their contents. */
+.lex-detail-panel-body > .lex-stack-natural { flex:0 0 auto; }
 .lex-tabbed-panel-content {
    min-width:0;min-height:0;flex:1 1 auto;overflow:auto;
  padding: var(--lex-detail-heading-padding, 4px);
@@ -7233,6 +7276,20 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   text-align:right;
   font-weight: 400;
   color: var(--lex-detail-id-fg, color-mix(in srgb, var(--lex-muted) 55%, var(--lex-panel)));
+}
+
+/* At narrow widths, the number gets its own row before the name would need
+   unreadably small text. The preview keeps its independent bounded size. */
+@container lex-record-heading (max-width:16em) {
+  .lex-detail-panel-identity > .lex-detail-panel-title,
+  .lex-detail-panel-identity:not(:has(> .lex-detail-panel-meta)) > .lex-detail-panel-title {
+    grid-column:1 / -1;
+    grid-row:auto;
+  }
+  .lex-detail-panel-identity > .lex-detail-panel-id {
+    grid-column:1 / -1;
+    grid-row:auto;
+  }
 }
 
 /* More of the same: a plain list and its rows, so a game's own palette reaches

@@ -8,6 +8,7 @@ late prototype-stage mod.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import copy
 import io
 import json
 import math
@@ -206,7 +207,39 @@ class PrototypeStore:
         self.raw = _raw_root(raw)
         self.overrides = validate_overrides(overrides or {"format": FORMAT_VERSION, "edits": {}})
         self._indexes = self._build_indexes()
+        self._install_creations()
         self._validate_override_targets()
+
+    def _install_creations(self) -> None:
+        for kind, records in self.overrides.get("created", {}).items():
+            for name, source_name in records.items():
+                if name in self.names(kind):
+                    raise FactorioDataError(f"Prototype already exists: {name}")
+                if source_name in records:
+                    raise FactorioDataError("A prototype template must come from the source dump")
+                prototype_type, source = self._source(kind, source_name)
+                record = copy.deepcopy(source)
+                record["name"] = name
+                self._indexes[kind][name] = ((prototype_type, record)
+                    if kind in {"items", "machines"} else record)
+
+    def create(self, kind: str, name: str, source_name: str) -> None:
+        if not isinstance(kind, str) or kind not in KINDS or not isinstance(name, str) or not SAFE_MOD_NAME.fullmatch(name):
+            raise FactorioDataError("Use letters, digits, underscores or hyphens for the new prototype name")
+        if name in self.names(kind):
+            raise FactorioDataError(f"Prototype already exists: {name}")
+        if not isinstance(source_name, str):
+            raise FactorioDataError("Choose a template from the source dump")
+        self._source(kind, source_name)
+        if source_name in self.overrides.get("created", {}).get(kind, {}):
+            raise FactorioDataError("Choose a template from the source dump")
+        candidate = copy.deepcopy(self.overrides)
+        candidate.setdefault("created", {}).setdefault(kind, {})[name] = source_name
+        patch = candidate["edits"].get(kind, {}).get(source_name)
+        if patch:
+            candidate["edits"].setdefault(kind, {})[name] = copy.deepcopy(patch)
+        validated = PrototypeStore(self.raw, candidate)
+        self.overrides, self._indexes = validated.overrides, validated._indexes
 
     @classmethod
     def from_project(cls, project: Path) -> "PrototypeStore":
@@ -234,10 +267,10 @@ class PrototypeStore:
                 if isinstance(record, dict):
                     machines[name] = (prototype_type, record)
         return {
-            "recipes": self._bucket("recipe"),
+            "recipes": dict(self._bucket("recipe")),
             "items": items,
             "machines": machines,
-            "technologies": self._bucket("technology"),
+            "technologies": dict(self._bucket("technology")),
             "fluids": self._bucket("fluid"),
             "recipeCategories": self._bucket("recipe-category"),
         }
@@ -371,7 +404,8 @@ class PrototypeStore:
                 "id": f"{prototype_type}:{name}",
                 "name": name,
                 "prototypeType": prototype_type,
-                "modified": bool(patch),
+                "modified": bool(patch) or name in self.overrides.get("created", {}).get(kind, {}),
+                "created": name in self.overrides.get("created", {}).get(kind, {}),
             }
             if kind == "recipes":
                 row.update({
@@ -531,7 +565,21 @@ class PrototypeStore:
         edits = self.overrides["edits"]
         if kind is None:
             edits.clear()
+            self.overrides.pop("created", None)
+            self._indexes = self._build_indexes()
             return
+        created = self.overrides.get("created", {})
+        if kind in created:
+            if name is None:
+                created.pop(kind)
+            else:
+                created[kind].pop(name, None)
+                if not created[kind]:
+                    created.pop(kind)
+            if not created:
+                self.overrides.pop("created", None)
+            self._indexes = self._build_indexes()
+            self._install_creations()
         if kind not in edits:
             return
         if name is None:
@@ -564,7 +612,20 @@ def validate_overrides(value: Any) -> dict[str, Any]:
             if not isinstance(name, str) or not name:
                 raise FactorioDataError(f"{kind} override has an invalid prototype name")
             normalized[kind][name] = _mapping(changes, f"{kind}:{name} override")
-    return {"format": FORMAT_VERSION, "edits": normalized}
+    result = {"format": FORMAT_VERSION, "edits": normalized}
+    creations = _mapping(value.get("created", {}), "Created prototypes")
+    created = {}
+    for kind, records in creations.items():
+        if kind not in KINDS:
+            raise FactorioDataError(f"Unsupported creation dataset: {kind}")
+        created[kind] = {}
+        for name, source_name in _mapping(records, "Created prototypes").items():
+            if not isinstance(name, str) or not SAFE_MOD_NAME.fullmatch(name) or not isinstance(source_name, str) or not source_name:
+                raise FactorioDataError("Invalid created prototype name or source")
+            created[kind][name] = source_name
+    if created:
+        result["created"] = created
+    return result
 
 
 def _atomic_json(path: Path, value: Any) -> None:
@@ -703,6 +764,18 @@ def render_data_final_fixes(store: PrototypeStore) -> str:
         "recipes": "recipe",
         "technologies": "technology",
     }
+    for kind in KINDS:
+        for name, source_name in sorted(store.overrides.get("created", {}).get(kind, {}).items()):
+            prototype_type, _ = store._source(kind, source_name)
+            lines += [
+                f"do local source = data.raw[{_lua_quote(prototype_type)}][{_lua_quote(source_name)}]",
+                f"  assert(source, {_lua_quote('Missing template: ' + source_name)})",
+                f"  assert(not data.raw[{_lua_quote(prototype_type)}][{_lua_quote(name)}], {_lua_quote('Prototype already exists: ' + name)})",
+                "  local created = table.deepcopy(source)",
+                f"  created.name = {_lua_quote(name)}",
+                "  data:extend({created})",
+                "end", "",
+            ]
     for kind in KINDS:
         records = edits.get(kind, {})
         for name in sorted(records, key=str.casefold):

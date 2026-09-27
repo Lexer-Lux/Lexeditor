@@ -368,8 +368,10 @@ def main() -> None:
             page.wait_for_function('state.tab==="info"')
 
             # Navigation exposes a loading state before the next animation frame.
-            loading = page.evaluate("""()=>{navigate("skills");return document.querySelector("#main").innerText}""")
-            assert "Loading" in loading, loading
+            loading = page.evaluate("""()=>{navigate("skills");
+              const status=document.querySelector('#main [role="status"][aria-busy="true"]');
+              return status?.getAttribute('aria-label');}""")
+            assert loading and "Loading" in loading, loading
             page.wait_for_timeout(80)
 
             for name, command in PAGES:

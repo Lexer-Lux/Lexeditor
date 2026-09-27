@@ -1,9 +1,55 @@
 """Graphs keep mathematical notation and invalid data visible to the user."""
 from pathlib import Path
+import os
 
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_formula_variables_link_pointer_and_keyboard_to_controls():
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={"width": 1200, "height": 900})
+            page.route('http://fixture/**', lambda route: route.fulfill(
+                body='<main></main>', content_type='text/html'))
+            page.goto('http://fixture/')
+            page.add_style_tag(path=str(ROOT / 'ui/framework.css'))
+            page.add_script_tag(path=str(ROOT / 'ui/framework.js'))
+            page.add_style_tag(content='main{display:grid!important;grid-template-columns:1fr 1fr;gap:20px}')
+            page.evaluate('''()=>{const U=LexeditorUI;
+                for(const mathematical of [true,false]){
+                  document.querySelector('main').append(U.curveEditor({title:mathematical?'Math':'Text',
+                    domain:{min:1,max:100},range:{min:0,max:250},evaluate:L=>L*2+10,
+                    variables:['A','B'].map(label=>({label,control:U.el('input',{type:'number',value:2,'aria-label':label})})),
+                    formula:mathematical?U.mathFormula('A*L+B'):'A*L+B'}));
+                }
+            }''')
+            for title, token_selector in [('Math','.lex-curve-math-atom mi'), ('Text','.lex-curve-path-formula tspan')]:
+                curve=page.locator(f'article[data-curve-title="{title}"]')
+                a=curve.locator(token_selector+'[data-curve-variable="a"]').first
+                if title == 'Text':
+                    point=a.evaluate('''e=>{const c=e.getExtentOfChar(0),s=e.getScreenCTM();
+                      const p=new DOMPoint(c.x+c.width/2,c.y+c.height/2).matrixTransform(s);
+                      return [p.x,p.y]}''')
+                    page.mouse.move(*point)
+                else:
+                    a.hover(timeout=4000)
+                assert curve.locator('.lex-curve-variable-active').get_attribute('data-curve-variable') == 'a'
+                assert 'lex-curve-variable-highlight' in a.get_attribute('class')
+                curve.get_by_role('spinbutton', name='B', exact=True).focus()
+                b=curve.locator(token_selector+'[data-curve-variable="b"]').first
+                assert 'lex-curve-variable-highlight' in b.get_attribute('class')
+                assert 'lex-curve-variable-highlight' not in a.get_attribute('class')
+                if title == 'Math' and (destination := os.environ.get('LEXEDITOR_UI_SCREENSHOT_DIR')):
+                    Path(destination).mkdir(parents=True, exist_ok=True)
+                    page.screenshot(path=str(Path(destination) / 'curve-variable-focus.png'))
+                page.mouse.move(1190,890)
+                page.evaluate('document.activeElement.blur()')
+                assert curve.locator('.lex-curve-variable-active').count() == 0
+        finally:
+            browser.close()
 
 
 def test_math_curve_resize_and_invalid_divisor():

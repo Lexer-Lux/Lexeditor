@@ -53,7 +53,8 @@
       detailField({label:typeof column.label==="string"?column.label:column.key,control:LexeditorUI.readonlyField(row[column.key]??"—",{format:false})}))})]})
       :detailPanel({title:"No matching records"});
     $("#toolbar").replaceChildren();
-    $("#main").replaceChildren(pagedListDetail({addDisabledReason:"Warband's module files can take new records, but Lexeditor only edits existing ones. Adding one is not supported yet.",modOnly:modOnlySpec(view,options.changed),rows:filtered,key:keyOf,slots:false,fit:{minRowHeight:36},page:state.pages[view],pageSize:state.pageSizes[view],selected,noun:view,splitKey:`warband-${view}`,className:"warband-paged-table",defaultSplit:58,
+    $("#main").replaceChildren(pagedListDetail({add:options.add,addDisabled:options.addDisabled,
+      addDisabledReason:options.addDisabledReason||"Warband's module files can take new records, but Lexeditor only edits existing ones. Adding one is not supported yet.",modOnly:modOnlySpec(view,options.changed),rows:filtered,key:keyOf,slots:false,fit:{minRowHeight:36},page:state.pages[view],pageSize:state.pageSizes[view],selected,noun:view,splitKey:`warband-${view}`,className:"warband-paged-table",defaultSplit:58,
       search:{key:`warband-${view}`,value:query,placeholder:`Search ${view}…`,change:value=>{state.filters[view]=value;state.pages[view]=0;render();}},filters:options.filters||[],
       master:({rows,selected,select})=>columnList({rows,key:keyOf,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts[view][0],dir:state.sorts[view][1]},sort:key=>sort(view,key),selected,selectedClass:"selected",select,class:"warband-record-list", "aria-label":`${view} records`}),
       detail:options.detail||detail,sync:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");},change:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");render();}}));
@@ -84,11 +85,54 @@
     {key:"inventoryMesh",label:"Inventory mesh",width:"minmax(7em,1fr)",render:row=>el("span",{title:itemInventoryMesh(row)},itemInventoryMesh(row)),
       sortValue:itemInventoryMesh}];}
   function itemRowKey(item){return String(item.recordIndex??item.line??item.id);}
+  function beginItemCreation(){beginRecordCreation('item');}
+  function beginTroopCreation(){beginRecordCreation('troop');}
+  function beginRecordCreation(kind){
+    if(state.activeSource!=="mine"||dirtyCount()||state.build.running)return;
+    const view=kind+'s',selectedKey=kind==='item'?'selectedItem':'selectedTroop',data=state[view];
+    const filename='module_'+view+'.py',label=kind==='item'?'Item':'Troop';
+    const templates=data.rows.filter(row=>!row.problem&&row.status!=='CUT');
+    const source=el("select",{"aria-label":`Copy from ${kind}`},...templates.map(row=>
+      el("option",{value:row.recordIndex,selected:String(row.recordIndex)===state[selectedKey]},`${row.name} (${row.id})`)));
+    const id=el("input",{type:"text",required:true,pattern:"[a-z][a-z0-9_]*","aria-label":`New ${kind} ID`});
+    const name=el("input",{type:"text",required:true,"aria-label":`New ${kind} name`});
+    const plural=kind==='troop'?el('input',{type:'text',required:true,'aria-label':'New troop plural name'}):null;
+    const create=el("button",{type:"button",onclick:async()=>{
+      if(!id.reportValidity()||!name.reportValidity()||(plural&&!plural.reportValidity()))return;
+      const template=templates.find(row=>row.recordIndex===Number(source.value));
+      if(!template)return;
+      create.disabled=true;
+      try{
+        const result=await api(`/api/${view}/create`,{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({recordIndex:template.recordIndex,originalId:template.id,id:id.value,name:name.value,plural:plural?.value,sha256:data.sha256})});
+        state[view]=await api(`/api/${view}`);state[selectedKey]=String(result.recordIndex);state.filters[view]=result.created;state.pages[view]=0;state.modOnly=false;
+        if(kind==='troop')state.filters.cut=false;
+        if(state.catalogFile?.filename===filename){
+          state.catalogFile=await api('/api/catalog/file?name='+filename);state.catalogDraft=state.catalogFile.text;
+        }
+        shell.history.clear();render();
+        try{await buildSavedModule();}
+        catch(error){setStatus(label+" created; build failed");showAlert({title:label+" created; build failed",items:[{item:result.created,issue:error.message||String(error)}]});}
+        shell.refresh();
+      }catch(error){create.disabled=false;LexeditorUI.showToast(error.message||String(error),true);}
+    }},"Create and build");
+    $("#main").replaceChildren(detailPanel({title:`Add ${kind}`,body:[
+      detailField({label:"Copy from",control:source,description:kind==='item'?"Copies the item's properties, appearance and triggers. Existing shops and troops still refer to their original items.":"Copies the troop's equipment, stats and appearance. Recruitment and upgrade links still refer to the original troop."}),
+      detailField({label:"ID",control:id,description:"Use a unique name with lowercase letters, digits and underscores, starting with a letter. This ID stays fixed after creation."}),
+      detailField({label:"Name",control:name}),
+      plural?detailField({label:'Plural name',control:plural}):null,
+      LexeditorUI.actionRow(el("button",{type:"button",onclick:kind==='item'?renderItems:renderTroops},"Cancel"),create),
+    ]}));
+    id.focus();
+  }
   function renderItems(){
     const view="items",columns=itemColumns(),query=state.filters.items||"";
     const filtered=sorted(search(state.items.rows,query,["name","id","type","inventoryMesh"]),view);
     $("#toolbar").replaceChildren();
-    $("#main").replaceChildren(pagedListDetail({addDisabledReason:"Warband's module files can take new items, but Lexeditor only edits existing ones. Adding an item is not supported yet.",modOnly:modOnlySpec("items",item=>Object.keys(state.itemEdits[itemEditKey(item)]?.fields||{}).length>0),rows:filtered,key:itemRowKey,slots:false,fit:{minRowHeight:36},page:state.pages.items,pageSize:state.pageSizes.items,selected:state.selectedItem,noun:"items",splitKey:"warband-items",className:"warband-paged-table warband-items",defaultSplit:43,
+    $("#main").replaceChildren(pagedListDetail({add:beginItemCreation,
+      addDisabled:state.activeSource!=="mine"||!!dirtyCount()||state.build.running||!state.items.rows.length,
+      addDisabledReason:state.activeSource!=="mine"?"Open an editable mod first.":dirtyCount()?"Save or discard pending edits before creating an item.":state.build.running?"Wait for the current build to finish.":"A source item is needed as a template.",
+      modOnly:modOnlySpec("items",item=>Object.keys(state.itemEdits[itemEditKey(item)]?.fields||{}).length>0),rows:filtered,key:itemRowKey,slots:false,fit:{minRowHeight:36},page:state.pages.items,pageSize:state.pageSizes.items,selected:state.selectedItem,noun:"items",splitKey:"warband-items",className:"warband-paged-table warband-items",defaultSplit:43,
       search:{key:"warband-items",value:query,placeholder:"Search items…",change:value=>{state.filters.items=value;state.pages.items=0;renderItems();}},
       master:({rows,selected,select})=>columnList({rows,key:itemRowKey,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts.items[0],dir:state.sorts.items[1]},sort:key=>sort("items",key),selected,selectedClass:"selected",select,class:"warband-record-list","aria-label":"Warband items"}),
       detail:()=>warbandItemDetail(state.items.rows.find(row=>itemRowKey(row)===state.selectedItem)),sync:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";},change:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";renderItems();}}));
@@ -322,7 +366,10 @@
   function renderTroops(){
     const base=state.filters.cut?state.troops.rows.filter(row=>row.status==="CUT"):state.troops.rows;
     const cutFilter=el("label",{class:"lex-bottom-filter"},el("input",{type:"checkbox",checked:state.filters.cut,onchange:event=>{state.filters.cut=event.target.checked;state.pages.troops=0;render();}})," Cut only");
-    renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name"},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{key:troopRowKey,selected:()=>state.selectedTroop,setSelected:value=>{state.selectedTroop=value;},filters:[cutFilter],detail:troopEditorPanel});
+    renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name"},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{
+      add:beginTroopCreation,addDisabled:state.activeSource!=="mine"||!!dirtyCount()||state.build.running||!base.some(row=>row.status!=='CUT'&&!row.problem),
+      addDisabledReason:state.activeSource!=="mine"?"Open an editable mod first.":dirtyCount()?"Save or discard pending edits before creating a troop.":state.build.running?"Wait for the current build to finish.":"An active troop is needed as a template.",
+      key:troopRowKey,selected:()=>state.selectedTroop,setSelected:value=>{state.selectedTroop=value;},filters:[cutFilter],detail:troopEditorPanel});
   }
   function troopTreeDetail(node){
     disposeWarbandPreview();

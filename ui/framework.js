@@ -1105,11 +1105,13 @@
     const bodyClass = ["lex-detail-panel-body", DETAIL_BODY_LAYOUTS[options.bodyLayout] || ""].filter(Boolean).join(" ");
     const nameField = headingNameField(options);
     if (nameField) {
+      const pin = nameField.field.querySelector('.lex-column-pin');
       const section = nameField.field.closest(".lex-detail-section");
       nameField.field.remove();
       const emptied = section && !section.querySelector(":scope > .lex-detail-section-content > *") ? section : null;
       emptied?.remove();
       options = {...options, titleControl: nameField.input,
+        actions: pin ? [pin, ...[options.actions || []].flat()] : options.actions,
         body: [options.body].flat().filter(node => node !== nameField.field && node !== emptied)};
     }
     // A record's name is the heading, so the heading is where it is edited. It
@@ -1597,10 +1599,29 @@
   };
 
   // Graphs side by side, as many to a row as fit at a readable width.
-  const tileGrid = (cards = [], options = {}) => element("div", {
+  const tileGrid = (cards = [], options = {}) => {
+    const minimum = Math.max(80,Number(options.minWidth)||320);
+    const grid = element("div", {
     class:"lex-tile-grid",
-    style:`--lex-tile-min-width:${Math.max(80,Number(options.minWidth)||320)}px;${options.columns ? `--lex-tile-columns:repeat(${Math.max(1,Math.floor(options.columns))},minmax(0,1fr))` : ""}`,
-  }, ...cards);
+    style:`--lex-tile-min-width:${minimum}px;${options.columns ? `--lex-tile-columns:repeat(${Math.max(1,Math.floor(options.columns))},minmax(0,1fr))` : ""}`,
+    }, ...cards);
+    if (options.balanced && !options.columns) {
+      const balance = () => {
+        if (!grid.isConnected || !grid.clientWidth) return;
+        const css = getComputedStyle(grid), gap = parseFloat(css.columnGap) || 0;
+        const width = grid.clientWidth - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight);
+        const count = [...grid.children].filter(child => !child.hidden && getComputedStyle(child).display !== "none").length;
+        const maximum = Math.max(1, Math.floor((width + gap) / (minimum + gap)));
+        // Use the fewest rows that fit, then distribute their columns evenly:
+        // six cards with room for five become two rows of three, not five + one.
+        const columns = Math.max(1, Math.ceil(count / Math.ceil(Math.max(1, count) / maximum)));
+        grid.style.setProperty("--lex-tile-columns", `repeat(${columns},minmax(0,1fr))`);
+      };
+      new ResizeObserver(balance).observe(grid);
+      new MutationObserver(balance).observe(grid, {childList:true, attributes:true, attributeFilter:["hidden"], subtree:true});
+    }
+    return grid;
+  };
   const curveGrid = (...cards) => {
     const options=cards[0] && !(cards[0] instanceof Node) ? cards.shift() : {};
     const grid=tileGrid(cards,options);
@@ -1621,6 +1642,17 @@
     element("span", {class: "lex-game-card-name"}, name));
   };
 
+  // A preview of a game record. The caller supplies shared links and controls;
+  // this frame keeps the name, picture and hover action consistent everywhere.
+  const recordCard = (options = {}) => element("article", {
+    class:["lex-record-card", options.className || ""].filter(Boolean).join(" "),
+  }, element("header", {class:"lex-record-card-header"},
+    element("h3", {class:"lex-record-card-title"}, options.title ?? ""),
+    options.identity == null ? null : element("span", {class:"lex-record-card-id"}, options.identity)),
+  element("div", {class:"lex-record-card-image"}, options.image || noImage()),
+  options.body == null ? null : element("div", {class:"lex-record-card-body"}, options.body),
+  options.action ? element("div", {class:"lex-record-card-action"}, options.action) : null);
+
   // The component catalogue's frame for one live sample: the component at the
   // size it really is, or across the pane when it is a page-wide one.
   const componentSample = (content, options = {}) => element("section", {
@@ -1633,6 +1665,16 @@
   const inlineLabel = (...children) => {
     const options=children[0] && typeof children[0]==='object' && !(children[0] instanceof Node) ? children.shift() : {};
     return element("span", {class:`lex-inline-label${options.imageFit==='row'?' lex-inline-label-row-image':''}`}, ...children);
+  };
+  // Source identity is supplied by the plugin; modifying a vanilla record
+  // does not make it a newly created record.
+  const recordSource = (options = {}) => {
+    if (options.vanilla) return null;
+    if (options.created) return element("span", {class:"lex-ui-symbol lex-record-source",
+      role:"img", title:"Created in this mod", "aria-label":"Created in this mod"}, "✒️");
+    if (!options.icon || !options.label) return null;
+    return element("span", {class:"lex-record-source", role:"img",
+      title:options.label, "aria-label":options.label}, options.icon);
   };
   const choiceField = (value, action) => element("span", {class:"lex-choice-field"}, value, action);
   const quantityChoice = (choice, quantity) => element("div", {class:"lex-quantity-choice"},
@@ -1716,21 +1758,28 @@
   // handler and then redraws this view, so the marker shows where the record is
   // now instead of where it was when the panel was drawn.
   const mapMagnifier = (options = {}) => {
+    const opener=document.activeElement;
     const backdrop=element("div",{class:"lex-dialog-backdrop lex-map-magnifier-backdrop","data-lex-history-control":true});
-    const note=element("p",{class:"lex-map-magnifier-note"});
+    const note=element("div",{class:"lex-map-magnifier-note",role:"status"});
     const body=element("div",{class:"lex-map-magnifier-body"});
-    const close=()=>{document.removeEventListener("keydown",onKey,true);backdrop.remove();};
-    const onKey=event=>{if(event.key==="Escape"){event.preventDefault();close();}};
+    const mapHost=element("div",{class:"lex-map-magnifier-map"});
+    const detailsHost=element("div",{class:"lex-map-magnifier-details"});
+    const close=()=>{document.removeEventListener("keydown",onKey,true);backdrop.remove();if(opener?.isConnected)opener.focus();};
+    const onKey=event=>{if(event.key==="Escape"){event.preventDefault();event.stopImmediatePropagation();close();}};
     const draw=()=>{
       const spec=options.magnify()||{},place=spec.place;
       note.textContent=spec.note||"Point at the map to read the value, then click to place the point.";
-      body.replaceChildren(imageMap({...spec,fill:true,magnify:null,crosshair:true,
+      mapHost.replaceChildren(imageMap({...spec,fill:true,magnify:null,crosshair:true,
         place:place?point=>{place(point);draw();}:undefined}));
+      if(options.details)detailsHost.replaceChildren(options.details({refresh:draw}));
     };
-    const done=element("button",{type:"button",class:"lex-dialog-action primary",onclick:close},"Close");
+    body.append(options.details?panelLayout([mapHost,detailsHost],"",{
+      defaultSizes:[3,1],minSizes:options.minSizes||[480,280],stackBelowMinimum:true,
+    }):mapHost);
+    const done=closeButton({onclick:close,"aria-label":"Close large map"});
     backdrop.append(element("section",{class:"lex-dialog lex-map-magnifier-dialog",role:"dialog","aria-modal":"true",
       "aria-label":`${options.label||"Map"}, full size`},
-      element("h2",{},options.label||"Map"),note,body,element("div",{class:"lex-dialog-actions"},done)));
+      element("header",{class:"lex-map-magnifier-header"},note,done),body));
     document.body.append(backdrop);
     document.addEventListener("keydown",onKey,true);
     draw();
@@ -2243,6 +2292,7 @@
       const box = () => (control instanceof Element && control.matches(".lex-unit-field")
         ? control : input);
       const setFromPointer = event => {
+        if (input.disabled || input.readOnly || refusesEdit(input)) return;
         const bounds = box().getBoundingClientRect();
         const share = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
         const step = Number(input.step) || 1;
@@ -2259,6 +2309,7 @@
         input.dispatchEvent(new Event("input", {bubbles: true}));
       };
       handle.addEventListener("pointerdown", event => {
+        if (input.disabled || input.readOnly || refusesEdit(input)) return;
         event.preventDefault();
         handle.setPointerCapture(event.pointerId);
         node.classList.add("lex-value-dragging");
@@ -2828,7 +2879,7 @@
       status);
 
     const variableKeys = curveVariableSet;
-    const formulaTokens = [...root.querySelectorAll(".lex-curve-path-formula [class]")];
+    const formulaTokens = [...root.querySelectorAll(".lex-curve-path-formula [class], .lex-curve-math-atom [class]")];
     formulaTokens.forEach(token => {
       const match = [...token.classList].find(name => {
         if (!name.startsWith("lex-curve-variable-")) return false;
@@ -7438,7 +7489,10 @@ ${contents.path}`});
         // Their natural size already includes the unwrapped heading.
         if (range) {
           if (/^(?:min-content|max-content|auto)$/.test(range[1].trim())) return track;
-          const candidate = `minmax(max(${width}px, ${range[1]}), ${range[2]})`;
+          // Grid accepts unitless zero, but CSS math requires a length when
+          // comparing against pixels. Otherwise minmax(0,1fr) loses its floor.
+          const minimum = /^[-+]?0(?:\.0+)?$/.test(range[1].trim()) ? "0px" : range[1];
+          const candidate = `minmax(max(${width}px, ${minimum}), ${range[2]})`;
           return CSS.supports('grid-template-columns', candidate) ? candidate : track;
         }
         if (/^[\d.]+(?:px|em|rem|ch|%)$/.test(track)) return `max(${width}px, ${track})`;
@@ -7464,6 +7518,12 @@ ${contents.path}`});
     });
     pendingHeadingFits.add(root);
   };
+
+  // A font may start loading only after the first table uses it. The ready
+  // promise taken while building that detached table can already be resolved.
+  document.fonts?.addEventListener("loadingdone", () => {
+    document.querySelectorAll(".lex-column-list").forEach(fitColumnHeadings);
+  });
 
   const columnList = options => {
     const preferredColumns = options.columnPreferences?.active?.();
@@ -7795,6 +7855,29 @@ ${contents.path}`});
       index < current.length - 1 && dividers
         ? [`minmax(0, ${value}fr)`, "var(--lex-panel-gap, 14px)"]
         : [`minmax(0, ${value}fr)`]).join(" ");
+    const minSizes = Array.from({length: nodes.length}, (_, index) =>
+      Math.max(80, Number(options.minSizes?.[index]) || 240));
+    let belowMinimum = false, measuredGap = 14;
+    const updateResponsive = () => {
+      if (!options.stackBelowMinimum || vertical || !root.clientWidth) return 0;
+      const css = getComputedStyle(root);
+      const divider = root.querySelector(':scope > .lex-panel-layout-divider');
+      if (divider?.offsetWidth) measuredGap = divider.offsetWidth;
+      else if (options.resizable === false && !belowMinimum) measuredGap = parseFloat(css.columnGap) || 0;
+      const available = root.clientWidth - (parseFloat(css.paddingLeft) || 0)
+        - (parseFloat(css.paddingRight) || 0) - measuredGap * (nodes.length - 1);
+      belowMinimum = available < minSizes.reduce((sum, value) => sum + value, 0);
+      root.classList.toggle('lex-panel-layout-below-minimum', belowMinimum);
+      root.style.setProperty('--lex-panel-count', nodes.length);
+      return belowMinimum ? 0 : available;
+    };
+    const fitResponsiveSizes = available => {
+      if (!available || !sizes.some((value,index)=>value*available/100<minSizes[index]-.5)) return null;
+      const spare=available-minSizes.reduce((sum,value)=>sum+value,0);
+      const weights=sizes.map((value,index)=>Math.max(0,value*available/100-minSizes[index]));
+      const total=weights.reduce((sum,value)=>sum+value,0);
+      return minSizes.map((value,index)=>value+spare*(total?weights[index]/total:1/nodes.length));
+    };
 
     if (nodes.length < 2 || options.resizable === false) {
       root.style.setProperty("--lex-panel-layout-template", template(sizes, false));
@@ -7802,12 +7885,23 @@ ${contents.path}`});
         ? `${Number(options.gap)}px` : "var(--lex-panel-gap, 14px)");
       root.classList.add("lex-panel-layout-static");
       root.append(...nodes);
+      if (options.stackBelowMinimum && !vertical) {
+        const refresh = () => {
+          const fitted = fitResponsiveSizes(updateResponsive());
+          if (fitted) {
+            sizes = sizesWithMinimums(fitted);
+            root.style.setProperty('--lex-panel-layout-template',template(sizes,false));
+          }
+        };
+        const observer = new ResizeObserver(refresh);
+        observer.observe(root);
+        root.__lexPanelLayoutObserver = observer;
+        requestAnimationFrame(refresh);
+      }
       return root;
     }
 
     root.classList.add("lex-panel-layout-resizable");
-    const minSizes = Array.from({length: nodes.length}, (_, index) =>
-      Math.max(80, Number(options.minSizes?.[index]) || 240));
     const dividers = Array.from({length: nodes.length - 1}, (_, index) => {
       const divider = element("div", {
         class: "lex-panel-layout-divider",
@@ -7859,6 +7953,7 @@ ${contents.path}`});
       return hidden;
     };
     const resizePair = (index, delta, persist = false, edge = "", initialWidths = null) => {
+      if (belowMinimum) return false;
       const widths = initialWidths ? [...initialWidths]
         : nodes.map(node => vertical ? node.getBoundingClientRect().height : node.getBoundingClientRect().width);
       if (!root.isConnected || widths.some(value => value <= 0)) return false;
@@ -7968,12 +8063,17 @@ ${contents.path}`});
       if (index < dividers.length) root.append(dividers[index]);
     });
     setSizes(sizes);
+    const refreshResponsive = () => {
+      const fitted = fitResponsiveSizes(updateResponsive());
+      if (fitted) setSizes(fitted);
+    };
     if (typeof ResizeObserver !== "undefined") {
       let pending = 0;
       const observer = new ResizeObserver(() => {
         if (pending) cancelAnimationFrame(pending);
         pending = requestAnimationFrame(() => {
           pending = 0;
+          refreshResponsive();
           if (nodes.length === 2 && !dividers[0]?.classList.contains("dragging")) {
             resizePair(0, 0);
           }
@@ -7984,6 +8084,7 @@ ${contents.path}`});
       root.__lexPanelLayoutObserver = observer;
     }
     requestAnimationFrame(() => {
+      refreshResponsive();
       if (root.isConnected && nodes.length === 2) resizePair(0, 0);
     });
     return root;
@@ -8186,6 +8287,34 @@ ${contents.path}`});
   };
 
   let activeSearcher = null;
+  const lockSearcherTarget = searcher => {
+    searcher.targetLocks ||= new Map();
+    if (activeSearcher !== searcher || !searcher.atTarget) {
+      for (const [node, inert] of searcher.targetLocks) node.inert = inert;
+      searcher.targetLocks.clear();
+      return;
+    }
+    // Browsing and filtering candidates stays live; their editable details
+    // and record actions must not change data during replacement selection.
+    for (const node of document.querySelectorAll(
+      "#main .lex-detail-field,#main .lex-detail-panel-actions,#main .lex-table-add," +
+      "#main input,#main select,#main textarea,#main [contenteditable='true'],#global-save,#global-undo,#global-redo")) {
+      if (node.matches("input,select,textarea,[contenteditable='true']") &&
+          (node.matches("input[type='search']") || node.closest(READONLY_EXEMPT))) continue;
+      if (!searcher.targetLocks.has(node)) searcher.targetLocks.set(node, node.inert);
+      node.inert = true;
+    }
+    for (const [node, inert] of searcher.targetLocks) if (!node.isConnected) {
+      node.inert = inert;
+      searcher.targetLocks.delete(node);
+    }
+  };
+  document.addEventListener("keydown", event => {
+    if (activeSearcher && (event.ctrlKey || event.metaKey) && ["s","z","y"].includes(event.key.toLowerCase())) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
   const lockSearcherSource = (searcher, locked) => {
     for (const [node, inert] of searcher.sourceLocks || []) node.inert = inert;
     searcher.sourceLocks = [];
@@ -8199,6 +8328,8 @@ ${contents.path}`});
     if (!activeSearcher) return;
     const searcher = activeSearcher;
     activeSearcher = null;
+    searcher.targetObserver?.disconnect();
+    lockSearcherTarget(searcher);
     lockSearcherSource(searcher, false);
     searcher.header?.classList.remove("lex-searcher-active");
     searcher.bar?.remove();
@@ -8219,9 +8350,12 @@ ${contents.path}`});
       holdMs: Math.max(150, Math.min(2000, Number(options.holdMs || sharedSettingsSnapshot?.selectionHoldMs || 650))),
     };
     activeSearcher = searcher;
+    searcher.targetObserver = new MutationObserver(() => lockSearcherTarget(searcher));
+    searcher.targetObserver.observe(document.body, {childList:true, subtree:true});
     context.onclick = () => {
       if (searcher.atTarget) {
         searcher.atTarget = false;
+        lockSearcherTarget(searcher);
         context.replaceChildren(element("span", {class: "lex-searcher-return lex-ui-symbol", "aria-hidden": "true"}, "↩"));
         context.title = "Return to selection results";
         context.classList.add("returning");
@@ -8239,12 +8373,14 @@ ${contents.path}`});
         context.replaceChildren(searchIcon());
         context.title = "Show the source record";
         searcher.target?.();
+        lockSearcherTarget(searcher);
       }
     };
     cancel.onclick = () => finishSearcher(true);
     header.classList.add("lex-searcher-active");
     header.append(bar);
     searcher.target?.();
+    lockSearcherTarget(searcher);
     window.dispatchEvent(new CustomEvent("lexeditor-searcher-changed", {detail: {active: true, type: searcher.type}}));
     return searcher;
   };
@@ -10090,7 +10226,7 @@ ${contents.path}`});
     return api;
   })();
 
-window.LexeditorUI = {panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, componentSample, toolbar, inlineLabel, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
+window.LexeditorUI = {panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
 // no pad attached pays one idle check a second and changes nothing on screen.
@@ -10479,7 +10615,8 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       if (label.scrollWidth > label.clientWidth || labelLeftOverflow(label)>1) widenLabelLane(label);
       label.style.whiteSpace = wrap;
     }
-    while (size > LABEL_MIN_PX && overflows()) {
+    const minimum = label.classList.contains('lex-detail-panel-name') ? 14 : LABEL_MIN_PX;
+    while (size > minimum && overflows()) {
       size -= .5;
       label.style.fontSize = `${size}px`;
     }
@@ -10495,7 +10632,7 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     // the key is the same one computed above and the label settles in one pass.
     fitted.set(label, key);
   };
-  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text';
+  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text,.lex-detail-panel-name';
   const labelSizeObserver = new ResizeObserver(entries => scheduleFit(entries.map(entry=>entry.target)));
   // Within the page-tab strip every tab is at least its own name's width, so a
   // game with twenty tabs wants a strip wider than its window. Shrinking one

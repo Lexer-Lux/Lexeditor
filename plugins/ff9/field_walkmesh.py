@@ -217,9 +217,9 @@ class FieldWalkmeshStore:
         _triangle_table(raw)
         _floor_table(raw)
 
-    def _vanilla_assets(self) -> dict[str, bytes]:
+    def _vanilla_assets(self, *, refresh: bool = False) -> dict[str, bytes]:
         signature = self._signature()
-        if signature == self._archive_signature:
+        if not refresh and signature == self._archive_signature:
             return self._vanilla
         result: dict[str, bytes] = {}
         for archive_path in self._archives():
@@ -255,8 +255,8 @@ class FieldWalkmeshStore:
                 result[relative] = file
         return result
 
-    def _sources(self) -> dict[str, tuple[bytes, str, Path | None]]:
-        vanilla = self._vanilla_assets()
+    def _sources(self, *, refresh: bool = False) -> dict[str, tuple[bytes, str, Path | None]]:
+        vanilla = self._vanilla_assets(refresh=refresh)
         project = self._project_assets()
         result: dict[str, tuple[bytes, str, Path | None]] = {}
         for relative in sorted(set(vanilla) | set(project)):
@@ -405,7 +405,9 @@ class FieldWalkmeshStore:
             grouped.setdefault(change["scene"], []).append(change)
 
         for relative, asset_changes in grouped.items():
-            sources = self._sources()
+            # Metadata caching is useful for browsing, but cannot establish
+            # that a source is unchanged before writing a player's override.
+            sources = self._sources(refresh=True)
             if relative not in sources:
                 raise ValueError("Changed FF9 walkmesh does not belong to this project")
             raw, _source_kind, project_file = sources[relative]
@@ -433,7 +435,7 @@ class FieldWalkmeshStore:
                     output.write(edited)
                     output.flush()
                     os.fsync(output.fileno())
-                latest = self._sources().get(relative)
+                latest = self._sources(refresh=True).get(relative)
                 if latest is None or _sha256(latest[0]) != expected:
                     raise RuntimeError(f"Walkmesh {relative} changed before saving. Reload first.")
                 os.replace(temporary, target)

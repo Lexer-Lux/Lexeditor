@@ -240,11 +240,18 @@ def assert_detail_reachable(page, label: str) -> dict | None:
     body = bodies.last
     value = body.evaluate(
         """node => {
-          node.scrollTop = node.scrollHeight;
-          return {scrollTop:node.scrollTop, scrollHeight:node.scrollHeight, clientHeight:node.clientHeight};
+          const last=node.lastElementChild;
+          let scroll=node;
+          while(scroll && !/^(auto|scroll)$/.test(getComputedStyle(scroll).overflowY)) scroll=scroll.parentElement;
+          if(!scroll)throw new Error('No scroll container for detail panel');
+          scroll.scrollTop=scroll.scrollHeight;
+          const view=scroll.getBoundingClientRect(),end=last?.getBoundingClientRect();
+          return {scrollTop:scroll.scrollTop,scrollHeight:scroll.scrollHeight,clientHeight:scroll.clientHeight,
+            lastBottom:end?.bottom,viewportBottom:view.bottom};
         }"""
     )
     assert value["scrollTop"] + value["clientHeight"] >= value["scrollHeight"] - 2, (label, value)
+    assert value["lastBottom"] <= value["viewportBottom"] + 2, (label, value)
     return value
 
 
@@ -293,7 +300,11 @@ def render_surface_set(page, folder: Path | None, prefix: str, width: int, heigh
         navigate(page, tab, selector)
         results[tab] = assert_layout(page, f"{tab}-{prefix}")
         assert_table_fit(page, f"{tab}-{prefix}")
-        assert_detail_reachable(page, f"{tab}-{prefix}")
+        try:
+            assert_detail_reachable(page, f"{tab}-{prefix}")
+        except AssertionError:
+            screenshot(page, folder, f"failure-{tab}-{prefix}-scroll")
+            raise
         if effective_width <= 850:
             assert_stacked_master_detail(page, f"{tab}-{prefix}")
         screenshot(page, folder, f"{prefix}-{index:02d}-{tab}")
@@ -370,6 +381,10 @@ def main() -> int:
                         assert identity_fit["scroll"] <= identity_fit["client"] + 1, (tab, identity_fit)
                         for header in page.locator(".pz-record-table .lex-column-list-head-cell .lex-column-sort").all():
                             header_fit = header.evaluate("(node) => ({client:node.clientWidth, scroll:node.scrollWidth, text:node.textContent})")
+                            if header_fit["scroll"] > header_fit["client"] + 1:
+                                screenshot(page, args.screenshots, f"failure-{tab}-header")
+                                print(header.evaluate("n=>({html:n.closest('.lex-column-list-head-cell').outerHTML,template:getComputedStyle(n.closest('.lex-column-list-header')).gridTemplateColumns})"))
+                                print(header.evaluate("n=>({base:n.closest('.lex-column-list').lexHeadingTemplate,style:n.closest('.lex-column-list').style.cssText,ancestors:[n,n.parentElement,n.parentElement.parentElement].map(e=>({width:e.clientWidth,font:getComputedStyle(e).font,padding:getComputedStyle(e).padding,gap:getComputedStyle(e).gap}))})"))
                             assert header_fit["scroll"] <= header_fit["client"] + 1, (tab, header_fit)
                         assert_layout(page, f"{tab}-desktop")
                         screenshot(page, args.screenshots, f"{index:02d}-{tab}-desktop")

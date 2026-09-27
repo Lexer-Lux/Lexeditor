@@ -21,7 +21,7 @@ function fixture(){
  const state={booting:true,ds:'mine',store:{},config:null,catalog:null};
  const ctx=vm.createContext({
   state,console,Promise,JSON,Object,LOOT_TAB_LABELS:{},
-  LexeditorUI:{stack:()=>({}),finishPluginLoading:()=>finishes.push({booting:state.booting,catalog:state.catalog})},
+  LexeditorUI:{stack:()=>({}),loadingPanel:()=>({}),finishPluginLoading:()=>finishes.push({booting:state.booting,catalog:state.catalog})},
   document:{body:{classList:{toggle(){}}}},
   $:id=>{if(!nodes.has(id))nodes.set(id,{innerHTML:'',append(){},replaceChildren(){},addEventListener(){}});return nodes.get(id);},
   el:()=>({}),rebuildTagMaps(){},

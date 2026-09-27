@@ -562,7 +562,7 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
 
         page.locator("#plugin-info").click()
         page.wait_for_function("state.tab==='info'")
-        expect(page.get_by_role("heading", name="Information", exact=True)).to_be_visible()
+        expect(page.locator('.lex-detail-panel-title').filter(has_text='Information')).to_be_visible()
         page.wait_for_function("""() => {
           const mod=document.querySelector(".lex-plugin-mod-loading");
           const credits=document.querySelector(".lex-plugin-credits");

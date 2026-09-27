@@ -493,7 +493,8 @@ function filtered(kind) {
 function table(kind, rows, selected, select) {
   return columnList({
     rows, key: row => row.name, selected, select,
-    columns: columns[kind], columnPreferences: prefs[kind],
+    columns: columns[kind].map(column=>column.key==="name"?{...column,
+      render:row=>LexeditorUI.inlineLabel(LexeditorUI.recordSource({created:row.created}),row.name)}:column), columnPreferences: prefs[kind],
     sortState: state.sort[kind],
     sort: key => {
       const current = state.sort[kind];
@@ -514,10 +515,36 @@ function sorted(kind, values) {
   });
 }
 
+function creationPanel(kind){
+  const draft=state.creating;
+  const name=el("input",{type:"text",value:draft.name,pattern:"[A-Za-z0-9_-]+",required:true,
+    "aria-label":"New prototype name",oninput:event=>{draft.name=event.target.value}});
+  const source=el("select",{"aria-label":"Source prototype",onchange:event=>{draft.source=event.target.value}},
+    ...state.data[kind].filter(row=>!row.created).map(row=>el("option",{value:row.name,selected:row.name===draft.source},row.name)));
+  const create=async()=>{
+    if(!name.reportValidity())return;
+    try{
+      const result=await jsonPost("/api/create",{kind,name:draft.name,source:draft.source});
+      state.data[kind].push(result.row);state.config.dirty=result.dirty;
+      state.selected[kind]=result.row.name;state.query[kind]="";state.creating=null;
+      render();refreshShell();
+    }catch(error){LexeditorUI.showToast(error.message,true);}
+  };
+  return detailPanel({title:`Add ${LABELS[kind].toLocaleLowerCase()}`,body:[
+    detailField({label:"Name",control:name}),
+    detailField({label:"Copy from",control:source,help:infoHelp("Copies this record's properties and graphics under the new name. Existing recipes, unlocks and placement items still point to their original records; creating a copy does not add those links.")}),
+    actionRow(el("button",{type:"button",onclick:()=>{state.creating=null;render();}},"Cancel"),
+      el("button",{type:"button",onclick:create},"Create prototype")),
+  ]});
+}
+
 function recordsPanel(kind) {
   if (!sourceReady()) return sourceState();
+  if(state.creating?.kind===kind)return creationPanel(kind);
   const rows = sorted(kind, filtered(kind));
-  return pagedListDetail({addDisabledReason:`A mod can define new ${LABELS[kind].toLocaleLowerCase()} in its own data stage, but Lexeditor only edits the existing ones. Adding one is not supported yet.`,
+  return pagedListDetail({add:()=>{state.creating={kind,name:"",source:state.data[kind].find(row=>!row.created&&row.name===state.selected[kind])?.name||state.data[kind].find(row=>!row.created)?.name||""};render();},
+    addDisabled:!editingAllowed()||!state.data[kind].some(row=>!row.created),
+    addDisabledReason:!editingAllowed()?"Open an editable mod project first.":"Import a prototype dump containing a source template first.",
     modOnly: {
       available: true,
       value: state.modOnly[kind],

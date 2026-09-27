@@ -28,6 +28,7 @@ function renderBehaviors(){
       const ids=new Set(state.catalog.effects.filter(effect=>edited.has(effect.key)).map(effect=>effect.id));
       return {available:!isRO(),value:state.modOnly===true,changed:row=>ids.has(row.id),
         change:value=>{state.modOnly=value;f.behaviorPage=0;renderBehaviors();}};})(),
+    addDisabledReason:"These IDs select behaviours implemented by the game. Adding a name here would not create a new behaviour.",
     rows,key:row=>row.id,slots:false,page:f.behaviorPage,pageSize:f.behaviorPageSize,selected:f.behaviorSel,noun:"behavior IDs",
     splitKey:"rdr2-effect-behaviors",defaultSplit:55,minLeft:480,
     search:{key:"rdr2-effect-behaviors",value:f.behaviorQ||"",placeholder:"Search behavior IDs…",change:value=>{f.behaviorQ=value;f.behaviorPage=0;renderBehaviors();}},
@@ -124,6 +125,7 @@ function renderEffects(){
   m.append(LexeditorUI.pagedListDetail({modOnly:(()=>{const touched=touchedRecords([state.effectEdits]);
       return {available:!isRO(),value:state.modOnly===true,changed:e=>touched.has(e.key),
         change:value=>{state.modOnly=value;f.effectPage=0;renderEffects();}};})(),
+    addDisabledReason:"Lexeditor can change existing item effects but cannot create a new effect definition yet.",
     rows,key:e=>e.key,slots:false,page:f.effectPage,pageSize:f.effectPageSize,selected:f.effectSel,noun:"effects",
     splitKey:"rdr2-effects",defaultSplit:64,minLeft:790,minRight:420,className:"lootsplit",
     search:{key:"rdr2-effects",value:f.effQ||"",placeholder:"Search effects… (e.g. HEALTH_CORE)",change:value=>{f.effQ=value;f.effectPage=0;renderEffects();}},filters:effectFilters,

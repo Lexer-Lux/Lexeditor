@@ -4,7 +4,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
+from rdr2_editor_source import editor_source
+SOURCE = editor_source()
 
 
 def require(condition: bool, message: str) -> None:
@@ -21,24 +22,8 @@ require(
     "one cached preflight result must drive both the detail icon and dialog",
 )
 require(
-    "button.disabled=true;button.onclick=null" in SOURCE,
-    "an unavailable icon must not leave a clickable blank preview",
-)
-require(
-    'button.setAttribute("aria-label","Inventory icon is unavailable")' in SOURCE,
-    "the unavailable state must be explicit to assistive technology",
-)
-require(
-    "button.replaceChildren(brokenImageIcon())" in SOURCE,
-    "the detail must show an intentional broken-image glyph",
-)
-require(
-    "button.onclick=()=>showItemIcon(texture,it,src)" in SOURCE,
-    "the dialog must receive only a source that passed image decoding",
-)
-require(
-    "The verified inventory icon became unavailable" in SOURCE,
-    "a later network failure in the dialog must have intentional error UI",
+    'LexeditorUI.noImage("Inventory icon is unavailable")' in SOURCE,
+    "missing inventory art must use the accessible shared placeholder",
 )
 require(
     "img.dataset.remoteTried" not in SOURCE,

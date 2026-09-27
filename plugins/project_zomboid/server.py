@@ -154,7 +154,12 @@ class Handler(PluginRequestHandler):
             payload = self.read_json()
             root = self.project()
             identity = {"path", "module", "id", "sha256", "edits"}
-            if path == "/api/mod-info/save":
+            if path == "/api/zedscript/create":
+                if set(payload) != {"path", "module", "kind", "source", "name", "sha256"} or not all(isinstance(value, str) for value in payload.values()):
+                    raise core.ProjectZomboidError("Creation requires a source record, new name and source hash")
+                result = zedscript.create_copy(root, payload["path"], payload["module"],
+                    payload["kind"], payload["source"], payload["name"], payload["sha256"])
+            elif path == "/api/mod-info/save":
                 if set(payload) != {"sha256", "edits"}:
                     raise core.ProjectZomboidError("mod.info save requires sha256 and edits")
                 result = core.save_mod_info(root, payload["sha256"], payload["edits"])

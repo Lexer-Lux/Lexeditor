@@ -29,6 +29,8 @@
   ];
 
   const entries = [
+    {id: "recordSource", level: "atom", summary: "Record origin: a pen for records created in the current mod, or a plugin-supplied source icon. Vanilla has no marker.",
+      sample: () => UI.inlineLabel(UI.recordSource({created:true}), "Created record")},
     // ---- atoms -----------------------------------------------------------
     {id: "element", level: "utility", summary: "document.createElement with the boring parts done: attributes, event handlers, children, and nulls skipped. Not a component - the thing every component is built out of.",
       sample: () => el("div", {class: "lex-reshade-actions"},
@@ -107,6 +109,7 @@
     {id: "toolbar", level:"molecule", summary:"A row of page controls.", sample:()=>UI.toolbar(UI.readonlyField("Current table"))},
     {id: "textArea", level:"atom", summary:"An editable text block.", sample:()=>UI.textArea({value:"Example description",rows:2})},
     {id: "tileGrid",level:"template",summary:"A responsive grid of shared fields, sections, or cards.",sample:()=>UI.tileGrid([UI.detailSection({title:"First",body:"First value"}),UI.detailSection({title:"Second",body:"Second value"})])},
+    {id: "recordCard",level:"molecule",summary:"A named game-record preview with an optional ID, properties and hover action. Use a balanced tileGrid to keep rows even.",sample:()=>UI.tileGrid(Array.from({length:6},(_,index)=>UI.recordCard({title:`Enemy ${index+1}`,identity:index+1,action:el("button",{},"Choose enemy")})),{balanced:true,minWidth:150})},
     {id: "inlineLabel",level:"molecule",summary:"A name with inline icons at one shared size.",sample:()=>UI.inlineLabel(UI.infoIcon(),"Example item")},
     {id: "choiceField",level:"molecule",summary:"A value with a separate selection action.",sample:()=>UI.choiceField("Potion",el("button",{},UI.selectionIcon()))},
     {id: "statCard",level:"molecule",summary:"An image card with directional ranks and corner controls.",sample:()=>UI.statCard({ranks:["8","5","3","6"].map(value=>el("button",{},value)),corner:el("button",{},"+"),footer:"70"})},
@@ -116,7 +119,7 @@
     {id: "stack", level: "template", summary: "A bar over the content it switches: the bar keeps its height, the content takes the rest."},
     {id: "bitmapText", level: "atom", summary: "Text in a game's own bitmap font, one masked glyph per character from --lex-bitmap-atlas."},
     {id: "imageMap", level: "organism", summary: "An image with selectable cells and point markers.", sample:()=>UI.imageMap({columns:4,rows:3,cells:Array.from({length:12},(_,id)=>({id,label:`Cell ${id+1}`,selected:id===3})),points:[{x:.5,y:.5,label:"Point"}]})},
-    {id: "mapMagnifier", level: "organism", summary: "The magnifier a map carries: the same map at the size of the window, with a crosshair and a live readout.", sample:()=>UI.imageMap({fill:false,columns:4,rows:3,label:"Map with a magnifier",points:[{x:.5,y:.5,label:"Point"}],magnify:()=>({fill:false,columns:4,rows:3,label:"Map with a magnifier",points:[{x:.5,y:.5,label:"Point"}],readout:point=>`cell ${point.column}, ${point.row}`,place:()=>{}})})},
+    {id: "mapMagnifier", level: "organism", summary: "An enlarged map with top instructions, crosshair, live readout and optional details({refresh}) beside it; narrow layouts stack the panes.", sample:()=>UI.imageMap({fill:false,columns:4,rows:3,label:"Map with a magnifier",points:[{x:.5,y:.5,label:"Point"}],magnify:()=>({fill:false,columns:4,rows:3,label:"Map with a magnifier",points:[{x:.5,y:.5,label:"Point"}],readout:point=>`cell ${point.column}, ${point.row}`,place:()=>{}})})},
     {id: "modelStage", level: "organism", summary: "A turnable model's stage: the canvas a renderer draws into and the message shown until it has.",
       sample: () => UI.modelStage({message: "This item has no inventory mesh."})},
     {id: "iconSlot", level: "atom", summary: "What fills a detail heading's icon box: a picture, a small stage, or a line saying why there is neither.",
@@ -304,7 +307,7 @@
 
     // ---- templates -------------------------------------------------------
     {id: "mountShell", level: "template", expect: "every game", summary: "The window: brand, tabs, project selector, save, play, history. Everything above this page is it."},
-    {id: "panelLayout", level: "template", summary: "One, two or three resizable panes across a page."},
+    {id: "panelLayout", level: "template", summary: "Resizable panes; stackBelowMinimum stacks them when their container cannot fit minSizes."},
     {id: "list", level: "organism", summary: "A plain list of rows, without columns."},
     {id: "listDetail", level: "template", summary: "A list beside the detail of the selected row."},
     {id: "masterDetail", level: "template", summary: "The older list and detail shape, kept for existing pages."},

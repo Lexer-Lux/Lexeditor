@@ -88,6 +88,7 @@ async function renderLootSounds(){
   const selected=rows.find(row=>row.id===state.lootSoundSelected)||rows[0];
   state.lootSoundSelected=selected?.id;
   main.append(LexeditorUI.pagedListDetail({
+    addDisabledReason:"Pickup sounds use the existing sound mappings. Lexeditor cannot create a new mapping yet.",
     rows,key:row=>row.id,selected:selected?.id,noun:"mappings",pageSize:15,slots:true,
     page:state.lootSoundPage||0,change:view=>{
       state.lootSoundPage=view.page;state.lootSoundSelected=view.selected;
@@ -194,6 +195,7 @@ async function renderLoot() {
       return {available:!isRO(),value:state.modOnly===true,
         changed:row=>!!dirty&&dirty.has(row.t.key),
         change:value=>{state.modOnly=value;f.lootPage=0;renderLoot();}};})(),
+    addDisabledReason:"Lexeditor edits existing loot tables but cannot create a new table and connect it to a loot source yet.",
     rows,key:row=>row.t.key,slots:false,page:f.lootPage,pageSize:f.lootPageSize,selected:f.lootSel,noun:state.lootFile==="loot_table_herb.meta"?"plant loot tables":"tables",
     splitKey:"rdr2-loot-tables",defaultSplit:44,
     search:{key:"rdr2-loot-tables",value:f.lootQ,placeholder:"Search tables… (e.g. VALENTINE, GANG)",change:value=>{f.lootQ=value;f.lootPage=0;renderLoot();}},filters:lootFilters,

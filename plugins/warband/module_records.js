@@ -35,6 +35,38 @@
       refreshShell();
     }
     const dirtyCount=()=>Object.keys(edits).reduce((n,dataset)=>n+datasetDirtyCount(dataset),0);
+    const creationBlocked=()=>state.activeSource!=="mine"?"Open an editable mod first.":
+      (options.hasPendingEdits?.()||dirtyCount())?"Save or discard pending edits before creating a sound.":
+      state.build?.running?"Wait for the current build to finish.":"";
+    function beginSoundCreation(data){
+      if(creationBlocked())return;
+      const U=LexeditorUI,local=viewState('sounds');
+      const templates=data.rows.filter(row=>!row.problem);
+      const source=U.el('select',{'aria-label':'Copy from sound'},...templates.map(row=>
+        U.el('option',{value:row.recordIndex,selected:String(row.recordIndex)===local.selected},row.id)));
+      const id=U.el('input',{type:'text',required:true,pattern:'[a-z][a-z0-9_]*','aria-label':'New sound ID'});
+      const create=U.el('button',{type:'button',onclick:async()=>{
+        if(!id.reportValidity()||creationBlocked())return;
+        const template=templates.find(row=>row.recordIndex===Number(source.value));if(!template)return;
+        create.disabled=true;
+        try{
+          const result=await api('/api/sounds/create',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({recordIndex:template.recordIndex,originalId:template.id,id:id.value,sha256:data.sha256})});
+          local.query='';local.selected=String(result.recordIndex);
+          local.page=Math.floor(result.recordIndex/Math.max(1,local.pageSize));
+          await load('sounds',true);
+          local.query=result.created;local.page=0;local.selected=String(result.recordIndex);
+          try{await options.onCreated?.(data.filename);}
+          catch(error){U.showToast('Sound created; build failed: '+(error.message||String(error)),true);}
+          renderApp();
+        }catch(error){create.disabled=false;U.showToast(error.message||String(error),true);}
+      }},'Create and build');
+      main().replaceChildren(U.detailPanel({title:'Add sound',help:'Copies the sound files and playback settings. The new sound plays only when game behaviour references its ID.',body:[
+        U.detailField({label:'Copy from',control:source}),
+        U.detailField({label:'ID',control:id,help:U.infoHelp('Use a unique ID with lowercase letters, digits and underscores. Start with a letter.')}),
+        U.actionRow(U.el('button',{type:'button',onclick:renderApp},'Cancel'),create)]}));
+      id.focus();
+    }
     const snapshot=()=>({edits:copy(edits),active,view:copy(view)});
     function restore(value){
       for(const key of Object.keys(edits))delete edits[key];
@@ -118,6 +150,9 @@
       if(row.problem)return LexeditorUI.detailPanel({className:"warband-module-detail",title:row.name||row.id,identity:row.id,body:[LexeditorUI.el("section",{class:"card error"},row.problem)]});
       const readOnly=state.activeSource!=="mine";
       const choices=data.choices||{};
+      const samples=dataset==="sounds"?row.audioSamples||[]:[];
+      const sampleKey=`sample:${row.recordIndex}`;
+      const selectedSample=samples.includes(viewState(dataset)[sampleKey])?viewState(dataset)[sampleKey]:samples[0];
       const fields=data.schema.fields.filter(spec=>row.presentFields?.includes(spec.key)).map(spec=>{
         const description=row.fieldProblems?.[spec.key]?(spec.help||"")+" This field is not a supported literal in this record: "+row.fieldProblems[spec.key]+". Use source editing for this field.":spec.help||"";
         const choice=row.fieldProblems?.[spec.key]?null:choices[spec.key];
@@ -142,11 +177,16 @@
           dataType:({identity:"ID",string:"STRING",text:"STRING",expr:"EXPR",integer:"INT",number:"FLOAT",vec2:"VECTOR2",vec3:"VECTOR3",vec4:"VECTOR4"})[spec.kind]||"VALUE",
           description,control:fieldControl(dataset,row,spec,readOnly)});
       });
+      if(samples.length>1)fields.unshift(LexeditorUI.detailField({label:"Preview sample",control:
+        LexeditorUI.el("select",{"aria-label":"Preview sample",onchange:event=>{
+          viewState(dataset)[sampleKey]=event.target.value;renderApp();
+        }},...samples.map(name=>LexeditorUI.el("option",{value:name,selected:name===selectedSample},name)))}));
       // The heading is drawn in the installed game's own font, the same face
       // the shell and the shell's tabs use, and wrapped the way the item
       // panel's heading is so every panel in the plugin sizes its heading the
       // same way.
       return LexeditorUI.detailPanel({className:"warband-module-detail",
+        audio:selectedSample?{src:`/api/sound-sample?name=${encodeURIComponent(selectedSample)}`,label:row.name||row.id}:null,
         title:LexeditorUI.el("h2",{class:"lex-detail-panel-title"},bitmapText(row.name||row.id,24)),
         // The heading shows the record's name; the ID repeats beside it only
         // when it is a different string. Coverage and the source caveat are
@@ -199,7 +239,10 @@
       });
       const prefs=preferencesFor(active,definitions);
       const selectedRow=filtered.find(row=>String(row.recordIndex)===local.selected)||filtered[0];if(selectedRow)local.selected=String(selectedRow.recordIndex);
-      main().replaceChildren(host(LexeditorUI.pagedListDetail({addDisabledReason:`Warband's module files can take new ${data.schema.label.toLowerCase()}, but Lexeditor only edits existing ones. Adding one is not supported yet.`,rows:filtered,key:row=>String(row.recordIndex),selected:local.selected,
+      main().replaceChildren(host(LexeditorUI.pagedListDetail({
+        add:active==='sounds'?()=>beginSoundCreation(data):undefined,
+        addDisabled:active==='sounds'&&!!creationBlocked(),
+        addDisabledReason:active==='sounds'?creationBlocked():`Warband's module files can take new ${data.schema.label.toLowerCase()}, but Lexeditor only edits existing ones. Adding one is not supported yet.`,rows:filtered,key:row=>String(row.recordIndex),selected:local.selected,
         noun:data.schema.label.toLowerCase(),splitKey:"warband-module-"+active,className:"warband-paged-table warband-module-data",slots:false,
         fit:{minRowHeight:36},page:local.page,pageSize:local.pageSize,defaultSplit:45,
         search:{key:"warband-module-"+active,value:local.query,placeholder:"Search "+data.schema.label.toLowerCase()+"…",change:value=>{local.query=value;local.page=0;renderApp();}},

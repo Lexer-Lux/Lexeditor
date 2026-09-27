@@ -4,7 +4,14 @@
     activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the Warband Data Map",info:()=>navigate("dashboard"),infoActive:()=>state.tab==="dashboard",infoTitle:"Open Warband information and log",projectSources:()=>[{key:"vanilla",label:"Vanilla",path:`${state.dashboard?.paths?.Game||"Installed Warband"}/Modules/Native`}],projectActiveSource:()=>state.activeSource,selectProjectSource:switchProjectSource,dirtyCount,readonly:()=>state.activeSource!=="mine",save:saveAll,
     history:{capture:historyCapture,restore:historyRestore,render,enabled:()=>!state.booting&&state.activeSource==="mine",limit:50}
   });
-  moduleRecords=WarbandModuleRecords.create({state,api,main:()=>$("#main"),toolbar:()=>$("#toolbar"),refreshShell:()=>shell.refresh(),renderApp:render,setStatus,dataMapRows:()=>state.datamap?.rows||[],sourceDraft:filename=>state.catalogFile?.filename===filename&&state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text});
+  moduleRecords=WarbandModuleRecords.create({state,api,main:()=>$("#main"),toolbar:()=>$("#toolbar"),refreshShell:()=>shell.refresh(),renderApp:render,setStatus,dataMapRows:()=>state.datamap?.rows||[],sourceDraft:filename=>state.catalogFile?.filename===filename&&state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text,
+    hasPendingEdits:dirtyCount,onCreated:async filename=>{
+      shell.history.clear();
+      if(state.catalogFile?.filename===filename){
+        state.catalogFile=await api('/api/catalog/file?name='+encodeURIComponent(filename));state.catalogDraft=state.catalogFile.text;
+      }
+      await buildSavedModule();shell.refresh();
+    }});
 
   async function boot(){
     try{

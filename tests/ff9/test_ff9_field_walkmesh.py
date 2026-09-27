@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
 import struct
 
@@ -242,18 +243,23 @@ def test_noop_save_does_not_create_overlay(store):
     assert saved["rows"][0]["source"] == "vanilla"
 
 
-def test_save_refuses_stale_vanilla_archive(store):
-    database, archive_path, _project = store
+@pytest.mark.parametrize('preserve_timestamp', [False, True])
+def test_save_refuses_stale_vanilla_archive(store, preserve_timestamp):
+    database, archive_path, project = store
     loaded = database.load("field-walkmesh")
     row = loaded["rows"][0]
+    before = archive_path.stat()
     raw = bytearray(archive_path.read_bytes())
     marker = raw.index(struct.pack("<I", walkmesh.BGI_MAGIC))
     raw[marker + 6] ^= 1
     archive_path.write_bytes(raw)
+    if preserve_timestamp:
+        os.utime(archive_path, ns=(before.st_atime_ns, before.st_mtime_ns))
     with pytest.raises(RuntimeError, match="changed outside Lexeditor"):
         database.save("field-walkmesh", loaded["sceneHashes"], [{
             "scene": row["scene"], "record": row["record"], "values": {"Active": False},
         }])
+    assert not (project / row['scene']).exists()
 
 def test_save_refuses_unknown_fields_and_stale_project_source(store):
     database, _archive, project = store

@@ -5,7 +5,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 FRAMEWORK_JS = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 FRAMEWORK_CSS = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
-RDR2 = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
+from rdr2_editor_source import editor_source
+RDR2 = editor_source()
 
 
 def require(condition: bool, message: str) -> None:
