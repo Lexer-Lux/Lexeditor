@@ -69,7 +69,11 @@ document.body.dataset.lexPlugin="ff8";renderSettings();LexeditorUI.finishPluginL
         assert not any("INCOMPLETE" in card for card in unlocked["cards"]), unlocked["cards"]
         assert any("SPELL HEALING" in card and "IMPLEMENTED" in card for card in unlocked["cards"]), unlocked["cards"]
         implemented = len(formulae_rework.implemented_ids())
-        assert f"{implemented}/{len(formulae_rework.rows())} requested runtime formulae are implemented" in unlocked["master"], unlocked["master"]
+        # The count is in the Formulae Rework section's help bubble, not on the page.
+        count = f"{implemented} of the {len(formulae_rework.rows())} requested formulae have a game patch."
+        helps = page.evaluate("()=>[...document.querySelectorAll('.lex-info-help')].map(n=>n.getAttribute('aria-label')||n.dataset.lexTitle||'')")
+        assert count in helps, helps
+        assert "requested runtime formulae are implemented" not in unlocked["master"], unlocked["master"]
         formulae_tab = next(tab for tab in unlocked["subtabs"] if tab["label"] == "Formulae")
         assert formulae_tab == {"label": "Formulae", "disabled": False, "active": True}, unlocked["subtabs"]
         metrics = page.evaluate("""() => {
