@@ -1806,15 +1806,20 @@
 
   // Map coordinates are fractions of the image, independent of UI zoom.
   const imageMap = (options = {}) => {
+    // A map with a corner readout answers "what is under the pointer" there,
+    // so its cells and markers carry no hover tooltip on top of it (Lexer:
+    // "hovering in the world map shouldn't bring up some weird info thing.
+    // that's what the coords in the bottom left are for").
+    const tooltip=text=>typeof options.readout==="function"||options.crosshair?null:text;
     const stage=element("div",{class:"lex-image-map-stage",style:`aspect-ratio:${Number(options.ratio)||4/3};--lex-map-columns:${Number(options.columns)||1};--lex-map-rows:${Number(options.rows)||1}`},
       options.media || (options.image?element("img",{src:options.image,alt:options.label||"Map",draggable:false}):null));
     if(options.cells?.length)stage.append(element("div",{class:"lex-image-map-cells"},...options.cells.map(cell=>
-      element("button",{type:"button",class:cell.selected?"selected":"",title:cell.title||cell.label,
+      element("button",{type:"button",class:cell.selected?"selected":"",title:tooltip(cell.title||cell.label),
         style:Number.isInteger(cell.column)&&Number.isInteger(cell.row)
           ?`grid-column:${cell.column+1};grid-row:${cell.row+1}`:null,
         "aria-label":cell.label,"aria-pressed":!!cell.selected,onclick:()=>options.select?.(cell.id)}))));
     for(const point of options.points||[])stage.append(element("button",{type:"button",class:`lex-image-map-point${point.selected?" selected":""}${point.className?" "+point.className:""}`,
-      style:`left:${point.x*100}%;top:${point.y*100}%`,title:point.label,"aria-label":point.label,
+      style:`left:${point.x*100}%;top:${point.y*100}%`,title:tooltip(point.label),"aria-label":point.label,
       onclick:event=>{event.stopPropagation();point.activate?.();}}));
     if(options.place)stage.addEventListener("click",event=>{
       if(event.target.closest("button"))return;
@@ -1829,7 +1834,6 @@
     if(typeof options.readout==="function"||options.crosshair){
       const columns=Math.max(1,Number(options.columns)||1),rows=Math.max(1,Number(options.rows)||1);
       readout=element("div",{class:"lex-image-map-readout","aria-live":"polite",hidden:!options.crosshair});
-      stage.append(readout);
       const crosshair=options.crosshair?element("div",{class:"lex-map-crosshair","aria-hidden":"true"},element("span",{})):null;
       if(crosshair)stage.append(crosshair);
       stage.addEventListener("pointermove",event=>{
@@ -1849,6 +1853,10 @@
     // A region, so its label is announced; a bare div's aria-label is not.
     const root=element("div",{class:options.fill===false?"lex-image-map lex-image-map-natural":"lex-image-map",role:"region","aria-label":options.label||"Map"},stage);
     root.style.setProperty("--lex-map-ratio", String(Number(options.ratio)||4/3));
+    // The readout sits in the map's frame, not on the stage: a zoomed or
+    // panned stage carried it out of view (Lexer: "they disappear when you
+    // zoom in").
+    if(readout)root.append(readout);
     const image=stage.querySelector('img');
     if(image&&!options.ratio){const fit=()=>{if(!image.naturalWidth||!image.naturalHeight)return;const ratio=image.naturalWidth/image.naturalHeight;root.style.setProperty('--lex-map-ratio',String(ratio));stage.style.aspectRatio=String(ratio)};image.addEventListener('load',fit);fit();}
     root.lexStage=stage;

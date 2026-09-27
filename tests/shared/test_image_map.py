@@ -134,3 +134,27 @@ def test_magnifier_opens_the_same_map_at_the_size_of_the_window():
             assert page.locator('.lex-map-magnifier-dialog').count() == 0
         finally:
             browser.close()
+
+
+def test_readout_stays_in_view_and_replaces_hover_tooltips(page):
+    """Lexer: hovering the world map should not bring up an info tooltip, since
+    the corner readout is for that, and the readout disappeared on zoom."""
+    framework(page)
+    page.evaluate('''()=>{const U=LexeditorUI,host=U.el('div',{style:'width:400px;height:300px'});
+      document.body.append(host);
+      window.map=U.imageMap({ratio:4/3,columns:4,rows:3,label:'Zoomed',
+        cells:[{id:0,column:0,row:0,label:'Cell 0',title:'Cell 0 details'}],
+        points:[{x:.5,y:.5,label:'Point A'}],readout:point=>`cell ${point.column}, ${point.row}`});
+      host.append(map);map.lexStage.style.transform='translate(-600px,-400px) scale(4)'}''')
+    assert page.locator('.lex-image-map [title]').count() == 0
+    assert page.evaluate("document.querySelector('.lex-image-map-readout').parentElement===map")
+    box = page.locator('.lex-image-map').bounding_box()
+    page.mouse.move(box['x'] + box['width'] / 2, box['y'] + box['height'] / 2)
+    readout = page.locator('.lex-image-map-readout')
+    assert readout.is_visible() and readout.inner_text().startswith('cell ')
+    shown = readout.bounding_box()
+    assert box['x'] <= shown['x'] and shown['y'] + shown['height'] <= box['y'] + box['height'] + 1
+    # A map without a readout keeps its tooltips.
+    page.evaluate('''()=>document.body.append(LexeditorUI.imageMap({ratio:1,
+      points:[{x:.2,y:.2,label:'Plain point'}]}))''')
+    assert page.locator('[title="Plain point"]').count() == 1

@@ -106,7 +106,7 @@
     z:Math.round((point.y*96-48)*2048)}}
   const worldVisualView={scale:1,x:0,y:0};
   function worldMapNavigation(panel,stage){
-    const view=worldVisualView,apply=()=>{stage.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.scale})`};apply();
+    const view=worldVisualView,apply=()=>{stage.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.scale})`;stage.style.setProperty('--lex-map-scale',String(view.scale))};apply();
     panel.addEventListener('wheel',event=>{
       event.preventDefault();event.stopPropagation();
       const box=panel.getBoundingClientRect(),ratio=box.width/panel.offsetWidth;

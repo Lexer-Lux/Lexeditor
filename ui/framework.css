@@ -4525,7 +4525,9 @@ body:has(.lex-data-map-table) #main {
 .lex-image-map-cells > button { min-width:0; min-height:0; padding:0; border:0; border-radius:0; background:transparent; cursor:crosshair; }
 .lex-image-map-cells > button:hover { outline:1px solid var(--lex-text); outline-offset:-1px; }
 .lex-image-map-cells > button.selected { outline:2px solid var(--lex-highlight); outline-offset:-2px; background:color-mix(in srgb,var(--lex-highlight) 20%,transparent); }
-.lex-image-map-point { position:absolute; z-index:2; width:10px; height:10px; min-width:10px; min-height:10px; padding:0; translate:-50% -50%; border:1px solid var(--lex-text); border-radius:50%; background:var(--lex-accent); }
+/* A zoomed stage sets --lex-map-scale; markers divide it out so they keep
+   their size while the art grows under them. */
+.lex-image-map-point { position:absolute; z-index:2; width:10px; height:10px; min-width:10px; min-height:10px; padding:0; translate:-50% -50%; scale:calc(1 / var(--lex-map-scale, 1)); border:1px solid var(--lex-text); border-radius:50%; background:var(--lex-accent); }
 /* ---- Tree graphs --------------------------------------------------------- */
 /* Records joined by arrows on a stage the game lays out. */
 .lex-tree-graph { min-width:0; min-height:0; overflow:auto; background:var(--lex-panel); }
