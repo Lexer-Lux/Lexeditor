@@ -42,15 +42,23 @@ absolute VAs; file offset = VA − `0x400000`. Battle participants are
   (Berserk). `+0x90` is the persistent status byte (`0x08` Darkness,
   `0x20` Berserk, `0x40` Zombie).
 
-## Damage is applied before the hit lands
+## Damage lands during the animation
 
-- The command resolves damage, caps it (`00491124`), stores the result in
-  `01D27AE4`, and calls `00494410`. That function writes the target's new
-  current HP (`+0x18`, at `004946BC`) straight away. The animation later only
-  displays the stored number.
-- Consequence for Timed Blocks: a press during the enemy's swing cannot
-  change the damage at its source. It must refund the difference to HP at
-  the hit frame and correct the displayed number.
+- A hit-frame log with HP on every line (Lexer's session, 2026-09-26) shows
+  targets' current HP (`+0x18`) dropping mid-animation, at a frame boundary,
+  never when the command is chosen. An earlier reading of this page said HP
+  was written at the command; the log disproves it.
+- The drops sit between animation frames, not right after one opcode: the
+  battle step applies the hit from a queued task. `0048F3F0` and `0048F350`
+  (queued through `0047E200` at `00485D46`/`00485D6B`) walk the action's hit
+  records and call `0048FE20(target)` then `0048EF80` for each; `00485160`
+  does the same for the gunblade trigger path, and `004850A0` for a
+  button-mash limit break. `0048FE20` reaches `00494410`, which writes HP
+  (`004946BC`).
+- So the hook for Timed Hits and Blocks is `0048FE20`: it runs for every
+  attacker at the moment damage lands, and a press shortly before it can
+  scale that hit. The hit-frame log's `FFFFFFFF` lines record each call to
+  confirm the timing in game.
 
 ## Hit records handed to the animation
 

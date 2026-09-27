@@ -561,6 +561,7 @@ def _verify_executable(game_root: Path) -> Path:
             (better_targeting_issue_64.TARGET_ICON_HOOK, better_targeting_issue_64.TARGET_ICON_HOOK_ORIGINAL),
             (damage_limit.DAMAGE_LIMIT_FLAG_OPCODE, damage_limit.DAMAGE_LIMIT_FLAG_ORIGINAL),
             (hit_frame_log.HOOK, hit_frame_log.HOOK_ORIGINAL),
+            (hit_frame_log.DAMAGE_HOOK, hit_frame_log.DAMAGE_ORIGINAL),
             *music_volume_issue_498.verified_hooks(),
             *magic_damage_rework.verified_hooks(),
             *melee_damage_rework.verified_hooks(),
