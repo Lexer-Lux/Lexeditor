@@ -59,7 +59,7 @@
     if(rule.mode==="fixed")return `Level ${rule.value}`;
     if(rule.mode==="maximum")return `Level up to ${rule.value}`;
     if(rule.mode==="ultimecia")return "Level 1 to 100";
-    return `Level byte ${slot.level}`;
+    return "Special level";
   }
   function encounterEnemyBox(slot,formation,origin){
     const enemy=enemyById(slot.enemyId);
@@ -75,7 +75,7 @@
           formation.name=encounterName(formation);shell.refresh();}})},LexeditorUI.selectionIcon());
     const card=LexeditorUI.recordCard({title:name,identity:slot.slot+1,
       image:slot.enabled?encounterEnemyTexture(slot.enemyId):LexeditorUI.noImage('Empty slot'),
-      body:slot.enabled?encounterSlotLevelText(slot):'Empty',action:finder});
+      body:slot.enabled?encounterSlotLevelText(slot):null,action:finder});
     card.setAttribute('aria-label',`Battle position ${slot.slot+1}`);
     card.dataset.lexBattlePosition=String(slot.slot+1);
     if(!slot.enabled)card.dataset.lexEmptyPosition='';
@@ -195,9 +195,8 @@
 
   // ---- Groups --------------------------------------------------------------
   function encounterGroupSlotControl(row,index,refresh,origin){
-    const value=row.encounters[index],formation=encounterRowById(value);
-    const label=formation?`${value} · ${encounterName(formation)}`:`Formation ${value} (not in scene.out)`;
-    const link=hoverable({content:label,targetType:"encounters",targetId:value,targetLabel:`battle formation ${value}`,class:'ff8-encounter-formation-link',
+    const value=row.encounters[index];
+    const link=hoverable({content:recordId(value),targetType:"encounters",targetId:value,targetLabel:`battle formation ${value}`,class:'ff8-encounter-formation-link',
       activate:()=>showEncounterSubtab("formations","encounters",Number(value))});
     const accept=next=>{if(state.activeSource!=='mine'||!encounterRowById(next))return;row.encounters[index]=Number(next);refresh()};
     const finder=el("button",{type:"button",title:"Choose a battle formation",disabled:state.activeSource!=='mine',class:'ff8-encounter-formation-finder',
@@ -211,7 +210,7 @@
     const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,
       value:worldRow(state.referenceData[reference.id],"group",row.id)?.encounters?.[index]})).filter(entry=>entry.value!==undefined);
     return sourceControl(LexeditorUI.choiceField(link,finder),()=>row.encounters[index],vanilla,references,accept,
-      next=>{const target=encounterRowById(next);return target?`${next} · ${encounterName(target)}`:String(next)});
+      next=>`#${next}`);
   }
   function encounterGroupUsage(row){
     const rules=encounterRulesForGroup(row.id);
@@ -237,7 +236,7 @@
       return strip;
     });
     return detailPanel({title:'Encounter group',identity:recordId(row.id),className,
-      help:'The game chooses one of these eight formations when this group starts a battle. Hover a formation name to replace it. Changing an enemy changes that formation everywhere it is used.',
+      help:'The game chooses one of these eight formations when this group starts a battle. Hover a formation ID to replace it. Changing an enemy changes that formation everywhere it is used. Special level means the enemy uses a level rule we do not yet understand.',
       body:[detailSection({body:LexeditorUI.stack({fill:false,className:'ff8-encounter-formations'},...formations)}),
         detailSection({title:'WHERE THIS GROUP IS USED',
           help:infoHelp('These region and ground rules select this group. Open a rule to change its group.'),

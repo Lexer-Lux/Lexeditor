@@ -54,7 +54,7 @@ FORMATIONS = [
     formation(0, {0: (0, 7), 1: (1, 12), 2: (2, 120)}),
     formation(1, {0: (3, 9), 6: (2, 30)}),           # a stored seventh slot
     formation(2, {0: (1, 4)}),
-    formation(3, {0: (2, 5)}),
+    formation(3, {0: (2, 255)}),
     formation(4, {0: (3, 6)}),
     formation(5, {0: (0, 252)}),
 ]
@@ -292,7 +292,11 @@ def main():
         assert rows.first.locator('[data-lex-battle-position]').count()==6
         assert rows.first.locator('.lex-record-card-title').first.inner_text()=='Caterchipillar'
         assert rows.first.locator('.lex-record-card-body').first.inner_text()=='Level 4'
-        assert rows.first.locator('.ff8-encounter-formation-link').evaluate("e=>getComputedStyle(e).writingMode")=='vertical-rl'
+        assert ''.join(rows.first.locator('.ff8-encounter-formation-link').inner_text().split())=='#2'
+        assert rows.first.locator('.ff8-encounter-formation-link').evaluate("e=>getComputedStyle(e).writingMode")=='horizontal-tb'
+        empty = preview.locator('[data-lex-empty-position]').first
+        assert empty.locator('.lex-record-card-title').inner_text() == 'Empty'
+        assert empty.locator('.lex-record-card-body').count() == 0
         shot('rules')
         page.evaluate("state.encountersTab='groups';state.selected.encounterGroups=2;renderEncounters()")
         page.wait_for_selector('.ff8-encounter-group-detail')
@@ -339,6 +343,10 @@ def main():
                       " renderEncounters(); }")
         page.wait_for_timeout(200)
         shot("groups")
+        assert page.locator('.ff8-encounter-group-detail').get_by_text('Special level', exact=True).count() == 1
+        assert 'Level byte' not in page.locator('.ff8-encounter-group-detail').inner_text()
+        page.locator('.ff8-encounter-group-detail').get_by_text('Special level', exact=True).scroll_into_view_if_needed()
+        shot('special-level')
         rows=page.locator('.ff8-encounter-group-detail .ff8-encounter-formation-row')
         assert rows.count()==8
         assert rows.nth(1).locator('[data-lex-battle-position]').count()==7
