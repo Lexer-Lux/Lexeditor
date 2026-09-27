@@ -40,6 +40,7 @@ def _machine():
         emu.mem_write(slot, struct.pack("<I", stub))
         emu.mem_write(stub, b"\xC2" + struct.pack("<H", pop))  # ret N
     emu.mem_write(h.HOOK_RESUME, b"\xF4")  # hlt: resume point reached
+    emu.mem_write(h.DAMAGE_RESUME, b"\xF4")
     return emu
 
 
@@ -96,10 +97,45 @@ def test_logs_each_opcode_once_opened_and_resumes_intact():
     assert second and second.groups() == (f"{SEQUENCE + 8:08X}", "91", hp)
 
 
+def test_damage_entry_logs_the_target_and_resumes_the_damage_routine():
+    emu = _machine()
+    calls = []
+
+    def on_code(uc, address, _size, _data):
+        if address == STUBS[h.IAT_CREATE_FILE_A][0]:
+            uc.reg_write(x86.UC_X86_REG_EAX, 0x1234)
+        elif address == STUBS[h.IAT_WRITE_FILE][0]:
+            esp = uc.reg_read(x86.UC_X86_REG_ESP)
+            args = struct.unpack("<5I", uc.mem_read(esp + 4, 20))
+            calls.append(bytes(uc.mem_read(args[1], args[2])).decode())
+            uc.reg_write(x86.UC_X86_REG_EAX, 1)
+    emu.hook_add(unicorn.UC_HOOK_CODE, on_code)
+    esp = STACK + 0x1000
+    caller = 0x0048F451
+    emu.mem_write(esp, struct.pack("<2I", caller, 4))  # return address, target 4
+    emu.reg_write(x86.UC_X86_REG_ESP, esp)
+    for reg, value in ((x86.UC_X86_REG_EBX, 0xBBBBBBBB), (x86.UC_X86_REG_ESI, 0x51515151),
+                       (x86.UC_X86_REG_EDI, 0xD1D1D1D1), (x86.UC_X86_REG_EBP, 0xB0B0B0B0)):
+        emu.reg_write(reg, value)
+    emu.emu_start(h.CAVE + h.ENTRY["damage"], h.DAMAGE_RESUME + 1, count=5000)
+    assert emu.reg_read(x86.UC_X86_REG_EIP) in (h.DAMAGE_RESUME, h.DAMAGE_RESUME + 1)
+    # The replaced instructions: sub esp, 0x10; mov eax, [esp + 0x14] (the target).
+    assert emu.reg_read(x86.UC_X86_REG_ESP) == esp - 0x10
+    assert emu.reg_read(x86.UC_X86_REG_EAX) == 4
+    for reg, value in ((x86.UC_X86_REG_EBX, 0xBBBBBBBB), (x86.UC_X86_REG_ESI, 0x51515151),
+                       (x86.UC_X86_REG_EDI, 0xD1D1D1D1), (x86.UC_X86_REG_EBP, 0xB0B0B0B0)):
+        assert emu.reg_read(reg) == value
+    hp = " " + " ".join(f"{value:08X}" for value in HP)
+    assert len(calls) == 1
+    assert calls[0][16:] == f" FFFFFFFF {caller:08X} 04{hp}\r\n"
+
+
 def test_off_writes_nothing_and_on_hooks_the_verified_bytes():
     assert h.build_hext(False) == ""
     text = h.build_hext(True)
     assert f"{h.HOOK:X} = E9" in text
+    assert f"{h.DAMAGE_HOOK:X} = E9" in text
+    assert len(h.damage_hook_bytes()) == len(h.DAMAGE_ORIGINAL)
     assert h.hook_bytes()[:1] == b"\xE9" and len(h.hook_bytes()) == len(h.HOOK_ORIGINAL)
     assert h.CAVE + len(h.CODE) <= h.DATA
     with pytest.raises(ValueError):
@@ -110,3 +146,5 @@ def test_cave_bytes_match_their_source():
     keystone = pytest.importorskip("keystone")
     ks = keystone.Ks(keystone.KS_ARCH_X86, keystone.KS_MODE_32)
     assert bytes(ks.asm(h.ASSEMBLY, h.CAVE)[0]) == h.CODE
+    probe = h.ASSEMBLY.split("\ndamage:")[0] + "\ndamage:\n nop\nwrite_line:\n nop"
+    assert len(ks.asm(probe, h.CAVE)[0]) - 2 == h.ENTRY["damage"]
