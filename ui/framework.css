@@ -3118,6 +3118,13 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
   top:4px;
   right:calc(var(--lex-reference-rail-width) + 12px);
 }
+/* A group of flag boxes: each box has its own pin, so the whole field's pin
+   leaves the corner of the last box, where it read as that box's pin (Lexer:
+   "mousing over this property highlights the pin in the very last bool box"),
+   and sits over the copy lane by the label. It shows while the label side is
+   pointed at, not while one box is. */
+.lex-source-control:has(> .lex-detail-parts-switches) > .lex-column-pin { top:-6px; right:auto; left:-22px; }
+.lex-detail-field:has(.lex-detail-parts-switches .lex-toggle:hover) > .lex-detail-field-control > .lex-source-control > .lex-column-pin:not(.pinned) { opacity:0; }
 /* Nothing to show in the rail means nothing to reserve. Reserving it anyway
    left every reference-free field short by the rail width, so no two rows in
    a detail pane ended at the same place. */
