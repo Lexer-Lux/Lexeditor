@@ -150,12 +150,13 @@
     const regions=axis(rules.map(rule=>Number(rule.regionId)),0);
     const grounds=axis(rules.map(rule=>Number(rule.groundId)),1);
     const rows=regions.map(regionId=>({id:regionId,regionId}));
-    const columns=[{key:"regionId",label:"REGION",numberedId:true,sortable:false,
-      render:row=>row.regionId},
-      ...grounds.map(ground=>({key:`ground:${ground}`,label:String(ground),sortable:false,align:"center",
-        render:row=>encounterRuleCell(row.regionId,ground,cells,reachable,refresh)}))];
-    const template=`84px repeat(${Math.max(1,grounds.length)},minmax(46px,1fr))`;
-    return {table:columnList({rows,key:row=>row.id,columns,fill:true,localSort:false,template,
+    const columns=grounds.map(ground=>({key:`ground:${ground}`,label:String(ground),align:"center",
+      render:row=>encounterRuleCell(row.regionId,ground,cells,reachable,refresh)}));
+    const template=`52px repeat(${Math.max(1,grounds.length)},minmax(46px,1fr))`;
+    return {table:LexeditorUI.matrixTable({rows,key:row=>row.id,columns,template,
+      rowAxis:{key:"regionId",label:"REGION",numberedId:true,render:row=>row.regionId,
+        help:"Region code of the world-map cell the player is standing in. Region codes are set on the World tab."},
+      columnAxis:{label:"TERRAIN",help:"Terrain code of the ground the player is standing on. The region and terrain together choose an encounter group."},
       class:"ff8-encounter-rule-table ff8-record-list","aria-label":"Encounter rules by region and ground"}),
       regions,grounds,rules,cells,reachable};
   }
@@ -291,7 +292,7 @@
   }
   const encounterTabs=[
     {id:"formations",label:"Formations",help:"Every battle formation in scene.out: which enemies stand in which of the eight slots, the level they fight at, and the stage and cameras the battle uses."},
-    {id:"rules",label:"Rules",help:"Rows are world-map region codes, and numbered columns are terrain codes. Each cell holds the encounter group used for that region and terrain. Edit the group number to change which battles happen there. Region codes are set on the World tab. The game has a fixed set of rules. A region and terrain pair with no rule cannot be given one here."},
+    {id:"rules",label:"Rules",help:"Each cell holds the encounter group used for that region and terrain. Edit the group number to change which battles happen there. The game has a fixed set of rules. A region and terrain pair with no rule cannot be given one here."},
     {id:"groups",label:"Groups",help:"An encounter group holds eight battle formations; the game picks one of them when a world-map battle starts. Rules choose the group, this page chooses its battles."}];
   function renderEncounters(){
     if(!encounterTabs.some(tab=>tab.id===state.encountersTab))state.encountersTab="formations";

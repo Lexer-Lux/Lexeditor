@@ -2372,6 +2372,27 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
 }
 .lex-column-list.lex-table-fill { flex:1; height:auto; align-self:stretch; grid-template-rows:auto repeat(var(--lex-table-row-count),minmax(32px,1fr)); }
 
+/* Named axes share the table grid so labels and values scroll together. */
+.lex-matrix-table { grid-template-rows:auto auto repeat(var(--lex-table-row-count),max-content); }
+.lex-matrix-table.lex-table-fill { grid-template-rows:auto auto repeat(var(--lex-table-row-count),minmax(32px,1fr)); }
+.lex-matrix-table > .lex-column-list-row,
+.lex-matrix-table > .lex-column-list-header { grid-column:2 / -1; }
+.lex-matrix-table > .lex-column-list-header { grid-row:2; position:static; }
+.lex-matrix-table > .lex-matrix-column-axis { grid-column:3 / -1; grid-row:1; }
+.lex-matrix-column-axis > .lex-column-list-head-cell { grid-column:1 / -1; justify-content:flex-start; }
+.lex-matrix-column-axis .lex-matrix-axis-label { position:sticky; left:0; }
+.lex-matrix-row-axis {
+  grid-column:1; grid-row:2 / -1;
+  display:flex; align-items:center; justify-content:center;
+  padding:6px; border-right:var(--lex-list-header-border, 0);
+  color:var(--lex-list-header-fg, var(--lex-highlight));
+  background:var(--lex-list-header-bg, var(--lex-panel-2));
+  font:var(--lex-list-header-font, inherit);
+}
+.lex-matrix-axis-label { display:inline-flex; align-items:center; justify-content:center; gap:.35em; }
+.lex-matrix-row-axis .lex-matrix-axis-label { flex-direction:column; }
+.lex-matrix-row-axis .lex-matrix-axis-text { writing-mode:vertical-rl; transform:rotate(180deg); }
+
 .lex-column-list-row {
   grid-column: 1 / -1;
   display: grid;

@@ -191,9 +191,23 @@ def main():
         page.wait_for_selector(".ff8-encounter-rule-table", timeout=10000)
         table = page.locator(".ff8-encounter-rule-table")
         headers = [value.strip() for value in
-                   table.locator(".lex-column-list-head-cell").all_inner_texts()]
-        assert headers[0].startswith("REGION"), headers
+                   table.locator(".lex-column-list-header:not(.lex-matrix-column-axis) > .lex-column-list-head-cell").all_inner_texts()]
+        assert headers[0] == "", headers
         assert [value.split("\n")[0].strip() for value in headers[1:]] == ["0", "2"], headers
+        assert table.locator(".lex-matrix-row-axis .lex-matrix-axis-text").inner_text() == "REGION"
+        assert table.locator(".lex-matrix-column-axis .lex-matrix-axis-text").inner_text() == "TERRAIN"
+        assert table.locator(".lex-info-help").count() == 2
+        assert table.locator('[role="rowheader"]').count() == 3
+        axes = table.evaluate("""table => {
+            const row = table.querySelector('.lex-matrix-row-axis').getBoundingClientRect();
+            const column = table.querySelector('.lex-matrix-column-axis').getBoundingClientRect();
+            const first = table.querySelector('.lex-column-list-row [data-column-key="ground:0"]').getBoundingClientRect();
+            return {rowRight:row.right, columnLeft:column.left, columnBottom:column.bottom,
+                    cellLeft:first.left, cellTop:first.top};
+        }""")
+        assert axes['rowRight'] < axes['cellLeft'], axes
+        assert abs(axes['columnLeft'] - axes['cellLeft']) <= 1, axes
+        assert axes['columnBottom'] < axes['cellTop'], axes
         region_column = [value.strip().lstrip("#").strip() for value in table.locator(
             ".lex-column-list-row > [data-column-key='regionId']").all_inner_texts()]
         assert region_column == ["1", "2", "3"], region_column
@@ -208,6 +222,37 @@ def main():
             }""")
             assert abs(bounds["bottom"] - bounds["panelBottom"]) <= 4, bounds
         page.set_viewport_size({"width": 1500, "height": 950})
+
+        # A dense two-axis table must retain alignment while scrolling sideways.
+        page.evaluate("""() => {
+            window.savedRuleRows = state.data.world.rows;
+            state.data.world.rows = [
+                ...state.data.world.rows.filter(row => row.kind !== 'helper'),
+                ...Array.from({length:20 * 32}, (_, id) => ({id, kind:'helper',
+                    regionId:Math.floor(id / 32), groundId:id % 32, encounterGroup:0}))];
+            renderEncounters();
+        }""")
+        page.wait_for_timeout(150)
+        assert table.evaluate("table => table.scrollWidth > table.clientWidth")
+        shot("matrix")
+        table.evaluate("table => { table.scrollLeft = table.scrollWidth; }")
+        alignment = table.evaluate("""table => {
+            const head = table.querySelector('.lex-column-list-head-cell[data-column-key="ground:31"]').getBoundingClientRect();
+            const cell = table.querySelector('.lex-column-list-row [data-column-key="ground:31"]').getBoundingClientRect();
+            return Math.abs(head.left - cell.left) + Math.abs(head.right - cell.right);
+        }""")
+        assert alignment <= 2, alignment
+        axis_visible = table.evaluate("""table => {
+            const label = table.querySelector('.lex-matrix-column-axis .lex-matrix-axis-label').getBoundingClientRect();
+            const panel = table.getBoundingClientRect();
+            return label.left >= panel.left && label.right <= panel.right;
+        }""")
+        assert axis_visible, "the column axis label scrolled out of view"
+        page.evaluate("""() => {
+            state.data.world.rows = window.savedRuleRows;
+            delete window.savedRuleRows;
+            renderEncounters();
+        }""")
 
         # A group finder edits only the chosen rule, then restores Rules.
         page.evaluate("state.activeSource='mine';renderEncounters();shell.refresh()")
