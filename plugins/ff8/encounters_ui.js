@@ -158,7 +158,9 @@
     const rows=regions.map(regionId=>({id:regionId,regionId}));
     const columns=grounds.map(ground=>({key:`ground:${ground}`,label:String(ground),align:"center",
       render:row=>encounterRuleCell(row.regionId,ground,cells,reachable,refresh)}));
-    const template=`52px repeat(${Math.max(1,grounds.length)},minmax(46px,1fr))`;
+    // The region column holds "#000" at the table's own size, 43px of ink:
+    // 52px left it 41.6px once its padding was out, and cut the last digit.
+    const template=`56px repeat(${Math.max(1,grounds.length)},minmax(46px,1fr))`;
     return {table:LexeditorUI.matrixTable({rows,key:row=>row.id,columns,template,
       rowAxis:{key:"regionId",label:"REGION",numberedId:true,render:row=>row.regionId,
         help:"Region code of the world-map cell the player is standing in. Region codes are set on the World tab."},
