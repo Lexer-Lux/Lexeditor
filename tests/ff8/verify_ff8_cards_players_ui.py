@@ -51,21 +51,26 @@ def run(browser_path=None,screenshot=None):
                 assert protected.locator('input[readonly]').input_value() == value
                 assert protected.locator('input:not([readonly]),select,textarea').count() == 0
             assert page.get_by_label('queen_est Rare card chance',exact=True).locator('..').inner_text()=='%'
-            assert page.get_by_label('queen_est card level 1',exact=True).is_checked()
+            # Card levels and rules are the shared switch rows (Lexer: "where are
+            # the bool boxes? ... no pins either").
+            assert page.get_by_label('Level 1',exact=True).is_checked()
+            assert page.locator('.lex-toggle').filter(has_text='Level 1').count()==1
             assert page.locator('.lex-record-card').count()==1
-            page.get_by_label('queen_est card level 2',exact=True).check()
+            page.get_by_label('Level 2',exact=True).check()
             assert page.evaluate('state.data.fields.rows[0].players[0].params[3].value')==3
             page.wait_for_timeout(150)
             bounds=page.evaluate("""() => {
-              const section=document.querySelector('section[aria-label="CARD LEVELS"]');
+              const levels=[...document.querySelectorAll('.lex-toggle')].filter(n=>/^Level/.test(n.textContent.trim()));
               const pool=document.querySelector('section[aria-label="COMMON CARD POOL"]');
-              return {bottom:Math.max(...[...section.querySelectorAll('label')].map(n=>n.getBoundingClientRect().bottom)),top:pool.getBoundingClientRect().top};
+              return {bottom:Math.max(...levels.map(n=>n.getBoundingClientRect().bottom)),top:pool.getBoundingClientRect().top};
             }""")
             assert bounds['bottom']<=bounds['top'],bounds
             if screenshot:page.screenshot(path=screenshot)
-            page.get_by_role('button',name='Open student',exact=True).click()
-            page.get_by_label('student Deck',exact=True).wait_for()
-            page.get_by_role('button',name='Open queen_est',exact=True).click()
+            # The location is the panel's subtitle and opens the field; the
+            # Location and Map file properties are gone (Lexer, 2026-09-27).
+            assert page.locator('.lex-detail-panel-meta, .lex-detail-panel-heading').get_by_role('button',name='Open Balamb',exact=True).count()==1
+            assert page.locator('.lex-detail-field').filter(has_text='Map file').count()==0
+            assert page.locator('.lex-detail-field').filter(has_text='Location').count()==0
             page.get_by_role('button',name='Open Balamb',exact=True).click()
             assert page.evaluate('[lastNavigation,state.selected.fields,state.filters.fields]')==['fields',12,'']
             field.fill('7')
@@ -76,17 +81,16 @@ def run(browser_path=None,screenshot=None):
             assert 'Opponent queen_est' not in page.locator('body').inner_text()
             page.evaluate("state.activeSource='vanilla';cardsUI.render()")
             assert field.is_disabled()
-            assert page.get_by_label('queen_est card level 1',exact=True).is_disabled()
-            # One actor can call CARDGAME from several script branches with
-            # different ownership IDs. Every literal setup contributes links.
+            assert page.get_by_label('Level 1',exact=True).is_disabled()
+            # Which opponents share a deck belongs to the deck, not to each
+            # opponent (Lexer: "remove the 'also uses deck X'").
             page.evaluate("""() => {
               state.data.fields.rows[0].players.push({id:2,entity:'queen_est',params:[
                 {id:0,name:'Deck',value:1,editable:true,mode:'literal'}]});
               cardsUI.render();
             }""")
-            assert page.locator('section[aria-label="ALSO USES DECK 7"]').count() == 1
-            assert page.locator('section[aria-label="ALSO USES DECK 1"]').count() == 1
-            assert page.get_by_role('button', name='Open student', exact=True).count() == 1
+            assert page.locator('.lex-detail-section-title', has_text='ALSO USES DECK').count() == 0
+            assert page.get_by_role('button', name='Open student', exact=True).count() == 0
             page.evaluate("""() => {
               state.activeSource='mine';
               const params=state.data.fields.rows[0].players[0].params;
@@ -94,10 +98,16 @@ def run(browser_path=None,screenshot=None):
               params.push({id:2,name:'Trade rule',mode:'literal',editable:true,value:2});
               cardsUI.render();
             }""")
-            page.get_by_label('queen_est Open', exact=True).check()
+            page.get_by_label('Open', exact=True).check()
             assert page.evaluate('state.data.fields.rows[0].players[0].params.find(p=>p.id===1).value') == 0x121
-            assert page.get_by_label('queen_est Retry (unused)', exact=True).is_checked()
-            assert page.get_by_label('queen_est Retry (unused)', exact=True).is_disabled()
+            assert page.get_by_label('Retry (unused)', exact=True).is_checked()
+            assert page.get_by_label('Retry (unused)', exact=True).is_disabled()
+            # Each rule can be pinned into the players list as a column.
+            page.get_by_role('button', name='Pin Same column', exact=True).click()
+            page.wait_for_function("localStorage.getItem('lexeditor:columns:ff8-card-players')?.includes('rule:1')")
+            page.wait_for_timeout(200)
+            heads = page.evaluate("[...document.querySelectorAll('.ff8-card-players .lex-column-list-cell.lex-column-list-head, .ff8-card-players [role=columnheader]')].map(n=>n.textContent.trim())")
+            assert any(text.startswith('Same') for text in heads), (heads, page.evaluate("localStorage.getItem('lexeditor:columns:ff8-card-players')"), page.get_by_role('button', name='Unpin Same column', exact=True).count())
             page.get_by_label('queen_est Trade rule', exact=True).select_option('3')
             assert page.evaluate('state.data.fields.rows[0].players[0].params.find(p=>p.id===2).value') == 3
             if screenshot:page.screenshot(path=str(Path(screenshot).with_stem('ff8-card-rules')))

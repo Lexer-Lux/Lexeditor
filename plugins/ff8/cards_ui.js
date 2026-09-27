@@ -137,6 +137,34 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       if (state.tab === "cards" && mode === "players") render();
     } finally { playerAreasPolling = false; }
   };
+  const PLAYER_RULES=['Open','Same','Plus','Random','Sudden Death','Retry (unused)','Same Wall','Elemental'];
+  const PLAYER_TRADES=['None','One','Difference','Direct','All'];
+  const PLAYER_SETTING_KEYS=new Set(['trade','rare','levels',...PLAYER_RULES.map((_,bit)=>`rule:${bit}`)]);
+  const playerRuleText=value=>PLAYER_RULES.filter((name,bit)=>bit!==5&&(Number(value)&(1<<bit))).join(', ')||'No rules';
+  const playerTradeText=value=>PLAYER_TRADES[Number(value)&255]??`Unverified (${Number(value)&255})`;
+  const playerLevelText=value=>{const mask=(Number(value)&255)===0?1:Number(value)&127;
+    return Array.from({length:7},(_,level)=>level+1).filter(level=>mask&(1<<(level-1))).join(', ')};
+  // One opponent can have several setups; a column shows each distinct value.
+  const playerSetting=(row,id,format)=>{
+    const map=state.data.fields.rows.find(value=>value.key===row.map);
+    if(!map?._loaded)return '…';
+    const values=[...new Set((map.players||[]).filter(player=>player.entity===row.entity)
+      .map(player=>player.params?.find(param=>param.id===id)).filter(Boolean)
+      .map(param=>param.mode==='literal'?format(param.value):'variable'))];
+    return values.join(' / ')||'—';
+  };
+  const playerColumnDefinitions=()=>[
+    {key:'name',label:'Player',help:'Character name when known, else the game identifier.'},
+    {key:'deck',label:'Deck',help:'The deck number this opponent names, or a dash when the script passes a savemap variable instead of a number.',
+      render:row=>row.deck===undefined?"—":String(row.deck)},
+    ...PLAYER_RULES.flatMap((name,bit)=>bit===5?[]:[{key:`rule:${bit}`,label:name,pinned:false,align:'center',
+      render:row=>{const text=playerSetting(row,1,value=>(Number(value)&(1<<bit))?'yes':'no');
+        return text==='yes'?LexeditorUI.booleanMark(true):text==='no'?LexeditorUI.booleanMark(false):text}}]),
+    {key:'trade',label:'Trade rule',pinned:false,render:row=>playerSetting(row,2,playerTradeText)},
+    {key:'rare',label:'Rare chance',pinned:false,render:row=>playerSetting(row,3,value=>`${value}%`)},
+    {key:'levels',label:'Card levels',pinned:false,render:row=>playerSetting(row,6,playerLevelText)}];
+  let playerColumnPrefs=null;
+  const playerColumns=()=>playerColumnPrefs||=LexeditorUI.columnPreferences('ff8-card-players',playerColumnDefinitions(),()=>render());
   const renderPlayers = () => {
     if (!playerAreas?.ready) {
       if (!playerAreas?.error) loadPlayerAreas();
@@ -173,17 +201,9 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         if(param?.mode==='literal')addDeck(key,param.value);
       }
     }
-    const deckMembers=new Map();
-    for(const entry of groups.values()){
-      for(const deck of deckOfCall.get(entry.key)||[]){
-        if(!deckMembers.has(deck))deckMembers.set(deck,[]);
-        deckMembers.get(deck).push(entry.key);
-      }
-    }
     const players=[...groups.values()].map(entry=>({...entry,
       name:known.get(entry.entity.toLowerCase())||entry.entity,
       deck:deckOfCall.has(entry.key)?[...deckOfCall.get(entry.key)].sort((a,b)=>a-b).join(', '):undefined}));
-    const byKey=new Map(players.map(row=>[row.key,row]));
     const rows=players.filter(row=>`${row.name} ${row.map}`.toLowerCase().includes(query));
     const help=[
       "Identifies this opponent's rare-card ownership. Common cards are chosen from the levels below when a match starts.",
@@ -198,10 +218,13 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       if(!map)return detailPanel({title:entry.name,body:[LexeditorUI.detailNote('Location data is unavailable.')]});
       if(!map._loaded&&!map._loading&&!map._error)
         queueMicrotask(async()=>{await ensureFieldDetail(map);if(state.tab==='cards'&&mode==='players')render()});
-      const body=[detailField({label:'Location',control:LexeditorUI.hoverable({content:map.name,
+      // Where the opponent stands is the panel's subtitle, and it opens that
+      // field (Lexer: "put the location in the subtitle, keep it hoverable").
+      const location=LexeditorUI.hoverable({content:map.name,
         targetType:'fields',targetId:map.id,targetLabel:map.name,
-        activate:()=>{state.selected.fields=map.id;state.filters.fields='';navigate('fields')}})}),
-        detailField({label:'Map file',control:LexeditorUI.readonlyField(map.key)})];
+        activate:()=>{state.selected.fields=map.id;state.filters.fields='';navigate('fields')}});
+      const body=[];
+      const locked=param=>!param.editable||state.activeSource!=='mine';
       if(map._error)body.push(LexeditorUI.detailNote(`Could not load opponent: ${map._error}`));
       else if(!map._loaded)body.push(LexeditorUI.loadingPanel({label:'Loading opponent settings'}));
       else {
@@ -212,46 +235,45 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
               help:infoHelp(help[param.id]),control:LexeditorUI.readonlyField(param.value)});
             const before=state.vanilla?.fields?.rows?.find(row=>row.key===map.key)?.players?.find(row=>row.id===player.id)?.params?.find(row=>row.id===param.id);
             const update=value=>{param.value=Number(value);noteFieldEdit('fields',{field:param.name});shell.refresh()};
+            // Rules and card levels are bits of one argument: the shared
+            // switch row, with boxes, and a pin on each rule so it can be a
+            // column in the list.
             if(param.id===1&&param.mode==='literal'){
-              const names=['Open','Same','Plus','Random','Sudden Death','Retry (unused)','Same Wall','Elemental'];
-              return detailSection({title:'RULES',help:infoHelp(help[1]),body:LexeditorUI.tileGrid(names.map((name,bit)=>{
-                const input=el('input',{type:'checkbox',checked:!!(param.value&(1<<bit)),
-                  disabled:bit===5||!param.editable||state.activeSource!=='mine',
-                  'aria-label':`${entry.name} ${name}`,
-                  onchange:event=>update(event.target.checked?param.value|(1<<bit):param.value&~(1<<bit))});
-                return el('label',{},input,name);
-              }),{minWidth:140})});
+              const switches=LexeditorUI.toggleRow({label:'Rules',value:()=>param.value,toggles:PLAYER_RULES.map((name,bit)=>({
+                key:String(bit),label:name,checked:!!(param.value&(1<<bit)),disabled:bit===5||locked(param),
+                pin:bit===5?null:playerColumns().pinButton(`rule:${bit}`,name),
+                change:checked=>{update(checked?param.value|(1<<bit):param.value&~(1<<bit));render()}}))});
+              return detailField({label:'Rules',help:infoHelp(help[1]),
+                control:sourceControl(switches,()=>param.value,before?.value,[],value=>{update(value);render()},playerRuleText)});
             }
             if(param.id===2&&param.mode==='literal'){
-              const current=param.value&255,names=['None','One','Difference','Direct','All'];
-              const choices=names.map((name,value)=>({name,value}));
-              if(current>=names.length)choices.push({name:`Unverified (${current})`,value:current});
+              const current=param.value&255;
+              const choices=PLAYER_TRADES.map((name,value)=>({name,value}));
+              if(current>=PLAYER_TRADES.length)choices.push({name:`Unverified (${current})`,value:current});
               const input=selectControl(current,choices,value=>update((param.value&~255)|Number(value)));
               input.setAttribute('aria-label',`${entry.name} Trade rule`);
-              input.disabled=!param.editable||state.activeSource!=='mine';
-              return detailField({label:'Trade rule',help:infoHelp(help[2]),control:input});
+              input.disabled=locked(param);
+              return detailField({label:'Trade rule',help:infoHelp(help[2]),pin:playerColumns().pinButton('trade','Trade rule'),
+                control:sourceControl(input,()=>param.value&255,before===undefined?undefined:before.value&255,[],value=>{update((param.value&~255)|Number(value));render()},playerTradeText)});
             }
             if(param.id===6&&param.mode==='literal'){
-              const levels=Array.from({length:7},(_,level)=>{
-                const check=el('input',{type:'checkbox',checked:!!(param.value&(1<<level)),
-                  disabled:!param.editable||state.activeSource!=='mine',
-                  'aria-label':`${entry.name} card level ${level+1}`,
-                  onchange:event=>{
-                    const next=event.target.checked?param.value|(1<<level):param.value&~(1<<level);
-                    // Bit 7 alone supplies no level and does not take the
-                    // game's zero-byte fallback. Preserve it without making
-                    // the native generator divide by an empty level count.
-                    if((next&255)===128){event.target.checked=true;return}
-                    update(next);render();}});
-                return el('label',{},check,`Level ${level+1}`);
-              });
-              return detailSection({title:'CARD LEVELS',help:infoHelp(help[6]),
-                body:LexeditorUI.tileGrid(levels,{minWidth:100})});
+              const switches=LexeditorUI.toggleRow({label:'Card levels',value:()=>param.value,toggles:Array.from({length:7},(_,level)=>({
+                key:String(level),label:`Level ${level+1}`,checked:!!(param.value&(1<<level)),disabled:locked(param),
+                change:checked=>{
+                  const next=checked?param.value|(1<<level):param.value&~(1<<level);
+                  // Bit 7 alone supplies no level and does not take the
+                  // game's zero-byte fallback. Preserve it without making
+                  // the native generator divide by an empty level count.
+                  if((next&255)===128){render();return}
+                  update(next);render();}}))});
+              return detailField({label:'Card levels',help:infoHelp(help[6]),pin:playerColumns().pinButton('levels','Card levels'),
+                control:sourceControl(switches,()=>param.value,before?.value,[],value=>{update(value);render()},playerLevelText)});
             }
             const variable=param.mode==='variable',maximum=!variable&&param.id===3?100:0xFFFFFF;
             const input=numberControl(param.value,0,maximum,1,update,{'aria-label':`${entry.name} ${param.name}`});
-            input.disabled=!param.editable||state.activeSource!=='mine';
+            input.disabled=locked(param);
             return detailField({label:param.name+(variable?' variable':''),dataType:'INT',min:0,max:maximum,
+              pin:!variable&&param.id===3?playerColumns().pinButton('rare','Rare chance'):null,
               help:infoHelp(help[param.id]+(variable?' Holds a game-variable reference; changing it selects a different variable.':'')),
               control:sourceControl(!variable&&param.id===3?LexeditorUI.unitField(input,'%'):input,()=>param.value,before?.value,[],update)});
           });
@@ -270,32 +292,21 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
                 image:el('img',{src:`/assets/cards/${card.id}.png`,alt:card.name,loading:'lazy'})})),{balanced:true,minWidth:110})}));
           }
         });
-        // Which other opponents play the same deck. Editing a deck means
-        // editing every script that names it, and no other screen shows that.
-        for(const deck of deckOfCall.get(entry.key)||[]){
-          const others=(deckMembers.get(deck)||[]).filter(key=>key!==entry.key)
-            .map(key=>byKey.get(key)).filter(Boolean);
-          body.push(detailSection({title:`ALSO USES DECK ${deck}`,
-            help:infoHelp('These opponents share the same rare-card ownership number. Their common-card levels can differ. Open an opponent to edit its settings.'),
-            body:others.length
-              ?LexeditorUI.stack({fill:false},...others.map(other=>
-                  LexeditorUI.hoverable({content:`${other.name} · ${other.map}`,
-                    targetType:'card-players',targetId:other.key,targetLabel:other.name,
-                    activate:()=>{playerView.selected=other.key;playerView.query='';playerView.page=0;render()}})))
-              :LexeditorUI.detailNote(`No other CARDGAME call in the game data names deck ${deck}.`)}));
-        }
       }
-      return detailPanel({title:entry.name,body});
+      return detailPanel({title:entry.name,meta:location,body});
     };
     return LexeditorUI.pagedListDetail({rows,key:row=>row.key,selected:playerView.selected,
       page:playerView.page,pageSize:40,noun:'players',maxBarrels:1,slots:true,addDisabledReason:'Card players are the people the game places in its world; each is fixed by the game and a new one has nowhere to stand.',fit:{minRowHeight:28},
       className:'ff8-card-players',splitKey:'ff8-card-players',rowsKey:'ff8-card-players',
       search:{key:'ff8-card-players',value:playerView.query,label:'Search card players',change:value=>{playerView.query=value;playerView.page=0;render()}},
       sync:next=>Object.assign(playerView,next),change:next=>{Object.assign(playerView,next);render()},
-      master:({rows,selected,select})=>columnList({rows,key:row=>row.key,selected,select,
-        columns:[{key:'name',label:'Player',help:'Character name when known, else the game identifier.'},
-          {key:'deck',label:'Deck',help:'The deck number this opponent names, or a dash when the script passes a savemap variable instead of a number.',
-            render:row=>row.deck===undefined?"—":String(row.deck)}]}),detail,
+      master:({rows,selected,select})=>{
+        // A pinned setting is read from the opponent's area, so the visible
+        // rows' areas load once something is pinned.
+        if(playerColumns().active().some(column=>PLAYER_SETTING_KEYS.has(column.key)))
+          for(const row of rows){const map=state.data.fields.rows.find(value=>value.key===row.map);
+            if(map&&!map._loaded&&!map._loading&&!map._error)queueMicrotask(async()=>{await ensureFieldDetail(map);if(state.tab==='cards'&&mode==='players')render()})}
+        return columnList({rows,key:row=>row.key,selected,select,columns:playerColumnDefinitions(),columnPreferences:playerColumns()})},detail,
       emptyDetail:()=>detailPanel({title:'Card players',body:[LexeditorUI.detailNote('No players match this search.')]})});
   };
   render = () => {

@@ -57,16 +57,10 @@ def main():
   control.fill('201')
   styles=control.evaluate('e=>{const s=getComputedStyle(e);return [s.color,s.backgroundColor]}')
   assert styles[0]!='rgb(0, 0, 0)' and styles[1]!='rgb(255, 255, 255)',styles
-  # Which other opponents name the same deck, and a way to reach each one.
-  # The section title carries its own question-mark bubble, so match the
-  # heading's own text rather than the element's whole text.
-  assert page.locator('.lex-detail-section-title',
-                      has_text='ALSO USES DECK 201').count()==1
-  other=page.get_by_role('button',name='Open Teacher',exact=True)
-  assert other.count()==1, 'the other opponent using deck 201 is not offered'
-  other.click()
-  page.wait_for_timeout(100)
-  assert page.locator('.lex-detail-panel').first.inner_text().find('Teacher')>=0
+  # Which opponents share a deck belongs to the deck, not to each opponent
+  # (Lexer, 2026-09-27: "remove the 'also uses deck X'").
+  assert page.locator('.lex-detail-section-title',has_text='ALSO USES DECK').count()==0
+  assert page.get_by_role('button',name='Open Teacher',exact=True).count()==0
   import tempfile
   page.wait_for_timeout(200)
   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-ff8-players.png'))
