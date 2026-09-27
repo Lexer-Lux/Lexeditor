@@ -374,7 +374,11 @@
       evaluate:level=>gfCurveValue("XP",fields,level),
       formula:coloredCurveFormula("XP(L) = 10 * L * A + floor(L^2 * B / 256)")}));
     if(!cards.length)return null;
-    return LexeditorUI.curveGrid({columns:1},...cards);
+    // One graph a page, like an enemy's stat graphs (Lexer: GF Leveling
+    // should be paged like the Enemies one, not stacked).
+    const index=Math.max(0,Math.min(cards.length-1,state.gfLevelPage||0));
+    return LexeditorUI.pagedPane(cards[index],pager({inline:true,page:index,pages:cards.length,pageSize:1,
+      total:cards.length,noun:"graphs",change:value=>{state.gfLevelPage=value;renderGFs()}}));
   }
   function characterDetail(row){
     const visible=row.fields.filter(field=>field.field!=="gender"&&field.name!=="gender"&&field.label!=="Gender"),growth=visible.filter(field=>field.group==="Stat coefficients"),exp=visible.filter(field=>["exp_linear","exp_quadratic"].includes(field.field)),other=visible.filter(field=>field.group!=="Stat coefficients"&&!exp.includes(field));
