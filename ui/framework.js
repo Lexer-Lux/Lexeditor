@@ -1298,7 +1298,9 @@
       // A table cell's value is the table's text: it may shrink to fit a
       // narrow column but never grows past the rows around it, which a box
       // the height of the row otherwise invited.
-      const maximum = control instanceof HTMLTextAreaElement || control.closest(".lex-column-list")
+      // An instruction step reads the same way: a short opcode such as "If"
+      // must not tower over the operands beside it.
+      const maximum = control instanceof HTMLTextAreaElement || control.closest(".lex-column-list, .lex-instruction-controls")
         ? Number.parseFloat(style.fontSize) || 16
         : Math.max(minimum,Math.min(28,control.clientHeight*.78));
       const horizontal = (Number.parseFloat(style.paddingLeft) || 0) +
