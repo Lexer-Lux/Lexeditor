@@ -50,6 +50,23 @@ def main() -> int:
                   const field=state.data.fields.rows.find(entry=>Number(entry.mapId)===Number(row.fieldId));
                   return field?field.name:''}""")
                 assert named and named in page.locator(".ff8-record-list .lex-list-row").first.inner_text(), named
+                # The detail is the entry's arrival in the field: the field's
+                # name as a link on top, and its picture with the point drawn
+                # (Lexer, 2026-09-27).
+                title = page.locator(".world-to-field .lex-detail-panel-title .lex-hoverable[data-hover-target-type='fields']")
+                assert title.inner_text().strip() == named, title.inner_text()
+                page.wait_for_function(
+                    "()=>{const s=document.querySelector('.world-to-field-picture');"
+                    "return s&&s.style.visibility!=='hidden'&&s.querySelector('img').naturalWidth>0}", timeout=120000)
+                marked = page.evaluate(
+                    "()=>{const c=document.querySelector('.world-to-field-picture canvas');"
+                    "const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;"
+                    "for(let i=3;i<d.length;i+=4)if(d[i])return true;return false}")
+                assert marked, "the arrival point is not drawn"
+                bound = page.evaluate("()=>document.querySelector('input[aria-label=\"World to field 0 Z\"]').max")
+                triangles = page.evaluate(
+                    "name=>state.data.fields.rows.find(r=>r.name===name).walkmesh.triangles.length", named)
+                assert int(bound) == triangles - 1, (bound, triangles)
                 x_field = page.locator('input[aria-label="World to field 0 X"]')
                 field_field = page.locator('input[aria-label="World to field 0 field ID"]')
                 before = api(session.url, "/api/wm2field?dataset=current")["rows"]

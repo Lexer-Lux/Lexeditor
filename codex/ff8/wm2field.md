@@ -1,9 +1,10 @@
 # World to field (wm2field.tbl)
 
-`wm2field.tbl` is the other half of the field-to-world table: where a position
-on the world map sends the player, one field ID per place. The plugin already
-had the field-to-world direction (wmset section 9); this is the world-to-field
-direction the editability audit listed as missing.
+`wm2field.tbl` is the other half of the field-to-world table: when the player
+enters a field from the world map, the field and the point inside it where they
+arrive. The plugin already had the field-to-world direction (wmset section 9);
+this is the world-to-field direction the editability audit listed as missing.
+It stores no world-map position.
 
 ## Where it lives
 
@@ -18,9 +19,9 @@ FFNx direct tree as `direct/wm2field.tbl`.
 
 | Offset | Size | Meaning |
 | --- | --- | --- |
-| 0 | signed 16-bit | X |
-| 2 | signed 16-bit | Y |
-| 4 | unsigned 16-bit | Z |
+| 0 | signed 16-bit | X in the field, walkmesh units |
+| 2 | signed 16-bit | Y in the field, walkmesh units |
+| 4 | unsigned 16-bit | walkmesh triangle under X and Y |
 | 6 | unsigned 16-bit | field ID |
 | 8 | 1 byte | one more value, unnamed here |
 | 9 | 15 bytes | preserved, meaning not established |
@@ -30,13 +31,23 @@ at offsets 0 and 2 are the only ones wider than a field ID (the widest is
 10,215 while every ID stays under 1,200), and every ID falls in the range the
 field archive uses. 67 of the 72 entries carry a distinct field ID.
 
+## X, Y and the triangle are a point in the field
+
+For all 72 entries, (X, Y) lies inside walkmesh triangle number Z of the
+field the entry names (the `.id` file in that field's archive folder).
+`tests/ff8/verify_ff8_wm2field_arrival.py` checks every entry. The earlier
+reading of these words as a world-map position was wrong: world positions
+in wmset run to tens of thousands of units, and these values fit each
+field's own walkmesh.
+
 ## What the other tool adds
 
 Rinoa's Toolset reads the same table (`SerahToolkit_SharpGL/wm2field.cs`, 72
 entries of 24 bytes, signed X, signed Y, unsigned Z, unsigned field ID, one
 byte at offset 8, then twelve bytes it does not name) and records that the game
-multiplies the stored X and Y by 4096 before comparing them (`shl ecx, 0Ch`).
-That scale is quoted from that tool, not measured here, and the page says so.
+multiplies the stored X and Y by 4096 (`shl ecx, 0Ch`). That scale is quoted
+from that tool, not measured here; it fits the fixed-point field coordinates
+the walkmesh check above implies.
 
 ## Evidence for the writer
 
@@ -51,6 +62,7 @@ ID and a truncated file.
 ## What is not claimed
 
 What the byte at offset 8 means, what the fifteen tail bytes hold, and how the
-game selects an entry from a standing position are not established here. The
+game chooses which entry to use when the player enters a field are not
+established here. The
 table is edited as the game's own world-to-field list, with those bytes
 preserved rather than guessed at.

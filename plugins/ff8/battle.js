@@ -141,9 +141,9 @@
       y:"Y coordinate for this record. Changing it moves the stored world position.",
       z:"Z coordinate for this record. Changing it moves the stored world position."},
     worldToField:{
-      x:"Signed stored X of the world position this entry answers to. It is a small number because the game multiplies it by 4096 before comparing - that scale is recorded from Rinoa's Toolset, not measured here.",
-      y:"Signed stored Y of that same position. X, Y and Z are stored in that order.",
-      z:"Unsigned stored Z of that position.",
+      x:"Where the player appears in the field, in the field's walkmesh units. Changing it moves the arrival point.",
+      y:"Where the player appears in the field, on the walkmesh's other ground axis. Changing it moves the arrival point.",
+      z:"The walkmesh triangle the player starts on. In every entry of the game it is the triangle under X and Y, so keep them together.",
       fieldId:"ID of the field the game loads from this position. The Field page lists the same IDs, so compare an entry against that list before changing it."},
     drawPoint:{
       drawId:"Identifier of this world draw point.",
@@ -361,17 +361,73 @@
       referenceValues("wm2field",row.id,value=>value?.[key]),value=>{row[key]=Number(value);rebuild()},
       value=>formatNumber(value));
   }
+  // The table stores where the player arrives inside the field: X and Y on
+  // the field's walkmesh and the triangle under them (all 72 entries fall in
+  // their own triangle; codex/ff8/wm2field.md). The picture is the field's
+  // own background with that point on it.
+  const worldToFieldPictures=new Map();
+  function worldToFieldHeight(triangle,x,y){
+    const [a,b,c]=triangle.vertices,det=(b.y-c.y)*(a.x-c.x)+(c.x-b.x)*(a.y-c.y);
+    if(!det)return (a.z+b.z+c.z)/3;
+    const u=((b.y-c.y)*(x-c.x)+(c.x-b.x)*(y-c.y))/det,v=((c.y-a.y)*(x-c.x)+(a.x-c.x)*(y-c.y))/det;
+    return u*a.z+v*b.z+(1-u-v)*c.z;
+  }
+  function drawWorldToFieldPoint(row,field,canvas,geometry){
+    const ctx=canvas.getContext("2d");if(!ctx||!geometry)return;
+    canvas.width=geometry.width;canvas.height=geometry.height;
+    const camera=field.camera?.cameras?.[0],triangle=field.walkmesh?.triangles?.find(entry=>entry.id===Number(row.z));
+    if(!camera)return;
+    const at=vertex=>{const projected=fieldProject(camera,vertex);return projected&&{x:projected.x+geometry.left,y:projected.y+geometry.top}};
+    if(triangle){const corners=triangle.vertices.map(at);if(corners.every(Boolean)){
+      ctx.beginPath();corners.forEach((point,index)=>ctx[index?"lineTo":"moveTo"](point.x,point.y));ctx.closePath();
+      ctx.fillStyle="rgba(255,144,0,.3)";ctx.fill();ctx.strokeStyle="#ff9000";ctx.lineWidth=2;ctx.stroke()}}
+    const z=triangle?worldToFieldHeight(triangle,Number(row.x),Number(row.y)):0,point=at({x:Number(row.x),y:Number(row.y),z});
+    if(!point)return;
+    ctx.save();ctx.shadowColor="#ff4040";ctx.shadowBlur=10;ctx.beginPath();ctx.arc(point.x,point.y,6,0,Math.PI*2);
+    ctx.fillStyle="#ff4040";ctx.fill();ctx.lineWidth=2;ctx.strokeStyle="#ffffff";ctx.stroke();ctx.restore();
+  }
+  function worldToFieldPicture(row,field){
+    if(!field)return LexeditorUI.noImage();
+    const image=el("img",{class:"field-background-image lex-overlay-base",alt:`${field.name} background`}),
+      canvas=el("canvas",{class:"field-overlay-canvas lex-overlay-layer","aria-hidden":"true"}),
+      stack=el("div",{class:"field-preview-stack lex-overlay-stack world-to-field-picture",style:"visibility:hidden"},image,canvas);
+    const dataset=state.activeSource==="mine"?"current":state.activeSource,cacheKey=`${dataset}:${field.key}`;
+    const show=picture=>{image.onload=()=>{stack.style.visibility=""};image.src=picture.url;drawWorldToFieldPoint(row,field,canvas,picture.geometry)};
+    (async()=>{
+      // The walkmesh arrives with the field (a read another page started is
+      // awaited too); render again so the triangle control takes its real
+      // upper bound.
+      if(!field._loaded){await ensureFieldDetail(field);
+        for(let wait=0;field._loading&&wait<600;wait++)await new Promise(resolve=>setTimeout(resolve,100));
+        if(!stack.isConnected)return;
+        if(field._loaded&&state.worldTab==="worldToField"){renderWorldMap();return}}
+      if(field._error||!field.background?.tiles?.length){stack.replaceWith(LexeditorUI.noImage());return}
+      let picture=worldToFieldPictures.get(cacheKey);
+      if(!picture){
+        const view=fieldBackgroundPreviewState(field),states=view.states.map(value=>{const [parameter,stateValue]=value.split(":").map(Number);return{parameter,state:stateValue}});
+        const [response,geometry]=await Promise.all([fetch("/api/field/background-preview",post({map:field.key,dataset,edits:[],activeStates:states,enabledLayers:view.layers,hideBackground:false})),
+          api("/api/field/background-geometry",post({map:field.key,dataset,edits:[]})).catch(()=>null)]);
+        if(!response.ok){stack.replaceWith(LexeditorUI.noImage());return}
+        picture={url:URL.createObjectURL(await response.blob()),geometry};
+        worldToFieldPictures.set(cacheKey,picture);
+      }
+      show(picture);
+    })().catch(error=>{console.warn("world-to-field picture",error);stack.replaceWith(LexeditorUI.noImage())});
+    return stack;
+  }
   function worldToFieldDetail(row,prefs){
     const field=state.data.fields.rows.find(entry=>Number(entry.mapId)===Number(row.fieldId));
-    return sharedDetail({...row,name:`WORLD TO FIELD ${row.id}`},prefs,[
-      detailSection({title:"WORLD POSITION",help:infoHelp("Where the player must stand on the world map for this entry to take them into a field."),body:[
-        detailField({label:"X",help:infoHelp(worldPropertyHelp.worldToField.x),control:worldToFieldNumber(row,"x",`World to field ${row.id} X`,-32768,32767)}),
-        detailField({label:"Y",help:infoHelp(worldPropertyHelp.worldToField.y),control:worldToFieldNumber(row,"y",`World to field ${row.id} Y`,-32768,32767)}),
-        detailField({label:"Z",help:infoHelp(worldPropertyHelp.worldToField.z),control:worldToFieldNumber(row,"z",`World to field ${row.id} Z`,0,65535)})]}),
-      detailSection({title:"FIELD",help:infoHelp("The field this position loads. The game's own code decides when to use this table; test a change in the game before relying on it."),body:[
-        detailField({label:"FIELD ID",help:infoHelp(worldPropertyHelp.worldToField.fieldId),control:worldToFieldNumber(row,"fieldId",`World to field ${row.id} field ID`,0,65535)}),
-        detailField({label:"FIELD",help:infoHelp("The field with this ID, named from the Field page's own list."),control:readonlyField(field?`${field.mapId} · ${field.name}`:"No field with this ID is in the list")}),
-        detailField({label:"PRESERVED",help:infoHelp("What these values do is not known. They stay exactly as stored."),control:readonlyField(`1 byte · ${wm2fieldReserved} bytes, preserved`)})]})],
+    const triangles=field?._loaded?field.walkmesh?.triangles?.length:0;
+    const title=field?hoverable({content:field.name,targetType:"fields",targetId:field.id,targetLabel:field.name,
+      activate:()=>{state.selected.fields=field.id;state.filters.fields="";navigate("fields")}}):`Field ${row.fieldId}`;
+    return sharedDetail({...row,name:field?.name||`Field ${row.fieldId}`,titleContent:title},prefs,[
+      detailSection({title:"ARRIVAL IN THE FIELD",help:infoHelp("Where the player appears in the field when this entry takes them in from the world map. The picture marks the point and its walkmesh triangle."),body:[
+        LexeditorUI.tileGrid([worldToFieldPicture(row,field),LexeditorUI.stack({fill:false},
+          detailField({label:"X",help:infoHelp(worldPropertyHelp.worldToField.x),control:worldToFieldNumber(row,"x",`World to field ${row.id} X`,-32768,32767)}),
+          detailField({label:"Y",help:infoHelp(worldPropertyHelp.worldToField.y),control:worldToFieldNumber(row,"y",`World to field ${row.id} Y`,-32768,32767)}),
+          detailField({label:"TRIANGLE",help:infoHelp(worldPropertyHelp.worldToField.z),control:worldToFieldNumber(row,"z",`World to field ${row.id} Z`,0,triangles?triangles-1:65535)}),
+          detailField({label:"FIELD ID",help:infoHelp(worldPropertyHelp.worldToField.fieldId),control:worldToFieldNumber(row,"fieldId",`World to field ${row.id} field ID`,0,65535)}),
+          detailField({label:"PRESERVED",help:infoHelp("What these values do is not known. They stay exactly as stored."),control:readonlyField(`1 byte · ${wm2fieldReserved} bytes, preserved`)}))],{columns:2,minWidth:300})]})],
       "world-map-detail world-to-field");
   }
   const wm2fieldReserved=15;
@@ -382,16 +438,16 @@
       visible=[...matching].sort((left,right)=>sortDirection*String(rowSortValue(left,sortKey)).localeCompare(String(rowSortValue(right,sortKey)),undefined,{numeric:true,sensitivity:"base"}));
     delete state.columnPrefs.wm2field;
     return showPaged("wm2field",visible,[
-      {key:"id",label:"ENTRY",help:"Index of this entry in the table. The game matches the stored position against these entries."},
+      {key:"id",label:"ENTRY"},
       {key:"fieldId",label:"FIELD",help:worldPropertyHelp.worldToField.fieldId,render:row=>worldToFieldName(row.fieldId)},
       {key:"x",label:"X",help:worldPropertyHelp.worldToField.x},
       {key:"y",label:"Y",help:worldPropertyHelp.worldToField.y},
-      {key:"z",label:"Z",help:worldPropertyHelp.worldToField.z}],
+      {key:"z",label:"TRIANGLE",help:worldPropertyHelp.worldToField.z}],
       worldToFieldDetail,"74px minmax(150px,1fr) repeat(3,minmax(70px,1fr))",
       {noun:"world to field entries"},false);
   }
   function renderWorldMapContent(mount=true){
-    const tabsData=[{id:"map",label:"Map",help:"The world map, and nothing else on the panel. Click a cell to inspect its terrain geometry and its region code, or a red dot to inspect a draw point; the corner shows what the pointer is over. Each panel's title opens the page that owns it. Scroll to zoom, drag with the middle mouse button to pan, and double-click to fit the map."},{id:"regions",label:"Regions",help:"The same world-map cells the Map page shows, listed for the region code each one carries. The rules table on the Encounters tab matches that code with the ground type to choose a battle group. Changing a code can change which battles occur there."},{id:"fieldReturns",label:"Field → World",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"worldToField",label:"World → Field",help:"Where each stored world position sends the player: 72 entries of X, Y, Z and a field ID, in the game's own wm2field table. Choose the same field ID the Field page lists. How the game selects an entry from a standing position is not established, so test a change in the game."},{id:"drawPoints",label:"Draw Points",help:"Move world draw points. Click the placement grid or edit the packed position bytes. What a draw point gives - its spell, whether it refills and whether it draws a high yield - is stored in FF8_EN.exe, not in this file, so this page changes only where the point is."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
+    const tabsData=[{id:"map",label:"Map",help:"The world map, and nothing else on the panel. Click a cell to inspect its terrain geometry and its region code, or a red dot to inspect a draw point; the corner shows what the pointer is over. Each panel's title opens the page that owns it. Scroll to zoom, drag with the middle mouse button to pan, and double-click to fit the map."},{id:"regions",label:"Regions",help:"The same world-map cells the Map page shows, listed for the region code each one carries. The rules table on the Encounters tab matches that code with the ground type to choose a battle group. Changing a code can change which battles occur there."},{id:"fieldReturns",label:"Field → World",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"worldToField",label:"World → Field",help:"Where the player arrives in a field when they enter it from the world map: the field, and the point and walkmesh triangle they start on. The table does not store a world-map position; which entry the game uses is decided by its own code, so test a change in the game."},{id:"drawPoints",label:"Draw Points",help:"Move world draw points. Click the placement grid or edit the packed position bytes. What a draw point gives - its spell, whether it refills and whether it draws a high yield - is stored in FF8_EN.exe, not in this file, so this page changes only where the point is."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
     if(state.worldTab==="map"){const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;return wrap(renderWorldVisual())}
     if(state.worldTab==="worldToField")return wrap(renderWorldToField());
     const kind={regions:"region",fieldReturns:"fieldReturn",drawPoints:"drawPoint",skyColors:"skyColor",rails:"railTrack",textures:"worldTexture"}[state.worldTab],rows=state.data.world.rows.filter(row=>row.kind===kind),query=state.filters.world.trim().toLocaleLowerCase(),matching=rows.filter(row=>!query||JSON.stringify(row).toLocaleLowerCase().includes(query)),[sortKey,sortDirection]=state.sorts.world,visible=[...matching].sort((left,right)=>sortDirection*String(rowSortValue(left,sortKey)).localeCompare(String(rowSortValue(right,sortKey)),undefined,{numeric:true,sensitivity:"base"}));
