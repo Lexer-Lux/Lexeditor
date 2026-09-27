@@ -22,10 +22,13 @@ def mount_field_detail(page, deling):
         return LexeditorUI.imageMap({media:el('div',{class:'lex-overlay-stack'},image,overlay)});
       }
       function fieldDetailSubtab(row,active){return el('input',{'aria-label':active,type:'number',value:1});}
+      // The preview's camera/layer controls have their own focused check.
+      // This fixture isolates the outer preview-versus-editor arrangement.
+      function fieldBackgroundPanels(row,preview){return preview;}
       function rerenderFields(){document.querySelector('main').replaceChildren(fieldDetail(row));}
     ''' % ('true' if deling else 'false')+detail+'rerenderFields();')
     # The shared sheet places a picture panel's help pip in its corner.
-    page.add_style_tag(content='main {height:700px;width:950px;display:flex;}')
+    page.add_style_tag(content='main {height:700px;width:1500px;display:flex;}')
 
 
 def check_every_tab(page, placed):

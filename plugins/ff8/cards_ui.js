@@ -192,7 +192,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       "Percentage chance, from 0 to 100, that this opponent uses an available rare card.",
       "The gameplay effect of this argument has not been verified. Its original value is retained.",
       "The gameplay effect of this argument has not been verified. Its original value is retained.",
-      "Choose the levels this opponent can draw common cards from. With no levels selected, the game uses level 1. Rare cards depend on ownership in your save."];
+      "Choose common-card levels. No selection uses level 1. Rare cards depend on ownership in your save."];
     const detail=entry=>{
       const map=state.data.fields.rows.find(row=>row.key===entry.map);
       if(!map)return detailPanel({title:entry.name,body:[LexeditorUI.detailNote('Location data is unavailable.')]});
