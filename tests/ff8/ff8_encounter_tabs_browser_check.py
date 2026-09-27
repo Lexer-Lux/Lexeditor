@@ -154,6 +154,17 @@ def text_of(locator):
     return " ".join(locator.all_inner_texts())
 
 
+def check_finder_icon(button):
+    bounds = button.evaluate("""button => {
+        const box = button.getBoundingClientRect();
+        const icon = button.querySelector('svg').getBoundingClientRect();
+        return {width:icon.width, height:icon.height,
+                inside:icon.left >= box.left && icon.right <= box.right &&
+                       icon.top >= box.top && icon.bottom <= box.bottom};
+    }""")
+    assert bounds['width'] >= 12 and bounds['height'] >= 12 and bounds['inside'], bounds
+
+
 def main():
     failures = []
     shots = Path(tempfile.gettempdir()) / "lexeditor-dev"
@@ -305,6 +316,18 @@ def main():
         empty = preview.locator('[data-lex-empty-position]').first
         assert empty.locator('.lex-record-card-title').inner_text() == 'Empty'
         assert empty.locator('.lex-record-card-body').count() == 0
+        rows.first.locator('.lex-record-card').first.hover()
+        page.wait_for_timeout(200)
+        check_finder_icon(rows.first.get_by_label('Choose enemy for formation 2 slot 1', exact=True))
+        shot('enemy-finder')
+        choice = rows.first.locator('.ff8-encounter-formation-choice')
+        choice.hover()
+        page.wait_for_timeout(200)
+        check_finder_icon(choice.locator('.ff8-encounter-formation-finder'))
+        assert choice.evaluate("""choice =>
+            choice.querySelector('.ff8-encounter-formation-link').getBoundingClientRect().right <=
+            choice.querySelector('.ff8-encounter-formation-finder').getBoundingClientRect().left""")
+        shot('formation-finder')
         shot('rules')
         page.evaluate("state.encountersTab='groups';state.selected.encounterGroups=2;renderEncounters()")
         page.wait_for_selector('.ff8-encounter-group-detail')

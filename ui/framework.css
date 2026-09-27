@@ -4255,8 +4255,10 @@ body:has(.lex-data-map-table) #main {
 .lex-paged-pane-content > .lex-curve-editor > .lex-curve-plot { flex:1; min-height:0; }
 .lex-paged-pane-content > .lex-curve-editor .lex-curve-svg { height:100%; aspect-ratio:auto; }
 .lex-choice-field { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px; width:100%; min-width:0; }
-.lex-choice-field > button:last-child { display:grid; place-items:center; width:1.8em; min-width:1.8em; min-height:1.6em; padding:2px; font:inherit; color:var(--lex-text); background:var(--lex-input-bg,var(--lex-panel-2)); border:var(--lex-input-border,1px solid var(--lex-border)); border-color:var(--lex-input-border-color,var(--lex-border)); }
-.lex-choice-field > button svg { width:1em; height:1em; }
+.lex-choice-field > button:last-child,
+.lex-record-card-action > button { display:grid; place-items:center; width:1.8em; min-width:1.8em; min-height:1.6em; padding:2px; font:inherit; color:var(--lex-text); background:var(--lex-input-bg,var(--lex-panel-2)); border:var(--lex-input-border,1px solid var(--lex-border)); border-color:var(--lex-input-border-color,var(--lex-border)); }
+.lex-choice-field > button svg,
+.lex-record-card-action > button svg { width:1em; height:1em; }
 /* ---- Paged panes and graph grids --------------------------------------- */
 .lex-paged-pane { display:grid; grid-template-rows:minmax(0,1fr) auto; min-height:0; overflow:hidden; gap:var(--lex-panel-gap); }
 .lex-paged-pane-content { min-width:0; min-height:0; overflow:auto; }
