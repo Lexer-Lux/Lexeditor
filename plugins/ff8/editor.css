@@ -186,3 +186,9 @@
 .lex-overlay-stack.world-to-field-picture>.lex-overlay-base{width:100%}
 /* A cell's records in its World panel: one link each, wrapping. */
 .world-cell-links{display:flex;flex-wrap:wrap;gap:4px 12px;min-width:0}
+/* Field picture: layer filters down its left side, state filters down its right,
+   inside the one picture panel. */
+.field-preview-sides{display:grid;grid-template-columns:minmax(96px,max-content) minmax(0,1fr) minmax(110px,max-content);gap:8px;height:100%;min-height:0;min-width:0}
+.field-preview-sides>.field-preview-layers,.field-preview-sides>.field-preview-states{min-height:0;overflow:auto;align-self:start}
+/* The panel title and help overlay the top of the panel; the side filters start below them. */
+.field-preview-sides>.field-preview-layers,.field-preview-sides>.field-preview-states{padding-top:calc(var(--lex-detail-title-size,clamp(21px,2.5vw,32px))*1.1 + 20px)}

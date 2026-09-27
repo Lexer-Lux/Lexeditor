@@ -195,9 +195,13 @@
     const layers=background.layers.map(layer=>fieldPreviewToggle(`Layer ${layer}`,"Show this layer's tiles in the picture. This changes only the preview, not the game.",preview.layers.includes(layer),checked=>{preview.layers=checked?[...new Set([...preview.layers,layer])]:preview.layers.filter(value=>value!==layer);redraw()}));
     const states=background.parameterStates.map(entry=>{const key=`${entry.parameter}:${entry.state}`;return fieldPreviewToggle(`P${entry.parameter} S${entry.state}`,`Show the tiles that background parameter ${entry.parameter} draws in state ${entry.state}. Field scripts switch these states during play. This changes only the preview.`,preview.states.includes(key),checked=>{preview.states=checked?[...new Set([...preview.states,key])]:preview.states.filter(value=>value!==key);redraw()})});
     const hide=fieldPreviewToggle("States only","Hide the tiles that always draw to see the conditional tiles on their own. This changes only the preview.",preview.hide,checked=>{preview.hide=checked;redraw()});
-    const layerPanel=detailPanel({heading:false,className:"field-preview-layers",body:toggleRow({label:"Background layers",columns:1,minimum:80,toggles:layers})});
-    const statePanel=detailPanel({heading:false,className:"field-preview-states",body:toggleRow({label:"Background states",columns:1,minimum:80,toggles:[hide,...states]})});
-    return LexeditorUI.panelLayout([layerPanel,picture,statePanel],"field-preview-panels",{layoutKey:"ff8-field-preview-filters",defaultSizes:[3,4,3],minSizes:[180,240,180]});
+    // The filters sit on the picture panel's own sides, not in panels of
+    // their own (Lexer: "why did you create two panels for these buttons
+    // instead of just putting those buttons on the sides of the panel").
+    return el("div",{class:"field-preview-sides"},
+      el("div",{class:"field-preview-layers"},toggleRow({label:"Background layers",columns:1,minimum:80,toggles:layers})),
+      picture,
+      el("div",{class:"field-preview-states"},toggleRow({label:"Background states",columns:1,minimum:80,toggles:[hide,...states]})));
   }
   const fieldTileDefinitions=[
     ["x","DESTINATION X",-32768,32767,"Horizontal destination of this 16 by 16 tile."],["y","DESTINATION Y",-32768,32767,"Vertical destination of this 16 by 16 tile."],["z","DESTINATION Z",0,65535,"Draw-order depth stored by this tile."],["sourceX","SOURCE X",0,255,"Horizontal source coordinate in the MIM texture."],["sourceY","SOURCE Y",0,255,"Vertical source coordinate in the MIM texture."],["texture","TEXTURE",0,15,"MIM texture page selected by this tile."],["palette","PALETTE",0,15,"MIM palette selected by indexed-colour tiles."],["blend","ALPHA",0,3,"Two-bit alpha mode stored in the packed texture word."],["draw","DRAW",0,1,"When off, this tile draws black instead of its MIM pixels."],["depth","COLOUR TYPE",0,3,"Stored colour-depth selector used to read the MIM pixels."],["layer","LAYER",0,255,"New-format background layer used by the preview filter."],["blendType","ALPHA TYPE",0,4,"New-format pixel blend operation."],["parameter","PARAMETER",0,255,"Field-script background parameter. 255 is unconditional."],["state","STATE",0,255,"State paired with the background parameter."]
@@ -374,7 +378,7 @@
     const tabs=[...fieldDetailTabs].sort((a,b)=>a.label.localeCompare(b.label));
     const active=tabs.some(tab=>tab.id===state.fieldDetailTab)?state.fieldDetailTab:"camera";
     state.fieldDetailTab=active;
-    const preview=LexeditorUI.detailPanel({title:row.name.toLocaleUpperCase(),headingOverlay:true,body:fieldPreviewView(row),className:"field-map-detail"});
+    const preview=LexeditorUI.detailPanel({title:row.name.toLocaleUpperCase(),headingOverlay:true,body:fieldBackgroundPanels(row,fieldPreviewView(row)),className:"field-map-detail"});
     // The picture's help sits in its own corner, outside the heading that
     // fades away while the picture is hovered.
     preview.append(el("span",{class:"lex-media-help"},infoHelp("The picture shows the background, walkmesh, exits and triggers through the selected camera. On the Tile or Walkmesh tab, click the picture to select a tile or triangle. The filters beside the picture change only this preview.")));
@@ -389,7 +393,7 @@
     // Three columns by default: list, picture, tabs. The Deling-style setting
     // stacks the picture over the tabs instead, as Deling does.
     const deling=state.editorSettings?.delingFieldLayout===true;
-    return LexeditorUI.panelLayout([fieldBackgroundPanels(row,preview),editor],deling?{orientation:"vertical",layoutKey:"ff8-field-detail",defaultSizes:[1,1]}:{layoutKey:"ff8-field-columns-with-filters",defaultSizes:[6,7],minSizes:[620,720],stackBelowMinimum:true});
+    return LexeditorUI.panelLayout([preview,editor],deling?{orientation:"vertical",layoutKey:"ff8-field-detail",defaultSizes:[1,1]}:{layoutKey:"ff8-field-columns-with-filters",defaultSizes:[6,7],minSizes:[620,720],stackBelowMinimum:true});
   }
   function buildFields(){const rows=filtered("fields",["name","key","group","mapId"]);return showPaged("fields",rows,[{key:"mapId",label:"MAP ID",help:"Number used to identify this field in MAPLIST. A dash means the archive is not listed; it may contain unused or test content.",numeric:true,numberedId:true,render:row=>row.mapId??"—"},{key:"name",label:"FIELD MAP",help:"Internal field archive name. Select a row to edit that location."},{key:"group",label:"GROUP",pinned:false,help:"Archive folder prefix used to organise fields. This is not an encounter group."},{key:"listed",label:"MAPLIST",pinned:false,help:"Whether this field appears in the game map list. A cross means it is not listed; it does not mean the archive is missing.",render:row=>row.listed?"✓":"×"}],fieldDetail,"90px minmax(180px,1fr) 90px 90px",{defaultSplit:state.editorSettings?.delingFieldLayout===true?34:22,minLeft:330,minRight:1160},false)}
   function renderFields(){const root=buildFields();$("#main").replaceChildren(root);return root}

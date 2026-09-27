@@ -36,7 +36,7 @@ def browser_session():
     hidden = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     browser = subprocess.Popen([
         str(EDGE), "--headless=new", "--no-first-run", "--no-default-browser-check",
-        "--remote-allow-origins=*", "--use-angle=swiftshader",
+        "--remote-allow-origins=*", "--use-angle=swiftshader", "--mute-audio",
         f"--remote-debugging-port={port}", f"--user-data-dir={profile.name}", "about:blank",
     ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=hidden)
     page = next(value for value in wait_json(f"http://127.0.0.1:{port}/json/list")

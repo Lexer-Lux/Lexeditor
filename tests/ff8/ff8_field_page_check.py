@@ -76,7 +76,7 @@ def main() -> int:
             wait_eval(cdp, "!!document.querySelector('.field-background-image')?.lexGeometry", 30)
             wait_eval(cdp, "!document.documentElement.classList.contains('lex-loading-live')", 30)
 
-            layout = cdp.eval("""(()=>{const L=document.querySelector('.field-preview-panels').parentElement.closest('.lex-panel-layout');
+            layout = cdp.eval("""(()=>{const L=document.querySelector('.field-map-detail').closest('.lex-panel-layout');
               return {vertical:L.classList.contains('lex-panel-layout-vertical'),
                 automatic:L.classList.contains('lex-panel-layout-below-minimum'),
                 tabs:[...document.querySelectorAll('.lex-tabbed-panel [role=tab]')].map(t=>t.textContent.trim().replace(/\\?$/,'')),
@@ -158,11 +158,12 @@ def main() -> int:
                 restored:camera.zoom===before}})()""")
             assert all(camera_edit.values()), camera_edit
 
-            # Preview-only filters remain beside the picture on every editor tab.
-            layers = cdp.eval("""(()=>{const root=document.querySelector('.field-preview-panels'),
+            # Preview-only filters sit on the picture panel's own sides, not in
+            # panels of their own (Lexer, 2026-09-27).
+            layers = cdp.eval("""(()=>{const root=document.querySelector('.field-map-detail'),
               boxes=[...root.querySelectorAll('input[type=checkbox]')],
               left=root.querySelector('.field-preview-layers').getBoundingClientRect(),
-              picture=root.querySelector('.field-map-detail').getBoundingClientRect(),
+              picture=root.querySelector('.lex-image-map').getBoundingClientRect(),
               right=root.querySelector('.field-preview-states').getBoundingClientRect();
               return {count:boxes.length,bool:boxes.filter(b=>b.closest('.lex-toggle')?.querySelector('.lex-toggle-type')?.textContent==='BOOL').length,
                 beside:left.right<=picture.left+1&&picture.right<=right.left+1,pictureWidth:picture.width}})()""")
@@ -202,7 +203,7 @@ def main() -> int:
             cdp.call("Emulation.setDeviceMetricsOverride", {
                 "width": 1920, "height": 1000, "deviceScaleFactor": 1, "mobile": False})
             settle(cdp)
-            wide = cdp.eval("""(()=>{const picture=document.querySelector('.field-preview-panels'),
+            wide = cdp.eval("""(()=>{const picture=document.querySelector('.field-map-detail'),
               editor=picture.parentElement.querySelector(':scope > .lex-tabbed-panel'),
               a=picture.getBoundingClientRect(),b=editor.getBoundingClientRect();
               return {beside:a.right<=b.left+1,labels:[...picture.querySelectorAll('.lex-toggle-name')].map(n=>{
@@ -215,7 +216,7 @@ def main() -> int:
             cdp.eval("""(async()=>{state.editorSettings=await api('/api/editor-settings/save',post({delingFieldLayout:true}));rerenderFields();return 1})()""",
                      await_promise=True)
             settle(cdp)
-            deling = cdp.eval("document.querySelector('.field-preview-panels').parentElement.closest('.lex-panel-layout').classList.contains('lex-panel-layout-vertical')")
+            deling = cdp.eval("document.querySelector('.field-map-detail').closest('.lex-panel-layout').classList.contains('lex-panel-layout-vertical')")
             assert deling is True, deling
             stacked = screenshot(cdp, "ff8-field-page-deling.png")
             print(json.dumps({"tabs": layout["tabs"], "tileSteps": len(steps), "tile": picked,
