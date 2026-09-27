@@ -25,6 +25,9 @@ def test_cached_preview_opens_once_and_closes_from_the_same_icon():
               // No base-game localization is loaded in this fixture, so no
               // heading has a reference to restore.
               const localizedReference=()=>undefined;
+              // The heading's origin marker (RDO, created in this mod) is not
+              // what this fixture checks.
+              const originMarker=()=>null;
               const fillItemSources=async (item,root)=>root.append(LexeditorUI.detailNote('Source fixture'));
               let built=0;
               function armItemModelPreview(pane){LexeditorUI.attachModelPreview(pane,{

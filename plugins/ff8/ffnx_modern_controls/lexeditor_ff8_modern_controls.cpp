@@ -114,7 +114,7 @@ int translate_battle_keys(int keyscan, int channel) {
     // and the real R1 is withheld. Outside Shot the trigger stays plain R2:
     // turning it into R1 for the whole battle made it open Universal Item's
     // Item menu, which is R1's job.
-    const shot_open = *reinterpret_cast<const std::uintptr_t *>(kShotWidgetUpdate) == kShotUpdate;
+    const bool shot_open = *reinterpret_cast<const std::uintptr_t *>(kShotWidgetUpdate) == kShotUpdate;
     if (shot_open) {
         bits &= ~kR1Function;
         // Alone, the trigger is half a flee and nothing else, so it is
