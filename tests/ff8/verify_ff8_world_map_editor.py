@@ -141,7 +141,7 @@ def verify_rendered() -> dict:
             # The region-and-ground rule table is a subtab of Encounters now, so
             # the World tab is checked for what is left on it and the rules are
             # checked where they live.
-            cdp.eval("[...document.querySelectorAll('.world-map-tabs [role=tab]')].find(n=>n.textContent.includes('Regions')).click()")
+            cdp.eval("[...document.querySelectorAll('.world-map-tabs [role=tab]')].find(n=>n.textContent.includes('Cells')).click()")
             wait_eval(cdp, "document.querySelector('.world-map-detail input[aria-label=\"World region ID\"]')!==null", 20)
             result = cdp.eval("""(()=>{const root=document.querySelector('.world-map-view'),panel=document.querySelector('.world-map-detail');return{
               tabs:[...document.querySelectorAll('.world-map-tabs [role=tab]')].map(n=>n.textContent.trim().replace(/\\d+$/,'')),
@@ -151,8 +151,8 @@ def verify_rendered() -> dict:
               panelHeight:panel.getBoundingClientRect().height,
             }})()""")
             assert first is not None, "Region ID is not editable"
-            assert result["tabs"] == ["Map", "Regions", "Field → World", "Draw Points", "Sky Colours", "Train Tracks", "World Textures"], result
-            assert result["active"] == "Regions" and result["inputs"] >= 1, result
+            assert result["tabs"] == ["Cells", "Draw Points", "Field → World", "Map", "Sky Colours", "Train Tracks", "World → Field", "World Textures"], result
+            assert result["active"] == "Cells" and result["inputs"] >= 1, result
             assert not result["overflow"] and result["panelHeight"] > 200, result
             cdp.eval("state.encountersTab='rules';navigate('encounters')")
             wait_eval(cdp, "document.querySelector('.ff8-encounter-rule-table')!==null", 20)
