@@ -1150,9 +1150,17 @@
       const name = title.querySelector(".lex-detail-panel-name") || title;
       return name.textContent.trim();
     };
+    // A heading reads: its name, the help bubble, the copy button, then a
+    // thing finder when the panel can pick a different record from here.
+    if (options.help) title.append(infoHelp(options.help));
     if (options.title !== undefined || options.titleControl || options.renameRecord)
       title.append(copyValueButton(titleText, "Copy this name"));
-    if (options.help) title.append(infoHelp(options.help));
+    if (typeof options.find === "function") {
+      const label = options.findTitle || "Find a different record";
+      title.append(element("button", {type: "button", class: "lex-title-finder", title: label,
+        "aria-label": label, onclick: event => { event.stopPropagation(); options.find(event); }},
+        selectionIcon()));
+    }
     const identity = element("div", {class: "lex-detail-panel-identity"},
       title,
       // The identity slot is the big ghosted record number, sized to the

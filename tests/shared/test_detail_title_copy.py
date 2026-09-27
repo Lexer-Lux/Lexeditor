@@ -33,8 +33,9 @@ def test_heading_name_has_copy_button(page):
         assert geometry['buttonLeft'] >= geometry['nameRight'] - 0.5, geometry
         assert geometry['buttonRight'] <= geometry['titleRight'] + 0.5, geometry
         assert geometry['width'] >= 12, geometry
+        # Lexer: title text, info bubble, then copy button (then any finder).
         if geometry['helpLeft'] is not None:
-            assert geometry['helpLeft'] >= geometry['buttonRight'] - 0.5, geometry
+            assert geometry['nameRight'] - 0.5 <= geometry['helpLeft'] <= geometry['buttonLeft'] + 0.5, geometry
         button.click()
         page.wait_for_function('n => window.__copied.length === n', arg=index + 1)
         assert page.evaluate('window.__copied.at(-1)') == expected
@@ -46,3 +47,17 @@ def test_heading_name_has_copy_button(page):
     if os.environ.get('LEX_SHOT'):
         panels.nth(0).locator('.lex-detail-panel-title').hover()
         page.locator('main').screenshot(path=os.environ['LEX_SHOT'])
+
+
+def test_heading_order_is_name_help_copy_then_finder(page):
+    """Lexer: title text, info bubble, copy button, then the thing finder."""
+    framework(page)
+    page.evaluate('''()=>{window.found=0;document.querySelector('main').replaceChildren(
+      LexeditorUI.detailPanel({title:'Encounter group',help:'Help text',identity:'#12',
+        find:()=>window.found++,findTitle:'Choose another group',body:[]}))}''')
+    order = page.evaluate('''()=>{const t=document.querySelector('.lex-detail-panel-title');
+      const x=s=>t.querySelector(s).getBoundingClientRect().left;
+      return [x('.lex-detail-panel-name'),x('.lex-info-help'),x('.lex-copy-value'),x('.lex-title-finder')]}''')
+    assert order == sorted(order), order
+    page.get_by_role('button', name='Choose another group').click()
+    assert page.evaluate('window.found') == 1
