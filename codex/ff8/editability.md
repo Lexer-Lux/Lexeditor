@@ -130,13 +130,18 @@ Not covered today, with what each would need:
   See `plugins/ff8/assets.py` `animation_sequences`,
   `tests/ff8/verify_ff8_animation_sequences.py`, and
   `/api/animation-sequences?file=c0m001.dat`.
-- **Model export** (3D, glTF). The Models tab previews a model; it does not
-  export geometry, and the geometry bytes are still only counted here. FF8
-  Ultimate Editor's 3D work is large rather than a decoder to lift: its editor
-  widget alone is 148 KB, its glTF exporter 27 KB and its importer 13 KB, with
-  round-trip tests of their own. Exporting therefore starts with vendoring and
-  crediting that geometry decode (the way its LZS decoder is already vendored,
-  GPL-3.0), not with a small reader in this plugin.
+- **Model export** (3D, glTF). `model_geometry.py` uses the credited, pinned
+  FF8 Ultimate Editor bone/geometry/animation decoder and GLB exporter under
+  `vendor/ff8ue/`. Enemies and Models share a WebGL preview of the first pose;
+  Export GLB includes textures, skeleton, skinning, and animations. The adapter
+  also retains colored primitives omitted by the upstream monster exporter.
+  Geometry counts sum the decoded vertex groups rather than interpreting the
+  section's final word as the whole-model count. The installed `c0m001.dat`
+  check decoded 570 vertices, 910 triangles, 36 bones and 20 animations; its
+  exported mesh, skin and animation container and rendered preview were checked.
+  The reader bounds files at 16 MB and full exports at 100,000 bone-frames.
+  Models with unrecognized layouts remain unsupported. Tests:
+  `test_ff8_model_geometry.py`, `ff8_model_viewer_check.py`.
 - **VRAM palette animation** (Dynamic Texture). Not worth building, and here is
   the evidence. FF8 Ultimate Editor parses the section (battle `.dat` section 4)
   and records in its own source that the feature is **vestigial in the retail PC

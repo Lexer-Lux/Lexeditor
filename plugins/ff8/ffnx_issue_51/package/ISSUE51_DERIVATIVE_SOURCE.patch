@@ -20466,10 +20466,10 @@ index 0000000..c139574
 +} // namespace lexeditor::ff8::shared_magic
 diff --git a/src/ff8/lexeditor_shared_magic_core.cpp b/src/ff8/lexeditor_shared_magic_core.cpp
 new file mode 100644
-index 0000000..ce9d781
+index 0000000..024a469
 --- /dev/null
 +++ b/src/ff8/lexeditor_shared_magic_core.cpp
-@@ -0,0 +1,304 @@
+@@ -0,0 +1,341 @@
 +#include "lexeditor_shared_magic_core.h"
 +
 +#include <algorithm>
@@ -20491,24 +20491,29 @@ index 0000000..ce9d781
 +    std::array<std::uint8_t, 255> order{};
 +    std::size_t distinct = 0;
 +
-+    for (const MagicInventory &inventory : source) {
-+        for (const MagicSlot slot : inventory) {
-+            if (slot.id == 0 && slot.amount == 0) {
++    for (std::size_t character = 0; character < source.size(); ++character) {
++        const auto who = static_cast<std::uint8_t>(character);
++        for (const MagicSlot slot : source[character]) {
++            // A slot with no spell or no copies holds nothing to lose. FF8
++            // leaves such leftovers behind, so they count as empty rather
++            // than blocking the whole merge.
++            if (slot.id == 0 || slot.amount == 0) {
 +                continue;
 +            }
-+            if (slot.id == 0 || slot.amount == 0 || slot.amount > stock_limit) {
-+                return {MergeError::invalid_slot, slot.id, {}};
++            if (slot.amount > stock_limit) {
++                return {MergeError::spell_stock_exceeds_limit, slot.id, who, slot.amount, {}};
 +            }
 +            if (!seen[slot.id]) {
 +                if (distinct >= kSlotCount) {
-+                    return {MergeError::too_many_distinct_spells, slot.id, {}};
++                    return {MergeError::too_many_distinct_spells, slot.id, who,
++                            static_cast<std::uint16_t>(distinct + 1), {}};
 +                }
 +                seen[slot.id] = true;
 +                order[distinct++] = slot.id;
 +            }
 +            totals[slot.id] = static_cast<std::uint16_t>(totals[slot.id] + slot.amount);
 +            if (totals[slot.id] > stock_limit) {
-+                return {MergeError::spell_stock_exceeds_limit, slot.id, {}};
++                return {MergeError::spell_stock_exceeds_limit, slot.id, who, totals[slot.id], {}};
 +            }
 +        }
 +    }
@@ -20542,6 +20547,8 @@ index 0000000..ce9d781
 +        static_cast<bool>(result),
 +        result.error,
 +        result.spell_id,
++        result.character,
++        result.amount,
 +    };
 +}
 +
@@ -20726,6 +20733,36 @@ index 0000000..ce9d781
 +    return "Shared Magic cannot start. No Magic was changed.";
 +}
 +
++std::string migration_warning(const ActivationResult &result, const std::uint8_t stock_limit)
++{
++    static const char *const kNames[kCharacterCount] = {
++        "Squall", "Zell", "Irvine", "Quistis", "Rinoa", "Selphie", "Seifer", "Edea",
++    };
++    const std::string limit = std::to_string(static_cast<unsigned int>(stock_limit));
++    const std::string spell = "spell no. " +
++        std::to_string(static_cast<unsigned int>(result.spell_id));
++    const std::string who = result.character < kCharacterCount
++        ? kNames[result.character] : "a character";
++    switch (result.error) {
++    case MergeError::none:
++        return "";
++    case MergeError::invalid_slot:
++        return "Shared Magic is off: the Max Spell limit is 0. Set it to 1 or more "
++               "on the Tweaks tab. No Magic was changed.";
++    case MergeError::too_many_distinct_spells:
++        return "Shared Magic is off: the party holds more than 32 different spells (" +
++               who + "'s " + spell + " is the 33rd). Use up or discard a few kinds, then "
++               "load again. No Magic was changed.";
++    case MergeError::spell_stock_exceeds_limit:
++        return "Shared Magic is off: pooled, the party would hold " +
++               std::to_string(static_cast<unsigned int>(result.amount)) + " of " + spell +
++               ", over the Max Spell limit of " + limit + " (" + who +
++               "'s copies push it over). Use or discard some, then load again. "
++               "No Magic was changed.";
++    }
++    return migration_warning_template(result.error, stock_limit);
++}
++
 +bool add_stock(MagicInventory &inventory, const std::uint8_t spell_id,
 +               const std::uint8_t amount, const std::uint8_t stock_limit)
 +{
@@ -20776,10 +20813,10 @@ index 0000000..ce9d781
 +} // namespace lexeditor::ff8::shared_magic
 diff --git a/src/ff8/lexeditor_shared_magic_core.h b/src/ff8/lexeditor_shared_magic_core.h
 new file mode 100644
-index 0000000..1188fcb
+index 0000000..6c3546a
 --- /dev/null
 +++ b/src/ff8/lexeditor_shared_magic_core.h
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,128 @@
 +#pragma once
 +
 +#include <array>
@@ -20816,6 +20853,10 @@ index 0000000..1188fcb
 +struct MergeResult {
 +    MergeError error = MergeError::none;
 +    std::uint8_t spell_id = 0;
++    // Where the blocker was found, so the warning can name it: the character
++    // index (0 Squall .. 7 Edea) and the copies of spell_id at that point.
++    std::uint8_t character = 0;
++    std::uint16_t amount = 0;
 +    MagicInventory inventory{};
 +
 +    explicit operator bool() const { return error == MergeError::none; }
@@ -20828,6 +20869,8 @@ index 0000000..1188fcb
 +    bool shared_pool_active = false;
 +    MergeError error = MergeError::none;
 +    std::uint8_t spell_id = 0;
++    std::uint8_t character = 0;
++    std::uint16_t amount = 0;
 +};
 +
 +enum class RuntimePhase {
@@ -20891,6 +20934,11 @@ index 0000000..1188fcb
 +// window. Each one states that no data was changed.
 +std::string migration_warning_template(
 +    MergeError error, std::uint8_t stock_limit = kDefaultStockLimit);
++
++// The same warning, naming the character, spell number and copies that
++// blocked it and what to do about it.
++std::string migration_warning(const ActivationResult &result,
++                              std::uint8_t stock_limit = kDefaultStockLimit);
 +
 +bool add_stock(MagicInventory &inventory, std::uint8_t spell_id, std::uint8_t amount,
 +               std::uint8_t stock_limit = kDefaultStockLimit);
@@ -20980,10 +21028,10 @@ index 0000000..5d8583f
 +}
 diff --git a/src/ff8/shared_magic_runtime.cpp b/src/ff8/shared_magic_runtime.cpp
 new file mode 100644
-index 0000000..324cb46
+index 0000000..45caf65
 --- /dev/null
 +++ b/src/ff8/shared_magic_runtime.cpp
-@@ -0,0 +1,1703 @@
+@@ -0,0 +1,1700 @@
 +/****************************************************************************/
 +// Lexeditor shared party Magic for FF8 1.2 US-English Nvidia.
 +// This file is part of the GPL-3.0-or-later FFNx derivative.
@@ -21475,11 +21523,8 @@ index 0000000..324cb46
 +        // main-menu controller to display a warning here: doing so can stall
 +        // or recursively re-enter the loader. Preserve the private stocks,
 +        // disable sharing for this process, and let the original loader run.
-+        g_activation_toast = migration_warning_template(result.error, g_stock_limit);
-+        append_runtime_log((g_activation_toast + "\n").c_str());
 +        {
-+            const std::string message =
-+                migration_warning_template(result.error, g_stock_limit);
++            const std::string message = migration_warning(result, g_stock_limit);
 +            lexeditor_ff8_toast_push(message.c_str(), true);
 +            append_runtime_log((message + "\n").c_str());
 +        }
@@ -30027,7 +30072,7 @@ index 0000000..7336b42
 +} // namespace lexeditor_interaction_indicator
 diff --git a/src/lexeditor_ff8_bars.cpp b/src/lexeditor_ff8_bars.cpp
 new file mode 100644
-index 0000000..bd96396
+index 0000000..def0eb9
 --- /dev/null
 +++ b/src/lexeditor_ff8_bars.cpp
 @@ -0,0 +1,792 @@
@@ -30501,14 +30546,14 @@ index 0000000..bd96396
 +    if(slot>=0 && slot<3) {
 +        const auto id=state[0x35+slot];
 +        if(id<CHAR_NUM) {
-+            if(enable_ff8_xp_bars) capture_menu_xp(114,55+Spacing*slot,48,
++            if(enable_ff8_xp_bars) capture_menu_xp(114,55+Spacing*slot,46,
 +                xp_fraction(ff8_externals.savemap->chars[id].exp,id));
 +            if(enable_ff8_hp_bars) {
 +                // The menu uses this 32-byte computed-stat record, including
 +                // junctions and abilities, for the HP X/Y text at x162.
 +                const auto *stats=reinterpret_cast<const std::uint16_t *>(0x01D771B0+32*id);
 +                const auto current=stats[4], maximum=stats[5];
-+                if(maximum) capture_menu_xp(162,55+Spacing*slot,94,
++                if(maximum) capture_menu_xp(164,55+Spacing*slot,92,
 +                    current/static_cast<float>(maximum),true);
 +            }
 +        }
@@ -32245,10 +32290,10 @@ index 0000000..4be5c84
 +void lexeditor_ff8_interaction_indicators_draw();
 diff --git a/src/lexeditor_ff8_modern_controls.cpp b/src/lexeditor_ff8_modern_controls.cpp
 new file mode 100644
-index 0000000..c9e1fa5
+index 0000000..862c63c
 --- /dev/null
 +++ b/src/lexeditor_ff8_modern_controls.cpp
-@@ -0,0 +1,348 @@
+@@ -0,0 +1,388 @@
 +#include "lexeditor_ff8_modern_controls.h"
 +#include "camera_axis.h"
 +#include "battle_camera.h"
@@ -32284,6 +32329,7 @@ index 0000000..c9e1fa5
 +std::uint32_t last_world_input_frame = ~0u;
 +bool world_square_down = false;
 +bool world_square_pressed = false;
++float vehicle_pressure = 0.0f;
 +
 +constexpr std::uintptr_t kWorldInputStates = 0x0203FDE8;
 +constexpr std::uintptr_t kWorldInputParity = 0x020409BC;
@@ -32381,6 +32427,7 @@ index 0000000..c9e1fa5
 +    last_world_input_frame = ~0u;
 +    world_square_down = false;
 +    world_square_pressed = false;
++    vehicle_pressure = 0.0f;
 +}
 +
 +std::uint32_t capture_world_input(bool suppress_legacy_drive) {
@@ -32402,6 +32449,7 @@ index 0000000..c9e1fa5
 +int vehicle_drive_axis(std::uint32_t keys) {
 +    const float left = use_sdl_gamepad ? sdlgamepad.leftTrigger : gamepad.leftTrigger;
 +    const float right = use_sdl_gamepad ? sdlgamepad.rightTrigger : gamepad.rightTrigger;
++    vehicle_pressure = lexeditor_vehicle_drive::pressure(left, right, (keys & kL2) != 0, (keys & kR2) != 0);
 +    return lexeditor_vehicle_drive::axis(left, right, (keys & kL2) != 0, (keys & kR2) != 0);
 +}
 +
@@ -32544,13 +32592,48 @@ index 0000000..c9e1fa5
 +    return ff8_get_analog_value(port, type, offset);
 +}
 +
++// World physics accumulates input/48 (car), /16 (Garden), or /8 (Ragnarok)
++// into speed, then caps it at ESI. Scaling input alone changes acceleration,
++// not eventual speed. Keep the native terrain/turn cap and scale that cap.
++extern "C" __declspec(dllexport) int __cdecl lexeditor_ff8_vehicle_speed_limit(int native_limit) {
++    if (!lexeditor_ff8_modern_controls_world_active() ||
++        !lexeditor_vehicle_drive::supported_state(*reinterpret_cast<const unsigned *>(kWorldVehicle)))
++        return native_limit;
++    return lexeditor_vehicle_drive::speed_limit(native_limit, vehicle_pressure);
++}
++
++namespace { std::uintptr_t vehicle_cap_resume = 0x00558023; }
++
++extern "C" __declspec(dllexport) __declspec(naked) void lexeditor_ff8_vehicle_cap_hook() {
++    __asm {
++        push eax
++        push ecx
++        push edx
++        push esi
++        call lexeditor_ff8_vehicle_speed_limit
++        add esp, 4
++        mov esi, eax
++        pop edx
++        pop ecx
++        pop eax
++        // Displaced native instructions: set the negative bound and flags
++        // for the original signed conditional jump at 00558023.
++        mov eax, esi
++        neg eax
++        cmp edx, eax
++        jmp dword ptr [vehicle_cap_resume]
++    }
++}
++
 +void lexeditor_ff8_modern_controls_install() {
 +    if (!ff8 || !enable_ff8_modern_controls || world_installed || battle_installed || bindings_installed) return;
 +
 +    const unsigned char first[] = {0xE8, 0xD7, 0x7E, 0x01, 0x00};
 +    const unsigned char second[] = {0xE8, 0x6F, 0x6A, 0x01, 0x00};
++    const unsigned char cap[] = {0x8B, 0xC6, 0xF7, 0xD8, 0x3B, 0xD0, 0x7D, 0x04};
 +    if (!std::memcmp(reinterpret_cast<void *>(0x0053FBB4), first, sizeof first) &&
 +        !std::memcmp(reinterpret_cast<void *>(0x0054101C), second, sizeof second) &&
++        !std::memcmp(reinterpret_cast<void *>(0x0055801D), cap, sizeof cap) &&
 +        *reinterpret_cast<const unsigned char *>(0x0053FD4A) == 0xE8 &&
 +        get_relative_call(0x0053FD4A,0) == 0x0054A7F0 &&
 +        *reinterpret_cast<const unsigned char *>(0x0054111A) == 0xE8 &&
@@ -32560,6 +32643,8 @@ index 0000000..c9e1fa5
 +        replace_call(0x0054101C, reinterpret_cast<void *>(&update_clear));
 +        replace_call(0x0053FD4A, reinterpret_cast<void *>(&world_actions));
 +        replace_call(0x0054111A, reinterpret_cast<void *>(&world_actions));
++        replace_function(0x0055801D, reinterpret_cast<void *>(&lexeditor_ff8_vehicle_cap_hook));
++        patch_code_byte(0x00558022, 0x90);
 +        world_installed = true;
 +    } else {
 +        ffnx_warning("Lexeditor Modern Controls: unsupported world-camera call sites; world camera changes not installed.\n");
@@ -33306,7 +33391,7 @@ index 0000000..a12ef0a
 +void lexeditor_ff8_stock_tweaks_install();
 diff --git a/src/lexeditor_ff8_toast.cpp b/src/lexeditor_ff8_toast.cpp
 new file mode 100644
-index 0000000..dc2a235
+index 0000000..fd75e42
 --- /dev/null
 +++ b/src/lexeditor_ff8_toast.cpp
 @@ -0,0 +1,168 @@
@@ -33338,13 +33423,13 @@ index 0000000..dc2a235
 +
 +lexeditor_toast::Queue g_queue;
 +
-+// FF8's window: a dark blue gradient behind a pale double edge. These are the
-+// colours the game's own window reads as on screen, not a theme of ours; a
-+// message that looked like an overlay would defeat the point of this file.
-+constexpr ImU32 kFillTop = IM_COL32(12, 24, 96, 232);
-+constexpr ImU32 kFillBottom = IM_COL32(4, 8, 40, 232);
-+constexpr ImU32 kEdgeOuter = IM_COL32(24, 32, 72, 255);
-+constexpr ImU32 kEdgeInner = IM_COL32(200, 208, 232, 255);
++// FF8's default window: a silver-grey gradient, lighter at the top, inside a
++// dark outer line and a pale inner one. Lexer asked for the game's own top
++// notice rather than a blue box, so these follow the default grey window.
++constexpr ImU32 kFillTop = IM_COL32(150, 150, 158, 236);
++constexpr ImU32 kFillBottom = IM_COL32(84, 84, 92, 236);
++constexpr ImU32 kEdgeOuter = IM_COL32(32, 32, 40, 255);
++constexpr ImU32 kEdgeInner = IM_COL32(224, 224, 232, 255);
 +constexpr ImU32 kText = IM_COL32(255, 255, 255, 255);
 +constexpr ImU32 kTextWarning = IM_COL32(255, 216, 136, 255);
 +constexpr ImU32 kTextShadow = IM_COL32(0, 0, 0, 200);
@@ -34491,10 +34576,10 @@ index 0000000..c3c89a0
 +} // namespace lexeditor_reptile_atb
 diff --git a/src/toast_layout.h b/src/toast_layout.h
 new file mode 100644
-index 0000000..db3b403
+index 0000000..7d37048
 --- /dev/null
 +++ b/src/toast_layout.h
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,71 @@
 +#pragma once
 +// Where a Lexeditor toast sits on screen, and how it fades.
 +//
@@ -34509,10 +34594,12 @@ index 0000000..db3b403
 +
 +namespace lexeditor_toast {
 +
-+// FF8's own message boxes sit a little above the bottom edge, indented from
-+// both sides, and are padded inside by about one character.
-+constexpr float BOTTOM_MARGIN = 0.08f;   // of the game's height
-+constexpr float SIDE_MARGIN = 0.06f;     // of the game's width
++// Lexer asked for the game's own notice: the wide silver box across the top
++// of the screen that battle uses for "Received ..." and ability names. It
++// spans nearly the whole frame, sits just below the top edge, and is padded
++// inside by about one character.
++constexpr float TOP_MARGIN = 0.02f;      // of the game's height
++constexpr float SIDE_MARGIN = 0.02f;     // of the game's width
 +constexpr float PADDING_CHARS = 1.0f;
 +constexpr float PADDING_LINES = 0.5f;
 +// The last fraction of the hold fades out, and the first fraction fades in, so
@@ -34532,23 +34619,22 @@ index 0000000..db3b403
 +    float text_x = 0.0f, text_y = 0.0f;
 +};
 +
-+// Size the box to the text, then place it bottom-centre. A box wider than the
-+// frame allows is clamped rather than allowed to hang off the edge, which is
-+// the case a long sentence in a small window produces.
++// The box is always the full width between the margins, like the game's
++// top notice, and as tall as the text. Its text is centred.
 +inline Box layout(const Metrics &metrics, std::size_t lines, std::size_t columns)
 +{
 +    const float padding_x = metrics.char_width * PADDING_CHARS;
 +    const float padding_y = metrics.line_height * PADDING_LINES;
 +    const float limit = metrics.width * (1.0f - 2.0f * SIDE_MARGIN);
 +    Box box;
-+    box.width = std::min(limit,
-+        static_cast<float>(columns) * metrics.char_width + 2.0f * padding_x);
++    box.width = limit;
 +    box.height = static_cast<float>(lines ? lines : 1) * metrics.line_height
 +        + 2.0f * padding_y;
 +    box.x = (metrics.width - box.width) * 0.5f;
-+    box.y = metrics.height * (1.0f - BOTTOM_MARGIN) - box.height;
-+    if (box.y < 0.0f) box.y = 0.0f;
-+    box.text_x = box.x + padding_x;
++    box.y = metrics.height * TOP_MARGIN;
++    const float text_width = std::min(limit - 2.0f * padding_x,
++        static_cast<float>(columns) * metrics.char_width);
++    box.text_x = box.x + (box.width - text_width) * 0.5f;
 +    box.text_y = box.y + padding_y;
 +    return box;
 +}
@@ -34567,10 +34653,10 @@ index 0000000..db3b403
 +}  // namespace lexeditor_toast
 diff --git a/src/vehicle_drive.h b/src/vehicle_drive.h
 new file mode 100644
-index 0000000..c79e739
+index 0000000..1b76e24
 --- /dev/null
 +++ b/src/vehicle_drive.h
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,53 @@
 +#pragma once
 +#include <algorithm>
 +#include <cmath>
@@ -34588,12 +34674,13 @@ index 0000000..c79e739
 +        (state >= 0x20u && state <= 0x28u);
 +}
 +
-+// FF8's world rY is centered at 128. Native World_HandleInputs converts a high
-+// raw value into negative/full forward movement and a low raw value into
-+// positive/reverse movement. RT is forward, LT is reverse. L2/R2 logical keys
-+// are digital fallbacks, so keyboard users get the same controls.
-+inline int axis(float left_trigger, float right_trigger,
-+                bool left_digital = false, bool right_digital = false) {
++// FF8's world rY is centered at 128. A LOW raw value drives forward and a high
++// one reverses: the first build assumed the opposite and Lexer found RT
++// reversing ("the triggers for forward/reverse are well, reversed"). RT is
++// forward, LT is reverse. L2/R2 logical keys are digital fallbacks, so
++// keyboard users get the same controls.
++inline float pressure(float left_trigger, float right_trigger,
++                      bool left_digital = false, bool right_digital = false) {
 +    float left = std::isfinite(left_trigger) ? std::clamp(left_trigger, 0.0f, 1.0f) : 0.0f;
 +    float right = std::isfinite(right_trigger) ? std::clamp(right_trigger, 0.0f, 1.0f) : 0.0f;
 +    // A physical trigger can also set its logical L2/R2 bit. Do not let that
@@ -34602,9 +34689,25 @@ index 0000000..c79e739
 +    if (left_digital && left == 0.0f) left = 1.0f;
 +    if (right_digital && right == 0.0f) right = 1.0f;
 +    const float drive = right - left;
-+    if (std::abs(drive) < 0.02f) return 128;
-+    const float scale = drive > 0.0f ? 127.0f : 128.0f;
-+    return std::clamp(128 + static_cast<int>(std::lround(drive * scale)), 0, 255);
++    return std::abs(drive) < 0.02f ? 0.0f : drive;
++}
++
++inline int speed_limit(int native_limit, float drive) {
++    if (native_limit <= 0 || !std::isfinite(drive)) return native_limit;
++    return std::clamp(static_cast<int>(std::lround(native_limit * std::abs(drive))),
++                      0, native_limit);
++}
++
++inline int axis(float left_trigger, float right_trigger,
++                bool left_digital = false, bool right_digital = false) {
++    const float drive = pressure(left_trigger, right_trigger, left_digital, right_digital);
++    if (!drive) return 128;
++    // Native input ignores magnitudes <=45; car acceleration then divides by
++    // 48. Cross both thresholds even for a light pull. The separate speed cap
++    // uses the original pressure, so this does not turn it into full throttle.
++    const float maximum = drive > 0.0f ? 127.0f : 128.0f;
++    const int magnitude = 49 + static_cast<int>(std::lround(std::abs(drive) * (maximum - 49)));
++    return 127 + (drive > 0.0f ? -magnitude : magnitude);
 +}
 +} // namespace lexeditor_vehicle_drive
 diff --git a/tests/lexeditor_live_conditions_test.cpp b/tests/lexeditor_live_conditions_test.cpp

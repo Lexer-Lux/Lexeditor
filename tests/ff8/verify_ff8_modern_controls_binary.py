@@ -21,6 +21,8 @@ ADDRESSES = {
     'world input states': 0x0203FDE8,
     'world input parity': 0x020409BC,
     'world vehicle state': 0x020409E0,
+    'world vehicle speed cap hook': 0x0055801D,
+    'world vehicle speed cap continuation': 0x00558023,
 }
 STRINGS = (
     b'unsupported battle-camera call site',

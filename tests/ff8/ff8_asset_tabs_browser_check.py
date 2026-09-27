@@ -105,7 +105,23 @@ def main():
             page.evaluate("state.selected.sfx = 5")
             page.evaluate("navigate('sfx')")
             page.wait_for_timeout(300)
-            assert page.locator("#main audio").count() == 1
+            # The shared record header owns playback; its Audio object is
+            # deliberately detached from the document.
+            assert page.locator("#main .lex-audio-play").count() == 1
+            assert page.locator("#main .lex-audio-scrub").count() == 1
+            assert page.locator("#main .lex-detail-panel-body audio").count() == 0
+            detail = page.locator("#main .lex-detail-panel").last
+            before_hover = detail.bounding_box()
+            page.mouse.move(1490, 500)
+            page.mouse.move(before_hover["x"] + before_hover["width"] - 12,
+                            before_hover["y"] + before_hover["height"] / 2)
+            for _ in range(8):
+                after_hover = detail.bounding_box()
+                assert abs(after_hover["height"] - before_hover["height"]) < 2, (before_hover, after_hover)
+                page.wait_for_timeout(20)
+            rendered = Path(tempfile.gettempdir()) / "lexeditor-dev" / "rendered"
+            rendered.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(rendered / "ff8-sfx-header.png"))
             set_mod_only(page, False)
 
             page.click('nav button[data-tab="models"]')

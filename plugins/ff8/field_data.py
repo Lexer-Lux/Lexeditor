@@ -30,9 +30,10 @@ BASELINE_SUBDIR = Path("field/mapdata")
 DIRECT_SUBDIR = Path("field/mapdata")
 CARDGAME_DWORD = 0x0000013A
 # https://wiki.ffrtt.ru/index.php/FF8/Field/Script/Opcodes/13A_CARDGAME
-# The last three arguments have no demonstrated gameplay meaning.
-PARAM_NAMES = ("Deck ID", "Known rules", "Region rules", "Rare card chance",
-               "Unknown setting 1", "Unknown setting 2", "Unknown setting 3")
+# The last argument is the common-card level mask. Proven against the English
+# executable by verify_ff8_card_hand_levels.py; arguments 5 and 6 remain unknown.
+PARAM_NAMES = ("Deck ID", "Rules", "Trade rule", "Rare card chance",
+               "Unknown setting 1", "Unknown setting 2", "Card levels")
 LITERAL_OPCODE = 0x07
 VARIABLE_OPCODES = {0x0A, 0x0C, 0x0E, 0x10, 0x11, 0x12}
 EDITABLE_OPCODES = {LITERAL_OPCODE, *VARIABLE_OPCODES}
@@ -1277,6 +1278,8 @@ def save(edits: list[dict]) -> dict:
                 if identity in seen or not 0 <= player_id < len(players) or not 0 <= param_id < 7:
                     raise ValueError("Invalid or duplicate field card-player edit")
                 seen.add(identity)
+                if param_id in (4, 5):
+                    raise ValueError("Unverified CARDGAME settings must retain their original values")
                 param = players[player_id]["params"][param_id]
                 if not param["editable"]:
                     raise ValueError("This field script expression is not a supported literal or variable push")

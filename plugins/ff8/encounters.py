@@ -106,6 +106,8 @@ def apply_edits(data: bytes, edits: list[dict], enemy_ids: set[int]) -> tuple[by
             values = [int(edit[name]) for name in ("stageId", "flags", "cameraMain", "cameraSecondary")]
             if any(not 0 <= value <= 255 for value in values):
                 raise ValueError("Encounter header values must be 0 to 255")
+            if bytes(values[1:]) != data[base + 1:base + 4]:
+                raise ValueError("Encounter flags and camera settings are not understood and must remain unchanged")
             raw[base:base + 4] = bytes(values)
             changed += 1
             continue

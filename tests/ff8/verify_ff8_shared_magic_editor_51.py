@@ -13,6 +13,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+from tests.shared.plugin_ui import plugin_ui
 
 from plugins.ff8 import ffnx_manager, gameplay_settings  # noqa: E402
 from plugins.ff8.ffnx_issue_51 import runtime_config, runtime_package  # noqa: E402
@@ -159,7 +160,7 @@ def verify_final_package_if_staged() -> bool:
 
 
 def main() -> int:
-    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    editor = plugin_ui('ff8')
     gameplay_view = editor[editor.index("function renderGameplaySettings"):editor.index("function renderPlatformSettings")]
     assert 'row("SHARED PARTY MAGIC INVENTORY"' in gameplay_view
     settings_dirty = editor.index("const settingsDirty=")

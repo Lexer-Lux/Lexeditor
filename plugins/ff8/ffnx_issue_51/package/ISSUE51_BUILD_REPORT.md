@@ -1,16 +1,16 @@
-# Lexeditor FFNx battle repair build
+# Lexeditor FFNx runtime build
 
 ## Artifact and source
 
 - FFNx base: `c056db2783f376a340fcefa6a48cc33618998876`
-- Editor build revision: `f12a03d5e2c8f9bf791b343f6c1817b0f19a650c`
-- Actions build run: `35798579648`
+- Editor build revision: `7e44d00acd81483b82fafdfe407aef2e76aa2821`
+- Actions build run: `36279512314`
 - Supported private game SHA-256: `064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570`
 - Identity: `Lexeditor issue 51 shared magic core; base=c056db2783f376a340fcefa6a48cc33618998876; runtime=on; hooks=28`
-- Driver SHA-256: `cf8aa19d233aa6cc69965ac8961759f5aadb7a1670926547e2ca07d052ad9621`
-- Driver size: 38859264 bytes; PE32 x86 DLL
-- PDB SHA-256: `55487cb04166371b137288548e721cc0ebd768b3f6c251a8f5a768be2fd6dc2c` (build artifact, not installed)
-- Complete source patch SHA-256: `537e6e294813b4377912fb5986f77275938578ff356a81e13b966c97f1dcaf0e`
+- Driver SHA-256: `544f68d96947d8eeb677c4c9ea55740aee17acdda82c80d53985dedaf3b40094`
+- Driver size: 38863360 bytes; PE32 x86 DLL
+- PDB SHA-256: `1b8100aa8c860d752a9320fa7644b4cc49aaf1ea1f269aa70e66143ef85d4fbc` (build artifact, not installed)
+- Complete source patch SHA-256: `e42ad5db8ceeaeb8124bb49266b993806ac8cd4420aa7bc31b6705a4b3969b86`
 - GPL licence SHA-256: `230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809`
 - Steamworks library unchanged: `abfedd473b3f4a9597bbdc90d20f4b6f696bb2ebb937a03177461df695430ad6`
 - Existing matching-base shader set retained: 163 files;
@@ -48,6 +48,18 @@ lossless migration refuses overflow. No Magic Consumption hooks only field and
 battle spell-cast debits, never the shared Item debit path. Drops After Mug is
 a separate guarded one-byte Hext change, retaining Mug-once and reward-once checks.
 
+Modern Controls maps RT to forward and LT to reverse on the native world
+vehicle axis, including digital keyboard fallbacks. Partial physical trigger
+pulls retain their axis magnitude even when they also set a digital trigger bit.
+This verifies the mapped input; proportional in-game vehicle speed remains a
+separate acceptance check.
+
+Runtime messages use a queued FF8-style panel with wrapping and a measured
+display duration. A refused summon consumes its notification flag once.
+Shared Magic migration failures identify the character, spell and stock count
+that prevented lossless activation. Messages keep the overlay render path
+active even when other overlays are disabled.
+
 ## Build reproduction
 
 Use the exact FFNx base and its pinned vcpkg submodule. Apply the complete
@@ -57,7 +69,7 @@ CMake 4.2.0, Ninja, Release, and the
 Configure with `FFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON`,
 `FFNX_LEXEDITOR_LIVE_CONDITIONS=ON`, and `FFNX_DEPLOY_TO_GAME_DIRS=OFF`,
 then run `cmake --build .build --parallel 4`.
-The full command sequence is in `.github/workflows/ff8-stock-build.yml`.
+The full command sequence is in `codex/ff8/native-runtime-build.md`.
 The complete patch restores test/verifier support omitted by the earlier
 preparation helper; every candidate patch section was compared unchanged.
 No production compilation inputs differ from the reviewed build artifact.

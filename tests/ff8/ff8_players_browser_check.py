@@ -33,7 +33,10 @@ def main():
   source=(ROOT/'plugins/ff8/cards_ui.js').read_text(encoding='utf-8').replace('    render,\n    edits:', '    render, renderPlayers:()=>{mode="players";return render()},\n    edits:',1)
   page.add_script_tag(content=source)
   page.evaluate('''()=>{
-   const U=LexeditorUI;window.model={tab:'cards',activeSource:'mine',data:{fields:{rows:[{key:'test',name:'Test area',_loaded:true,players:[]},{key:'garden',name:'Garden',_loaded:true,players:[{id:0,entity:'Student',params:[{id:0,name:'Deck level',mode:'literal',editable:true,value:3}]}]}]}},vanilla:{fields:{rows:[]}}};
+   const U=LexeditorUI;window.model={tab:'cards',activeSource:'mine',data:{fields:{rows:[{key:'test',name:'Test area',_loaded:true,players:[]},{key:'garden',name:'Garden',_loaded:true,players:[
+     {id:0,entity:'Student',params:[{id:0,name:'Deck ID',mode:'literal',editable:true,value:201}]},
+     {id:1,entity:'Teacher',params:[{id:0,name:'Deck ID',mode:'literal',editable:true,value:201}]},
+     {id:2,entity:'Ghost',params:[{id:0,name:'Deck ID',mode:'variable',editable:true,value:7}]}]}]}},vanilla:{fields:{rows:[]}}};
    window.calls=[];const ui=FF8CardsUI({el:U.el,subtabBar:U.subtabBar,state:model,columnList:U.columnList,detailPanel:U.detailPanel,detailSection:U.detailSection,detailField:U.detailField,infoHelp:U.infoHelp,sourceControl:control=>control,numberControl:(value,min,max,step,change,attrs)=>U.el('input',{type:'number',value,min,max,step,...attrs,oninput:e=>change(e.target.value)}),noteFieldEdit:(...args)=>calls.push(args),shell:{refresh:()=>{}},ensureFieldDetail:async()=>{}});
    document.querySelector('main').replaceChildren(ui.renderPlayers());}''')
   assert page.locator('select').count()==0
@@ -47,10 +50,11 @@ def main():
   # deck number to show.
   assert page.locator('.lex-column-list-row').filter(has_text='Student').first.inner_text().find('201')>=0
   assert page.locator('.lex-column-list-row').filter(has_text='Ghost').first.inner_text().find('—')>=0
-  control=page.get_by_label('Student Deck level',exact=True)
+  control=page.get_by_label('Student Deck ID',exact=True)
   control.fill('5')
   assert page.evaluate('model.data.fields.rows[1].players[0].params[0].value')==5
   assert page.evaluate('calls[0][0]')=='fields'
+  control.fill('201')
   styles=control.evaluate('e=>{const s=getComputedStyle(e);return [s.color,s.backgroundColor]}')
   assert styles[0]!='rgb(0, 0, 0)' and styles[1]!='rgb(255, 255, 255)',styles
   # Which other opponents name the same deck, and a way to reach each one.
@@ -58,7 +62,7 @@ def main():
   # heading's own text rather than the element's whole text.
   assert page.locator('.lex-detail-section-title',
                       has_text='ALSO USES DECK 201').count()==1
-  other=page.get_by_role('button',name='Teacher · garden',exact=True)
+  other=page.get_by_role('button',name='Open Teacher',exact=True)
   assert other.count()==1, 'the other opponent using deck 201 is not offered'
   other.click()
   page.wait_for_timeout(100)

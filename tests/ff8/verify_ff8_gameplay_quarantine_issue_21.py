@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+from tests.shared.plugin_ui import plugin_ui
 
 from plugins.ff8 import gameplay_settings
 
@@ -24,7 +25,7 @@ VISIBLE = frozenset({
 })
 
 
-EDITOR = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+EDITOR = plugin_ui('ff8')
 
 
 def main() -> None:
@@ -78,18 +79,18 @@ def main() -> None:
             assert loaded[key] is True, key
         assert loaded["formulaeRework"] is False
 
-    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(
-        encoding="utf-8",
-    )
+    editor = plugin_ui('ff8')
     rendered = editor[editor.index('const view=el("section",{class:"settings-view"}'):
-                      editor.index('$("#main").replaceChildren(view);')]
+                      editor.index('const settingsView=LexeditorUI.settingsColumns')]
     assert 'row("MONOGAMY"' in rendered
     assert 'row("UNIVERSAL ITEM"' in rendered
     for title in ("XP BARS", "HP BARS", "SHARED PARTY MAGIC INVENTORY",
                   "BETTER TARGETING", "COMMAND MENU REWORK"):
         assert f'row("{title}"' in rendered, title
     assert 'row("ENHANCED SCAN"' in rendered
-    assert 'row("FORMULAE REWORK"' not in rendered
+    # The unfinished tweak is visible with a blocker, while the persisted
+    # setting above remains fail-closed until the implementation is accepted.
+    assert 'formulaeRework,{blocker:settings.formulaeReworkBlocker}' in rendered
 
     print("FF8 visible Tweak persistence regression check passed")
 

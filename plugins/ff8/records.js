@@ -172,7 +172,18 @@
     }));
   }
   function renderKernel(view,label){const rows=filtered(view,["name","id"]),sample=state.data[view].rows[0],columns=[{key:"id",label:"ID"},{key:"name",label,render:row=>recordHoverLabel(view,row,view==="magic"?magicLabel(row):row.abilityType?abilityLabel(row):row.name,row.abilityType?node=>renameAbilityName(row,node):null)},...(sample?.fields||[]).map(field=>({key:`field:${field.field}`,label:field.label,pinned:false,numeric:field.control!=="boolean"&&field.lookup?.type!=="enum",sortValue:row=>row.fields.find(value=>value.field===field.field)?.value??"",render:row=>displayFieldValue(row.fields.find(value=>value.field===field.field))}))];showPaged(view,rows,columns,view==="magic"?magicDetail:(row,prefs)=>sharedDetail(row.abilityType?{...row,titleContent:abilityLabel(row,node=>renameAbilityName(row,node))}:row,prefs,fieldGroups(row.fields,view,row.id,false,prefs)),"74px minmax(180px,1fr)",view==="magic"?{leadingPanel:magicLeadingPanel,minLeading:260,defaultLeadingWidth:20,minLeft:260,minRight:430}:{})}
-  function matchingTextRow(dataset,row){return dataset?.text?.rows?.find(value=>value.source===row.source&&value.sectionId===row.sectionId&&value.recordId===row.recordId&&value.slot===row.slot)}
+  // Refine owns these strings and their linked offsets. The Text page presents
+  // live views of those same rows so undo and Save never juggle competing copies.
+  function refineTextRecord(recipe,dataset=state.data){
+    const table=dataset?.refine?.tables?.find(entry=>entry.id===recipe.table);
+    return {id:`refine:${recipe.table}:${recipe.id}`,source:"refine",sourceLabel:"Refine text",
+      sectionId:recipe.table,section:table?.name||recipe.table,recordId:recipe.id,slot:0,role:"Recipe",
+      name:`${table?.name||recipe.table} ${recipe.id+1}`,
+      get value(){return recipe.text},set value(value){recipe.text=String(value??"")}};
+  }
+  function textRecordRows(dataset=state.data){return [...(dataset?.text?.rows||[]),...(dataset?.refine?.rows||[]).map(row=>refineTextRecord(row,dataset))]}
+  function matchingTextRow(dataset,row){return textRecordRows(dataset).find(value=>value.source===row.source&&value.sectionId===row.sectionId&&value.recordId===row.recordId&&value.slot===row.slot)}
+  function openRefineText(row){state.selected.text=refineTextRecord(row).id;state.filters.text="";state.pages.text=0;state.textTab="text";navigate("text")}
   function textTokenToolbar(input){
     const tokens=state.data.text?.tokens;
     if(!tokens)return null;
@@ -221,6 +232,7 @@
     const references=state.references.map(reference=>{const value=matchingTextRow(state.referenceData[reference.id],row);return value?{name:reference.name,shortName:reference.shortName,value:value.value}:null}).filter(Boolean);
     const control=sourceControl(input,()=>row.value,matchingTextRow(state.vanilla,row)?.value,references,value=>row.value=String(value??""),undefined,{internal:true});
     const boundaries={
+      refine:"This message describes a refine recipe. Editing it changes the same message shown on Refine, without changing ingredients or quantities.",
       mngrp:"Menu text stays inside its original fixed-size mngrp.bin section. An edit that does not fit is rejected; all other menu data remains unchanged.",
       kernel:"Kernel text rebuilds its linked offsets and section table while preserving unrelated kernel data.",
       exe_card_names:"Card names are saved as ff8/en/exe/card_names.msd in this mod. FFNx replaces the game's card-name lookup at runtime; Lexeditor never changes FF8_EN.exe.",
@@ -238,7 +250,7 @@
         targetLabel:`text record ${row.name}`,
         activate:()=>{state.selected.text=row.id;state.textTab="text";navigate("text")}}),help:infoHelp(`${boundary} Each group in the special-text toolbar above explains what it inserts.`),control,pin:prefs?.pinButton("value","Text")})]});
   }
-  function renderTextRecords(){const rows=filtered("text",["sourceLabel","section","recordId","role","value"]),columns=[{key:"sourceLabel",label:"Source",width:"95px"},{key:"sectionId",label:"Section",numeric:true,width:"70px"},{key:"recordId",label:"Record",numeric:true,width:"70px"},{key:"role",label:"Field",width:"minmax(106px,.55fr)"},{key:"value",label:"Text",grow:1}];showPaged("text",rows,columns,textDetail,"95px 70px 70px minmax(106px,.55fr) minmax(160px,1fr)")}
+  function renderTextRecords(){const rows=filtered("text",["sourceLabel","section","recordId","role","value"],textRecordRows()),columns=[{key:"sourceLabel",label:"Source",width:"95px"},{key:"sectionId",label:"Section",numeric:true,width:"70px"},{key:"recordId",label:"Record",numeric:true,width:"70px"},{key:"role",label:"Field",width:"minmax(106px,.55fr)"},{key:"value",label:"Text",grow:1}];showPaged("text",rows,columns,textDetail,"95px 70px 70px minmax(106px,.55fr) minmax(160px,1fr)")}
 
   // The Text page holds the game's text records and its own name list, one
   // sub-tab each. A name is one line, so the list is one table edited in

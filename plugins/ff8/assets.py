@@ -493,7 +493,7 @@ def _geometry_counts(data: bytes, section: dict) -> dict | None:
     positions = struct.unpack_from(f"<{objects}I", data, start + 4)
     if any(position < 4 + objects * 4 or position >= size for position in positions):
         return None
-    vertices, = struct.unpack_from("<I", data, start + size - 4)
+    vertices = 0
     triangles = quads = 0
     for position in positions:
         cursor = start + position
@@ -505,6 +505,7 @@ def _geometry_counts(data: bytes, section: dict) -> dict | None:
             if cursor + 4 > start + size - 4:
                 return None
             count, = struct.unpack_from("<H", data, cursor + 2)
+            vertices += count
             cursor += 4 + count * 6
             if cursor > start + size - 4:
                 return None

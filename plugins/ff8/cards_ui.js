@@ -3,7 +3,7 @@
 window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
   detailSection, detailField, numberControl, selectControl, sourceControl,
   referenceValues, infoHelp, shell, noteFieldEdit, subtabBar, detailPanel,
-  recordId, columnList, conceptIcon, ensureFieldDetail}) => {
+  recordId, columnList, conceptIcon, ensureFieldDetail, navigate}) => {
   // The card's own four sides, in the order Triple Triad draws them.
   const sides = ["top", "left", "right", "bottom"];
   const fields = [...sides, "element", "power"];
@@ -156,70 +156,132 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     // several opponents. The scan already read every CARDGAME call, so the
     // deck each opponent names is known without loading a single area here.
     const deckOfCall=new Map();
+    const addDeck=(key,deck)=>{
+      if(!deckOfCall.has(key))deckOfCall.set(key,new Set());
+      deckOfCall.get(key).add(Number(deck));
+    };
     for(const entry of playerAreas.players||[]){
       if(entry.deckMode!=="literal"||entry.deckId===null||entry.deckId===undefined)continue;
-      deckOfCall.set(`${entry.map}:${entry.entity}`,Number(entry.deckId));
+      addDeck(`${entry.map}:${entry.entity}`,entry.deckId);
+    }
+    // Loaded script values include unsaved edits; the initial scan does not.
+    for(const map of state.data.fields.rows){
+      if(!map._loaded)continue;
+      for(const entry of groups.values())if(entry.map===map.key)deckOfCall.delete(entry.key);
+      for(const player of map.players||[]){
+        const param=player.params?.find(value=>value.id===0),key=`${map.key}:${player.entity}`;
+        if(param?.mode==='literal')addDeck(key,param.value);
+      }
     }
     const deckMembers=new Map();
     for(const entry of groups.values()){
-      const deck=deckOfCall.get(entry.key);
-      if(deck===undefined)continue;
-      if(!deckMembers.has(deck))deckMembers.set(deck,[]);
-      deckMembers.get(deck).push(entry.key);
+      for(const deck of deckOfCall.get(entry.key)||[]){
+        if(!deckMembers.has(deck))deckMembers.set(deck,[]);
+        deckMembers.get(deck).push(entry.key);
+      }
     }
     const players=[...groups.values()].map(entry=>({...entry,
       name:known.get(entry.entity.toLowerCase())||entry.entity,
-      deck:deckOfCall.get(entry.key)}));
+      deck:deckOfCall.has(entry.key)?[...deckOfCall.get(entry.key)].sort((a,b)=>a-b).join(', '):undefined}));
     const byKey=new Map(players.map(row=>[row.key,row]));
     const rows=players.filter(row=>`${row.name} ${row.map}`.toLowerCase().includes(query));
     const help=[
-      "Selects the opponent's deck, not a single card. The deck list itself is not editable.",
-      "The card rules you bring from previous regions. The game uses these when it offers to mix rules.",
-      "The card rules used in this opponent's region. These are separate from the rules you bring with you.",
+      "Identifies this opponent's rare-card ownership. Common cards are chosen from the levels below when a match starts.",
+      "Rules active for this match. Other script flags and the unused Retry bit are preserved.",
+      "Which cards change hands after the match: none, one chosen card, the score difference, each side's captured cards, or all five cards.",
       "Percentage chance, from 0 to 100, that this opponent uses an available rare card.",
       "The gameplay effect of this argument has not been verified. Its original value is retained.",
       "The gameplay effect of this argument has not been verified. Its original value is retained.",
-      "The gameplay effect of this argument has not been verified. Its original value is retained."];
+      "Choose common-card levels. No selection uses level 1. Rare cards depend on ownership in your save."];
     const detail=entry=>{
       const map=state.data.fields.rows.find(row=>row.key===entry.map);
       if(!map)return detailPanel({title:entry.name,body:[LexeditorUI.detailNote('Location data is unavailable.')]});
       if(!map._loaded&&!map._loading&&!map._error)
         queueMicrotask(async()=>{await ensureFieldDetail(map);if(state.tab==='cards'&&mode==='players')render()});
-      const body=[detailField({label:'Location',control:LexeditorUI.readonlyField(map.name)}),
+      const body=[detailField({label:'Location',control:LexeditorUI.hoverable({content:map.name,
+        targetType:'fields',targetId:map.id,targetLabel:map.name,
+        activate:()=>{state.selected.fields=map.id;state.filters.fields='';navigate('fields')}})}),
         detailField({label:'Map file',control:LexeditorUI.readonlyField(map.key)})];
       if(map._error)body.push(LexeditorUI.detailNote(`Could not load opponent: ${map._error}`));
       else if(!map._loaded)body.push(LexeditorUI.loadingPanel({label:'Loading opponent settings'}));
       else {
         const calls=(map.players||[]).filter(player=>player.entity===entry.entity);
-        if(calls.length>1)body.push(LexeditorUI.detailNote('This opponent has more than one card-game setup. The game script decides which setup is used.'));
         calls.forEach((player,index)=>{
           const fields=(player.params||[]).map(param=>{
+            if(param.id===4||param.id===5)return detailField({label:param.name,
+              help:infoHelp(help[param.id]),control:LexeditorUI.readonlyField(param.value)});
             const before=state.vanilla?.fields?.rows?.find(row=>row.key===map.key)?.players?.find(row=>row.id===player.id)?.params?.find(row=>row.id===param.id);
             const update=value=>{param.value=Number(value);noteFieldEdit('fields',{field:param.name});shell.refresh()};
+            if(param.id===1&&param.mode==='literal'){
+              const names=['Open','Same','Plus','Random','Sudden Death','Retry (unused)','Same Wall','Elemental'];
+              return detailSection({title:'RULES',help:infoHelp(help[1]),body:LexeditorUI.tileGrid(names.map((name,bit)=>{
+                const input=el('input',{type:'checkbox',checked:!!(param.value&(1<<bit)),
+                  disabled:bit===5||!param.editable||state.activeSource!=='mine',
+                  'aria-label':`${entry.name} ${name}`,
+                  onchange:event=>update(event.target.checked?param.value|(1<<bit):param.value&~(1<<bit))});
+                return el('label',{},input,name);
+              }),{minWidth:140})});
+            }
+            if(param.id===2&&param.mode==='literal'){
+              const current=param.value&255,names=['None','One','Difference','Direct','All'];
+              const choices=names.map((name,value)=>({name,value}));
+              if(current>=names.length)choices.push({name:`Unverified (${current})`,value:current});
+              const input=selectControl(current,choices,value=>update((param.value&~255)|Number(value)));
+              input.setAttribute('aria-label',`${entry.name} Trade rule`);
+              input.disabled=!param.editable||state.activeSource!=='mine';
+              return detailField({label:'Trade rule',help:infoHelp(help[2]),control:input});
+            }
+            if(param.id===6&&param.mode==='literal'){
+              const levels=Array.from({length:7},(_,level)=>{
+                const check=el('input',{type:'checkbox',checked:!!(param.value&(1<<level)),
+                  disabled:!param.editable||state.activeSource!=='mine',
+                  'aria-label':`${entry.name} card level ${level+1}`,
+                  onchange:event=>{
+                    const next=event.target.checked?param.value|(1<<level):param.value&~(1<<level);
+                    // Bit 7 alone supplies no level and does not take the
+                    // game's zero-byte fallback. Preserve it without making
+                    // the native generator divide by an empty level count.
+                    if((next&255)===128){event.target.checked=true;return}
+                    update(next);render();}});
+                return el('label',{},check,`Level ${level+1}`);
+              });
+              return detailSection({title:'CARD LEVELS',help:infoHelp(help[6]),
+                body:LexeditorUI.tileGrid(levels,{minWidth:100})});
+            }
             const variable=param.mode==='variable',maximum=!variable&&param.id===3?100:0xFFFFFF;
             const input=numberControl(param.value,0,maximum,1,update,{'aria-label':`${entry.name} ${param.name}`});
             input.disabled=!param.editable||state.activeSource!=='mine';
             return detailField({label:param.name+(variable?' variable':''),dataType:'INT',min:0,max:maximum,
               help:infoHelp(help[param.id]+(variable?' Holds a game-variable reference; changing it selects a different variable.':'')),
-              control:sourceControl(input,()=>param.value,before?.value,[],update)});
+              control:sourceControl(!variable&&param.id===3?LexeditorUI.unitField(input,'%'):input,()=>param.value,before?.value,[],update)});
           });
-          body.push(calls.length===1?LexeditorUI.stack({fill:false},...fields):detailSection({title:`Setup ${index+1}`,body:fields}));
+          if(calls.length===1)body.push(...fields);
+          else body.push(detailSection({title:`Setup ${index+1}`,
+            help:infoHelp('The game script chooses which of this opponent\'s card-game setups is used.'),body:fields}));
+          const levels=player.params?.find(param=>param.id===6);
+          if(levels?.mode==='literal'){
+            const mask=(levels.value&255)===0?1:levels.value&127;
+            const pool=state.data.cards.rows.filter(card=>card.id<77&&card.id!==47&&(mask&(1<<Math.floor(card.id/11))));
+            body.push(detailSection({title:calls.length===1?'COMMON CARD POOL':`SETUP ${index+1} COMMON CARD POOL`,
+              help:infoHelp('The game draws distinct cards from these levels when the match starts. PuPu is never drawn. Rare cards depend on the current save and can replace common cards.'),
+              body:LexeditorUI.tileGrid(pool.map(card=>LexeditorUI.recordCard({
+                title:LexeditorUI.hoverable({content:card.name,targetType:'cards',targetId:card.id,targetLabel:card.name,
+                  activate:()=>{state.selected.cards=card.id;state.filters.cards='';mode='cards';render()}}),
+                image:el('img',{src:`/assets/cards/${card.id}.png`,alt:card.name,loading:'lazy'})})),{balanced:true,minWidth:110})}));
+          }
         });
         // Which other opponents play the same deck. Editing a deck means
         // editing every script that names it, and no other screen shows that.
-        const deck=deckOfCall.get(entry.key);
-        if(deck!==undefined){
+        for(const deck of deckOfCall.get(entry.key)||[]){
           const others=(deckMembers.get(deck)||[]).filter(key=>key!==entry.key)
             .map(key=>byKey.get(key)).filter(Boolean);
           body.push(detailSection({title:`ALSO USES DECK ${deck}`,
-            help:infoHelp(`The deck number this opponent's CARDGAME call names. Several opponents can name the same deck, and the game reads that deck's own card list.`
-              +` The card list of a deck is not stored in the files this editor reads, so it cannot be shown or edited here.`
-              +` Each opponent below has its own CARDGAME call; select one to edit the values its script passes.`),
+            help:infoHelp('These opponents share the same rare-card ownership number. Their common-card levels can differ. Open an opponent to edit its settings.'),
             body:others.length
               ?LexeditorUI.stack({fill:false},...others.map(other=>
-                  el("button",{type:"button",style:"text-align:left",
-                    onclick:()=>{playerView.selected=other.key;playerView.page=0;render()}},
-                    `${other.name} · ${other.map}`)))
+                  LexeditorUI.hoverable({content:`${other.name} · ${other.map}`,
+                    targetType:'card-players',targetId:other.key,targetLabel:other.name,
+                    activate:()=>{playerView.selected=other.key;playerView.query='';playerView.page=0;render()}})))
               :LexeditorUI.detailNote(`No other CARDGAME call in the game data names deck ${deck}.`)}));
         }
       }

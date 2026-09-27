@@ -11,6 +11,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+from tests.shared.plugin_ui import plugin_ui
 
 
 def require(condition: bool, message: str) -> None:
@@ -19,7 +20,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> None:
-    editor = (ROOT / "plugins/ff8/editor.html").read_text(encoding="utf-8")
+    editor = plugin_ui('ff8')
     server = (ROOT / "plugins/ff8/server.py").read_text(encoding="utf-8")
     require("Read-only inventory" not in editor, "The old read-only enemy placeholder remains")
     require('/api/enemies/save' in server, "The enemy save route is missing")
@@ -33,10 +34,8 @@ def main() -> None:
             "The Enemies detail heading still sends raw braces to the game font")
     require('className:"enemy-scan-section"' in editor and 'field:"scan_description"' in editor,
             "The Enemies detail panel does not expose and save Scan descriptions")
-    # Matched without the quote characters, and without requiring the class
-    # attribute to end there: a row is allowed to carry a second class, and the
-    # panel is allowed to be written with single quotes.
-    require("enemy-properties-section" in editor and "enemy-properties-row" in editor,
+    require("detailSection({title:'PROPERTIES'" in editor and
+            "numeric.map(field=>detailField({label:enemyPropertyLabel(field)" in editor,
             "enemy properties must use one compact shared row")
 
     from plugins.ff8 import formats, paths, scan_text

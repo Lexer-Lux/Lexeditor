@@ -80,24 +80,19 @@
       {key:"timCount",label:"Textures",render:row=>row.timCount??"—"}];
     showPaged("models",rows,columns,modelDetail,"110px minmax(150px,2fr) 90px 80px 70px");
   }
-  // A model's texture pages as cards. The panel body and the model-preview
-  // drawer show the same grid, so it is built once. `inPlace` keeps the pages
-  // where the reader already is: a creature's own texture pages are that
-  // creature's data, not a reason to leave for the Textures page.
+  // The detail pane and preview drawer share the same linked texture cards.
   function modelTextureCards(row,options={}){
-    const inPlace=options.inPlace===true;
     return LexeditorUI.tileGrid((row.tims||[]).map(tim=>{
       const key=`${row.id}#${tim.index}`,palette=Math.max(0,Math.min((tim.paletteCount||1)-1,Number(assetPalettes[key]??0)));
       const targetId=`battle/${row.file}#${tim.index}`,targetLabel=`Texture ${tim.index+1}`;
       const preview=el("img",{src:`/assets/texture.png?id=${encodeURIComponent(targetId)}&palette=${palette}&dataset=${encodeURIComponent(assetDataset())}`,alt:`${row.name}, texture ${tim.index+1}`});
-      const cardContent=LexeditorUI.stack({fill:false},el("span",{},targetLabel),LexeditorUI.iconSlot({content:preview,shape:'square'}));
-      const link=inPlace?cardContent:hoverable({content:cardContent,targetType:"texture",targetId,targetLabel,activate:()=>{state.selected.textures=targetId;navigate("textures")}})
-      const paletteSelect=tim.paletteCount>1?selectControl(palette,Array.from({length:tim.paletteCount},(_,id)=>({value:id,name:`Palette ${id+1}`})),value=>{assetPalettes[key]=value;renderModels()}):null;
+      const link=content=>hoverable({content,targetType:"textures",targetId,targetLabel,
+        activate:()=>{state.selected.textures=targetId;state.filters.textures='';navigate("textures")}});
+      const paletteSelect=tim.paletteCount>1?selectControl(palette,Array.from({length:tim.paletteCount},(_,id)=>({value:id,name:`Palette ${id+1}`})),value=>{assetPalettes[key]=value;render()}):null;
       if(paletteSelect)paletteSelect.setAttribute("aria-label",`${row.name} texture ${tim.index+1} palette`);
-      const card=[link];
-      if(paletteSelect)card.push(detailField({label:"PALETTE",help:infoHelp("Palette selection only changes this preview; the game chooses palettes while rendering."),control:paletteSelect}));
-      return LexeditorUI.stack({fill:false},...card);
-    }),{minWidth:160});
+      return LexeditorUI.recordCard({title:link(targetLabel),image:link(preview),
+        body:paletteSelect?detailField({label:"PALETTE",help:infoHelp("Palette selection only changes this preview; the game chooses palettes while rendering."),control:paletteSelect}):null});
+    }),{minWidth:160,balanced:true});
   }
   // The first texture page of a battle model, as the record's own picture.
   // A creature whose model the game ships shows the creature; only a record
@@ -108,21 +103,17 @@
     const id=`battle/${model.file}#${tim.index}`;
     return el("img",{src:`/assets/texture.png?id=${encodeURIComponent(id)}&palette=0&dataset=${encodeURIComponent(assetDataset())}`,alt:`${model.name} texture page`});
   }
-  // What the shared model-preview drawer shows for a battle model. Nothing here
-  // draws 3D: what a reader can check without leaving the page is the model's own
-  // texture pages, the file facts beside them, and the way on to its record.
+  // Both Enemies and Models open the same geometry viewer from their header.
   function modelPreviewSpec(row,extra=null,options={}){
     if(!row?.file)return null;
     return {label:`${row.name} model`,
       openLabel:`Open the ${row.name} model`,
       closeLabel:`Close the ${row.name} model`,
-      content:()=>LexeditorUI.stack({fill:false},
-        LexeditorUI.detailNote([row.file,modelKindName(row.modelKind),
-          row.vertices==null?"no vertices":`${formatNumber(row.vertices)} vertices`,
-          `${row.timCount??0} textures`].join(" - ")),
-        row.tims?.length?modelTextureCards(row,options)
-          :LexeditorUI.detailNote("This file has no texture pages to preview."),
-        ...(extra?[extra]:[]))};
+      content:()=>LexeditorUI.stack(
+        LexeditorUI.actionRow(infoHelp('Drag to turn the model and use the wheel to zoom. Arrow keys also turn it; plus and minus zoom, and Home resets the view. The preview shows its first pose; Export GLB includes its textures, skeleton, and animations.'),
+          el('button',{type:'button',onclick:()=>el('a',{href:`/assets/model.glb?file=${encodeURIComponent(row.file)}&dataset=${encodeURIComponent(assetDataset())}`,download:`${row.file.replace(/\.[^.]+$/,'')}.glb`}).click()},'Export GLB'),...(extra?[extra]:[])),
+        FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name})),
+      onClose:drawer=>{drawer.querySelector('.lex-model-stage')?.lexDispose?.();drawer.replaceChildren();}};
   }
   function modelDetail(row,prefs){
     const sections=[];
@@ -161,7 +152,7 @@
       detailField({label:"",control:actions}),
       detailField({label:"",control:pending})],
       help:infoHelp([row.note,"Replace writes this battle file into the project's direct/ folder; FFNx loads it instead of the archive copy. Revert deletes the project copy."].filter(Boolean).join(' '))}));
-    return detailPanel({title:row.name,meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections,modelPreview:modelPreviewSpec(row)});
+    return detailPanel({title:row.name,icon:LexeditorUI.noImage(),meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections,modelPreview:modelPreviewSpec(row)});
   }
 
   function renderTextures(){

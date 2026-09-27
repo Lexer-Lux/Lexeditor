@@ -1,16 +1,6 @@
-"""An enemy's own texture pages stand in the enemy's own panel.
+"""Enemy textures use shared cards, with links to their editable texture records.
 
-Lexer: "why is clicking the thumbnail taking me to a page with textures. that
-info, specific to the enemy, should just be in the details panel!!! if i open
-the model viewer on an enemy it should show me the enemy!!!" and "why is the
-thumbnail preview thing on the other side of the header."
-
-The panel used to open with the shared "No image" box on the right of the
-heading, and both the box and the model preview led to the Textures page. This
-renders the real Enemies page from the installed game and checks what a reader
-gets now: the enemy's first texture page as the heading's own picture, on the
-left with the record; a TEXTURES section in the panel; and a preview that shows
-the enemy's pages where the reader already is.
+This covers texture previews and navigation, not a rendered 3D model.
 """
 from __future__ import annotations
 
@@ -61,7 +51,7 @@ def main() -> int:
               icon=panel.querySelector('.lex-detail-panel-icon'),title=panel.querySelector('.lex-detail-panel-title'),
               image=icon?.querySelector('img'),
               sections=[...panel.querySelectorAll('.lex-detail-section-title')].map(node=>node.textContent.trim()),
-              cards=panel.querySelectorAll('.lex-detail-section .lex-icon-slot').length,
+              cards=panel.querySelectorAll('.lex-detail-section .lex-record-card').length,
               links=panel.querySelectorAll('.lex-detail-section .lex-hoverable').length;
               return {iconImage:!!image,imageSource:image?image.getAttribute('src'):'',
                 iconLeft:icon?Math.round(icon.getBoundingClientRect().left):null,
@@ -73,16 +63,21 @@ def main() -> int:
             # The section's own question mark rides inside its title element.
             assert any(name.startswith("TEXTURES") for name in rendered["sections"]), rendered
             assert rendered["cards"] >= 1, rendered
-            assert rendered["links"] == 0, ("a panel card still leaves for another page", rendered)
+            assert rendered["links"] >= 2, rendered
+            cdp.eval("document.querySelector('.enemy-detail .lex-record-card .lex-hoverable').click()")
+            wait_eval(cdp,"state.tab==='textures'",15)
+            assert cdp.eval("state.selected.textures").startswith('battle/')
+            cdp.eval("navigate('enemies')")
+            wait_eval(cdp,"document.querySelector('.enemy-detail .lex-record-card')!==null",15)
 
             # The heading picture is the model preview trigger, and what it opens
             # is the enemy's own pages where the reader already stands.
             cdp.eval("document.querySelector('.enemy-detail .lex-detail-panel-icon').click()")
             wait_eval(cdp, "document.querySelector('.lex-model-preview-drawer')!==null", 15)
             drawer = cdp.eval("""(()=>{const drawer=document.querySelector('.lex-model-preview-drawer');
-              return {text:drawer.innerText.slice(0,120),cards:drawer.querySelectorAll('.lex-icon-slot').length,
+              return {text:drawer.innerText.slice(0,120),cards:drawer.querySelectorAll('.lex-record-card').length,
                 links:drawer.querySelectorAll('.lex-hoverable').length,tab:state.tab}})()""")
-            assert drawer["cards"] >= 1 and drawer["links"] == 0, drawer
+            assert drawer["cards"] >= 1 and drawer["links"] >= 2, drawer
             assert "Texture 1" in drawer["text"], drawer
             assert drawer["tab"] == "enemies", drawer
             image = screenshot(cdp, "ff8-enemy-textures.png")

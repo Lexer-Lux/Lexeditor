@@ -126,9 +126,17 @@ def main():
         source.write_text(CASES, encoding='utf-8')
         if os.name == 'nt':
             binary=binary.with_suffix('.exe')
-            vcvars=Path(r'C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars32.bat')
+            vswhere=Path(os.environ.get('ProgramFiles(x86)', r'C:\Program Files (x86)')) / 'Microsoft Visual Studio/Installer/vswhere.exe'
+            installation=subprocess.check_output([
+                str(vswhere),'-latest','-products','*',
+                '-requires','Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+                '-property','installationPath',
+            ],text=True).strip()
+            if not installation:
+                raise RuntimeError('Visual Studio C++ tools are required for the battle-camera check')
+            vcvars=Path(installation)/'VC/Auxiliary/Build/vcvars32.bat'
             script=Path(folder)/'build.cmd'
-            script.write_text(f'@call "{vcvars}" >nul\n@cl /nologo /EHsc /std:c++20 /O2 /I"{HEADER.parent}" "{source}" /Fe:"{binary}"\n')
+            script.write_text(f'@call "{vcvars}" >nul\n@if errorlevel 1 exit /b %errorlevel%\n@cl /nologo /EHsc /std:c++20 /O2 /I"{HEADER.parent}" "{source}" /Fe:"{binary}"\n')
             subprocess.run(['cmd.exe','/c',str(script)],cwd=folder,check=True)
         else:
             subprocess.run([

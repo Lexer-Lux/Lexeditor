@@ -9,6 +9,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "shared"))
 from plugin_ui import plugin_ui
 FRAMEWORK_CSS=(ROOT/'ui/framework.css').read_text(encoding='utf-8')
 FRAMEWORK_JS=(ROOT/'ui/framework.js').read_text(encoding='utf-8')
+
+def readable_inputs(card):
+ return card.evaluate("""e=>{const canvas=document.createElement('canvas'),context=canvas.getContext('2d');
+   return [...e.querySelectorAll('.lex-curve-variable input')].map(input=>{
+     const style=getComputedStyle(input);context.font=style.font;
+     const text=Math.max(...[input.value,input.min,input.max].map(value=>context.measureText(value).width));
+     const chrome=['paddingLeft','paddingRight','borderLeftWidth','borderRightWidth']
+       .reduce((total,key)=>total+(parseFloat(style[key])||0),0);
+     // Reserve a full em for the native number spinner on either browser.
+     const required=text+chrome+parseFloat(style.fontSize);
+     return {width:input.getBoundingClientRect().width,required};
+   })}""")
+
+def assert_readable_inputs(card):
+ metrics=readable_inputs(card)
+ assert len(metrics)==4 and all(item['width']+1>=item['required'] for item in metrics),metrics
 def main():
  css=(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8')
  with sync_playwright() as pw:
@@ -47,8 +63,7 @@ def main():
     const variables=['A','B','C','D'].map(label=>({label,control:LexeditorUI.el('input',{type:'number',value:20,min:0,max:255})}));
     mount.append(LexeditorUI.curveEditor({title:'NARROW',variables,domain:{min:1,max:100},range:{min:0,max:255},evaluate:x=>x,formula:LexeditorUI.mathFormula('N = A')}));}""")
   narrow=page.locator('#narrow-mount .lex-curve-editor')
-  widths=narrow.evaluate("""e=>[...e.querySelectorAll('.lex-curve-variable input')].map(n=>Math.round(n.getBoundingClientRect().width))""")
-  assert len(widths)==4 and min(widths)>=70,widths
+  assert_readable_inputs(narrow)
   narrow.hover();page.wait_for_timeout(220)
   hit=narrow.evaluate("""e=>{const t=e.querySelector('.lex-curve-mode-toggle'),r=t.getBoundingClientRect();
     const n=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
@@ -83,7 +98,7 @@ def main():
   assert strip['rows']<=2,strip
   assert strip['slack']<=2,strip
   assert strip['share']<=65,strip
-  assert len(strip['widths'])==4 and min(strip['widths'])>=70,strip
+  assert_readable_inputs(wrap)
   page.mouse.move(1,1);page.wait_for_timeout(250)
   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-ff8-eight-graphs.png'))
   browser.close();print('Eight graphs: titles, borders, colors, drawer bounds and equation spacing passed.')

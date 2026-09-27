@@ -56,7 +56,9 @@ def fixture() -> dict:
 
 def page_html() -> str:
     editor = '<html><head><style>'+(ROOT/'plugins/ff8/editor.css').read_text(encoding='utf-8')+'</style></head><body><header id="lexeditor-shell"></header><div id="toolbar"></div><main id="main"></main><script>'
-    editor += '\n'.join((ROOT/'plugins/ff8'/name).read_text(encoding='utf-8') for name in ['core.js','records.js','party.js','battle.js','places.js','boot.js'])
+    page = (ROOT/'plugins/ff8/editor.html').read_text(encoding='utf-8')
+    modules = re.findall(r'<script src="([A-Za-z0-9_.-]+\.js)">',page)
+    editor += '\n'.join((ROOT/'plugins/ff8'/name).read_text(encoding='utf-8') for name in modules if name != 'cards_ui.js')
     # Only omit the desktop boot / external game discovery; every view,
     # picker, provenance control, serializer and layout is production code.
     editor = editor[:editor.index('  const shell=LexeditorUI.mountShell(')]
@@ -134,6 +136,9 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
             page.evaluate('setup', dataset)
             page.wait_for_timeout(200)
             assert not errors, errors
+            if output:
+                output.mkdir(parents=True,exist_ok=True)
+                page.screenshot(path=str(output/'ff8-enemy-compact.png'))
             assert page.locator('.enemy-detail .enemy-scan-section textarea').count() == 1
             page.locator('.enemy-scan-section textarea').fill('Changed Scan text')
             assert page.evaluate('fixtureState.data.enemies.rows[0].scanDescription') == 'Changed Scan text'

@@ -11,24 +11,19 @@
     mode.value=rule.mode;
     return LexeditorUI.stack({fill:false},mode,...(["fixed","maximum"].includes(rule.mode)?[numberControl(rule.value,1,100,1,value=>apply(rule.mode,value),{"aria-label":"Enemy level rule value"})]:[]));
   }
-  // The four header bytes of a formation, as ordinary properties: the name on
-  // the left and a help bubble beside it. This row used the stacked part of the
-  // shared row component, which puts the name over the box and, with no help
-  // passed, leaves the property with no bubble at all - so the same kind of
-  // value looked unlike every other property in the editor. Four property
-  // rows in one pair of lanes, like the field pages use, because four parts
-  // across one lane leaves the longest name - Secondary camera - clipped.
+  // Keep the four formation properties together. Only the arena selector has
+  // established editing semantics; preserve the three unresolved header values.
   const encounterHeaderFields=[
     ["Stage","Battle stage number for this formation. It selects the arena the battle is fought in, so two formations with the same stage fight in the same place."],
-    ["Flags","Flag byte stored with this formation. Its effect on the battle is not established here, so Lexeditor shows it and saves it without interpretation."],
-    ["Main camera","Main camera number stored with this formation. The game's use of this value is not established here."],
-    ["Secondary camera","Second camera number stored with this formation. The game's use of this value is not established here."]];
+    ["Flags","These battle settings are not understood yet, so this value is read-only."],
+    ["Main camera","This may select the main battle camera. Its effect is not confirmed, so this value is read-only."],
+    ["Secondary camera","This may select a second battle camera. Its effect is not confirmed, so this value is read-only."]];
   function encounterDetail(row,prefs){
-    const formation=LexeditorUI.tileGrid(['stageId','flags','cameraMain','cameraSecondary'].map((key,index)=>detailField({
+    const formation=LexeditorUI.multiNumberRow(['stageId','flags','cameraMain','cameraSecondary'].map((key,index)=>({
       label:encounterHeaderFields[index][0],
-      help:infoHelp(encounterHeaderFields[index][1]),
-      control:encounterSource(numberControl(row[key],0,255,1,value=>{row[key]=value;shell.refresh()}),row,value=>value?.[key],value=>{row[key]=Number(value);shell.refresh()})
-    })),{columns:2});
+      help:encounterHeaderFields[index][1],
+      control:index===0?encounterSource(numberControl(row[key],0,255,1,value=>{row[key]=value;shell.refresh()},{'aria-label':'Formation stage'}),row,value=>value?.[key],value=>{row[key]=Number(value);shell.refresh()}):LexeditorUI.readonlyField(row[key])
+    })),{columns:4,stacked:true});
     const source=(slot,key,control)=>{
       if(!slot.enabled&&key!=='enabled')for(const input of [control,...control.querySelectorAll('input,select,button')])
         if(input.matches('input,select,button'))input.disabled=true;
@@ -36,7 +31,7 @@
     };
     const table=columnList({rows:row.slots,key:slot=>slot.slot,editable:true,fill:true,
       'aria-label':'Formation enemies',columns:[
-        {key:'slot',label:'Slot',width:'max-content',render:slot=>slot.slot+1},
+        {key:'slot',label:'Slot',width:'max-content',render:slot=>LexeditorUI.numberValue(slot.slot+1)},
         {key:'enemyId',label:'Enemy',grow:2,render:slot=>source(slot,'enemyId',enemySearchControl(slot.enemyId,`Choose enemy for slot ${slot.slot+1}`,value=>{slot.enemyId=Number(value);slot.enemyName=enemyById(value).name;shell.refresh()},()=>navigate('encounters')))},
         ...['enabled','visible','loaded','targetable'].map(key=>({key,label:key==='enabled'?LexeditorUI.enabledMark:key[0].toUpperCase()+key.slice(1),render:slot=>source(slot,key,el('input',{type:'checkbox',checked:slot[key],'aria-label':`Slot ${slot.slot+1} ${key}`,onchange:event=>{slot[key]=event.target.checked;if(key==='enabled')renderEncounters();shell.refresh()}}))})),
         ...['x','y','z'].map(key=>({key,label:key.toUpperCase(),grow:1,render:slot=>source(slot,key,numberControl(slot[key],-32768,32767,1,value=>{slot[key]=value;shell.refresh()},{'aria-label':`Slot ${slot.slot+1} ${key}`}))})),
@@ -51,7 +46,7 @@
   // above is its Formations subtab, beside Rules and Groups.
 
   function worldRow(dataset,kind,id){return dataset?.world?.rows?.find(row=>row.kind===kind&&Number(row.id)===Number(id))}
-  function worldNumber(row,key,min,max,label){
+  function worldNumber(row,key,min,max,label,refresh=render){
     const vanilla=worldRow(state.vanilla,row.kind,row.id),refs=state.references.map(reference=>({name:reference.name,
       shortName:reference.shortName,value:worldRow(state.referenceData[reference.id],row.kind,row.id)?.[key]}))
       .filter(entry=>entry.value!==undefined);
@@ -61,8 +56,8 @@
     // alone changed the stored number and left the drawing where it was, which is
     // why a draw point's dot did not move when its X was edited. The rebuild waits
     // for the change, not every keystroke, so the field keeps focus while typing.
-    control.addEventListener("change",()=>{render();shell.refresh()});
-    return sourceControl(control,()=>row[key],vanilla?.[key],refs,value=>{row[key]=Number(value);render();shell.refresh()})
+    control.addEventListener("change",()=>{refresh();shell.refresh()});
+    return sourceControl(control,()=>row[key],vanilla?.[key],refs,value=>{row[key]=Number(value);refresh();shell.refresh()})
   }
   // Where a signed world coordinate lands on the map image: 2048 stored units
   // to a block, on the 128 by 96 grid the draw points use, centred on the
@@ -183,6 +178,12 @@
     return map;
   }
   function worldDrawPointDetail(row,prefs){
+    const editable=()=>state.activeSource==='mine'&&document.documentElement.dataset.lexProjectReadonly!=='true';
+    const fields=refresh=>[['x','X'],['y','Y'],['subId','SUB-ID']].map(([key,label])=>{
+      const control=worldNumber(row,key,0,255,`Draw Point ${row.drawId} ${label}`,refresh);
+      if(!editable())control.querySelectorAll('input,select,button').forEach(node=>node.disabled=true);
+      return detailField({label,help:infoHelp(worldPropertyHelp.drawPoint[key]),control});
+    });
     // The panel's map is a picture of where the point is. Clicking it opens the
     // large map, and the large map is where the point is placed: a stray click on
     // a panel must never move game data.
@@ -191,7 +192,7 @@
       points:()=>{const at=worldDrawPosition(row);return at.y>=96?[]:[{x:at.x/128,y:at.y/96,selected:true,
         label:`Draw Point ${row.drawId}`}];},
       readout:point=>{const block=worldDrawBlock(point);return `block ${block.x}, ${block.y}`},
-      place:point=>{const block=worldDrawBlock(point);Object.assign(row,worldDrawBytes(block.x,block.y));rerenderWorldMap();shell.refresh()}});
+      place:editable()?point=>{const block=worldDrawBlock(point);Object.assign(row,worldDrawBytes(block.x,block.y));rerenderWorldMap();shell.refresh()}:null});
     const map=LexeditorUI.imageMap({...spec(),place:null,magnify:null});
     worldMapNavigation(map,map.lexStage);
     map.classList.add("world-draw-map");
@@ -200,11 +201,15 @@
     // The marker is a button and stops its own click, so the map listens on the
     // way down: any click on the picture opens the large map.
     map.addEventListener("click",event=>{if(event.target.closest("input,a"))return;
-      LexeditorUI.mapMagnifier({label:`Draw Point ${row.drawId}`,magnify:()=>({...spec(),
-        note:`Click the map to place Draw Point ${row.drawId}, or close this view and type the exact byte coordinates.`})});},true);
+      LexeditorUI.mapMagnifier({label:`Draw Point ${row.drawId}`,minSizes:[480,300],
+        details:({refresh})=>detailPanel({title:`Draw Point ${row.drawId}`,
+          body:detailSection({body:fields(()=>{rerenderWorldMap();refresh()})})}),
+        magnify:()=>({...spec(),note:editable()
+          ?`Click the map to place Draw Point ${row.drawId}, or edit its position on the right.`
+          :'This source is read-only. Select an editable mod to move this draw point.'})});},true);
 
     // The list shows the draw point's own draw ID, so the panel does too.
-    return sharedDetail({...row,id:row.drawId,name:`DRAW POINT ${row.drawId}`},prefs,[detailSection({className:"world-draw-position",help:infoHelp("Section 34 stores only this world Draw Point's X, Y, and sub-ID bytes. Its magic, quantity, and refill behavior live in FF8_EN.exe and are not invented here."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},detailField({label:"X",help:infoHelp(worldPropertyHelp.drawPoint.x),control:worldNumber(row,"x",0,255,`Draw Point ${row.drawId} X`)}),detailField({label:"Y",help:infoHelp(worldPropertyHelp.drawPoint.y),control:worldNumber(row,"y",0,255,`Draw Point ${row.drawId} Y`)}),detailField({label:"SUB-ID",help:infoHelp(worldPropertyHelp.drawPoint.subId),control:worldNumber(row,"subId",0,255,`Draw Point ${row.drawId} sub-ID`)}))],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
+    return sharedDetail({...row,id:row.drawId,name:`DRAW POINT ${row.drawId}`},prefs,[detailSection({className:"world-draw-position",help:infoHelp("Section 34 stores only this world Draw Point's X, Y, and sub-ID bytes. Its magic, quantity, and refill behavior live in FF8_EN.exe and are not invented here."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},...fields())],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
   }
   function worldFieldReturnDetail(row,prefs){
     // The map, so the reader can see where the stored point lands: the coordinates are
@@ -399,6 +404,6 @@
         LexeditorUI.quantityChoice(recipeFields[0],recipeFields[1]),
         el("span",{"aria-label":"produces"},"→"),
         LexeditorUI.quantityChoice(recipeFields[2],recipeFields[3])),
-      detailField({label:"Recipe text",className:"lex-detail-field-stacked",showType:false,pin:prefs?.pinButton("text","Recipe text"),help:infoHelp("Message shown in the game for this recipe. Line breaks here also appear in the game. Update it when you change the ingredients or quantities; it does not set the conversion itself."),control:refineSource(text,row,"text",value=>row.text=String(value??""))})
+      detailField({label:hoverable({content:"Recipe text",targetType:"text",targetId:refineTextRecord(row).id,targetLabel:`recipe text for ${label}`,activate:()=>openRefineText(row)}),className:"lex-detail-field-stacked lex-text-editor",showType:false,pin:prefs?.pinButton("text","Recipe text"),help:infoHelp("Message shown in the game for this recipe. Line breaks here also appear in the game. Update it when you change the ingredients or quantities; it does not set the conversion itself."),control:refineSource(text,row,"text",value=>row.text=String(value??""))})
     ],"refine-detail");
   }

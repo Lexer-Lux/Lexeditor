@@ -22,11 +22,13 @@ def main():
   page.evaluate('''()=>{
     const content=document.querySelector('.lex-detail-section-content');
     const input=content.querySelector('input');
-    content.replaceChildren(LexeditorUI.columnList({rows:Array.from({length:22},(_,id)=>({id})),
+    const table=LexeditorUI.columnList({rows:Array.from({length:22},(_,id)=>({id})),
       columns:[{key:'id',label:'Slot',render:r=>r.id},{key:'ability',label:'Ability',render:r=>r.id===0?input:
         LexeditorUI.inlineLabel(LexeditorUI.inlineLabel(LexeditorUI.el('img',{
           src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path fill="%23998ab6" d="M2 2h12v12H2z"/></svg>',alt:''})),
-          LexeditorUI.el('span',{},'Ability '+r.id))}]}));
+          LexeditorUI.el('span',{},'Ability '+r.id))}]});
+    table.dataset.gfAbilities='true';
+    content.replaceChildren(table);
   }''')
   page.add_style_tag(content='#gf-detail {display:flex} #gf-detail > .lex-tabbed-panel {flex:1;min-height:0}')
   page.add_script_tag(content=(ROOT/'plugins/ff8/cards_ui.js').read_text(encoding='utf-8'))

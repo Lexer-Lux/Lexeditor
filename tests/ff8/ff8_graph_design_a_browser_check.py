@@ -109,6 +109,8 @@ METRICS_SCRIPT = r"""() => [...document.querySelectorAll('.ff8-character-curve')
     endpointWeight:endpointStyle?.fontWeight||'',
     endpointFilter:endpointStyle?.filter||'',
     endpointStroke:endpointStyle?.stroke||'',
+    endpointStrokeWidth:Number.parseFloat(endpointStyle?.strokeWidth||'0'),
+    endpointPaintOrder:endpointStyle?.paintOrder||'',
     insideViewport:!!box&&box.left>=-2&&box.right<=innerWidth+2,
   };
 })"""
@@ -158,8 +160,11 @@ with sync_playwright() as playwright:
                 assert item["hasPower"],(width,item)
                 assert item["powerTop"]<0,(width,item)
                 assert item["endpointWeight"] in ("700","bold"),(width,item)
-                assert "drop-shadow" in item["endpointFilter"],(width,item)
-                assert item["endpointStroke"]=="none",(width,item)
+                # Shared graph endpoints use an outline behind the fill so
+                # values stay legible against both bright and dark plots.
+                assert item["endpointStroke"]!="none",(width,item)
+                assert item["endpointStrokeWidth"]>=1,(width,item)
+                assert item["endpointPaintOrder"].startswith("stroke"),(width,item)
                 assert item["insideViewport"],(width,item)
 
             before=page.locator('.ff8-character-curve[data-curve-title="HP"] .lex-curve-line').get_attribute("d")

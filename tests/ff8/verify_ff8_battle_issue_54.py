@@ -16,6 +16,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+from tests.shared.plugin_ui import plugin_ui
 from plugins.ff8 import battle_issue_54 as battle
 from plugins.ff8 import gameplay_settings
 EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")
@@ -215,7 +216,7 @@ def main() -> int:
     assert battle.summon_unavailable_reason(junctioned_gf_count=2) == ""
 
     gameplay = (ROOT / "plugins" / "ff8" / "gameplay_settings.py").read_text(encoding="utf-8")
-    editor = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    editor = plugin_ui('ff8')
     assert "battle_issue_54.build_command_eligibility_patch(" in gameplay
     assert "draw_once=draw_once_per_enemy, better_card=better_card_enabled" in gameplay
     assert "battle_issue_54.build_draw_patch(draw_once_per_enemy)" not in gameplay

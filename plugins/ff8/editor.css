@@ -167,6 +167,13 @@
 .ff8-encounter-rule-table {--lex-cell-padding:2px 4px;--lex-cell-padding-inline:4px;--lex-head-cell-padding:3px 4px;}
 
 .ff8-encounter-preview-section {--lex-section-content-padding:6px 0 0;}
+.ff8-encounter-formation-row { display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px;min-width:0; }
+.ff8-encounter-formation-choice { position:relative;display:flex;align-items:stretch;min-width:0; }
+.ff8-encounter-formation-choice > .lex-source-control,
+.ff8-encounter-formation-choice .lex-choice-field { display:flex;align-items:stretch;width:100%; }
+.ff8-encounter-formation-link { writing-mode:vertical-rl;transform:rotate(180deg);white-space:normal;max-height:26em;width:100%; }
+.ff8-encounter-formation-finder { position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:0; }
+.ff8-encounter-formation-row:where(:hover,:focus-within) .ff8-encounter-formation-finder { opacity:1; }
 
 /* The world map fills its panel: no band, no heading, just the map. */
 .ff8-world-map-panel {--lex-panel-body-gap:0;}

@@ -420,12 +420,14 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     return LexeditorUI.instructionList({rows:script.instructions,page:state.enemyAiPages[pageKey]||0,pageSize:state.enemyAiPageSizes[pageKey],
       editable:state.activeSource==='mine',changePage:(value,size)=>{state.enemyAiPages[pageKey]=value;state.enemyAiPageSizes[pageKey]=size},
       controls:instruction=>{
-        const controls=el('div',{class:'lex-instruction-controls'},enemyAiOpcodeControl(script,instruction,opcodeChoices),
+        const controls=[enemyAiOpcodeControl(script,instruction,opcodeChoices),
           ...instruction.operands.filter(operand=>{
             const subject=Number(instruction.operands[0]?.value);
             return !(instruction.opcode===2&&operand.type==='subject_param'&&operand.value===200&&((subject>=80&&subject<=87)||(subject>=96&&subject<=103)));
-          }).map(operand=>enemyAiOperand(row,script,instruction,operand)));
-        if(state.activeSource!=='mine'||!instruction.editable)controls.querySelectorAll('input,select,button').forEach(control=>control.disabled=true);
+          }).map(operand=>enemyAiOperand(row,script,instruction,operand))];
+        if(state.activeSource!=='mine'||!instruction.editable)for(const control of controls)
+          for(const input of [control,...control.querySelectorAll('input,select,button')])
+            if(input.matches('input,select,button'))input.disabled=true;
         return controls;
       },describe:instruction=>enemyAiDescription(row,instruction,script),
       move:(from,to)=>enemyAiMove(script,from,to-from),

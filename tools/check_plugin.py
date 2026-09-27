@@ -157,9 +157,11 @@ jobs:
 
 def workflow_files() -> dict[str, str]:
     """The complete, expected contents of .github/workflows/."""
+    from runpy import run_path
+    native_ff8_workflow = run_path(str(ROOT / "tools/ff8_native_workflow.py"))["WORKFLOW"]
     shared = ["tests/plugin_checks.json", "tools/check_plugin.py", "tests/shared/verify_all.py",
               "requirements-test.txt"]
-    files = {}
+    files = {"ff8-stock-build.yml": native_ff8_workflow}
     for plugin in PLUGINS:
         paths = [f"plugins/{plugin}/**", f"tests/{plugin}/**"] + shared
         paths.append(f".github/workflows/{plugin}-checks.yml")

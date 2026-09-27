@@ -10,6 +10,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+from tests.shared.plugin_ui import plugin_ui
 
 from plugins.ff8 import paths  # noqa: E402
 from plugins.ff8.plugin import FF8Session  # noqa: E402
@@ -25,19 +26,20 @@ def post(session: FF8Session, endpoint: str, payload: dict) -> dict:
 
 
 def main() -> int:
-    html = (ROOT / "plugins" / "ff8" / "editor.html").read_text(encoding="utf-8")
+    html = plugin_ui('ff8')
     weapon_start = html.index("function weaponDetail(row,prefs)")
     weapon_end = html.index("function renderKernel", weapon_start)
     weapon_source = html[weapon_start:weapon_end]
 
-    assert 'detailSection({className:"weapon-section weapon-data",title:"DATA"' in weapon_source
-    assert 'detailSection({className:"weapon-section weapon-cost",title:"COST"' in weapon_source
+    assert 'detailSection({title:"DATA",body:dataFields}' in weapon_source
+    assert 'detailSection({title:"COST",body:[' in weapon_source
     assert "return sharedDetail(row,prefs" in weapon_source
     assert weapon_source.index('"DATA"') < weapon_source.index('"COST"')
     assert '"INGREDIENTS"' not in weapon_source
     assert 'el("thead"' not in weapon_source
-    cost_start = weapon_source.index('className:"weapon-section weapon-cost"')
-    assert weapon_source.index('label:"PRICE"', cost_start) < weapon_source.index("...ingredients", cost_start)
+    cost_start = weapon_source.index('title:"COST"')
+    assert weapon_source.index('control:price', cost_start) < weapon_source.index("...ingredients", cost_start)
+    assert 'pinButton("upgradePrice","Price")' in weapon_source
     assert '"Upgrade price"' not in weapon_source
     assert 'fieldSourceControl(field,"weapons",row.id,{internal:true})' in weapon_source
     assert 'sourceControl(itemSearchControl(ingredient.itemId' in weapon_source
@@ -47,7 +49,7 @@ def main() -> int:
     assert 'type:"items"' in html and 'prompt,target:()=>navigate("items")' in html
     assert "fieldGroups(" not in weapon_source
     assert 'el("details"' not in weapon_source
-    assert ".weapon-detail" in html and "overflow:hidden" in html
+    assert 'LexeditorUI.controlGroup([item,quantity].filter(Boolean))' in weapon_source
 
     baseline = {
         path: digest(path)

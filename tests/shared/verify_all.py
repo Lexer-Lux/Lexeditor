@@ -109,6 +109,35 @@ def timeout_for(tool: Path, default: float) -> float:
 # HTTP 400s, empty-corpus assertions, or font timeouts. Keep this list exact so
 # self-contained FF8 source/unit verifiers still run in CI.
 _FF8_BASELINE_TOOLS = frozenset({
+    # These checks intentionally inspect shipped archives/models/sounds or
+    # render their real records. Synthetic archive/card/control checks still
+    # run on CI without a proprietary game installation.
+    "ff8_asset_tabs_browser_check",
+    "ff8_enemy_texture_panel_check",
+    "ff8_enemy_ai_speed_check",
+    "ff8_model_viewer_check",
+    # These boot the complete server with no synthetic dataset. Their
+    # assertions inspect kernel/world/name records from the installed game.
+    "ff8_edit_memory_browser_check",
+    "ff8_gf_hp_casting_browser_check",
+    "ff8_magic_narrow_check",
+    "ff8_namedic_browser_check",
+    "ff8_new_game_tab_browser_check",
+    "ff8_reshade_tab_browser_check",
+    "ff8_spreadsheet_browser_check",
+    "ff8_wm2field_browser_check",
+    "verify_ff8_world_extra_api",
+    "verify_ff8_character_stat_curves",
+    "verify_ff8_enemies_editor_issue_39",
+    "verify_ff8_weapons_detail_issue_36",
+    "verify_ff8_info_visual_58",
+    "verify_ff8_current_ui_visual",
+    "ff8_field_name_fade_check",
+    "ff8_field_page_check",
+    "ff8_textures_list_check",
+    "verify_ff8_animation_sequences",
+    "verify_ff8_archives",
+    "verify_ff8_field_walkmesh_editor",
     "verify_bottom_command_bar_visual",
     "verify_ff8_cards_visual_91",
     "verify_ff8_data_ui_completion",
@@ -152,6 +181,10 @@ def _ff8_baseline_sentinel() -> Path:
 
 
 def _preflight_unrunnable(tool: Path) -> tuple[str, str]:
+    if tool.stem == "ff8_tabs_browser_check":
+        font = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Lexeditor/game-data/ff8/generated/ff8-menu.ttf"
+        if not font.is_file():
+            return "needs installed game/project data", f"missing extracted FF8 menu font: {font}"
     if tool.stem in _FF8_BASELINE_TOOLS:
         sentinel = _ff8_baseline_sentinel()
         if not sentinel.is_file():

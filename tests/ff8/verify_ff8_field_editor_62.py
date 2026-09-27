@@ -81,6 +81,15 @@ def verify_archive_and_binary() -> dict:
             changed = [index for index, pair in enumerate(zip(before, after)) if pair[0] != pair[1]]
             assert result == {"saved": 1, "maps": 1}
             assert changed == [param["offset"]], changed
+            for unknown in (4, 5):
+                try:
+                    field_data.save([{"map": selected["key"], "player": 0,
+                                      "param": unknown, "value": 1}])
+                except ValueError as error:
+                    assert "Unverified CARDGAME" in str(error)
+                else:
+                    raise AssertionError("Unverified CARDGAME argument was editable")
+                assert destination.read_bytes() == after
             assert field_data.map_rows(selected["key"])["players"][0]["params"][0]["value"] == replacement
             inf_before = (paths.BASELINE_ROOT /
                           "field/mapdata/bg/bghall_1/bghall_1.inf").read_bytes()
