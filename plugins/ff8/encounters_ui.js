@@ -192,7 +192,7 @@
   // ---- Groups --------------------------------------------------------------
   function encounterGroupSlotControl(row,index,refresh,origin){
     const value=row.encounters[index];
-    const link=hoverable({content:recordId(value),targetType:"encounters",targetId:value,targetLabel:`battle formation ${value}`,class:'ff8-encounter-formation-link',
+    const link=hoverable({content:el("span",{},"Formation ",recordId(value)),targetType:"encounters",targetId:value,targetLabel:`battle formation ${value}`,class:'ff8-encounter-formation-link',
       activate:()=>showEncounterSubtab("formations","encounters",Number(value))});
     const accept=next=>{if(state.activeSource!=='mine'||!encounterRowById(next))return;row.encounters[index]=Number(next);refresh()};
     const finder=el("button",{type:"button",title:"Choose a battle formation",disabled:state.activeSource!=='mine',class:'ff8-encounter-formation-finder',
@@ -206,7 +206,7 @@
     const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,
       value:worldRow(state.referenceData[reference.id],"group",row.id)?.encounters?.[index]})).filter(entry=>entry.value!==undefined);
     return sourceControl(LexeditorUI.choiceField(link,finder),()=>row.encounters[index],vanilla,references,accept,
-      next=>`#${next}`);
+      next=>`Formation #${next}`);
   }
   function encounterGroupUsage(row){
     const rules=encounterRulesForGroup(row.id);
