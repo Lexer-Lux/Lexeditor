@@ -6443,6 +6443,16 @@ ${contents.path}`});
   const labelUndo = [];
   const labelRedo = [];
   let labelHistoryChanged = () => {};
+  // A table's column header shows the same property as the field, so a rename
+  // reaches the headers already drawn too (Lexer: "i renamed a property but its
+  // name in the table column header remained the same?").
+  const relabelHeaders = (key, text) => {
+    for (const label of document.querySelectorAll(".header-label[data-lex-label-key]")) {
+      if (label.dataset.lexLabelKey !== key) continue;
+      const name = label.lastChild;
+      if (name?.nodeType === Node.TEXT_NODE) name.data = text;
+    }
+  };
   const storeLabel = async (key, tabId, value, shipped) => {
     const next = value && value !== shipped ? value : "";
     try {
@@ -6457,6 +6467,7 @@ ${contents.path}`});
     const entry = labelUndo.pop();
     if (!entry) return false;
     if (entry.node?.isConnected) entry.node.textContent = entry.before;
+    relabelHeaders(entry.key, entry.before);
     await storeLabel(entry.key, entry.tabId, entry.before, entry.shipped);
     labelRedo.push(entry);
     labelHistoryChanged();
@@ -6466,6 +6477,7 @@ ${contents.path}`});
     const entry = labelRedo.pop();
     if (!entry) return false;
     if (entry.node?.isConnected) entry.node.textContent = entry.after;
+    relabelHeaders(entry.key, entry.after);
     await storeLabel(entry.key, entry.tabId, entry.after, entry.shipped);
     labelUndo.push(entry);
     labelHistoryChanged();
@@ -6536,6 +6548,7 @@ ${contents.path}`});
       if (!commit) { text.textContent = before; input.replaceWith(text); return; }
           text.textContent = label;
           input.replaceWith(text);
+          relabelHeaders(key, label);
           // Remember it, so the shell's undo can take the name back: the
           // plugin's record history has no idea this happened.
           labelUndo.push({key, tabId, before, after: label, shipped: fallback, node: text});
@@ -7744,7 +7757,10 @@ ${contents.path}`});
     }, ...columns.map(column => {
       const sortable = canSort(column);
       const active = sortable && sortState.key === column.key;
-      const label = element("span", {class: "header-label"},
+      // A plain name is the property's name, and reads as the developer last
+      // named it, here as in the record's field.
+      const labelKey = typeof column.label === "string" && column.label ? fieldLabelKey(column.label) : null;
+      const label = element("span", {class: "header-label", ...(labelKey ? {"data-lex-label-key": labelKey} : {})},
         active ? element("span", {
           class: `lex-sort-indicator ${sortState.dir > 0 ? "ascending" : "descending"}`,
           "aria-hidden": "true",
@@ -7752,7 +7768,8 @@ ${contents.path}`});
         // A label may be a factory. One DOM node cannot be in two places, so a
         // node reused across renders or across barrelled tables lands in the
         // last one and leaves the others blank; a factory builds a fresh one.
-        typeof column.label === "function" ? column.label() : column.label);  // ascending points up
+        typeof column.label === "function" ? column.label()
+          : labelKey ? document.createTextNode(savedLabel(labelKey, column.label)) : column.label);  // ascending points up
       const sortControl = sortable
         ? element("button", {
             type: "button", "data-lex-control": "sort",
