@@ -1184,8 +1184,8 @@ details.lex-detail-section[open] > summary::before { content:"▾"; }
 .lex-detail-field:not(:focus-within) .lex-field-type-range { display:block;opacity:0; }
 .lex-field-type-rail:hover { z-index:6; }
 
-.lex-detail-field:focus-within:has(.lex-field-type-range) .lex-field-type-name { left:25%; }
-.lex-detail-field:focus-within .lex-field-type-range { left:75%;opacity:1; }
+/* The name and the range take turns in the rail, so both stay centred in it. */
+.lex-detail-field:focus-within .lex-field-type-range { opacity:1; }
 
 /* The arrow has to reach the box it points at, so the two insets between the
    label column and the checkbox are removed for boolean rows only. */
@@ -7482,7 +7482,9 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
 
  transition: background-color .14s ease;
 
-  --lex-field-type-gutter:22px;
+  /* Just wide enough for the rotated type rail, so property names sit close
+     under their section heading. */
+  --lex-field-type-gutter:14px;
   padding-inline-start:var(--lex-field-type-gutter);
   padding-inline-end:0;
 
