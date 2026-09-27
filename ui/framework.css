@@ -6925,7 +6925,9 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   overflow:visible;
   padding-right:0;
 }
-.lex-boolean-field > .lex-detail-field-label > .lex-detail-field-label-text { flex:1 1 auto; min-width:0; }
+/* The name keeps its own width so its help follows it, as on every other row;
+   the leader arrow lives in the control column and spans the gap itself. */
+.lex-boolean-field > .lex-detail-field-label > .lex-detail-field-label-text { flex:0 1 auto; min-width:0; }
 .lex-boolean-field > .lex-detail-field-control {
   display:flex;
   min-width:0;

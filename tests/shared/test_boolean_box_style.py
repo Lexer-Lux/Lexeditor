@@ -50,3 +50,24 @@ def test_box_style_fills_the_value_column_and_arrow_style_does_not(page):
     assert abs(box['checkLeft'] - box['valueLeft']) <= 2 and abs(box['checkRight'] - box['valueRight']) <= 12, box
     arrow = _geometry(page, 'arrow')
     assert arrow['arrow'] and arrow['checkWidth'] < 30, arrow
+
+
+def test_boolean_help_follows_its_name_in_both_styles(page):
+    framework(page)
+    for style in ('box', 'arrow'):
+        page.evaluate('''style => {
+          document.documentElement.dataset.lexBooleanStyle = style;
+          const U = LexeditorUI, box = U.el('div', {style: 'width:700px'});
+          document.querySelector('main').replaceChildren(box);
+          for (const label of ['Renzokuken finisher count', 'Crit bonus', 'Melee weapon'])
+            box.append(U.detailField({label, showType: true, help: U.infoHelp('Help for ' + label),
+              control: U.el('input', label === 'Melee weapon' ? {type: 'checkbox'} : {type: 'number', value: 1})}));
+        }''', style)
+        page.wait_for_timeout(150)
+        assert page.locator('.lex-boolean-field').count() == 1
+        gaps = page.locator('.lex-detail-field-label').evaluate_all('''labels => labels.map(label => {
+          const text = label.querySelector('.lex-detail-field-label-text'), range = document.createRange();
+          range.selectNodeContents(text);
+          return label.querySelector('.lex-info-help').getBoundingClientRect().left - range.getBoundingClientRect().right;
+        })''')
+        assert len(gaps) == 3 and all(0 <= gap < 14 for gap in gaps), (style, gaps)
