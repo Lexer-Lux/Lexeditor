@@ -229,7 +229,7 @@
           help:"Position of this rule in the stored list. The number is fixed; the group it points at is not.",
           render:rule=>rule.id},
         {key:"regionId",label:"REGION",sortable:false,help:"Region code this rule matches.",render:rule=>rule.regionId},
-        {key:"groundId",label:"GROUND",sortable:false,help:"Ground code this rule matches.",render:rule=>rule.groundId},
+        {key:"groundId",label:"GROUND",sortable:false,help:"Ground code this rule matches.",render:rule=>worldGroundLink(rule.groundId)},
         {key:"open",label:"RULES PAGE",sortable:false,help:"Open the rules table with this rule selected.",
           render:rule=>hoverable({content:`Region ${rule.regionId} · ground ${rule.groundId}`,targetType:"encounterRules",
             targetId:rule.id,targetLabel:`encounter rule ${rule.id}`,

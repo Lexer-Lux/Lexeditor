@@ -124,8 +124,8 @@ def main() -> int:
               overflow:root.scrollWidth>root.clientWidth+1,
             }})()""")
             assert rendered["active"] == "Draw Points"
-            assert rendered["tabs"] == ["Cells", "Draw Points", "Field → World", "Map", "Sky Colours",
-                                        "Train Tracks", "World → Field", "World Textures"], rendered["tabs"]
+            assert rendered["tabs"] == ["Cells", "Draw Points", "Field → World", "Ground Types", "Map",
+                                        "Sky Colours", "Train Tracks", "World → Field", "World Textures"], rendered["tabs"]
             assert rendered["inputs"] == ["Draw Point 129 X", "Draw Point 129 Y",
                                           "Draw Point 129 sub-ID"]
             # The world map is the game's 4:3 art, so the panel shows it 4:3.

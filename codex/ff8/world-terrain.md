@@ -18,6 +18,17 @@ Each polygon has three vertex indices, three normal indices, three byte UV
 pairs, a texture byte (page in the high nibble, palette in the low nibble),
 ground type, and two flag bytes. Block vertex indices are local to the block.
 
+The ground type byte is the terrain code the encounter rules match (wmset
+section 1 pairs a region with a ground type). The game stores only the number.
+Deling's `WmxFile.cpp` describes most codes by where they appear - 0 to 5 are
+forests by continent, 6 grass, 7 ground, 8 desert, 9 ice, 10 shallow water,
+12 Esthar roads, 14 plateau, 15 to 18, 23 and 25 ground-to-mountain slopes,
+24 Balamb grass-to-mountain, 27 railroads, 28 roads, FH and some towns, 29
+inaccessible places, 31 lakes, 32 and 33 water near coasts, 34 open water.
+Those are observations, not names from the game; the World > Ground Types page
+shows them as descriptions and leaves undescribed codes as numbers. The base map
+uses 27 distinct codes.
+
 Sources:
 [Deling WorldmapGLWidget](https://github.com/myst6re/deling/blob/master/src/3d/WorldmapGLWidget.cpp),
 [Deling WmxFile](https://github.com/myst6re/deling/blob/master/src/game/worldmap/WmxFile.cpp).

@@ -8981,7 +8981,11 @@ ${contents.path}`});
     // the table straight back to it and pagination looked dead: every press of
     // Next re-rendered page one. A page the reader asked for wins; the reveal
     // applies when the PAGE did not change and the selection did.
-    const pagedDeliberately = lastRenderedPage.get(rowPreferenceKey) !== undefined &&
+    // A null page is a link asking for its record, not a page choice: several
+    // lists can share one key (FF8's World subtabs), and a link from one to
+    // another must still reveal its record.
+    const pagedDeliberately = options.page !== null && options.page !== undefined &&
+      lastRenderedPage.get(rowPreferenceKey) !== undefined &&
       lastRenderedPage.get(rowPreferenceKey) !== page;
     lastRenderedPage.set(rowPreferenceKey, page);
     if (options.revealSelected !== false && !pagedDeliberately && requestedIndex >= 0 &&

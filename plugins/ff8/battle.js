@@ -247,6 +247,50 @@
       detailSection({title:"FIELD → WORLD POSITION",help:infoHelp("Where the player appears on the world map after leaving a field by this exit. Click the map to open the large map and move the point. The number is the exit's own index, not a field ID."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},...fields(()=>rerenderWorldMap()),
         detailField({label:"UNRESOLVED WORD",help:infoHelp("What this value does is not known. It stays exactly as stored."),control:readonlyField(row.unknown)}))],{columns:2,minWidth:300})]})],"world-map-detail world-field-return")}
   function worldSkyDetail(row,prefs,titleContent=null,note=""){return sharedDetail({...row,name:`SKY RECORD ${row.id}`,...(titleContent?{titleContent}:{})},prefs,[detailSection({title:"WORLD POSITION",help:infoHelp("The record holds two world coordinates and then a fade distance, in the stored order X, Z, RANGE. The first two say where the zone applies; the third says how far its colours fade."),body:[detailField({label:"X",help:infoHelp("X coordinate for this record. Changing it moves the stored world position."),control:worldNumber(row,"x",-2147483648,2147483647,`Sky record ${row.id} X`)}),detailField({label:"RANGE",help:infoHelp("Fade distance in world units. The shipped records use round values - 16384, 24576, 40960 - which is how a distance reads rather than a coordinate. How the game fades between zones is not established."),control:worldNumber(row,"y",-2147483648,2147483647,`Sky record ${row.id} fade range`)}),detailField({label:"Z",help:infoHelp("World Z coordinate of this lighting zone. The zone applies around the point X, Z."),control:worldNumber(row,"z",-2147483648,2147483647,`Sky record ${row.id} Z`)})]}),detailSection({className:"world-sky-colors",title:"SKY AND AMBIENT COLOURS",help:infoHelp("OpenVIII proves five RGB triples in each section 33 record. Lexeditor preserves each unused fourth colour byte and the unresolved record tail."),body:[detailField({label:"SHADOWS",help:infoHelp("Ambient shadow colour for this world colour record. Choose a colour and test the result at this location."),control:worldColor(row,"shadows",`Sky record ${row.id} shadows colour`)}),detailField({label:"VEHICLES",help:infoHelp("Vehicle colour value stored in this world colour record."),control:worldColor(row,"vehicles",`Sky record ${row.id} vehicles colour`)}),detailField({label:"SKY TOP",help:infoHelp("Colour at the top of the sky gradient."),control:worldColor(row,"skyTop",`Sky record ${row.id} sky top colour`)}),detailField({label:"SKY CENTRE",help:infoHelp("Colour in the middle of the sky gradient."),control:worldColor(row,"skyCenter",`Sky record ${row.id} sky centre colour`)}),detailField({label:"SKY BOTTOM",help:infoHelp("Colour at the bottom of the sky gradient."),control:worldColor(row,"skyBottom",`Sky record ${row.id} sky bottom colour`)})]})],"world-map-detail world-sky-detail",note)}
+  // Ground types: the terrain code each world polygon stores. The game keeps
+  // only the number; these descriptions are Deling's notes on where each code
+  // appears (src/game/worldmap/WmxFile.cpp), so codes it does not describe
+  // stay bare numbers.
+  const worldGroundTypeNames={0:"Galbadia forests",1:"Trabia forests",2:"Esthar forests",3:"Centra forests",
+    4:"Balamb forests",5:"Trabia forests",6:"Normal grass, Galbadia and Balamb",7:"Normal ground, Galbadia",
+    8:"Normal desert, Galbadia",9:"Normal ice, Trabia",10:"Water you can step in (waves)",12:"Esthar city roads",
+    14:"Plateau",15:"Ground to mountain, Galbadia",16:"Ground to mountain, Galbadia, Esthar and Centra",
+    17:"Ground to mountain, Trabia (1)",18:"Ground to mountain, Trabia (2)",23:"Ground to mountain, Trabia (3)",
+    24:"Grass to mountain, Balamb",25:"Some Esthar borders, ground to mountain (?)",27:"Railroads",
+    28:"Roads, FH and some towns",29:"Inaccessible places",31:"Lakes",32:"Water at coasts",
+    33:"Water near coasts",34:"Water"};
+  function worldGroundLabel(id){const name=worldGroundTypeNames[Number(id)];return name?`${id} · ${name}`:String(id)}
+  function worldGroundLink(id){
+    return hoverable({content:worldGroundLabel(id),targetType:"groundTypes",targetId:id,targetLabel:`ground type ${id}`,
+      activate:()=>{state.worldTab="groundTypes";state.selected.world=Number(id);state.worldMapPoint=null;state.worldMapSky=null;
+        state.pages.world=null;state.filters.world="";state.modOnly=false;if(state.tab==="world")rerenderWorldMap();else navigate("world")}});
+  }
+  function worldGroundTypeRows(){
+    const rows=new Map(),world=state.data.world.rows;
+    for(const segment of world)if(segment.kind==="worldSegment"&&segment.id<768)for(const ground of segment.groundTypes||[]){
+      if(!rows.has(ground))rows.set(ground,{kind:"groundType",id:ground,name:worldGroundTypeNames[ground]||"",cells:[],rules:[]});
+      rows.get(ground).cells.push(segment.id);
+    }
+    for(const rule of world)if(rule.kind==="helper"&&rows.has(rule.groundId))rows.get(rule.groundId).rules.push(rule);
+    return [...rows.values()];
+  }
+  function worldGroundTypeDetail(row,prefs){
+    const cells=row.cells.map(id=>{const cell=worldRow(state.data,"region",id);return {id,column:cell?.x??id%32,row:cell?.y??Math.floor(id/32),label:`Cell ${id}`,selected:true}});
+    const rules=row.rules.length?columnList({rows:row.rules,key:rule=>rule.id,fill:true,localSort:false,
+        class:"ff8-encounter-usage-table ff8-record-list","aria-label":`Encounter rules for ground ${row.id}`,
+        columns:[{key:"regionId",label:"REGION",sortable:false,render:rule=>rule.regionId},
+          {key:"group",label:"ENCOUNTER GROUP",sortable:false,render:rule=>hoverable({content:`Group ${rule.encounterGroup}`,
+            targetType:"encounterGroups",targetId:rule.encounterGroup,targetLabel:`encounter group ${rule.encounterGroup}`,
+            activate:()=>showEncounterSubtab("groups","encounterGroups",rule.encounterGroup)})}]})
+      :LexeditorUI.notice({message:"No encounter rule uses this ground type, so no random battle starts on it."});
+    return sharedDetail({...row,name:`GROUND ${row.id}`},prefs,[
+      LexeditorUI.tileGrid([detailSection({className:"world-region-position",title:"WHERE IT IS",
+          body:[worldLocationMap({label:`Cells with ground ${row.id}`,cells,select:id=>{state.worldTab="regions";state.selected.world=id;state.pages.world=null;state.filters.world="";rerenderWorldMap()}})]}),
+        detailSection({title:"GROUND TYPE",body:[detailField({label:"CELLS",help:infoHelp("World-map cells with at least one polygon of this ground type."),control:readonlyField(row.cells.length)}),
+          detailField({label:"RULES",help:infoHelp("Encounter rules that start battles on this ground type."),control:readonlyField(row.rules.length)})]})],{columns:2,minWidth:300}),
+      detailSection({title:"ENCOUNTERS",help:infoHelp("The rules that start battles on this ground type, one per region, and the battle group each one starts."),body:[rules]})],
+      "world-map-detail world-ground-type",row.name||"Not described in Deling's notes");
+  }
   // One world-map cell, one panel: the Map page and the Cells page show the
   // same record, so they draw the same panel (Lexer, 2026-09-27). The word
   // "segment" belongs to the WMX file, which stores one 0x9000-byte segment per
@@ -258,7 +302,7 @@
   function worldRecordLink(tab,row,label){
     return hoverable({content:label,targetType:tab,targetId:row.id,targetLabel:label,
       activate:()=>{state.worldTab=tab;state.selected.world=row.id;state.worldMapPoint=null;state.worldMapSky=null;
-        state.pages.world=0;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
+        state.pages.world=null;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
   }
   function worldLinkList(links){return links.length?el("span",{class:"world-cell-links"},...links):el("span",{},"None")}
   function worldCellContents(cellId,region,segment){
@@ -270,7 +314,7 @@
     const rules=region&&region.regionId!==255?rows("helper").filter(rule=>rule.regionId===region.regionId&&grounds.includes(rule.groundId)):[];
     const encounters=rules.length?columnList({rows:rules,key:rule=>rule.id,fill:true,localSort:false,
         class:"ff8-encounter-usage-table ff8-record-list","aria-label":`Encounter rules for cell ${cellId}`,
-        columns:[{key:"groundId",label:"GROUND",sortable:false,render:rule=>rule.groundId},
+        columns:[{key:"groundId",label:"GROUND",sortable:false,render:rule=>worldGroundLink(rule.groundId)},
           {key:"group",label:"ENCOUNTER GROUP",sortable:false,render:rule=>hoverable({content:`Group ${rule.encounterGroup}`,
             targetType:"encounterGroups",targetId:rule.encounterGroup,targetLabel:`encounter group ${rule.encounterGroup}`,
             activate:()=>showEncounterSubtab("groups","encounterGroups",rule.encounterGroup)})}]})
@@ -280,7 +324,7 @@
         body:[detailField({label:"DRAW POINTS",control:worldLinkList(draws.map(point=>worldRecordLink("drawPoints",point,`Draw Point ${point.drawId}`)))}),
           detailField({label:"SKY COLOURS",control:worldLinkList(rows("skyColor").filter(placed).map(sky=>worldRecordLink("skyColors",sky,`Sky record ${sky.id}`)))}),
           detailField({label:"FIELD → WORLD",control:worldLinkList(rows("fieldReturn").filter(placed).map(entry=>worldRecordLink("fieldReturns",entry,`Field return ${entry.id}`)))}),
-          detailField({label:"GROUND TYPES",help:infoHelp("Terrain codes used by the polygons in this cell. A ground code and the cell's region choose an encounter rule."),control:el("span",{class:"world-ground-list"},grounds.join(", ")||"None")})]}),
+          detailField({label:"GROUND TYPES",help:infoHelp("Terrain codes used by the polygons in this cell. A ground code and the cell's region choose an encounter rule."),control:worldLinkList(grounds.map(worldGroundLink))})]}),
       detailSection({title:"ENCOUNTERS",help:infoHelp("The rules that match this cell's region and one of its ground types, and the battle group each one starts. Open a group to see its battles."),body:[encounters]})];
   }
   function worldCellDetail(cellId,prefs,titleContent=null){
@@ -304,7 +348,8 @@
   function worldSegmentDetail(row){
     const title=hoverable({content:`CELL ${row.id}`,targetType:"regions",targetId:row.id,
       targetLabel:`world map cell ${row.id}`,
-      activate:()=>{state.worldTab="regions";state.selected.world=row.id;state.worldMapPoint=null;rerenderWorldMap()}});
+      activate:()=>{state.worldTab="regions";state.selected.world=row.id;state.worldMapPoint=null;
+        state.pages.world=null;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
     return worldCellDetail(row.id,null,title);
   }
   function renderWorldVisual(){
@@ -360,7 +405,7 @@
     return hoverable({content:`SKY RECORD ${row.id}`,targetType:"skyColors",targetId:row.id,
       targetLabel:`sky record ${row.id}`,
       activate:()=>{state.worldTab="skyColors";state.selected.world=row.id;state.worldMapSky=null;
-        state.pages.world=0;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
+        state.pages.world=null;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
   }
   // A draw point picked on the map is the record the Draw Points page shows,
   // so it draws that page's panel (Lexer: "the panel on the right should just
@@ -370,10 +415,11 @@
     return hoverable({content:`DRAW POINT ${row.drawId}`,targetType:"drawPoints",targetId:row.drawId,
       targetLabel:`draw point ${row.drawId}`,
       activate:()=>{state.worldTab="drawPoints";state.selected.world=row.id;state.worldMapPoint=null;
-        state.pages.world=0;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
+        state.pages.world=null;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
   }
   function worldDetail(row,prefs){
     if(row.kind==="region")return worldCellDetail(row.id,prefs);
+    if(row.kind==="groundType")return worldGroundTypeDetail(row,prefs);
     if(row.kind==="railTrack")return railTrackDetail(row,prefs);
     if(row.kind==="worldTexture")return worldTextureDetail(row,prefs);
     if(row.kind==="drawPoint")return worldDrawPointDetail(row,prefs);
@@ -486,9 +532,20 @@
       {noun:"world to field entries"},false);
   }
   function renderWorldMapContent(mount=true){
-    const tabsData=[{id:"map",label:"Map",help:"The world map, and nothing else on the panel. Regions colours each cell by its region, so cells of one colour share encounter rules. Click a cell to inspect its terrain geometry and its region, or a red dot to inspect a draw point; the corner shows what the pointer is over. Each panel's title opens the page that owns it. Scroll to zoom, drag with the middle mouse button to pan, and double-click to fit the map."},{id:"regions",label:"Cells",help:"Every cell of the world map and the region it belongs to. The Encounters tab matches the region with the ground type to choose a battle group, so changing a cell's region can change which battles occur there."},{id:"fieldReturns",label:"Field → World",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"worldToField",label:"World → Field",help:"Where the player arrives in a field when they enter it from the world map: the field, and the point and walkmesh triangle they start on. The table does not store a world-map position; which entry the game uses is decided by its own code, so test a change in the game."},{id:"drawPoints",label:"Draw Points",help:"Move world draw points. Click the placement grid or edit the packed position bytes. What a draw point gives - its spell, whether it refills and whether it draws a high yield - is stored in FF8_EN.exe, not in this file, so this page changes only where the point is."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
+    const tabsData=[{id:"map",label:"Map",help:"The world map, and nothing else on the panel. Regions colours each cell by its region, so cells of one colour share encounter rules. Click a cell to inspect its terrain geometry and its region, or a red dot to inspect a draw point; the corner shows what the pointer is over. Each panel's title opens the page that owns it. Scroll to zoom, drag with the middle mouse button to pan, and double-click to fit the map."},{id:"regions",label:"Cells",help:"Every cell of the world map and the region it belongs to. The Encounters tab matches the region with the ground type to choose a battle group, so changing a cell's region can change which battles occur there."},{id:"groundTypes",label:"Ground Types",help:"Every terrain code the world map's polygons use, where it is, and the encounter rules that start battles on it. The game stores only the number; the descriptions are Deling's notes."},{id:"fieldReturns",label:"Field → World",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"worldToField",label:"World → Field",help:"Where the player arrives in a field when they enter it from the world map: the field, and the point and walkmesh triangle they start on. The table does not store a world-map position; which entry the game uses is decided by its own code, so test a change in the game."},{id:"drawPoints",label:"Draw Points",help:"Move world draw points. Click the placement grid or edit the packed position bytes. What a draw point gives - its spell, whether it refills and whether it draws a high yield - is stored in FF8_EN.exe, not in this file, so this page changes only where the point is."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
     if(state.worldTab==="map"){const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;return wrap(renderWorldVisual())}
     if(state.worldTab==="worldToField")return wrap(renderWorldToField());
+    if(state.worldTab==="groundTypes"){
+      const query=state.filters.world.trim().toLocaleLowerCase(),[sortKey,sortDirection]=state.sorts.world;
+      const visible=worldGroundTypeRows().filter(row=>!query||`${row.id} ${row.name}`.toLocaleLowerCase().includes(query))
+        .sort((left,right)=>sortDirection*String(rowSortValue(left,sortKey)).localeCompare(String(rowSortValue(right,sortKey)),undefined,{numeric:true,sensitivity:"base"}));
+      delete state.columnPrefs.world;
+      return wrap(showPaged("world",visible,[{key:"id",label:"GROUND"},
+        {key:"name",label:"DESCRIPTION",help:"Where this code appears in the game, from Deling's notes. The game stores only the number.",render:row=>row.name||"—"},
+        {key:"cellCount",label:"CELLS",sortValue:row=>row.cells.length,render:row=>row.cells.length},
+        {key:"ruleCount",label:"RULES",help:"Encounter rules that start battles on this ground type.",sortValue:row=>row.rules.length,render:row=>row.rules.length}],
+        worldDetail,"90px minmax(180px,2fr) minmax(70px,.5fr) minmax(70px,.5fr)",{noun:"ground types",defaultSplit:43,minLeft:360,minRight:460,fixedTemplate:true},false));
+    }
     const kind={regions:"region",fieldReturns:"fieldReturn",drawPoints:"drawPoint",skyColors:"skyColor",rails:"railTrack",textures:"worldTexture"}[state.worldTab],rows=state.data.world.rows.filter(row=>row.kind===kind),query=state.filters.world.trim().toLocaleLowerCase(),matching=rows.filter(row=>!query||JSON.stringify(row).toLocaleLowerCase().includes(query)),[sortKey,sortDirection]=state.sorts.world,visible=[...matching].sort((left,right)=>sortDirection*String(rowSortValue(left,sortKey)).localeCompare(String(rowSortValue(right,sortKey)),undefined,{numeric:true,sensitivity:"base"}));
     const columns=kind==="region"?[{key:"id",label:"CELL",help:worldPropertyHelp.region.cell},{key:"x",label:"X",help:worldPropertyHelp.region.x},{key:"y",label:"Y",help:worldPropertyHelp.region.y},{key:"regionId",label:"REGION",help:worldPropertyHelp.region.regionId}]:kind==="fieldReturn"?[{key:"id",label:"INDEX",help:worldPropertyHelp.fieldReturn.index},{key:"x",label:"X",help:worldPropertyHelp.fieldReturn.x},{key:"y",label:"Y",help:worldPropertyHelp.fieldReturn.y},{key:"z",label:"Z",help:worldPropertyHelp.fieldReturn.z}]:kind==="drawPoint"?[{key:"drawId",label:"DRAW ID",help:worldPropertyHelp.drawPoint.drawId},{key:"x",label:"X",help:worldPropertyHelp.drawPoint.x},{key:"y",label:"Y",help:worldPropertyHelp.drawPoint.y},{key:"subId",label:"SUB-ID",help:worldPropertyHelp.drawPoint.subId}]:kind==="skyColor"?[{key:"id",label:"RECORD",help:"Identifier of this sky colour record."},{key:"skyTop",label:"SKY GRADIENT",grow:1,cellClass:"lex-cell-fill",help:"Preview of the top, centre, and bottom sky colours.",render:worldSkySwatch}]:kind==="railTrack"?[{key:"id",label:"TRACK",help:"Identifier of the train route."},{key:"pointCount",label:"POINTS",help:"Number of points forming the route."},{key:"trainStop1",label:"STOP 1",help:"First stop point in this route."},{key:"trainStop2",label:"STOP 2",help:"Second stop point in this route."}]:[{key:"id",label:"TEXTURE",help:"Identifier of the world texture."},{key:"name",label:"ASSET",help:"Name of the texture image record."},{key:"paletteCount",label:"PALETTES",help:"Number of colour tables in this indexed image."},{key:"depth",label:"BPP",help:"Bits per pixel, which determines how pixel indices refer to palette colours."}];
     delete state.columnPrefs.world;

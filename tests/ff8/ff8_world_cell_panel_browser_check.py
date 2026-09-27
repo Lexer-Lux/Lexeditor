@@ -53,6 +53,21 @@ def main() -> int:
                 assert on_map["sections"][:5] == ["WORLD MAP", "CELL", "IN THIS CELL", "ENCOUNTERS", "BLOCKS"], on_map
                 assert any(link.startswith("Draw Point ") for link in on_map["links"]), on_map
                 assert on_map["rules"] == expected_rules, (on_map, expected_rules)
+                # Ground types are named where Deling describes them, and each
+                # links to the Ground Types subtab (Lexer: "have the things that
+                # show ground types show their names rather than numbers").
+                grounds = page.evaluate(f"()=>state.data.world.rows.find(r=>r.kind==='worldSegment'&&r.id==={cell}).groundTypes")
+                labels = page.locator(".world-segment-detail .world-cell-links .lex-hoverable[data-hover-target-type='groundTypes']").all_inner_texts()
+                assert [label.split(" ")[0] for label in labels] == [str(ground) for ground in grounds], (labels, grounds)
+                assert all(" · " in label for label in labels if int(label.split(" ")[0]) in (0, 6, 7, 24, 34)), labels
+                page.locator(".world-segment-detail .world-cell-links .lex-hoverable[data-hover-target-type='groundTypes']").first.click()
+                page.wait_for_selector(".world-ground-type", timeout=20000)
+                ground_panel = page.evaluate("""()=>({title:document.querySelector('.world-ground-type .lex-detail-panel-title').textContent,
+                  cells:document.querySelectorAll('.world-ground-type .lex-image-map-cells > button.selected').length,
+                  rows:state.tab==='world'&&state.worldTab})""")
+                assert ground_panel["title"].startswith(f"GROUND {grounds[0]}") and ground_panel["cells"] > 0, ground_panel
+                page.evaluate(f"()=>{{state.worldTab='regions';state.selected.world={cell};renderWorldMap()}}")
+                page.wait_for_selector(".world-segment-detail .world-cell-links", timeout=20000)
                 # A link opens the record's own page.
                 page.locator(".world-cell-links .lex-hoverable", has_text="Draw Point").first.click()
                 page.wait_for_function("()=>state.worldTab==='drawPoints'", timeout=20000)
