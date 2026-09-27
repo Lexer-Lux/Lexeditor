@@ -6031,7 +6031,20 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 /* The heading's copy button sits right of the name and appears on hover, like
    a property's. It scales with the heading so it does not read as a stray dot
    beside a thirty-pixel name. */
-.lex-detail-panel-name { min-width:0; }
+/* The heading has one fixed height: one line of the theme's title size. A
+   long name is fitted into that box - smaller, wrapping between words if it
+   must - and never makes the header taller (Lexer: the header has a fixed
+   height). The label fitter shrinks it while it overflows the box. */
+.lex-detail-panel-title:not(.lex-detail-panel-rename) {
+  height:calc(var(--lex-detail-title-size,clamp(21px,2.5vw,32px)) * 1.1);
+}
+.lex-detail-panel-name {
+  min-width:0;
+  height:100%;
+  display:flex;
+  align-items:center;
+  overflow:hidden;
+}
 .lex-detail-panel-title > .lex-copy-value { --lex-copy-lane:clamp(12px,.5em,16px);flex:none; }
 .lex-detail-panel-title:hover > .lex-copy-value { opacity:.7; }
 .lex-detail-panel-title > .lex-copy-value:hover { opacity:1; }

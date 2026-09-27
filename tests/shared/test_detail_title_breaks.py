@@ -1,8 +1,8 @@
 """A record's name wraps between words or at an identifier's own separators.
 
 Names such as ADVERT_WHR_QUARTER_SHOES have no space, so a narrow heading
-clipped them at the 14px floor; the name now breaks after `_` and `.`, and a
-single word too long for the heading shrinks instead of being cut or split.
+clipped them; the name may break after `_` and `.`, and it is fitted into the
+heading's one fixed height instead of being cut, split or making it taller.
 """
 from test_shared_ui_feedback import page, framework
 
@@ -37,9 +37,13 @@ def test_long_names_neither_clip_nor_break_inside_words(page):
       }
       const box = node.getBoundingClientRect();
       return {text, split: words, size: parseFloat(getComputedStyle(node).fontSize),
-        clipped: node.scrollWidth > node.clientWidth + 1 || box.right > panel.right + 1};
+        height: Math.round(node.closest('.lex-detail-panel-title').getBoundingClientRect().height),
+        clipped: node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1
+          || box.right > panel.right + 1};
     })''')
     assert [row['text'] for row in rows] == names * 2
     assert not [row for row in rows if row['split'] or row['clipped']], rows
-    # An identifier wraps at its separators rather than shrinking to the floor.
-    assert all(row['size'] >= 14 for row in rows if row['text'] != 'Uncharacteristically'), rows
+    # The header has one fixed height (Lexer); a long name is fitted into it,
+    # never below the readable floor.
+    assert len({row['height'] for row in rows}) == 1, rows
+    assert all(row['size'] >= 9 for row in rows), rows
