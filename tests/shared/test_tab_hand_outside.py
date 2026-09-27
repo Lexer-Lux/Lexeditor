@@ -1,13 +1,14 @@
-"""A game's pointing hand stands outside the chosen tab, in room of its own.
+"""A game's pointing hand is drawn on top of the tabs and takes no room.
 
-Lexer, 2026-09-27, after the hand kept coming back inside FF8's tabs: never
-draw it inside a tab. The chosen tab leaves a gap as wide as the hand on its
-left, and the hand is drawn in that gap, not over the tab or its neighbour.
+Lexer, 2026-09-27: "INSTEAD OF TAKING THE POINTER FINGER OUT OF THE TABS YOU
+NOW MADE IT SO THERE'S A GIANT GAP BETWEEN THEM CREATED BY THE POINTER ... THE
+POINTER FINGER IS JUST ON TOP. THAT'S IT." The chosen tab keeps its place; the
+hand is drawn over its left edge, above the tabs.
 """
 from test_shared_ui_feedback import page, framework
 
 
-def test_the_chosen_tab_leaves_the_hand_its_own_room(page):
+def test_the_hand_sits_on_top_and_opens_no_gap(page):
     framework(page)
     page.evaluate('''()=>{
       const header=document.createElement('header');header.className='lex-shell-header';
@@ -19,9 +20,10 @@ def test_the_chosen_tab_leaves_the_hand_its_own_room(page):
       header.append(nav);document.querySelector('main').replaceChildren(header);
     }''')
     boxes = page.locator('nav button').evaluate_all('bs=>bs.map(b=>b.getBoundingClientRect().toJSON())')
-    before = page.evaluate('''()=>{const b=document.querySelector('nav button.active'),s=getComputedStyle(b,'::before');
-      return {right:s.right,left:s.left}}''')
-    room = boxes[1]['left'] - boxes[0]['right']
-    assert room >= 32, room
-    # The hand's left edge lies at least its own width left of the tab.
-    assert float(before['left'].rstrip('px')) <= -32, before
+    hand = page.evaluate('''()=>{const b=document.querySelector('nav button.active'),s=getComputedStyle(b,'::before');
+      return {left:parseFloat(s.left),z:s.zIndex,position:s.position}}''')
+    # No room is made for the hand: the chosen tab sits right against its neighbour.
+    assert abs(boxes[1]['left'] - boxes[0]['right']) <= 1, boxes
+    # The hand is drawn over the tab's left edge, above the tabs.
+    assert hand['position'] == 'absolute' and int(hand['z']) >= 5, hand
+    assert -32 < hand['left'] < 0, hand
