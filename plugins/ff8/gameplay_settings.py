@@ -1380,6 +1380,24 @@ def ensure(game_root: Path | None = None, project_root: Path | None = None,
     )
 
 
+def keep_previous_log(game: Path) -> Path | None:
+    """Copy the last session's FFNx.log aside before the game starts again.
+
+    FFNx rewrites FFNx.log on every start, so the session in which something
+    went wrong (a crash, music at the wrong speed) was gone the moment the
+    game was relaunched. One previous copy is kept and replaced each launch.
+    """
+    log = game / "FFNx.log"
+    previous = game / "FFNx.previous.log"
+    try:
+        if log.is_file() and log.stat().st_size:
+            previous.write_bytes(log.read_bytes())
+            return previous
+    except OSError:
+        pass  # a log that cannot be copied must never stop the game starting
+    return None
+
+
 def activate(game_root: Path | None = None,
              project_root: Path | None = None,
              runtime_root: Path | None = None) -> dict:
@@ -1388,6 +1406,7 @@ def activate(game_root: Path | None = None,
     game = (game_root or paths.GAME_ROOT).resolve()
     project = (project_root or paths.PROJECT_ROOT).resolve()
     active_root = _runtime_root(runtime_root, project)
+    keep_previous_log(game)
     result = ensure(
         game, project, install_runtime=True, runtime_root=active_root,
     )
