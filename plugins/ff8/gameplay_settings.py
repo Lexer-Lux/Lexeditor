@@ -43,6 +43,7 @@ from . import healing_rework
 from . import formulae_rework as formulae_rework_contract
 from . import flat_stat_abilities
 from . import max_spell
+from . import timed_hits
 from . import mug_drops
 from . import drop_chance
 from .ffnx_issue_51 import runtime_config as shared_magic_runtime_config
@@ -99,6 +100,7 @@ ACCEPTED_TWEAKS = frozenset({
     "interactionIndicators",
     "flatStatAbilities", "maxSpellEnabled", "noMagicConsumption", "dropsAfterMug",
     "dropChance", "gfHpCasting", "battleResultsHelp", "hitFrameLog", "splitMusicVolume",
+    "timedHits",
 })
 MIN_FLYING_EVA_BONUS = 0
 MAX_FLYING_EVA_BONUS = 100
@@ -429,6 +431,10 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         )
     except ValueError:
         max_spell_value = DEFAULT_MAX_SPELL
+    timed_hits_enabled = data.get("timedHits", timed_hits.DEFAULT_TIMED_HITS)
+    if not isinstance(timed_hits_enabled, bool):
+        timed_hits_enabled = timed_hits.DEFAULT_TIMED_HITS
+    timed_hits_options = timed_hits.options(data, strict=False)
     # A formula description is not an implementation. Keep the owning toggle
     # off until every row in the central Formulae Rework contract has a real
     # guarded runtime component.
@@ -495,6 +501,10 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "maxSpell": max_spell_value,
         "maxSpellMinimum": max_spell.MIN_MAX_SPELL,
         "maxSpellMaximum": max_spell.MAX_MAX_SPELL,
+        "timedHits": timed_hits_enabled,
+        **{key: timed_hits_options[argument]
+           for key, (argument, *_rest) in timed_hits.SETTING_KEYS.items()},
+        "timedHitsLimits": timed_hits.limits(),
         **shared_magic,
     }
 
@@ -560,6 +570,7 @@ def _verify_executable(game_root: Path) -> Path:
             (vibration_consolidation_issue_66.BATTLE_HOOK, vibration_consolidation_issue_66.BATTLE_HOOK_ORIGINAL),
             (better_targeting_issue_64.TARGET_ICON_HOOK, better_targeting_issue_64.TARGET_ICON_HOOK_ORIGINAL),
             (damage_limit.DAMAGE_LIMIT_FLAG_OPCODE, damage_limit.DAMAGE_LIMIT_FLAG_ORIGINAL),
+            *timed_hits.verified_hooks(),
             (hit_frame_log.HOOK, hit_frame_log.HOOK_ORIGINAL),
             *music_volume_issue_498.verified_hooks(),
             *magic_damage_rework.verified_hooks(),
@@ -614,6 +625,8 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
                flat_stat_abilities_enabled: bool = DEFAULT_FLAT_STAT_ABILITIES,
                max_spell_enabled: bool = DEFAULT_MAX_SPELL_ENABLED,
                max_spell_value: int = DEFAULT_MAX_SPELL,
+               timed_hits_enabled: bool = False,
+               timed_hits_options: dict | None = None,
                flying_eva_enabled: bool = True,
                drops_after_mug: bool = False,
                drop_chance_enabled: bool = False,
@@ -660,6 +673,8 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
     )
     max_spell_enabled = _boolean(max_spell_enabled, "Max Spell")
     max_spell_value = max_spell.bounded_limit(max_spell_value)
+    timed_hits_enabled = _boolean(timed_hits_enabled, "Timed Hits")
+    timed_hits_options = dict(timed_hits_options or {})
     drops_after_mug = _boolean(drops_after_mug, "Drops After Mug")
     drop_chance_enabled = _boolean(drop_chance_enabled, "Drop Chance")
     header = [
@@ -829,6 +844,11 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
         lines.extend(max_spell_patch.rstrip().splitlines())
     else:
         lines.append("# Max Spell is disabled; the native stock cap and junction scaling remain 100.")
+    timed_hits_patch = timed_hits.build_hext(timed_hits_enabled, **timed_hits_options)
+    if timed_hits_patch:
+        lines.extend(timed_hits_patch.rstrip().splitlines())
+    else:
+        lines.append("# Timed Hits is disabled; only Squall's gunblade trigger is timed.")
     return "\n".join(lines + [""])
 
 
@@ -963,6 +983,8 @@ def initialize_project(project_root: Path) -> None:
         "flatStatAbilities": False,
         "maxSpellEnabled": False,
         "maxSpell": DEFAULT_MAX_SPELL,
+        "timedHits": False,
+        **{key: default for key, (_a, default, *_r) in timed_hits.SETTING_KEYS.items()},
         "cameraSpeed": DEFAULT_CAMERA_SPEED,
     }
     _atomic_text(settings_path(project), json.dumps(
@@ -1108,6 +1130,10 @@ def save(data: dict, game_root: Path | None = None,
     max_spell_value = max_spell.bounded_limit(
         data.get("maxSpell", DEFAULT_MAX_SPELL),
     )
+    timed_hits_enabled = _boolean(
+        data.get("timedHits", timed_hits.DEFAULT_TIMED_HITS), "Timed Hits",
+    )
+    timed_hits_options = timed_hits.options(data, strict=True)
     shared_magic_inventory = _boolean(
         data.get("sharedMagicInventory", DEFAULT_SHARED_MAGIC_INVENTORY),
         "Shared Party Magic Inventory",
@@ -1178,6 +1204,8 @@ def save(data: dict, game_root: Path | None = None,
         flat_stat_abilities_enabled=flat_stat_abilities_enabled,
         max_spell_enabled=max_spell_enabled,
         max_spell_value=max_spell_value,
+        timed_hits_enabled=timed_hits_enabled,
+        timed_hits_options=timed_hits_options,
         flying_eva_enabled=flying_enabled,
         drops_after_mug=drops_after_mug,
         drop_chance_enabled=drop_chance_enabled,
@@ -1230,6 +1258,9 @@ def save(data: dict, game_root: Path | None = None,
         "flatStatAbilities": flat_stat_abilities_enabled,
         "maxSpellEnabled": max_spell_enabled,
         "maxSpell": max_spell_value,
+        "timedHits": timed_hits_enabled,
+        **{key: timed_hits_options[argument]
+           for key, (argument, *_rest) in timed_hits.SETTING_KEYS.items()},
     }
     settings_text = json.dumps(settings_data, indent=2, sort_keys=True) + "\n"
     runtime_text = shared_magic_runtime_config.build(
