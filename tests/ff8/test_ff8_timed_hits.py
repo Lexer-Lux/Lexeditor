@@ -18,13 +18,13 @@ INPUT_BLOCK = 0x00E0E000
 TIME_STUB = 0x00E0D000
 
 
-def _machine(now: int, *, window=250, bonus=150, block=50, ok=7, fail=9):
+def _machine(now: int, *, window=250, bonus=150, block=50, ok=7, fail=9, physical_only=False):
     emu = unicorn.Uc(unicorn.UC_ARCH_X86, unicorn.UC_MODE_32)
     for base, size in ((0x00400000, 0x00800000), (0x00E00000, 0x00010000),
                        (0x01D27000, 0x2000), (0x027AB000, 0x1000)):
         emu.mem_map(base, size)
     emu.mem_write(t.CAVE, t.CODE)
-    emu.mem_write(t.DATA, t.data_bytes(window, bonus, block, ok, fail))
+    emu.mem_write(t.DATA, t.data_bytes(window, bonus, block, ok, fail, physical_only))
     emu.mem_write(t.TIME_GET_TIME, struct.pack("<I", TIME_STUB))
     emu.mem_write(TIME_STUB, b"\xA1" + struct.pack("<I", CLOCK) + b"\xC3")  # mov eax,[CLOCK]; ret
     emu.mem_write(CLOCK, struct.pack("<I", now))
@@ -33,7 +33,7 @@ def _machine(now: int, *, window=250, bonus=150, block=50, ok=7, fail=9):
     stub += bytes.fromhex("89 04 8D") + struct.pack("<I", SOUNDS + 4)
     stub += bytes.fromhex("FF 05") + struct.pack("<I", SOUNDS) + b"\xC3"
     emu.mem_write(t.PLAY_SOUND, stub)
-    for resume in (t.INPUT_RESUME, t.HIT_RESUME):
+    for resume in (t.INPUT_RESUME, t.HIT_RESUME, t.TYPE_RESUME):
         emu.mem_write(resume, b"\xF4")
     return emu
 
@@ -140,7 +140,36 @@ def test_hext_and_hooks():
 
 def test_embedded_code_matches_its_source():
     pytest.importorskip("keystone")
-    assert t._assemble() == (t.CODE, t.HIT_ENTRY)
+    assert t._assemble() == (t.CODE, t.HIT_ENTRY, t.TYPE_ENTRY)
+
+
+def _damage_type(emu, kind: int):
+    """Enter 004922B0(kind, ...) through the recorder, as 0048FE20 does."""
+    esp = STACK + 0x7000
+    emu.mem_write(esp, struct.pack("<II", 0xCAFEF00D, kind))
+    emu.reg_write(x86.UC_X86_REG_ESP, esp)
+    emu.emu_start(t.TYPE_ENTRY, t.TYPE_RESUME + 1, count=50)
+    assert emu.reg_read(x86.UC_X86_REG_ESP) == esp
+
+
+@pytest.mark.parametrize("kind,counts", [(1, True), (7, True), (9, True), (10, True), (36, True),
+                                         (2, False), (8, False), (11, False), (22, False)])
+def test_physical_only_times_physical_hits_and_keeps_the_press_otherwise(kind, counts):
+    emu = _machine(1000, ok=7, physical_only=True)
+    _press(emu, t.SQUARE)
+    emu.mem_write(CLOCK, struct.pack("<I", 1200))
+    _damage_type(emu, kind)
+    assert _hit(emu, 1, 4, 1000) == (1500 if counts else 1000)
+    # A spell that is ignored leaves the press for the next physical hit.
+    assert _pressed(emu)[1] == (0 if counts else 1)
+
+
+def test_every_damaging_hit_counts_by_default():
+    emu = _machine(1000, ok=7)
+    _press(emu, t.SQUARE)
+    emu.mem_write(CLOCK, struct.pack("<I", 1200))
+    _damage_type(emu, 2)  # Magic Attack
+    assert _hit(emu, 1, 4, 1000) == 1500
 
 
 def test_settings_round_trip_and_reach_the_patch(tmp_path):
