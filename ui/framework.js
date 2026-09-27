@@ -2568,7 +2568,49 @@
   // Subtabs read in alphabetical order, the same rule the tabbed panel and
   // the page tabs follow (a Misc tab, then Tweaks, come last). An image bar
   // keeps the game's own order - GF and character portraits.
+  // Holding the right button on a subtab saves the page's view as the shipped
+  // default, as it does on the page tab: a subtab's layout is stored under its
+  // page, so the page is what gets saved (Lexer: the hold did nothing on a
+  // subtab). Developer mode only, like the page tab.
+  const holdToSaveDefaultView = button => {
+    let timer = 0, saved = false;
+    button.addEventListener("pointerdown", event => {
+      if (event.button !== 2 || !sharedSettingsSnapshot?.developerMode) return;
+      saved = false;
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const plugin = shellPluginId(), page = activePageTab();
+        if (!plugin || !page) return;
+        const token = `${plugin}-${page}`, preferences = {};
+        try {
+          for (let index = 0; index < localStorage.length; index += 1) {
+            const key = localStorage.key(index);
+            if (key && key.includes(token)) preferences[key] = localStorage.getItem(key);
+          }
+          const result = await callWindow("save_default_view", plugin, page, preferences);
+          saved = !!result?.saved;
+          const name = document.querySelector(".lex-shell-header nav button.active .lex-tab-label-text")?.textContent || page;
+          if (saved) showToast(`${name} is now the shipped default view.`);
+        } catch (error) {
+          showAlert({title: "Could not save the default view", message: error.message || String(error)});
+        }
+      }, 700);
+    });
+    for (const type of ["pointerup", "pointercancel", "pointerleave"])
+      button.addEventListener(type, () => clearTimeout(timer));
+    button.addEventListener("contextmenu", event => {
+      if (!sharedSettingsSnapshot?.developerMode) return;
+      event.preventDefault();
+      clearTimeout(timer);
+      saved = false;
+    });
+  };
   const subtabBar = (options = {}) => {
+    const bar = subtabBarSorted(options);
+    bar.querySelectorAll(".lex-subtab-button").forEach(holdToSaveDefaultView);
+    return bar;
+  };
+  const subtabBarSorted = (options = {}) => {
     if (options.images || options.order === "given") return subtabBarElement(options);
     const rank = tab => ({tweaks: 2, misc: 1})[String(tab.id).toLocaleLowerCase()] || 0;
     const name = tab => String(tab.label instanceof Node ? tab.label.textContent : tab.label ?? tab.id);

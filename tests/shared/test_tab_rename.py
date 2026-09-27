@@ -200,3 +200,23 @@ def test_the_shell_undo_takes_a_rename_back_and_redo_puts_it_on_again(page):
     page.wait_for_timeout(300)
     assert label_of(page, "items") == "Gear", "redo did not put the name back"
     assert page.evaluate('localStorage.getItem("fixture-items.label")') == "Gear"
+
+
+def test_holding_right_click_on_a_subtab_saves_its_page_view(page):
+    """Lexer: holding the right button on a subtab to save its layout did nothing."""
+    framework(page)
+    mount_shell(page)
+    mount_subtabs(page)
+    page.evaluate("localStorage.setItem('lexeditor:list-detail:fixture-items','40')")
+    page.evaluate("window.savedCalls.length=0")
+    tab = page.locator('.lex-subtab-button[data-subtab="growth"]')
+    tab.hover()
+    page.mouse.down(button='right')
+    page.wait_for_timeout(900)
+    page.mouse.up(button='right')
+    page.wait_for_timeout(200)
+    saved = page.evaluate('window.savedCalls')
+    assert len(saved) == 1, saved
+    plugin, page_tab, preferences = saved[0]
+    assert (plugin, page_tab) == ('fixture', 'items'), saved
+    assert preferences.get('lexeditor:list-detail:fixture-items') == '40', preferences
