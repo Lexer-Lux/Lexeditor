@@ -792,7 +792,8 @@
       prefs:textPrefs,columns:textColumns,ariaLabel:"FF7 Remake localized text entries",
       split:40,minLeft:360,minRight:420,detail:()=>textRecordPanel()}))}
 
-  function loadingPanel(title,message){return detailPanel({className:"ff7r-detail",title,body:[detailSection({title:"DATA",body:[detailField({label:"STATE",control:readonlyField(message)})]})]})}
+  // The shared, themed loading state; the title says what is being read.
+  function loadingPanel(title,message){return LexeditorUI.loadingPanel({className:"ff7r-detail",label:`${title}: ${message}`})}
   function errorPanel(message){return detailPanel({className:"ff7r-detail",title:"Resource unavailable",body:[detailSection({title:"ERROR",body:[detailField({label:"DETAIL",control:LexeditorUI.notice({tone:"warning",message})})]})]})}
   function openMapRow(row){
     const asset=row.target||row.view;if(!asset)return;

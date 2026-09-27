@@ -107,7 +107,7 @@ function FF8ArchivesUI({el,columnList,pagedPane,pager,detailPanel,detailSection,
         detailField({label:"ACTION",control:repack}),
         local.repacked?detailField({label:"LAST REPACK",control:readonlyField(local.repacked)}):null]}),
       local.error?notice({message:local.error,tone:"warning"}):null,
-      local.busy?notice({message:"Reading the archive list…"}):null]});
+      local.busy?LexeditorUI.loadingPanel({label:"Reading the archive list"}):null]});
     const chosen=rows.find(entry=>entry.id===local.selected)||null;
     const entry=chosen?entryDetail(chosen)
       :detailPanel({heading:false,className:"ff8-archive-panel",

@@ -78,10 +78,9 @@ function fieldAvailability(row,spec){
   const unknownSelect=spec.type==="select"&&present&&!choices.includes(original);
   return{original,present,ambiguous,choices,unknownSelect,disabled:(!present&&spec.addable!==true)||ambiguous||spec.locked===true||unknownSelect};
 }
-function renderLoading(message="Reading the Build 42 project…"){
-  main.replaceChildren(LexeditorUI.detailPanel({className:"lex-information-panel pz-loading",title:"Loading Project Zomboid",meta:"Build 42 editor",body:[
-    LexeditorUI.el("p",{class:"lex-detail-note",role:"status"},message),
-  ]}));
+function renderLoading(message="Reading the Build 42 project"){
+  // The shared, themed loading state rather than a panel of its own.
+  main.replaceChildren(LexeditorUI.loadingPanel({className:"pz-loading",label:message}));
 }
 function renderEmpty(title,message){
   return LexeditorUI.detailPanel({className:"pz-empty-state",title,meta:"No records",body:[

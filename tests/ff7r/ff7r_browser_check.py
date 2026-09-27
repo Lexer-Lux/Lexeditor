@@ -589,7 +589,8 @@ def exercise_editor(browser, output: Path, html: str) -> list[dict]:
 
         # Explicit state surfaces: loading, error and empty data.
         page.evaluate("""() => {state.tab="misc";state.busy=true;render();}""")
-        assert "Loading DataObject" in page.locator("#main").inner_text()
+        # The shared, themed loading state names what it reads in its label.
+        assert "Loading DataObject" in (page.locator("#main .lex-panel-loading").get_attribute("aria-label") or "")
         page.screenshot(path=str(output / "state-loading.png"), full_page=True)
 
         page.evaluate("""() => {

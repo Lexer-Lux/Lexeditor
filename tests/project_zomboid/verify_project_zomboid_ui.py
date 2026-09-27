@@ -351,7 +351,10 @@ def main() -> int:
 
                     # Render the plugin-owned loading and error states, then restore the live page.
                     page.evaluate("renderLoading('Rendered acceptance loading state')")
-                    assert page.locator(".pz-loading").get_by_text("Rendered acceptance loading state").count() == 1
+                    # The shared, themed loading state names what it reads in its label.
+                    loading = page.locator(".pz-loading.lex-panel-loading")
+                    assert loading.get_attribute("aria-label") == "Rendered acceptance loading state"
+                    assert loading.get_attribute("aria-busy") == "true"
                     page.evaluate("render()")
                     page.locator(".pz-metadata").wait_for(state="visible")
                     page.evaluate("renderLoadError(new Error('Rendered acceptance error state'))")

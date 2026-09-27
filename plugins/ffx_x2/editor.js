@@ -595,7 +595,7 @@ async function renderGroup(){
   const content=el("div",{});
   const page=stack(subtabBar({tabs:tabs,active:key,label:group.label+" datasets",change:value=>{state.subtabs[state.tab]=value;render()}}),content);
   $("#main").replaceChildren(page);
-  content.replaceChildren(el("div",{class:"lex-notice",role:"status"},"Loading "+spec.label+"…"));
+  content.replaceChildren(LexeditorUI.loadingPanel({label:"Loading "+spec.label}));
   try{
     const ds=await ensureDataset(key,false);
     if(state.tab!==Object.keys(GROUPS).find(groupKey=>GROUPS[groupKey].datasets.includes(key))&&currentDatasetKey()!==key)return;
