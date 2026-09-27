@@ -554,6 +554,12 @@ def _display_fields(section_id: int) -> list[dict]:
     return result
 
 
+# Kernel section 5 holds the weapons; character 2 is Irvine, whose guns alone
+# read the Shots per ATB byte (battle_issue_54.py).
+WEAPON_SECTION = 5
+IRVINE_CHARACTER_ID = 2
+
+
 def _protected_lookup_entry(entry: dict) -> bool:
     return bool(entry.get("readonly") or str(entry.get("name", "")).casefold().startswith(("unknown", "unused")))
 
@@ -604,6 +610,13 @@ def kernel_rows(section_id: int, dataset: str = "current") -> dict:
                 "subgroup": field.get("subgroup"),
                 "readonly": bool(field.get("readonly")),
             })
+        # Shots per ATB drives Irvine's Shot command only; on anyone else's
+        # weapon the byte does nothing the editor knows of, so it stays as stored.
+        if section_id == WEAPON_SECTION:
+            owner = next((entry["value"] for entry in values if entry["field"] == "character_id"), None)
+            for entry in values:
+                if entry["field"] == "shots_per_atb" and owner != IRVINE_CHARACTER_ID:
+                    entry["readonly"] = True
         # Where this record's name is stored, so a page can offer to change it
         # instead of guessing or keeping a second copy.
         name_ref = ({"source": "kernel", "sectionId": ABILITY_TEXT_SECTIONS[section_id],
@@ -640,6 +653,11 @@ def save_kernel(section_id: int, edits: list[dict]) -> dict:
             raise ValueError(f"{field_name} must be {minimum} to {maximum}")
         absolute = section_start + record_id * section["sub_section_size"] + relative
         current = int.from_bytes(raw[absolute:absolute + size], "little")
+        if section_id == WEAPON_SECTION and field_name == "shots_per_atb" and value != current:
+            owner_field = definitions.get("character_id")
+            owner_at = section_start + record_id * section["sub_section_size"] + int(owner_field["offset"])
+            if raw[owner_at] != IRVINE_CHARACTER_ID:
+                raise ValueError("Shots per ATB only applies to Irvine's guns")
         mask = definition.get("mask")
         if mask is not None:
             current = int.from_bytes(raw[absolute:absolute + size], "little")
