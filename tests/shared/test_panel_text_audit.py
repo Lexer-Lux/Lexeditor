@@ -118,22 +118,21 @@ def test_stat_bonus_ids_fit_their_column(page):
     assert audit == [], audit
 
 
-def test_audit_catches_a_narrow_id_column(page):
+def test_audit_catches_a_narrow_column(page):
     lexend(page)
+    # A numbered-ID column now grows to fit its widest ID (a 44px track once
+    # sheared "#01"), so the audit's own proof uses a nominated column that
+    # the table does not resize: a long code in a 30px track.
     page.evaluate("""() => {
-      // Armor's whole-set id floor is 2 (ids 0..31), so the slot numbers
-      // render padded (#01) and shear in the fixed 44px track. An unpadded
-      // #1 would fit, which is why this control must set the floor.
       document.querySelector('main').append(LexeditorUI.columnList({
-        template: '44px minmax(120px,1fr) minmax(90px,.8fr)',
-        columns: [{key: 'key', label: '#', numberedId: true},
-                  {key: 'stat', label: 'Stat'}, {key: 'amount', label: 'Amount'}],
-        rows: [{key: 1, stat: 'Strength', amount: 0}],
-        idFloor: 2,
+        template: '30px minmax(120px,1fr)',
+        columns: [{key: 'code', label: 'Code', cellClass: 'audit-probe-cell'},
+                  {key: 'stat', label: 'Stat'}],
+        rows: [{key: 1, code: 'STRENGTH-BONUS', stat: 'Strength'}],
       }));
     }""")
     audit = page.evaluate(
-        "window.__lexPanelTextAudit(document, ['.lex-numbered-id-cell'])")
+        "window.__lexPanelTextAudit(document, ['.audit-probe-cell'])")
     assert any(finding["axis"] == "horizontal" for finding in audit), audit
 
 
