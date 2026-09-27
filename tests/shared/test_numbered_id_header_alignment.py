@@ -29,3 +29,25 @@ def test_id_header_and_ids_share_a_start(page):
     }''')
     assert all(abs(result['head'] - left) <= 2 for left in result['ids']), result
     assert result['cut'] == 0, result
+
+
+def test_first_centred_header_sits_in_its_column_middle(page):
+    """Lexer: SFX's "ID" and Text's "Source" headers were "clearly pushed a bit
+    to the right". The first sortable header keeps the sort mark's room on its
+    left; centred words need the same room on the right to stay in the middle."""
+    page.add_style_tag(content=(ROOT / 'plugins/ff8/editor.css').read_text(encoding='utf-8').replace('url(', 'url(x'))
+    framework(page)
+    page.evaluate("document.body.dataset.lexPlugin='ff8'")
+    page.evaluate('''()=>{
+      const rows=[1,2,3].map(id=>({id,source:'Vanilla',name:'Row '+id}));
+      const main=document.querySelector('main');main.style.cssText='width:600px';
+      main.replaceChildren(LexeditorUI.columnList({rows,key:r=>r.id,
+        template:'110px minmax(120px,1fr)',
+        columns:[{key:'source',label:'Source',sortable:true},{key:'name',label:'Name',sortable:true}]}));
+    }''')
+    page.wait_for_timeout(200)
+    offset = page.evaluate('''()=>{
+      const head=document.querySelector('.lex-column-list-head-cell'),label=head.querySelector('.header-label');
+      const h=head.getBoundingClientRect(),l=label.getBoundingClientRect();
+      return (l.left+l.width/2)-(h.left+h.width/2)}''')
+    assert abs(offset) <= 1.5, offset

@@ -8236,6 +8236,13 @@ body { text-shadow: var(--lex-text-shadow, none); }
 .lex-column-list-head-cell.lex-column-sortable:first-child {
   padding-inline-start:max(8px, calc(var(--lex-sort-marker-width, 7px) + var(--lex-sort-marker-gap, 2px) + 2px));
 }
+/* Words centred in that header get the same room on the right, or they centre
+   in a lopsided box and sit right of the column's middle (Lexer: SFX's "ID"
+   and Text's "Source" were "clearly pushed a bit to the right"). Words that
+   start at the left or end at the right keep their edge. */
+.lex-column-list-head-cell.lex-column-sortable:first-child:not(.lex-column-align-end, .lex-column-align-start:has(.lex-column-heading)) {
+  padding-inline-end:max(8px, calc(var(--lex-sort-marker-width, 7px) + var(--lex-sort-marker-gap, 2px) + 2px));
+}
 /* A start-aligned first column keeps that same room in its cells, so the
    header's words and the values under them start on one line (FF8 GF
    ability Slot: the header sat a sort mark's width right of its numbers). */
