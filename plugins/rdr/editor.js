@@ -229,7 +229,7 @@
     // The save button is held here rather than re-rendering the section on
     // every keystroke: a full render would rebuild the box being typed into.
     let saveButton=null;
-    if(!script)return LexeditorUI.detailSection({title,body:[LexeditorUI.detailNote("Reading the script that holds it…")]});
+    if(!script)return LexeditorUI.detailSection({title,body:[LexeditorUI.loadingPanel({label:"Reading the script that holds it"})]});
     if(!script.available)return LexeditorUI.detailSection({title,
       help:infoHelp("The table lives in a compiled script inside content.rpf. Lexeditor reads it through the same RPF6 bridge it uses everywhere else; this is what stopped it."),
       body:[notice({tone:"warning",message:script.reason||"The loot script could not be read."})]});
