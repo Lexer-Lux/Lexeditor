@@ -39,7 +39,7 @@ try:
         boot = boot[:boot.index("  const shell=LexeditorUI.mountShell(")] + """
 const shell={refresh(){}};
 state.formula={weaponId:0,strength:100,vitality:50,luck:20,eva:10,targetLuck:5,flying:false,float:false};
-state.data={weapons:{rows:[]},settings:{formulaeRework:true,formulaeReworkAvailable:false,
+state.data={weapons:{rows:[]},settings:{formulaeRework:true,formulaeReworkAvailable:true,
   formulaeReworkFormulas:FORMULA_ROWS_PLACEHOLDER,
   flyingEvaEnabled:false,flyingEvaBonus:0,minimum:0,maximum:100,
   cameraSpeed:1,cameraSpeedMinimum:0.2,cameraSpeedMaximum:4,
@@ -66,7 +66,7 @@ document.body.dataset.lexPlugin="ff8";renderSettings();LexeditorUI.finishPluginL
         assert any("PHYSICAL ACCURACY" in card for card in unlocked["cards"]), unlocked["cards"]
         assert any("MELEE DAMAGE" in card and "IMPLEMENTED" in card for card in unlocked["cards"]), unlocked["cards"]
         assert "ENEMIES" in unlocked["cards"], unlocked["cards"]
-        assert any("ELEMENTAL ATTACK DAMAGE" in card and "INCOMPLETE" in card for card in unlocked["cards"]), unlocked["cards"]
+        assert not any("INCOMPLETE" in card for card in unlocked["cards"]), unlocked["cards"]
         assert any("SPELL HEALING" in card and "IMPLEMENTED" in card for card in unlocked["cards"]), unlocked["cards"]
         implemented = len(formulae_rework.implemented_ids())
         assert f"{implemented}/{len(formulae_rework.rows())} requested runtime formulae are implemented" in unlocked["master"], unlocked["master"]

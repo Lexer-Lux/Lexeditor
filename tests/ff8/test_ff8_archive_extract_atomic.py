@@ -15,6 +15,11 @@ def test_failed_archive_replace_preserves_previous_extraction(tmp_path, monkeypa
     entry = SimpleNamespace(index=0, basename='entry.bin', name='entry.bin')
     archive = SimpleNamespace(entries=[entry], extract=lambda _: b'new')
     monkeypatch.setattr(archive_index, 'FsArchive', lambda _: archive)
+    # No game here: point the installed-archive check at a stand-in index file.
+    prefix = tmp_path / 'game' / 'main'
+    prefix.parent.mkdir()
+    prefix.with_suffix('.fi').write_bytes(b'')
+    monkeypatch.setattr(archive_index, '_prefix', lambda _: prefix)
     target = tmp_path / archive_index.EXTRACTED_ROOT / 'main' / 'entry.bin'
     target.parent.mkdir(parents=True)
     target.write_bytes(b'previous edit')

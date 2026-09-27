@@ -72,14 +72,15 @@ def main() -> int:
     by_id = {row["id"]: row for row in rows}
     assert {
         "melee_damage", "magic_damage", "status_infliction", "spell_healing",
-        "physical_accuracy", "status_attack", "elemental_attack", "mug_chance",
+        "physical_accuracy", "status_attack", "mug_chance",
     } == set(by_id)
     assert "Damage_ComputeMagicAndGF at 0x491AD0" in by_id["magic_damage"]["vanilla"]
     assert "Battle_ApplyStatusWithResistRoll at 0x48F9F0" in by_id["status_infliction"]["vanilla"]
     assert "Damage_ComputeCurativeMagic at 0x493280" in by_id["spell_healing"]["vanilla"]
     assert by_id["spell_healing"]["status"] == formulae_rework.STATUS_IMPLEMENTED
     assert by_id["physical_accuracy"]["status"] == formulae_rework.STATUS_IMPLEMENTED
-    assert not formulae_rework.available(), "master toggle must stay unavailable while advertised rows are incomplete"
+    assert formulae_rework.available(), "every listed formula has a runtime, so the master toggle is available"
+    assert formulae_rework.blocker() == ""
 
     print("FF8 Formulae Tweaks-subtab single-source inventory and UI contract passed")
     return 0

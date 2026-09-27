@@ -17,7 +17,6 @@ class FormulaeReworkTests(unittest.TestCase):
         "spell_healing",
         "physical_accuracy",
         "status_attack",
-        "elemental_attack",
         "mug_chance",
     )
 
@@ -54,11 +53,11 @@ class FormulaeReworkTests(unittest.TestCase):
         })
         self.assertTrue(healing_rework.build_hext(True))
         self.assertTrue(luck_accuracy.build_hext(True))
-        self.assertFalse(formulae_rework.available())
-        self.assertEqual(
-            formulae_rework.incomplete_ids(),
-            ("elemental_attack",),
-        )
+        # Elemental attack damage stays vanilla (Lexer, 2026-09-26), so every
+        # listed change is real and the one switch can turn on.
+        self.assertTrue(formulae_rework.available())
+        self.assertEqual(formulae_rework.incomplete_ids(), ())
+        self.assertEqual(formulae_rework.blocker(), "")
 
     def test_healing_replacement_mirror(self):
         self.assertEqual(formulae_rework.healing_amount(12, 40), 480)

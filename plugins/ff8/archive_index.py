@@ -95,7 +95,7 @@ def extract(name: str, index: int, project_root: Path | None = None) -> dict:
 
     Browsing reads metadata; this is the one place entry contents are read, and
     they are written into the project, never back into the installation. The
-    copy is bounded like every other project write: one previous copy is kept.
+    write is atomic, so a failed extraction leaves the previous file intact.
     """
     prefix = _prefix(name)
     if not prefix.with_suffix(".fi").is_file():
