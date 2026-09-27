@@ -70,6 +70,17 @@ SUMMON_GATE_CAVE = 0x0279F400
 # after it has said why. A refusal that only plays the denied sound is what
 # made the greyed slot look broken in the first place.
 SUMMON_REFUSED_FLAG = 0x0279F4F0
+# The refusal is said in FF8's own battle message box at the top of the screen
+# (Lexer: in-game messages use the game's box, never an overlay). 0047E220 is
+# the routine the game itself uses for its top notices: 00485420 calls it as
+# (text, (Battle Message speed + 1) x 8 frames, 3, 0x80, 0x56). The text is
+# FF8 battle text, NUL-terminated, kept beside the call in the free space
+# between the flag and the fixed-command block at 0279F600.
+SUMMON_MESSAGE_CAVE = 0x0279F500
+SUMMON_MESSAGE_TEXT = 0x0279F530
+BATTLE_MESSAGE = 0x0047E220
+BATTLE_MESSAGE_SPEED = 0x01CFE739
+SUMMON_MESSAGE = "No GF is junctioned to this character."
 
 # Where a character's junctioned GFs live. Verified by the Single GF patch,
 # which normalizes this same mask on field and world-map entry.
@@ -215,6 +226,25 @@ def _summon_gate_payload() -> bytes:
     return code.finish()
 
 
+def _summon_message_payload() -> bytes:
+    """Show SUMMON_MESSAGE in FF8's battle message box; preserve every register."""
+    code = _MachineCode(SUMMON_MESSAGE_CAVE)
+    code.add(bytes.fromhex("60 9C"))                                    # pushad; pushfd
+    code.add(b"\x0F\xB6\x0D" + BATTLE_MESSAGE_SPEED.to_bytes(4, "little"))  # movzx ecx, [speed]
+    code.add(bytes.fromhex("8D 0C CD 08 00 00 00"))                     # lea ecx, [ecx*8 + 8]
+    code.add(bytes.fromhex("6A 56 68 80 00 00 00 6A 03 51"))           # push 0x56, 0x80, 3, ecx
+    code.add(b"\x68" + SUMMON_MESSAGE_TEXT.to_bytes(4, "little"))       # push text
+    source = code.address + len(code.data)
+    code.add(_near_call(source, BATTLE_MESSAGE))
+    code.add(bytes.fromhex("83 C4 14 9D 61 C3"))                        # add esp, 20; popfd; popad; ret
+    return code.finish()
+
+
+def summon_message_bytes() -> bytes:
+    from .kernel_text import encode
+    return encode(SUMMON_MESSAGE, compress=False) + b"\x00"
+
+
 def _card_filter_payload() -> bytes:
     """Filter EAX's actor mask to enemies that have a Card result."""
     code = _MachineCode(CARD_FILTER_CAVE)
@@ -290,9 +320,10 @@ def _draw_select_payload(*, draw_once: bool = True,
         code.add(_near_call(source, SUMMON_GATE_CAVE))
         code.add(bytes.fromhex("84 C0"))
         code.jump(bytes.fromhex("0F 85"), "enabled")
-        # Refused. Raise the flag so the reason can be said, then let FF8's own
+        # Refused. Say why in the game's own top box, then let FF8's own
         # disabled branch play the denied sound and swallow the press.
-        code.add(b"\xC6\x05" + SUMMON_REFUSED_FLAG.to_bytes(4, "little") + b"\x01")
+        source = code.address + len(code.data)
+        code.add(_near_call(source, SUMMON_MESSAGE_CAVE))
         code.jump(bytes.fromhex("E9"), "disabled")
         code.label("not_summon")
     if draw_once or streamlined_draw:
@@ -595,6 +626,8 @@ def build_command_eligibility_patch(*, draw_once: bool = DEFAULT_DRAW_ONCE_PER_E
         caves.append((CARD_FILTER_CAVE, _card_filter_payload()))
     if summon_gate:
         caves.append((SUMMON_GATE_CAVE, _summon_gate_payload()))
+        caves.append((SUMMON_MESSAGE_CAVE, _summon_message_payload()))
+        caves.append((SUMMON_MESSAGE_TEXT, summon_message_bytes()))
     hooks.extend((
         (DRAW_SELECT_HOOK, len(DRAW_SELECT_ORIGINAL), DRAW_SELECT_CAVE),
         (DRAW_RENDER_HOOK, len(DRAW_RENDER_ORIGINAL), DRAW_RENDER_CAVE),
