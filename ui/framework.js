@@ -1785,7 +1785,8 @@
     const onKey=event=>{if(event.key==="Escape"){event.preventDefault();event.stopImmediatePropagation();close();}};
     const draw=()=>{
       const spec=options.magnify()||{},place=spec.place;
-      note.textContent=spec.note||"Point at the map to read the value, then click to place the point.";
+      // The placing hint only where a click places something.
+      note.textContent=spec.note||(place?"Point at the map to read the value, then click to place the point.":"");
       mapHost.replaceChildren(imageMap({...spec,fill:true,magnify:null,crosshair:true,
         place:place?point=>{place(point);draw();}:undefined}));
       if(options.details)detailsHost.replaceChildren(options.details({refresh:draw}));
@@ -1872,6 +1873,14 @@
       root.append(element("button",{type:"button",class:"lex-image-map-magnify",
         title:"Open the large map","aria-label":`Open the large map: ${options.label||"map"}`,
         onclick:event=>{event.stopPropagation();mapMagnifier(options);}},magnifyIcon()));
+    // A small preview map is a way into the large one: a click anywhere on it
+    // opens the large map, and the magnifier shows over the whole picture on
+    // hover, as a model thumbnail's does (Lexer: "clicking it ANYWHERE should
+    // enter the bigger version").
+    if(typeof options.magnify==="function"&&options.magnifyOnClick){
+      root.classList.add("lex-image-map-click-magnify");
+      root.addEventListener("click",event=>{event.preventDefault();event.stopPropagation();mapMagnifier(options);},true);
+    }
     return root;
   };
 

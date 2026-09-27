@@ -116,7 +116,7 @@ def main() -> int:
               inputs:[...panel.querySelectorAll('input')].map(node=>node.getAttribute('aria-label')),
               map:{width:map.getBoundingClientRect().width,height:map.getBoundingClientRect().height,label:map.getAttribute('aria-label')},
               marker:{left:marker.style.left,top:marker.style.top},
-              sectionTitles:panel.querySelectorAll('.lex-detail-section-title').length,
+              sectionTitles:panel.querySelectorAll('.world-draw-position .lex-detail-section-title').length,
               magnifiers:panel.querySelectorAll('.lex-image-map-magnify').length,
               help:[...document.querySelectorAll('.ff8-world-tabs [role=tab]')]
                 .find(node=>/draw points/i.test(node.textContent))
@@ -126,16 +126,17 @@ def main() -> int:
             assert rendered["active"] == "Draw Points"
             assert rendered["tabs"] == ["Cells", "Draw Points", "Field Returns", "Ground Types", "Map",
                                         "Sky Colours", "Train Tracks", "World → Field", "World Textures"], rendered["tabs"]
-            assert rendered["inputs"] == ["Draw Point 129 X", "Draw Point 129 Y",
-                                          "Draw Point 129 sub-ID"]
+            assert rendered["inputs"] == ["Draw Point 129 refill", "Draw Point 129 high yield",
+                                          "Draw Point 129 X", "Draw Point 129 Y",
+                                          "Draw Point 129 SUB-ID"], rendered["inputs"]
             # The world map is the game's 4:3 art, so the panel shows it 4:3.
             assert abs(rendered["map"]["width"] / rendered["map"]["height"] - 4 / 3) < 0.02, rendered["map"]
             assert rendered["map"]["width"] > 250 and "Set Draw Point 129" in rendered["map"]["label"]
             # The page's own help carries what the file does not store, and the
             # panel is the map and the three byte fields, with no heading band.
-            assert "FF8_EN.exe" in rendered["help"], rendered["help"]
+            assert "Hext patch" in rendered["help"] and "executable" in rendered["help"], rendered["help"]
             assert rendered["sectionTitles"] == 0, rendered
-            assert rendered["magnifiers"] == 0, rendered
+            assert rendered["magnifiers"] == 1, rendered  # the shared click-anywhere overlay
             assert not rendered["overflow"]
 
             # A click on the panel's map opens the large map and leaves the

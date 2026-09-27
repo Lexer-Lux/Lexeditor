@@ -4502,6 +4502,13 @@ body:has(.lex-data-map-table) #main {
 .lex-image-map-magnify { position:absolute; z-index:5; top:6px; right:6px; display:grid; width:30px; height:30px; min-width:30px; padding:0; place-items:center; color:var(--lex-text); border:1px solid var(--lex-border); border-radius:var(--lex-radius); background:color-mix(in srgb,var(--lex-panel) 86%,transparent); }
 .lex-image-map-magnify > svg { width:18px; height:18px; }
 .lex-image-map-magnify:hover,.lex-image-map-magnify:focus-visible { color:var(--lex-accent); border-color:var(--lex-highlight); }
+/* A preview map that opens the large map on any click: its magnifier covers the
+   picture and fades in on hover, big, like a model thumbnail's. */
+.lex-image-map-click-magnify { cursor:zoom-in; }
+.lex-image-map-click-magnify > .lex-image-map-magnify { inset:0; width:100%; height:100%; border:0; border-radius:0; opacity:0; transition:opacity .15s ease; pointer-events:none;
+  color:#fff; filter:drop-shadow(0 1px 2px #000c) drop-shadow(0 0 1px #000); background:transparent; }
+.lex-image-map-click-magnify > .lex-image-map-magnify > svg { width:min(64px,40%); height:min(64px,40%); }
+.lex-image-map-click-magnify:is(:hover,:focus-within) > .lex-image-map-magnify { opacity:1; background:color-mix(in srgb,var(--lex-panel) 45%,transparent); color:#fff; }
 .lex-map-magnifier-dialog { width:min(1600px,96vw); height:96vh; max-height:96vh; display:flex; flex-direction:column; }
 .lex-map-magnifier-header { display:flex; align-items:center; gap:12px; flex:0 0 auto; }
 .lex-map-magnifier-note { flex:1; min-width:0; margin:0; color:var(--lex-text); }

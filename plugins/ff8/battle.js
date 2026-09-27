@@ -236,12 +236,14 @@
       image:worldMapImage(),
       points:typeof options.points==="function"?options.points():options.points,
       cells:options.cells,select:options.select,place:options.place,
-      readout:options.readout,note:options.note};
+      // Where the pointer is, in the world grid's own cells - the same (x, y)
+      // the Map shows, not a percentage.
+      readout:options.readout||(point=>`(${point.column}, ${point.row})`),note:options.note};
   }
   function worldLocationMap(options){
     // Unfilled, so the map takes the section's width and its own aspect ratio: a
     // filled map fills a panel, and a panel's sections have no height to fill.
-    const map=LexeditorUI.imageMap({...worldLocationOptions(options),
+    const map=LexeditorUI.imageMap({...worldLocationOptions(options),magnifyOnClick:true,
       magnify:()=>worldLocationOptions(options)});
     worldMapNavigation(map,map.lexStage);
     return map;
@@ -288,20 +290,17 @@
         label:`Draw Point ${row.drawId}`}];},
       readout:point=>{const block=worldDrawBlock(point);return `block ${block.x}, ${block.y}`},
       place:editable()?point=>{const block=worldDrawBlock(point);Object.assign(row,worldDrawBytes(block.x,block.y));rerenderWorldMap();shell.refresh()}:null});
-    const map=LexeditorUI.imageMap({...spec(),place:null,magnify:null});
+    // The shared preview map: a click anywhere opens the large map, where the
+    // point is placed, with the magnifier over the picture on hover - the same
+    // component every world preview uses.
+    const map=LexeditorUI.imageMap({...spec(),place:null,magnifyOnClick:true,minSizes:[480,300],
+      details:({refresh})=>detailPanel({title:`Draw Point ${row.drawId}`,
+        body:detailSection({body:fields(()=>{rerenderWorldMap();refresh()})})}),
+      magnify:()=>({...spec(),note:editable()
+        ?`Click the map to place Draw Point ${row.drawId}, or edit its position on the right.`
+        :'This source is read-only. Select an editable mod to move this draw point.'})});
     worldMapNavigation(map,map.lexStage);
     map.classList.add("world-draw-map");
-    // The large map keeps the same click that places the point, and the panel
-    // states the rule on its bar, as the shared finder does.
-    // The marker is a button and stops its own click, so the map listens on the
-    // way down: any click on the picture opens the large map.
-    map.addEventListener("click",event=>{if(event.target.closest("input,a"))return;
-      LexeditorUI.mapMagnifier({label:`Draw Point ${row.drawId}`,minSizes:[480,300],
-        details:({refresh})=>detailPanel({title:`Draw Point ${row.drawId}`,
-          body:detailSection({body:fields(()=>{rerenderWorldMap();refresh()})})}),
-        magnify:()=>({...spec(),note:editable()
-          ?`Click the map to place Draw Point ${row.drawId}, or edit its position on the right.`
-          :'This source is read-only. Select an editable mod to move this draw point.'})});},true);
 
     // What it gives lives in the executable's draw point table, one byte per
     // draw ID, and is edited through the project's Hext patch (Lexer: "edit
@@ -333,15 +332,13 @@
           :[{x:at.x,y:at.y,selected:true,label:`Field return ${row.id}`}];},
       readout:point=>{const at=worldMapCoordinate(point);return `x ${formatNumber(at.x)}, z ${formatNumber(at.z)}`},
       place:editable()?point=>{const at=worldMapCoordinate(point);row.x=at.x;row.z=at.z;rerenderWorldMap();shell.refresh()}:null});
-    const map=LexeditorUI.imageMap({...spec(),place:null,magnify:null});
+    const map=LexeditorUI.imageMap({...spec(),place:null,magnifyOnClick:true,minSizes:[480,300],
+      details:({refresh})=>detailPanel({title:`Field return ${row.id}`,
+        body:detailSection({body:fields(()=>{rerenderWorldMap();refresh()})})}),
+      magnify:()=>({...spec(),note:editable()
+        ?`Click the map to place field return ${row.id}, or edit its position on the right.`
+        :'This source is read-only. Select an editable mod to move this return point.'})});
     worldMapNavigation(map,map.lexStage);
-    map.addEventListener("click",event=>{if(event.target.closest("input,a"))return;
-      LexeditorUI.mapMagnifier({label:`Field return ${row.id}`,minSizes:[480,300],
-        details:({refresh})=>detailPanel({title:`Field return ${row.id}`,
-          body:detailSection({body:fields(()=>{rerenderWorldMap();refresh()})})}),
-        magnify:()=>({...spec(),note:editable()
-          ?`Click the map to place field return ${row.id}, or edit its position on the right.`
-          :'This source is read-only. Select an editable mod to move this return point.'})});},true);
     return sharedDetail({...row,name:`FIELD RETURN ${row.id}`},prefs,[
       detailSection({title:"WORLD POSITION",help:infoHelp("Where the player appears on the world map after leaving a field by this exit. Click the map to open the large map and move the point. The number is the exit's own index, not a field ID."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},...fields(()=>rerenderWorldMap()),
         detailField({label:"UNRESOLVED WORD",help:infoHelp("What this value does is not known. It stays exactly as stored."),control:readonlyField(row.unknown)}))],{columns:2,minWidth:300})]})],"world-map-detail world-field-return")}

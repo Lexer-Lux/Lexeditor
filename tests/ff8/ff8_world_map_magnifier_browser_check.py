@@ -81,8 +81,10 @@ def main():
         small = page.locator('.lex-image-map-stage').bounding_box()
         page.mouse.move(small['x'] + small['width'] * .5, small['y'] + small['height'] * .5)
         assert readout(page, False) == 'block 64, 48', readout(page, False)
-        assert page.locator('.world-draw-point .lex-image-map-magnify').count() == 0, \
-            'the panel map is the way into the large map, so it carries no magnifier button'
+        # The panel map is the shared click-anywhere preview: one magnifier over
+        # the whole picture, shown on hover (Lexer: the draw point and field
+        # return previews must be the same component as every other one).
+        assert page.locator('.world-draw-point .lex-image-map-click-magnify > .lex-image-map-magnify').count() == 1
         before = page.evaluate('[drawRow.x,drawRow.y]')
         page.mouse.click(small['x'] + small['width'] * .5, small['y'] + small['height'] * .5)
         page.wait_for_selector('.lex-map-magnifier-dialog', timeout=5000)

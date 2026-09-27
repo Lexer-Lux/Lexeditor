@@ -115,7 +115,7 @@ def main():
           magnifiers: document.querySelectorAll(".world-draw-point .lex-image-map-magnify").length,
           fields: document.querySelectorAll(".world-draw-position input[type=number]").length,
         })""")
-        assert chrome == {"titles": 0, "notes": 0, "magnifiers": 0, "fields": 3}, chrome
+        assert chrome == {"titles": 0, "notes": 0, "magnifiers": 1, "fields": 3}, chrome  # the shared click-anywhere overlay
 
         before = stored(page)
         page.click(".world-draw-map .lex-image-map-stage", position={"x": 40, "y": 40})
