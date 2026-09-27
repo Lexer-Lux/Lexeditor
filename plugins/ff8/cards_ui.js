@@ -170,9 +170,11 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
   const playerScanPending = title => {
     if (playerAreas?.ready) return null;
     if (!playerAreas?.error) loadPlayerAreas();
-    const text = playerAreas?.error ? `Could not find card players: ${playerAreas.error}`
-      : `Finding card players… ${playerAreas?.scanned || 0} of ${playerAreas?.total || "?"} areas read`;
-    return detailPanel({className:"ff8-card-player-detail",title,body:[el("p",{},text)]});
+    if (playerAreas?.error)
+      return detailPanel({className:"ff8-card-player-detail",title,body:[LexeditorUI.detailNote(`Could not find card players: ${playerAreas.error}`)]});
+    // The shared, themed loading state; how far the scan is goes in its label.
+    return LexeditorUI.loadingPanel({className:"ff8-card-player-detail",
+      label:`Finding card players: ${playerAreas?.scanned || 0} of ${playerAreas?.total || "?"} areas read`});
   };
   const cardPlayerModel = () => {
     const groups=new Map();
