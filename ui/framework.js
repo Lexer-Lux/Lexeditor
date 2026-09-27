@@ -10922,6 +10922,13 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
       // strip owns them. A sub-tab bar shares its row equally and still fits
       // each of its labels here.
       if(nav){fitted.set(label,fitKey(label));return;}
+      // A sub-tab bar is fitted as a whole, like the page-tab strip: every
+      // name in it takes one size, only as small as the longest needs. Fitted
+      // one at a time, a long name shrank to the floor inside its slice while
+      // a short neighbour kept full size (Field: "Camera Ranges" at 8px beside
+      // a 16px "Tile").
+      const bar=label.closest('.lex-subtab-bar:not(.lex-subtab-bar-images)');
+      if(bar){fitSubtabBar(bar);return;}
       const range=document.createRange();range.selectNodeContents(label);
       // A tab with a help mark hugs its label to its text, so the label's own
       // width is no measure of the room: text 3px short of a box its own
@@ -10992,6 +10999,58 @@ if (typeof window !== "undefined" && typeof requestAnimationFrame === "function"
     // `contain:size` keeps the font size out of the box's own measurements, so
     // the key is the same one computed above and the label settles in one pass.
     fitted.set(label, key);
+  };
+  // The room a sub-tab leaves its name once padding, help mark and badges are
+  // out, and whether the name's text fits it.
+  const tabLabelFits = label => {
+    const range=document.createRange();range.selectNodeContents(label);
+    const button=label.closest('button'),own=label.closest('.lex-tab-label')||label;
+    const css=getComputedStyle(label),inset=parseFloat(css.paddingLeft)+parseFloat(css.paddingRight)+3;
+    let room=label.clientWidth-inset;
+    if(button&&button.querySelector(':scope > .lex-info-help')){
+      const box=getComputedStyle(button),gap=parseFloat(box.columnGap)||0;
+      room=button.clientWidth-parseFloat(box.paddingLeft)-parseFloat(box.paddingRight);
+      for(const part of button.children){
+        if(part===own||part.contains(label)||getComputedStyle(part).position==='absolute')continue;
+        room-=part.getBoundingClientRect().width+gap;
+      }
+      room-=inset;
+    }
+    return range.getBoundingClientRect().width<=room;
+  };
+  const barKey = bar => `${bar.clientWidth}|${[...bar.querySelectorAll('.lex-tab-label-text')].map(label=>label.textContent).join('|')}`;
+  const fitSubtabBar = bar => {
+    const labels=[...bar.querySelectorAll('.lex-tab-label-text')];
+    if(!labels.length)return;
+    const key=barKey(bar);
+    if(fitted.get(bar)===key&&labels.every(tabLabelFits))return;
+    labels.forEach(label=>{label.style.fontSize='';});
+    bar.style.gridTemplateColumns='';
+    // Names that all fit at full size keep the bar's equal lanes.
+    if(labels.every(tabLabelFits)){fitted.set(bar,barKey(bar));labels.forEach(label=>fitted.set(label,fitKey(label)));return;}
+    // Otherwise each tab's share of the row follows what it needs at full
+    // size - its name, its help mark and its padding - so every name reaches
+    // the same size at once instead of short names holding room long ones
+    // lack. The bar is a grid, so the shares are its columns.
+    const needs=[];
+    for(const label of labels){
+      const button=label.closest('button');if(!button){needs.push(1);continue;}
+      const range=document.createRange();range.selectNodeContents(label);
+      const text=range.getBoundingClientRect().width,css=getComputedStyle(label),box=getComputedStyle(button);
+      let need=text+parseFloat(css.paddingLeft)+parseFloat(css.paddingRight)+parseFloat(box.paddingLeft)+parseFloat(box.paddingRight)+6;
+      for(const part of button.children)if(!part.contains(label)&&getComputedStyle(part).position!=='absolute')
+        need+=part.getBoundingClientRect().width+(parseFloat(box.columnGap)||0);
+      needs.push(Math.max(1,Math.round(need)));
+    }
+    if(getComputedStyle(bar).display==='grid'&&needs.length===bar.querySelectorAll(':scope > [role="tab"]').length)
+      bar.style.gridTemplateColumns=needs.map(need=>`minmax(0,${need}fr)`).join(' ');
+    let size=parseFloat(getComputedStyle(labels[0]).fontSize)||12;
+    while(size>LABEL_MIN_PX&&!labels.every(tabLabelFits)){
+      size-=.5;
+      labels.forEach(label=>{label.style.fontSize=`${size}px`;});
+    }
+    fitted.set(bar,barKey(bar));
+    labels.forEach(label=>fitted.set(label,fitKey(label)));
   };
   const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label,.lex-tab-label-text,.lex-detail-panel-name';
   const labelSizeObserver = new ResizeObserver(entries => scheduleFit(entries.map(entry=>entry.target)));
