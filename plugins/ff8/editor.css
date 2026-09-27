@@ -30,7 +30,7 @@
       --lex-tab-min-height:44px;--lex-tab-padding-inline:clamp(3px,.35vw,8px);
       --lex-tab-font-size:clamp(12px,1.02vw,20px);--lex-tab-fg:#cfcfcf;
       --lex-tab-bg:linear-gradient(135deg,#5c5c5c,#404040);
-      --lex-tab-border:3px solid;--lex-tab-border-color:#a7a7a7 #292929 #292929 #a7a7a7;
+      --lex-tab-border:3px solid;--lex-tab-border-width:3px;--lex-tab-border-color:#a7a7a7 #292929 #292929 #a7a7a7;
       --lex-tab-hover-bg:linear-gradient(135deg,#7b7b7b,#5b5b5b);
       --lex-tab-active-fg:#fff;--lex-tab-active-bg:linear-gradient(135deg,#a3a3a3,#787878);
       --lex-tab-active-border-color:#e8e8e8 #3d3d3d #3d3d3d #e8e8e8;

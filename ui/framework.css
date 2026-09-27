@@ -7836,8 +7836,17 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
   border-color: var(--lex-tab-active-border-color, transparent);
 
 }
+/* A game's pointing hand stands OUTSIDE the chosen tab, in room of its own:
+   the tab gives up a left margin as wide as the hand and the hand is drawn in
+   it, pointing at the tab. Inside the tab it crowded the name; hung outside
+   with no room it covered the neighbouring tab's name. Lexer has asked for
+   this repeatedly - never draw the hand inside a tab. */
 .lex-shell-header nav button[data-tab].active {
-  padding-left:max(var(--lex-tab-padding-inline,14px),calc(var(--lex-tab-marker-width,0px) + 6px));
+  margin-left:calc(var(--lex-tab-marker-width,0px) + var(--lex-tab-marker-outside-gap,2px));
+}
+.lex-shell-header nav button[data-tab].active::before {
+  left:auto;
+  right:calc(100% + var(--lex-tab-marker-outside-gap,2px) + var(--lex-tab-border-width,0px));
 }
 .lex-shell-header nav button:first-child { border-left: var(--lex-tab-first-border, 0); }
 /* Set by the strip fit once its names are at the readable floor and the row
@@ -8104,11 +8113,11 @@ body { text-shadow: var(--lex-text-shadow, none); }
 .lex-subtab-bar.lex-subtab-bar-images { gap:2px; }
 .lex-subtab-bar-images > .lex-subtab-button { background:transparent; border:0; box-shadow:none; padding:0; }
 .lex-subtab-bar-images > .lex-subtab-button.active { background:transparent; box-shadow:none; }
-/* The marker sits on the chosen image's own left edge. Hung outside it, the
-   hand covered the neighbouring image (FF8's GF portraits). */
+/* The hand points at the chosen image from outside it (never inside it);
+   the strip keeps its spacing so the portraits do not move on selection. */
 .lex-subtab-bar-images > .lex-subtab-button.active::before {
   content:var(--lex-tab-marker-content,none);position:absolute;z-index:3;
-  left:0;top:50%;transform:translateY(-50%);
+  right:calc(100% + 6px);top:50%;transform:translateY(-50%);
   width:var(--lex-tab-marker-width,24px);height:var(--lex-tab-marker-height,18px);
   background:var(--lex-tab-marker-image,none) center/contain no-repeat;pointer-events:none;
 }
