@@ -1,11 +1,11 @@
 /* Battle geometry uses the shared model stage; this module only draws the mesh. */
-window.FF8ModelViewer = function ({file,dataset,label}) {
+window.FF8ModelViewer = function ({file,dataset,label,onReady,onError,initialView={}}) {
   const ui=LexeditorUI,stage=ui.modelStage(),canvas=ui.el('canvas',{tabindex:0,style:'position:absolute;inset:0','aria-label':`${label}: drag or use arrow keys to rotate; wheel or plus and minus to zoom`});
   stage.lexMessage.replaceChildren(ui.loadingPanel({label:'Loading model'}));
   stage.append(canvas);
   const gl=canvas.getContext('webgl',{alpha:true,antialias:true,preserveDrawingBuffer:true});
-  if(!gl){stage.lexMessage.textContent='A 3D graphics context is unavailable.';return stage;}
-  let yaw=0,pitch=0,zoom=.9,drag=null,disposed=false,attached=false,program=null;
+  if(!gl){stage.lexMessage.textContent='A 3D graphics context is unavailable.';onError?.(new Error(stage.lexMessage.textContent));return stage;}
+  let yaw=initialView.yaw??0,pitch=initialView.pitch??0,zoom=.9,drag=null,disposed=false,attached=false,program=null;
   const buffers=[],textures=[],meshes=[],abort=new AbortController();
   const resize=new ResizeObserver(()=>draw());
   const lifetime=new MutationObserver(()=>{if(stage.isConnected)attached=true;else if(attached)dispose();});
@@ -62,7 +62,73 @@ window.FF8ModelViewer = function ({file,dataset,label}) {
       const tex=texture(color);meshes.push({buffer,texture:tex,count:values.length/8});if(index<0)continue;
       loads.push(new Promise(resolve=>{const image=new Image();image.onload=()=>{if(!disposed){gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);draw();}resolve();};image.onerror=resolve;
         image.src=`/assets/texture.png?id=${encodeURIComponent(`battle/${file}#${scene.textures[index]}`)}&palette=0&dataset=${encodeURIComponent(dataset)}`;}));}
-    stage.lexMessage.hidden=true;draw();await Promise.all(loads);if(!disposed){stage.dataset.texturesReady='true';draw();}
-  }catch(error){if(!disposed){stage.lexMessage.replaceChildren(ui.detailNote(error.message));stage.lexMessage.hidden=false;stage.dataset.error=error.message;}}})();
+    stage.lexMessage.hidden=true;draw();await Promise.all(loads);if(!disposed){stage.dataset.texturesReady='true';draw();onReady?.(canvas);}
+  }catch(error){if(!disposed){stage.lexMessage.replaceChildren(ui.detailNote(error.message));stage.lexMessage.hidden=false;stage.dataset.error=error.message;onError?.(error);}}})();
   return stage;
 };
+
+// Cards share bounded snapshots of the same renderer used by the model drawer.
+// Only one temporary WebGL context is active, even across eight formations.
+(() => {
+  const cache=new Map(),pending=new Map();
+  let queue=Promise.resolve();
+  function portrait(canvas){
+    const copy=document.createElement('canvas');copy.width=canvas.width;copy.height=canvas.height;
+    const ctx=copy.getContext('2d');ctx.drawImage(canvas,0,0);
+    const pixels=ctx.getImageData(0,0,copy.width,copy.height).data;
+    let left=copy.width,top=copy.height,right=-1,bottom=-1;
+    for(let y=0;y<copy.height;y++)for(let x=0;x<copy.width;x++)if(pixels[(y*copy.width+x)*4+3]){
+      left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);
+    }
+    if(right<left)throw Error('The model rendered no visible geometry');
+    const cropped=document.createElement('canvas'),padding=6;
+    cropped.width=right-left+1+padding*2;cropped.height=bottom-top+1+padding*2;
+    cropped.getContext('2d').drawImage(copy,left,top,right-left+1,bottom-top+1,
+      padding,padding,right-left+1,bottom-top+1);
+    return cropped.toDataURL('image/png');
+  }
+  async function snapshot(options){
+    let stage,timer;
+    try{
+      return await new Promise((resolve,reject)=>{
+        timer=setTimeout(()=>reject(new Error('Model preview timed out')),15000);
+        stage=FF8ModelViewer({...options,initialView:{yaw:.55,pitch:.15},onReady:canvas=>resolve(portrait(canvas)),onError:reject});
+        stage.style.cssText='position:fixed;left:-10000px;top:0;width:192px;height:192px;min-height:0;visibility:hidden;pointer-events:none';
+        stage.setAttribute('aria-hidden','true');
+        document.body.append(stage);
+      });
+    }finally{clearTimeout(timer);stage?.lexDispose?.();stage?.remove();}
+  }
+  window.FF8ModelThumbnail = options => {
+    const image=LexeditorUI.el('img',{alt:`${options.label} model`,class:'ff8-model-thumbnail'});
+    const key=JSON.stringify([options.dataset,options.file,options.revision]);
+    // Wait for the card to mount before scheduling work. Discard queued work
+    // when every card waiting for it has left the page.
+    requestAnimationFrame(async()=>{
+      if(!image.isConnected)return;
+      try{
+        let source=cache.get(key);
+        if(source){cache.delete(key);cache.set(key,source);}
+        else{
+          let job=pending.get(key);
+          if(!job){
+            job={images:[]};
+            job.promise=queue.then(async()=>{
+              if(!job.images.some(node=>node.isConnected))return null;
+              const result=await snapshot(options);
+              cache.set(key,result);
+              while(cache.size>32)cache.delete(cache.keys().next().value);
+              return result;
+            }).finally(()=>pending.delete(key));
+            queue=job.promise.catch(()=>{});
+            pending.set(key,job);
+          }
+          job.images.push(image);
+          source=await job.promise;
+        }
+        if(image.isConnected&&source){image.src=source;image.dataset.modelReady='true';}
+      }catch(_error){if(image.isConnected)image.replaceWith(LexeditorUI.noImage('Model preview unavailable'));}
+    });
+    return image;
+  };
+})();

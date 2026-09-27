@@ -43,23 +43,17 @@
   }
 
   // ---- Enemy previews ------------------------------------------------------
-  // A battle model file carries the enemy number it belongs to and its TIM
-  // images, which is the same picture the Models tab shows. There is no other
-  // rendered enemy art in the game data, so a slot with no battle texture says
-  // so instead of showing a stand-in.
-  function encounterEnemyTexture(enemyId){
-    const model=state.data.models?.rows?.find(row=>row.enemyId!=null&&Number(row.enemyId)===Number(enemyId)&&(row.tims?.length||0)>0);
+  function encounterEnemyPreview(enemyId){
+    const model=state.data.models?.rows?.find(row=>row.enemyId!=null&&Number(row.enemyId)===Number(enemyId)&&row.file);
     if(!model)return null;
-    const target=`battle/${model.file}#0`;
-    return el("img",{src:`/assets/texture.png?id=${encodeURIComponent(target)}&palette=0&dataset=${encodeURIComponent(assetDataset())}`,
-      alt:`Battle texture for ${model.name}`,loading:"lazy"});
+    return FF8ModelThumbnail({file:model.file,dataset:assetDataset(),label:model.name,revision:model.sha256});
   }
   function encounterSlotLevelText(slot){
     const rule=encounterLevelRule(slot.level);
     if(rule.mode==="fixed")return `Level ${rule.value}`;
     if(rule.mode==="maximum")return `Level up to ${rule.value}`;
     if(rule.mode==="ultimecia")return "Level 1 to 100";
-    return `Level byte ${slot.level}`;
+    return "Special level";
   }
   function encounterEnemyBox(slot,formation,origin){
     const enemy=enemyById(slot.enemyId);
@@ -74,8 +68,8 @@
           slot.enemyId=Number(value);slot.enemyName=next.name;slot.enabled=true;
           formation.name=encounterName(formation);shell.refresh();}})},LexeditorUI.selectionIcon());
     const card=LexeditorUI.recordCard({title:name,identity:slot.slot+1,
-      image:slot.enabled?encounterEnemyTexture(slot.enemyId):LexeditorUI.noImage('Empty slot'),
-      body:slot.enabled?encounterSlotLevelText(slot):'Empty',action:finder});
+      image:slot.enabled?encounterEnemyPreview(slot.enemyId):LexeditorUI.noImage('Empty slot'),
+      body:slot.enabled?encounterSlotLevelText(slot):null,action:finder});
     card.setAttribute('aria-label',`Battle position ${slot.slot+1}`);
     card.dataset.lexBattlePosition=String(slot.slot+1);
     if(!slot.enabled)card.dataset.lexEmptyPosition='';
@@ -119,11 +113,13 @@
       const title=!known
         ? `No rule is stored for region ${regionId} with ground ${groundId}. World terrain is unavailable, so whether the map can reach this pair is unknown.`
         : onMap
-          ? `The map has terrain with region ${regionId} and ground ${groundId}, and no rule is stored for it. The game has nothing to look up there.`
+          ? `The map has terrain with region ${regionId} and ground ${groundId}, and no rule is stored for it.`
           : `No rule is stored for region ${regionId} with ground ${groundId}, and no world terrain uses that pair.`;
       // A shape the map really uses and has nothing stored for is the one that
       // needs attention; the rest are simply empty cells.
-      const blank=LexeditorUI.badge(onMap?"!":"—",{...(onMap?{tone:"warning"}:{}),title});
+      const blank=LexeditorUI.readonlyField(onMap?"!":"—",{
+        title:`${title} This cell cannot be edited because there is no stored rule.`,
+        'aria-label':`Region ${regionId} ground ${groundId}: ${onMap?'missing rule':'no rule'}`});
       blank.dataset.lexRuleCell=onMap?"missing":"blank";
       return blank;
     }
@@ -150,14 +146,13 @@
     const regions=axis(rules.map(rule=>Number(rule.regionId)),0);
     const grounds=axis(rules.map(rule=>Number(rule.groundId)),1);
     const rows=regions.map(regionId=>({id:regionId,regionId}));
-    const columns=[{key:"regionId",label:"REGION",numberedId:true,sortable:false,
-      help:"Region code of the world-map cell the player is standing in. Regions are set on the World tab.",
-      render:row=>row.regionId},
-      ...grounds.map(ground=>({key:`ground:${ground}`,label:String(ground),sortable:false,align:"center",
-        help:`Terrain code ${ground}. The cell below holds the encounter group the game uses for this region and this ground.`,
-        render:row=>encounterRuleCell(row.regionId,ground,cells,reachable,refresh)}))];
-    const template=`84px repeat(${Math.max(1,grounds.length)},minmax(46px,1fr))`;
-    return {table:columnList({rows,key:row=>row.id,columns,localSort:false,template,
+    const columns=grounds.map(ground=>({key:`ground:${ground}`,label:String(ground),align:"center",
+      render:row=>encounterRuleCell(row.regionId,ground,cells,reachable,refresh)}));
+    const template=`52px repeat(${Math.max(1,grounds.length)},minmax(46px,1fr))`;
+    return {table:LexeditorUI.matrixTable({rows,key:row=>row.id,columns,template,
+      rowAxis:{key:"regionId",label:"REGION",numberedId:true,render:row=>row.regionId,
+        help:"Region code of the world-map cell the player is standing in. Region codes are set on the World tab."},
+      columnAxis:{label:"TERRAIN",help:"Terrain code of the ground the player is standing on. The region and terrain together choose an encounter group."},
       class:"ff8-encounter-rule-table ff8-record-list","aria-label":"Encounter rules by region and ground"}),
       regions,grounds,rules,cells,reachable};
   }
@@ -196,9 +191,8 @@
 
   // ---- Groups --------------------------------------------------------------
   function encounterGroupSlotControl(row,index,refresh,origin){
-    const value=row.encounters[index],formation=encounterRowById(value);
-    const label=formation?`${value} · ${encounterName(formation)}`:`Formation ${value} (not in scene.out)`;
-    const link=hoverable({content:label,targetType:"encounters",targetId:value,targetLabel:`battle formation ${value}`,class:'ff8-encounter-formation-link',
+    const value=row.encounters[index];
+    const link=hoverable({content:recordId(value),targetType:"encounters",targetId:value,targetLabel:`battle formation ${value}`,class:'ff8-encounter-formation-link',
       activate:()=>showEncounterSubtab("formations","encounters",Number(value))});
     const accept=next=>{if(state.activeSource!=='mine'||!encounterRowById(next))return;row.encounters[index]=Number(next);refresh()};
     const finder=el("button",{type:"button",title:"Choose a battle formation",disabled:state.activeSource!=='mine',class:'ff8-encounter-formation-finder',
@@ -212,7 +206,7 @@
     const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,
       value:worldRow(state.referenceData[reference.id],"group",row.id)?.encounters?.[index]})).filter(entry=>entry.value!==undefined);
     return sourceControl(LexeditorUI.choiceField(link,finder),()=>row.encounters[index],vanilla,references,accept,
-      next=>{const target=encounterRowById(next);return target?`${next} · ${encounterName(target)}`:String(next)});
+      next=>`#${next}`);
   }
   function encounterGroupUsage(row){
     const rules=encounterRulesForGroup(row.id);
@@ -238,7 +232,7 @@
       return strip;
     });
     return detailPanel({title:'Encounter group',identity:recordId(row.id),className,
-      help:'The game chooses one of these eight formations when this group starts a battle. Hover a formation name to replace it. Changing an enemy changes that formation everywhere it is used.',
+      help:'The game chooses one of these eight formations when this group starts a battle. Hover a formation ID to replace it. Changing an enemy changes that formation everywhere it is used. Special level means the enemy uses a level rule we do not yet understand.',
       body:[detailSection({body:LexeditorUI.stack({fill:false,className:'ff8-encounter-formations'},...formations)}),
         detailSection({title:'WHERE THIS GROUP IS USED',
           help:infoHelp('These region and ground rules select this group. Open a rule to change its group.'),
@@ -293,7 +287,7 @@
   }
   const encounterTabs=[
     {id:"formations",label:"Formations",help:"Every battle formation in scene.out: which enemies stand in which of the eight slots, the level they fight at, and the stage and cameras the battle uses."},
-    {id:"rules",label:"Rules",help:"The world-map lookup: a region code and a ground code together choose one encounter group. Edit the group number in a cell to change which battles happen on that terrain. The file holds a fixed number of rules, so a pair with no rule cannot be given one here."},
+    {id:"rules",label:"Rules",help:"Each number is the encounter group used for that region and terrain. Choose a number to change the group. A dash means no rule is stored for a pair the loaded map does not use. An exclamation mark means the map uses that pair but no rule is stored. Without map data, a dash means the pair's use is unknown. Cells without rules are read-only because this editor can change stored rules but cannot add them."},
     {id:"groups",label:"Groups",help:"An encounter group holds eight battle formations; the game picks one of them when a world-map battle starts. Rules choose the group, this page chooses its battles."}];
   function renderEncounters(){
     if(!encounterTabs.some(tab=>tab.id===state.encountersTab))state.encountersTab="formations";

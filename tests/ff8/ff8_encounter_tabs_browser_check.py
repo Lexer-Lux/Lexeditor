@@ -54,7 +54,7 @@ FORMATIONS = [
     formation(0, {0: (0, 7), 1: (1, 12), 2: (2, 120)}),
     formation(1, {0: (3, 9), 6: (2, 30)}),           # a stored seventh slot
     formation(2, {0: (1, 4)}),
-    formation(3, {0: (2, 5)}),
+    formation(3, {0: (2, 255)}),
     formation(4, {0: (3, 6)}),
     formation(5, {0: (0, 252)}),
 ]
@@ -154,6 +154,17 @@ def text_of(locator):
     return " ".join(locator.all_inner_texts())
 
 
+def check_finder_icon(button):
+    bounds = button.evaluate("""button => {
+        const box = button.getBoundingClientRect();
+        const icon = button.querySelector('svg').getBoundingClientRect();
+        return {width:icon.width, height:icon.height,
+                inside:icon.left >= box.left && icon.right <= box.right &&
+                       icon.top >= box.top && icon.bottom <= box.bottom};
+    }""")
+    assert bounds['width'] >= 12 and bounds['height'] >= 12 and bounds['inside'], bounds
+
+
 def main():
     failures = []
     shots = Path(tempfile.gettempdir()) / "lexeditor-dev"
@@ -191,12 +202,68 @@ def main():
         page.wait_for_selector(".ff8-encounter-rule-table", timeout=10000)
         table = page.locator(".ff8-encounter-rule-table")
         headers = [value.strip() for value in
-                   table.locator(".lex-column-list-head-cell").all_inner_texts()]
-        assert headers[0].startswith("REGION"), headers
+                   table.locator(".lex-column-list-header:not(.lex-matrix-column-axis) > .lex-column-list-head-cell").all_inner_texts()]
+        assert headers[0] == "", headers
         assert [value.split("\n")[0].strip() for value in headers[1:]] == ["0", "2"], headers
+        assert table.locator(".lex-matrix-row-axis .lex-matrix-axis-text").inner_text() == "REGION"
+        assert table.locator(".lex-matrix-column-axis .lex-matrix-axis-text").inner_text() == "TERRAIN"
+        assert table.locator(".lex-info-help").count() == 2
+        assert table.locator('[role="rowheader"]').count() == 3
+        axes = table.evaluate("""table => {
+            const row = table.querySelector('.lex-matrix-row-axis').getBoundingClientRect();
+            const column = table.querySelector('.lex-matrix-column-axis').getBoundingClientRect();
+            const first = table.querySelector('.lex-column-list-row [data-column-key="ground:0"]').getBoundingClientRect();
+            return {rowRight:row.right, columnLeft:column.left, columnBottom:column.bottom,
+                    cellLeft:first.left, cellTop:first.top};
+        }""")
+        assert axes['rowRight'] < axes['cellLeft'], axes
+        assert abs(axes['columnLeft'] - axes['cellLeft']) <= 1, axes
+        assert axes['columnBottom'] < axes['cellTop'], axes
         region_column = [value.strip().lstrip("#").strip() for value in table.locator(
             ".lex-column-list-row > [data-column-key='regionId']").all_inner_texts()]
         assert region_column == ["1", "2", "3"], region_column
+        # Rules uses the shared table fill behavior at different panel heights.
+        for height in (950, 720):
+            page.set_viewport_size({"width": 1500, "height": height})
+            page.wait_for_timeout(100)
+            bounds = table.evaluate("""table => {
+                const last = table.querySelector('.lex-column-list-row:last-child');
+                return {bottom: last.getBoundingClientRect().bottom,
+                        panelBottom: table.getBoundingClientRect().top + table.clientHeight};
+            }""")
+            assert abs(bounds["bottom"] - bounds["panelBottom"]) <= 4, bounds
+        page.set_viewport_size({"width": 1500, "height": 950})
+
+        # A dense two-axis table must retain alignment while scrolling sideways.
+        page.evaluate("""() => {
+            window.savedRuleRows = state.data.world.rows;
+            state.data.world.rows = [
+                ...state.data.world.rows.filter(row => row.kind !== 'helper'),
+                ...Array.from({length:20 * 32}, (_, id) => ({id, kind:'helper',
+                    regionId:Math.floor(id / 32), groundId:id % 32, encounterGroup:0}))];
+            renderEncounters();
+        }""")
+        page.wait_for_timeout(150)
+        assert table.evaluate("table => table.scrollWidth > table.clientWidth")
+        shot("matrix")
+        table.evaluate("table => { table.scrollLeft = table.scrollWidth; }")
+        alignment = table.evaluate("""table => {
+            const head = table.querySelector('.lex-column-list-head-cell[data-column-key="ground:31"]').getBoundingClientRect();
+            const cell = table.querySelector('.lex-column-list-row [data-column-key="ground:31"]').getBoundingClientRect();
+            return Math.abs(head.left - cell.left) + Math.abs(head.right - cell.right);
+        }""")
+        assert alignment <= 2, alignment
+        axis_visible = table.evaluate("""table => {
+            const label = table.querySelector('.lex-matrix-column-axis .lex-matrix-axis-label').getBoundingClientRect();
+            const panel = table.getBoundingClientRect();
+            return label.left >= panel.left && label.right <= panel.right;
+        }""")
+        assert axis_visible, "the column axis label scrolled out of view"
+        page.evaluate("""() => {
+            state.data.world.rows = window.savedRuleRows;
+            delete window.savedRuleRows;
+            renderEncounters();
+        }""")
 
         # A group finder edits only the chosen rule, then restores Rules.
         page.evaluate("state.activeSource='mine';renderEncounters();shell.refresh()")
@@ -217,6 +284,14 @@ def main():
         assert blanks.count() == 1, blanks.count()
         missing = page.locator('[data-lex-rule-cell="missing"]')
         assert missing.count() == 1, "the reachable pair with no rule is not called out"
+        for status in (blanks.first, missing.first):
+            assert status.is_disabled()
+            fit = status.evaluate("""control => {
+                const box = control.getBoundingClientRect();
+                const cell = control.closest('.lex-column-list-cell').getBoundingClientRect();
+                return {width:box.width / cell.width, height:box.height / cell.height};
+            }""")
+            assert fit['width'] > .95 and fit['height'] > .95, fit
         # The shared framework moves every title onto data-lex-title and
         # aria-description, so the explanation is read from there.
         assert "no rule is stored for it" in (missing.first.get_attribute("data-lex-title") or "")
@@ -236,7 +311,23 @@ def main():
         assert rows.first.locator('[data-lex-battle-position]').count()==6
         assert rows.first.locator('.lex-record-card-title').first.inner_text()=='Caterchipillar'
         assert rows.first.locator('.lex-record-card-body').first.inner_text()=='Level 4'
-        assert rows.first.locator('.ff8-encounter-formation-link').evaluate("e=>getComputedStyle(e).writingMode")=='vertical-rl'
+        assert ''.join(rows.first.locator('.ff8-encounter-formation-link').inner_text().split())=='#2'
+        assert rows.first.locator('.ff8-encounter-formation-link').evaluate("e=>getComputedStyle(e).writingMode")=='horizontal-tb'
+        empty = preview.locator('[data-lex-empty-position]').first
+        assert empty.locator('.lex-record-card-title').inner_text() == 'Empty'
+        assert empty.locator('.lex-record-card-body').count() == 0
+        rows.first.locator('.lex-record-card').first.hover()
+        page.wait_for_timeout(200)
+        check_finder_icon(rows.first.get_by_label('Choose enemy for formation 2 slot 1', exact=True))
+        shot('enemy-finder')
+        choice = rows.first.locator('.ff8-encounter-formation-choice')
+        choice.hover()
+        page.wait_for_timeout(200)
+        check_finder_icon(choice.locator('.ff8-encounter-formation-finder'))
+        assert choice.evaluate("""choice =>
+            choice.querySelector('.ff8-encounter-formation-link').getBoundingClientRect().right <=
+            choice.querySelector('.ff8-encounter-formation-finder').getBoundingClientRect().left""")
+        shot('formation-finder')
         shot('rules')
         page.evaluate("state.encountersTab='groups';state.selected.encounterGroups=2;renderEncounters()")
         page.wait_for_selector('.ff8-encounter-group-detail')
@@ -283,6 +374,10 @@ def main():
                       " renderEncounters(); }")
         page.wait_for_timeout(200)
         shot("groups")
+        assert page.locator('.ff8-encounter-group-detail').get_by_text('Special level', exact=True).count() == 1
+        assert 'Level byte' not in page.locator('.ff8-encounter-group-detail').inner_text()
+        page.locator('.ff8-encounter-group-detail').get_by_text('Special level', exact=True).scroll_into_view_if_needed()
+        shot('special-level')
         rows=page.locator('.ff8-encounter-group-detail .ff8-encounter-formation-row')
         assert rows.count()==8
         assert rows.nth(1).locator('[data-lex-battle-position]').count()==7

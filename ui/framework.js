@@ -7482,7 +7482,7 @@ ${contents.path}`});
         start = index + 1;
       }
     }
-    const heads = [...root.querySelectorAll(":scope > .lex-column-list-header > .lex-column-list-head-cell")];
+    const heads = [...root.querySelectorAll(":scope > .lex-column-list-header:not(.lex-matrix-column-axis) > .lex-column-list-head-cell")];
     if (!heads.length || tracks.length !== heads.length) return null;
     // Probing one column at a time cost a full page layout per column, and a
     // panel holding a dozen tables spent over a second doing it.
@@ -7792,6 +7792,38 @@ ${contents.path}`});
     if (cachedHeadingTemplate) root.style.setProperty("--lex-column-list-template", cachedHeadingTemplate);
     fitColumnHeadings(root);
     document.fonts?.ready.then(() => fitColumnHeadings(root));
+    return root;
+  };
+
+  // A matrix keeps the column-list controls and sizing, with one name/help
+  // for each axis. The first column identifies rows; remaining columns are
+  // values of the column axis. Axis order is fixed rather than locally sorted.
+  const matrixTable = options => {
+    const {rowAxis, columnAxis} = options;
+    const root = columnList({...options, fill: options.fill !== false, localSort:false,
+      class: ["lex-matrix-table", options.class || ""].join(" "),
+      columns:[{...rowAxis, label:"", help:null}, ...options.columns]
+        .map(column => ({...column, sortable:false}))});
+    root.style.gridTemplateColumns = "max-content var(--lex-column-list-template)";
+    root.setAttribute("aria-rowcount", options.rows.length + 2);
+    const axisLabel = axis => element("span", {class:"lex-matrix-axis-label"},
+      element("span", {class:"lex-matrix-axis-text"}, axis.label),
+      axis.help ? infoHelp(axis.help) : null);
+    const columnHeading = element("div", {
+      class:"lex-matrix-column-axis lex-column-list-header", role:"row",
+    }, element("div", {class:"lex-column-list-head-cell", role:"columnheader",
+      "aria-colindex":2, "aria-colspan":options.columns.length}, axisLabel(columnAxis)));
+    const rowHeading = element("div", {
+      class:"lex-matrix-row-axis", role:"presentation",
+    }, axisLabel(rowAxis));
+    const header = root.querySelector(".lex-column-list-header");
+    header.firstElementChild.setAttribute("aria-label", rowAxis.label);
+    root.querySelectorAll(".lex-column-list-row").forEach((row, index) => {
+      row.style.gridRow = String(index + 3);
+      row.firstElementChild.setAttribute("role", "rowheader");
+      row.firstElementChild.setAttribute("aria-label", `${rowAxis.label} ${row.firstElementChild.textContent.trim()}`);
+    });
+    root.prepend(columnHeading, rowHeading);
     return root;
   };
 
@@ -10430,7 +10462,7 @@ ${contents.path}`});
     return api;
   })();
 
-window.LexeditorUI = {panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
+window.LexeditorUI = {panelIcon, noImage, openGitHubIssues, shellTextNodes, dismissDialogs, sectionParts, pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, instructionList, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, lazyOptions, notice, actionRow, pagedPane, tileGrid, curveGrid, gameCard, recordCard, componentSample, toolbar, inlineLabel, recordSource, choiceField, quantityChoice, iconValue, textArea, controlGroup, stack, bitmapText, modelStage, iconSlot, figureGrid, imageMap, mapMagnifier, statCard, choicePopover, treeGraph, codeField, logView, detailText, loadingPanel, badge, showToast, copyText, mathFormula, curveEditor, refreshReferences, closeButton, hoverable, renameValue, settingsIcon, infoIcon, folderIcon, searchIcon, magnifyIcon, selectionIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, createModProject, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, matrixTable, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView, gamepadNavigation};
 // The pad path is on for every page that mounts the shared UI, so a plugin
 // becomes usable with a controller without doing anything itself. A page with
 // no pad attached pays one idle check a second and changes nothing on screen.
