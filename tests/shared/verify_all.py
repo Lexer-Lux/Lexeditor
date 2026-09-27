@@ -180,7 +180,28 @@ def _ff8_baseline_sentinel() -> Path:
     return data_root / "baseline" / "en" / "main" / "kernel.bin"
 
 
+def _ff8_game_executable() -> Path:
+    """The installed FF8_EN.exe, where plugins/ff8/paths.py looks for it."""
+    return Path(os.environ.get(
+        "LEXEDITOR_FF8_ROOT", r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII")) / "FF8_EN.exe"
+
+
+# A check that starts the real FF8 editor - an FF8Session or the plugin's own
+# server - reads the installed game. On a runner without it the check timed
+# out or failed an assertion on empty data (CI: "no archive of the installed
+# game could be listed", "TIMEOUT after 180s"), which the last-line rule below
+# cannot tell apart from a real defect. Those are known before they run.
+_FF8_LIVE_MARKERS = ("FF8Session(", "plugins.ff8.server")
+
+
 def _preflight_unrunnable(tool: Path) -> tuple[str, str]:
+    if tool.parent.name == "ff8" and not _ff8_game_executable().is_file():
+        try:
+            source = tool.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            source = ""
+        if any(marker in source for marker in _FF8_LIVE_MARKERS):
+            return "needs installed game/project data", f"FF8_EN.exe not found: {_ff8_game_executable()}"
     if tool.stem == "ff8_tabs_browser_check":
         font = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Lexeditor/game-data/ff8/generated/ff8-menu.ttf"
         if not font.is_file():
