@@ -30,9 +30,11 @@ def main():
   assert p.locator('.point-detail').inner_text().startswith('DRAW POINT 129')
   panel=p.get_by_role('region',name='FF8 world map');box=panel.bounding_box();p.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2);p.mouse.wheel(0,-500);p.wait_for_timeout(100)
   assert p.evaluate('worldVisualView.scale')>1
-  p.mouse.down(button='middle');p.mouse.move(box['x']+box['width']/2+40,box['y']+box['height']/2+20);p.mouse.up(button='middle')
+  # Right button pans, middle button resets (Lexer: "RMB to pan, MMB to reset view").
+  p.mouse.down(button='right');p.mouse.move(box['x']+box['width']/2+40,box['y']+box['height']/2+20);p.mouse.up(button='right')
   assert p.evaluate('worldVisualView.x')>20
-  p.mouse.wheel(0,10000);p.wait_for_timeout(100);assert p.evaluate('worldVisualView.scale')==1
+  p.mouse.down(button='middle');p.mouse.up(button='middle');p.wait_for_timeout(100)
+  assert p.evaluate('[worldVisualView.scale,worldVisualView.x,worldVisualView.y]')==[1,0,0]
   b.close()
- print('12,288 coordinate round trips; marker position/selection; wheel zoom and middle-button pan passed.')
+ print('12,288 coordinate round trips; marker position/selection; wheel zoom, right-button pan and middle-button reset passed.')
 if __name__=='__main__':main()
