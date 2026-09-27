@@ -224,7 +224,9 @@
       // already shows start pinned; the rest wait in the panel.
       const definitions=data.schema.fields.map(spec=>{
         const key=spec.key,column={key,label:spec.label,sortable:false,pinned:data.schema.columns.includes(key)?true:false,
-          render:row=>{const value=effective(active,row,key),text=Array.isArray(value)?value.join(", "):String(value??"");return LexeditorUI.el("span",{class:"warband-cell-text",title:text},text);},
+          render:row=>{const value=effective(active,row,key),text=Array.isArray(value)?value.join(", "):String(value??""),cell=LexeditorUI.el("span",{class:"warband-cell-text",title:text},text);
+            // A record this mod created carries the shared pen in its first column.
+            return row.created&&key===data.schema.columns[0]?LexeditorUI.inlineLabel(LexeditorUI.recordSource({created:true}),cell):cell;},
           sortValue:row=>effective(active,row,key)};
         if(["string","text","integer","number"].includes(spec.kind)){
           column.editValue=row=>effective(active,row,key);

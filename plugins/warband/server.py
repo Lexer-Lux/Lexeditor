@@ -94,6 +94,47 @@ def save_settings(edits: list[dict]) -> dict:
 ITEM_FIELD_NAMES = ("id", "name", "meshes", "flags", "capabilities", "value", "stats", "modifierBits", "factions")
 
 
+# Records Lexeditor created in this mod, by kind. The module files keep no
+# trace of where a record came from, so the create actions note each new id
+# here and the lists mark those records with the created-in-mod pen.
+CREATED_LEDGER = Path(PROJECT) / ".lexeditor-created.json"
+
+
+def created_ids(kind: str) -> set[str]:
+    try:
+        value = json.loads(CREATED_LEDGER.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return set()
+    ids = value.get(kind) if isinstance(value, dict) else None
+    return {str(item) for item in ids} if isinstance(ids, list) else set()
+
+
+def note_created(kind: str, result: dict) -> dict:
+    record_id = result.get("created") if isinstance(result, dict) else None
+    if not record_id:
+        return result
+    try:
+        value = json.loads(CREATED_LEDGER.read_text(encoding="utf-8"))
+        value = value if isinstance(value, dict) else {}
+    except (OSError, ValueError, TypeError):
+        value = {}
+    ids = [str(item) for item in value.get(kind, []) if isinstance(item, str)]
+    if str(record_id) not in ids:
+        ids.append(str(record_id))
+    value[kind] = ids
+    CREATED_LEDGER.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+    return result
+
+
+def mark_created(kind: str, payload: dict) -> dict:
+    ids = created_ids(kind)
+    if ids and isinstance(payload, dict):
+        for row in payload.get("rows", []):
+            if isinstance(row, dict) and str(row.get("id")) in ids:
+                row["created"] = True
+    return payload
+
+
 def _module_items_source() -> tuple[str, str, bytes]:
     source = MODULE_SYSTEM / "module_items.py"
     raw = source.read_bytes()
@@ -765,9 +806,9 @@ class Handler(PluginRequestHandler):
             elif path == "/api/settings":
                 self.json_response({"file": str(SETTINGS), "rows": settings_rows()})
             elif path == "/api/troops":
-                self.json_response(troop_data(MODULE_SYSTEM))
+                self.json_response(mark_created("troops", troop_data(MODULE_SYSTEM)))
             elif path == "/api/items":
-                self.json_response(item_data())
+                self.json_response(mark_created("items", item_data()))
             elif path == "/api/warband-font":
                 self.json_response(font_manifest())
             elif path == "/api/warband-font/atlas":
@@ -807,7 +848,8 @@ class Handler(PluginRequestHandler):
             elif path == "/api/datamap":
                 self.json_response(data_map_rows())
             elif path == "/api/module-records":
-                self.json_response(dataset_data(MODULE_SYSTEM, query.get("dataset", [""])[0]))
+                dataset = query.get("dataset", [""])[0]
+                self.json_response(mark_created(dataset, dataset_data(MODULE_SYSTEM, dataset)))
             elif path == "/api/sound-sample":
                 self.file_response(sample_path(PROJECT, Path(paths.WARBAND_ROOT), query.get("name", [""])[0]))
             elif path == "/api/catalog/file":
@@ -832,17 +874,17 @@ class Handler(PluginRequestHandler):
             elif path == "/api/troops/save":
                 self.json_response(save_troops(MODULE_SYSTEM, body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/troops/create":
-                self.json_response(create_troop(MODULE_SYSTEM, body.get("sha256", ""), body.get("recordIndex"),
-                                                body.get("originalId"), body.get("id"), body.get("name"), body.get("plural")))
+                self.json_response(note_created("troops", create_troop(MODULE_SYSTEM, body.get("sha256", ""), body.get("recordIndex"),
+                                                body.get("originalId"), body.get("id"), body.get("name"), body.get("plural"))))
             elif path == "/api/items/save":
                 self.json_response(save_item_edits(body.get("edits", []), body.get("sha256", "")))
             elif path == "/api/items/create":
-                self.json_response(create_item(body.get("recordIndex"), body.get("originalId"),
-                                               body.get("id"), body.get("name"), body.get("sha256", "")))
+                self.json_response(note_created("items", create_item(body.get("recordIndex"), body.get("originalId"),
+                                               body.get("id"), body.get("name"), body.get("sha256", ""))))
             elif path == "/api/module-records/save":
                 self.json_response(save_dataset(MODULE_SYSTEM, body.get("dataset", ""), body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/sounds/create":
-                self.json_response(create_sound(MODULE_SYSTEM, body.get("sha256", ""), body.get("recordIndex"), body.get("originalId"), body.get("id")))
+                self.json_response(note_created("sounds", create_sound(MODULE_SYSTEM, body.get("sha256", ""), body.get("recordIndex"), body.get("originalId"), body.get("id"))))
             elif path == "/api/catalog/file/save":
                 self.json_response(save_catalog_file(body.get("filename", ""), body.get("text", ""), body.get("encoding", "utf-8"), body.get("sha256", "")))
             elif path == "/api/build/start":

@@ -17,6 +17,7 @@ from plugins.warband import server
 @pytest.mark.parametrize('kind',['item','troop'])
 def test_item_creation_from_shared_add(page, tmp_path, monkeypatch,kind):
     monkeypatch.setattr(server, "MODULE_SYSTEM", tmp_path)
+    monkeypatch.setattr(server, "CREATED_LEDGER", tmp_path / ".lexeditor-created.json")
     view=kind+'s'
     source = tmp_path / f"module_{view}.py"
     source.write_text(SOURCE if kind=='item' else TROOP_SOURCE, encoding="utf-8")
@@ -30,14 +31,14 @@ def test_item_creation_from_shared_add(page, tmp_path, monkeypatch,kind):
         try:
             if path == "/api/items/create":
                 body = route.request.post_data_json
-                result = server.create_item(body["recordIndex"], body["originalId"], body["id"], body["name"], body["sha256"])
+                result = server.note_created("items", server.create_item(body["recordIndex"], body["originalId"], body["id"], body["name"], body["sha256"]))
             elif path == "/api/items":
-                result = server.item_data()
+                result = server.mark_created("items", server.item_data())
             elif path == '/api/troops/create':
                 body=route.request.post_data_json
-                result=server.create_troop(tmp_path,body['sha256'],body['recordIndex'],body['originalId'],body['id'],body['name'],body['plural'])
+                result=server.note_created('troops',server.create_troop(tmp_path,body['sha256'],body['recordIndex'],body['originalId'],body['id'],body['name'],body['plural']))
             elif path == '/api/troops':
-                result=server.troop_data(tmp_path)
+                result=server.mark_created('troops',server.troop_data(tmp_path))
             elif path == "/api/build/start":
                 builds.append(True)
                 result = {"started": True}
@@ -78,5 +79,12 @@ def test_item_creation_from_shared_add(page, tmp_path, monkeypatch,kind):
     # Reload from disk, then verify pending edits disable creation.
     page.evaluate("async view=>{state[view]=await api('/api/'+view);render();}",view)
     assert page.locator(".warband-record-list").get_by_text("New Copy", exact=True).count() == 1
+    # The created record carries the created-in-mod pen; the one it was copied
+    # from does not.
+    pens = page.locator(".warband-record-list .lex-column-list-row").filter(
+        has=page.locator('[aria-label="Created in this mod"]'))
+    assert pens.count() == 1 and "New Copy" in pens.first.inner_text(), pens.count()
+    if destination:
+        page.screenshot(path=str(Path(destination) / f"warband-created-pen-{kind}.png"))
     page.evaluate("state.itemEdits={'0':{fields:{value:'123'}}};render()")
     assert page.locator(".lex-table-add").get_attribute("aria-disabled") == "true"
