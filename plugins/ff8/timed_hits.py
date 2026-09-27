@@ -3,8 +3,17 @@
 Lexer's rule (2026-09-27): one timing system for everyone, Squall included.
 The hit moment is when the game applies a hit's damage. Press Square within the
 window before it lands and a party member's hit on an enemy gets the bonus
-multiplier; an enemy's hit on a party member is reduced instead. A press that
-is too early plays the failure sound; a timed one plays the success sound.
+multiplier; an enemy's hit on a party member is reduced instead. One press,
+at the right time (Lexer, 2026-09-26: mashing Square won every hit):
+
+- The first press arms the next hit. A second press while it is armed is a
+  fumble, and that hit misses.
+- A press too early (up to three windows before the hit) or fumbled plays
+  the miss sound; an older press is simply forgotten.
+- A press within one window after a hit lands is too late: it plays the miss
+  sound (once per hit) and arms nothing. This also covers Squall, whose one
+  swing reaches 0048FE20 twice (the normal path, then 00485160 for the
+  gunblade trigger), so a press between the two could not be judged again.
 
 Against FF8_EN.exe SHA-256 064d466b...9570 (see codex/ff8/timed-hits.md):
 
@@ -20,6 +29,7 @@ Against FF8_EN.exe SHA-256 064d466b...9570 (see codex/ff8/timed-hits.md):
   is byte 01D27AD8 and [esp+0x10] is the target x 0xD0. The hook scales ESI
   when the last press is inside the window, then lets the cap run as usual.
 - A press counts for one hit: it is used up by the first hit it affects.
+- Every judged hit stamps its time, which is what "too late" is measured from.
 - Physical only (option, off by default): 004922B0(type, ...) works out one
   hit's damage by attack type and is called from 0048FE20 before the hook.
   Its entry records the type; the hit hook then ignores (without using up
@@ -89,7 +99,10 @@ PRESS_TIME = DATA + 0x18
 PRESSED = DATA + 0x1C
 PHYSICAL_ONLY = DATA + 0x20
 HIT_TYPE = DATA + 0x24
-DATA_SIZE = 0x28
+LAST_HIT = DATA + 0x28      # time the last eligible hit landed
+FUMBLED = DATA + 0x2C       # a second press arrived while armed
+LATE_MARK = DATA + 0x30     # LAST_HIT already answered with a too-late sound
+DATA_SIZE = 0x34
 
 ASSEMBLY = f"""
 input:
@@ -99,8 +112,32 @@ input:
     jz input_done
     pushad
     call dword ptr [{TIME_GET_TIME:#x}]
+    mov edx, eax
+    sub edx, dword ptr [{LAST_HIT:#x}]
+    cmp edx, dword ptr [{WINDOW:#x}]
+    ja not_late
+    mov edx, dword ptr [{LAST_HIT:#x}]
+    cmp edx, dword ptr [{LATE_MARK:#x}]
+    je input_popped
+    mov dword ptr [{LATE_MARK:#x}], edx
+    push dword ptr [{SOUND_FAILURE:#x}]
+    call {PLAY_SOUND:#x}
+    add esp, 4
+    jmp input_popped
+not_late:
+    cmp dword ptr [{PRESSED:#x}], 0
+    je arm
+    mov edx, eax
+    sub edx, dword ptr [{PRESS_TIME:#x}]
+    cmp edx, dword ptr [{EARLY:#x}]
+    ja arm
+    mov dword ptr [{FUMBLED:#x}], 1
+    jmp input_popped
+arm:
     mov dword ptr [{PRESS_TIME:#x}], eax
     mov dword ptr [{PRESSED:#x}], 1
+    mov dword ptr [{FUMBLED:#x}], 0
+input_popped:
     popad
 input_done:
     push {INPUT_RESUME:#x}
@@ -110,8 +147,6 @@ hit:
     pushfd
     test esi, esi
     jle hit_done
-    cmp dword ptr [{PRESSED:#x}], 0
-    je hit_done
     cmp dword ptr [{PHYSICAL_ONLY:#x}], 0
     je typed
     movzx eax, byte ptr [{HIT_TYPE:#x}]
@@ -139,8 +174,13 @@ enemy_attacks:
     jae hit_done
     mov edi, dword ptr [{BLOCK:#x}]
 judged:
-    mov dword ptr [{PRESSED:#x}], 0
     call dword ptr [{TIME_GET_TIME:#x}]
+    mov dword ptr [{LAST_HIT:#x}], eax
+    cmp dword ptr [{PRESSED:#x}], 0
+    je hit_done
+    mov dword ptr [{PRESSED:#x}], 0
+    cmp dword ptr [{FUMBLED:#x}], 0
+    jne miss_sound
     sub eax, dword ptr [{PRESS_TIME:#x}]
     cmp eax, dword ptr [{WINDOW:#x}]
     ja missed
@@ -157,6 +197,7 @@ judged:
 missed:
     cmp eax, dword ptr [{EARLY:#x}]
     ja hit_done
+miss_sound:
     push dword ptr [{SOUND_FAILURE:#x}]
     call {PLAY_SOUND:#x}
     add esp, 4
@@ -177,27 +218,34 @@ hit_type:
 # Assembled at CAVE from ASSEMBLY; tests/ff8/test_ff8_timed_hits.py
 # re-assembles it (keystone) and runs it under unicorn.
 CODE = bytes.fromhex(
-    "66 8B 41 10 66 89 41 18 F6 41 12 80 74 17 60 FF"
-    "15 78 93 B6 00 A3 F8 BA 7A 02 C7 05 FC BA 7A 02"
-    "01 00 00 00 61 68 5C 85 4A 00 C3 60 9C 85 F6 0F"
-    "8E C2 00 00 00 83 3D FC BA 7A 02 00 0F 84 B5 00"
-    "00 00 83 3D 00 BB 7A 02 00 74 23 0F B6 05 04 BB"
-    "7A 02 83 F8 24 74 17 83 F8 1F 0F 87 97 00 00 00"
-    "B9 82 06 00 00 0F A3 C1 0F 83 89 00 00 00 0F B6"
-    "1D D8 7A D2 01 8B 44 24 34 31 D2 B9 D0 00 00 00"
-    "F7 F1 83 FB 03 73 0D 83 F8 03 72 6B 8B 3D E8 BA"
-    "7A 02 EB 0B 83 F8 03 73 5E 8B 3D EC BA 7A 02 C7"
-    "05 FC BA 7A 02 00 00 00 00 FF 15 78 93 B6 00 2B"
-    "05 F8 BA 7A 02 3B 05 E0 BA 7A 02 77 24 8B 44 24"
-    "08 0F AF C7 31 D2 B9 64 00 00 00 F7 F1 89 44 24"
-    "08 FF 35 F0 BA 7A 02 E8 A4 F8 CB FD 83 C4 04 EB"
-    "16 3B 05 E4 BA 7A 02 77 0E FF 35 F4 BA 7A 02 E8"
-    "8C F8 CB FD 83 C4 04 9D 61 8A 0D 0E 8E D2 01 68"
-    "2A 11 49 00 C3 8B 44 24 04 A2 04 BB 7A 02 A0 0E"
-    "8E D2 01 68 B5 22 49 00 C3"
+    "66 8B 41 10 66 89 41 18 F6 41 12 80 74 7A 60 FF"
+    "15 78 93 B6 00 89 C2 2B 15 08 BB 7A 02 3B 15 E0"
+    "BA 7A 02 77 24 8B 15 08 BB 7A 02 3B 15 10 BB 7A"
+    "02 74 54 89 15 10 BB 7A 02 FF 35 F4 BA 7A 02 E8"
+    "3C F9 CB FD 83 C4 04 EB 3E 83 3D FC BA 7A 02 00"
+    "74 1C 89 C2 2B 15 F8 BA 7A 02 3B 15 E4 BA 7A 02"
+    "77 0C C7 05 0C BB 7A 02 01 00 00 00 EB 19 A3 F8"
+    "BA 7A 02 C7 05 FC BA 7A 02 01 00 00 00 C7 05 0C"
+    "BB 7A 02 00 00 00 00 61 68 5C 85 4A 00 C3 60 9C"
+    "85 F6 0F 8E D0 00 00 00 83 3D 00 BB 7A 02 00 74"
+    "23 0F B6 05 04 BB 7A 02 83 F8 24 74 17 83 F8 1F"
+    "0F 87 B2 00 00 00 B9 82 06 00 00 0F A3 C1 0F 83"
+    "A4 00 00 00 0F B6 1D D8 7A D2 01 8B 44 24 34 31"
+    "D2 B9 D0 00 00 00 F7 F1 83 FB 03 73 11 83 F8 03"
+    "0F 82 82 00 00 00 8B 3D E8 BA 7A 02 EB 0B 83 F8"
+    "03 73 75 8B 3D EC BA 7A 02 FF 15 78 93 B6 00 A3"
+    "08 BB 7A 02 83 3D FC BA 7A 02 00 74 5B C7 05 FC"
+    "BA 7A 02 00 00 00 00 83 3D 0C BB 7A 02 00 75 3A"
+    "2B 05 F8 BA 7A 02 3B 05 E0 BA 7A 02 77 24 8B 44"
+    "24 08 0F AF C7 31 D2 B9 64 00 00 00 F7 F1 89 44"
+    "24 08 FF 35 F0 BA 7A 02 E8 33 F8 CB FD 83 C4 04"
+    "EB 16 3B 05 E4 BA 7A 02 77 0E FF 35 F4 BA 7A 02"
+    "E8 1B F8 CB FD 83 C4 04 9D 61 8A 0D 0E 8E D2 01"
+    "68 2A 11 49 00 C3 8B 44 24 04 A2 04 BB 7A 02 A0"
+    "0E 8E D2 01 68 B5 22 49 00 C3"
 )
-HIT_ENTRY = 0x27ab92b
-TYPE_ENTRY = 0x27aba05
+HIT_ENTRY = 0x27ab98e
+TYPE_ENTRY = 0x27aba76
 
 
 def _assemble() -> tuple[bytes, int, int]:
@@ -222,7 +270,7 @@ def _bounded(value, low: int, high: int, label: str) -> int:
 def data_bytes(window_ms: int, bonus_percent: int, block_percent: int,
                success_sound: int, failure_sound: int, physical_only: bool = False) -> bytes:
     values = (window_ms, window_ms * EARLY_FACTOR, bonus_percent, block_percent,
-              success_sound, failure_sound, 0, 0, int(physical_only), 0)
+              success_sound, failure_sound, 0, 0, int(physical_only), 0, 0, 0, 0)
     return b"".join(value.to_bytes(4, "little") for value in values)
 
 
@@ -246,7 +294,7 @@ def build_hext(enabled: bool, *, window_ms: int = DEFAULT_WINDOW_MS,
     bonus_percent = _bounded(bonus_percent, MIN_BONUS_PERCENT, MAX_BONUS_PERCENT, "Timed Hits bonus")
     block_percent = _bounded(block_percent, MIN_BLOCK_PERCENT, MAX_BLOCK_PERCENT, "Timed Blocks damage")
     success_sound = _bounded(success_sound, 1, MAX_SOUND, "Timed Hits success sound")
-    failure_sound = _bounded(failure_sound, 1, MAX_SOUND, "Timed Hits failure sound")
+    failure_sound = _bounded(failure_sound, 1, MAX_SOUND, "Timed Hits miss sound")
     if not enabled:
         return ""
     data = data_bytes(window_ms, bonus_percent, block_percent, success_sound, failure_sound, physical_only)
@@ -274,7 +322,7 @@ SETTING_KEYS = {
     "timedHitsBonus": ("bonus_percent", DEFAULT_BONUS_PERCENT, MIN_BONUS_PERCENT, MAX_BONUS_PERCENT, "Timed Hits bonus"),
     "timedBlocksDamage": ("block_percent", DEFAULT_BLOCK_PERCENT, MIN_BLOCK_PERCENT, MAX_BLOCK_PERCENT, "Timed Blocks damage"),
     "timedHitsSuccessSound": ("success_sound", DEFAULT_SUCCESS_SOUND, 1, MAX_SOUND, "Timed Hits success sound"),
-    "timedHitsFailureSound": ("failure_sound", DEFAULT_FAILURE_SOUND, 1, MAX_SOUND, "Timed Hits failure sound"),
+    "timedHitsFailureSound": ("failure_sound", DEFAULT_FAILURE_SOUND, 1, MAX_SOUND, "Timed Hits miss sound"),
     "timedHitsPhysicalOnly": ("physical_only", DEFAULT_PHYSICAL_ONLY, False, True, "Timed Hits physical only"),
 }
 

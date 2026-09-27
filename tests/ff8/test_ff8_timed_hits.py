@@ -194,3 +194,60 @@ def test_settings_round_trip_and_reach_the_patch(tmp_path):
         for bad in ({"timedHitsWindow": 5}, {"timedHitsBonus": "150"}, {"timedHits": 1}):
             with pytest.raises(ValueError):
                 gameplay_settings.save({**data, **bad}, game, project, runtime_root=runtime)
+
+
+def _at(emu, now: int):
+    emu.mem_write(CLOCK, struct.pack("<I", now))
+
+
+def test_mashing_fumbles_instead_of_winning():
+    """Lexer mashed Square and won every hit and every block."""
+    emu = _machine(1000, ok=7, fail=9)
+    for now in range(1000, 1300, 50):
+        _at(emu, now)
+        _press(emu, t.SQUARE)
+    _at(emu, 1320)
+    assert _hit(emu, 1, 4, 1000) == 1000
+    assert _hit(emu, 5, 0, 1000) == 1000  # the enemy's hit on the party too
+    assert _sounds(emu) == [9]
+
+
+def test_a_block_far_too_early_misses():
+    emu = _machine(1000, window=150, ok=7, fail=9)
+    _press(emu, t.SQUARE)
+    _at(emu, 1400)                       # 400 ms early, inside three windows
+    assert _hit(emu, 5, 0, 1000) == 1000
+    assert _sounds(emu) == [9]
+
+
+def test_a_press_just_after_the_hit_is_too_late_once():
+    emu = _machine(1000, window=150, ok=7, fail=9)
+    assert _hit(emu, 1, 4, 1000) == 1000  # no press yet
+    for now in (1050, 1080, 1120):
+        _at(emu, now)
+        _press(emu, t.SQUARE)
+    assert _sounds(emu) == [9]            # one too-late sound, however many presses
+    _at(emu, 1130)
+    assert _hit(emu, 1, 4, 1000) == 1000  # and nothing was armed by them
+
+
+def test_squalls_second_call_for_the_same_swing_is_not_judged_again():
+    emu = _machine(1000, window=150, ok=7, fail=9)
+    _press(emu, t.SQUARE)
+    _at(emu, 1100)
+    assert _hit(emu, 0, 4, 1000) == 1500  # the normal path
+    _at(emu, 1110)
+    _press(emu, t.SQUARE)                 # a press between the two calls
+    _at(emu, 1120)
+    assert _hit(emu, 0, 4, 1000) == 1000  # 00485160's call: no second bonus
+    assert _sounds(emu) == [7, 9]
+
+
+def test_an_old_early_press_is_forgotten_not_held_against_the_player():
+    emu = _machine(1000, window=150, ok=7, fail=9)
+    _press(emu, t.SQUARE)
+    _at(emu, 2000)                        # far older than three windows
+    _press(emu, t.SQUARE)                 # a fresh press, not a fumble
+    _at(emu, 2100)
+    assert _hit(emu, 1, 4, 1000) == 1500
+    assert _sounds(emu) == [7]
