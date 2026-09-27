@@ -418,6 +418,10 @@ PANES = """
 </header>
 <main class="lex-panel-layout">
   <section class="lex-panel-layout-pane" id="left">
+    <div class="lex-subtab-bar" role="tablist">
+      <button type="button" class="lex-subtab-button active" id="sub-one">Sub one</button>
+      <button type="button" class="lex-subtab-button" id="sub-two">Sub two</button>
+    </div>
     <button type="button" id="left-a">Left A</button>
     <button type="button" id="left-b">Left B</button>
   </section>
@@ -434,8 +438,9 @@ PANES = """
 def test_sticks_move_within_and_between_panels_and_the_clicks_reach_the_bars():
     """Issue: "pressing right on the brand button goes down to a column header".
 
-    The left stick stays in its region; the right stick changes panel; L3 and
-    R3 are the menu and pagination bars, where left and right walk buttons.
+    The left stick stays in its region and never lands on a bar; the right
+    stick changes panel; L3 and R3 toggle to the menu and pagination bars,
+    where left and right walk buttons, and back to where the player was.
     """
     with sync_playwright() as play:
         browser = play.chromium.launch(headless=True)
@@ -475,8 +480,13 @@ def test_sticks_move_within_and_between_panels_and_the_clicks_reach_the_bars():
             def stick(*axes):
                 tap(f"()=>window.__axes({','.join(map(str, axes))})", "()=>window.__axes(0,0,0,0)")
 
-            # The first step lands in the first panel, not on the brand button.
+            # The first step lands in the first panel, not on the brand button
+            # or the panel's subtabs, and that panel is outlined.
             button(13)
+            assert _focused(page) == "left-a", _focused(page)
+            assert page.evaluate("()=>[...document.querySelectorAll('.lex-pad-region')].map(n=>n.id)") == ["left"]
+            # Up from the top control does not climb onto the subtab bar.
+            stick(0, -1, 0, 0)
             assert _focused(page) == "left-a", _focused(page)
             # Right with the left stick stays in that panel.
             stick(1, 0, 0, 0)
@@ -489,6 +499,9 @@ def test_sticks_move_within_and_between_panels_and_the_clicks_reach_the_bars():
             assert _focused(page) == "right-a", _focused(page)
             stick(0, 0, -1, 0)
             assert _focused(page) == "left-b", _focused(page)
+            # Up from a panel never reaches the menu bar or the tab strip.
+            stick(0, 0, 0, -1)
+            assert _focused(page) == "left-b", _focused(page)
             # L3 is the menu bar; left and right walk it without touching the
             # mod selector's value.
             button(10)
@@ -498,9 +511,23 @@ def test_sticks_move_within_and_between_panels_and_the_clicks_reach_the_bars():
             button(15)
             assert _focused(page) == "save", _focused(page)
             assert page.locator("#mod").input_value() == "Vanilla"
-            # R3 is the pagination bar.
+            # L3 again goes back to where the player was.
+            button(10)
+            assert _focused(page) == "left-b", _focused(page)
+            # R3 is the pagination bar, and a toggle too.
             button(11)
             assert page.evaluate("()=>!!document.activeElement.closest('.lex-pager')")
+            button(11)
+            assert _focused(page) == "left-b", _focused(page)
+            # The triggers switch the panel's subtabs and the ring stays in
+            # the panel rather than on the subtab.
+            page.evaluate("""()=>document.querySelectorAll('.lex-subtab-button').forEach(b=>
+              b.addEventListener('click',()=>{document.querySelectorAll('.lex-subtab-button')
+                .forEach(o=>o.classList.toggle('active',o===b));}))""")
+            button(7)
+            page.wait_for_timeout(50)
+            assert page.evaluate("()=>document.querySelector('.lex-subtab-button.active').id") == "sub-two"
+            assert not page.evaluate("()=>document.activeElement.matches('.lex-subtab-button')")
         finally:
             browser.close()
 

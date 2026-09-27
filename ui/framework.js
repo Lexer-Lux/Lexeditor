@@ -9918,15 +9918,31 @@ ${contents.path}`});
         .sort((a, b) => b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom)[0] || null;
     };
 
+    // The bars have controls of their own (LB/RB tabs, LT/RT subtabs, L3 the
+    // menu bar, R3 the pagination bar), so the sticks never walk onto them:
+    // the pool inside a panel leaves its subtab buttons out, and the right
+    // stick moves between panels only.
+    const BAR_CONTROL = ".lex-subtab-bar *";
+    const panels = () => openDialog() ? [] : [...document.querySelectorAll(PANE)]
+      .filter(pane => shown(pane) && !pane.querySelector(PANE));
+    const bars = () => [document.querySelector(MENU_BAR), pagerBar()].filter(node => node && shown(node));
     const regions = () => {
-      if (openDialog()) return [];
-      const panes = [...document.querySelectorAll(PANE)]
-        .filter(pane => shown(pane) && !pane.querySelector(PANE));
-      if (!panes.length) return [];
-      return [document.querySelector(MENU_BAR), document.querySelector(TAB_STRIP), pagerBar(), ...panes]
-        .filter(node => node && shown(node));
+      const list = panels();
+      return list.length ? [...bars(), ...list] : [];
     };
     const regionOf = (node, list = regions()) => list.find(region => region.contains(node)) || null;
+    const reachable = (pool, region) => pool.filter(node => region.contains(node)
+      && !(region.matches(PANE) && node.matches(BAR_CONTROL)));
+
+    // The panel the player is in is outlined, so the right stick has a
+    // visible starting point.
+    let markedRegion = null;
+    const markRegion = region => {
+      if (markedRegion === region) return;
+      markedRegion?.classList.remove("lex-pad-region");
+      markedRegion = region;
+      region?.classList.add("lex-pad-region");
+    };
 
     const topLeft = pool => pool.reduce((best, node) => {
       const a = node.getBoundingClientRect(), b = best.getBoundingClientRect();
@@ -9936,7 +9952,7 @@ ${contents.path}`});
     // Entering a region returns to where the player last was in it, else to
     // its selected tab or row, else to its first control.
     const enterRegion = region => {
-      const pool = focusPool().filter(node => region.contains(node));
+      const pool = reachable(focusPool(), region);
       if (!pool.length) return false;
       const remembered = lastInRegion.get(region);
       if (remembered && pool.includes(remembered)) return setPadFocus(remembered);
@@ -9954,6 +9970,7 @@ ${contents.path}`});
     const clearPadFocus = () => {
       padFocus?.classList.remove("lex-pad-focus");
       padFocus = null;
+      markRegion(null);
     };
 
     // A programmatic focus() does not always light :focus-visible, so the
@@ -9966,6 +9983,7 @@ ${contents.path}`});
       node.classList.add("lex-pad-focus");
       const region = regionOf(node);
       if (region) lastInRegion.set(region, node);
+      markRegion(region);
       try { node.focus({preventScroll: true}); } catch (_error) { node.focus?.(); }
       node.scrollIntoView?.({block: "nearest", inline: "nearest", behavior: "auto"});
       return true;
@@ -10057,11 +10075,16 @@ ${contents.path}`});
       const from = focused(pool);
       if (!from) return enterFirstPanel(list) || setPadFocus(pool[0]);
       const region = regionOf(from, list);
+      // Focus that reached a bar by other means (a click, a tab switch) is
+      // not somewhere the stick walks from; it goes back into a panel.
+      if (list.length && (!region || (region.matches(PANE) && from.matches(BAR_CONTROL)))) {
+        return (region && enterRegion(region)) || enterFirstPanel(list);
+      }
       // In the menu bar and a pager, left and right walk the buttons; they
       // never flip the mod selector or the page size under the player.
-      const bar = region?.matches(`${MENU_BAR},${TAB_STRIP}`) || from.closest(".lex-pager");
+      const bar = region?.matches(MENU_BAR) || from.closest(".lex-pager");
       if ((direction === "left" || direction === "right") && !bar && stepControl(from, direction)) return true;
-      const next = nearest(region ? pool.filter(node => region.contains(node)) : pool, from, direction);
+      const next = nearest(region ? reachable(pool, region) : pool, from, direction);
       return next ? setPadFocus(next) : false;
     };
 
@@ -10072,17 +10095,30 @@ ${contents.path}`});
       const pool = focusPool();
       const from = focused(pool);
       const current = from ? regionOf(from, list) : null;
-      if (!current) return enterFirstPanel(list);
-      const candidates = list.filter(region => region !== current && pool.some(node => region.contains(node)));
+      // From a bar, the right stick goes back to the panel the player left.
+      if (!current || !current.matches(PANE)) return returnFromBar() || enterFirstPanel(list);
+      const candidates = panels().filter(region => region !== current && reachable(pool, region).length);
       const next = nearest(candidates, current, direction);
       return next ? enterRegion(next) : false;
     };
 
-    // L3 is the menu bar, R3 the pagination bar.
+    // L3 is the menu bar, R3 the pagination bar. Each is a toggle: the same
+    // click again returns to the control the player was on in a panel.
+    let returnTo = null;
+    const returnFromBar = () => {
+      const node = returnTo;
+      returnTo = null;
+      if (node?.isConnected && focusPool().includes(node)) return setPadFocus(node);
+      return enterFirstPanel(regions());
+    };
     const focusBar = which => {
       if (openDialog()) return false;
       const bar = which === "menu" ? document.querySelector(MENU_BAR) : pagerBar();
-      return bar && shown(bar) ? enterRegion(bar) : false;
+      if (!bar || !shown(bar)) return false;
+      const from = focused(focusPool());
+      if (from && bar.contains(from)) return returnFromBar();
+      if (from && regionOf(from)?.matches(PANE)) returnTo = from;
+      return enterRegion(bar);
     };
 
     // The triggers step the subtabs of the panel the player is in, or the
@@ -10106,11 +10142,19 @@ ${contents.path}`});
       // (enemy AI asks about unsaved steps first); the ring follows the new
       // selection whenever it lands.
       const label = next.textContent;
+      // In a page of panels the ring stays in the panel, on its new content;
+      // a page without panels has nowhere else, so it marks the subtab.
       const follow = () => {
         const redrawn = subtabBars()[position]?.querySelector(".lex-subtab-button.active");
-        if (redrawn && redrawn !== padFocus && redrawn.textContent === label) setPadFocus(redrawn);
+        if (!redrawn || redrawn.textContent !== label) return;
+        const pane = panels().find(node => node.contains(redrawn));
+        if (pane) {
+          if (!(padFocus?.isConnected && pane.contains(padFocus) && !padFocus.matches(BAR_CONTROL))) {
+            lastInRegion.delete(pane);
+            enterRegion(pane);
+          }
+        } else if (redrawn !== padFocus) setPadFocus(redrawn);
       };
-      setPadFocus(next);
       follow();
       setTimeout(follow, 0);
       setTimeout(follow, 200);
@@ -10191,7 +10235,13 @@ ${contents.path}`});
       const next = buttons[(Math.max(0, index) + step + buttons.length) % buttons.length];
       if (!next) return false;
       next.click();
-      setPadFocus(next);
+      // The bumpers own the tab strip; with panels on the page, the ring
+      // lands in the new page's first panel once it has drawn.
+      if (!panels().length) return setPadFocus(next);
+      clearPadFocus();
+      const land = () => { if (!padFocus?.isConnected) enterFirstPanel(regions()); };
+      setTimeout(land, 0);
+      setTimeout(land, 250);
       return true;
     };
 

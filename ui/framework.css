@@ -8249,3 +8249,9 @@ body { text-shadow: var(--lex-text-shadow, none); }
   outline:2px solid var(--lex-highlight);
   outline-offset:2px;
 }
+/* The panel the pad is in, so the right stick has a visible starting point.
+   Drawn inside the panel, where neighbouring panels cannot cover it. */
+.lex-pad-region {
+  outline:2px solid color-mix(in srgb, var(--lex-highlight) 60%, transparent);
+  outline-offset:-2px;
+}
