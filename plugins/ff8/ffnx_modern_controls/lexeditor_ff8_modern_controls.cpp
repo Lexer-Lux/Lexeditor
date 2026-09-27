@@ -64,6 +64,11 @@ constexpr std::uintptr_t kBattlePressedCall = 0x004A8521;
 constexpr std::uintptr_t kBattleRepeatCall = 0x004A853D;
 constexpr std::uintptr_t kBattleKeyTranslate = 0x004A2D60;
 constexpr int kL2Function = 0x01, kR2Function = 0x02, kR1Function = 0x08;
+// FF8 has no L3/R3 function: its translator only remaps its 12 own bits, and
+// PSX R3 (0x400) never comes out of it. Clicking the right stick sets that bit
+// so Enhanced Scan (battle_shortcuts.py, Hext) has a button of its own; FFNx
+// owns the pad, which is why this one line lives in the driver.
+constexpr int kR3Function = 0x400;
 // Shot registers its widget in slot 6 of the table at 01D76628 (20-byte
 // entries, update callback first) and clears it on close (004ADBAC). Its
 // update ends Shot through its own path when the request byte is set
@@ -76,7 +81,7 @@ using KeyTranslate = int(__cdecl *)(int);
 KeyTranslate original_translate = nullptr;
 bool bindings_installed = false;
 
-struct BattleButtons { bool fire = false, flee = false, back = false; };
+struct BattleButtons { bool fire = false, flee = false, back = false, scan = false; };
 BattleButtons buttons_now, buttons_before;
 std::uint32_t buttons_frame = ~0u;
 
@@ -94,6 +99,8 @@ void read_battle_buttons() {
     buttons_now.fire = right > 0.5f || down(VK_LBUTTON);
     buttons_now.flee = left > 0.5f || down(VK_RBUTTON);
     buttons_now.back = b || down(VK_BACK);
+    buttons_now.scan = use_sdl_gamepad ? sdlgamepad.IsPressed(SDL_GAMEPAD_BUTTON_RIGHT_STICK)
+                                       : gamepad.IsPressed(XINPUT_GAMEPAD_RIGHT_THUMB);
 }
 
 // channel: 0 held, 1 newly pressed, 2 repeating.
@@ -107,6 +114,7 @@ int translate_battle_keys(int keyscan, int channel) {
     if (buttons_now.fire && !buttons_now.flee) bits &= ~kR2Function;
     if (channel == 0 ? buttons_now.fire : fire_edge) bits |= kR1Function;
     if (channel == 0 && buttons_now.flee) bits |= kL2Function | kR2Function;
+    if (channel == 0 ? buttons_now.scan : buttons_now.scan && !buttons_before.scan) bits |= kR3Function;
     if (channel == 1 && buttons_now.back && !buttons_before.back &&
         *reinterpret_cast<const std::uintptr_t *>(kShotWidgetUpdate) == kShotUpdate) {
         *reinterpret_cast<std::uint8_t *>(kShotEndRequest) = 1;

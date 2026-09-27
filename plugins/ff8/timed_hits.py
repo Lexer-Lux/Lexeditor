@@ -1,7 +1,7 @@
 """Timed Hits and Timed Blocks for every character (#482, #483), as Hext.
 
 Lexer's rule (2026-09-27): one timing system for everyone, Squall included.
-The hit moment is when the game applies a hit's damage. Press R1 within the
+The hit moment is when the game applies a hit's damage. Press Square within the
 window before it lands and a party member's hit on an enemy gets the bonus
 multiplier; an enemy's hit on a party member is reduced instead. A press that
 is too early plays the failure sound; a timed one plays the success sound.
@@ -11,8 +11,10 @@ Against FF8_EN.exe SHA-256 064d466b...9570 (see codex/ff8/timed-hits.md):
 - Presses: the battle input routine 004A84E0 stores this frame's newly
   pressed buttons at [01D6D490] + 0x12 (FF8's own layout, after the
   translator 004A2D60 that Modern Controls hooks). The hook at 004A8554,
-  after those calls, records timeGetTime (import 00B69378) when bit 0x08
-  (R1, the bit Squall's trigger tests) is newly pressed.
+  after those calls, records timeGetTime (import 00B69378) when bit 0x80
+  (Square) is newly pressed. It was R1 (0x08, the bit Squall's trigger
+  tests), but R1 is also Look Right, which Universal Item turns into the
+  Item menu, and Modern Controls feeds the right trigger into that bit.
 - Hits: 0048FE20(target) works out and applies one hit, mid-animation. At
   00491124, just before the damage cap, ESI is the hit's damage, the attacker
   is byte 01D27AD8 and [esp+0x10] is the target x 0xD0. The hook scales ESI
@@ -46,7 +48,7 @@ INPUT_HOOK = 0x004A8554
 INPUT_ORIGINAL = bytes.fromhex("66 8B 41 10 66 89 41 18")
 INPUT_RESUME = 0x004A855C
 BATTLE_INPUT = 0x01D6D490   # pointer; +0x12 newly pressed
-R1 = 0x08
+SQUARE = 0x80  # FF8 function bits: L2 01 R2 02 L1 04 R1 08 Tri 10 O 20 X 40 Sq 80
 HIT_HOOK = 0x00491124
 HIT_ORIGINAL = bytes.fromhex("8A 0D 0E 8E D2 01")  # mov cl, [01D28E0E]
 HIT_RESUME = 0x0049112A
@@ -78,7 +80,7 @@ ASSEMBLY = f"""
 input:
     mov ax, word ptr [ecx + 0x10]
     mov word ptr [ecx + 0x18], ax
-    test byte ptr [ecx + 0x12], {R1:#x}
+    test byte ptr [ecx + 0x12], {SQUARE:#x}
     jz input_done
     pushad
     call dword ptr [{TIME_GET_TIME:#x}]
@@ -143,7 +145,7 @@ hit_done:
 # Assembled at CAVE from ASSEMBLY; tests/ff8/test_ff8_timed_hits.py
 # re-assembles it (keystone) and runs it under unicorn.
 CODE = bytes.fromhex(
-    "66 8B 41 10 66 89 41 18 F6 41 12 08 74 17 60 FF"
+    "66 8B 41 10 66 89 41 18 F6 41 12 80 74 17 60 FF"
     "15 78 93 B6 00 A3 F8 BA 7A 02 C7 05 FC BA 7A 02"
     "01 00 00 00 61 68 5C 85 4A 00 C3 60 9C 85 F6 0F"
     "8E 96 00 00 00 83 3D FC BA 7A 02 00 0F 84 89 00"
@@ -206,7 +208,7 @@ def build_hext(enabled: bool, *, window_ms: int = DEFAULT_WINDOW_MS,
         return ""
     data = data_bytes(window_ms, bonus_percent, block_percent, success_sound, failure_sound)
     lines = [
-        f"# Timed Hits and Blocks: R1 within {window_ms} ms before a hit lands; "
+        f"# Timed Hits and Blocks: Square within {window_ms} ms before a hit lands; "
         f"hits x{bonus_percent}%, blocks take {block_percent}%.",
         f"{CAVE:X}:{len(CODE):X}",
         f"{CAVE:X} = {CODE.hex(' ').upper()}",

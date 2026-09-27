@@ -76,17 +76,18 @@ def _pressed(emu):
     return struct.unpack("<II", emu.mem_read(t.PRESS_TIME, 8))
 
 
-def test_r1_records_the_time_and_other_buttons_do_not():
+def test_square_records_the_time_and_other_buttons_do_not():
     emu = _machine(1000)
-    _press(emu, 0x20)
-    assert _pressed(emu) == (0, 0)
+    # R1 is Look Right (Universal Item) and the Modern Controls fire bit.
     _press(emu, 0x08 | 0x20)
+    assert _pressed(emu) == (0, 0)
+    _press(emu, 0x80 | 0x20)
     assert _pressed(emu) == (1000, 1)
 
 
 def test_a_timed_party_hit_gets_the_bonus_once():
     emu = _machine(1000, ok=7)
-    _press(emu, 0x08)
+    _press(emu, 0x80)
     emu.mem_write(CLOCK, struct.pack("<I", 1200))
     assert _hit(emu, 1, 4, 1000) == 1500
     assert _sounds(emu) == [7]
@@ -96,14 +97,14 @@ def test_a_timed_party_hit_gets_the_bonus_once():
 
 def test_a_timed_block_reduces_an_enemy_hit_on_the_party():
     emu = _machine(1000, block=50)
-    _press(emu, 0x08)
+    _press(emu, 0x80)
     emu.mem_write(CLOCK, struct.pack("<I", 1100))
     assert _hit(emu, 5, 0, 801) == 400
 
 
 def test_an_early_press_misses_with_the_failure_sound():
     emu = _machine(1000, fail=9)
-    _press(emu, 0x08)
+    _press(emu, 0x80)
     emu.mem_write(CLOCK, struct.pack("<I", 1400))  # 400 ms: outside 250, inside 750
     assert _hit(emu, 0, 3, 1000) == 1000
     assert _sounds(emu) == [9]
@@ -111,7 +112,7 @@ def test_an_early_press_misses_with_the_failure_sound():
 
 def test_a_press_long_before_is_ignored_silently():
     emu = _machine(1000)
-    _press(emu, 0x08)
+    _press(emu, 0x80)
     emu.mem_write(CLOCK, struct.pack("<I", 5000))
     assert _hit(emu, 0, 3, 1000) == 1000
     assert _sounds(emu) == []
@@ -119,7 +120,7 @@ def test_a_press_long_before_is_ignored_silently():
 
 def test_party_on_party_and_healing_are_left_alone():
     emu = _machine(1000)
-    _press(emu, 0x08)
+    _press(emu, 0x80)
     assert _hit(emu, 0, 1, 1000) == 1000
     assert _hit(emu, 0, 3, 0) == 0
     assert _pressed(emu)[1] == 1, "the press waits for a hit it applies to"

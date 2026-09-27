@@ -173,7 +173,7 @@ def main() -> None:
     scan_router = bytes.fromhex(
         scan_patch.split(f"{battle_shortcuts.CODE_CAVE:X} = ", 1)[1].splitlines()[0]
     )
-    assert bytes((0xA8, battle_shortcuts.CARD_GAME_INPUT_MASK)) in scan_router
+    assert battle_shortcuts.SCAN_INPUT_TEST in scan_router
     assert battle_shortcuts.SCAN_DESCRIPTOR_BYTES == bytes.fromhex("02 00 00 00")
     assert battle_shortcuts.SCAN_LIST_BYTES == bytes.fromhex("32 01 80 54 00")
     assert f"{battle_shortcuts.MAGIC_CONTROLLER_TAIL:X} = E9" in scan_patch

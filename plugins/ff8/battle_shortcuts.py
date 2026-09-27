@@ -64,8 +64,12 @@ SCAN_LIST_BYTES = bytes((SCAN_MAGIC_ID, 1, 0x80, 0x54, 0x00))
 
 # FF8 keeps the PlayStation logical button layout in this command-state byte:
 # L1 0x04, R1 0x08, Triangle 0x10, Circle 0x20, Cross 0x40, Square 0x80.
-# Square is the configurable Card Game action and the default XInput X button.
-CARD_GAME_INPUT_MASK = 0x80
+# Square belongs to Timed Hits and Blocks, so Enhanced Scan is R3: the PSX
+# bit 0x400 of the battle block's newly-pressed word ([01D6D490]+0x12), which
+# FF8's layout translator 004A2D60 never produces for its own functions. The
+# Modern Controls driver sets it when the right stick is clicked in battle.
+# ECX holds [01D6D490] at the hook (loaded at 004BBDD9).
+SCAN_INPUT_TEST = bytes.fromhex("F6 41 13 04")  # test byte ptr [ecx+0x13], 0x04
 
 ITEM_DESCRIPTOR_BYTES = bytes.fromhex("04 82 D4 00")
 SCAN_DESCRIPTOR_BYTES = bytes.fromhex("02 00 00 00")
@@ -138,7 +142,7 @@ def _command_payload(*, universal_item: bool, scanned_target_scan: bool,
         _jump(code, COMMAND_EXECUTE)
         code.label("after_item")
     if scanned_target_scan:
-        code.add(bytes.fromhex("A8") + bytes((CARD_GAME_INPUT_MASK,)))
+        code.add(SCAN_INPUT_TEST)
         code.branch(bytes.fromhex("0F 84"), "scan_released")
         code.add(b"\x80\x3D" + SCAN_INPUT_LATCH.to_bytes(4, "little") + b"\x00")
         code.branch(bytes.fromhex("0F 85"), "after_scan")
@@ -232,7 +236,7 @@ def build_hext(*, universal_item: bool = DEFAULT_UNIVERSAL_ITEM,
     )
     hook = _near_jump(COMMAND_INPUT_HOOK, CODE_CAVE)
     lines = [
-        "# Universal Item uses Look Right / RB; Enhanced Scan uses Card Game / X in battle commands.",
+        "# Universal Item uses Look Right / RB; Enhanced Scan uses R3 (Modern Controls) in battle commands.",
         f"{CODE_CAVE:X}:{CODE_CAVE_LENGTH:X}",
         f"{COMMAND_INPUT_HOOK:X} = {hook.hex(' ').upper()}",
         f"{CODE_CAVE:X} = {payload.hex(' ').upper()}",
