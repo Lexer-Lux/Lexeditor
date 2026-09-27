@@ -44,8 +44,15 @@ def test_localization_add_from_empty_file():
                     page.get_by_label('New localization value',exact=True).fill('Hello player')
                     page.get_by_role('button',name='Add key',exact=True).click()
                     assert target.read_text()=='{}\n'
+                    # A key added in this mod carries the shared created-record pen.
+                    assert page.locator('.lex-record-source').count()==1
                     page.locator('#global-save').click()
-                    page.wait_for_function('document.querySelector("#global-save").disabled')
+                    # Save disables its button when it starts, before the file is
+                    # written, so wait for the file itself.
+                    for _ in range(100):
+                        if 'Hello player' in target.read_text():
+                            break
+                        page.wait_for_timeout(50)
                     assert 'Hello player' in target.read_text()
                     page.reload()
                     page.wait_for_function('locCurrent?.entries?.some(e=>e.key==="Mods.ExampleMod.Custom.Greeting" && e.value==="Hello player")')

@@ -405,7 +405,7 @@
       change:next=>{locPage=next.page;locPageSize=next.pageSize;if(next.selected){const [path,key]=String(next.selected).split("\u001f");locSelectedKey=key;if(path!==locCurrent?.path)void loadLocalizationFile(path,key);else render()}else render()},
       master:({rows,selected,select})=>columnList({rows,key:row=>`${row.path}\u001f${row.key}`,selected,select,sortState:locSort,sort:key=>{locSort=nextSort(locSort,key);render()},refresh:()=>{render();shell?.refresh?.()},
         template:"minmax(180px,1.25fr) minmax(170px,1.1fr) minmax(160px,1fr)",
-        columns:[{key:"key",label:"Key",sortable:true,align:"start"},{key:"value",label:"Value",sortable:true,align:"start",edit:(row,value)=>void editLocalizationCell(row,value),editValue:row=>row.value},{key:"path",label:"Resource",sortable:true,align:"start"}],"aria-label":`${locCulture} localization entries`}),
+        columns:[{key:"key",label:"Key",sortable:true,align:"start",render:row=>LexeditorUI.inlineLabel(LexeditorUI.recordSource({created:row.isNew}),row.key)},{key:"value",label:"Value",sortable:true,align:"start",edit:(row,value)=>void editLocalizationCell(row,value),editValue:row=>row.value},{key:"path",label:"Resource",sortable:true,align:"start"}],"aria-label":`${locCulture} localization entries`}),
       detail:localizationDetail,emptyDetail:()=>localizationDetail(null),
     });
   }
