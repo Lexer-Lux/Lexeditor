@@ -99,8 +99,9 @@ def mount_subtabs(page):
     page.wait_for_timeout(200)
 
 
-def subtab_label(page, index=0):
-    return page.locator(".lex-subtab-button .lex-tab-label-text").nth(index) \
+def subtab_label(page, tab="stats"):
+    # Subtabs are shown in alphabetical order, so they are found by id.
+    return page.locator(f'.lex-subtab-button[data-subtab="{tab}"] .lex-tab-label-text') \
         .evaluate("n=>n.textContent.trim()")
 
 
@@ -109,8 +110,8 @@ def test_renaming_a_subtab_ships_under_the_page_tab_that_owns_it(page):
     mount_shell(page)
     mount_subtabs(page)
     assert subtab_label(page) == "Stats"
-    page.locator(".lex-subtab-button .lex-tab-label-text").first.dblclick()
-    field = page.locator(".lex-subtab-button .lex-label-rename").first
+    page.locator('.lex-subtab-button[data-subtab="stats"] .lex-tab-label-text').dblclick()
+    field = page.locator('.lex-subtab-button[data-subtab="stats"] .lex-label-rename')
     field.wait_for(timeout=3000)
     field.fill("Parameters")
     field.press("Enter")
@@ -122,7 +123,7 @@ def test_renaming_a_subtab_ships_under_the_page_tab_that_owns_it(page):
     assert saved == [["fixture", "items", {"fixture-items.sub.stats.label": "Parameters"}]], saved
     mount_subtabs(page)
     assert subtab_label(page) == "Parameters", "the saved subtab name did not come back"
-    assert subtab_label(page, 1) == "Growth"
+    assert subtab_label(page, "growth") == "Growth"
 
 
 def mount_field(page):

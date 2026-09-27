@@ -2557,7 +2557,18 @@
   // active state, and the page-owned change callback.
   // A page with one subtab has no choice to offer, so it shows no bar. A bar
   // with a single tab in it reads as a control that does nothing.
-  const subtabBar = (options = {}) => (options.tabs || []).length < 2
+  // Subtabs read in alphabetical order, the same rule the tabbed panel and
+  // the page tabs follow (a Misc tab, then Tweaks, come last). An image bar
+  // keeps the game's own order - GF and character portraits.
+  const subtabBar = (options = {}) => {
+    if (options.images || options.order === "given") return subtabBarElement(options);
+    const rank = tab => ({tweaks: 2, misc: 1})[String(tab.id).toLocaleLowerCase()] || 0;
+    const name = tab => String(tab.label instanceof Node ? tab.label.textContent : tab.label ?? tab.id);
+    const tabs = [...(options.tabs || [])].sort((a, b) => rank(a) - rank(b)
+      || name(a).localeCompare(name(b), undefined, {numeric: true, sensitivity: "base"}));
+    return subtabBarElement({...options, tabs});
+  };
+  const subtabBarElement = (options = {}) => (options.tabs || []).length < 2
     ? element("div", {class: "lex-subtab-bar lex-subtab-bar-single", hidden: true})
     : element("div", {
     class: ["lex-subtab-bar", options.flush === true ? "lex-subtab-bar-flush" : "",
@@ -2585,6 +2596,7 @@
       ...(tab.attrs || {}),
       disabled:!!tab.disabled,
       class: ["lex-subtab-button", tab.id === options.active ? "active" : ""].filter(Boolean).join(" "),
+      "data-subtab": String(tab.id),
       role: "tab",
       "aria-selected": String(tab.id === options.active),
       tabindex: tab.id === options.active ? "0" : "-1",

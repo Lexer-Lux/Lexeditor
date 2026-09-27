@@ -17,7 +17,9 @@ def test_visible_subtab_shortcuts(page):
         U.subtabBar({tabs,label:'Starting data',change:id=>chosen=id}));
     }''')
     page.keyboard.press('Control+Shift+Digit2')
-    assert page.evaluate('chosen')=='Characters'
+    # Subtabs read alphabetically (Characters, General, Inventory); the
+    # shortcut numbers follow the order on screen.
+    assert page.evaluate('chosen')=='General'
     page.keyboard.press('Control+Digit3')
     assert page.evaluate('mainChosen')==page.locator('nav button[data-tab]').nth(2).get_attribute('data-tab')
     assert page.get_by_role('tablist',name='Starting data').locator('.lex-tab-shortcut').all_text_contents()==['⇧1','⇧2','⇧3']

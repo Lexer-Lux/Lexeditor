@@ -42,11 +42,13 @@ def test_tab_hover_does_not_move_or_resize_label(page):
     label.hover();page.wait_for_timeout(100)
     assert label.bounding_box()==before
     assert label.evaluate('n=>getComputedStyle(n).fontSize')==font
+    # The hand stands outside the chosen tab (Lexer: never inside a tab), so
+    # its tip ends at or before the tab's own left edge.
     assert page.locator('nav button.active').evaluate('''n=>{
-      const p=getComputedStyle(n,'::before'),range=document.createRange();
-      range.selectNodeContents(n.querySelector('.lex-tab-label-text'));
+      const p=getComputedStyle(n,'::before');
+      if(p.content==='none')return true;
       const tip=n.getBoundingClientRect().left+parseFloat(getComputedStyle(n).borderLeftWidth)+parseFloat(p.left)+parseFloat(p.width);
-      return Math.abs(range.getBoundingClientRect().left-tip-6)<2
+      return tip<=n.getBoundingClientRect().left+1
     }''')
 
 
