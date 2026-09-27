@@ -71,6 +71,38 @@ absolute VAs; file offset = VA − `0x400000`. Battle participants are
 - Neither FFNx's `ff8.h` nor ff8-decomp (the PS1 build, battle interpreter
   not yet decompiled) names this display path.
 
+## Hit and crit rolls (2026-09-27)
+
+- Physical types reach `00492339` (and the similar callers at `00492470`,
+  `004924FA`, `00492682`): `00492B00(attacker, target)` returns 1 for an
+  automatic hit (target status flags `& 9`, or hit rate `[01D2A238]` = 255);
+  otherwise `00492BA0` rolls. A failed roll jumps to `004926B0`, which sets
+  the miss mark (`01D27ADE` bit 4) and deals nothing. Then `00492B30` rolls the
+  crit and, on success, sets `01D28E07` and the crit mark (`01D27ADE` bit 2).
+- Hit roll: `esi = max(0, hit rate + attacker LUCK/2 − target EVA − target
+  LUCK) × 255 / 100`; the hit lands when `esi ≠ 0 && esi ≥ random & 0xFF`
+  (`call 0048F020` at `00492C15`). No cap at 100: above 255 always hits.
+- Crit roll: `esi = (attacker LUCK + [01D2A23B]) × 255 / 256`, the same test
+  (`call 0048F020` at `00492B6C`).
+- Types 34 and 36 go to `00492E10`, the same rolls with the threshold in EDI,
+  attacker × 0xD0 in ESI and target × 0xD0 in EBP: automatic hit → crit roll
+  only at `00492EA3`; hit roll at `00492F29`; crit roll at `00492F71`; miss
+  exit `004930CB`. Full LUCK Accuracy (`luck_accuracy.py`) patches only this
+  routine (`00492EEF`), so ordinary Attack (type 1, `00492BA0`) keeps LUCK/2
+  even with it on.
+- Squall's gunblade handler `0048F480` never rolls a hit. `0048F52A` clears
+  `01D28E07`, and `0048F652` doubles the damage when it is set. `0048F522`
+  (`xor eax, eax; pop ebp; ret`) is its no-damage exit.
+- Squall's hit lands through `00485160` when his trigger task closes a
+  window at frame 27 (`004BA8F5` → `00485130` stores the hit counter
+  `01D28D90`). His earlier normal-path call to `0048FE20` (from `0048EA93`)
+  deals no damage: in the 2026-09-27 hit-frame log every `004851F6` landing
+  is preceded by a `0048EA98` call on the same target that leaves its HP
+  unchanged.
+- Timed Hits (redesign) replaces the random byte at all five roll sites with
+  the timing verdict, and judges Squall at `0048F530` only while `01D28D90`
+  is set.
+
 ## Not yet established
 
 - Which sequence opcode marks the moment damage is displayed (the hit frame)
