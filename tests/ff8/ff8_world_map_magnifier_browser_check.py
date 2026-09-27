@@ -112,7 +112,11 @@ def main():
         marker = page.locator('.lex-image-map-point')
         assert marker.count() == 1
         assert abs(float(marker.evaluate('node=>parseFloat(node.style.left)')) - 75) < .1
-        page.get_by_role('button', name='Open the large map: World position of field return 1').click()
+        # Like a draw point, the panel's map opens the large map when clicked
+        # and never moves the point itself (Lexer, 2026-09-27).
+        before = page.evaluate('[returnRow.x,returnRow.z]')
+        page.locator('.world-field-return .lex-image-map-stage').click()
+        assert page.evaluate('[returnRow.x,returnRow.z]') == before, 'a panel click moved the point'
         large = page.locator('.lex-map-magnifier-body .lex-image-map-stage').bounding_box()
         target = (round(large['x'] + large['width'] * .25), round(large['y'] + large['height'] * .75))
         page.mouse.move(*target)

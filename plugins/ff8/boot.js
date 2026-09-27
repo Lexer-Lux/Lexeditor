@@ -270,8 +270,9 @@
       section("PREVIEW INPUTS",[formulaInput("Attacker STR","strength",0,255),formulaInput("Target VIT","vitality",0,255)]),damageOutput]);
     const flyingTerm=sourceControl(unitField(numberControl(boost(),0,100,1,value=>state.data.settings.flyingEvaBonus=value),"%"),()=>state.data.settings.flyingEvaBonus,DEFAULT_FLYING_EVA_BONUS,[],value=>state.data.settings.flyingEvaBonus=Number(value),value=>`${formatNumber(value)}%`);
     const accuracyLuck=settings.formulaeRework?"attacker LUCK":"floor(attacker LUCK / 2)";
-    const accuracy=section("PHYSICAL ACCURACY",[
-      preset(),LexeditorUI.detailNote("A hit rate of 255 receives no bypass."),
+    const accuracy=detailSection({title:"PHYSICAL ACCURACY",
+      help:infoHelp("A hit rate of 255 does not always hit here. It goes through this formula like any other value."),body:[
+      preset(),
       section("FORMULA",[
         LexeditorUI.mathFormula(`EFFECTIVE = clamp(hit rate + ${accuracyLuck} - target EVA - target LUCK - flying penalty, 0, 100)`),
         LexeditorUI.mathFormula("HIT CHANCE = (floor(255 * EFFECTIVE / 100) + 1) / 256 * 100%")]),
@@ -279,7 +280,7 @@
         formulaTerm("hit_rate","Weapon hit rate","Weapon accuracy contributes directly to effective hit chance before target Evasion and Luck; FF8's special 255 value uses the always-hit bypass."),
         formulaTerm("melee","Melee weapon","Marks the attack as close-range for this formula; grounded melee attacks take the flying-target accuracy penalty."),
         detailField({label:"Flying EVA bonus",help:infoHelp("This penalty applies to grounded melee attackers when the target is flying."),control:flyingTerm})]),
-      section("PREVIEW INPUTS",[formulaInput("Attacker LUCK","luck",0,255),formulaInput("Target EVA","eva",0,255),formulaInput("Target LUCK","targetLuck",0,255),checkbox("Target is flying","flying"),checkbox("Attacker has Float","float")]),accuracyOutput]);
+      section("PREVIEW INPUTS",[formulaInput("Attacker LUCK","luck",0,255),formulaInput("Target EVA","eva",0,255),formulaInput("Target LUCK","targetLuck",0,255),checkbox("Target is flying","flying"),checkbox("Attacker has Float","float")]),accuracyOutput]});
     function updateOutputs(){const value=calculate();damageOutput.textContent=value.low===value.high?`DAMAGE: ${formatNumber(value.low)}`:`DAMAGE: ${formatNumber(value.low)} TO ${formatNumber(value.high)} · AVERAGE ${formatNumber(value.average)}`;accuracyOutput.textContent=`FLYING PENALTY: ${formatNumber(value.flyingPenalty)}% · HIT CHANCE: ${formatNumber(value.chance,{maximumFractionDigits:1})}%`}
     // The backend owns the complete requested inventory and each row's runtime
     // status. A formula cannot disappear from this page merely because its native
@@ -292,12 +293,12 @@
         section("VANILLA",LexeditorUI.mathFormula(formula.vanilla||"Not documented")),
         formula.blocker?LexeditorUI.detailNote(`INCOMPLETE: ${formula.blocker}`):null].filter(Boolean)});
     const implementedCount=formulaRows.filter(formula=>formula.status==="implemented").length;
-    const master=section("FORMULAE REWORK",[
+    const master=detailSection({title:"FORMULAE REWORK",
+      help:infoHelp(`${implementedCount} of the ${formulaRows.length} requested formulae have a game patch.`),body:[
       // The blocker comes from the module that owns the switch, so this page
       // cannot disagree with the row that cannot turn it on.
       LexeditorUI.detailNote(settings.formulaeReworkBlocker
-        || "Formulae Rework is on: every listed formula has a guarded game patch, so what the previews below show is what the game runs."),
-      LexeditorUI.detailNote(`${implementedCount}/${formulaRows.length} requested runtime formulae are implemented.`)])
+        || "Formulae Rework is on: every listed formula has a guarded game patch, so what the previews below show is what the game runs.")]})
     const view=LexeditorUI.stack({fill:false},master,LexeditorUI.tileGrid([damage,accuracy,...formulaRows.map(reworkCard)],{minWidth:450}));
     view.addEventListener("input",()=>requestAnimationFrame(updateOutputs));updateOutputs();
     // The stacked damage, accuracy and per-formula cards run taller than the
