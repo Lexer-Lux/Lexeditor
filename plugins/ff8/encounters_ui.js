@@ -155,7 +155,7 @@
       ...grounds.map(ground=>({key:`ground:${ground}`,label:String(ground),sortable:false,align:"center",
         render:row=>encounterRuleCell(row.regionId,ground,cells,reachable,refresh)}))];
     const template=`84px repeat(${Math.max(1,grounds.length)},minmax(46px,1fr))`;
-    return {table:columnList({rows,key:row=>row.id,columns,localSort:false,template,
+    return {table:columnList({rows,key:row=>row.id,columns,fill:true,localSort:false,template,
       class:"ff8-encounter-rule-table ff8-record-list","aria-label":"Encounter rules by region and ground"}),
       regions,grounds,rules,cells,reachable};
   }

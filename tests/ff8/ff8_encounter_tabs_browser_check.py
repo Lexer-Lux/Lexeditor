@@ -197,6 +197,17 @@ def main():
         region_column = [value.strip().lstrip("#").strip() for value in table.locator(
             ".lex-column-list-row > [data-column-key='regionId']").all_inner_texts()]
         assert region_column == ["1", "2", "3"], region_column
+        # Rules uses the shared table fill behavior at different panel heights.
+        for height in (950, 720):
+            page.set_viewport_size({"width": 1500, "height": height})
+            page.wait_for_timeout(100)
+            bounds = table.evaluate("""table => {
+                const last = table.querySelector('.lex-column-list-row:last-child');
+                return {bottom: last.getBoundingClientRect().bottom,
+                        panelBottom: table.getBoundingClientRect().top + table.clientHeight};
+            }""")
+            assert abs(bounds["bottom"] - bounds["panelBottom"]) <= 4, bounds
+        page.set_viewport_size({"width": 1500, "height": 950})
 
         # A group finder edits only the chosen rule, then restores Rules.
         page.evaluate("state.activeSource='mine';renderEncounters();shell.refresh()")
