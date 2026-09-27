@@ -601,6 +601,13 @@ void draw_battle_hp()
         ff8_externals.char_comp_stats_1CFF000.size() != 3) {
         return;
     }
+    // The blue gauge spanned each name's own width, so Zell's bar was shorter
+    // than Quistis's. Every row's blue gauge now runs as long as the widest
+    // name drawn this frame, as the red gauge has one length for every row.
+    float name_span = 0.0f;
+    for (const auto &row : g_hp_rows)
+        if ((row.hp_visible || row.atb_visible) && row.name_right > row.left)
+            name_span = std::max(name_span, row.name_right - row.left);
     for (const auto &row : g_hp_rows) {
         // Only rows the native HUD drew this frame.
         if (!(row.hp_visible || row.atb_visible) ||
@@ -626,9 +633,9 @@ void draw_battle_hp()
                 row.top + 14.0f, IM_COL32(236, 0, 0, 255), true);
         }
         // The blue gauge takes the two pixels above the name, whose text
-        // starts at row_y+2, and spans the name's own area.
+        // starts at row_y+2, and spans the widest name's area.
         if (enable_ff8_gf_hp_bars && row.name_right > row.left)
-            draw_line(row.gf_current, row.gf_maximum, row.left, row.name_right,
+            draw_line(row.gf_current, row.gf_maximum, row.left, row.left + name_span,
                 row.top, IM_COL32(48, 128, 255, 255));
     }
 }
