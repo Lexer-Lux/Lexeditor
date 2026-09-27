@@ -352,7 +352,7 @@ def test_the_pad_changes_values_pages_and_tabs():
             page.evaluate("()=>window.__press(15,false)")
             _tick(page, 2300)
 
-            # The bumpers are the tabs, and the triggers page the list.
+            # The bumpers are the tabs.
             page.evaluate("()=>window.__events.length=0")
             page.evaluate("()=>window.__press(5)")
             _tick(page, 2400)
@@ -363,13 +363,36 @@ def test_the_pad_changes_values_pages_and_tabs():
             assert page.evaluate(
                 "()=>document.querySelector('nav button.active').dataset.tab") == "two"
 
-            page.evaluate("()=>window.__events.length=0")
+            # The triggers step the subtabs; R3 goes to the pagination bar,
+            # where A turns the page.
+            page.evaluate("""()=>{
+              window.__events.length=0;
+              const U=LexeditorUI;let active='a';
+              const draw=()=>U.subtabBar({active,tabs:[{id:'a',label:'A'},{id:'b',label:'B'}],
+                change:id=>{active=id;window.__events.push('subtab:'+id);
+                  document.querySelector('.lex-subtab-bar').replaceWith(draw());}});
+              document.querySelector('.lex-panel').prepend(draw());
+            }""")
             page.evaluate("()=>window.__press(7)")
             _tick(page, 2600)
+            page.evaluate("()=>window.__press(7,false)")
+            _tick(page, 2650)
+            assert page.evaluate("()=>window.__events") == ["subtab:b"], \
+                page.evaluate("()=>window.__events")
+            assert page.evaluate(
+                "()=>document.activeElement.matches('.lex-subtab-button.active')")
+            page.evaluate("()=>{window.__events.length=0;window.__press(11)}")
+            _tick(page, 2660)
+            page.evaluate("()=>window.__press(11,false)")
+            _tick(page, 2670)
+            assert page.evaluate("()=>!!document.activeElement.closest('.lex-pager')")
+            page.evaluate("""()=>{LexeditorUI.gamepadNavigation.setPadFocus(
+              document.querySelector('.lex-pager button[title="Next page"]'));window.__press(0)}""")
+            _tick(page, 2680)
+            page.evaluate("()=>window.__press(0,false)")
+            _tick(page, 2700)
             assert page.evaluate("()=>window.__events") == ["next-page"], \
                 page.evaluate("()=>window.__events")
-            page.evaluate("()=>window.__press(7,false)")
-            _tick(page, 2700)
 
             # The left stick walks the same way the d-pad does.
             page.evaluate("""()=>{
@@ -379,6 +402,105 @@ def test_the_pad_changes_values_pages_and_tabs():
             }""")
             _tick(page, 2800)
             assert _focused(page) != "first-action", _focused(page)
+        finally:
+            browser.close()
+
+
+PANES = """
+<header class="lex-shell-header">
+  <div class="lex-shell-command-row">
+    <button type="button" id="brand">LEXEDITOR</button>
+    <select id="mod" aria-label="Mod"><option>Vanilla</option><option>Mine</option></select>
+    <button type="button" id="save">Save</button>
+  </div>
+  <nav><button type="button" data-tab="one" class="active">One</button>
+       <button type="button" data-tab="two">Two</button></nav>
+</header>
+<main class="lex-panel-layout">
+  <section class="lex-panel-layout-pane" id="left">
+    <button type="button" id="left-a">Left A</button>
+    <button type="button" id="left-b">Left B</button>
+  </section>
+  <section class="lex-panel-layout-pane" id="right">
+    <button type="button" id="right-a">Right A</button>
+    <button type="button" id="right-b">Right B</button>
+  </section>
+</main>
+<div class="lex-pager"><button type="button" title="Previous page">&lt;</button>
+  <button type="button" title="Next page">&gt;</button></div>
+"""
+
+
+def test_sticks_move_within_and_between_panels_and_the_clicks_reach_the_bars():
+    """Issue: "pressing right on the brand button goes down to a column header".
+
+    The left stick stays in its region; the right stick changes panel; L3 and
+    R3 are the menu and pagination bars, where left and right walk buttons.
+    """
+    with sync_playwright() as play:
+        browser = play.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={"width": 1100, "height": 700})
+            page.route("http://fixture/**", lambda route: route.fulfill(body=PANES, content_type="text/html"))
+            page.goto("http://fixture/")
+            page.add_style_tag(path=str(ROOT / "ui/framework.css"))
+            page.add_style_tag(content="""
+              body{margin:0;font:14px sans-serif}
+              .lex-shell-command-row,nav,.lex-pager{display:flex;gap:6px;padding:4px}
+              main{display:flex;gap:20px;height:400px}
+              .lex-panel-layout-pane{display:flex;flex-direction:column;gap:8px;width:300px}
+            """)
+            page.add_script_tag(path=str(ROOT / "ui/framework.js"))
+            page.evaluate("""()=>{
+              window.__pad = {index:0, id:'fixture pad', connected:true, mapping:'standard',
+                axes:[0,0,0,0], buttons:Array.from({length:17},()=>({pressed:false,value:0}))};
+              window.__press = (index,down=true)=>{window.__pad.buttons[index].pressed=down;
+                window.__pad.buttons[index].value=down?1:0;};
+              window.__axes = (...values)=>{window.__pad.axes=values;};
+              const pad=LexeditorUI.gamepadNavigation;
+              pad.setPadSource(()=>[window.__pad]);
+              pad.uninstall();
+            }""")
+            clock = iter(range(0, 100000, 50))
+
+            def tap(script, release):
+                page.evaluate(script)
+                _tick(page, next(clock))
+                page.evaluate(release)
+                _tick(page, next(clock))
+
+            def button(index):
+                tap(f"()=>window.__press({index})", f"()=>window.__press({index},false)")
+
+            def stick(*axes):
+                tap(f"()=>window.__axes({','.join(map(str, axes))})", "()=>window.__axes(0,0,0,0)")
+
+            # The first step lands in the first panel, not on the brand button.
+            button(13)
+            assert _focused(page) == "left-a", _focused(page)
+            # Right with the left stick stays in that panel.
+            stick(1, 0, 0, 0)
+            assert _focused(page) == "left-a", _focused(page)
+            stick(0, 1, 0, 0)
+            assert _focused(page) == "left-b", _focused(page)
+            # The right stick changes panel, and coming back returns to the
+            # control the player left.
+            stick(0, 0, 1, 0)
+            assert _focused(page) == "right-a", _focused(page)
+            stick(0, 0, -1, 0)
+            assert _focused(page) == "left-b", _focused(page)
+            # L3 is the menu bar; left and right walk it without touching the
+            # mod selector's value.
+            button(10)
+            assert _focused(page) == "brand", _focused(page)
+            button(15)
+            assert _focused(page) == "mod", _focused(page)
+            button(15)
+            assert _focused(page) == "save", _focused(page)
+            assert page.locator("#mod").input_value() == "Vanilla"
+            # R3 is the pagination bar.
+            button(11)
+            assert page.evaluate("()=>!!document.activeElement.closest('.lex-pager')")
         finally:
             browser.close()
 
