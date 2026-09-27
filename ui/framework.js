@@ -8460,7 +8460,10 @@ ${contents.path}`});
     if (!searcher || searcher.type !== String(options.type || "record")) return node;
     node.classList.add("lex-search-candidate");
     node.style.setProperty("--lex-search-hold", `${searcher.holdMs}ms`);
-    let timer = 0;
+    // A hold picks the candidate; a plain click does what it always does -
+    // select the row and show it in the detail panel - so the player can look
+    // inside a candidate before choosing it (Lexer, FF8 encounter groups).
+    let timer = 0, held = false;
     const cancel = () => {
       clearTimeout(timer); timer = 0; node.classList.remove("selecting");
     };
@@ -8471,6 +8474,7 @@ ${contents.path}`});
       node.classList.add("selecting");
       timer = setTimeout(() => {
         timer = 0;
+        held = true;
         node.classList.remove("selecting");
         if (activeSearcher !== searcher || !searcher.atTarget) return;
         const accept = searcher.accept;
@@ -8480,7 +8484,12 @@ ${contents.path}`});
       }, searcher.holdMs);
     });
     for (const type of ["pointerup", "pointercancel", "pointerleave"]) node.addEventListener(type, cancel);
-    node.addEventListener("click", event => { event.preventDefault(); event.stopImmediatePropagation(); }, true);
+    node.addEventListener("click", event => {
+      if (!held) return;
+      held = false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
     return node;
   };
 

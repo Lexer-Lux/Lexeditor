@@ -69,3 +69,29 @@ def test_searcher_locks_candidate_edits_through_rerender_and_restores_them(page)
     assert page.evaluate('accepted')==[7]
     assert page.locator('.lex-detail-field').evaluate_all('nodes=>nodes.map(n=>n.inert)')==[False,True]
     assert not page.locator('.lex-detail-panel-actions').evaluate('n=>n.inert')
+
+
+def test_a_short_click_shows_a_candidate_and_a_hold_picks_it(page):
+    """Lexer: in the finder he could hold a group to pick it, but a click did
+    nothing, so he could not look inside a group before choosing it."""
+    framework(page)
+    mount_shell(page)
+    page.evaluate('''()=>{
+      const U=LexeditorUI;window.accepted=[];window.shown=[];
+      window.showCandidates=()=>{
+        const candidate=U.decorateSearchCandidate(U.el('button',{onclick:()=>shown.push(7)},'Candidate'),{type:'groups',value:7});
+        document.querySelector('main').replaceChildren(candidate);
+      };
+      U.beginSearcher({type:'groups',holdMs:200,target:showCandidates,origin:()=>{},accept:v=>accepted.push(v)});
+    }''')
+    candidate = page.get_by_role('button', name='Candidate', exact=True)
+    candidate.click()
+    assert page.evaluate('shown') == [7]
+    assert page.evaluate('accepted') == []
+    assert page.locator('.lex-searcher-bar').count() == 1
+    candidate.hover()
+    page.mouse.down()
+    page.wait_for_function('accepted.length===1')
+    page.mouse.up()
+    assert page.evaluate('accepted') == [7]
+    assert page.evaluate('shown') == [7]
