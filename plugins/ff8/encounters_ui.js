@@ -151,10 +151,8 @@
     const grounds=axis(rules.map(rule=>Number(rule.groundId)),1);
     const rows=regions.map(regionId=>({id:regionId,regionId}));
     const columns=[{key:"regionId",label:"REGION",numberedId:true,sortable:false,
-      help:"Region code of the world-map cell the player is standing in. Regions are set on the World tab.",
       render:row=>row.regionId},
       ...grounds.map(ground=>({key:`ground:${ground}`,label:String(ground),sortable:false,align:"center",
-        help:`Terrain code ${ground}. The cell below holds the encounter group the game uses for this region and this ground.`,
         render:row=>encounterRuleCell(row.regionId,ground,cells,reachable,refresh)}))];
     const template=`84px repeat(${Math.max(1,grounds.length)},minmax(46px,1fr))`;
     return {table:columnList({rows,key:row=>row.id,columns,localSort:false,template,
@@ -293,7 +291,7 @@
   }
   const encounterTabs=[
     {id:"formations",label:"Formations",help:"Every battle formation in scene.out: which enemies stand in which of the eight slots, the level they fight at, and the stage and cameras the battle uses."},
-    {id:"rules",label:"Rules",help:"The world-map lookup: a region code and a ground code together choose one encounter group. Edit the group number in a cell to change which battles happen on that terrain. The file holds a fixed number of rules, so a pair with no rule cannot be given one here."},
+    {id:"rules",label:"Rules",help:"Rows are world-map region codes, and numbered columns are terrain codes. Each cell holds the encounter group used for that region and terrain. Edit the group number to change which battles happen there. Region codes are set on the World tab. The game has a fixed set of rules. A region and terrain pair with no rule cannot be given one here."},
     {id:"groups",label:"Groups",help:"An encounter group holds eight battle formations; the game picks one of them when a world-map battle starts. Rules choose the group, this page chooses its battles."}];
   function renderEncounters(){
     if(!encounterTabs.some(tab=>tab.id===state.encountersTab))state.encountersTab="formations";
