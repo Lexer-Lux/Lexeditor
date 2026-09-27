@@ -483,8 +483,9 @@
       readout:point=>{
         const cell=segments[point.row*32+point.column];
         if(!cell)return "";
-        return `cell ${cell.id} (${point.column}, ${point.row}) · region `
-          +`${worldRow(state.data,"region",cell.id)?.regionId??"?"} · group ${cell.groupId}`;},
+        // Just where the pointer is (Lexer: "should just be (x, y). KISS"); the
+        // cell's region and geometry are on its panel.
+        return `(${point.column}, ${point.row})`;},
       select:id=>{state.worldMapPoint=null;state.worldMapSky=null;state.selected.world=id;rerenderWorldMap()}});
     worldMapNavigation(map,map.lexStage);
     return LexeditorUI.panelLayout([detailPanel({heading:false,className:"ff8-world-map-panel",body:map}),
