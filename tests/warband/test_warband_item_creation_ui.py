@@ -2,6 +2,7 @@
 from pathlib import Path
 import os
 import sys
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -9,13 +10,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(ROOT / "tests/shared"))
 from test_shared_ui_feedback import page, framework
 from test_warband_items_editor import SOURCE
+from test_warband_troop_editor import SOURCE as TROOP_SOURCE
 from plugins.warband import server
 
 
-def test_item_creation_from_shared_add(page, tmp_path, monkeypatch):
+@pytest.mark.parametrize('kind',['item','troop'])
+def test_item_creation_from_shared_add(page, tmp_path, monkeypatch,kind):
     monkeypatch.setattr(server, "MODULE_SYSTEM", tmp_path)
-    source = tmp_path / "module_items.py"
-    source.write_text(SOURCE, encoding="utf-8")
+    view=kind+'s'
+    source = tmp_path / f"module_{view}.py"
+    source.write_text(SOURCE if kind=='item' else TROOP_SOURCE, encoding="utf-8")
+    read_data=lambda:server.item_data() if kind=='item' else server.troop_data(tmp_path)
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     builds = []
@@ -28,6 +33,11 @@ def test_item_creation_from_shared_add(page, tmp_path, monkeypatch):
                 result = server.create_item(body["recordIndex"], body["originalId"], body["id"], body["name"], body["sha256"])
             elif path == "/api/items":
                 result = server.item_data()
+            elif path == '/api/troops/create':
+                body=route.request.post_data_json
+                result=server.create_troop(tmp_path,body['sha256'],body['recordIndex'],body['originalId'],body['id'],body['name'],body['plural'])
+            elif path == '/api/troops':
+                result=server.troop_data(tmp_path)
             elif path == "/api/build/start":
                 builds.append(True)
                 result = {"started": True}
@@ -45,25 +55,28 @@ def test_item_creation_from_shared_add(page, tmp_path, monkeypatch):
     page.evaluate("document.body.prepend(Object.assign(document.createElement('div'),{id:'toolbar'}))")
     page.add_script_tag(path=str(ROOT / "plugins/warband/field_controls.js"))
     page.add_script_tag(path=str(ROOT / "plugins/warband/editor.js"))
+    page.add_script_tag(path=str(ROOT / "plugins/warband/troop_editor.js"))
     page.add_script_tag(content="const shell={refresh(){},history:{clear(){}}};")
-    page.evaluate("data=>{state.items=data;state.booting=false;renderItems();}", server.item_data())
+    page.evaluate("({data,view})=>{state[view]=data;state.tab=view;state.booting=false;render();}", {'data':read_data(),'view':view})
     page.locator(".lex-table-add").click(force=True)
-    page.get_by_label("New item ID", exact=True).fill("new_sword")
-    page.get_by_label("New item name", exact=True).fill("New Sword")
-    page.get_by_label("Copy from item", exact=True).select_option("0")
+    page.get_by_label(f"New {kind} ID", exact=True).fill("new_copy")
+    page.get_by_label(f"New {kind} name", exact=True).fill("New Copy")
+    page.get_by_label(f"Copy from {kind}", exact=True).select_option("0")
+    if kind=='troop':page.get_by_label('New troop plural name',exact=True).fill('New Copies')
     destination = os.environ.get("LEXEDITOR_UI_SCREENSHOT_DIR")
     if destination:
         Path(destination).mkdir(parents=True, exist_ok=True)
-        page.screenshot(path=str(Path(destination) / "warband-create-item.png"))
+        page.screenshot(path=str(Path(destination) / f"warband-create-{kind}.png"))
     page.get_by_role("button", name="Create and build", exact=True).click()
     page.wait_for_function("state.status === 'Saved and build verified'")
     assert builds == [True]
-    assert server.item_rows()[-1]["id"] == "new_sword"
-    assert page.evaluate("state.selectedItem") == "2"
-    assert page.evaluate("state.items.rows.at(-1).name") == "New Sword"
+    created=next(row for row in read_data()['rows'] if row['id']=='new_copy')
+    assert created['name']=='New Copy'
+    selected='selectedItem' if kind=='item' else 'selectedTroop'
+    assert page.evaluate('key=>state[key]',selected)==str(created['recordIndex'])
     assert not errors, errors
     # Reload from disk, then verify pending edits disable creation.
-    page.evaluate("async()=>{state.items=await api('/api/items');renderItems();}")
-    assert page.locator(".warband-record-list").get_by_text("New Sword", exact=True).count() == 1
-    page.evaluate("state.itemEdits={'0':{fields:{value:'123'}}};renderItems()")
+    page.evaluate("async view=>{state[view]=await api('/api/'+view);render();}",view)
+    assert page.locator(".warband-record-list").get_by_text("New Copy", exact=True).count() == 1
+    page.evaluate("state.itemEdits={'0':{fields:{value:'123'}}};render()")
     assert page.locator(".lex-table-add").get_attribute("aria-disabled") == "true"

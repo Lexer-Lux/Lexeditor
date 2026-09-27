@@ -18,7 +18,7 @@ from . import paths
 from .item_icons import CACHE as ICON_CACHE
 from .catalog import DATA_CATALOG
 from .dump_infopages import parse_info_pages
-from .troop_editor import troop_data, save_troops
+from .troop_editor import create_troop, troop_data, save_troops
 from .module_records import (PROMOTED_TABS, SCHEMAS as MODULE_RECORD_SCHEMAS, SCHEMA_BY_FILENAME,
                              _single_bits, create_sound, dataset_data, header_constants, mesh_choices, save_dataset)
 from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
@@ -831,6 +831,9 @@ class Handler(PluginRequestHandler):
                 self.json_response(save_settings(body.get("edits", [])))
             elif path == "/api/troops/save":
                 self.json_response(save_troops(MODULE_SYSTEM, body.get("sha256", ""), body.get("edits", [])))
+            elif path == "/api/troops/create":
+                self.json_response(create_troop(MODULE_SYSTEM, body.get("sha256", ""), body.get("recordIndex"),
+                                                body.get("originalId"), body.get("id"), body.get("name"), body.get("plural")))
             elif path == "/api/items/save":
                 self.json_response(save_item_edits(body.get("edits", []), body.get("sha256", "")))
             elif path == "/api/items/create":

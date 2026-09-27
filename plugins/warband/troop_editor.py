@@ -208,6 +208,48 @@ def troop_data(root):
             'types':{k:v for k,v in symbols.items() if k.startswith('tf_') and 0<=v<16}}
 
 
+def create_troop(root, expected, record_index, original_id, new_id, name, plural):
+    from .module_records import _source as read_source, _record_spans, _write_candidate
+    if type(record_index) is not int:
+        raise ValueError('Choose an existing troop')
+    if not isinstance(new_id,str) or not re.fullmatch(r'[a-z][a-z0-9_]*',new_id):
+        raise ValueError('ID must start with a lowercase letter and use letters, digits or underscores')
+    for value in (name,plural):
+        if not isinstance(value,str) or not value.strip() or any(ord(char)<32 for char in value):
+            raise ValueError('Troop names must be nonempty and contain no control characters')
+    path=Path(root)/'module_troops.py'
+    with _LOCK:
+        text,encoding,raw=read_source(path)
+        if hashlib.sha256(raw).hexdigest()!=expected:
+            raise ValueError('Troop source changed; reload before creating')
+        records=_records(text)
+        if any(row.get('problem') for row in records):
+            raise ValueError('Repair malformed troop records before creating')
+        row=next((row for row in records if row['recordIndex']==record_index),None)
+        if row is None or row['id']!=original_id or row['status']=='CUT':
+            raise ValueError('Choose an active template troop and reload if its source changed')
+        if any(row['id']==new_id for row in records):
+            raise ValueError('A troop with that ID already exists, including cut records')
+        spans=_record_spans(text,'troops')
+        active_records=[r for r in records if r['status']!='CUT']
+        if len(spans)!=len(active_records) or len({r['id'] for r in active_records})!=len(active_records):
+            raise ValueError('Repair unsupported or duplicate active troop records before creating')
+        start,end=next((a,b) for a,b in spans if a<=row['_spans'][0][0]<b)
+        copied=text[start:end]
+        for (a,b),value in reversed(list(zip(row['_spans'][:3],(new_id,name,plural)))):
+            copied=copied[:a-start]+json.dumps(value,ensure_ascii=False)+copied[b-start:]
+        insertion=spans[-1][1]
+        newline='\r\n' if '\r\n' in text else '\n'
+        candidate=text[:insertion]+','+newline+' '+copied+text[insertion:]
+        reparsed=_records(candidate)
+        active=lambda rows:[r['id'] for r in rows if r['status']!='CUT']
+        if active(reparsed)!=active(records)+[new_id]:
+            raise ValueError('Creation changed existing troop IDs')
+        result=_write_candidate(path,candidate,encoding,raw)
+        created=next(r for r in reparsed if r['id']==new_id)
+        return {**result,'created':new_id,'recordIndex':created['recordIndex']}
+
+
 def save_troops(root,expected,edits):
     root=Path(root);path=root/'module_troops.py'
     with _LOCK:
