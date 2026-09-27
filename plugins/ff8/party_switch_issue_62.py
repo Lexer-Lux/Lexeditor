@@ -4,6 +4,9 @@ from __future__ import annotations
 
 
 DEFAULT_PARTY_SWITCH = False
+# Look Left (L1) opens the selector; the driver tests `edge&4` on the battle
+# block's held word (ffnx_party_switch/ffnx-src/lexeditor_ff8_party_switch.cpp).
+PARTY_SWITCH_INPUT_MASK = 0x04
 PARTY_SWITCH_AVAILABLE = True
 
 SUPPORTED_EXE_SHA256 = (

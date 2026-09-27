@@ -109,10 +109,19 @@ int translate_battle_keys(int keyscan, int channel) {
     if (!lexeditor_ff8_modern_controls_battle_active()) return bits;
     read_battle_buttons();
     const bool fire_edge = buttons_now.fire && !buttons_before.fire;
-    // The right trigger is also FF8's R2. Alone, that is half a flee and
-    // nothing else, so it is withheld while the trigger means "fire".
-    if (buttons_now.fire && !buttons_now.flee) bits &= ~kR2Function;
-    if (channel == 0 ? buttons_now.fire : fire_edge) bits |= kR1Function;
+    // Shot fires on R2 (the right trigger) and only while Shot is open. FF8's
+    // own fire button is R1, so during Shot the trigger is handed over as R1
+    // and the real R1 is withheld. Outside Shot the trigger stays plain R2:
+    // turning it into R1 for the whole battle made it open Universal Item's
+    // Item menu, which is R1's job.
+    const shot_open = *reinterpret_cast<const std::uintptr_t *>(kShotWidgetUpdate) == kShotUpdate;
+    if (shot_open) {
+        bits &= ~kR1Function;
+        // Alone, the trigger is half a flee and nothing else, so it is
+        // withheld while it means "fire".
+        if (buttons_now.fire && !buttons_now.flee) bits &= ~kR2Function;
+        if (channel == 0 ? buttons_now.fire : fire_edge) bits |= kR1Function;
+    }
     if (channel == 0 && buttons_now.flee) bits |= kL2Function | kR2Function;
     if (channel == 0 ? buttons_now.scan : buttons_now.scan && !buttons_before.scan) bits |= kR3Function;
     if (channel == 1 && buttons_now.back && !buttons_before.back &&

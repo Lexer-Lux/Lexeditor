@@ -69,7 +69,10 @@ SCAN_LIST_BYTES = bytes((SCAN_MAGIC_ID, 1, 0x80, 0x54, 0x00))
 # FF8's layout translator 004A2D60 never produces for its own functions. The
 # Modern Controls driver sets it when the right stick is clicked in battle.
 # ECX holds [01D6D490] at the hook (loaded at 004BBDD9).
-SCAN_INPUT_TEST = bytes.fromhex("F6 41 13 04")  # test byte ptr [ecx+0x13], 0x04
+SCAN_INPUT_MASK = 0x400
+SCAN_INPUT_TEST = bytes((0xF6, 0x41, 0x13, SCAN_INPUT_MASK >> 8))  # test byte ptr [ecx+0x13], 0x04
+# Universal Item answers Look Right (R1) in the command-state byte.
+UNIVERSAL_ITEM_INPUT_MASK = 0x08
 
 ITEM_DESCRIPTOR_BYTES = bytes.fromhex("04 82 D4 00")
 SCAN_DESCRIPTOR_BYTES = bytes.fromhex("02 00 00 00")
@@ -132,7 +135,7 @@ def _command_payload(*, universal_item: bool, scanned_target_scan: bool,
     # AL nor the flags, so the replayed TEST below still drives the JE.
     code.add(COMMAND_STATE_STORE)
     if universal_item:
-        code.add(bytes.fromhex("A8 08"))
+        code.add(bytes((0xA8, UNIVERSAL_ITEM_INPUT_MASK)))
         code.branch(bytes.fromhex("0F 84"), "after_item")
         code.add(bytes.fromhex("C6 05") + descriptor_flags.to_bytes(4, "little") + b"\x00")
         code.add(bytes.fromhex("F6 05") + ITEM_DISABLED_FLAGS.to_bytes(4, "little"))
