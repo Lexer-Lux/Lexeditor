@@ -34,10 +34,8 @@ def main() -> None:
             "The Enemies detail heading still sends raw braces to the game font")
     require('className:"enemy-scan-section"' in editor and 'field:"scan_description"' in editor,
             "The Enemies detail panel does not expose and save Scan descriptions")
-    # Matched without the quote characters, and without requiring the class
-    # attribute to end there: a row is allowed to carry a second class, and the
-    # panel is allowed to be written with single quotes.
-    require("enemy-properties-section" in editor and "enemy-properties-row" in editor,
+    require("detailSection({title:'PROPERTIES'" in editor and
+            "numeric.map(field=>detailField({label:enemyPropertyLabel(field)" in editor,
             "enemy properties must use one compact shared row")
 
     from plugins.ff8 import formats, paths, scan_text
