@@ -9246,18 +9246,33 @@ ${contents.path}`});
     const suppliedAdd = bottomTools.find(control => control?.matches?.(".lex-new-button"));
     if (suppliedAdd) bottomTools.splice(bottomTools.indexOf(suppliedAdd), 1);
     const readonlySource = document.documentElement.dataset.lexProjectReadonly === "true";
+    // A slot table cannot grow, but one that knows its empty slots fills the
+    // next one: Add hands the plugin that slot (Lexer: "i distinctly remember
+    // you saying that there were empty slots for things").
+    const claimsEmpty = slotBased && Boolean(emptyRow) && typeof options.add === "function"
+      && options.addDisabled !== true;
     const pluginAdd = suppliedAdd ? !suppliedAdd.disabled
+      : claimsEmpty ? emptyCount > 0
       : !slotBased && typeof options.add === "function" && options.addDisabled !== true;
     const canAdd = pluginAdd && !readonlySource;
     const addWhy = canAdd ? "" : readonlySource
       ? "This is the game's own data, shown read-only. Create a mod to add records to it."
       : options.addDisabledReason || (suppliedAdd || options.addDisabled === true
         ? "Adding is unavailable right now."
+        : claimsEmpty
+          ? `Every slot in this table is in use, so there is no room to add ${options.noun || "records"}.`
         : slotBased
           ? `This table is a fixed set of slots in the game's data, so there is no room to add ${options.noun || "records"}.`
           : `Adding ${options.noun || "records"} to this table is not supported yet.`);
     const tableAdd = suppliedAdd || newButton({title: options.addTitle || `Add ${options.noun || "record"}`,
-      onclick: event => { event.stopPropagation(); if (canAdd) options.add(); }});
+      onclick: event => {
+        event.stopPropagation();
+        if (!canAdd) return;
+        if (!claimsEmpty) { options.add(); return; }
+        // The slot being filled must be on screen, so Hide empty lets go.
+        if (hideEmpty) saveHideEmpty(hideEmptyKey, false);
+        options.add(allRows.find(record => emptyRow(record)));
+      }});
     tableAdd.disabled = false;
     tableAdd.classList.add("lex-table-add");
     tableAdd.classList.toggle("unavailable", !canAdd);

@@ -300,8 +300,16 @@
     return showPaged("encounters",rows,[{key:"id",label:"ID",help:"scene.out record number of this battle formation. Encounter groups and field maps refer to it."},
       {key:"name",label:"Encounter",help:"The enemies switched on in this formation. Select a row to edit its slots."},
       {key:"stageId",label:"Stage",pinned:false,help:"Battle stage number used when this formation starts."}],
-      encounterDetail,"74px minmax(180px,1fr)",{defaultSplit:26,minLeft:220,minRight:600},false);
+      encounterDetail,"74px minmax(180px,1fr)",{defaultSplit:26,minLeft:220,minRight:600,
+        // A formation whose eight slots all hold enemy 0 ("Dummy") is an
+        // unused slot: none of the game's encounter groups names one. Add
+        // opens the first of them to be filled in.
+        empty:encounterFormationEmpty,
+        add:()=>{const free=state.data.encounters.rows.filter(encounterFormationEmpty).sort((a,b)=>a.id-b.id)[0];if(!free)return;
+          state.selected.encounters=free.id;state.filters.encounters="";state.pages.encounters=null;renderEncounters();shell.refresh();
+          LexeditorUI.showToast?.(`Formation ${free.id} was empty. Choose its enemies to use it.`)}},false);
   }
+  function encounterFormationEmpty(row){return (row.slots||[]).every(slot=>Number(slot.enemyId)===0)}
   const encounterTabs=[
     {id:"formations",label:"Formations",help:"Every battle formation in scene.out: which enemies stand in which of the eight slots, the level they fight at, and the stage and cameras the battle uses."},
     {id:"rules",label:"Rules",help:"Each number is the encounter group used for that region and terrain. Choose a number to change the group. A dash means no rule is stored for a pair the loaded map does not use. A dot means the map has that ground in that region but no rule is stored, so no random battle starts there; the shipped game leaves many such pairs. Without map data, a dash means the pair's use is unknown. Cells without rules are read-only because this editor can change stored rules but cannot add them."},

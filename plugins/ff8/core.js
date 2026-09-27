@@ -113,7 +113,7 @@
     weapons:"Weapons are a fixed table in the game's data, one entry per upgrade the menus know; a new weapon has no slot and no menu to appear in.",
     shops:"Each shop is a fixed slot the game's shops read by number; a new shop has no place to be opened from.",
     cards:"Triple Triad's cards are a fixed set the game reads by card number; a new card has no slot.",
-    encounters:"Encounters are a fixed table the game reads by encounter number; a new one has no slot for the world or a field to point at.",
+    encounters:"Every one of scene.out's formation slots holds a formation; the game reads them by number, so there is no room for another.",
     refine:"Refine abilities read a fixed table of recipes; a new recipe has no slot.",
     enemies:"Each enemy is its own battle file the game looks up by number. Adding one needs a new file and an encounter that uses it, which Lexeditor does not do yet.",
     fields:"Field maps are reached by fixed numbers from the game's scripts; a new map would need new archive and script entries, which Lexeditor does not do yet.",
@@ -140,7 +140,7 @@
     });
     const normalized=[...columns,...flagColumns].map(column=>({...column,sortable:true,numberedId:column.numberedId??column.key==="id"}));
     const prefs=state.columnPrefs[view]||=columnPreferences(`ff8-${view}`,normalized,()=>render());
-    const root=pagedListDetail({bulkChanged:()=>shell.refresh(),modOnly:modOnlySpec(view),rows,key:row=>row.id,slots:true,addDisabledReason:layout.addReason||addReasonFor(view),page:state.pages[view],pageSize:state.pageSizes[view],selected:state.selected[view],noun,splitKey:`ff8-${view}`,defaultSplit:layout.defaultSplit??42,minLeft:layout.minLeft??340,minRight:layout.minRight??420,maxBarrels:layout.maxBarrels,leadingPanel:layout.leadingPanel,minLeading:layout.minLeading,defaultLeadingWidth:layout.defaultLeadingWidth,trailingPanel:layout.trailingPanel,minTrailing:layout.minTrailing,panelSizes:layout.panelSizes,
+    const root=pagedListDetail({bulkChanged:()=>shell.refresh(),modOnly:modOnlySpec(view),rows,key:row=>row.id,slots:true,empty:layout.empty,add:layout.add,addDisabledReason:layout.addReason||addReasonFor(view),page:state.pages[view],pageSize:state.pageSizes[view],selected:state.selected[view],noun,splitKey:`ff8-${view}`,defaultSplit:layout.defaultSplit??42,minLeft:layout.minLeft??340,minRight:layout.minRight??420,maxBarrels:layout.maxBarrels,leadingPanel:layout.leadingPanel,minLeading:layout.minLeading,defaultLeadingWidth:layout.defaultLeadingWidth,trailingPanel:layout.trailingPanel,minTrailing:layout.minTrailing,panelSizes:layout.panelSizes,
       search:{key:`ff8-${view}`,value:state.filters[view],delay:110,placeholder:`Search ${noun.toLocaleLowerCase()}…`,label:`Search ${noun}`,change:value=>{state.filters[view]=value;state.pages[view]=0;render()}},
       sync:value=>{state.pages[view]=value.page;state.pageSizes[view]=value.pageSize;state.selected[view]=value.selected},
       change:async value=>{if(view==="enemies"&&!(await enemyAiBeforeLeave()))return;state.pages[view]=value.page;state.pageSizes[view]=value.pageSize;state.selected[view]=value.selected;render()},
