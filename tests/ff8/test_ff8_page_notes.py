@@ -35,9 +35,11 @@ ALLOWED = {
     "`Could not load opponent: ${map._error}`)",
     "`No other CARDGAME call in the game data names deck ${deck}.`)",
     "'No players match this search.')",
+    "'No decks match this search.')",
     '"Enable GF Spellbooks on the Tweaks page.")',
     '"GF Spellbooks needs Monogamy on and Shared Party Magic Inventory off.',
     "error.message)",
+    "data.error)",  # FF8_EN.exe missing or an unknown build: draw point magic cannot be read
     "'No initial state for this GF.')",
     "'This enemy has no battle-script section.')",
     '"This enemy has no battle-script section.")',

@@ -11,7 +11,7 @@
 
   async function api(path,options){const response=await fetch(path,options);const data=await response.json();if(!response.ok)throw new Error(data.error||`HTTP ${response.status}`);return data;}
   function signature(value){return JSON.stringify(value)}
-  const editableDatasets=["battleItems","ammoEffects","cards","items","menuItems","shops","weapons","magic","gfs","characters","abilityJunction","abilityCommand","abilityStat","abilityCharacter","abilityParty","abilityGf","abilityMenu","text","names","wm2field","enemies","enemyTables","enemyAi","enemyBattleText","refine","encounters","world","fields","sfx","models","textures"];
+  const editableDatasets=["battleItems","ammoEffects","cards","items","menuItems","shops","weapons","magic","gfs","characters","abilityJunction","abilityCommand","abilityStat","abilityCharacter","abilityParty","abilityGf","abilityMenu","text","names","wm2field","enemies","enemyTables","enemyAi","enemyBattleText","refine","encounters","world","fields","sfx","models","textures","drawPointData"];
   const platformFields=config=>Object.fromEntries((config?.sections||[]).flatMap(section=>section.fields).map(field=>[field.id,field.value]));
   function platformChanges(){const current=platformFields(state.platformConfig),saved=platformFields(state.savedPlatformConfig),changes={};for(const [id,value] of Object.entries(current))if(signature(value)!==signature(saved[id]))changes[id]=value;return changes}
   // "Mod contents only" keeps the rows this project has actually changed.

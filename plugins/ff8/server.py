@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from . import assets, card_art, cards, editor_settings, field_data, featured_mods, formats, gameplay_settings, paths, runtime_layout, world_geometry, world_map, world_textures
 from . import world_preview
+from . import draw_point_data
 from . import model_geometry
 from .game_icons import icon_path, portrait_path
 from .extractor import baseline_ready, manifest_path
@@ -227,6 +228,8 @@ class Handler(PluginRequestHandler):
                 self.json_response(formats.namedic_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/wm2field":
                 self.json_response(formats.wm2field_rows(query.get("dataset", ["current"])[0]))
+            elif path == "/api/draw-point-data":
+                self.json_response(draw_point_data.rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/archives":
                 self.json_response(formats.archive_rows())
             elif path == "/api/archive":
@@ -355,6 +358,8 @@ class Handler(PluginRequestHandler):
                 self.json_response(formats.save_namedic(body.get("edits", [])))
             elif path == "/api/wm2field/save":
                 self.json_response(formats.save_wm2field(body.get("edits", [])))
+            elif path == "/api/draw-point-data/save":
+                self.json_response(draw_point_data.save(body.get("edits", [])))
             elif path == "/api/archive/extract":
                 self.json_response(formats.extract_archive_entry(
                     str(body.get("name", "")), int(body.get("index", -1))))

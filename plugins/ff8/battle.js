@@ -240,6 +240,32 @@
     worldMapNavigation(map,map.lexStage);
     return map;
   }
+  function worldDrawPointGives(row){
+    const data=state.data.drawPointData;
+    if(data?.error)return detailSection({title:"WHAT IT GIVES",body:[LexeditorUI.detailNote(data.error)]});
+    const entry=data?.rows?.find(value=>value.id===row.drawId);
+    if(!entry)return null;
+    const vanilla=state.vanilla?.drawPointData?.rows?.find(value=>value.id===row.drawId);
+    const refs=key=>state.references.map(reference=>({name:reference.name,shortName:reference.shortName,
+      value:state.referenceData[reference.id]?.drawPointData?.rows?.find(value=>value.id===row.drawId)?.[key]})).filter(value=>value.value!==undefined);
+    const editable=state.activeSource==='mine'&&document.documentElement.dataset.lexProjectReadonly!=='true';
+    const changed=()=>{rerenderWorldMap();shell.refresh()};
+    const magicName=id=>state.data.magic.rows.find(value=>Number(value.id)===Number(id))?.name||`Magic ${id}`;
+    const spell=magicSearchControl(entry.magicId,`Choose the magic Draw Point ${row.drawId} gives.`,
+      value=>{entry.magicId=Number(value);changed()},()=>{state.worldTab="drawPoints";state.selected.world=row.id;navigate("world")});
+    if(!editable)spell.querySelectorAll('button').forEach(node=>{if(!node.classList.contains('lex-hoverable'))node.disabled=true});
+    const flag=(key,label)=>{
+      const box=el("input",{type:"checkbox",checked:!!entry[key],disabled:!editable,"aria-label":`Draw Point ${row.drawId} ${label}`,
+        onchange:event=>{entry[key]=event.target.checked;changed()}});
+      return sourceControl(box,()=>entry[key],vanilla?.[key],refs(key),value=>{entry[key]=!!value;changed()},LexeditorUI.booleanMark);
+    };
+    return detailSection({title:"WHAT IT GIVES",
+      help:infoHelp("The magic this draw point gives, whether it fills again after it is drawn, and whether it gives a high yield. The game keeps these in FF8_EN.exe; Lexeditor changes them with a Hext patch in the mod and never writes the executable. A high yield gives about twice as much; the game stores no other amount."),
+      body:[detailField({label:"MAGIC",
+          control:sourceControl(spell,()=>entry.magicId,vanilla?.magicId,refs("magicId"),value=>{entry.magicId=Number(value);changed()},magicName)}),
+        detailField({label:"REFILL",help:infoHelp("On: the point stocks up again some time after it is drawn. Off: once drawn, it stays empty."),control:flag("refill","refill")}),
+        detailField({label:"HIGH YIELD",help:infoHelp("On: each draw gives more of the spell."),control:flag("highYield","high yield")})]});
+  }
   function worldDrawPointDetail(row,prefs,titleContent=null){
     const editable=()=>state.activeSource==='mine'&&document.documentElement.dataset.lexProjectReadonly!=='true';
     const fields=refresh=>[['x','X'],['y','Y'],['subId','SUB-ID']].map(([key,label])=>{
@@ -271,8 +297,12 @@
           ?`Click the map to place Draw Point ${row.drawId}, or edit its position on the right.`
           :'This source is read-only. Select an editable mod to move this draw point.'})});},true);
 
+    // What it gives lives in the executable's draw point table, one byte per
+    // draw ID, and is edited through the project's Hext patch (Lexer: "edit
+    // the amount and spell on the draw points ... some hext editing").
+    const gives=worldDrawPointGives(row);
     // The list shows the draw point's own draw ID, so the panel does too.
-    return sharedDetail({...row,id:row.drawId,name:`DRAW POINT ${row.drawId}`,...(titleContent?{titleContent}:{})},prefs,[detailSection({className:"world-draw-position",help:infoHelp("Section 34 stores only this world Draw Point's X, Y, and sub-ID bytes. Its magic, quantity, and refill behavior live in FF8_EN.exe and are not invented here."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},...fields())],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
+    return sharedDetail({...row,id:row.drawId,name:`DRAW POINT ${row.drawId}`,...(titleContent?{titleContent}:{})},prefs,[...(gives?[gives]:[]),detailSection({className:"world-draw-position",help:infoHelp("Where the player finds this draw point on the world map. Moving it into another block changes which draw point the game finds there."),body:[LexeditorUI.tileGrid([map,LexeditorUI.stack({fill:false},...fields())],{columns:2,minWidth:300})]})],"world-map-detail world-draw-point");
   }
   function worldFieldReturnDetail(row,prefs){
     const editable=()=>state.activeSource==='mine'&&document.documentElement.dataset.lexProjectReadonly!=='true';
@@ -595,7 +625,7 @@
       {noun:"world to field entries"},false);
   }
   function renderWorldMapContent(mount=true){
-    const tabsData=[{id:"map",label:"Map",help:"The world map, and nothing else on the panel. Regions colours each cell by its region, so cells of one colour share encounter rules. Terrain draws the map from the world's own terrain and textures instead of the game's small map; the first time takes a few seconds. Click a cell to inspect its terrain geometry and its region, or a red dot to inspect a draw point; the corner shows what the pointer is over. Each panel's title opens the page that owns it. Scroll to zoom, drag with the middle mouse button to pan, and double-click to fit the map."},{id:"regions",label:"Cells",help:"Every cell of the world map and the region it belongs to. The Encounters tab matches the region with the ground type to choose a battle group, so changing a cell's region can change which battles occur there."},{id:"groundTypes",label:"Ground Types",help:"Every terrain code the world map's polygons use, where it is, and the encounter rules that start battles on it. The game stores only the number; the descriptions are Deling's notes."},{id:"fieldReturns",label:"Field → World",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"worldToField",label:"World → Field",help:"Where the player arrives in a field when they enter it from the world map: the field, and the point and walkmesh triangle they start on. The table does not store a world-map position; which entry the game uses is decided by its own code, so test a change in the game."},{id:"drawPoints",label:"Draw Points",help:"Move world draw points. Click the placement grid or edit the packed position bytes. What a draw point gives - its spell, whether it refills and whether it draws a high yield - is stored in FF8_EN.exe, not in this file, so this page changes only where the point is."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
+    const tabsData=[{id:"map",label:"Map",help:"The world map, and nothing else on the panel. Regions colours each cell by its region, so cells of one colour share encounter rules. Terrain draws the map from the world's own terrain and textures instead of the game's small map; the first time takes a few seconds. Click a cell to inspect its terrain geometry and its region, or a red dot to inspect a draw point; the corner shows what the pointer is over. Each panel's title opens the page that owns it. Scroll to zoom, drag with the middle mouse button to pan, and double-click to fit the map."},{id:"regions",label:"Cells",help:"Every cell of the world map and the region it belongs to. The Encounters tab matches the region with the ground type to choose a battle group, so changing a cell's region can change which battles occur there."},{id:"groundTypes",label:"Ground Types",help:"Every terrain code the world map's polygons use, where it is, and the encounter rules that start battles on it. The game stores only the number; the descriptions are Deling's notes."},{id:"fieldReturns",label:"Field → World",help:"Set world positions used when leaving a field location. The record index identifies a transition location, not a field map ID. Edit coordinates to move the arrival point; the unused word is preserved."},{id:"worldToField",label:"World → Field",help:"Where the player arrives in a field when they enter it from the world map: the field, and the point and walkmesh triangle they start on. The table does not store a world-map position; which entry the game uses is decided by its own code, so test a change in the game."},{id:"drawPoints",label:"Draw Points",help:"Where each world draw point is, and what it gives: its magic, whether it refills and whether it gives a high yield. Click the map to move a point. What it gives is changed through a Hext patch in the mod; the executable is never written."},{id:"skyColors",label:"Sky Colours",help:"Edit sky gradients and ambient colours at stored world positions. Each record holds two world coordinates and a fade distance, then two light colours and three fog colours. How the game chooses and blends zones is not established, so test any change in the game."},{id:"rails",label:"Train Tracks",help:"Edit the points that form a train route and select its two stop points. Coordinates move the route; stop values select points already in that route."},{id:"textures",label:"World Textures",help:"Preview or replace world texture images. Choose a palette for the preview. Export TIM to edit the texture in a compatible tool, then Replace TIM and Save. Palette selection only changes the preview."}],wrap=content=>{const tabs=subtabBar({className:"ff8-world-tabs",tabs:tabsData,active:state.worldTab,label:"World",change:value=>{state.worldTab=value;state.pages.world=0;state.selected.world=null;rerenderWorldMap()}}),root=LexeditorUI.stack(tabs,content);if(mount)$("#main").replaceChildren(root);return root};
     if(state.worldTab==="map"){const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;return wrap(renderWorldVisual())}
     if(state.worldTab==="worldToField")return wrap(renderWorldToField());
     if(state.worldTab==="groundTypes"){

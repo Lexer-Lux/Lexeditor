@@ -56,5 +56,21 @@ Two consequences a reader of the editor needs:
 (0 fully stocked, 1 partly, 2 empty but refills, 3 empty forever).
 
 There is no per-draw-point **quantity** in either table: the only amount the
-game stores is the high-yield flag. Lexeditor does not write the executable, so
-this page moves draw points and cannot change what they give.
+game stores is the high-yield flag.
+
+## Where the table is, and how Lexeditor edits it
+
+In the 2013 Steam `FF8_EN.exe` the table starts at `0x00B92328` in `.data`
+(file offset `0x792328`) and is contiguous: Draw ID `N` is at
+`0x00B92328 + N - 1`, so the world points 129-256 start at `0x00B923A8`.
+Checked 2026-09-27 against the installed executable: the 18 bytes for Draw IDs
+1-18 match the modding wiki's default list exactly (`55 44 99 9B 0D CC ...`), and
+Draw ID 1 decodes to Cure with refill, the Balamb Garden courtyard point.
+
+`plugins/ff8/draw_point_data.py` reads that table from the executable, refuses an
+executable whose first 18 bytes differ, and writes each changed byte as one Hext
+line in the project's `hext/ff8/en_nv/Lexeditor.DRAW_POINTS.txt`. That file is
+also where the current values are read back from. The executable is never
+written. The game reads the table whenever a point is drawn, so a patch applies
+to existing saves. Not yet confirmed in game: that FFNx's Hext loader writes this
+`.data` table before the first draw point is read.
