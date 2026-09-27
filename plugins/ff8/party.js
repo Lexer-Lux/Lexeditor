@@ -259,7 +259,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       const art=LexeditorUI.iconSlot({content:placeholder});
       if(id>=0&&id<110){
         const image=el('img',{src:`/assets/cards/${id}.png`,alt:name,
-          onload:()=>{placeholder.hidden=true},onerror:()=>{image.remove();placeholder.textContent='Art unavailable'}});
+          onload:()=>{placeholder.hidden=true},onerror:()=>{image.remove();placeholder.replaceWith(LexeditorUI.noImage('Art unavailable'))}});
         art.append(image);
       }
       const choose=el('button',{type:'button',disabled:state.activeSource!=='mine',
