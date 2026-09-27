@@ -188,7 +188,7 @@ def main():
         tabs = page.locator(".ff8-encounter-tabs [role=tab]")
         labels = [value.strip().title() for value in
                   tabs.locator(".lex-tab-label-text").all_inner_texts()]
-        assert labels == ["Formations", "Rules", "Groups"], labels
+        assert labels == ["Formations", "Groups", "Rules"], labels  # alphabetical
         helped = tabs.locator(".lex-info-help").count()
         assert helped == 3, f"every subtab needs its own help, found {helped}"
         assert page.locator(".lex-column-list-row").count() > 0, "Formations lost its list"
@@ -198,7 +198,7 @@ def main():
             "Formations no longer shows the eight-slot formation editor"
 
         # ---- Rules: the axes ---------------------------------------------
-        tabs.nth(1).click()
+        tabs.filter(has_text="Rules").click()
         page.wait_for_selector(".ff8-encounter-rule-table", timeout=10000)
         table = page.locator(".ff8-encounter-rule-table")
         headers = [value.strip() for value in
@@ -280,10 +280,11 @@ def main():
         # ---- Rules: what exists, what is missing, what clashes ------------
         blanks = page.locator('[data-lex-rule-cell="blank"]')
         # Two cells have nothing stored; one of them is a pair the terrain
-        # really uses, and that is the one the next line calls out.
+        # really uses, which is marked quietly (no battles start there).
         assert blanks.count() == 1, blanks.count()
-        missing = page.locator('[data-lex-rule-cell="missing"]')
-        assert missing.count() == 1, "the reachable pair with no rule is not called out"
+        missing = page.locator('[data-lex-rule-cell="no-battles"]')
+        assert missing.count() == 1, "the reachable pair with no rule is not marked"
+        assert missing.first.input_value() == "·", "a pair with no battles is not an error"
         for status in (blanks.first, missing.first):
             assert status.is_disabled()
             fit = status.evaluate("""control => {
@@ -294,7 +295,7 @@ def main():
             assert fit['width'] > .95 and fit['height'] > .95, fit
         # The shared framework moves every title onto data-lex-title and
         # aria-description, so the explanation is read from there.
-        assert "no rule is stored for it" in (missing.first.get_attribute("data-lex-title") or "")
+        assert "not an error" in (missing.first.get_attribute("data-lex-title") or "")
         clash = page.locator('[data-lex-rule-cell="clash"]')
         assert clash.count() == 1, clash.count()
         assert clash.first.locator(".ff8-encounter-rule-input").count() == 2, "both clashing rules must stay editable"
@@ -311,7 +312,7 @@ def main():
         assert rows.first.locator('[data-lex-battle-position]').count()==6
         assert rows.first.locator('.lex-record-card-title').first.inner_text()=='Caterchipillar'
         assert rows.first.locator('.lex-record-card-body').first.inner_text()=='Level 4'
-        assert ''.join(rows.first.locator('.ff8-encounter-formation-link').inner_text().split())=='#2'
+        assert ''.join(rows.first.locator('.ff8-encounter-formation-link').inner_text().split())=='Formation#2'
         assert rows.first.locator('.ff8-encounter-formation-link').evaluate("e=>getComputedStyle(e).writingMode")=='horizontal-tb'
         empty = preview.locator('[data-lex-empty-position]').first
         assert empty.locator('.lex-record-card-title').inner_text() == 'Empty'
