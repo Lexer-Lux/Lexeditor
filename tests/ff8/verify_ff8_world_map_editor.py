@@ -151,7 +151,7 @@ def verify_rendered() -> dict:
               panelHeight:panel.getBoundingClientRect().height,
             }})()""")
             assert first is not None, "Region ID is not editable"
-            assert result["tabs"] == ["Cells", "Draw Points", "Field → World", "Ground Types", "Map", "Sky Colours", "Train Tracks", "World → Field", "World Textures"], result
+            assert result["tabs"] == ["Cells", "Draw Points", "Field Returns", "Ground Types", "Map", "Sky Colours", "Train Tracks", "World → Field", "World Textures"], result
             assert result["active"] == "Cells" and result["inputs"] >= 1, result
             assert not result["overflow"] and result["panelHeight"] > 200, result
             cdp.eval("state.encountersTab='rules';navigate('encounters')")

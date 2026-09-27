@@ -109,7 +109,7 @@ def main() -> int:
               help:panel.querySelector('.lex-info-help')?.getAttribute('aria-label')||'',
               overflow:root.scrollWidth>root.clientWidth+1,
             }})()""")
-            assert rendered["active"] == "Field → World"
+            assert rendered["active"] == "Field Returns"
             assert rendered["inputs"] == ["Field return 0 X", "Field return 0 Y",
                                           "Field return 0 Z"]
             assert rendered["locked"] and "not a field ID" in rendered["help"]

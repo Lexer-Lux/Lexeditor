@@ -134,7 +134,7 @@ def main() -> int:
               text:panel.textContent,
               overflow:root.scrollWidth>root.clientWidth+1,
             }})()""")
-            assert rendered["tabs"] == ["Cells", "Draw Points", "Field → World", "Ground Types", "Map",
+            assert rendered["tabs"] == ["Cells", "Draw Points", "Field Returns", "Ground Types", "Map",
                                         "Sky Colours", "Train Tracks", "World → Field", "World Textures"]
             assert "Maps" in rendered["mainTabs"]
             assert "Field" not in rendered["mainTabs"] and "World Map" not in rendered["mainTabs"]
