@@ -6275,6 +6275,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    button sat against sixteen on its left. The label gives its inset up to the
    lane, which owns the spacing on both sides now. */
 .lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-label { padding-right:0; }
+/* The rail already separates a name from the panel edge, so the name needs
+   only a hair of its own inset: heading to name went 26px, then 22px, now 15px
+   (todo: "reduce the heading-to-property-label offset further"). */
+.lex-detail-field:not(.lex-detail-field-stacked) > .lex-detail-field-label { padding-inline-start:4px; }
 
 /* The reference row belongs UNDER the checkbox: the width of the box, no
    horizontal margin, sitting in the space between the bottom of the box and
@@ -7551,9 +7555,9 @@ html[data-lex-boolean-style="box"] .lex-boolean-field .lex-source-control > inpu
 
  transition: background-color .14s ease;
 
-  /* Just wide enough for the rotated type rail, so property names sit close
-     under their section heading. */
-  --lex-field-type-gutter:14px;
+  /* Just wide enough for the rotated type rail (its 9px text is 10px wide),
+     so property names sit close under their section heading. */
+  --lex-field-type-gutter:11px;
   padding-inline-start:var(--lex-field-type-gutter);
   padding-inline-end:0;
 
