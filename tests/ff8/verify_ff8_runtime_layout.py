@@ -10,7 +10,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from plugins.ff8 import formats, paths, runtime_layout
+from plugins.ff8 import kernel_merge, kernel_text, paths, runtime_layout
+from tests.ff8.test_ff8_kernel_text import fixture as kernel_fixture
 
 
 def main() -> int:
@@ -75,14 +76,22 @@ def main() -> int:
             "path": "direct/menu/price.bin",
             "winner": "second",
             "claimants": ["editable-mod", "second"],
+            "mode": "opaque winner",
+            "warning": "Only second's direct/menu/price.bin is used; editable-mod's changes to this file are dropped",
         }]
 
         source_direct.unlink()
         competing.unlink()
-        baseline_kernel = paths.BASELINE_ROOT / "main" / "kernel.bin"
-        if not baseline_kernel.is_file():
-            raise FileNotFoundError(f"Installed FF8 extracted baseline is missing: {baseline_kernel}")
-        vanilla_kernel = baseline_kernel.read_bytes()
+        # Keep this composition check runnable on hosted CI: the standalone
+        # kernel-merge verifier separately covers the installed retail corpus.
+        fixture, definitions = kernel_fixture()
+        payloads, _ = kernel_text._split_sections(fixture, len(definitions))
+        payloads[1] += bytes(6)
+        definitions[2].update(type="data", sub_section_size=8)
+        vanilla_kernel = kernel_merge._rebuild(payloads)
+        baseline = root / "baseline"
+        (baseline / "main").mkdir(parents=True)
+        (baseline / "main" / "kernel.bin").write_bytes(vanilla_kernel)
         section2 = int.from_bytes(vanilla_kernel[8:12], "little")
         first = bytearray(vanilla_kernel)
         second = bytearray(vanilla_kernel)
@@ -91,7 +100,7 @@ def main() -> int:
         (project / "direct" / "kernel.bin").write_bytes(first)
         (managed / "direct" / "kernel.bin").write_bytes(second)
         result = runtime_layout.compose(
-            project, active, rows, paths.BASELINE_ROOT, formats.SECTIONS)
+            project, active, rows, baseline, definitions)
         composed = (active / "direct" / "kernel.bin").read_bytes()
         composed_section2 = int.from_bytes(composed[8:12], "little")
         assert composed[composed_section2 + 4] == first[section2 + 4]
