@@ -3,14 +3,14 @@
 ## Artifact and source
 
 - FFNx base: `c056db2783f376a340fcefa6a48cc33618998876`
-- Editor build revision: `ec1b3d7468c5e5dc38fa47894b31ba2db5ff7713`
-- Actions build run: `36275033948`
+- Editor build revision: `7e44d00acd81483b82fafdfe407aef2e76aa2821`
+- Actions build run: `36279512314`
 - Supported private game SHA-256: `064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570`
 - Identity: `Lexeditor issue 51 shared magic core; base=c056db2783f376a340fcefa6a48cc33618998876; runtime=on; hooks=28`
-- Driver SHA-256: `09074b112fcec9c58e66be9f7723b044c77b7a682e27fb17e3051b8714d8283e`
+- Driver SHA-256: `544f68d96947d8eeb677c4c9ea55740aee17acdda82c80d53985dedaf3b40094`
 - Driver size: 38863360 bytes; PE32 x86 DLL
-- PDB SHA-256: `cf2272af4d78bbfec0ef063603c2b30e3f8b83d1265f7f9ab135697ad1feac7a` (build artifact, not installed)
-- Complete source patch SHA-256: `21ec3c75a5b9e9b24b9e16c190ca9ea57c5d99b0b50b5e59a2f93824dee685a6`
+- PDB SHA-256: `1b8100aa8c860d752a9320fa7644b4cc49aaf1ea1f269aa70e66143ef85d4fbc` (build artifact, not installed)
+- Complete source patch SHA-256: `e42ad5db8ceeaeb8124bb49266b993806ac8cd4420aa7bc31b6705a4b3969b86`
 - GPL licence SHA-256: `230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809`
 - Steamworks library unchanged: `abfedd473b3f4a9597bbdc90d20f4b6f696bb2ebb937a03177461df695430ad6`
 - Existing matching-base shader set retained: 163 files;
