@@ -196,3 +196,7 @@
    "Abilit") and the value takes the rest of the cell, which follows the panel
    down to a narrow window instead of holding a fixed 232px. */
 .gf-prereq-cell > .lex-detail-part:first-child{flex:none}
+/* A model thumbnail stays unseen until its snapshot is drawn: before that the
+   browser painted the image's alt text, in the accent, for a moment (Models:
+   "some weird red text that gets quickly replaced"). */
+.ff8-model-thumbnail:not([data-model-ready]){visibility:hidden}
