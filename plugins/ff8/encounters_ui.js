@@ -119,11 +119,13 @@
       const title=!known
         ? `No rule is stored for region ${regionId} with ground ${groundId}. World terrain is unavailable, so whether the map can reach this pair is unknown.`
         : onMap
-          ? `The map has terrain with region ${regionId} and ground ${groundId}, and no rule is stored for it. The game has nothing to look up there.`
+          ? `The map has terrain with region ${regionId} and ground ${groundId}, and no rule is stored for it.`
           : `No rule is stored for region ${regionId} with ground ${groundId}, and no world terrain uses that pair.`;
       // A shape the map really uses and has nothing stored for is the one that
       // needs attention; the rest are simply empty cells.
-      const blank=LexeditorUI.badge(onMap?"!":"—",{...(onMap?{tone:"warning"}:{}),title});
+      const blank=LexeditorUI.readonlyField(onMap?"!":"—",{
+        title:`${title} This cell cannot be edited because there is no stored rule.`,
+        'aria-label':`Region ${regionId} ground ${groundId}: ${onMap?'missing rule':'no rule'}`});
       blank.dataset.lexRuleCell=onMap?"missing":"blank";
       return blank;
     }
@@ -291,7 +293,7 @@
   }
   const encounterTabs=[
     {id:"formations",label:"Formations",help:"Every battle formation in scene.out: which enemies stand in which of the eight slots, the level they fight at, and the stage and cameras the battle uses."},
-    {id:"rules",label:"Rules",help:"Each cell holds the encounter group used for that region and terrain. Edit the group number to change which battles happen there. The game has a fixed set of rules. A region and terrain pair with no rule cannot be given one here."},
+    {id:"rules",label:"Rules",help:"Each number is the encounter group used for that region and terrain. Choose a number to change the group. A dash means no rule is stored for a pair the loaded map does not use. An exclamation mark means the map uses that pair but no rule is stored. Without map data, a dash means the pair's use is unknown. Cells without rules are read-only because this editor can change stored rules but cannot add them."},
     {id:"groups",label:"Groups",help:"An encounter group holds eight battle formations; the game picks one of them when a world-map battle starts. Rules choose the group, this page chooses its battles."}];
   function renderEncounters(){
     if(!encounterTabs.some(tab=>tab.id===state.encountersTab))state.encountersTab="formations";

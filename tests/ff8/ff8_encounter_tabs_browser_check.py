@@ -273,6 +273,14 @@ def main():
         assert blanks.count() == 1, blanks.count()
         missing = page.locator('[data-lex-rule-cell="missing"]')
         assert missing.count() == 1, "the reachable pair with no rule is not called out"
+        for status in (blanks.first, missing.first):
+            assert status.is_disabled()
+            fit = status.evaluate("""control => {
+                const box = control.getBoundingClientRect();
+                const cell = control.closest('.lex-column-list-cell').getBoundingClientRect();
+                return {width:box.width / cell.width, height:box.height / cell.height};
+            }""")
+            assert fit['width'] > .95 and fit['height'] > .95, fit
         # The shared framework moves every title onto data-lex-title and
         # aria-description, so the explanation is read from there.
         assert "no rule is stored for it" in (missing.first.get_attribute("data-lex-title") or "")
