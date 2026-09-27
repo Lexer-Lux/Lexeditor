@@ -43,16 +43,10 @@
   }
 
   // ---- Enemy previews ------------------------------------------------------
-  // A battle model file carries the enemy number it belongs to and its TIM
-  // images, which is the same picture the Models tab shows. There is no other
-  // rendered enemy art in the game data, so a slot with no battle texture says
-  // so instead of showing a stand-in.
-  function encounterEnemyTexture(enemyId){
-    const model=state.data.models?.rows?.find(row=>row.enemyId!=null&&Number(row.enemyId)===Number(enemyId)&&(row.tims?.length||0)>0);
+  function encounterEnemyPreview(enemyId){
+    const model=state.data.models?.rows?.find(row=>row.enemyId!=null&&Number(row.enemyId)===Number(enemyId)&&row.file);
     if(!model)return null;
-    const target=`battle/${model.file}#0`;
-    return el("img",{src:`/assets/texture.png?id=${encodeURIComponent(target)}&palette=0&dataset=${encodeURIComponent(assetDataset())}`,
-      alt:`Battle texture for ${model.name}`,loading:"lazy"});
+    return FF8ModelThumbnail({file:model.file,dataset:assetDataset(),label:model.name,revision:model.sha256});
   }
   function encounterSlotLevelText(slot){
     const rule=encounterLevelRule(slot.level);
@@ -74,7 +68,7 @@
           slot.enemyId=Number(value);slot.enemyName=next.name;slot.enabled=true;
           formation.name=encounterName(formation);shell.refresh();}})},LexeditorUI.selectionIcon());
     const card=LexeditorUI.recordCard({title:name,identity:slot.slot+1,
-      image:slot.enabled?encounterEnemyTexture(slot.enemyId):LexeditorUI.noImage('Empty slot'),
+      image:slot.enabled?encounterEnemyPreview(slot.enemyId):LexeditorUI.noImage('Empty slot'),
       body:slot.enabled?encounterSlotLevelText(slot):null,action:finder});
     card.setAttribute('aria-label',`Battle position ${slot.slot+1}`);
     card.dataset.lexBattlePosition=String(slot.slot+1);

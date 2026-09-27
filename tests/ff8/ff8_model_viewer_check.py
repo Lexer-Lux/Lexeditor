@@ -1,6 +1,7 @@
 """Installed-model browser check: both callers, rendered geometry and GLB download."""
 import sys
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[2]
@@ -49,8 +50,31 @@ def main():
             page.locator('.enemy-detail .lex-model-preview-trigger').click()
             page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'",timeout=30000)
             assert page.locator('.lex-model-stage').get_attribute('data-rendered')=='true'
+            page.locator('.enemy-detail .lex-model-preview-trigger').click()
+            thumbnail_requests=[]
+            page.on('request',lambda request:thumbnail_requests.append(request.url) if '/api/model-scene?' in request.url else None)
+            page.evaluate('''()=>{
+                const models=new Set(state.data.models.rows.filter(row=>row.enemyId!=null&&row.vertices>0).map(row=>row.enemyId));
+                const formations=new Set(state.data.encounters.rows.filter(row=>
+                    row.slots.some(slot=>slot.enabled&&models.has(slot.enemyId))).map(row=>row.id));
+                const groups=new Set(state.data.world.rows.filter(row=>row.kind==='group'&&
+                    row.encounters.some(id=>formations.has(id))).map(row=>row.id));
+                const rules=state.data.world.rows.filter(row=>row.kind==='helper'&&groups.has(row.encounterGroup));
+                const rule=rules.find(row=>row.encounterGroup===31)||rules[0];
+                if(!rule)throw Error('No world rule uses the model fixture enemy');
+                state.selected.encounterRule=rule.id;state.encountersTab='rules';navigate('encounters');
+            }''')
+            page.wait_for_selector('.ff8-model-thumbnail[data-model-ready="true"]',timeout=60000)
+            thumb=page.locator('.ff8-model-thumbnail[data-model-ready="true"]').first
+            assert thumb.get_attribute('src').startswith('data:image/png;base64,')
+            assert thumb.evaluate('image=>image.complete&&image.naturalWidth>12&&image.naturalHeight>12')
+            page.wait_for_function("[...document.querySelectorAll('.ff8-model-thumbnail')].every(image=>image.dataset.modelReady==='true')",timeout=60000)
+            assert max(Counter(thumbnail_requests).values()) == 1, thumbnail_requests
+            assert page.locator('.lex-model-stage').count() == 0, 'thumbnail renderer was not disposed'
+            screenshot=Path(tempfile.gettempdir())/'lexeditor-dev/rendered/ff8-encounter-models.png'
+            page.screenshot(path=str(screenshot))
             assert not errors,errors
-            print(f'Models and Enemies render geometry; {visible} opaque pixels; rotation/zoom/reset, GLB download and close cleanup passed.')
+            print(f'Models and Enemies render geometry; {visible} opaque pixels; rotation/zoom/reset, GLB download, encounter thumbnails, request sharing and renderer cleanup passed.')
         finally:
             browser.close()
 
