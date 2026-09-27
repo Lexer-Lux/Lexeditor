@@ -21,6 +21,7 @@ from plugin_ui import plugin_ui  # noqa: E402
 STUBS = r"""
 const el=LexeditorUI.el;
 const infoHelp=LexeditorUI.infoHelp;
+const detailPanel=LexeditorUI.detailPanel;
 const shell={refresh:()=>{}};
 const state={activeSource:'mine',vanilla:null,references:[],referenceData:{},
   data:{world:{sha256:'fixture',rows:[],drawPoints:[]}}};

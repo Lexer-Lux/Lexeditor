@@ -81,14 +81,16 @@ def main() -> None:
 
     editor = plugin_ui('ff8')
     rendered = editor[editor.index('const view=el("section",{class:"settings-view"}'):
-                      editor.index('$("#main").replaceChildren(view);')]
+                      editor.index('const settingsView=LexeditorUI.settingsColumns')]
     assert 'row("MONOGAMY"' in rendered
     assert 'row("UNIVERSAL ITEM"' in rendered
     for title in ("XP BARS", "HP BARS", "SHARED PARTY MAGIC INVENTORY",
                   "BETTER TARGETING", "COMMAND MENU REWORK"):
         assert f'row("{title}"' in rendered, title
     assert 'row("ENHANCED SCAN"' in rendered
-    assert 'row("FORMULAE REWORK"' not in rendered
+    # The unfinished tweak is visible with a blocker, while the persisted
+    # setting above remains fail-closed until the implementation is accepted.
+    assert 'formulaeRework,{blocker:settings.formulaeReworkBlocker}' in rendered
 
     print("FF8 visible Tweak persistence regression check passed")
 
