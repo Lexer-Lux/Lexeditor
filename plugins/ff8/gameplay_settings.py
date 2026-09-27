@@ -568,6 +568,7 @@ def _verify_executable(game_root: Path) -> Path:
             (modern_controls_issue_65.REJECTED_SPECIAL_MODE_READ, modern_controls_issue_65.REJECTED_SPECIAL_MODE_ORIGINAL),
             (vibration_consolidation_issue_66.FIELD_HOOK, vibration_consolidation_issue_66.FIELD_HOOK_ORIGINAL),
             (vibration_consolidation_issue_66.BATTLE_HOOK, vibration_consolidation_issue_66.BATTLE_HOOK_ORIGINAL),
+            (vibration_consolidation_issue_66.BATTLE_BRANCH, vibration_consolidation_issue_66.BATTLE_BRANCH_ORIGINAL),
             (better_targeting_issue_64.TARGET_ICON_HOOK, better_targeting_issue_64.TARGET_ICON_HOOK_ORIGINAL),
             (damage_limit.DAMAGE_LIMIT_FLAG_OPCODE, damage_limit.DAMAGE_LIMIT_FLAG_ORIGINAL),
             *timed_hits.verified_hooks(),

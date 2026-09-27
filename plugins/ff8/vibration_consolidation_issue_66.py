@@ -20,6 +20,13 @@ BATTLE_HOOK_ORIGINAL = bytes.fromhex("83 C4 28 5F 50")
 BATTLE_PATCHED_CALL = 0x004C8D95
 BATTLE_NATIVE_PAUSE = 0x004C8DC0
 BATTLE_RETURN = 0x004C8D9A
+# The native pause routine has a second way in: 004C8CC2 jumps straight to
+# 004C8D93 (the `push eax` the hook above covers). Landing in the middle of
+# the hook's jump crashed the game at 004C8D99 when a battle was paused early
+# in an enemy's attack (Lexer, 2026-09-26; three identical crash dumps). That
+# jump is sent to its own entry, which does what 004C8D93 did.
+BATTLE_BRANCH = 0x004C8CC2
+BATTLE_BRANCH_ORIGINAL = bytes.fromhex("E9 CC 00 00 00")
 
 CODE_CAVE = 0x0279EEAC
 FIELD_CAVE = CODE_CAVE
@@ -47,7 +54,17 @@ def build_battle_cave() -> bytes:
     return bytes(payload)
 
 
-CODE_CAVE_LENGTH = 0x20 + len(build_battle_cave())
+BATTLE_BRANCH_CAVE = BATTLE_CAVE + len(build_battle_cave())
+
+
+def build_battle_branch_cave() -> bytes:
+    payload = bytearray.fromhex("50 55")
+    payload += _rel32(0xE8, BATTLE_BRANCH_CAVE + len(payload), BATTLE_NATIVE_PAUSE)
+    payload += _rel32(0xE9, BATTLE_BRANCH_CAVE + len(payload), BATTLE_RETURN)
+    return bytes(payload)
+
+
+CODE_CAVE_LENGTH = 0x20 + len(build_battle_cave()) + len(build_battle_branch_cave())
 
 
 def build_hext(enabled: bool) -> str:
@@ -59,6 +76,8 @@ def build_hext(enabled: bool) -> str:
     battle = build_battle_cave()
     field_hook = _rel32(0xE9, FIELD_HOOK, FIELD_CAVE)
     battle_hook = _rel32(0xE9, BATTLE_HOOK, BATTLE_CAVE)
+    branch = build_battle_branch_cave()
+    branch_hook = _rel32(0xE9, BATTLE_BRANCH, BATTLE_BRANCH_CAVE)
     return "\n".join((
         "# Vibration Rationalization: bypass FFNx's extra field and battle pause screens.",
         "# The normal Config-menu vibration setting remains available.",
@@ -67,5 +86,7 @@ def build_hext(enabled: bool) -> str:
         f"{BATTLE_HOOK:X} = {battle_hook.hex(' ').upper()}",
         f"{FIELD_CAVE:X} = {field.hex(' ').upper()}",
         f"{BATTLE_CAVE:X} = {battle.hex(' ').upper()}",
+        f"{BATTLE_BRANCH:X} = {branch_hook.hex(' ').upper()}",
+        f"{BATTLE_BRANCH_CAVE:X} = {branch.hex(' ').upper()}",
         "",
     ))
