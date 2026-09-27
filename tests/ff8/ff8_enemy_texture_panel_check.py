@@ -53,12 +53,14 @@ def main() -> int:
               sections=[...panel.querySelectorAll('.lex-detail-section-title')].map(node=>node.textContent.trim()),
               cards=panel.querySelectorAll('.lex-detail-section .lex-record-card').length,
               links=panel.querySelectorAll('.lex-detail-section .lex-hoverable').length;
-              return {iconImage:!!image,imageSource:image?image.getAttribute('src'):'',
+              return {iconImage:!!image,iconModel:!!image&&image.classList.contains('ff8-model-thumbnail'),
                 iconLeft:icon?Math.round(icon.getBoundingClientRect().left):null,
                 titleLeft:title?Math.round(title.getBoundingClientRect().left):null,
                 sections,cards,links,tab:state.tab}})()""")
             assert rendered["iconImage"], rendered
-            assert "battle" in rendered["imageSource"] and "texture.png" in rendered["imageSource"], rendered
+            # The heading picture is the model itself, as on the Models page
+            # (Lexer, 2026-09-27), not its first texture page.
+            assert rendered["iconModel"], rendered
             assert rendered["iconLeft"] < rendered["titleLeft"], rendered
             # The section's own question mark rides inside its title element.
             assert any(name.startswith("TEXTURES") for name in rendered["sections"]), rendered

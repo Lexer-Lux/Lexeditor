@@ -35,7 +35,9 @@ def main():
             page.goto(session.url)
             page.wait_for_function("typeof state!=='undefined'&&!state.booting",timeout=120000)
             enemy=page.evaluate("()=>{const row=state.data.models.rows.find(row=>row.file==='c0m001.dat');state.selected.models=row.file;navigate('models');return row.enemyId}")
-            assert page.locator('.lex-detail-panel-icon .lex-no-image').count()==1
+            # The heading shows the model it opens (Lexer, 2026-09-27: it showed
+            # no image, yet a click showed the model).
+            page.wait_for_selector(".lex-detail-panel-icon img.ff8-model-thumbnail[data-model-ready='true']",timeout=60000)
             check_card_overlay(page)
             shots=Path(tempfile.gettempdir())/'lexeditor-dev/rendered'
             shots.mkdir(parents=True,exist_ok=True)

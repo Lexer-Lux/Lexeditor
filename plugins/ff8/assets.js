@@ -109,11 +109,12 @@
   // The first texture page of a battle model, as the record's own picture.
   // A creature whose model the game ships shows the creature; only a record
   // with no page left falls back to the shared placeholder.
+  // The header's picture is the model itself, rendered by the same viewer the
+  // header opens (Lexer: the Models header showed no image, yet a click
+  // showed the model). Enemies and Models share it.
   function modelPageThumb(model){
-    const tim=model?.tims?.[0];
-    if(!model?.file||!tim)return null;
-    const id=`battle/${model.file}#${tim.index}`;
-    return el("img",{src:`/assets/texture.png?id=${encodeURIComponent(id)}&palette=0&dataset=${encodeURIComponent(assetDataset())}`,alt:`${model.name} texture page`});
+    if(!model?.file)return null;
+    return FF8ModelThumbnail({file:model.file,dataset:assetDataset(),label:model.name,revision:model.sha256});
   }
   // Both Enemies and Models open the same geometry viewer from their header.
   function modelPreviewSpec(row,extra=null,options={}){
@@ -164,7 +165,7 @@
       detailField({label:"",control:actions}),
       detailField({label:"",control:pending})],
       help:infoHelp([row.note,"Replace writes this battle file into the project's direct/ folder; FFNx loads it instead of the archive copy. Revert deletes the project copy."].filter(Boolean).join(' '))}));
-    return detailPanel({title:assetName(row,modelOverridden(row)),icon:LexeditorUI.noImage(),meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections,modelPreview:modelPreviewSpec(row)});
+    return detailPanel({title:assetName(row,modelOverridden(row)),icon:modelPageThumb(row)||LexeditorUI.noImage(),meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections,modelPreview:modelPreviewSpec(row)});
   }
 
   function renderTextures(){
