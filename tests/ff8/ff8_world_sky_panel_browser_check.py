@@ -56,7 +56,9 @@ function render(){
   document.querySelector('#map').replaceChildren(
     worldSkyDetail(skyRow,null,worldSkyMapTitle(skyRow),
       `World ${formatNumber(skyRow.x)}, ${formatNumber(skyRow.z)}`));
-  document.querySelector('#swatch').replaceChildren(worldSkySwatch(skyRow));
+  document.querySelector('#swatch').replaceChildren(LexeditorUI.columnList({rows:[skyRow],
+    columns:[{key:'id',label:'Record',render:row=>row.id},
+      {key:'skyTop',label:'Sky gradient',cellClass:'lex-cell-fill',render:worldSkySwatch}]}));
 }
 """
 
@@ -90,6 +92,7 @@ def main():
                  'style="width:200px"></div>', content_type='text/html'))
         page.goto('http://fixture/')
         page.add_style_tag(content=(ROOT / 'ui/framework.css').read_text(encoding='utf-8'))
+        page.add_style_tag(content=(ROOT / 'plugins/ff8/editor.css').read_text(encoding='utf-8'))
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.on('console', lambda message: errors.append(message.text)
