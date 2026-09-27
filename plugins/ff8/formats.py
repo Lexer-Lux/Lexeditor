@@ -20,7 +20,6 @@ from . import init_data as init_format
 from . import kernel_text
 from . import namedic
 from . import wm2field
-from . import archive_index
 from . import world_map
 from . import menu_items as menu_item_format
 from . import mngrp_text
@@ -297,26 +296,6 @@ def save_wm2field(edits: list[dict]) -> dict:
     payload = wm2field.save(edits)
     return {"saved": len(edits), "file": payload["path"], **payload}
 
-
-def archive_rows() -> dict:
-    """What the installed game's archives hold, without reading entry contents."""
-    return archive_index.archives()
-
-
-def archive_entries(name: str, query: str = "", page: int = 0,
-                    page_size: int = archive_index.DEFAULT_PAGE_SIZE) -> dict:
-    return archive_index.entries(name, query, page, page_size)
-
-
-def extract_archive_entry(name: str, index: int) -> dict:
-    """Copy one archive entry into the project, leaving the game untouched."""
-    return archive_index.extract(name, index)
-
-
-def repack_archive(name: str) -> dict:
-    """Build an archive from the project's own replaced files."""
-    return archive_index.repack(name, project_root=paths.PROJECT_ROOT,
-                                direct_root=paths.DIRECT_ROOT)
 
 
 # The world map's own sections that are read here rather than edited through
@@ -1292,7 +1271,7 @@ def data_map_rows() -> dict:
         "menu/mitem.bin": ["items"], "menu/mngrp.bin": ["text", "refine"],
         "main.fs → namedic.bin": ["names"],
         "main.fs → wm2field.tbl": ["world"],
-        "ff8/*.fs + .fi + .fl archives": ["archives"],
+        "ff8/*.fs + .fi + .fl archives": [],
         "battle/c0m*.dat": ["enemies", "models"], "battle/scene.out": ["encounters"],
         "FF8_EN.exe": ["cards", "text", "enemies"],
         "ff8/en/exe/battle_scans.msd": ["enemies"],

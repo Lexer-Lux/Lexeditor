@@ -168,7 +168,8 @@ Not covered today, with what each would need:
   field, world and magic with its stored name, unpacked size, compression flag
   and offset, with search and paging, and copies one entry into the project's
   own `extracted/` folder, keeping one previous copy
-  (`plugins/ff8/archive_index.py`, `archives_ui.js`). Listing reads metadata
+  (`plugins/ff8/archive_index.py`; its Archives page was removed on 2026-09-27
+  at Lexer's request - a raw file browser is not a player-facing editor). Listing reads metadata
   only; the extract is the one place contents are read, and it never writes to
   the installation. Repacking is covered too: the Archives page builds a whole
   triplet in the project's `repacked/` folder from the files the project

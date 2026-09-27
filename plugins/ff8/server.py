@@ -230,12 +230,6 @@ class Handler(PluginRequestHandler):
                 self.json_response(formats.wm2field_rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/draw-point-data":
                 self.json_response(draw_point_data.rows(query.get("dataset", ["current"])[0]))
-            elif path == "/api/archives":
-                self.json_response(formats.archive_rows())
-            elif path == "/api/archive":
-                self.json_response(formats.archive_entries(
-                    query.get("name", ["main"])[0], query.get("query", [""])[0],
-                    int(query.get("page", ["0"])[0]), int(query.get("pageSize", ["60"])[0])))
             elif path == "/api/tables":
                 self.json_response(formats.table_list())
             elif path == "/api/world-extra":
@@ -360,11 +354,6 @@ class Handler(PluginRequestHandler):
                 self.json_response(formats.save_wm2field(body.get("edits", [])))
             elif path == "/api/draw-point-data/save":
                 self.json_response(draw_point_data.save(body.get("edits", [])))
-            elif path == "/api/archive/extract":
-                self.json_response(formats.extract_archive_entry(
-                    str(body.get("name", "")), int(body.get("index", -1))))
-            elif path == "/api/archive/repack":
-                self.json_response(formats.repack_archive(str(body.get("name", ""))))
             elif path == "/api/table/import":
                 self.json_response(formats.import_table_csv(
                     str(body.get("name", "")), str(body.get("csv", ""))))
