@@ -2953,10 +2953,20 @@
       const inset = 4;
       const halfWidth = tooltipBounds.width / 2;
       /* Centre the readout on the pointer across neighbouring graph space.
-         Clamp only at the real window edge; clamping to each small plot made
-         the label drift away from the cursor near every card boundary. */
-      const viewportCenter = Math.max(inset + halfWidth,
-        Math.min(innerWidth - inset - halfWidth, event.clientX));
+         Clamp only at the real edge - the nearest panel that clips or
+         scrolls, else the window. Clamping to each small plot made the label
+         drift from the cursor near every card boundary; clamping only to the
+         window let it poke out of its panel, which grew a scrollbar and
+         shifted the graphs when the pointer came in from the right (GFs). */
+      let edge = {left:0, right:innerWidth};
+      for (let node = plot.parentElement; node && node !== document.body; node = node.parentElement) {
+        if (!/auto|scroll|hidden|clip/.test(getComputedStyle(node).overflowX)) continue;
+        const box = node.getBoundingClientRect();
+        edge = {left:box.left + node.clientLeft, right:box.left + node.clientLeft + node.clientWidth};
+        break;
+      }
+      const viewportCenter = Math.max(edge.left + inset + halfWidth,
+        Math.min(edge.right - inset - halfWidth, event.clientX));
       tooltip.style.left = `${viewportCenter - plotBounds.left}px`;
       tooltip.style.top = `${Math.max(8, bounds.top - plotBounds.top + graphY / graphHeight * bounds.height)}px`;
     });
