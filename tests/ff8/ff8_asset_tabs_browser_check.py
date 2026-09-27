@@ -102,6 +102,9 @@ def main():
             assert len(rows) == 2, f"SFX mod-only rows: {rows}"
             assert any("Sound 5" in row for row in rows), rows
             assert any("Sound 9" in row for row in rows), rows
+            # A replaced asset reads like an edited record: its name in the accent.
+            assert page.locator("#main .lex-column-list .lex-value-modified").count() == 2, "SFX accent"
+            assert page.locator("#main .lex-detail-panel-title .lex-value-modified").count() == 1, "SFX heading accent"
             page.evaluate("state.selected.sfx = 5")
             page.evaluate("navigate('sfx')")
             page.wait_for_timeout(300)
@@ -129,6 +132,9 @@ def main():
             rows = master_rows(page)
             assert len(rows) == 1, f"Models mod-only rows: {rows}"
             assert "c0m001.dat" in rows[0], rows
+            # A replaced asset reads like an edited record: its name in the accent.
+            assert page.locator("#main .lex-column-list .lex-value-modified").count() == 1, "Models accent"
+            assert page.locator("#main .lex-detail-panel-title .lex-value-modified").count() == 1, "Models heading accent"
             assert page.locator("#main .ff8-model-sections").count() == 1
             set_mod_only(page, False)
 
@@ -138,6 +144,9 @@ def main():
             assert len(rows) == 3, f"Textures mod-only rows: {rows}"
             assert sum("c0m001" in row for row in rows) == 2, rows
             assert any("custom.png" in row for row in rows), rows
+            # A replaced asset reads like an edited record: its name in the accent.
+            assert page.locator("#main .lex-column-list .lex-value-modified").count() == 3, "Textures accent"
+            assert page.locator("#main .lex-detail-panel-title .lex-value-modified").count() == 1, "Textures heading accent"
             assert page.locator("#main .lex-detail-panel img").count() >= 1
             set_mod_only(page, False)
             # The file a texture belongs to is the panel subtitle, and it is

@@ -19,10 +19,17 @@
     return el("div",{class:"world-texture-pending"},row[key]?`${label} selected; Save applies it.`:"No pending replacement.");
   }
 
+  // An asset this mod replaces reads the way an edited record does: its name
+  // in the accent, from the list to its heading, whether the replacement is
+  // saved or only staged.
+  function assetName(row,overridden){return overridden?el("span",{class:"lex-value-modified"},el("output",{},row.name)):row.name}
+  const sfxOverridden=row=>!!(row.modFiles?.length||row.audioBase64);
+  const modelOverridden=row=>!!(row.override||row.datBase64);
+  const textureOverridden=row=>!!row.modFiles?.length;
   function renderSfx(){
     const rows=filtered("sfx",["name","id"]),columns=[
       {key:"id",label:"ID"},
-      {key:"name",label:"Sound"},
+      {key:"name",label:"Sound",render:row=>assetName(row,sfxOverridden(row))},
       {key:"durationMs",label:"Length",render:row=>assetDuration(row.durationMs)},
       {key:"loop",label:"Loop",render:row=>row.valid?(row.loop?"Yes":"No"):"—"},
       {key:"modFiles",label:"Replaced",render:row=>row.modFiles?.length?`Yes (${row.modFiles.length})`:"—"}];
@@ -67,14 +74,14 @@
       sections.push(detailSection({title:"REPLACEMENT",body:replaceBody,
         help:infoHelp("Replace writes sfx/<id>.<ext> into this project; FFNx plays it instead of the shipped sound. Revert deletes the project override.")}));
     }
-    return sharedDetail(row,prefs,sections);
+    return sharedDetail({...row,titleContent:assetName(row,sfxOverridden(row))},prefs,sections);
   }
 
   function modelKindName(kind){return {monster:"Monster",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Locked",empty:"Empty"}[kind]||kind}
   function renderModels(){
     const rows=filtered("models",["name","file"]),columns=[
       {key:"file",label:"File"},
-      {key:"name",label:"Model"},
+      {key:"name",label:"Model",render:row=>assetName(row,modelOverridden(row))},
       {key:"modelKind",label:"Kind",render:row=>modelKindName(row.modelKind)},
       {key:"vertices",label:"Vertices",render:row=>row.vertices==null?"—":formatNumber(row.vertices)},
       {key:"timCount",label:"Textures",render:row=>row.timCount??"—"}];
@@ -152,12 +159,12 @@
       detailField({label:"",control:actions}),
       detailField({label:"",control:pending})],
       help:infoHelp([row.note,"Replace writes this battle file into the project's direct/ folder; FFNx loads it instead of the archive copy. Revert deletes the project copy."].filter(Boolean).join(' '))}));
-    return detailPanel({title:row.name,icon:LexeditorUI.noImage(),meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections,modelPreview:modelPreviewSpec(row)});
+    return detailPanel({title:assetName(row,modelOverridden(row)),icon:LexeditorUI.noImage(),meta:`${row.file} · ${assetFileSize(row.sizeBytes)}`,body:sections,modelPreview:modelPreviewSpec(row)});
   }
 
   function renderTextures(){
     const rows=filtered("textures",["name","id","ffnxBase","source"]),columns=[
-      {key:"name",label:"Texture"},
+      {key:"name",label:"Texture",render:row=>assetName(row,textureOverridden(row))},
       {key:"source",label:"Source"},
       {key:"width",label:"Size",render:row=>row.width==null?"—":`${row.width} × ${row.height} · ${row.depth}-bit`},
       {key:"modFiles",label:"Mod files",render:row=>row.modFiles?.length?formatNumber(row.modFiles.length):"—"}];
@@ -202,5 +209,5 @@
     }else if(row.editor==="world"){
       meta=hoverable({content:row.id,targetType:"world",targetId:row.timIndex,targetLabel:`World Texture ${row.timIndex+1} in Maps`,activate:()=>{state.selected.world=row.timIndex;state.worldTab="textures";navigate("world")}});
     }
-    return detailPanel({title:row.name,meta,icon,body:sections});
+    return detailPanel({title:assetName(row,textureOverridden(row)),meta,icon,body:sections});
   }
