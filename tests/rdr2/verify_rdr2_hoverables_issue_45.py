@@ -4,7 +4,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
+from rdr2_editor_source import editor_source
+SOURCE = editor_source()
 
 
 def require(condition: bool, message: str) -> None:

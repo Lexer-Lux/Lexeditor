@@ -2,7 +2,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EDITOR = (ROOT / "plugins" / "rdr2" / "editor.html").read_text(encoding="utf-8")
+from rdr2_editor_source import editor_source
+EDITOR = editor_source()
 SERVER = (ROOT / "plugins" / "rdr2" / "server.py").read_text(encoding="utf-8")
 
 
@@ -13,7 +14,10 @@ def require(condition: bool, message: str) -> None:
 
 require('mobView: "archetypes"' in EDITOR,
         "Mobs must open on the real editable archetype data")
-require('["archetypes","Archetypes"],["models","Observed Models"]' in EDITOR,
+require('id:"combat",label:"Combat profiles"' in EDITOR
+        and 'id:"health",label:"Health archetypes"' in EDITOR
+        and 'id:"models",label:"Observed Models"' in EDITOR
+        and 'if(f.mobView==="models")return renderMobModels()' in EDITOR,
         "the read-only probe evidence must not be presented as an editable Mobs model table")
 require("r.observedHealth!==null" in EDITOR,
         "Observed Models must omit empty rows with no probe evidence")

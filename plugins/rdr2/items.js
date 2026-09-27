@@ -702,21 +702,13 @@ function loadInventoryIcon(texture){
   inventoryIconLoads.set(key,load);return load;
 }
 
-function brokenImageIcon(){
-  const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
-  svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("aria-hidden","true");
-  const path=document.createElementNS(ns,"path");path.setAttribute("fill","none");path.setAttribute("stroke","currentColor");
-  path.setAttribute("stroke-width","1.7");path.setAttribute("stroke-linecap","round");path.setAttribute("stroke-linejoin","round");
-  path.setAttribute("d","M4 4h16v16H4z M7 16l3-3 2 2 2-2 3 3 M8 8h.01 M5 19 19 5");svg.append(path);return svg;
-}
-
 function itemIcon(texture,it){
-  const slot=LexeditorUI.iconSlot({message:"Loading icon…"});
+  const slot=LexeditorUI.iconSlot({content:LexeditorUI.loadingPanel({label:"Loading inventory icon"})});
   slot.dataset.inventoryIcon="";
   slot.title=texture?`${texture.dict} / ${texture.id}`:"No inventory icon";
   slot.lexLoaded=loadInventoryIcon(texture).then(src=>{
     if(src)slot.replaceChildren(el("img",{src,alt:`${localizedValue(it.nameKey)?.trim()||it.key} icon`}));
-    else{slot.dataset.missing="true";slot.replaceChildren(brokenImageIcon());}
+    else{slot.dataset.missing="true";slot.replaceChildren(LexeditorUI.noImage("Inventory icon is unavailable"));}
   });
   return slot;
 }
