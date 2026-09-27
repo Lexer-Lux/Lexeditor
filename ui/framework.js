@@ -1105,11 +1105,13 @@
     const bodyClass = ["lex-detail-panel-body", DETAIL_BODY_LAYOUTS[options.bodyLayout] || ""].filter(Boolean).join(" ");
     const nameField = headingNameField(options);
     if (nameField) {
+      const pin = nameField.field.querySelector('.lex-column-pin');
       const section = nameField.field.closest(".lex-detail-section");
       nameField.field.remove();
       const emptied = section && !section.querySelector(":scope > .lex-detail-section-content > *") ? section : null;
       emptied?.remove();
       options = {...options, titleControl: nameField.input,
+        actions: pin ? [pin, ...[options.actions || []].flat()] : options.actions,
         body: [options.body].flat().filter(node => node !== nameField.field && node !== emptied)};
     }
     // A record's name is the heading, so the heading is where it is edited. It
