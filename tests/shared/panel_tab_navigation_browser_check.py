@@ -22,7 +22,7 @@ def main():
   p.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
   p.add_style_tag(content='#a .lex-tabbed-panel,#b .lex-tabbed-panel{height:300px;width:300px}.lex-tabbed-panel-content{overflow:auto}')
   p.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
-  p.evaluate("""()=>{const U=LexeditorUI;window.active={a:'one',b:'one'};window.draw=id=>document.getElementById(id).replaceChildren(U.tabbedPanel({label:id,active:active[id],tabs:[{id:'one',label:'One'},{id:'two',label:'Two'}],change:value=>{active[id]=value;draw(id)},content:U.el('input',{'aria-label':id+' input'})}));draw('a');draw('b')}""")
+  p.evaluate("""()=>{const U=LexeditorUI;window.active={a:'one',b:'one'};window.draw=id=>document.getElementById(id).replaceChildren(U.tabbedPanel({label:id,active:active[id],tabs:[{id:'one',label:'One'},{id:'two',label:'Two'}],change:value=>{active[id]=value;draw(id)},content:U.el('div',{},U.el('input',{'aria-label':id+' input'}),U.el('button',{type:'button','aria-label':id+' button'},'Go'))}));draw('a');draw('b')}""")
   p.wait_for_timeout(100)
   # A tabbed panel standing on its own is page-level: its tabs stay on top.
   assert p.locator('#a .lex-subtab-bar').bounding_box()['y']<p.locator('#a .lex-tabbed-panel-content').bounding_box()['y']
@@ -36,13 +36,17 @@ def main():
   assert not p.locator('#page-tabs').evaluate("e=>e.classList.contains('lex-bottom-tab-panel')")
   assert p.locator('#page-tabs .lex-subtab-bar').bounding_box()['y']<p.locator('#page-content').bounding_box()['y']
   p.locator('#page-tabs').evaluate('e=>e.remove()')
-  p.locator('#b input').focus();p.locator('#a .lex-tabbed-panel-content').hover()
+  p.locator('#b [aria-label="b button"]').focus();p.locator('#a .lex-tabbed-panel-content').hover()
   p.keyboard.press('Tab');assert p.evaluate('active.a')=='two';assert p.evaluate('active.b')=='one'
   p.keyboard.press('Tab');assert p.evaluate('active.a')=='one'
   p.keyboard.press('Shift+Tab');assert p.evaluate('active.a')=='two'
   p.evaluate("window.dispatchEvent(new CustomEvent('lexeditor-settings-ready',{detail:{panelTabTarget:'focus'}}))")
-  p.locator('#b input').focus();p.keyboard.press('Tab');p.wait_for_timeout(50);assert p.evaluate('active.b')=='two'
+  p.locator('#b [aria-label="b button"]').focus();p.keyboard.press('Tab');p.wait_for_timeout(50);assert p.evaluate('active.b')=='two'
   p.keyboard.press('Shift+Tab');p.wait_for_timeout(50);assert p.evaluate('active.b')=='one'
+  # Typing in a field keeps Tab for moving to the next field, in either mode.
+  p.locator('#b input').focus();p.keyboard.press('Tab');p.wait_for_timeout(50)
+  assert p.evaluate('active.b')=='one',p.evaluate('active.b')
+  assert p.locator('#b [aria-label="b button"]').evaluate('(e)=>e===document.activeElement')
   p.evaluate("document.body.insertAdjacentHTML('beforeend','<div role=dialog><input id=d1><input id=d2></div>')")
   p.locator('#d1').focus();p.keyboard.press('Tab');assert p.locator('#d2').evaluate('(e)=>e===document.activeElement')
   ff8=plugin_ui('ff8')

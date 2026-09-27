@@ -7439,6 +7439,12 @@ ${contents.path}`});
     if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return;
     // Dialog controls retain normal keyboard navigation.
     if (event.target?.closest?.('[role="dialog"],.lex-dialog-backdrop')) return;
+    // So does a field being typed in: Tab there finishes the entry and moves
+    // to the next field. Cycling tabs from it flipped the page after an edit
+    // (Lexer: "Tab after editing unexpectedly switching to Field-to-World").
+    const typing = event.target?.closest?.('textarea,select,[contenteditable=""],[contenteditable="true"]')
+      || (event.target?.matches?.('input') && !/^(checkbox|radio|button|submit|reset|range|color|file|image)$/i.test(event.target.type || "text"));
+    if (typing) return;
     event.preventDefault();
     event.stopPropagation();
     let node = panelTabTarget === "focus" ? document.activeElement
