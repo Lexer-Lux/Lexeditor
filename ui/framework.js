@@ -1814,9 +1814,9 @@
     const stage=element("div",{class:"lex-image-map-stage",style:`aspect-ratio:${Number(options.ratio)||4/3};--lex-map-columns:${Number(options.columns)||1};--lex-map-rows:${Number(options.rows)||1}`},
       options.media || (options.image?element("img",{src:options.image,alt:options.label||"Map",draggable:false}):null));
     if(options.cells?.length)stage.append(element("div",{class:"lex-image-map-cells"},...options.cells.map(cell=>
-      element("button",{type:"button",class:cell.selected?"selected":"",title:tooltip(cell.title||cell.label),
-        style:Number.isInteger(cell.column)&&Number.isInteger(cell.row)
-          ?`grid-column:${cell.column+1};grid-row:${cell.row+1}`:null,
+      element("button",{type:"button",class:[cell.selected?"selected":"",cell.fill?"lex-map-cell-filled":""].filter(Boolean).join(" "),title:tooltip(cell.title||cell.label),
+        style:[Number.isInteger(cell.column)&&Number.isInteger(cell.row)
+          ?`grid-column:${cell.column+1};grid-row:${cell.row+1}`:"",cell.fill?`--lex-map-cell-fill:${cell.fill}`:""].filter(Boolean).join(";")||null,
         "aria-label":cell.label,"aria-pressed":!!cell.selected,onclick:()=>options.select?.(cell.id)}))));
     for(const point of options.points||[])stage.append(element("button",{type:"button",class:`lex-image-map-point${point.selected?" selected":""}${point.className?" "+point.className:""}`,
       style:`left:${point.x*100}%;top:${point.y*100}%`,title:tooltip(point.label),"aria-label":point.label,
@@ -1857,6 +1857,9 @@
     // panned stage carried it out of view (Lexer: "they disappear when you
     // zoom in").
     if(readout)root.append(readout);
+    // Buttons that change how the map is drawn, such as a lens, sit in the
+    // frame's top-left corner; the magnifier keeps the top-right one.
+    if(options.tools?.length)root.append(element("div",{class:"lex-image-map-tools"},...options.tools));
     const image=stage.querySelector('img');
     if(image&&!options.ratio){const fit=()=>{if(!image.naturalWidth||!image.naturalHeight)return;const ratio=image.naturalWidth/image.naturalHeight;root.style.setProperty('--lex-map-ratio',String(ratio));stage.style.aspectRatio=String(ratio)};image.addEventListener('load',fit);fit();}
     root.lexStage=stage;

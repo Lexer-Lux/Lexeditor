@@ -158,3 +158,17 @@ def test_readout_stays_in_view_and_replaces_hover_tooltips(page):
     page.evaluate('''()=>document.body.append(LexeditorUI.imageMap({ratio:1,
       points:[{x:.2,y:.2,label:'Plain point'}]}))''')
     assert page.locator('[title="Plain point"]').count() == 1
+
+
+def test_cells_take_a_fill_and_tools_sit_in_the_frame(page):
+    """The FF8 regions lens colours cells through `fill` and toggles from a
+    `tools` button in the map's corner (Lexer, 2026-09-27)."""
+    framework(page)
+    page.evaluate('''()=>{const U=LexeditorUI;window.map=U.imageMap({ratio:4/3,columns:2,rows:1,label:'Lens',
+      cells:[{id:0,column:0,row:0,label:'A',fill:'rgb(255, 0, 0)'},{id:1,column:1,row:0,label:'B'}],
+      tools:[U.el('button',{type:'button','aria-pressed':'true'},'Regions')]});
+      map.lexStage.style.transform='scale(3)';document.body.append(map)}''')
+    fills = page.evaluate("[...document.querySelectorAll('.lex-image-map-cells > button')].map(n=>getComputedStyle(n).backgroundColor)")
+    assert fills[0] == 'rgb(255, 0, 0)' and fills[1] == 'rgba(0, 0, 0, 0)', fills
+    assert page.evaluate("document.querySelector('.lex-image-map-tools').parentElement===map")
+    assert page.get_by_role('button', name='Regions').is_visible()

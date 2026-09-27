@@ -4524,6 +4524,11 @@ body:has(.lex-data-map-table) #main {
 .lex-image-map-cells { position:absolute; inset:0; display:grid; grid-template-columns:repeat(var(--lex-map-columns),1fr); grid-template-rows:repeat(var(--lex-map-rows),1fr); }
 .lex-image-map-cells > button { min-width:0; min-height:0; padding:0; border:0; border-radius:0; background:transparent; cursor:crosshair; }
 .lex-image-map-cells > button:hover { outline:1px solid var(--lex-text); outline-offset:-1px; }
+.lex-image-map-cells > button.lex-map-cell-filled { background:var(--lex-map-cell-fill); }
+.lex-image-map-tools { position:absolute; z-index:5; top:6px; left:6px; display:flex; gap:6px; }
+.lex-image-map-tools > button { min-height:30px; padding:0 10px; color:var(--lex-text); border:1px solid var(--lex-border); border-radius:var(--lex-radius); background:color-mix(in srgb,var(--lex-panel) 86%,transparent); }
+.lex-image-map-tools > button:hover,.lex-image-map-tools > button:focus-visible { color:var(--lex-accent); border-color:var(--lex-highlight); }
+.lex-image-map-tools > button[aria-pressed="true"] { color:var(--lex-text); border-color:var(--lex-highlight); background:color-mix(in srgb,var(--lex-accent) 55%,var(--lex-panel)); }
 .lex-image-map-cells > button.selected { outline:2px solid var(--lex-highlight); outline-offset:-2px; background:color-mix(in srgb,var(--lex-highlight) 20%,transparent); }
 /* A zoomed stage sets --lex-map-scale; markers divide it out so they keep
    their size while the art grows under them. */
