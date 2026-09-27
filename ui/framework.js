@@ -7521,6 +7521,7 @@ ${contents.path}`});
     return () => {
       const widths = probes.map(probe => Math.ceil(probe.offsetWidth + 2));
       probes.forEach(probe => probe.remove());
+
       const fitted = heads.map((head, index) => {
         const width = widths[index];
         const track = tracks[index], range = /^minmax\((.*),\s*([^,]+)\)$/.exec(track);
@@ -7534,6 +7535,12 @@ ${contents.path}`});
           const candidate = `minmax(max(${width}px, ${minimum}), ${range[2]})`;
           return CSS.supports('grid-template-columns', candidate) ? candidate : track;
         }
+        // A numbered-id column never goes below its widest id with the cell's
+        // padding, measured by the grid itself: the table resizes its text
+        // after this pass, and a first column that keeps room for the sort
+        // mark cut its ids short (FF8 Weapons "#1").
+        if (head.dataset.lexIdColumn === "true" && /^[\d.]+(?:px|em|rem|ch|%)$/.test(track))
+          return `minmax(max-content, max(${width}px, ${track}))`;
         if (/^[\d.]+(?:px|em|rem|ch|%)$/.test(track)) return `max(${width}px, ${track})`;
         if (/^[\d.]+fr$/.test(track)) return `minmax(${width}px, ${track})`;
         return track;
@@ -7588,7 +7595,11 @@ ${contents.path}`});
     const template = options.template || dynamicColumnTemplate(columns);
     const numberedColumn = column => isNumberedIdColumn(column, options.rows || []);
     const alignmentClass = column => `lex-column-align-${column.align || (numberedColumn(column) ? "start" : options.align) || "center"}`;
-    const headerAlignmentClass = column => `lex-column-align-${column.headerAlign || options.headerAlign || "center"}`;
+    // A numbered-id column's values sit at the start of the cell, so its
+    // header does too; centred over them it read as misaligned (FF8 GF
+    // ability Slot column).
+    const headerAlignmentClass = column => `lex-column-align-${column.headerAlign
+      || (numberedColumn(column) ? (column.align || "start") : null) || options.headerAlign || "center"}`;
     const canSort = column => column.sortable !== false && options.localSort !== false;
     const valueForSort = (row, column) => {
       const value = typeof column.sortValue === "function" ? column.sortValue(row) : row?.[column.key];

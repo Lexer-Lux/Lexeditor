@@ -2691,10 +2691,12 @@ body.lex-panel-layout-dragging, body.lex-panel-layout-dragging * {
   white-space:nowrap;
 }
 
+.lex-column-list-head-cell.lex-column-align-start,
 .lex-column-list-head-cell.lex-column-align-start .lex-column-heading {
   justify-content:flex-start;
 }
 
+.lex-column-list-head-cell.lex-column-align-end,
 .lex-column-list-head-cell.lex-column-align-end .lex-column-heading {
   justify-content:flex-end;
 }
@@ -8189,6 +8191,13 @@ body { text-shadow: var(--lex-text-shadow, none); }
    Every other header's mark hangs over its neighbour's edge instead of
    widening nine narrow coordinate columns. */
 .lex-column-list-head-cell.lex-column-sortable:first-child {
+  padding-inline-start:max(8px, calc(var(--lex-sort-marker-width, 7px) + var(--lex-sort-marker-gap, 2px) + 2px));
+}
+/* A start-aligned first column keeps that same room in its cells, so the
+   header's words and the values under them start on one line (FF8 GF
+   ability Slot: the header sat a sort mark's width right of its numbers). */
+.lex-column-list:has(> .lex-column-list-header > .lex-column-list-head-cell.lex-column-sortable.lex-column-align-start:first-child)
+  > .lex-column-list-row > .lex-column-list-cell.lex-column-align-start:first-child {
   padding-inline-start:max(8px, calc(var(--lex-sort-marker-width, 7px) + var(--lex-sort-marker-gap, 2px) + 2px));
 }
 /* The label, its sort button and the cell all clip, for their ellipsis, and a
