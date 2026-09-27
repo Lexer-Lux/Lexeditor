@@ -192,3 +192,7 @@
 .field-preview-sides>.field-preview-layers,.field-preview-sides>.field-preview-states{min-height:0;overflow:auto;align-self:start}
 /* The panel title and help overlay the top of the panel; the side filters start below them. */
 .field-preview-sides>.field-preview-layers,.field-preview-sides>.field-preview-states{padding-top:calc(var(--lex-detail-title-size,clamp(21px,2.5vw,32px))*1.1 + 20px)}
+/* GF abilities, Prereq: the kind menu keeps its word ("Ability" was cut to
+   "Abilit") and the value takes the rest of the cell, which follows the panel
+   down to a narrow window instead of holding a fixed 232px. */
+.gf-prereq-cell > .lex-detail-part:first-child{flex:none}
