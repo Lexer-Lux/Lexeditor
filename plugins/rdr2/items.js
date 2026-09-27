@@ -632,7 +632,7 @@ function itemDetailPane(it, cells){
   input.setAttribute("aria-label","Item name");
   input.placeholder="No localized name";
   const pane=LexeditorUI.detailPanel({titleControl:name,
-    meta:it.key,icon:identityIcon||null,body});
+    meta:it.key,icon:identityIcon||null,actions:originMarker(it),body});
   body.append(LexeditorUI.controlGroup([
     {label:"Group",control:LexeditorUI.readonlyField(it.group||"No group")},
     {label:"Category",control:LexeditorUI.readonlyField(it.category.replace("CI_CATEGORY_",""))}]));

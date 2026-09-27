@@ -451,7 +451,7 @@ function weaponFieldCategory(row){
 }
 
 function weaponDetail(d,section,record,f){
-  const body=LexeditorUI.stack({fill:false}),pane=LexeditorUI.detailPanel({title:record?LexeditorUI.detailField({label:"Name",control:localizationInput(record.name)}):"Weapon",meta:record?.name,body});
+  const body=LexeditorUI.stack({fill:false}),pane=LexeditorUI.detailPanel({title:record?LexeditorUI.detailField({label:"Name",control:localizationInput(record.name)}):"Weapon",meta:record?.name,actions:originMarker(record),body});
   if(!record)return pane.appendChild(LexeditorUI.stack({fill:false,className:"lex-notice"},"Select a weapon."))&&pane;
   const vanilla=state.weaponData.vanilla?.[section]?.find(x=>x.name===record.name);
   const wr=state.weaponReference?.[section]?.find(x=>x.name===record.name);
