@@ -4299,6 +4299,17 @@ body:has(.lex-data-map-table) #main {
 .lex-instruction-operand { display:flex; flex-direction:column; gap:2px; width:90px; min-width:52px; flex:0 1 90px; font-size:.8em; }
 .lex-instruction-operand :is(input,select) { width:100%; min-width:0; }
 .lex-instruction-description { flex:1 1 180px; min-width:120px; max-width:300px; max-height:84px; overflow:auto; white-space:normal; font-size:.9em; }
+/* A narrow pane has no room for the controls and the description side by
+   side. The operands wrap, the description moves under them, and the step
+   grows to hold both, rather than the operands spilling under the
+   description's text (Enemies AI at 1100px: "If Battle variable 96..."
+   printed over "Otherwise"). */
+.lex-instruction-list { container-type:inline-size; }
+.lex-instruction-row { min-height:auto; }
+@container (max-width: 620px) {
+  .lex-instruction-row { flex-wrap:wrap; row-gap:4px; }
+  .lex-instruction-controls { flex-wrap:wrap; row-gap:4px; }
+}
 .lex-instruction-actions { display:flex; gap:3px; }
 .lex-instruction-actions > button { padding:3px; min-width:24px; }
 .lex-instruction-footer { min-width:0; }
