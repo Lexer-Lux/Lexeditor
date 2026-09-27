@@ -39,3 +39,28 @@ bundled `ISSUE51_BUILD_REPORT.md` still names that retired workflow).
 
 Build outside the checkout (for example `%TEMP%/lexeditor-dev`); a full vcpkg
 tree is about 16 GB.
+
+## What belongs in the driver (#671)
+
+Hext first (AGENTS.md, Game patches): driver code only for drawing the game
+has no routine for, renderer or frame-rate work, file I/O, or logic too large
+to keep correct in hand-written assembly. Every feature the derivative
+carries, and why:
+
+| Feature | Driver source | Stays because | Move to Hext? |
+| --- | --- | --- | --- |
+| Shared Magic Inventory (#51) | `ffnx_issue_51`, `shared_magic_runtime` | 28 hooks plus merge, mirror and save-phase logic | No |
+| Party Switch | `ffnx_party_switch` | Event-driven model retire/replace against a task pool, tied to Shared Magic | No |
+| Modern Controls | `ffnx_modern_controls` | FFNx owns the gamepad layer and analog axes; FF8 never sees them | No |
+| HP / XP / GF HP bars, HP colours | `ffnx_status_bars` | Draws gauges the game has no routine for; colours go through FFNx's renderer | No |
+| Interaction indicators | `lexeditor_ff8_interaction_indicators` | Draws field cues the game has no routine for | No |
+| Better Targeting | `ffnx_better_targeting` | FFNx replaces the native icon routine `004B75B0` wholesale, so a Hext patch there never runs | No |
+| Fast Start | `fast_start_ffnx.py` | Suppresses presented frames in the renderer | No |
+| Live conditions / asset lookup | `lexeditor_live_conditions` | File I/O | No |
+| Signal Flare (item, shop, menu, encounters) | `lexeditor_ff8_flare*` | The encounter gate sits inside FFNx's own replacement of the battle trigger | Review: item, shop and menu parts may not need the driver |
+| GF Spellbooks (#93) | `lexeditor_ff8_gf_spellbooks` | Reads `gf-spellbooks.bin` at run time | Candidate: Lexeditor writes the Hext per mod, so the book can be baked into it |
+| Reptile ATB (#323) | `lexeditor_ff8_reptile_atb` | Reads `reptile-atb.toml` at run time | Candidate: same, bake the classification into the Hext |
+| In-game Time | derivative patch (`enable_ff8_ingame_time`) | Relabels the native menu counter | Review: likely a Hext text or draw-call change |
+| Toasts | `ffnx_toasts` | Draws an imitation box | Retire: messages go through the game's own box (#670) |
+| No Magic Consumption | `lexeditor_ff8_stock_tweaks` | - | Moved: `plugins/ff8/no_magic_consumption.py`. The driver copy stays off and is deleted at the next rebuild |
+

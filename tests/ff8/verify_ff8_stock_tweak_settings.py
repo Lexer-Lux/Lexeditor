@@ -68,7 +68,7 @@ def run(exe:Path|None=None) -> None:
         settings.initialize_project(project)
         assert not settings.load(project,game)['noMagicConsumption']
         assert not settings.load(project,game)['dropsAfterMug']
-    ui=(ROOT/'plugins/ff8/editor.html').read_text(encoding='utf-8')
+    ui=(ROOT/'plugins/ff8/boot.js').read_text(encoding='utf-8')
     for key,label in [('noMagicConsumption','No Magic Consumption'),('dropsAfterMug','Drops After Mug')]:
         assert f'{key}:state.data.settings.{key}' in ui
         assert f'"aria-label":"{label}"' in ui

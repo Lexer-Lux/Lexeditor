@@ -37,6 +37,7 @@ from . import magic_damage_rework
 from . import melee_damage_rework
 from . import mug_chance_rework
 from . import status_chance_rework
+from . import no_magic_consumption as no_magic_consumption_patch
 from . import fast_start
 from . import streamlined_draw
 from . import healing_rework
@@ -566,6 +567,7 @@ def _verify_executable(game_root: Path) -> Path:
             *melee_damage_rework.verified_hooks(),
             *mug_chance_rework.verified_hooks(),
             *status_chance_rework.verified_hooks(),
+            *no_magic_consumption_patch.verified_hooks(),
             *gf_acquisition_rework.verified_hooks(),
             (healing_rework.HEALING_FORMULA_HOOK, healing_rework.HEALING_FORMULA_ORIGINAL),
             (menu_qol_issue_61.ABILITY_LIST_RETURN_HOOK, menu_qol_issue_61.ABILITY_LIST_RETURN_ORIGINAL),
@@ -620,8 +622,10 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
                drop_chance_plan=None,
                world_map_fullscreen: bool = DEFAULT_WORLD_MAP_FULLSCREEN,
                gf_acquisition_rework_enabled: bool = DEFAULT_GF_ACQUISITION_REWORK,
-               battle_results_help: bool = DEFAULT_BATTLE_RESULTS_HELP) -> str:
+               battle_results_help: bool = DEFAULT_BATTLE_RESULTS_HELP,
+               no_magic_consumption: bool = False) -> str:
     bonus = _bounded_bonus(bonus)
+    no_magic_consumption = _boolean(no_magic_consumption, "No Magic Consumption")
     flying_eva_enabled = _boolean(flying_eva_enabled, "Flying EVA Bonus")
     auto_sort = _boolean(auto_sort, "Auto-sort Inventory")
     auto_sort_magic = _boolean(auto_sort_magic, "Auto-sort Magic Menu")
@@ -748,6 +752,7 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
     lines.extend(melee_damage_rework.build_hext(formulae_rework).rstrip().splitlines())
     lines.extend(mug_chance_rework.build_hext(formulae_rework).rstrip().splitlines())
     lines.extend(status_chance_rework.build_hext(formulae_rework).rstrip().splitlines())
+    lines.extend(no_magic_consumption_patch.build_hext(no_magic_consumption).rstrip().splitlines())
     fixed_commands = fixed_command_menu.build_patch(
         enabled=fixed_command_menu_enabled,
         single_gf_enabled=single_gf_enabled,
@@ -1169,6 +1174,7 @@ def save(data: dict, game_root: Path | None = None,
         modern_controls=modern_controls,
         world_map_fullscreen=world_map_fullscreen,
         battle_results_help=battle_results_help,
+        no_magic_consumption=no_magic_consumption,
         gf_acquisition_rework_enabled=gf_acquisition_rework_enabled,
         vibration_consolidation=vibration_consolidation,
         better_targeting=better_targeting,
@@ -1240,7 +1246,7 @@ def save(data: dict, game_root: Path | None = None,
         install_runtime
         and
         (shared_magic_inventory or xp_bars or hp_bars or interaction_indicators or better_hp_colors or gf_hp_bars or in_game_time or better_targeting or fast_start_enabled
-         or modern_controls or party_switch or no_magic_consumption)
+         or modern_controls or party_switch)
         and not shared_magic_status.get("sharedMagicInventoryRuntime")
     )
     changed_files = [
@@ -1311,7 +1317,9 @@ def save(data: dict, game_root: Path | None = None,
                 fast_start=fast_start_enabled,
                 interaction_indicators=interaction_indicators,
                 modern_controls=modern_controls, party_switch=party_switch,
-                no_magic_consumption=no_magic_consumption,
+                # No Magic Consumption is a Hext patch now; the driver's
+                # copy stays off so only one of them ever hooks the debit.
+                no_magic_consumption=False,
                 camera_speed=camera_speed,
             )
     except Exception:
