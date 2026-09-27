@@ -236,15 +236,20 @@
             activate:()=>{state.selected.encounterRule=rule.id;showEncounterSubtab("rules")}})}]});
   }
   function encounterGroupPanel(row,refresh,origin,className='ff8-encounter-group-detail',heading={}){
+    // A formation can fill several of the eight slots, so the group does not
+    // give every formation the same share (Lexer: "encounter chances aren't
+    // actually equal ... the editor doesn't say that at all").
+    const share=value=>row.encounters.filter(entry=>Number(entry)===Number(value)).length;
     const formations=row.encounters.map((value,index)=>{
       const strip=el('div',{class:'ff8-encounter-formation-row',
         'data-formation-position':index,'aria-label':`Battle ${index+1} of encounter group ${row.id}`},
-        el('div',{class:'ff8-encounter-formation-choice'},encounterGroupSlotControl(row,index,refresh,origin)),
+        el('div',{class:'ff8-encounter-formation-choice'},encounterGroupSlotControl(row,index,refresh,origin),
+          el('span',{class:'ff8-encounter-formation-share','data-formation-share':share(value)},`${share(value)} of ${row.encounters.length}`)),
         encounterPreviewGrid(encounterRowById(value),origin));
       return strip;
     });
     return detailPanel({title:'Encounter group',identity:recordId(row.id),className,...heading,
-      help:'The game chooses one of these eight formations when this group starts a battle. Hover a formation ID to replace it. Changing an enemy changes that formation everywhere it is used. Special level means the enemy uses a level rule we do not yet understand.',
+      help:'The game chooses one of these eight slots when this group starts a battle. A formation can fill several slots; the count beside it says how many. If the game picks a slot evenly, a formation in three slots comes up three times as often as one in a single slot; how it picks is not yet proven. Hover a formation ID to replace it. Changing an enemy changes that formation everywhere it is used. Special level means the enemy uses a level rule we do not yet understand.',
       body:[detailSection({body:LexeditorUI.stack({fill:false,className:'ff8-encounter-formations'},...formations)}),
         detailSection({title:'WHERE THIS GROUP IS USED',
           help:infoHelp('These region and ground rules select this group. Open a rule to change its group.'),

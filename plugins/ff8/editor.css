@@ -171,7 +171,9 @@
    beside them, the name's column took half the panel and left it blank. */
 .ff8-encounter-formation-row { display:grid;grid-template-columns:minmax(0,1fr);gap:4px;min-width:0; }
 .ff8-encounter-formation-choice { position:relative;display:flex;align-items:stretch;min-width:0; }
-.ff8-encounter-formation-choice > .lex-source-control { display:flex;align-items:stretch;width:100%; }
+.ff8-encounter-formation-choice > .lex-source-control { display:flex;align-items:stretch;flex:1 1 auto;min-width:0; }
+.ff8-encounter-formation-share { display:flex;align-items:center;flex:0 0 auto;padding:0 10px;white-space:nowrap;color:var(--lex-text);opacity:.75; }
+.ff8-encounter-formation-share:not([data-formation-share="1"]) { opacity:1; }
 .ff8-encounter-formation-link { width:100%; }
 .ff8-encounter-formation-finder { opacity:0; }
 .ff8-encounter-formation-choice:where(:hover,:focus-within) .ff8-encounter-formation-finder { opacity:1; }

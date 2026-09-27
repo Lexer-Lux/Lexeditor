@@ -388,6 +388,16 @@ def main():
         rows=page.locator('.ff8-encounter-group-detail .ff8-encounter-formation-row')
         assert rows.count()==8
         assert rows.nth(1).locator('[data-lex-battle-position]').count()==7
+        # Each slot says how many of the eight slots hold its formation, so a
+        # repeated formation's larger share is on the page (Lexer, 2026-09-27).
+        shares=page.evaluate("""() => {
+          const rows=[...document.querySelectorAll('.ff8-encounter-group-detail .ff8-encounter-formation-row')];
+          return rows.map(row=>[row.querySelector('.ff8-encounter-formation-link').textContent.replace(/\\D/g,''),
+            row.querySelector('.ff8-encounter-formation-share').textContent]);
+        }""")
+        for formation,text in shares:
+            count=sum(1 for other,_ in shares if other==formation)
+            assert text==f'{count} of 8',(formation,text,shares)
         bounds=page.evaluate("""() => {
           const rows=[...document.querySelectorAll('.ff8-encounter-group-detail .ff8-encounter-formation-row')];
           const usage=document.querySelector('.ff8-encounter-group-detail section[aria-label="WHERE THIS GROUP IS USED"]');
