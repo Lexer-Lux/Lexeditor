@@ -25,7 +25,9 @@
   function assetName(row,overridden){return overridden?el("span",{class:"lex-value-modified"},el("output",{},row.name)):row.name}
   const sfxOverridden=row=>!!(row.modFiles?.length||row.audioBase64);
   const sfxFile=row=>String(row.id).startsWith("file:");
-  const modelOverridden=row=>!!(row.override||row.datBase64);
+  // A mod copy of an enemy's file also holds its stats and AI; the model is
+  // only changed when its model sections differ (the server compares them).
+  const modelOverridden=row=>!!(row.modelChanged||row.datBase64);
   const textureOverridden=row=>!!row.modFiles?.length;
   function renderSfx(){
     // A shipped sound has no name of its own - "Sound 12" only repeats its

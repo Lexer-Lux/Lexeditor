@@ -620,6 +620,49 @@ def _cached_model_file(path_text: str, size: int, mtime_ns: int) -> dict:
     return _model_file_info(Path(path_text))
 
 
+# The parts of a battle file that are the model itself. An enemy's file also
+# carries its stats, AI and sounds, which the Enemies tab edits, so a mod copy
+# of the file is not by itself a changed model (Lexer, 2026-09-27: Griever,
+# Abadon and others read as replaced models in a mod that only edits stats).
+MODEL_PART_SECTIONS = frozenset((
+    "Skeleton", "Model geometry", "Model animation", "Dynamic texture data",
+    "Animation sequences", "Camera sequence", "Textures", "Extra animation block",
+))
+
+
+@lru_cache(maxsize=1024)
+def _model_parts_digest(path_text: str, size: int, mtime_ns: int) -> str:
+    """Hash of a battle file's model sections, or of the whole file when its
+    sections are not mapped."""
+    data = Path(path_text).read_bytes()
+    sections = parse_dat_sections(data)
+    names = _section_names(Path(path_text).name, len(sections))[1] if sections else None
+    digest = hashlib.sha256()
+    if not sections or names is None:
+        digest.update(data)
+        return digest.hexdigest()
+    for name, section in zip(names, sections):
+        if name in MODEL_PART_SECTIONS:
+            digest.update(name.encode())
+            digest.update(data[section["offset"]:section["offset"] + section["size"]])
+    return digest.hexdigest()
+
+
+def _model_changed(filename: str, dataset: str) -> bool:
+    """Whether this dataset's copy changes the model, not just stats or AI."""
+    if dataset == "vanilla":
+        return False
+    mine = _battle_path(filename, dataset)
+    shipped = _battle_path(filename, "vanilla")
+    if not mine.is_file() or not shipped.is_file() or mine.resolve() == shipped.resolve():
+        return False
+
+    def digest(path: Path) -> str:
+        stat = path.stat()
+        return _model_parts_digest(str(path), stat.st_size, stat.st_mtime_ns)
+    return digest(mine) != digest(shipped)
+
+
 def _model_bytes(filename: str, dataset: str) -> tuple[bytes, str | None]:
     """Return resolved model bytes and the mod-relative override path."""
     override = _battle_override(filename, dataset)
@@ -898,8 +941,12 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
         stat = target.stat()
         info = _cached_model_file(str(target), stat.st_size, stat.st_mtime_ns)
     row: dict = {"id": filename, "kind": "model", "file": filename,
-                 "override": override, "modOnly": filename in mod_only_files}
+                 "override": override, "modOnly": filename in mod_only_files,
+                 "modelChanged": bool(override) and (filename in mod_only_files
+                                                     or _model_changed(filename, dataset))}
     if filename == "scene.out":
+        # Formations, edited on the Encounters tab: never a changed model.
+        row["modelChanged"] = False
         row.update(modelKind="locked", name="Battle formations (scene.out)",
                    sections=None, counts=None, tims=[],
                    sizeBytes=info["sizeBytes"] if info else archive_sizes.get(filename, 0),
