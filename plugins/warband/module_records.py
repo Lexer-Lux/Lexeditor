@@ -367,6 +367,8 @@ PROMOTED_TABS = {"music": "music", "factions": "factions", "skills": "skills", "
 
 def _source(path: Path):
     raw = path.read_bytes()
+    if raw.startswith(b'\xef\xbb\xbf'):
+        return raw.decode('utf-8-sig'), 'utf-8-sig', raw
     for encoding in ("utf-8", "cp1254", "latin1"):
         try:
             return raw.decode(encoding), encoding, raw
@@ -825,6 +827,60 @@ def _validate_python(encoded: bytes):
         temporary_path.unlink(missing_ok=True)
 
 
+def _write_candidate(path, candidate, encoding, raw):
+    if encoding != 'utf-8-sig' and any(ord(char) > 127 for char in candidate) and not re.search(
+            r"coding[:=]\s*[-\w.]+", "\n".join(candidate.splitlines()[:2])):
+        candidate = f"# coding: {encoding}\n" + candidate
+    encoded = candidate.encode(encoding)
+    _validate_python(encoded)
+    if path.read_bytes() != raw:
+        raise ValueError(f"{path.name} changed while validating; reload before saving")
+    backup = path.with_name(path.name + ".lexeditor.bak")
+    backup.write_bytes(raw)
+    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.stem}-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(encoded)
+        os.replace(temporary_name, path)
+    finally:
+        if os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+    return {"sha256": hashlib.sha256(encoded).hexdigest(), "backup": str(backup)}
+
+
+def create_sound(root, expected_sha256, record_index, original_id, new_id):
+    """Append a sound template; process_sounds numbers existing entries unchanged."""
+    if type(record_index) is not int:
+        raise ValueError("Choose an existing sound")
+    if not isinstance(new_id, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", new_id):
+        raise ValueError("ID must start with a lowercase letter and use letters, digits or underscores")
+    schema = SCHEMAS['sounds']
+    path = Path(root) / schema['filename']
+    with _LOCK:
+        text, encoding, raw = _source(path)
+        if hashlib.sha256(raw).hexdigest() != expected_sha256:
+            raise ValueError("Sound source changed; reload before creating")
+        records = _records(text, schema)
+        ids = [row['id'] for row in records]
+        if any(row.get('problem') for row in records) or len(set(ids)) != len(ids):
+            raise ValueError("Repair unsupported or duplicate source records before creating")
+        if new_id in ids:
+            raise ValueError("A sound with that ID already exists")
+        if not 0 <= record_index < len(records) or records[record_index]['id'] != original_id:
+            raise ValueError("Template sound changed; reload before creating")
+        spans = _record_spans(text, schema['variable'])
+        start, end = spans[record_index]
+        left, right = records[record_index]['_spans'][0]
+        copied = text[start:left] + json.dumps(new_id) + text[right:end]
+        insertion = spans[-1][1]
+        newline = '\r\n' if '\r\n' in text else '\n'
+        candidate = text[:insertion] + ',' + newline + '  ' + copied + text[insertion:]
+        if [row['id'] for row in _records(candidate, schema)] != ids + [new_id]:
+            raise ValueError("Creation changed existing sound identities")
+        return {**_write_candidate(path, candidate, encoding, raw),
+                'created':new_id, 'recordIndex':len(records)}
+
+
 def save_dataset(root, dataset: str, expected_sha256: str, edits: list[dict]):
     if dataset not in SCHEMAS:
         raise ValueError("Unknown Warband Module System dataset")
@@ -878,21 +934,4 @@ def save_dataset(root, dataset: str, expected_sha256: str, edits: list[dict]):
             raise ValueError("Save changed record identities or record count")
         if [len(row["_spans"]) for row in reparsed] != [len(row["_spans"]) for row in records]:
             raise ValueError("Save changed Module System field structure")
-        if any(ord(char) > 127 for char in candidate) and not re.search(
-                r"coding[:=]\s*[-\w.]+", "\n".join(candidate.splitlines()[:2])):
-            candidate = f"# coding: {encoding}\n" + candidate
-        encoded = candidate.encode(encoding)
-        _validate_python(encoded)
-        if path.read_bytes() != raw:
-            raise ValueError(f"{schema['filename']} changed while validating; reload before saving")
-        backup = path.with_name(path.name + ".lexeditor.bak")
-        backup.write_bytes(raw)
-        fd, temporary_name = tempfile.mkstemp(prefix=f".{path.stem}-", dir=path.parent)
-        try:
-            with os.fdopen(fd, "wb") as stream:
-                stream.write(encoded)
-            os.replace(temporary_name, path)
-        finally:
-            if os.path.exists(temporary_name):
-                os.unlink(temporary_name)
-        return {"saved": changed_records, "sha256": hashlib.sha256(encoded).hexdigest(), "backup": str(backup)}
+        return {"saved": changed_records, **_write_candidate(path, candidate, encoding, raw)}
