@@ -30,19 +30,21 @@ at the far edge of W. A crit is taken as twice normal damage.
 
 One press, at the right time (Lexer, 2026-09-26: mashing Square won every hit):
 
+- Square only counts while an action plays (Lexer, 2026-09-28: outside an
+  attack the code should not fire at all). 0050A790 starts an action's
+  animation task when the scheduler dispatches its message 0x68, for party
+  and enemy actions alike; the scheduler removes that message (00500D51)
+  when the action is over. Outside that, a press does nothing and makes no
+  sound. A press left over from the last action is cleared silently.
 - One try per hit (Lexer, 2026-09-28). The first press arms the next hit,
   and every other press before that hit lands counts for nothing. A second
   press while armed is a fumble: the miss sound plays at once (once), and
   the hit counts as unpressed (Lexer, 2026-09-27: mashing with Squall was
-  silent until the hit, then sounded two or three times).
-- A press that no hit uses within W was early, whatever comes next: the miss
-  sound plays then, W after the press, and the press is spent (Lexer: an
-  early press was silent, or its miss sounded only when the attack ended).
-  The input hook runs every battle input frame, so it notices in time.
-- The try comes back when a hit lands. The game does not say when an attack
-  starts, so a press no hit ever uses (in a menu, or the last press of a
-  battle) also expires three windows after it was made; later presses do
-  not extend it.
+  silent until the hit, then sounded two or three times). The try comes
+  back when the hit lands.
+- A press is judged when the hit lands, however early it was, so an early
+  press in an attack always gets its miss sound. A press in an action that
+  never hits (a cure, an item) is never judged and stays silent.
 - A press after a hit lands counts for nothing on that hit: it arms the
   next one, so the hits of a multi-hit attack can each be timed.
 
@@ -92,7 +94,7 @@ DEFAULT_SUCCESS_SOUND = 1   # the menu confirm sound (menu sounds 1 and 2)
 DEFAULT_CRIT_SOUND = 9      # menu sound 3 in the table at 00B87D28
 DEFAULT_FAILURE_SOUND = 16  # the menu denied buzz (menu sound 5)
 MAX_SOUND = 2790            # audio.fmt holds 2791 entries; 0 is blank
-EARLY_FACTOR = 3            # a press older than 3 windows is forgotten
+EARLY_FACTOR = 3            # stored for old patches' layout; no longer read
 
 INPUT_HOOK = 0x004A8554
 INPUT_ORIGINAL = bytes.fromhex("66 8B 41 10 66 89 41 18")
@@ -102,6 +104,13 @@ SQUARE = 0x80  # FF8 function bits: L2 01 R2 02 L1 04 R1 08 Tri 10 O 20 X 40 Sq 
 HIT_HOOK = 0x00491124
 HIT_ORIGINAL = bytes.fromhex("8A 0D 0E 8E D2 01")  # mov cl, [01D28E0E]
 HIT_RESUME = 0x0049112A
+ACTION_HOOK = 0x0050A790
+ACTION_ORIGINAL = bytes.fromhex("56 8B 74 24 08")  # push esi; mov esi, [esp+8]
+ACTION_RESUME = 0x0050A795
+ACTION_END_HOOK = 0x00500D51
+ACTION_END_ORIGINAL = bytes.fromhex("68 68 6D D9 01")  # push 01D96D68 (the scheduler queue)
+ACTION_END_RESUME = 0x00500D56
+ACTION_MESSAGE = 0x68
 AUTO_HOOK = 0x00492B22
 AUTO_ORIGINAL = bytes.fromhex("B8 01 00 00 00 C3")  # mov eax, 1; ret
 HIT_ROLL_CALL = 0x00492C15
@@ -151,37 +160,22 @@ DEFENDING = DATA + 0x30     # a block's hit roll landed: its crit roll is judged
 JUDGED = DATA + 0x34        # the judged press's lead over its hit, or -1
 HIT_WINDOW = DATA + 0x38    # an attack's hit window, or a block's dodge band
 FORCE_MISS = DATA + 0x3C    # an automatic hit that missed: fail the roll after it
-DATA_SIZE = 0x40
+ACTION_START = DATA + 0x40  # when the current action's animation started
+ACTIVE = DATA + 0x44        # an action is playing: Square counts
+DATA_SIZE = 0x48
 
 ASSEMBLY = f"""
 input:
     mov ax, word ptr [ecx + 0x10]
     mov word ptr [ecx + 0x18], ax
+    test byte ptr [ecx + 0x12], {SQUARE:#x}
+    jz input_done
+    cmp dword ptr [{ACTIVE:#x}], 0
+    je input_done
     pushad
     call dword ptr [{TIME_GET_TIME:#x}]
     cmp dword ptr [{PRESSED:#x}], 0
-    je input_pressed
-    cmp dword ptr [{FUMBLED:#x}], 0
-    jne input_pressed
-    mov edx, eax
-    sub edx, dword ptr [{PRESS_TIME:#x}]
-    cmp edx, dword ptr [{WINDOW:#x}]
-    jbe input_pressed
-    mov dword ptr [{FUMBLED:#x}], 1
-    push dword ptr [{SOUND_FAILURE:#x}]
-    call {PLAY_SOUND:#x}
-    add esp, 4
-    call dword ptr [{TIME_GET_TIME:#x}]
-input_pressed:
-    mov ecx, dword ptr [esp + 0x18]
-    test byte ptr [ecx + 0x12], {SQUARE:#x}
-    jz input_popped
-    cmp dword ptr [{PRESSED:#x}], 0
     je arm
-    mov edx, eax
-    sub edx, dword ptr [{PRESS_TIME:#x}]
-    cmp edx, dword ptr [{EARLY:#x}]
-    ja arm
     cmp dword ptr [{FUMBLED:#x}], 0
     jne input_popped
     mov dword ptr [{FUMBLED:#x}], 1
@@ -199,6 +193,30 @@ input_done:
     push {INPUT_RESUME:#x}
     ret
 
+action:
+    pushad
+    pushfd
+    mov dword ptr [{PRESSED:#x}], 0
+    mov dword ptr [{FUMBLED:#x}], 0
+    mov dword ptr [{ACTIVE:#x}], 1
+    call dword ptr [{TIME_GET_TIME:#x}]
+    mov dword ptr [{ACTION_START:#x}], eax
+    popfd
+    popad
+    push esi
+    mov esi, dword ptr [esp + 8]
+    push {ACTION_RESUME:#x}
+    ret
+
+action_end:
+    cmp word ptr [esi + 2], {ACTION_MESSAGE:#x}
+    jne action_end_resume
+    mov dword ptr [{ACTIVE:#x}], 0
+action_end_resume:
+    push 0x1d96d68
+    push {ACTION_END_RESUME:#x}
+    ret
+
 take_press:
     call dword ptr [{TIME_GET_TIME:#x}]
     mov dword ptr [{LAST_HIT:#x}], eax
@@ -206,8 +224,6 @@ take_press:
     je take_none
     mov dword ptr [{PRESSED:#x}], 0
     sub eax, dword ptr [{PRESS_TIME:#x}]
-    cmp eax, dword ptr [{EARLY:#x}]
-    ja take_none
     cmp dword ptr [{FUMBLED:#x}], 0
     jne take_none
     ret
@@ -678,123 +694,125 @@ hit_done:
     ret
 """
 
-ENTRY_LABELS = ("hit", "auto", "hit_roll", "crit_roll", "gunblade",
+ENTRY_LABELS = ("hit", "action", "action_end", "auto", "hit_roll", "crit_roll", "gunblade",
                 "e10_hit_roll", "e10_crit_roll", "e10_auto_crit")
 
 # Assembled at CAVE from ASSEMBLY; tests/ff8/test_ff8_timed_hits.py
 # re-assembles it (keystone) and runs it under unicorn.
 CODE = bytes.fromhex(
-    "66 8B 41 10 66 89 41 18 60 FF 15 78 93 B6 00 83"
-    "3D 1C C0 7A 02 00 74 37 83 3D 2C C0 7A 02 00 75"
-    "2E 89 C2 2B 15 18 C0 7A 02 3B 15 00 C0 7A 02 76"
-    "1E C7 05 2C C0 7A 02 01 00 00 00 FF 35 14 C0 7A"
-    "02 E8 3A F9 CB FD 83 C4 04 FF 15 78 93 B6 00 8B"
-    "4C 24 18 F6 41 12 80 74 55 83 3D 1C C0 7A 02 00"
-    "74 33 89 C2 2B 15 18 C0 7A 02 3B 15 04 C0 7A 02"
-    "77 23 83 3D 2C C0 7A 02 00 75 33 C7 05 2C C0 7A"
-    "02 01 00 00 00 FF 35 14 C0 7A 02 E8 F0 F8 CB FD"
-    "83 C4 04 EB 19 A3 18 C0 7A 02 C7 05 1C C0 7A 02"
-    "01 00 00 00 C7 05 2C C0 7A 02 00 00 00 00 61 68"
-    "5C 85 4A 00 C3 FF 15 78 93 B6 00 A3 28 C0 7A 02"
-    "83 3D 1C C0 7A 02 00 74 22 C7 05 1C C0 7A 02 00"
-    "00 00 00 2B 05 18 C0 7A 02 3B 05 04 C0 7A 02 77"
-    "0A 83 3D 2C C0 7A 02 00 75 01 C3 B8 FF FF FF FF"
-    "C3 53 8B 5C 24 08 81 FB FF 00 00 00 76 05 BB FF"
-    "00 00 00 C7 05 24 C0 7A 02 00 00 00 00 C7 05 30"
-    "C0 7A 02 00 00 00 00 C7 05 34 C0 7A 02 FF FF FF"
-    "FF E8 8F FF FF FF 83 F8 FF 74 3A 89 C1 A1 00 C0"
-    "7A 02 F7 E3 51 B9 FF 00 00 00 F7 F1 59 85 DB 74"
-    "16 39 C1 77 12 A3 38 C0 7A 02 89 0D 34 C0 7A 02"
-    "B8 01 00 00 00 5B C3 FF 35 14 C0 7A 02 E8 1E F8"
-    "CB FD 83 C4 04 31 C0 5B C3 53 56 8B 5C 24 0C 81"
-    "FB FF 00 00 00 76 05 BB FF 00 00 00 8B 35 34 C0"
-    "7A 02 83 FE FF 0F 84 B4 00 00 00 C7 05 34 C0 7A"
-    "02 FF FF FF FF A1 38 C0 7A 02 F7 E3 B9 FF 00 00"
-    "00 F7 F1 85 DB 74 4E 39 C6 77 4A 89 C1 B8 E8 03"
-    "00 00 85 C9 74 11 69 C6 F4 01 00 00 31 D2 F7 F1"
-    "F7 D8 05 E8 03 00 00 83 3D 08 C0 7A 02 00 74 0F"
-    "A3 20 C0 7A 02 C7 05 24 C0 7A 02 01 00 00 00 FF"
-    "35 10 C0 7A 02 E8 96 F7 CB FD 83 C4 04 B8 01 00"
-    "00 00 5E 5B C3 8B 0D 38 C0 7A 02 29 C1 A1 38 C0"
-    "7A 02 29 F0 69 C0 E8 03 00 00 85 C9 75 07 B8 E8"
-    "03 00 00 EB 04 31 D2 F7 F1 83 3D 08 C0 7A 02 00"
-    "74 0F A3 20 C0 7A 02 C7 05 24 C0 7A 02 01 00 00"
-    "00 FF 35 0C C0 7A 02 E8 44 F7 CB FD 83 C4 04 31"
-    "C0 5E 5B C3 53 8B 5C 24 08 81 FB FF 00 00 00 76"
-    "05 BB FF 00 00 00 C7 05 24 C0 7A 02 00 00 00 00"
-    "C7 05 30 C0 7A 02 00 00 00 00 85 DB 74 57 E8 42"
-    "FE FF FF 89 C1 B8 FF 00 00 00 29 D8 F7 25 00 C0"
-    "7A 02 51 B9 FF 00 00 00 F7 F1 59 A3 38 C0 7A 02"
-    "89 0D 34 C0 7A 02 C7 05 30 C0 7A 02 01 00 00 00"
-    "83 F9 FF 74 24 85 C0 74 20 39 C1 77 1C C7 05 30"
-    "C0 7A 02 00 00 00 00 FF 35 10 C0 7A 02 E8 BE F6"
-    "CB FD 83 C4 04 31 C0 5B C3 B8 01 00 00 00 5B C3"
-    "53 56 57 8B 5C 24 10 81 FB FF 00 00 00 76 05 BB"
-    "FF 00 00 00 83 3D 30 C0 7A 02 00 0F 84 02 01 00"
-    "00 C7 05 30 C0 7A 02 00 00 00 00 8B 35 34 C0 7A"
-    "02 8B 3D 38 C0 7A 02 B8 FF 00 00 00 29 D8 8B 0D"
-    "00 C0 7A 02 29 F9 F7 E1 B9 FF 00 00 00 F7 F1 83"
-    "FE FF 74 4B 89 F1 29 F9 39 C1 77 43 85 C0 74 0D"
-    "69 C9 E8 03 00 00 91 31 D2 F7 F1 EB 05 B8 E8 03"
-    "00 00 83 3D 08 C0 7A 02 00 74 0F A3 20 C0 7A 02"
-    "C7 05 24 C0 7A 02 01 00 00 00 FF 35 0C C0 7A 02"
-    "E8 1B F6 CB FD 83 C4 04 31 C0 E9 89 00 00 00 85"
-    "DB 74 69 8B 0D 00 C0 7A 02 29 F9 29 C1 83 FE FF"
-    "74 23 3B 35 00 C0 7A 02 77 1B 85 C9 74 17 89 F2"
-    "29 FA 29 C2 69 C2 F4 01 00 00 31 D2 F7 F1 05 F4"
-    "01 00 00 EB 05 B8 E8 03 00 00 83 3D 08 C0 7A 02"
+    "66 8B 41 10 66 89 41 18 F6 41 12 80 74 56 83 3D"
+    "44 C0 7A 02 00 74 4D 60 FF 15 78 93 B6 00 83 3D"
+    "1C C0 7A 02 00 74 23 83 3D 2C C0 7A 02 00 75 33"
+    "C7 05 2C C0 7A 02 01 00 00 00 FF 35 14 C0 7A 02"
+    "E8 3B F9 CB FD 83 C4 04 EB 19 A3 18 C0 7A 02 C7"
+    "05 1C C0 7A 02 01 00 00 00 C7 05 2C C0 7A 02 00"
+    "00 00 00 61 68 5C 85 4A 00 C3 60 9C C7 05 1C C0"
+    "7A 02 00 00 00 00 C7 05 2C C0 7A 02 00 00 00 00"
+    "C7 05 44 C0 7A 02 01 00 00 00 FF 15 78 93 B6 00"
+    "A3 40 C0 7A 02 9D 61 56 8B 74 24 08 68 95 A7 50"
+    "00 C3 66 83 7E 02 68 75 0A C7 05 44 C0 7A 02 00"
+    "00 00 00 68 68 6D D9 01 68 56 0D 50 00 C3 FF 15"
+    "78 93 B6 00 A3 28 C0 7A 02 83 3D 1C C0 7A 02 00"
+    "74 1A C7 05 1C C0 7A 02 00 00 00 00 2B 05 18 C0"
+    "7A 02 83 3D 2C C0 7A 02 00 75 01 C3 B8 FF FF FF"
+    "FF C3 53 8B 5C 24 08 81 FB FF 00 00 00 76 05 BB"
+    "FF 00 00 00 C7 05 24 C0 7A 02 00 00 00 00 C7 05"
+    "30 C0 7A 02 00 00 00 00 C7 05 34 C0 7A 02 FF FF"
+    "FF FF E8 97 FF FF FF 83 F8 FF 74 3A 89 C1 A1 00"
+    "C0 7A 02 F7 E3 51 B9 FF 00 00 00 F7 F1 59 85 DB"
+    "74 16 39 C1 77 12 A3 38 C0 7A 02 89 0D 34 C0 7A"
+    "02 B8 01 00 00 00 5B C3 FF 35 14 C0 7A 02 E8 1D"
+    "F8 CB FD 83 C4 04 31 C0 5B C3 53 56 8B 5C 24 0C"
+    "81 FB FF 00 00 00 76 05 BB FF 00 00 00 8B 35 34"
+    "C0 7A 02 83 FE FF 0F 84 B4 00 00 00 C7 05 34 C0"
+    "7A 02 FF FF FF FF A1 38 C0 7A 02 F7 E3 B9 FF 00"
+    "00 00 F7 F1 85 DB 74 4E 39 C6 77 4A 89 C1 B8 E8"
+    "03 00 00 85 C9 74 11 69 C6 F4 01 00 00 31 D2 F7"
+    "F1 F7 D8 05 E8 03 00 00 83 3D 08 C0 7A 02 00 74"
+    "0F A3 20 C0 7A 02 C7 05 24 C0 7A 02 01 00 00 00"
+    "FF 35 10 C0 7A 02 E8 95 F7 CB FD 83 C4 04 B8 01"
+    "00 00 00 5E 5B C3 8B 0D 38 C0 7A 02 29 C1 A1 38"
+    "C0 7A 02 29 F0 69 C0 E8 03 00 00 85 C9 75 07 B8"
+    "E8 03 00 00 EB 04 31 D2 F7 F1 83 3D 08 C0 7A 02"
     "00 74 0F A3 20 C0 7A 02 C7 05 24 C0 7A 02 01 00"
-    "00 00 83 FE FF 74 0E FF 35 14 C0 7A 02 E8 AE F5"
-    "CB FD 83 C4 04 B8 01 00 00 00 EB 1C 83 FE FF 74"
-    "0E FF 35 14 C0 7A 02 E8 94 F5 CB FD 83 C4 04 31"
-    "C0 EB 05 B8 02 00 00 00 5F 5E 5B C3 8B 44 24 04"
-    "8B 4C 24 08 83 F8 03 72 13 83 F9 03 73 2F 68 FF"
-    "00 00 00 E8 2C FE FF FF 83 C4 04 C3 83 F9 03 72"
-    "1C 68 FF 00 00 00 E8 C6 FC FF FF 83 C4 04 85 C0"
-    "75 10 C7 05 3C C0 7A 02 01 00 00 00 C3 B8 01 00"
-    "00 00 C3 8B 44 24 0C 8B 4C 24 10 83 F8 03 72 14"
-    "83 F9 03 73 3D 85 F6 74 39 56 E8 E5 FD FF FF 83"
-    "C4 04 EB 24 83 F9 03 72 29 83 3D 3C C0 7A 02 00"
-    "74 0D C7 05 3C C0 7A 02 00 00 00 00 31 F6 C3 56"
-    "E8 6C FC FF FF 83 C4 04 85 C0 74 03 31 C0 C3 31"
-    "F6 C3 E9 89 32 CE FD 8B 44 24 0C 8B 4C 24 10 83"
-    "F8 03 72 15 83 F9 03 73 E9 56 E8 21 FE FF FF 83"
-    "C4 04 83 F8 02 74 DB EB CF 83 F9 03 72 D4 56 E8"
-    "A5 FC FF FF 83 C4 04 EB BF 81 FE 70 02 00 00 72"
-    "17 81 FD 70 02 00 00 73 B9 85 FF 74 B5 57 E8 61"
-    "FD FF FF 83 C4 04 EB 11 81 FD 70 02 00 00 72 A2"
-    "57 E8 FB FB FF FF 83 C4 04 85 C0 74 03 31 C0 C3"
-    "31 FF C3 81 FE 70 02 00 00 72 20 81 FD 70 02 00"
-    "00 0F 83 7B FF FF FF 57 E8 B3 FD FF FF 83 C4 04"
-    "83 F8 02 0F 84 69 FF FF FF EB CE 81 FD 70 02 00"
-    "00 0F 82 5B FF FF FF 57 E8 2C FC FF FF 83 C4 04"
-    "EB B7 81 FE 70 02 00 00 72 1B 81 FD 70 02 00 00"
-    "0F 83 3C FF FF FF 68 FF 00 00 00 E8 E4 FC FF FF"
-    "83 C4 04 EB 9E 81 FD 70 02 00 00 0F 82 21 FF FF"
-    "FF 68 FF 00 00 00 E8 76 FB FF FF 83 C4 04 85 C0"
-    "75 81 C7 04 24 CB 30 49 00 C3 60 9C 83 7C 24 2C"
-    "03 73 5E 83 FD 03 72 59 66 83 3D 90 8D D2 01 00"
-    "74 4F 68 FF 00 00 00 E8 45 FB FF FF 83 C4 04 85"
-    "C0 74 4D 8B 44 24 2C 69 C0 D0 00 00 00 0F B6 80"
-    "D2 7B D2 01 0F B6 0D 3B A2 D2 01 01 C8 69 C0 FF"
-    "00 00 00 C1 E8 08 50 E8 8D FB FF FF 83 C4 04 85"
-    "C0 74 0E C6 05 07 8E D2 01 01 80 0D DE 7A D2 01"
-    "02 9D 61 53 31 DB 8D 44 95 00 68 37 F5 48 00 C3"
-    "9D 61 80 0D DE 7A D2 01 04 68 22 F5 48 00 C3 60"
-    "9C 83 3D 24 C0 7A 02 00 74 26 C7 05 24 C0 7A 02"
-    "00 00 00 00 85 F6 7E 18 8B 44 24 08 0F AF 05 20"
-    "C0 7A 02 31 D2 B9 E8 03 00 00 F7 F1 89 44 24 08"
-    "9D 61 8A 0D 0E 8E D2 01 68 2A 11 49 00 C3"
+    "00 00 FF 35 0C C0 7A 02 E8 43 F7 CB FD 83 C4 04"
+    "31 C0 5E 5B C3 53 8B 5C 24 08 81 FB FF 00 00 00"
+    "76 05 BB FF 00 00 00 C7 05 24 C0 7A 02 00 00 00"
+    "00 C7 05 30 C0 7A 02 00 00 00 00 85 DB 74 57 E8"
+    "4A FE FF FF 89 C1 B8 FF 00 00 00 29 D8 F7 25 00"
+    "C0 7A 02 51 B9 FF 00 00 00 F7 F1 59 A3 38 C0 7A"
+    "02 89 0D 34 C0 7A 02 C7 05 30 C0 7A 02 01 00 00"
+    "00 83 F9 FF 74 24 85 C0 74 20 39 C1 77 1C C7 05"
+    "30 C0 7A 02 00 00 00 00 FF 35 10 C0 7A 02 E8 BD"
+    "F6 CB FD 83 C4 04 31 C0 5B C3 B8 01 00 00 00 5B"
+    "C3 53 56 57 8B 5C 24 10 81 FB FF 00 00 00 76 05"
+    "BB FF 00 00 00 83 3D 30 C0 7A 02 00 0F 84 02 01"
+    "00 00 C7 05 30 C0 7A 02 00 00 00 00 8B 35 34 C0"
+    "7A 02 8B 3D 38 C0 7A 02 B8 FF 00 00 00 29 D8 8B"
+    "0D 00 C0 7A 02 29 F9 F7 E1 B9 FF 00 00 00 F7 F1"
+    "83 FE FF 74 4B 89 F1 29 F9 39 C1 77 43 85 C0 74"
+    "0D 69 C9 E8 03 00 00 91 31 D2 F7 F1 EB 05 B8 E8"
+    "03 00 00 83 3D 08 C0 7A 02 00 74 0F A3 20 C0 7A"
+    "02 C7 05 24 C0 7A 02 01 00 00 00 FF 35 0C C0 7A"
+    "02 E8 1A F6 CB FD 83 C4 04 31 C0 E9 89 00 00 00"
+    "85 DB 74 69 8B 0D 00 C0 7A 02 29 F9 29 C1 83 FE"
+    "FF 74 23 3B 35 00 C0 7A 02 77 1B 85 C9 74 17 89"
+    "F2 29 FA 29 C2 69 C2 F4 01 00 00 31 D2 F7 F1 05"
+    "F4 01 00 00 EB 05 B8 E8 03 00 00 83 3D 08 C0 7A"
+    "02 00 74 0F A3 20 C0 7A 02 C7 05 24 C0 7A 02 01"
+    "00 00 00 83 FE FF 74 0E FF 35 14 C0 7A 02 E8 AD"
+    "F5 CB FD 83 C4 04 B8 01 00 00 00 EB 1C 83 FE FF"
+    "74 0E FF 35 14 C0 7A 02 E8 93 F5 CB FD 83 C4 04"
+    "31 C0 EB 05 B8 02 00 00 00 5F 5E 5B C3 8B 44 24"
+    "04 8B 4C 24 08 83 F8 03 72 13 83 F9 03 73 2F 68"
+    "FF 00 00 00 E8 2C FE FF FF 83 C4 04 C3 83 F9 03"
+    "72 1C 68 FF 00 00 00 E8 C6 FC FF FF 83 C4 04 85"
+    "C0 75 10 C7 05 3C C0 7A 02 01 00 00 00 C3 B8 01"
+    "00 00 00 C3 8B 44 24 0C 8B 4C 24 10 83 F8 03 72"
+    "14 83 F9 03 73 3D 85 F6 74 39 56 E8 E5 FD FF FF"
+    "83 C4 04 EB 24 83 F9 03 72 29 83 3D 3C C0 7A 02"
+    "00 74 0D C7 05 3C C0 7A 02 00 00 00 00 31 F6 C3"
+    "56 E8 6C FC FF FF 83 C4 04 85 C0 74 03 31 C0 C3"
+    "31 F6 C3 E9 88 32 CE FD 8B 44 24 0C 8B 4C 24 10"
+    "83 F8 03 72 15 83 F9 03 73 E9 56 E8 21 FE FF FF"
+    "83 C4 04 83 F8 02 74 DB EB CF 83 F9 03 72 D4 56"
+    "E8 A5 FC FF FF 83 C4 04 EB BF 81 FE 70 02 00 00"
+    "72 17 81 FD 70 02 00 00 73 B9 85 FF 74 B5 57 E8"
+    "61 FD FF FF 83 C4 04 EB 11 81 FD 70 02 00 00 72"
+    "A2 57 E8 FB FB FF FF 83 C4 04 85 C0 74 03 31 C0"
+    "C3 31 FF C3 81 FE 70 02 00 00 72 20 81 FD 70 02"
+    "00 00 0F 83 7B FF FF FF 57 E8 B3 FD FF FF 83 C4"
+    "04 83 F8 02 0F 84 69 FF FF FF EB CE 81 FD 70 02"
+    "00 00 0F 82 5B FF FF FF 57 E8 2C FC FF FF 83 C4"
+    "04 EB B7 81 FE 70 02 00 00 72 1B 81 FD 70 02 00"
+    "00 0F 83 3C FF FF FF 68 FF 00 00 00 E8 E4 FC FF"
+    "FF 83 C4 04 EB 9E 81 FD 70 02 00 00 0F 82 21 FF"
+    "FF FF 68 FF 00 00 00 E8 76 FB FF FF 83 C4 04 85"
+    "C0 75 81 C7 04 24 CB 30 49 00 C3 60 9C 83 7C 24"
+    "2C 03 73 5E 83 FD 03 72 59 66 83 3D 90 8D D2 01"
+    "00 74 4F 68 FF 00 00 00 E8 45 FB FF FF 83 C4 04"
+    "85 C0 74 4D 8B 44 24 2C 69 C0 D0 00 00 00 0F B6"
+    "80 D2 7B D2 01 0F B6 0D 3B A2 D2 01 01 C8 69 C0"
+    "FF 00 00 00 C1 E8 08 50 E8 8D FB FF FF 83 C4 04"
+    "85 C0 74 0E C6 05 07 8E D2 01 01 80 0D DE 7A D2"
+    "01 02 9D 61 53 31 DB 8D 44 95 00 68 37 F5 48 00"
+    "C3 9D 61 80 0D DE 7A D2 01 04 68 22 F5 48 00 C3"
+    "60 9C 83 3D 24 C0 7A 02 00 74 26 C7 05 24 C0 7A"
+    "02 00 00 00 00 85 F6 7E 18 8B 44 24 08 0F AF 05"
+    "20 C0 7A 02 31 D2 B9 E8 03 00 00 F7 F1 89 44 24"
+    "08 9D 61 8A 0D 0E 8E D2 01 68 2A 11 49 00 C3"
 )
 ENTRIES = {
-    "hit": 0x27abf0f,
-    "auto": 0x27abcfc,
-    "hit_roll": 0x27abd43,
-    "crit_roll": 0x27abd97,
-    "gunblade": 0x27abe8a,
-    "e10_hit_roll": 0x27abdc9,
-    "e10_crit_roll": 0x27abe03,
-    "e10_auto_crit": 0x27abe42,
+    "hit": 0x27abf10,
+    "action": 0x27ab96a,
+    "action_end": 0x27ab9a2,
+    "auto": 0x27abcfd,
+    "hit_roll": 0x27abd44,
+    "crit_roll": 0x27abd98,
+    "gunblade": 0x27abe8b,
+    "e10_hit_roll": 0x27abdca,
+    "e10_crit_roll": 0x27abe04,
+    "e10_auto_crit": 0x27abe43,
 }
 HIT_ENTRY = ENTRIES.get("hit", 0)
 
@@ -821,7 +839,7 @@ def _bounded(value, low: int, high: int, label: str) -> int:
 def data_bytes(window_ms: int, success_sound: int, crit_sound: int, failure_sound: int,
                continuous: bool = False) -> bytes:
     values = (window_ms, window_ms * EARLY_FACTOR, int(continuous), success_sound, crit_sound,
-              failure_sound, 0, 0, 1000, 0, 0, 0, 0, 0xFFFFFFFF, 0, 0)
+              failure_sound, 0, 0, 1000, 0, 0, 0, 0, 0xFFFFFFFF, 0, 0, 0, 0)
     return b"".join(value.to_bytes(4, "little") for value in values)
 
 
@@ -860,6 +878,8 @@ def build_hext(enabled: bool, *, window_ms: int = DEFAULT_WINDOW_MS,
         f"{DATA:X} = {data.hex(' ').upper()}",
         f"{INPUT_HOOK:X} = {_jump(INPUT_HOOK, CAVE, len(INPUT_ORIGINAL)).hex(' ').upper()}",
         f"{HIT_HOOK:X} = {_jump(HIT_HOOK, ENTRIES['hit'], len(HIT_ORIGINAL)).hex(' ').upper()}",
+        f"{ACTION_HOOK:X} = {_jump(ACTION_HOOK, ENTRIES['action'], len(ACTION_ORIGINAL)).hex(' ').upper()}",
+        f"{ACTION_END_HOOK:X} = {_jump(ACTION_END_HOOK, ENTRIES['action_end'], len(ACTION_END_ORIGINAL)).hex(' ').upper()}",
         f"{AUTO_HOOK:X} = {_jump(AUTO_HOOK, ENTRIES['auto'], len(AUTO_ORIGINAL)).hex(' ').upper()}",
         f"{HIT_ROLL_CALL:X} = {_call(HIT_ROLL_CALL, ENTRIES['hit_roll']).hex(' ').upper()}",
         f"{CRIT_ROLL_CALL:X} = {_call(CRIT_ROLL_CALL, ENTRIES['crit_roll']).hex(' ').upper()}",
@@ -919,6 +939,7 @@ def limits() -> dict:
 
 def verified_hooks() -> list[tuple[int, bytes]]:
     return [(INPUT_HOOK, INPUT_ORIGINAL), (HIT_HOOK, HIT_ORIGINAL),
+            (ACTION_HOOK, ACTION_ORIGINAL), (ACTION_END_HOOK, ACTION_END_ORIGINAL),
             (AUTO_HOOK, AUTO_ORIGINAL), (GUNBLADE_HOOK, GUNBLADE_ORIGINAL),
             *((site, _call(site, RANDOM)) for site in (HIT_ROLL_CALL, CRIT_ROLL_CALL, E10_AUTO_CRIT_CALL,
                                                        E10_HIT_ROLL_CALL, E10_CRIT_ROLL_CALL)),

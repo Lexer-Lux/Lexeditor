@@ -30,6 +30,7 @@ def _machine(now: int = 0, *, window=1000, continuous=False):
         emu.mem_map(base, size)
     emu.mem_write(t.CAVE, t.CODE)
     emu.mem_write(t.DATA, t.data_bytes(window, OK, CRIT, FAIL, continuous))
+    emu.mem_write(t.ACTIVE, struct.pack("<I", 1))  # most tests run inside an action
     emu.mem_write(t.TIME_GET_TIME, struct.pack("<I", TIME_STUB))
     emu.mem_write(TIME_STUB, b"\xA1" + struct.pack("<I", CLOCK) + b"\xC3")  # mov eax,[CLOCK]; ret
     emu.mem_write(CLOCK, struct.pack("<I", now))
@@ -39,7 +40,8 @@ def _machine(now: int = 0, *, window=1000, continuous=False):
     stub += bytes.fromhex("FF 05") + struct.pack("<I", SOUNDS) + b"\xC3"
     emu.mem_write(t.PLAY_SOUND, stub)
     emu.mem_write(t.RANDOM, bytes((0xB8, GAME_RANDOM, 0, 0, 0, 0xC3)))  # mov eax, 0x77; ret
-    for halt in (t.INPUT_RESUME, t.HIT_RESUME, t.GUNBLADE_RESUME, t.GUNBLADE_NO_DAMAGE, t.E10_MISS, STOP):
+    for halt in (t.INPUT_RESUME, t.HIT_RESUME, t.GUNBLADE_RESUME, t.GUNBLADE_NO_DAMAGE, t.E10_MISS,
+                 t.ACTION_RESUME, t.ACTION_END_RESUME, STOP):
         emu.mem_write(halt, b"\xF4")
     return emu
 
@@ -406,59 +408,102 @@ def test_a_fumble_sounds_at_once_and_only_once():
     assert _sounds(emu) == [FAIL], "the hit adds no second sound"
 
 
-def _frame(emu, now: int):
-    """A battle input frame with nothing newly pressed."""
+def _action(emu, now: int):
+    """0050A790: the scheduler starts an action's animation task."""
     _at(emu, now)
-    _press(emu, 0)
+    esp = STACK + 0x6000
+    emu.mem_write(esp, struct.pack("<II", 0xCAFEF00D, 0x00AB0000))
+    emu.reg_write(x86.UC_X86_REG_ESP, esp)
+    emu.reg_write(x86.UC_X86_REG_ESI, 0x5E5E5E5E)
+    emu.reg_write(x86.UC_X86_REG_EBX, 0xB0B0B0B0)
+    emu.emu_start(t.ENTRIES["action"], t.ACTION_RESUME + 1, count=200)
+    # The replaced instructions ran: push esi; mov esi, [esp + 8] (the message).
+    assert emu.reg_read(x86.UC_X86_REG_ESP) == esp - 4
+    assert struct.unpack("<I", emu.mem_read(esp - 4, 4))[0] == 0x5E5E5E5E
+    assert emu.reg_read(x86.UC_X86_REG_ESI) == 0x00AB0000
+    assert emu.reg_read(x86.UC_X86_REG_EBX) == 0xB0B0B0B0
 
 
-def test_an_early_press_sounds_its_miss_one_window_later():
-    """Lexer: pressing as the attack starts gave a miss sound only when the
-    attack was over, and a press older than three windows gave none at all."""
-    emu = _machine(window=149)
+def _removed(emu, message_type: int):
+    """00500D51: the scheduler removes a finished message."""
+    message = STACK + 0x5000
+    emu.mem_write(message, struct.pack("<BBH", 3, 0xFF, message_type))
+    esp = STACK + 0x6000
+    emu.reg_write(x86.UC_X86_REG_ESP, esp)
+    emu.reg_write(x86.UC_X86_REG_ESI, message)
+    emu.emu_start(t.ENTRIES["action_end"], t.ACTION_END_RESUME + 1, count=50)
+    # The replaced instruction ran: push 01D96D68.
+    assert emu.reg_read(x86.UC_X86_REG_ESP) == esp - 4
+    assert struct.unpack("<I", emu.mem_read(esp - 4, 4))[0] == 0x01D96D68
+
+
+def _active(emu):
+    return struct.unpack("<I", emu.mem_read(t.ACTIVE, 4))[0]
+
+
+def test_square_outside_an_action_does_nothing():
+    """Lexer: if they're not even doing an attack this code shouldn't be firing."""
+    emu = _machine(window=1000)
+    emu.mem_write(t.ACTIVE, struct.pack("<I", 0))
     _at(emu, 1000)
     _press(emu)
-    _frame(emu, 1149)
-    assert _sounds(emu) == [], "still inside the window"
-    _frame(emu, 1150)
-    assert _sounds(emu) == [FAIL], "no hit came within the window: it was early"
-    _frame(emu, 1300)
-    assert _sounds(emu) == [FAIL], "once"
-    assert _attack(emu, None, 2500) == "miss"
-    assert _sounds(emu) == [FAIL], "the hit adds nothing"
+    _at(emu, 1050)
+    _press(emu)
+    assert _pressed(emu) == (0, 0) and _sounds(emu) == []
+
+
+def test_an_action_opens_square_and_its_end_closes_it():
+    emu = _machine(window=1000)
+    emu.mem_write(t.ACTIVE, struct.pack("<I", 0))
+    _action(emu, 1000)
+    assert _active(emu) == 1
+    _removed(emu, 10)                     # a damage message: the action goes on
+    assert _active(emu) == 1
+    _removed(emu, t.ACTION_MESSAGE)       # the action's own message
+    assert _active(emu) == 0
+    _at(emu, 2000)
+    _press(emu)
+    assert _pressed(emu) == (0, 0)
+
+
+def test_a_press_left_from_the_last_action_is_cleared_silently():
+    emu = _machine(window=1000)
+    _at(emu, 1000)
+    _press(emu)                           # during a cure, say: never judged
+    _action(emu, 3000)
+    assert _pressed(emu)[1] == 0 and _sounds(emu) == []
 
 
 def test_one_try_per_hit():
     """Lexer: why not allow only one try per attack, or per hit."""
-    emu = _machine(window=149)
+    emu = _machine(window=1000)
+    _action(emu, 500)
     _at(emu, 1000)
     _press(emu)
-    _frame(emu, 1200)                     # spent: the miss sounded
-    assert _attack(emu, 1250, 1300) == "miss", "no second try before the hit"
+    _at(emu, 1800)
+    _press(emu)                           # a second try: a fumble, heard at once
     assert _sounds(emu) == [FAIL]
-    # The hit gave the try back: the next hit's press counts at once.
-    assert _attack(emu, 1350, 1400) in ("hit", "crit")
-
-
-def test_mashing_does_not_extend_a_stray_press():
-    """A press no hit uses expires three windows after it was made."""
-    emu = _machine(window=149)          # three windows: 447 ms
-    _at(emu, 1000)
-    _press(emu)
-    for now in (1100, 1300, 1440):
+    for now in range(1900, 9000, 300):    # any amount of mashing stays one fumble
         _at(emu, now)
         _press(emu)
-    _at(emu, 1500)                        # 500 ms after the first press
-    _press(emu)
-    assert _pressed(emu) == (1500, 1), "a fresh try, not held back by the mashing"
+    assert _attack(emu, None, 9500) == "miss"
+    assert _sounds(emu) == [FAIL], "the hit adds nothing"
+    # The hit gave the try back: the next hit's press counts at once.
+    assert _attack(emu, 9600, 9700) in ("hit", "crit")
+
+
+def test_an_early_press_is_judged_at_impact_with_its_miss_sound():
+    """Lexer: a press as the attack started was silent, or sounded only at the end."""
+    emu = _machine(window=1000)
+    _action(emu, 500)
+    assert _attack(emu, 1000, 6000) == "miss"   # five seconds early
+    assert _sounds(emu) == [FAIL]
 
 
 def test_an_early_press_on_a_block_is_the_worst_band_with_one_sound():
     emu = _machine(window=1000)
-    _at(emu, 1000)
-    _press(emu)
-    _frame(emu, 2001)
-    assert _block(emu, None, 2500) == "crit"
+    _action(emu, 500)
+    assert _block(emu, 1000, 6000) == "crit"
     assert _sounds(emu) == [FAIL]
 
 
@@ -477,7 +522,7 @@ def test_hext_and_hooks():
     text = t.build_hext(True, window_ms=1000, success_sound=12, crit_sound=13, failure_sound=34,
                         continuous=True)
     assert f"\n{t.DATA:X} = {t.data_bytes(1000, 12, 13, 34, True).hex(' ').upper()}" in text
-    for site in (t.INPUT_HOOK, t.HIT_HOOK, t.AUTO_HOOK, t.GUNBLADE_HOOK):
+    for site in (t.INPUT_HOOK, t.HIT_HOOK, t.ACTION_HOOK, t.ACTION_END_HOOK, t.AUTO_HOOK, t.GUNBLADE_HOOK):
         assert f"\n{site:X} = E9" in text
     for site in (t.HIT_ROLL_CALL, t.CRIT_ROLL_CALL, t.E10_AUTO_CRIT_CALL, t.E10_HIT_ROLL_CALL,
                  t.E10_CRIT_ROLL_CALL):

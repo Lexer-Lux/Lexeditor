@@ -141,6 +141,14 @@ The time indicator needs a hit's landing time before it lands. Static trace:
   `01D97718` and the physical task's state (`[task + 0xD]`) next to the
   existing `0048FE20` lines.
 
+## When an action plays
+
+- An action starts when the scheduler dispatches its message 0x68:
+  `005023D0` calls `0050A790(message)` (its only caller), which starts the
+  action's animation task. It ends when the scheduler removes that message
+  (`00500D51`, `push 01D96D68; call 005032E0`, with ESI the message and
+  word `+2` its type). Timed Hits counts Square only between the two.
+
 ## Not yet established
 
 - Which sequence opcode marks the moment damage is displayed (the hit frame)
