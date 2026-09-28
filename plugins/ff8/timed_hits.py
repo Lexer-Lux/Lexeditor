@@ -35,7 +35,11 @@ One press, at the right time (Lexer, 2026-09-26: mashing Square won every hit):
   Mashing on keeps the fumble going silently until the player lets up for
   three windows (Lexer, 2026-09-27: mashing with Squall was silent until the
   hit, then sounded two or three times).
-- A press more than three windows before the hit is forgotten.
+- A press that no hit uses within W was early, whatever comes next: the miss
+  sound plays then, W after the press, and the press is spent (Lexer: an
+  early press was silent, or its miss sounded only when the attack ended).
+  The input hook runs every battle input frame, so it notices in time.
+- A press more than three windows old no longer counts as mashing.
 - A press after a hit lands counts for nothing on that hit: it arms the
   next one, so the hits of a multi-hit attack can each be timed.
 
@@ -150,10 +154,25 @@ ASSEMBLY = f"""
 input:
     mov ax, word ptr [ecx + 0x10]
     mov word ptr [ecx + 0x18], ax
-    test byte ptr [ecx + 0x12], {SQUARE:#x}
-    jz input_done
     pushad
     call dword ptr [{TIME_GET_TIME:#x}]
+    cmp dword ptr [{PRESSED:#x}], 0
+    je input_pressed
+    cmp dword ptr [{FUMBLED:#x}], 0
+    jne input_pressed
+    mov edx, eax
+    sub edx, dword ptr [{PRESS_TIME:#x}]
+    cmp edx, dword ptr [{WINDOW:#x}]
+    jbe input_pressed
+    mov dword ptr [{FUMBLED:#x}], 1
+    push dword ptr [{SOUND_FAILURE:#x}]
+    call {PLAY_SOUND:#x}
+    add esp, 4
+    call dword ptr [{TIME_GET_TIME:#x}]
+input_pressed:
+    mov ecx, dword ptr [esp + 0x18]
+    test byte ptr [ecx + 0x12], {SQUARE:#x}
+    jz input_popped
     cmp dword ptr [{PRESSED:#x}], 0
     je arm
     mov edx, eax
@@ -663,113 +682,118 @@ ENTRY_LABELS = ("hit", "auto", "hit_roll", "crit_roll", "gunblade",
 # Assembled at CAVE from ASSEMBLY; tests/ff8/test_ff8_timed_hits.py
 # re-assembles it (keystone) and runs it under unicorn.
 CODE = bytes.fromhex(
-    "66 8B 41 10 66 89 41 18 F6 41 12 80 74 62 60 FF"
-    "15 78 93 B6 00 83 3D 1C C0 7A 02 00 74 38 89 C2"
-    "2B 15 18 C0 7A 02 3B 15 04 C0 7A 02 77 28 A3 18"
-    "C0 7A 02 83 3D 2C C0 7A 02 00 75 33 C7 05 2C C0"
-    "7A 02 01 00 00 00 FF 35 14 C0 7A 02 E8 2F F9 CB"
-    "FD 83 C4 04 EB 19 A3 18 C0 7A 02 C7 05 1C C0 7A"
-    "02 01 00 00 00 C7 05 2C C0 7A 02 00 00 00 00 61"
-    "68 5C 85 4A 00 C3 FF 15 78 93 B6 00 A3 28 C0 7A"
-    "02 83 3D 1C C0 7A 02 00 74 22 C7 05 1C C0 7A 02"
-    "00 00 00 00 2B 05 18 C0 7A 02 3B 05 04 C0 7A 02"
-    "77 0A 83 3D 2C C0 7A 02 00 75 01 C3 B8 FF FF FF"
-    "FF C3 53 8B 5C 24 08 81 FB FF 00 00 00 76 05 BB"
-    "FF 00 00 00 C7 05 24 C0 7A 02 00 00 00 00 C7 05"
-    "30 C0 7A 02 00 00 00 00 C7 05 34 C0 7A 02 FF FF"
-    "FF FF E8 8F FF FF FF 83 F8 FF 74 3A 89 C1 A1 00"
-    "C0 7A 02 F7 E3 51 B9 FF 00 00 00 F7 F1 59 85 DB"
-    "74 16 39 C1 77 12 A3 38 C0 7A 02 89 0D 34 C0 7A"
-    "02 B8 01 00 00 00 5B C3 FF 35 14 C0 7A 02 E8 5D"
-    "F8 CB FD 83 C4 04 31 C0 5B C3 53 56 8B 5C 24 0C"
-    "81 FB FF 00 00 00 76 05 BB FF 00 00 00 8B 35 34"
-    "C0 7A 02 83 FE FF 0F 84 B4 00 00 00 C7 05 34 C0"
-    "7A 02 FF FF FF FF A1 38 C0 7A 02 F7 E3 B9 FF 00"
-    "00 00 F7 F1 85 DB 74 4E 39 C6 77 4A 89 C1 B8 E8"
-    "03 00 00 85 C9 74 11 69 C6 F4 01 00 00 31 D2 F7"
-    "F1 F7 D8 05 E8 03 00 00 83 3D 08 C0 7A 02 00 74"
-    "0F A3 20 C0 7A 02 C7 05 24 C0 7A 02 01 00 00 00"
-    "FF 35 10 C0 7A 02 E8 D5 F7 CB FD 83 C4 04 B8 01"
-    "00 00 00 5E 5B C3 8B 0D 38 C0 7A 02 29 C1 A1 38"
-    "C0 7A 02 29 F0 69 C0 E8 03 00 00 85 C9 75 07 B8"
-    "E8 03 00 00 EB 04 31 D2 F7 F1 83 3D 08 C0 7A 02"
-    "00 74 0F A3 20 C0 7A 02 C7 05 24 C0 7A 02 01 00"
-    "00 00 FF 35 0C C0 7A 02 E8 83 F7 CB FD 83 C4 04"
-    "31 C0 5E 5B C3 53 8B 5C 24 08 81 FB FF 00 00 00"
-    "76 05 BB FF 00 00 00 C7 05 24 C0 7A 02 00 00 00"
-    "00 C7 05 30 C0 7A 02 00 00 00 00 85 DB 74 57 E8"
-    "42 FE FF FF 89 C1 B8 FF 00 00 00 29 D8 F7 25 00"
-    "C0 7A 02 51 B9 FF 00 00 00 F7 F1 59 A3 38 C0 7A"
-    "02 89 0D 34 C0 7A 02 C7 05 30 C0 7A 02 01 00 00"
-    "00 83 F9 FF 74 24 85 C0 74 20 39 C1 77 1C C7 05"
-    "30 C0 7A 02 00 00 00 00 FF 35 10 C0 7A 02 E8 FD"
-    "F6 CB FD 83 C4 04 31 C0 5B C3 B8 01 00 00 00 5B"
-    "C3 53 56 57 8B 5C 24 10 81 FB FF 00 00 00 76 05"
-    "BB FF 00 00 00 83 3D 30 C0 7A 02 00 0F 84 02 01"
-    "00 00 C7 05 30 C0 7A 02 00 00 00 00 8B 35 34 C0"
-    "7A 02 8B 3D 38 C0 7A 02 B8 FF 00 00 00 29 D8 8B"
-    "0D 00 C0 7A 02 29 F9 F7 E1 B9 FF 00 00 00 F7 F1"
-    "83 FE FF 74 4B 89 F1 29 F9 39 C1 77 43 85 C0 74"
-    "0D 69 C9 E8 03 00 00 91 31 D2 F7 F1 EB 05 B8 E8"
-    "03 00 00 83 3D 08 C0 7A 02 00 74 0F A3 20 C0 7A"
-    "02 C7 05 24 C0 7A 02 01 00 00 00 FF 35 0C C0 7A"
-    "02 E8 5A F6 CB FD 83 C4 04 31 C0 E9 89 00 00 00"
-    "85 DB 74 69 8B 0D 00 C0 7A 02 29 F9 29 C1 83 FE"
-    "FF 74 23 3B 35 00 C0 7A 02 77 1B 85 C9 74 17 89"
-    "F2 29 FA 29 C2 69 C2 F4 01 00 00 31 D2 F7 F1 05"
-    "F4 01 00 00 EB 05 B8 E8 03 00 00 83 3D 08 C0 7A"
-    "02 00 74 0F A3 20 C0 7A 02 C7 05 24 C0 7A 02 01"
-    "00 00 00 83 FE FF 74 0E FF 35 14 C0 7A 02 E8 ED"
-    "F5 CB FD 83 C4 04 B8 01 00 00 00 EB 1C 83 FE FF"
-    "74 0E FF 35 14 C0 7A 02 E8 D3 F5 CB FD 83 C4 04"
-    "31 C0 EB 05 B8 02 00 00 00 5F 5E 5B C3 8B 44 24"
-    "04 8B 4C 24 08 83 F8 03 72 13 83 F9 03 73 2F 68"
-    "FF 00 00 00 E8 2C FE FF FF 83 C4 04 C3 83 F9 03"
-    "72 1C 68 FF 00 00 00 E8 C6 FC FF FF 83 C4 04 85"
-    "C0 75 10 C7 05 3C C0 7A 02 01 00 00 00 C3 B8 01"
-    "00 00 00 C3 8B 44 24 0C 8B 4C 24 10 83 F8 03 72"
-    "14 83 F9 03 73 3D 85 F6 74 39 56 E8 E5 FD FF FF"
-    "83 C4 04 EB 24 83 F9 03 72 29 83 3D 3C C0 7A 02"
-    "00 74 0D C7 05 3C C0 7A 02 00 00 00 00 31 F6 C3"
-    "56 E8 6C FC FF FF 83 C4 04 85 C0 74 03 31 C0 C3"
-    "31 F6 C3 E9 C8 32 CE FD 8B 44 24 0C 8B 4C 24 10"
-    "83 F8 03 72 15 83 F9 03 73 E9 56 E8 21 FE FF FF"
-    "83 C4 04 83 F8 02 74 DB EB CF 83 F9 03 72 D4 56"
-    "E8 A5 FC FF FF 83 C4 04 EB BF 81 FE 70 02 00 00"
-    "72 17 81 FD 70 02 00 00 73 B9 85 FF 74 B5 57 E8"
-    "61 FD FF FF 83 C4 04 EB 11 81 FD 70 02 00 00 72"
-    "A2 57 E8 FB FB FF FF 83 C4 04 85 C0 74 03 31 C0"
-    "C3 31 FF C3 81 FE 70 02 00 00 72 20 81 FD 70 02"
-    "00 00 0F 83 7B FF FF FF 57 E8 B3 FD FF FF 83 C4"
-    "04 83 F8 02 0F 84 69 FF FF FF EB CE 81 FD 70 02"
-    "00 00 0F 82 5B FF FF FF 57 E8 2C FC FF FF 83 C4"
-    "04 EB B7 81 FE 70 02 00 00 72 1B 81 FD 70 02 00"
-    "00 0F 83 3C FF FF FF 68 FF 00 00 00 E8 E4 FC FF"
-    "FF 83 C4 04 EB 9E 81 FD 70 02 00 00 0F 82 21 FF"
-    "FF FF 68 FF 00 00 00 E8 76 FB FF FF 83 C4 04 85"
-    "C0 75 81 C7 04 24 CB 30 49 00 C3 60 9C 83 7C 24"
-    "2C 03 73 5E 83 FD 03 72 59 66 83 3D 90 8D D2 01"
-    "00 74 4F 68 FF 00 00 00 E8 45 FB FF FF 83 C4 04"
-    "85 C0 74 4D 8B 44 24 2C 69 C0 D0 00 00 00 0F B6"
-    "80 D2 7B D2 01 0F B6 0D 3B A2 D2 01 01 C8 69 C0"
-    "FF 00 00 00 C1 E8 08 50 E8 8D FB FF FF 83 C4 04"
-    "85 C0 74 0E C6 05 07 8E D2 01 01 80 0D DE 7A D2"
-    "01 02 9D 61 53 31 DB 8D 44 95 00 68 37 F5 48 00"
-    "C3 9D 61 80 0D DE 7A D2 01 04 68 22 F5 48 00 C3"
-    "60 9C 83 3D 24 C0 7A 02 00 74 26 C7 05 24 C0 7A"
-    "02 00 00 00 00 85 F6 7E 18 8B 44 24 08 0F AF 05"
-    "20 C0 7A 02 31 D2 B9 E8 03 00 00 F7 F1 89 44 24"
-    "08 9D 61 8A 0D 0E 8E D2 01 68 2A 11 49 00 C3"
+    "66 8B 41 10 66 89 41 18 60 FF 15 78 93 B6 00 83"
+    "3D 1C C0 7A 02 00 74 37 83 3D 2C C0 7A 02 00 75"
+    "2E 89 C2 2B 15 18 C0 7A 02 3B 15 00 C0 7A 02 76"
+    "1E C7 05 2C C0 7A 02 01 00 00 00 FF 35 14 C0 7A"
+    "02 E8 3A F9 CB FD 83 C4 04 FF 15 78 93 B6 00 8B"
+    "4C 24 18 F6 41 12 80 74 5A 83 3D 1C C0 7A 02 00"
+    "74 38 89 C2 2B 15 18 C0 7A 02 3B 15 04 C0 7A 02"
+    "77 28 A3 18 C0 7A 02 83 3D 2C C0 7A 02 00 75 33"
+    "C7 05 2C C0 7A 02 01 00 00 00 FF 35 14 C0 7A 02"
+    "E8 EB F8 CB FD 83 C4 04 EB 19 A3 18 C0 7A 02 C7"
+    "05 1C C0 7A 02 01 00 00 00 C7 05 2C C0 7A 02 00"
+    "00 00 00 61 68 5C 85 4A 00 C3 FF 15 78 93 B6 00"
+    "A3 28 C0 7A 02 83 3D 1C C0 7A 02 00 74 22 C7 05"
+    "1C C0 7A 02 00 00 00 00 2B 05 18 C0 7A 02 3B 05"
+    "04 C0 7A 02 77 0A 83 3D 2C C0 7A 02 00 75 01 C3"
+    "B8 FF FF FF FF C3 53 8B 5C 24 08 81 FB FF 00 00"
+    "00 76 05 BB FF 00 00 00 C7 05 24 C0 7A 02 00 00"
+    "00 00 C7 05 30 C0 7A 02 00 00 00 00 C7 05 34 C0"
+    "7A 02 FF FF FF FF E8 8F FF FF FF 83 F8 FF 74 3A"
+    "89 C1 A1 00 C0 7A 02 F7 E3 51 B9 FF 00 00 00 F7"
+    "F1 59 85 DB 74 16 39 C1 77 12 A3 38 C0 7A 02 89"
+    "0D 34 C0 7A 02 B8 01 00 00 00 5B C3 FF 35 14 C0"
+    "7A 02 E8 19 F8 CB FD 83 C4 04 31 C0 5B C3 53 56"
+    "8B 5C 24 0C 81 FB FF 00 00 00 76 05 BB FF 00 00"
+    "00 8B 35 34 C0 7A 02 83 FE FF 0F 84 B4 00 00 00"
+    "C7 05 34 C0 7A 02 FF FF FF FF A1 38 C0 7A 02 F7"
+    "E3 B9 FF 00 00 00 F7 F1 85 DB 74 4E 39 C6 77 4A"
+    "89 C1 B8 E8 03 00 00 85 C9 74 11 69 C6 F4 01 00"
+    "00 31 D2 F7 F1 F7 D8 05 E8 03 00 00 83 3D 08 C0"
+    "7A 02 00 74 0F A3 20 C0 7A 02 C7 05 24 C0 7A 02"
+    "01 00 00 00 FF 35 10 C0 7A 02 E8 91 F7 CB FD 83"
+    "C4 04 B8 01 00 00 00 5E 5B C3 8B 0D 38 C0 7A 02"
+    "29 C1 A1 38 C0 7A 02 29 F0 69 C0 E8 03 00 00 85"
+    "C9 75 07 B8 E8 03 00 00 EB 04 31 D2 F7 F1 83 3D"
+    "08 C0 7A 02 00 74 0F A3 20 C0 7A 02 C7 05 24 C0"
+    "7A 02 01 00 00 00 FF 35 0C C0 7A 02 E8 3F F7 CB"
+    "FD 83 C4 04 31 C0 5E 5B C3 53 8B 5C 24 08 81 FB"
+    "FF 00 00 00 76 05 BB FF 00 00 00 C7 05 24 C0 7A"
+    "02 00 00 00 00 C7 05 30 C0 7A 02 00 00 00 00 85"
+    "DB 74 57 E8 42 FE FF FF 89 C1 B8 FF 00 00 00 29"
+    "D8 F7 25 00 C0 7A 02 51 B9 FF 00 00 00 F7 F1 59"
+    "A3 38 C0 7A 02 89 0D 34 C0 7A 02 C7 05 30 C0 7A"
+    "02 01 00 00 00 83 F9 FF 74 24 85 C0 74 20 39 C1"
+    "77 1C C7 05 30 C0 7A 02 00 00 00 00 FF 35 10 C0"
+    "7A 02 E8 B9 F6 CB FD 83 C4 04 31 C0 5B C3 B8 01"
+    "00 00 00 5B C3 53 56 57 8B 5C 24 10 81 FB FF 00"
+    "00 00 76 05 BB FF 00 00 00 83 3D 30 C0 7A 02 00"
+    "0F 84 02 01 00 00 C7 05 30 C0 7A 02 00 00 00 00"
+    "8B 35 34 C0 7A 02 8B 3D 38 C0 7A 02 B8 FF 00 00"
+    "00 29 D8 8B 0D 00 C0 7A 02 29 F9 F7 E1 B9 FF 00"
+    "00 00 F7 F1 83 FE FF 74 4B 89 F1 29 F9 39 C1 77"
+    "43 85 C0 74 0D 69 C9 E8 03 00 00 91 31 D2 F7 F1"
+    "EB 05 B8 E8 03 00 00 83 3D 08 C0 7A 02 00 74 0F"
+    "A3 20 C0 7A 02 C7 05 24 C0 7A 02 01 00 00 00 FF"
+    "35 0C C0 7A 02 E8 16 F6 CB FD 83 C4 04 31 C0 E9"
+    "89 00 00 00 85 DB 74 69 8B 0D 00 C0 7A 02 29 F9"
+    "29 C1 83 FE FF 74 23 3B 35 00 C0 7A 02 77 1B 85"
+    "C9 74 17 89 F2 29 FA 29 C2 69 C2 F4 01 00 00 31"
+    "D2 F7 F1 05 F4 01 00 00 EB 05 B8 E8 03 00 00 83"
+    "3D 08 C0 7A 02 00 74 0F A3 20 C0 7A 02 C7 05 24"
+    "C0 7A 02 01 00 00 00 83 FE FF 74 0E FF 35 14 C0"
+    "7A 02 E8 A9 F5 CB FD 83 C4 04 B8 01 00 00 00 EB"
+    "1C 83 FE FF 74 0E FF 35 14 C0 7A 02 E8 8F F5 CB"
+    "FD 83 C4 04 31 C0 EB 05 B8 02 00 00 00 5F 5E 5B"
+    "C3 8B 44 24 04 8B 4C 24 08 83 F8 03 72 13 83 F9"
+    "03 73 2F 68 FF 00 00 00 E8 2C FE FF FF 83 C4 04"
+    "C3 83 F9 03 72 1C 68 FF 00 00 00 E8 C6 FC FF FF"
+    "83 C4 04 85 C0 75 10 C7 05 3C C0 7A 02 01 00 00"
+    "00 C3 B8 01 00 00 00 C3 8B 44 24 0C 8B 4C 24 10"
+    "83 F8 03 72 14 83 F9 03 73 3D 85 F6 74 39 56 E8"
+    "E5 FD FF FF 83 C4 04 EB 24 83 F9 03 72 29 83 3D"
+    "3C C0 7A 02 00 74 0D C7 05 3C C0 7A 02 00 00 00"
+    "00 31 F6 C3 56 E8 6C FC FF FF 83 C4 04 85 C0 74"
+    "03 31 C0 C3 31 F6 C3 E9 84 32 CE FD 8B 44 24 0C"
+    "8B 4C 24 10 83 F8 03 72 15 83 F9 03 73 E9 56 E8"
+    "21 FE FF FF 83 C4 04 83 F8 02 74 DB EB CF 83 F9"
+    "03 72 D4 56 E8 A5 FC FF FF 83 C4 04 EB BF 81 FE"
+    "70 02 00 00 72 17 81 FD 70 02 00 00 73 B9 85 FF"
+    "74 B5 57 E8 61 FD FF FF 83 C4 04 EB 11 81 FD 70"
+    "02 00 00 72 A2 57 E8 FB FB FF FF 83 C4 04 85 C0"
+    "74 03 31 C0 C3 31 FF C3 81 FE 70 02 00 00 72 20"
+    "81 FD 70 02 00 00 0F 83 7B FF FF FF 57 E8 B3 FD"
+    "FF FF 83 C4 04 83 F8 02 0F 84 69 FF FF FF EB CE"
+    "81 FD 70 02 00 00 0F 82 5B FF FF FF 57 E8 2C FC"
+    "FF FF 83 C4 04 EB B7 81 FE 70 02 00 00 72 1B 81"
+    "FD 70 02 00 00 0F 83 3C FF FF FF 68 FF 00 00 00"
+    "E8 E4 FC FF FF 83 C4 04 EB 9E 81 FD 70 02 00 00"
+    "0F 82 21 FF FF FF 68 FF 00 00 00 E8 76 FB FF FF"
+    "83 C4 04 85 C0 75 81 C7 04 24 CB 30 49 00 C3 60"
+    "9C 83 7C 24 2C 03 73 5E 83 FD 03 72 59 66 83 3D"
+    "90 8D D2 01 00 74 4F 68 FF 00 00 00 E8 45 FB FF"
+    "FF 83 C4 04 85 C0 74 4D 8B 44 24 2C 69 C0 D0 00"
+    "00 00 0F B6 80 D2 7B D2 01 0F B6 0D 3B A2 D2 01"
+    "01 C8 69 C0 FF 00 00 00 C1 E8 08 50 E8 8D FB FF"
+    "FF 83 C4 04 85 C0 74 0E C6 05 07 8E D2 01 01 80"
+    "0D DE 7A D2 01 02 9D 61 53 31 DB 8D 44 95 00 68"
+    "37 F5 48 00 C3 9D 61 80 0D DE 7A D2 01 04 68 22"
+    "F5 48 00 C3 60 9C 83 3D 24 C0 7A 02 00 74 26 C7"
+    "05 24 C0 7A 02 00 00 00 00 85 F6 7E 18 8B 44 24"
+    "08 0F AF 05 20 C0 7A 02 31 D2 B9 E8 03 00 00 F7"
+    "F1 89 44 24 08 9D 61 8A 0D 0E 8E D2 01 68 2A 11"
+    "49 00 C3"
 )
 ENTRIES = {
-    "hit": 0x27abed0,
-    "auto": 0x27abcbd,
-    "hit_roll": 0x27abd04,
-    "crit_roll": 0x27abd58,
-    "gunblade": 0x27abe4b,
-    "e10_hit_roll": 0x27abd8a,
-    "e10_crit_roll": 0x27abdc4,
-    "e10_auto_crit": 0x27abe03,
+    "hit": 0x27abf14,
+    "auto": 0x27abd01,
+    "hit_roll": 0x27abd48,
+    "crit_roll": 0x27abd9c,
+    "gunblade": 0x27abe8f,
+    "e10_hit_roll": 0x27abdce,
+    "e10_crit_roll": 0x27abe08,
+    "e10_auto_crit": 0x27abe47,
 }
 HIT_ENTRY = ENTRIES.get("hit", 0)
 

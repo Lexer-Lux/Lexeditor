@@ -85,6 +85,13 @@ def _blocked_message() -> str:
     return f"FFNx setup is waiting for Final Fantasy VIII to close. Still running: {listed}."
 
 
+def _game_started() -> bool:
+    """The game itself is running, not only its launcher."""
+    if os.name != "nt":
+        return False
+    return bool(process_probe.live_processes(("FF8_EN.exe",)))
+
+
 def _game_running() -> bool:
     if os.name != "nt":
         return False

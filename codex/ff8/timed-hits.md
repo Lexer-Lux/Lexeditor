@@ -129,7 +129,11 @@ The time indicator needs a hit's landing time before it lands. Static trace:
   bit (`0050375B`) when its last key is reached. `0050B190` (spells and
   effects) releases at `0050B266` once `0050AE80` reports every sequence
   owner idle, the effect module done (`[01D96AAC]` = 0) and no motion path.
-- So a physical hit probably lands when the attacker's motion path ends,
+- Refuted by Lexer's 2026-09-27 log (motion column): `01D97718` was 0 at all
+  94 damage calls and had last changed seconds to tens of seconds before,
+  once, at the battle intro. Motion paths do not gate a hit; the physical
+  task's earlier states do. Still open: which of them, and what they wait on.
+- The earlier guess read: a physical hit probably lands when the attacker's motion path ends,
   and a spell when its effect ends. A path's keys are known when it starts,
   which would let the indicator predict the landing time. Not yet shown: which
   path an Attack waits on, how many frames separate its end from the damage,

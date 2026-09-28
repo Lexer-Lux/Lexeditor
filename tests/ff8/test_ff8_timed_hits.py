@@ -406,6 +406,47 @@ def test_a_fumble_sounds_at_once_and_only_once():
     assert _sounds(emu) == [FAIL], "the hit adds no second sound"
 
 
+def _frame(emu, now: int):
+    """A battle input frame with nothing newly pressed."""
+    _at(emu, now)
+    _press(emu, 0)
+
+
+def test_an_early_press_sounds_its_miss_one_window_later():
+    """Lexer: pressing as the attack starts gave a miss sound only when the
+    attack was over, and a press older than three windows gave none at all."""
+    emu = _machine(window=149)
+    _at(emu, 1000)
+    _press(emu)
+    _frame(emu, 1149)
+    assert _sounds(emu) == [], "still inside the window"
+    _frame(emu, 1150)
+    assert _sounds(emu) == [FAIL], "no hit came within the window: it was early"
+    _frame(emu, 1300)
+    assert _sounds(emu) == [FAIL], "once"
+    assert _attack(emu, None, 2500) == "miss"
+    assert _sounds(emu) == [FAIL], "the hit adds nothing"
+
+
+def test_a_spent_press_cannot_be_retried_until_the_player_lets_up():
+    emu = _machine(window=149)
+    _at(emu, 1000)
+    _press(emu)
+    _frame(emu, 1200)                     # spent: the miss sounded
+    assert _attack(emu, 1250, 1300) == "miss", "a quick second try is still the spent press"
+    assert _sounds(emu) == [FAIL]
+    assert _attack(emu, 2000, 2050) in ("hit", "crit"), "after three quiet windows it arms again"
+
+
+def test_an_early_press_on_a_block_is_the_worst_band_with_one_sound():
+    emu = _machine(window=1000)
+    _at(emu, 1000)
+    _press(emu)
+    _frame(emu, 2001)
+    assert _block(emu, None, 2500) == "crit"
+    assert _sounds(emu) == [FAIL]
+
+
 def test_a_late_press_gets_nothing_and_times_the_next_hit():
     """Lexer: the window is only before the hit; late inputs get nothing."""
     emu = _machine(window=1000)

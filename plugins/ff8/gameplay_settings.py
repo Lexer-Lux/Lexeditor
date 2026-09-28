@@ -1457,12 +1457,17 @@ def _log_has_loaded_patch(text: str, target: Path) -> bool:
 def runtime_status(game_root: Path | None = None,
                    project_root: Path | None = None,
                    runtime_root: Path | None = None,
-                   game_running=ffnx_manager._game_running) -> dict:
+                   game_running=ffnx_manager._game_running,
+                   game_started=ffnx_manager._game_started) -> dict:
     """Report whether FFNx loaded the patch from the latest launch barrier."""
     game = (game_root or paths.GAME_ROOT).resolve()
     log = game / "FFNx.log"
+    # The launcher can stay open for as long as the player likes; FFNx only
+    # starts with the game, so the editor times its check from this.
+    started = bool(game_started())
     if not log.is_file():
-        return {"loaded": False, "logReady": False, "message": "FFNx.log is not ready."}
+        return {"loaded": False, "logReady": False, "gameStarted": started,
+                "message": "FFNx.log is not ready."}
     text = log.read_text(encoding="utf-8", errors="replace")
     log_is_current = bool(_last_activation_ns) and log.stat().st_mtime_ns >= _last_activation_ns - 1_000_000_000
     target = materialized_runtime_patch_path(_runtime_root(runtime_root, project_root))
@@ -1481,6 +1486,7 @@ def runtime_status(game_root: Path | None = None,
         "logReady": log_ready,
         "startupIncomplete": log_is_current and not log_ready,
         "gameRunning": running,
+        "gameStarted": started,
         "log": str(log),
         "message": (
             "FFNx loaded the Lexeditor gameplay patch."
