@@ -391,17 +391,17 @@ def test_square_records_the_time_and_other_buttons_do_not():
 def test_a_fumble_sounds_at_once_and_only_once():
     """Lexer, 2026-09-27: mashing with Irvine or Quistis failed at once; with
     Squall it was silent until the very end, then sounded two or three times."""
-    emu = _machine(1000, window=150)
+    emu = _machine(1000, window=1000)
     _press(emu)
     assert _sounds(emu) == []
     _at(emu, 1030)
     _press(emu)
     assert _sounds(emu) == [FAIL], "the second press fails right away"
-    for now in range(1060, 4000, 60):   # Squall's long run-up
+    for now in range(1060, 3900, 60):   # Squall's run-up, within three windows
         _at(emu, now)
         _press(emu)
     assert _sounds(emu) == [FAIL]
-    _at(emu, 4010)
+    _at(emu, 3950)
     assert _gunblade(emu, 0, 4) == ("miss", 0)
     assert _sounds(emu) == [FAIL], "the hit adds no second sound"
 
@@ -428,14 +428,29 @@ def test_an_early_press_sounds_its_miss_one_window_later():
     assert _sounds(emu) == [FAIL], "the hit adds nothing"
 
 
-def test_a_spent_press_cannot_be_retried_until_the_player_lets_up():
+def test_one_try_per_hit():
+    """Lexer: why not allow only one try per attack, or per hit."""
     emu = _machine(window=149)
     _at(emu, 1000)
     _press(emu)
     _frame(emu, 1200)                     # spent: the miss sounded
-    assert _attack(emu, 1250, 1300) == "miss", "a quick second try is still the spent press"
+    assert _attack(emu, 1250, 1300) == "miss", "no second try before the hit"
     assert _sounds(emu) == [FAIL]
-    assert _attack(emu, 2000, 2050) in ("hit", "crit"), "after three quiet windows it arms again"
+    # The hit gave the try back: the next hit's press counts at once.
+    assert _attack(emu, 1350, 1400) in ("hit", "crit")
+
+
+def test_mashing_does_not_extend_a_stray_press():
+    """A press no hit uses expires three windows after it was made."""
+    emu = _machine(window=149)          # three windows: 447 ms
+    _at(emu, 1000)
+    _press(emu)
+    for now in (1100, 1300, 1440):
+        _at(emu, now)
+        _press(emu)
+    _at(emu, 1500)                        # 500 ms after the first press
+    _press(emu)
+    assert _pressed(emu) == (1500, 1), "a fresh try, not held back by the mashing"
 
 
 def test_an_early_press_on_a_block_is_the_worst_band_with_one_sound():
