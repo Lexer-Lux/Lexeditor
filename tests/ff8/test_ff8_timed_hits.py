@@ -441,15 +441,12 @@ def _active(emu):
     return struct.unpack("<I", emu.mem_read(t.ACTIVE, 4))[0]
 
 
-def test_square_outside_an_action_does_nothing():
-    """Lexer: if they're not even doing an attack this code shouldn't be firing."""
+def test_a_press_before_the_swing_still_counts():
+    """The game applies an attack's damage as the swing starts, just before the
+    animation task starts, so a press then must not be cut off."""
     emu = _machine(window=1000)
     emu.mem_write(t.ACTIVE, struct.pack("<I", 0))
-    _at(emu, 1000)
-    _press(emu)
-    _at(emu, 1050)
-    _press(emu)
-    assert _pressed(emu) == (0, 0) and _sounds(emu) == []
+    assert _attack(emu, 9900, 10000) in ("hit", "crit")
 
 
 def test_an_action_opens_square_and_its_end_closes_it():
@@ -461,9 +458,6 @@ def test_an_action_opens_square_and_its_end_closes_it():
     assert _active(emu) == 1
     _removed(emu, t.ACTION_MESSAGE)       # the action's own message
     assert _active(emu) == 0
-    _at(emu, 2000)
-    _press(emu)
-    assert _pressed(emu) == (0, 0)
 
 
 def test_a_press_left_from_the_last_action_is_cleared_silently():
