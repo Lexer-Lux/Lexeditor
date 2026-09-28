@@ -207,6 +207,24 @@ def test_a_script_line_names_the_script_and_its_model():
     assert calls == [calls[0]] and calls[0][16:] == f" {h.SCRIPT_OWNER:08X} 00001014 02{hp} {MOTION:04X}\r\n"
 
 
+def test_a_sequence_line_names_the_model_the_caller_and_the_sequence():
+    hp = " " + " ".join(f"{value:08X}" for value in HP)
+    emu = _machine()
+    calls = _writes(emu)
+    emu.mem_write(h.SEQUENCE_RESUME, b"\xF4")
+    esp = STACK + 0x1000
+    caller, model = 0x00504441, 0x01D973F8
+    emu.mem_write(esp, struct.pack("<3I", caller, model, 0x0B))
+    emu.reg_write(x86.UC_X86_REG_ESP, esp)
+    emu.reg_write(x86.UC_X86_REG_EBX, 0xBBBBBBBB)
+    emu.emu_start(h.CAVE + h.ENTRY["sequence"], h.SEQUENCE_RESUME + 1, count=5000)
+    # The replaced instructions ran: push ebx; mov ebx, [esp + 0xc] (the sequence).
+    assert emu.reg_read(x86.UC_X86_REG_ESP) == esp - 4
+    assert struct.unpack("<I", emu.mem_read(esp - 4, 4))[0] == 0xBBBBBBBB
+    assert emu.reg_read(x86.UC_X86_REG_EBX) == 0x0B
+    assert calls == [f"{calls[0][:16]} {model:08X} {caller:08X} 0B{hp} {MOTION:04X}\r\n"]
+
+
 def test_off_writes_nothing_and_on_hooks_the_verified_bytes():
     assert h.build_hext(False) == ""
     text = h.build_hext(True)
@@ -215,6 +233,8 @@ def test_off_writes_nothing_and_on_hooks_the_verified_bytes():
     assert f"{h.TASK_HOOK:X} = E9" in text and f"{h.SCRIPT_HOOK:X} = E9" in text
     assert len(h.task_hook_bytes()) == len(h.TASK_ORIGINAL)
     assert len(h.script_hook_bytes()) == len(h.SCRIPT_ORIGINAL)
+    assert len(h.sequence_hook_bytes()) == len(h.SEQUENCE_ORIGINAL)
+    assert f"{h.SEQUENCE_HOOK:X} = E9" in text
     assert len(h.damage_hook_bytes()) == len(h.DAMAGE_ORIGINAL)
     assert h.hook_bytes()[:1] == b"\xE9" and len(h.hook_bytes()) == len(h.HOOK_ORIGINAL)
     assert h.CAVE + len(h.CODE) <= h.DATA

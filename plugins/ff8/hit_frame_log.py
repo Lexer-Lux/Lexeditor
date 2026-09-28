@@ -48,6 +48,17 @@ and 00507080 writes one line per script it starts:
 
 Next to the damage lines, these show which state and which script end at
 the moment a hit lands, and how long they run.
+
+Sequence lines. The 2026-09-28 log showed that an ordinary attack's damage
+is applied as the swing starts, and the target flinches about 36 frames
+later, just before the action ends. 00505C00(model, sequence) starts a
+sequence on a model; the hook writes one line per call:
+
+    <tsc> <model> <caller> <sequence id> <HP ...> <motion>
+
+The caller column is a code address (00xxxxxx), unlike an opcode line's
+script address. The line that starts the target's flinch names the code that
+decides the moment of contact, which is where deferred damage must land.
 """
 
 from __future__ import annotations
@@ -76,6 +87,10 @@ SCRIPT_HOOK = 0x00507080
 SCRIPT_ORIGINAL = bytes.fromhex("53 6A 01 6A 14")  # push ebx; push 1; push 0x14
 SCRIPT_RESUME = 0x00507085
 SCRIPT_OWNER = 0xEEEEEEEE
+# 00505C00(model, sequence) starts a sequence on a model.
+SEQUENCE_HOOK = 0x00505C00
+SEQUENCE_ORIGINAL = bytes.fromhex("53 8B 5C 24 0C")  # push ebx; mov ebx, [esp+0xc]
+SEQUENCE_RESUME = 0x00505C05
 
 # Kernel32 import-table slots of the supported executable.
 IAT_CREATE_FILE_A = 0x00B691C8
@@ -257,6 +272,19 @@ script:
     push 0x14
     push {SCRIPT_RESUME:#x}
     ret
+sequence:
+    pushad
+    pushfd
+    mov esi, dword ptr [esp + 0x28]
+    mov edx, dword ptr [esp + 0x24]
+    movzx ecx, byte ptr [esp + 0x2c]
+    call write_line
+    popfd
+    popad
+    push ebx
+    mov ebx, dword ptr [esp + 0xc]
+    push {SEQUENCE_RESUME:#x}
+    ret
 """
 
 # Assembled at CAVE from ASSEMBLY (keystone); tests/ff8/test_ff8_hit_frame_log.py
@@ -287,9 +315,11 @@ CODE = bytes.fromhex(
     "B9 FF 00 00 00 EB 04 39 D1 74 0A 89 EA 8B 76 08"
     "E8 D7 FE FF FF 9D 61 68 3A 84 50 00 C3 60 9C BE"
     "EE EE EE EE 8B 54 24 28 0F B6 4C 24 2C E8 BA FE"
-    "FF FF 9D 61 53 6A 01 6A 14 68 85 70 50 00 C3"
+    "FF FF 9D 61 53 6A 01 6A 14 68 85 70 50 00 C3 60"
+    "9C 8B 74 24 28 8B 54 24 24 0F B6 4C 24 2C E8 99"
+    "FE FF FF 9D 61 53 8B 5C 24 0C 68 05 5C 50 00 C3"
 )
-ENTRY = {"opcode": 0x0, "damage": 0x28, "task": 0x149, "script": 0x17d}
+ENTRY = {"opcode": 0x0, "damage": 0x28, "task": 0x149, "script": 0x17d, "sequence": 0x19f}
 
 DATA_BYTES = (
     b"\x00" * 0x40
@@ -324,6 +354,10 @@ def script_hook_bytes() -> bytes:
     return b"\xE9" + (_entry("script") - (SCRIPT_HOOK + 5)).to_bytes(4, "little", signed=True)
 
 
+def sequence_hook_bytes() -> bytes:
+    return b"\xE9" + (_entry("sequence") - (SEQUENCE_HOOK + 5)).to_bytes(4, "little", signed=True)
+
+
 def build_hext(enabled: bool) -> str:
     """Return the diagnostic's Hext fragment, or nothing when it is off."""
     if not isinstance(enabled, bool):
@@ -340,5 +374,6 @@ def build_hext(enabled: bool) -> str:
         f"{DAMAGE_HOOK:X} = {damage_hook_bytes().hex(' ').upper()}",
         f"{TASK_HOOK:X} = {task_hook_bytes().hex(' ').upper()}",
         f"{SCRIPT_HOOK:X} = {script_hook_bytes().hex(' ').upper()}",
+        f"{SEQUENCE_HOOK:X} = {sequence_hook_bytes().hex(' ').upper()}",
         "",
     ))

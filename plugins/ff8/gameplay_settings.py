@@ -576,6 +576,7 @@ def _verify_executable(game_root: Path) -> Path:
             (hit_frame_log.DAMAGE_HOOK, hit_frame_log.DAMAGE_ORIGINAL),
             (hit_frame_log.TASK_HOOK, hit_frame_log.TASK_ORIGINAL),
             (hit_frame_log.SCRIPT_HOOK, hit_frame_log.SCRIPT_ORIGINAL),
+            (hit_frame_log.SEQUENCE_HOOK, hit_frame_log.SEQUENCE_ORIGINAL),
             *music_volume_issue_498.verified_hooks(),
             *magic_damage_rework.verified_hooks(),
             *melee_damage_rework.verified_hooks(),
