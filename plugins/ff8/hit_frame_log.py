@@ -29,7 +29,25 @@ Off by default: with it off, no byte is written.
 active motion path. The physical-attack task releases the damage only once it
 is 0 (codex/ff8/timed-hits.md, "What releases a hit"), so the log shows
 whether a hit lands when the attacker's path ends - the time indicator needs
-that to predict a hit before it lands.
+that to predict a hit before it lands. (Refuted: it was 0 at every hit.)
+
+Task lines. The opcode stream above does not contain an attacker's swing:
+the attacking model sits idle on its loop for seconds before its hit lands.
+What drives an action is its task: the scheduler starts one per action
+(0050A790) and it steps through states, starting numbered scripts with
+00507080(id, model, ...) and waiting for them. Every task list runs through
+00508420, which calls each task as [node + 8](node) at 00508433. The hook
+there writes a line whenever a task's state byte (node + 0xD) changes or the
+task finishes:
+
+    <tsc> <task function> <task list> <new state, FF when finished> <HP ...> <motion>
+
+and 00507080 writes one line per script it starts:
+
+    <tsc> EEEEEEEE <script id> <model> <HP ...> <motion>
+
+Next to the damage lines, these show which state and which script end at
+the moment a hit lands, and how long they run.
 """
 
 from __future__ import annotations
@@ -49,6 +67,15 @@ DAMAGE_ORIGINAL = bytes.fromhex("83 EC 10 8B 44 24 14")  # sub esp,0x10; mov eax
 DAMAGE_RESUME = 0x0048FE27
 DAMAGE_OWNER = 0xFFFFFFFF
 SEQUENCE_OWNER = 0x01D98204
+# 00508420(list) runs a task list: push esi; call [esi + 8]; add esp, 4.
+TASK_HOOK = 0x00508433
+TASK_ORIGINAL = bytes.fromhex("56 FF 56 08 83 C4 04")
+TASK_RESUME = 0x0050843A
+# 00507080(id, model, ...) starts a numbered script task.
+SCRIPT_HOOK = 0x00507080
+SCRIPT_ORIGINAL = bytes.fromhex("53 6A 01 6A 14")  # push ebx; push 1; push 0x14
+SCRIPT_RESUME = 0x00507085
+SCRIPT_OWNER = 0xEEEEEEEE
 
 # Kernel32 import-table slots of the supported executable.
 IAT_CREATE_FILE_A = 0x00B691C8
@@ -190,6 +217,46 @@ hexn:
     dec ecx
     jnz hexn
     ret
+task:
+    movzx edx, byte ptr [esi + 0xd]
+    push edx
+    push esi
+    call dword ptr [esi + 8]
+    add esp, 4
+    pop edx
+    pushad
+    pushfd
+    movzx ecx, byte ptr [esi + 0xd]
+    test al, 2
+    jz task_running
+    mov ecx, 0xff
+    jmp task_log
+task_running:
+    cmp ecx, edx
+    je task_quiet
+task_log:
+    mov edx, ebp
+    mov esi, dword ptr [esi + 8]
+    call write_line
+task_quiet:
+    popfd
+    popad
+    push {TASK_RESUME:#x}
+    ret
+script:
+    pushad
+    pushfd
+    mov esi, {SCRIPT_OWNER:#x}
+    mov edx, dword ptr [esp + 0x28]
+    movzx ecx, byte ptr [esp + 0x2c]
+    call write_line
+    popfd
+    popad
+    push ebx
+    push 1
+    push 0x14
+    push {SCRIPT_RESUME:#x}
+    ret
 """
 
 # Assembled at CAVE from ASSEMBLY (keystone); tests/ff8/test_ff8_hit_frame_log.py
@@ -215,9 +282,14 @@ CODE = bytes.fromhex(
     "C7 02 6A 00 8D 43 04 50 8D 83 00 01 00 00 89 F9"
     "29 C1 51 50 FF 33 FF 15 AC 90 B6 00 C3 83 C4 08"
     "C3 B9 08 00 00 00 C1 C0 04 89 C2 83 E2 0F 8A 54"
-    "13 40 88 17 47 49 75 EE C3"
+    "13 40 88 17 47 49 75 EE C3 0F B6 56 0D 52 56 FF"
+    "56 08 83 C4 04 5A 60 9C 0F B6 4E 0D A8 02 74 07"
+    "B9 FF 00 00 00 EB 04 39 D1 74 0A 89 EA 8B 76 08"
+    "E8 D7 FE FF FF 9D 61 68 3A 84 50 00 C3 60 9C BE"
+    "EE EE EE EE 8B 54 24 28 0F B6 4C 24 2C E8 BA FE"
+    "FF FF 9D 61 53 6A 01 6A 14 68 85 70 50 00 C3"
 )
-ENTRY = {"opcode": 0x0, "damage": 0x28}
+ENTRY = {"opcode": 0x0, "damage": 0x28, "task": 0x149, "script": 0x17d}
 
 DATA_BYTES = (
     b"\x00" * 0x40
@@ -243,6 +315,15 @@ def damage_hook_bytes() -> bytes:
     return jump + b"\x90" * (len(DAMAGE_ORIGINAL) - 5)
 
 
+def task_hook_bytes() -> bytes:
+    jump = b"\xE9" + (_entry("task") - (TASK_HOOK + 5)).to_bytes(4, "little", signed=True)
+    return jump + b"\x90" * (len(TASK_ORIGINAL) - 5)
+
+
+def script_hook_bytes() -> bytes:
+    return b"\xE9" + (_entry("script") - (SCRIPT_HOOK + 5)).to_bytes(4, "little", signed=True)
+
+
 def build_hext(enabled: bool) -> str:
     """Return the diagnostic's Hext fragment, or nothing when it is off."""
     if not isinstance(enabled, bool):
@@ -257,5 +338,7 @@ def build_hext(enabled: bool) -> str:
         f"{DATA:X} = {DATA_BYTES.hex(' ').upper()}",
         f"{HOOK:X} = {hook_bytes().hex(' ').upper()}",
         f"{DAMAGE_HOOK:X} = {damage_hook_bytes().hex(' ').upper()}",
+        f"{TASK_HOOK:X} = {task_hook_bytes().hex(' ').upper()}",
+        f"{SCRIPT_HOOK:X} = {script_hook_bytes().hex(' ').upper()}",
         "",
     ))

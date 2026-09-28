@@ -132,11 +132,89 @@ def test_damage_entry_logs_the_target_and_resumes_the_damage_routine():
     assert calls[0][16:] == f" FFFFFFFF {caller:08X} 04{hp} {MOTION:04X}\r\n"
 
 
+def _writes(emu):
+    calls = []
+
+    def on_code(uc, address, _size, _data):
+        if address == STUBS[h.IAT_CREATE_FILE_A][0]:
+            uc.reg_write(x86.UC_X86_REG_EAX, 0x1234)
+        elif address == STUBS[h.IAT_WRITE_FILE][0]:
+            esp = uc.reg_read(x86.UC_X86_REG_ESP)
+            args = struct.unpack("<5I", uc.mem_read(esp + 4, 20))
+            calls.append(bytes(uc.mem_read(args[1], args[2])).decode())
+            uc.reg_write(x86.UC_X86_REG_EAX, 1)
+    emu.hook_add(unicorn.UC_HOOK_CODE, on_code)
+    return calls
+
+
+TASK_LIST = 0x01D96D78
+NODE = 0x00D00400
+STEPS = {  # task functions: [esp+4] is the node
+    "advance": (0x00D00500, "8B 44 24 04 FE 40 0D 31 C0 C3"),   # inc byte [node+0xD]; return 0
+    "wait": (0x00D00520, "31 C0 C3"),                          # nothing changes
+    "finish": (0x00D00540, "B8 02 00 00 00 C3"),               # return 2: the task is done
+}
+
+
+def _run_task(emu, step: str):
+    function, code = STEPS[step]
+    emu.mem_write(function, bytes.fromhex(code))
+    emu.mem_write(NODE, bytes(0x14))
+    emu.mem_write(NODE + 8, struct.pack("<I", function))
+    emu.mem_write(NODE + 0xD, bytes((3,)))
+    emu.mem_write(h.TASK_RESUME, b"\xF4")
+    esp = STACK + 0x1000
+    emu.reg_write(x86.UC_X86_REG_ESP, esp)
+    emu.reg_write(x86.UC_X86_REG_ESI, NODE)
+    emu.reg_write(x86.UC_X86_REG_EBP, TASK_LIST)
+    emu.reg_write(x86.UC_X86_REG_EDI, 0xD1D1D1D1)
+    emu.reg_write(x86.UC_X86_REG_EBX, 0xBBBBBBBB)
+    emu.emu_start(h.CAVE + h.ENTRY["task"], h.TASK_RESUME + 1, count=5000)
+    # The replaced call ran and its result reached the runner unchanged.
+    assert emu.reg_read(x86.UC_X86_REG_ESP) == esp
+    assert emu.reg_read(x86.UC_X86_REG_ESI) == NODE
+    assert emu.reg_read(x86.UC_X86_REG_EBP) == TASK_LIST
+    assert emu.reg_read(x86.UC_X86_REG_EDI) == 0xD1D1D1D1
+    assert emu.reg_read(x86.UC_X86_REG_EBX) == 0xBBBBBBBB
+    return emu.reg_read(x86.UC_X86_REG_EAX)
+
+
+def test_a_task_line_marks_each_state_change_and_the_finish():
+    hp = " " + " ".join(f"{value:08X}" for value in HP)
+    emu = _machine()
+    calls = _writes(emu)
+    assert _run_task(emu, "advance") == 0
+    assert calls[-1][16:] == f" {STEPS['advance'][0]:08X} {TASK_LIST:08X} 04{hp} {MOTION:04X}\r\n"
+    assert _run_task(emu, "wait") == 0
+    assert len(calls) == 1, "a task that stays in its state writes nothing"
+    assert _run_task(emu, "finish") == 2
+    assert calls[-1][16:] == f" {STEPS['finish'][0]:08X} {TASK_LIST:08X} FF{hp} {MOTION:04X}\r\n"
+
+
+def test_a_script_line_names_the_script_and_its_model():
+    hp = " " + " ".join(f"{value:08X}" for value in HP)
+    emu = _machine()
+    calls = _writes(emu)
+    emu.mem_write(h.SCRIPT_RESUME, b"\xF4")
+    esp = STACK + 0x1000
+    emu.mem_write(esp, struct.pack("<4I", 0xCAFEBABE, 0x1014, 2, 0))  # return, id, model, 0
+    emu.reg_write(x86.UC_X86_REG_ESP, esp)
+    emu.reg_write(x86.UC_X86_REG_EBX, 0xBBBBBBBB)
+    emu.emu_start(h.CAVE + h.ENTRY["script"], h.SCRIPT_RESUME + 1, count=5000)
+    # The replaced pushes ran: ebx, 1, 0x14.
+    assert emu.reg_read(x86.UC_X86_REG_ESP) == esp - 12
+    assert struct.unpack("<3I", emu.mem_read(esp - 12, 12)) == (0x14, 1, 0xBBBBBBBB)
+    assert calls == [calls[0]] and calls[0][16:] == f" {h.SCRIPT_OWNER:08X} 00001014 02{hp} {MOTION:04X}\r\n"
+
+
 def test_off_writes_nothing_and_on_hooks_the_verified_bytes():
     assert h.build_hext(False) == ""
     text = h.build_hext(True)
     assert f"{h.HOOK:X} = E9" in text
     assert f"{h.DAMAGE_HOOK:X} = E9" in text
+    assert f"{h.TASK_HOOK:X} = E9" in text and f"{h.SCRIPT_HOOK:X} = E9" in text
+    assert len(h.task_hook_bytes()) == len(h.TASK_ORIGINAL)
+    assert len(h.script_hook_bytes()) == len(h.SCRIPT_ORIGINAL)
     assert len(h.damage_hook_bytes()) == len(h.DAMAGE_ORIGINAL)
     assert h.hook_bytes()[:1] == b"\xE9" and len(h.hook_bytes()) == len(h.HOOK_ORIGINAL)
     assert h.CAVE + len(h.CODE) <= h.DATA
