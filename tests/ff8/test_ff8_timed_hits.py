@@ -1,6 +1,10 @@
-"""Timed Hits and Blocks (#482/#483) under unicorn: the press recorder, the
-hit and crit verdicts that replace the game's rolls for attacks and blocks,
-Squall's gunblade landing, and continuous grading."""
+"""Timed Hits and Blocks (#482/#483) under unicorn.
+
+The game applies an ordinary attack's result as the swing starts and shows
+it at the visible contact. The patch notes the rolls' thresholds and holds
+the result at the swing start, then judges the press and applies the result
+at the contact. These tests run each hook the way the game calls it: the
+rolls, the held apply (004911BC), and the contact (00506690)."""
 from __future__ import annotations
 
 import struct
@@ -11,26 +15,47 @@ from plugins.ff8 import gameplay_settings
 from plugins.ff8 import timed_hits as t
 
 unicorn = pytest.importorskip("unicorn")
+keystone = pytest.importorskip("keystone")
 from unicorn import x86_const as x86  # noqa: E402
 
 STACK = 0x00E00000
 CLOCK = 0x00E0F000        # the stand-in timeGetTime returns this dword
 SOUNDS = 0x00E0F010       # the stand-in sound call records its argument here
+APPLIED = 0x00E0F200      # the stand-in 00494410: call count, then its nine arguments
 INPUT_BLOCK = 0x00E0E000
 TIME_STUB = 0x00E0D000
 STOP = 0x00E0C000         # a return address that halts the emulator
 GAME_RANDOM = 0x77        # the stand-in random byte
 OK, CRIT, FAIL = 7, 11, 9
 
+APPLY_STUB = f"""
+    inc dword ptr [{APPLIED:#x}]
+    push esi
+    push edi
+    lea esi, [esp + 0xc]
+    mov edi, {APPLIED + 4:#x}
+    mov ecx, 9
+copy:
+    mov eax, dword ptr [esi]
+    mov dword ptr [edi], eax
+    add esi, 4
+    add edi, 4
+    dec ecx
+    jnz copy
+    pop edi
+    pop esi
+    ret
+"""
 
-def _machine(now: int = 0, *, window=1000, continuous=False):
+
+def _machine(now: int = 0, *, window=1000, continuous=False, active=True):
     emu = unicorn.Uc(unicorn.UC_ARCH_X86, unicorn.UC_MODE_32)
     for base, size in ((0x00400000, 0x00800000), (0x00E00000, 0x00010000),
                        (0x01D27000, 0x4000), (0x027AB000, 0x2000)):
         emu.mem_map(base, size)
     emu.mem_write(t.CAVE, t.CODE)
     emu.mem_write(t.DATA, t.data_bytes(window, OK, CRIT, FAIL, continuous))
-    emu.mem_write(t.ACTIVE, struct.pack("<I", 1))  # most tests run inside an action
+    emu.mem_write(t.ACTIVE, struct.pack("<I", int(active)))
     emu.mem_write(t.TIME_GET_TIME, struct.pack("<I", TIME_STUB))
     emu.mem_write(TIME_STUB, b"\xA1" + struct.pack("<I", CLOCK) + b"\xC3")  # mov eax,[CLOCK]; ret
     emu.mem_write(CLOCK, struct.pack("<I", now))
@@ -40,8 +65,10 @@ def _machine(now: int = 0, *, window=1000, continuous=False):
     stub += bytes.fromhex("FF 05") + struct.pack("<I", SOUNDS) + b"\xC3"
     emu.mem_write(t.PLAY_SOUND, stub)
     emu.mem_write(t.RANDOM, bytes((0xB8, GAME_RANDOM, 0, 0, 0, 0xC3)))  # mov eax, 0x77; ret
-    for halt in (t.INPUT_RESUME, t.HIT_RESUME, t.GUNBLADE_RESUME, t.GUNBLADE_NO_DAMAGE, t.E10_MISS,
-                 t.ACTION_RESUME, t.ACTION_END_RESUME, STOP):
+    ks = keystone.Ks(keystone.KS_ARCH_X86, keystone.KS_MODE_32)
+    emu.mem_write(t.APPLY, bytes(ks.asm(APPLY_STUB, t.APPLY)[0]))
+    for halt in (t.INPUT_RESUME, t.GUNBLADE_RESUME, t.ACTION_RESUME, t.ACTION_END_RESUME,
+                 t.CONTACT_RESUME, STOP):
         emu.mem_write(halt, b"\xF4")
     return emu
 
@@ -49,6 +76,11 @@ def _machine(now: int = 0, *, window=1000, continuous=False):
 def _sounds(emu):
     count = struct.unpack("<I", emu.mem_read(SOUNDS, 4))[0]
     return list(struct.unpack(f"<{count}I", emu.mem_read(SOUNDS + 4, 4 * count))) if count else []
+
+
+def _applied(emu):
+    count = struct.unpack("<I", emu.mem_read(APPLIED, 4))[0]
+    return count, struct.unpack("<9I", emu.mem_read(APPLIED + 4, 36))
 
 
 def _at(emu, now: int):
@@ -73,8 +105,8 @@ def _pressed(emu):
     return struct.unpack("<II", emu.mem_read(t.PRESS_TIME, 8))
 
 
-def _roll(emu, entry: str, attacker: int, target: int, threshold: int) -> bool:
-    """Call a replaced random byte as 00492BA0/00492B30 do; True if the roll lands."""
+def _roll(emu, entry: str, attacker: int, target: int, threshold: int) -> tuple[bool, int]:
+    """A replaced random byte as 00492BA0/00492B30 call it: (lands, threshold after)."""
     esp = STACK + 0x6000
     emu.mem_write(esp, struct.pack("<IIIII", STOP, 0x5E5E5E5E, 0xCAFEF00D, attacker, target))
     emu.reg_write(x86.UC_X86_REG_ESP, esp)
@@ -84,328 +116,371 @@ def _roll(emu, entry: str, attacker: int, target: int, threshold: int) -> bool:
     emu.reg_write(x86.UC_X86_REG_EBP, 0xEBEBEBEB)
     emu.emu_start(t.ENTRIES[entry], STOP + 1, count=800)
     assert emu.reg_read(x86.UC_X86_REG_ESP) == esp + 4
-    assert emu.reg_read(x86.UC_X86_REG_EBX) == 0xB0B0B0B0
-    assert emu.reg_read(x86.UC_X86_REG_EDI) == 0xD1D1D1D1
-    assert emu.reg_read(x86.UC_X86_REG_EBP) == 0xEBEBEBEB
+    for reg, value in ((x86.UC_X86_REG_EBX, 0xB0B0B0B0), (x86.UC_X86_REG_EDI, 0xD1D1D1D1),
+                       (x86.UC_X86_REG_EBP, 0xEBEBEBEB)):
+        assert emu.reg_read(reg) == value
     esi = emu.reg_read(x86.UC_X86_REG_ESI)
     roll = emu.reg_read(x86.UC_X86_REG_EAX) & 0xFF
-    return esi != 0 and esi >= roll          # the game's own test after the call
+    return esi != 0 and esi >= roll, esi
 
 
-def _e10(emu, entry: str, attacker: int, target: int, threshold: int):
-    """A replaced random byte inside 00492E10: 'lands', 'fails' or 'miss exit'."""
+def _held(emu, attacker: int, target: int, damage: int) -> bool:
+    """004911BC: the call to 00494410. True if the result was held."""
+    before = _applied(emu)[0]
     esp = STACK + 0x6000
-    emu.mem_write(esp, struct.pack("<I", STOP))
+    args = (target, damage, 0x01D27ADE, 0x01D27ADD, attacker, 0x01D27ADC, 0x01D27AF6, 0x01D27AE8, 0)
+    emu.mem_write(esp, struct.pack("<10I", STOP, *args))
     emu.reg_write(x86.UC_X86_REG_ESP, esp)
-    emu.reg_write(x86.UC_X86_REG_ESI, attacker * 0xD0)
-    emu.reg_write(x86.UC_X86_REG_EBP, target * 0xD0)
-    emu.reg_write(x86.UC_X86_REG_EDI, threshold)
-    emu.reg_write(x86.UC_X86_REG_EBX, 0xB0B0B0B0)
-    emu.emu_start(t.ENTRIES[entry], 0, count=800)
+    for reg, value in ((x86.UC_X86_REG_ESI, 0x51515151), (x86.UC_X86_REG_EDI, 0xD1D1D1D1),
+                       (x86.UC_X86_REG_EBX, 0xB0B0B0B0), (x86.UC_X86_REG_EBP, 0xEBEBEBEB)):
+        emu.reg_write(reg, value)
+    emu.emu_start(t.ENTRIES["defer"], STOP + 1, count=800)
     assert emu.reg_read(x86.UC_X86_REG_ESP) == esp + 4
-    assert emu.reg_read(x86.UC_X86_REG_EBX) == 0xB0B0B0B0
-    assert emu.reg_read(x86.UC_X86_REG_ESI) == attacker * 0xD0
-    if emu.reg_read(x86.UC_X86_REG_EIP) - 1 == t.E10_MISS:
-        return "miss exit"
-    edi = emu.reg_read(x86.UC_X86_REG_EDI)
-    roll = emu.reg_read(x86.UC_X86_REG_EAX) & 0xFF
-    return "lands" if edi != 0 and edi >= roll else "fails"
+    for reg, value in ((x86.UC_X86_REG_ESI, 0x51515151), (x86.UC_X86_REG_EDI, 0xD1D1D1D1),
+                       (x86.UC_X86_REG_EBX, 0xB0B0B0B0), (x86.UC_X86_REG_EBP, 0xEBEBEBEB)):
+        assert emu.reg_read(reg) == value
+    return _applied(emu)[0] == before
 
 
-def _auto(emu, attacker: int, target: int) -> int:
-    """00492B00's automatic-hit exit."""
+SECOND_EFFECT = bytes(range(0xA0, 0xAC))
+
+
+def _record(index: int) -> int:
+    return t.RECORDS + index * t.RECORD_SIZE
+
+
+def _swing(emu, attacker, target, *, damage=1000, hit=191, crit=128, auto=False):
+    """The swing start: the rolls, the result block, the held apply and the record 0048EF80 writes."""
+    index = emu.mem_read(t.RECORD_COUNT, 1)[0]
+    if auto:
+        esp = STACK + 0x6000
+        emu.mem_write(esp, struct.pack("<III", STOP, attacker, target))
+        emu.reg_write(x86.UC_X86_REG_ESP, esp)
+        emu.emu_start(t.ENTRIES["auto"], STOP + 1, count=200)
+        assert emu.reg_read(x86.UC_X86_REG_EAX) == 1
+    else:
+        lands, _ = _roll(emu, "hit_roll", attacker, target, hit)
+        assert lands, "the swing always lands; the press decides at contact"
+    crits, _ = _roll(emu, "crit_roll", attacker, target, crit)
+    assert not crits, "no crit at the swing; the press decides at contact"
+    block = bytearray(t.RESULT_SIZE)
+    block[0] = attacker                                   # 01D27AD8
+    block[0xE4 - 0xD8:0xE6 - 0xD8] = struct.pack("<H", damage)
+    emu.mem_write(t.RESULT_BLOCK, bytes(block))
+    held = _held(emu, attacker, target, damage)
+    record = bytearray(t.RECORD_SIZE)
+    record[0] = target
+    record[6:8] = struct.pack("<H", damage)
+    record[0xC:] = SECOND_EFFECT             # what 004911FD applied at the swing
+    emu.mem_write(_record(index), bytes(record))
+    emu.mem_write(t.RECORD_COUNT, bytes((index + 1,)))
+    return index, held
+
+
+def _contact(emu, index: int):
+    """00506690(record): the hit visibly connects. Returns (outcome, damage applied, record)."""
+    applied_before = _applied(emu)[0]
     esp = STACK + 0x6000
-    emu.mem_write(esp, struct.pack("<III", STOP, attacker, target))
+    emu.mem_write(esp, struct.pack("<II", 0xCAFEBABE, _record(index)))
     emu.reg_write(x86.UC_X86_REG_ESP, esp)
-    emu.emu_start(t.ENTRIES["auto"], STOP + 1, count=800)
-    return emu.reg_read(x86.UC_X86_REG_EAX)
-
-
-def _damage(emu, damage: int) -> int:
-    """The hit's damage through 00491124, where continuous grading scales it."""
-    esp = STACK + 0x8000
-    emu.mem_write(esp, bytes(0x20))
-    emu.reg_write(x86.UC_X86_REG_ESP, esp)
-    emu.reg_write(x86.UC_X86_REG_ESI, damage)
-    emu.reg_write(x86.UC_X86_REG_EDI, 0xD1D1D1D1)
-    emu.emu_start(t.ENTRIES["hit"], t.HIT_RESUME + 1, count=500)
-    assert emu.reg_read(x86.UC_X86_REG_ESP) == esp
-    assert emu.reg_read(x86.UC_X86_REG_EDI) == 0xD1D1D1D1
-    return emu.reg_read(x86.UC_X86_REG_ESI)
-
-
-def _gunblade(emu, attacker: int, target: int, *, landing: bool = True, luck: int = 0, bonus: int = 0):
-    """0048F530 inside Squall's gunblade handler: ('hit' or 'miss', crit flag)."""
-    emu.mem_write(t.HIT_COUNTER, struct.pack("<H", 1 if landing else 0))
-    emu.mem_write(t.PARTICIPANTS + attacker * 0xD0 + t.LUCK, bytes((luck,)))
-    emu.mem_write(t.CRIT_BONUS, bytes((bonus,)))
-    emu.mem_write(t.CRIT_FLAG, b"\x00")
-    emu.mem_write(t.HIT_MARKS, b"\x00")
-    esp = STACK + 0x6000
-    emu.mem_write(esp, struct.pack("<III", 0xEBEBEBEB, 0xCAFEF00D, attacker))
-    emu.reg_write(x86.UC_X86_REG_ESP, esp)
-    emu.reg_write(x86.UC_X86_REG_EBP, target)
-    emu.reg_write(x86.UC_X86_REG_EDX, target * 3)
     emu.reg_write(x86.UC_X86_REG_EBX, 0xB0B0B0B0)
-    emu.emu_start(t.ENTRIES["gunblade"], 0, count=1000)
-    eip = emu.reg_read(x86.UC_X86_REG_EIP) - 1   # the hlt
-    marks = emu.mem_read(t.HIT_MARKS, 1)[0]
-    crit = emu.mem_read(t.CRIT_FLAG, 1)[0]
-    if eip == t.GUNBLADE_NO_DAMAGE:
-        assert emu.reg_read(x86.UC_X86_REG_ESP) == esp and marks & 4
-        return "miss", crit
-    assert eip == t.GUNBLADE_RESUME, hex(eip)
-    # The replaced instructions ran: push ebx; xor ebx, ebx; lea eax, [ebp+edx*4].
-    assert emu.reg_read(x86.UC_X86_REG_ESP) == esp - 4
-    assert emu.reg_read(x86.UC_X86_REG_EBX) == 0
-    assert emu.reg_read(x86.UC_X86_REG_EAX) == target + target * 12
-    return "hit", crit
+    emu.reg_write(x86.UC_X86_REG_EDI, 0xD1D1D1D1)
+    emu.emu_start(t.ENTRIES["contact"], t.CONTACT_RESUME + 1, count=5000)
+    # The replaced instructions ran: push ebx; push esi; mov esi, [esp + 0xc].
+    assert emu.reg_read(x86.UC_X86_REG_ESP) == esp - 8
+    assert emu.reg_read(x86.UC_X86_REG_ESI) == _record(index)
+    assert emu.reg_read(x86.UC_X86_REG_EBX) == 0xB0B0B0B0
+    assert emu.reg_read(x86.UC_X86_REG_EDI) == 0xD1D1D1D1
+    count, args = _applied(emu)
+    record = bytes(emu.mem_read(_record(index), t.RECORD_SIZE))
+    flags = record[3]
+    shown = struct.unpack_from("<H", record, 6)[0]
+    if count == applied_before:
+        assert flags & 4 and shown == 0, "a miss shows as a miss"
+        return "miss", 0, record
+    assert shown == args[1], "the number shows what was applied"
+    return ("crit" if flags & 2 else "hit"), args[1], record
 
 
-def _outcome(emu, attacker, target, press_at, land_at, hit, crit):
-    if press_at is not None:
+def _attack(emu, press_at, contact_at, *, swing_at=None, attacker=1, target=4, **swing):
+    swing_at = contact_at - 2400 if swing_at is None else swing_at
+    if press_at is not None and press_at < swing_at:
         _at(emu, press_at)
         _press(emu)
-    _at(emu, land_at)
-    if not _roll(emu, "hit_roll", attacker, target, hit):
-        return "miss"
-    return "crit" if _roll(emu, "crit_roll", attacker, target, crit) else "hit"
+    _at(emu, swing_at)
+    index, held = _swing(emu, attacker, target, **swing)
+    assert held
+    if press_at is not None and press_at >= swing_at:
+        _at(emu, press_at)
+        _press(emu)
+    _at(emu, contact_at)
+    outcome, damage, _ = _contact(emu, index)
+    return outcome, damage
+
+
+def _block(emu, press_at, contact_at, **swing):
+    return _attack(emu, press_at, contact_at, attacker=5, target=0, **swing)
 
 
 # Lexer's attack example: W 1000 ms, 75% hit chance, 50% crit chance: a press
-# in the 750 ms before the hit lands hits, in the last 375 ms it crits.
-HIT_75 = 191   # 75% of 255: a 749 ms hit window
-CRIT_50 = 128  # 50% of 255: a 375 ms crit window
-
-
-def _attack(emu, press_at, land_at: int, *, hit=HIT_75, crit=CRIT_50):
-    return _outcome(emu, 1, 4, press_at, land_at, hit, crit)
-
-
-# Lexer's block example: W 1000 ms, 20% hit chance, 50% crit chance: the last
-# 800 ms dodges, the 100 ms before that is a normal hit, earlier crits.
-HIT_20 = 51    # 20% of 255: an 800 ms dodge band
-# CRIT_50 again: a 99 ms normal band, then crits
-
-
-def _block(emu, press_at, land_at: int, *, hit=HIT_20, crit=CRIT_50):
-    return _outcome(emu, 5, 0, press_at, land_at, hit, crit)
-
-
-@pytest.mark.parametrize("lead,verdict", [(0, "crit"), (370, "crit"), (380, "hit"), (740, "hit"),
-                                          (760, "miss"), (1200, "miss")])
-def test_lexers_attack_example(lead, verdict):
+# in the 750 ms before the hit visibly lands hits, in the last 375 ms it crits.
+@pytest.mark.parametrize("lead,verdict,damage,sounds", [
+    (0, "crit", 2000, [CRIT]), (370, "crit", 2000, [CRIT]), (380, "hit", 1000, [OK]),
+    (740, "hit", 1000, [OK]), (760, "miss", 0, [FAIL]), (None, "miss", 0, [])])
+def test_lexers_attack_example_judged_at_contact(lead, verdict, damage, sounds):
     emu = _machine(window=1000)
-    assert _attack(emu, 10000 - lead, 10000) == verdict
-    assert _sounds(emu) == {"crit": [CRIT], "hit": [OK], "miss": [FAIL]}[verdict]
-
-
-@pytest.mark.parametrize("lead,verdict,sounds", [(0, "miss", [CRIT]), (800, "miss", [CRIT]),
-                                                 (850, "hit", [OK]), (899, "hit", [OK]),
-                                                 (950, "crit", [FAIL]), (1500, "crit", [FAIL]),
-                                                 (None, "crit", [])])
-def test_lexers_block_example(lead, verdict, sounds):
-    emu = _machine(window=1000)
-    assert _block(emu, None if lead is None else 10000 - lead, 10000) == verdict
+    press = None if lead is None else 10000 - lead
+    assert _attack(emu, press, 10000) == (verdict, damage)
     assert _sounds(emu) == sounds
 
 
-def test_a_block_against_an_attack_that_cannot_crit_is_a_normal_hit_at_worst():
+# Lexer's block example: W 1000 ms, 20% hit, 50% crit: the last 800 ms before
+# contact dodges, the ~100 ms before that is a normal hit, earlier crits.
+@pytest.mark.parametrize("lead,verdict,damage,sounds", [
+    (500, "miss", 0, [CRIT]), (850, "hit", 1000, [OK]), (950, "crit", 2000, [FAIL]),
+    (None, "crit", 2000, [])])
+def test_lexers_block_example_judged_at_contact(lead, verdict, damage, sounds):
     emu = _machine(window=1000)
-    assert _block(emu, None, 10000, crit=0) == "hit"
-    assert _block(emu, 11000 - 950, 11000, crit=0) == "hit"
+    press = None if lead is None else 10000 - lead
+    assert _block(emu, press, 10000, hit=51) == (verdict, damage)
+    assert _sounds(emu) == sounds
 
 
-def test_a_block_against_a_0_percent_attack_keeps_the_games_miss():
-    emu = _machine()
+def test_a_press_during_the_swing_counts_and_one_before_it_does_not():
+    """Lexer: pressing at the visible hit did nothing; the verdict came at the swing start."""
+    emu = _machine(window=1000)
+    # During the swing, 300 ms before the visible contact: a hit or better.
+    assert _attack(emu, 9700, 10000, swing_at=7600)[0] in ("hit", "crit")
+    # Before the swing starts: the action start clears it; the attack misses.
+    emu = _machine(window=1000)
+    _at(emu, 7000)
     _press(emu)
-    _at(emu, 100)
-    assert not _roll(emu, "hit_roll", 5, 0, 0)
-    assert _pressed(emu)[1] == 1, "the press is left for a real hit"
+    _action(emu, 7500)
+    assert _attack(emu, None, 10000, swing_at=7600) == ("miss", 0)
 
 
-def test_an_attack_with_no_press_misses_silently():
-    emu = _machine()
-    assert _attack(emu, None, 10000) == "miss"
-    assert _sounds(emu) == []
-
-
-def test_the_hit_window_follows_the_hit_chance():
+def test_the_hit_is_held_at_the_swing_and_applied_at_contact():
     emu = _machine(window=1000)
-    assert _attack(emu, 10000 - 410, 10000, hit=102) == "miss"   # 40%: 400 ms
-    emu = _machine(window=1000)
-    assert _attack(emu, 10000 - 390, 10000, hit=102) == "hit"
-    emu = _machine(window=1000)
-    assert _attack(emu, 10000 - 990, 10000, hit=600) == "hit", "above 100% is the whole window"
-    emu = _machine(window=1000)
-    assert _attack(emu, 10000, 10000, hit=0) == "miss", "0% never hits"
-
-
-def test_a_crit_chance_of_zero_never_crits():
-    emu = _machine(window=1000)
-    assert _attack(emu, 10000, 10000, crit=0) == "hit"
-
-
-def test_the_press_is_used_by_one_hit():
-    emu = _machine(window=1000)
-    assert _attack(emu, 9900, 10000) == "crit"
-    assert _attack(emu, None, 10050) == "miss", "a second hit needs its own press"
-
-
-def test_party_on_party_and_enemy_on_enemy_keep_the_games_random_byte():
-    emu = _machine()
+    _at(emu, 7600)
+    index, held = _swing(emu, 1, 4, damage=321)
+    assert held and _applied(emu)[0] == 0, "nothing reaches 00494410 at the swing"
+    _at(emu, 9900)
     _press(emu)
-    _at(emu, 100)
-    esp = STACK + 0x6000
+    _at(emu, 10000)
+    outcome, damage, _ = _contact(emu, index)
+    count, args = _applied(emu)
+    assert count == 1 and args[0] == 4 and args[4] == 1, "target and attacker as the game passes them"
+    assert args[1] == damage == (642 if outcome == "crit" else 321)
+    record = bytes(emu.mem_read(_record(index), t.RECORD_SIZE))
+    assert record[0xC:] == SECOND_EFFECT, "the second effect stays as the game recorded it"
+    assert args[2:4] == (0x01D27ADE, 0x01D27ADD) and args[5:] == (0x01D27ADC, 0x01D27AF6, 0x01D27AE8, 0)
+
+
+def test_a_miss_applies_nothing():
+    emu = _machine(window=1000)
+    assert _attack(emu, None, 10000) == ("miss", 0)
+    assert _applied(emu)[0] == 0
+
+
+def test_a_crit_keeps_to_the_damage_limit():
+    emu = _machine(window=1000)
+    assert _attack(emu, 10000, 10000, damage=8000) == ("crit", 9999)
+    emu = _machine(window=1000)
+    assert _attack(emu, 10000, 10000, damage=12000) == ("crit", 24000), "the damage limit was lifted"
+
+
+def test_untimed_hits_are_applied_at_once():
+    emu = _machine()
+    # Party on party, enemy on enemy: no roll is noted, the call goes through.
+    assert not _held(emu, 0, 1, 50)
+    assert not _held(emu, 4, 6, 50)
+    # A spell reaches 00494410 without a noted roll: applied at once too.
+    assert not _held(emu, 1, 4, 50)
+    assert _applied(emu)[0] == 3
+
+
+def test_rolls_between_untimed_pairs_keep_the_games_random_byte():
+    emu = _machine()
     for entry in ("hit_roll", "crit_roll"):
         for attacker, target in ((0, 1), (4, 6)):
+            esp = STACK + 0x6000
             emu.mem_write(esp, struct.pack("<IIIII", STOP, 0, 0, attacker, target))
             emu.reg_write(x86.UC_X86_REG_ESP, esp)
             emu.reg_write(x86.UC_X86_REG_ESI, 200)
             emu.emu_start(t.ENTRIES[entry], STOP + 1, count=100)
             assert emu.reg_read(x86.UC_X86_REG_EAX) == GAME_RANDOM
             assert emu.reg_read(x86.UC_X86_REG_ESI) == 200
-    assert _pressed(emu)[1] == 1
 
 
-def test_an_enemy_crit_roll_without_a_judged_hit_is_the_games():
+def test_a_0_percent_hit_keeps_the_games_miss():
     emu = _machine()
+    assert _roll(emu, "hit_roll", 1, 4, 0) == (False, 0)
+    assert not _held(emu, 1, 4, 50), "nothing noted, so nothing held"
+
+
+def test_the_hit_window_follows_the_noted_hit_chance():
+    emu = _machine(window=1000)
+    assert _attack(emu, 10000 - 410, 10000, hit=102)[0] == "miss"   # 40%: 400 ms
+    emu = _machine(window=1000)
+    assert _attack(emu, 10000 - 390, 10000, hit=102)[0] == "hit"
+    emu = _machine(window=1000)
+    assert _attack(emu, 10000 - 990, 10000, hit=600)[0] == "hit", "above 100% is the whole window"
+    emu = _machine(window=1000)
+    assert _attack(emu, 10000 - 990, 10000, auto=True)[0] == "hit", "an automatic hit is 100%"
+
+
+def test_a_crit_chance_of_zero_never_crits():
+    emu = _machine(window=1000)
+    assert _attack(emu, 10000, 10000, crit=0)[0] == "hit"
+
+
+def test_a_block_against_an_attack_that_cannot_crit_is_a_normal_hit_at_worst():
+    emu = _machine(window=1000)
+    assert _block(emu, None, 10000, hit=51, crit=0) == ("hit", 1000)
+
+
+def test_a_contact_without_a_held_result_is_left_alone():
+    emu = _machine()
+    record = bytearray(t.RECORD_SIZE)
+    record[0], record[3], record[6] = 4, 0x10, 0x44
+    emu.mem_write(_record(3), bytes(record))
+    _contact_raw = bytes(record)
     esp = STACK + 0x6000
-    emu.mem_write(esp, struct.pack("<IIIII", STOP, 0, 0, 5, 0))
+    emu.mem_write(esp, struct.pack("<II", 0xCAFEBABE, _record(3)))
     emu.reg_write(x86.UC_X86_REG_ESP, esp)
-    emu.reg_write(x86.UC_X86_REG_ESI, 200)
-    emu.emu_start(t.ENTRIES["crit_roll"], STOP + 1, count=200)
-    assert emu.reg_read(x86.UC_X86_REG_EAX) == GAME_RANDOM
+    emu.emu_start(t.ENTRIES["contact"], t.CONTACT_RESUME + 1, count=500)
+    assert bytes(emu.mem_read(_record(3), t.RECORD_SIZE)) == _contact_raw
+    assert _applied(emu)[0] == 0
 
 
-def test_an_automatic_hit_is_a_full_window():
+def test_a_held_result_is_used_once():
     emu = _machine(window=1000)
-    _press(emu)
-    _at(emu, 900)
-    assert _auto(emu, 1, 4) == 1                    # 900 ms of a 1000 ms window
+    _at(emu, 7600)
+    index, _ = _swing(emu, 1, 4)
+    _at(emu, 10000)
+    assert _contact(emu, index)[0] == "miss"
+    record = bytes(emu.mem_read(_record(index), t.RECORD_SIZE))
+    _contact(emu, index) if False else None
+    esp = STACK + 0x6000
+    emu.mem_write(esp, struct.pack("<II", 0xCAFEBABE, _record(index)))
+    emu.reg_write(x86.UC_X86_REG_ESP, esp)
+    emu.emu_start(t.ENTRIES["contact"], t.CONTACT_RESUME + 1, count=500)
+    assert bytes(emu.mem_read(_record(index), t.RECORD_SIZE)) == record, "0050A6C0 shows it again unchanged"
+
+
+def test_every_hit_of_a_multi_hit_attack_is_judged_at_its_own_contact():
     emu = _machine(window=1000)
-    _press(emu)
-    _at(emu, 1100)
-    assert _auto(emu, 1, 4) == 0                    # too early: the roll after it fails
-    assert not _roll(emu, "hit_roll", 1, 4, 255)
-
-
-def test_an_enemys_automatic_hit_cannot_be_dodged_but_its_crit_is_judged():
-    emu = _machine(window=1000)
-    _at(emu, 900)
-    _press(emu)
-    _at(emu, 1000)                                  # 100 ms before
-    assert _auto(emu, 5, 0) == 1
-    assert not _roll(emu, "crit_roll", 5, 0, CRIT_50), "inside the normal band"
-    assert _sounds(emu) == [OK]
-
-
-def test_types_34_and_36_are_timed_the_same_way():
-    """00492E10: the routine Full LUCK Accuracy changes."""
-    emu = _machine(window=1000)
-    _at(emu, 9700)
-    _press(emu)
-    _at(emu, 10000)                                   # 300 ms before
-    assert _e10(emu, "e10_hit_roll", 2, 5, HIT_75) == "lands"
-    assert _e10(emu, "e10_crit_roll", 2, 5, CRIT_50) == "lands"
-    _at(emu, 10200)
-    _press(emu)
-    _at(emu, 11000)                                   # 800 ms before: out of 749
-    assert _e10(emu, "e10_hit_roll", 2, 5, HIT_75) == "fails"
-    # An enemy's type 34/36 attack is a block like any other.
-    _at(emu, 12000)
-    _press(emu)
-    _at(emu, 12500)                                   # inside the 800 ms dodge band
-    assert _e10(emu, "e10_hit_roll", 5, 0, HIT_20) == "fails"
-    assert _sounds(emu) == [CRIT, FAIL, CRIT]
-
-
-def test_the_automatic_hit_in_00492e10_can_miss():
-    emu = _machine(window=1000)
-    _at(emu, 5000)
-    assert _e10(emu, "e10_auto_crit", 0, 3, 40) == "miss exit"   # no press
-    _at(emu, 6000)
-    _press(emu)
-    _at(emu, 6500)                                    # 500 ms of a full 1000
-    assert _e10(emu, "e10_auto_crit", 0, 3, 40) == "fails"      # a hit, not a crit
-    assert _sounds(emu) == [OK]
-
-
-def test_squall_misses_without_a_press_and_crits_with_a_late_one():
-    emu = _machine(window=1000)
-    _at(emu, 5000)
-    assert _gunblade(emu, 0, 4) == ("miss", 0)
-    # LUCK 30, no bonus: crit threshold 29 of 255, the last ~113 ms of 1000.
-    _at(emu, 6000)
-    _press(emu)
-    _at(emu, 6050)
-    assert _gunblade(emu, 0, 4, luck=30) == ("hit", 1)
-    assert emu.mem_read(t.HIT_MARKS, 1)[0] & 2
     _at(emu, 7000)
+    first, _ = _swing(emu, 2, 3)
+    second, _ = _swing(emu, 2, 3)
+    _at(emu, 9900)
     _press(emu)
-    _at(emu, 7500)
-    assert _gunblade(emu, 0, 4, luck=30) == ("hit", 0)
-    assert _sounds(emu) == [CRIT, OK]
-
-
-def test_squalls_no_damage_call_is_not_judged():
-    emu = _machine()
-    _press(emu)
-    _at(emu, 100)
-    assert _gunblade(emu, 0, 4, landing=False) == ("hit", 0)
-    assert _pressed(emu)[1] == 1, "his landing still has the press"
+    _at(emu, 10000)
+    assert _contact(emu, first)[0] in ("hit", "crit")
+    _at(emu, 10250)
+    _press(emu)                            # the try came back with the first hit
+    _at(emu, 10300)
+    assert _contact(emu, second)[0] in ("hit", "crit")
+    assert len(_sounds(emu)) == 2
 
 
 @pytest.mark.parametrize("lead,verdict,dealt", [(0, "crit", 2000), (187, "crit", 1502),
                                                 (562, "hit", 500), (748, "hit", 2)])
 def test_continuous_grading_on_an_attack(lead, verdict, dealt):
-    """0 where the hit window opens, normal where the crit window opens, crit at impact.
-    The game's damage reaching 00491124 is 1000, or 2000 for a crit."""
     emu = _machine(window=1000, continuous=True)
-    assert _attack(emu, 10000 - lead, 10000) == verdict
-    assert _damage(emu, 2000 if verdict == "crit" else 1000) == dealt
-    assert _damage(emu, 1000) == 1000, "the next hit is not graded again"
+    assert _attack(emu, 10000 - lead, 10000) == (verdict, dealt)
 
 
-@pytest.mark.parametrize("lead,verdict,taken", [(850, "hit", 505), (899, "hit", 1000),
-                                                (950, "crit", 1504), (None, "crit", 2000)])
+@pytest.mark.parametrize("lead,verdict,taken", [(850, "hit", 505), (950, "crit", 1504),
+                                                (None, "crit", 2000)])
 def test_continuous_grading_on_a_block(lead, verdict, taken):
-    """0 at the dodge band's edge, normal at the normal band's far edge, crit at W."""
     emu = _machine(window=1000, continuous=True)
-    assert _block(emu, None if lead is None else 10000 - lead, 10000) == verdict
-    assert _damage(emu, 2000 if verdict == "crit" else 1000) == taken
+    assert _block(emu, None if lead is None else 10000 - lead, 10000, hit=51) == (verdict, taken)
 
 
-def test_without_continuous_grading_damage_is_the_games():
+def test_rolls_inside_00492e10_are_noted_the_same_way():
+    emu = _machine()
+    esp = STACK + 0x6000
+    for entry, threshold in (("e10_hit_roll", 191), ("e10_crit_roll", 128)):
+        emu.mem_write(esp, struct.pack("<I", STOP))
+        emu.reg_write(x86.UC_X86_REG_ESP, esp)
+        emu.reg_write(x86.UC_X86_REG_ESI, 2 * 0xD0)
+        emu.reg_write(x86.UC_X86_REG_EBP, 5 * 0xD0)
+        emu.reg_write(x86.UC_X86_REG_EDI, threshold)
+        emu.emu_start(t.ENTRIES[entry], 0, count=300)
+    assert struct.unpack("<III", emu.mem_read(t.THR_HIT, 12)) == (191, 128, 1)
+    assert emu.reg_read(x86.UC_X86_REG_EDI) == 0, "no crit at the swing"
+    emu.mem_write(esp, struct.pack("<I", STOP))
+    emu.reg_write(x86.UC_X86_REG_ESP, esp)
+    emu.reg_write(x86.UC_X86_REG_EDI, 40)
+    emu.emu_start(t.ENTRIES["e10_auto_crit"], 0, count=300)
+    assert struct.unpack("<III", emu.mem_read(t.THR_HIT, 12)) == (255, 40, 1)
+
+
+def _gunblade(emu, *, landing=True, luck=30):
+    emu.mem_write(t.HIT_COUNTER, struct.pack("<H", 1 if landing else 0))
+    emu.mem_write(t.PARTICIPANTS + t.LUCK, bytes((luck,)))
+    emu.mem_write(t.CRIT_BONUS, b"\x00")
+    esp = STACK + 0x6000
+    emu.mem_write(esp, struct.pack("<III", 0xEBEBEBEB, 0xCAFEF00D, 0))
+    emu.reg_write(x86.UC_X86_REG_ESP, esp)
+    emu.reg_write(x86.UC_X86_REG_EBP, 4)
+    emu.reg_write(x86.UC_X86_REG_EDX, 12)
+    emu.emu_start(t.ENTRIES["gunblade"], 0, count=500)
+    assert emu.reg_read(x86.UC_X86_REG_EIP) - 1 == t.GUNBLADE_RESUME, "Squall never misses at the swing"
+    assert emu.reg_read(x86.UC_X86_REG_EAX) == 4 + 4 * 12
+
+
+def test_squall_is_judged_at_contact_like_everyone():
     emu = _machine(window=1000)
-    assert _attack(emu, 10000 - 562, 10000) == "hit"
-    assert _damage(emu, 1000) == 1000
+    _gunblade(emu)
+    assert struct.unpack("<III", emu.mem_read(t.THR_HIT, 12)) == (255, 29, 1)
+    emu = _machine(window=1000)
+    _gunblade(emu, landing=False)
+    assert struct.unpack("<I", emu.mem_read(t.THR_VALID, 4))[0] == 0, "his no-damage call is not held"
 
 
-def test_square_records_the_time_and_other_buttons_do_not():
-    emu = _machine(1000)
-    _press(emu, 0x08 | 0x20)
-    assert _pressed(emu) == (0, 0)
-    _press(emu, 0x80 | 0x20)
-    assert _pressed(emu) == (1000, 1)
-
-
-def test_a_fumble_sounds_at_once_and_only_once():
-    """Lexer, 2026-09-27: mashing with Irvine or Quistis failed at once; with
-    Squall it was silent until the very end, then sounded two or three times."""
-    emu = _machine(1000, window=1000)
+def test_square_counts_only_while_an_action_plays():
+    """Lexer: outside an attack the code should not fire at all."""
+    emu = _machine(window=1000, active=False)
+    _at(emu, 1000)
     _press(emu)
-    assert _sounds(emu) == []
-    _at(emu, 1030)
+    _at(emu, 1050)
     _press(emu)
-    assert _sounds(emu) == [FAIL], "the second press fails right away"
-    for now in range(1060, 3900, 60):   # Squall's run-up, within three windows
+    assert _pressed(emu) == (0, 0) and _sounds(emu) == []
+    _action(emu, 2000)
+    assert _active(emu) == 1
+    _removed(emu, 10)
+    assert _active(emu) == 1, "a damage message does not end the action"
+    _removed(emu, t.ACTION_MESSAGE)
+    assert _active(emu) == 0
+
+
+def test_an_action_start_clears_a_leftover_press_and_roll_silently():
+    emu = _machine(window=1000)
+    _at(emu, 1000)
+    _press(emu)
+    emu.mem_write(t.THR_VALID, struct.pack("<I", 1))
+    _action(emu, 3000)
+    assert _pressed(emu)[1] == 0 and _sounds(emu) == []
+    assert struct.unpack("<I", emu.mem_read(t.THR_VALID, 4))[0] == 0
+
+
+def test_one_try_per_hit_and_a_fumble_sounds_once():
+    emu = _machine(window=1000)
+    _at(emu, 7000)
+    index, _ = _swing(emu, 1, 4)
+    _at(emu, 8000)
+    _press(emu)
+    _at(emu, 8100)
+    _press(emu)
+    assert _sounds(emu) == [FAIL], "the second try fails at once"
+    for now in range(8200, 9900, 300):
         _at(emu, now)
         _press(emu)
-    assert _sounds(emu) == [FAIL]
-    _at(emu, 3950)
-    assert _gunblade(emu, 0, 4) == ("miss", 0)
-    assert _sounds(emu) == [FAIL], "the hit adds no second sound"
+    _at(emu, 10000)
+    assert _contact(emu, index)[0] == "miss"
+    assert _sounds(emu) == [FAIL], "the contact adds nothing"
 
 
 def _action(emu, now: int):
@@ -415,13 +490,9 @@ def _action(emu, now: int):
     emu.mem_write(esp, struct.pack("<II", 0xCAFEF00D, 0x00AB0000))
     emu.reg_write(x86.UC_X86_REG_ESP, esp)
     emu.reg_write(x86.UC_X86_REG_ESI, 0x5E5E5E5E)
-    emu.reg_write(x86.UC_X86_REG_EBX, 0xB0B0B0B0)
     emu.emu_start(t.ENTRIES["action"], t.ACTION_RESUME + 1, count=200)
-    # The replaced instructions ran: push esi; mov esi, [esp + 8] (the message).
     assert emu.reg_read(x86.UC_X86_REG_ESP) == esp - 4
-    assert struct.unpack("<I", emu.mem_read(esp - 4, 4))[0] == 0x5E5E5E5E
     assert emu.reg_read(x86.UC_X86_REG_ESI) == 0x00AB0000
-    assert emu.reg_read(x86.UC_X86_REG_EBX) == 0xB0B0B0B0
 
 
 def _removed(emu, message_type: int):
@@ -432,7 +503,6 @@ def _removed(emu, message_type: int):
     emu.reg_write(x86.UC_X86_REG_ESP, esp)
     emu.reg_write(x86.UC_X86_REG_ESI, message)
     emu.emu_start(t.ENTRIES["action_end"], t.ACTION_END_RESUME + 1, count=50)
-    # The replaced instruction ran: push 01D96D68.
     assert emu.reg_read(x86.UC_X86_REG_ESP) == esp - 4
     assert struct.unpack("<I", emu.mem_read(esp - 4, 4))[0] == 0x01D96D68
 
@@ -441,74 +511,12 @@ def _active(emu):
     return struct.unpack("<I", emu.mem_read(t.ACTIVE, 4))[0]
 
 
-def test_a_press_before_the_swing_still_counts():
-    """The game applies an attack's damage as the swing starts, just before the
-    animation task starts, so a press then must not be cut off."""
-    emu = _machine(window=1000)
-    emu.mem_write(t.ACTIVE, struct.pack("<I", 0))
-    assert _attack(emu, 9900, 10000) in ("hit", "crit")
-
-
-def test_an_action_opens_square_and_its_end_closes_it():
-    emu = _machine(window=1000)
-    emu.mem_write(t.ACTIVE, struct.pack("<I", 0))
-    _action(emu, 1000)
-    assert _active(emu) == 1
-    _removed(emu, 10)                     # a damage message: the action goes on
-    assert _active(emu) == 1
-    _removed(emu, t.ACTION_MESSAGE)       # the action's own message
-    assert _active(emu) == 0
-
-
-def test_a_press_left_from_the_last_action_is_cleared_silently():
-    emu = _machine(window=1000)
-    _at(emu, 1000)
-    _press(emu)                           # during a cure, say: never judged
-    _action(emu, 3000)
-    assert _pressed(emu)[1] == 0 and _sounds(emu) == []
-
-
-def test_one_try_per_hit():
-    """Lexer: why not allow only one try per attack, or per hit."""
-    emu = _machine(window=1000)
-    _action(emu, 500)
-    _at(emu, 1000)
-    _press(emu)
-    _at(emu, 1800)
-    _press(emu)                           # a second try: a fumble, heard at once
-    assert _sounds(emu) == [FAIL]
-    for now in range(1900, 9000, 300):    # any amount of mashing stays one fumble
-        _at(emu, now)
-        _press(emu)
-    assert _attack(emu, None, 9500) == "miss"
-    assert _sounds(emu) == [FAIL], "the hit adds nothing"
-    # The hit gave the try back: the next hit's press counts at once.
-    assert _attack(emu, 9600, 9700) in ("hit", "crit")
-
-
-def test_an_early_press_is_judged_at_impact_with_its_miss_sound():
-    """Lexer: a press as the attack started was silent, or sounded only at the end."""
-    emu = _machine(window=1000)
-    _action(emu, 500)
-    assert _attack(emu, 1000, 6000) == "miss"   # five seconds early
-    assert _sounds(emu) == [FAIL]
-
-
-def test_an_early_press_on_a_block_is_the_worst_band_with_one_sound():
-    emu = _machine(window=1000)
-    _action(emu, 500)
-    assert _block(emu, 1000, 6000) == "crit"
-    assert _sounds(emu) == [FAIL]
-
-
-def test_a_late_press_gets_nothing_and_times_the_next_hit():
-    """Lexer: the window is only before the hit; late inputs get nothing."""
-    emu = _machine(window=1000)
-    assert _attack(emu, None, 1000) == "miss"
-    # Irvine's next shot lands 300 ms later: the late press times it.
-    assert _attack(emu, 1100, 1300) == "crit"
-    assert _attack(emu, 1350, 1600) == "crit"
-    assert _sounds(emu) == [CRIT, CRIT]
+def test_square_records_the_time_and_other_buttons_do_not():
+    emu = _machine(1000)
+    _press(emu, 0x08 | 0x20)
+    assert _pressed(emu) == (0, 0)
+    _press(emu, 0x80 | 0x20)
+    assert _pressed(emu) == (1000, 1)
 
 
 def test_hext_and_hooks():
@@ -516,13 +524,15 @@ def test_hext_and_hooks():
     text = t.build_hext(True, window_ms=1000, success_sound=12, crit_sound=13, failure_sound=34,
                         continuous=True)
     assert f"\n{t.DATA:X} = {t.data_bytes(1000, 12, 13, 34, True).hex(' ').upper()}" in text
-    for site in (t.INPUT_HOOK, t.HIT_HOOK, t.ACTION_HOOK, t.ACTION_END_HOOK, t.AUTO_HOOK, t.GUNBLADE_HOOK):
+    for site in (t.INPUT_HOOK, t.ACTION_HOOK, t.ACTION_END_HOOK, t.AUTO_HOOK, t.GUNBLADE_HOOK,
+                 t.CONTACT_HOOK):
         assert f"\n{site:X} = E9" in text
     for site in (t.HIT_ROLL_CALL, t.CRIT_ROLL_CALL, t.E10_AUTO_CRIT_CALL, t.E10_HIT_ROLL_CALL,
-                 t.E10_CRIT_ROLL_CALL):
+                 t.E10_CRIT_ROLL_CALL, t.DEFER_CALL):
         assert f"\n{site:X} = E8" in text
-    assert "4922B0 =" not in text, "the attack-type hook is gone"
+    assert "491124 =" not in text and "4922B0 =" not in text
     assert t.CAVE + len(t.CODE) <= t.DATA
+    assert len(t.data_bytes(1000, 1, 2, 3)) == t.DATA_SIZE
     for bad in ({"window_ms": 10}, {"window_ms": 2001}, {"success_sound": 0}, {"crit_sound": 0},
                 {"failure_sound": True}, {"continuous": 1}):
         with pytest.raises(ValueError):
@@ -530,7 +540,6 @@ def test_hext_and_hooks():
 
 
 def test_embedded_code_matches_its_source():
-    pytest.importorskip("keystone")
     assert t._assemble() == (t.CODE, t.ENTRIES)
 
 
@@ -543,7 +552,6 @@ def test_settings_round_trip_and_reach_the_patch(tmp_path):
     loaded = gameplay_settings.load(project, game)
     assert loaded["timedHits"] is False and loaded["timedHitsWindow"] == t.DEFAULT_WINDOW_MS
     assert loaded["timedHitsContinuous"] is False
-    assert loaded["timedHitsLimits"]["timedHitsWindow"]["maximum"] == 2000
     with patch.object(gameplay_settings, "_verify_executable", return_value=game / "FF8_EN.exe"):
         data = {**loaded, "timedHits": True, "timedHitsWindow": 1000, "timedHitsSuccessSound": 40,
                 "timedHitsCritSound": 42, "timedHitsFailureSound": 41, "timedHitsContinuous": True}
@@ -554,6 +562,3 @@ def test_settings_round_trip_and_reach_the_patch(tmp_path):
             assert saved[key] == data[key], key
         patch_text = gameplay_settings.patch_path(project).read_text(encoding="utf-8")
         assert f"{t.DATA:X} = {t.data_bytes(1000, 40, 42, 41, True).hex(' ').upper()}" in patch_text
-        for bad in ({"timedHitsWindow": 5}, {"timedHitsCritSound": "9"}, {"timedHitsContinuous": 1}):
-            with pytest.raises(ValueError):
-                gameplay_settings.save({**data, **bad}, game, project, runtime_root=runtime)

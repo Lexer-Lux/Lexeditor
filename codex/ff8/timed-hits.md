@@ -149,6 +149,30 @@ The time indicator needs a hit's landing time before it lands. Static trace:
   (`00500D51`, `push 01D96D68; call 005032E0`, with ESI the message and
   word `+2` its type). Timed Hits counts Square only between the two.
 
+## Swing start and visible contact (2026-09-28 logs)
+
+- An ordinary attack's result is applied the moment the swing starts: the
+  action executor `00485850` calls `0048E830` (`00485949`), which runs
+  `0048FE20` then `0048EF80` per target, in the same frame the action task
+  (`0050BB00`, state 2) starts the attacker's attack sequence (`0050BBA3`).
+  HP drops then.
+- The hit visibly connects about 2 s (30-40 frames) later: `00506690(record)`
+  plays the target's reaction from its hit record (via `0050A690`, which
+  steps the record pointer `[01D99A60]` by 0x18, called from the hit effect
+  `0056FCA0`, and via opcode `0xB2`). In the logs it fires 1 frame before the
+  action task finishes. Squall's trigger hits land about 3 frames before it.
+- Hit record (0x18 bytes, `01D28344`, count `01D280C1`), copied by
+  `0048EF80` from the result block `01D27AD8`: +0 target, +1 `ADC`,
+  +2 `ADD`, +3 `ADE` (bit 2 crit, bit 4 miss), +4 `AF6`, +6 `AE4` (shown
+  damage), +8 `AE8`, +0xC `ADF`, +0xD `AE0`, +0xE `AE1`, +0xF `AE2`,
+  +0x10 `AF8`, +0x12 `AEC`, +0x14 `AF0` (the second effect from +0xC).
+- `00494410(target, damage, &ADE, &ADD, attacker, &ADC, &AF6, &AE8, 0)`
+  applies one result (HP, statuses, KO); `004911BC` calls it for the first
+  effect and `004911FD` for the second. All pointers are the global block.
+- Timed Hits holds the first-effect call at the swing and makes it at
+  contact, after judging the press, so the press is timed against what the
+  player sees.
+
 ## Not yet established
 
 - Which sequence opcode marks the moment damage is displayed (the hit frame)
