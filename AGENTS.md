@@ -38,6 +38,18 @@ work, even if your tool does not load skills on its own.
 - Do not claim visual acceptance from source, API, or smoke checks. Look at the
   rendered screen.
 
+## Tweaks
+
+- A **tweak** is a small, self-contained, toggleable modification that plugs into
+  Lexeditor's shared standardized tweak component/UI. Do not build a bespoke
+  settings surface or one-off toggle system for an individual tweak.
+- Implement each tweak as its own focused script/module (or the existing
+  project-standard equivalent for that plugin), so it can be enabled/disabled
+  independently through the shared tweak mechanism.
+- When an issue says a change "should be a tweak," treat that as a structural
+  requirement: reuse the shared tweak component and keep vanilla behavior
+  available when the tweak is disabled.
+
 ## Git and publishing
 
 - Branches are fine; leftovers are not. When a task is done and verified, merge
