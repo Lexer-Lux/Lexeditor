@@ -762,3 +762,34 @@ def test_the_marker_is_left_alone_when_the_indicator_is_off():
     emu.mem_write(t.MARKER_COLOURS, t.MARKER_ORIGINAL)
     _paint(emu, 1000)
     assert bytes(emu.mem_read(t.MARKER_COLOURS, 60)) == t.MARKER_ORIGINAL
+
+
+def _marker_owner(emu):
+    """004BB0B5: the marker drawer asks whose turn it is."""
+    emu.mem_write(t.MARKER_OWNER, bytes.fromhex("B8 02 00 00 00 C3"))  # the turn: slot 2
+    esp = STACK + 0x6000
+    emu.mem_write(esp, struct.pack("<I", STOP))
+    emu.reg_write(x86.UC_X86_REG_ESP, esp)
+    emu.reg_write(x86.UC_X86_REG_ESI, 0x51515151)
+    emu.emu_start(t.ENTRIES["marker_owner"], STOP + 1, count=300)
+    assert emu.reg_read(x86.UC_X86_REG_ESP) == esp + 4
+    assert emu.reg_read(x86.UC_X86_REG_ESI) == 0x51515151
+    return emu.reg_read(x86.UC_X86_REG_EAX)
+
+
+def test_the_marker_goes_over_whoever_the_waiting_hit_involves():
+    """Lexer: how will we do this when non-active characters are getting attacked?"""
+    emu = _machine()
+    assert _marker_owner(emu) == 2, "nothing waits: the character whose turn it is"
+    _swing(emu, 5, 0)                     # an enemy hits party member 0
+    assert _marker_owner(emu) == 0
+    emu = _machine()
+    _swing(emu, 1, 4)                     # party member 1 attacks
+    assert _marker_owner(emu) == 1
+
+
+def test_the_marker_stays_with_the_turn_when_the_indicator_is_off():
+    emu = _machine()
+    emu.mem_write(t.INDICATOR, struct.pack("<I", 0))
+    _swing(emu, 5, 0)
+    assert _marker_owner(emu) == 2
