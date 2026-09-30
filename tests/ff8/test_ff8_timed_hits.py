@@ -51,7 +51,7 @@ copy:
 def _machine(now: int = 0, *, window=1000, continuous=False, active=True):
     emu = unicorn.Uc(unicorn.UC_ARCH_X86, unicorn.UC_MODE_32)
     for base, size in ((0x00400000, 0x00800000), (0x00E00000, 0x00010000),
-                       (0x01D27000, 0x4000), (0x027AB000, 0x2000)):
+                       (0x01D27000, 0x4000), (0x027AB000, 0x3000)):
         emu.mem_map(base, size)
     emu.mem_write(t.CAVE, t.CODE)
     emu.mem_write(t.DATA, t.data_bytes(window, OK, CRIT, FAIL, continuous))
@@ -68,7 +68,7 @@ def _machine(now: int = 0, *, window=1000, continuous=False, active=True):
     ks = keystone.Ks(keystone.KS_ARCH_X86, keystone.KS_MODE_32)
     emu.mem_write(t.APPLY, bytes(ks.asm(APPLY_STUB, t.APPLY)[0]))
     for halt in (t.INPUT_RESUME, t.GUNBLADE_RESUME, t.ACTION_RESUME, t.ACTION_END_RESUME,
-                 t.CONTACT_RESUME, STOP):
+                 t.CONTACT_RESUME, t.START_SEQUENCE, STOP):
         emu.mem_write(halt, b"\xF4")
     return emu
 
@@ -562,3 +562,132 @@ def test_settings_round_trip_and_reach_the_patch(tmp_path):
             assert saved[key] == data[key], key
         patch_text = gameplay_settings.patch_path(project).read_text(encoding="utf-8")
         assert f"{t.DATA:X} = {t.data_bytes(1000, 40, 42, 41, True).hex(' ').upper()}" in patch_text
+
+
+def _swing_starts(emu, now: int, model: int, sequence: int = 0x0D):
+    """0050BB9E: the action task starts the attacker's attack sequence."""
+    _at(emu, now)
+    esp = STACK + 0x6000
+    emu.mem_write(esp, struct.pack("<III", 0x0050BBA3, t.MODELS + model * t.MODEL_SIZE, sequence))
+    emu.reg_write(x86.UC_X86_REG_ESP, esp)
+    emu.reg_write(x86.UC_X86_REG_EBX, 0xB0B0B0B0)
+    emu.reg_write(x86.UC_X86_REG_ESI, 0x51515151)
+    emu.emu_start(t.ENTRIES["swing"], t.START_SEQUENCE + 1, count=300)
+    # It went on into 00505C00 with the game's own arguments.
+    assert emu.reg_read(x86.UC_X86_REG_ESP) == esp
+    assert emu.reg_read(x86.UC_X86_REG_EBX) == 0xB0B0B0B0
+    assert emu.reg_read(x86.UC_X86_REG_ESI) == 0x51515151
+
+
+def _predicted(emu):
+    return struct.unpack("<I", emu.mem_read(t.PREDICTED, 4))[0]
+
+
+def _learned(emu, model, sequence):
+    return struct.unpack("<I", emu.mem_read(t.LEARNED + (model * 32 + sequence) * 4, 4))[0]
+
+
+def _first_swing(emu, *, attacker=1, target=4, model=1):
+    """Swing 0 of an attack: held at 7000, the attack sequence at 7300, contact at 9300."""
+    _at(emu, 7000)
+    index, _ = _swing(emu, attacker, target)
+    _swing_starts(emu, 7300, model)
+    assert _predicted(emu) == 0, "nothing learned yet"
+    _at(emu, 9300)
+    _contact(emu, index)
+    assert _learned(emu, model, 0x0D) == 2000
+    emu.mem_write(t.RECORD_COUNT, b"\x00")
+    return index
+
+
+def test_the_first_swing_teaches_the_contact_delay():
+    emu = _machine(window=1000)
+    _first_swing(emu)
+    _at(emu, 12000)
+    index, _ = _swing(emu, 1, 4)
+    _swing_starts(emu, 12300, 1)
+    assert _predicted(emu) == 14300
+
+
+def test_a_press_is_heard_at_once_when_the_contact_is_predicted():
+    """Lexer: the sound should play the moment you hit the button. every time."""
+    emu = _machine(window=1000)
+    _first_swing(emu)
+    sounds_before = len(_sounds(emu))
+    _at(emu, 12000)
+    index, _ = _swing(emu, 1, 4)
+    _swing_starts(emu, 12300, 1)
+    _at(emu, 14000)                       # 300 ms before the predicted contact: a crit
+    _press(emu)
+    assert _sounds(emu)[sounds_before:] == [CRIT], "heard the moment it is pressed"
+    _at(emu, 14100)
+    _press(emu)                           # the one try is spent: nothing more
+    _at(emu, 14320)                       # the contact comes a little late
+    assert _contact(emu, index)[:2] == ("crit", 2000), "the verdict heard is the one applied"
+    assert _sounds(emu)[sounds_before:] == [CRIT], "the contact adds no sound"
+    assert _learned(emu, 1, 0x0D) == 2020, "each first contact refreshes the delay"
+
+
+def test_a_predicted_miss_is_heard_at_once_too():
+    emu = _machine(window=1000)
+    _first_swing(emu)
+    sounds_before = len(_sounds(emu))
+    _at(emu, 12000)
+    index, _ = _swing(emu, 1, 4)
+    _swing_starts(emu, 12300, 1)
+    _at(emu, 12500)                       # 1800 ms early
+    _press(emu)
+    assert _sounds(emu)[sounds_before:] == [FAIL]
+    _at(emu, 14300)
+    assert _contact(emu, index)[:2] == ("miss", 0)
+
+
+def test_a_press_after_the_predicted_contact_waits_for_the_real_one():
+    emu = _machine(window=1000)
+    _first_swing(emu)
+    sounds_before = len(_sounds(emu))
+    _at(emu, 12000)
+    index, _ = _swing(emu, 1, 4)
+    _swing_starts(emu, 12300, 1)
+    _at(emu, 14350)                       # after the prediction, before the contact
+    _press(emu)
+    assert _sounds(emu)[sounds_before:] == []
+    _at(emu, 14400)
+    assert _contact(emu, index)[0] == "crit"
+    assert _sounds(emu)[sounds_before:] == [CRIT]
+
+
+def test_a_predicted_block_is_heard_at_once():
+    emu = _machine(window=1000)
+    _first_swing(emu, attacker=5, target=0, model=5)
+    sounds_before = len(_sounds(emu))
+    _at(emu, 12000)
+    index, _ = _swing(emu, 5, 0, hit=51)
+    _swing_starts(emu, 12300, 5)
+    _at(emu, 13800)                       # 500 ms before: inside the 800 ms dodge
+    _press(emu)
+    assert _sounds(emu)[sounds_before:] == [CRIT]
+    _at(emu, 14300)
+    assert _contact(emu, index)[:2] == ("miss", 0)
+
+
+def test_an_unknown_model_or_sequence_predicts_nothing():
+    emu = _machine(window=1000)
+    _first_swing(emu)
+    _swing_starts(emu, 12300, 1, sequence=0x40)
+    assert _predicted(emu) == 0
+    _swing_starts(emu, 12300, 9)
+    assert _predicted(emu) == 0
+
+
+def test_a_new_action_clears_results_left_from_the_last():
+    emu = _machine(window=1000)
+    _at(emu, 7000)
+    first, _ = _swing(emu, 1, 4)
+    second, _ = _swing(emu, 1, 4)          # never reached its contact
+    emu.mem_write(t.RECORD_COUNT, b"\x00")
+    _at(emu, 9000)
+    index, _ = _swing(emu, 1, 4)           # the next action's first record
+    assert index == 0
+    held = [emu.mem_read(t.SLOTS + n * t.SLOT_SIZE, 1)[0] for n in range(3)]
+    assert held == [1, 0, 0], "the stale second result is gone"
