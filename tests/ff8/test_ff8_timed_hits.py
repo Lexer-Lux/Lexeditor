@@ -93,7 +93,7 @@ def _press(emu, pressed_bits: int = t.SQUARE):
     emu.reg_write(x86.UC_X86_REG_ESP, esp)
     emu.reg_write(x86.UC_X86_REG_ECX, INPUT_BLOCK)
     emu.reg_write(x86.UC_X86_REG_EBX, 0xBBBBBBBB)
-    emu.emu_start(t.CAVE, t.INPUT_RESUME + 1, count=200)
+    emu.emu_start(t.CAVE, t.INPUT_RESUME + 1, count=3000)
     assert emu.reg_read(x86.UC_X86_REG_ESP) == esp
     assert emu.reg_read(x86.UC_X86_REG_EBX) == 0xBBBBBBBB
     # The replaced instructions still ran: +0x18 is the held word, AX holds it.
@@ -502,7 +502,7 @@ def _removed(emu, message_type: int):
     esp = STACK + 0x6000
     emu.reg_write(x86.UC_X86_REG_ESP, esp)
     emu.reg_write(x86.UC_X86_REG_ESI, message)
-    emu.emu_start(t.ENTRIES["action_end"], t.ACTION_END_RESUME + 1, count=50)
+    emu.emu_start(t.ENTRIES["action_end"], t.ACTION_END_RESUME + 1, count=500)
     assert emu.reg_read(x86.UC_X86_REG_ESP) == esp - 4
     assert struct.unpack("<I", emu.mem_read(esp - 4, 4))[0] == 0x01D96D68
 
@@ -513,10 +513,27 @@ def _active(emu):
 
 def test_square_records_the_time_and_other_buttons_do_not():
     emu = _machine(1000)
+    _swing(emu, 1, 4)
     _press(emu, 0x08 | 0x20)
     assert _pressed(emu) == (0, 0)
     _press(emu, 0x80 | 0x20)
     assert _pressed(emu) == (1000, 1)
+
+
+def test_square_does_nothing_without_a_timed_hit_waiting():
+    """Lexer: a press during the battle's opening dialogue buzzed."""
+    emu = _machine(1000)                  # an action plays, but nothing is held
+    for now in (1000, 1050, 1100):
+        _at(emu, now)
+        _press(emu)
+    assert _pressed(emu) == (0, 0) and _sounds(emu) == []
+
+
+def test_an_action_end_drops_what_it_held():
+    emu = _machine(1000)
+    index, _ = _swing(emu, 1, 4)
+    _removed(emu, t.ACTION_MESSAGE)
+    assert emu.mem_read(t.SLOTS + index * t.SLOT_SIZE, 1)[0] == 0
 
 
 def test_hext_and_hooks():
@@ -691,3 +708,57 @@ def test_a_new_action_clears_results_left_from_the_last():
     assert index == 0
     held = [emu.mem_read(t.SLOTS + n * t.SLOT_SIZE, 1)[0] for n in range(3)]
     assert held == [1, 0, 0], "the stale second result is gone"
+
+
+
+def _paint(emu, now: int):
+    """A battle input frame with nothing pressed; returns the marker's colours."""
+    _at(emu, now)
+    _press(emu, 0)
+    return struct.unpack("<15I", emu.mem_read(t.MARKER_COLOURS, 60))
+
+
+def _colour(colours):
+    """The colour of the brightest corner (brightness 0xFF), as 0xBBGGRR."""
+    return colours[1] & 0xFFFFFF
+
+
+def test_the_marker_is_white_when_nothing_waits():
+    emu = _machine()
+    colours = _paint(emu, 1000)
+    assert _colour(colours) == 0xFEFEFE, "white, at each corner's own brightness"
+    assert colours[0] == 0x30545454 and colours[5] == 0x30444444
+    assert all(value >> 24 == 0x30 for value in colours)
+
+
+def test_the_marker_shows_green_blue_and_purple_as_the_contact_nears():
+    """Lexer: green when a timed input can be entered, blue when it would succeed,
+    purple when perfect. W 1000, 75% hit (749 ms), 50% crit (375 ms)."""
+    emu = _machine(window=1000)
+    _first_swing(emu)
+    _at(emu, 12000)
+    _swing(emu, 1, 4)
+    assert _colour(_paint(emu, 12100)) == 0x00FE00, "waiting, before the attack sequence"
+    _swing_starts(emu, 12300, 1)                        # contact predicted at 14300
+    assert _colour(_paint(emu, 13400)) == 0x00FE00      # 900 ms out
+    assert _colour(_paint(emu, 13700)) == 0xFE7F00      # 600 ms: a hit
+    assert _colour(_paint(emu, 14000)) == 0xFE00B3      # 300 ms: a crit
+
+
+def test_the_marker_on_a_block_shows_the_dodge_band_as_purple():
+    emu = _machine(window=1000)
+    _first_swing(emu, attacker=5, target=0, model=5)
+    _at(emu, 12000)
+    _swing(emu, 5, 0, hit=51)
+    _swing_starts(emu, 12300, 5)                        # contact at 14300
+    assert _colour(_paint(emu, 13250)) == 0x00FE00      # 1050 ms: outside W
+    assert _colour(_paint(emu, 13450)) == 0xFE7F00      # 850 ms: the normal band
+    assert _colour(_paint(emu, 13800)) == 0xFE00B3      # 500 ms: the dodge band
+
+
+def test_the_marker_is_left_alone_when_the_indicator_is_off():
+    emu = _machine()
+    emu.mem_write(t.INDICATOR, struct.pack("<I", 0))
+    emu.mem_write(t.MARKER_COLOURS, t.MARKER_ORIGINAL)
+    _paint(emu, 1000)
+    assert bytes(emu.mem_read(t.MARKER_COLOURS, 60)) == t.MARKER_ORIGINAL
