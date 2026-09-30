@@ -226,7 +226,7 @@ def _block(emu, press_at, contact_at, **swing):
 # in the 750 ms before the hit visibly lands hits, in the last 375 ms it crits.
 @pytest.mark.parametrize("lead,verdict,damage,sounds", [
     (0, "crit", 2000, [CRIT]), (370, "crit", 2000, [CRIT]), (380, "hit", 1000, [OK]),
-    (740, "hit", 1000, [OK]), (760, "miss", 0, [FAIL]), (None, "miss", 0, [])])
+    (740, "hit", 1000, [OK]), (760, "miss", 0, [FAIL]), (None, "miss", 0, [])])  # silent until the late period
 def test_lexers_attack_example_judged_at_contact(lead, verdict, damage, sounds):
     emu = _machine(window=1000)
     press = None if lead is None else 10000 - lead
@@ -238,7 +238,7 @@ def test_lexers_attack_example_judged_at_contact(lead, verdict, damage, sounds):
 # contact dodges, the ~100 ms before that is a normal hit, earlier crits.
 @pytest.mark.parametrize("lead,verdict,damage,sounds", [
     (500, "miss", 0, [CRIT]), (850, "hit", 1000, [OK]), (950, "crit", 2000, [FAIL]),
-    (None, "crit", 2000, [])])
+    (None, "crit", 2000, [])])  # silent until the late period
 def test_lexers_block_example_judged_at_contact(lead, verdict, damage, sounds):
     emu = _machine(window=1000)
     press = None if lead is None else 10000 - lead
@@ -613,6 +613,7 @@ def _first_swing(emu, *, attacker=1, target=4, model=1):
     _at(emu, 9300)
     _contact(emu, index)
     assert _learned(emu, model, 0x0D) == 2000
+    _paint(emu, 9300 + 1000)              # the unpressed hit's late period ends
     emu.mem_write(t.RECORD_COUNT, b"\x00")
     return index
 
@@ -718,6 +719,9 @@ def _paint(emu, now: int):
     return struct.unpack("<15I", emu.mem_read(t.MARKER_COLOURS, 60))
 
 
+RED, YELLOW, GREEN = 0x0000FE, 0x00FEFE, 0x00FE00   # 0xBBGGRR at a corner's full brightness
+
+
 def _colour(colours):
     """The colour of the brightest corner (brightness 0xFF), as 0xBBGGRR."""
     return colours[1] & 0xFFFFFF
@@ -731,29 +735,29 @@ def test_the_marker_is_white_when_nothing_waits():
     assert all(value >> 24 == 0x30 for value in colours)
 
 
-def test_the_marker_shows_green_blue_and_purple_as_the_contact_nears():
-    """Lexer: green when a timed input can be entered, blue when it would succeed,
-    purple when perfect. W 1000, 75% hit (749 ms), 50% crit (375 ms)."""
+def test_the_marker_turns_red_yellow_and_green_as_the_contact_nears():
+    """Lexer: white when just active, red when it's the wrong time to hit, yellow
+    when OK/good, green when perfect. W 1000, 75% hit (749 ms), 50% crit (375 ms)."""
     emu = _machine(window=1000)
     _first_swing(emu)
     _at(emu, 12000)
     _swing(emu, 1, 4)
-    assert _colour(_paint(emu, 12100)) == 0x00FE00, "waiting, before the attack sequence"
+    assert _colour(_paint(emu, 12100)) == RED, "waiting, before the attack sequence"
     _swing_starts(emu, 12300, 1)                        # contact predicted at 14300
-    assert _colour(_paint(emu, 13400)) == 0x00FE00      # 900 ms out
-    assert _colour(_paint(emu, 13700)) == 0xFE7F00      # 600 ms: a hit
-    assert _colour(_paint(emu, 14000)) == 0xFE00B3      # 300 ms: a crit
+    assert _colour(_paint(emu, 13400)) == RED           # 900 ms out
+    assert _colour(_paint(emu, 13700)) == YELLOW        # 600 ms: a hit
+    assert _colour(_paint(emu, 14000)) == GREEN         # 300 ms: a crit
 
 
-def test_the_marker_on_a_block_shows_the_dodge_band_as_purple():
+def test_the_marker_on_a_block_shows_the_dodge_band_as_green():
     emu = _machine(window=1000)
     _first_swing(emu, attacker=5, target=0, model=5)
     _at(emu, 12000)
     _swing(emu, 5, 0, hit=51)
     _swing_starts(emu, 12300, 5)                        # contact at 14300
-    assert _colour(_paint(emu, 13250)) == 0x00FE00      # 1050 ms: outside W
-    assert _colour(_paint(emu, 13450)) == 0xFE7F00      # 850 ms: the normal band
-    assert _colour(_paint(emu, 13800)) == 0xFE00B3      # 500 ms: the dodge band
+    assert _colour(_paint(emu, 13250)) == RED           # 1050 ms: outside W
+    assert _colour(_paint(emu, 13450)) == YELLOW        # 850 ms: the normal band
+    assert _colour(_paint(emu, 13800)) == GREEN         # 500 ms: the dodge band
 
 
 def test_the_marker_is_left_alone_when_the_indicator_is_off():
@@ -793,3 +797,69 @@ def test_the_marker_stays_with_the_turn_when_the_indicator_is_off():
     emu.mem_write(t.INDICATOR, struct.pack("<I", 0))
     _swing(emu, 5, 0)
     assert _marker_owner(emu) == 2
+
+
+
+def test_a_late_press_after_an_unpressed_hit_sounds_the_miss_at_the_press():
+    """Lexer: if I hit late there's no sound effect."""
+    emu = _machine(window=1000)
+    assert _attack(emu, None, 10000) == ("miss", 0)
+    assert _sounds(emu) == [], "the period is open; nothing yet"
+    _paint(emu, 10200)
+    assert _sounds(emu) == []
+    _at(emu, 10300)
+    _press(emu)                           # the late press
+    assert _sounds(emu) == [FAIL]
+    _paint(emu, 11500)
+    assert _sounds(emu) == [FAIL], "once"
+
+
+def test_an_unpressed_hit_sounds_the_miss_when_the_late_period_ends():
+    """Lexer: if no button gets pressed at all, you still need to play the sound."""
+    emu = _machine(window=1000)
+    assert _attack(emu, None, 10000) == ("miss", 0)
+    _paint(emu, 10999)
+    assert _sounds(emu) == []
+    _paint(emu, 11000)
+    assert _sounds(emu) == [FAIL]
+
+
+def test_an_unpressed_block_sounds_after_the_late_period_too():
+    emu = _machine(window=1000)
+    assert _block(emu, None, 10000, hit=51) == ("crit", 2000)
+    _paint(emu, 11000)
+    assert _sounds(emu) == [FAIL]
+
+
+def test_a_fumbled_hit_opens_no_late_period():
+    emu = _machine(window=1000)
+    _at(emu, 7600)
+    index, _ = _swing(emu, 1, 4)
+    _at(emu, 9000)
+    _press(emu)
+    _at(emu, 9100)
+    _press(emu)                           # the fumble buzzes now
+    _at(emu, 10000)
+    assert _contact(emu, index)[0] == "miss"
+    _paint(emu, 11500)
+    assert _sounds(emu) == [FAIL]
+
+
+def test_squall_s_presses_count_from_his_swing():
+    """His hit is held only a few frames before it lands."""
+    emu = _machine(window=1000)
+    _swing_starts(emu, 5000, 0)           # his attack sequence starts; nothing held yet
+    _at(emu, 6600)
+    _press(emu)
+    assert _pressed(emu) == (6600, 1), "the press counts"
+    _at(emu, 6850)                        # his hit is held just before it lands
+    index, _ = _swing(emu, 0, 4)
+    _at(emu, 6900)
+    assert _contact(emu, index)[0] in ("hit", "crit")
+
+
+def test_the_marker_follows_the_swinging_attacker_before_the_hit_is_held():
+    emu = _machine()
+    _swing_starts(emu, 5000, 1)
+    assert _marker_owner(emu) == 1
+    assert _colour(_paint(emu, 5100)) == RED
