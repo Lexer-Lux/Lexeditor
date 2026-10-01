@@ -281,6 +281,15 @@
     const supplied = Number(loadingParameters.get("lexLoadStarted"));
     return Number.isFinite(supplied) && supplied > 0 ? supplied : Date.now();
   })();
+  window.addEventListener('lexeditor-loading-status', event => {
+    if (!pluginLoadingScreen) return;
+    let status = pluginLoadingScreen.querySelector('.lex-plugin-loading-status');
+    if (!status) {
+      status = element('p', {class:'lex-plugin-loading-status'});
+      pluginLoadingScreen.append(status);
+    }
+    status.textContent = String(event.detail?.message || '');
+  });
   if (document.getElementById("lexeditor-shell") && transitionKind !== "resume") {
     pluginLoadingScreen = element("div", {
       class: ["lex-plugin-loading-screen",

@@ -56,6 +56,9 @@
   const editHistory=new EditHistory({capture:()=>state.records,restore:snapshot=>{state.records=clone(snapshot);state.invalid={}},render:async()=>render(),enabled:()=>state.loaded&&!readonly(),changed:shellRefresh});
   const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:identity.id,name:identity.name,themeName:identity.id,theme:{bg:"#06063c",panel:"#10106a","panel-2":"#0b0b52",border:"#8a8ac8",text:"#fff",muted:"#c6c6ee",accent:"#d02020","accent-text":"#fff",highlight:"#f0f0ff",success:"#d0d0d0",font:'"FF7 Menu","Arial Narrow",sans-serif',"heading-font":'"FF7 Menu","Arial Narrow",sans-serif'}},tabs,activeTab:()=>parentTab(state.tab),navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the FF7 Data Map",info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF7 plugin information",projectSources:()=>[{key:"vanilla",label:"Vanilla",path:state.dashboard?.baseline?.source||"Installed unchanged KERNEL.BIN"}],projectActiveSource:()=>state.activeSource,selectProjectSource:switchProjectSource,dirtyCount,readonly,save,discard,history:editHistory});
   editHistory.observe(document);
+  window.dispatchEvent(new CustomEvent('lexeditor-loading-status',{detail:{
+    message:`Reading ${identity.name} game archives for this editor session…`
+  }}));
   Promise.allSettled([api("/api/dashboard"),api("/api/datamap"),api("/api/data"),api("/api/platform-config"),api("/api/deployment")]).then(results=>{
     const [dashboard,map,data,config,deployment]=results;
     state.dashboard=dashboard.status==="fulfilled"?dashboard.value:{baseline:{message:dashboard.reason.message},game:{},problems:[]};

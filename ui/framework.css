@@ -173,6 +173,14 @@ html.lex-transition-entry body > .lex-plugin-loading-screen, html.lex-transition
   backface-visibility:hidden;
   will-change:transform;
 }
+.lex-plugin-loading-status {
+  position:absolute;
+  inset:40% 30px auto;
+  margin:0 auto;
+  max-width:48em;
+  font:400 16px/1.5 "Lexend","Segoe UI",system-ui,sans-serif;
+  text-align:center;
+}
 .lex-plugin-loading-quote {
   animation:lex-plugin-loading-quote-enter .34s .1s ease both;
   position:absolute;
