@@ -116,7 +116,10 @@ def decode(filename: str, data: bytes, *, animations: bool = True):
     return exporter
 
 
-def scene(filename: str, dataset: str = 'current') -> dict:
+def scene(filename: str, dataset: str = 'current', object_id: int | None = None) -> dict:
+    from . import effect_mesh
+    if effect_mesh.FILENAME.fullmatch(filename):
+        return effect_mesh.scene(filename, assets.model_dat_bytes(filename, dataset), object_id)
     if filename.casefold().startswith('a0stg') and filename.casefold().endswith('.x'):
         from . import battle_stage
         return battle_stage.scene(filename, assets.model_dat_bytes(filename, dataset))

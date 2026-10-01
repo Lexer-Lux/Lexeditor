@@ -4,6 +4,9 @@ Format: https://hobbitdur.github.io/FF8ModdingWiki/technical-reference/battle/gf
 Only packed Ifrit-family resources are accepted; raw VRAM pages are not meshes.
 """
 import struct
+import re
+
+FILENAME = re.compile(r'mag(005|200|201|202|203|204|205)_b\.\d+', re.IGNORECASE)
 
 
 PRIMITIVES = {
@@ -71,3 +74,43 @@ def mesh(data: bytes) -> dict:
                 faces.append({'type': kind, 'indices': [ref // 8 for ref in refs]})
             cursor += total * stride
     return {'vertices': vertices, 'faces': faces}
+
+
+def inventory(data: bytes) -> list[dict]:
+    result = []
+    summaries = {}
+    for obj in objects(data):
+        key = (obj['offset'], obj['size'])
+        if key not in summaries:
+            try:
+                decoded = mesh(data[obj['offset']:obj['offset'] + obj['size']])
+                summaries[key] = {'vertices': len(decoded['vertices']),
+                                  'triangles': sum(len(face['indices']) == 3 for face in decoded['faces']),
+                                  'quads': sum(len(face['indices']) == 4 for face in decoded['faces'])}
+            except ValueError:
+                summaries[key] = None
+        if summaries[key] is None:
+            continue
+        result.append({**obj, **summaries[key]})
+    return result
+
+
+def scene(filename: str, data: bytes, object_id: int | None = None) -> dict:
+    candidates = inventory(data)
+    if object_id is None:
+        chosen = next((obj for obj in candidates if obj['triangles'] or obj['quads']), None)
+    else:
+        chosen = next((obj for obj in candidates if obj['id'] == object_id), None)
+    if chosen is None:
+        raise ValueError('No supported effect mesh at this object ID')
+    decoded = mesh(data[chosen['offset']:chosen['offset'] + chosen['size']])
+    if not decoded['faces']:
+        raise ValueError('This morph target contains vertices but no faces')
+    triangles = []
+    for face in decoded['faces']:
+        for corners in (((0, 1, 2),) if len(face['indices']) == 3 else ((0, 1, 2), (1, 3, 2))):
+            triangles.append({'indices': [face['indices'][i] for i in corners],
+                              'uv': [[0, 0]] * 3, 'texture': -1})
+    return {'file': filename, 'objectId': chosen['id'],
+            'positions': [(x, -y, -z) for x, y, z in decoded['vertices']],
+            'triangles': triangles, 'textures': [], 'bones': 0, 'animations': 0}

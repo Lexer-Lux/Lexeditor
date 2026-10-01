@@ -172,7 +172,8 @@ class Handler(PluginRequestHandler):
                         int(query.get("palette", ["0"])[0]),
                         query.get("dataset", ["current"])[0]), "image/png")
             elif path == "/api/model-scene":
-                self.json_response(model_geometry.scene(query.get("file",[""])[0],query.get("dataset",["current"])[0]))
+                self.json_response(model_geometry.scene(query.get("file",[""])[0],query.get("dataset",["current"])[0],
+                    int(query['object'][0]) if 'object' in query else None))
             elif path == "/assets/model.glb":
                 filename=query.get("file",[""])[0]
                 self.binary_response(model_geometry.glb(filename,query.get("dataset",["current"])[0]),

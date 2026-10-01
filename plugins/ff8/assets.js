@@ -82,7 +82,7 @@
     return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections);
   }
 
-  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
+  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
   function renderModels(){
     const rows=filtered("models",["name","file"]),columns=[
       {key:"file",label:"File"},
@@ -114,6 +114,7 @@
   // showed the model). Enemies and Models share it.
   function modelPageThumb(model){
     if(!model?.file)return null;
+    if(model.modelKind==='effect'&&!model.effectMeshes?.some(mesh=>mesh.triangles||mesh.quads))return null;
     if(model.modelKind==='texture')return el('img',{src:`/assets/texture.png?id=${encodeURIComponent(`battle/${model.file}#0`)}&palette=0&dataset=${encodeURIComponent(assetDataset())}`,alt:model.name});
     if(!model.vertices&&!model.counts?.vertices)return null;
     return FF8ModelThumbnail({file:model.file,dataset:assetDataset(),label:model.name,revision:model.sha256});
@@ -121,6 +122,18 @@
   // Both Enemies and Models open the same geometry viewer from their header.
   function modelPreviewSpec(row,extra=null,options={}){
     if(!row?.file||(!row.vertices&&!row.counts?.vertices))return null;
+    if(row.modelKind==='effect'){
+      const meshes=(row.effectMeshes||[]).filter(mesh=>mesh.triangles||mesh.quads);
+      if(!meshes.length)return null;
+      return {label:`${row.name} geometry`,openLabel:`Open the ${row.name} geometry`,closeLabel:`Close the ${row.name} geometry`,
+        content:()=>{
+          const host=el('div',{style:'display:contents'});
+          const show=id=>{host.querySelector('.lex-model-stage')?.lexDispose?.();host.replaceChildren(FF8ModelViewer({file:row.file,dataset:assetDataset(),label:row.name,objectId:id}));};
+          const control=selectControl(meshes[0].id,meshes.map(mesh=>({value:mesh.id,name:`Object ${mesh.id} · ${mesh.vertices} vertices`})),show);
+          control.setAttribute('aria-label','Summon mesh object');show(meshes[0].id);
+          return LexeditorUI.stack(detailField({label:'OBJECT',control,help:infoHelp('Each object is shown separately, without textures or animation. Objects with vertices but no faces are morph targets and have no standalone surface.')}),host);
+        },onClose:drawer=>{drawer.querySelector('.lex-model-stage')?.lexDispose?.();drawer.replaceChildren();}};
+    }
     return {label:`${row.name} model`,
       openLabel:`Open the ${row.name} model`,
       closeLabel:`Close the ${row.name} model`,

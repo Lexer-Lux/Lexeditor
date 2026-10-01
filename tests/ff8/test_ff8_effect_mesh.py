@@ -51,3 +51,17 @@ def test_sparse_object_table_retains_resource_ids():
 def test_raw_texture_page_is_not_a_packed_effect():
     with pytest.raises(ValueError, match='Not a packed'):
         effect_mesh.objects(bytes(32768))
+
+
+def test_scene_selects_sparse_object_and_rejects_missing_id():
+    data = bytearray(64) + triangle()
+    struct.pack_into('<I', data, 12, 48)
+    struct.pack_into('<I', data, 20, 48)
+    struct.pack_into('<4I', data, 48, 3, 0, 16, 0)
+    result = effect_mesh.scene('mag005_b.05', data, 1)
+    assert result['objectId'] == 1
+    assert result['positions'][1] == (100, 20, 0)
+    assert result['triangles'][0]['indices'] == [0, 1, 2]
+    assert result['textures'] == []
+    with pytest.raises(ValueError, match='object ID'):
+        effect_mesh.scene('mag005_b.05', data, 0)

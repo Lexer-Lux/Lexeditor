@@ -37,6 +37,14 @@ def main():
             page.get_by_role('combobox', name='Battle texture mag163_a.dat texture 1 palette', exact=True).select_option('1')
             page.wait_for_function("Array.from(document.querySelectorAll('img')).some(i=>i.src.includes('palette=1')&&i.naturalWidth>0)")
             assert page.locator('.lex-model-stage').count() == 0
+            page.evaluate("state.selected.models='mag005_b.05';navigate('models')")
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
+            page.locator('.lex-detail-panel-icon').click()
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
+            with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'object=8' in response.url) as selected:
+                page.get_by_role('combobox', name='Summon mesh object', exact=True).select_option('8')
+            assert selected.value.json()['objectId'] == 8
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
             assert not failed_textures, failed_textures
             assert not errors, errors
             browser.close()
