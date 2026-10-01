@@ -42,6 +42,38 @@ def test_all_primitive_groups_and_vertex_frames():
     assert obj['faces'][7]['colors'] == [[128, 64, 32], [10, 20, 30], [11, 20, 30], [12, 20, 30]]
 
 
+def test_composite_tables_keep_absolute_frame_offsets(monkeypatch):
+    # Three independent field types exercise the 16-, 12- and 20-byte records.
+    tracks = struct.pack('<3I', 1, 6, 12)
+    tracks += struct.pack('<5I', 0, (1 << 6) | (1 << 9) | (1 << 13), 20, 40, 56)
+    for words in (4, 3, 5):
+        tracks += struct.pack(f'<{words + 1}I', 6, *([0] * (words - 1)), 0xffffffff)
+    prefix = struct.pack('<2I', 16, 1) + bytes(8)
+    first = surface()
+    second = bytearray(surface())
+    # Second object's second vertex frame starts at its local offset 56.
+    struct.pack_into('<h', second, 56, 777)
+    raw = prefix + first + tracks + second + tracks
+    objects = effect_surface.parse(raw)
+    assert [obj['id'] for obj in objects] == [0, 1]
+    assert objects[1]['offset'] == len(prefix + first + tracks) + 12
+    monkeypatch.setattr(effect_model_textures, 'sources', lambda *args: {})
+    scene = effect_surface.scene('mag115_h.16', raw, 'vanilla', object_id=1, frame=1)
+    assert scene['positions'][0][0] == 777
+    assert assets._battle_file_info('mag115_h.16', raw)['kind'] == 'surface'
+    track_start = len(prefix + first)
+    for offset, value in ((track_start, 257), (track_start + 8, 16),
+                          (track_start + 16, 1 << 31), (track_start + 20, 24),
+                          (track_start + 32, 7), (track_start + 48, 7)):
+        invalid = bytearray(raw)
+        struct.pack_into('<I', invalid, offset, value)
+        with pytest.raises(ValueError):
+            effect_surface.parse(invalid)
+    for invalid in (raw[:-1], raw + b'junk'):
+        with pytest.raises(ValueError):
+            effect_surface.parse(invalid)
+
+
 def test_flat_quad_has_no_padding_after_its_four_indices():
     # Four color/command bytes followed immediately by four u16 references.
     face = bytes.fromhex('80 40 20 28 00 00 02 00 04 00 06 00')

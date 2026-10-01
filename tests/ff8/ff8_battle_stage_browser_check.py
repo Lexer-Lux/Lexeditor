@@ -70,6 +70,21 @@ def main():
                 page.get_by_role('combobox', name='Summon mesh object', exact=True).select_option('2')
             assert len(surface.value.json()['positions']) == 107
             assert page.get_by_role('combobox', name='Surface frame', exact=True).count() == 0
+            page.evaluate("state.selected.models='mag115_h.16';navigate('models')")
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
+            page.locator('.lex-detail-panel-icon').click()
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
+            objects = page.get_by_role('combobox', name='Summon mesh object', exact=True)
+            assert objects.locator('option').count() == 8
+            objects.select_option('2')
+            with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'frame=5' in response.url) as surface:
+                page.get_by_role('combobox', name='Surface frame', exact=True).select_option('5')
+            assert surface.value.json()['frameCount'] == 6
+            assert surface.value.json()['unmappedFaces'] == 0
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
+            if os.environ.get('LEXEDITOR_QUEZACOTL_SURFACE_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_QUEZACOTL_SURFACE_SCREENSHOT'])
             page.evaluate("state.selected.models='mag324_h.s00';navigate('models')")
             page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
             page.locator('.lex-detail-panel-icon').click()

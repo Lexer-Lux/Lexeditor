@@ -17,8 +17,80 @@ def parse(data: bytes) -> list[dict]:
     if 8 <= len(data) <= 16 * 1024 * 1024:
         faces_at, vertices = struct.unpack_from('<2I', data)
         if vertices and faces_at == 8 + vertices * 8:
+            if faces_at + 12 <= len(data):
+                count, end, first = struct.unpack_from('<3I', data, faces_at)
+                if 1 <= count <= 256 and first == 8 + count * 4 and first < end <= len(data) - faces_at:
+                    return _composite_objects(data, faces_at)
             return _direct_objects(data)
     return _parse_table(data)
+
+
+def _track_table_end(data: bytes, start: int) -> int:
+    """Bound the keyframe tracks between Quezacotl's surface tables.
+
+    Field meanings are not interpreted. Mask bits select streams of timestamped
+    records; bit 9 uses 12 bytes, bit 13 uses 20, and other known bits use 16.
+    Each stream ends with a single 0xffffffff word at a record boundary.
+    """
+    if start + 8 > len(data):
+        raise ValueError('Truncated surface track table')
+    count, duration = struct.unpack_from('<2I', data, start)
+    if not 1 <= count <= 256 or not 1 <= duration <= 4096 or start + 8 + count * 4 > len(data):
+        raise ValueError('Invalid surface track table')
+    offsets = struct.unpack_from(f'<{count}I', data, start + 8)
+    if offsets[0] != 8 + count * 4 or any(a >= b for a, b in zip(offsets, offsets[1:])):
+        raise ValueError('Invalid surface track offsets')
+    cursor = start + offsets[0]
+    for offset in offsets:
+        if start + offset != cursor or cursor + 8 > len(data):
+            raise ValueError('Surface tracks are not contiguous')
+        base = cursor
+        mask, = struct.unpack_from('<I', data, base + 4)
+        if not mask or mask & ~0x3fff:
+            raise ValueError('Unsupported surface track fields')
+        bits = [bit for bit in range(14) if mask & (1 << bit)]
+        header = 8 + len(bits) * 4
+        if base + header > len(data):
+            raise ValueError('Truncated surface track fields')
+        fields = struct.unpack_from(f'<{len(bits)}I', data, base + 8)
+        cursor = base + header
+        for bit, field in zip(bits, fields):
+            if base + field != cursor:
+                raise ValueError('Invalid surface track field offset')
+            stride = {9: 12, 13: 20}.get(bit, 16)
+            previous = -1
+            while True:
+                if cursor + 4 > len(data):
+                    raise ValueError('Truncated surface keyframe')
+                timestamp, = struct.unpack_from('<I', data, cursor)
+                if timestamp == 0xffffffff:
+                    cursor += 4
+                    break
+                if not previous < timestamp <= duration or cursor + stride > len(data):
+                    raise ValueError('Invalid surface keyframe timestamp')
+                previous = timestamp
+                cursor += stride
+    return cursor
+
+
+def _composite_objects(data: bytes, start: int) -> list[dict]:
+    """A vertex block followed by alternating surface and keyframe tables."""
+    objects = []
+    while start < len(data):
+        if start + 8 > len(data):
+            raise ValueError('Truncated composite surface table')
+        size, = struct.unpack_from('<I', data, start + 4)
+        if not 12 <= size <= len(data) - start:
+            raise ValueError('Invalid composite surface size')
+        group = _parse_table(data[start:start + size])
+        for obj in group:
+            obj['offset'] += start
+            obj['id'] = len(objects)
+            objects.append(obj)
+        if len(objects) > 256 or sum(obj['vertexCount'] * obj['frameCount'] for obj in objects) > 500000 or sum(len(obj['faces']) for obj in objects) > 500000:
+            raise ValueError('Composite surface exceeds decoding budget')
+        start = _track_table_end(data, start + size)
+    return objects
 
 
 def _direct_objects(data: bytes) -> list[dict]:
