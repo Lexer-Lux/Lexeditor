@@ -82,7 +82,7 @@
     return sharedDetail({...row,titleContent:assetName({...row,name:"Sound effect"},sfxOverridden(row))},prefs,sections);
   }
 
-  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",surface:"Effect surface","effect-data":"Summon data","effect-model":"Effect model",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
+  function modelKindName(kind){return {monster:"Monster",stage:"Battle stage",effect:"Summon mesh",surface:"Effect surface","sound-data":"Sound data",formations:"Formations","effect-data":"Summon data","effect-model":"Effect model",texture:"Texture",nomodel:"No model",body:"Body",edea:"Edea body",weapon:"Weapon","weapon-reduced":"Attack data",locked:"Unsupported",empty:"Empty"}[kind]||kind}
   function renderModels(){
     const rows=filtered("models",["name","file"]),columns=[
       {key:"file",label:"File"},
@@ -232,7 +232,7 @@
         {key:"offset",label:"Offset",render:section=>formatNumber(section.offset)},
         ...(resources?[]:[{key:"size",label:"Size",render:section=>assetFileSize(section.size)}])]});
       sections.push(detailSection({title:resources?"RESOURCES":"SECTIONS",body:[table],
-        help:infoHelp(resources?"Textures and palettes stored in this file. Their numbers identify them within the summon. Individual resources are not editable.":"The model's building blocks in file order. Only whole-file replacement is supported; no section is editable.")}));
+        help:infoHelp(resources?"Textures and palettes stored in this file. Their numbers identify them within the summon. Individual resources are not editable.":row.modelKind==='sound-data'?"Parts of this sound file. The sound data is not editable here.":"The model's building blocks in file order. Only whole-file replacement is supported; no section is editable.")}));
     }
     const links=[];
     if(row.enemyId!=null)links.push(el("button",{type:"button",onclick:()=>{state.selected.enemies=row.enemyId;navigate("enemies")}},"Open in Enemies"));
@@ -244,7 +244,7 @@
       if(row.modelKind!=='texture'&&!["dat","x"].includes(ext)){showAlert({title:"Unsupported model",message:`${file.name} is not a .dat or .x battle file.`});return null}
       return {datRevert:false};
     });
-    const replace=el("button",{type:"button",disabled:state.activeSource!=="mine"||(row.modelKind!=='texture'&&!(/\.(dat|x)$/i.test(row.file))),onclick:()=>upload.click()},"Replace"),
+    const replace=el("button",{type:"button",disabled:state.activeSource!=="mine"||row.modelKind==='sound-data'||(row.modelKind!=='texture'&&!(/\.(dat|x)$/i.test(row.file))),onclick:()=>upload.click()},"Replace"),
       revert=el("button",{type:"button",disabled:state.activeSource!=="mine"||!row.override,onclick:()=>{row.datBase64="";row.datRevert=true;shell.refresh();render()}},"Revert"),
       exportLink=row.sha256?el("a",{href:`/assets/models/${row.file}?dataset=${encodeURIComponent(assetDataset())}`,download:row.file},"Export"):null,
       pending=assetPendingNote(row,"datBase64","Replacement"),

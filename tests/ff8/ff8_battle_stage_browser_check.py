@@ -1,4 +1,4 @@
-"""Installed battle stages load textures and reset to a useful overview."""
+"""Installed battle assets expose their previews, selectors and resource details."""
 from pathlib import Path
 import sys
 import tempfile
@@ -170,9 +170,19 @@ def main():
             if os.environ.get('LEXEDITOR_DIABLOS_SCREENSHOT'):
                 page.mouse.move(10, 10)
                 page.screenshot(path=os.environ['LEXEDITOR_DIABLOS_SCREENSHOT'])
+            page.evaluate("state.selected.models='mag076_b.02';navigate('models')")
+            page.locator('[data-lex-layout-section="SECTIONS"]').get_by_text('Sound header', exact=True).wait_for(state='visible')
+            assert page.locator('.lex-model-stage').count() == 0
+            assert page.get_by_role('button', name='Replace', exact=True).is_disabled()
+            if os.environ.get('LEXEDITOR_SOUND_DATA_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_SOUND_DATA_SCREENSHOT'])
+            page.evaluate("state.selected.models='scene.out';navigate('models')")
+            assert page.get_by_role('button', name='Open in Encounters', exact=True).is_visible()
+            assert page.locator('.lex-model-stage').count() == 0
             assert not errors, errors
             browser.close()
-    print('Stage preview loads its palette textures; rotation and Home restore the overview.')
+    print('Battle previews load stages, surfaces, model parts, palettes and resource details.')
 
 
 if __name__ == '__main__':

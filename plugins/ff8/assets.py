@@ -661,6 +661,17 @@ def _model_motion_info(data: bytes, sections: list[dict], part: int = 1) -> list
 
 def _battle_file_info(filename: str, data: bytes) -> dict:
     from . import effect_mesh
+    # Both archive sound containers use a 64-byte header and a bounded payload.
+    # SCOT identification: wiki.ffrtt.ru/index.php/FF8/FileFormat_magfiles
+    if 64 <= len(data) <= MAX_MODEL_BYTES and (data[:4] == b'AKAO' or data[4:8] == b'SCOT'):
+        payload_size, = struct.unpack_from('<I', data, 16)
+        payload_offset, = struct.unpack_from('<I', data, 24)
+        if payload_offset == 64 and payload_offset + payload_size == len(data):
+            return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+                    'parsed': True, 'kind': 'sound-data', 'counts': None, 'tims': [],
+                    'geometryVerified': False, 'texturesVerified': False,
+                    'sections': [{'index': 1, 'name': 'Sound header', 'offset': 0, 'size': 64},
+                                 {'index': 2, 'name': 'Sound data', 'offset': 64, 'size': payload_size}]}
     image = _texture_pack_info(data)
     if image is not None:
         return image
@@ -1138,7 +1149,7 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
     if filename == "scene.out":
         # Formations, edited on the Encounters tab: never a changed model.
         row["modelChanged"] = False
-        row.update(modelKind="locked", name="Battle formations (scene.out)",
+        row.update(modelKind="formations", name="Battle formations (scene.out)",
                    sections=None, counts=None, tims=[],
                    sizeBytes=info["sizeBytes"] if info else archive_sizes.get(filename, 0),
                    sha256=info["sha256"] if info else None,
@@ -1194,10 +1205,13 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
         name, note = EFFECT_MODEL_NAMES.get(filename, f'Effect model {filename}'), 'A model used by a battle effect, shown in its first pose. Matching textures come from other files in the effect. Unmatched surfaces stay plain.'
     elif kind == 'surface':
         name, note = f'Effect surface {filename}', 'Animated scenery used by a battle effect. Select an object and frame to inspect its shape. Matching textures are shown when known.'
+    elif kind == 'sound-data':
+        name, note = f'Battle sound data {filename}', 'This file contains sound data. It has no model preview, and playback of this sound container is not decoded.'
+        row['summonFamily'] = None
     if kind == "unmapped":
         note = ("This file parses as a model container but its section "
                 "layout is not mapped; whole-file replacement only.")
-    elif kind not in ("nomodel", "texture", "effect", "effect-data", "effect-model", "surface") and (not info["geometryVerified"]
+    elif kind not in ("nomodel", "texture", "effect", "effect-data", "effect-model", "surface", "sound-data") and (not info["geometryVerified"]
                                 or not info["texturesVerified"]):
         note = ((note + " ") if note else "") + (
             "Some sections did not verify; counts and textures below "
@@ -1208,7 +1222,7 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
     row.update(modelKind=kind, name=name, sections=info["sections"], effectMeshes=info.get('effectMeshes'), modelParts=info.get('modelParts'),
                effectResources=info.get('effectResources'), motion=info.get('motion'),
                counts=info["counts"], tims=info["tims"],
-               vertices=counts.get("vertices"), timCount=None if kind in ('effect', 'effect-data', 'effect-model', 'surface') else len(info["tims"]),
+               vertices=counts.get("vertices"), timCount=None if kind in ('effect', 'effect-data', 'effect-model', 'surface', 'sound-data') else len(info["tims"]),
                sizeBytes=info["sizeBytes"], sha256=info["sha256"],
                enemyId=enemy_id, note=note)
     return row
