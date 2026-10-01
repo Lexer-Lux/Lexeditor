@@ -31,3 +31,8 @@ def test_instruction_budget_stops_non_yielding_loop(monkeypatch):
 def test_invalid_root_is_rejected():
     with pytest.raises(ValueError, match='root script'):
         simulate(bytes(50))
+
+
+def test_shared_page_load_replaces_previous_upload_source():
+    result = simulate(script(0xC006, 0x2029, 704, 256, 64, 256, 0))
+    assert result.vram_events == [(0, 'rawrect', ((704, 256, 64, 256), 'ma8def_p.0'))]

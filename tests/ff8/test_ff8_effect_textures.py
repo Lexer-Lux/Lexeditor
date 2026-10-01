@@ -2,7 +2,7 @@ import struct
 
 import pytest
 
-from plugins.ff8.effect_textures import read_descriptor, resource_bytes
+from plugins.ff8.effect_textures import TextureMemory, read_descriptor, resource_bytes
 
 
 def descriptor():
@@ -48,3 +48,35 @@ def test_resource_masks_flags_and_requires_complete_pixels():
     struct.pack_into('<I', data, 48, 0)
     with pytest.raises(ValueError, match='absent'):
         resource_bytes(data, row, texture=True)
+
+
+@pytest.mark.parametrize('mode,packed', [(0, 0x21), (1, 0x0201)])
+def test_texture_pages_use_low_index_first(mode, packed):
+    memory = TextureMemory({'textures': [], 'cluts': []}, {})
+    memory.write((0, 0, 1, 1), struct.pack('<H', packed))
+    palette = [0, 31, 31 << 5] + [0] * 253
+    memory.write((320, 224, 256, 1), struct.pack('<256H', *palette))
+    result = memory.page_rgba(mode << 7, (224 << 6) | 20)
+    assert result[:8] == bytes((255, 0, 0, 255, 0, 255, 0, 255))
+    assert result[11] == 0
+
+
+def test_direct_color_texture_page():
+    memory = TextureMemory({'textures': [], 'cluts': []}, {})
+    memory.write((0, 0, 1, 1), struct.pack('<H', 31 << 10))
+    assert memory.page_rgba(2 << 7, 0)[:4] == bytes((0, 0, 255, 255))
+
+
+def test_replay_overwrites_and_rewinds_raw_uploads():
+    rows = {'textures': [{'id': 0, 'slot': None, 'rect': (0, 0, 1, 1)}], 'cluts': []}
+    memory = TextureMemory(rows, {2: b'\x1f\x00', 3: b'\xe0\x03'})
+    events = [(1, 'raw', (0, 2, 0)), (5, 'raw', (0, 3, 0))]
+    assert memory.replay(events, 5).words[0] == 31 << 5
+    assert memory.replay(events, 1).words[0] == 31
+    assert memory.replay(events, 0).words[0] == 0
+
+
+def test_raw_upload_rejects_truncated_pixels():
+    rows = {'textures': [{'id': 0, 'slot': None, 'rect': (0, 0, 1, 1)}], 'cluts': []}
+    with pytest.raises(ValueError, match='incomplete'):
+        TextureMemory(rows, {2: b'\x00'}).replay([(1, 'raw', (0, 2, 0))], 1)

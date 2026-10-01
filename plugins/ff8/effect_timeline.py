@@ -19,6 +19,15 @@ class PreviewSimulation(CineSimulation):
             raise ValueError('Summon preview exceeded its object budget')
         return super()._spawn(parent, program, at, bone_id)
 
+    def _record_props(self, bone, instruction):
+        super()._record_props(bone, instruction)
+        if instruction.code == 6 and instruction.op & 0x8000:
+            slot = (instruction.op >> 9) & 63
+            if slot & 32:
+                # Shared page loads replace the last-upload source even though
+                # they do not replace a summon-specific file slot.
+                self._last_load = f'ma8def_p.{slot & 31}'
+
 
 def simulate(data: bytes) -> PreviewSimulation:
     if not 48 <= len(data) <= 16 * 1024 * 1024:

@@ -5,6 +5,7 @@ format reference. Descriptor addresses were verified against the supported EXE.
 No executable, palette or texture bytes are bundled with the editor.
 """
 import struct
+from array import array
 
 from . import executable_text
 
@@ -73,3 +74,100 @@ def resource_bytes(data: bytes, row: dict, *, texture: bool) -> bytes:
     if start < table + 4 * (index + 1) or end > len(data):
         raise ValueError('Cinematic resource pixels are truncated')
     return data[start:end]
+
+
+class TextureMemory:
+    """One bounded PSX VRAM snapshot, replayed in script order up to a tick."""
+
+    def __init__(self, description: dict, files: dict[int | str, bytes]):
+        self.description, self.files = description, files
+        self.words = array('H', [0]) * (1024 * 512)
+        self.present = bytearray(1024 * 512)
+        self.missing = []
+
+    def write(self, rect, data: bytes):
+        x, y, width, height = rect
+        if not (0 <= x < 1024 and 0 <= y < 512 and 0 < width <= 1024 - x and 0 < height <= 512 - y):
+            raise ValueError('Texture upload rectangle is outside VRAM')
+        if len(data) != width * height * 2:
+            raise ValueError('Texture upload has incomplete pixels')
+        for row in range(height):
+            values = struct.unpack_from(f'<{width}H', data, row * width * 2)
+            start = (y + row) * 1024 + x
+            self.words[start:start + width] = array('H', values)
+            self.present[start:start + width] = b'\x01' * width
+
+    def upload(self, index: int, *, texture: bool):
+        rows = self.description['textures' if texture else 'cluts']
+        if not 0 <= index < len(rows):
+            raise ValueError('Texture upload resource ID is outside its table')
+        row = rows[index]
+        slot = row['slot']
+        if slot is None or slot not in self.files:
+            self.missing.append(('texture' if texture else 'clut', index, slot))
+            return
+        self.write(row['rect'], resource_bytes(self.files[slot], row, texture=texture))
+
+    def replay(self, events: list, tick: int):
+        if not 0 <= tick <= 3000 or len(events) > 100000:
+            raise ValueError('Texture replay exceeds preview limits')
+        self.words = array('H', [0]) * (1024 * 512)
+        self.present = bytearray(1024 * 512)
+        self.missing = []
+        # Begin with known packed resources, matching the preview simulator's
+        # baseline. The script may replace these rectangles with streamed pages.
+        for texture, rows in ((True, self.description['textures']), (False, self.description['cluts'])):
+            for row in rows:
+                if row['slot'] is not None and row['slot'] in self.files:
+                    self.upload(row['id'], texture=texture)
+        for when, kind, args in events:
+            if when > tick:
+                break
+            if kind in ('tex', 'clut'):
+                self.upload(args[0], texture=kind == 'tex')
+            elif kind in ('raw', 'rawrect'):
+                if kind == 'raw':
+                    index, slot, offset = args
+                    if not 0 <= index < len(self.description['textures']):
+                        raise ValueError('Raw texture rectangle ID is outside its table')
+                    rect = self.description['textures'][index]['rect']
+                else:
+                    rect, slot = args
+                    offset = 0
+                if slot not in self.files:
+                    self.missing.append((kind, slot))
+                    continue
+                if offset < 0:
+                    raise ValueError('Raw texture upload has a negative offset')
+                length = rect[2] * rect[3] * 2
+                self.write(rect, self.files[slot][offset:offset + length])
+            else:
+                raise ValueError(f'Unsupported texture upload event {kind}')
+        return self
+
+    def page_rgba(self, tpage: int, clut: int) -> bytes:
+        if not 0 <= tpage <= 65535 or not 0 <= clut <= 65535:
+            raise ValueError('Texture page and palette must be 16-bit values')
+        mode = (tpage >> 7) & 3
+        if mode == 3:
+            raise ValueError('Unsupported texture page depth')
+        base_x, base_y = (tpage & 15) * 64, ((tpage >> 4) & 1) * 256
+        palette_x, palette_y = (clut & 63) * 16, (clut >> 6) & 511
+        rgba = bytearray(256 * 256 * 4)
+        def word(x, y):
+            return self.words[y * 1024 + x] if 0 <= x < 1024 and 0 <= y < 512 else 0
+        for y in range(256):
+            for x in range(256):
+                packed = word(base_x + (x >> (2 - mode)), base_y + y)
+                if mode == 0:
+                    color = word(palette_x + ((packed >> ((x & 3) * 4)) & 15), palette_y)
+                elif mode == 1:
+                    color = word(palette_x + ((packed >> ((x & 1) * 8)) & 255), palette_y)
+                else:
+                    color = packed
+                offset = (y * 256 + x) * 4
+                for channel, shift in enumerate((0, 5, 10)):
+                    value = (color >> shift) & 31
+                    rgba[offset + channel] = (value << 3) | (value >> 2)
+                rgba[offset + 3] = 0 if color == 0 else 255
+        return bytes(rgba)
