@@ -8202,14 +8202,16 @@ ${contents.path}`});
     // three-pane page at 1100px squeezed its detail to 350px of a 430px
     // minimum while its other panes kept more than theirs (Enemies > Loot).
     const updateResponsive = () => {
-      if (vertical || !root.clientWidth) return 0;
+      const extent = vertical ? root.clientHeight : root.clientWidth;
+      if (!extent) return 0;
       const css = getComputedStyle(root);
       const divider = root.querySelector(':scope > .lex-panel-layout-divider');
-      if (divider?.offsetWidth) measuredGap = divider.offsetWidth;
-      else if (options.resizable === false && !belowMinimum) measuredGap = parseFloat(css.columnGap) || 0;
-      const available = root.clientWidth - (parseFloat(css.paddingLeft) || 0)
-        - (parseFloat(css.paddingRight) || 0) - measuredGap * (nodes.length - 1);
-      if (!options.stackBelowMinimum) return available;
+      const dividerSize = vertical ? divider?.offsetHeight : divider?.offsetWidth;
+      if (dividerSize) measuredGap = dividerSize;
+      else if (options.resizable === false && !belowMinimum) measuredGap = parseFloat(vertical ? css.rowGap : css.columnGap) || 0;
+      const available = extent - (parseFloat(vertical ? css.paddingTop : css.paddingLeft) || 0)
+        - (parseFloat(vertical ? css.paddingBottom : css.paddingRight) || 0) - measuredGap * (nodes.length - 1);
+      if (vertical || !options.stackBelowMinimum) return available;
       belowMinimum = available < minSizes.reduce((sum, value) => sum + value, 0);
       root.classList.toggle('lex-panel-layout-below-minimum', belowMinimum);
       root.style.setProperty('--lex-panel-count', nodes.length);
@@ -8236,7 +8238,7 @@ ${contents.path}`});
         ? `${Number(options.gap)}px` : "var(--lex-panel-gap, 14px)");
       root.classList.add("lex-panel-layout-static");
       root.append(...nodes);
-      if (options.stackBelowMinimum && !vertical) {
+      if (nodes.length > 1) {
         const refresh = () => {
           const fitted = fitResponsiveSizes(updateResponsive());
           if (fitted) {
@@ -8280,6 +8282,8 @@ ${contents.path}`});
     });
     const setSizes = (requested, persist = false) => {
       sizes = sizesWithMinimums(requested);
+      const fitted = fitResponsiveSizes(updateResponsive());
+      if (fitted) sizes = sizesWithMinimums(fitted);
       root.style.setProperty("--lex-panel-layout-template", template(sizes));
       updateDividerState();
       const detail = {sizes: [...sizes], split: sizes[0]};
@@ -8291,18 +8295,8 @@ ${contents.path}`});
         } catch (_error) {}
       }
     };
-    // A pane is never dragged so small that its text starts to clip: a table
-    // name cut to nothing, a choice whose words run under its arrow. The fixed
-    // floor above knows nothing of what a pane holds, so the drag also stops
-    // at the last width where the shrinking pane's text is clipped by no more
-    // pixels than before - so a name already cut short is not cut further.
-    const CLIP_CANDIDATES = ".lex-column-cell-content,.lex-column-cell-content *,select,.lex-readonly-field,.lex-toggle-label,.lex-detail-panel-title";
-    const clippedIn = node => {
-      let hidden = 0;
-      for (const item of node.querySelectorAll(CLIP_CANDIDATES))
-        if (item.clientWidth && item.scrollWidth > item.clientWidth + 1) hidden += item.scrollWidth - item.clientWidth;
-      return hidden;
-    };
+    // The configured floor is the same before and after a drag. Text fitting
+    // must not turn a temporary wider view into a new, irreversible minimum.
     const resizePair = (index, delta, persist = false, edge = "", initialWidths = null) => {
       if (belowMinimum) return false;
       const widths = initialWidths ? [...initialWidths]
@@ -8328,20 +8322,8 @@ ${contents.path}`});
       // must restore those widths, even though this move transfers nothing.
       if(applied<.25){if(initialWidths)setSizes(widths,persist);return false;}
       widths[delta>0?index:index+1]+=applied;
-      const shrunk=donors.filter(donor=>widths[donor]<nodes[donor].getBoundingClientRect()[vertical?"height":"width"]-.25);
-      const before=[...sizes],clipped=shrunk.map(donor=>clippedIn(nodes[donor]));
       setSizes(widths, persist);
-      const clips=()=>shrunk.some((donor,i)=>clippedIn(nodes[donor])>clipped[i]+1);
-      if(!clips())return true;
-      // One fast flick can pass the limit in a single frame. Find the
-      // smallest step toward it that still clips nothing, rather than
-      // snapping the pane back to where the drag started.
-      const sum=before.reduce((a,b)=>a+b,0)||1,from=before.map(value=>value/sum*total);
-      const mix=t=>from.map((value,i)=>value+(widths[i]-value)*t);
-      let good=0,bad=1;
-      for(let step=0;step<7;step++){const t=(good+bad)/2;setSizes(mix(t),false);if(clips())bad=t;else good=t;}
-      setSizes(mix(good),persist);
-      return good>0;
+      return true;
     };
     let dragFrame = 0, pendingDrag = null, dragStart = null;
     const flushDrag = () => {
