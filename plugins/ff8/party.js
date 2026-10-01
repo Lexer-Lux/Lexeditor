@@ -359,7 +359,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     }
   }
   function enemyScanSection(row,prefs){
-    const input=LexeditorUI.textArea({rows:6,"aria-label":`Scan description for ${row.name}`,oninput:event=>{row.scanDescription=event.target.value;shell.refresh()}});input.value=row.scanDescription??"";
+    const input=LexeditorUI.textArea({rows:1,"aria-label":`Scan description for ${row.name}`,oninput:event=>{row.scanDescription=event.target.value;shell.refresh()}});input.value=row.scanDescription??"";
     return detailSection({className:"enemy-scan-section",title:"SCAN",help:infoHelp("The Scan spell shows this description. When you edit it, elemental resistance, or Devour rewards, the Details page updates when you leave the enemy view or save."),body:detailField({label:"DESCRIPTION",control:sourceControl(input,()=>row.scanDescription,rowOf(state.vanilla,"enemies",row.id)?.scanDescription,referenceValues("enemies",row.id,value=>value?.scanDescription),value=>row.scanDescription=String(value??"")),pin:prefs?.pinButton("scanDescription","Scan description")})});
   }
   function enemyPropertyLabel(field){const labels={"Medium level starts":"MED LV","High level starts":"HIGH LV","Auto-Reflect":"REFLECT","Auto-Shell":"SHELL","Auto-Protect":"PROTECT","Surprise immunity":"NO SURPRISE","Diablos misses":"NO DIABLOS","Always yields a card":"ALWAYS CARD","Extra XP":"EXTRA XP","Mug rate":"MUG %","Drop rate":"DROP %"};return labels[field.label]||field.label}
@@ -510,7 +510,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     if(!document.lines.length)return LexeditorUI.stack({fill:false},scan,LexeditorUI.detailNote("This enemy has no local battle dialogue."));
     const vanilla=enemyBattleTextRow(state.vanilla,row.id),referenceLine=(dataset,id)=>enemyBattleTextRow(dataset,row.id)?.lines?.find(value=>value.id===id)?.text;
     return LexeditorUI.stack({fill:false},scan,...document.lines.map(line=>{
-      const input=LexeditorUI.textArea({rows:4,maxlength:400,"aria-label":`Battle text line ${line.id} for ${row.name}`,oninput:event=>{line.text=event.target.value;shell.refresh()}});input.value=line.text;
+      const input=LexeditorUI.textArea({rows:1,maxlength:400,"aria-label":`Battle text line ${line.id} for ${row.name}`,oninput:event=>{line.text=event.target.value;shell.refresh()}});input.value=line.text;
       const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:referenceLine(state.referenceData[reference.id],line.id)})).filter(value=>value.value!==undefined);
       return detailSection({className:"enemy-battle-text-line",title:`LINE ${line.id}`,help:infoHelp("This enemy uses this line during battle. Its number matches a Show Text instruction in the AI view."),body:sourceControl(input,()=>line.text,vanilla?.lines?.find(value=>value.id===line.id)?.text,references,value=>line.text=String(value??""))});
     }));

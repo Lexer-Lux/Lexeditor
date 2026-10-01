@@ -4598,7 +4598,7 @@ body:has(.lex-data-map-table) #main {
 
 /* ---- Section prose ----------------------------------------------------- */
 .lex-detail-text { margin:0; padding:6px 10px; white-space:pre-wrap; overflow-wrap:anywhere; }
-.lex-text-area { display:block; width:100%; min-width:0; resize:vertical; font:inherit; line-height:1.35; field-sizing:content; min-height:4lh; }
+.lex-text-area { display:block; width:100%; min-width:0; resize:vertical; font:inherit; line-height:1.35; field-sizing:content; min-height:1lh; }
 
 /* ---- Logs -------------------------------------------------------------- */
 .lex-log {
