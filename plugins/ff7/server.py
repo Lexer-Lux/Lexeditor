@@ -84,15 +84,17 @@ def _signature() -> tuple:
 
 def cached_editor_data() -> dict:
     """The loaded datasets, reused while the installed and project files hold still."""
-    key = _signature()
     with _DATA_CACHE_LOCK:
+        key = _signature()
         if _DATA_CACHE["key"] == key and _DATA_CACHE["value"] is not None:
             return _DATA_CACHE["value"]
-    value = editor_data()
-    with _DATA_CACHE_LOCK:
+        # Data-map/data requests can arrive together. Keep the load
+        # under the same lock so only one request decodes the archives and
+        # waiting requests inspect the latest signature after that load.
+        value = editor_data()
         _DATA_CACHE["key"] = key
         _DATA_CACHE["value"] = value
-    return value
+        return value
 
 
 def drop_data_cache() -> None:
