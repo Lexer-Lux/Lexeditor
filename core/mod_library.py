@@ -363,7 +363,8 @@ class ModLibrary:
             if not root.is_dir():
                 raise ValueError("Choose a folder in the package")
             files = self.select_files(file_tree(root), selected)
-            result = adapter.inspect(root, files)
+            from core.bundled_mods import inspect_bundle
+            result = inspect_bundle(root, files, adapter)
             return {**result, "files": [p.as_posix() for p in file_tree(package)],
                     "rootFiles": [p.as_posix() for p in file_tree(root)],
                     "dataRoot": data_root, "metadata": metadata(root)}
@@ -385,7 +386,8 @@ class ModLibrary:
             if not root.is_dir():
                 raise ValueError("Choose a folder in the package")
             files = self.select_files(file_tree(root), selected)
-            report = adapter.inspect(root, files)
+            from core.bundled_mods import inspect_bundle
+            report = inspect_bundle(root, files, adapter)
             if not report["valid"]:
                 raise ValueError("; ".join(report["problems"]))
             size = sum((root / path).stat().st_size for path in files)

@@ -1198,7 +1198,8 @@
     return element("section", {
       ...(options.attrs || {}),
       class: ["lex-detail-panel", "lex-detail", options.headingOverlay ? "lex-detail-panel-media" : "", options.tone ? `lex-panel-tone-${options.tone}` : "", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
-    }, heading, options.paginate ? paginateSettings(element("div", {class: bodyClass}, options.body || [])) : element("div", {class: bodyClass}, options.body || []));
+    }, heading, options.paginate ? paginateSettings(element("div", {class: bodyClass}, options.body || []),
+      typeof options.paginate === "object" ? options.paginate : {}) : element("div", {class: bodyClass}, options.body || []));
   };
 
   // A panel can own local navigation without turning those choices into
@@ -4308,7 +4309,8 @@
       const focused = footer.contains(document.activeElement) ? document.activeElement : null;
       const selection = focused && [focused.selectionStart, focused.selectionEnd];
       const label = focused?.getAttribute("aria-label");
-      footer.replaceChildren(pager({page, pages, total:visible.length, range:[from + 1, to],
+      // Embedded property panes need their own footer, not the window's list pager.
+      footer.replaceChildren(pager({inline:options.inline === true,page, pages, total:visible.length, range:[from + 1, to],
         search:options.search, change:turn}));
       if (label && focused?.matches("input")) {
         const replacement = [...footer.querySelectorAll("input")].find(input=>input.getAttribute("aria-label")===label);
@@ -5312,7 +5314,8 @@ ${contents.path}`});
         }, infoIcon());
         return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`},
           select,
-          element("span", {class: "lex-project-menu-item-actions"}, rename, folder, about),
+          element("span", {class: "lex-project-menu-item-actions"}, rename, folder, about,
+            row.linkedTweaks?.length ? infoHelp(`This mod contains components attached to these tweaks: ${row.linkedTweaks.join(", ")}. Use Mod library to enable or disable them together.`) : null),
           select.querySelector(".lex-project-source-status"));
       });
       const sourceRows = sources.map((row,index) => {
@@ -5626,7 +5629,30 @@ ${contents.path}`});
         message.textContent = state.authorTest ? "Author test build: game loading has not been verified." : state.message;
         if (state.managedUpdate?.message) message.textContent += ` ${state.managedUpdate.message}`;
         if (state.managedUpdate?.error) message.textContent += ` ${state.managedUpdate.error}`;
+        const blocked = !state.canManage || !!state.bundleError || !!state.bundles?.recoveryRequired;
+        if (state.bundleError) message.textContent = state.bundleError;
+        if (state.bundles?.inconsistent) message.textContent = "Linked mods and tweaks differ from the saved selection. Apply the component selection to restore them.";
+        if (state.bundles?.recoveryRequired) message.textContent = "A linked mod change was interrupted. Recover the previous selection before continuing.";
+        const syncLinked = () => {
+          const selected = new Set([...content.querySelectorAll('input[data-bundle-component]:checked')].map(node=>node.dataset.bundleComponent));
+          for(const tweak of state.bundles?.tweaks || []){
+            const control=[...content.querySelectorAll('input[data-bundle-tweak]')].find(node=>node.dataset.bundleTweak===tweak.id);
+            if(control)control.checked=tweak.components.some(token=>selected.has(token));
+          }
+        };
         const rows = state.entries.map(row => {
+          if(row.components?.length){
+            return detailSection({title:row.name,body:row.components.map(component=>toggleRow({toggles:[{
+              label:component.name, key:component.token, checked:component.enabled,
+              disabled:blocked || !!component.error,
+              control:element("input",{type:"checkbox",checked:component.enabled,
+                disabled:blocked || !!component.error,"aria-label":component.name,
+                "data-bundle-component":component.token,onchange:syncLinked}),
+              help:component.error || (component.linkedTweaks.length
+                ? `Attached tweaks: ${component.linkedTweaks.map(t=>t.name).join(", ")}. Apply enables these together. Disabling this component disables a tweak when no other enabled component needs it.`
+                : "Apply enables or disables this component independently.")
+            }]}))});
+          }
           const box = element("input", {type:"checkbox", checked:row.enabled, disabled:!state.canManage || !!row.error, value:row.path});
           const copy = element("button", {type:"button", disabled:!state.canManage || !!row.error, onclick:async event => {
             event.preventDefault();
@@ -5649,14 +5675,35 @@ ${contents.path}`});
           try { const value = await callWindow("choose_mod_package", pluginId, kind); if (value && !value.cancelled) await inspect(value.source); }
           catch (error) { failure(error); }
         };
-        const apply = element("button", {type:"button", disabled:!state.canManage, onclick:async () => {
-          apply.disabled = true;
+        const apply = element("button", {type:"button", disabled:blocked, onclick:async () => {
+          content.querySelectorAll("input,button").forEach(node=>node.disabled=true);
           try {
-            await callWindow("activate_library_mods", pluginId, rows.flatMap(row => [...row.querySelectorAll("input:checked")].map(box => box.value)));
+            await callWindow("activate_library_mods", pluginId,
+              rows.flatMap(row => [...row.querySelectorAll("input:checked:not([data-bundle-component])")].map(box => box.value)),
+              rows.flatMap(row => [...row.querySelectorAll("input[data-bundle-component]:checked")].map(box => box.dataset.bundleComponent)));
             await render(); message.textContent = "Active mod files updated. Launch the game to test them.";
-          } catch (error) { failure(error); apply.disabled = false; }
+          } catch (error) { await render(); failure(error); }
         }}, "Apply enabled mods");
+        const linked = state.bundles?.tweaks?.length ? detailSection({title:"Linked tweaks",body:
+          state.bundles.tweaks.map(tweak=>toggleRow({toggles:[{label:tweak.name,key:tweak.id,
+            checked:tweak.enabled,disabled:blocked,
+            control:element("input",{type:"checkbox",checked:tweak.enabled,disabled:blocked,
+              "aria-label":tweak.name,"data-bundle-tweak":tweak.id,onchange:event=>{
+                for(const box of content.querySelectorAll('input[data-bundle-component]')){
+                  if(tweak.components.includes(box.dataset.bundleComponent)&&!box.disabled)box.checked=event.target.checked;
+                }
+                syncLinked();
+              }}),
+            help:`Attached to: ${tweak.components.map(token=>state.bundles.components.find(c=>c.token===token)?.name||token).join(", ")}. This switch also selects or deselects all attached components. Apply saves both together.` +
+              (tweak.inconsistent ? " The saved states differ. Apply the component selection to restore the link." : ""),
+            }]}))}) : null;
+        const recover = state.bundles?.recoveryRequired ? element("button",{type:"button",onclick:async()=>{
+          recover.disabled=true;
+          try{await callWindow("recover_bundled_mods",pluginId);await render();}
+          catch(error){failure(error);recover.disabled=false;}
+        }},"Recover linked mods") : null;
         content.replaceChildren(element("p", {}, state.root), element("p", {}, "Drop a folder or ZIP here, or use Import below."), ...rows,
+          ...(linked?[linked]:[]),...(recover?[recover]:[]),
           element("div", {class:"lex-dialog-actions"},
             element("button", {type:"button", disabled:!state.canManage, onclick:choose("folder")}, "Import folder…"),
             element("button", {type:"button", disabled:!state.canManage, onclick:choose("zip")}, "Import ZIP…"), apply));

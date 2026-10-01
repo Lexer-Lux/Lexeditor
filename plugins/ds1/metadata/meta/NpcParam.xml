@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self />
+  <Field>
+    <behaviorVariationId VRef="BehaviorVariation" />
+    <aiThinkId Refs="NpcThinkParam" />
+    <nameId FmgRef="Title_Characters" />
+    <turnVellocity />
+    <hitHeight />
+    <hitRadius />
+    <weight />
+    <hitYOffset />
+    <hp />
+    <mp />
+    <getSoul />
+    <itemLotId_1 Refs="ItemLotParam" />
+    <itemLotId_2 Refs="ItemLotParam" />
+    <itemLotId_3 Refs="ItemLotParam" />
+    <itemLotId_4 Refs="ItemLotParam" />
+    <itemLotId_5 Refs="ItemLotParam" />
+    <itemLotId_6 Refs="ItemLotParam" />
+    <humanityLotId Refs="ItemLotParam" />
+    <spEffectID0 Refs="SpEffectParam" />
+    <spEffectID1 Refs="SpEffectParam" />
+    <spEffectID2 Refs="SpEffectParam" />
+    <spEffectID3 Refs="SpEffectParam" />
+    <spEffectID4 Refs="SpEffectParam" />
+    <spEffectID5 Refs="SpEffectParam" />
+    <spEffectID6 Refs="SpEffectParam" />
+    <spEffectID7 Refs="SpEffectParam" />
+    <GameClearSpEffectID Refs="SpEffectParam" />
+    <physGuardCutRate />
+    <magGuardCutRate />
+    <fireGuardCutRate />
+    <thunGuardCutRate />
+    <animIdOffset />
+    <moveAnimId />
+    <spMoveAnimId1 />
+    <spMoveAnimId2 />
+    <networkWarpDist />
+    <dbgBehaviorR1 />
+    <dbgBehaviorL1 />
+    <dbgBehaviorR2 />
+    <dbgBehaviorL2 />
+    <dbgBehaviorRL />
+    <dbgBehaviorRR />
+    <dbgBehaviorRD />
+    <dbgBehaviorRU />
+    <dbgBehaviorLL />
+    <dbgBehaviorLR />
+    <dbgBehaviorLD />
+    <dbgBehaviorLU />
+    <animIdOffset2 />
+    <partsDamageRate1 />
+    <partsDamageRate2 />
+    <partsDamageRate3 />
+    <partsDamageRate4 />
+    <partsDamageRate5 />
+    <partsDamageRate6 />
+    <partsDamageRate7 />
+    <partsDamageRate8 />
+    <weakPartsDamageRate />
+    <superArmorRecoverCorrection />
+    <superArmorBrakeKnockbackDist />
+    <stamina />
+    <staminaRecoverBaseVel />
+    <def_phys />
+    <def_slash />
+    <def_blow />
+    <def_thrust />
+    <def_mag />
+    <def_fire />
+    <def_thunder />
+    <defFlickPower />
+    <resist_poison />
+    <resist_desease />
+    <resist_blood />
+    <resist_curse />
+    <ghostModelId />
+    <normalChangeResouceId />
+    <guardAngle />
+    <slashGuardCutRate />
+    <blowGuardCutRate />
+    <thrustGuardCutRate />
+    <superArmorDurability />
+    <normalChangeTexChrId />
+    <dropType Enum="NPC_ITEMDROP_TYPE" />
+    <knockbackRate />
+    <knockbackParamId Refs="KnockBackParam" />
+    <fallDamageDump />
+    <staminaGuardDef />
+    <pcAttrB />
+    <pcAttrW />
+    <pcAttrL />
+    <pcAttrR />
+    <areaAttrB />
+    <areaAttrW />
+    <areaAttrL />
+    <areaAttrR />
+    <mpRecoverBaseVel Obsolete="" />
+    <flickDamageCutRate />
+    <defaultLodParamId />
+    <drawType Enum="NPC_DRAW_TYPE" />
+    <npcType Enum="NPC_TYPE" />
+    <teamType Enum="TEAM_TYPE" />
+    <moveType Enum="NPC_MOVE_TYPE" />
+    <lockDist />
+    <material Enum="WEP_MATERIAL_DEF" />
+    <materialSfx Enum="WEP_MATERIAL_DEF_SFX" />
+    <material_Weak Enum="WEP_MATERIAL_DEF" />
+    <materialSfx_Weak Enum="WEP_MATERIAL_DEF_SFX" />
+    <partsDamageType Enum="ATK_PARAM_PARTSDMGTYPE" />
+    <maxUndurationAng />
+    <guardLevel Enum="GUARD_DAMAGE_LEVEL" />
+    <burnSfxType Enum="NPC_BURN_TYPE" />
+    <poisonGuardResist />
+    <diseaseGuardResist />
+    <bloodGuardResist />
+    <curseGuardResist />
+    <parryAttack />
+    <parryDefence />
+    <sfxSize Enum="NPC_SFX_SIZE" />
+    <pushOutCamRegionRadius />
+    <hitStopType Enum="NPC_HITSTOP_TYPE" />
+    <ladderEndChkOffsetTop />
+    <ladderEndChkOffsetLow />
+    <useRagdollCamHit IsBool="" />
+    <disableClothRigidHit IsBool="" />
+    <useRagdoll IsBool="" />
+    <isDemon IsBool="" />
+    <isGhost IsBool="" />
+    <isNoDamageMotion IsBool="" />
+    <isUnduration IsBool="" />
+    <isChangeWanderGhost IsBool="" />
+    <modelDispMask0 IsBool="" />
+    <modelDispMask1 IsBool="" />
+    <modelDispMask2 IsBool="" />
+    <modelDispMask3 IsBool="" />
+    <modelDispMask4 IsBool="" />
+    <modelDispMask5 IsBool="" />
+    <modelDispMask6 IsBool="" />
+    <modelDispMask7 IsBool="" />
+    <modelDispMask8 IsBool="" />
+    <modelDispMask9 IsBool="" />
+    <modelDispMask10 IsBool="" />
+    <modelDispMask11 IsBool="" />
+    <modelDispMask12 IsBool="" />
+    <modelDispMask13 IsBool="" />
+    <modelDispMask14 IsBool="" />
+    <modelDispMask15 IsBool="" />
+    <isEnableNeckTurn IsBool="" />
+    <disableRespawn IsBool="" />
+    <isMoveAnimWait IsBool="" />
+    <isCrowd IsBool="" />
+    <isWeakSaint IsBool="" />
+    <isWeakA IsBool="" />
+    <isWeakB IsBool="" />
+    <pad1 Padding="" />
+    <vowType Enum="VOW_TYPE" />
+    <disableInitializeDead IsBool="" />
+    <pad3 Padding="" />
+    <pad2 Padding="" />
+  </Field>
+</PARAMMETA>

@@ -202,6 +202,9 @@ class GamePlugin:
     # reads it since the developer page moved to the Mod Loader issue's status.
     mods_load: bool = False
     managed_mod: object | None = None
+    # Trusted, persistent boolean tweak callbacks for shared bundled components.
+    # Keys are stable IDs referenced by mod.json; packages never supply code.
+    bundled_tweaks: dict | None = None
     # Multi-helper plugins opt into independent setup/update rows. Legacy
     # singular fields above remain valid and are synthesized into one helper.
     helpers: tuple[PluginHelper, ...] = ()

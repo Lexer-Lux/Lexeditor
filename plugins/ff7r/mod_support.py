@@ -8,6 +8,8 @@ from .tooling import list_pak, get_file, pack_directory
 
 
 class PakModAdapter:
+    # activate() consumes explicit roots and persists stable folder IDs.
+    supports_bundle_components = True
     def active_mod_ids(self, game_root: Path) -> list[str]:
         self.recover(game_root)
         destination = game_root / "End/Content/Paks/~mods/LexeditorLibrary"

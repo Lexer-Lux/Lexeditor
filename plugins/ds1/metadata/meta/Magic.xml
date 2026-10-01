@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self />
+  <Field>
+    <yesNoDialogMessageId FmgRef="Event_Text" />
+    <limitCancelSpEffectId Refs="SpEffectParam" />
+    <sortId />
+    <refId Refs="AtkParam_Pc(refCategory=0),Bullet(refCategory=1),SpEffectParam(refCategory=2)" />
+    <mp />
+    <stamina />
+    <iconId />
+    <behaviorId />
+    <mtrlItemId Refs="EquipMtrlSetParam" />
+    <replaceMagicId />
+    <maxQuantity />
+    <heroPoint />
+    <overDexterity />
+    <sfxVariationId />
+    <slotLength />
+    <requirementIntellect />
+    <requirementFaith />
+    <analogDexiterityMin />
+    <analogDexiterityMax />
+    <ezStateBehaviorType Enum="MAGIC_CATEGORY" />
+    <refCategory Enum="BEHAVIOR_REF_TYPE" />
+    <spEffectCategory Enum="BEHAVIOR_CATEGORY" />
+    <refType Enum="TAE_MOTION_MAGIC_CATEGORIES" />
+    <opmeMenuType Enum="GOODS_OPEN_MENU" />
+    <hasSpEffectType Enum="SP_EFFECT_TYPE" />
+    <replaceCategory Enum="REPLACE_CATEGORY" />
+    <useLimitCategory Enum="SP_EFFECT_USELIMIT_CATEGORY" />
+    <vowType0 IsBool="" />
+    <vowType1 IsBool="" />
+    <vowType2 IsBool="" />
+    <vowType3 IsBool="" />
+    <vowType4 IsBool="" />
+    <vowType5 IsBool="" />
+    <vowType6 IsBool="" />
+    <vowType7 IsBool="" />
+    <enable_multi IsBool="" />
+    <enable_multi_only IsBool="" />
+    <isEnchant IsBool="" />
+    <isShieldEnchant IsBool="" />
+    <enable_live IsBool="" />
+    <enable_gray IsBool="" />
+    <enable_white IsBool="" />
+    <enable_black IsBool="" />
+    <disableOffline IsBool="" />
+    <castResonanceMagic IsBool="" />
+    <pad_1 Padding="" />
+    <vowType8 IsBool="" />
+    <vowType9 IsBool="" />
+    <vowType10 IsBool="" />
+    <vowType11 IsBool="" />
+    <vowType12 IsBool="" />
+    <vowType13 IsBool="" />
+    <vowType14 IsBool="" />
+    <vowType15 IsBool="" />
+    <pad Padding="" />
+  </Field>
+</PARAMMETA>

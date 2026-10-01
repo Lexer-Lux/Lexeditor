@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self />
+  <Field>
+    <refId Refs="Bullet(refCategory=1),SpEffectParam(refCategory=2)" />
+    <sfxVariationId />
+    <weight />
+    <basicPrice />
+    <sellValue />
+    <behaviorId />
+    <replaceItemId Refs="EquipParamGoods" />
+    <sortId />
+    <qwcId Obsolete="" />
+    <yesNoDialogMessageId />
+    <magicId Refs="Magic" />
+    <iconId />
+    <modelId />
+    <shopLv />
+    <compTrophySedId />
+    <trophySeqId />
+    <maxNum />
+    <consumeHeroPoint />
+    <overDexterity />
+    <goodsType Enum="GOODS_TYPE" />
+    <refCategory Enum="BEHAVIOR_REF_TYPE" />
+    <spEffectCategory Enum="BEHAVIOR_CATEGORY" />
+    <goodsCategory Enum="GOODS_CATEGORY" />
+    <goodsUseAnim Enum="GOODS_USE_ANIM" />
+    <opmeMenuType Enum="GOODS_OPEN_MENU" />
+    <useLimitCategory Enum="SP_EFFECT_USELIMIT_CATEGORY" />
+    <replaceCategory Enum="REPLACE_CATEGORY" />
+    <vowType0 IsBool="" />
+    <vowType1 IsBool="" />
+    <vowType2 IsBool="" />
+    <vowType3 IsBool="" />
+    <vowType4 IsBool="" />
+    <vowType5 IsBool="" />
+    <vowType6 IsBool="" />
+    <vowType7 IsBool="" />
+    <vowType8 IsBool="" />
+    <vowType9 IsBool="" />
+    <vowType10 IsBool="" />
+    <vowType11 IsBool="" />
+    <vowType12 IsBool="" />
+    <vowType13 IsBool="" />
+    <vowType14 IsBool="" />
+    <vowType15 IsBool="" />
+    <enable_live IsBool="" />
+    <enable_gray IsBool="" />
+    <enable_white IsBool="" />
+    <enable_black IsBool="" />
+    <enable_multi IsBool="" />
+    <enable_pvp IsBool="" />
+    <disable_offline />
+    <isEquip IsBool="" />
+    <isConsume IsBool="" />
+    <isAutoEquip IsBool="" />
+    <isEstablishment IsBool="" />
+    <isOnlyOne IsBool="" />
+    <isDrop IsBool="" />
+    <isDeposit IsBool="" />
+    <isDisableHand IsBool="" />
+    <IsTravelItem IsBool="" />
+    <isSuppleItem IsBool="" />
+    <isFullSuppleItem IsBool="" />
+    <isEnhance IsBool="" />
+    <isFixItem IsBool="" />
+    <disableMultiDropShare IsBool="" />
+    <disableUseAtColiseum IsBool="" />
+    <disableUseAtOutOfColiseum IsBool="" />
+    <pad Padding="" />
+    <vagrantItemLotId Refs="ItemLotParam" />
+    <vagrantBonusEneDropItemLotId Refs="ItemLotParam" />
+    <vagrantItemEneDropItemLotId Refs="ItemLotParam" />
+  </Field>
+</PARAMMETA>

@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PARAMMETA XmlVersion="0">
+  <Self OffsetSize="100" />
+  <Field>
+    <behaviorVariationId VRef="BehaviorVariation" />
+    <sortId />
+    <wanderingEquipId Refs="EquipParamWeapon" />
+    <weight />
+    <weaponWeightRate />
+    <fixPrice />
+    <basicPrice />
+    <sellValue />
+    <correctStrength />
+    <correctAgility />
+    <correctMagic />
+    <correctFaith />
+    <physGuardCutRate />
+    <magGuardCutRate />
+    <fireGuardCutRate />
+    <thunGuardCutRate />
+    <spEffectBehaviorId0 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <spEffectBehaviorId1 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <spEffectBehaviorId2 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <residentSpEffectId Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <residentSpEffectId1 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <residentSpEffectId2 Refs="SpEffectParam" DeepCopyTarget="SpEffect" />
+    <materialSetId Refs="EquipMtrlSetParam" />
+    <originEquipWep Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep1 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep2 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep3 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep4 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep5 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep6 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep7 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep8 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep9 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep10 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep11 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep12 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep13 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep14 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <originEquipWep15 Refs="EquipParamWeapon" DeepCopyTarget="Source" />
+    <antiDemonDamageRate />
+    <antSaintDamageRate />
+    <antWeakA_DamageRate />
+    <antWeakB_DamageRate />
+    <vagrantItemLotId Refs="ItemLotParam" />
+    <vagrantBonusEneDropItemLotId Refs="ItemLotParam" />
+    <vagrantItemEneDropItemLotId Refs="ItemLotParam" />
+    <equipModelId />
+    <iconId />
+    <durability />
+    <durabilityMax />
+    <attackThrowEscape />
+    <parryDamageLife />
+    <attackBasePhysics />
+    <attackBaseMagic />
+    <attackBaseFire />
+    <attackBaseThunder />
+    <attackBaseStamina />
+    <saWeaponDamage />
+    <saDurability />
+    <guardAngle />
+    <staminaGuardDef />
+    <reinforceTypeId Refs="ReinforceParamWeapon" />
+    <trophySGradeId />
+    <trophySeqId />
+    <throwAtkRate />
+    <bowDistRate />
+    <equipModelCategory Enum="EQUIP_MODEL_CATEGORY" />
+    <equipModelGender Enum="EQUIP_MODEL_GENDER" />
+    <weaponCategory Enum="WEAPON_CATEGORY" />
+    <wepmotionCategory Enum="TAE_MOTION_BASE_CATEGORIES" />
+    <guardmotionCategory Enum="TAE_MOTION_GUARD_CATEGORIES" />
+    <atkMaterial Enum="WEP_MATERIAL_ATK" />
+    <defMaterial Enum="WEP_MATERIAL_ATK" />
+    <defSfxMaterial Enum="WEP_MATERIAL_DEF_SFX" />
+    <correctType Refs="CalcCorrectGraph" />
+    <spAttribute Enum="ATKPARAM_SPATTR_TYPE" />
+    <spAtkcategory Enum="TAE_MOTION_OVERRIDE_CATEGORIES" />
+    <wepmotionOneHandId Enum="TAE_MOTION_HOLD_CATEGORIES" />
+    <wepmotionBothHandId Enum="TAE_MOTION_HOLD_CATEGORIES" />
+    <properStrength />
+    <properAgility />
+    <properMagic />
+    <properFaith />
+    <overStrength />
+    <attackBaseParry />
+    <defenseBaseParry />
+    <guardBaseRepel />
+    <attackBaseRepel />
+    <guardCutCancelRate />
+    <guardLevel Enum="GUARD_DAMAGE_LEVEL" />
+    <slashGuardCutRate />
+    <blowGuardCutRate />
+    <thrustGuardCutRate />
+    <poisonGuardResist />
+    <diseaseGuardResist />
+    <bloodGuardResist />
+    <curseGuardResist />
+    <isDurabilityDivergence Enum="DURABILITY_DIVERGENCE_CATEGORY" />
+    <rightHandEquipable IsBool="" />
+    <leftHandEquipable IsBool="" />
+    <bothHandEquipable IsBool="" />
+    <arrowSlotEquipable IsBool="" />
+    <boltSlotEquipable IsBool="" />
+    <enableGuard IsBool="" />
+    <enableParry IsBool="" />
+    <enableMagic IsBool="" />
+    <enableSorcery IsBool="" />
+    <enableMiracle IsBool="" />
+    <enableVowMagic IsBool="" />
+    <isNormalAttackType IsBool="" />
+    <isBlowAttackType IsBool="" />
+    <isSlashAttackType IsBool="" />
+    <isThrustAttackType IsBool="" />
+    <isEnhance IsBool="" />
+    <isLuckCorrect IsBool="" />
+    <isCustom IsBool="" />
+    <disableBaseChangeReset IsBool="" />
+    <disableRepair IsBool="" />
+    <isDarkHand IsBool="" />
+    <simpleModelForDlc IsBool="" />
+    <lanternWep IsBool="" />
+    <isVersusGhostWep IsBool="" />
+    <baseChangeCategory Enum="WEP_BASE_CHANGE_CATEGORY" />
+    <isDragonSlayer IsBool="" />
+    <isDeposit IsBool="" />
+    <disableMultiDropShare IsBool="" />
+    <pad_0 Padding="" />
+    <oldSortId />
+    <levelSyncCorrectID Refs="CalcCorrectGraph" />
+    <pad_1 Padding="" />
+  </Field>
+</PARAMMETA>

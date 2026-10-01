@@ -1220,6 +1220,13 @@ class HostApi:
         if not getattr(self._plugins[plugin_id], "can_launch", True):
             raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
         adapter = self._plugins[plugin_id].mod_adapter
+        if adapter is not None and getattr(adapter, "supports_bundle_components", False):
+            with self._mod_library_lock:
+                manager = self._bundle_manager(plugin_id)
+                if manager.state_path.exists() or manager.journal.exists():
+                    links = manager.snapshot()
+                    if links["recoveryRequired"] or links["inconsistent"]:
+                        raise ValueError("Recover or apply the linked mod selection in Mod library before launching the game")
         if adapter is not None and hasattr(adapter, "recover") and not self.game_process_status(plugin_id).get("running"):
             root, _executable = self._game_executable(plugin_id)
             with self._mod_library_lock:
@@ -1297,6 +1304,13 @@ class HostApi:
         result = self._projects.snapshot(plugin_id)
         for row in result["projects"]:
             row["readOnly"] = self._managed_project_locked(plugin_id, Path(row["path"]))
+            from core.bundled_mods import components
+            try:
+                links = {key for component in components(Path(row["path"])) for key in component["tweaks"]}
+                registry = getattr(self._plugins[plugin_id], "bundled_tweaks", None) or {}
+                row["linkedTweaks"] = [registry[key].name if key in registry else key for key in sorted(links)]
+            except (ValueError, OSError):
+                row["linkedTweaks"] = []
         return result
 
     def _managed_project_locked(self, plugin_id: str, path: Path) -> bool:
@@ -1551,10 +1565,12 @@ class HostApi:
         if game and adapter is not None and hasattr(adapter, "active_mod_ids"):
             active = list(adapter.active_mod_ids(Path(game)))
         entries = []
+        has_bundles = (root / '.bundles.json').exists() or (root / '.bundles-pending.json').exists()
         for child in sorted(root.iterdir()) if root.is_dir() else []:
             if child.is_dir() and not child.name.startswith(".") and not child.is_symlink():
                 try:
                     info = metadata(child)
+                    has_bundles = has_bundles or info.get('bundle') is not None
                     policy = self._plugins[plugin_id].managed_mod
                     locked = bool(policy and child.name == policy.folder_name and
                                   not self._github.visible_repository(LEXEDITOR_REPOSITORY))
@@ -1562,7 +1578,42 @@ class HostApi:
                                     "version": info["version"], "enabled": child.name in active})
                 except (OSError, ValueError) as error:
                     entries.append({"path": str(child), "name": child.name, "error": str(error)})
-        return {**status, "entries": entries, "managedUpdate": self._managed_mod_results.get(plugin_id)}
+        result = {**status, "entries": entries, "managedUpdate": self._managed_mod_results.get(plugin_id)}
+        if game and adapter is not None and has_bundles:
+            try:
+                with self._mod_library_lock:
+                    bundles = self._bundle_manager(plugin_id).snapshot()
+                result["bundles"] = bundles
+                for entry in entries:
+                    entry["components"] = [row for row in bundles["components"] if row["parent"] == str(Path(entry["path"]).resolve())]
+                    if entry["components"]:
+                        entry["enabled"] = any(row["enabled"] for row in entry["components"])
+            except (ValueError, OSError) as error:
+                result["bundleError"] = str(error)
+        return result
+
+    def _bundle_manager(self, plugin_id: str):
+        from core.bundled_mods import BundleManager
+        status = self.mod_library_status(plugin_id)
+        game = self._installations.snapshot(plugin_id).get("root")
+        if not game or not status["canManage"]:
+            raise ValueError("Locate the game and enable its mod loader first")
+        return BundleManager(Path(status["root"]) / plugin_id, Path(game),
+                             self._mod_adapter(plugin_id), getattr(self._plugins[plugin_id], "bundled_tweaks", None) or {})
+
+    def set_bundled_tweak(self, plugin_id: str, tweak_id: str, enabled: bool) -> dict:
+        if self.game_process_status(plugin_id).get("running"):
+            raise ValueError("Close the game before changing linked tweaks")
+        with self._mod_library_lock:
+            self._bundle_manager(plugin_id).toggle_tweak(tweak_id, enabled)
+        return self.mod_library_entries(plugin_id)
+
+    def recover_bundled_mods(self, plugin_id: str) -> dict:
+        if self.game_process_status(plugin_id).get("running"):
+            raise ValueError("Close the game before recovering linked mods")
+        with self._mod_library_lock:
+            self._bundle_manager(plugin_id).recover()
+        return self.mod_library_entries(plugin_id)
 
     def update_managed_mod(self, plugin_id: str) -> dict:
         from core.managed_mods import update_mod, refresh_active_mod
@@ -1581,9 +1632,15 @@ class HostApi:
                 game = self._installations.snapshot(plugin_id).get("root")
                 if not author and game:
                     try:
-                        result["deploymentRefreshed"] = refresh_active_mod(
-                            ModLibrary(Path(self.mod_library_location()["root"])),
-                            plugin_id, plugin.mod_adapter, plugin.managed_mod, Path(game))
+                        manager = self._bundle_manager(plugin_id)
+                        if manager.state_path.exists() or manager.journal.exists():
+                            saved = manager.state()
+                            manager.activate(saved["mods"], saved["components"])
+                            result["deploymentRefreshed"] = True
+                        else:
+                            result["deploymentRefreshed"] = refresh_active_mod(
+                                ModLibrary(Path(self.mod_library_location()["root"])),
+                                plugin_id, plugin.mod_adapter, plugin.managed_mod, Path(game))
                     except Exception as error:
                         result["error"] = str(error)
                         result["message"] = (
@@ -1594,7 +1651,7 @@ class HostApi:
         self._managed_mod_results[plugin_id] = result
         return result
 
-    def activate_library_mods(self, plugin_id: str, paths: list[str]) -> dict:
+    def activate_library_mods(self, plugin_id: str, paths: list[str], components: list[str] | None = None) -> dict:
         from core.mod_library import relative_path
         status = self.mod_library_status(plugin_id)
         if not status["canManage"]:
@@ -1610,7 +1667,11 @@ class HostApi:
         if len(set(roots)) != len(roots) or any(path.parent != library for path in roots):
             raise ValueError("Choose each mod once from this game's library")
         with self._mod_library_lock:
-            self._mod_adapter(plugin_id).activate(roots, Path(game))
+            manager = self._bundle_manager(plugin_id)
+            if manager.catalog() or manager.state_path.exists() or manager.journal.exists():
+                manager.activate([path.name for path in roots], components or [])
+            else:
+                self._mod_adapter(plugin_id).activate(roots, Path(game))
         return self.mod_library_entries(plugin_id)
 
     def _choose_folder(self, directory: str = "") -> str:

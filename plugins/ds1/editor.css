@@ -1,0 +1,2 @@
+.ds1-items { display:flex; flex-direction:column; height:100%; min-height:0; }
+.ds1-records { flex:1; min-height:0; }
