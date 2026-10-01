@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from plugins.ff8 import assets,model_geometry
+from plugins.ff8 import assets,model_geometry,effect_model_textures
 from plugins.ff8.vendor.ff8ue.glbbuilder import read_glb,read_accessor
 
 
@@ -36,7 +36,7 @@ class ModelGeometryTests(unittest.TestCase):
         info = assets._battle_file_info('mag184_e.dat', raw)
         self.assertEqual(info['kind'], 'effect-model')
         self.assertEqual(info['counts']['vertices'], 3)
-        with patch.object(assets, 'model_dat_bytes', return_value=raw):
+        with patch.object(assets, 'model_dat_bytes', return_value=raw), patch.object(effect_model_textures, 'sources', return_value={}):
             scene = model_geometry.scene('mag184_e.dat')
             self.assertEqual(len(scene['triangles']), 1)
             self.assertEqual(scene['textures'], [])

@@ -89,6 +89,13 @@ EFFECT_MODEL_FILES = frozenset((
     'mag325_b.dat', 'mag325_h.dat', 'mag326_b.dat', 'mag326_g.dat',
 ))
 EFFECT_MODEL_SECTIONS = ('Skeleton', 'Model geometry', 'Model animation', 'Extra data')
+# Confirmed identities from the summon-creature-models format census.
+EFFECT_MODEL_NAMES = {
+    'mag094_b.2e0': 'Siren', 'mag115_h.07': 'Quezacotl', 'mag184_e.dat': 'Shiva',
+    'mag186_b.dat': 'Odin', 'mag190_b.dat': 'Doomtrain',
+    'mag217_b.dat': 'Gilgamesh (alternate animations)', 'mag290_h.03': 'Pandemona',
+    'mag325_b.dat': 'Odin (Zantetsuken Reverse)', 'mag326_g.dat': 'Gilgamesh',
+}
 MONSTER_FILENAME = re.compile(r"c0m(\d{3})\.dat", re.IGNORECASE)
 
 
@@ -1093,7 +1100,7 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
     elif kind == 'effect-data':
         name, note = f'Summon resources {filename}', 'Textures and palettes used during a summon. This file has no decoded mesh. Choose a preview palette to inspect each supported texture.'
     elif kind == 'effect-model':
-        name, note = f'Effect model {filename}', 'A model used by a battle effect. The preview shows its first pose. Its textures are stored separately and are not yet mapped.'
+        name, note = EFFECT_MODEL_NAMES.get(filename, f'Effect model {filename}'), 'A model used by a battle effect, shown in its first pose. Matching textures come from other files in the effect. Unmatched surfaces stay plain.'
     if kind == "unmapped":
         note = ("This file parses as a model container but its section "
                 "layout is not mapped; whole-file replacement only.")

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import base64
 from pathlib import Path
 import struct
 import tempfile
@@ -15,6 +16,8 @@ from .vendor.ff8ue.gltfexporter import GltfExporter, _transform_point
 class ModelExporter(GltfExporter):
     """Retain colored primitives which the upstream monster exporter omits."""
     def _collect_triangulated_faces(self):
+        if hasattr(self, '_resolved_faces'):
+            return [face for face in self._resolved_faces if not getattr(self, '_textures_only', False) or face[2] >= 0]
         faces=super()._collect_triangulated_faces()
         if getattr(self,'_textures_only',False): return faces
         offset=0
@@ -125,6 +128,9 @@ def scene(filename: str, dataset: str = 'current', object_id: int | None = None)
         from . import battle_stage
         return battle_stage.scene(filename, assets.model_dat_bytes(filename, dataset))
     exporter=decode(filename,assets.model_dat_bytes(filename,dataset),animations=False)
+    if filename.casefold() in assets.EFFECT_MODEL_FILES:
+        from . import effect_model_textures
+        effect_model_textures.resolve(exporter, effect_model_textures.sources(filename, dataset))
     positions,bones=exporter._collect_vertices()
     animations=exporter.ifrit_manager.enemy.animation_data.animations
     frame=next((animation.frames[0] for animation in animations if animation.frames),None)
@@ -140,11 +146,16 @@ def scene(filename: str, dataset: str = 'current', object_id: int | None = None)
     return {'file':filename,'positions':positions,
         'triangles':[{'indices':indices,'uv':uv,'texture':texture_map[texture] if texture>=0 else texture} for indices,uv,texture in faces],
         'textures':[texture.index for texture in exporter.ifrit_manager.texture_data],
-        'bones':len(exporter.ifrit_manager.enemy.bone_data.bones)}
+        'bones':len(exporter.ifrit_manager.enemy.bone_data.bones),
+        **({'textureImages':['data:image/png;base64,' + base64.b64encode(texture.texture_image).decode('ascii') for texture in exporter.ifrit_manager.texture_data],
+            'unmappedFaces': exporter.unmapped_effect_faces} if hasattr(exporter, '_resolved_faces') else {})}
 
 
 def glb(filename: str, dataset: str = 'current') -> bytes:
     exporter=decode(filename,assets.model_dat_bytes(filename,dataset))
+    if filename.casefold() in assets.EFFECT_MODEL_FILES:
+        from . import effect_model_textures
+        effect_model_textures.resolve(exporter, effect_model_textures.sources(filename, dataset))
     with tempfile.TemporaryDirectory(prefix='ff8-model-export-') as directory:
         target=Path(directory)/'model.glb'
         exporter.export(str(target))

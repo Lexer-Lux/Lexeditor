@@ -69,6 +69,9 @@ def main():
             page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
             assert not failed_textures, failed_textures
             page.evaluate("state.selected.models='mag184_e.dat';navigate('models')")
+            effect = page.request.get(session.url + 'api/model-scene?file=mag184_e.dat&dataset=vanilla').json()
+            assert len(effect['textureImages']) == 2
+            assert effect['unmappedFaces'] == 0
             page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
             page.locator('.lex-detail-panel-icon').click()
             page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
