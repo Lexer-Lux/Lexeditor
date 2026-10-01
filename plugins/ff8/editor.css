@@ -188,10 +188,12 @@
 .world-cell-links{display:flex;flex-wrap:wrap;gap:4px 12px;min-width:0}
 /* Field picture: layer filters down its left side, state filters down its right,
    inside the one picture panel. */
-.field-preview-sides{display:grid;grid-template-columns:minmax(96px,max-content) minmax(0,1fr) minmax(110px,max-content);gap:8px;height:100%;min-height:0;min-width:0}
-.field-preview-sides>.field-preview-layers,.field-preview-sides>.field-preview-states{min-height:0;overflow:auto;align-self:start}
+.field-preview-sides{position:relative;display:grid;grid-template-columns:minmax(0,1fr);height:100%;min-height:0;min-width:0}
+.field-preview-sides>.field-preview-layers,.field-preview-sides>.field-preview-states{position:absolute;z-index:2;max-width:36%;min-height:0;max-height:calc(100% - var(--lex-detail-title-size,32px)*1.1 - 20px);overflow:auto}
+.field-preview-sides>.field-preview-layers{left:0}
+.field-preview-sides>.field-preview-states{right:0}
 /* The panel title and help overlay the top of the panel; the side filters start below them. */
-.field-preview-sides>.field-preview-layers,.field-preview-sides>.field-preview-states{padding-top:calc(var(--lex-detail-title-size,clamp(21px,2.5vw,32px))*1.1 + 20px)}
+.field-preview-sides>.field-preview-layers,.field-preview-sides>.field-preview-states{top:calc(var(--lex-detail-title-size,clamp(21px,2.5vw,32px))*1.1 + 20px)}
 /* GF abilities, Prereq: the kind menu keeps its word ("Ability" was cut to
    "Abilit") and the value takes the rest of the cell, which follows the panel
    down to a narrow window instead of holding a fixed 232px. */

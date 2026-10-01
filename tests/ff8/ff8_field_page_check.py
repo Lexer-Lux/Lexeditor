@@ -166,9 +166,9 @@ def main() -> int:
               picture=root.querySelector('.lex-image-map').getBoundingClientRect(),
               right=root.querySelector('.field-preview-states').getBoundingClientRect();
               return {count:boxes.length,bool:boxes.filter(b=>b.closest('.lex-toggle')?.querySelector('.lex-toggle-type')?.textContent==='BOOL').length,
-                beside:left.right<=picture.left+1&&picture.right<=right.left+1,pictureWidth:picture.width}})()""")
+                overlay:left.left>=picture.left-1&&left.right>picture.left&&right.right<=picture.right+1&&right.left<picture.right,pictureWidth:picture.width}})()""")
             assert layers["count"] >= 2 and layers["bool"] == layers["count"], layers
-            assert layers["beside"] and layers["pictureWidth"] >= 220, layers
+            assert layers["overlay"] and layers["pictureWidth"] >= 220, layers
             filter_edit = cdp.eval("""(()=>{const row=state.data.fields.rows.find(r=>r._loaded&&r.background),
               before=JSON.stringify(row.background),input=document.querySelector('.field-preview-layers input'),
               layer=row.background.layers[0],checked=input.checked;
