@@ -1499,6 +1499,7 @@
   const detailSection = (options = {}) => element(options.collapsible ? "details" : "section", {
     ...(options.attrs || {}),
     class: ["lex-detail-section", options.className || ""].filter(Boolean).join(" "),
+    "data-lex-layout-section": options.layoutKey || (typeof options.title === "string" ? options.title : ""),
     "aria-label": options.ariaLabel || (typeof options.title === "string" ? options.title : null),
     ...(options.collapsible && options.open ? {open: true} : {}),
   }, options.title ? element(options.collapsible ? "summary" : "h3", {class: "lex-detail-section-title"},
@@ -2237,6 +2238,7 @@
         input?.tagName === "TEXTAREA" ? "lex-detail-field-stacked" : "",
         options.tone ? `lex-tone-${options.tone}` : "", options.className || ""].filter(Boolean).join(" "),
       "data-lex-type": dataType,
+      "data-lex-layout-field": options.property || pin?.getAttribute?.("data-lex-pin-column") || labelText,
       "data-lex-property": options.property
         || pin?.getAttribute?.("data-lex-pin-column") || null,
       "data-lex-readonly": String(readOnly),
@@ -6484,6 +6486,12 @@ ${contents.path}`});
   const undoLabel = async () => {
     const entry = labelUndo.pop();
     if (!entry) return false;
+    if (entry.apply) {
+      await entry.apply(entry.before);
+      labelRedo.push(entry);
+      labelHistoryChanged();
+      return true;
+    }
     if (entry.node?.isConnected) entry.node.textContent = entry.before;
     relabelHeaders(entry.key, entry.before);
     await storeLabel(entry.key, entry.tabId, entry.before, entry.shipped);
@@ -6494,6 +6502,12 @@ ${contents.path}`});
   const redoLabel = async () => {
     const entry = labelRedo.pop();
     if (!entry) return false;
+    if (entry.apply) {
+      await entry.apply(entry.after);
+      labelUndo.push(entry);
+      labelHistoryChanged();
+      return true;
+    }
     if (entry.node?.isConnected) entry.node.textContent = entry.after;
     relabelHeaders(entry.key, entry.after);
     await storeLabel(entry.key, entry.tabId, entry.after, entry.shipped);
@@ -6505,6 +6519,152 @@ ${contents.path}`});
   // key, so an override never orphans itself: the same property, drawn on any
   // screen, reads the same. A label that is a node rather than a name (a chip
   // with an icon in it) is left alone.
+  // Keep layout separate from record data. IDs describe the original shared
+  // field/section structure, never the selected record's name or number.
+  const propertyLayouts = new WeakMap();
+  const propertyRoot = field => field.closest(".lex-detail-panel") || field.closest(".lex-detail-section");
+  const layoutFields = root => [...root.querySelectorAll(".lex-detail-field[data-lex-layout-field]")]
+    .filter(field => propertyRoot(field) === root && !field.parentElement.closest(".lex-detail-field"));
+  const preparePropertyLayout = root => {
+    const fields = layoutFields(root);
+    const previous = propertyLayouts.get(root);
+    if (previous && fields.length === previous.fields.size && fields.every(field => previous.fields.has(field))) return previous;
+    const groups = new Map(), fieldMap = new Map(), identities = new Map();
+    const addGroup = node => {
+      if (groups.has(node)) return groups.get(node);
+      const section = node.closest(".lex-detail-section");
+      const name = section?.dataset.lexLayoutSection || "properties";
+      const index = [...groups.values()].filter(group => group.name === name).length;
+      const group = {id: `${name}:${index}`, name, node};
+      groups.set(node, group);
+      return group;
+    };
+    for (const section of root.querySelectorAll(".lex-detail-section-content")) {
+      if (!section.closest(".lex-detail-field") &&
+          (section.closest(".lex-detail-panel") || section.closest(".lex-detail-section")) === root) addGroup(section);
+    }
+    for (const field of fields) {
+      const group = addGroup(field.parentElement);
+      const base = `${group.id}/${field.dataset.lexLayoutField}`;
+      const index = identities.get(base) || 0;
+      identities.set(base, index + 1);
+      fieldMap.set(field, `${base}:${index}`);
+    }
+    for (const group of groups.values()) {
+      group.anchors = [...group.node.children].filter(node => fieldMap.has(node)).map(field => {
+        let next = field.nextSibling;
+        while (next && fieldMap.has(next)) next = next.nextSibling;
+        return next;
+      });
+    }
+    const schema = JSON.stringify([...fieldMap.values()]);
+    const state = {root, fields: fieldMap, groups,
+      tab: activePageTab(), plugin: shellPluginId(),
+      key: `${shellPluginId()}-${activePageTab()}.property-layout.${textDigest(schema)}`};
+    propertyLayouts.set(root, state);
+    try { applyPropertyLayout(state, JSON.parse(localStorage.getItem(state.key) || "null")); } catch (_error) {}
+    return state;
+  };
+  const capturePropertyLayout = state => Object.fromEntries([...state.groups.values()].map(group =>
+    [group.id, [...group.node.children].filter(field => state.fields.has(field)).map(field => state.fields.get(field))]));
+  const applyPropertyLayout = (state, layout) => {
+    if (!layout || typeof layout !== "object") return;
+    const byId = new Map([...state.fields].map(([field, id]) => [id, field]));
+    const used = new Set();
+    for (const group of state.groups.values()) {
+      const ids = layout[group.id];
+      if (!Array.isArray(ids)) continue;
+      for (const [index, id] of ids.entries()) {
+        const field = byId.get(id);
+        if (!field || used.has(id) || field.contains(group.node)) continue;
+        used.add(id);
+        const anchor = group.anchors[index] || group.anchors.at(-1);
+        group.node.insertBefore(field, anchor?.parentNode === group.node ? anchor : null);
+      }
+    }
+  };
+  const storePropertyLayout = async (state, layout) => {
+    const value = JSON.stringify(layout);
+    localStorage.setItem(state.key, value);
+    for (const root of document.querySelectorAll(".lex-detail-panel, .lex-detail-section")) {
+      const current = propertyLayouts.get(root);
+      if (current?.key === state.key) applyPropertyLayout(current, layout);
+    }
+    try { await callWindow("save_default_view", state.plugin, state.tab, {[state.key]: value}); }
+    catch (_error) { showToast("Layout saved on this device; the shared default could not be saved."); }
+  };
+  let propertyDrag = null, propertyDrop = null;
+  const clearPropertyDrop = () => {
+    propertyDrop?.marker.classList.remove("lex-property-drop-before", "lex-property-drop-after");
+    propertyDrop = null;
+  };
+  document.addEventListener("pointerover", event => {
+    const label = event.target.closest?.(".lex-detail-field-label-text");
+    if (label?.closest(".lex-detail-field")) label.draggable = !!sharedSettingsSnapshot?.developerMode;
+  });
+  document.addEventListener("dragstart", event => {
+    const label = event.target.closest?.(".lex-detail-field-label-text");
+    const field = label?.closest(".lex-detail-field");
+    if (!field) return;
+    const root = propertyRoot(field);
+    if (!sharedSettingsSnapshot?.developerMode || !root || label.querySelector("input")) { event.preventDefault(); return; }
+    const state = preparePropertyLayout(root);
+    if (!state.fields.has(field)) { event.preventDefault(); return; }
+    propertyDrag = {state, field, before: capturePropertyLayout(state)};
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", field.dataset.lexLayoutField);
+    field.classList.add("lex-property-dragging");
+  });
+  document.addEventListener("dragover", event => {
+    if (!propertyDrag) return;
+    clearPropertyDrop();
+    if (!sharedSettingsSnapshot?.developerMode) return;
+    const {state, field} = propertyDrag;
+    const target = event.target.closest?.(".lex-detail-field");
+    if (target === field) return;
+    if (state.fields.has(target)) {
+      const after = event.clientY >= target.getBoundingClientRect().top + target.offsetHeight / 2;
+      propertyDrop = {node: target.parentElement, before: after ? target.nextSibling : target, marker: target, after};
+    } else {
+      const section = event.target.closest?.(".lex-detail-section");
+      const node = section?.querySelector(":scope > .lex-detail-section-content");
+      if (state.groups.has(node)) propertyDrop = {node, before: null, marker: section, after: true};
+    }
+    if (!propertyDrop) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    propertyDrop.marker.classList.add(propertyDrop.after ? "lex-property-drop-after" : "lex-property-drop-before");
+  });
+  document.addEventListener("drop", event => {
+    if (!propertyDrag || !propertyDrop || !sharedSettingsSnapshot?.developerMode) return;
+    event.preventDefault();
+    const {state, field, before} = propertyDrag;
+    propertyDrop.node.insertBefore(field, propertyDrop.before);
+    const after = capturePropertyLayout(state);
+    clearPropertyDrop();
+    if (JSON.stringify(before) === JSON.stringify(after)) return;
+    const apply = layout => storePropertyLayout(state, layout);
+    labelUndo.push({before, after, apply});
+    labelRedo.length = 0;
+    labelHistoryChanged();
+    void apply(after);
+  });
+  document.addEventListener("dragend", () => {
+    propertyDrag?.field.classList.remove("lex-property-dragging");
+    propertyDrag = null;
+    clearPropertyDrop();
+  });
+  let layoutPending = false;
+  new MutationObserver(() => {
+    if (layoutPending) return;
+    layoutPending = true;
+    requestAnimationFrame(() => {
+      layoutPending = false;
+      const roots = new Set([...document.querySelectorAll(".lex-detail-field[data-lex-layout-field]")].map(propertyRoot).filter(Boolean));
+      roots.forEach(preparePropertyLayout);
+    });
+  }).observe(document.documentElement, {childList: true, subtree: true});
+
   const fieldLabelKey = label =>
     `${shellPluginId()}-${activePageTab()}.field.${label}.label`;
   const labelNode = options => {

@@ -720,7 +720,7 @@ class HostApi:
                 payload = {}
         except (OSError, ValueError, TypeError):
             payload = {}
-        payload.setdefault(plugin_id, {})[tab_id] = clean
+        payload.setdefault(plugin_id, {}).setdefault(tab_id, {}).update(clean)
         temporary = DEFAULT_VIEWS.with_suffix(".tmp")
         temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         temporary.replace(DEFAULT_VIEWS)

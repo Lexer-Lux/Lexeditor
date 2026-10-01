@@ -63,6 +63,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-default-view-", ignore_cleanu
         assert stored == {"ff8": {"items": {key: '["name","buyPrice"]'}}}
         assert api(GitHub()).default_views("ff8")["views"] == stored["ff8"]
 
+        layout_key = "ff8-items.property-layout.fixture"
+        api(GitHub()).save_default_view("ff8", "items", {layout_key: "{}"})
+        values = api(GitHub()).default_views("ff8")["views"]["items"]
+        assert values == {key: '["name","buyPrice"]', layout_key: "{}"}
+
         blocked = api(GitHub(False))
         try:
             blocked.save_default_view("ff8", "items", {key: "[]"})

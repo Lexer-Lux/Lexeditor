@@ -8407,3 +8407,7 @@ body { text-shadow: var(--lex-text-shadow, none); }
   outline:2px solid color-mix(in srgb, var(--lex-highlight) 60%, transparent);
   outline-offset:-2px;
 }
+:where(.lex-detail-field-label-text)[draggable="true"] { cursor: grab; }
+.lex-property-dragging { opacity: .45; }
+.lex-property-drop-before { box-shadow: inset 0 2px currentColor; }
+.lex-property-drop-after { box-shadow: inset 0 -2px currentColor; }

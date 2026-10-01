@@ -18,7 +18,6 @@
     > status 2026-09-27: FF8 swept (every tab, subtab and panel tab) - all fine. Other games not swept yet.
 - pins in the new and improved bool boxes are...well, way out of place
     > status 2026-09-27: fixed one cause - a group of bool boxes also had a pin for the whole field, and it sat in the last box's corner and lit up when any box was hovered (Weapons > Renzokuken finishers). It now sits by the label and each box shows only its own pin. If you meant a different misplacement, say which page.
-- in dev mode i need to be able to click and drag a property to move it around so i can change the order or even put it in a different header and so on
 
 
 ==================================================================== GITHUB
