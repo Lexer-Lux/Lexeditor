@@ -88,6 +88,10 @@ def _once(tool: Path, timeout: float = 180, output: Path | None = None,
 # Holding them to the common timeout reported a TIMEOUT that said nothing about
 # the code, which is exactly the kind of noise that makes a suite ignorable.
 SLOW = {
+    # These are whole rendered suites with binary save/reload cases, not
+    # individual browser probes. Shared hosted runners can exceed 180s.
+    "verify_ff7_rendered": 900,
+    "verify_ff7_rendered_neutral": 900,
     "verify_no_clipped_text": 900,
     "verify_browser_regressions": 600,
     "verify_rdr2_runtime": 600,

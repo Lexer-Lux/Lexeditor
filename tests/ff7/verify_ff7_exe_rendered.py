@@ -13,7 +13,6 @@ def test_executable_surface_navigation_save_and_reopen(self):
     # New executable datasets are reachable through the normal related-tab UI.
     for parent, tab_name, expected in (
         ("commands", "Limit breaks", "limitBreaks"),
-        ("items", "Name sort", "itemSortOrder"),
         ("materia", "Equip effects", "materiaEquipEffects"),
         ("materia", "Menu priority", "materiaPriority"),
         ("materia", "Master sale price", "apMultiplier"),
@@ -30,7 +29,6 @@ def test_executable_surface_navigation_save_and_reopen(self):
     edits = (
         ("limitBreaks", "attackPower", "77", 77),
         ("materiaEquipEffects", "strength", "7", 7),
-        ("itemSortOrder", "position", "7", 7),
         ("materiaPriority", "priority", "1", 1),
         ("audioMixing", "volume", "123", 123),
         ("apMultiplier", "multiplier", "3", 3),
@@ -48,6 +46,14 @@ def test_executable_surface_navigation_save_and_reopen(self):
             row = next(row for row in data["records"][group] if row["id"] == selected)
             self.assertEqual(row["values"][key], expected)
 
+    # Name-sort order is an item property, not a separate record editor.
+    self.navigate("items")
+    order = self.page.get_by_label("Name-sort position for Record0", exact=True)
+    order.fill("7")
+    self.save()
+    status, data = self.backend.request("/api/data")
+    self.assertEqual(status, 200)
+    self.assertEqual(data["records"]["itemSortOrder"][0]["values"]["position"], 7)
     self.originals_unchanged()
     self.open()
     for group, key, _value, expected in edits:
@@ -55,6 +61,8 @@ def test_executable_surface_navigation_save_and_reopen(self):
             control = self.control(group, key)
             self.assertEqual(control.input_value(), str(expected))
     self.originals_unchanged()
+    self.navigate("items")
+    self.assertEqual(self.page.get_by_label("Name-sort position for Record0", exact=True).input_value(), "7")
 
 
 target.RenderedTests.test_executable_surface_navigation_save_and_reopen = test_executable_surface_navigation_save_and_reopen

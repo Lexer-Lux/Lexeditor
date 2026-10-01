@@ -55,7 +55,7 @@ class RenderedTests(unittest.TestCase):
         self.browser=self.driver.chromium.launch(headless=True,executable_path=os.environ.get('CHROMIUM') or shutil.which('chromium') or None)
         self.addCleanup(self.browser.close)
         self.page=self.browser.new_page(viewport={'width':1200,'height':800})
-        self.page.set_default_timeout(10000);self.errors=[]
+        self.page.set_default_timeout(30000);self.errors=[]
         self.page.on('pageerror',lambda error:self.errors.append(str(error)))
         self.page.expose_function('testRequest',self.bridge)
         self.paths={}

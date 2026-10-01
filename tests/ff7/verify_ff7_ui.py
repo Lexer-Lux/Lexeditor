@@ -134,7 +134,7 @@ class PageTests(unittest.TestCase):
         self.context = self.browser.new_context()
         self.addCleanup(self.context.close)
         self.page = self.context.new_page()
-        self.page.set_default_timeout(5000)
+        self.page.set_default_timeout(30000)
         self.errors = []
         self.page.on("pageerror", lambda error: self.errors.append(str(error)))
         self.failures = {}

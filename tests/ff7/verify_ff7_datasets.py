@@ -498,7 +498,7 @@ class HttpTests(unittest.TestCase):
         request = Request(self.url + path, data=json.dumps(payload).encode() if payload is not None else None,
                           headers={"Content-Type": "application/json"})
         try:
-            with urlopen(request, timeout=5) as response:
+            with urlopen(request, timeout=30) as response:
                 return response.status, json.load(response)
         except HTTPError as error:
             return error.code, json.load(error)
