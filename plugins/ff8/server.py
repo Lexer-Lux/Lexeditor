@@ -182,7 +182,7 @@ class Handler(PluginRequestHandler):
             elif path == "/api/model-scene":
                 self.json_response(model_geometry.scene(query.get("file",[""])[0],query.get("dataset",["current"])[0],
                     int(query['object'][0]) if 'object' in query else None,
-                    query.get('textureSource', [None])[0]))
+                    query.get('textureSource', [None])[0], int(query.get('frame', ['0'])[0])))
             elif path == "/assets/model.glb":
                 filename=query.get("file",[""])[0]
                 object_id = int(query['object'][0]) if 'object' in query else None

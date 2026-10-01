@@ -3,6 +3,7 @@ import struct
 import pytest
 
 from plugins.ff8 import effect_surface
+from plugins.ff8 import assets, effect_model_textures, model_geometry
 
 
 def surface():
@@ -59,3 +60,24 @@ def test_truncated_or_invalid_primitives_are_rejected():
         data[offset] = value
         with pytest.raises(ValueError):
             effect_surface.parse(data)
+
+
+def test_inventory_and_scene_select_vertex_frames(monkeypatch):
+    data = bytearray(surface())
+    struct.pack_into('<h', data, 12 + 12 + 4 * 8, 50)
+    data = bytes(data)
+    monkeypatch.setattr(assets, 'model_dat_bytes', lambda *args: data)
+    monkeypatch.setattr(effect_model_textures, 'sources', lambda *args: {})
+    info = assets._battle_file_info('mag094_b.1s0', data)
+    assert info['kind'] == 'surface'
+    assert info['counts'] == {'objects': 1, 'vertices': 4, 'triangles': 4, 'quads': 4}
+    first = model_geometry.scene('mag094_b.1s0', frame=0)
+    second = model_geometry.scene('mag094_b.1s0', frame=1)
+    assert first['positions'][0] == (0, 0, 0)
+    assert second['positions'][0] == (50, 0, 0)
+    assert len(second['triangles']) == 12
+    assert second['unmappedFaces'] == 4
+    assert second['triangles'][-1]['colors'][-1] == [11 / 128, 20 / 128, 30 / 128]
+    for object_id, frame in ((1, 0), (-1, 0), (0, -1), (0, 2)):
+        with pytest.raises(ValueError):
+            model_geometry.scene('mag094_b.1s0', object_id=object_id, frame=frame)

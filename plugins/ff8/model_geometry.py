@@ -128,11 +128,14 @@ def decode(filename: str, data: bytes, *, animations: bool = True, object_id: in
     return exporter
 
 
-def scene(filename: str, dataset: str = 'current', object_id: int | None = None, texture_source: str | None = None) -> dict:
+def scene(filename: str, dataset: str = 'current', object_id: int | None = None, texture_source: str | None = None, frame: int = 0) -> dict:
     from . import effect_mesh
     if effect_mesh.FILENAME.fullmatch(filename):
         from . import effect_preview
         return effect_preview.scene(filename, dataset, object_id)
+    if filename.startswith('mag') and filename.casefold() not in assets.EFFECT_MODEL_FILES:
+        from . import effect_surface
+        return effect_surface.scene(filename, assets.model_dat_bytes(filename, dataset), dataset, object_id, frame)
     if filename.casefold().startswith('a0stg') and filename.casefold().endswith('.x'):
         from . import battle_stage
         return battle_stage.scene(filename, assets.model_dat_bytes(filename, dataset))

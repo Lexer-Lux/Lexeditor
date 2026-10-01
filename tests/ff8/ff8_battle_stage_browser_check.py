@@ -51,6 +51,25 @@ def main():
             if os.environ.get('LEXEDITOR_PADDED_PALETTE_SCREENSHOT'):
                 page.mouse.move(10, 10)
                 page.screenshot(path=os.environ['LEXEDITOR_PADDED_PALETTE_SCREENSHOT'])
+            page.evaluate("state.selected.models='mag094_b.1s0';navigate('models')")
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
+            page.locator('.lex-detail-panel-icon').click()
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
+            with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'frame=4' in response.url) as surface:
+                page.get_by_role('combobox', name='Surface frame', exact=True).select_option('4')
+            assert surface.value.json()['frameCount'] == 5
+            assert len(surface.value.json()['triangles']) == 384
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
+            if os.environ.get('LEXEDITOR_SURFACE_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_SURFACE_SCREENSHOT'])
+            page.evaluate("state.selected.models='mag094_b.2s0';navigate('models')")
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
+            page.locator('.lex-detail-panel-icon').click()
+            with page.expect_response(lambda response: '/api/model-scene?' in response.url and 'object=2' in response.url) as surface:
+                page.get_by_role('combobox', name='Summon mesh object', exact=True).select_option('2')
+            assert len(surface.value.json()['positions']) == 107
+            assert page.get_by_role('combobox', name='Surface frame', exact=True).count() == 0
             page.evaluate("state.selected.models='mag200_b.03';navigate('models')")
             page.locator('[data-lex-layout-section="RESOURCES"]').wait_for(state='visible')
             assert page.locator('.ff8-model-sections').get_by_text('Texture 13', exact=True).is_visible()

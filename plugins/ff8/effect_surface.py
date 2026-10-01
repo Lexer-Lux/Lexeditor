@@ -5,6 +5,7 @@ https://forums.qhimm.com/index.php?topic=16283.0
 Each object stores vertex frames followed by eight counted primitive groups.
 """
 import struct
+import base64
 
 
 def parse(data: bytes) -> list[dict]:
@@ -70,3 +71,55 @@ def parse(data: bytes) -> list[dict]:
                        'positions': [struct.unpack_from('<3h', data, start + 12 + i * 8) for i in range(vertices)],
                        'faces': faces})
     return result
+
+
+def inventory(data: bytes) -> list[dict]:
+    return [{key: obj[key] for key in ('id', 'offset', 'size', 'frameCount')} |
+            {'vertices': obj['vertexCount'],
+             'triangles': sum(len(face['indices']) == 3 for face in obj['faces']),
+             'quads': sum(len(face['indices']) == 4 for face in obj['faces'])}
+            for obj in parse(data)]
+
+
+def scene(filename: str, data: bytes, dataset: str, object_id: int | None = None, frame: int = 0) -> dict:
+    from . import assets, effect_model_textures as materials
+    objects = parse(data)
+    selected = 0 if object_id is None else object_id
+    if not 0 <= selected < len(objects):
+        raise ValueError('Unknown surface object')
+    obj = objects[selected]
+    if not 0 <= frame < obj['frameCount']:
+        raise ValueError('Unknown surface frame')
+    start = obj['offset'] + 12 + frame * obj['vertexCount'] * 8
+    positions = [(x, -y, -z) for x, y, z in
+                 (struct.unpack_from('<3h', data, start + i * 8) for i in range(obj['vertexCount']))]
+    images = materials.sources(filename, dataset)
+    regions = {name: materials.tim_region(image) for name, image in images.items()}
+    textures, keys, triangles = [], {}, []
+    missing = 0
+    for face in obj['faces']:
+        texture, uv = -0xffffff - 2, [(0, 0)] * len(face['indices'])
+        if 'uv' in face:
+            matches = [(name, materials.match_material(region, face['tpage'], face['clut'], face['uv']))
+                       for name, region in regions.items()]
+            matches = [(name, match) for name, match in matches if match is not None]
+            if len(matches) == 1:
+                name, (palette, uv) = matches[0]
+                key = name, palette
+                if key not in keys:
+                    if len(keys) >= 128:
+                        raise ValueError('Surface exceeds material limit')
+                    keys[key] = len(textures)
+                    textures.append('data:image/png;base64,' + base64.b64encode(
+                        assets.tim_png_bytes(images[name], palette=palette)).decode('ascii'))
+                texture = keys[key]
+            else:
+                missing += 1
+        for corners in (((0, 1, 2),) if len(face['indices']) == 3 else ((0, 1, 2), (1, 3, 2))):
+            triangles.append({'indices': [face['indices'][i] for i in corners],
+                              'uv': [uv[i] for i in corners], 'texture': texture,
+                              'colors': [[value / (128 if 'uv' in face else 255) for value in face['colors'][i]]
+                                         for i in corners]})
+    return {'file': filename, 'objectId': selected, 'frame': frame, 'frameCount': obj['frameCount'],
+            'positions': positions, 'triangles': triangles, 'textures': list(range(len(textures))),
+            'textureImages': textures, 'unmappedFaces': missing, 'bones': 0}

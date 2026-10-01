@@ -678,6 +678,18 @@ def _battle_file_info(filename: str, data: bytes) -> dict:
                 'geometryVerified': True,
                 'counts': {key: sum(part[key] for part in parts)
                            for key in ('objects', 'vertices', 'triangles', 'quads')}}
+    if filename.startswith('mag') and filename not in EFFECT_MODEL_FILES:
+        from . import effect_surface
+        try:
+            surfaces = effect_surface.inventory(data)
+        except ValueError:
+            surfaces = []
+        if surfaces:
+            return {'sizeBytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(),
+                    'parsed': True, 'kind': 'surface', 'sections': [], 'tims': [],
+                    'effectMeshes': surfaces, 'geometryVerified': True, 'texturesVerified': False,
+                    'counts': {'objects': len(surfaces), **{key: sum(obj[key] for obj in surfaces)
+                               for key in ('vertices', 'triangles', 'quads')}}}
     sections = parse_dat_sections(data)
     if sections is None:
         return {"sizeBytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
@@ -1157,10 +1169,12 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
         name, note = f'Summon resources {filename}', 'Textures and palettes used during a summon. This file has no decoded mesh. Choose a preview palette to inspect each supported texture.'
     elif kind == 'effect-model':
         name, note = EFFECT_MODEL_NAMES.get(filename, f'Effect model {filename}'), 'A model used by a battle effect, shown in its first pose. Matching textures come from other files in the effect. Unmatched surfaces stay plain.'
+    elif kind == 'surface':
+        name, note = f'Effect surface {filename}', 'Animated scenery used by a battle effect. Select an object and frame to inspect its shape. Matching textures are shown when known.'
     if kind == "unmapped":
         note = ("This file parses as a model container but its section "
                 "layout is not mapped; whole-file replacement only.")
-    elif kind not in ("nomodel", "texture", "effect", "effect-data", "effect-model") and (not info["geometryVerified"]
+    elif kind not in ("nomodel", "texture", "effect", "effect-data", "effect-model", "surface") and (not info["geometryVerified"]
                                 or not info["texturesVerified"]):
         note = ((note + " ") if note else "") + (
             "Some sections did not verify; counts and textures below "
@@ -1171,7 +1185,7 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
     row.update(modelKind=kind, name=name, sections=info["sections"], effectMeshes=info.get('effectMeshes'), modelParts=info.get('modelParts'),
                effectResources=info.get('effectResources'),
                counts=info["counts"], tims=info["tims"],
-               vertices=counts.get("vertices"), timCount=None if kind in ('effect', 'effect-data', 'effect-model') else len(info["tims"]),
+               vertices=counts.get("vertices"), timCount=None if kind in ('effect', 'effect-data', 'effect-model', 'surface') else len(info["tims"]),
                sizeBytes=info["sizeBytes"], sha256=info["sha256"],
                enemyId=enemy_id, note=note)
     return row
