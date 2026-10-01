@@ -1,7 +1,8 @@
 "use strict";
-const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedListDetail,columnList,subtabBar}=LexeditorUI;
+const {el,detailPanel,detailSection,detailField,readonlyField,infoHelp,pagedListDetail,columnList,subtabBar,
+  actionRow,confirmAction,modLoaderSection}=LexeditorUI;
 const state={tab:"items",sub:"consumables",tabs:[],rows:[],selected:null,row:null,dirty:0,pending:0,
-  readOnly:true,query:"",page:0,pageSize:20,sort:{key:"id",dir:1},error:""};
+  readOnly:true,query:"",page:0,pageSize:20,sort:{key:"id",dir:1},error:"",deployment:null,deployBusy:false};
 let edits=Promise.resolve(),navigation=0;
 const key=row=>`${row.table}:${row.id}`;
 async function api(path,body){
@@ -36,11 +37,31 @@ async function loadDetail(){
   const result=await api(`/api/row?table=${encodeURIComponent(row.table)}&id=${row.id}`);
   if(state.selected===key(row))state.row=result.row;
 }
+async function loadDeployment(){
+  state.deployment=await api("/api/deployment");
+}
 async function navigate(tab,sub=state.sub){
   const token=++navigation;await edits;state.tab=tab;
   if(sub!==state.sub){state.sub=sub;state.selected=null;state.query="";state.page=0;}
-  try{if(tab==="items")await loadItems();if(token!==navigation)return;state.error="";render();}
+  try{
+    if(tab==="items")await loadItems();else if(tab==="info")await loadDeployment();
+    if(token!==navigation)return;state.error="";render();
+  }
   catch(error){if(token===navigation){state.error=error.message;render();}}
+}
+async function deploymentAction(action){
+  if(state.deployBusy)return;
+  if(state.dirty+state.pending){LexeditorUI.showAlert({title:"Save project changes first",message:"Applying installs the archive already saved to the mod project."});return;}
+  const confirmations={
+    apply:{title:"Apply this mod to the installed game?",message:"Lexeditor keeps one backup of the original param archive the first time you apply, then replaces the installed copy with this project's saved edits.",confirmLabel:"Apply"},
+    disable:{title:"Restore the original installed param archive?",message:"Lexeditor copies its preserved original bytes back over the installed file. The mod project itself is unchanged.",confirmLabel:"Restore original"}
+  };
+  const ok=await confirmAction({...confirmations[action],cancelLabel:"Cancel"});
+  if(!ok)return;
+  state.deployBusy=true;render();
+  try{await api("/api/deployment/"+action,{});await loadDeployment();}
+  catch(error){notify(error);}
+  finally{state.deployBusy=false;render();}
 }
 async function save(){
   await edits;
@@ -136,15 +157,43 @@ function renderItems(){
     detail,emptyDetail:()=>detailPanel({title:"No matching items",body:[LexeditorUI.detailNote("Change the search to find an item.")]})});
   return el("div",{class:"ds1-items"},subtabBar({tabs:state.tabs,order:"given",active:state.sub,label:"Items",change:id=>navigate("items",id)}),view);
 }
+function appliedLabel(deploy){
+  if(!deploy.everApplied)return "No";
+  if(deploy.changedExternally)return "Unknown — installed file changed outside Lexeditor";
+  if(deploy.pendingRecovery)return "Unknown — an interrupted operation needs Apply or Restore to finish";
+  if(!deploy.backupOk)return "Unknown — the preserved original is missing or changed";
+  if(deploy.enabled)return deploy.thisProjectActive?"Yes, this project's edits":"Yes, a different project's edits";
+  if(deploy.matchesOriginal)return "No, original restored";
+  return "No";
+}
+function needsAttentionNote(deploy){
+  if(deploy.changedExternally)return LexeditorUI.detailNote("The installed param archive changed outside Lexeditor. Apply and Restore refuse to continue until it is restored or verified by hand.");
+  if(deploy.pendingRecovery)return LexeditorUI.detailNote("A previous Apply or Restore was interrupted before it finished. Click Apply or Restore original to complete it safely.");
+  if(deploy.everApplied&&!deploy.backupOk)return LexeditorUI.detailNote("The preserved original copy is missing or has changed. Apply and Restore refuse to continue until it is restored by hand.");
+  return null;
+}
 function renderInfo(){
+  const deploy=state.deployment||{};
+  const upToDate=deploy.enabled&&deploy.thisProjectActive?(deploy.stale?"No, reapply after the latest save":"Yes"):"-";
   return detailPanel({className:"lex-information-panel",title:"Information",body:[
     detailSection({title:"ITEMS",body:[detailField({label:"EDITION",control:readonlyField("Dark Souls Remastered / Steam")}),
       detailField({label:"SUPPORT",control:readonlyField("Item properties"),help:infoHelp("Edit documented item properties. Names are reference labels. Unknown fields and padding stay unchanged. Saves go to the selected mod project.")})]}),
-    LexeditorUI.modLoaderSection({loader:"External loading is not configured by this editor.",
-      output:"The selected mod contains param/GameParam/GameParam.parambnd.dcx.",
-      order:"One complete parameter archive. Separate archives are not merged.",
-      safety:"Saves replace only the mod copy. Installed files and saves are not modified.",
-      removal:"Remove the mod copy. Nothing is installed into the game."})]});
+    detailSection({title:"INSTALLED GAME",body:[
+      detailField({label:"APPLIED",control:readonlyField(appliedLabel(deploy))}),
+      detailField({label:"ORIGINAL PRESERVED",control:readonlyField(deploy.everApplied?(deploy.backupOk?"Yes":"No, needs attention"):"Not yet applied"),
+        help:infoHelp("The first Apply keeps one copy of the installed file exactly as it was. Disable always restores that copy.")}),
+      detailField({label:"UP TO DATE",control:readonlyField(upToDate),
+        help:infoHelp("Apply installs the archive already saved in the mod project. Reapply after every later save that should reach the installed game.")}),
+      needsAttentionNote(deploy),
+      actionRow(
+        el("button",{type:"button",disabled:state.deployBusy||!deploy.isProject||!deploy.sourceReady||deploy.changedExternally,onclick:()=>deploymentAction("apply")},deploy.everApplied?"Reapply":"Apply"),
+        el("button",{type:"button",disabled:state.deployBusy||!deploy.everApplied||deploy.changedExternally,onclick:()=>deploymentAction("disable")},"Restore original")
+      )].filter(Boolean)}),
+    modLoaderSection({loader:deploy.note||"Dark Souls Remastered reads this file as a loose file; no mod loader is installed.",
+      output:"Apply replaces the installed param/GameParam/GameParam.parambnd.dcx with the mod project's saved copy, after preserving the original once.",
+      order:"One complete parameter archive. Separate projects are not merged; applying a different project replaces what is currently installed.",
+      safety:"Apply and Disable touch only param/GameParam/GameParam.parambnd.dcx and refuse to continue if that file changed outside Lexeditor.",
+      removal:"Restore original copies the preserved original bytes back over the installed file."})]});
 }
 function render(){
   document.querySelector("#main").replaceChildren(state.error?LexeditorUI.notice({tone:"warning",message:state.error}):state.tab==="items"?renderItems():renderInfo());

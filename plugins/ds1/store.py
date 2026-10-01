@@ -18,7 +18,6 @@ class ItemStore:
         self.game_root = Path(game_root).resolve()
         self.project = Path(project).resolve() if project else None
         self.read_only = read_only or self.project is None
-        self.vanilla = self.game_root / RELATIVE
         self.output = self.project / RELATIVE if self.project else None
         self.document = None
 
@@ -33,16 +32,26 @@ class ItemStore:
         if not (self.project / MARKER).is_file():
             raise ValueError('Select a valid Dark Souls mod project.')
 
+    def _vanilla_path(self):
+        # Once a deployment owns the installed file, the true pristine original
+        # is the preserved backup, not the now-modded installed copy. Deferred
+        # import avoids a module-load cycle with deployment, which imports
+        # RELATIVE/MARKER from this module.
+        from . import deployment
+        return deployment.vanilla_source(self.game_root)
+
     def load(self):
         if not self.read_only: self.writable()
-        source = self.output if self.output and self.output.is_file() else self.vanilla
+        vanilla = self._vanilla_path()
+        source = self.output if self.output and self.output.is_file() else vanilla
         if source.stat().st_size > MAX_ARCHIVE:
             raise ValueError('The parameter archive is too large.')
         raw = source.read_bytes()
         document = ItemDocument(raw)
         self.source = source
+        self.vanilla = vanilla
         self.source_hash = hashlib.sha256(raw).hexdigest()
-        self.vanilla_hash = digest(self.vanilla)
+        self.vanilla_hash = digest(vanilla)
         self.output_hash = digest(self.output) if self.output else None
         self.document = document
         return document
@@ -64,7 +73,9 @@ class ItemStore:
     def save(self):
         self.writable()
         document = self.get()
-        if digest(self.source) != self.source_hash or digest(self.vanilla) != self.vanilla_hash:
+        # Apply can legitimately replace the live file while this editor stays
+        # open. Compare against its verified preserved original after deployment.
+        if digest(self.source) != self.source_hash or digest(self._vanilla_path()) != self.vanilla_hash:
             raise ValueError('The source changed outside Lexeditor. Reopen it before saving.')
         if digest(self.output) != self.output_hash:
             raise ValueError('The mod archive changed outside Lexeditor. Reopen it before saving.')

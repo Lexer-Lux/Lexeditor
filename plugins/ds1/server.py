@@ -7,6 +7,7 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from core.plugin_http import PluginRequestHandler
+from . import deployment
 from .formats import FormatError
 from .store import ItemStore
 
@@ -34,7 +35,14 @@ class Handler(PluginRequestHandler):
                     else:
                         result = {'row': STORE.get().read_row(query.get('table', [''])[0], int(query.get('id', [''])[0])), 'dirtyCount': STORE.get().dirty_count}
                     self.send_json(result)
-            except (FormatError, ValueError, OSError, KeyError, UnicodeError) as error:
+            except (FormatError, RuntimeError, ValueError, OSError, KeyError, UnicodeError) as error:
+                self.send_json({'error': str(error)}, 400)
+            return
+        if path == '/api/deployment':
+            try:
+                with LOCK:
+                    self.send_json(deployment.status(STORE.game_root, STORE.project))
+            except (RuntimeError, ValueError, OSError, KeyError) as error:
                 self.send_json({'error': str(error)}, 400)
             return
         if path == "/":
@@ -42,7 +50,7 @@ class Handler(PluginRequestHandler):
         elif path == "/api/plugin":
             self.send_json({"apiVersion": 1, "pluginId": "ds1",
                             "name": "Dark Souls Remastered", "hosted": True,
-                            "capabilities": ["items", "project-export", "byte-preserving-roundtrip"]})
+                            "capabilities": ["items", "project-export", "byte-preserving-roundtrip", "mod-deployment"]})
         elif self.send_page_module(PLUGIN_ROOT, path):
             return
         elif path.startswith("/shared/"):
@@ -60,7 +68,7 @@ class Handler(PluginRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         try:
-            if path not in ('/api/edit', '/api/save', '/api/discard'):
+            if path not in ('/api/edit', '/api/save', '/api/discard', '/api/deployment/apply', '/api/deployment/disable'):
                 self.send_json({'error': 'Not found'}, 404)
                 return
             origin = self.headers.get('Origin')
@@ -77,12 +85,16 @@ class Handler(PluginRequestHandler):
                     result = {'row': row, 'dirtyCount': STORE.get().dirty_count}
                 elif path == '/api/save':
                     result = STORE.save()
-                else:
+                elif path == '/api/discard':
                     result = STORE.discard()
+                elif path == '/api/deployment/apply':
+                    result = deployment.apply(STORE.game_root, STORE.project)
+                else:
+                    result = deployment.disable(STORE.game_root)
                 self.send_json(result)
         except PermissionError as error:
             self.send_json({'error': str(error)}, 403)
-        except (FormatError, ValueError, OSError, KeyError, TypeError) as error:
+        except (FormatError, RuntimeError, ValueError, OSError, KeyError, TypeError) as error:
             self.send_json({'error': str(error)}, 400)
 
 

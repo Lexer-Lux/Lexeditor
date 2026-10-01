@@ -21,6 +21,19 @@ https://github.com/JKAnderson/SoulsTemplates
 Smithbox's SoulsFormats dependency was inspected as a research reference,
 found to be GPL-3.0, and excluded. It is not bundled, linked, or invoked.
 
+## Native param replacement (deployment.py)
+
+No mod loader is bundled or invoked. The finding that Dark Souls Remastered
+reads param/GameParam/GameParam.parambnd.dcx as a loose file came from direct,
+read-only inspection of an installed copy (param/, map/, chr/, sound/ etc. are
+ordinary folders, not a packed archive), corroborated by the published
+documentation of Nordgaren/UXM-Selective-Unpack (MIT-style community tool,
+https://github.com/Nordgaren/UXM-Selective-Unpack) and its predecessor
+JKAnderson/UXM (https://github.com/JKAnderson/UXM), both of which note that
+Dark Souls Remastered needs no unpacking because it ships unpacked already.
+No UXM code, binaries, or dependencies are used; this is a factual reference
+only, consulted to confirm a design decision before implementing it.
+
 MIT License
 
 Copyright (c) 2025 Vawser
