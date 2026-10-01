@@ -45,6 +45,12 @@ def main():
             if os.environ.get('LEXEDITOR_TEXTURE_PACK_SCREENSHOT'):
                 page.mouse.move(10, 10)
                 page.screenshot(path=os.environ['LEXEDITOR_TEXTURE_PACK_SCREENSHOT'])
+            page.evaluate("state.selected.models='mag199_a.dat';navigate('models')")
+            page.get_by_role('combobox', name='Battle texture mag199_a.dat texture 1 palette', exact=True).select_option('4')
+            page.wait_for_function("Array.from(document.images).some(i=>i.src.includes('mag199_a.dat%230')&&i.src.includes('palette=4')&&i.complete&&i.naturalWidth===384&&i.naturalHeight===256)")
+            if os.environ.get('LEXEDITOR_PADDED_PALETTE_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_PADDED_PALETTE_SCREENSHOT'])
             page.evaluate("state.selected.models='mag200_b.03';navigate('models')")
             page.locator('[data-lex-layout-section="RESOURCES"]').wait_for(state='visible')
             assert page.locator('.ff8-model-sections').get_by_text('Texture 13', exact=True).is_visible()

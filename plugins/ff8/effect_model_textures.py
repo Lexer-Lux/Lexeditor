@@ -54,8 +54,7 @@ def match_material(region: dict, page: int, clut: int, uv: list[tuple]) -> tuple
     dx, dy = cx - region['paletteX'], cy - region['paletteY']
     if not (0 <= dy < region['paletteHeight'] and 0 <= dx <= region['paletteWidth'] - colors):
         return None
-    palette_start = dy * region['paletteWidth'] + dx
-    if palette_start % colors:
+    if dx % colors:
         return None
     scale = 16 // region['depth']
     left = ((page & 15) * 64 - region['x']) * scale
@@ -63,7 +62,8 @@ def match_material(region: dict, page: int, clut: int, uv: list[tuple]) -> tuple
     points = [(left + u, top + v) for u, v in uv]
     if not all(0 <= u < region['width'] and 0 <= v < region['height'] for u, v in points):
         return None
-    return palette_start // colors, [(u / region['width'], v / region['height']) for u, v in points]
+    palette = dy * (region['paletteWidth'] // colors) + dx // colors
+    return palette, [(u / region['width'], v / region['height']) for u, v in points]
 
 
 def resolve(exporter, images: dict[str, bytes], preferred_source: str | None = None) -> None:

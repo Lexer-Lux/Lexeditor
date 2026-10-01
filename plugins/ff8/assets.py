@@ -266,11 +266,13 @@ def _tim_layout(data: bytes, offset: int = 0) -> dict:
         palette_size, _, _, palette_width, palette_height = struct.unpack_from(
             "<IHHHH", data, position)
         colors = palette_width * palette_height
-        if depth == 16 or colors == 0 or colors % colors_per_palette:
+        if depth == 16 or palette_height == 0 or palette_width < colors_per_palette:
             raise ValueError("TIM palette layout is unsupported")
         if palette_size != 12 + colors * 2:
             raise ValueError("TIM palette length does not match its header")
-        palette_count = colors // colors_per_palette
+        # A CLUT upload is a rectangle. Extra colors at a row's end do not
+        # shift the next row's palette (several effect TIMs use width 272).
+        palette_count = (palette_width // colors_per_palette) * palette_height
         position += palette_size
     if len(data) < position + 12:
         raise ValueError("TIM image header is truncated")
@@ -320,7 +322,9 @@ def tim_png_bytes(data: bytes, offset: int = 0, palette: int = 0) -> bytes:
                 f"Palette ID must be 0 to {layout['paletteCount'] - 1}")
         colors = []
         per_palette = 16 if depth == 4 else 256
-        start = offset + 20 + palette * per_palette * 2
+        palette_width, = struct.unpack_from('<H', data, offset + 16)
+        row, column = divmod(palette, palette_width // per_palette)
+        start = offset + 20 + (row * palette_width + column * per_palette) * 2
         for index in range(per_palette):
             color, = struct.unpack_from("<H", data, start + index * 2)
             colors.append((

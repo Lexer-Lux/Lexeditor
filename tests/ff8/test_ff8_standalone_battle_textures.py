@@ -1,5 +1,8 @@
 import base64
 import struct
+from io import BytesIO
+
+from PIL import Image
 
 import pytest
 
@@ -16,6 +19,19 @@ def test_complete_image_required():
     assert assets._standalone_texture_info(image())['tims'][0]['width'] == 4
     assert assets._standalone_texture_info(image() + b'extra') is None
     assert assets._standalone_texture_info(image()[:-1]) is None
+
+
+def test_palette_rows_keep_their_stride():
+    rows = [([31] * 256 + [31744] * 16), ([992] * 256 + [31744] * 16)]
+    palette = struct.pack('<I4H', 12 + 272 * 2 * 2, 320, 224, 272, 2)
+    palette += struct.pack('<544H', *(rows[0] + rows[1]))
+    data = struct.pack('<II', 16, 9) + palette + struct.pack('<I4H', 14, 0, 0, 1, 1) + b'\x00\xff'
+    assert assets._tim_layout(data)['paletteCount'] == 2
+    for index, expected in enumerate(((255, 0, 0, 255), (0, 255, 0, 255))):
+        rendered = Image.open(BytesIO(assets.tim_png_bytes(data, palette=index)))
+        assert rendered.getpixel((0, 0)) == rendered.getpixel((1, 0)) == expected
+    with pytest.raises(ValueError, match='Palette ID'):
+        assets.tim_png_bytes(data, palette=2)
 
 
 def test_texture_pack_requires_complete_bounded_images(monkeypatch):

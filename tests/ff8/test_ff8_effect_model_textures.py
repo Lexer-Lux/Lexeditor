@@ -21,6 +21,8 @@ def test_atlas_offsets_and_palette_rows_are_preserved():
     assert uv == [(256 / 384, 0), (383 / 384, 255 / 256)]
     assert materials.match_material(region, 189, 14420, [(128, 0)]) is None
     assert materials.match_material(region, 189, 14421, [(0, 0)]) is None
+    padded = {**region, 'paletteWidth': 272}
+    assert materials.match_material(padded, 189, 14420, [(0, 0)])[0] == 1
 
 
 def test_resolved_faces_and_glb_use_the_same_texture(tmp_path):
