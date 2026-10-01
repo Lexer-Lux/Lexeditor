@@ -83,6 +83,12 @@ BATTLE_FILENAME = re.compile(r"[a-z0-9][a-z0-9_-]*\.[a-z0-9]{1,3}", re.IGNORECAS
 CHARACTER_MODEL = re.compile(r"d[0-9a-f][cw][0-9]{3}\.dat")
 BODY_FILENAME = re.compile(r"d([0-9a-f])c(\d{3})\.dat", re.IGNORECASE)
 WEAPON_FILENAME = re.compile(r"d([0-9a-f])w(\d{3})\.dat", re.IGNORECASE)
+EFFECT_MODEL_FILES = frozenset((
+    'mag184_e.dat', 'mag290_h.03', 'mag094_b.2e0', 'mag099_b.4e0',
+    'mag115_h.07', 'mag186_b.dat', 'mag190_b.dat', 'mag217_b.dat',
+    'mag325_b.dat', 'mag325_h.dat', 'mag326_b.dat', 'mag326_g.dat',
+))
+EFFECT_MODEL_SECTIONS = ('Skeleton', 'Model geometry', 'Model animation', 'Extra data')
 MONSTER_FILENAME = re.compile(r"c0m(\d{3})\.dat", re.IGNORECASE)
 
 
@@ -444,6 +450,8 @@ def animation_sequences(filename: str, data: bytes) -> dict | None:
 
 def _section_names(filename: str, section_count: int) -> tuple[str, tuple[str, ...] | None]:
     """Name a model layout from its filename kind and section count."""
+    if filename.casefold() in EFFECT_MODEL_FILES and section_count == 4:
+        return 'effect-model', EFFECT_MODEL_SECTIONS
     if MONSTER_FILENAME.fullmatch(filename):
         if section_count == 11:
             return "monster", MONSTER_SECTIONS
@@ -469,7 +477,7 @@ def _section_names(filename: str, section_count: int) -> tuple[str, tuple[str, .
 
 def _geometry_section(name: str, sections: list[dict]) -> dict | None:
     wanted = {"monster": 2, "body": 2, "edea": 2, "weapon": 2,
-              "weapon-reduced": 1}.get(name)
+              "weapon-reduced": 1, "effect-model": 2}.get(name)
     if wanted is None or len(sections) < wanted:
         return None
     return sections[wanted - 1]
@@ -671,6 +679,10 @@ def _model_parts_digest(path_text: str, size: int, mtime_ns: int) -> str:
     """Hash of a battle file's model sections, or of the whole file when its
     sections are not mapped."""
     data = Path(path_text).read_bytes()
+    if Path(path_text).name.casefold() in EFFECT_MODEL_FILES:
+        # The fourth section is not mapped, so it cannot be ruled out as part
+        # of the model. Retain whole-file provenance for these effect models.
+        return hashlib.sha256(data).hexdigest()
     sections = parse_dat_sections(data)
     names = _section_names(Path(path_text).name, len(sections))[1] if sections else None
     digest = hashlib.sha256()
@@ -1080,10 +1092,12 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
         name, note = f'Summon geometry {filename}', 'Preview individual mesh objects in this summon file. Textures use the first simulated appearance when known. Animation and placement within the summon are not yet shown.'
     elif kind == 'effect-data':
         name, note = f'Summon resources {filename}', 'Textures and palettes used during a summon. This file has no decoded mesh. Choose a preview palette to inspect each supported texture.'
+    elif kind == 'effect-model':
+        name, note = f'Effect model {filename}', 'A model used by a battle effect. The preview shows its first pose. Its textures are stored separately and are not yet mapped.'
     if kind == "unmapped":
         note = ("This file parses as a model container but its section "
                 "layout is not mapped; whole-file replacement only.")
-    elif kind not in ("nomodel", "texture", "effect", "effect-data") and (not info["geometryVerified"]
+    elif kind not in ("nomodel", "texture", "effect", "effect-data", "effect-model") and (not info["geometryVerified"]
                                 or not info["texturesVerified"]):
         note = ((note + " ") if note else "") + (
             "Some sections did not verify; counts and textures below "
@@ -1094,7 +1108,7 @@ def _model_row(filename: str, dataset: str, archive_sizes: dict[str, int],
     row.update(modelKind=kind, name=name, sections=info["sections"], effectMeshes=info.get('effectMeshes'),
                effectResources=info.get('effectResources'),
                counts=info["counts"], tims=info["tims"],
-               vertices=counts.get("vertices"), timCount=None if kind in ('effect', 'effect-data') else len(info["tims"]),
+               vertices=counts.get("vertices"), timCount=None if kind in ('effect', 'effect-data', 'effect-model') else len(info["tims"]),
                sizeBytes=info["sizeBytes"], sha256=info["sha256"],
                enemyId=enemy_id, note=note)
     return row

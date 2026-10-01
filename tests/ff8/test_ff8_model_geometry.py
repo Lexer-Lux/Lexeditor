@@ -25,6 +25,25 @@ def model_bytes(colored=False):
 
 
 class ModelGeometryTests(unittest.TestCase):
+    def test_four_section_effect_model_reuses_battle_geometry(self):
+        original = model_bytes()
+        spans = assets.parse_dat_sections(original)
+        sections = [original[span['offset']:span['offset'] + span['size']] for span in spans[:3]] + [b'']
+        offsets = [24]
+        for section in sections:
+            offsets.append(offsets[-1] + len(section))
+        raw = struct.pack('<6I', 4, *offsets) + b''.join(sections)
+        info = assets._battle_file_info('mag184_e.dat', raw)
+        self.assertEqual(info['kind'], 'effect-model')
+        self.assertEqual(info['counts']['vertices'], 3)
+        with patch.object(assets, 'model_dat_bytes', return_value=raw):
+            scene = model_geometry.scene('mag184_e.dat')
+            self.assertEqual(len(scene['triangles']), 1)
+            self.assertEqual(scene['textures'], [])
+            self.assertEqual(model_geometry.glb('mag184_e.dat')[:4], b'glTF')
+        self.assertEqual(assets._section_names('mag184_e.dat', 5), ('unmapped', None))
+        self.assertEqual(assets._section_names('mag123_b.dat', 4), ('unmapped', None))
+
     def test_colored_primitives_are_not_dropped(self):
         with patch.object(assets,'model_dat_bytes',return_value=model_bytes(colored=True)):
             scene=model_geometry.scene('d0c000.dat')

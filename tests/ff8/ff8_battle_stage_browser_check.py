@@ -68,6 +68,15 @@ def main():
             assert selected.value.json()['previewTick'] == 255
             page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.rendered==='true'", timeout=30000)
             assert not failed_textures, failed_textures
+            page.evaluate("state.selected.models='mag184_e.dat';navigate('models')")
+            page.wait_for_function("document.querySelector('.lex-detail-panel-icon img')?.src.startsWith('data:')", timeout=60000)
+            page.locator('.lex-detail-panel-icon').click()
+            page.wait_for_function("document.querySelector('.lex-model-stage')?.dataset.texturesReady==='true'", timeout=30000)
+            assert page.get_by_role('button', name='Export GLB', exact=True).is_visible()
+            assert not page.locator('.lex-model-stage').get_attribute('data-error')
+            if os.environ.get('LEXEDITOR_EFFECT_MODEL_SCREENSHOT'):
+                page.mouse.move(10, 10)
+                page.screenshot(path=os.environ['LEXEDITOR_EFFECT_MODEL_SCREENSHOT'])
             assert not errors, errors
             browser.close()
     print('Stage preview loads its palette textures; rotation and Home restore the overview.')
